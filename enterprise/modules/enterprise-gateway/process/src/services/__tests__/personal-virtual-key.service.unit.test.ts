@@ -35,15 +35,17 @@ class MemoryIssuer implements Pick<PersonalVirtualKeyIssuerService, "issue" | "r
 
 class MemoryOrganizations {
   ensurePersonalWorkspace = vi.fn(async () => ({
-    team: { id: "team", name: "Mine", slug: "mine", createdAtMs: 1 },
-    project: {
-      id: "project",
-      name: "Personal Workspace",
-      slug: "personal",
-      apiKey: "pkey",
-      createdAtMs: 1,
+    kind: "ready" as const,
+    workspace: {
+      team: { id: "team", name: "Mine", slug: "mine", createdAtMs: 1 },
+      project: {
+        id: "project",
+        name: "Personal Workspace",
+        slug: "personal",
+        apiKey: "pkey",
+        createdAtMs: 1,
+      },
     },
-    created: false,
   }));
 }
 

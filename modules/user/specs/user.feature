@@ -263,3 +263,52 @@ Feature: Canonical user lifecycle
       Given a deployment that sets one of the switches to a value outside "on" and "off"
       When user's configuration is parsed
       Then the boot is refused rather than the surface left quietly off
+
+  # Round 54 (O1-P2): a first visit can act before its personal project arrives; the server
+  # answers the retryable "personal_workspace_pending" and the screen waits instead of failing.
+  Rule: Personal actions wait while the personal workspace is being set up
+
+    @integration
+    Scenario: Issuing a personal key waits while the personal workspace is set up
+      Given a first visit whose personal workspace is still being created
+      When they issue a personal key on their settings
+      Then no error is shown
+      And the create action is disabled with a "Setting up your workspace" hint
+      And the personal workspace is read again
+
+    @integration
+    Scenario: Saving a profile photo waits while the personal workspace is set up
+      Given a first visit whose personal workspace is still being created
+      When they save a new profile photo
+      Then no error is shown
+      And the save action is disabled with a "Setting up your workspace" hint
+      And the personal workspace is read again
+
+    @integration
+    Scenario: Issuing a provider key from its tile waits while the personal workspace is set up
+      Given a first visit whose personal workspace is still being created
+      When they issue a virtual key from a model provider tile
+      Then no error is shown
+      And the issue action is disabled with a "Setting up your workspace" hint
+      And the personal workspace is read again
+
+    @unit
+    Scenario: Uploading an avatar while the personal project is still being created
+      Given a first visit whose personal workspace is still being created
+      When they upload a new avatar
+      Then it refuses with "personal_workspace_pending", a retryable handled error, and stores nothing
+
+  Rule: The personal workspace offers the Langy ask only to a reader who may start a Langy turn
+
+    @integration
+    Scenario: A reader who may start a Langy turn is offered Explore via Langy on /me
+      Given a reader holding "langy:create" where Langy is rolled out
+      When the personal workspace host is asked whether the assistant can be asked
+      Then it answers yes
+      And asking it hands the prompt to Langy's ask
+
+    @integration
+    Scenario: A reader who may not start a Langy turn is not offered Explore via Langy on /me
+      Given a reader without "langy:create", or where Langy is not rolled out
+      When the personal workspace host is asked whether the assistant can be asked
+      Then it answers no

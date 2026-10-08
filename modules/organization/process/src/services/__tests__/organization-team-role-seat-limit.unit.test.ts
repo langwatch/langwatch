@@ -28,7 +28,7 @@ function serviceWhere(options: {
       findTeamGrants,
       findCustomRolePermissions,
     }),
-    prompts: { seedTagsForOrganization: vi.fn(), reportCompensationFailure: vi.fn() },
+    creations: { created: vi.fn(), reportError: vi.fn() },
     seats: { checkLimit: vi.fn(), assertRoleChangeAllowed },
     seatNotices: { memberDisabled: vi.fn() },
     grantCache: { invalidateOrganization: vi.fn() },

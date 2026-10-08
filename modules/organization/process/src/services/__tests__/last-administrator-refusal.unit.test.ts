@@ -14,7 +14,7 @@ import type {
   OrganizationSeatRevocationNotice,
 } from "../organization-member-role.service.ts";
 import { OrganizationMembershipService } from "../organization-membership.service.ts";
-import type { OrganizationPromptSeed } from "../organization-prompt-seed.service.ts";
+import type { OrganizationCreationNotice } from "../organization-provisioning.service.ts";
 import type { OrganizationSeatLicense } from "../organization-seat-license.service.ts";
 
 const ORGANIZATION = "org_acme";
@@ -38,7 +38,7 @@ beforeEach(() => {
   memory = MemoryOrganizationDatabase.create();
   service = OrganizationMembershipService.create({
     repository: MemoryOrganizationMembershipRepository.create({ memory }),
-    prompts: createApiFixture<OrganizationPromptSeed>(),
+    creations: createApiFixture<OrganizationCreationNotice>(),
     seats: createApiFixture<OrganizationSeatLicense>(),
     seatNotices: createApiFixture<OrganizationSeatRevocationNotice>(),
     grantCache: createApiFixture<OrganizationGrantCache>(),

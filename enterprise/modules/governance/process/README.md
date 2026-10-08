@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The ingestion-template operations the governance REST family calls.
 
-Peers call these through the token, declared at `../contract/src/governance.api.ts:168`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/governance.api.ts:174`; nothing else in this package is public.
 
 #### `registerMcpTools`
 
@@ -719,31 +719,31 @@ cliBootstrap(input: { organizationId: string }, by: GovernanceCaller): Promise<C
 
 #### `GET /api/auth/cli/budget/status` · `readCliBudgetStatus`
 
-Authenticated: main asked no permission here: the CLI token door admits the device-session bearer, and the key-minting routes check the active seat. Declared at `src/transport/governance-cli.rest.ts:42`.
+Authenticated: the CLI bearer is one user's device session; every route answers for that user's own seat and the minting routes refuse an inactive seat. Declared at `src/transport/governance-cli.rest.ts:42`.
 
 Answers at `/api/auth/cli/budget/status`, `/api/v1/auth/cli/budget/status`.
 
 #### `GET /api/auth/cli/bootstrap` · `readCliBootstrap`
 
-Authenticated: main asked no permission here: the CLI token door admits the device-session bearer, and the key-minting routes check the active seat. Declared at `src/transport/governance-cli.rest.ts:48`.
+Authenticated: the CLI bearer is one user's device session; every route answers for that user's own seat and the minting routes refuse an inactive seat. Declared at `src/transport/governance-cli.rest.ts:48`.
 
 Answers at `/api/auth/cli/bootstrap`, `/api/v1/auth/cli/bootstrap`.
 
 #### `GET /api/auth/cli/budget-overview` · `readCliBudgetOverview`
 
-Authenticated: main asked no permission here: the CLI token door admits the device-session bearer, and the key-minting routes check the active seat. Declared at `src/transport/governance-cli.rest.ts:54`.
+Authenticated: the CLI bearer is one user's device session; every route answers for that user's own seat and the minting routes refuse an inactive seat. Declared at `src/transport/governance-cli.rest.ts:54`.
 
 Answers at `/api/auth/cli/budget-overview`, `/api/v1/auth/cli/budget-overview`.
 
 #### `GET /api/auth/cli/personal-project` · `readCliPersonalProject`
 
-Authenticated: main asked no permission here: the CLI token door admits the device-session bearer, and the key-minting routes check the active seat. Declared at `src/transport/governance-cli.rest.ts:60`.
+Authenticated: the CLI bearer is one user's device session; every route answers for that user's own seat and the minting routes refuse an inactive seat. Declared at `src/transport/governance-cli.rest.ts:60`.
 
 Answers at `/api/auth/cli/personal-project`, `/api/v1/auth/cli/personal-project`.
 
 #### `POST /api/auth/cli/project-key` · `readCliProjectKey`
 
-Authenticated: main asked no permission here: the CLI token door admits the device-session bearer, and the key-minting routes check the active seat. Declared at `src/transport/governance-cli.rest.ts:68`.
+Authenticated: the CLI bearer is one user's device session; every route answers for that user's own seat and the minting routes refuse an inactive seat. Declared at `src/transport/governance-cli.rest.ts:68`.
 
 Answers at `/api/auth/cli/project-key`, `/api/v1/auth/cli/project-key`.
 
@@ -753,7 +753,7 @@ Answers at `/api/auth/cli/project-key`, `/api/v1/auth/cli/project-key`.
 
 #### `POST /api/auth/cli/virtual-key` · `issueCliVirtualKey`
 
-Authenticated: main asked no permission here: the CLI token door admits the device-session bearer, and the key-minting routes check the active seat. Declared at `src/transport/governance-cli.rest.ts:80`.
+Authenticated: the CLI bearer is one user's device session; every route answers for that user's own seat and the minting routes refuse an inactive seat. Declared at `src/transport/governance-cli.rest.ts:80`.
 
 Answers at `/api/auth/cli/virtual-key`, `/api/v1/auth/cli/virtual-key`.
 
@@ -768,7 +768,7 @@ Permission `ingestionSources:view`. Entitlement `enterprise` (feature `INGESTION
 Answers at `/api/auth/cli/governance/ingest/sources`, `/api/v1/auth/cli/governance/ingest/sources`.
 
 ```typescript
-// Query: governanceCliSourcesQuerySchema, ../contract/src/governance-cli-rest.schemas.ts:47
+// Query: governanceCliSourcesQuerySchema, ../contract/src/features/cli/governance-cli-rest.schemas.ts:47
 interface Query {
   include_archived?: string;
 }
@@ -781,11 +781,11 @@ Permission `activityMonitor:view`. Entitlement `enterprise` (feature `ACTIVITY_M
 Answers at `/api/auth/cli/governance/ingest/sources/:sourceId/events`, `/api/v1/auth/cli/governance/ingest/sources/:sourceId/events`.
 
 ```typescript
-// Params: governanceCliSourceParamsSchema, ../contract/src/governance-cli-rest.schemas.ts:42
+// Params: governanceCliSourceParamsSchema, ../contract/src/features/cli/governance-cli-rest.schemas.ts:42
 interface Params {
   sourceId: string;
 }
-// Query: governanceCliSourceEventsQuerySchema, ../contract/src/governance-cli-rest.schemas.ts:59
+// Query: governanceCliSourceEventsQuerySchema, ../contract/src/features/cli/governance-cli-rest.schemas.ts:59
 interface Query {
   limit?: string;
   before_iso?: string;
@@ -799,24 +799,24 @@ Permission `activityMonitor:view`. Entitlement `enterprise` (feature `INGESTION_
 Answers at `/api/auth/cli/governance/ingest/sources/:sourceId/health`, `/api/v1/auth/cli/governance/ingest/sources/:sourceId/health`.
 
 ```typescript
-type Params = z.infer<typeof governanceCliSourceParamsSchema>; // ../contract/src/governance-cli-rest.schemas.ts:42
+type Params = z.infer<typeof governanceCliSourceParamsSchema>; // ../contract/src/features/cli/governance-cli-rest.schemas.ts:42
 ```
 
 #### `GET /api/auth/cli/governance/status` · `readCliGovernanceStatus`
 
-Authenticated: main asked no permission here: the CLI token door admits the device-session bearer, and the key-minting routes check the active seat. Entitlement `enterprise` (feature `INGESTION_SOURCES`). Declared at `src/transport/governance-cli.rest.ts:129`.
+Authenticated: the CLI bearer is one user's device session; every route answers for that user's own seat and the minting routes refuse an inactive seat. Entitlement `enterprise` (feature `INGESTION_SOURCES`). Declared at `src/transport/governance-cli.rest.ts:129`.
 
 Answers at `/api/auth/cli/governance/status`, `/api/v1/auth/cli/governance/status`.
 
 #### `GET /api/auth/cli/governance/ingestion-templates` · `listCliIngestionTemplates`
 
-Authenticated: main asked no permission here: the CLI token door admits the device-session bearer, and the key-minting routes check the active seat. Declared at `src/transport/governance-cli.rest.ts:136`.
+Authenticated: the CLI bearer is one user's device session; every route answers for that user's own seat and the minting routes refuse an inactive seat. Declared at `src/transport/governance-cli.rest.ts:136`.
 
 Answers at `/api/auth/cli/governance/ingestion-templates`, `/api/v1/auth/cli/governance/ingestion-templates`.
 
 #### `POST /api/auth/cli/governance/ingestion-key` · `mintCliIngestionKey`
 
-Authenticated: main asked no permission here: the CLI token door admits the device-session bearer, and the key-minting routes check the active seat. Declared at `src/transport/governance-cli.rest.ts:142`.
+Authenticated: the CLI bearer is one user's device session; every route answers for that user's own seat and the minting routes refuse an inactive seat. Declared at `src/transport/governance-cli.rest.ts:142`.
 
 Answers at `/api/auth/cli/governance/ingestion-key`, `/api/v1/auth/cli/governance/ingestion-key`.
 
@@ -826,18 +826,18 @@ Answers at `/api/auth/cli/governance/ingestion-key`, `/api/v1/auth/cli/governanc
 
 #### `GET /api/auth/cli/governance/ingestion-keys` · `listCliIngestionKeys`
 
-Authenticated: main asked no permission here: the CLI token door admits the device-session bearer, and the key-minting routes check the active seat. Declared at `src/transport/governance-cli.rest.ts:149`.
+Authenticated: the CLI bearer is one user's device session; every route answers for that user's own seat and the minting routes refuse an inactive seat. Declared at `src/transport/governance-cli.rest.ts:149`.
 
 Answers at `/api/auth/cli/governance/ingestion-keys`, `/api/v1/auth/cli/governance/ingestion-keys`.
 
 #### `GET /api/auth/cli/governance/ingestion-keys/:lookup_id` · `readCliIngestionKeyState`
 
-Authenticated: main asked no permission here: the CLI token door admits the device-session bearer, and the key-minting routes check the active seat. Declared at `src/transport/governance-cli.rest.ts:155`.
+Authenticated: the CLI bearer is one user's device session; every route answers for that user's own seat and the minting routes refuse an inactive seat. Declared at `src/transport/governance-cli.rest.ts:155`.
 
 Answers at `/api/auth/cli/governance/ingestion-keys/:lookup_id`, `/api/v1/auth/cli/governance/ingestion-keys/:lookup_id`.
 
 ```typescript
-// Params: governanceCliKeyLookupParamsSchema, ../contract/src/governance-cli-rest.schemas.ts:44
+// Params: governanceCliKeyLookupParamsSchema, ../contract/src/features/cli/governance-cli-rest.schemas.ts:44
 interface Params {
   lookup_id: string;
 }
@@ -859,12 +859,12 @@ Public: an ingestion source's bearer secret is resolved in-handler against Inges
 Answers at `/api/ingest/otel/:sourceId`, `/api/v1/ingest/otel/:sourceId`.
 
 ```typescript
-// Params: governanceIngestSourceParamsSchema, ../contract/src/governance-ingest-rest.schemas.ts:9
+// Params: governanceIngestSourceParamsSchema, ../contract/src/features/ingestion/governance-ingest-rest.schemas.ts:9
 interface Params {
   sourceId: string;
 }
 // Rawbody: "bytes" (inline, src/transport/governance-ingest.rest.ts:27)
-type Headers = z.infer<typeof governanceIngestHeadersSchema>; // ../contract/src/governance-ingest-rest.schemas.ts:27
+type Headers = z.infer<typeof governanceIngestHeadersSchema>; // ../contract/src/features/ingestion/governance-ingest-rest.schemas.ts:27
 ```
 
 #### `POST /api/ingest/webhook/:sourceId` · `ingestSourceWebhook`
@@ -874,9 +874,9 @@ Public: an ingestion source's bearer secret is resolved in-handler against Inges
 Answers at `/api/ingest/webhook/:sourceId`, `/api/v1/ingest/webhook/:sourceId`.
 
 ```typescript
-type Params = z.infer<typeof governanceIngestSourceParamsSchema>; // ../contract/src/governance-ingest-rest.schemas.ts:9
+type Params = z.infer<typeof governanceIngestSourceParamsSchema>; // ../contract/src/features/ingestion/governance-ingest-rest.schemas.ts:9
 // Rawbody: "text" (inline, src/transport/governance-ingest.rest.ts:38)
-type Headers = z.infer<typeof governanceIngestHeadersSchema>; // ../contract/src/governance-ingest-rest.schemas.ts:27
+type Headers = z.infer<typeof governanceIngestHeadersSchema>; // ../contract/src/features/ingestion/governance-ingest-rest.schemas.ts:27
 ```
 
 #### `POST /api/ingest/otel/:sourceId/v1/logs` · `ingestSourceOtlpLogs`
@@ -886,9 +886,9 @@ Public: an ingestion source's bearer secret is resolved in-handler against Inges
 Answers at `/api/ingest/otel/:sourceId/v1/logs`.
 
 ```typescript
-type Params = z.infer<typeof governanceIngestSourceParamsSchema>; // ../contract/src/governance-ingest-rest.schemas.ts:9
+type Params = z.infer<typeof governanceIngestSourceParamsSchema>; // ../contract/src/features/ingestion/governance-ingest-rest.schemas.ts:9
 // Rawbody: "bytes" (inline, src/transport/governance-ingest.rest.ts:49)
-type Headers = z.infer<typeof governanceIngestHeadersSchema>; // ../contract/src/governance-ingest-rest.schemas.ts:27
+type Headers = z.infer<typeof governanceIngestHeadersSchema>; // ../contract/src/features/ingestion/governance-ingest-rest.schemas.ts:27
 ```
 
 #### `POST /api/ingest/otel/:sourceId/v1/metrics` · `ingestSourceOtlpMetrics`
@@ -898,9 +898,9 @@ Public: an ingestion source's bearer secret is resolved in-handler against Inges
 Answers at `/api/ingest/otel/:sourceId/v1/metrics`.
 
 ```typescript
-type Params = z.infer<typeof governanceIngestSourceParamsSchema>; // ../contract/src/governance-ingest-rest.schemas.ts:9
+type Params = z.infer<typeof governanceIngestSourceParamsSchema>; // ../contract/src/features/ingestion/governance-ingest-rest.schemas.ts:9
 // Rawbody: "bytes" (inline, src/transport/governance-ingest.rest.ts:60)
-type Headers = z.infer<typeof governanceIngestHeadersSchema>; // ../contract/src/governance-ingest-rest.schemas.ts:27
+type Headers = z.infer<typeof governanceIngestHeadersSchema>; // ../contract/src/features/ingestion/governance-ingest-rest.schemas.ts:27
 ```
 
 ### `governanceRest`
@@ -1042,12 +1042,12 @@ Permission `project:view`. Declared at `src/transport/me-usage.rest.ts:29`.
 Answers at `/api/me/usage`, `/api/v1/me/usage`; also, undocumented, `/api/me/2026-08-07/usage`, `/api/v1/me/2026-08-07/usage`, `/api/me/latest/usage`, `/api/v1/me/latest/usage`.
 
 ```typescript
-// Query: meUsageQuerySchema, ../contract/src/personal-usage.ts:83
+// Query: meUsageQuerySchema, ../contract/src/features/personal/personal-usage.ts:83
 interface Query {
   windowStartMs?: number;
   windowEndMs?: number;
 }
-type Response = z.infer<typeof meUsageResponseSchema>; // ../contract/src/personal-usage.ts:129
+type Response = z.infer<typeof meUsageResponseSchema>; // ../contract/src/features/personal/personal-usage.ts:129
 ```
 
 ## tRPC transport
@@ -1075,7 +1075,7 @@ interface Input {
   organizationId: string;
   windowDays?: number;
 }
-type Output = z.infer<typeof activityMonitorSummarySchema>; // ../contract/src/ingestion-source-activity.queries.ts:28
+type Output = z.infer<typeof activityMonitorSummarySchema>; // ../contract/src/features/ingestion/ingestion-source-activity.queries.ts:28
 
 // activityMonitor.spendByUser
 // Input: pagedWindowQuery, ../contract/src/activity-monitor.trpc.ts:26
@@ -1130,7 +1130,7 @@ interface Input {
   windowDays?: number;
   groupBy?: "team" | "user" | "model";
 }
-// Output: spendOverTimeResultSchema, ../contract/src/ingestion-source-activity.queries.ts:106
+// Output: spendOverTimeResultSchema, ../contract/src/features/ingestion/ingestion-source-activity.queries.ts:106
 interface Output {
   buckets: {
     bucketIso: string;
@@ -1181,7 +1181,7 @@ interface Input {
   organizationId: string;
   sourceId: string;
 }
-// Output: sourceHealthMetricsSchema, ../contract/src/ingestion-source-activity.queries.ts:149
+// Output: sourceHealthMetricsSchema, ../contract/src/features/ingestion/ingestion-source-activity.queries.ts:149
 interface Output {
   events24h: number;
   events7d: number;
@@ -1524,7 +1524,7 @@ interface Output {
 
 ### `governanceCost`
 
-Contract `../contract/src/governance-cost.trpc.ts:15`, router `src/transport/governance-cost.trpc.ts:13`.
+Contract `../contract/src/features/cost/governance-cost.trpc.ts:15`, router `src/transport/governance-cost.trpc.ts:13`.
 
 | Procedure                        | Kind  | Gate                                                | Input                                    | Output                                     |
 | -------------------------------- | ----- | --------------------------------------------------- | ---------------------------------------- | ------------------------------------------ |
@@ -1536,16 +1536,16 @@ Contract `../contract/src/governance-cost.trpc.ts:15`, router `src/transport/gov
 
 ```typescript
 // governanceCost.summary
-// Input: governanceCostWindowInputSchema, ../contract/src/governance-cost.ts:27
+// Input: governanceCostWindowInputSchema, ../contract/src/features/cost/governance-cost.ts:27
 interface Input {
   organizationId: string;
   windowDays?: number;
 }
-type Output = z.infer<typeof governanceCostSummarySchema>; // ../contract/src/governance-cost.ts:179
+type Output = z.infer<typeof governanceCostSummarySchema>; // ../contract/src/features/cost/governance-cost.ts:179
 
 // governanceCost.dailyByProvider
-type Input = z.infer<typeof governanceCostWindowInputSchema>; // ../contract/src/governance-cost.ts:27
-// Output: governanceCostProviderDayBreakdownSchema, ../contract/src/governance-cost.ts:59
+type Input = z.infer<typeof governanceCostWindowInputSchema>; // ../contract/src/features/cost/governance-cost.ts:27
+// Output: governanceCostProviderDayBreakdownSchema, ../contract/src/features/cost/governance-cost.ts:59
 interface Output {
   unavailableReason: "no_cost_store" | "no_governance_project" | null;
   rows: {
@@ -1559,8 +1559,8 @@ interface Output {
 }
 
 // governanceCost.spendByModel
-type Input = z.infer<typeof governanceCostWindowInputSchema>; // ../contract/src/governance-cost.ts:27
-// Output: governanceCostModelBreakdownSchema, ../contract/src/governance-cost.ts:71
+type Input = z.infer<typeof governanceCostWindowInputSchema>; // ../contract/src/features/cost/governance-cost.ts:27
+// Output: governanceCostModelBreakdownSchema, ../contract/src/features/cost/governance-cost.ts:71
 interface Output {
   unavailableReason: "no_cost_store" | "no_governance_project" | null;
   rows: {
@@ -1573,14 +1573,14 @@ interface Output {
 }
 
 // governanceCost.periodRecords
-// Input: governanceCostPeriodRecordsInputSchema, ../contract/src/governance-cost.ts:33
+// Input: governanceCostPeriodRecordsInputSchema, ../contract/src/features/cost/governance-cost.ts:33
 interface Input {
   organizationId: string;
   fromDay: string;
   toDay: string;
   provider: string;
 }
-// Output: governanceCostDayRecordsSchema, ../contract/src/governance-cost.ts:84
+// Output: governanceCostDayRecordsSchema, ../contract/src/features/cost/governance-cost.ts:84
 interface Output {
   unavailableReason: "no_cost_store" | "no_governance_project" | null;
   records: {
@@ -1592,8 +1592,8 @@ interface Output {
 }
 
 // governanceCost.spenders
-type Input = z.infer<typeof governanceCostWindowInputSchema>; // ../contract/src/governance-cost.ts:27
-type Output = z.infer<typeof governanceSpenderBreakdownSchema>; // ../contract/src/governance-cost.ts:99
+type Input = z.infer<typeof governanceCostWindowInputSchema>; // ../contract/src/features/cost/governance-cost.ts:27
+type Output = z.infer<typeof governanceSpenderBreakdownSchema>; // ../contract/src/features/cost/governance-cost.ts:99
 ```
 
 ### `governancePeople`
@@ -1652,7 +1652,7 @@ interface Output {
 
 ### `governance`
 
-Contract `../contract/src/governance.trpc.ts:25`, router `src/transport/governance.trpc.ts:13`.
+Contract `../contract/src/governance.trpc.ts:26`, router `src/transport/governance.trpc.ts:13`.
 
 | Procedure                                | Kind     | Gate                               | Input               | Output                                  |
 | ---------------------------------------- | -------- | ---------------------------------- | ------------------- | --------------------------------------- |
@@ -1668,12 +1668,12 @@ Contract `../contract/src/governance.trpc.ts:25`, router `src/transport/governan
 
 ```typescript
 // governance.resolveActorPersonalProject
-// Input: inline, ../contract/src/governance.trpc.ts:28
+// Input: inline, ../contract/src/governance.trpc.ts:31
 interface Input {
   organizationId: string;
   actor: string;
 }
-// Output: inline, ../contract/src/governance.trpc.ts:29
+// Output: inline, ../contract/src/governance.trpc.ts:32
 type Output = {
   userId: string;
   displayName: string;
@@ -1683,11 +1683,11 @@ type Output = {
 } | null;
 
 // governance.resolveHome
-// Input: organizationScope, ../contract/src/governance.trpc.ts:23
+// Input: organizationScope, ../contract/src/governance.trpc.ts:24
 interface Input {
   organizationId: string;
 }
-// Output: personaResolutionSchema, ../contract/src/persona-home.ts:31
+// Output: personaResolutionSchema, ../contract/src/features/personal/persona-home.ts:31
 interface Output {
   persona: "personal_only" | "mixed" | "project_only" | "governance_admin";
   destination: string;
@@ -1698,7 +1698,7 @@ interface Output {
 }
 
 // governance.setupState
-type Input = z.infer<typeof organizationScope>; // ../contract/src/governance.trpc.ts:23
+type Input = z.infer<typeof organizationScope>; // ../contract/src/governance.trpc.ts:24
 // Output: governanceSetupStateSchema, ../contract/src/governance.ts:42
 interface Output {
   hasPersonalVKs: boolean;
@@ -1711,7 +1711,7 @@ interface Output {
 }
 
 // governance.ocsfExport
-// Input: inline, ../contract/src/governance.trpc.ts:44
+// Input: inline, ../contract/src/governance.trpc.ts:47
 interface Input {
   organizationId: string;
   sinceMs?: number;
@@ -1721,13 +1721,13 @@ interface Input {
 type Output = z.infer<typeof governanceOcsfExportPageSchema>; // ../contract/src/ocsf-export.ts:25
 
 // governance.quarantineFillStats
-// Input: inline, ../contract/src/governance.trpc.ts:56
+// Input: inline, ../contract/src/governance.trpc.ts:59
 interface Input {
   organizationId: string;
   windowSeconds?: number;
   threshold?: number;
 }
-// Output: quarantineFillStatsSchema, ../contract/src/quarantine-fill.ts:15
+// Output: quarantineFillStatsSchema, ../contract/src/features/ingestion/quarantine-fill.ts:15
 interface Output {
   windowSeconds: number;
   threshold: number;
@@ -1741,7 +1741,7 @@ interface Output {
 }
 
 // governance.recordWorkspaceView
-// Input: inline, ../contract/src/governance.trpc.ts:67
+// Input: inline, ../contract/src/governance.trpc.ts:70
 interface Input {
   organizationId: string;
   targetTeamId: string;
@@ -1755,30 +1755,30 @@ interface Output {
 }
 
 // governance.personalUsage
-// Input: inline, ../contract/src/governance.trpc.ts:79
+// Input: inline, ../contract/src/governance.trpc.ts:82
 interface Input {
   organizationId: string;
   windowStartMs?: number;
   windowEndMs?: number;
 }
-type Output = z.infer<typeof personalUsageRollupSchema>; // ../contract/src/personal-usage.ts:64
+type Output = z.infer<typeof personalUsageRollupSchema>; // ../contract/src/features/personal/personal-usage.ts:64
 
 // governance.budgetOverview
-// Input: inline, ../contract/src/governance.trpc.ts:89
+// Input: inline, ../contract/src/governance.trpc.ts:92
 interface Input {
   organizationId: string;
   includeTopModels?: boolean;
 }
-type Output = z.infer<typeof governanceBudgetOverviewForUserSchema>; // ../contract/src/personal-budget-overview.ts:50
+type Output = z.infer<typeof governanceBudgetOverviewForUserSchema>; // ../contract/src/features/personal/personal-budget-overview.ts:50
 
 // governance.cliBootstrap
-type Input = z.infer<typeof organizationScope>; // ../contract/src/governance.trpc.ts:23
-type Output = z.infer<typeof cliBootstrapResultSchema>; // ../contract/src/cli-bootstrap.ts:25
+type Input = z.infer<typeof organizationScope>; // ../contract/src/governance.trpc.ts:24
+type Output = z.infer<typeof cliBootstrapResultSchema>; // ../contract/src/features/cli/cli-bootstrap.ts:25
 ```
 
 ### `ingestionKey`
 
-Contract `../contract/src/ingestion-key.trpc.ts:37`, router `src/transport/ingestion-key.trpc.ts:12`.
+Contract `../contract/src/features/ingestion/ingestion-key.trpc.ts:37`, router `src/transport/ingestion-key.trpc.ts:12`.
 
 | Procedure              | Kind     | Gate                           | Input                         | Output                      |
 | ---------------------- | -------- | ------------------------------ | ----------------------------- | --------------------------- |
@@ -1789,11 +1789,11 @@ Contract `../contract/src/ingestion-key.trpc.ts:37`, router `src/transport/inges
 
 ```typescript
 // ingestionKey.list
-// Input: inline, ../contract/src/ingestion-key.trpc.ts:39
+// Input: inline, ../contract/src/features/ingestion/ingestion-key.trpc.ts:39
 interface Input {
   organizationId: string;
 }
-// Output: inline, ../contract/src/ingestion-key.trpc.ts:40
+// Output: inline, ../contract/src/features/ingestion/ingestion-key.trpc.ts:40
 type Output = {
   apiKeyId: string;
   name: string;
@@ -1807,13 +1807,13 @@ type Output = {
 }[];
 
 // ingestionKey.install
-// Input: ingestionKeyMintInputSchema, ../contract/src/ingestion-key.trpc.ts:25
+// Input: ingestionKeyMintInputSchema, ../contract/src/features/ingestion/ingestion-key.trpc.ts:25
 interface Input {
   organizationId: string;
   sourceType: string;
   templateId?: string;
 }
-// Output: issuedIngestionKeySchema, ../contract/src/ingestion-source-key.commands.ts:17
+// Output: issuedIngestionKeySchema, ../contract/src/features/ingestion/ingestion-source-key.commands.ts:17
 interface Output {
   token: string;
   apiKeyId: string;
@@ -1822,8 +1822,8 @@ interface Output {
 }
 
 // ingestionKey.rotate
-type Input = z.infer<typeof ingestionKeyMintInputSchema>; // ../contract/src/ingestion-key.trpc.ts:25
-// Output: rotatedIngestionKeySchema, ../contract/src/ingestion-key.trpc.ts:31
+type Input = z.infer<typeof ingestionKeyMintInputSchema>; // ../contract/src/features/ingestion/ingestion-key.trpc.ts:25
+// Output: rotatedIngestionKeySchema, ../contract/src/features/ingestion/ingestion-key.trpc.ts:31
 interface Output {
   token: string;
   apiKeyId: string;
@@ -1834,12 +1834,12 @@ interface Output {
 }
 
 // ingestionKey.revoke
-// Input: inline, ../contract/src/ingestion-key.trpc.ts:51
+// Input: inline, ../contract/src/features/ingestion/ingestion-key.trpc.ts:51
 interface Input {
   organizationId: string;
   apiKeyId: string;
 }
-// Output: inline, ../contract/src/ingestion-key.trpc.ts:52
+// Output: inline, ../contract/src/features/ingestion/ingestion-key.trpc.ts:52
 interface Output {
   success: true;
 }
@@ -1847,7 +1847,7 @@ interface Output {
 
 ### `ingestionSources`
 
-Contract `../contract/src/ingestion-sources.trpc.ts:47`, router `src/transport/ingestion-sources.trpc.ts:12`.
+Contract `../contract/src/features/ingestion/ingestion-sources.trpc.ts:47`, router `src/transport/ingestion-sources.trpc.ts:12`.
 
 | Procedure                       | Kind     | Gate                                 | Input                              | Output                            |
 | ------------------------------- | -------- | ------------------------------------ | ---------------------------------- | --------------------------------- |
@@ -1862,26 +1862,26 @@ Contract `../contract/src/ingestion-sources.trpc.ts:47`, router `src/transport/i
 
 ```typescript
 // ingestionSources.list
-// Input: organizationScope, ../contract/src/ingestion-sources.trpc.ts:14
+// Input: organizationScope, ../contract/src/features/ingestion/ingestion-sources.trpc.ts:14
 interface Input {
   organizationId: string;
 }
-// Output: ingestionSourceDtoSchema.array() (inline, ../contract/src/ingestion-sources.trpc.ts:50)
+// Output: ingestionSourceDtoSchema.array() (inline, ../contract/src/features/ingestion/ingestion-sources.trpc.ts:50)
 
 // ingestionSources.get
-// Input: sourceInOrganization, ../contract/src/ingestion-sources.trpc.ts:15
+// Input: sourceInOrganization, ../contract/src/features/ingestion/ingestion-sources.trpc.ts:15
 interface Input {
   organizationId: string;
   id: string;
 }
-type Output = z.infer<typeof ingestionSourceDtoSchema>; // ../contract/src/ingestion-source.ts:39
+type Output = z.infer<typeof ingestionSourceDtoSchema>; // ../contract/src/features/ingestion/ingestion-source.ts:39
 
 // ingestionSources.create
-type Input = z.infer<typeof ingestionSourceCreateInputSchema>; // ../contract/src/ingestion-sources.trpc.ts:17
-type Output = z.infer<typeof createdIngestionSourceSchema>; // ../contract/src/ingestion-sources.trpc.ts:43
+type Input = z.infer<typeof ingestionSourceCreateInputSchema>; // ../contract/src/features/ingestion/ingestion-sources.trpc.ts:17
+type Output = z.infer<typeof createdIngestionSourceSchema>; // ../contract/src/features/ingestion/ingestion-sources.trpc.ts:43
 
 // ingestionSources.update
-// Input: ingestionSourceUpdateInputSchema, ../contract/src/ingestion-sources.trpc.ts:30
+// Input: ingestionSourceUpdateInputSchema, ../contract/src/features/ingestion/ingestion-sources.trpc.ts:30
 interface Input {
   organizationId: string;
   id: string;
@@ -1893,31 +1893,31 @@ interface Input {
   pullSchedule?: string | null;
   traceProjectId?: string | null;
 }
-type Output = z.infer<typeof ingestionSourceDtoSchema>; // ../contract/src/ingestion-source.ts:39
+type Output = z.infer<typeof ingestionSourceDtoSchema>; // ../contract/src/features/ingestion/ingestion-source.ts:39
 
 // ingestionSources.rotateSecret
-type Input = z.infer<typeof sourceInOrganization>; // ../contract/src/ingestion-sources.trpc.ts:15
-type Output = z.infer<typeof ingestionSourceWithSecretSchema>; // ../contract/src/ingestion-source.ts:72
+type Input = z.infer<typeof sourceInOrganization>; // ../contract/src/features/ingestion/ingestion-sources.trpc.ts:15
+type Output = z.infer<typeof ingestionSourceWithSecretSchema>; // ../contract/src/features/ingestion/ingestion-source.ts:72
 
 // ingestionSources.archive
-type Input = z.infer<typeof sourceInOrganization>; // ../contract/src/ingestion-sources.trpc.ts:15
-type Output = z.infer<typeof ingestionSourceDtoSchema>; // ../contract/src/ingestion-source.ts:39
+type Input = z.infer<typeof sourceInOrganization>; // ../contract/src/features/ingestion/ingestion-sources.trpc.ts:15
+type Output = z.infer<typeof ingestionSourceDtoSchema>; // ../contract/src/features/ingestion/ingestion-source.ts:39
 
 // ingestionSources.validateOttl
-// Input: inline, ../contract/src/ingestion-sources.trpc.ts:74
+// Input: inline, ../contract/src/features/ingestion/ingestion-sources.trpc.ts:74
 interface Input {
   organizationId: string;
   statements: string[];
 }
-type Output = z.infer<typeof ottlValidationResultSchema>; // ../contract/src/ottl.ts:19
+type Output = z.infer<typeof ottlValidationResultSchema>; // ../contract/src/features/ingestion/ottl.ts:19
 
 // ingestionSources.ottlStarter
-// Input: inline, ../contract/src/ingestion-sources.trpc.ts:79
+// Input: inline, ../contract/src/features/ingestion/ingestion-sources.trpc.ts:79
 interface Input {
   organizationId: string;
   sourceType: string;
 }
-// Output: ottlStarterTemplateSchema, ../contract/src/ingestion-source.ts:80
+// Output: ottlStarterTemplateSchema, ../contract/src/features/ingestion/ingestion-source.ts:80
 interface Output {
   enabled: boolean;
   statements: string[];
@@ -1927,7 +1927,7 @@ interface Output {
 
 ### `ingestionTemplates`
 
-Contract `../contract/src/ingestion-templates.trpc.ts:22`, router `src/transport/ingestion-templates.trpc.ts:15`.
+Contract `../contract/src/features/ingestion/ingestion-templates.trpc.ts:22`, router `src/transport/ingestion-templates.trpc.ts:15`.
 
 | Procedure                              | Kind     | Gate                        | Input                           | Output                              |
 | -------------------------------------- | -------- | --------------------------- | ------------------------------- | ----------------------------------- |
@@ -1941,26 +1941,26 @@ Contract `../contract/src/ingestion-templates.trpc.ts:22`, router `src/transport
 
 ```typescript
 // ingestionTemplates.list
-// Input: organizationScope, ../contract/src/ingestion-templates.trpc.ts:9
+// Input: organizationScope, ../contract/src/features/ingestion/ingestion-templates.trpc.ts:9
 interface Input {
   organizationId: string;
 }
-// Output: ingestionTemplateSchema.array() (inline, ../contract/src/ingestion-templates.trpc.ts:25)
+// Output: ingestionTemplateSchema.array() (inline, ../contract/src/features/ingestion/ingestion-templates.trpc.ts:25)
 
 // ingestionTemplates.adminList
-type Input = z.infer<typeof organizationScope>; // ../contract/src/ingestion-templates.trpc.ts:9
-// Output: ingestionTemplateSchema.array() (inline, ../contract/src/ingestion-templates.trpc.ts:29)
+type Input = z.infer<typeof organizationScope>; // ../contract/src/features/ingestion/ingestion-templates.trpc.ts:9
+// Output: ingestionTemplateSchema.array() (inline, ../contract/src/features/ingestion/ingestion-templates.trpc.ts:29)
 
 // ingestionTemplates.get
-// Input: templateInOrganization, ../contract/src/ingestion-templates.trpc.ts:10
+// Input: templateInOrganization, ../contract/src/features/ingestion/ingestion-templates.trpc.ts:10
 interface Input {
   organizationId: string;
   id: string;
 }
-type Output = z.infer<typeof ingestionTemplateSchema>; // ../contract/src/ingestion-template.ts:9
+type Output = z.infer<typeof ingestionTemplateSchema>; // ../contract/src/features/ingestion/ingestion-template.ts:9
 
 // ingestionTemplates.create
-// Input: ingestionTemplateCreateSchema, ../contract/src/ingestion-templates.trpc.ts:12
+// Input: ingestionTemplateCreateSchema, ../contract/src/features/ingestion/ingestion-templates.trpc.ts:12
 interface Input {
   organizationId: string;
   sourceType: string;
@@ -1970,33 +1970,33 @@ interface Input {
   credentialSchema?: "otlp_token" | "static_api_key" | "agent_id" | null;
   ottlRules?: string;
 }
-type Output = z.infer<typeof ingestionTemplateSchema>; // ../contract/src/ingestion-template.ts:9
+type Output = z.infer<typeof ingestionTemplateSchema>; // ../contract/src/features/ingestion/ingestion-template.ts:9
 
 // ingestionTemplates.updateOttlRules
-// Input: inline, ../contract/src/ingestion-templates.trpc.ts:40
+// Input: inline, ../contract/src/features/ingestion/ingestion-templates.trpc.ts:40
 interface Input {
   organizationId: string;
   id: string;
   ottlRules: string;
 }
-type Output = z.infer<typeof ingestionTemplateSchema>; // ../contract/src/ingestion-template.ts:9
+type Output = z.infer<typeof ingestionTemplateSchema>; // ../contract/src/features/ingestion/ingestion-template.ts:9
 
 // ingestionTemplates.archive
-type Input = z.infer<typeof templateInOrganization>; // ../contract/src/ingestion-templates.trpc.ts:10
+type Input = z.infer<typeof templateInOrganization>; // ../contract/src/features/ingestion/ingestion-templates.trpc.ts:10
 type Output = z.infer<typeof governanceWriteAcknowledgedSchema>; // ../contract/src/governance.responses.ts:8
 
 // ingestionTemplates.cloneFromPlatform
-// Input: inline, ../contract/src/ingestion-templates.trpc.ts:48
+// Input: inline, ../contract/src/features/ingestion/ingestion-templates.trpc.ts:48
 interface Input {
   organizationId: string;
   sourceTemplateId: string;
 }
-type Output = z.infer<typeof ingestionTemplateSchema>; // ../contract/src/ingestion-template.ts:9
+type Output = z.infer<typeof ingestionTemplateSchema>; // ../contract/src/features/ingestion/ingestion-template.ts:9
 ```
 
 ### `personalSessions`
 
-Contract `../contract/src/personal-sessions.trpc.ts:12`, router `src/transport/personal-sessions.trpc.ts:17`.
+Contract `../contract/src/features/personal/personal-sessions.trpc.ts:12`, router `src/transport/personal-sessions.trpc.ts:17`.
 
 | Procedure                                         | Kind     | Gate                                                                                                                                    | Input               | Output                       |
 | ------------------------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------- | ---------------------------- |
@@ -2009,11 +2009,11 @@ Contract `../contract/src/personal-sessions.trpc.ts:12`, router `src/transport/p
 
 ```typescript
 // personalSessions.list
-// Input: organizationScope, ../contract/src/personal-sessions.trpc.ts:9
+// Input: organizationScope, ../contract/src/features/personal/personal-sessions.trpc.ts:9
 interface Input {
   organizationId: string;
 }
-// Output: inline, ../contract/src/personal-sessions.trpc.ts:15
+// Output: inline, ../contract/src/features/personal/personal-sessions.trpc.ts:15
 type Output = {
   sessionStartedAtMs: number;
   deviceLabel: string;
@@ -2026,12 +2026,12 @@ type Output = {
 }[];
 
 // personalSessions.revoke
-// Input: inline, ../contract/src/personal-sessions.trpc.ts:19
+// Input: inline, ../contract/src/features/personal/personal-sessions.trpc.ts:19
 interface Input {
   organizationId: string;
   sessionStartedAtMs: number;
 }
-// Output: cliSessionRevocationSchema, ../contract/src/cli-sessions.ts:52
+// Output: cliSessionRevocationSchema, ../contract/src/features/cli/cli-sessions.ts:52
 interface Output {
   ok: boolean;
   revokedTokens: number;
@@ -2039,13 +2039,13 @@ interface Output {
 }
 
 // personalSessions.revokeAll
-type Input = z.infer<typeof organizationScope>; // ../contract/src/personal-sessions.trpc.ts:9
-type Output = z.infer<typeof cliSessionRevocationSchema>; // ../contract/src/cli-sessions.ts:52
+type Input = z.infer<typeof organizationScope>; // ../contract/src/features/personal/personal-sessions.trpc.ts:9
+type Output = z.infer<typeof cliSessionRevocationSchema>; // ../contract/src/features/cli/cli-sessions.ts:52
 
 // personalSessions.listWebSessions
-// Input: inline, ../contract/src/personal-sessions.trpc.ts:28
+// Input: inline, ../contract/src/features/personal/personal-sessions.trpc.ts:28
 type Input = Record<string, unknown>;
-// Output: inline, ../contract/src/personal-sessions.trpc.ts:29
+// Output: inline, ../contract/src/features/personal/personal-sessions.trpc.ts:29
 type Output = {
   sessionId: string;
   identifierId: string | null;
@@ -2060,21 +2060,21 @@ type Output = {
 }[];
 
 // personalSessions.revokeWebSession
-// Input: inline, ../contract/src/personal-sessions.trpc.ts:32
+// Input: inline, ../contract/src/features/personal/personal-sessions.trpc.ts:32
 interface Input {
   sessionId: string;
 }
-// Output: webSessionsEnded, ../contract/src/personal-sessions.trpc.ts:10
+// Output: webSessionsEnded, ../contract/src/features/personal/personal-sessions.trpc.ts:10
 interface Output {
   ended: number;
 }
 
 // personalSessions.revokeWebSessionsForIdentifier
-// Input: inline, ../contract/src/personal-sessions.trpc.ts:36
+// Input: inline, ../contract/src/features/personal/personal-sessions.trpc.ts:36
 interface Input {
   identifierId: string;
 }
-type Output = z.infer<typeof webSessionsEnded>; // ../contract/src/personal-sessions.trpc.ts:10
+type Output = z.infer<typeof webSessionsEnded>; // ../contract/src/features/personal/personal-sessions.trpc.ts:10
 ```
 
 ### `sessionPolicy`

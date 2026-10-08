@@ -32,6 +32,7 @@ import {
   type OrganizationSettingsCipher,
   type PersonalWorkspaceFeatureProject,
   type PersonalWorkspaceResourceIds,
+  type EnsuredPersonalTeam,
   type StoredOrganizationSettings,
   type OrganizationTeamProject,
 } from "../organization.repository.ts";
@@ -540,46 +541,23 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
       displayEmail?: string | null;
     };
     resources: PersonalWorkspaceResourceIds;
-  }): Promise<{
-    workspace: PersonalWorkspace;
-    created: boolean;
-  }> {
+  }): Promise<EnsuredPersonalTeam> {
     try {
       return await this.database.$transaction(async (transaction) => {
-        const existing = await this.tryFindWorkspace(transaction, input.workspace);
-        if (existing) {
-          return {
-            workspace: existing,
-            created: false,
-          };
-        }
+        const existing = await this.tryFindPersonalTeam(transaction, input.workspace);
+        if (existing) return existing;
 
         const reactivated = await this.tryReactivateWorkspace(transaction, input.workspace);
-        if (reactivated) {
-          return {
-            workspace: reactivated,
-            created: false,
-          };
-        }
+        if (reactivated) return { kind: "ready", workspace: reactivated };
 
-        const workspace = await this.createPersonalWorkspace(
-          transaction,
-          input.workspace,
-          input.resources,
-        );
-        return {
-          workspace,
-          created: true,
-        };
+        const team = await this.createPersonalTeam(transaction, input.workspace, input.resources);
+        return { kind: "pending", team };
       });
     } catch (error) {
       if (!isUniqueConstraintError(error)) throw error;
-      const winner = await this.tryFindWorkspace(this.database, input.workspace);
+      const winner = await this.tryFindPersonalTeam(this.database, input.workspace);
       if (!winner) throw error;
-      return {
-        workspace: winner,
-        created: false,
-      };
+      return winner;
     }
   }
 
@@ -670,7 +648,8 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
     });
   }
 
-  private async createPersonalWorkspace(
+  /** Project creates the personal project on organization's fact (Round 54); never here. */
+  private async createPersonalTeam(
     transaction: Prisma.TransactionClient,
     input: {
       userId: string;
@@ -679,7 +658,7 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
       displayEmail?: string | null;
     },
     resources: PersonalWorkspaceResourceIds,
-  ): Promise<PersonalWorkspace> {
+  ): Promise<PersonalWorkspace["team"]> {
     const displayLabel = input.displayName?.trim() || input.displayEmail?.split("@")[0] || "user";
     const team = await transaction.team.create({
       data: {
@@ -691,23 +670,10 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
         ownerUserId: input.userId,
       },
     });
-    const project = await transaction.project.create({
-      data: {
-        id: resources.projectId,
-        name: "Personal Workspace",
-        slug: resources.projectSlug,
-        apiKey: resources.projectApiKey,
-        teamId: team.id,
-        language: "other",
-        framework: "other",
-        isPersonal: true,
-        ownerUserId: input.userId,
-      },
-    });
     await transaction.teamUser.create({
       data: { userId: input.userId, teamId: team.id, role: "ADMIN" },
     });
-    return mapPersonalWorkspace(team, project);
+    return mapPersonalTeam(team);
   }
 
   private async tryReactivateWorkspace(
@@ -746,6 +712,14 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
     client: Client,
     input: { userId: string; organizationId: string },
   ): Promise<PersonalWorkspace | null> {
+    const found = await this.tryFindPersonalTeam(client, input);
+    return found?.kind === "ready" ? found.workspace : null;
+  }
+
+  private async tryFindPersonalTeam(
+    client: Client,
+    input: { userId: string; organizationId: string },
+  ): Promise<EnsuredPersonalTeam | null> {
     const team = await client.team.findFirst({
       where: {
         organizationId: input.organizationId,
@@ -771,12 +745,20 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
         },
       },
     });
-    if (!team || team.projects.length === 0) return null;
-    return mapPersonalWorkspace(team, team.projects[0]!);
+    if (!team) return null;
+    const project = team.projects[0];
+    if (!project) return { kind: "pending", team: mapPersonalTeam(team) };
+    return { kind: "ready", workspace: mapPersonalWorkspace(team, project) };
   }
 }
 function isUniqueConstraintError(error: unknown): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
+}
+
+function mapPersonalTeam(
+  team: Pick<Team, "id" | "name" | "slug" | "createdAt">,
+): PersonalWorkspace["team"] {
+  return { id: team.id, name: team.name, slug: team.slug, createdAtMs: team.createdAt.getTime() };
 }
 
 function mapPersonalWorkspace(
@@ -790,12 +772,7 @@ function mapPersonalWorkspace(
   },
 ): PersonalWorkspace {
   return {
-    team: {
-      id: team.id,
-      name: team.name,
-      slug: team.slug,
-      createdAtMs: team.createdAt.getTime(),
-    },
+    team: mapPersonalTeam(team),
     project: {
       id: project.id,
       name: project.name,

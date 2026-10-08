@@ -40,10 +40,16 @@ const ALL_PERSONAL_FEATURES_ENABLED: PersonalFeatures = {
   automations: true,
 };
 
-/** Where a newly created workspace is recorded as organization's event (§9); never throws. */
+/** Where a personal team is recorded as organization's fact for project (§9); never throws. */
 export type PersonalWorkspaceNotices = Readonly<{
-  personalWorkspaceProvisioned(
-    input: Readonly<{ organizationId: string; userId: string; projectId: string }>,
+  personalTeamCreated(
+    input: Readonly<{
+      organizationId: string;
+      userId: string;
+      teamId: string;
+      projectId: string;
+      projectSlug: string;
+    }>,
   ): void;
 }>;
 
@@ -69,20 +75,19 @@ export class PersonalWorkspaceService {
       workspace: parsed,
       resources,
     });
-    // After the commit, so a rolled-back workspace records nothing, and before the grant, whose
-    // failure would otherwise skip it for good (main's order). Project records the project.
-    if (result.created) {
-      this.deps.notices?.personalWorkspaceProvisioned({
+    const team = result.kind === "ready" ? result.workspace.team : result.team;
+    // After the commit and before the grant (main's order). Recorded on every pending answer:
+    // keyed by the team, so project creates once (the first id wins) and a lost record heals.
+    if (result.kind === "pending") {
+      this.deps.notices?.personalTeamCreated({
         organizationId: parsed.organizationId,
         userId: parsed.userId,
-        projectId: result.workspace.project.id,
+        teamId: team.id,
+        projectId: this.deps.identities.newProjectId(),
+        projectSlug: resources.projectSlug,
       });
     }
-    const grant = {
-      userId: parsed.userId,
-      organizationId: parsed.organizationId,
-      teamId: result.workspace.team.id,
-    };
+    const grant = { userId: parsed.userId, organizationId: parsed.organizationId, teamId: team.id };
     try {
       await this.deps.grants.attachBindings({
         organizationId: grant.organizationId,
@@ -113,7 +118,7 @@ export class PersonalWorkspaceService {
       );
     }
 
-    return { ...result.workspace, created: result.created };
+    return result.kind === "ready" ? result : { kind: "pending", team };
   }
 
   /** Throws `TeamNotFoundError` when the user has no personal workspace there. */

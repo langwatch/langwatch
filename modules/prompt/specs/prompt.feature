@@ -121,3 +121,15 @@ Feature: Prompt service
     When a prompt is created or updated over the REST API
     Then no author check runs and the prompt is written
 
+
+  @unit
+  Scenario: a new organization is seeded with the production and staging prompt tags
+    Given organization records that an organization was created
+    When prompt's peer subscriber handles the fact
+    Then the organization has the production and staging prompt tags
+
+  @unit
+  Scenario: a redelivered creation fact seeds no prompt tag twice
+    Given an organization already seeded with the production and staging prompt tags
+    When the creation fact is delivered again
+    Then the organization still has exactly one production and one staging tag

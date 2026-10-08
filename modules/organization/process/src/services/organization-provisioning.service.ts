@@ -13,12 +13,18 @@ import type {
   OrganizationProvisioningSummary,
   OrganizationMembershipRepository,
 } from "../repositories/organization-membership.repository.ts";
+import type { OrganizationLifecycleNoticeService } from "./organization-lifecycle-notice.service.ts";
 import type { OrganizationTestArrivals } from "./organization-membership.service.ts";
-import type { OrganizationPromptSeed } from "./organization-prompt-seed.service.ts";
 
 /** The KSUID resources an organization and its first team are born under. */
 const ORGANIZATION_KSUID_RESOURCE = "organization";
 const TEAM_KSUID_RESOURCE = "team";
+
+/** Where every new organization is recorded as `lw.organization.created`; prompt seeds on it. */
+export type OrganizationCreationNotice = Pick<
+  OrganizationLifecycleNoticeService,
+  "created" | "reportError"
+>;
 
 /**
  * Founding and provisioning organizations: the signup path, the instance-provisioning path
@@ -27,7 +33,7 @@ const TEAM_KSUID_RESOURCE = "team";
 export class OrganizationProvisioningService {
   static create(dependencies: {
     repository: OrganizationMembershipRepository;
-    prompts: OrganizationPromptSeed;
+    creations: OrganizationCreationNotice;
     testArrivals: OrganizationTestArrivals;
   }): OrganizationProvisioningService {
     return new OrganizationProvisioningService(dependencies);
@@ -36,7 +42,7 @@ export class OrganizationProvisioningService {
   private constructor(
     private readonly dependencies: {
       repository: OrganizationMembershipRepository;
-      prompts: OrganizationPromptSeed;
+      creations: OrganizationCreationNotice;
       testArrivals: OrganizationTestArrivals;
     },
   ) {}
@@ -91,8 +97,9 @@ export class OrganizationProvisioningService {
       pricingModel: PricingModel.SEAT_EVENT,
     });
 
-    await this.dependencies.prompts.seedTagsForOrganization({
+    await this.dependencies.creations.created({
       organizationId: result.organization.id,
+      organizationName: result.organization.name,
     });
 
     return result;
@@ -128,8 +135,9 @@ export class OrganizationProvisioningService {
     });
 
     try {
-      await this.dependencies.prompts.seedTagsForOrganization({
+      await this.dependencies.creations.created({
         organizationId: result.organization.id,
+        organizationName: result.organization.name,
       });
     } catch (error) {
       // The caller has to see what actually went wrong, so a compensation
@@ -137,7 +145,7 @@ export class OrganizationProvisioningService {
       try {
         await this.repo.deleteProvisionedOrganization(result.organization.id);
       } catch (compensationError) {
-        this.dependencies.prompts.reportCompensationFailure(
+        this.dependencies.creations.reportError(
           compensationError instanceof Error
             ? compensationError
             : new Error(String(compensationError)),

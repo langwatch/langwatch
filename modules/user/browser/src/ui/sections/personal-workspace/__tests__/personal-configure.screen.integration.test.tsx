@@ -27,21 +27,30 @@ type ScreenState = {
   projectApiKey: string | null;
   features: { evaluations: boolean; datasets: boolean; annotations: boolean; automations: boolean };
   failWith: Error | undefined;
+  contextError: Error | null;
 };
 
 type Recorded = { name: string; input: unknown };
 
-const { state, calls } = vi.hoisted(() => {
+const { state, calls, pendingWorkspace } = vi.hoisted(() => {
+  /** The wire shape of the retryable refusal sent before the personal project exists. */
+  const pendingWorkspace = (): Error =>
+    Object.assign(new Error("personal_workspace_pending"), {
+      code: "personal_workspace_pending",
+      httpStatus: 409,
+      retryable: true,
+    });
   const state: ScreenState = {
     ctx: undefined,
     projectId: "proj_me",
     projectApiKey: "",
     features: { evaluations: true, datasets: true, annotations: true, automations: true },
     failWith: undefined,
+    contextError: null,
   };
   const mutations: Recorded[] = [];
   const invalidations: Recorded[] = [];
-  return { state, calls: { mutations, invalidations } };
+  return { state, calls: { mutations, invalidations }, pendingWorkspace };
 });
 
 vi.mock("../../../../behavior/use-personal-context.ts", () => ({
@@ -83,6 +92,15 @@ vi.mock("../../../../behavior/personal-workspace-api.ts", () => {
   const api = {
     useUtils: () => ({
       personalVirtualKeys: { list: { invalidate: invalidate("keys.list") } },
+      routingPolicy: {
+        personalContext: {
+          // The read answers as the server would while the workspace is still being created.
+          invalidate: (input?: unknown) => {
+            calls.invalidations.push({ name: "personalContext", input });
+            state.contextError = pendingWorkspace();
+          },
+        },
+      },
       personalWorkspaceFeatures: { get: { invalidate: invalidate("features.get") } },
     }),
     routingPolicy: {
@@ -91,6 +109,8 @@ vi.mock("../../../../behavior/personal-workspace-api.ts", () => {
           data: state.projectId
             ? { workspace: { project: { id: state.projectId, apiKey: state.projectApiKey } } }
             : undefined,
+          error: state.contextError,
+          isFetching: false,
         }),
       },
     },
@@ -154,6 +174,7 @@ beforeEach(() => {
   state.projectApiKey = "";
   state.features = { evaluations: true, datasets: true, annotations: true, automations: true };
   state.failWith = undefined;
+  state.contextError = null;
   calls.mutations.length = 0;
   calls.invalidations.length = 0;
 });
@@ -219,6 +240,18 @@ describe("PersonalConfigureScreen", () => {
       expect(host.recording.failures).toEqual([
         expect.objectContaining({ fallbackTitle: "Couldn't issue the personal key" }),
       ]);
+    });
+
+    /** @scenario "Issuing a personal key waits while the personal workspace is set up" */
+    it("waits for the personal workspace instead of reporting a failure", async () => {
+      state.failWith = pendingWorkspace();
+      const host = renderScreen();
+      await issueKey();
+
+      expect(host.recording.failures).toEqual([]);
+      expect(await screen.findByRole("status")).toHaveTextContent("Setting up your workspace");
+      expect(screen.getByRole("button", { name: "Create key" })).toBeDisabled();
+      expect(calls.invalidations).toContainEqual({ name: "personalContext", input: undefined });
     });
   });
 

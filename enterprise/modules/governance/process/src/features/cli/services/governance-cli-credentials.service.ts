@@ -15,7 +15,11 @@ import { createLogger } from "@langwatch/observability";
  * budget probe that decides whether a wrapped tool may run at all. The
  * transport renders these outcomes; every branch between them is decided here.
  */
-import { TeamNotFoundError } from "@langwatch/organization-contract";
+import {
+  PersonalWorkspacePendingError,
+  TeamNotFoundError,
+  type EnsuredPersonalWorkspace,
+} from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { UserApi } from "@langwatch/user-contract";
 
@@ -77,7 +81,7 @@ export type GovernanceCliCredentialMembers = Readonly<{
     userId: string;
     displayName?: string | null;
     displayEmail?: string | null;
-  }) => Promise<GovernanceCliPersonalWorkspace>;
+  }) => Promise<EnsuredPersonalWorkspace>;
   /** Throws `TeamNotFoundError` when the caller has no personal workspace here. */
   getPersonalWorkspace: (input: {
     organizationId: string;
@@ -193,13 +197,14 @@ export class GovernanceCliCredentialService implements GovernanceCliCredentialAp
     const person = await this.members.users.findById({ id: caller.user_id });
 
     try {
-      const workspace = await this.members.ensurePersonalWorkspace({
+      const ensured = await this.members.ensurePersonalWorkspace({
         organizationId: caller.organization_id,
         userId: caller.user_id,
         displayName: person?.name,
         displayEmail: person?.email,
       });
-      const { id, slug, name } = workspace.project;
+      if (ensured.kind === "pending") return { outcome: "failed" };
+      const { id, slug, name } = ensured.workspace.project;
 
       return { outcome: "resolved", project: { id, slug, name } };
     } catch (err) {
@@ -262,6 +267,9 @@ export class GovernanceCliCredentialService implements GovernanceCliCredentialAp
         return { outcome: "no-eligible-providers" };
       }
 
+      // Retryable: the CLI asks again once project has created the personal project.
+      if (err instanceof PersonalWorkspacePendingError) throw err;
+
       logger.error(
         { err, userId: caller.user_id },
         "[governance-cli] personal virtual key issuance failed",
@@ -300,12 +308,14 @@ export class GovernanceCliCredentialService implements GovernanceCliCredentialAp
       if (!(err instanceof PersonalVirtualKeyAlreadyExistsError)) throw err;
     }
 
-    const workspace = await this.members.ensurePersonalWorkspace({
+    const ensured = await this.members.ensurePersonalWorkspace({
       organizationId,
       userId,
       displayName: input.displayName,
       displayEmail: input.displayEmail,
     });
+    if (ensured.kind === "pending") throw new PersonalWorkspacePendingError();
+    const { workspace } = ensured;
     const suffix = input.deviceLabel ?? randomBytes(3).toString("hex");
 
     return this.members.personalKeys.personalVirtualKeyIssue({

@@ -22,11 +22,13 @@ import { Temporal } from "@langwatch/time";
 import type { OrganizationModule } from "../app/organization.app.ts";
 import type { OrganizationRepositories } from "../repositories/organization.repositories.ts";
 import {
+  RecordCreatedCommand,
   RecordIntegrationMethodChosenCommand,
   RecordInviteAcceptedCommand,
   RecordMembersInvitedCommand,
   RecordMemberDisabledCommand,
   RecordPersonalWorkspaceProvisionedCommand,
+  RecordPersonalTeamCreatedCommand,
   RecordPresenceSettingChangedCommand,
   RecordSignedUpCommand,
   RecordTraceSharingDisabledCommand,
@@ -37,11 +39,13 @@ import {
   membersInvitedEventSchema,
   ORGANIZATION_AGGREGATE_TYPE,
   ORGANIZATION_LIFECYCLE_PIPELINE_NAME,
+  organizationCreatedEventSchema,
   organizationMemberDisabledEventSchema,
   organizationPresenceSettingChangedEventSchema,
   organizationSignedUpEventSchema,
   organizationTraceSharingDisabledEventSchema,
   personalWorkspaceProvisionedEventSchema,
+  personalTeamCreatedEventSchema,
 } from "./organization-lifecycle.events.ts";
 
 /** Where billing's organisation-row facts land: organization's own writers (R42). */
@@ -74,18 +78,22 @@ function lifecycleCommands() {
       inviteAcceptedEventSchema,
       integrationMethodChosenEventSchema,
       personalWorkspaceProvisionedEventSchema,
+      personalTeamCreatedEventSchema,
       organizationPresenceSettingChangedEventSchema,
       organizationTraceSharingDisabledEventSchema,
       organizationMemberDisabledEventSchema,
+      organizationCreatedEventSchema,
     ])
     .withCommand("recordSignedUp", RecordSignedUpCommand)
     .withCommand("recordMembersInvited", RecordMembersInvitedCommand)
     .withCommand("recordInviteAccepted", RecordInviteAcceptedCommand)
     .withCommand("recordIntegrationMethodChosen", RecordIntegrationMethodChosenCommand)
     .withCommand("recordPersonalWorkspaceProvisioned", RecordPersonalWorkspaceProvisionedCommand)
+    .withCommand("recordPersonalTeamCreated", RecordPersonalTeamCreatedCommand)
     .withCommand("recordPresenceSettingChanged", RecordPresenceSettingChangedCommand)
     .withCommand("recordTraceSharingDisabled", RecordTraceSharingDisabledCommand)
-    .withCommand("recordMemberDisabled", RecordMemberDisabledCommand);
+    .withCommand("recordMemberDisabled", RecordMemberDisabledCommand)
+    .withCommand("recordCreated", RecordCreatedCommand);
 }
 
 export type OrganizationLifecycleDefinition = ReturnType<

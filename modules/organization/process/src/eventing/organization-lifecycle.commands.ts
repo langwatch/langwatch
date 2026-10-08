@@ -7,11 +7,14 @@ import {
   ORGANIZATION_PRESENCE_SETTING_CHANGED_EVENT_TYPE,
   ORGANIZATION_PRESENCE_SETTING_CHANGED_EVENT_VERSION,
   ORGANIZATION_SIGNED_UP_EVENT_TYPE,
+  ORGANIZATION_CREATED_EVENT_TYPE,
+  ORGANIZATION_CREATED_EVENT_VERSION,
   ORGANIZATION_MEMBER_DISABLED_EVENT_TYPE,
   ORGANIZATION_MEMBER_DISABLED_EVENT_VERSION,
   ORGANIZATION_TRACE_SHARING_DISABLED_EVENT_TYPE,
   ORGANIZATION_TRACE_SHARING_DISABLED_EVENT_VERSION,
   PERSONAL_WORKSPACE_PROVISIONED_EVENT_TYPE,
+  PERSONAL_TEAM_CREATED_EVENT_TYPE,
 } from "@langwatch/organization-contract";
 
 import {
@@ -20,29 +23,37 @@ import {
   type MembersInvitedEvent,
   ORGANIZATION_AGGREGATE_TYPE,
   ORGANIZATION_LIFECYCLE_EVENT_VERSION,
+  type OrganizationCreatedEvent,
   type OrganizationMemberDisabledEvent,
   type OrganizationPresenceSettingChangedEvent,
   type OrganizationSignedUpEvent,
   type OrganizationTraceSharingDisabledEvent,
   type PersonalWorkspaceProvisionedEvent,
+  type PersonalTeamCreatedEvent,
   RECORD_INTEGRATION_METHOD_CHOSEN_COMMAND_TYPE,
+  RECORD_CREATED_COMMAND_TYPE,
   RECORD_MEMBER_DISABLED_COMMAND_TYPE,
   RECORD_INVITE_ACCEPTED_COMMAND_TYPE,
   RECORD_MEMBERS_INVITED_COMMAND_TYPE,
   RECORD_PERSONAL_WORKSPACE_PROVISIONED_COMMAND_TYPE,
+  RECORD_PERSONAL_TEAM_CREATED_COMMAND_TYPE,
   RECORD_PRESENCE_SETTING_CHANGED_COMMAND_TYPE,
   RECORD_SIGNED_UP_COMMAND_TYPE,
   RECORD_TRACE_SHARING_DISABLED_COMMAND_TYPE,
   type RecordIntegrationMethodChosenCommandData,
   recordIntegrationMethodChosenCommandDataSchema,
   type RecordInviteAcceptedCommandData,
+  type RecordCreatedCommandData,
+  recordCreatedCommandDataSchema,
   type RecordMemberDisabledCommandData,
   recordMemberDisabledCommandDataSchema,
   recordInviteAcceptedCommandDataSchema,
   type RecordMembersInvitedCommandData,
   recordMembersInvitedCommandDataSchema,
   type RecordPersonalWorkspaceProvisionedCommandData,
+  type RecordPersonalTeamCreatedCommandData,
   recordPersonalWorkspaceProvisionedCommandDataSchema,
+  recordPersonalTeamCreatedCommandDataSchema,
   type RecordPresenceSettingChangedCommandData,
   recordPresenceSettingChangedCommandDataSchema,
   type RecordSignedUpCommandData,
@@ -216,6 +227,40 @@ export class RecordPersonalWorkspaceProvisionedCommand implements CommandHandler
 }
 
 /**
+ * Records a new personal team; keyed by the team, so a re-record from a pending ensure collapses.
+ */
+export class RecordPersonalTeamCreatedCommand implements CommandHandler<
+  Command<RecordPersonalTeamCreatedCommandData>,
+  PersonalTeamCreatedEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_PERSONAL_TEAM_CREATED_COMMAND_TYPE,
+    recordPersonalTeamCreatedCommandDataSchema,
+    "Record that a personal team was created, for project to create its personal project",
+  );
+
+  handle(command: Command<RecordPersonalTeamCreatedCommandData>): PersonalTeamCreatedEvent[] {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<PersonalTeamCreatedEvent>({
+        aggregateType: ORGANIZATION_AGGREGATE_TYPE,
+        aggregateId: data.organizationId,
+        tenantId: createTenantId(command.tenantId),
+        type: PERSONAL_TEAM_CREATED_EVENT_TYPE,
+        version: ORGANIZATION_LIFECYCLE_EVENT_VERSION,
+        data,
+        occurredAt: data.occurredAt,
+        idempotencyKey: `${data.teamId}:personal_team_created`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: RecordPersonalTeamCreatedCommandData): string {
+    return payload.organizationId;
+  }
+}
+
+/**
  * Records the organization's presence switch. A change is keyed on its moment; a backfill once per
  * organization, so a re-run collapses onto the first.
  */
@@ -316,6 +361,37 @@ export class RecordMemberDisabledCommand implements CommandHandler<
   }
 
   static getAggregateId(payload: RecordMemberDisabledCommandData): string {
+    return payload.organizationId;
+  }
+}
+
+export class RecordCreatedCommand implements CommandHandler<
+  Command<RecordCreatedCommandData>,
+  OrganizationCreatedEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_CREATED_COMMAND_TYPE,
+    recordCreatedCommandDataSchema,
+    "Record that an organization was created",
+  );
+
+  handle(command: Command<RecordCreatedCommandData>): OrganizationCreatedEvent[] {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<OrganizationCreatedEvent>({
+        aggregateType: ORGANIZATION_AGGREGATE_TYPE,
+        aggregateId: data.organizationId,
+        tenantId: createTenantId(command.tenantId),
+        type: ORGANIZATION_CREATED_EVENT_TYPE,
+        version: ORGANIZATION_CREATED_EVENT_VERSION,
+        data,
+        occurredAt: data.occurredAt,
+        idempotencyKey: `${data.organizationId}:created`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: RecordCreatedCommandData): string {
     return payload.organizationId;
   }
 }

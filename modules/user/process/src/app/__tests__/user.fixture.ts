@@ -122,8 +122,8 @@ export function createUserTestLifecycle() {
 export function createUserTestOrganizations(projectId = "project-1") {
   return Object.assign(createApiFixture<OrganizationApi>(), {
     ensurePersonalWorkspace: vi.fn(async () => ({
-      project: { id: projectId },
-      team: { id: "team-1" },
+      kind: "ready" as const,
+      workspace: { project: { id: projectId }, team: { id: "team-1" } },
     })),
     getPersonalWorkspace: vi.fn(async (): Promise<PersonalWorkspace> => {
       throw new TeamNotFoundError();

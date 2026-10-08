@@ -17,6 +17,7 @@ vi.mock("../../../../behavior/personal-workspace-api.ts", () => ({
   personalWorkspaceApi: {},
   api: {
     useUtils: () => ({ auth: { browserSessions: { invalidate: () => Promise.resolve() } } }),
+    routingPolicy: { personalContext: { useQuery: () => ({ error: null, isFetching: false }) } },
     identity: { myIdentifiers: { useQuery: () => ({ data: [] }) } },
     auth: {
       myAddressConfirmation: { useQuery: () => ({ data: undefined }) },

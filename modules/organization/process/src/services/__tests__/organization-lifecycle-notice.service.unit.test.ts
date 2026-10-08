@@ -18,8 +18,10 @@ function notices(
   const service = OrganizationLifecycleNoticeService.create({ reportError });
   service.connect({
     recordSignedUp,
+    recordCreated: idle,
     recordMembersInvited: idle,
     recordInviteAccepted: idle,
+    recordPersonalTeamCreated: idle,
     recordIntegrationMethodChosen,
     recordPersonalWorkspaceProvisioned,
     recordPresenceSettingChanged: idle,

@@ -82,9 +82,22 @@ describe.skipIf(!DB_URL)("given a member with a personal workspace in an organiz
       data: { userId: leaverUserId, organizationId, role: OrganizationUserRole.MEMBER },
     });
 
-    const workspace = await ensureLeaverWorkspace();
-    personalTeamId = workspace.workspace.team.id;
-    personalProjectId = workspace.workspace.project.id;
+    const first = await ensureLeaverWorkspace();
+    if (first.kind !== "pending") throw new Error("a first ensure leaves the project to project");
+    personalTeamId = first.team.id;
+    personalProjectId = identities.newProjectId();
+    // Stands in for project's subscriber, which creates the personal project.
+    await prisma!.project.create({
+      data: {
+        id: personalProjectId,
+        name: "Personal",
+        slug: `personal-${testNamespace}`,
+        apiKey: `sk-lw-${testNamespace}`,
+        teamId: personalTeamId,
+        language: "other",
+        framework: "other",
+      },
+    });
   });
 
   afterAll(async () => {
@@ -142,9 +155,10 @@ describe.skipIf(!DB_URL)("given a member with a personal workspace in an organiz
       it("hands back the same workspace rather than a new one", async () => {
         const result = await ensureLeaverWorkspace();
 
-        expect(result.created).toBe(false);
-        expect(result.workspace.team.id).toBe(personalTeamId);
-        expect(result.workspace.project.id).toBe(personalProjectId);
+        expect(result).toMatchObject({
+          kind: "ready",
+          workspace: { team: { id: personalTeamId }, project: { id: personalProjectId } },
+        });
       });
 
       /** @scenario Inviting a removed member back gives them their workspace again */

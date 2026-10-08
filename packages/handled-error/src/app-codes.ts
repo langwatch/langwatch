@@ -565,6 +565,7 @@ export const APP_ERROR_CODES = [
   "personal_virtual_key_label_taken",
   "personal_workspace_boundary",
   "personal_workspace_not_managed_here",
+  "personal_workspace_pending",
   "platform_health_subsystem_not_found",
   "platform_health_unhealthy",
   "platform_operator_last_holder",

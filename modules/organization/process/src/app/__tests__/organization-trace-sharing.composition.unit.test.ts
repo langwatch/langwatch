@@ -27,11 +27,13 @@ function lifecycleSenders({
 }): OrganizationLifecycleSenders {
   const accepts = { send: async () => undefined };
   return {
+    recordCreated: { send: async () => undefined },
     recordSignedUp: accepts,
     recordMembersInvited: accepts,
     recordInviteAccepted: accepts,
     recordIntegrationMethodChosen: accepts,
     recordPersonalWorkspaceProvisioned: accepts,
+    recordPersonalTeamCreated: accepts,
     recordPresenceSettingChanged: accepts,
     recordMemberDisabled: accepts,
     recordTraceSharingDisabled: {

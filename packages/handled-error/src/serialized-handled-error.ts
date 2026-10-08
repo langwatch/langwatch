@@ -68,6 +68,7 @@ export interface SerializedHandledError {
   traceId?: string;
   spanId?: string;
   traceUrl?: string;
+  logsUrl?: string;
   httpStatus: number;
   fault: HandledErrorFault;
   tips?: readonly string[];
@@ -84,6 +85,7 @@ const serializedHandledErrorWireSchema = z
     traceId: z.string().optional(),
     spanId: z.string().optional(),
     traceUrl: z.string().optional(),
+    logsUrl: z.string().optional(),
     httpStatus: z.number(),
     fault: handledErrorFaultSchema.default("customer"),
     tips: z.array(z.string()).optional(),

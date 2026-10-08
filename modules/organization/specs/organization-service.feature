@@ -137,6 +137,7 @@ Feature: Shared organization service
     And each identifier carries the resource prefix the existing rows already use
     And the team and the project receive separate slugs seeded from the user identifier
     And no composition root describes any of those formats
+    And the personal project id is a fresh strict project KSUID, never derived from the team id
 
   @unit
   Scenario: Ensuring a personal workspace leaves an existing membership as it was
@@ -286,3 +287,43 @@ Feature: Shared organization service
       Given a process in which organization's lifecycle pipeline is not registered
       When an administrator disables a member
       Then the disable is refused rather than left without its session revocation
+
+  @unit
+  Scenario: A new personal workspace answers pending until project has created its project
+    Given a user with no personal workspace in an organization
+    When the user's personal workspace is ensured
+    Then organization creates the personal team and its owner membership, and no project row
+    And it records "lw.organization.personal_team_created" with the team id, a freshly minted project id and the project slug
+    And it answers pending with the team to wait on
+
+  @unit
+  Scenario: Ensuring again while the personal project is pending creates no second team
+    Given a personal team whose personal project has not been created yet
+    When the user's personal workspace is ensured again
+    Then no second personal team is created
+    And it answers pending with the same team
+    And it records "lw.organization.personal_team_created" again with a new project id, so a lost record heals
+
+  @unit
+  Scenario: Ensuring a personal workspace whose project exists answers ready
+    Given a personal team whose personal project has been created
+    When the user's personal workspace is ensured
+    Then it answers ready with the team and the project, and records nothing
+
+  @unit
+  Scenario: The personal team fact never carries the project key
+    When organization records "lw.organization.personal_team_created"
+    Then the fact carries no API key
+
+  @unit
+  Scenario: A mutation that needs a pending personal project refuses as retryable
+    Given a personal workspace whose project is pending
+    When a caller needs the personal project to make a change
+    Then it refuses with "personal_workspace_pending", a retryable handled error, and changes nothing
+
+  @unit
+  Scenario: Every way an organization is created records lw.organization.created
+    Given an organization is created by sign-up, by instance provisioning or for a self-hosted customer
+    When the organization and its first team are committed
+    Then organization records "lw.organization.created" carrying the organization's id and name
+    And peers such as prompt seed their own defaults from that fact

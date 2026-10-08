@@ -1,6 +1,10 @@
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { EnsuredPersonalWorkspace, OrganizationApi } from "@langwatch/organization-contract";
+import type {
+  EnsuredPersonalWorkspace,
+  OrganizationApi,
+  PersonalWorkspace,
+} from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { fromDate, toDate, type Instant } from "@langwatch/time";
 import { USER_AVATAR_MAX_BYTES, type UserFullProfile } from "@langwatch/user-contract";
@@ -32,10 +36,17 @@ function lifecyclePeers() {
   };
 }
 
-const ENSURED_WORKSPACE: EnsuredPersonalWorkspace = {
+const PERSONAL_WORKSPACE: PersonalWorkspace = {
   team: { id: "team-1", name: "Personal", slug: "personal", createdAtMs: 0 },
   project: { id: "project-1", name: "Personal", slug: "personal", apiKey: "key-1", createdAtMs: 0 },
-  created: true,
+};
+const ENSURED_WORKSPACE: EnsuredPersonalWorkspace = {
+  kind: "ready",
+  workspace: PERSONAL_WORKSPACE,
+};
+const PENDING_WORKSPACE: EnsuredPersonalWorkspace = {
+  kind: "pending",
+  team: PERSONAL_WORKSPACE.team,
 };
 
 const user: UserFullProfile = {
@@ -121,11 +132,14 @@ class StubAvatarStorage implements UserAvatarStorage {
 const PNG =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
 
-function createService({ auth = createApiFixture<AuthApi>({}) }: { auth?: AuthApi } = {}) {
+function createService({
+  auth = createApiFixture<AuthApi>({}),
+  ensured = ENSURED_WORKSPACE,
+}: { auth?: AuthApi; ensured?: EnsuredPersonalWorkspace } = {}) {
   const repository = new StubRepository();
   const avatarStorage = new StubAvatarStorage();
   const organizations = createApiFixture<OrganizationApi>({
-    ensurePersonalWorkspace: async () => ENSURED_WORKSPACE,
+    ensurePersonalWorkspace: async () => ensured,
   });
   return {
     service: UserService.create({
@@ -315,6 +329,19 @@ describe("UserService", () => {
       id: "user-1",
       image: "/api/user-avatar/project-1/object-1",
     });
+  });
+
+  /** @scenario "Uploading an avatar while the personal project is still being created" */
+  it("refuses an avatar as retryable while the personal project is pending, storing nothing", async () => {
+    const { service, repository, avatarStorage } = createService({ ensured: PENDING_WORKSPACE });
+    await expect(
+      service.setAvatar({ userId: "user-1", organizationId: "org-1", imageDataUrl: PNG }),
+    ).rejects.toMatchObject({
+      code: "personal_workspace_pending",
+      retryable: true,
+    });
+    expect(avatarStorage.store).not.toHaveBeenCalled();
+    expect(repository.setAvatar).not.toHaveBeenCalled();
   });
 
   it("owns user-scoped display preferences", async () => {

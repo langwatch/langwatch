@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /** Every `governance.*` procedure served so far, declared once, at main's wire names. */
 import { defineTrpcContract } from "@langwatch/module";
+import { PROJECT_CREATED_EVENT_TYPE } from "@langwatch/project-contract";
 import { z } from "zod";
 
 import {
@@ -24,7 +25,9 @@ const organizationScope = z.object({ organizationId: z.string() });
 
 export const governanceTrpc = defineTrpcContract("governance")
   /** An actor stamped on spans (email or user id) to their personal workspace here, or null. */
-  .query("resolveActorPersonalProject")
+  .query("resolveActorPersonalProject", {
+    invalidatedBy: [{ event: PROJECT_CREATED_EVENT_TYPE, scope: "organizationId" }],
+  })
   .withInput(z.object({ organizationId: z.string(), actor: z.string().min(1).max(512) }))
   .withOutput(governanceActorWorkspaceSchema.nullable())
 

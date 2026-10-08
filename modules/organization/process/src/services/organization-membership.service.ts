@@ -35,8 +35,10 @@ import type {
   OrganizationSeatRevocationNotice,
 } from "./organization-member-role.service.ts";
 import { OrganizationMemberRoleService } from "./organization-member-role.service.ts";
-import type { OrganizationPromptSeed } from "./organization-prompt-seed.service.ts";
-import { OrganizationProvisioningService } from "./organization-provisioning.service.ts";
+import {
+  OrganizationProvisioningService,
+  type OrganizationCreationNotice,
+} from "./organization-provisioning.service.ts";
 import type {
   OrganizationSeatLicense,
   OrganizationPlanUser,
@@ -60,7 +62,7 @@ export class OrganizationMembershipService {
 
   static create(dependencies: {
     repository: OrganizationMembershipRepository;
-    prompts: OrganizationPromptSeed;
+    creations: OrganizationCreationNotice;
     seats: OrganizationSeatLicense;
     seatNotices: OrganizationSeatRevocationNotice;
     grantCache: OrganizationGrantCache;
@@ -75,7 +77,7 @@ export class OrganizationMembershipService {
   private constructor(
     private readonly dependencies: {
       repository: OrganizationMembershipRepository;
-      prompts: OrganizationPromptSeed;
+      creations: OrganizationCreationNotice;
       seats: OrganizationSeatLicense;
       seatNotices: OrganizationSeatRevocationNotice;
       grantCache: OrganizationGrantCache;

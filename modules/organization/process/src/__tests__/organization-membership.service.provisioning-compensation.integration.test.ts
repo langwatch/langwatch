@@ -23,7 +23,7 @@ import type {
   OrganizationSeatRevocationNotice,
 } from "../services/organization-member-role.service.ts";
 import { OrganizationMembershipService } from "../services/organization-membership.service.ts";
-import type { OrganizationPromptSeed } from "../services/organization-prompt-seed.service.ts";
+import type { OrganizationCreationNotice } from "../services/organization-provisioning.service.ts";
 import type { OrganizationSeatLicense } from "../services/organization-seat-license.service.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
@@ -47,21 +47,21 @@ const grantCache: OrganizationGrantCache = {
 };
 
 /** A prompt-seed port whose seeding is down, recording who it was asked about. */
-function buildFailingPrompts(seenOrganizationIds: string[]): OrganizationPromptSeed {
+function buildFailingPrompts(seenOrganizationIds: string[]): OrganizationCreationNotice {
   return {
-    seedTagsForOrganization: vi.fn(async ({ organizationId }: { organizationId: string }) => {
+    created: vi.fn(async ({ organizationId }: { organizationId: string }) => {
       seenOrganizationIds.push(organizationId);
       throw new Error(SEEDING_FAILURE);
     }),
-    reportCompensationFailure: vi.fn(),
+    reportError: vi.fn(),
   };
 }
 
 /** A prompt-seed port that works, for the retry half of the scenario. */
-function buildWorkingPrompts(): OrganizationPromptSeed {
+function buildWorkingPrompts(): OrganizationCreationNotice {
   return {
-    seedTagsForOrganization: vi.fn(async () => {}),
-    reportCompensationFailure: vi.fn(),
+    created: vi.fn(async () => {}),
+    reportError: vi.fn(),
   };
 }
 
@@ -103,7 +103,7 @@ describe.skipIf(!DB_URL)("OrganizationMembershipService.createForProvisioning", 
       const attempted: string[] = [];
       const failing = OrganizationMembershipService.create({
         repository: repo,
-        prompts: buildFailingPrompts(attempted),
+        creations: buildFailingPrompts(attempted),
         seats,
         seatNotices,
         grantCache,
@@ -128,7 +128,7 @@ describe.skipIf(!DB_URL)("OrganizationMembershipService.createForProvisioning", 
 
       const retried = await OrganizationMembershipService.create({
         repository: repo,
-        prompts: buildWorkingPrompts(),
+        creations: buildWorkingPrompts(),
         seats,
         seatNotices,
         grantCache,

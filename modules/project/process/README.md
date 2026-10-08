@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`ProjectApi`)
 
-Peers call these through the token, declared at `../contract/src/project.api.ts:53`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/project.api.ts:64`; nothing else in this package is public.
 
 #### `listPaths`
 
@@ -308,6 +308,14 @@ Project ids on this install ordered by id, archived included, a page at a time f
 listAllIds(input?: ProjectIdPageInput): Promise<ProjectIdPage>;
 ```
 
+#### `listAllWithOrganization`
+
+Every project with its organisation, paged like `listAllIds`, for the storage migration inventory (main `migrateObjectStorage.ts` `listProjectsPage`).
+
+```typescript
+listAllWithOrganization(input?: ProjectIdPageInput): Promise<ProjectOrganizationPage>;
+```
+
 ## REST transport
 
 ### `projectRest`
@@ -329,7 +337,7 @@ Permission `project:view`. Declared at `src/transport/project.rest.ts:98`.
 Answers at `/api/projects/:id`; also, undocumented, `/api/projects/2026-08-07/:id`, `/api/projects/latest/:id`.
 
 ```typescript
-// Params: projectRestParamsSchema, ../contract/src/project-rest.schemas.ts:14
+// Params: projectRestParamsSchema, ../contract/src/project.ts:279
 interface Params {
   id: string;
 }
@@ -356,8 +364,8 @@ Permission `project:update`. Declared at `src/transport/project.rest.ts:116`.
 Answers at `/api/projects/:id`; also, undocumented, `/api/projects/2026-08-07/:id`, `/api/projects/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project-rest.schemas.ts:14
-// Body: projectRestUpdateSchema, ../contract/src/project-rest.schemas.ts:4
+type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project.ts:279
+// Body: projectRestUpdateSchema, ../contract/src/project.ts:269
 interface Body {
   name?: string;
   language?: string;
@@ -377,7 +385,7 @@ Permission `project:delete`. Declared at `src/transport/project.rest.ts:133`.
 Answers at `/api/projects/:id`; also, undocumented, `/api/projects/2026-08-07/:id`, `/api/projects/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project-rest.schemas.ts:14
+type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project.ts:279
 // Response: projectRestArchivedSchema, ../contract/src/project.responses.ts:72
 interface Response {
   id: string;
@@ -395,7 +403,7 @@ Authenticated: the base key is never handed to an API token, so there is no perm
 Answers at `/api/projects/:id/api-key`; also, undocumented, `/api/projects/2026-08-07/:id/api-key`, `/api/projects/latest/:id/api-key`.
 
 ```typescript
-type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project-rest.schemas.ts:14
+type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project.ts:279
 // Response: projectApiKeyRotationSchema, ../contract/src/project.responses.ts:30
 interface Response {
   apiKey: string;
@@ -411,8 +419,8 @@ Authenticated: the base key is never handed to an API token, so there is no perm
 Answers at `/api/projects/:id/regenerate-api-key`; also, undocumented, `/api/projects/2026-08-07/:id/regenerate-api-key`, `/api/projects/latest/:id/regenerate-api-key`.
 
 ```typescript
-type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project-rest.schemas.ts:14
-// Body: projectRestRegenerateApiKeyInputSchema, ../contract/src/project-rest.schemas.ts:17
+type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project.ts:279
+// Body: projectRestRegenerateApiKeyInputSchema, ../contract/src/project.ts:282
 type Body = Record<string, unknown>;
 type Response = z.infer<typeof projectApiKeyRotationSchema>; // ../contract/src/project.responses.ts:30
 ```
@@ -502,17 +510,17 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `project_lifecycle` (aggregate `project`)
 
-Declared at `src/eventing/project-lifecycle.pipeline.ts:38`. Events: `projectCreatedEventSchema`, `projectLegacyKeyRevokedEventSchema`, `projectPresenceSettingChangedEventSchema`, `projectMovedEventSchema`, `projectArchivedEventSchema`, `projectDepartmentAssignedEventSchema`, `projectTraceSharingDisabledEventSchema`.
+Declared at `src/eventing/project-lifecycle.pipeline.ts:47`. Events: `projectCreatedEventSchema`, `projectLegacyKeyRevokedEventSchema`, `projectPresenceSettingChangedEventSchema`, `projectMovedEventSchema`, `projectArchivedEventSchema`, `projectDepartmentAssignedEventSchema`, `projectTraceSharingDisabledEventSchema`.
 
 | Kind    | Name                                | Handles | Declared at                                     |
 | ------- | ----------------------------------- | ------- | ----------------------------------------------- |
-| command | `recordProjectCreated`              | –       | `src/eventing/project-lifecycle.pipeline.ts:51` |
-| command | `recordProjectLegacyKeyRevoked`     | –       | `src/eventing/project-lifecycle.pipeline.ts:52` |
-| command | `recordPresenceSettingChanged`      | –       | `src/eventing/project-lifecycle.pipeline.ts:53` |
-| command | `recordProjectMoved`                | –       | `src/eventing/project-lifecycle.pipeline.ts:54` |
-| command | `recordProjectArchived`             | –       | `src/eventing/project-lifecycle.pipeline.ts:55` |
-| command | `recordProjectDepartmentAssigned`   | –       | `src/eventing/project-lifecycle.pipeline.ts:56` |
-| command | `recordProjectTraceSharingDisabled` | –       | `src/eventing/project-lifecycle.pipeline.ts:57` |
+| command | `recordProjectCreated`              | –       | `src/eventing/project-lifecycle.pipeline.ts:60` |
+| command | `recordProjectLegacyKeyRevoked`     | –       | `src/eventing/project-lifecycle.pipeline.ts:61` |
+| command | `recordPresenceSettingChanged`      | –       | `src/eventing/project-lifecycle.pipeline.ts:62` |
+| command | `recordProjectMoved`                | –       | `src/eventing/project-lifecycle.pipeline.ts:63` |
+| command | `recordProjectArchived`             | –       | `src/eventing/project-lifecycle.pipeline.ts:64` |
+| command | `recordProjectDepartmentAssigned`   | –       | `src/eventing/project-lifecycle.pipeline.ts:65` |
+| command | `recordProjectTraceSharingDisabled` | –       | `src/eventing/project-lifecycle.pipeline.ts:66` |
 
 ### Tasks
 

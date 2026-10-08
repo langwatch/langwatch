@@ -1615,6 +1615,10 @@ const presentations = {
     describe: () =>
       "Every personal workspace keeps its own project. Archive a team project instead.",
   },
+  personal_workspace_pending: {
+    title: "Your personal workspace is still being set up",
+    describe: () => "Try again in a moment.",
+  },
   organization_not_found: {
     title: "Organization not found",
     describe: () =>

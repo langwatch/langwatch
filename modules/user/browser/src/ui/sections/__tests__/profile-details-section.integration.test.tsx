@@ -18,6 +18,8 @@ type NameMutationOptions = { onSuccess?: () => Promise<void>; onError?: (error: 
 vi.mock("../../../behavior/personal-workspace-api.ts", () => ({
   personalWorkspaceApi: {},
   api: {
+    useUtils: () => ({}),
+    routingPolicy: { personalContext: { useQuery: () => ({ error: null, isFetching: false }) } },
     user: {
       updateName: {
         useMutation: (options: NameMutationOptions) => ({

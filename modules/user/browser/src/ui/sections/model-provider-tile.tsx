@@ -12,6 +12,10 @@ import { Check, ChevronDown, ChevronRight, Copy, Eye, EyeOff } from "lucide-reac
 import { useState } from "react";
 
 import { api } from "../../behavior/personal-workspace-api.ts";
+import {
+  PERSONAL_WORKSPACE_WAIT_HINT,
+  usePersonalWorkspaceWait,
+} from "../../behavior/use-personal-workspace-wait.ts";
 import type { AiToolConfigOf } from "../../model/ai-tool-config.ts";
 import { Link } from "../elements/personal-link.tsx";
 import { TileIcon } from "../elements/tile-icon.tsx";
@@ -92,6 +96,7 @@ export function ModelProviderTile({
   const [copied, setCopied] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const workspaceWait = usePersonalWorkspaceWait({ organizationId });
   const issueMutation = api.personalVirtualKeys.issuePersonal.useMutation({
     onSuccess: (result) => {
       setIssued({
@@ -102,6 +107,7 @@ export function ModelProviderTile({
       setErrorMessage(null);
     },
     onError: (err) => {
+      if (workspaceWait.absorb(err)) return;
       setErrorMessage(humanizeZodMessage(err.message));
     },
   });
@@ -223,13 +229,22 @@ export function ModelProviderTile({
             />
           </VStack>
           <HStack gap={2}>
-            <Button size="sm" onClick={onIssue} disabled={!label.trim() || issuing}>
+            <Button
+              size="sm"
+              onClick={onIssue}
+              disabled={!label.trim() || issuing || workspaceWait.waiting}
+            >
               {issuing ? "Issuing…" : "Issue key"}
             </Button>
             <Button size="sm" variant="ghost" onClick={() => setExpanded(false)}>
               Cancel
             </Button>
           </HStack>
+          {workspaceWait.waiting && (
+            <Text fontSize="xs" color="fg.muted" as="output" display="block">
+              {PERSONAL_WORKSPACE_WAIT_HINT}
+            </Text>
+          )}
           {errorMessage && (
             <Box
               padding={2}

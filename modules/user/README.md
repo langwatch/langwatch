@@ -11,7 +11,7 @@ Users: profiles and avatars, account and single sign-on status, and the sign-in 
 | Classification | core (`modules/catalogue.json`)                                                            |
 | Subjects       | user, user-avatar                                                                          |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                   |
-| Api token      | `UserApi` = `moduleApi<UserApi>()("user")`, `contract/src/user.api.ts:193` (59 operations) |
+| Api token      | `UserApi` = `moduleApi<UserApi>()("user")`, `contract/src/user.api.ts:165` (51 operations) |
 | Other token    | `UserAvatarFileApi`, `process/src/transport/user-avatar.rest.ts:23`                        |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                 |
 
@@ -23,7 +23,7 @@ Users: profiles and avatars, account and single sign-on status, and the sign-in 
 | Postgres table                 | `User`                                                                                                                                                   | `process/src/repositories/prisma/prisma.user.repository.ts:96`                       |
 | Postgres table                 | `Account`                                                                                                                                                | `process/src/repositories/prisma/prisma.user.repository.ts:96`                       |
 | Postgres table                 | `Passkey`                                                                                                                                                | `process/src/repositories/prisma/prisma.user.repository.ts:96`                       |
-| Postgres, accessed not claimed | `Organization`, `OrganizationUser`, `Project`                                                                                                            | `process/src/repositories/prisma/prisma.user-organization-directory.repository.ts:8` |
+| Postgres, accessed not claimed | `Organization`, `OrganizationUser`, `Project`                                                                                                            | `process/src/repositories/prisma/prisma.user-organization-directory.repository.ts:9` |
 | Stores required                |                                                                                                                                                          | `process/src/channels/user.channels.ts:21`                                           |
 | Stores required                | prisma, redis                                                                                                                                            | `process/src/repositories/live/live.user.repositories.ts:11`                         |
 | Config                         | `publicBaseUrl` (BASE_HOST), `passkeysEnabled` (PASSKEYS_ENABLED), `mfaEnrollmentOpen` (MFA_ENROLLMENT_OPEN), `localPasswords` (LOCAL_PASSWORDS_ENABLED) | `contract/src/user.config.ts:13`                                                     |
@@ -34,11 +34,9 @@ Anything else user needs belongs to another module and is reached through its `*
 
 | Name            | Token                 | Module                                      |
 | --------------- | --------------------- | ------------------------------------------- |
-| `auth`          | `AuthApi`             | [auth](../auth/README.md)                   |
 | `authz`         | `AuthzApi`            | [authz](../authz/README.md)                 |
 | `notifications` | `NotificationService` | [notification](../notification/README.md)   |
 | `organizations` | `OrganizationApi`     | [organization](../organization/README.md)   |
-| `projects`      | `ProjectApi`          | [project](../project/README.md)             |
 | `storedObjects` | `StoredObjectApi`     | [stored-object](../stored-object/README.md) |
 
 ## Who depends on user

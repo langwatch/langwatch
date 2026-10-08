@@ -21,11 +21,14 @@ import type { Instant } from "@langwatch/time";
 export type PersonalWorkspaceResourceIds = {
   teamId: string;
   teamSlug: string;
-  projectId: string;
   projectSlug: string;
-  projectApiKey: string;
   ownerBindingId: string;
 };
+
+/** The personal workspace, or its personal team while project has not created its project. */
+export type EnsuredPersonalTeam =
+  | { kind: "ready"; workspace: PersonalWorkspace }
+  | { kind: "pending"; team: PersonalWorkspace["team"] };
 
 /** What a team read shows of one project, read through the `Project` share. */
 export type OrganizationTeamProject = Pick<
@@ -193,10 +196,7 @@ export abstract class OrganizationRepository {
   abstract ensurePersonalWorkspace(input: {
     workspace: PersonalWorkspaceInput;
     resources: PersonalWorkspaceResourceIds;
-  }): Promise<{
-    workspace: PersonalWorkspace;
-    created: boolean;
-  }>;
+  }): Promise<EnsuredPersonalTeam>;
   abstract getPersonalWorkspaceFeatureProject(
     projectId: string,
   ): Promise<PersonalWorkspaceFeatureProject>;

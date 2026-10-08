@@ -141,20 +141,16 @@ async function personalProjectFieldsOf({
   }>
 > {
   try {
-    const workspace = await flow.ensurePersonalWorkspace({
+    const ensured = await flow.ensurePersonalWorkspace({
       organizationId: organization.id,
       userId: user.id,
       displayName: user.name,
       displayEmail: user.email,
     });
+    if (ensured.kind === "pending") return {};
+    const { id, slug, name } = ensured.workspace.project;
 
-    return {
-      personal_project: {
-        id: workspace.project.id,
-        slug: workspace.project.slug,
-        name: workspace.project.name,
-      },
-    };
+    return { personal_project: { id, slug, name } };
   } catch (err) {
     logger.error(
       { err, userId: user.id, organizationId: organization.id },

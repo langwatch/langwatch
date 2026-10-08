@@ -108,20 +108,20 @@ async function application({ plan = {} }: { plan?: Partial<Plan> } = {}) {
     resources: {
       teamId: PERSONAL_TEAM_ID,
       teamSlug: "--personal-admin",
-      projectId: "project_personal",
       projectSlug: "personal-admin",
-      projectApiKey: "sk-lw-personal",
       ownerBindingId: "binding-admin-personal",
     },
   });
   const app = await OrganizationModule.create(setup);
   const accepts = { send: async () => undefined };
   app.connectLifecycle({
+    recordCreated: { send: async () => undefined },
     recordSignedUp: accepts,
     recordMembersInvited: accepts,
     recordInviteAccepted: accepts,
     recordIntegrationMethodChosen: accepts,
     recordPersonalWorkspaceProvisioned: accepts,
+    recordPersonalTeamCreated: accepts,
     recordPresenceSettingChanged: accepts,
     recordTraceSharingDisabled: accepts,
     recordMemberDisabled: { send: async (data) => void disabledMembers.push(data) },

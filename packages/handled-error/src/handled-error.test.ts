@@ -6,6 +6,7 @@ import {
   NotFoundError,
   serializedHandledErrorSchema,
   setTraceUrlProvider,
+  traceLinksFor,
 } from "./index.ts";
 
 class TestError extends HandledError {
@@ -133,7 +134,9 @@ describe("HandledError.serialize", () => {
 
   it("uses the configured trace URL provider", () => {
     const provider = vi.fn((traceId: string | undefined) =>
-      traceId ? `https://grafana/${traceId}` : undefined,
+      traceId
+        ? { traceUrl: `https://grafana/${traceId}`, logsUrl: `https://grafana/logs/${traceId}` }
+        : undefined,
     );
     setTraceUrlProvider(provider);
     try {
@@ -143,6 +146,11 @@ describe("HandledError.serialize", () => {
 
       const withIds = new TestError("with ids", { traceId: "abc123" });
       expect(withIds.serialize().traceUrl).toBe("https://grafana/abc123");
+      expect(withIds.serialize().logsUrl).toBe("https://grafana/logs/abc123");
+      expect(traceLinksFor("abc123")).toEqual({
+        traceUrl: "https://grafana/abc123",
+        logsUrl: "https://grafana/logs/abc123",
+      });
       expect(provider).toHaveBeenCalledWith("abc123");
     } finally {
       setTraceUrlProvider(() => undefined);
@@ -224,7 +232,7 @@ describe("HandledError.isHandled", () => {
     vi.resetModules();
     const duplicateModule = await import("./handled-error.ts");
     duplicateModule.setTraceUrlProvider((traceId) =>
-      traceId ? `https://traces.example/${traceId}` : void 0,
+      traceId ? { traceUrl: `https://traces.example/${traceId}` } : void 0,
     );
 
     const error = new TestError("boom", { traceId: "trace-1" });

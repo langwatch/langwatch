@@ -155,7 +155,7 @@ export class PromptModule implements PromptApi {
   static createWithPrompts(setup: PromptSetup, prompts: PromptService): PromptModule {
     const { dependencies, config } = setup;
     const logger = createLogger("langwatch:prompt");
-    const lifecycle = buildPromptLifecyclePipeline();
+    const lifecycle = buildPromptLifecyclePipeline({ tags: prompts });
     // Tied the knot: the callback below fires only once a request calls
     // `announceCreated`, by which point `app` is always assigned.
     const appRef: { current?: PromptModule } = {};

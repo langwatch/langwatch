@@ -128,9 +128,7 @@ async function seed(
     resources: {
       teamId: PERSONAL_TEAM_ID,
       teamSlug: "--personal-owner",
-      projectId: "project_personal",
       projectSlug: "personal-owner",
-      projectApiKey: "sk-lw-personal",
       ownerBindingId: "binding-owner-personal",
     },
   });

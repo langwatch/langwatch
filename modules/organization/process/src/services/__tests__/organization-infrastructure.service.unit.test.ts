@@ -32,6 +32,7 @@ import type { PersonalWorkspaceIdentity } from "../../features/personal-workspac
 import type * as groupRepositoryModule from "../../repositories/group.repository.ts";
 import {
   OrganizationRepository,
+  type EnsuredPersonalTeam,
   type PersonalWorkspaceFeatureProject,
   type PersonalWorkspaceResourceIds,
   type StoredOrganizationSettings,
@@ -184,10 +185,7 @@ class StubRepository extends OrganizationRepository {
     return Promise.reject(new TeamNotFoundError());
   }
 
-  ensurePersonalWorkspace(): Promise<{
-    workspace: PersonalWorkspace;
-    created: boolean;
-  }> {
+  ensurePersonalWorkspace(): Promise<EnsuredPersonalTeam> {
     throw new Error("not used by this test");
   }
 
@@ -224,11 +222,13 @@ class FixedIdentities implements PersonalWorkspaceIdentity {
     return {
       teamId: "team",
       teamSlug: "team",
-      projectId: "project",
       projectSlug: "project",
-      projectApiKey: "key",
       ownerBindingId: "binding",
     };
+  }
+
+  newProjectId(): string {
+    return "project";
   }
 }
 
@@ -765,6 +765,7 @@ describe("OrganizationService", () => {
     const repository = new StubRepository("team");
     repository.ensurePersonalWorkspace = () =>
       Promise.resolve({
+        kind: "ready",
         workspace: {
           team: {
             id: "team",
@@ -780,7 +781,6 @@ describe("OrganizationService", () => {
             createdAtMs: 1,
           },
         },
-        created: false,
       });
     const grants = new RecordingGrants();
 
@@ -789,7 +789,7 @@ describe("OrganizationService", () => {
         userId: "user",
         organizationId: "org",
       }),
-    ).resolves.toMatchObject({ created: false });
+    ).resolves.toMatchObject({ kind: "ready" });
     expect(grants.attachedInputs).toEqual([
       {
         organizationId: "org",
@@ -816,6 +816,7 @@ describe("OrganizationService", () => {
     const repository = new StubRepository("team");
     repository.ensurePersonalWorkspace = () =>
       Promise.resolve({
+        kind: "ready",
         workspace: {
           team: {
             id: "team",
@@ -831,7 +832,6 @@ describe("OrganizationService", () => {
             createdAtMs: 1,
           },
         },
-        created: true,
       });
 
     await expect(
@@ -842,6 +842,6 @@ describe("OrganizationService", () => {
         userId: "user",
         organizationId: "org",
       }),
-    ).resolves.toMatchObject({ created: true });
+    ).resolves.toMatchObject({ kind: "ready" });
   });
 });

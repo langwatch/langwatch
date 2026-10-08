@@ -176,8 +176,6 @@ import { OrganizationLifecycleNoticeService } from "../services/organization-lif
 import type { OrganizationLifecycleSenders } from "../services/organization-lifecycle-notice.service.ts";
 import type { OrganizationGrantCache } from "../services/organization-member-role.service.ts";
 import { OrganizationMembershipService } from "../services/organization-membership.service.ts";
-import { OrganizationPromptSeedService } from "../services/organization-prompt-seed.service.ts";
-import type { OrganizationPromptSeed } from "../services/organization-prompt-seed.service.ts";
 import { OrganizationScopeGraphService } from "../services/organization-scope-graph.service.ts";
 import { OrganizationSeatLicenseService } from "../services/organization-seat-license.service.ts";
 import type {
@@ -238,7 +236,6 @@ export type OrganizationInfrastructure = Readonly<{
   teamIdentities: TeamIdentity;
   groupIdentities: GroupIdentity;
   diagnostics?: PersonalWorkspaceDiagnostics;
-  prompts: OrganizationPromptSeed;
   seats: OrganizationSeatLicense;
   /** The full and lite seats an organization holds, as a licence and a plan count them. */
   seatCounts: OrganizationSeatRepository;
@@ -335,7 +332,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     const membershipRepository = setup.repositories.membership(setup.dependencies.permissions);
     const membership = OrganizationMembershipService.create({
       repository: membershipRepository,
-      prompts: infrastructure.prompts,
+      creations: infrastructure.lifecycle,
       seats: infrastructure.seats,
       seatNotices: infrastructure.lifecycle,
       grantCache: AuthzApiOrganizationGrantCache.create(setup.dependencies.permissions),
@@ -450,7 +447,6 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       teamIdentities: TeamIdentityService.create(),
       groupIdentities: GroupIdentityService.create(),
       diagnostics: PersonalWorkspaceDiagnosticsService.create(logger),
-      prompts: OrganizationPromptSeedService.create({ role: setup.role ?? "unknown role", logger }),
       seats: OrganizationSeatLicenseService.create({
         plans: dependencies.entitlement,
         memberships: seatCounts,

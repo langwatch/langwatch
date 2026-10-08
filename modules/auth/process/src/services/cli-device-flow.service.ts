@@ -6,6 +6,7 @@ import {
   deviceCodeRequestSchema,
 } from "@langwatch/auth-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { EnsuredPersonalWorkspace } from "@langwatch/organization-contract";
 import type * as zodModule from "zod";
 
 import {
@@ -39,12 +40,6 @@ function refused(error: string, description: string, status: number): CliDeviceF
     httpStatus: status,
   });
 }
-
-/** The personal workspace a device session names. */
-type CliPersonalWorkspace = Readonly<{
-  team: Readonly<{ id: string }>;
-  project: Readonly<{ id: string; slug: string; name: string }>;
-}>;
 
 /** Who is signed in, as this process resolves a browser session. */
 export type CliBrowserSession = Readonly<{
@@ -93,7 +88,7 @@ export interface CliDeviceFlowCollaborators {
     userId: string;
     displayName?: string | null;
     displayEmail?: string | null;
-  }) => Promise<CliPersonalWorkspace>;
+  }) => Promise<EnsuredPersonalWorkspace>;
   /** Whether the person holds `project:view` there: the bar a project session is bound at. */
   canViewProject: (input: { userId: string; projectId: string }) => Promise<boolean>;
   /** This deployment's flag store, for the device journey's rollout gate. */

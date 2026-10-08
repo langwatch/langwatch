@@ -29,3 +29,25 @@ Feature: A personal project follows its personal team
     Given a shared project
     When a features fact names it
     Then the shared project's stored switches are unchanged
+
+  @unit
+  Scenario: A personal team's fact creates its personal project with a key project mints
+    Given organization recorded "lw.organization.personal_team_created" for a user's personal team
+    When project handles the fact
+    Then project creates the personal project in that team under the fact's id and slug, owned by the user
+    And project mints its ingestion key in the "pkey_" format
+    And project records "lw.project.created" for it, which a waiting screen reads as ready
+
+  @unit
+  Scenario: A personal team's fact delivered twice creates one personal project
+    Given project has created the personal project for a personal team
+    When the same fact is delivered again
+    Then no second project is created and its key is unchanged
+
+
+  @unit
+  Scenario: A second personal-team fact for a team records only the team's existing project as created
+    Given project has created the personal project for a personal team
+    When organization records another "lw.organization.personal_team_created" for that team under a new project id
+    Then no second project is created
+    And project records "lw.project.created" for the existing personal project only, never for the new id

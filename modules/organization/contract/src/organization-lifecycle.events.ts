@@ -2,6 +2,8 @@ import { z } from "zod";
 
 /** An organization's membership milestones, which peers react to from their own side (§9). */
 export const ORGANIZATION_SIGNED_UP_EVENT_TYPE = "lw.organization.signed_up" as const;
+export const ORGANIZATION_CREATED_EVENT_TYPE = "lw.organization.created" as const;
+export const ORGANIZATION_CREATED_EVENT_VERSION = "2026-10-09" as const;
 export const MEMBERS_INVITED_EVENT_TYPE = "lw.organization.members_invited" as const;
 export const INVITE_ACCEPTED_EVENT_TYPE = "lw.organization.invite_accepted" as const;
 export const INTEGRATION_METHOD_CHOSEN_EVENT_TYPE =
@@ -99,3 +101,12 @@ export const organizationMemberDisabledEventDataSchema = z.object({
 export type OrganizationMemberDisabledEventData = z.infer<
   typeof organizationMemberDisabledEventDataSchema
 >;
+
+/** An organization now exists, on every creation path; peers seed their own defaults (§9). */
+export const organizationCreatedEventDataSchema = z.object({
+  tenantId: z.string().min(1),
+  organizationId: z.string().min(1),
+  organizationName: z.string(),
+  occurredAt: z.number().int().nonnegative(),
+});
+export type OrganizationCreatedEventData = z.infer<typeof organizationCreatedEventDataSchema>;

@@ -36,6 +36,7 @@ function projectNotice() {
     buildProjectLifecyclePipeline({
       recordProjectCreated: async () => {},
       personalProjects: {
+        create: async () => "project_personal",
         archive: async () => {},
         revive: async () => {},
         setFeatures: async () => {},

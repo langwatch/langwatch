@@ -26,6 +26,7 @@ import {
   OrganizationRepository,
   type PersonalWorkspaceFeatureProject,
   type PersonalWorkspaceResourceIds,
+  type EnsuredPersonalTeam,
   type StoredOrganizationSettings,
   type OrganizationTeamProject,
 } from "../organization.repository.ts";
@@ -428,9 +429,9 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
       displayEmail?: string | null;
     };
     resources: PersonalWorkspaceResourceIds;
-  }): Promise<{ workspace: PersonalWorkspace; created: boolean }> {
-    const existing = this.findWorkspace(input.workspace);
-    if (existing) return { workspace: existing, created: false };
+  }): Promise<EnsuredPersonalTeam> {
+    const existing = this.findPersonalTeam(input.workspace);
+    if (existing) return existing;
 
     const displayLabel =
       input.workspace.displayName?.trim() || input.workspace.displayEmail?.split("@")[0] || "user";
@@ -447,20 +448,6 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
       updatedAt: now,
     };
     this.memory.teams.set(team.id, team);
-    this.memory.projects.set(input.resources.projectId, {
-      id: input.resources.projectId,
-      name: "Personal Workspace",
-      slug: input.resources.projectSlug,
-      apiKey: input.resources.projectApiKey,
-      teamId: team.id,
-      isPersonal: true,
-      ownerUserId: input.workspace.userId,
-      organizationId: input.workspace.organizationId,
-      archivedAt: null,
-      createdAt: now,
-      updatedAt: now,
-      personalFeatures: null,
-    });
     const alreadyMember = this.memory.organizationUsers.some(
       (row) =>
         row.userId === input.workspace.userId &&
@@ -477,9 +464,10 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
       });
     }
 
-    const created = this.findWorkspace(input.workspace);
-    if (!created) throw new Error("personal workspace vanished after being written");
-    return { workspace: created, created: true };
+    return {
+      kind: "pending",
+      team: { id: team.id, name: team.name, slug: team.slug, createdAtMs: now.epochMilliseconds },
+    };
   }
 
   async getPersonalWorkspaceFeatureProject(
@@ -549,6 +537,31 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
 
   private teamsOf(organizationId: string): MemoryTeamRow[] {
     return [...this.memory.teams.values()].filter((team) => team.organizationId === organizationId);
+  }
+
+  /** Pending while the personal team has no project: project creates it on organization's fact. */
+  private findPersonalTeam(input: {
+    userId: string;
+    organizationId: string;
+  }): EnsuredPersonalTeam | null {
+    const workspace = this.findWorkspace(input);
+    if (workspace) return { kind: "ready", workspace };
+    const team = this.teamsOf(input.organizationId).find(
+      (candidate) =>
+        candidate.isPersonal &&
+        candidate.ownerUserId === input.userId &&
+        candidate.archivedAt === null,
+    );
+    if (!team) return null;
+    return {
+      kind: "pending",
+      team: {
+        id: team.id,
+        name: team.name,
+        slug: team.slug,
+        createdAtMs: team.createdAt.epochMilliseconds,
+      },
+    };
   }
 
   private findWorkspace(input: {

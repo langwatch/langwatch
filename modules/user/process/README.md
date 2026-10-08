@@ -6,7 +6,7 @@ The server half of [user](../README.md). Users: profiles and avatars, account an
 
 ## Installation
 
-`defineProcessModule("user").withRepositories(userRepositories).withChannels(userChannels).withApi(UserModule).withTransports(meRest, userAvatarRest, userTrpcTransport).withEventing(userLifecycleEventing).withTasks(…).withMigrations(…).withTransportFacts(…)`, `src/user.module.ts:16`.
+`defineProcessModule("user").withRepositories(userRepositories).withChannels(userChannels).withApi(UserModule).withTransports(meRest, userAvatarRest, userTrpcTransport).withEventing(userLifecycleEventing).withTasks(…).withMigrations(…)`, `src/user.module.ts:15`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Portable User use cases exposed to process peers and transports.
 
-Peers call these through the token, declared at `../contract/src/user.api.ts:71`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/user.api.ts:62`; nothing else in this package is public.
 
 #### `findById`
 
@@ -138,12 +138,6 @@ Mints a directory account with no sign-in method of its own.
 create(input: CreateUserInput): Promise<UserProfile>;
 ```
 
-#### `createCredentialUser`
-
-```typescript
-createCredentialUser(input: CreateCredentialUserInput): Promise<CreatedUser>;
-```
-
 #### `createPasskeyUser`
 
 Mints an account whose only sign-in method is the passkey about to be registered.
@@ -162,10 +156,10 @@ adoptUnconfirmedAccount(input: UserEmailInput): Promise<AdoptUnconfirmedAccountO
 
 #### `registerCredentialAccount`
 
-The signup form's whole path: the mode gate, the throttle and the mint.
+Mints the account auth's register door cleared, its address proof already spent (D-A1U-2).
 
 ```typescript
-registerCredentialAccount(input: RegisterCredentialAccountInput): Promise<CreatedUser>;
+registerCredentialAccount(input: CredentialAccountInput): Promise<CreatedUser>;
 ```
 
 #### `hasPassword`
@@ -178,28 +172,6 @@ hasPassword(input: UserIdInput): Promise<boolean>;
 
 ```typescript
 setFirstPassword(input: SetFirstUserPasswordInput): Promise<SetFirstUserPasswordResult>;
-```
-
-#### `setOwnFirstPassword`
-
-Fills an empty credential slot, then ends every other session.
-
-```typescript
-setOwnFirstPassword(input: SetOwnFirstPasswordInput): Promise<void>;
-```
-
-#### `changeOwnPassword`
-
-Verifies the current password, replaces it, then ends every other session.
-
-```typescript
-changeOwnPassword(input: ChangeOwnPasswordInput): Promise<void>;
-```
-
-#### `getPasskeyNudgeStatus`
-
-```typescript
-getPasskeyNudgeStatus(input: UserIdInput): Promise<UserPasskeyNudgeStatus>;
 ```
 
 #### `getPasskeyOffer`
@@ -266,34 +238,6 @@ Removes one of the caller's own sign-in methods, refusing the last one.
 
 ```typescript
 unlinkOwnAccount(input: UnlinkUserAccountInput): Promise<void>;
-```
-
-#### `listBrowserSessions`
-
-What this person is signed in on, and how each session signed in.
-
-```typescript
-listBrowserSessions(input: { userId: string; currentSessionId?: string | undefined; }): Promise<UserBrowserSession[]>;
-```
-
-#### `endBrowserSession`
-
-Ends ONE of this person's own sessions; the current one is refused.
-
-```typescript
-endBrowserSession(input: { userId: string; sessionId: string; currentSessionId?: string | undefined; }): Promise<UserBrowserSessionEnded>;
-```
-
-#### `revokeOtherBrowserSessions`
-
-```typescript
-revokeOtherBrowserSessions(input: { userId: string; keepSessionId: string }): Promise<void>;
-```
-
-#### `revokeAllBrowserSessions`
-
-```typescript
-revokeAllBrowserSessions(input: { userId: string }): Promise<void>;
 ```
 
 #### `deactivate`
@@ -489,11 +433,10 @@ type Response = unknown;
 
 ### `user`
 
-Contract `../contract/src/user.trpc.ts:47`, router `src/transport/user.trpc.ts:46`.
+Contract `../contract/src/user.trpc.ts:40`, router `src/transport/user.trpc.ts:36`.
 
 | Procedure                             | Kind     | Gate                                                                                                                                                           | Input                                         | Output                                 |
 | ------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- | -------------------------------------- |
-| `user.register`                       | mutation | Public: the signup form's own backend: it mints the account a caller would otherwise need to already hold                                                      | `userApiRegisterInputSchema`                  | `createdUserSchema`                    |
 | `user.getAvatarUrl`                   | query    | No permission: a photo shows wherever a person is shown, across organizations; the object's purpose and owner kind gate it                                     | `userAvatarRestParamsSchema`                  | `userAvatarUrlSchema`                  |
 | `user.getTraceExplorerTourPreference` | query    | No permission: operates on the session user's own account, so no tenant scope applies                                                                          | `userApiEmptyInputSchema`                     | `userTourPreferenceSchema`             |
 | `user.dismissTraceExplorerTour`       | mutation | No permission: operates on the session user's own account, so no tenant scope applies                                                                          | `userApiEmptyInputSchema`                     | `userTourPreferenceSchema`             |
@@ -508,11 +451,7 @@ Contract `../contract/src/user.trpc.ts:47`, router `src/transport/user.trpc.ts:4
 | `user.secureAccountNudge`             | query    | No permission: operates on the session user's own account, so no tenant scope applies                                                                          | `userApiEmptyInputSchema`                     | `userSecureAccountOfferSchema`         |
 | `user.dismissSecureAccountNudge`      | mutation | No permission: operates on the session user's own account, so no tenant scope applies                                                                          | `userApiEmptyInputSchema`                     | `userApiSuccessSchema`                 |
 | `user.updateName`                     | mutation | No permission: operates on the session user's own account, so no tenant scope applies                                                                          | `userApiUpdateNameInputSchema`                | `userApiUpdatedNameSchema`             |
-| `user.browserSessions`                | query    | No permission: operates on the session user's own account, so no tenant scope applies                                                                          | `userApiEmptyInputSchema`                     | inline                                 |
-| `user.endBrowserSession`              | mutation | No permission: operates on the session user's own account, so no tenant scope applies                                                                          | `userApiEndBrowserSessionInputSchema`         | `userApiBrowserSessionEndedSchema`     |
 | `user.hasPassword`                    | query    | No permission: operates on the session user's own account, so no tenant scope applies                                                                          | `userApiEmptyInputSchema`                     | `userApiHasPasswordSchema`             |
-| `user.setPassword`                    | mutation | No permission: operates on the session user's own account, so no tenant scope applies                                                                          | `userApiSetPasswordInputSchema`               | `userApiSuccessSchema`                 |
-| `user.changePassword`                 | mutation | No permission: operates on the session user's own account, so no tenant scope applies                                                                          | `userApiChangePasswordInputSchema`            | `userApiSuccessSchema`                 |
 | `user.reactivate`                     | mutation | No permission: operator-only for the named account; the application enforces operator standing itself, against the platform operator list rather than a tenant | `userApiUserInputSchema`                      | `userApiSuccessSchema`                 |
 | `user.setAvatar`                      | mutation | Permission `organization:view`                                                                                                                                 | `userApiSetAvatarInputSchema`                 | `userAvatarResultSchema`               |
 | `user.removeAvatar`                   | mutation | No permission: operates on the session user's own account, so no tenant scope applies                                                                          | `userApiEmptyInputSchema`                     | `userApiSuccessSchema`                 |
@@ -521,19 +460,6 @@ Contract `../contract/src/user.trpc.ts:47`, router `src/transport/user.trpc.ts:4
 | `user.homePagePickerState`            | query    | Permission `organization:view`                                                                                                                                 | `userApiOrganizationInputSchema`              | `userApiHomePagePickerStateSchema`     |
 
 ```typescript
-// user.register
-// Input: userApiRegisterInputSchema, ../contract/src/user.schemas.ts:29
-interface Input {
-  name?: string;
-  email: string;
-  password: string;
-  addressProof: string;
-}
-// Output: createdUserSchema, ../contract/src/user.ts:82
-interface Output {
-  id: string;
-}
-
 // user.getAvatarUrl
 type Input = z.infer<typeof userAvatarRestParamsSchema>; // ../contract/src/user-rest.schemas.ts:21
 // Output: userAvatarUrlSchema, ../contract/src/user.ts:258
@@ -618,7 +544,7 @@ interface Output {
 
 // user.secureAccountNudge
 type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:15
-// Output: userSecureAccountOfferSchema, ../contract/src/user.ts:339
+// Output: userSecureAccountOfferSchema, ../contract/src/user.ts:350
 interface Output {
   offer: boolean;
   passkey: boolean;
@@ -640,32 +566,6 @@ interface Output {
   name: string;
 }
 
-// user.browserSessions
-type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:15
-// Output: inline, ../contract/src/user.trpc.ts:120
-type Output = {
-  sessionId: string;
-  identifierId: string | null;
-  method: string;
-  secondFactorProven: boolean;
-  ipAddress: string | null;
-  userAgent: string | null;
-  signedInAt: string;
-  lastActiveAt: string;
-  expiresAt: string;
-  current: boolean;
-}[];
-
-// user.endBrowserSession
-// Input: userApiEndBrowserSessionInputSchema, ../contract/src/user.schemas.ts:47
-interface Input {
-  sessionId: string;
-}
-// Output: userApiBrowserSessionEndedSchema, ../contract/src/user.responses.ts:77
-interface Output {
-  ended: number;
-}
-
 // user.hasPassword
 type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:15
 // Output: userApiHasPasswordSchema, ../contract/src/user.responses.ts:18
@@ -673,30 +573,15 @@ interface Output {
   hasPassword: boolean;
 }
 
-// user.setPassword
-// Input: userApiSetPasswordInputSchema, ../contract/src/user.schemas.ts:51
-interface Input {
-  password: string;
-}
-type Output = z.infer<typeof userApiSuccessSchema>; // ../contract/src/user.responses.ts:9
-
-// user.changePassword
-// Input: userApiChangePasswordInputSchema, ../contract/src/user.schemas.ts:53
-interface Input {
-  currentPassword: string;
-  newPassword: string;
-}
-type Output = z.infer<typeof userApiSuccessSchema>; // ../contract/src/user.responses.ts:9
-
 // user.reactivate
-// Input: userApiUserInputSchema, ../contract/src/user.schemas.ts:63
+// Input: userApiUserInputSchema, ../contract/src/user.schemas.ts:58
 interface Input {
   userId: string;
 }
 type Output = z.infer<typeof userApiSuccessSchema>; // ../contract/src/user.responses.ts:9
 
 // user.setAvatar
-// Input: userApiSetAvatarInputSchema, ../contract/src/user.schemas.ts:65
+// Input: userApiSetAvatarInputSchema, ../contract/src/user.schemas.ts:60
 interface Input {
   organizationId: string;
   imageDataUrl: string;
@@ -711,7 +596,7 @@ type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.sc
 type Output = z.infer<typeof userApiSuccessSchema>; // ../contract/src/user.responses.ts:9
 
 // user.requestBudgetIncrease
-// Input: userApiRequestBudgetIncreaseInputSchema, ../contract/src/user.schemas.ts:78
+// Input: userApiRequestBudgetIncreaseInputSchema, ../contract/src/user.schemas.ts:73
 interface Input {
   organizationId: string;
   scope: string;
@@ -728,7 +613,7 @@ interface Output {
 }
 
 // user.setLastHomePath
-// Input: userApiSetLastHomePathInputSchema, ../contract/src/user.schemas.ts:88
+// Input: userApiSetLastHomePathInputSchema, ../contract/src/user.schemas.ts:83
 interface Input {
   path: string | null;
 }
@@ -738,7 +623,7 @@ interface Output {
 }
 
 // user.homePagePickerState
-// Input: userApiOrganizationInputSchema, ../contract/src/user.schemas.ts:75
+// Input: userApiOrganizationInputSchema, ../contract/src/user.schemas.ts:70
 interface Input {
   organizationId: string;
 }
@@ -757,16 +642,16 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `user_lifecycle` (aggregate `user_account`)
 
-Declared at `src/eventing/user-lifecycle.pipeline.ts:62`. Events: `userDeactivatedEventSchema`, `userReactivatedEventSchema`, `userRegisteredEventSchema`, `userCreatedEventSchema`, `userErasedEventSchema`.
+Declared at `src/eventing/user-lifecycle.pipeline.ts:57`. Events: `userDeactivatedEventSchema`, `userReactivatedEventSchema`, `userRegisteredEventSchema`, `userCreatedEventSchema`, `userErasedEventSchema`.
 
 | Kind            | Name                    | Handles                                                                                                                                              | Declared at                                  |
 | --------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
-| command         | `recordUserDeactivated` | –                                                                                                                                                    | `src/eventing/user-lifecycle.pipeline.ts:73` |
-| command         | `recordUserReactivated` | –                                                                                                                                                    | `src/eventing/user-lifecycle.pipeline.ts:74` |
-| command         | `recordUserRegistered`  | –                                                                                                                                                    | `src/eventing/user-lifecycle.pipeline.ts:75` |
-| command         | `recordUserCreated`     | –                                                                                                                                                    | `src/eventing/user-lifecycle.pipeline.ts:76` |
-| command         | `recordUserErased`      | –                                                                                                                                                    | `src/eventing/user-lifecycle.pipeline.ts:77` |
-| process manager | `userLifecycleFacts`    | every 1 d (`USER_FACTS_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `pruneFacts`, `recordErased`, `recordRegistered`, `recordCreated` (outbox) | `src/eventing/user-lifecycle.pipeline.ts:78` |
+| command         | `recordUserDeactivated` | –                                                                                                                                                    | `src/eventing/user-lifecycle.pipeline.ts:68` |
+| command         | `recordUserReactivated` | –                                                                                                                                                    | `src/eventing/user-lifecycle.pipeline.ts:69` |
+| command         | `recordUserRegistered`  | –                                                                                                                                                    | `src/eventing/user-lifecycle.pipeline.ts:70` |
+| command         | `recordUserCreated`     | –                                                                                                                                                    | `src/eventing/user-lifecycle.pipeline.ts:71` |
+| command         | `recordUserErased`      | –                                                                                                                                                    | `src/eventing/user-lifecycle.pipeline.ts:72` |
+| process manager | `userLifecycleFacts`    | every 1 d (`USER_FACTS_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `pruneFacts`, `recordErased`, `recordRegistered`, `recordCreated` (outbox) | `src/eventing/user-lifecycle.pipeline.ts:73` |
 
 ## Configuration
 

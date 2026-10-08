@@ -23,7 +23,7 @@ import type {
   OrganizationSeatRevocationNotice,
 } from "../services/organization-member-role.service.ts";
 import { OrganizationMembershipService } from "../services/organization-membership.service.ts";
-import type { OrganizationPromptSeed } from "../services/organization-prompt-seed.service.ts";
+import type { OrganizationCreationNotice } from "../services/organization-provisioning.service.ts";
 import type { OrganizationSeatLicense } from "../services/organization-seat-license.service.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
@@ -55,9 +55,9 @@ const seatNotices: OrganizationSeatRevocationNotice = {
 const grantCache: OrganizationGrantCache = {
   invalidateOrganization: vi.fn(),
 };
-const prompts: OrganizationPromptSeed = {
-  seedTagsForOrganization: vi.fn(),
-  reportCompensationFailure: vi.fn(),
+const creations: OrganizationCreationNotice = {
+  created: vi.fn(),
+  reportError: vi.fn(),
 };
 
 describe.skipIf(!DB_URL)(
@@ -76,7 +76,7 @@ describe.skipIf(!DB_URL)(
         cipher: { encrypt: (value: string) => value, decrypt: (value: string) => value },
         grants: recordingGrantsWriter,
       }),
-      prompts,
+      creations,
       seats,
       seatNotices,
       grantCache,

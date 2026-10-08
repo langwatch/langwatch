@@ -86,11 +86,10 @@ describe.skipIf(!DB_URL)("PrismaOrganizationRepository.ensurePersonalWorkspace",
         });
 
       const first = await ensure();
-      expect(first.created).toBe(true);
+      expect(first.kind).toBe("pending");
 
       const second = await ensure();
-      expect(second.created).toBe(false);
-      expect(second.workspace.team.id).toBe(first.workspace.team.id);
+      expect(second).toEqual(first);
 
       await expect(
         prisma!.team.count({ where: { organizationId, isPersonal: true } }),

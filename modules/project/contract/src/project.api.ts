@@ -47,6 +47,17 @@ export interface ProjectIdPage {
   next: string | null;
 }
 
+/** A project and the organisation that owns it, as fleet scans read them. */
+export interface ProjectOrganizationRef {
+  id: string;
+  organizationId: string;
+}
+
+export interface ProjectOrganizationPage {
+  projects: ProjectOrganizationRef[];
+  next: string | null;
+}
+
 /** The page size fleet scans pass to `listAllIds`. */
 export const PROJECT_ID_PAGE_LIMIT = 500;
 
@@ -197,6 +208,11 @@ export interface ProjectApi {
    * for fleet-wide scans. No limit reads them all; `next` is null on the last page.
    */
   listAllIds(input?: ProjectIdPageInput): Promise<ProjectIdPage>;
+  /**
+   * Every project with its organisation, paged like `listAllIds`, for the storage
+   * migration inventory (main `migrateObjectStorage.ts` `listProjectsPage`).
+   */
+  listAllWithOrganization(input?: ProjectIdPageInput): Promise<ProjectOrganizationPage>;
 }
 
 export const ProjectApi = moduleApi<ProjectApi>()("project");

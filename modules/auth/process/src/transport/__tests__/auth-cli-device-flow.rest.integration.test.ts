@@ -1570,11 +1570,16 @@ function deviceFlowWorld(
       }) as never,
     ensurePersonalWorkspace: () =>
       Promise.resolve({
-        team: { id: "team-personal" },
-        project: {
-          id: "project-personal",
-          slug: "personal-bob",
-          name: "Bob",
+        kind: "ready",
+        workspace: {
+          team: { id: "team-personal", name: "Personal", slug: "personal", createdAtMs: 0 },
+          project: {
+            id: "project-personal",
+            slug: "personal-bob",
+            name: "Bob",
+            apiKey: "key-personal",
+            createdAtMs: 0,
+          },
         },
       }),
     canViewProject: () => Promise.resolve(world.administersProject),

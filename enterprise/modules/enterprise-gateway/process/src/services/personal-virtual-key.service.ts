@@ -19,7 +19,10 @@ import {
 } from "@langwatch/enterprise-gateway-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
+import {
+  type OrganizationApi,
+  PersonalWorkspacePendingError,
+} from "@langwatch/organization-contract";
 
 import {
   DEFAULT_PERSONAL_KEY_LABEL,
@@ -126,7 +129,9 @@ export class PersonalVirtualKeyService {
     input: EnsureDefaultPersonalVirtualKeyInput,
   ): Promise<IssuedPersonalVirtualKey> {
     const parsed = ensureDefaultPersonalVirtualKeyInputSchema.parse(input);
-    const workspace = await this.organizations.ensurePersonalWorkspace(parsed);
+    const ensured = await this.organizations.ensurePersonalWorkspace(parsed);
+    if (ensured.kind === "pending") throw new PersonalWorkspacePendingError();
+    const { workspace } = ensured;
     const held = await this.keys.findPersonalVirtualKeys({
       organizationId: parsed.organizationId,
       principalUserId: parsed.userId,

@@ -124,9 +124,11 @@ describe("given two organizations whose presence settings were stored before the
       });
       const idle = { send: async () => undefined };
       notices.connect({
+        recordCreated: { send: async () => undefined },
         recordSignedUp: idle,
         recordMembersInvited: idle,
         recordInviteAccepted: idle,
+        recordPersonalTeamCreated: idle,
         recordIntegrationMethodChosen: idle,
         recordPersonalWorkspaceProvisioned: idle,
         recordTraceSharingDisabled: idle,

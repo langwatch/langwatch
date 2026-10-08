@@ -10,7 +10,7 @@ import type {
   OrganizationSeatRevocationNotice,
 } from "../organization-member-role.service.ts";
 import { OrganizationMembershipService } from "../organization-membership.service.ts";
-import type { OrganizationPromptSeed } from "../organization-prompt-seed.service.ts";
+import type { OrganizationCreationNotice } from "../organization-provisioning.service.ts";
 import type { OrganizationSeatLicense } from "../organization-seat-license.service.ts";
 
 const refuse = (what: string) => () => Promise.reject(new Error(`${what} is not asked here`));
@@ -18,11 +18,11 @@ const refuse = (what: string) => () => Promise.reject(new Error(`${what} is not 
 function installed() {
   const memory = MemoryOrganizationDatabase.create();
   const seeded: string[] = [];
-  const prompts: OrganizationPromptSeed = {
-    seedTagsForOrganization: async ({ organizationId }) => {
+  const creations: OrganizationCreationNotice = {
+    created: async ({ organizationId }) => {
       seeded.push(organizationId);
     },
-    reportCompensationFailure: () => undefined,
+    reportError: () => undefined,
   };
   const seats: OrganizationSeatLicense = {
     checkLimit: refuse("a seat limit"),
@@ -34,7 +34,7 @@ function installed() {
   const grantCache: OrganizationGrantCache = { invalidateOrganization: refuse("a grant cache") };
   const service = OrganizationMembershipService.create({
     repository: MemoryOrganizationMembershipRepository.create({ memory }),
-    prompts,
+    creations,
     seats,
     seatNotices,
     grantCache,
@@ -55,6 +55,7 @@ function installed() {
 
 describe("OrganizationMembershipService.createSelfHostedCustomer", () => {
   describe("when a licence is issued to a customer with no organization yet", () => {
+    /** @scenario "Every way an organization is created records lw.organization.created" */
     it("creates the organization with its first team, exactly as provisioning does", async () => {
       const { service, organizations, seeded } = installed();
 

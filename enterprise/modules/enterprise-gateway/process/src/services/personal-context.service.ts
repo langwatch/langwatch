@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { PersonalContext } from "@langwatch/enterprise-gateway-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
+import {
+  type OrganizationApi,
+  PersonalWorkspacePendingError,
+} from "@langwatch/organization-contract";
 import { type UserApi, UserNotOrganizationMemberError } from "@langwatch/user-contract";
 
 import type { RoutingPolicyService } from "./routing-policy.service.ts";
@@ -39,19 +42,22 @@ export class PersonalContextService {
     if (!member) throw new UserNotOrganizationMemberError(organizationId);
 
     const profile = await this.users.findById({ id: userId });
-    const workspace = await this.members.ensurePersonalWorkspace({
+    const ensured = await this.members.ensurePersonalWorkspace({
       userId,
       organizationId,
       displayName: profile?.name ?? null,
       displayEmail: profile?.email ?? null,
     });
+    if (ensured.kind === "pending") throw new PersonalWorkspacePendingError();
+    const { workspace } = ensured;
     const [policy] = await this.policies.findDefaults({
       organizationId,
       personalTeamId: workspace.team.id,
     });
 
     return {
-      workspace: { ...workspace, project: { ...workspace.project, apiKey: "" } },
+      // `created` is main's wire field; a call that creates the project now answers pending.
+      workspace: { ...workspace, project: { ...workspace.project, apiKey: "" }, created: false },
       routingPolicy: policy ? { id: policy.id, name: policy.name } : null,
     };
   }

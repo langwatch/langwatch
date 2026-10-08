@@ -12,9 +12,11 @@ import { describe, expect, it } from "vitest";
 import { PersonalContextService } from "../personal-context.service.ts";
 
 const WORKSPACE: EnsuredPersonalWorkspace = {
-  team: { id: "team-1", name: "Ada's workspace", slug: "ada", createdAtMs: 0 },
-  project: { id: "project-1", name: "Ada", slug: "ada", apiKey: "sk-lw-secret", createdAtMs: 0 },
-  created: false,
+  kind: "ready",
+  workspace: {
+    team: { id: "team-1", name: "Ada's workspace", slug: "ada", createdAtMs: 0 },
+    project: { id: "project-1", name: "Ada", slug: "ada", apiKey: "sk-lw-secret", createdAtMs: 0 },
+  },
 };
 
 function routingPolicy({ id, name }: { id: string; name: string }): RoutingPolicy {

@@ -7,16 +7,17 @@ import type { PersonalWorkspaceResourceIds } from "../../../repositories/organiz
 
 export interface PersonalWorkspaceIdentity {
   create(input: { userId: string; organizationId: string }): PersonalWorkspaceResourceIds;
+  /** A strict project KSUID, minted afresh for each personal-team fact; project keeps the first. */
+  newProjectId(): string;
 }
 
 /** KSUID resource prefixes: a persisted format, since each id is written into a customer's row. */
 const TEAM_KSUID_RESOURCE = "team";
 const PROJECT_KSUID_RESOURCE = "project";
 
-/** The personal slug's user-id prefix length, random suffix length, and ingestion key length. */
+/** The personal slug's user-id prefix length and random suffix length. */
 const SLUG_USER_PREFIX_CHARS = 12;
 const SLUG_SUFFIX_CHARS = 6;
-const PERSONAL_PROJECT_API_KEY_CHARS = 40;
 
 /** Uniform characters from the URL-safe alphabet, the format these values have always had. */
 function randomUrlSafe(length: number): string {
@@ -42,10 +43,12 @@ export class PersonalWorkspaceIdentityService implements PersonalWorkspaceIdenti
     return {
       teamId: generate(TEAM_KSUID_RESOURCE).toString(),
       teamSlug: personalSlug(slugPrefix),
-      projectId: generate(PROJECT_KSUID_RESOURCE).toString(),
       projectSlug: personalSlug(slugPrefix),
-      projectApiKey: `pkey_${randomUrlSafe(PERSONAL_PROJECT_API_KEY_CHARS)}`,
       ownerBindingId: newAuthzGrantId(),
     };
+  }
+
+  newProjectId(): string {
+    return generate(PROJECT_KSUID_RESOURCE).toString();
   }
 }

@@ -27,7 +27,6 @@ import type {
   OrganizationGrantCeilingService,
   OrganizationIntendedGrant,
 } from "./organization-grant-ceiling.service.ts";
-import type { OrganizationPromptSeed } from "./organization-prompt-seed.service.ts";
 import type {
   OrganizationSeatLicense,
   OrganizationPlanUser,
@@ -94,7 +93,6 @@ async function findCustomRolePermissionGrants({
 
 type OrganizationMemberRoleDependencies = {
   repository: OrganizationMembershipRepository;
-  prompts: OrganizationPromptSeed;
   seats: OrganizationSeatLicense;
   seatNotices: OrganizationSeatRevocationNotice;
   grantCache: OrganizationGrantCache;

@@ -119,3 +119,39 @@ describe("PersonalProjectService", () => {
     expect(row("shared")?.personalFeatures).toEqual(ALL_OFF);
   });
 });
+
+describe("creating a personal team's personal project", () => {
+  const fact = {
+    teamId: "team-p",
+    projectId: "project-p",
+    projectSlug: "personal-p",
+    userId: "user-1",
+  };
+
+  /** @scenario "A personal team's fact creates its personal project with a key project mints" */
+  it("creates the project under the fact's id and slug with a key in the pkey_ format", async () => {
+    const { service, row } = setup();
+
+    await service.create(fact);
+
+    expect(row("project-p")).toMatchObject({
+      teamId: "team-p",
+      slug: "personal-p",
+      name: "Personal Workspace",
+      isPersonal: true,
+      ownerUserId: "user-1",
+    });
+    expect(row("project-p")?.apiKey).toMatch(/^pkey_[A-Za-z0-9_-]{40}$/);
+  });
+
+  /** @scenario "A personal team's fact delivered twice creates one personal project" */
+  it("creates nothing on a redelivery and keeps the first key", async () => {
+    const { service, row } = setup();
+    await service.create(fact);
+    const firstKey = row("project-p")?.apiKey;
+
+    await service.create(fact);
+
+    expect(row("project-p")?.apiKey).toBe(firstKey);
+  });
+});

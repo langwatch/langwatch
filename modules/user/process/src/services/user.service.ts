@@ -1,6 +1,9 @@
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
+import {
+  PersonalWorkspacePendingError,
+  type OrganizationApi,
+} from "@langwatch/organization-contract";
 import { fromDate, nowInstant, type Instant } from "@langwatch/time";
 import {
   UserEmailAmbiguousError,
@@ -414,12 +417,14 @@ export class UserService {
   async setAvatar(input: SetUserAvatarInput): Promise<UserAvatarResult> {
     const parsed = setUserAvatarInputSchema.parse(input);
     const { mediaType, bytes } = this.avatars.parse(parsed.imageDataUrl);
-    const workspace = await this.organizations.ensurePersonalWorkspace({
+    const ensured = await this.organizations.ensurePersonalWorkspace({
       userId: parsed.userId,
       organizationId: parsed.organizationId,
       displayName: parsed.displayName,
       displayEmail: parsed.displayEmail,
     });
+    if (ensured.kind === "pending") throw new PersonalWorkspacePendingError();
+    const { workspace } = ensured;
     const stored = await this.avatarStorage.store({
       projectId: workspace.project.id,
       userId: parsed.userId,

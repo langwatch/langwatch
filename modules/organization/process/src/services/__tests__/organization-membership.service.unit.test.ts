@@ -16,7 +16,7 @@ import {
   OrganizationMembershipService,
   type OrganizationTestArrivals,
 } from "../organization-membership.service.ts";
-import type { OrganizationPromptSeed } from "../organization-prompt-seed.service.ts";
+import type { OrganizationCreationNotice } from "../organization-provisioning.service.ts";
 import type { OrganizationSeatLicense } from "../organization-seat-license.service.ts";
 
 const mockInvalidateOrganization = vi.fn();
@@ -73,9 +73,9 @@ describe("OrganizationMembershipService", () => {
     getAuditLogs: vi.fn(),
   };
 
-  const mockPrompts: OrganizationPromptSeed = {
-    seedTagsForOrganization: vi.fn(),
-    reportCompensationFailure: vi.fn(),
+  const mockCreations: OrganizationCreationNotice = {
+    created: vi.fn(),
+    reportError: vi.fn(),
   };
   const seats: OrganizationSeatLicense = {
     checkLimit: mockCheckLimit,
@@ -115,7 +115,7 @@ describe("OrganizationMembershipService", () => {
     vi.mocked(mockRepo.findCustomRolePermissions).mockResolvedValue([]);
     service = OrganizationMembershipService.create({
       repository: mockRepo,
-      prompts: mockPrompts,
+      creations: mockCreations,
       seats,
       seatNotices,
       grantCache,
@@ -144,15 +144,20 @@ describe("OrganizationMembershipService", () => {
       expect(mockCreateAndAssign).not.toHaveBeenCalled();
     });
 
-    it("creates one for somebody who simply has no organization yet", async () => {
+    /** @scenario "Every way an organization is created records lw.organization.created" */
+    it("creates one for somebody who simply has no organization yet, and records it", async () => {
       mockCreateAndAssign.mockResolvedValue({
-        organization: { id: "org-123" },
+        organization: { id: "org-123", name: "Acme" },
         team: { id: "team-123" },
       });
 
       await service.createAndAssign({ userId: "user-456", orgName: "Acme" });
 
       expect(mockCreateAndAssign).toHaveBeenCalledTimes(1);
+      expect(mockCreations.created).toHaveBeenCalledWith({
+        organizationId: "org-123",
+        organizationName: "Acme",
+      });
     });
   });
 
@@ -357,7 +362,7 @@ describe("OrganizationMembershipService", () => {
     const refusing = () =>
       OrganizationMembershipService.create({
         repository: mockRepo,
-        prompts: mockPrompts,
+        creations: mockCreations,
         seats,
         seatNotices,
         grantCache,
@@ -655,7 +660,7 @@ describe("OrganizationMembershipService", () => {
       it("refuses the disable when the revocation cannot be recorded", async () => {
         const unrecorded = OrganizationMembershipService.create({
           repository: mockRepo,
-          prompts: mockPrompts,
+          creations: mockCreations,
           seats,
           seatNotices: {
             memberDisabled: () =>

@@ -1,47 +1,45 @@
-/**
- * A project's new prompt is recorded on prompt's own pipeline, and nurturing
- * reacts to its event from its own side.
- * @see specs/features/customer-io-nurturing-integration.feature
- */
-import { createTenantId } from "@langwatch/eventing";
-import { PROMPT_CREATED_EVENT_TYPE } from "@langwatch/prompt-contract";
 import { describe, expect, it } from "vitest";
 
-import {
-  RecordPromptCreatedCommand,
-  PROMPT_CREATED_EVENT_VERSION,
-  type PromptCreatedEvent,
-} from "../prompt-lifecycle.commands.ts";
+import { MemoryPromptTagRepository } from "../../repositories/memory/memory.prompt-tag.repository.ts";
+import { MemoryPromptState } from "../../repositories/memory/memory.prompt.store.ts";
+import { seedOrganizationPromptTags } from "../prompt-lifecycle.pipeline.ts";
 
 const created = {
-  promptId: "prompt-1",
-  projectId: "project-1",
-  userId: "user-1",
-  orgPromptCount: 1,
+  tenantId: "organization_acme",
+  organizationId: "organization_acme",
+  organizationName: "Acme",
+  occurredAt: 1,
 };
 
-function createdEvent(): PromptCreatedEvent {
-  const [event] = new RecordPromptCreatedCommand().handle({
-    tenantId: createTenantId("project-1"),
-    type: "lw.prompt.record_created",
-    aggregateId: created.promptId,
-    data: { tenantId: "project-1", occurredAt: 1_700_000_000_000, ...created },
+function installed() {
+  const repository = MemoryPromptTagRepository.create(new MemoryPromptState());
+  const handle = seedOrganizationPromptTags({
+    tags: { seedTagsForOrganization: (input) => repository.seedForOrg(input) },
   });
-  if (!event) throw new Error("the command recorded no event");
-  return event;
+  const tagNames = async () =>
+    (await repository.findAll({ organizationId: created.organizationId }))
+      .map((tag) => tag.name)
+      .toSorted();
+  return { handle, tagNames };
 }
 
-describe("the prompt lifecycle pipeline", () => {
-  describe("when the record-created command is handled", () => {
-    it("appends one prompt_created event keyed by the prompt", () => {
-      expect(createdEvent()).toMatchObject({
-        type: PROMPT_CREATED_EVENT_TYPE,
-        version: PROMPT_CREATED_EVENT_VERSION,
-        aggregateType: "prompt",
-        aggregateId: "prompt-1",
-        idempotencyKey: "project-1:prompt-1:created",
-        data: created,
-      });
-    });
+describe("prompt's subscriber to lw.organization.created", () => {
+  /** @scenario "a new organization is seeded with the production and staging prompt tags" */
+  it("seeds the production and staging tags", async () => {
+    const { handle, tagNames } = installed();
+
+    await handle(created);
+
+    expect(await tagNames()).toEqual(["production", "staging"]);
+  });
+
+  /** @scenario "a redelivered creation fact seeds no prompt tag twice" */
+  it("seeds nothing twice when the fact is delivered again", async () => {
+    const { handle, tagNames } = installed();
+
+    await handle(created);
+    await handle(created);
+
+    expect(await tagNames()).toEqual(["production", "staging"]);
   });
 });

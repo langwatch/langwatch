@@ -105,6 +105,10 @@ class StubRepository implements ProjectRepository {
     return Promise.resolve();
   }
 
+  createPersonal(): Promise<string> {
+    return Promise.resolve("project-personal");
+  }
+
   updatePersonalFeatures(): Promise<void> {
     return Promise.resolve();
   }
@@ -132,6 +136,7 @@ class StubRepository implements ProjectRepository {
   countWithTraces = vi.fn(async () => 0);
   findSharedProjectSlugs = vi.fn(async () => []);
   listAllIds = vi.fn(async () => ({ ids: [], next: null }));
+  listAllWithOrganization = vi.fn(async () => ({ projects: [], next: null }));
   create = vi.fn(async () => applicationProject);
   findById = vi.fn(async () => applicationProject);
   findOrganizationId = vi.fn<(projectId: string) => Promise<string | undefined>>(async () => "org");

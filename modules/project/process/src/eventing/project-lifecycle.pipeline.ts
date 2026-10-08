@@ -9,10 +9,12 @@ import {
   PERSONAL_WORKSPACE_FEATURES_CHANGED_EVENT_TYPE,
   PERSONAL_WORKSPACE_PROVISIONED_EVENT_TYPE,
   PERSONAL_WORKSPACE_REVIVED_EVENT_TYPE,
+  PERSONAL_TEAM_CREATED_EVENT_TYPE,
   personalWorkspaceArchivedEventDataSchema,
   personalWorkspaceFeaturesChangedEventDataSchema,
   personalWorkspaceProvisionedEventDataSchema,
   personalWorkspaceRevivedEventDataSchema,
+  personalTeamCreatedEventDataSchema,
 } from "@langwatch/organization-contract";
 import {
   PROJECT_AGGREGATE_TYPE,
@@ -67,12 +69,13 @@ function lifecycleCommands() {
 type ProjectLifecycleDefinition = ReturnType<ReturnType<typeof lifecycleCommands>["build"]>;
 
 /**
- * project_lifecycle: project records its facts; peers react from their own side (§9). Organization
- * writes a personal workspace's project row itself, so project records that project as created.
+ * project_lifecycle: project records its facts; peers react from their own side (§9). Project
+ * creates a personal team's project on organization's fact and records the team's real project as
+ * created; workspaces provisioned before it are recorded.
  */
 export function buildProjectLifecyclePipeline(deps: {
   recordProjectCreated: (input: { projectId: string; organizationId: string }) => Promise<void>;
-  personalProjects: Pick<PersonalProjectService, "archive" | "revive" | "setFeatures">;
+  personalProjects: Pick<PersonalProjectService, "create" | "archive" | "revive" | "setFeatures">;
 }): ProjectLifecycleDefinition {
   return lifecycleCommands()
     .withPeerSubscriber("recordPersonalWorkspaceProject", {
@@ -80,6 +83,14 @@ export function buildProjectLifecyclePipeline(deps: {
       data: personalWorkspaceProvisionedEventDataSchema,
       handle: ({ projectId, organizationId }) =>
         deps.recordProjectCreated({ projectId, organizationId }),
+    })
+    .withPeerSubscriber("createPersonalWorkspaceProject", {
+      eventType: PERSONAL_TEAM_CREATED_EVENT_TYPE,
+      data: personalTeamCreatedEventDataSchema,
+      handle: async (fact) => {
+        const projectId = await deps.personalProjects.create(fact);
+        await deps.recordProjectCreated({ projectId, organizationId: fact.organizationId });
+      },
     })
     .withPeerSubscriber("archivePersonalWorkspaceProjects", {
       eventType: PERSONAL_WORKSPACE_ARCHIVED_EVENT_TYPE,

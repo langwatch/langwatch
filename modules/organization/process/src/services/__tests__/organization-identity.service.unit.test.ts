@@ -19,9 +19,18 @@ describe("PersonalWorkspaceIdentityService", () => {
       });
 
       expect(resources.teamId).toMatch(/^team_/);
-      expect(resources.projectId).toMatch(/^project_/);
       expect(resources.ownerBindingId).toMatch(/^rolebinding_/);
-      expect(resources.projectApiKey).toMatch(/^pkey_.{40}$/);
+    });
+
+    /** @scenario "A personal workspace is born with packaged identifiers" */
+    it("mints a fresh strict project KSUID, never one derived from the team id", () => {
+      const identity = PersonalWorkspaceIdentityService.create();
+      const { teamId } = identity.create({ userId: "user_1", organizationId: "organization_1" });
+      const projectId = identity.newProjectId();
+
+      expect(projectId).toMatch(/^project_[0-9A-Za-z]+$/);
+      expect(projectId.slice("project_".length)).not.toBe(teamId.slice("team_".length));
+      expect(identity.newProjectId()).not.toBe(projectId);
     });
 
     /** @scenario "A personal workspace is born with packaged identifiers" */
@@ -54,9 +63,7 @@ describe("PersonalWorkspaceIdentityService", () => {
       const second = adapter.create(input);
 
       expect(first.teamId).not.toBe(second.teamId);
-      expect(first.projectId).not.toBe(second.projectId);
       expect(first.ownerBindingId).not.toBe(second.ownerBindingId);
-      expect(first.projectApiKey).not.toBe(second.projectApiKey);
     });
   });
 });

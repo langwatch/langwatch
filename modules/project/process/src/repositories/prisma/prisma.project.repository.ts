@@ -24,6 +24,7 @@ import {
   type UpdateProjectMetadataInput,
   type ProjectIdPage,
   type ProjectIdPageInput,
+  type ProjectOrganizationPage,
   type ProjectUsageCount,
 } from "@langwatch/project-contract";
 import { fromDate, toDate, type Instant } from "@langwatch/time";
@@ -121,6 +122,22 @@ export class PrismaProjectRepository
     if (limit === undefined || ids.length <= limit) return { ids, next: null };
     const page = ids.slice(0, limit);
     return { ids: page, next: page[page.length - 1] ?? null };
+  }
+
+  async listAllWithOrganization({
+    after,
+    limit,
+  }: ProjectIdPageInput = {}): Promise<ProjectOrganizationPage> {
+    const rows = await this.prisma.project.findMany({
+      select: { id: true, team: { select: { organizationId: true } } },
+      orderBy: { id: "asc" },
+      ...(after === undefined ? {} : { where: { id: { gt: after } } }),
+      ...(limit === undefined ? {} : { take: limit + 1 }),
+    });
+    const projects = rows.map((row) => ({ id: row.id, organizationId: row.team.organizationId }));
+    if (limit === undefined || projects.length <= limit) return { projects, next: null };
+    const page = projects.slice(0, limit);
+    return { projects: page, next: page[page.length - 1]?.id ?? null };
   }
 
   async countWithTraces({ organizationId }: { organizationId: string }): Promise<number> {
@@ -661,6 +678,34 @@ export class PrismaProjectRepository
       data: { apiKey: input.token },
     });
     return result.count > 0;
+  }
+
+  async createPersonal(input: {
+    id: string;
+    slug: string;
+    apiKey: string;
+    teamId: string;
+    ownerUserId: string;
+  }): Promise<string> {
+    const existing = await this.prisma.project.findFirst({
+      where: { teamId: input.teamId, isPersonal: true },
+      select: { id: true },
+    });
+    if (existing) return existing.id;
+    await this.prisma.project.create({
+      data: {
+        id: input.id,
+        name: "Personal Workspace",
+        slug: input.slug,
+        apiKey: input.apiKey,
+        teamId: input.teamId,
+        language: "other",
+        framework: "other",
+        isPersonal: true,
+        ownerUserId: input.ownerUserId,
+      },
+    });
+    return input.id;
   }
 
   async archivePersonalInTeams(input: { teamIds: string[]; archivedAt: Instant }): Promise<void> {

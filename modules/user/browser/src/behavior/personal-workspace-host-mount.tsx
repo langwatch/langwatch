@@ -13,6 +13,12 @@ import {
   type UiRoute,
   type UiSession,
 } from "@langwatch/browser-host/capabilities";
+import { readSlice } from "@langwatch/browser-host/global-store";
+import {
+  LANGY_ABSENT_SURFACE,
+  LANGY_STORE_SLICE,
+  type LangySliceSurface,
+} from "@langwatch/langy-contract";
 import { useMemo, type ReactNode } from "react";
 
 import {
@@ -41,6 +47,16 @@ const NO_TWO_STEP_CEREMONIES: { ok: false; error: unknown } = {
   ok: false,
   error: new Error("Two-step verification ceremonies are not installed"),
 };
+
+/** Starting a Langy turn, not reading one; and the rollout that reveals Langy at all. */
+const LANGY_CREATE_PERMISSION = "langy:create";
+const LANGY_RELEASE_FLAG = "release_langy_enabled";
+
+/** Langy's panel state, read like any peer's slice; Langy owns the writes. */
+const useLangyStore = readSlice<LangySliceSurface>({
+  name: LANGY_STORE_SLICE,
+  absent: LANGY_ABSENT_SURFACE,
+});
 
 /** A stable reference, so a query still loading never re-triggers a memo below it. */
 const NO_ORGANIZATIONS: readonly PersonalOrganizationGraph[] = [];
@@ -95,6 +111,7 @@ class CapabilityPersonalWorkspaceHost extends PersonalWorkspaceHostApi {
   private readonly organization_: PersonalOrganization | undefined;
   private readonly project_: PersonalProject | undefined;
   private readonly lent: LentAuthCeremonies;
+  private readonly askLangy: (prompt: string) => void;
 
   constructor({
     session,
@@ -107,6 +124,7 @@ class CapabilityPersonalWorkspaceHost extends PersonalWorkspaceHostApi {
     organization,
     project,
     lent,
+    askLangy,
   }: {
     session: UiSession;
     navigationCapability: UiNavigation;
@@ -118,6 +136,7 @@ class CapabilityPersonalWorkspaceHost extends PersonalWorkspaceHostApi {
     organization: PersonalOrganization | undefined;
     project: PersonalProject | undefined;
     lent: LentAuthCeremonies;
+    askLangy: (prompt: string) => void;
   }) {
     super();
     this.session = session;
@@ -130,6 +149,7 @@ class CapabilityPersonalWorkspaceHost extends PersonalWorkspaceHostApi {
     this.organization_ = organization;
     this.project_ = project;
     this.lent = lent;
+    this.askLangy = askLangy;
   }
 
   scope(): PersonalScope {
@@ -242,13 +262,16 @@ class CapabilityPersonalWorkspaceHost extends PersonalWorkspaceHostApi {
     return linking.link({ provider });
   }
 
-  /** No assistant hand-off capability exists; false/no-op is the honest reading. */
+  /** Main's useCanAskLangy grant, plus the rollout the shell's command bar also asks. */
   canAskAssistant(): boolean {
-    return false;
+    return (
+      this.session.hasPermission(LANGY_CREATE_PERMISSION) &&
+      this.session.isFeatureEnabled(LANGY_RELEASE_FLAG)
+    );
   }
 
-  askAssistant(): void {
-    return void 0;
+  askAssistant(prompt: string): void {
+    this.askLangy(prompt);
   }
 
   succeeded(notice: PersonalSuccessNotice): void {
@@ -272,6 +295,7 @@ export default function PersonalWorkspaceHostMount({ children }: { children?: Re
   const organizationRole = scope.scopeHost()?.organizationRole();
   const deployment = useUiDeployment();
   const lent = useLentAuthCeremonies();
+  const askLangy = useLangyStore((store) => store.askLangy);
 
   // Shares the tRPC cache entry with every other reader of this procedure, so
   // the graph is fetched once per page however many hosts want it.
@@ -311,6 +335,7 @@ export default function PersonalWorkspaceHostMount({ children }: { children?: Re
         organization,
         project,
         lent,
+        askLangy,
       }),
     [
       session,
@@ -328,6 +353,7 @@ export default function PersonalWorkspaceHostMount({ children }: { children?: Re
       organization,
       project,
       lent,
+      askLangy,
     ],
   );
   return <PersonalWorkspaceHostProvider value={host}>{children}</PersonalWorkspaceHostProvider>;

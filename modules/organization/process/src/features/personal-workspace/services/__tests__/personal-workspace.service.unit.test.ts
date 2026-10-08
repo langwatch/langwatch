@@ -1,15 +1,20 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
-import { PersonalProjectOwnerMismatchError } from "@langwatch/organization-contract";
+import {
+  PersonalProjectOwnerMismatchError,
+  PersonalWorkspacePendingError,
+} from "@langwatch/organization-contract";
 /**
  * @vitest-environment node
- * Organization writes a personal workspace's project row itself, so it records the new workspace
- * and project records the project as created (ARCHITECTURE §9).
- * Spec: specs/lwql/project-key-map.feature
+ * Organization creates the personal team and records its fact; project creates the project and
+ * mints its key (Round 54). Spec: modules/organization/specs/organization-service.feature
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
-import type { OrganizationRepository } from "../../../../repositories/organization.repository.ts";
+import type {
+  EnsuredPersonalTeam,
+  OrganizationRepository,
+} from "../../../../repositories/organization.repository.ts";
 import type { PersonalWorkspaceIdentity } from "../personal-workspace-identity.service.ts";
 import {
   PersonalWorkspaceService,
@@ -20,30 +25,19 @@ const IDENTITIES: PersonalWorkspaceIdentity = {
   create: () => ({
     teamId: "team_personal",
     teamSlug: "team-personal",
-    projectId: "project_personal",
     projectSlug: "project-personal",
-    projectApiKey: "key",
     ownerBindingId: "binding",
   }),
+  newProjectId: () => "project_personal",
 };
 
-function serviceWhere(created: boolean) {
+const TEAM = { id: "team_personal", name: "Personal", slug: "team-personal", createdAtMs: 1 };
+
+function serviceWhere(found: EnsuredPersonalTeam) {
   const repository = createApiFixture<OrganizationRepository>({
-    ensurePersonalWorkspace: async () => ({
-      workspace: {
-        team: { id: "team_personal", name: "Personal", slug: "team-personal", createdAtMs: 1 },
-        project: {
-          id: "project_personal",
-          name: "Personal Workspace",
-          slug: "project-personal",
-          apiKey: "key",
-          createdAtMs: 1,
-        },
-      },
-      created,
-    }),
+    ensurePersonalWorkspace: async () => found,
   });
-  const personalWorkspaceProvisioned = vi.fn();
+  const personalTeamCreated = vi.fn();
   const service = PersonalWorkspaceService.create({
     repository,
     identities: IDENTITIES,
@@ -51,34 +45,85 @@ function serviceWhere(created: boolean) {
       attachBindings: async () => ({ attached: ["binding"], duplicates: [] }),
     }),
     diagnostics: undefined,
-    notices: createApiFixture<PersonalWorkspaceNotices>({ personalWorkspaceProvisioned }),
+    notices: createApiFixture<PersonalWorkspaceNotices>({ personalTeamCreated }),
   });
-  return { service, personalWorkspaceProvisioned };
+  return { service, personalTeamCreated };
 }
 
+const INPUT = { userId: "user_1", organizationId: "org_acme" };
+
 describe("ensuring a personal workspace", () => {
-  describe("when it is created", () => {
-    /** @scenario "A personal workspace records its new project" */
-    it("records the new workspace with its project, for project to record as created", async () => {
-      const { service, personalWorkspaceProvisioned } = serviceWhere(true);
+  describe("when its personal project is still pending", () => {
+    /** @scenario "A new personal workspace answers pending until project has created its project" */
+    it("answers pending with the team to wait on", async () => {
+      const { service } = serviceWhere({ kind: "pending", team: TEAM });
 
-      await service.ensurePersonalWorkspace({ userId: "user_1", organizationId: "org_acme" });
+      await expect(service.ensurePersonalWorkspace(INPUT)).resolves.toEqual({
+        kind: "pending",
+        team: TEAM,
+      });
+    });
 
-      expect(personalWorkspaceProvisioned).toHaveBeenCalledWith({
+    /** @scenario "Ensuring again while the personal project is pending creates no second team" */
+    it("records the personal team fact on every pending answer, so a lost record heals", async () => {
+      const { service, personalTeamCreated } = serviceWhere({ kind: "pending", team: TEAM });
+
+      await service.ensurePersonalWorkspace(INPUT);
+      await service.ensurePersonalWorkspace(INPUT);
+
+      expect(personalTeamCreated).toHaveBeenCalledTimes(2);
+      expect(personalTeamCreated).toHaveBeenLastCalledWith({
         organizationId: "org_acme",
         userId: "user_1",
+        teamId: "team_personal",
         projectId: "project_personal",
+        projectSlug: "project-personal",
       });
+    });
+
+    /** @scenario "The personal team fact never carries the project key" */
+    it("records no key in the fact", async () => {
+      const { service, personalTeamCreated } = serviceWhere({ kind: "pending", team: TEAM });
+
+      await service.ensurePersonalWorkspace(INPUT);
+
+      expect(JSON.stringify(personalTeamCreated.mock.calls)).not.toMatch(/apiKey|pkey_/);
     });
   });
 
-  describe("when it already exists", () => {
-    it("records nothing, since its project was recorded when it was created", async () => {
-      const { service, personalWorkspaceProvisioned } = serviceWhere(false);
+  describe("when its personal project exists", () => {
+    /** @scenario "Ensuring a personal workspace whose project exists answers ready" */
+    it("answers ready with the workspace and records nothing", async () => {
+      const workspace = {
+        team: TEAM,
+        project: {
+          id: "project_personal",
+          name: "Personal Workspace",
+          slug: "project-personal",
+          apiKey: "key",
+          createdAtMs: 1,
+        },
+      };
+      const { service, personalTeamCreated } = serviceWhere({ kind: "ready", workspace });
 
-      await service.ensurePersonalWorkspace({ userId: "user_1", organizationId: "org_acme" });
+      await expect(service.ensurePersonalWorkspace(INPUT)).resolves.toEqual({
+        kind: "ready",
+        workspace,
+      });
+      expect(personalTeamCreated).not.toHaveBeenCalled();
+    });
+  });
+});
 
-      expect(personalWorkspaceProvisioned).not.toHaveBeenCalled();
+describe("refusing a change that needs a pending personal project", () => {
+  /** @scenario "A mutation that needs a pending personal project refuses as retryable" */
+  it("is a retryable 409 handled error", () => {
+    const refusal = new PersonalWorkspacePendingError();
+
+    expect(refusal).toMatchObject({
+      code: "personal_workspace_pending",
+      retryable: true,
+      httpStatus: 409,
     });
   });
 });
