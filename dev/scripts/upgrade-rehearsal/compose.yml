@@ -1,0 +1,115 @@
+# The upgrade rehearsal's stack (plan 2026-10-08, section F): one set of stores, the old image's
+# api and worker (profile "old") and head's upgrade, api and worker (profile "head") over them.
+# Driven by rehearse.sh, which sets the images, the env file and the host ports; not for direct use.
+name: ${REHEARSAL_PROJECT:-lw-upgrade-rehearsal}
+
+x-store-urls: &store-urls
+  DATABASE_URL: postgresql://prisma:prisma@postgres:5432/mydb?schema=mydb
+  CLICKHOUSE_URL: http://default:langwatch@clickhouse:8123/langwatch
+  CLICKHOUSE_BACKUP_METRICS_ENABLED: "false"
+  REDIS_URL: redis://redis:6379
+  NODE_ENV: production
+
+x-stores-healthy: &stores-healthy
+  postgres:
+    condition: service_healthy
+  redis:
+    condition: service_healthy
+  clickhouse:
+    condition: service_healthy
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: mydb
+      POSTGRES_USER: prisma
+      POSTGRES_PASSWORD: prisma
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U prisma -d mydb"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  redis:
+    image: redis:alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  clickhouse:
+    image: langwatch/clickhouse-serverless:0.2.0
+    environment:
+      CLICKHOUSE_PASSWORD: langwatch
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8123/ping || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  # The old image (3.20.1 or an origin/main build). Its start script runs start:prepare:db and the
+  # system-migrations pass on every start, so restarting it over head's schema is the S01 case.
+  old-app:
+    profiles: ["old"]
+    image: ${OLD_IMAGE:-langwatch/langwatch:3.20.1}
+    environment:
+      <<: *store-urls
+      SKIP_ENV_VALIDATION: "true"
+      INSTALL_METHOD: docker
+      LANGWATCH_ENDPOINT: http://old-app:5560
+    env_file: ["${REHEARSAL_ENV_FILE:?rehearse.sh writes the env file}"]
+    pull_policy: missing
+    ports: ["${OLD_APP_PORT:-15560}:5560"]
+    depends_on: *stores-healthy
+
+  old-worker:
+    profiles: ["old"]
+    image: ${OLD_IMAGE:-langwatch/langwatch:3.20.1}
+    command: ["pnpm", "run", "start:workers"]
+    working_dir: /app/platform/app
+    environment:
+      <<: *store-urls
+      SKIP_ENV_VALIDATION: "true"
+      LANGWATCH_ENDPOINT: http://old-app:5560
+    env_file: ["${REHEARSAL_ENV_FILE:?rehearse.sh writes the env file}"]
+    pull_policy: missing
+    depends_on: *stores-healthy
+
+  head-migrate:
+    profiles: ["head"]
+    image: ${HEAD_IMAGE:?rehearse.sh sets HEAD_IMAGE}
+    command: ["pnpm", "--silent", "run", "start:prepare:db"]
+    working_dir: /app/apps/api
+    environment: *store-urls
+    env_file: ["${REHEARSAL_ENV_FILE:?rehearse.sh writes the env file}"]
+    pull_policy: missing
+    restart: "no"
+    depends_on: *stores-healthy
+
+  head-api:
+    profiles: ["head"]
+    image: ${HEAD_IMAGE:?rehearse.sh sets HEAD_IMAGE}
+    environment:
+      <<: *store-urls
+      INSTALL_METHOD: docker
+      LANGWATCH_ENDPOINT: http://head-api:5560
+    env_file: ["${REHEARSAL_ENV_FILE:?rehearse.sh writes the env file}"]
+    pull_policy: missing
+    ports: ["${HEAD_API_PORT:-16560}:5560"]
+    depends_on: *stores-healthy
+
+  head-worker:
+    profiles: ["head"]
+    image: ${HEAD_IMAGE:?rehearse.sh sets HEAD_IMAGE}
+    command: ["pnpm", "run", "start"]
+    working_dir: /app/apps/worker
+    environment:
+      <<: *store-urls
+      LANGWATCH_ENDPOINT: http://head-api:5560
+    env_file: ["${REHEARSAL_ENV_FILE:?rehearse.sh writes the env file}"]
+    pull_policy: missing
+    ports: ["${HEAD_WORKER_METRICS_PORT:-12999}:2999"]
+    depends_on: *stores-healthy

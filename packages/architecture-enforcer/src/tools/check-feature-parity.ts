@@ -160,6 +160,7 @@ const DEFAULT_TEST_ROOTS: string[] = [
   // scans this directory for `.bats` files; this is the `.test.mjs`
   // counterpart. Without it, dev-tooling scenarios could only ever be @unimplemented.
   "dev/scripts/__tests__",
+  "dev/scripts/upgrade-rehearsal/__tests__",
 ];
 
 /**

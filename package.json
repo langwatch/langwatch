@@ -33,7 +33,7 @@
     "test:sdk": "pnpm --filter langwatch test",
     "typecheck": "GOMEMLIMIT=2GiB tsc -b --builders 1",
     "sync:references": "bash dev/scripts/devscripts.sh sync-references --write",
-    "test:dev-scripts": "TZ=UTC node --test dev/scripts/__tests__/*.unit.test.mjs",
+    "test:dev-scripts": "TZ=UTC node --test dev/scripts/__tests__/*.unit.test.mjs dev/scripts/upgrade-rehearsal/__tests__/*.unit.test.mjs",
     "lint": "node dev/nx/lint.mjs",
     "lint:changed": "node dev/nx/lint.mjs --changed",
     "lint:architecture": "pnpm --filter @langwatch/architecture-enforcer lint",
