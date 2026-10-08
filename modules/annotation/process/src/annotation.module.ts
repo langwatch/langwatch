@@ -1,6 +1,5 @@
 import type { AnnotationApi } from "@langwatch/annotation-contract";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
-import { defineMigrationStep } from "@langwatch/upgrade/step";
 
 import { AnnotationModule } from "#app/annotation.app";
 import { annotationLifecycleEventing } from "#eventing/annotation-lifecycle.pipeline";
@@ -27,26 +26,5 @@ export const annotationProcessModule: PublishedProcessModule<"annotation", Annot
         traces: dependencies.traces,
         projects: dependencies.projects,
         organizations: dependencies.organizations,
-      }),
-    ])
-    .withMigrations(({ app }) => [
-      defineMigrationStep({
-        id: "annotation:record-existing-facts",
-        kind: "data",
-        mode: "background",
-        description:
-          "Records every existing annotation and score definition as annotation's fact, for trace to read.",
-        // An old image still writing annotations records no facts: wait until none serves.
-        needsOldWritersGone: true,
-        run: async ({ checkpoint, dryRun, signal }) => {
-          const resumed = checkpoint.resumeFrom?.afterProjectId;
-          return app.recordExistingFacts({
-            dryRun,
-            signal,
-            afterProjectId: typeof resumed === "string" ? resumed : null,
-            onProjectDone: ({ projectId, report }) =>
-              checkpoint.save({ report: { afterProjectId: projectId, ...report } }),
-          });
-        },
       }),
     ]);

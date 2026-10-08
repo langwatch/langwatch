@@ -1,7 +1,8 @@
 -- A Slack connection in use is claimed, not counted (ARCHITECTURE.md §3, the
 -- claims ruling of 2026-09-30). Automation claims a connection when it saves a
 -- trigger on it and releases it when the trigger moves off, pauses or is
--- deleted; a claimed connection cannot be deleted (ON DELETE RESTRICT).
+-- deleted; a claimed connection cannot be deleted (slack's service refuses it;
+-- there is no foreign key).
 -- projectId is the claimant's project; organizationId the tenancy anchor.
 
 -- CreateTable
@@ -19,6 +20,3 @@ CREATE TABLE "slack_connection_claim" (
 
 -- CreateIndex
 CREATE INDEX "slack_connection_claim_organizationId_idx" ON "slack_connection_claim"("organizationId");
-
--- AddForeignKey
-ALTER TABLE "slack_connection_claim" ADD CONSTRAINT "slack_connection_claim_connectionId_fkey" FOREIGN KEY ("connectionId") REFERENCES "SlackIntegration"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

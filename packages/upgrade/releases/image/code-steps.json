@@ -1,12 +1,5 @@
 [
   {
-    "id": "annotation:record-existing-facts",
-    "kind": "data",
-    "mode": "background",
-    "owner": "annotation",
-    "description": "Records every existing annotation and score definition as annotation's fact, for trace to read."
-  },
-  {
     "id": "entitlement:seed-trace-meter",
     "kind": "data",
     "mode": "background",

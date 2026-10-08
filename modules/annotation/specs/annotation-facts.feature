@@ -57,48 +57,8 @@ Feature: Annotation records its facts
     Then annotation records no score fact
 
   @unit
-  Scenario: Existing annotations and score definitions are recorded by the backfill
-    Given annotations and score definitions stored before annotation recorded facts
-    When the "annotation:record-existing-facts" step runs
-    Then every stored annotation is recorded as a backfilled "lw.annotation.created" with its current content
-    And every score definition, soft-deleted ones included, is recorded as a backfilled "lw.annotation.score_defined"
-
-  @unit
-  Scenario: A second backfill run records nothing new
-    Given the backfill step has run
-    When it runs again over the same rows
-    Then no new fact is recorded
-
-  @unit
-  Scenario: A row changed since the last backfill run is recorded again
-    Given the backfill step has run
-    And an old writer changed an annotation without recording a fact
-    When the step runs again
-    Then the changed annotation is recorded with its new content
-
-  @unit
-  Scenario: A backfill dry run records nothing
-    Given stored annotations and score definitions
-    When the step runs as a dry run
-    Then it reports what it would record
-    And no fact is recorded and no checkpoint is saved
-
-  @unit
-  Scenario: An interrupted backfill resumes after the last finished project
-    Given a checkpoint naming the last project the step finished
-    When the step runs again
-    Then it records only the projects after that one
-
-  @unit
-  Scenario: A failed record stops the backfill at the last finished project
-    Given the backfill is recording a project's annotations
-    When recording one of them fails
-    Then the step fails with that error
-    And its checkpoint still names the last project it finished
-
-  @unit
-  Scenario: The annotation module declares its pipeline and its backfill step
+  Scenario: The annotation module declares its pipeline and no migration step
     Given the annotation process module
     When a process collects its eventing and its migration steps
     Then it registers annotation_lifecycle
-    And it declares the background step "annotation:record-existing-facts", run only once old writers are gone
+    And it declares no migration step

@@ -71,11 +71,6 @@ import {
 import type { AnnotationQueueWalkScope } from "#repositories/annotation-queue-item.repository";
 import type { AnnotationRepositories } from "#repositories/annotation.repositories";
 import {
-  AnnotationFactBackfillService,
-  type AnnotationFactBackfillReport,
-  type AnnotationFactBackfillRun,
-} from "#services/annotation-fact-backfill.service";
-import {
   AnnotationFactsService,
   type AnnotationLifecycleSenders,
 } from "#services/annotation-facts.service";
@@ -130,7 +125,6 @@ export class AnnotationModule implements AnnotationApi {
   #annotations: AnnotationService;
   #scores: AnnotationScoreService;
   #facts = AnnotationFactsService.create();
-  #factBackfill: AnnotationFactBackfillService;
   readonly #lifecycle = buildAnnotationLifecyclePipeline();
   #queues: AnnotationQueueService;
   #count: AnnotationRepositories["count"];
@@ -152,13 +146,6 @@ export class AnnotationModule implements AnnotationApi {
     this.#scores = AnnotationScoreService.create({
       repository: repositories.scores,
       facts: this.#facts,
-    });
-    this.#factBackfill = AnnotationFactBackfillService.create({
-      annotations: repositories.annotations,
-      scores: repositories.scores,
-      facts: this.#facts,
-      projects: dependencies.projects,
-      organizations: dependencies.organizations,
     });
 
     this.#queues = AnnotationQueueService.create({
@@ -187,11 +174,6 @@ export class AnnotationModule implements AnnotationApi {
   /** Binds the built lifecycle pipeline's own senders. */
   connectLifecycleCommands(commands: AnnotationLifecycleSenders): void {
     this.#facts.connect(commands);
-  }
-
-  /** The `annotation:record-existing-facts` step's body: stored rows recorded as facts. */
-  recordExistingFacts(input: AnnotationFactBackfillRun): Promise<AnnotationFactBackfillReport> {
-    return this.#factBackfill.recordExisting(input);
   }
 
   create(input: CreateAnnotationInput): Promise<Annotation> {

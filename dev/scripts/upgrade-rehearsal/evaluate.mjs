@@ -9,7 +9,6 @@ import { fileURLToPath } from "node:url";
 
 /** The background steps that wait for old writers to be gone (plan B.3, S02 to S06). */
 export const NOWG_STEP_IDS = [
-  "annotation:record-existing-facts",
   "user:record-created-facts",
   "suite:replay-scenario-facts-for-open-runs",
   "workflow:record-current-version-fields",

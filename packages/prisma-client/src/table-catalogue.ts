@@ -1135,12 +1135,10 @@ export const prismaModelFieldCatalogue = {
     "createdById",
     "updatedById",
     "createdAt",
-    "updatedAt",
-    "claims"
+    "updatedAt"
   ],
   "SlackConnectionClaim": [
     "connectionId",
-    "connection",
     "claimantId",
     "claimantLabel",
     "organizationId",
@@ -3101,12 +3099,8 @@ export const prismaRelationCatalogue = {
     "latestEvaluation": "TriggerLatestEvaluation",
     "customGraph": "CustomGraph"
   },
-  "SlackIntegration": {
-    "claims": "SlackConnectionClaim"
-  },
-  "SlackConnectionClaim": {
-    "connection": "SlackIntegration"
-  },
+  "SlackIntegration": {},
+  "SlackConnectionClaim": {},
   "WebhookEndpoint": {
     "organization": "Organization",
     "deliveries": "WebhookEndpointDelivery"
