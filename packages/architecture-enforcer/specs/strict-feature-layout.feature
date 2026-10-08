@@ -34,6 +34,14 @@ Feature: Strict versioned feature source layout
     Then it is no longer reported
 
   @unit @architecture
+  Scenario: A process package that records the plan it is staged on holds no service yet
+    Given a strict process package with no subject-named service
+    Then it is reported as missing its service
+    When its package.json records "staged" naming a plan under dev/docs/plans/ that exists
+    Then it is no longer reported
+    And a "staged" plan that does not exist leaves the finding in place
+
+  @unit @architecture
   Scenario: Behaviour-bearing modules are classes
     Given a layout-version-0 service, store, projection, API, migration, or repository module
     When Oxlint checks the module
@@ -53,6 +61,14 @@ Feature: Strict versioned feature source layout
     And that piece is an abstract contract service, a persistence adapter, a fixtures directory, a testing entry, a nested transport folder, a transport still built on a legacy REST or tRPC builder, unselected repositories, Prisma repositories without memory twins, a memory twin no contract test runs against both backends, a nested web entry, a refusing composition twin, a missing installer or app, or an installer no process boots
     When architecture lint checks the workspace
     Then the piece is reported with the reference shape it should take
+
+  @unit @architecture
+  Scenario: A staged module is not asked for its app or installer
+    Given a catalogue feature whose process package has no installer and no app
+    Then the missing installer and app are reported
+    When its package.json records "staged" naming a plan under dev/docs/plans/ that exists
+    Then neither is reported
+    And every other legacy piece it carries is still reported
 
   @integration @architecture
   Scenario: The reference feature carries no legacy piece

@@ -845,6 +845,22 @@ describe("strict feature source layout", () => {
     expect(policies()).not.toContain("feature-layout");
   });
 
+  /** @scenario A process package that records the plan it is staged on holds no service yet */
+  it("accepts a process package with no service only when it records an existing staged plan", () => {
+    featurePackage({ feature: "widget", role: "process" });
+    rmSync(join(root, "modules/widget/process/src/services/widget.service.ts"));
+    expect(policies()).toContain("feature-layout");
+
+    const manifestPath = join(root, "modules/widget/process/package.json");
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as Record<string, unknown>;
+    const staged = { ...manifest, staged: "dev/docs/plans/widget.md" };
+    write("modules/widget/process/package.json", JSON.stringify(staged));
+    expect(policies()).toContain("feature-layout");
+
+    write("dev/docs/plans/widget.md", "# Widget\n");
+    expect(policies()).not.toContain("feature-layout");
+  });
+
   it("rejects process wiring bound from the composition root by a portable API contract", () => {
     featurePackage({
       feature: "widget",

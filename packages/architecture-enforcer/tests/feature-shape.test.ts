@@ -307,6 +307,26 @@ describe("feature shape", () => {
       expect(findings().map((finding) => finding.kind)).toEqual(["no-app"]);
     });
 
+    /** @scenario "A staged module is not asked for its app or installer" */
+    it("asks a staged process package for neither, only when the plan it names exists", () => {
+      referenceFeature();
+      rmSync(join(root, "modules/widget/process/src/widget.module.ts"));
+      rmSync(join(root, "modules/widget/process/src/app/widget.app.ts"));
+      write("modules/widget/process/src/fixtures/widget.fixture.ts");
+      const staged = { ...pkg("process"), manifest: { staged: "dev/docs/plans/widget.md" } };
+      const measure = () =>
+        collectFeatureShapeFindings(root, catalogue, [pkg("contract"), staged, pkg("browser")]);
+
+      expect(measure().map((finding) => finding.kind)).toEqual([
+        "fixtures-directory",
+        "no-app",
+        "no-installer",
+      ]);
+
+      write("dev/docs/plans/widget.md", "# Widget\n");
+      expect(measure().map((finding) => finding.kind)).toEqual(["fixtures-directory"]);
+    });
+
     /** @scenario "A pre-reference feature shape is reported, never admitted" */
     it("reports an installer the generated module list omits, naming the installer file", () => {
       referenceFeature();

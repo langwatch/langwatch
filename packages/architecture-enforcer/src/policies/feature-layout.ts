@@ -21,6 +21,7 @@ import {
   type WorkspaceModuleResolver,
 } from "../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../workspace/snapshot.ts";
+import { isStagedModule } from "../workspace/staged-module.ts";
 
 const RULES_IMPLEMENTATION_PATH =
   /(?:^|\/)(?:services|ports|adapters|repositories|stores|projections|subscribers|processes|intents|transport)(?:\/|$)/;
@@ -280,7 +281,7 @@ function lintServer(snapshot: WorkspaceSnapshot, pkg: ClassifiedPackage): Archit
     if (SERVICE_MODULE_PATTERN.test(path)) serviceCount += 1;
   }
 
-  if (serviceCount === 0) {
+  if (serviceCount === 0 && !isStagedModule({ root: snapshot.root, manifest: pkg.manifest })) {
     violations.push(
       violation(
         `${pkg.root}/src/services`,

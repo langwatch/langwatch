@@ -4,17 +4,9 @@
   "private": true,
   "description": "Weekly digest emails: folds the week's usage, picks one of five templates per person and sends it.",
   "license": "SEE LICENSE IN ../../../LICENSE.md",
-  "files": [
-    "src"
-  ],
   "type": "module",
-  "main": "./src/index.ts",
-  "types": "./dist/index.d.ts",
   "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./src/index.ts"
-    }
+    "./package.json": "./package.json"
   },
   "scripts": {
     "typecheck": "tsc -b",
@@ -28,5 +20,6 @@
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
-  }
+  },
+  "staged": "dev/docs/plans/weekly-digest.md"
 }

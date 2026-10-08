@@ -30,6 +30,8 @@ export type PackageManifest = {
   private?: boolean;
   /** `false` records a contract package that deliberately declares no callable `*Api`. */
   callable?: boolean;
+  /** The plan (dev/docs/plans/<name>.md) a designed but unbuilt process package waits on. */
+  staged?: string;
   license?: string;
   exports?: unknown;
   scripts?: Record<string, string>;

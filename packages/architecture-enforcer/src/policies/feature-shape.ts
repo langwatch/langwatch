@@ -7,6 +7,7 @@ import { listFiles } from "../workspace/layout.ts";
 import { sourceText } from "../workspace/module-graph.ts";
 import { repositoryHomes } from "../workspace/repository-homes.ts";
 import type { WorkspaceSnapshot } from "../workspace/snapshot.ts";
+import { isStagedModule } from "../workspace/staged-module.ts";
 
 /** Colocated tests are not the shape they test. */
 const TEST_DIRECTORIES = new Set(["__tests__"]);
@@ -200,12 +201,13 @@ function serverFindings({
   const installer = join(src, `${feature}.module.ts`);
   const installed = isFile(installer);
   const bootedSomewhere = installed && isBooted(feature, booted);
+  const staged = isStagedModule({ root, manifest: pkg.manifest });
 
-  if (!installed) add("no-installer", src);
-  else if (!bootedSomewhere) add("installer-not-booted", installer);
+  if (!installed && !staged) add("no-installer", src);
+  else if (installed && !bootedSomewhere) add("installer-not-booted", installer);
 
   const appMissing = !isFile(join(src, "app", `${feature}.app.ts`));
-  if (appMissing) add("no-app", src);
+  if (appMissing && !staged) add("no-app", src);
 
   const adapter = files(join(src, "adapters")).find((name) => PERSISTENCE_ADAPTER.test(name));
   if (adapter) add("persistence-adapter", join(src, "adapters", adapter));
