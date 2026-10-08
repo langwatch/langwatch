@@ -733,3 +733,54 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     When better-auth lists the user's accounts with a sort
     Then the read is refused
     And the refusal is logged at error
+
+  # ── The two Postgres repositories behind the identity branch ───────────
+
+  @integration
+  Scenario: Only a live identifier assembles into an account row
+    Given a user with a verified google identifier holding a credential row
+    And a detached github identifier on the same user
+    When the user's account rows are read
+    Then only the google account is returned, carrying its credential's secrets
+
+  @integration
+  Scenario: A live identifier without a credential row still answers, its secrets absent
+    Given a user with an attached email identifier and no credential row
+    When the user's account rows are read
+    Then the account is returned with no password and the mailbox as its account id
+
+  @integration
+  Scenario: An account lookup by a provider subject nothing live holds is refused as not found
+    Given a user whose github identifier is detached
+    When the account is looked up by "github" and its subject
+    Then the lookup throws identifier-not-found
+
+  @integration
+  Scenario: A resolution is finalized only when the user's own backfill row says finalized
+    Given three users holding a verified address, one finalized, one held and one with no backfill row
+    When each is resolved by that address
+    Then only the finalized user's resolution reports finalized
+
+  @integration
+  Scenario: An attached address resolves nobody
+    Given a user whose only identifier for an address is still ATTACHED
+    When the address is resolved
+    Then the resolution throws identifier-not-found
+
+  @integration
+  Scenario: The earliest attached identifier answers a resolution
+    Given two users holding the same verified address, attached a day apart
+    When the address is resolved
+    Then the user attached first answers
+
+  @integration
+  Scenario: A resolution records when the identifier last answered
+    Given a user with a verified google identifier that has never answered
+    When the user is resolved by "google" and the subject
+    Then the identifier's last-used time is recorded
+
+  @integration
+  Scenario: An issuer-subject resolution hands back the row's own provider id
+    Given a user with an identifier under a connection's issuer and provider id "auth0"
+    When the user is resolved by that issuer and the subject
+    Then the resolution names provider id "auth0"
