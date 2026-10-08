@@ -1058,7 +1058,7 @@ workers:
   # Connection to the main LangWatch application
   ## @extra workers.upstreams Upstream to app (callbacks, etc.).
   ## @param workers.upstreams.langwatch.scheme [string, default: http] Scheme to app.
-  ## @param workers.upstreams.langwatch.name [string, default: langwatch-app] Service name for app.
+  ## @param workers.upstreams.langwatch.name [string, default: ""] Service name for app. If empty, defaults to {{ .Release.Name }}-app.
   ## @param workers.upstreams.langwatch.port [default: 5560] Port to app.
   upstreams:
     langwatch: { scheme: http, port: 5560, name: "" } # name: override the app Service host; empty derives <release>-app
@@ -1236,7 +1236,7 @@ langwatch_nlp:
   # Connection to the main LangWatch application
   ## @extra langwatch_nlp.upstreams Upstream to app (callbacks, etc.).
   ## @param langwatch_nlp.upstreams.langwatch.scheme [string, default: http] Scheme to app.
-  ## @param langwatch_nlp.upstreams.langwatch.name [string, default: langwatch-app] Service name for app.
+  ## @param langwatch_nlp.upstreams.langwatch.name [string, default: ""] Service name for app. If empty, defaults to {{ .Release.Name }}-app.
   ## @param langwatch_nlp.upstreams.langwatch.port [default: 5560] Port to app.
   upstreams:
     langwatch: { scheme: http, port: 5560, name: "" } # name: override the app Service host; empty derives <release>-app
