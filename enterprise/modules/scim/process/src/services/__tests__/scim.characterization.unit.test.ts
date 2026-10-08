@@ -20,6 +20,7 @@ const now = new Date("2026-08-25T12:00:00.000Z");
 function repository(overrides: Partial<ScimRepository> = {}): ScimRepository {
   return {
     findOrganizationBySsoDomain: vi.fn(),
+    findOrganizationNames: vi.fn(async () => []),
     createToken: vi.fn(async () => ({ id: "token_1" })),
     findTokens: vi.fn(async () => []),
     findToken: vi.fn(async () => null),

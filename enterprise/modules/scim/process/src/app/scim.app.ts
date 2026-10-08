@@ -70,7 +70,6 @@ import {
 } from "@langwatch/entitlement-contract";
 import type { EventingCommandSender, EventingParticipation } from "@langwatch/eventing";
 import { AdminSurfaceHiddenError } from "@langwatch/ops-contract";
-import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { nowInstant, type Instant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
@@ -242,7 +241,6 @@ export class ScimModule implements ScimApiContract {
     users: UserApi,
     entitlements: EntitlementApi,
     auditLog: AuditLogApi,
-    organization: OrganizationApi,
   };
   static readonly config = scimConfig;
   static readonly secrets = { ...scimSecrets, ...scimTokenPepperSecrets } as const;
@@ -311,7 +309,7 @@ export class ScimModule implements ScimApiContract {
       writer: dependencies.authorization,
       users: dependencies.users,
       costCenterFacts,
-      organization: dependencies.organization,
+      organization: dependencies.authorization,
       entitlements: dependencies.entitlements,
       lifecycle,
       provenOffboarding: config.provenOffboarding,
@@ -340,13 +338,13 @@ export class ScimModule implements ScimApiContract {
       minting: ScimTokenMintService.create(dependencies.authorization),
       oversight: ScimOversightService.create({
         syncs,
-        organizations: dependencies.organization,
+        organizations: repositories.scim,
         identities: repositories.scim,
         lifecycle,
         deprovision: ScimDeprovisionService.create({
           grants: dependencies.authorization,
           lifecycle,
-          organization: dependencies.organization,
+          organization: dependencies.authorization,
         }),
       }),
       platformOperators: dependencies.authorization,

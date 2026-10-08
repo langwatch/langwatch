@@ -26,7 +26,7 @@ type StoredToken = ScimTokenRecord & { hashedToken: string };
 type StoredRequest = ScimRequestLogEntry;
 type StoredMembership = { organizationId: string; userId: string; role: string };
 type StoredGroupMember = { groupId: string; userId: string };
-type StoredOrganization = { id: string; ssoDomain: string | null };
+type StoredOrganization = { id: string; ssoDomain: string | null; name?: string };
 type StoredDirectoryUser = { organizationId: string; connectionId: string; userId: string };
 
 const sameName = (left: string, right: string): boolean =>
@@ -93,6 +93,15 @@ export class MemoryScimRepository extends ScimRepository {
       if (organization.ssoDomain === input.domain) return { id: organization.id };
     }
     return null;
+  }
+
+  async findOrganizationNames(input: {
+    organizationIds: readonly string[];
+  }): Promise<{ id: string; name: string }[]> {
+    return input.organizationIds.flatMap((id) => {
+      const name = this.organizations.get(id)?.name;
+      return name === undefined ? [] : [{ id, name }];
+    });
   }
 
   findMembership = async (input: {

@@ -26,7 +26,6 @@ import {
   SSO_CONNECTION_AGGREGATE_TYPE,
   SSO_CONNECTION_PIPELINE_NAME,
 } from "@langwatch/identity-contract";
-import { OrganizationApi } from "@langwatch/organization-contract";
 import { bootInstalledProcess } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import { testPeer } from "@langwatch/process/testing";
@@ -224,7 +223,6 @@ async function bootWorker() {
       testPeer({ token: UserApi, instance: createApiFixture<UserApi>() }),
       testPeer({ token: EntitlementApi, instance: createApiFixture<EntitlementApi>() }),
       testPeer({ token: AuditLogApi, instance: createApiFixture<AuditLogApi>() }),
-      testPeer({ token: OrganizationApi, instance: createApiFixture<OrganizationApi>() }),
     ],
   });
   return { runtime, closed };

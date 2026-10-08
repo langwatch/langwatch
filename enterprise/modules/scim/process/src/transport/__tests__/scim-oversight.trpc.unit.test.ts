@@ -52,7 +52,7 @@ function mount(userId: string) {
       },
       findForOperator: async () => [],
     },
-    organizations: { findProvisioningSummary: async () => null },
+    organizations: { findOrganizationNames: async () => [] },
     identities: MemoryScimRepository.create(),
     lifecycle: { applyRedriven: async () => undefined },
     deprovision: { removeAccess: async () => ({ ownedApiKeys: [], personalTeams: [] }) },

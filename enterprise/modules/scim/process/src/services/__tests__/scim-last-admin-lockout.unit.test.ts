@@ -10,7 +10,6 @@
  */
 import type { ScimCreateUserRequest } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import { CannotRemoveLastAdminError } from "@langwatch/organization-contract";
 import type { UserProfile } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -94,9 +93,7 @@ function stack({ provenOffboarding, refuses }: { provenOffboarding: boolean; ref
   const writer = new GrantsFake();
   const organization = new OrganizationAdministrationFake();
   if (refuses) {
-    organization.assertRemovalKeepsAnAdministrator.mockRejectedValue(
-      new CannotRemoveLastAdminError(),
-    );
+    organization.findActiveOrganizationAdministrators.mockResolvedValue([ADMIN]);
   }
 
   return {
@@ -193,9 +190,8 @@ describe("given somebody whose removal costs the organization no administrator",
       connectionId: CONNECTION,
     });
 
-    expect(organization.assertRemovalKeepsAnAdministrator).toHaveBeenCalledWith({
+    expect(organization.findActiveOrganizationAdministrators).toHaveBeenCalledWith({
       organizationId: ORGANIZATION,
-      userId: ADMIN,
     });
     expect(repository.removeMembership).toHaveBeenCalled();
   });

@@ -396,7 +396,7 @@ describe("a directory push that arrives for a person", () => {
       // The directory already decided: the only things asked are who holds the
       // address and to mint the account; no administrator or department check.
       expect(w.users.findByEmail).toHaveBeenCalledTimes(1);
-      expect(w.organization.assertRemovalKeepsAnAdministrator).not.toHaveBeenCalled();
+      expect(w.organization.findActiveOrganizationAdministrators).not.toHaveBeenCalled();
       expect(w.departments.recordCostCenterChanged).not.toHaveBeenCalled();
     });
   });

@@ -109,6 +109,16 @@ export class PrismaScimRepository extends ScimRepository {
     });
   }
 
+  findOrganizationNames(input: {
+    organizationIds: readonly string[];
+  }): Promise<{ id: string; name: string }[]> {
+    if (input.organizationIds.length === 0) return Promise.resolve([]);
+    return this.prisma.organization.findMany({
+      where: { id: { in: [...input.organizationIds] } },
+      select: { id: true, name: true },
+    });
+  }
+
   // Arrow instance properties, not prototype methods, from here through
   // `removeMembership`: the base class declares these members as properties
   // of function type (so tests can reference a mock repository's methods
