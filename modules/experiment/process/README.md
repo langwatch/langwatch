@@ -930,9 +930,25 @@ Permission `workflows:create or evaluations:view`. Declared at `src/transport/ex
 Answers at `/api/workflows/:id/evaluate`, `/api/v1/workflows/:id/evaluate`; also, undocumented, `/api/workflows/2026-08-07/:id/evaluate`, `/api/v1/workflows/2026-08-07/:id/evaluate`, `/api/workflows/latest/:id/evaluate`, `/api/v1/workflows/latest/:id/evaluate`.
 
 ```typescript
-type Params = z.infer<typeof experimentWorkflowEvaluateParamsSchema>; // ../contract/src/experiment-workflow-evaluation-rest.ts:8
-type Body = z.infer<typeof experimentWorkflowEvaluateSchema>; // ../contract/src/experiment-workflow-evaluation-rest.ts:19
-type Response = z.infer<typeof experimentWorkflowEvaluationStartedSchema>; // ../contract/src/experiment-workflow-evaluation-rest.ts:11
+// Params: experimentWorkflowEvaluateParamsSchema, ../contract/src/experiment-workflow-evaluation-rest.ts:8
+interface Params {
+  id: string;
+}
+// Body: experimentWorkflowEvaluateSchema, ../contract/src/experiment-workflow-evaluation-rest.ts:19
+interface Body {
+  version_id?: string;
+  data?: Record<string, unknown>[];
+  dataset_id?: string;
+  parameters?: Record<string, string | number | boolean>;
+  row_indices?: number[];
+}
+// Response: experimentWorkflowEvaluationStartedSchema, ../contract/src/experiment-workflow-evaluation-rest.ts:11
+interface Response {
+  run_id: string;
+  run_url: string;
+  workflow_version_id: string;
+  version: string;
+}
 ```
 
 ### `experimentRest`

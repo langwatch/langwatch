@@ -25,7 +25,7 @@ None.
 ## Calls
 
 - `withApi(workflowApi)`, tRPC contracts: `workflow.*`, `optimization.*`.
-- Client packages (package.json): `@langwatch/agent-client`, `@langwatch/api-key-client`, `@langwatch/dataset-client`, `@langwatch/evaluator-client`, `@langwatch/model-provider-client`, `@langwatch/trace-client`, `@langwatch/workflow-client`.
+- Client packages (package.json): `@langwatch/agent-client`, `@langwatch/api-key-client`, `@langwatch/dataset-client`, `@langwatch/evaluator-client`, `@langwatch/model-provider-client`, `@langwatch/scenario-client`, `@langwatch/trace-client`, `@langwatch/workflow-client`.
 - Lends: `HoverableBigTextToken`, `RedactedFieldToken`, `VersionBoxToken`, `RunExperimentViaApiDialogToken`.
 - Host APIs it requires: `WorkflowHostApi`.
 

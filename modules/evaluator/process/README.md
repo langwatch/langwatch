@@ -380,7 +380,7 @@ Contract `../contract/src/evaluator.trpc.ts:31`, router `src/transport/evaluator
 interface Input {
   projectId: string;
 }
-// Output: evaluatorWithFieldsSchema.array() (inline, ../contract/src/evaluator.trpc.ts:34)
+// Output: evaluatorWithFieldsSchema.array() (inline, ../contract/src/evaluator.trpc.ts:35)
 
 // evaluators.getById
 // Input: evaluatorApiEvaluatorIdInputSchema, ../contract/src/evaluator.schemas.ts:21
@@ -388,7 +388,7 @@ interface Input {
   id: string;
   projectId: string;
 }
-// Output: evaluatorWithFieldsSchema.nullable() (inline, ../contract/src/evaluator.trpc.ts:39)
+// Output: evaluatorWithFieldsSchema.nullable() (inline, ../contract/src/evaluator.trpc.ts:40)
 
 // evaluators.getBySlug
 // Input: evaluatorApiSlugInputSchema, ../contract/src/evaluator.schemas.ts:37
@@ -396,7 +396,7 @@ interface Input {
   slug: string;
   projectId: string;
 }
-// Output: evaluatorSchema.nullable() (inline, ../contract/src/evaluator.trpc.ts:43)
+// Output: evaluatorSchema.nullable() (inline, ../contract/src/evaluator.trpc.ts:44)
 
 // evaluators.create
 // Input: evaluatorApiCreateInputSchema, ../contract/src/evaluator.schemas.ts:58
@@ -432,9 +432,21 @@ interface Output {
   } | null;
 }
 
+// evaluators.listByWorkflow
+// Input: evaluatorApiWorkflowInputSchema, ../contract/src/evaluator.schemas.ts:161
+interface Input {
+  workflowId: string;
+  projectId: string;
+}
+// Output: inline, ../contract/src/evaluator.trpc.ts:62
+type Output = {
+  id: string;
+  name: string;
+}[];
+
 // evaluators.cascadeArchive
 type Input = z.infer<typeof evaluatorApiEvaluatorIdInputSchema>; // ../contract/src/evaluator.schemas.ts:21
-type Output = z.infer<typeof evaluatorCascadeArchiveSchema>; // ../contract/src/evaluator.schemas.ts:143
+type Output = z.infer<typeof evaluatorCascadeArchiveSchema>; // ../contract/src/evaluator.schemas.ts:146
 
 // evaluators.delete
 type Input = z.infer<typeof evaluatorApiEvaluatorIdInputSchema>; // ../contract/src/evaluator.schemas.ts:21
@@ -450,7 +462,7 @@ interface Input {
   projectId: string;
   evaluatorId: string;
 }
-// Output: inline, ../contract/src/evaluator.trpc.ts:75
+// Output: inline, ../contract/src/evaluator.trpc.ts:81
 type Output = {
   id: string;
   name: string;
@@ -475,7 +487,7 @@ interface Input {
   evaluatorId: string;
   copyIds?: string[];
 }
-// Output: evaluatorPushToCopiesSchema, ../contract/src/evaluator.schemas.ts:149
+// Output: evaluatorPushToCopiesSchema, ../contract/src/evaluator.schemas.ts:152
 interface Output {
   pushedTo: number;
   selectedCopies: number;
@@ -483,14 +495,14 @@ interface Output {
 
 // evaluators.syncFromSource
 type Input = z.infer<typeof evaluatorApiEvaluatorInputSchema>; // ../contract/src/evaluator.schemas.ts:31
-// Output: evaluatorSyncFromSourceSchema, ../contract/src/evaluator.schemas.ts:155
+// Output: evaluatorSyncFromSourceSchema, ../contract/src/evaluator.schemas.ts:158
 interface Output {
   ok: true;
 }
 
 // evaluators.getHistory
 type Input = z.infer<typeof evaluatorApiEvaluatorInputSchema>; // ../contract/src/evaluator.schemas.ts:31
-// Output: inline, ../contract/src/evaluator.trpc.ts:92
+// Output: inline, ../contract/src/evaluator.trpc.ts:98
 type Output = {
   id: string;
   action: string;
@@ -504,25 +516,21 @@ type Output = {
 }[];
 
 // evaluators.disableAsEvaluator
-// Input: evaluatorApiWorkflowInputSchema, ../contract/src/evaluator.schemas.ts:158
-interface Input {
-  workflowId: string;
-  projectId: string;
-}
-// Output: evaluatorWorkflowSwitchedSchema, ../contract/src/evaluator.schemas.ts:171
+type Input = z.infer<typeof evaluatorApiWorkflowInputSchema>; // ../contract/src/evaluator.schemas.ts:161
+// Output: evaluatorWorkflowSwitchedSchema, ../contract/src/evaluator.schemas.ts:174
 interface Output {
   success: boolean;
 }
 
 // evaluators.toggleSaveAsEvaluator
-// Input: evaluatorApiWorkflowToggleInputSchema, ../contract/src/evaluator.schemas.ts:164
+// Input: evaluatorApiWorkflowToggleInputSchema, ../contract/src/evaluator.schemas.ts:167
 interface Input {
   workflowId: string;
   projectId: string;
   isEvaluator: boolean;
   isComponent: boolean;
 }
-type Output = z.infer<typeof evaluatorWorkflowSwitchedSchema>; // ../contract/src/evaluator.schemas.ts:171
+type Output = z.infer<typeof evaluatorWorkflowSwitchedSchema>; // ../contract/src/evaluator.schemas.ts:174
 ```
 
 ## Sockets

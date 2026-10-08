@@ -292,37 +292,16 @@ Contract `../contract/src/identity.trpc.ts:25`, router `src/transport/identity.t
 | `identity.resendIdentifierConfirmation` | mutation | No permission: re-sends the session user's own address confirmation; the ceremony proves the identifier is theirs                                                 | inline                            | inline                         |
 | `identity.removeIdentifier`             | mutation | No permission: removes an identifier from the session user's own account; the identity guards decide, and no organization scope applies                           | inline                            | inline                         |
 
-### `identity.joinRequests`
-
-Contract `../contract/src/join-request.trpc.ts:35`, router `src/transport/join-request.trpc.ts:104`.
-
-| Procedure                                  | Kind     | Gate                                                                                                                                                                                                                     | Input                                   | Output                            |
-| ------------------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------- | --------------------------------- |
-| `identity.joinRequests.lookup`             | query    | No permission: the caller is asking about organizations they are not in yet, so there is no scope to hold a permission on; the handler answers only for the session's OWN verified addresses and reveals nothing else    | inline                                  | `joinRequestLookupSchema`         |
-| `identity.joinRequests.offer`              | query    | No permission: the same own-verified-address answer `lookup` gives, minus the domains this caller has dismissed; no other person's organizations are reachable                                                           | inline                                  | `joinRequestLookupSchema`         |
-| `identity.joinRequests.dismissOffer`       | mutation | No permission: the caller silencing their own offer, on the domain their own session's verified address holds                                                                                                            | inline                                  | `joinRequestWriteAckSchema`       |
-| `identity.joinRequests.admitAutomatically` | mutation | No permission: admits the caller to an organization that opted into admitting their own verified domain; the handler re-derives the match server-side and admits nothing else                                            | `joinRequestApiAdmitInputSchema`        | `joinRequestAdmittedSchema`       |
-| `identity.joinRequests.mine`               | query    | No permission: the caller's own pending requests, keyed by their session id                                                                                                                                              | inline                                  | `joinRequestMineSchema`           |
-| `identity.joinRequests.request`            | mutation | No permission: asking to join is the one action a non-member takes on an organization; the handler proves the organization was OFFERED to this caller's verified domain and refuses anything else as if it did not exist | `joinRequestApiRequestInputSchema`      | `joinRequestFiledSchema`          |
-| `identity.joinRequests.withdraw`           | mutation | No permission: the requester withdrawing their own request, matched on the session's user id                                                                                                                             | `joinRequestApiWithdrawInputSchema`     | `joinRequestWriteAckSchema`       |
-| `identity.joinRequests.pending`            | query    | Permission `organization:manage`                                                                                                                                                                                         | `joinRequestApiOrganizationScopeSchema` | `joinRequestPendingSchema`        |
-| `identity.joinRequests.approve`            | mutation | Permission `organization:manage`                                                                                                                                                                                         | `joinRequestApiDecisionInputSchema`     | `joinRequestWriteAckSchema`       |
-| `identity.joinRequests.reject`             | mutation | Permission `organization:manage`                                                                                                                                                                                         | `joinRequestApiDecisionInputSchema`     | `joinRequestWriteAckSchema`       |
-| `identity.joinRequests.joining`            | query    | Permission `organization:manage`                                                                                                                                                                                         | `joinRequestApiOrganizationScopeSchema` | `joinRequestJoiningSchema`        |
-| `identity.joinRequests.setJoining`         | mutation | Permission `organization:manage`                                                                                                                                                                                         | `joinRequestApiSetJoiningInputSchema`   | `joinRequestJoiningChangedSchema` |
-| `identity.joinRequests.automaticJoins`     | query    | Permission `organization:manage`                                                                                                                                                                                         | `joinRequestApiOrganizationScopeSchema` | `joinRequestAutomaticJoinsSchema` |
-| `identity.joinRequests.getJoinAdmissions`  | query    | Permission `organization:manage`                                                                                                                                                                                         | `joinRequestApiAdmissionsInputSchema`   | inline                            |
-
 ```typescript
 // identity.completeVerification
-// Input: completeVerificationInputSchema, ../contract/src/identity.trpc.ts:24
+// Input: completeVerificationInputSchema, ../contract/src/identity.trpc.ts:17
 interface Input {
   identifierId: string;
   verificationId: string;
   token: string;
   codeVerifier: string;
 }
-// Output: inline, ../contract/src/identity.trpc.ts:35
+// Output: inline, ../contract/src/identity.trpc.ts:28
 interface Output {
   verified: true;
 }
@@ -342,7 +321,7 @@ type Output = {
 
 // identity.myIdentifiers
 type Input = z.infer<typeof emptyInputSchema>; // ../contract/src/identity.trpc.ts:14
-// Output: inline, ../contract/src/identity.trpc.ts:43
+// Output: inline, ../contract/src/identity.trpc.ts:36
 type Output = {
   identifierId: string;
   accountId: string | null;
@@ -365,7 +344,7 @@ interface Output {
 }
 
 // identity.addEmailIdentifier
-// Input: inline, ../contract/src/identity.trpc.ts:50
+// Input: inline, ../contract/src/identity.trpc.ts:43
 interface Input {
   email: string;
   codeChallenge: string;
@@ -376,32 +355,185 @@ interface Output {
 }
 
 // identity.resendIdentifierConfirmation
-// Input: inline, ../contract/src/identity.trpc.ts:55
+// Input: inline, ../contract/src/identity.trpc.ts:48
 interface Input {
   identifierId: string;
   codeChallenge: string;
 }
-// Output: inline, ../contract/src/identity.trpc.ts:57
+// Output: inline, ../contract/src/identity.trpc.ts:50
 interface Output {
   sent: true;
 }
 
 // identity.removeIdentifier
-// Input: inline, ../contract/src/identity.trpc.ts:60
+// Input: inline, ../contract/src/identity.trpc.ts:53
 interface Input {
   identifierId: string;
 }
-// Output: inline, ../contract/src/identity.trpc.ts:61
+// Output: inline, ../contract/src/identity.trpc.ts:54
 interface Output {
   removed: true;
 }
+```
 
-// identity.getJoinAdmissions
-// Input: inline, ../contract/src/identity.trpc.ts:65
+### `identity.joinRequests`
+
+Contract `../contract/src/join-request.trpc.ts:35`, router `src/transport/join-request.trpc.ts:104`.
+
+| Procedure                                  | Kind     | Gate                                                                                                                                                                                                                     | Input                                   | Output                            |
+| ------------------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------- | --------------------------------- |
+| `identity.joinRequests.lookup`             | query    | No permission: the caller is asking about organizations they are not in yet, so there is no scope to hold a permission on; the handler answers only for the session's OWN verified addresses and reveals nothing else    | inline                                  | `joinRequestLookupSchema`         |
+| `identity.joinRequests.offer`              | query    | No permission: the same own-verified-address answer `lookup` gives, minus the domains this caller has dismissed; no other person's organizations are reachable                                                           | inline                                  | `joinRequestLookupSchema`         |
+| `identity.joinRequests.dismissOffer`       | mutation | No permission: the caller silencing their own offer, on the domain their own session's verified address holds                                                                                                            | inline                                  | `joinRequestWriteAckSchema`       |
+| `identity.joinRequests.admitAutomatically` | mutation | No permission: admits the caller to an organization that opted into admitting their own verified domain; the handler re-derives the match server-side and admits nothing else                                            | `joinRequestApiAdmitInputSchema`        | `joinRequestAdmittedSchema`       |
+| `identity.joinRequests.mine`               | query    | No permission: the caller's own pending requests, keyed by their session id                                                                                                                                              | inline                                  | `joinRequestMineSchema`           |
+| `identity.joinRequests.request`            | mutation | No permission: asking to join is the one action a non-member takes on an organization; the handler proves the organization was OFFERED to this caller's verified domain and refuses anything else as if it did not exist | `joinRequestApiRequestInputSchema`      | `joinRequestFiledSchema`          |
+| `identity.joinRequests.withdraw`           | mutation | No permission: the requester withdrawing their own request, matched on the session's user id                                                                                                                             | `joinRequestApiWithdrawInputSchema`     | `joinRequestWriteAckSchema`       |
+| `identity.joinRequests.pending`            | query    | Permission `organization:manage`                                                                                                                                                                                         | `joinRequestApiOrganizationScopeSchema` | `joinRequestPendingSchema`        |
+| `identity.joinRequests.approve`            | mutation | Permission `organization:manage`                                                                                                                                                                                         | `joinRequestApiDecisionInputSchema`     | `joinRequestWriteAckSchema`       |
+| `identity.joinRequests.reject`             | mutation | Permission `organization:manage`                                                                                                                                                                                         | `joinRequestApiDecisionInputSchema`     | `joinRequestWriteAckSchema`       |
+| `identity.joinRequests.joining`            | query    | Permission `organization:manage`                                                                                                                                                                                         | `joinRequestApiOrganizationScopeSchema` | `joinRequestJoiningSchema`        |
+| `identity.joinRequests.setJoining`         | mutation | Permission `organization:manage`                                                                                                                                                                                         | `joinRequestApiSetJoiningInputSchema`   | `joinRequestJoiningChangedSchema` |
+| `identity.joinRequests.automaticJoins`     | query    | Permission `organization:manage`                                                                                                                                                                                         | `joinRequestApiOrganizationScopeSchema` | `joinRequestAutomaticJoinsSchema` |
+| `identity.joinRequests.getJoinAdmissions`  | query    | Permission `organization:manage`                                                                                                                                                                                         | `joinRequestApiAdmissionsInputSchema`   | inline                            |
+
+```typescript
+// identity.joinRequests.lookup
+// Input: inline, ../contract/src/join-request.trpc.ts:42
+type Input = unknown;
+// Output: joinRequestLookupSchema, ../contract/src/join-request.trpc.ts:33
+type Output = unknown;
+
+// identity.joinRequests.offer
+// Input: inline, ../contract/src/join-request.trpc.ts:47
+type Input = unknown;
+type Output = z.infer<typeof joinRequestLookupSchema>; // ../contract/src/join-request.trpc.ts:33
+
+// identity.joinRequests.dismissOffer
+// Input: inline, ../contract/src/join-request.trpc.ts:52
+type Input = Record<string, unknown>;
+// Output: joinRequestWriteAckSchema, ../contract/src/join-request.responses.ts:63
+interface Output {
+  success: true;
+}
+
+// identity.joinRequests.admitAutomatically
+// Input: joinRequestApiAdmitInputSchema, ../contract/src/join-request.trpc-schemas.ts:29
+interface Input {
+  origin?: "web" | "cli";
+}
+// Output: joinRequestAdmittedSchema, ../contract/src/join-request.responses.ts:35
+interface Output {
+  organization: {
+    organizationId: string;
+    name: string;
+    colleagueCount: number;
+  } | null;
+}
+
+// identity.joinRequests.mine
+// Input: inline, ../contract/src/join-request.trpc.ts:62
+type Input = unknown;
+// Output: joinRequestMineSchema, ../contract/src/join-request.responses.ts:20
+type Output = {
+  joinRequestId: string;
+  requestedAt: unknown;
+  expiresAt: unknown | null;
+  organizationId: string;
+}[];
+
+// identity.joinRequests.request
+// Input: joinRequestApiRequestInputSchema, ../contract/src/join-request.trpc-schemas.ts:23
+interface Input {
+  organizationId: string;
+  origin?: "web" | "cli";
+}
+// Output: joinRequestFiledSchema, ../contract/src/join-request.responses.ts:26
+interface Output {
+  joinRequestId: string;
+  state: "PENDING" | "APPROVED";
+}
+
+// identity.joinRequests.withdraw
+// Input: joinRequestApiWithdrawInputSchema, ../contract/src/join-request.trpc-schemas.ts:33
+interface Input {
+  joinRequestId: string;
+}
+type Output = z.infer<typeof joinRequestWriteAckSchema>; // ../contract/src/join-request.responses.ts:63
+
+// identity.joinRequests.pending
+// Input: joinRequestApiOrganizationScopeSchema, ../contract/src/join-request.trpc-schemas.ts:10
 interface Input {
   organizationId: string;
 }
-// Output: inline, ../contract/src/identity.trpc.ts:66
+// Output: joinRequestPendingSchema, ../contract/src/join-request.responses.ts:67
+type Output = {
+  joinRequestId: string;
+  requestedAt: unknown;
+  expiresAt: unknown | null;
+  userId: string;
+  name: string;
+  domain: string;
+  seat: "MEMBER" | "DEVELOPER";
+}[];
+
+// identity.joinRequests.approve
+// Input: joinRequestApiDecisionInputSchema, ../contract/src/join-request.trpc-schemas.ts:39
+interface Input {
+  organizationId: string;
+  joinRequestId: string;
+}
+type Output = z.infer<typeof joinRequestWriteAckSchema>; // ../contract/src/join-request.responses.ts:63
+
+// identity.joinRequests.reject
+type Input = z.infer<typeof joinRequestApiDecisionInputSchema>; // ../contract/src/join-request.trpc-schemas.ts:39
+type Output = z.infer<typeof joinRequestWriteAckSchema>; // ../contract/src/join-request.responses.ts:63
+
+// identity.joinRequests.joining
+type Input = z.infer<typeof joinRequestApiOrganizationScopeSchema>; // ../contract/src/join-request.trpc-schemas.ts:10
+// Output: joinRequestJoiningSchema, ../contract/src/join-request.responses.ts:79
+interface Output {
+  domainJoin: "off" | "request" | "auto";
+  joinDomains: string[];
+  joinerRole: "MEMBER" | "DEVELOPER";
+}
+
+// identity.joinRequests.setJoining
+// Input: joinRequestApiSetJoiningInputSchema, ../contract/src/join-request.trpc-schemas.ts:46
+interface Input {
+  organizationId: string;
+  domainJoin: "off" | "request" | "auto";
+  domains?: string[];
+  joinerRole?: "MEMBER" | "DEVELOPER";
+}
+// Output: joinRequestJoiningChangedSchema, ../contract/src/join-request.responses.ts:89
+interface Output {
+  previous: "off" | "request" | "auto";
+  next: "off" | "request" | "auto";
+  previousDomains: string[];
+  nextDomains: string[];
+  previousJoinerRole: "MEMBER" | "DEVELOPER";
+  nextJoinerRole: "MEMBER" | "DEVELOPER";
+}
+
+// identity.joinRequests.automaticJoins
+type Input = z.infer<typeof joinRequestApiOrganizationScopeSchema>; // ../contract/src/join-request.trpc-schemas.ts:10
+// Output: joinRequestAutomaticJoinsSchema, ../contract/src/join-request.responses.ts:50
+type Output = {
+  joinRequestId: string;
+  userId: string;
+  name: string;
+  domain: string;
+  joinedAt: unknown | null;
+}[];
+
+// identity.joinRequests.getJoinAdmissions
+// Input: joinRequestApiAdmissionsInputSchema, ../contract/src/join-request.trpc-schemas.ts:55
+interface Input {
+  organizationId: string;
+  userIds: string[];
+}
+// Output: inline, ../contract/src/join-request.trpc.ts:102
 type Output = {
   userId: string;
   domain: string;

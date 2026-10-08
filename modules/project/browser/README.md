@@ -23,7 +23,7 @@ None.
 
 ## Calls
 
-- Client packages (package.json): `@langwatch/analytics-client`, `@langwatch/navigation-client`, `@langwatch/onboarding-client`, `@langwatch/organization-client`, `@langwatch/project-client`, `@langwatch/trace-client`.
+- Client packages (package.json): `@langwatch/analytics-client`, `@langwatch/annotation-client`, `@langwatch/dataset-client`, `@langwatch/monitor-client`, `@langwatch/navigation-client`, `@langwatch/onboarding-client`, `@langwatch/organization-client`, `@langwatch/project-client`, `@langwatch/prompt-client`, `@langwatch/trace-client`, `@langwatch/workflow-client`.
 - Lends: `HeroAskFieldToken`, `ProjectSwitcherToken`.
 - Host APIs it requires: `ProjectHostApi`, `ProjectHomeHost`.
 

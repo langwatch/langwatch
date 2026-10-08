@@ -26,7 +26,7 @@ None.
 
 ## Calls
 
-- Client packages (package.json): `@langwatch/api-key-client`, `@langwatch/enterprise-governance-client`, `@langwatch/langy-client`, `@langwatch/model-provider-client`, `@langwatch/navigation-client`, `@langwatch/onboarding-client`, `@langwatch/organization-client`.
+- Client packages (package.json): `@langwatch/api-key-client`, `@langwatch/enterprise-governance-client`, `@langwatch/identity-client`, `@langwatch/langy-client`, `@langwatch/model-provider-client`, `@langwatch/navigation-client`, `@langwatch/onboarding-client`, `@langwatch/organization-client`.
 - Lends: `GuidedTourToken`, `GuidedTourStateToken`, `GuidedPathActiveToken`, `FirstTouchAttributionToken`, `GuidedOnboardingOfferToken`.
 - Host APIs it requires: `OnboardingHostApi`, `GuidedOnboardingHostApi`.
 
