@@ -9,6 +9,7 @@ import { Box, Button, HStack, Skeleton, Text, VStack } from "@langwatch/design-s
 import { OverviewCard, OverviewDetail, StatusChip } from "@langwatch/design-system/settings-card";
 import type { SsoSetupPageView } from "@langwatch/enterprise-sso-contract";
 import { ArrowRight, ExternalLink, RefreshCw, Settings2 } from "lucide-react";
+import type { ReactNode } from "react";
 
 import { ssoApi } from "../../behavior/sso-api.ts";
 import { useTestSignIn } from "../../behavior/use-test-sign-in.ts";
@@ -19,9 +20,11 @@ import {
   previewCopyFor,
 } from "../../model/connection-status.ts";
 import { domainProofChipFor } from "../../model/domain-proof-chip.ts";
+import { domainRowsFor } from "../../model/domain-rows.ts";
 import { updateChipFor } from "../../model/migration-route.ts";
+import { isReadRefused } from "../../model/read-refusal.ts";
 import { setupProgressFor } from "../../model/setup-progress.ts";
-import { domainClaimsOf, goLiveFactsOf } from "../../model/setup-view.ts";
+import { domainClaimsOf, goLiveFactsOf, routedDomainEvidenceOf } from "../../model/setup-view.ts";
 import { useSsoHost } from "../../model/sso-host.ts";
 import { AvailabilityRefusalNotice, LoadFailure } from "../elements/refusals.tsx";
 import { TestSignInFailureNotice } from "../elements/test-sign-in-failure-notice.tsx";
@@ -35,6 +38,7 @@ export function SsoOverviewCard({ organizationId }: { organizationId: string }) 
   const setup = ssoApi.ssoSetup.getSetup.useQuery({ organizationId });
 
   if (setup.isLoading) return <Skeleton height="220px" width="full" />;
+  if (setup.isError && isReadRefused(setup.error)) return <ReadRefusedCard />;
   if (setup.isError) return <LoadFailure error={setup.error} what="single sign-on" />;
 
   const view = setup.data;
@@ -56,6 +60,7 @@ export function SsoOverviewCard({ organizationId }: { organizationId: string }) 
           goLiveBlockedBecause={
             setupProgressFor(goLiveFactsOf(view?.goLive ?? null)).goLiveBlockedBecause
           }
+          domains={view ? <DomainsDetail view={view} canManage={canOffer} /> : void 0}
         />
       )}
     </>
@@ -63,6 +68,65 @@ export function SsoOverviewCard({ organizationId }: { organizationId: string }) 
 }
 
 export default SsoOverviewCard;
+
+/** A reader the read refused is told who can tell them, never shown a failure. */
+function ReadRefusedCard() {
+  return (
+    <OverviewCard title="Single sign-on" data-testid="sso-read-refused">
+      <Text color="fg.muted" data-testid="domains-no-access">
+        You need permission to see single sign-on to read how your organization signs in and which
+        domains have been proved. An administrator who has it can tell you.
+      </Text>
+    </OverviewCard>
+  );
+}
+
+/**
+ * Every domain the organization put forward, proved or still waiting on the
+ * reader, each once, and the way to prove another. None claimed is said in
+ * words rather than left as an empty panel.
+ */
+function DomainsDetail({ view, canManage }: { view: SsoSetupPageView; canManage: boolean }) {
+  const rows = domainRowsFor({
+    evidence: view.connection ? routedDomainEvidenceOf(view.connection) : [],
+    claims: domainClaimsOf(view.claims),
+  });
+
+  return (
+    <OverviewDetail label="Domains">
+      <VStack align="start" gap={2}>
+        {rows.length === 0 ? (
+          <Text color="fg.muted" data-testid="domains-empty">
+            No domain has been claimed yet.
+          </Text>
+        ) : (
+          <HStack gap={1} flexWrap="wrap">
+            {rows.map((row) => {
+              const chip = domainProofChipFor(row);
+              return (
+                <StatusChip
+                  key={row.domain}
+                  label={`${row.domain} · ${chip.label}`}
+                  tone={chip.tone}
+                  title={chip.title}
+                  data-testid="authentication-domain-chip"
+                />
+              );
+            })}
+          </HStack>
+        )}
+        {canManage && (
+          <Button asChild size="sm" variant="outline">
+            <Link unstyled href={PROVIDER_PAGE} data-testid="sso-prove-domain">
+              <ExternalLink size={14} />
+              Prove a domain
+            </Link>
+          </Button>
+        )}
+      </VStack>
+    </OverviewDetail>
+  );
+}
 
 /** A live connection, named by its protocol; the chip says where it stands in words. */
 export function SingleSignOnCard({
@@ -75,8 +139,6 @@ export function SingleSignOnCard({
   canManage: boolean;
 }) {
   const testSignIn = useTestSignIn({ connectionId: connection.connectionId });
-  const proofByDomain = new Map(connection.domainProofs.map((proof) => [proof.domain, proof]));
-  const claims = domainClaimsOf(view.claims);
   const active = connection.state === "ACTIVE";
 
   return (
@@ -141,32 +203,7 @@ export function SingleSignOnCard({
         </Link>
       </OverviewDetail>
 
-      <OverviewDetail label="Verified domains">
-        {connection.verifiedDomains.length === 0 ? (
-          <Text color="fg.muted">No domain is proved yet.</Text>
-        ) : (
-          <HStack gap={1} flexWrap="wrap">
-            {connection.verifiedDomains.map((domain) => {
-              const proof = proofByDomain.get(domain);
-              const chip = domainProofChipFor({
-                proved: true,
-                proofState: proof?.proofState ?? "VERIFIED",
-                graceEndsAtMs: proof?.graceEndsAtMs ?? null,
-                claim: claims.find((entry) => entry.domain === domain),
-              });
-              return (
-                <StatusChip
-                  key={domain}
-                  label={`${domain} · ${chip.label}`}
-                  tone={chip.tone}
-                  title={chip.title}
-                  data-testid="authentication-domain-chip"
-                />
-              );
-            })}
-          </HStack>
-        )}
-      </OverviewDetail>
+      <DomainsDetail view={view} canManage={canManage} />
 
       <UpdateNotice view={view} connection={connection} canManage={canManage} />
     </OverviewCard>
@@ -240,12 +277,15 @@ export function SingleSignOnPreviewCard({
   canManage = false,
   goLiveBlockedBecause = null,
   updatePhase = null,
+  domains,
 }: {
   state?: SetupConnection["state"] | null;
   canManage?: boolean;
   goLiveBlockedBecause?: string | null;
   /** Where an update to the organization's own identity provider got to. */
   updatePhase?: NonNullable<SsoSetupPageView["migration"]>["phase"] | null;
+  /** The organization's domains, where there was a read to list them from. */
+  domains?: ReactNode;
 }) {
   const copy = previewCopyFor({ state, goLiveBlockedBecause, updatePhase });
 
@@ -281,6 +321,8 @@ export function SingleSignOnPreviewCard({
       <OverviewDetail label={copy.stepLabel}>
         <Text color="fg.muted">{copy.step}</Text>
       </OverviewDetail>
+
+      {domains}
     </OverviewCard>
   );
 }

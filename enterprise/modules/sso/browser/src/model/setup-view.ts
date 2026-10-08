@@ -24,6 +24,21 @@ export function domainEvidenceOf(connection: SetupConnection): DomainEvidenceVie
   }));
 }
 
+/**
+ * The overview's evidence: every domain the connection routes, proved, with
+ * what its record says today. The overview reads routing, not qualification,
+ * so a lapsed domain still shows here with its record missing.
+ */
+export function routedDomainEvidenceOf(connection: SetupConnection): DomainEvidenceView[] {
+  const proofByDomain = new Map(connection.domainProofs.map((proof) => [proof.domain, proof]));
+  return connection.verifiedDomains.map((domain) => ({
+    domain,
+    proved: true,
+    proofState: proofByDomain.get(domain)?.proofState ?? "VERIFIED",
+    graceEndsAtMs: proofByDomain.get(domain)?.graceEndsAtMs ?? null,
+  }));
+}
+
 /** A claim waits for review only where somebody else proved the domain first. */
 export function domainClaimsOf(claims: SsoSetupPageView["claims"]): DomainClaimView[] {
   return claims.map((claim) => ({
