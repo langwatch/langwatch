@@ -12,6 +12,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { ArrowUpRight, Plus } from "lucide-react";
+import { useMemo } from "react";
 import { BarChart2 } from "react-feather";
 import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
 import { dashboardContextChip } from "~/features/langy/logic/langyContextChips";
@@ -20,6 +21,7 @@ import {
   DocumentsCountsTable,
 } from "../../../components/analytics/DocumentsCountsTable";
 import { UserMetrics } from "../../../components/analytics/UserMetrics";
+import { useTopUsedDocuments } from "../../../components/analytics/useTopUsedDocuments";
 import { DashboardLayout } from "../../../components/DashboardLayout";
 import { FilterSidebar } from "../../../components/filters/FilterSidebar";
 import GraphsLayout from "../../../components/GraphsLayout";
@@ -70,14 +72,17 @@ function AnalyticsContent() {
 
 function DocumentsMetrics() {
   const { filterParams, queryOpts } = useFilterParams();
-  const documents = api.analytics.topUsedDocuments.useQuery(
-    filterParams,
-    queryOpts,
+  const params = useMemo(
+    () => ({ filterParams, queryOpts }),
+    [filterParams, queryOpts],
   );
+  const documents = useTopUsedDocuments(params);
 
   const count = documents.data?.totalUniqueDocuments;
 
-  if (!count || count === 0) {
+  // A failed query says nothing about whether there are documents, so the
+  // section stays up and its panels show the error with a Retry.
+  if (!documents.error && (!count || count === 0)) {
     return null;
   }
 
@@ -100,7 +105,7 @@ function DocumentsMetrics() {
                 <VStack align="start">
                   <Text color="fg">Total documents</Text>
                   <Box textStyle="2xl" color="fg" fontWeight="bold">
-                    <DocumentsCountsSummary />
+                    <DocumentsCountsSummary params={params} />
                   </Box>
                 </VStack>
               </Tabs.Trigger>
@@ -113,7 +118,7 @@ function DocumentsMetrics() {
               />
             </Tabs.List>
             <Tabs.Content value="total-documents">
-              <DocumentsCountsTable />
+              <DocumentsCountsTable params={params} />
             </Tabs.Content>
           </Tabs.Root>
         </Card.Body>
