@@ -1,7 +1,6 @@
+import type { BillingPricingModel } from "@langwatch/enterprise-billing-contract";
 import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
-
-import type { BillingLifecycleAnnouncerService } from "../services/billing-lifecycle-announcer.service.ts";
 
 const logger = createLogger("langwatch:task:tiered-free-to-seat-event");
 
@@ -25,10 +24,12 @@ export type TieredFreeToSeatEventMigrationDatabase = {
 };
 
 /** Where the move is recorded: billing's fact, which organization applies to its row (R42). */
-export type TieredFreeToSeatEventMigrationFacts = Pick<
-  BillingLifecycleAnnouncerService,
-  "pricingModelChanged"
->;
+export type TieredFreeToSeatEventMigrationFacts = {
+  pricingModelChanged(input: {
+    organizationId: string;
+    pricingModel: BillingPricingModel;
+  }): Promise<void>;
+};
 
 export type TieredFreeToSeatEventMigrationOutcome = {
   found: number;
