@@ -61,14 +61,6 @@ cd "$(dirname "$0")/.."
 # should not) declare, with the one-line reason it is exempt. Anything NOT here
 # and NOT declared in values.yaml is a hard failure.
 VALUES_ALLOWLIST=(
-  # gateway.* is the langwatch-gateway SUBCHART's own values tree; the parent
-  # reads gateway.ingress.host to derive the gateway public URL. Subchart values
-  # are owned by the subchart and are not enumerated in the parent values.yaml.
-  "gateway.ingress"
-  # NOTES.txt display default only; the canonical ingress key is ingress.hosts
-  # (a list). `.Values.ingress.host | default "<your-ingress-host>"` is a
-  # human-facing placeholder in the post-install notes, not a wired value.
-  "ingress.host"
   # The gateway subchart's own Service port; ingress.yaml reads it to route.
   "gateway.service"
   # Named only in a _helpers.tpl comment, as the ClickHouse subchart's value path.

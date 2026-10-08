@@ -91,10 +91,17 @@ e2e_docker_build = sum(
 )
 emit("e2e_docker_build_count", e2e_docker_build)
 
-# Every leg must load the app image (needs_app): every chart-managed ClickHouse
-# install runs the LWQL access-render Job on it, and a leg without it makes
-# e2e.sh rebuild the most expensive image on every run.
-app_unprovisioned = sum(1 for l in legs if not l.get("needs_app"))
+# Every leg must load the app image: every chart-managed ClickHouse install runs
+# the LWQL access-render Job on it. Count app-image steps that a condition can
+# skip; 0 means every leg downloads, docker-loads and kind-loads it.
+app_steps = [
+    s for s in e2e["steps"]
+    if (isinstance(s.get("with"), dict) and s["with"].get("name") == "image-app")
+    or (isinstance(s.get("run"), str) and ("app.tar" in s["run"] or "$APP_IMAGE" in s["run"]))
+]
+app_unprovisioned = 3 - len(app_steps) + sum(
+    1 for s in app_steps if "if" in s or "if [" in (s.get("run") or "")
+)
 emit("app_unprovisioned_legs", app_unprovisioned)
 
 # The suite step (the one that runs matrix.script / e2e.sh, where every suite
@@ -237,7 +244,7 @@ test_images_are_built_once_and_reused() {
   if [ "$unprovisioned" = "0" ]; then
     ok "image reuse" "every leg loads the app image"
   else
-    bad "image reuse" "$unprovisioned leg(s) do not load the app image (needs_app)"
+    bad "image reuse" "the app image is not downloaded, docker-loaded and kind-loaded unconditionally ($unprovisioned gap(s))"
   fi
 }
 

@@ -427,24 +427,14 @@ jobs:
           - name: core
             script: make test-e2e E2E_SUITES="test_install test_clickhouse test_clickhouse_url_secret test_postgresql test_redis test_resources test_app test_lwql test_workers test_metrics_collection test_upgrade_strategy_boundary test_upgrade"
             cluster: lw-core
-            needs_app: true
           # Each of these does its own install and shares nothing with the
-          # chain, so they run as their own leg. Every chart-managed ClickHouse
-          # install runs the lwql-access-render Job on the app image, so this
-          # leg loads it too.
+          # chain, so they run as their own leg.
           - name: external
             script: make test-e2e E2E_SUITES="test_external_clickhouse test_cold_storage_and_backup test_lwql_replicas test_lwql_upgrade_from_main"
             cluster: lw-external
-            needs_app: true
           - name: overlays
             script: make test-e2e-overlays
             cluster: lw-overlay
-            # The overlays leg installs chart-managed ClickHouse, which depends
-            # on the app image: the lwql-access-render Job runs it to write the
-            # access Secret every ClickHouse pod mounts. Without the image the
-            # Job hits ErrImageNeverPull and ClickHouse never leaves
-            # ContainerCreating.
-            needs_app: true
     defaults:
       run:
         working-directory: charts/langwatch
@@ -463,8 +453,10 @@ jobs:
         with:
           name: image-gateway
           path: ${{ runner.temp }}/images
+      # Every leg loads the app image: every chart-managed ClickHouse install
+      # runs the lwql-access-render Job on it to write the access Secret the
+      # ClickHouse pods mount. Without it the Job hits ErrImageNeverPull.
       - name: Download app image
-        if: matrix.needs_app
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: image-app
@@ -473,9 +465,7 @@ jobs:
         run: |
           docker load -i "${RUNNER_TEMP}/images/clickhouse.tar"
           docker load -i "${RUNNER_TEMP}/images/gateway.tar"
-          if [ "${{ matrix.needs_app }}" = "true" ]; then
-            docker load -i "${RUNNER_TEMP}/images/app.tar"
-          fi
+          docker load -i "${RUNNER_TEMP}/images/app.tar"
       - uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1
         with:
           cluster_name: ${{ matrix.cluster }}
@@ -485,9 +475,7 @@ jobs:
         run: |
           kind load docker-image langwatch/clickhouse-serverless:next --name ${{ matrix.cluster }}
           kind load docker-image langwatch/ai-gateway:e2e --name ${{ matrix.cluster }}
-          if [ "${{ matrix.needs_app }}" = "true" ]; then
-            kind load docker-image "$APP_IMAGE" --name ${{ matrix.cluster }}
-          fi
+          kind load docker-image "$APP_IMAGE" --name ${{ matrix.cluster }}
       - run: ${{ matrix.script }}
         env:
           KEEP_CLUSTER: "true"
@@ -495,9 +483,9 @@ jobs:
       - name: Show pod status on failure
         if: failure()
         run: |
-          # The e2e.sh legs run in namespace lw-test, the overlays leg in
-          # lw-overlay. Dump each that exists.
-          for NS in $(kubectl get ns -o name 2>/dev/null | grep -oE 'lw-test|lw-overlay' | sort -u); do
+          # Every leg's suites run in namespace lw-test (lw-overlay is only the
+          # overlays leg's kind cluster name).
+          for NS in $(kubectl get ns -o name 2>/dev/null | grep -oE 'lw-test' | sort -u); do
             echo "===== namespace ${NS} ====="
             kubectl -n "$NS" get pods -o wide 2>/dev/null || true
             kubectl -n "$NS" get events --sort-by='.lastTimestamp' 2>/dev/null | tail -30 || true
