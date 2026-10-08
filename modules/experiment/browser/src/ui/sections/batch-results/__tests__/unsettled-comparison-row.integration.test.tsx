@@ -10,6 +10,7 @@ import { cleanup, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { WHOLE_RUN_COMPLETENESS } from "../../../../__tests__/run-completeness.fixture.ts";
 import { buildCsvData, buildCsvHeaders } from "../../batch-evaluation-results.csv.ts";
 import { buildPairwiseComparisons } from "../../batch-evaluation-results.pairwise.ts";
 import {
@@ -42,6 +43,7 @@ const createRun = (evaluations: ExperimentRunWithItems["evaluations"]): Experime
   experimentId: "exp-1",
   runId: "run-1",
   projectId: "proj-1",
+  completeness: WHOLE_RUN_COMPLETENESS,
   targets: TARGETS,
   dataset: Array.from({ length: 2 }).flatMap((_, index) =>
     ["target-a", "target-b"].map((targetId) => ({

@@ -5,6 +5,7 @@
 
 import { z } from "zod";
 
+import { experimentRunCompletenessSchema } from "./experiment-run.ts";
 import type { WorkbenchCredential } from "./experiment.api.ts";
 import type { EvaluationV3Event } from "./workbench/execution/types.ts";
 
@@ -347,6 +348,9 @@ export const runResultsResponseSchema = z.object({
     .describe("One row per dataset entry, with what the target predicted"),
   evaluations: z.array(evaluationResultSchema).describe("One row per evaluator per dataset entry"),
   timestamps: runTimestampsSchema,
+  completeness: experimentRunCompletenessSchema.describe(
+    "What is stored against what the run reported. Results are stored after they are reported, so a read can hold part of a run: `complete` is false until the run has ended and every reported row and evaluation is stored. `expected` is null when the run reported no counts",
+  ),
 });
 
 // ── workbench state and version history ─────────────────────────────────────

@@ -39,6 +39,12 @@ interface EvaluationRunResults {
     finishedAt?: number | null;
     stoppedAt?: number | null;
   };
+  /** What is stored against what the run reported; absent on servers that predate it. */
+  completeness?: {
+    complete: boolean;
+    dataset: { received: number; expected: number | null };
+    evaluations: { received: number; expected: number | null };
+  };
 }
 
 const DEFAULT_ROW_CAP = 50;
@@ -177,6 +183,13 @@ function headerLines({
         : "> These are partial results. The run is still in progress, so more rows may appear on a later call.",
     );
   }
+  const stored = results.completeness;
+  if (isTerminalStatus(runStatus) && stored && !stored.complete) {
+    lines.push("");
+    lines.push(
+      `> These are partial results. The run has ended, but the platform is still storing it: ${storedCount(stored.dataset)} rows and ${storedCount(stored.evaluations)} evaluations so far. Call again shortly for the whole run.`,
+    );
+  }
   lines.push("");
   return lines;
 }
@@ -196,6 +209,9 @@ function evaluatorSummaryLines(averages: Map<string, EvaluatorStats>): string[] 
   lines.push("");
   return lines;
 }
+
+const storedCount = ({ received, expected }: { received: number; expected: number | null }) =>
+  expected === null ? `${received}` : `${received} of ${expected}`;
 
 function noRowsLine({ filter, runStatus }: { filter: "all" | "failed"; runStatus: RunStatus }) {
   if (filter === "failed") return "_No rows matched the filter._";

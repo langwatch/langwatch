@@ -4083,6 +4083,22 @@
               "unit": null,
               "gates": [],
               "available": true
+            },
+            {
+              "name": "ExpectedTargetResults",
+              "type": "Nullable(UInt32)",
+              "description": "ExpectedTargetResults",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "ExpectedEvaluatorResults",
+              "type": "Nullable(UInt32)",
+              "description": "ExpectedEvaluatorResults",
+              "unit": null,
+              "gates": [],
+              "available": true
             }
           ],
           "exampleSql": "SELECT ProjectionId, RunId, ExperimentId\nFROM analytics.experiment_run_results\nWHERE StartedAt >= subtractDays(now(), 7)\nORDER BY StartedAt DESC\nLIMIT 100"

@@ -19,6 +19,7 @@ import type {
   ExperimentRunPlanFoldState,
   ExperimentRunProgressState,
 } from "../repositories/experiment-run-fold.repository.ts";
+import { EXPERIMENT_RUN_RESULT_COALESCE_MAX_BATCH } from "../rules/experiment-run-event-types.rules.ts";
 import {
   ExecuteExperimentCellCommand,
   type ExecuteExperimentCellCommandData,
@@ -158,10 +159,16 @@ export function buildExperimentRunProcessingPipeline(
     )
     .withProjectionSubscriber(deps.runFrames.name, deps.runFrames.spec);
 
+  // ADR-066 pillar 2: a row's results share one group, so a backed-up row appends them in one
+  // insert. Safe to fold: each result handler derives its event from its own command alone.
   return (deps.retention ? builder.withRetention(deps.retention) : builder)
     .withCommand("startExperimentRun", StartExperimentRunCommand)
-    .withCommand("recordTargetResult", RecordTargetResultCommand)
-    .withCommand("recordEvaluatorResult", RecordEvaluatorResultCommand)
+    .withCommand("recordTargetResult", RecordTargetResultCommand, {
+      coalesceMaxBatch: EXPERIMENT_RUN_RESULT_COALESCE_MAX_BATCH,
+    })
+    .withCommand("recordEvaluatorResult", RecordEvaluatorResultCommand, {
+      coalesceMaxBatch: EXPERIMENT_RUN_RESULT_COALESCE_MAX_BATCH,
+    })
     .withCommand("computeExperimentRunMetrics", ComputeExperimentRunMetricsCommand)
     .withCommand("completeExperimentRun", CompleteExperimentRunCommand)
     .withCommand("requestWorkflowEvaluation", RequestWorkflowEvaluationCommand)

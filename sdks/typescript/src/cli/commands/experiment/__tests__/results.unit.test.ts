@@ -514,6 +514,201 @@ describe("experimentResultsCommand()", () => {
       });
     });
   });
+
+  describe("given a run whose results are still being stored", () => {
+    const partial = {
+      ...sampleResults,
+      timestamps: { createdAt: 0, updatedAt: 0, finishedAt: 5 },
+      completeness: {
+        complete: false,
+        dataset: { received: 3, expected: 40 },
+        evaluations: { received: 3, expected: 480 },
+      },
+    };
+    const whole = {
+      ...partial,
+      completeness: {
+        complete: true,
+        dataset: { received: 40, expected: 40 },
+        evaluations: { received: 480, expected: 480 },
+      },
+    };
+    let errorSpy: ReturnType<typeof vi.spyOn>;
+    const stderr = () =>
+      errorSpy.mock.calls
+        .map((call: unknown[]) => stripVTControlCharacters(String(call[0])))
+        .join("\n");
+
+    beforeEach(() => {
+      process.exitCode = undefined;
+      errorSpy = vi.spyOn(console, "error").mockImplementation(noop);
+    });
+
+    afterEach(() => {
+      process.exitCode = undefined;
+    });
+
+    describe("when the answer is read as JSON", () => {
+      /** @scenario "A JSON answer that is not whole says so" */
+      it("carries the counts, marks the answer partial and warns on stderr", async () => {
+        mockGetRunResults.mockResolvedValue(partial);
+
+        const result = await experimentResultsCommand({ experimentSlug: "doc-qa" });
+
+        const payload = result?.data as {
+          completeness: unknown;
+          meta: Record<string, unknown>;
+        };
+        expect(payload.completeness).toEqual(partial.completeness);
+        expect(payload.meta.complete).toBe(false);
+        expect(stderr()).toContain("Partial results: 3 of 40 rows and 3 of 480 evaluations");
+        expect(process.exitCode).toBeUndefined();
+      });
+    });
+
+    describe("when complete results are required", () => {
+      /** @scenario "Requiring complete results fails on a partial answer" */
+      it("sets exit status 2 and names what is missing", async () => {
+        mockGetRunResults.mockResolvedValue(partial);
+
+        await experimentResultsCommand({
+          experimentSlug: "doc-qa",
+          options: { requireComplete: true },
+        });
+
+        expect(process.exitCode).toBe(2);
+        expect(stderr()).toContain("3 of 480 evaluations");
+      });
+    });
+
+    describe("when the caller waits and the run becomes whole", () => {
+      /** @scenario "Waiting returns the whole run once it is stored" */
+      it("reads again until complete and exits clean", async () => {
+        mockGetRunResults
+          .mockResolvedValueOnce(partial)
+          .mockResolvedValueOnce(partial)
+          .mockResolvedValue(whole);
+
+        const result = await experimentResultsCommand({
+          experimentSlug: "doc-qa",
+          options: { wait: "60", pollMs: 1 },
+        });
+
+        expect(mockGetRunResults).toHaveBeenCalledTimes(3);
+        expect(result).toMatchObject({ data: { meta: { complete: true } } });
+        expect(stderr()).not.toContain("Partial results");
+        expect(process.exitCode).toBeUndefined();
+      });
+    });
+
+    describe("when the caller waits for a run the platform does not hold yet", () => {
+      const notFound = () =>
+        new ExperimentsApiServiceError("Run not found: run_1", "get run results", {
+          name: "LangWatchHandledError",
+          code: "run_not_found",
+          httpStatus: 404,
+        });
+
+      /** @scenario "Waiting holds on while the run is not stored yet" */
+      it("reads again instead of failing, and answers once the run is whole", async () => {
+        mockGetRunResults
+          .mockRejectedValueOnce(notFound())
+          .mockRejectedValueOnce(notFound())
+          .mockResolvedValueOnce(partial)
+          .mockResolvedValue(whole);
+
+        const result = await experimentResultsCommand({
+          experimentSlug: "doc-qa",
+          options: { wait: "60", pollMs: 1 },
+        });
+
+        expect(mockGetRunResults).toHaveBeenCalledTimes(4);
+        expect(result).toMatchObject({ data: { meta: { complete: true } } });
+        expect(process.exitCode).toBeUndefined();
+      });
+
+      /** @scenario "Waiting reports a run that never appears" */
+      it("fails with the missing run once the wait is over", async () => {
+        mockGetRunResults.mockRejectedValue(notFound());
+
+        await expect(
+          experimentResultsCommand({
+            experimentSlug: "doc-qa",
+            options: { wait: "0.02", pollMs: 5 },
+          }),
+        ).rejects.toThrow("process.exit(1)");
+        expect(mockGetRunResults.mock.calls.length).toBeGreaterThan(1);
+      });
+
+      it("fails at once on any other error", async () => {
+        mockGetRunResults.mockRejectedValue(
+          new ExperimentsApiServiceError("Forbidden", "get run results", {
+            response: { status: 403 },
+          }),
+        );
+
+        await expect(
+          experimentResultsCommand({
+            experimentSlug: "doc-qa",
+            options: { wait: "60", pollMs: 1 },
+          }),
+        ).rejects.toThrow("process.exit(1)");
+        expect(mockGetRunResults).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("when the caller waits and the run stays partial", () => {
+      /** @scenario "Waiting gives up when the run stays partial" */
+      it("sets exit status 2 once the wait is over", async () => {
+        mockGetRunResults.mockResolvedValue(partial);
+
+        await experimentResultsCommand({
+          experimentSlug: "doc-qa",
+          options: { wait: "0.02", pollMs: 5 },
+        });
+
+        expect(process.exitCode).toBe(2);
+        expect(stderr()).toContain("Partial results");
+      });
+    });
+
+    describe("when every reported result is stored", () => {
+      /** @scenario "A whole answer raises no warning" */
+      it("prints no partial warning and exits clean", async () => {
+        mockGetRunResults.mockResolvedValue(whole);
+
+        await experimentResultsCommand({
+          experimentSlug: "doc-qa",
+          options: { requireComplete: true },
+        });
+
+        expect(stderr()).not.toContain("Partial results");
+        expect(process.exitCode).toBeUndefined();
+      });
+    });
+
+    describe("when the server predates the completeness count", () => {
+      it("derives a partial answer from a run with no finish marker", async () => {
+        mockGetRunResults.mockResolvedValue({
+          ...sampleResults,
+          timestamps: { createdAt: 0, updatedAt: Date.now() },
+        });
+
+        const result = await experimentResultsCommand({ experimentSlug: "doc-qa" });
+
+        expect(result).toMatchObject({
+          data: {
+            completeness: {
+              complete: false,
+              dataset: { received: 3, expected: null },
+              evaluations: { received: 3, expected: null },
+            },
+          },
+        });
+        expect(stderr()).toContain("Partial results: 3 rows and 3 evaluations");
+      });
+    });
+  });
 });
 
 /**

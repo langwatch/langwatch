@@ -11,6 +11,7 @@ import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { WHOLE_RUN_COMPLETENESS } from "../../../../__tests__/run-completeness.fixture.ts";
 import {
   type BatchComparisonColumn,
   type BatchComparisonVerdict,
@@ -180,6 +181,7 @@ const SDK_RUN: ExperimentRunWithItems = {
   experimentId: "experiment-support-bot",
   runId: "run-sdk-1",
   projectId: "project-1",
+  completeness: WHOLE_RUN_COMPLETENESS,
   targets: TARGETS,
   dataset: DATASET,
   evaluations: [...SCALAR_EVALUATIONS, ...COMPARISON_VERDICTS],

@@ -15,6 +15,9 @@ if TYPE_CHECKING:
     from ..models.post_api_evaluations_batch_log_results_body_evaluations_item import (
         PostApiEvaluationsBatchLogResultsBodyEvaluationsItem,
     )
+    from ..models.post_api_evaluations_batch_log_results_body_expected_type_0 import (
+        PostApiEvaluationsBatchLogResultsBodyExpectedType0,
+    )
     from ..models.post_api_evaluations_batch_log_results_body_targets_type_0_item import (
         PostApiEvaluationsBatchLogResultsBodyTargetsType0Item,
     )
@@ -42,6 +45,7 @@ class PostApiEvaluationsBatchLogResultsBody:
         name (None | str | Unset):
         targets (list[PostApiEvaluationsBatchLogResultsBodyTargetsType0Item] | None | Unset):
         timestamps (PostApiEvaluationsBatchLogResultsBodyTimestamps | Unset):
+        expected (None | PostApiEvaluationsBatchLogResultsBodyExpectedType0 | Unset):
     """
 
     run_id: str
@@ -56,9 +60,14 @@ class PostApiEvaluationsBatchLogResultsBody:
     name: None | str | Unset = UNSET
     targets: list[PostApiEvaluationsBatchLogResultsBodyTargetsType0Item] | None | Unset = UNSET
     timestamps: PostApiEvaluationsBatchLogResultsBodyTimestamps | Unset = UNSET
+    expected: None | PostApiEvaluationsBatchLogResultsBodyExpectedType0 | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
+        from ..models.post_api_evaluations_batch_log_results_body_expected_type_0 import (
+            PostApiEvaluationsBatchLogResultsBodyExpectedType0,
+        )
+
         run_id = self.run_id
 
         workflow_version_id: None | str | Unset
@@ -133,6 +142,14 @@ class PostApiEvaluationsBatchLogResultsBody:
         if not isinstance(self.timestamps, Unset):
             timestamps = self.timestamps.to_dict()
 
+        expected: dict[str, Any] | None | Unset
+        if isinstance(self.expected, Unset):
+            expected = UNSET
+        elif isinstance(self.expected, PostApiEvaluationsBatchLogResultsBodyExpectedType0):
+            expected = self.expected.to_dict()
+        else:
+            expected = self.expected
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -162,6 +179,8 @@ class PostApiEvaluationsBatchLogResultsBody:
             field_dict["targets"] = targets
         if timestamps is not UNSET:
             field_dict["timestamps"] = timestamps
+        if expected is not UNSET:
+            field_dict["expected"] = expected
 
         return field_dict
 
@@ -172,6 +191,9 @@ class PostApiEvaluationsBatchLogResultsBody:
         )
         from ..models.post_api_evaluations_batch_log_results_body_evaluations_item import (
             PostApiEvaluationsBatchLogResultsBodyEvaluationsItem,
+        )
+        from ..models.post_api_evaluations_batch_log_results_body_expected_type_0 import (
+            PostApiEvaluationsBatchLogResultsBodyExpectedType0,
         )
         from ..models.post_api_evaluations_batch_log_results_body_targets_type_0_item import (
             PostApiEvaluationsBatchLogResultsBodyTargetsType0Item,
@@ -295,6 +317,23 @@ class PostApiEvaluationsBatchLogResultsBody:
         else:
             timestamps = PostApiEvaluationsBatchLogResultsBodyTimestamps.from_dict(_timestamps)
 
+        def _parse_expected(data: object) -> None | PostApiEvaluationsBatchLogResultsBodyExpectedType0 | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                expected_type_0 = PostApiEvaluationsBatchLogResultsBodyExpectedType0.from_dict(data)
+
+                return expected_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(None | PostApiEvaluationsBatchLogResultsBodyExpectedType0 | Unset, data)
+
+        expected = _parse_expected(d.pop("expected", UNSET))
+
         post_api_evaluations_batch_log_results_body = cls(
             run_id=run_id,
             workflow_version_id=workflow_version_id,
@@ -308,6 +347,7 @@ class PostApiEvaluationsBatchLogResultsBody:
             name=name,
             targets=targets,
             timestamps=timestamps,
+            expected=expected,
         )
 
         post_api_evaluations_batch_log_results_body.additional_properties = d

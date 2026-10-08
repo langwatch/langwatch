@@ -157,12 +157,22 @@ export const recordEvaluatorResultInputSchema = z.object({
 });
 export type RecordEvaluatorResultInput = z.infer<typeof recordEvaluatorResultInputSchema>;
 
+/** How many rows and verdicts a run reported in total, as its reporter counted them. */
+export const experimentRunExpectedCountsSchema = z
+  .object({
+    dataset: z.number().int().nonnegative(),
+    evaluations: z.number().int().nonnegative(),
+  })
+  .strict();
+export type ExperimentRunExpectedCounts = z.infer<typeof experimentRunExpectedCountsSchema>;
+
 export const completeExperimentRunInputSchema = z.object({
   tenantId: z.string(),
   runId: z.string(),
   experimentId: z.string(),
   finishedAt: z.number().nullable().optional(),
   stoppedAt: z.number().nullable().optional(),
+  expected: experimentRunExpectedCountsSchema.optional(),
   occurredAt: z.number(),
 });
 export type CompleteExperimentRunInput = z.infer<typeof completeExperimentRunInputSchema>;
@@ -198,6 +208,26 @@ export const experimentRunEvaluationSchema = z
   })
   .strict();
 
+const experimentRunStoredCountSchema = z
+  .object({
+    received: z.number().int().nonnegative(),
+    expected: z.number().int().nonnegative().nullable(),
+  })
+  .strict();
+
+/**
+ * What is stored of a run against what the run reported. Results are stored after they are
+ * reported, so a read can hold part of a run; `expected` is null when the run reported no counts.
+ */
+export const experimentRunCompletenessSchema = z
+  .object({
+    complete: z.boolean(),
+    dataset: experimentRunStoredCountSchema,
+    evaluations: experimentRunStoredCountSchema,
+  })
+  .strict();
+export type ExperimentRunCompleteness = z.infer<typeof experimentRunCompletenessSchema>;
+
 export const experimentRunWithItemsSchema = z
   .object({
     experimentId: z.string(),
@@ -210,6 +240,7 @@ export const experimentRunWithItemsSchema = z
     dataset: z.array(experimentRunDatasetEntrySchema),
     evaluations: z.array(experimentRunEvaluationSchema),
     timestamps: experimentRunTimestampsSchema,
+    completeness: experimentRunCompletenessSchema,
   })
   .strict();
 export type ExperimentRunWithItems = z.infer<typeof experimentRunWithItemsSchema>;

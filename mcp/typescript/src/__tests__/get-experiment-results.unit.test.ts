@@ -234,6 +234,28 @@ describe("handleExperimentResults()", () => {
     });
   });
 
+  describe("given the run has ended and is still being stored", () => {
+    describe("when results are requested", () => {
+      /** @scenario "The MCP results tool says when a finished run is still being stored" */
+      it("notes how much of the run is stored so far", async () => {
+        mockMakeRequest.mockResolvedValueOnce({
+          ...sample,
+          completeness: {
+            complete: false,
+            dataset: { received: 3, expected: 40 },
+            evaluations: { received: 3, expected: 480 },
+          },
+        });
+
+        const result = await handleExperimentResults({ runId: "run_1" });
+
+        expect(result).toContain("**Status**: completed");
+        expect(result).toContain("the platform is still storing it");
+        expect(result).toContain("3 of 40 rows and 3 of 480 evaluations");
+      });
+    });
+  });
+
   describe("given the run was interrupted before finishing", () => {
     describe("when results are requested", () => {
       it("serves the partial rows with an interrupted note", async () => {

@@ -12,6 +12,7 @@ import {
   type BatchTargetOutput,
   transformBatchEvaluationData,
 } from "../ui/sections/batch-evaluation-results.types.ts";
+import { WHOLE_RUN_COMPLETENESS } from "./run-completeness.fixture.ts";
 
 const createMinimalData = (overrides: Partial<BatchEvaluationData> = {}): BatchEvaluationData => ({
   runId: "run-1",
@@ -611,6 +612,7 @@ describe("csvExport", () => {
       experimentId: "exp-1",
       runId: "run-1",
       projectId: "project-1",
+      completeness: WHOLE_RUN_COMPLETENESS,
       timestamps: {
         createdAt: 1705320000000,
         updatedAt: 1705320000000,
@@ -1211,6 +1213,7 @@ describe("csvExport", () => {
         experimentId: "exp-1",
         runId: "run-1",
         projectId: "project-1",
+        completeness: WHOLE_RUN_COMPLETENESS,
         timestamps: { createdAt: 1705320000000, updatedAt: 1705320000000 },
         targets: [
           { id: "gpt-5-mini", name: "gpt-5-mini", type: "custom" },
@@ -1284,6 +1287,7 @@ describe("given two targets stored under the same name", () => {
         experimentId: "exp-1",
         runId: "run-1",
         projectId: "project-1",
+        completeness: WHOLE_RUN_COMPLETENESS,
         targets: [
           { id: "target-1", name: "classifier", type: "prompt" },
           { id: "target-2", name: "classifier", type: "prompt" },

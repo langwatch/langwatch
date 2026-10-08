@@ -886,6 +886,11 @@ describe("GET /api/experiments/runs/:runId/results", () => {
       dataset: [],
       evaluations: [],
       timestamps: { createdAt: 1, updatedAt: 2 },
+      completeness: {
+        complete: false,
+        dataset: { received: 0, expected: null },
+        evaluations: { received: 0, expected: null },
+      },
     }));
     const { request } = await harness({
       experiments: { isActive: async () => true, findRun },

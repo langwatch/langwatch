@@ -3002,6 +3002,8 @@ export const LWQL_CLICKHOUSE_CATALOGUE = defineLwqlCatalog({
       LastEventOccurredAt: "inherit",
       _retention_days: "inherit",
       _size_bytes: "inherit",
+      ExpectedTargetResults: "inherit",
+      ExpectedEvaluatorResults: "inherit",
     },
   }),
   gateway_budget_ledger: defineTableCatalogue({

@@ -40399,6 +40399,10 @@ type PostApiEvaluationsBatchLogResultsJSONBody struct {
 		Status    PostApiEvaluationsBatchLogResultsJSONBody_Evaluations_Status `json:"status"`
 		TargetId  *string                                                      `json:"target_id,omitempty"`
 	} `json:"evaluations,omitempty"`
+	Expected *struct {
+		Dataset     int `json:"dataset"`
+		Evaluations int `json:"evaluations"`
+	} `json:"expected,omitempty"`
 	ExperimentId   *string  `json:"experiment_id,omitempty"`
 	ExperimentSlug *string  `json:"experiment_slug,omitempty"`
 	Name           *string  `json:"name,omitempty"`
@@ -147866,6 +147870,19 @@ type GetApiExperimentsRunsByRunIdResultsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *struct {
+		// Completeness What is stored against what the run reported. Results are stored after they are reported, so a read can hold part of a run: `complete` is false until the run has ended and every reported row and evaluation is stored. `expected` is null when the run reported no counts
+		Completeness struct {
+			Complete bool `json:"complete"`
+			Dataset  struct {
+				Expected *int `json:"expected"`
+				Received int  `json:"received"`
+			} `json:"dataset"`
+			Evaluations struct {
+				Expected *int `json:"expected"`
+				Received int  `json:"received"`
+			} `json:"evaluations"`
+		} `json:"completeness"`
+
 		// Dataset One row per dataset entry, with what the target predicted
 		Dataset []struct {
 			Cost *float32 `json:"cost,omitempty"`
@@ -176510,6 +176527,19 @@ func ParseGetApiExperimentsRunsByRunIdResultsResponse(rsp *http.Response) (*GetA
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
+			// Completeness What is stored against what the run reported. Results are stored after they are reported, so a read can hold part of a run: `complete` is false until the run has ended and every reported row and evaluation is stored. `expected` is null when the run reported no counts
+			Completeness struct {
+				Complete bool `json:"complete"`
+				Dataset  struct {
+					Expected *int `json:"expected"`
+					Received int  `json:"received"`
+				} `json:"dataset"`
+				Evaluations struct {
+					Expected *int `json:"expected"`
+					Received int  `json:"received"`
+				} `json:"evaluations"`
+			} `json:"completeness"`
+
 			// Dataset One row per dataset entry, with what the target predicted
 			Dataset []struct {
 				Cost *float32 `json:"cost,omitempty"`

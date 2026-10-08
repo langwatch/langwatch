@@ -186,4 +186,21 @@ describe("Experiment log_results batching", () => {
       });
     });
   });
+
+  describe("given three small rows with one evaluation each", () => {
+    describe("when the experiment finishes", () => {
+      /** @scenario "The request that ends the run carries the counts the run reported" */
+      it("reports the rows and evaluations of the whole run as expected", async () => {
+        const server = serve();
+
+        await runExperiment([0, 0, 0]);
+
+        const finishing = server.bodies.filter(
+          (body) => (body.timestamps.finished_at ?? null) !== null,
+        );
+        expect(finishing).toHaveLength(1);
+        expect(finishing[0]!.expected).toEqual({ dataset: 3, evaluations: 3 });
+      });
+    });
+  });
 });

@@ -12,6 +12,7 @@ import {
   eSBatchEvaluationSchema,
   mapLegacyExperimentTargets,
   type ESBatchEvaluation,
+  type ExperimentRunExpectedCounts,
   type LogBatchEvaluationInput,
 } from "@langwatch/experiment-contract";
 import { createLogger } from "@langwatch/observability";
@@ -95,17 +96,24 @@ export class ExperimentBatchLogService {
 
     eSBatchEvaluationSchema.parse(batchEvaluation);
 
-    await this.#dispatch({ projectId, experimentId: experiment.id, batchEvaluation });
+    await this.#dispatch({
+      projectId,
+      experimentId: experiment.id,
+      batchEvaluation,
+      expected: params.expected ?? undefined,
+    });
   }
 
   async #dispatch({
     projectId,
     experimentId,
     batchEvaluation,
+    expected,
   }: {
     projectId: string;
     experimentId: string;
     batchEvaluation: ESBatchEvaluation;
+    expected: ExperimentRunExpectedCounts | undefined;
   }): Promise<void> {
     const { run_id: runId } = batchEvaluation;
     const targets = mapLegacyExperimentTargets(batchEvaluation.targets ?? []);
@@ -179,7 +187,7 @@ export class ExperimentBatchLogService {
       ),
     ]);
 
-    await this.#completeRun({ projectId, experimentId, batchEvaluation });
+    await this.#completeRun({ projectId, experimentId, batchEvaluation, expected });
     await this.#reportVerdicts({ projectId, batchEvaluation });
   }
 
@@ -188,10 +196,12 @@ export class ExperimentBatchLogService {
     projectId,
     experimentId,
     batchEvaluation,
+    expected,
   }: {
     projectId: string;
     experimentId: string;
     batchEvaluation: ESBatchEvaluation;
+    expected: ExperimentRunExpectedCounts | undefined;
   }): Promise<void> {
     const { finished_at: finishedAt, stopped_at: stoppedAt } = batchEvaluation.timestamps;
 
@@ -204,6 +214,7 @@ export class ExperimentBatchLogService {
         experimentId,
         finishedAt: finishedAt ?? undefined,
         stoppedAt: stoppedAt ?? undefined,
+        expected,
         occurredAt: nowInstant().epochMilliseconds,
       });
     } catch (error) {
