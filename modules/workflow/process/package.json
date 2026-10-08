@@ -53,6 +53,7 @@
     "@langwatch/secrets": "workspace:*",
     "@langwatch/task": "workspace:*",
     "@langwatch/time": "workspace:*",
+    "@langwatch/upgrade": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
     "@trpc/server": "catalog:",
     "ai": "catalog:",

@@ -20,6 +20,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { WorkflowLifecyclePipeline } from "../../eventing/workflow-lifecycle.pipeline.ts";
 import { MemoryWorkflowRepositories } from "../../repositories/memory/memory.workflow.repositories.ts";
 import type { StudioEventPreparer } from "../../services/studio-event-preparer.service.ts";
+import { WorkflowCurrentVersionBackfillService } from "../../services/workflow-current-version-backfill.service.ts";
 import { WorkflowService } from "../../services/workflow.service.ts";
 import {
   type WorkflowDslMigration,
@@ -144,6 +145,70 @@ describe("workflow lifecycle facts", () => {
       ]);
       await workflows.archiveLinked(reference);
       expect(await workflows.findCurrentVersionFacts(reference)).toEqual([]);
+    });
+  });
+
+  describe("when the deploy backfill runs", () => {
+    async function backfillSetup() {
+      const facts = await setup();
+      const { workflows } = facts.repositories;
+      for (const [id, projectId] of [
+        ["workflow_2", "project_2"],
+        ["workflow_3", "project_1"],
+      ] as const) {
+        await workflows.createWorkflow({ id, projectId, name: id, icon: null, description: null });
+      }
+      await workflows.archiveLinked({ workflowId: "workflow_3", projectId: "project_1" });
+      const backfill = WorkflowCurrentVersionBackfillService.create({
+        workflows,
+        versions: facts.app,
+      });
+      return { ...facts, backfill };
+    }
+
+    /** @scenario "The deploy backfill records each live workflow's current version with its fields" */
+    it("records the current version of each live workflow with its fields once", async () => {
+      const { backfill, saved } = await backfillSetup();
+      const done: string[] = [];
+
+      const report = await backfill.recordLiveWorkflows({
+        dryRun: false,
+        signal: new AbortController().signal,
+        afterTenantId: null,
+        onTenantDone: async ({ tenantId }) => void done.push(tenantId),
+      });
+
+      expect(report).toEqual({ tenants: 2, liveWorkflows: 2, versionsRecorded: 1 });
+      expect(saved).toHaveBeenCalledTimes(1);
+      expect(saved).toHaveBeenCalledWith(
+        expect.objectContaining({ ...reference, versionId: "version_2", fields: UNRESOLVED }),
+      );
+      expect(done).toEqual(["project_1", "project_2"]);
+    });
+
+    /** @scenario "The deploy backfill records each live workflow's current version with its fields" */
+    it("records nothing on a dry run, and skips the projects a resumed run finished", async () => {
+      const { backfill, saved } = await backfillSetup();
+      const onTenantDone = vi.fn(async () => void 0);
+      const signal = new AbortController().signal;
+
+      const dry = await backfill.recordLiveWorkflows({
+        dryRun: true,
+        signal,
+        afterTenantId: null,
+        onTenantDone,
+      });
+      const resumed = await backfill.recordLiveWorkflows({
+        dryRun: false,
+        signal,
+        afterTenantId: "project_1",
+        onTenantDone,
+      });
+
+      expect(dry).toEqual({ tenants: 2, liveWorkflows: 2, versionsRecorded: 0 });
+      expect(resumed).toEqual({ tenants: 1, liveWorkflows: 1, versionsRecorded: 0 });
+      expect(saved).not.toHaveBeenCalled();
+      expect(onTenantDone).toHaveBeenCalledTimes(1);
     });
   });
 });

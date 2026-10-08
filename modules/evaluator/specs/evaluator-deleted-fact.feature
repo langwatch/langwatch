@@ -27,3 +27,17 @@ Feature: Evaluator records that an evaluator was deleted
     Given an evaluator with a linked workflow
     When the archive confirmation asks what goes with it
     Then evaluator answers the workflow, and the monitors are read from monitor
+
+  @unit
+  Scenario: an archived workflow archives the evaluators it backed
+    Given a live evaluator backed by a workflow
+    When workflow records that the workflow was archived
+    Then evaluator archives that evaluator from its own side, after a lag
+    And records it deleted, so monitor removes the monitors that ran it
+
+  @unit
+  Scenario: a redelivered workflow archived fact archives nothing more
+    Given evaluator handled a workflow archived fact
+    When the same fact is delivered again
+    Then both deliveries share one deduplication id
+    And no second evaluator deleted fact is recorded

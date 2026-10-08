@@ -185,6 +185,7 @@ describe("the worker process installation", () => {
       expect(pipelines).toContain("trace_analytics");
       expect(pipelines).toContain("user_lifecycle");
       expect(pipelines).toContain("workflow_agent_archive_cascade");
+      expect(pipelines).toContain("evaluator_workflow_archive_cascade");
       expect(pipelines).toContain("share_trace_sharing_revocation");
       expect(pipelines).toContain("topic_clustering_processing");
       expect(pipelines).toContain("automations");

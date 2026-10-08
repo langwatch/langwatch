@@ -5,7 +5,7 @@
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { type WorkflowCardBase, WorkflowCardDisplay } from "@langwatch/design-system/workflow-card";
 import { toEpochMs } from "@langwatch/time";
-import type { WorkflowCascadeArchive } from "@langwatch/workflow-contract";
+import type { WorkflowCascadeArchive, WorkflowRelatedEntities } from "@langwatch/workflow-contract";
 import { useCallback, useState, type ComponentProps, type ReactNode } from "react";
 
 import { workflowApi, type WorkflowListRow } from "../../behavior/workflow-api.ts";
@@ -87,7 +87,7 @@ export function WorkflowListCard({
           onSuccess: (result) => {
             setIsDeleteDialogOpen(false);
             void utils.workflow.getAll.invalidate();
-            const parts = describeCascadeArchive(result);
+            const parts = describeCascadeArchive({ result, related: relatedEntitiesQuery.data });
             host.succeeded({
               title: `Workflow "${name}" deleted`,
               ...(parts.length > 0 ? { description: `Also deleted: ${parts.join(", ")}` } : {}),
@@ -192,15 +192,17 @@ function countLabel(count: number, noun: string): string[] {
   return count > 0 ? [`${count} ${noun}${count > 1 ? "s" : ""}`] : [];
 }
 
-function describeCascadeArchive(
-  result: Pick<
-    WorkflowCascadeArchive,
-    "archivedEvaluatorsCount" | "archivedAgentsCount" | "deletedMonitorsCount"
-  >,
-): string[] {
+/** Evaluators and their monitors go after a lag, so the preview the reader confirmed names them. */
+function describeCascadeArchive({
+  result,
+  related,
+}: {
+  result: Pick<WorkflowCascadeArchive, "archivedAgentsCount">;
+  related: Pick<WorkflowRelatedEntities, "evaluators" | "monitors"> | undefined;
+}): string[] {
   return [
-    ...countLabel(result.archivedEvaluatorsCount, "evaluator"),
+    ...countLabel(related?.evaluators.length ?? 0, "evaluator"),
     ...countLabel(result.archivedAgentsCount, "agent"),
-    ...countLabel(result.deletedMonitorsCount, "online evaluation"),
+    ...countLabel(related?.monitors.length ?? 0, "online evaluation"),
   ];
 }

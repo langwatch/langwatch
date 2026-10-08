@@ -1,5 +1,4 @@
 import type { AgentApi } from "@langwatch/agent-contract";
-import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { WorkflowCascadeArchive } from "@langwatch/workflow-contract";
 
@@ -11,14 +10,13 @@ type WorkflowScope = Readonly<{ workflowId: string; projectId: string }>;
 type WorkflowLinkedRowsServiceOptions = {
   workflows: Pick<WorkflowService, "archive">;
   agents: Pick<AgentApi, "listWorkflowConfigs" | "getNamesByIds" | "archive">;
-  evaluators: Pick<EvaluatorApi, "listByWorkflow" | "archive">;
-  monitors: Pick<MonitorApi, "findByEvaluator" | "delete">;
+  monitors: Pick<MonitorApi, "findByEvaluator">;
 };
 
 /**
- * The agents, evaluators and monitors hanging off a workflow, through their owners. The
- * archive cascade is one owner call at a time, so a failure part way leaves what already
- * ran; each step is safe to repeat.
+ * The agents and monitors hanging off a workflow, through their owners. The archive cascade
+ * takes the agents one call at a time, each safe to repeat; evaluator archives the evaluators
+ * from workflow's archived fact, and monitor the monitors from evaluator's (plan §7).
  */
 export class WorkflowLinkedRowsService implements Pick<
   WorkflowLineageReads,
@@ -69,25 +67,9 @@ export class WorkflowLinkedRowsService implements Pick<
         projectId: input.projectId,
         unarchive: true,
       });
-      return {
-        workflow,
-        archivedEvaluatorsCount: 0,
-        archivedAgentsCount: 0,
-        deletedMonitorsCount: 0,
-      };
+      return { workflow, archivedAgentsCount: 0 };
     }
 
-    const evaluators = await this.options.evaluators.listByWorkflow(input);
-    const monitors = await this.listMonitorsForEvaluators({
-      projectId: input.projectId,
-      evaluatorIds: evaluators.map(({ id }) => id),
-    });
-    for (const monitor of monitors) {
-      await this.options.monitors.delete({ id: monitor.id, projectId: input.projectId });
-    }
-    for (const evaluator of evaluators) {
-      await this.options.evaluators.archive({ id: evaluator.id, projectId: input.projectId });
-    }
     const agents = await this.options.agents.listWorkflowConfigs(input);
     for (const agent of agents) {
       await this.options.agents.archive({ id: agent.id, projectId: input.projectId });
@@ -97,11 +79,6 @@ export class WorkflowLinkedRowsService implements Pick<
       projectId: input.projectId,
     });
 
-    return {
-      workflow,
-      archivedEvaluatorsCount: evaluators.length,
-      archivedAgentsCount: agents.length,
-      deletedMonitorsCount: monitors.length,
-    };
+    return { workflow, archivedAgentsCount: agents.length };
   }
 }

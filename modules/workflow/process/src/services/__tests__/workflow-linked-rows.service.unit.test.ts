@@ -3,7 +3,6 @@
  * @see modules/workflow/specs/workflow-service.feature
  */
 import type { AgentApi } from "@langwatch/agent-contract";
-import type { Evaluator, EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { Workflow } from "@langwatch/workflow-contract";
@@ -32,24 +31,10 @@ const archivedWorkflow: Workflow = {
   updatedAt: NOW,
 };
 
-const evaluator: Evaluator = {
-  id: "evaluator_1",
-  projectId: "project_1",
-  name: "Quality check",
-  slug: null,
-  type: "workflow",
-  config: {},
-  workflowId: "workflow_1",
-  copiedFromEvaluatorId: null,
-  archivedAt: null,
-  createdAt: NOW,
-  updatedAt: NOW,
-};
-
 describe("the workflow's linked rows", () => {
-  describe("when a workflow backing an evaluator, a monitor and an agent is archived", () => {
-    /** @scenario "Archiving a workflow takes its evaluators, agents and monitors with it" */
-    it("deletes the monitor, archives the evaluator and the agent, then the workflow", async () => {
+  describe("when a workflow an agent runs is archived with its dependants", () => {
+    /** @scenario "Archiving a workflow takes its agents with it, and its evaluators and monitors after a lag" */
+    it("archives the agent then the workflow, and leaves evaluators and monitors to their owners", async () => {
       const calls: string[] = [];
       const service = WorkflowLinkedRowsService.create({
         workflows: {
@@ -58,26 +43,7 @@ describe("the workflow's linked rows", () => {
             return archivedWorkflow;
           },
         } satisfies Pick<WorkflowService, "archive">,
-        evaluators: createApiFixture<EvaluatorApi>(
-          {
-            listByWorkflow: async () => [evaluator],
-            archive: async (input) => {
-              calls.push(`evaluator ${input.id}`);
-              return evaluator;
-            },
-          },
-          "EvaluatorApi",
-        ),
-        monitors: createApiFixture<MonitorApi>(
-          {
-            findByEvaluator: async () => [{ id: "monitor_1", name: "Online check" }],
-            delete: async (input) => {
-              calls.push(`monitor ${input.id}`);
-              return { success: true };
-            },
-          },
-          "MonitorApi",
-        ),
+        monitors: createApiFixture<MonitorApi>({}, "MonitorApi"),
         agents: createApiFixture<AgentApi>(
           {
             listWorkflowConfigs: async () => [{ id: "agent_1", config: {} }],
@@ -95,18 +61,8 @@ describe("the workflow's linked rows", () => {
         workflowId: "workflow_1",
       });
 
-      expect(calls).toEqual([
-        "monitor monitor_1",
-        "evaluator evaluator_1",
-        "agent agent_1",
-        "workflow workflow_1",
-      ]);
-      expect(result).toEqual({
-        workflow: archivedWorkflow,
-        archivedEvaluatorsCount: 1,
-        archivedAgentsCount: 1,
-        deletedMonitorsCount: 1,
-      });
+      expect(calls).toEqual(["agent agent_1", "workflow workflow_1"]);
+      expect(result).toEqual({ workflow: archivedWorkflow, archivedAgentsCount: 1 });
     });
   });
 });

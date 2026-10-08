@@ -44,6 +44,10 @@ import type { Trace } from "@langwatch/trace-contract";
 import { UserApi } from "@langwatch/user-contract";
 import { WorkflowApi } from "@langwatch/workflow-contract";
 
+import {
+  buildEvaluatorWorkflowArchiveCascadePipeline,
+  type EvaluatorWorkflowArchiveCascadePipeline,
+} from "../eventing/evaluator-workflow-archive-cascade.pipeline.ts";
 import type { EvaluatorRepositories } from "../repositories/evaluator.repositories.ts";
 import { evaluatorPlatformUrl } from "../rules/evaluator-platform-url.rules.ts";
 import { findTraceIdsPassingPreconditions } from "../rules/precondition-trace-data.rules.ts";
@@ -55,6 +59,7 @@ import {
 import { EvaluatorHistoryService } from "../services/evaluator-history.service.ts";
 import { EvaluatorLinkedRowsService } from "../services/evaluator-linked-rows.service.ts";
 import { EvaluatorReplicationService } from "../services/evaluator-replication.service.ts";
+import { EvaluatorWorkflowArchiveService } from "../services/evaluator-workflow-archive.service.ts";
 import { EvaluatorService as EvaluatorRuntimeService } from "../services/evaluator.service.ts";
 
 /** The workflow rows an evaluator is entangled with, read through their owner. */
@@ -151,6 +156,16 @@ export class EvaluatorModule implements EvaluatorApi {
   /** evaluator_lifecycle's senders, once the pipeline registers in this process. */
   connectLifecycle(senders: EvaluatorLifecycleSenders): void {
     this.#dependencies.deletionFacts.connect(senders);
+  }
+
+  /** Archives the evaluators a workflow backed once workflow records the archive (§9). */
+  workflowArchiveCascadePipeline(): EvaluatorWorkflowArchiveCascadePipeline {
+    return buildEvaluatorWorkflowArchiveCascadePipeline({
+      evaluators: EvaluatorWorkflowArchiveService.create({
+        evaluators: this.#dependencies.evaluators,
+        deletionFacts: this.#dependencies.deletionFacts,
+      }),
+    });
   }
 
   #dependencies: EvaluatorAppParts;

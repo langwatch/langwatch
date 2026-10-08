@@ -57,6 +57,14 @@ Feature: Workflow service boundary
     And recording it never fails or delays the archive
 
   @unit
+  Scenario: The deploy backfill records each live workflow's current version with its fields
+    Given live workflows across projects, some with a current version, and an archived workflow
+    When the background backfill runs after the old writers are gone
+    Then one version_saved fact with fields is recorded per live workflow with a current version
+    And the archived workflow records nothing, a dry run records nothing
+    And a resumed run skips every project its checkpoint already finished
+
+  @unit
   Scenario: A workflow created as an autosave keeps one version across later autosaves
     Given a workflow created with its first version marked autosaved
     When a second autosave is written into it
@@ -296,10 +304,12 @@ Feature: Workflow service boundary
     And no workflow of another project comes back
 
   @unit
-  Scenario: Archiving a workflow takes its evaluators, agents and monitors with it
+  Scenario: Archiving a workflow takes its agents with it, and its evaluators and monitors after a lag
     Given a workflow backs an evaluator that a monitor uses, and an agent runs it
     When the workflow is archived with its dependants
-    Then the monitor is deleted, the evaluator and the agent are archived, then the workflow
+    Then the agent is archived, then the workflow, and the archived fact is recorded
+    And evaluator archives the evaluator and monitor deletes the monitor from their own sides
+    And the confirmation names the evaluators and monitors from the preview the reader confirmed
 
   @unit
   Scenario: The workflows list reads copy lineage on a process that supplies only stores and declared peers

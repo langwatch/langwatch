@@ -688,7 +688,6 @@ export class WorkflowModule implements WorkflowApi, WorkflowBrowserApi {
         linked: WorkflowLinkedRowsService.create({
           workflows,
           agents: setup.dependencies.agents,
-          evaluators: setup.dependencies.evaluators,
           monitors: setup.dependencies.monitors,
         }),
       }),
@@ -948,6 +947,22 @@ export class WorkflowModule implements WorkflowApi, WorkflowBrowserApi {
   /** Binds the built lifecycle pipeline's own senders. */
   connectLifecycleCommands(commands: EventingCommands<WorkflowLifecyclePipeline>): void {
     this.#lifecycleCommands = commands;
+  }
+
+  /** Records a live workflow's current version with its fields, for the backfill; false if none. */
+  async recordCurrentVersionFields(input: WorkflowReference): Promise<boolean> {
+    const commands = this.#lifecycleCommands;
+    if (!commands) throw new Error("workflow_lifecycle pipeline senders are not connected yet");
+    const facts = await this.#infrastructure.workflows.findCurrentVersionFacts(input);
+    for (const fact of facts) {
+      await commands.recordWorkflowVersionSaved.send({
+        tenantId: input.projectId,
+        occurredAt: nowInstant().epochMilliseconds,
+        ...input,
+        ...fact,
+      });
+    }
+    return facts.length > 0;
   }
 
   /** Archives an agent's graph once agent records the archive, from workflow's own side (§9). */
@@ -1453,9 +1468,9 @@ export class WorkflowModule implements WorkflowApi, WorkflowBrowserApi {
   }
 
   /**
-   * Archives the workflow and everything downstream of it in one transaction:
-   * linked evaluators and agents are archived, and the monitors those
-   * evaluators back are deleted outright.
+   * Archives the workflow and the agents that run it; evaluator archives the
+   * evaluators it backs from the archived fact, and monitor deletes their
+   * monitors from evaluator's, after a lag (plan §7).
    */
   async cascadeArchive(input: {
     projectId: string;

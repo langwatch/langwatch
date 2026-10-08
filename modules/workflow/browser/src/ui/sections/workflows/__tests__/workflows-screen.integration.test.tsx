@@ -157,11 +157,7 @@ describe("given the workflows library", () => {
         agents: [],
         monitors: [{ id: "mo_1", name: "Nightly relevance" }],
       };
-      calls.cascadeArchive.mockReturnValue({
-        archivedEvaluatorsCount: 1,
-        archivedAgentsCount: 0,
-        deletedMonitorsCount: 1,
-      });
+      calls.cascadeArchive.mockReturnValue({ archivedAgentsCount: 0 });
 
       const { host } = renderWithWorkflowHost(<WorkflowsScreen />);
       await user.click(screen.getByRole("button", { name: /workflow actions/i }));

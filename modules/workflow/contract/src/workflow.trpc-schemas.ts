@@ -212,12 +212,10 @@ export const workflowRelatedEntitiesSchema = z.object({
   monitors: z.array(z.object({ id: z.string(), name: z.string(), evaluatorId: z.string() })),
 });
 
-/** What `cascadeArchive` did, in one transaction. */
+/** What `cascadeArchive` archived at once; evaluators and their monitors follow after a lag. */
 export const workflowCascadeArchiveSchema = z.object({
   workflow: workflowSchema,
-  archivedEvaluatorsCount: z.number(),
   archivedAgentsCount: z.number(),
-  deletedMonitorsCount: z.number(),
 });
 
 export type WorkflowProjectPath = z.infer<typeof workflowProjectPathSchema>;

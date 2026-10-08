@@ -4,12 +4,14 @@ import {
   projectCredentialOfRequest,
 } from "@langwatch/api/rest";
 import { defineProcessModule } from "@langwatch/process";
+import { defineMigrationStep } from "@langwatch/upgrade/step";
 
 import { WorkflowModule } from "#app/workflow.app";
 import { workflowAgentArchiveCascadeEventing } from "#eventing/workflow-agent-archive-cascade.pipeline";
 import { workflowLifecycleEventing } from "#eventing/workflow-lifecycle.pipeline";
 import { workflowNlpLambdaCleanupEventing } from "#eventing/workflow-nlp-lambda-cleanup.pipeline";
 import { workflowRepositories } from "#repositories/workflow-repositories.registry";
+import { WorkflowCurrentVersionBackfillService } from "#services/workflow-current-version-backfill.service";
 import { WorkflowHttpSecretsService } from "#services/workflow-http-secrets.service";
 import { WorkflowHttpCredentialsBackfillTask } from "#tasks/workflow-http-credentials-backfill.task";
 import { workflowExecuteSyncRest } from "#transport/workflow-execute-sync.rest";
@@ -37,6 +39,29 @@ export const workflowProcessModule = defineProcessModule("workflow")
     WorkflowHttpCredentialsBackfillTask.create({
       workflows: repositories.workflows,
       httpSecrets: WorkflowHttpSecretsService.create(dependencies.secrets),
+    }),
+  ])
+  // Background, after old writers are gone: agent's fields arrive from version_saved (round 20).
+  .withMigrations(({ app, repositories }) => [
+    defineMigrationStep({
+      id: "workflow:record-current-version-fields",
+      kind: "data",
+      mode: "background",
+      description: "Records each live workflow's current version with its fields for agent.",
+      needsOldWritersGone: true,
+      run: async ({ checkpoint, dryRun, signal }) => {
+        const resumed = checkpoint.resumeFrom?.afterTenantId;
+        return WorkflowCurrentVersionBackfillService.create({
+          workflows: repositories.workflows,
+          versions: app,
+        }).recordLiveWorkflows({
+          dryRun,
+          signal,
+          afterTenantId: typeof resumed === "string" ? resumed : null,
+          onTenantDone: ({ tenantId, report }) =>
+            checkpoint.save({ report: { afterTenantId: tenantId, ...report } }),
+        });
+      },
     }),
   ])
   .withTransportFacts(() => [
