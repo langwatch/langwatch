@@ -701,13 +701,6 @@ function focusTemplates({ byAgentKind, ...base }: AuthoredTemplate): CatalogueTe
   );
 }
 
-/** Every template, each base followed by its focus templates. */
-export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = AUTHORED_TEMPLATES.flatMap(
-  (template) => [baseTemplate(template), ...focusTemplates(template)],
-).map((template) => ({
-  ...template,
-  reportPrompt: `${template.reportPrompt} ${setupCheckFor(template.widgets)}`,
-}));
 const REQUIREMENTS = new Map(DATA_REQUIREMENTS.map((need) => [need.key, need] as const));
 const WIDGET_NEEDS = new Map(CATALOGUE_WIDGETS.map(({ id, requirements }) => [id, requirements]));
 
@@ -749,3 +742,11 @@ function setupCheckFor(widgets: readonly string[]): string {
     "and offer to help me set up each piece.",
   ].join(" ");
 }
+
+/** Every template, each base followed by its focus templates. */
+export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = AUTHORED_TEMPLATES.flatMap(
+  (template) => [baseTemplate(template), ...focusTemplates(template)],
+).map((template) => ({
+  ...template,
+  reportPrompt: `${template.reportPrompt} ${setupCheckFor(template.widgets)}`,
+}));
