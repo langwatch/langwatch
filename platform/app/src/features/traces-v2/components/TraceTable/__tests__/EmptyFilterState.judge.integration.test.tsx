@@ -41,6 +41,12 @@ vi.mock("../../../stores/instantEvalRunStore", () => ({
     selector(runState),
 }));
 
+vi.mock("~/hooks/useOrganizationTeamProject", () => ({
+  useOrganizationTeamProject: () => ({
+    project: { id: "project-1", kind: "application", createdAt: new Date(0) },
+  }),
+}));
+
 vi.mock("../QueryBreakdownChips", () => ({
   QueryBreakdownChips: () => null,
 }));

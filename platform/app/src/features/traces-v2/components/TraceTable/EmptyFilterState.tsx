@@ -7,9 +7,11 @@ import {
   Stack,
   Text,
 } from "@chakra-ui/react";
+import { format } from "date-fns";
 import type React from "react";
 import { PIIRedactionAlert } from "~/components/ui/PIIRedactionNotice";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { isAggregateProjectKind } from "~/server/app-layer/projects/project-kinds";
 import { api } from "~/utils/api";
 import { useInstantEvalRuns } from "../../hooks/useInstantEvalRuns";
 import { useExplorerStore } from "../../stores/explorerStore";
@@ -109,12 +111,62 @@ function shortRangeEmptyContent(rangeHours: number): EmptyContent | null {
   return null;
 }
 
+/**
+ * Whether the window reaches back before an aggregate project existed. An
+ * aggregate reads each member from the moment it was attached (ADR-144: the
+ * grant's window starts at attach time, and the first members attach when the
+ * aggregate is created), so nothing older ever lists here and a wider window
+ * only reaches further into that gap. False on every other project.
+ */
+function reachesBeforeAggregate({
+  aggregateCreatedAt,
+  rangeFrom,
+}: {
+  aggregateCreatedAt: number | null;
+  rangeFrom: number;
+}): boolean {
+  return aggregateCreatedAt !== null && rangeFrom < aggregateCreatedAt;
+}
+
+/**
+ * What an empty aggregate says when its window reaches back before it was
+ * created, or null when it does not. Members added later start later still,
+ * so the date is the earliest any member trace can list from.
+ */
+function aggregateEmptyContent({
+  aggregateCreatedAt,
+  rangeFrom,
+  rangeTo,
+}: {
+  aggregateCreatedAt: number | null;
+  rangeFrom: number;
+  rangeTo: number;
+}): EmptyContent | null {
+  if (
+    aggregateCreatedAt === null ||
+    !reachesBeforeAggregate({ aggregateCreatedAt, rangeFrom })
+  ) {
+    return null;
+  }
+  const createdOn = format(aggregateCreatedAt, "d MMMM yyyy");
+  return {
+    title:
+      rangeTo < aggregateCreatedAt
+        ? "This window ends before the aggregate was created"
+        : "Nothing since this aggregate was created",
+    description: `This aggregate shows member traces from ${createdOn}, when it was created, and a project added later from when it joined. Older traces stay in each member project.`,
+  };
+}
+
 export function emptyContent({
   activeLensId,
   hasFilters,
   rangeHours,
   isJudging,
   hasUnjudgedEval = false,
+  aggregateCreatedAt = null,
+  rangeFrom = 0,
+  rangeTo = 0,
 }: {
   activeLensId: string;
   hasFilters: boolean;
@@ -123,6 +175,10 @@ export function emptyContent({
   isJudging: boolean;
   /** An eval chip has no run for this window, lens and filter. */
   hasUnjudgedEval?: boolean;
+  /** When the open project is an aggregate, the time it was created; null otherwise. */
+  aggregateCreatedAt?: number | null;
+  rangeFrom?: number;
+  rangeTo?: number;
 }): EmptyContent {
   const judging = instantEvalEmptyContent({ isJudging, hasUnjudgedEval });
   if (judging) return judging;
@@ -147,6 +203,12 @@ export function emptyContent({
         "Your query is valid, there's just nothing matching it in this window. Try widening the window, or clearing all filters.",
     };
   }
+  const aggregate = aggregateEmptyContent({
+    aggregateCreatedAt,
+    rangeFrom,
+    rangeTo,
+  });
+  if (aggregate) return aggregate;
   const shortRange = shortRangeEmptyContent(rangeHours);
   if (shortRange) return shortRange;
   // Else branch: not errors/conversations lens, no filters, range is
@@ -230,11 +292,13 @@ function widerRangeActions({
  * unjudged eval chip leads, because judging the results is what fills the
  * table; every other action widens what is searched.
  */
-function emptyStateActions({
+export function emptyStateActions({
   activeLensId,
   hasFilters,
   isJudging,
   rangeHours,
+  rangeFrom,
+  aggregateCreatedAt,
   unjudgedChip,
   clearAll,
   selectLens,
@@ -245,6 +309,8 @@ function emptyStateActions({
   hasFilters: boolean;
   isJudging: boolean;
   rangeHours: number;
+  rangeFrom: number;
+  aggregateCreatedAt: number | null;
   unjudgedChip: { question: string } | null;
   clearAll: () => void;
   selectLens: (lensId: string) => void;
@@ -278,8 +344,22 @@ function emptyStateActions({
       primary: !hasFilters,
     });
   }
-  actions.push(...widerRangeActions({ rangeHours, setTimeRange }));
+  // A wider window on an aggregate that already reaches back before it was
+  // created only adds time no member trace can list from.
+  if (!reachesBeforeAggregate({ aggregateCreatedAt, rangeFrom })) {
+    actions.push(...widerRangeActions({ rangeHours, setTimeRange }));
+  }
   return actions;
+}
+
+/**
+ * When the open project is an aggregate, the time it was created, which is
+ * when its first members were attached; null on every other project.
+ */
+function useAggregateCreatedAt(): number | null {
+  const { project } = useOrganizationTeamProject();
+  if (!project || !isAggregateProjectKind(project.kind)) return null;
+  return new Date(project.createdAt).getTime();
 }
 
 export const EmptyFilterState: React.FC = () => {
@@ -289,6 +369,7 @@ export const EmptyFilterState: React.FC = () => {
   const setTimeRange = useExplorerStore((s) => s.setTimeRange);
   const activeLensId = useExplorerStore((s) => s.activeLensId);
   const selectLens = useExplorerStore((s) => s.selectLens);
+  const aggregateCreatedAt = useAggregateCreatedAt();
 
   const isJudging = useInstantEvalRunStore((s) =>
     Object.keys(s.runs).some((runId) => !s.settled[runId]),
@@ -305,6 +386,9 @@ export const EmptyFilterState: React.FC = () => {
     rangeHours,
     isJudging,
     hasUnjudgedEval: Boolean(unjudgedChip),
+    aggregateCreatedAt,
+    rangeFrom: timeRange.from,
+    rangeTo: timeRange.to,
   });
 
   const actions = emptyStateActions({
@@ -312,6 +396,8 @@ export const EmptyFilterState: React.FC = () => {
     hasFilters,
     isJudging,
     rangeHours,
+    rangeFrom: timeRange.from,
+    aggregateCreatedAt,
     unjudgedChip: unjudgedChip ?? null,
     clearAll,
     selectLens,
