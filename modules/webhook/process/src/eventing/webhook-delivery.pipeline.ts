@@ -29,6 +29,16 @@ import {
   WEBHOOK_DELIVERY_PROCESS_NAME,
 } from "../rules/webhook-delivery-contract.rules.ts";
 import {
+  runWebhookDeliveryPrune,
+  WEBHOOK_DELIVERY_PRUNE_INITIAL_STATE,
+  WEBHOOK_DELIVERY_PRUNE_INTERVAL_MS,
+  WEBHOOK_DELIVERY_PRUNE_PROCESS_NAME,
+  type WebhookDeliveryPruneDeps,
+  webhookDeliveryPruneSchema,
+  webhookDeliveryPruneStateSchema,
+  webhookDeliveryPruneWake,
+} from "./webhook-delivery-prune.process.ts";
+import {
   type WebhookGatewayEventDelivery,
   webhookGatewayEventSubscribers,
 } from "./webhook-gateway-events.subscriber.ts";
@@ -56,6 +66,7 @@ export function buildWebhookDeliveryPipeline(input: {
   deliveryProcess?: ProcessManagerApplier<WebhookDeliveryEvent>;
   governanceProcess?: ProcessManagerApplier<WebhookDeliveryEvent>;
   gatewayEvents?: WebhookGatewayEventDelivery;
+  prune?: WebhookDeliveryPruneDeps;
 }): WebhookDeliveryDefinition {
   const pipeline = definePipeline({
     name: WEBHOOK_DELIVERY_PIPELINE_NAME,
@@ -67,13 +78,21 @@ export function buildWebhookDeliveryPipeline(input: {
     ])
     .withCommand("requestSpendDelivery", RequestSpendDeliveryCommand)
     .withCommand("requestGovernanceDelivery", RequestGovernanceDeliveryCommand);
-  if (!input.deliveryProcess || !input.governanceProcess || !input.gatewayEvents) {
+  if (!input.deliveryProcess || !input.governanceProcess || !input.gatewayEvents || !input.prune) {
     return pipeline.build();
   }
   const gateway = webhookGatewayEventSubscribers(input.gatewayEvents);
+  const prune = input.prune;
   return pipeline
     .withProcessManager(WEBHOOK_DELIVERY_PROCESS_NAME, input.deliveryProcess)
     .withProcessManager(GOVERNANCE_EVENTS_PROCESS_NAME, input.governanceProcess)
+    .withProcessManager(WEBHOOK_DELIVERY_PRUNE_PROCESS_NAME, (pm) =>
+      pm
+        .state(webhookDeliveryPruneStateSchema, WEBHOOK_DELIVERY_PRUNE_INITIAL_STATE)
+        .schedule({ everyMs: WEBHOOK_DELIVERY_PRUNE_INTERVAL_MS })
+        .onWake(webhookDeliveryPruneWake)
+        .intent("prune", webhookDeliveryPruneSchema, runWebhookDeliveryPrune(prune)),
+    )
     .withPeerSubscriber("gatewaySpendAdmittedDelivery", gateway.gatewaySpendAdmittedDelivery)
     .withPeerSubscriber("gatewaySpendConfirmedDelivery", gateway.gatewaySpendConfirmedDelivery)
     .withPeerSubscriber("gatewaySpendFailedDelivery", gateway.gatewaySpendFailedDelivery)

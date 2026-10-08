@@ -35,6 +35,7 @@ import type { WebhookDispatchResult as DeliveryDispatchResult } from "../rules/w
 import type { WebhookDestinationConfig } from "../rules/webhook-destination.rules.ts";
 import { webhookEndpointConfiguration } from "../rules/webhook-endpoint-policy.rules.ts";
 import { WebhookAccessService } from "../services/webhook-access.service.ts";
+import { WebhookDeliveryMaintenanceService } from "../services/webhook-delivery-maintenance.service.ts";
 import { WebhookDeliveryRequestService } from "../services/webhook-delivery-request.service.ts";
 import {
   WebhookDeliveryService,
@@ -244,6 +245,10 @@ export class WebhookModule implements WebhookApiContract, WebhookSpendReplayDoor
       deliveryProcess: WebhookDeliveryService.create(deps).processManager(),
       governanceProcess: WebhookGovernanceDeliveryService.create(deps).processManager(),
       gatewayEvents: (request) => this.requestGatewayEventDelivery(request),
+      prune: {
+        prune: () => WebhookDeliveryMaintenanceService.create(deps).runIfDue(),
+        deleteDispatchedBefore: (params) => processStore.deleteDispatchedBefore(params),
+      },
     });
   }
 

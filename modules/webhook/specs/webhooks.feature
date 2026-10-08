@@ -27,6 +27,12 @@ Feature: Enterprise webhook endpoints
     Then the next attempt uses the declared retry delay
     And exhausted attempts become terminal dead-letter work
 
+  @unit
+  Scenario: The delivery log is pruned daily without delivery traffic
+    Given the worker hosts the webhook delivery pipeline
+    When the daily prune schedule wakes
+    Then the maintenance sweep runs and the prune's own outbox rows are retired
+
   @integration
   Scenario: Emitted events are tenant scoped
     Given an organization has a set of project tenants
