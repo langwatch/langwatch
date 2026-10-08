@@ -14,6 +14,7 @@ import {
   hoistSystemMessage,
   type ApiResponsePrompt,
   PromptNotFoundError,
+  PromptAuthorUnknownError,
   PromptHasNoCopiesError,
   PromptNoCopiesSelectedError,
   PromptTagUnprocessableError,
@@ -879,16 +880,41 @@ export class PromptModule implements PromptApi {
     return this.#dependencies.library.getByAddress(input);
   }
 
-  createWithTags(
+  async createWithTags(
     input: CreatePromptCommand & { organizationId: string; tags?: string[] },
   ): Promise<ApiResponsePrompt> {
+    await this.#assertAuthorMayWrite({
+      authorId: input.authorId,
+      permission: "prompts:create",
+      projectId: input.projectId,
+    });
     return this.#dependencies.library.createWithTags(input);
   }
 
-  updateWithTags(
+  async updateWithTags(
     input: UpdatePromptCommand & { organizationId: string; tags?: string[] },
   ): Promise<ApiResponsePrompt> {
+    await this.#assertAuthorMayWrite({
+      authorId: input.data.authorId,
+      permission: "prompts:update",
+      projectId: input.projectId,
+    });
     return this.#dependencies.library.updateWithTags(input);
+  }
+
+  /** A body-supplied author must hold the write's permission on the project. */
+  async #assertAuthorMayWrite(input: {
+    authorId: string | null | undefined;
+    permission: AuthzPermission;
+    projectId: string;
+  }): Promise<void> {
+    if (!input.authorId) return;
+    const may = await this.#permissions().hasPermission({
+      userId: input.authorId,
+      permission: input.permission,
+      projectId: input.projectId,
+    });
+    if (!may) throw new PromptAuthorUnknownError(input.authorId);
   }
 
   syncAndAnnounce(input: PromptRestSyncInput): Promise<PromptSyncResult> {

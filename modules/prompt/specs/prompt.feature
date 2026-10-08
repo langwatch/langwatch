@@ -90,3 +90,28 @@ Feature: Prompt service
     Given the organization has a custom prompt tag
     When a caller renames it over the REST API
     Then the tag list shows the new name and no longer the old one
+
+  @unit
+  Scenario: a REST author who is not a user is refused
+    Given the body names an authorId that matches no user
+    When a prompt is created or updated over the REST API
+    Then the write is refused as prompt_author_unknown with status 422
+
+  @unit
+  Scenario: a REST author without the write permission is refused
+    Given the body names a user who lacks prompts:create or prompts:update on the project
+    When a prompt is created or updated over the REST API
+    Then the write is refused as prompt_author_unknown with status 422
+
+  @unit
+  Scenario: a REST author holding the write permission is accepted
+    Given the body names a user who holds the permission on the project
+    When a prompt is created or updated over the REST API
+    Then the prompt is written with that author
+
+  @unit
+  Scenario: a REST write with no authorId is unchanged
+    Given the body names no authorId
+    When a prompt is created or updated over the REST API
+    Then no author check runs and the prompt is written
+
