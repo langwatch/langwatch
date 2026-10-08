@@ -3,11 +3,12 @@ Feature: A retention scope write is authorised at the door, inside the organisat
   in. The door asks the permission the target needs before the handler runs: organization:manage
   on an organisation, team:manage on a team, project:update on a project, as on main. Data
   retention then asks only what depends on its own rows: that the target sits in that
-  organisation, through its fold of project facts (ruling LIN-1, Alex, 2026-10-08).
+  organisation, read from project's and organization's rows through their shares (ruling LIN-1,
+  Alex, 2026-10-08; R40).
 
   Background:
     Given an organisation "acme" with a team "platform" and a project "web-app" under that team
-    And data retention has folded "web-app" under "platform" in "acme"
+    And project's table places "web-app" under "platform", and organization's places "platform" in "acme"
 
   @unit
   Scenario: Each scope procedure declares the target's permission at the door
@@ -51,10 +52,10 @@ Feature: A retention scope write is authorised at the door, inside the organisat
     And no directory of teams or projects is read to find the organisation
 
   @unit
-  Scenario: A team with no project folded yet is refused as not found
-    Given a team "research" in "acme" with no project folded under it
+  Scenario: A team with no project yet takes a team-level rule
+    Given a team "research" in "acme" that holds no project
     When an administrator of "acme" sets a team-level retention for "research" naming "acme"
-    Then the request is refused as a scope target that was not found
+    Then the override is written, anchored to "acme"
 
   @integration
   Scenario: The settings page sends its organisation with every scope write

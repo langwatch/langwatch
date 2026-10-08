@@ -27,9 +27,10 @@ export class DataPrivacyPolicyCacheService {
     private readonly now: () => number = () => nowInstant().epochMilliseconds,
   ) {}
 
+  /** `facts` is read only on a miss: the ingest hot path reads placement once per window. */
   async resolve(input: {
     projectId: string;
-    facts: DataPrivacyScopeFacts;
+    facts: () => Promise<DataPrivacyScopeFacts>;
   }): Promise<ResolvedDataPrivacy> {
     const cached = this.entries.get(input.projectId);
     if (cached && cached.expiresAt > this.now()) {
@@ -37,12 +38,13 @@ export class DataPrivacyPolicyCacheService {
     }
 
     this.entries.delete(input.projectId);
+    const facts = await input.facts();
     const value = resolveDataPrivacy({
       rows: await this.repository.findForProjectChain({
-        organizationId: input.facts.organizationId,
-        scopes: buildDataPrivacyChain(input.facts),
+        organizationId: facts.organizationId,
+        scopes: buildDataPrivacyChain(facts),
       }),
-      facts: input.facts,
+      facts,
     });
     this.entries.set(input.projectId, { value, expiresAt: this.now() + this.ttlMs });
 

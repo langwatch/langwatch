@@ -1,17 +1,19 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { dataPrivacyTestPlacement } from "../../app/__tests__/data-privacy.fixture.ts";
+import type { DataPrivacyProjectScope } from "../../repositories/data-privacy-project-scope.repository.ts";
 import { MemoryDataPrivacyProjectScopeRepository } from "../../repositories/memory/memory.data-privacy-project-scope.repository.ts";
 import { MemoryDataPrivacyPolicyRepository } from "../../repositories/memory/memory.data-privacy.repository.ts";
 import { DataPrivacyProjectScopeService } from "../data-privacy-project-scope.service.ts";
 import { DataPrivacyResolutionService } from "../data-privacy-resolution.service.ts";
 
-/** Spec: modules/data-privacy/specs/data-privacy-resolution-seam.feature, the fold rule. */
+/** Spec: modules/data-privacy/specs/data-privacy-resolution-seam.feature, the placement rule. */
 
 const project = { projectId: "project-1", organizationId: "organization-1" } as const;
 
-function setup() {
+function setup(rows: readonly DataPrivacyProjectScope[] = []) {
   const scopes = DataPrivacyProjectScopeService.create({
-    repository: MemoryDataPrivacyProjectScopeRepository.create(),
+    repository: MemoryDataPrivacyProjectScopeRepository.create({ projects: rows }),
   });
 
   /** The scopes a fresh resolution reads its chain at, so no cache stands between cases. */
@@ -32,11 +34,9 @@ const ofType = (type: string) =>
   expect.arrayContaining([expect.objectContaining({ scopeType: type })]);
 
 describe("DataPrivacyProjectScopeService", () => {
-  /** @scenario "A new project's scope folds from project's created fact" */
-  it("resolves a created project through its organization and team, with no department", async () => {
-    const { scopes, chainOf } = setup();
-
-    await scopes.projectCreated({ ...project, teamId: "alpha", isPersonal: false, occurredAt: 10 });
+  /** @scenario "An existing project resolves its privacy policy on the first request after deploy" */
+  it("resolves a project project recorded no fact for through its row's organization and team", async () => {
+    const { scopes, chainOf } = setup([dataPrivacyTestPlacement({ teamId: "alpha" })]);
 
     await expect(scopes.getScopeFacts(project)).resolves.toEqual({
       ...project,
@@ -53,11 +53,8 @@ describe("DataPrivacyProjectScopeService", () => {
   });
 
   /** @scenario "A moved project resolves through its new team" */
-  it("resolves a moved project through the team the move named", async () => {
-    const { scopes, chainOf } = setup();
-    await scopes.projectCreated({ ...project, teamId: "alpha", isPersonal: false, occurredAt: 10 });
-
-    await scopes.projectMoved({ ...project, toTeamId: "beta", occurredAt: 20 });
+  it("resolves a moved project through the team its row names", async () => {
+    const { chainOf } = setup([dataPrivacyTestPlacement({ teamId: "beta" })]);
 
     const chain = await chainOf(project.projectId);
     expect(chain?.scopes).toEqual(
@@ -66,18 +63,10 @@ describe("DataPrivacyProjectScopeService", () => {
   });
 
   /** @scenario "A department assigned to a project reaches its resolved policy" */
-  it("resolves through the department the assignment named", async () => {
-    const { scopes, chainOf } = setup();
-    await scopes.projectCreated({ ...project, teamId: "alpha", isPersonal: false, occurredAt: 10 });
+  it("resolves through the department its row names", async () => {
+    const { scopes, chainOf } = setup([dataPrivacyTestPlacement({ departmentId: "risk" })]);
 
-    await scopes.departmentAssigned({
-      ...project,
-      departmentId: "risk",
-      teamId: "alpha",
-      isPersonal: false,
-      occurredAt: 20,
-    });
-
+    await expect(scopes.getScopeFacts(project)).resolves.toMatchObject({ departmentId: "risk" });
     const chain = await chainOf(project.projectId);
     expect(chain?.scopes).toEqual(
       expect.arrayContaining([
@@ -86,48 +75,18 @@ describe("DataPrivacyProjectScopeService", () => {
     );
   });
 
-  /** @scenario "A late or repeated project fact does not overwrite a newer one" */
-  it("keeps the move's team and the assignment's department when the older fact repeats", async () => {
-    const { scopes } = setup();
-    const assignment = {
-      ...project,
-      departmentId: "risk",
-      teamId: "alpha",
-      isPersonal: false,
-      occurredAt: 10,
-    };
-    await scopes.departmentAssigned(assignment);
-    await scopes.projectMoved({ ...project, toTeamId: "beta", occurredAt: 20 });
-    await scopes.projectCreated({ ...project, teamId: "alpha", isPersonal: false, occurredAt: 5 });
-
-    await scopes.departmentAssigned(assignment);
-
-    await expect(scopes.getScopeFacts(project)).resolves.toMatchObject({
-      teamId: "beta",
-      departmentId: "risk",
-    });
-  });
-
-  /** @scenario "A project whose scope has not folded yet is refused as not found" */
-  it("refuses an unfolded project, and one folded only from a created fact naming no team", async () => {
-    const { scopes } = setup();
-    await scopes.projectCreated({ projectId: "project-old", organizationId: "o", occurredAt: 1 });
+  /** @scenario "A project with no row is refused as not found" */
+  it("refuses a project project's table holds no row for", async () => {
+    const { scopes } = setup([dataPrivacyTestPlacement()]);
 
     await expect(scopes.getScopeFacts({ projectId: "project-new" })).rejects.toMatchObject({
-      code: "project_not_found",
-    });
-    await expect(scopes.getScopeFacts({ projectId: "project-old" })).rejects.toMatchObject({
       code: "project_not_found",
     });
   });
 
   /** @scenario "An archived project no longer resolves" */
-  it("refuses a project once it is archived, whatever arrives after", async () => {
-    const { scopes } = setup();
-    await scopes.projectCreated({ ...project, teamId: "alpha", isPersonal: false, occurredAt: 10 });
-
-    await scopes.projectArchived({ ...project, occurredAt: 20 });
-    await scopes.projectMoved({ ...project, toTeamId: "beta", occurredAt: 30 });
+  it("refuses a project whose row is archived", async () => {
+    const { scopes } = setup([dataPrivacyTestPlacement({ archived: true })]);
 
     await expect(scopes.getScopeFacts(project)).rejects.toMatchObject({
       code: "project_not_found",

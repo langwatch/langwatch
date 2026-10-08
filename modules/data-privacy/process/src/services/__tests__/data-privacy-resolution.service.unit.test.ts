@@ -10,8 +10,8 @@ import { DataPrivacyResolutionService } from "../data-privacy-resolution.service
 
 /**
  * Spec: modules/data-privacy/specs/data-privacy-resolution-seam.feature.
- * Resolving a project's policy asks no other module: data privacy's own project-scope fold
- * carries the organization, team and department the chain is built from.
+ * Resolving a project's policy asks no other module: data privacy's placement reader over
+ * project's and organization's rows carries the organization, team and department.
  */
 
 const ORGANIZATION_ID = dataPrivacyTestGraph.organizationId;
@@ -28,22 +28,23 @@ async function resolution(options: { drops?: boolean } = {}) {
   }
 
   const findForProjectChain = vi.spyOn(repository, "findForProjectChain");
+  const placements = createDataPrivacyTestScopes();
+  const findPlacement = vi.spyOn(placements, "find");
 
   return {
     findForProjectChain,
+    findPlacement,
     built: DataPrivacyResolutionService.create({
       repository,
-      scopes: DataPrivacyProjectScopeService.create({
-        repository: await createDataPrivacyTestScopes(),
-      }),
+      scopes: DataPrivacyProjectScopeService.create({ repository: placements }),
     }),
   };
 }
 
 describe("DataPrivacyResolutionService", () => {
-  describe("given a policy store and a folded scope for a project", () => {
+  describe("given a policy store and a project placed by its rows", () => {
     describe("when a project's policy is resolved", () => {
-      /** @scenario "The policy resolution composes from a database and its own project-scope fold" */
+      /** @scenario "The policy resolution composes from a database and its placement reader" */
       it("reads the chain from the project's own organization", async () => {
         const { built, findForProjectChain } = await resolution();
 
@@ -68,13 +69,14 @@ describe("DataPrivacyResolutionService", () => {
       });
 
       /** @scenario "A second resolution inside the window reuses the first" */
-      it("reads the policy rows once per project inside the cache window", async () => {
-        const { built, findForProjectChain } = await resolution();
+      it("reads the policy rows and the placement once per project inside the window", async () => {
+        const { built, findForProjectChain, findPlacement } = await resolution();
 
         await built.getResolvedForProject({ projectId: "project-1" });
         await built.getResolvedForProject({ projectId: "project-1" });
 
         expect(findForProjectChain).toHaveBeenCalledTimes(1);
+        expect(findPlacement).toHaveBeenCalledTimes(1);
       });
     });
   });

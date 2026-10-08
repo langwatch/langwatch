@@ -16,7 +16,7 @@ import { DataPrivacyService } from "../data-privacy.service.ts";
 const ORGANIZATION_ID = dataPrivacyTestGraph.organizationId;
 
 const scopes = DataPrivacyProjectScopeService.create({
-  repository: await createDataPrivacyTestScopes(),
+  repository: createDataPrivacyTestScopes(),
 });
 
 /** Authz's lineage check over the test graph: consistent only inside the scope's organization. */

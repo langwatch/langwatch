@@ -6,7 +6,7 @@ The server half of [data-privacy](../README.md). Data privacy: per-scope rules a
 
 ## Installation
 
-`defineProcessModule("data-privacy").withRepositories(dataPrivacyRepositories).withApi(DataPrivacyModule).withTransports(dataPrivacyTrpcTransport).withEventing(dataPrivacyProjectScopeEventing)`, `src/data-privacy.module.ts:8`.
+`defineProcessModule("data-privacy").withRepositories(dataPrivacyRepositories).withChannels(dataPrivacyChannels).withApi(DataPrivacyModule).withTransports(dataPrivacyTrpcTransport)`, `src/data-privacy.module.ts:8`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -144,22 +144,13 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ## Workers
 
-### Pipeline `data_privacy_project_scope` (aggregate `global`)
-
-Declared at `src/eventing/data-privacy-project-scope.pipeline.ts:37`.
-
-| Kind            | Name                                   | Handles                                                                  | Declared at                                              |
-| --------------- | -------------------------------------- | ------------------------------------------------------------------------ | -------------------------------------------------------- |
-| peer subscriber | `dataPrivacyProjectCreated`            | `lw.project.created` from [project](../../project/README.md)             | `src/eventing/data-privacy-project-scope.pipeline.ts:44` |
-| peer subscriber | `dataPrivacyProjectMoved`              | `lw.project.moved` from [project](../../project/README.md)               | `src/eventing/data-privacy-project-scope.pipeline.ts:56` |
-| peer subscriber | `dataPrivacyProjectDepartmentAssigned` | `lw.project.department_assigned` from [project](../../project/README.md) | `src/eventing/data-privacy-project-scope.pipeline.ts:62` |
-| peer subscriber | `dataPrivacyProjectArchived`           | `lw.project.archived` from [project](../../project/README.md)            | `src/eventing/data-privacy-project-scope.pipeline.ts:75` |
+None: data-privacy declares no pipeline, process manager, subscriber or task.
 
 ## Configuration
 
 | Kind   | Leaf                           | Environment variable                 | Declared at                                 |
 | ------ | ------------------------------ | ------------------------------------ | ------------------------------------------- |
-| secret | `googleApplicationCredentials` | `GOOGLE_APPLICATION_CREDENTIALS`     | `src/app/data-privacy.app.ts:107`           |
+| secret | `googleApplicationCredentials` | `GOOGLE_APPLICATION_CREDENTIALS`     | `src/app/data-privacy.app.ts:103`           |
 | config | `googleDlpDisabled`            | `LANGWATCH_DISABLE_GOOGLE_DLP`       | `../contract/src/data-privacy.config.ts:11` |
 | config | `enforcement`                  | `LANGWATCH_DATA_PRIVACY_ENFORCEMENT` | `../contract/src/data-privacy.config.ts:16` |
 | config | `nodeEnvironment`              | `NODE_ENV`                           | `../contract/src/data-privacy.config.ts:18` |

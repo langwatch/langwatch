@@ -146,9 +146,9 @@ describe("DataRetentionService", () => {
     });
   });
 
-  describe("given a project retention has not folded yet", () => {
-    /** @scenario "A project retention has not folded yet is refused, and the refusal is never cached" */
-    it("refuses it as not found, caches nothing, and resolves its rules once its fact folds", async () => {
+  describe("given a project with no row in project's table", () => {
+    /** @scenario "A project with no row is refused, and the refusal is never cached" */
+    it("refuses it as not found, caches nothing, and resolves its rules once its row exists", async () => {
       const cache = new RecordingCache();
       const projectScopes = MemoryDataRetentionProjectScopeRepository.create();
       const policies = MemoryDataRetentionRepository.create();
@@ -165,7 +165,7 @@ describe("DataRetentionService", () => {
       });
       expect(cache.values.size).toBe(0);
 
-      await projectScopes.store(retentionTestScopeRow(PROJECT));
+      projectScopes.putProject(retentionTestScopeRow(PROJECT));
       await expect(
         service.getRetentionDays({ projectId: PROJECT, category: "traces" }),
       ).resolves.toBe(63);
@@ -210,10 +210,10 @@ describe("DataRetentionService", () => {
 
   describe("when a scope names a team", () => {
     /** @scenario "Resolve scope ownership through canonical services" */
-    it("places the team in an organization only from the projects folded under it", async () => {
+    it("places the team in an organization from the team's own row", async () => {
       const service = createService();
       const team = { scopeType: "TEAM", scopeId: retentionTestGraph.teamId } as const;
-      const unknown = { scopeType: "TEAM", scopeId: "team-unfolded" } as const;
+      const unknown = { scopeType: "TEAM", scopeId: "team-without-row" } as const;
 
       await expect(
         service.assertScopeInOrganization({ organizationId: ORGANIZATION, scope: team }),
@@ -234,13 +234,13 @@ describe("DataRetentionService", () => {
     });
   });
 
-  describe("when a write names a project data retention has not folded", () => {
+  describe("when a write names a project with no row", () => {
     /** @scenario "Reject a missing write target" */
     it("refuses it as a missing scope target", async () => {
       await expect(
         createService().setForScope({
           organizationId: ORGANIZATION,
-          scope: { scopeType: "PROJECT", scopeId: "project-unfolded" },
+          scope: { scopeType: "PROJECT", scopeId: "project-without-row" },
           category: "traces",
           retentionDays: 63,
         }),
@@ -276,7 +276,7 @@ describe("DataRetentionService", () => {
     /** @scenario "An organization or team retention rule reaches the governance project" */
     it("invalidates the governance project for organization and team rules", async () => {
       const cache = new RecordingCache();
-      // Project records a governance project's facts like any other, so the fold holds it.
+      // The governance project has a Project row like any other, so the placement reader holds it.
       const projectScopes = createDataRetentionTestProjectScopes(retentionTestGraph, [
         "project-governance",
       ]);
@@ -296,6 +296,80 @@ describe("DataRetentionService", () => {
       });
 
       expect(cache.deleted).toEqual([PROJECT, "project-governance", PROJECT, "project-governance"]);
+    });
+  });
+});
+
+describe("given placement read from project's and organization's rows", () => {
+  const TEAM = retentionTestGraph.teamId;
+
+  async function rulesOn(
+    rules: readonly { scopeType: "ORGANIZATION" | "TEAM"; scopeId: string; days: number }[],
+  ) {
+    const policies = MemoryDataRetentionRepository.create();
+    for (const rule of rules) {
+      await policies.upsertForScope({
+        organizationId: ORGANIZATION,
+        scope: { scopeType: rule.scopeType, scopeId: rule.scopeId },
+        category: "traces",
+        retentionDays: rule.days,
+      });
+    }
+    return policies;
+  }
+
+  describe("when a project that existed before the deploy is first resolved", () => {
+    /** @scenario "An existing project resolves retention on the first request after deploy" */
+    it("resolves through the project, its team and organisation with nothing replayed", async () => {
+      const policies = await rulesOn([{ scopeType: "TEAM", scopeId: TEAM, days: 70 }]);
+      const service = createService({
+        policies,
+        projectScopes: MemoryDataRetentionProjectScopeRepository.create({
+          projects: [retentionTestScopeRow(PROJECT)],
+        }),
+      });
+
+      await expect(service.getResolvedForProject({ projectId: PROJECT })).resolves.toMatchObject({
+        traces: 70,
+      });
+    });
+  });
+
+  describe("when the project's row names the team it was moved to", () => {
+    /** @scenario "A moved project resolves under the team its row names now" */
+    it("applies the rule on the new team", async () => {
+      const moved = { ...retentionTestGraph, teamId: "team-moved-to" };
+      const policies = await rulesOn([
+        { scopeType: "TEAM", scopeId: TEAM, days: 70 },
+        { scopeType: "TEAM", scopeId: moved.teamId, days: 91 },
+      ]);
+      const projectScopes = MemoryDataRetentionProjectScopeRepository.create({
+        projects: [retentionTestScopeRow(PROJECT)],
+      });
+      projectScopes.putProject(retentionTestScopeRow(PROJECT, moved));
+
+      await expect(
+        createService({ policies, projectScopes }).getResolvedForProject({ projectId: PROJECT }),
+      ).resolves.toMatchObject({ traces: 91 });
+    });
+  });
+
+  describe("when a team holds no project yet", () => {
+    /** @scenario "A team is placed in its organisation by its own row" */
+    it("places the team by its own row and refuses it in another organisation", async () => {
+      const empty = { scopeType: "TEAM", scopeId: "team-empty" } as const;
+      const service = createService({
+        projectScopes: MemoryDataRetentionProjectScopeRepository.create({
+          teams: [{ teamId: empty.scopeId, organizationId: ORGANIZATION }],
+        }),
+      });
+
+      await expect(
+        service.assertScopeInOrganization({ organizationId: ORGANIZATION, scope: empty }),
+      ).resolves.toBeUndefined();
+      await expect(
+        service.assertScopeInOrganization({ organizationId: "organization-other", scope: empty }),
+      ).rejects.toMatchObject({ code: "data_retention_scope_target_not_found" });
     });
   });
 });

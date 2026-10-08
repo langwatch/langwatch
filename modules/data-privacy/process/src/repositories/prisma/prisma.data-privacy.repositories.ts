@@ -7,17 +7,17 @@ import { PrismaDataPrivacyPolicyRepository } from "./prisma.data-privacy.reposit
 
 const policyRepositories = prismaRepositories({
   policies: PrismaDataPrivacyPolicyRepository,
-  projectScopes: PrismaDataPrivacyProjectScopeRepository,
 });
 
 /**
- * The policy rows data-privacy owns, plus the directory it reads over the same Prisma store: the
- * directory claims no tables, as it did when the process built it (Alex, 2026-09-28).
+ * The policy rows data-privacy owns, plus the directory and project placement it reads over the
+ * same Prisma store: neither claims a table (Alex, 2026-09-28; placement through shares, R40).
  */
 export const PostgresDataPrivacyRepositories = {
   ...policyRepositories,
   create: (input: Parameters<typeof policyRepositories.create>[0]): DataPrivacyRepositories => ({
     ...policyRepositories.create(input),
     directory: PrismaDataPrivacyDirectoryRepository.create(input.prisma),
+    projectScopes: PrismaDataPrivacyProjectScopeRepository.create(input.prisma),
   }),
 };

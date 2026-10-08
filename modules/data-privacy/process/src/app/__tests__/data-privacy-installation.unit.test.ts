@@ -1,5 +1,5 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
-import { DataPrivacyApi, PLATFORM_DEFAULT_DATA_PRIVACY } from "@langwatch/data-privacy-contract";
+import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
@@ -8,15 +8,7 @@ import { describe, expect, it } from "vitest";
 
 import { DataPrivacyModule } from "../../app/data-privacy.app.ts";
 import { dataPrivacyProcessModule } from "../../data-privacy.module.ts";
-import {
-  dataPrivacyTestEventing,
-  projectFactOwner,
-} from "../../eventing/__tests__/data-privacy-project-scope.fixture.ts";
-import {
-  dataPrivacyTestGraph,
-  dataPrivacyTestSecrets,
-  foldDataPrivacyTestProject,
-} from "./data-privacy.fixture.ts";
+import { dataPrivacyTestGraph, dataPrivacyTestSecrets } from "./data-privacy.fixture.ts";
 
 const PROJECT_ID = dataPrivacyTestGraph.projectId;
 const ORGANIZATION_ID = dataPrivacyTestGraph.organizationId;
@@ -40,7 +32,7 @@ function process(role: "api" | "worker", googleCredentials?: string) {
 }
 
 describe("data privacy app installation", () => {
-  it("installs a working app in the api role, which refuses a project it has not folded", async () => {
+  it("installs a working app in the api role, which refuses a project with no row", async () => {
     const runtime = await process("api").boot();
 
     try {
@@ -58,26 +50,20 @@ describe("data privacy app installation", () => {
     }
   });
 
-  /** @scenario "Data privacy keeps no project peer" */
-  it("names no project peer and, in the worker role, resolves a project from its own fold", async () => {
-    const eventing = dataPrivacyTestEventing();
-    const append = projectFactOwner(eventing);
-    const runtime = await process("worker").withEventing(eventing).boot();
-    await runtime.start();
+  /** @scenario "Data privacy keeps no project peer and no project-scope fold" */
+  it("names no project peer and, in the worker role, hosts no project-scope pipeline", async () => {
+    const runtime = await process("worker").boot();
 
     try {
       const app = runtime.service(DataPrivacyApi);
+
       expect(Object.keys(DataPrivacyModule.dependencies)).not.toContain("projects");
-
-      await foldDataPrivacyTestProject({ append, app });
-
-      await expect(app.getResolvedForProject({ projectId: PROJECT_ID })).resolves.toEqual(
-        PLATFORM_DEFAULT_DATA_PRIVACY,
-      );
-      await expect(app.dropsAnyContent({ projectId: PROJECT_ID })).resolves.toBe(false);
+      expect(dataPrivacyProcessModule.eventing).toBeUndefined();
+      await expect(app.getResolvedForProject({ projectId: PROJECT_ID })).rejects.toMatchObject({
+        code: "project_not_found",
+      });
     } finally {
       await runtime.stop();
-      await eventing.close();
     }
   });
 

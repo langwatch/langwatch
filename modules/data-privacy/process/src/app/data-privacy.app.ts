@@ -23,10 +23,6 @@ import type { OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
 
 import type { DataPrivacyChannels } from "../channels/data-privacy.channels.ts";
 import { googleApplicationCredentials } from "../channels/google-dlp.channel.ts";
-import {
-  buildDataPrivacyProjectScopePipeline,
-  type DataPrivacyProjectScopePipeline,
-} from "../eventing/data-privacy-project-scope.pipeline.ts";
 import type { DataPrivacyRepositories } from "../repositories/data-privacy.repositories.ts";
 import { ContentDropPolicyService } from "../services/content-drop-policy.service.ts";
 import { DataPrivacyPermissionsService } from "../services/data-privacy-permissions.service.ts";
@@ -113,7 +109,6 @@ export class DataPrivacyModule implements DataPrivacyApi {
   #scopeAuthorization: DataPrivacyScopeAuthorizationService;
   #contentDrop: ContentDropPolicyService;
   #spanContentDrop: OtlpSpanContentDropService;
-  #projectScopes: DataPrivacyProjectScopeService;
   #googleCredentials: GoogleCredentialsUse;
 
   private constructor(services: {
@@ -123,7 +118,6 @@ export class DataPrivacyModule implements DataPrivacyApi {
     scopeAuthorization: DataPrivacyScopeAuthorizationService;
     contentDrop: ContentDropPolicyService;
     spanContentDrop: OtlpSpanContentDropService;
-    projectScopes: DataPrivacyProjectScopeService;
     googleCredentials: GoogleCredentialsUse;
   }) {
     this.#privacy = services.privacy;
@@ -132,7 +126,6 @@ export class DataPrivacyModule implements DataPrivacyApi {
     this.#scopeAuthorization = services.scopeAuthorization;
     this.#contentDrop = services.contentDrop;
     this.#spanContentDrop = services.spanContentDrop;
-    this.#projectScopes = services.projectScopes;
     this.#googleCredentials = services.googleCredentials;
   }
 
@@ -198,18 +191,12 @@ export class DataPrivacyModule implements DataPrivacyApi {
         dataPrivacy: privacy,
         nativePolicyEnforced: config.enforcement !== "off",
       }),
-      projectScopes,
       googleCredentials,
     });
   }
 
   intoGoogleApplicationCredentials<Out>(build: (credential: string | undefined) => Out): Out {
     return this.#googleCredentials(build);
-  }
-
-  /** The pipeline whose peer subscribers fold where each project sits. */
-  projectScopePipeline(): DataPrivacyProjectScopePipeline {
-    return buildDataPrivacyProjectScopePipeline({ scopes: this.#projectScopes });
   }
 
   getResolvedForProject(input: { projectId: string }): Promise<ResolvedDataPrivacy> {

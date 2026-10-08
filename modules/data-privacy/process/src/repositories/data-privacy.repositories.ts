@@ -4,7 +4,7 @@ import type { DataPrivacyPolicyRepository } from "./data-privacy.repository.ts";
 
 export interface DataPrivacyRepositories {
   readonly policies: DataPrivacyPolicyRepository;
-  /** Where each project sits, folded from project's lifecycle facts. */
+  /** Where each project sits, read through project's and organization's shares (R40). */
   readonly projectScopes: DataPrivacyProjectScopeRepository;
   /** Which organization owns a scope target, and what each scope is called. */
   readonly directory: DataPrivacyDirectoryReader;

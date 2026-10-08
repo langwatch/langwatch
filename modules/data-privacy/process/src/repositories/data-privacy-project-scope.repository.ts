@@ -1,27 +1,18 @@
-/** Where one project sits, as data privacy last folded project's facts. */
+/** Where one project sits, as project's row and its team's row place it. */
 export type DataPrivacyProjectScope = Readonly<{
   projectId: string;
   organizationId: string;
-  /** Null until a fact naming the team has folded (a created fact before 2026-10-06 names none). */
-  teamId: string | null;
-  isPersonal: boolean | null;
+  teamId: string;
+  isPersonal: boolean;
   departmentId: string | null;
   archived: boolean;
 }>;
 
-export type DataPrivacyProjectKey = Readonly<{ projectId: string; organizationId: string }>;
-
 /**
- * Data privacy's fold of project's lifecycle facts, one row per project (Alex, 2026-10-06). Each
- * column group keeps the newer of the stored and given fact, so a late or repeated fact is inert.
+ * Project placement read through project's `Project` and organization's `Team` shares (round 46
+ * E1, R40): no copy, so an existing project resolves on the first request after a deploy.
  */
 export abstract class DataPrivacyProjectScopeRepository {
+  /** Null when project's table holds no row for the id; an archived row is answered as archived. */
   abstract find(input: { projectId: string }): Promise<DataPrivacyProjectScope | null>;
-  abstract recordTeam(
-    input: DataPrivacyProjectKey & { teamId: string; isPersonal?: boolean; recordedAtMs: number },
-  ): Promise<void>;
-  abstract recordDepartment(
-    input: DataPrivacyProjectKey & { departmentId: string | null; recordedAtMs: number },
-  ): Promise<void>;
-  abstract recordArchived(input: DataPrivacyProjectKey & { archivedAtMs: number }): Promise<void>;
 }

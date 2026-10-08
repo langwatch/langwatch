@@ -8,7 +8,7 @@ type ScopeFacts = Pick<DataPrivacyProjectScopeService, "getScopeFacts">;
 
 /**
  * The policy a scope resolves to, and the two reads that support it. Three operations that
- * stand on the policy repository, its cache and data privacy's own project-scope fold.
+ * stand on the policy repository, its cache and data privacy's placement reader.
  */
 export class DataPrivacyResolutionService {
   private constructor(
@@ -32,10 +32,11 @@ export class DataPrivacyResolutionService {
     );
   }
 
-  async getResolvedForProject(input: { projectId: string }): Promise<ResolvedDataPrivacy> {
-    const facts = await this.scopes.getScopeFacts(input);
-
-    return this.cache.resolve({ projectId: input.projectId, facts });
+  getResolvedForProject(input: { projectId: string }): Promise<ResolvedDataPrivacy> {
+    return this.cache.resolve({
+      projectId: input.projectId,
+      facts: () => this.scopes.getScopeFacts(input),
+    });
   }
 
   listOrganizationRules(input: { organizationId: string }): Promise<DataPrivacyPolicy[]> {

@@ -1,12 +1,11 @@
-import type { DataPrivacyApi, ResolvedDataPrivacy } from "@langwatch/data-privacy-contract";
+import type { ResolvedDataPrivacy } from "@langwatch/data-privacy-contract";
 import type { ModuleSecretsScope } from "@langwatch/process";
-import { PROJECT_DEPARTMENT_ASSIGNED_EVENT_TYPE, type Team } from "@langwatch/project-contract";
+import type { Team } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
-import { vi } from "vitest";
 
 import { MemoryDataPrivacyChannels } from "../../channels/memory/memory.data-privacy.channels.ts";
-import type { ProjectFact } from "../../eventing/__tests__/data-privacy-project-scope.fixture.ts";
-import type { MemoryDataPrivacyDirectoryRepository } from "../../repositories/memory/memory.data-privacy-directory.repository.ts";
+import type { DataPrivacyProjectScope } from "../../repositories/data-privacy-project-scope.repository.ts";
+import { MemoryDataPrivacyDirectoryRepository } from "../../repositories/memory/memory.data-privacy-directory.repository.ts";
 import { MemoryDataPrivacyProjectScopeRepository } from "../../repositories/memory/memory.data-privacy-project-scope.repository.ts";
 import { MemoryDataPrivacyRepositories } from "../../repositories/memory/memory.data-privacy.repositories.ts";
 import type { DataPrivacyResolutionService } from "../../services/data-privacy-resolution.service.ts";
@@ -48,45 +47,24 @@ export function dataPrivacyTestTeam(): Team {
   };
 }
 
-/** Data privacy's own fold, holding the one test project as project's facts would leave it. */
-export async function createDataPrivacyTestScopes(): Promise<MemoryDataPrivacyProjectScopeRepository> {
-  const repository = MemoryDataPrivacyProjectScopeRepository.create();
-  await repository.recordTeam({
+/** The test project as project's and organization's rows place it; overrides move or archive it. */
+export function dataPrivacyTestPlacement(
+  overrides: Partial<DataPrivacyProjectScope> = {},
+): DataPrivacyProjectScope {
+  return {
     projectId: dataPrivacyTestGraph.projectId,
     organizationId: dataPrivacyTestGraph.organizationId,
     teamId: dataPrivacyTestGraph.teamId,
     isPersonal: false,
-    recordedAtMs: 1,
-  });
-  return repository;
+    departmentId: null,
+    archived: false,
+    ...overrides,
+  };
 }
 
-/** The test project as project records it, appended and waited on until data privacy folds it. */
-export async function foldDataPrivacyTestProject({
-  append,
-  app,
-}: {
-  append: (fact: ProjectFact, id: string) => Promise<unknown>;
-  app: Pick<DataPrivacyApi, "getResolvedForProject">;
-}): Promise<void> {
-  const { projectId, organizationId, teamId } = dataPrivacyTestGraph;
-  await append(
-    {
-      type: PROJECT_DEPARTMENT_ASSIGNED_EVENT_TYPE,
-      data: {
-        tenantId: projectId,
-        projectId,
-        organizationId,
-        occurredAt: 10,
-        departmentId: null,
-        teamId,
-        isPersonal: false,
-        backfilled: true,
-      },
-    },
-    "event-department-assigned",
-  );
-  await vi.waitFor(() => app.getResolvedForProject({ projectId }));
+/** Data privacy's placement reader, holding the one test project. */
+export function createDataPrivacyTestScopes(): MemoryDataPrivacyProjectScopeRepository {
+  return MemoryDataPrivacyProjectScopeRepository.create({ projects: [dataPrivacyTestPlacement()] });
 }
 
 /** `createApp` composes no secrets chain, so the module's one secret is answered here. */
@@ -98,15 +76,17 @@ export function dataPrivacyTestSecrets({
 
 /** The app built directly over memory repositories, for a case that seeds the directory. */
 export async function createDataPrivacyTestApp({
-  directory,
+  directory = MemoryDataPrivacyDirectoryRepository.create(),
   dependencies,
+  enforcement,
 }: {
-  directory: MemoryDataPrivacyDirectoryRepository;
+  directory?: MemoryDataPrivacyDirectoryRepository;
   dependencies: Parameters<typeof DataPrivacyModule.create>[0]["dependencies"];
+  enforcement?: string;
 }): Promise<DataPrivacyModule> {
   const config = {
     googleDlpDisabled: undefined,
-    enforcement: undefined,
+    enforcement,
     nodeEnvironment: undefined,
     langevalsEndpoint: undefined,
   };
@@ -114,7 +94,7 @@ export async function createDataPrivacyTestApp({
     repositories: {
       ...MemoryDataPrivacyRepositories.create(),
       directory,
-      projectScopes: await createDataPrivacyTestScopes(),
+      projectScopes: createDataPrivacyTestScopes(),
     },
     channels: MemoryDataPrivacyChannels.create({ config }),
     dependencies,

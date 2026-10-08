@@ -7,7 +7,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi, UserProfile } from "@langwatch/user-contract";
 import { vi } from "vitest";
 
-import type { DataRetentionProjectScopeState } from "../../repositories/data-retention-project-scope.repository.ts";
+import type { DataRetentionProjectPlacement } from "../../repositories/data-retention-project-scope.repository.ts";
 import type { DataRetentionRepositories } from "../../repositories/data-retention.repositories.ts";
 import { MemoryDataRetentionProjectScopeRepository } from "../../repositories/memory/memory.data-retention-project-scope.repository.ts";
 import { MemoryDataRetentionRepositories } from "../../repositories/memory/memory.data-retention.repositories.ts";
@@ -90,7 +90,7 @@ export class MemoryRetentionDirectory implements DataRetentionDirectoryReader {
 const epoch = new Date(0);
 
 /**
- * Retention's project fold, seeded as project's facts leave it. `siblingProjectIds` are the other
+ * Project and team rows retention reads through its shares. `siblingProjectIds` are the other
  * projects the organization's team holds, which a cache invalidation on a wider scope has to reach.
  */
 export function createDataRetentionTestProjectScopes(
@@ -98,25 +98,18 @@ export function createDataRetentionTestProjectScopes(
   siblingProjectIds: readonly string[] = [],
 ): MemoryDataRetentionProjectScopeRepository {
   return MemoryDataRetentionProjectScopeRepository.create({
-    rows: [graph.projectId, ...siblingProjectIds].map((projectId) =>
+    projects: [graph.projectId, ...siblingProjectIds].map((projectId) =>
       retentionTestScopeRow(projectId, graph),
     ),
   });
 }
 
-/** One project's fold row, as project's facts leave it under the graph's team. */
+/** One project's placement, as its row sits under the graph's team. */
 export function retentionTestScopeRow(
   projectId: string,
   graph: RetentionTestDirectoryGraph = retentionTestGraph,
-): DataRetentionProjectScopeState {
-  return {
-    projectId,
-    organizationId: graph.organizationId ?? "",
-    teamId: graph.teamId,
-    teamRecordedAt: 1,
-    archivedAt: null,
-    LastEventOccurredAt: 1,
-  };
+): DataRetentionProjectPlacement {
+  return { projectId, organizationId: graph.organizationId ?? "", teamId: graph.teamId };
 }
 
 /** Every permission answers `permitted`, so a gate test states one thing. */

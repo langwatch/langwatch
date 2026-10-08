@@ -1,34 +1,43 @@
-Feature: Data retention folds where each project sits from project's facts
-  Data retention keeps its own copy of each project's organization and team, folded from
-  project's lifecycle facts (Alex, 2026-10-06, Q151 Q1), so resolving a project's retention
-  asks project nothing. Existing projects arrive by a projection replay at deploy.
+Feature: Data retention reads where each project sits from project's and organization's rows
+  Data retention reads a project's team from project's `Project` table and a team's organisation
+  from organization's `Team` table, through Postgres shares the owners declare (R40, round 46 E1).
+  It keeps no copy, so a project that existed before a deploy resolves on the first request after
+  it, with no fact, fold or replay to wait for (plan rows R02 and DATA-PROJECT-SCOPE).
 
   @unit
-  Scenario: A moved project sits under its new team, and a late older fact is inert
-    Given project recorded a project created in one team and then moved to another
-    When data retention folds those facts, and then receives them again out of order
-    Then the project sits under the team it was moved to
-    And the repeated facts change nothing
+  Scenario: An existing project resolves retention on the first request after deploy
+    Given project's table places a project under a team of an organisation, and project recorded no fact for it
+    When data retention resolves that project's retention
+    Then it resolves through the project, its team and that organisation
 
   @unit
-  Scenario: A project whose facts name no team yet folds its organization only
-    Given project recorded the project's creation before creation facts named a team
-    When data retention folds that fact
-    Then it holds the project's organization and no team
-    And the project's department fact later names the team
+  Scenario: A moved project resolves under the team its row names now
+    Given a project whose row names a team it was moved to
+    When data retention resolves that project's retention
+    Then the rule set on the new team applies
 
   @unit
   Scenario: An archived project keeps its place, so its stored data still expires
-    Given project recorded a project created in a team and then archived
-    When data retention folds those facts
-    Then it records when the project was archived and keeps its team and organization
+    Given a project whose row is archived
+    When data retention resolves that project's retention
+    Then it still resolves under its team and organisation
 
   @unit
-  Scenario: The worker collects retention's project scope replay step and it fills an empty fold once
-    Given a worker installs data retention over an empty project fold
-    And project's lifecycle log holds a project created in one team and moved to another
-    When the worker collects its migration steps
-    Then it collects "data-retention:replay-project-scope" as a background data step
-    And before it runs the project is refused as not found
-    And running it lets the project resolve under the rule set on its new team
-    And a second run from the first run's cursor replays nothing
+  Scenario: A team is placed in its organisation by its own row
+    Given a team of an organisation that holds no project yet
+    When data retention asks which organisation the team sits in
+    Then the team's row answers, so a team-level rule can be written before its first project
+
+  @unit
+  Scenario: Data retention installs no project-scope fold and no replay step
+    Given a worker that installs data retention
+    When it boots and collects its migration steps
+    Then no data retention project-scope pipeline runs
+    And "data-retention:replay-project-scope" is not among the steps
+
+  @unit
+  Scenario: The memory and Postgres placement readers answer alike
+    Given an organisation with a team holding a live and an archived project, and a second team with none
+    When each placement reader is asked for those projects, that team and the organisation's projects
+    Then both answer the same placements, archived projects included
+    And neither knows a project or team that has no row

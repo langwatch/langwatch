@@ -19,27 +19,20 @@ import {
   type UnpinTraceInput,
   unpinTraceInputSchema,
 } from "@langwatch/data-retention-contract";
-import type { FoldStateRead } from "@langwatch/eventing";
 import { ProjectNotFoundError } from "@langwatch/project-contract";
 
 import type { DataRetentionCacheRepository } from "../repositories/data-retention-cache.repository.ts";
-import type { DataRetentionProjectScopeState } from "../repositories/data-retention-project-scope.repository.ts";
+import type { DataRetentionProjectScopeRepository } from "../repositories/data-retention-project-scope.repository.ts";
 import type { DataRetentionRepository } from "../repositories/data-retention.repository.ts";
 import type { PinnedTraceRepository } from "../repositories/pinned-trace.repository.ts";
 import type { RetroactiveRetentionRepository } from "../repositories/retroactive-retention.repository.ts";
 import type { StorageMeterService } from "./storage-meter.service.ts";
 
-/** The read side of the project-scope fold: this service never writes it. */
-type ProjectScopeReader = {
-  get(aggregateId: string): Promise<FoldStateRead<DataRetentionProjectScopeState>>;
-  findProjectIds(input: { organizationId: string; teamId?: string }): Promise<string[]>;
-};
-
 type DataRetentionServiceOptions = Readonly<{
   policies: DataRetentionRepository;
   pins: PinnedTraceRepository;
-  /** Where each project sits, folded from project's facts: no project peer (Q151 Q1). */
-  projectScopes: ProjectScopeReader;
+  /** Where each project sits, read through project's and organization's shares (R40). */
+  projectScopes: DataRetentionProjectScopeRepository;
   defaultRetentionDays: number;
   /**
    * The rewrite path. Not nullable: a deployment with no ClickHouse refuses at
@@ -72,7 +65,7 @@ export class DataRetentionService {
       return cached.value;
     }
 
-    // A project not folded yet is refused, never cached: the job retries until its fact lands.
+    // A project with no row is refused, never cached: the job retries until the row exists.
     const context = await this.findProjectContext(input.projectId);
     if (!context) throw new ProjectNotFoundError();
     const chain = resolveScopeChain(context);
@@ -98,7 +91,7 @@ export class DataRetentionService {
     return retention[input.category];
   }
 
-  /** Refuses a target that does not sit in `organizationId`, as folded from project's facts. */
+  /** Refuses a target that does not sit in `organizationId`, as its row places it. */
   async assertScopeInOrganization(input: {
     organizationId: string;
     scope: ScopeAssignment;
@@ -251,7 +244,7 @@ export class DataRetentionService {
     await Promise.all(projectIds.map((projectId) => this.options.cache.delete(projectId)));
   }
 
-  /** The target's chain inside `organizationId`, or null when the fold puts it elsewhere. */
+  /** The target's chain inside `organizationId`, or null when its row puts it elsewhere. */
   private async findScopeChain({
     organizationId,
     scope,
@@ -265,12 +258,11 @@ export class DataRetentionService {
     }
 
     if (scope.scopeType === "TEAM") {
-      const projectIds = await this.options.projectScopes.findProjectIds({
-        organizationId,
+      const teamOrganizationId = await this.options.projectScopes.findTeamOrganizationId({
         teamId: scope.scopeId,
       });
 
-      return projectIds.length > 0 ? [scope, organization] : null;
+      return teamOrganizationId === organizationId ? [scope, organization] : null;
     }
 
     const context = await this.findProjectContext(scope.scopeId);
@@ -281,18 +273,13 @@ export class DataRetentionService {
     return resolveScopeChain(context);
   }
 
-  /** The project's chain as folded; null until a fact naming its team has folded. */
-  private async findProjectContext(projectId: string): Promise<{
+  /** The project's chain as its row places it, archived included; null when it has no row. */
+  private findProjectContext(projectId: string): Promise<{
     organizationId: string;
     teamId: string;
     projectId: string;
   } | null> {
-    const scope = await this.options.projectScopes.get(projectId);
-    if (scope.kind === "empty" || scope.state.teamId === null) {
-      return null;
-    }
-
-    return { organizationId: scope.state.organizationId, teamId: scope.state.teamId, projectId };
+    return this.options.projectScopes.findProjectPlacement({ projectId });
   }
 
   private async findAffectedProjectIds({

@@ -38,7 +38,11 @@ function retentionApp(entitlement?: EntitlementApi): DataRetentionModule {
       ...MemoryDataRetentionRepositories.create(),
       directory: MemoryRetentionDirectory.create(),
       projectScopes: MemoryDataRetentionProjectScopeRepository.create({
-        rows: [retentionTestScopeRow(WEB_APP), retentionTestScopeRow("project-billing", GLOBEX)],
+        projects: [
+          retentionTestScopeRow(WEB_APP),
+          retentionTestScopeRow("project-billing", GLOBEX),
+        ],
+        teams: [{ teamId: "team-research", organizationId: ACME }],
       }),
     },
     ...(entitlement ? { dependencies: { entitlement } } : {}),
@@ -208,14 +212,20 @@ describe("given an administrator of acme naming acme", () => {
     });
   });
 
-  describe("when the team has no project folded under it", () => {
-    /** @scenario "A team with no project folded yet is refused as not found" */
-    it("is refused as not found", async () => {
-      const failure = await door()
-        .call.setForScope(write({ scopeType: "TEAM", scopeId: "team-research" }))
-        .catch((error: unknown) => error);
+  describe("when the team holds no project yet", () => {
+    /** @scenario "A team with no project yet takes a team-level rule" */
+    it("writes the override, anchored to acme, from the team's own row", async () => {
+      const { call, app } = door();
 
-      expect(codeOf(failure)).toBe("data_retention_scope_target_not_found");
+      await call.setForScope(write({ scopeType: "TEAM", scopeId: "team-research" }));
+
+      await expect(app.listOrganizationRules({ organizationId: ACME })).resolves.toEqual([
+        expect.objectContaining({
+          scopeType: "TEAM",
+          scopeId: "team-research",
+          organizationId: ACME,
+        }),
+      ]);
     });
   });
 
@@ -232,7 +242,7 @@ describe("given an administrator of acme naming acme", () => {
             },
           }),
           projectScopes: MemoryDataRetentionProjectScopeRepository.create({
-            rows: [retentionTestScopeRow(WEB_APP)],
+            projects: [retentionTestScopeRow(WEB_APP)],
           }),
         },
         dependencies: {

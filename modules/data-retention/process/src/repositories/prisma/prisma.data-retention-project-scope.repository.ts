@@ -1,59 +1,44 @@
-import type { FoldStateRead } from "@langwatch/eventing";
-import { PrismaRepository } from "@langwatch/prisma-client";
-import { Temporal, toDate } from "@langwatch/time";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type {
+  DataRetentionProjectPlacement,
   DataRetentionProjectScopeRepository,
-  DataRetentionProjectScopeState,
 } from "../data-retention-project-scope.repository.ts";
 
-function instant(epochMs: number): Date {
-  return toDate(Temporal.Instant.fromEpochMilliseconds(epochMs));
-}
+/** Only the shared delegates this reader touches; it claims neither table (R40). */
+type DataRetentionProjectScopeDatabase = Pick<PrismaClient, "project" | "team">;
 
-/**
- * Data retention's fold of where each project sits, over Postgres (`DataRetentionProjectScope`).
- * `updatedAt` holds the newest fact's business time, so a replayed row equals the row it rebuilds.
- */
-export class PrismaDataRetentionProjectScopeRepository
-  extends PrismaRepository.for("DataRetentionProjectScope")
-  implements DataRetentionProjectScopeRepository
-{
-  static readonly create = this.factory(
-    (prisma) => new PrismaDataRetentionProjectScopeRepository(prisma),
-  );
-
-  async get(aggregateId: string): Promise<FoldStateRead<DataRetentionProjectScopeState>> {
-    const row = await this.prisma.dataRetentionProjectScope.findUnique({
-      where: { projectId: aggregateId },
-    });
-    if (!row) return { kind: "empty" };
-    return {
-      kind: "folded",
-      state: {
-        projectId: row.projectId,
-        organizationId: row.organizationId,
-        teamId: row.teamId,
-        teamRecordedAt: row.teamRecordedAt?.getTime() ?? null,
-        archivedAt: row.archivedAt?.getTime() ?? null,
-        LastEventOccurredAt: row.updatedAt.getTime(),
-      },
-    };
+/** Project's `Project` rows and organization's `Team` rows, through their shares. */
+export class PrismaDataRetentionProjectScopeRepository implements DataRetentionProjectScopeRepository {
+  static create(
+    prisma: DataRetentionProjectScopeDatabase,
+  ): PrismaDataRetentionProjectScopeRepository {
+    return new PrismaDataRetentionProjectScopeRepository(prisma);
   }
 
-  async store(state: DataRetentionProjectScopeState): Promise<void> {
-    const columns = {
-      organizationId: state.organizationId,
-      teamId: state.teamId,
-      teamRecordedAt: state.teamRecordedAt === null ? null : instant(state.teamRecordedAt),
-      archivedAt: state.archivedAt === null ? null : instant(state.archivedAt),
-      updatedAt: instant(state.LastEventOccurredAt),
-    };
-    await this.prisma.dataRetentionProjectScope.upsert({
-      where: { projectId: state.projectId },
-      create: { projectId: state.projectId, ...columns },
-      update: columns,
+  private constructor(private readonly prisma: DataRetentionProjectScopeDatabase) {}
+
+  async findProjectPlacement({
+    projectId,
+  }: {
+    projectId: string;
+  }): Promise<DataRetentionProjectPlacement | null> {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { teamId: true, team: { select: { organizationId: true } } },
     });
+    if (!project?.team) return null;
+
+    return { projectId, organizationId: project.team.organizationId, teamId: project.teamId };
+  }
+
+  async findTeamOrganizationId({ teamId }: { teamId: string }): Promise<string | null> {
+    const team = await this.prisma.team.findUnique({
+      where: { id: teamId },
+      select: { organizationId: true },
+    });
+
+    return team?.organizationId ?? null;
   }
 
   async findProjectIds({
@@ -63,10 +48,11 @@ export class PrismaDataRetentionProjectScopeRepository
     organizationId: string;
     teamId?: string;
   }): Promise<string[]> {
-    const rows = await this.prisma.dataRetentionProjectScope.findMany({
-      where: { organizationId, ...(teamId === undefined ? {} : { teamId }) },
-      select: { projectId: true },
+    const projects = await this.prisma.project.findMany({
+      where: { team: { organizationId }, ...(teamId === undefined ? {} : { teamId }) },
+      select: { id: true },
     });
-    return rows.map((row) => row.projectId);
+
+    return projects.map((project) => project.id);
   }
 }

@@ -6,7 +6,7 @@ The server half of [data-retention](../README.md). Data retention: the retention
 
 ## Installation
 
-`defineProcessModule("data-retention").withRepositories(dataRetentionRepositories).withApi(DataRetentionModule).withTransports(dataRetentionTrpcTransport).withEventing(dataRetentionProjectScopeEventing).withEventing(dataRetentionSeatPolicyEventing).withMigrations(…)`, `src/data-retention.module.ts:14`.
+`defineProcessModule("data-retention").withRepositories(dataRetentionRepositories).withApi(DataRetentionModule).withTransports(dataRetentionTrpcTransport).withEventing(dataRetentionSeatPolicyEventing)`, `src/data-retention.module.ts:16`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -47,7 +47,7 @@ listOrganizationRules(input: { organizationId: string }): Promise<RetentionPolic
 The system write, for a plan change that resets an organization's window.
 
 ```typescript
-setForScope(input: { scope: ScopeAssignment; category: RetentionCategory; retentionDays: number; }): Promise<RetentionPolicy>;
+setForScope(input: { organizationId: string; scope: ScopeAssignment; category: RetentionCategory; retentionDays: number; }): Promise<RetentionPolicy>;
 ```
 
 #### `pin`
@@ -118,7 +118,7 @@ getTotalStorageBytesForTenants(input: StorageMeterTenantsInput): Promise<number>
 
 #### `getPolicySnapshot`
 
-The retention settings surface. Each operation authorizes and plan-gates the caller against the scope it acts on, never against a project id the input also carries: the two can belong to different organizations.
+The retention settings surface. The door authorises each scope write on its target; these refuse a target outside `organizationId` and plan-gate on it.
 
 ```typescript
 getPolicySnapshot(input: { projectId: string } & RetentionCallerInput): Promise<RetentionPolicySnapshot>;
@@ -133,19 +133,19 @@ getScopeStorageUsage(input: { projectId: string; scope: ScopeAssignment } & Rete
 #### `previewScopeRemoval`
 
 ```typescript
-previewScopeRemoval(input: { scope: ScopeAssignment } & RetentionCallerInput): Promise<ResolvedRetention>;
+previewScopeRemoval(input: { organizationId: string; scope: ScopeAssignment } & RetentionCallerInput): Promise<ResolvedRetention>;
 ```
 
 #### `changeScopeRetention`
 
 ```typescript
-changeScopeRetention(input: { scope: ScopeAssignment; category: RetentionCategory; retentionDays: number; } & RetentionCallerInput): Promise<RetentionPolicy>;
+changeScopeRetention(input: { organizationId: string; scope: ScopeAssignment; category: RetentionCategory; retentionDays: number; } & RetentionCallerInput): Promise<RetentionPolicy>;
 ```
 
 #### `removeForScope`
 
 ```typescript
-removeForScope(input: { scope: ScopeAssignment; category: RetentionCategory } & RetentionCallerInput): Promise<void>;
+removeForScope(input: { organizationId: string; scope: ScopeAssignment; category: RetentionCategory; } & RetentionCallerInput): Promise<void>;
 ```
 
 #### `applyRetentionToExistingData`
@@ -170,32 +170,24 @@ None: this module declares no REST family.
 
 ### `dataRetention`
 
-Contract `../contract/src/data-retention.trpc.ts:45`, router `src/transport/data-retention.trpc.ts:35`.
+Contract `../contract/src/data-retention.trpc.ts:51`, router `src/transport/data-retention.trpc.ts:28`.
 
-| Procedure                                | Kind     | Gate                                                                                                                                                                                                          | Input                                    | Output                                   |
-| ---------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- | ---------------------------------------- |
-| `dataRetention.getRules`                 | query    | Permission `project:view`                                                                                                                                                                                     | `retentionProjectScopeSchema`            | `retentionPolicySnapshotSchema`          |
-| `dataRetention.setForScope`              | mutation | Service-authorized: SCOPE_TARGETED_PERMISSIONS; The authorized target is the organization, team or project named by `scope`, which the app resolves — the `projectId` this input also carries is not acted on | inline                                   | `retentionPolicySchema`                  |
-| `dataRetention.previewScopeRemoval`      | query    | Service-authorized: SCOPE_TARGETED_PERMISSIONS; The authorized target is the organization, team or project named by `scope`, which the app resolves — the `projectId` this input also carries is not acted on | `retentionScopeTargetInputSchema`        | `resolvedRetentionSchema`                |
-| `dataRetention.removeForScope`           | mutation | Service-authorized: SCOPE_TARGETED_PERMISSIONS; The authorized target is the organization, team or project named by `scope`, which the app resolves — the `projectId` this input also carries is not acted on | inline                                   | –                                        |
-| `dataRetention.triggerRetroactiveUpdate` | mutation | Permission `project:update`                                                                                                                                                                                   | `retentionTriggerRetroactiveInputSchema` | `retroactiveRetentionUpdateResultSchema` |
-| `dataRetention.getMutationProgress`      | query    | Permission `traces:view`                                                                                                                                                                                      | `retroactiveMutationProjectInputSchema`  | inline                                   |
-| `dataRetention.killMutation`             | mutation | Permission `project:update`                                                                                                                                                                                   | `killRetroactiveMutationInputSchema`     | –                                        |
-| `dataRetention.getScopeStorageUsage`     | query    | Permission `traces:view`                                                                                                                                                                                      | `retentionScopeTargetInputSchema`        | `retentionStorageUsageSchema`            |
+| Procedure                                | Kind     | Gate                        | Input                                    | Output                                   |
+| ---------------------------------------- | -------- | --------------------------- | ---------------------------------------- | ---------------------------------------- |
+| `dataRetention.getRules`                 | query    | Permission `project:view`   | `retentionProjectScopeSchema`            | `retentionPolicySnapshotSchema`          |
+| `dataRetention.setForScope`              | mutation | Gate ≈ `WRITE_ON_SCOPE`     | inline                                   | `retentionPolicySchema`                  |
+| `dataRetention.previewScopeRemoval`      | query    | Gate ≈ `WRITE_ON_SCOPE`     | `retentionScopeWriteInputSchema`         | `resolvedRetentionSchema`                |
+| `dataRetention.removeForScope`           | mutation | Gate ≈ `WRITE_ON_SCOPE`     | inline                                   | –                                        |
+| `dataRetention.triggerRetroactiveUpdate` | mutation | Permission `project:update` | `retentionTriggerRetroactiveInputSchema` | `retroactiveRetentionUpdateResultSchema` |
+| `dataRetention.getMutationProgress`      | query    | Permission `traces:view`    | `retroactiveMutationProjectInputSchema`  | inline                                   |
+| `dataRetention.killMutation`             | mutation | Permission `project:update` | `killRetroactiveMutationInputSchema`     | –                                        |
+| `dataRetention.getScopeStorageUsage`     | query    | Permission `traces:view`    | `retentionScopeTargetInputSchema`        | `retentionStorageUsageSchema`            |
 
 ## Sockets
 
 None: this module declares no websocket, rawsocket or rawhttp door.
 
 ## Workers
-
-### Pipeline `data_retention_project_scope` (aggregate `data_retention_project_scope`)
-
-Declared at `src/eventing/data-retention-project-scope.pipeline.ts:17`.
-
-| Kind                 | Name                                         | Handles | Declared at                                                |
-| -------------------- | -------------------------------------------- | ------- | ---------------------------------------------------------- |
-| peer fold projection | `≈ dataRetentionProjectScopePeerFold(store)` | –       | `src/eventing/data-retention-project-scope.pipeline.ts:22` |
 
 ### Pipeline `data_retention_seat_policy` (aggregate `global`)
 

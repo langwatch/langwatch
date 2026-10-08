@@ -12,7 +12,7 @@ export interface DataRetentionRepositories {
   readonly pins: PinnedTraceRepository;
   /** Which organization owns a scope, what it is called, what it resolves to. */
   readonly directory: DataRetentionDirectoryReader;
-  /** Where each project sits, folded from project's lifecycle facts. */
+  /** Where each project sits, read through project's and organization's shares (R40). */
   readonly projectScopes: DataRetentionProjectScopeRepository;
   /** The rewrite of rows already captured, when a retention change applies to them. */
   readonly retroactive: RetroactiveRetentionRepository;

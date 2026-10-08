@@ -376,8 +376,23 @@ describe("Prisma table ownership lint", () => {
     expect(SHARED_PRISMA_TABLES.filter((item) => item.reason.trim() === "")).toEqual([]);
     expect(writes.filter((item) => item.reason.trim() === "")).toEqual([]);
     expect(SHARED_PRISMA_TABLES.map((item) => [item.table, item.owner, item.readers])).toEqual([
-      ["Project", "project", ["entitlement", "billing", "instant-eval-judge", "nurturing"]],
-      ["Team", "organization", ["instant-eval-judge", "nurturing"]],
+      [
+        "Project",
+        "project",
+        [
+          "entitlement",
+          "billing",
+          "data-retention",
+          "data-privacy",
+          "instant-eval-judge",
+          "nurturing",
+        ],
+      ],
+      [
+        "Team",
+        "organization",
+        ["data-retention", "data-privacy", "instant-eval-judge", "nurturing"],
+      ],
       ["OrganizationUser", "organization", ["authz"]],
       ["Organization", "organization", ["scim", "entitlement"]],
       ["Topic", "topic", ["trace"]],

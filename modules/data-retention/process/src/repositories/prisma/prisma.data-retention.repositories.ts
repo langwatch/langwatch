@@ -9,12 +9,11 @@ import { PrismaPinnedTraceRepository } from "./prisma.pinned-trace.repository.ts
 const ownedRepositories = prismaRepositories({
   policies: PrismaDataRetentionRepository,
   pins: PrismaPinnedTraceRepository,
-  projectScopes: PrismaDataRetentionProjectScopeRepository,
 });
 
 /**
- * The rows data-retention owns, plus the directory it reads over the same Prisma store: the
- * directory claims no tables, as data-privacy's does (record §6, Alex 2026-09-28).
+ * The rows data-retention owns, plus the directory and project placement it reads over the same
+ * Prisma store: neither claims a table (record §6, Alex 2026-09-28; placement through shares, R40).
  */
 export const PostgresDataRetentionRepositories = {
   ...ownedRepositories,
@@ -23,5 +22,6 @@ export const PostgresDataRetentionRepositories = {
   ): Pick<DataRetentionRepositories, "policies" | "pins" | "projectScopes" | "directory"> => ({
     ...ownedRepositories.create(input),
     directory: PrismaDataRetentionDirectoryRepository.create(input.prisma),
+    projectScopes: PrismaDataRetentionProjectScopeRepository.create(input.prisma),
   }),
 };

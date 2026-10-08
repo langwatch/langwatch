@@ -7,6 +7,7 @@ import {
 } from "@langwatch/data-retention-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
+import { isMigrationStep } from "@langwatch/upgrade/step";
 import { describe, expect, it } from "vitest";
 
 import { dataRetentionProcessModule } from "../../data-retention.module.ts";
@@ -47,7 +48,7 @@ describe("data retention app installation", () => {
 
       expect(runtime.module(dataRetentionProcessModule).provided).toBe(app);
 
-      // The installed fold starts empty: a project it has not folded is refused, never defaulted.
+      // The memory placement reader starts empty: a project with no row is refused, not defaulted.
       await expect(
         app.getResolvedForProject({ projectId: retentionTestGraph.projectId }),
       ).rejects.toMatchObject({ code: "project_not_found" });
@@ -57,13 +58,34 @@ describe("data retention app installation", () => {
         [],
       );
 
-      // The settings page's read resolves through the same fold, so it refuses the same way.
+      // The settings page's read resolves through the same reader, so it refuses the same way.
       await expect(
         app.getPolicySnapshot({ projectId: retentionTestGraph.projectId, userId: "user-1" }),
       ).rejects.toMatchObject({ code: "project_not_found" });
     } finally {
       await runtime.stop();
     }
+  });
+
+  describe("when a worker installs data retention", () => {
+    /** @scenario "Data retention installs no project-scope fold and no replay step" */
+    it("hosts no project-scope pipeline and collects no project-scope replay step", async () => {
+      const runtime = await process("worker").boot();
+
+      try {
+        const steps = runtime.migrationSteps(isMigrationStep).map(({ id }) => id);
+
+        expect(steps).not.toContain("data-retention:replay-project-scope");
+        expect(dataRetentionProcessModule.eventing?.pipeline).toContain(
+          "data_retention_seat_policy",
+        );
+        expect(dataRetentionProcessModule.eventing?.pipeline).not.toContain(
+          "data_retention_project_scope",
+        );
+      } finally {
+        await runtime.stop();
+      }
+    });
   });
 
   describe("when boot validates a platform default named in its configuration", () => {

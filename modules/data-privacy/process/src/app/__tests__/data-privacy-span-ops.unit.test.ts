@@ -1,22 +1,11 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
-import { DataPrivacyApi, PRIVACY_DROPPED_MARKER_ATTR } from "@langwatch/data-privacy-contract";
+import { type DataPrivacyApi, PRIVACY_DROPPED_MARKER_ATTR } from "@langwatch/data-privacy-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import { createApp } from "@langwatch/process";
-import { memoryStores } from "@langwatch/process-stores";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { OtlpSpan } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { dataPrivacyProcessModule } from "../../data-privacy.module.ts";
-import {
-  dataPrivacyTestEventing,
-  projectFactOwner,
-} from "../../eventing/__tests__/data-privacy-project-scope.fixture.ts";
-import {
-  dataPrivacyTestGraph,
-  dataPrivacyTestSecrets,
-  foldDataPrivacyTestProject,
-} from "./data-privacy.fixture.ts";
+import { createDataPrivacyTestApp, dataPrivacyTestGraph } from "./data-privacy.fixture.ts";
 
 const PROJECT_ID = dataPrivacyTestGraph.projectId;
 
@@ -38,40 +27,19 @@ function spanWith(value: string): OtlpSpan {
   };
 }
 
-/** A worker hosting data privacy's project-scope fold, with the test project folded. */
+/** Data privacy built from what a process holds, with the test project placed by its rows. */
 async function boot({ enforcement }: { enforcement?: string }) {
-  const eventing = dataPrivacyTestEventing();
-  const append = projectFactOwner(eventing);
-  const runtime = await createApp({ role: "worker", secrets: dataPrivacyTestSecrets() })
-    .withModules([dataPrivacyProcessModule])
-    .withStores(memoryStores())
-    .withConfig({
-      "data-privacy": {
-        googleDlpDisabled: undefined,
-        enforcement,
-        nodeEnvironment: undefined,
-        langevalsEndpoint: undefined,
-      },
-    })
-    .provide({
-      authz: createApiFixture<AuthzApi>({
+  const app = await createDataPrivacyTestApp({
+    enforcement,
+    dependencies: {
+      permissions: createApiFixture<AuthzApi>({
         checkScopeLineage: async () => ({ kind: "consistent" }),
       }),
-      "feature-flag": createApiFixture<FeatureFlagApi>({ isEnabled: async () => false }),
-    })
-    .withEventing(eventing)
-    .boot();
-  await runtime.start();
-  const app = runtime.service(DataPrivacyApi);
-  await foldDataPrivacyTestProject({ append, app });
-
-  return {
-    app,
-    stop: async () => {
-      await runtime.stop();
-      await eventing.close();
+      featureFlags: createApiFixture<FeatureFlagApi>({ isEnabled: async () => false }),
     },
-  };
+  });
+
+  return { app, stop: async () => undefined };
 }
 
 async function dropInputForProject(app: DataPrivacyApi): Promise<void> {

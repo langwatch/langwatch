@@ -7,13 +7,6 @@
     "description": "Records every existing annotation and score definition as annotation's fact, for trace to read."
   },
   {
-    "id": "data-retention:replay-project-scope",
-    "kind": "data",
-    "mode": "background",
-    "owner": "data-retention",
-    "description": "Fills data retention's project scope fold from project's lifecycle log at deploy."
-  },
-  {
     "id": "entitlement:seed-trace-meter",
     "kind": "data",
     "mode": "background",

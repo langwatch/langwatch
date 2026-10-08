@@ -1,33 +1,55 @@
-import type { FoldStateRead } from "@langwatch/eventing";
-
 import type {
+  DataRetentionProjectPlacement,
   DataRetentionProjectScopeRepository,
-  DataRetentionProjectScopeState,
 } from "../data-retention-project-scope.repository.ts";
 
-/** Data retention's fold of where each project sits, in memory. */
+export type MemoryRetentionTeamRow = Readonly<{ teamId: string; organizationId: string }>;
+
+/** Project and team rows a test put there, as project's and organization's tables hold them. */
 export class MemoryDataRetentionProjectScopeRepository implements DataRetentionProjectScopeRepository {
   static create({
-    rows = [],
+    projects = [],
+    teams = [],
   }: {
-    rows?: readonly DataRetentionProjectScopeState[];
+    projects?: readonly DataRetentionProjectPlacement[];
+    teams?: readonly MemoryRetentionTeamRow[];
   } = {}): MemoryDataRetentionProjectScopeRepository {
-    return new MemoryDataRetentionProjectScopeRepository(rows);
+    return new MemoryDataRetentionProjectScopeRepository({ projects, teams });
   }
 
-  private readonly rows: Map<string, DataRetentionProjectScopeState>;
+  readonly #projects: Map<string, DataRetentionProjectPlacement>;
+  readonly #teams: Map<string, string>;
 
-  private constructor(rows: readonly DataRetentionProjectScopeState[]) {
-    this.rows = new Map(rows.map((state) => [state.projectId, state]));
+  private constructor({
+    projects,
+    teams,
+  }: {
+    projects: readonly DataRetentionProjectPlacement[];
+    teams: readonly MemoryRetentionTeamRow[];
+  }) {
+    this.#projects = new Map(projects.map((project) => [project.projectId, project]));
+    this.#teams = new Map([
+      ...projects.map((project): [string, string] => [project.teamId, project.organizationId]),
+      ...teams.map((team): [string, string] => [team.teamId, team.organizationId]),
+    ]);
   }
 
-  async get(aggregateId: string): Promise<FoldStateRead<DataRetentionProjectScopeState>> {
-    const state = this.rows.get(aggregateId);
-    return state ? { kind: "folded", state } : { kind: "empty" };
+  /** Puts or moves a project, as a row written by project. */
+  putProject(placement: DataRetentionProjectPlacement): void {
+    this.#projects.set(placement.projectId, placement);
+    this.#teams.set(placement.teamId, placement.organizationId);
   }
 
-  async store(state: DataRetentionProjectScopeState): Promise<void> {
-    this.rows.set(state.projectId, state);
+  async findProjectPlacement({
+    projectId,
+  }: {
+    projectId: string;
+  }): Promise<DataRetentionProjectPlacement | null> {
+    return this.#projects.get(projectId) ?? null;
+  }
+
+  async findTeamOrganizationId({ teamId }: { teamId: string }): Promise<string | null> {
+    return this.#teams.get(teamId) ?? null;
   }
 
   async findProjectIds({
@@ -37,9 +59,9 @@ export class MemoryDataRetentionProjectScopeRepository implements DataRetentionP
     organizationId: string;
     teamId?: string;
   }): Promise<string[]> {
-    return [...this.rows.values()]
-      .filter((state) => state.organizationId === organizationId)
-      .filter((state) => teamId === undefined || state.teamId === teamId)
-      .map((state) => state.projectId);
+    return [...this.#projects.values()]
+      .filter((project) => project.organizationId === organizationId)
+      .filter((project) => teamId === undefined || project.teamId === teamId)
+      .map((project) => project.projectId);
   }
 }
