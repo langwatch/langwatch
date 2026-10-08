@@ -15,8 +15,8 @@ const ORGANIZATION_STATE = {
   simulationRunCount: true,
 } as const;
 
-/** Only the shared delegate the project read touches; it claims no table (R40). */
-type NurturingProjectShare = Pick<PrismaClient, "project">;
+/** Only the shared delegates the placement read touches; it claims no table (R40). */
+type NurturingProjectShare = Pick<PrismaClient, "project" | "team">;
 
 /** Nurturing's organizations; a project's organization is read through its owners' shares (R40). */
 export class PrismaNurturingMilestonesRepository
@@ -83,8 +83,13 @@ export class PrismaNurturingMilestonesRepository
   private async organizationOf({ projectId }: { projectId: string }): Promise<string | undefined> {
     const project = await this.projects.project.findUnique({
       where: { id: projectId },
-      select: { team: { select: { organizationId: true } } },
+      select: { teamId: true },
     });
-    return project?.team?.organizationId;
+    if (!project) return void 0;
+    const team = await this.projects.team.findUnique({
+      where: { id: project.teamId },
+      select: { organizationId: true },
+    });
+    return team?.organizationId;
   }
 }

@@ -5,10 +5,10 @@ import type {
   InstantEvalJudgeProjectRepository,
 } from "../instant-eval-judge-placement.repository.ts";
 
-/** Only the shared delegate this reader touches; it claims no table (R40). */
-type InstantEvalJudgePlacementDatabase = Pick<PrismaClient, "project">;
+/** Only the shared delegates this reader touches; it claims no table (R40). */
+type InstantEvalJudgePlacementDatabase = Pick<PrismaClient, "project" | "team">;
 
-/** Project's `Project` row and its team's organization, through their shares, in one read. */
+/** Project's `Project` row and its team's organization, through their shares. */
 export class PrismaInstantEvalJudgeProjectRepository implements InstantEvalJudgeProjectRepository {
   static create({
     prisma,
@@ -27,10 +27,15 @@ export class PrismaInstantEvalJudgeProjectRepository implements InstantEvalJudge
   }): Promise<InstantEvalJudgeProjectPlacement> {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
-      select: { team: { select: { organizationId: true } } },
+      select: { teamId: true },
     });
-    return project?.team
-      ? { outcome: "known", organizationId: project.team.organizationId }
+    if (!project) return { outcome: "unknown" };
+    const team = await this.prisma.team.findUnique({
+      where: { id: project.teamId },
+      select: { organizationId: true },
+    });
+    return team
+      ? { outcome: "known", organizationId: team.organizationId }
       : { outcome: "unknown" };
   }
 }
