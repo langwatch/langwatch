@@ -200,9 +200,8 @@ const run = (runner: ReturnType<typeof createUpgradeRunner>) =>
 /** Brings the scratch database to the floor, then holds an exclusive lock on "Alpha". */
 async function atFloorWithLockedAlpha({ next }: { next: string }) {
   const floor = await realApplier({ next });
-  expect((await run(runnerFor({ release: "3.20.1", next, applier: floor.applier }))).code).toBe(
-    "done",
-  );
+  const outcome = await run(runnerFor({ release: "3.20.1", next, applier: floor.applier }));
+  expect(outcome, outcome.message).toMatchObject({ code: "done" });
   const holder: PoolClient = await scratch.postgres.connect();
   await holder.query("BEGIN");
   await holder.query('LOCK TABLE "Alpha" IN ACCESS EXCLUSIVE MODE');
