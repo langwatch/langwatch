@@ -8,7 +8,7 @@
 
 The singular `github` feature owns the organization GitHub App installation,
 webhook, repository access and pull-request linkage lifecycle. Its contract
-exports portable Zod 4 values and one abstract `GithubService`. Its server
+exports portable Zod 4 values and one abstract `GithubApi`. Its server
 package composes one concrete `GithubFeatureService` through
 `GithubPrismaInstaller.create` at process boot.
 
@@ -57,7 +57,7 @@ Prisma adapters map generated records to portable values and are not exported.
 ## Runtime and registration
 
 The API or worker composition root calls `GithubPrismaInstaller.create` once and
-passes the resulting `GithubService` through its process graph. Imports register
+passes the resulting `GithubApi` through its process graph. Imports register
 no routes, timers or clients.
 
 ## Environment and configuration

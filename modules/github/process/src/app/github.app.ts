@@ -175,8 +175,8 @@ type GithubBranchDemandComposition = Readonly<{
 
 /**
  * The demand service under the two names its cross-feature consumers know.
- * `GithubService` answers the host question from the same `GithubHostApi`
- * this composition resolved and routes into the same demand service.
+ * It answers the host question from the same `GithubHost` this composition
+ * resolved and routes into the same demand service.
  */
 class ComposedGithubBranchDemand {
   static create(parts: {

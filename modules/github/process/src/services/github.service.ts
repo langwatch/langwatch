@@ -28,13 +28,11 @@ import {
   type GithubWebhookDelivery,
   type GithubWebhookReceipt,
 } from "../rules/github-webhook.rules.ts";
+import type { BranchMappingRequest } from "./github-branch-demand.service.ts";
 import { GithubConnectionService } from "./github-connection.service.ts";
 import type { GithubInstallState } from "./github-install-state.service.ts";
 import type { GithubInstallationsService } from "./github-installations.service.ts";
-import {
-  type GithubPullRequestMappingService,
-  type BranchMappingRequest,
-} from "./github-pull-request-mapping.service.ts";
+import type { GithubPullRequestMappingService } from "./github-pull-request-mapping.service.ts";
 import type { GithubPullRequestStatusService } from "./github-pull-request-status.service.ts";
 
 const logger = createLogger("langwatch:github:webhook");
