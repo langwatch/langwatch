@@ -1,9 +1,14 @@
+import type { AuthApi } from "@langwatch/auth-contract";
 import {
   defineAggregate,
   defineEventingModule,
   definePipeline,
   type EventingSetup,
 } from "@langwatch/eventing";
+import {
+  ORGANIZATION_MEMBER_DISABLED_EVENT_TYPE,
+  organizationMemberDisabledEventDataSchema,
+} from "@langwatch/organization-contract";
 
 import type { AuthModule } from "../app/auth.app.ts";
 import type { AuthRepositories } from "../repositories/auth.repositories.ts";
@@ -33,9 +38,45 @@ function lifecycleCommands() {
 
 export type AuthLifecycleDefinition = ReturnType<ReturnType<typeof lifecycleCommands>["build"]>;
 
-/** auth_lifecycle records; peers (nurturing) react to its events from their own side (§9). */
-export function buildAuthLifecyclePipeline(): AuthLifecycleDefinition {
-  return lifecycleCommands().build();
+const memberDisabledKeyOf = organizationMemberDisabledEventDataSchema.pick({
+  userId: true,
+  occurredAt: true,
+});
+
+/**
+ * auth_lifecycle records; peers (nurturing) react to its events from their own side (§9). A seat
+ * organization took away ends the person's sessions here (R7, D-A1U-6); user's former lane drains
+ * through the alias. Spec: modules/auth/specs/browser-session.feature
+ */
+export function buildAuthLifecyclePipeline(deps: {
+  sessions: Pick<AuthApi, "revokeAllBrowserSessions">;
+}): AuthLifecycleDefinition {
+  return (
+    lifecycleCommands()
+      // The revoke ends whatever sessions exist, so a redelivery finds none left to end.
+      .withPeerSubscriber("revokeDisabledMemberSessions", {
+        eventType: ORGANIZATION_MEMBER_DISABLED_EVENT_TYPE,
+        data: organizationMemberDisabledEventDataSchema,
+        options: {
+          deduplication: {
+            makeId: (event) => {
+              const { userId, occurredAt } = memberDisabledKeyOf.parse(event.data);
+              return `user-member-disabled:${event.tenantId}:${String(event.aggregateId)}:${userId}:${occurredAt}`;
+            },
+            ttlMs: 60_000,
+          },
+        },
+        handle: ({ userId }) => deps.sessions.revokeAllBrowserSessions({ userId }),
+      })
+      .withLaneAliases([
+        {
+          from: "global:subscriber:user_lifecycle.revokeDisabledMemberSessions",
+          to: { jobType: "subscriber", lane: "revokeDisabledMemberSessions" },
+          removeAfter: "3.21.0",
+        },
+      ])
+      .build()
+  );
 }
 
 export const authLifecycleEventing = defineEventingModule({

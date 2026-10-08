@@ -1,26 +1,22 @@
 /**
  * @vitest-environment node
  * @unit
- * @see modules/user/specs/user.feature
+ * @see modules/auth/specs/browser-session.feature
  */
-import {
-  createTenantId,
-  type Event,
-  type EventSubscriberDefinition,
-  InMemoryProcessStore,
-} from "@langwatch/eventing";
+import type { AuthApi } from "@langwatch/auth-contract";
+import { createTenantId, type Event, type EventSubscriberDefinition } from "@langwatch/eventing";
 import {
   ORGANIZATION_MEMBER_DISABLED_EVENT_TYPE,
   ORGANIZATION_MEMBER_DISABLED_EVENT_VERSION,
   type OrganizationMemberDisabledEventData,
 } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
-import { buildUserLifecyclePipeline } from "../user-lifecycle.pipeline.ts";
+import { AUTH_LIFECYCLE_PIPELINE_NAME } from "../auth-lifecycle.events.ts";
+import { buildAuthLifecyclePipeline } from "../auth-lifecycle.pipeline.ts";
 
-const LANE = "user_lifecycle.revokeDisabledMemberSessions";
+const LANE = `${AUTH_LIFECYCLE_PIPELINE_NAME}.revokeDisabledMemberSessions`;
 
 const DISABLED: OrganizationMemberDisabledEventData = {
   tenantId: "organization-1",
@@ -44,33 +40,30 @@ function disabledEvent({ id = "event-1" }: { id?: string } = {}): Event {
   };
 }
 
-/** The sessions user holds per account, ended the way user's own revoke ends them. */
+/** The sessions auth holds per account, ended the way auth's own revoke ends them. */
 function sessionStore() {
   const held = new Map<string, Set<string>>([
     ["user-1", new Set(["session-a", "session-b"])],
     ["user-2", new Set(["session-c"])],
   ]);
   const revocations: string[] = [];
-  const sessions = createApiFixture<UserApi>(
+  const sessions = createApiFixture<AuthApi>(
     {
       revokeAllBrowserSessions: async ({ userId }) => {
         revocations.push(userId);
         held.get(userId)?.clear();
       },
     },
-    "UserApi",
+    "AuthApi",
   );
   const counts = () => [...held.entries()].map(([userId, ids]) => [userId, ids.size]);
   return { sessions, revocations, counts };
 }
 
 function revocationLane(
-  sessions: Pick<UserApi, "revokeAllBrowserSessions">,
+  sessions: Pick<AuthApi, "revokeAllBrowserSessions">,
 ): EventSubscriberDefinition {
-  const pipeline = buildUserLifecyclePipeline({
-    sessions,
-    facts: { record: async () => undefined, retention: InMemoryProcessStore.createForTesting() },
-  });
+  const pipeline = buildAuthLifecyclePipeline({ sessions });
   const lanes = new Map<string, EventSubscriberDefinition>();
   const registry = createApiFixture<
     Parameters<NonNullable<typeof pipeline.globalProjections>[number]["register"]>[0]
@@ -99,7 +92,7 @@ function deduplicationIdOf({
 
 const CONTEXT = { tenantId: DISABLED.tenantId, aggregateId: DISABLED.organizationId };
 
-describe("user's member-disabled session lane", () => {
+describe("auth's member-disabled session lane", () => {
   describe("when organization records a member as disabled", () => {
     /** @scenario "A member disabled in an organization loses their browser sessions" */
     it("ends that person's browser sessions and nobody else's", async () => {
@@ -133,6 +126,21 @@ describe("user's member-disabled session lane", () => {
       expect(deduplicationIdOf({ definition, event: disabledEvent() })).toBe(
         deduplicationIdOf({ definition, event: disabledEvent({ id: "redelivered" }) }),
       );
+    });
+  });
+
+  describe("when the previous release queued revocations on user's lane", () => {
+    /** @scenario "Seat revocations the previous release queued on user's lane run on auth's" */
+    it("aliases user's former lane to auth's for one release", () => {
+      const pipeline = buildAuthLifecyclePipeline({ sessions: sessionStore().sessions });
+
+      expect(pipeline.laneAliases).toEqual([
+        {
+          from: "global:subscriber:user_lifecycle.revokeDisabledMemberSessions",
+          to: { jobType: "subscriber", lane: "revokeDisabledMemberSessions" },
+          removeAfter: "3.21.0",
+        },
+      ]);
     });
   });
 });

@@ -2,21 +2,27 @@
  * The signup form's door (D-A1U-2): auth decides whether an account may be minted and spends
  * the address proof; user writes the account. Spec: specs/licensing/sso-license-gating.feature.
  */
-import type { AuthApi } from "@langwatch/auth-contract";
+import {
+  type AuthApi,
+  DirectRegistrationUnavailableError,
+  FrontDoorRateLimitedError,
+  type SignUpEnrollment,
+} from "@langwatch/auth-contract";
 import { ValidationError } from "@langwatch/handled-error";
 import {
   IdentityVerificationExpiredError,
   describePasswordProblem,
-  routesToOrganizationConnection,
+  normalizeIdentifierValue,
+  type SignInMethod,
 } from "@langwatch/identity-contract";
 import { type OrganizationApi, SignUpRestrictedError } from "@langwatch/organization-contract";
-import {
-  type CreatedUser,
-  type RegisterCredentialAccountInput,
-  type UserApi,
-  UserRegistrationNotAvailableError,
-  UserSignupThrottledError,
+import type {
+  CreatedUser,
+  RegisterCredentialAccountInput,
+  UserApi,
 } from "@langwatch/user-contract";
+
+import { decideLocalSignUp, isSettledByRouting } from "../rules/local-sign-up.rules.ts";
 
 type AccountWrites = Pick<UserApi, "registerCredentialAccount">;
 type SignUpPolicy = Pick<OrganizationApi, "checkSignUp">;
@@ -28,6 +34,7 @@ type RegistrationDoors = Pick<
   | "isWithinBudget"
   | "claimSignUpAddressProof"
   | "claimUnconfirmedSignUpAddressProof"
+  | "addressIsRegistered"
 >;
 
 const SIGNUP_BUDGET = { windowSeconds: 60 * 60, max: 20 } as const;
@@ -37,6 +44,7 @@ type RegistrationPeers = Readonly<{
   organizations: SignUpPolicy;
   auth: RegistrationDoors;
   issuesOwnPasswords: () => boolean;
+  resolveDefaultMethods: () => Promise<readonly SignInMethod[]>;
 }>;
 
 export class CredentialRegistrationService {
@@ -65,14 +73,20 @@ export class CredentialRegistrationService {
     // Sign-in lowercases the address on every lookup; the proof is bound to the same spelling.
     const email = input.email.toLowerCase();
 
-    // D09: a deployment issuing its own passwords beside its provider passes too, except for
-    // an address an organization routes to its own connection.
-    const emailMode = (await this.peers.auth.resolveAuthProvider()) === "email";
+    // D09: a deployment issuing its own passwords beside its provider passes too.
+    const passwordIsAllowed =
+      (await this.peers.auth.resolveAuthProvider()) === "email" || this.peers.issuesOwnPasswords();
 
-    if (!emailMode && !this.peers.issuesOwnPasswords())
-      throw new UserRegistrationNotAvailableError();
-    if (!emailMode && (await this.#routesToConnection(email))) {
-      throw new UserRegistrationNotAvailableError();
+    if (!passwordIsAllowed) throw new DirectRegistrationUnavailableError();
+
+    // In every sign-in mode and before the proof is spent: the address must be offered a password.
+    const enrollment = await this.#localSignUp({ email, passwordIsAllowed });
+
+    if (
+      enrollment.outcome !== "enroll" ||
+      !enrollment.methodSet.some((method) => method.kind === "password")
+    ) {
+      throw new DirectRegistrationUnavailableError();
     }
 
     const allowance = await this.peers.auth.isWithinBudget({
@@ -80,7 +94,11 @@ export class CredentialRegistrationService {
       ...SIGNUP_BUDGET,
     });
 
-    if (!allowance.allowed) throw new UserSignupThrottledError();
+    if (!allowance.allowed) {
+      throw new FrontDoorRateLimitedError("Too many attempts. Please try again later.", {
+        retryAfterSeconds: allowance.retryAfterSeconds,
+      });
+    }
 
     // Before the proof is spent: a refused address keeps its link for the day an
     // administrator invites it.
@@ -99,11 +117,33 @@ export class CredentialRegistrationService {
     });
   }
 
-  /** Left to throw: for an address a company signs in, "could not tell" is no password. */
-  async #routesToConnection(email: string): Promise<boolean> {
-    return routesToOrganizationConnection(
-      await this.peers.auth.route({ identifier: email, breakGlass: false }),
-    );
+  /** Routing left to throw: for an address a company signs in, "could not tell" is no password. */
+  async #localSignUp({
+    email,
+    passwordIsAllowed,
+  }: {
+    email: string;
+    passwordIsAllowed: boolean;
+  }): Promise<SignUpEnrollment> {
+    const decision = await this.peers.auth.route({ identifier: email, breakGlass: false });
+    // An organization's address is answered by routing alone, with no account looked up.
+    if (isSettledByRouting(decision)) {
+      return decideLocalSignUp({
+        decision,
+        addressIsTaken: false,
+        defaultMethods: [],
+        passwordIsAllowed,
+      });
+    }
+
+    return decideLocalSignUp({
+      decision,
+      addressIsTaken: await this.peers.auth.addressIsRegistered({
+        email: normalizeIdentifierValue(email),
+      }),
+      defaultMethods: await this.peers.resolveDefaultMethods(),
+      passwordIsAllowed,
+    });
   }
 
   /**

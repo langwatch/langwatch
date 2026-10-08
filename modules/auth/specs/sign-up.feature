@@ -45,3 +45,32 @@ Feature: Sign-up
     When an address proof adopts it
     Then every browser session on that account is ended
     And a refused adoption ends none
+
+  # Main's local sign-up decision, asked on every registration before the address proof is spent.
+  @unit
+  Scenario: Registering an address that already has an account keeps its address proof
+    Given an address that already has an account
+    When the sign-up form is submitted for it with a password
+    Then the registration is refused as "auth_direct_registration_unavailable"
+    And the address proof is not spent and no account is written
+
+  @unit
+  Scenario: Registering an address an organization signs in through its own connection is refused in every sign-in mode
+    Given an address whose domain an organization routes to its own connection
+    When the sign-up form is submitted for it with a password, in email mode or beside a provider
+    Then the registration is refused as "auth_direct_registration_unavailable"
+    And the address proof is not spent and no account is written
+
+  @unit
+  Scenario: Registering an address the sign-in routing offers no password is refused
+    Given the sign-in routing offers this address no password
+    When the sign-up form is submitted for it with a password
+    Then the registration is refused as "auth_direct_registration_unavailable"
+    And the address proof is not spent and no account is written
+
+  @unit
+  Scenario: A caller over the sign-up budget is told how long to wait
+    Given a caller that has registered too often this hour
+    When it submits the sign-up form again
+    Then the refusal is "auth_rate_limited" and names the seconds to wait
+    And the address proof is not spent

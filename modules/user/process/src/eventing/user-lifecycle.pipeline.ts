@@ -6,13 +6,8 @@ import {
   type ProcessStore,
 } from "@langwatch/eventing";
 import {
-  ORGANIZATION_MEMBER_DISABLED_EVENT_TYPE,
-  organizationMemberDisabledEventDataSchema,
-} from "@langwatch/organization-contract";
-import {
   USER_AGGREGATE_TYPE,
   USER_LIFECYCLE_PIPELINE_NAME,
-  type UserApi,
   userCreatedEventDataSchema,
   userLifecycleEventDataSchema,
   userRegisteredEventDataSchema,
@@ -100,46 +95,21 @@ function lifecycleCommands(facts: UserFactsDeps) {
 
 type UserLifecycleDefinition = ReturnType<ReturnType<typeof lifecycleCommands>["build"]>;
 
-const memberDisabledKeyOf = organizationMemberDisabledEventDataSchema.pick({
-  userId: true,
-  occurredAt: true,
-});
-
 /**
  * user_lifecycle: user records its account's facts; peers react from their own side (§9). A mint's,
- * registration's and erasure's facts arrive through its fact outbox (round 35). A seat organization
- * took away ends the person's sessions here (R7). Spec: modules/user/specs/user.feature
+ * registration's and erasure's facts arrive through its fact outbox (round 35).
+ * Spec: modules/user/specs/user.feature
  */
 export function buildUserLifecyclePipeline(deps: {
-  sessions: Pick<UserApi, "revokeAllBrowserSessions">;
   facts: UserFactsDeps;
 }): UserLifecycleDefinition {
-  return (
-    lifecycleCommands(deps.facts)
-      // The revoke ends whatever sessions exist, so a redelivery finds none left to end.
-      .withPeerSubscriber("revokeDisabledMemberSessions", {
-        eventType: ORGANIZATION_MEMBER_DISABLED_EVENT_TYPE,
-        data: organizationMemberDisabledEventDataSchema,
-        options: {
-          deduplication: {
-            makeId: (event) => {
-              const { userId, occurredAt } = memberDisabledKeyOf.parse(event.data);
-              return `user-member-disabled:${event.tenantId}:${String(event.aggregateId)}:${userId}:${occurredAt}`;
-            },
-            ttlMs: 60_000,
-          },
-        },
-        handle: ({ userId }) => deps.sessions.revokeAllBrowserSessions({ userId }),
-      })
-      .build()
-  );
+  return lifecycleCommands(deps.facts).build();
 }
 
 export const userLifecycleEventing = defineEventingModule({
   pipeline: USER_LIFECYCLE_PIPELINE_NAME,
   build: ({ app, processStore }: EventingSetup<UserRepositories, UserModule>) =>
     buildUserLifecyclePipeline({
-      sessions: { revokeAllBrowserSessions: (input) => app.revokeAllBrowserSessions(input) },
       facts: {
         record: (intent) => app.recordLifecycleFact(intent),
         retention: processStore,

@@ -57,3 +57,24 @@ Feature: Browser session lifecycle
     Given a signed-in person reading from one of their browsers
     When they list their browsers or end one over auth's procedures
     Then auth answers for the caller's own account, with the reading browser named as current
+
+  # Organization records a seat taken away; auth, which owns the sessions, ends them from its own
+  # side, eventually, while authorization refuses them at once (ruling R7, D-A1U-6).
+  @unit
+  Scenario: A member disabled in an organization loses their browser sessions
+    Given organization has recorded a member as disabled
+    When auth receives that fact
+    Then every browser session that person holds is ended
+
+  @unit
+  Scenario: A redelivered seat revocation is keyed alike and harmless
+    Given organization's member-disabled fact was already handled
+    When the same fact is delivered again
+    Then both deliveries share one deduplication key
+    And ending the sessions again leaves the account with none
+
+  @unit
+  Scenario: Seat revocations the previous release queued on user's lane run on auth's
+    Given a seat revocation the previous release queued on user's member-disabled lane
+    When a worker of this release drains the queue
+    Then auth's member-disabled lane consumes it until the alias window closes

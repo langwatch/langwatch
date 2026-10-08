@@ -248,23 +248,6 @@ Feature: Canonical user lifecycle
     When the caller asks for the key's project
     Then the request is refused and names no project
 
-  # Organization records a seat taken away; user ends that person's browser sessions from its own
-  # side, eventually, while authorization refuses them at once (ruling R7).
-  Rule: A seat taken away in an organization ends the person's browser sessions
-
-    @unit
-    Scenario: A member disabled in an organization loses their browser sessions
-      Given organization has recorded a member as disabled
-      When user receives that fact
-      Then every browser session that person holds is ended
-
-    @unit
-    Scenario: A redelivered seat revocation is keyed alike and harmless
-      Given organization's member-disabled fact was already handled
-      When the same fact is delivered again
-      Then both deliveries share one deduplication key
-      And ending the sessions again leaves the account with none
-
   # Round 48 (A1-a): the switches are shared deployment facts, so user asks no peer for them.
   Rule: User reads the sign-in capability switches from the deployment facts auth reads
 

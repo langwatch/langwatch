@@ -1,23 +1,21 @@
 /**
  * The signup form's door auth now owns (D-A1U-2), over user and organization stubs.
  * @see specs/licensing/sso-license-gating.feature
+ * @see modules/auth/specs/sign-up.feature
  */
 import { type AuthApi, InvalidAuthOriginError } from "@langwatch/auth-contract";
-import type { RoutingDecision } from "@langwatch/identity-contract";
+import type { RoutingDecision, SignInMethod } from "@langwatch/identity-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import {
-  type RegisterCredentialAccountInput,
-  type UserApi,
-  UserRegistrationNotAvailableError,
-  UserSignupThrottledError,
-} from "@langwatch/user-contract";
+import type { RegisterCredentialAccountInput, UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { CredentialRegistrationService } from "../credential-registration.service.ts";
 
+const PASSWORD: SignInMethod = { id: "password", kind: "password", connectionId: null };
+const PASSKEY: SignInMethod = { id: "passkey", kind: "passkey", connectionId: null };
 const OPEN: RoutingDecision = {
-  outcome: "method_picker",
-  methodSet: [{ id: "password", kind: "password", connectionId: null }],
+  outcome: "route_to_signup",
+  methodSet: [],
   reasonCode: "no_domain_match",
 };
 const GOVERNED: RoutingDecision = {
@@ -33,7 +31,11 @@ function doors({
   allowed = true,
   routing = OPEN,
   proof = "confirmed",
+  taken = false,
+  defaultMethods = [PASSWORD],
 }: {
+  taken?: boolean;
+  defaultMethods?: readonly SignInMethod[];
   provider?: string;
   localPasswords?: boolean;
   allowed?: boolean;
@@ -55,7 +57,8 @@ function doors({
     assertSignUpOrigin: vi.fn<AuthApi["assertSignUpOrigin"]>(async () => undefined),
     resolveAuthProvider: vi.fn(async () => provider),
     route: vi.fn(async () => routing),
-    isWithinBudget: vi.fn(async () => ({ allowed })),
+    isWithinBudget: vi.fn(async () => ({ allowed, retryAfterSeconds: allowed ? undefined : 1200 })),
+    addressIsRegistered: vi.fn(async () => taken),
     claimSignUpAddressProof: vi.fn(async () => proof === "confirmed"),
     claimUnconfirmedSignUpAddressProof: vi.fn(async () => proof === "unconfirmed"),
   };
@@ -64,6 +67,7 @@ function doors({
     organizations,
     auth,
     issuesOwnPasswords: () => localPasswords,
+    resolveDefaultMethods: vi.fn(async () => defaultMethods),
   });
 
   return { users, organizations, auth, service };
@@ -135,10 +139,14 @@ describe("registering through auth's door", () => {
   });
 
   describe("when the caller's address is over the sign-up budget", () => {
-    it("refuses as throttled before the proof is spent", async () => {
+    /** @scenario "A caller over the sign-up budget is told how long to wait" */
+    it("refuses as rate limited, naming the wait, before the proof is spent", async () => {
       const { auth, service } = doors({ allowed: false });
 
-      await expect(service.register(signUp())).rejects.toBeInstanceOf(UserSignupThrottledError);
+      await expect(service.register(signUp())).rejects.toMatchObject({
+        code: "auth_rate_limited",
+        meta: { retryAfterSeconds: 1200 },
+      });
       expect(auth.isWithinBudget).toHaveBeenCalledWith({
         key: "user.register:127.0.0.1",
         windowSeconds: 3600,
@@ -224,9 +232,9 @@ describe("registering through auth's door", () => {
     it("refuses direct registration", async () => {
       const { users, service } = doors({ provider: "auth0" });
 
-      await expect(service.register(signUp())).rejects.toBeInstanceOf(
-        UserRegistrationNotAvailableError,
-      );
+      await expect(service.register(signUp())).rejects.toMatchObject({
+        code: "auth_direct_registration_unavailable",
+      });
       expect(users.registerCredentialAccount).not.toHaveBeenCalled();
     });
   });
@@ -245,9 +253,52 @@ describe("registering through auth's door", () => {
     it("still hands an address whose domain routes to a connection to that provider", async () => {
       const { service } = doors({ provider: "auth0", localPasswords: true, routing: GOVERNED });
 
-      await expect(service.register(signUp({ email: "jo@acme.com" }))).rejects.toBeInstanceOf(
-        UserRegistrationNotAvailableError,
-      );
+      await expect(service.register(signUp({ email: "jo@acme.com" }))).rejects.toMatchObject({
+        code: "auth_direct_registration_unavailable",
+      });
+    });
+  });
+
+  describe.each([
+    { mode: "email mode", provider: "email", localPasswords: false },
+    { mode: "beside a provider (D09)", provider: "auth0", localPasswords: true },
+  ])("given a deployment in $mode", ({ provider, localPasswords }) => {
+    function expectRefusedUnspent(context: ReturnType<typeof doors>) {
+      expect(context.auth.claimSignUpAddressProof).not.toHaveBeenCalled();
+      expect(context.auth.claimUnconfirmedSignUpAddressProof).not.toHaveBeenCalled();
+      expect(context.users.registerCredentialAccount).not.toHaveBeenCalled();
+    }
+
+    /** @scenario "Registering an address an organization signs in through its own connection is refused in every sign-in mode" */
+    it("refuses an address an organization routes to its connection, proof unspent", async () => {
+      const context = doors({ provider, localPasswords, routing: GOVERNED, taken: true });
+
+      await expect(context.service.register(signUp())).rejects.toMatchObject({
+        code: "auth_direct_registration_unavailable",
+      });
+      expectRefusedUnspent(context);
+      expect(context.auth.addressIsRegistered).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Registering an address that already has an account keeps its address proof" */
+    it("refuses an address that already has an account, proof unspent", async () => {
+      const context = doors({ provider, localPasswords, taken: true });
+
+      await expect(
+        context.service.register(signUp({ email: "Sam@Acme.com" })),
+      ).rejects.toMatchObject({ code: "auth_direct_registration_unavailable" });
+      expect(context.auth.addressIsRegistered).toHaveBeenCalledWith({ email: "sam@acme.com" });
+      expectRefusedUnspent(context);
+    });
+
+    /** @scenario "Registering an address the sign-in routing offers no password is refused" */
+    it("refuses where the routing offers the address no password, proof unspent", async () => {
+      const context = doors({ provider, localPasswords, defaultMethods: [PASSKEY] });
+
+      await expect(context.service.register(signUp())).rejects.toMatchObject({
+        code: "auth_direct_registration_unavailable",
+      });
+      expectRefusedUnspent(context);
     });
   });
 });

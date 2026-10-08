@@ -6,7 +6,6 @@
  * @see modules/user/specs/user.feature
  */
 import { createTenantId, InMemoryProcessStore, OutboxDispatcherService } from "@langwatch/eventing";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant } from "@langwatch/time";
 import {
   USER_CREATED_EVENT_TYPE,
@@ -16,7 +15,6 @@ import {
   USER_REACTIVATED_EVENT_TYPE,
   USER_REGISTERED_EVENT_TYPE,
 } from "@langwatch/user-contract";
-import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -113,7 +111,6 @@ describe("user's lifecycle pipeline", () => {
 
   it("hosts no reaction on its own events", () => {
     const definition = buildUserLifecyclePipeline({
-      sessions: createApiFixture<UserApi>({}, "UserApi"),
       facts: { record: async () => undefined, retention: InMemoryProcessStore.createForTesting() },
     });
 
@@ -125,10 +122,7 @@ describe("user's lifecycle pipeline", () => {
 /** User's fact outbox over an in-memory process store, delivered as the worker's dispatcher. */
 function factOutboxOver(record: (intent: UserFactIntent) => Promise<void>) {
   const store = InMemoryProcessStore.createForTesting();
-  const pipeline = buildUserLifecyclePipeline({
-    sessions: createApiFixture<UserApi>({}, "UserApi"),
-    facts: { record, retention: store },
-  });
+  const pipeline = buildUserLifecyclePipeline({ facts: { record, retention: store } });
   const intents = pipeline.processManagers.get(USER_FACTS_PROCESS_NAME)?.config.intents;
   if (!intents) throw new Error("user_lifecycle declares no fact outbox");
   const handler =

@@ -58,6 +58,7 @@ import {
   organizationConnectionsOf,
   type RoutingDecision,
   type SignedInWith,
+  type SignInMethod,
   SignInMethodPolicyService,
   type SignInMethodPolicy,
   type SsoArrivalAdmission,
@@ -404,6 +405,7 @@ export class AuthModule implements AuthApiContract {
     signInSecurity,
     connectionIssuers,
     signUpEnrollment,
+    resolveDefaultMethods,
     addressConfirmation,
     priorSessions,
     twoStep,
@@ -420,6 +422,7 @@ export class AuthModule implements AuthApiContract {
     signInSecurity: SignInSecuritySettingsService;
     connectionIssuers: Pick<SsoIssuerDirectory, "findIssuersForConnection">;
     signUpEnrollment: SignUpEnrollmentService;
+    resolveDefaultMethods: () => Promise<readonly SignInMethod[]>;
     addressConfirmation: AddressConfirmationService;
     priorSessions: PriorSessionService;
     twoStep: TwoStepVerificationService;
@@ -461,6 +464,7 @@ export class AuthModule implements AuthApiContract {
       organizations: dependencies.organizations,
       auth: this,
       issuesOwnPasswords: () => this.#issuesOwnPasswords,
+      resolveDefaultMethods,
     });
     this.#providerAccountLinks = ProviderAccountLinkService.create({
       issuers: connectionIssuers,
@@ -521,6 +525,19 @@ export class AuthModule implements AuthApiContract {
       organizations: dependencies.organizations,
       projects: dependencies.projects,
     });
+
+    /** The deployment's default sign-in methods, asked by enrollment and by the register door. */
+    const resolveDefaultMethods = async () => {
+      const policy = await SignInMethodPolicyService.create({
+        resolveAuthProvider: () => app.resolveAuthProvider(),
+        federationLicensed: () => dependencies.licensing.isPlatformSsoLicensed(),
+        offersPasskeys: () => config.passkeysEnabled,
+        issuesOwnPasswords: () => config.localPasswords,
+        selfHosted: () => !config.isSaas,
+        mountedSocialMethodIds: () => app.#mountedSocialMethodIds,
+      }).resolvePolicy();
+      return policy.defaultMethods;
+    };
 
     const app = new AuthModule({
       sessions,
@@ -591,21 +608,12 @@ export class AuthModule implements AuthApiContract {
         route: (input) => app.route(input),
         addressIsTaken: async ({ email }) =>
           (await dependencies.users.findByEmail({ email })) !== null,
-        resolveDefaultMethods: async () => {
-          const policy = await SignInMethodPolicyService.create({
-            resolveAuthProvider: () => app.resolveAuthProvider(),
-            federationLicensed: () => dependencies.licensing.isPlatformSsoLicensed(),
-            offersPasskeys: () => config.passkeysEnabled,
-            issuesOwnPasswords: () => config.localPasswords,
-            selfHosted: () => !config.isSaas,
-            mountedSocialMethodIds: () => app.#mountedSocialMethodIds,
-          }).resolvePolicy();
-          return policy.defaultMethods;
-        },
+        resolveDefaultMethods,
         passwordIsAllowed: async () =>
           (await app.resolveAuthProvider()) === "email" || config.localPasswords,
         checkSignUp: (input) => dependencies.organizations.checkSignUp(input),
       }),
+      resolveDefaultMethods,
       addressConfirmation: AddressConfirmationService.create({
         isConfirmed: async ({ email }) =>
           (await dependencies.users.findByEmail({ email }))?.emailVerified === true,
@@ -749,7 +757,9 @@ export class AuthModule implements AuthApiContract {
   }
 
   lifecyclePipeline(): AuthLifecycleDefinition {
-    return buildAuthLifecyclePipeline();
+    return buildAuthLifecyclePipeline({
+      sessions: { revokeAllBrowserSessions: (input) => this.revokeAllBrowserSessions(input) },
+    });
   }
 
   connectLifecycle(senders: AuthLifecycleSenders): void {
