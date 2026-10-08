@@ -261,7 +261,7 @@ describe("MemoryProjectRepository", () => {
 
       expect(loser).toEqual(minted);
       expect(await repository.findInternalByOrganization(ORGANIZATION_ID)).toEqual(minted);
-      expect(await repository.countLiveNonGovernanceProjects(ORGANIZATION_ID)).toBe(0);
+      expect(await repository.countLiveDestinationProjects(ORGANIZATION_ID)).toBe(0);
       expect(
         await repository.findAllByTeam({ organizationId: ORGANIZATION_ID, teamId: TEAM_ID }),
       ).toEqual([]);

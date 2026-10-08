@@ -1587,6 +1587,27 @@ const presentations = {
     title: "Switch projects before archiving this one",
     describe: () => "You're working in it right now. Open another project, then archive it.",
   },
+  aggregate_project_admin_only: {
+    // Reached from the new-project flow by someone whose role lets them manage
+    // projects but who is not an organisation admin. Nothing was written.
+    title: "Only organization admins can do this",
+    describe: () =>
+      "This project reads traces from every member project, including personal ones, so only an organization admin can create it or change what it reads.",
+  },
+  aggregate_project_is_read_only: {
+    // Reached from any save aimed at an aggregate, often a form opened before
+    // the project was switched, so the copy says where the change belongs.
+    title: "Data can't be added to this project",
+    describe: () =>
+      "It reads traces from other projects and keeps nothing of its own. Open the project the data belongs to and make the change there.",
+  },
+  aggregate_rule_outside_organization: {
+    // Raised before anything is written, so the form is still open with the
+    // rule in it. One answer for a foreign id and a missing one, on purpose.
+    title: "That rule names something outside this organization",
+    describe: () =>
+      "An aggregate project can only read projects and departments of this organization. Remove the project or department that isn't listed here, then create it again.",
+  },
   personal_workspace_boundary: {
     // One code over three moves — out of a personal workspace, into one, and
     // creating a second project inside one — so the copy has to hold for all

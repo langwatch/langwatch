@@ -1,9 +1,11 @@
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { PaginatedProjects, Project, ProjectApi } from "@langwatch/project-contract";
 
-/** The page a listing asks for, and the key whose reach cuts it. */
+/** The page a listing asks for, the key whose reach cuts it, and the person it acts for. */
 export type VisibleProjectsQuery = Readonly<{
   apiKeyId: string;
+  /** The key's owner; null for a service key, which acts for nobody. */
+  userId: string | null;
   organizationId: string;
   page: number;
   limit: number;
@@ -57,6 +59,8 @@ export class ProjectProvisioningService {
       page: input.page,
       limit: input.limit,
       ...(visible.kind === "some" ? { projectIds: visible.ids } : {}),
+      // ADR-175 decision 5: an aggregate is listed only to an organisation admin.
+      aggregatesVisibleTo: { userId: input.userId },
     });
   }
 

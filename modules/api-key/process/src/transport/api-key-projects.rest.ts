@@ -30,9 +30,15 @@ import { apiKeyRestCredential } from "./api-key.rest.ts";
 
 /** What the projects collection door reaches; `ApiKeyModule` serves it. */
 export interface ApiKeyProjectsDoorApi {
-  /** The organization's projects, cut to those the presented key reaches. */
+  /** The organization's projects, cut to those the presented key and its owner reach. */
   listVisibleProjects(
-    input: Readonly<{ apiKeyId: string; organizationId: string; page: number; limit: number }>,
+    input: Readonly<{
+      apiKeyId: string;
+      userId: string | null;
+      organizationId: string;
+      page: number;
+      limit: number;
+    }>,
   ): Promise<PaginatedProjects>;
   /** A project provisioned in the organization, with its freshly minted service key. */
   provisionProject(input: ProjectProvisioningRequest): Promise<ProvisionedProject>;
@@ -100,6 +106,7 @@ export const apiKeyProjectsRest = defineRestRouter(ApiKeyProjectsDoorApi)
   .handle(async ({ app, input, scope }, credential) => {
     const result = await app.listVisibleProjects({
       apiKeyId: credential.apiKeyId,
+      userId: credential.userId,
       organizationId: scope.id,
       page: input.page,
       limit: input.limit,

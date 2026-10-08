@@ -382,6 +382,7 @@ describe("the projects collection, served by api-key", () => {
         page: 1,
         limit: 100,
         projectIds: ["project_1", "project_9"],
+        aggregatesVisibleTo: { userId: USER_ID },
       });
     });
 
@@ -413,7 +414,20 @@ describe("the projects collection, served by api-key", () => {
         organizationId: ORGANIZATION_ID,
         page: 1,
         limit: 50,
+        aggregatesVisibleTo: { userId: USER_ID },
       });
+    });
+
+    // ADR-175 decision 5: project decides from the owner's role; a service key has none.
+    it("asks project to show an aggregate only if the credential's owner may open one", async () => {
+      const listByOrganization = vi.fn(async () => page([]));
+      const { send } = mount({ projects: { listByOrganization } });
+
+      await send("/api/projects");
+
+      expect(listByOrganization).toHaveBeenCalledWith(
+        expect.objectContaining({ aggregatesVisibleTo: { userId: USER_ID } }),
+      );
     });
   });
 });

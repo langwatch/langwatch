@@ -5,6 +5,9 @@
  */
 import { z } from "zod";
 
+import { aggregateRuleSchema } from "./aggregate-rule.ts";
+import { creatableProjectKindSchema } from "./project.ts";
+
 /** The project a procedure acts on, and the only field most of them take. */
 export const projectScopeSchema = z.object({ projectId: z.string() });
 export type ProjectScopeInput = z.infer<typeof projectScopeSchema>;
@@ -21,6 +24,9 @@ export const projectCreateInputSchema = z.object({
   name: z.string(),
   language: z.string(),
   framework: z.string(),
+  /** ADR-175: an aggregate reads its members and owns no traces. */
+  kind: creatableProjectKindSchema.optional(),
+  aggregateRule: aggregateRuleSchema.optional(),
 });
 export type ProjectCreateInput = z.infer<typeof projectCreateInputSchema>;
 
@@ -51,6 +57,10 @@ export const projectUpdateInputSchema = z
     return (hasEndpoint && hasAccessKey) || (!hasEndpoint && !hasAccessKey && !hasSecretKey);
   });
 export type ProjectUpdateInput = z.infer<typeof projectUpdateInputSchema>;
+
+/** The organisation whose projects an admin may pick for an aggregate's rule. */
+export const projectOrganizationScopeSchema = z.object({ organizationId: z.string() });
+export type ProjectOrganizationScopeInput = z.infer<typeof projectOrganizationScopeSchema>;
 
 /** Two projects: the one the caller is in, and the one being archived. */
 export const projectArchiveByIdInputSchema = z.object({

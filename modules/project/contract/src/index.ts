@@ -1,4 +1,6 @@
 export * from "./project.ts";
+export * from "./aggregate-rule.ts";
+export * from "./project-kinds.ts";
 export * from "./project.errors.ts";
 export * from "./project.events.ts";
 export * from "./project.responses.ts";

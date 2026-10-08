@@ -52,7 +52,7 @@ describe("PrismaProjectRepository trace destinations", () => {
     });
   });
 
-  it("finds a live project only inside the named organization", async () => {
+  it("finds a live project only inside the named organization, never an aggregate", async () => {
     const { repository, project } = repositoryWithQueries({ findFirst: [destination] });
 
     await expect(
@@ -67,6 +67,7 @@ describe("PrismaProjectRepository trace destinations", () => {
           id: destination.id,
           team: { organizationId: "org_1" },
           archivedAt: null,
+          kind: { not: "aggregate" },
         },
       }),
     );
@@ -83,17 +84,17 @@ describe("PrismaProjectRepository trace destinations", () => {
     );
   });
 
-  it("counts only live non-governance alternatives", async () => {
+  it("counts only live alternatives that receive traces", async () => {
     const { repository, project } = repositoryWithQueries({
       findFirst: [],
       alternatives: 2,
     });
 
-    await expect(repository.countLiveNonGovernanceProjects("org_1")).resolves.toBe(2);
+    await expect(repository.countLiveDestinationProjects("org_1")).resolves.toBe(2);
     expect(project.count).toHaveBeenCalledWith({
       where: {
         team: { organizationId: "org_1" },
-        kind: { not: "internal_governance" },
+        kind: { notIn: ["internal_governance", "aggregate"] },
         archivedAt: null,
       },
     });

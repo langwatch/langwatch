@@ -10,6 +10,8 @@
 import { dataPrivacyPiiRedactionLevelSchema } from "@langwatch/data-privacy-contract";
 import { z } from "zod";
 
+import { aggregateMemberCandidateSchema } from "./aggregate-rule.ts";
+
 /** A project was provisioned; the slug is what the caller navigates to. */
 export const projectProvisionedSchema = z
   .object({ success: z.literal(true), projectSlug: z.string().min(1) })
@@ -77,3 +79,6 @@ export const projectRestArchivedSchema = z
   })
   .strict();
 export type ProjectRestArchived = z.infer<typeof projectRestArchivedSchema>;
+
+/** ADR-175: every project an admin may pick for an aggregate, personal ones naming their owner. */
+export const projectAggregateMemberCandidatesSchema = z.array(aggregateMemberCandidateSchema);

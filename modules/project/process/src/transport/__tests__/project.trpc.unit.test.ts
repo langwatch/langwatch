@@ -64,6 +64,9 @@ function mount({
     getLegacyKeyStatus,
     probePermission: probe,
     archiveOtherProject: (input) => requests.archiveOtherProject(input),
+    // The aggregate procedures are covered over the real app in project.trpc.aggregate.
+    assertMayCreateAggregate: () => Promise.reject(new Error("not asked in this suite")),
+    aggregateMemberCandidates: () => Promise.reject(new Error("not asked in this suite")),
   };
 
   const trpc = initTRPC.context<ProjectTrpcTestContext>().create();
@@ -88,6 +91,7 @@ describe("the project tRPC namespace", () => {
       const { router } = mount();
 
       expect(Object.keys(router._def.procedures).toSorted()).toEqual([
+        "aggregateMemberCandidates",
         "archiveById",
         "create",
         "getHasFirstMessage",

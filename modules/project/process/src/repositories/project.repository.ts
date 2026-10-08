@@ -85,6 +85,8 @@ export interface ProjectRepository {
     limit: number;
     projectIds?: string[];
     includeGovernance?: boolean;
+    /** False leaves aggregate projects out (ADR-175 decision 5); absent lists them. */
+    includeAggregates?: boolean;
   }): Promise<PaginatedProjects>;
   findAllByTeam(input: {
     organizationId: string;
@@ -102,6 +104,7 @@ export interface ProjectRepository {
   findLiveBySlugInOrganization(input: { slug: string; organizationId: string }): Promise<Project[]>;
   findActiveByScopes(input: ActiveProjectsByScopesInput): Promise<Project[]>;
   findBySlugInTeam(input: { slug: string; teamId: string }): Promise<Project | null>;
+  /** A live project of the organisation that receives traces; never an aggregate (ADR-175). */
   findLiveTraceDestination(input: {
     organizationId: string;
     projectId: string;
@@ -109,7 +112,8 @@ export interface ProjectRepository {
   findOldestGovernanceTraceDestination(
     organizationId: string,
   ): Promise<TraceDestinationProject | null>;
-  countLiveNonGovernanceProjects(organizationId: string): Promise<number>;
+  /** Live projects that receive traces: neither the governance project nor an aggregate. */
+  countLiveDestinationProjects(organizationId: string): Promise<number>;
   findTraceDestination(projectId: string): Promise<TraceDestinationProject | null>;
   findTraceDestinations(projectIds: string[]): Promise<TraceDestinationProject[]>;
   /** The live project the legacy `apiKey` column names, or nothing. */

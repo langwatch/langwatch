@@ -216,6 +216,58 @@ export function assertPersonalWorkspaceCreate(isDestinationTeamPersonal: boolean
   }
 }
 
+/**
+ * A write was aimed at an aggregate project (ADR-175 decision 8). It owns no
+ * traces, prompts, datasets or experiments; a change is made on its members.
+ */
+export class AggregateProjectIsReadOnlyError extends HandledError {
+  declare readonly code: "aggregate_project_is_read_only";
+
+  constructor() {
+    super(
+      "aggregate_project_is_read_only",
+      "This project reads traces from other projects, so no data can be added to it",
+      { httpStatus: 403, fault: "customer" },
+    );
+    this.name = "AggregateProjectIsReadOnlyError";
+  }
+}
+
+/**
+ * Someone who is not an organisation admin asked to create or open an
+ * aggregate (ADR-175 decision 5): it reads other people's personal projects.
+ */
+export class AggregateProjectAdminOnlyError extends HandledError {
+  declare readonly code: "aggregate_project_admin_only";
+
+  constructor() {
+    super(
+      "aggregate_project_admin_only",
+      "Only organization admins can open an aggregate project",
+      { httpStatus: 403, fault: "customer" },
+    );
+    this.name = "AggregateProjectAdminOnlyError";
+  }
+}
+
+/**
+ * A rule named a project or department this organisation does not own, or one
+ * an aggregate cannot read. One code for every case, so a guessed id is never
+ * confirmed to exist elsewhere; raised before anything is written.
+ */
+export class AggregateRuleOutsideOrganizationError extends HandledError {
+  declare readonly code: "aggregate_rule_outside_organization";
+
+  constructor() {
+    super(
+      "aggregate_rule_outside_organization",
+      "The rule names a project or department outside this organization",
+      { httpStatus: 400, fault: "customer" },
+    );
+    this.name = "AggregateRuleOutsideOrganizationError";
+  }
+}
+
 /** First-time storage setup with no secret: a stored secret may stay blank, an absent one not. */
 export class ProjectS3SecretRequiredError extends HandledError {
   declare readonly code: "validation_error";

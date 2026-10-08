@@ -1,5 +1,6 @@
 import type { PersonalFeatures } from "@langwatch/organization-contract";
 import {
+  NON_DESTINATION_PROJECT_KINDS,
   PROJECT_KIND,
   ProjectNotFoundError,
   internalProjectSchema,
@@ -265,6 +266,7 @@ export class MemoryProjectRepository implements ProjectRepository {
     limit: number;
     projectIds?: string[];
     includeGovernance?: boolean;
+    includeAggregates?: boolean;
   }): Promise<PaginatedProjects> {
     const matching = this.#database
       .projects()
@@ -272,6 +274,7 @@ export class MemoryProjectRepository implements ProjectRepository {
         (project) =>
           project.archivedAt === null &&
           (input.includeGovernance === true || project.kind !== PROJECT_KIND.INTERNAL_GOVERNANCE) &&
+          (input.includeAggregates !== false || project.kind !== PROJECT_KIND.AGGREGATE) &&
           this.#database.isInOrganization(project, input.organizationId) &&
           (!input.projectIds || input.projectIds.includes(project.id)),
       )
@@ -509,6 +512,7 @@ export class MemoryProjectRepository implements ProjectRepository {
     if (
       !project ||
       project.archivedAt !== null ||
+      project.kind === PROJECT_KIND.AGGREGATE ||
       !this.#database.isInOrganization(project, input.organizationId)
     ) {
       return null;
@@ -533,13 +537,13 @@ export class MemoryProjectRepository implements ProjectRepository {
     return project ? this.#destination(project) : null;
   }
 
-  async countLiveNonGovernanceProjects(organizationId: string): Promise<number> {
+  async countLiveDestinationProjects(organizationId: string): Promise<number> {
     return this.#database
       .projects()
       .filter(
         (project) =>
           project.archivedAt === null &&
-          project.kind !== PROJECT_KIND.INTERNAL_GOVERNANCE &&
+          !NON_DESTINATION_PROJECT_KINDS.includes(project.kind) &&
           this.#database.isInOrganization(project, organizationId),
       ).length;
   }
@@ -702,7 +706,7 @@ export class MemoryProjectRepository implements ProjectRepository {
   }
 
   /** A freshly inserted row, with the columns the database defaults. */
-  #row(input: CreateProjectInput & Partial<Project>): Project {
+  #row(input: Omit<CreateProjectInput, "kind"> & Partial<Project>): Project {
     const now = toDate(nowInstant());
 
     return projectSchema.parse({

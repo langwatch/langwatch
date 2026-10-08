@@ -2,6 +2,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type { ProjectStorageCipher } from "../project-storage-settings.repository.ts";
 import type { ProjectRepositories } from "../project.repositories.ts";
+import { PrismaAggregateRuleRepository } from "./prisma.aggregate-rule.repository.ts";
 import { PrismaProjectStorageSettingsRepository } from "./prisma.project-storage-settings.repository.ts";
 import { PrismaProjectRepository } from "./prisma.project.repository.ts";
 
@@ -14,6 +15,7 @@ export class PostgresProjectRepositories {
   static readonly repositories = {
     projects: { tables: PrismaProjectRepository.tables },
     storageSettings: { tables: PrismaProjectStorageSettingsRepository.tables },
+    aggregateRules: { tables: PrismaAggregateRuleRepository.tables },
   } as const;
 
   static create(
@@ -25,6 +27,7 @@ export class PostgresProjectRepositories {
         prisma: members.prisma,
         cipher: members.encryption,
       }),
+      aggregateRules: PrismaAggregateRuleRepository.create({ prisma: members.prisma }),
     };
   }
 }

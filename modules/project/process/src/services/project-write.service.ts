@@ -4,8 +4,13 @@ import {
   TeamNotFoundError,
 } from "@langwatch/organization-contract";
 import {
+  AGGREGATE_DEFAULT_RULE,
+  PROJECT_KIND,
   ProjectCreateTargetMissingError,
   createProjectInputSchema,
+  isAggregateProjectKind,
+  type AggregateRule,
+  type CreatableProjectKind,
   type ArchivedProject,
   type Project,
   type UpdateProjectInput,
@@ -20,6 +25,7 @@ import {
 
 import type { ProjectRepository } from "../repositories/project.repository.ts";
 import { mintProjectSlug, projectIdSlugToken } from "../rules/project-slug-service.rules.ts";
+import type { AggregateRuleService } from "./aggregate-rule.service.ts";
 import type { ProjectCreatedNoticeService } from "./project-created-notice.service.ts";
 import type { ProjectCredentials } from "./project-credentials.service.ts";
 import type { ProjectDiagnostics, ProjectStoredObjects } from "./project.service.ts";
@@ -32,6 +38,8 @@ export class ProjectWriteService {
   private readonly created: ProjectCreatedNoticeService;
   private readonly storedObjects?: ProjectStoredObjects;
   private readonly diagnostics?: ProjectDiagnostics;
+  /** ADR-175: validates an aggregate's rule; absent, creating one is refused. */
+  private readonly aggregateRules?: AggregateRuleService;
 
   private constructor(options: {
     repository: ProjectRepository;
@@ -40,6 +48,7 @@ export class ProjectWriteService {
     created: ProjectCreatedNoticeService;
     storedObjects?: ProjectStoredObjects;
     diagnostics?: ProjectDiagnostics;
+    aggregateRules?: AggregateRuleService;
   }) {
     this.repository = options.repository;
     this.credentials = options.credentials;
@@ -47,6 +56,7 @@ export class ProjectWriteService {
     this.created = options.created;
     this.storedObjects = options.storedObjects;
     this.diagnostics = options.diagnostics;
+    this.aggregateRules = options.aggregateRules;
   }
 
   static create(options: {
@@ -56,6 +66,7 @@ export class ProjectWriteService {
     created: ProjectCreatedNoticeService;
     storedObjects?: ProjectStoredObjects;
     diagnostics?: ProjectDiagnostics;
+    aggregateRules?: AggregateRuleService;
   }): ProjectWriteService {
     return new ProjectWriteService(options);
   }
@@ -80,10 +91,17 @@ export class ProjectWriteService {
     name: string;
     language: string;
     framework: string;
+    /** ADR-175: the caller has decided the actor may create an aggregate; this checks the rule. */
+    kind?: CreatableProjectKind;
+    /** Only read for an aggregate; defaults to the all-personal rule. */
+    aggregateRule?: AggregateRule;
   }): Promise<Project> {
     if (!input.teamId && !input.newTeamName) {
       throw new ProjectCreateTargetMissingError();
     }
+
+    // Validated before the team is created, so a refused rule writes nothing.
+    const kindFields = await this.createKindFields(input);
 
     let teamId = input.teamId;
     if (teamId) {
@@ -129,6 +147,7 @@ export class ProjectWriteService {
         framework: input.framework,
         teamId,
         apiKey: this.credentials.generateApiKey(),
+        ...kindFields,
       }),
     );
     await this.created.created({
@@ -140,6 +159,25 @@ export class ProjectWriteService {
     });
 
     return project;
+  }
+
+  /**
+   * The kind columns a new project is written with: none for an ordinary
+   * project, the kind and its validated rule for an aggregate, so an
+   * aggregate never lands without a rule and nothing else carries one.
+   */
+  private async createKindFields(input: {
+    organizationId: string;
+    kind?: CreatableProjectKind;
+    aggregateRule?: AggregateRule;
+  }): Promise<{ kind?: CreatableProjectKind; aggregateRule?: AggregateRule }> {
+    if (!isAggregateProjectKind(input.kind)) return {};
+    if (!this.aggregateRules) {
+      throw new Error("No aggregate rule service is wired; an aggregate cannot be created here");
+    }
+    const rule = input.aggregateRule ?? AGGREGATE_DEFAULT_RULE;
+    await this.aggregateRules.assertValid({ rule, organizationId: input.organizationId });
+    return { kind: PROJECT_KIND.AGGREGATE, aggregateRule: rule };
   }
 
   async update(input: {

@@ -18,6 +18,7 @@ import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ProjectModule } from "../../app/project.app.ts";
+import { MemoryAggregateRuleRepository } from "../../repositories/memory/memory.aggregate-rule.repository.ts";
 import { MemoryProjectStorageSettingsRepository } from "../../repositories/memory/memory.project-storage-settings.repository.ts";
 import { MemoryProjectDatabase } from "../../repositories/memory/memory.project.database.ts";
 import { MemoryProjectRepository } from "../../repositories/memory/memory.project.repository.ts";
@@ -150,6 +151,7 @@ function application(
     repositories: {
       projects: MemoryProjectRepository.create({ memory: database }),
       storageSettings: MemoryProjectStorageSettingsRepository.create({ memory: database }),
+      aggregateRules: MemoryAggregateRuleRepository.create({ memory: database }),
     },
     config: undefined,
     resources: new ResourceScope(),
@@ -184,6 +186,8 @@ function mount(options: Parameters<typeof application>[0] = {}) {
     archiveOtherProject: (input) => app.archiveOtherProject(input),
     revokeProjectApiKey: (input) => app.revokeProjectApiKey(input),
     getLegacyKeyStatus: (input) => app.getLegacyKeyStatus(input),
+    assertMayCreateAggregate: (input) => app.assertMayCreateAggregate(input),
+    aggregateMemberCandidates: (input) => app.aggregateMemberCandidates(input),
   };
 
   const trpc = initTRPC.context<ProjectTrpcTestContext>().create();

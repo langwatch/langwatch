@@ -1,9 +1,11 @@
 import { moduleApi } from "@langwatch/module";
 import type { Instant } from "@langwatch/time";
 
+import type { AggregateRule } from "./aggregate-rule.ts";
 import type {
   ActiveProjectsByScopes,
   ActiveProjectsByScopesInput,
+  CreatableProjectKind,
   InternalProject,
   InternalProjectKind,
   InternalProjectQuery,
@@ -106,6 +108,8 @@ export interface ProjectApi {
     projectIds?: string[];
     /** The organization's hidden governance project is left out unless this is true. */
     includeGovernance?: boolean;
+    /** Aggregates are left out unless this person is an organisation admin (ADR-175). */
+    aggregatesVisibleTo?: { userId: string | null };
   }): Promise<PaginatedProjects>;
   listByTeam(input: {
     organizationId: string;
@@ -125,6 +129,7 @@ export interface ProjectApi {
   findLiveByRef(
     input: Readonly<{ projectRef: string; organizationId: string }>,
   ): Promise<Project[]>;
+  /** An aggregate (ADR-175) is created only after the caller was judged an organisation admin. */
   create(
     input: Readonly<{
       organizationId: string;
@@ -133,6 +138,8 @@ export interface ProjectApi {
       name: string;
       language: string;
       framework: string;
+      kind?: CreatableProjectKind | undefined;
+      aggregateRule?: AggregateRule | undefined;
     }>,
     by: Readonly<{ id: string }>,
   ): Promise<Project>;

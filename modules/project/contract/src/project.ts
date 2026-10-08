@@ -3,15 +3,26 @@ import type { OnboardingVariant } from "@langwatch/onboarding-contract";
 import type { Instant } from "@langwatch/time";
 import { z } from "zod";
 
+import { aggregateRuleSchema } from "./aggregate-rule.ts";
+
 export const PROJECT_FEATURE_ID = "project" as const;
 
 export const PROJECT_KIND = {
   APPLICATION: "application",
   INTERNAL_GOVERNANCE: "internal_governance",
+  /** ADR-175: owns no traces and reads its member projects through shared grants. */
+  AGGREGATE: "aggregate",
 } as const;
 
 export const projectKindSchema = z.enum(PROJECT_KIND);
 export type ProjectKind = z.infer<typeof projectKindSchema>;
+
+/** The kinds a caller may ask to create; the governance project is provisioned, never asked for. */
+export const creatableProjectKindSchema = z.enum([
+  PROJECT_KIND.APPLICATION,
+  PROJECT_KIND.AGGREGATE,
+]);
+export type CreatableProjectKind = z.infer<typeof creatableProjectKindSchema>;
 
 export const internalProjectKindSchema = z.literal(PROJECT_KIND.INTERNAL_GOVERNANCE);
 export type InternalProjectKind = z.infer<typeof internalProjectKindSchema>;
@@ -78,6 +89,8 @@ export const projectSchema = z
     langyEgressAllowlist: projectJsonValueSchema.nullable(),
     lastCodingAgentSessionAt: z.date().nullable(),
     lastCodingAgentPullRequestAt: z.date().nullable(),
+    /** ADR-175: an aggregate's stored rule, raw; `aggregateRuleFromDb` reads it. */
+    aggregateRule: projectJsonValueSchema.nullable().optional(),
   })
   .strict();
 export type Project = z.infer<typeof projectSchema>;
@@ -133,6 +146,10 @@ export const createProjectInputSchema = z
     framework: z.string(),
     teamId: z.string().min(1),
     apiKey: z.string(),
+    /** Omitted means the column default, an application project. */
+    kind: creatableProjectKindSchema.optional(),
+    /** ADR-175: set only on an aggregate project, validated before it is written. */
+    aggregateRule: aggregateRuleSchema.optional(),
   })
   .strict();
 export type CreateProjectInput = z.infer<typeof createProjectInputSchema>;
@@ -144,6 +161,14 @@ export const projectPaginationSchema = z
     limit: z.number().int().positive(),
     projectIds: z.array(z.string().min(1)).optional(),
     includeGovernance: z.boolean().optional(),
+    /**
+     * ADR-175 decision 5: the person a listing answers, whose organisation
+     * role decides whether aggregates are listed. Absent, they are.
+     */
+    aggregatesVisibleTo: z
+      .object({ userId: z.string().min(1).nullable() })
+      .strict()
+      .optional(),
   })
   .strict();
 export type ProjectPaginationInput = z.infer<typeof projectPaginationSchema>;

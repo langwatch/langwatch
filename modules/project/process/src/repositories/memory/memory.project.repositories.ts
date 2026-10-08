@@ -1,4 +1,5 @@
 import type { ProjectRepositories } from "../project.repositories.ts";
+import { MemoryAggregateRuleRepository } from "./memory.aggregate-rule.repository.ts";
 import { MemoryProjectStorageSettingsRepository } from "./memory.project-storage-settings.repository.ts";
 import { MemoryProjectDatabase } from "./memory.project.database.ts";
 import { MemoryProjectRepository } from "./memory.project.repository.ts";
@@ -12,6 +13,7 @@ export class MemoryProjectRepositories {
     return {
       projects: MemoryProjectRepository.create({ memory }),
       storageSettings: MemoryProjectStorageSettingsRepository.create({ memory }),
+      aggregateRules: MemoryAggregateRuleRepository.create({ memory }),
     };
   }
 }

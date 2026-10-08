@@ -3,6 +3,7 @@ import type { PersonalFeatures } from "@langwatch/organization-contract";
 import { PrismaRepository } from "@langwatch/prisma-client";
 import { Prisma, type Project as PrismaProject } from "@langwatch/prisma-client/generated";
 import {
+  NON_DESTINATION_PROJECT_KINDS,
   PROJECT_KIND,
   ProjectNotFoundError,
   internalProjectSchema,
@@ -484,11 +485,17 @@ export class PrismaProjectRepository
     limit: number;
     projectIds?: string[];
     includeGovernance?: boolean;
+    includeAggregates?: boolean;
   }): Promise<PaginatedProjects> {
+    const hidden = [
+      ...(input.includeGovernance ? [] : [PROJECT_KIND.INTERNAL_GOVERNANCE]),
+      ...(input.includeAggregates === false ? [PROJECT_KIND.AGGREGATE] : []),
+    ];
     const where = {
       archivedAt: null,
       team: { organizationId: input.organizationId },
-      ...(input.includeGovernance ? {} : { kind: { not: PROJECT_KIND.INTERNAL_GOVERNANCE } }),
+      ...(hidden.length === 1 ? { kind: { not: hidden[0] } } : {}),
+      ...(hidden.length > 1 ? { kind: { notIn: hidden } } : {}),
       ...(input.projectIds ? { id: { in: input.projectIds } } : {}),
     };
     const [rows, total] = await Promise.all([
@@ -628,6 +635,8 @@ export class PrismaProjectRepository
         id: input.projectId,
         team: { organizationId: input.organizationId },
         archivedAt: null,
+        // ADR-175: an aggregate owns no traces, so a key naming one names nothing.
+        kind: { not: PROJECT_KIND.AGGREGATE },
       },
       select: { id: true, teamId: true, archivedAt: true },
     });
@@ -647,11 +656,11 @@ export class PrismaProjectRepository
     });
   }
 
-  countLiveNonGovernanceProjects(organizationId: string): Promise<number> {
+  countLiveDestinationProjects(organizationId: string): Promise<number> {
     return this.prisma.project.count({
       where: {
         team: { organizationId },
-        kind: { not: PROJECT_KIND.INTERNAL_GOVERNANCE },
+        kind: { notIn: [...NON_DESTINATION_PROJECT_KINDS] },
         archivedAt: null,
       },
     });

@@ -8,11 +8,13 @@ import { defineTrpcContract } from "@langwatch/module";
 import {
   projectArchiveByIdInputSchema,
   projectCreateInputSchema,
+  projectOrganizationScopeSchema,
   projectScopeSchema,
   projectUpdateInputSchema,
 } from "./project-trpc.schemas.ts";
 import { PROJECT_LEGACY_KEY_REVOKED_EVENT_TYPE } from "./project.events.ts";
 import {
+  projectAggregateMemberCandidatesSchema,
   projectApiKeyRevokedSchema,
   projectArchivedSchema,
   projectFirstMessageSchema,
@@ -52,4 +54,9 @@ export const projectTrpc = defineTrpcContract("project")
   .mutation("archiveById")
   .withInput(projectArchiveByIdInputSchema)
   .withOutput(projectArchivedSchema)
+
+  // ADR-175: what an organisation admin may pick for an aggregate's explicit rule.
+  .query("aggregateMemberCandidates")
+  .withInput(projectOrganizationScopeSchema)
+  .withOutput(projectAggregateMemberCandidatesSchema)
   .build();

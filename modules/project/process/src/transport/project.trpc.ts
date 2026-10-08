@@ -10,7 +10,10 @@ import {
   ProjectCreateDeniedError,
   ProjectCreateTargetMissingError,
   TraceSharingDeniedError,
+  hasTracesToShow,
+  isAggregateProjectKind,
   projectTrpc,
+  type AggregateMemberCandidate,
   type ProjectApi,
 } from "@langwatch/project-contract";
 
@@ -48,17 +51,30 @@ export interface ProjectBrowserApi {
   getLegacyKeyStatus(input: { projectId: string }): Promise<{ present: boolean }>;
   /** Revokes the legacy project key for good, audited; no key is returned. */
   revokeProjectApiKey(input: { projectId: string; by: Readonly<{ id: string }> }): Promise<void>;
+  /**
+   * ADR-175: refuses a member of the organisation who is not an admin; an
+   * outsider is left to the permission probe the create asks next.
+   */
+  assertMayCreateAggregate(input: {
+    organizationId: string;
+    by: Readonly<{ id: string }>;
+  }): Promise<void>;
+  /** What an organisation admin may pick for an aggregate's rule; anyone else is refused. */
+  aggregateMemberCandidates(input: {
+    organizationId: string;
+    by: Readonly<{ id: string }>;
+  }): Promise<AggregateMemberCandidate[]>;
 }
 
 export const ProjectBrowserApi = moduleApi<ProjectBrowserApi>()("project");
 
 /**
  * `create`'s standing depends on what was asked for: creating INTO a team
- * asks that team for `project:create`; creating a team alongside asks the
- * organization for `organization:manage`. The handler resolves the tier.
+ * asks that team for `project:create`; creating a team alongside, or an
+ * aggregate anywhere, asks the organization for `organization:manage`.
  */
 const CREATE_RESOLVES_ITS_OWN_TIER =
-  "creating INTO a team asks that team for project:create; creating a team alongside asks the organization for organization:manage, and which of the two was asked for is only known once the input is parsed";
+  "creating INTO a team asks that team for project:create; creating a team alongside, or an aggregate project anywhere, asks the organization for organization:manage, and which was asked for is only known once the input is parsed";
 
 export const projectTrpcTransport: TrpcRouterDeclaration<ProjectBrowserApi, typeof projectTrpc> =
   defineTrpcRouter(ProjectBrowserApi, projectTrpc)
@@ -74,7 +90,7 @@ export const projectTrpcTransport: TrpcRouterDeclaration<ProjectBrowserApi, type
       enforces: {
         teamId: "requireCreateStanding asks the named team for project:create",
         organizationId:
-          "requireCreateStanding asks the organization for organization:manage when a team is created alongside",
+          "requireCreateStanding asks the organization for organization:manage when a team is created alongside or an aggregate is created",
       },
     })
     .handle(async ({ app, input, actor }) => {
@@ -88,6 +104,8 @@ export const projectTrpcTransport: TrpcRouterDeclaration<ProjectBrowserApi, type
           name: input.name,
           language: input.language,
           framework: input.framework,
+          kind: input.kind,
+          aggregateRule: input.aggregateRule,
         },
         actor,
       );
@@ -100,7 +118,8 @@ export const projectTrpcTransport: TrpcRouterDeclaration<ProjectBrowserApi, type
     .handle(async ({ app, input }) => {
       const project = await app.projects().findById(input.projectId);
 
-      return { firstMessage: project?.firstMessage ?? false };
+      // ADR-175: an aggregate shows its members' traces, so it never waits on a first one.
+      return { firstMessage: project ? hasTracesToShow(project) : false };
     })
 
     .procedure("getLegacyKeyStatus")
@@ -159,6 +178,12 @@ export const projectTrpcTransport: TrpcRouterDeclaration<ProjectBrowserApi, type
 
       return { success: true as const, alreadyArchived };
     })
+
+    .procedure("aggregateMemberCandidates")
+    .withPermission("organization:manage")
+    .handle(({ app, input, actor }) =>
+      app.aggregateMemberCandidates({ organizationId: input.organizationId, by: actor }),
+    )
     .build();
 
 /**
@@ -176,22 +201,31 @@ async function createStanding({
     organizationId: string;
     teamId?: string | undefined;
     newTeamName?: string | undefined;
+    kind?: string | undefined;
   }>;
   actor: Readonly<{ id: string }>;
 }): Promise<void> {
   if (!input.teamId && !input.newTeamName) throw new ProjectCreateTargetMissingError();
 
-  const permitted = input.teamId
-    ? await app.probePermission({
-        permission: "project:create",
-        scope: { tier: "team", id: input.teamId },
-        by: actor,
-      })
-    : await app.probePermission({
-        permission: "organization:manage",
-        scope: { tier: "organization", id: input.organizationId },
-        by: actor,
-      });
+  // ADR-175 decision 5: whichever team an aggregate attaches to, only an
+  // organisation admin may create one, whatever a custom role grants.
+  const aggregate = isAggregateProjectKind(input.kind);
+  if (aggregate) {
+    await app.assertMayCreateAggregate({ organizationId: input.organizationId, by: actor });
+  }
+
+  const permitted =
+    input.teamId && !aggregate
+      ? await app.probePermission({
+          permission: "project:create",
+          scope: { tier: "team", id: input.teamId },
+          by: actor,
+        })
+      : await app.probePermission({
+          permission: "organization:manage",
+          scope: { tier: "organization", id: input.organizationId },
+          by: actor,
+        });
 
   if (!permitted) throw new ProjectCreateDeniedError();
 }

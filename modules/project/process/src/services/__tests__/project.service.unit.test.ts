@@ -164,7 +164,7 @@ class StubRepository implements ProjectRepository {
   findOldestGovernanceTraceDestination = vi.fn(
     async (_organizationId: string): Promise<TraceDestinationProject | null> => null,
   );
-  countLiveNonGovernanceProjects = vi.fn(async () => 0);
+  countLiveDestinationProjects = vi.fn(async () => 0);
   findTraceDestination = vi.fn(async () => null);
   findTraceDestinations = vi.fn(async () => []);
   findIdByLegacyApiKey = vi.fn(async (): Promise<string | null> => null);
@@ -483,7 +483,7 @@ describe("ProjectService", () => {
   it("reports ambiguity when a governance fallback would hide live alternatives", async () => {
     const repository = new StubRepository();
     repository.findOldestGovernanceTraceDestination.mockResolvedValue(traceDestination);
-    repository.countLiveNonGovernanceProjects.mockResolvedValue(1);
+    repository.countLiveDestinationProjects.mockResolvedValue(1);
 
     await expect(
       createService(repository).resolveTraceDestination({
@@ -502,7 +502,7 @@ describe("ProjectService", () => {
         projectScopeIds: [],
       }),
     ).resolves.toEqual({ outcome: "no_destination" });
-    expect(repository.countLiveNonGovernanceProjects).not.toHaveBeenCalled();
+    expect(repository.countLiveDestinationProjects).not.toHaveBeenCalled();
   });
 
   /** @scenario "A feature reads an internal project" */

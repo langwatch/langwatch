@@ -11,6 +11,8 @@ import {
   projectPresenceInputSchema,
   type ActiveProjectsByScopes,
   type ActiveProjectsByScopesInput,
+  type AggregateRule,
+  type CreatableProjectKind,
   type InternalProject,
   type LiveProjectIdsByOrganizationInput,
   type InternalProjectKind,
@@ -43,6 +45,8 @@ import type { Instant } from "@langwatch/time";
 import type { ProjectRepository } from "../repositories/project.repository.ts";
 import { codingAgentActivityStaleBefore } from "../rules/coding-agent-activity.rules.ts";
 import { isLegacyKeyRevoked } from "../rules/legacy-project-key.rules.ts";
+import { AggregateAccessService } from "./aggregate-access.service.ts";
+import type { AggregateRuleService } from "./aggregate-rule.service.ts";
 import type { ProjectCreatedNoticeService } from "./project-created-notice.service.ts";
 import type { ProjectCredentials } from "./project-credentials.service.ts";
 import { ProjectMetadataService } from "./project-metadata.service.ts";
@@ -89,6 +93,7 @@ export class ProjectService {
   private readonly credentials: ProjectCredentials;
   private readonly organizations: OrganizationApi;
   private readonly created: ProjectCreatedNoticeService;
+  private readonly aggregateAccess: AggregateAccessService;
 
   private constructor({
     metadata,
@@ -111,6 +116,7 @@ export class ProjectService {
     this.credentials = credentials;
     this.organizations = organizations;
     this.created = created;
+    this.aggregateAccess = AggregateAccessService.create({ organizations });
   }
 
   static create(options: {
@@ -120,6 +126,8 @@ export class ProjectService {
     created: ProjectCreatedNoticeService;
     storedObjects?: ProjectStoredObjects;
     diagnostics?: ProjectDiagnostics;
+    /** ADR-175: validates an aggregate's rule; absent, creating an aggregate is refused. */
+    aggregateRules?: AggregateRuleService;
   }): ProjectService {
     return new ProjectService({
       metadata: ProjectMetadataService.create({
@@ -173,9 +181,7 @@ export class ProjectService {
       return { outcome: "no_destination" };
     }
 
-    const alternatives = await this.repository.countLiveNonGovernanceProjects(
-      parsed.organizationId,
-    );
+    const alternatives = await this.repository.countLiveDestinationProjects(parsed.organizationId);
     return alternatives > 0
       ? { outcome: "ambiguous", projectScopeCount: parsed.projectScopeIds.length }
       : { outcome: "resolved", project: governance };
@@ -271,6 +277,8 @@ export class ProjectService {
     name: string;
     language: string;
     framework: string;
+    kind?: CreatableProjectKind;
+    aggregateRule?: AggregateRule;
   }): Promise<Project> {
     return this.writes.create(input);
   }
@@ -287,14 +295,23 @@ export class ProjectService {
     return this.writes.archive(input);
   }
 
-  listByOrganization(input: {
+  async listByOrganization(input: {
     organizationId: string;
     page: number;
     limit: number;
     projectIds?: string[];
     includeGovernance?: boolean;
+    aggregatesVisibleTo?: { userId: string | null };
   }): Promise<PaginatedProjects> {
-    return this.repository.listAllByOrganization(projectPaginationSchema.parse(input));
+    const { aggregatesVisibleTo, ...page } = projectPaginationSchema.parse(input);
+    const includeAggregates =
+      aggregatesVisibleTo === undefined ||
+      (await this.aggregateAccess.mayOpen({
+        organizationId: page.organizationId,
+        userId: aggregatesVisibleTo.userId,
+      }));
+
+    return this.repository.listAllByOrganization({ ...page, includeAggregates });
   }
 
   listByTeam(input: {

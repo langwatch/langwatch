@@ -1,3 +1,4 @@
+import type { AggregateRuleRepository } from "./aggregate-rule.repository.ts";
 import type { ProjectStorageSettingsRepository } from "./project-storage-settings.repository.ts";
 import type { ProjectRepository } from "./project.repository.ts";
 
@@ -10,4 +11,6 @@ export interface ProjectRepositories {
   readonly projects: ProjectRepository;
   /** The stored-object columns of the project row, sealed by the live tier. */
   readonly storageSettings: ProjectStorageSettingsRepository;
+  /** ADR-175: the project rows an aggregate's rule reads. */
+  readonly aggregateRules: AggregateRuleRepository;
 }

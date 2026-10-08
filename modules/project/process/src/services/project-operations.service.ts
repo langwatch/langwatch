@@ -4,6 +4,8 @@ import {
   assertNotGovernanceProject,
   ProjectNotFoundError,
   ProjectS3SecretRequiredError,
+  type AggregateRule,
+  type CreatableProjectKind,
   type Project,
   type UpdateProjectInput,
   type ProjectLegacyKeyStatus,
@@ -60,6 +62,8 @@ export class ProjectOperationsService {
       name: string;
       language: string;
       framework: string;
+      kind?: CreatableProjectKind | undefined;
+      aggregateRule?: AggregateRule | undefined;
     }>,
     by: ProjectCaller,
   ): Promise<Project> {
@@ -71,6 +75,8 @@ export class ProjectOperationsService {
       name: input.name,
       language: input.language,
       framework: input.framework,
+      kind: input.kind,
+      aggregateRule: input.aggregateRule,
     });
   }
 

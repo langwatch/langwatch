@@ -34,6 +34,7 @@ describe("the project tRPC declarations", () => {
     it("keeps the namespace and the procedure names of each surface", () => {
       expect(projectTrpc.namespace).toBe("project");
       expect(Object.keys(projectTrpc.members).toSorted()).toEqual([
+        "aggregateMemberCandidates",
         "archiveById",
         "create",
         "getHasFirstMessage",
@@ -67,6 +68,7 @@ describe("the project tRPC declarations", () => {
         revokeProjectApiKey: "mutation",
         update: "mutation",
         archiveById: "mutation",
+        aggregateMemberCandidates: "query",
       });
     });
 
@@ -93,6 +95,10 @@ describe("the project tRPC declarations", () => {
         "project.revokeProjectApiKey": { kind: "permission", permission: "project:manage" },
         "project.update": { kind: "permission", permission: "project:update" },
         "project.archiveById": { kind: "permission", permission: "project:delete" },
+        "project.aggregateMemberCandidates": {
+          kind: "permission",
+          permission: "organization:manage",
+        },
       });
     });
   });
