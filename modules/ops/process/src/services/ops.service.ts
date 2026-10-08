@@ -40,9 +40,9 @@ import {
 import type { OpsExplorers } from "../app/ops.app.ts";
 import type { AnomalyStateRepository } from "../repositories/anomaly.repository.ts";
 import type { AdminAccess } from "./admin-access.service.ts";
-import type { AdminBackofficeService } from "./admin-backoffice.service.ts";
 import type { BlobStoreService } from "./blob-store.service.ts";
 import type { ImpersonationService } from "./impersonation.service.ts";
+import type { InstanceAdminService } from "./instance-admin.service.ts";
 import type { QueueService } from "./queue.service.ts";
 import type { SchedulerOpsService } from "./scheduler-ops.service.ts";
 
@@ -50,7 +50,7 @@ import type { SchedulerOpsService } from "./scheduler-ops.service.ts";
 export class OpsService {
   private readonly access: AdminAccess;
   private readonly impersonation: ImpersonationService;
-  private readonly adminBackoffice: AdminBackofficeService;
+  private readonly instanceAdmin: InstanceAdminService;
   private readonly blobStore: BlobStoreService;
   private readonly scheduler: SchedulerOpsService;
   private readonly anomalyState: AnomalyStateRepository | null;
@@ -63,7 +63,7 @@ export class OpsService {
   private constructor(deps: {
     access: AdminAccess;
     impersonation: ImpersonationService;
-    adminBackoffice: AdminBackofficeService;
+    instanceAdmin: InstanceAdminService;
     blobStore: BlobStoreService;
     scheduler: SchedulerOpsService;
     anomalyState: AnomalyStateRepository | null;
@@ -76,7 +76,7 @@ export class OpsService {
     this.snapshots = deps.explorers.snapshots;
     this.access = deps.access;
     this.impersonation = deps.impersonation;
-    this.adminBackoffice = deps.adminBackoffice;
+    this.instanceAdmin = deps.instanceAdmin;
     this.blobStore = deps.blobStore;
     this.scheduler = deps.scheduler;
     this.anomalyState = deps.anomalyState;
@@ -86,7 +86,7 @@ export class OpsService {
   static create(options: {
     access: AdminAccess;
     impersonation: ImpersonationService;
-    adminBackoffice: AdminBackofficeService;
+    instanceAdmin: InstanceAdminService;
     blobStore: BlobStoreService;
     scheduler: SchedulerOpsService;
     anomalyState: AnomalyStateRepository | null;
@@ -113,7 +113,7 @@ export class OpsService {
   }
 
   adminOperation(input: AdminOperationInput): Promise<AdminOperationResult> {
-    return this.adminBackoffice.execute(input);
+    return this.instanceAdmin.execute(input);
   }
 
   listBlobQueues(): Promise<string[]> {

@@ -185,7 +185,13 @@
       "pattern": "\\b[Bb]ack-?[Oo]ffice",
       "replacement": "\"Admin\" (Ops instance admin, Cloud admin, `ssoAdmin()`; round 39 DS-A)",
       "section": "§3.5",
-      "ruled": "2026-10-08"
+      "ruled": "2026-10-08",
+      "exemptPaths": [
+        "apps/ui/src/shell/ui-route-table.ts",
+        "apps/ui/src/shell/__tests__/retired-page-redirects.integration.test.tsx",
+        "apps/ui/src/shell/__tests__/ui-route-transcript.ts",
+        "packages/browser/src/__tests__/ui-prefix-redirect.integration.test.tsx"
+      ]
     },
     {
       "spelling": "`refusing*` twins",

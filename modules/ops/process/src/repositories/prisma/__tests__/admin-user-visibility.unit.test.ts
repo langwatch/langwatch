@@ -1,16 +1,14 @@
-import type { UserWithBackofficeIncludes } from "@langwatch/ops-contract";
+import type { UserWithAdminIncludes } from "@langwatch/ops-contract";
 import { describe, expect, it } from "vitest";
 
-import { toBackofficeUserRow } from "../../../rules/backoffice-user-row.rules.ts";
+import { toAdminUserRow } from "../../../rules/admin-user-row.rules.ts";
 
-const mapUserToBackofficeRow = (user: UserWithBackofficeIncludes) => toBackofficeUserRow(user);
+const mapUserToAdminRow = (user: UserWithAdminIncludes) => toAdminUserRow(user);
 
 /** Regression test for project-visibility rule: OrganizationUser without
  * TeamUser sees all non-archived projects. */
 
-function buildUser(
-  overrides: Partial<UserWithBackofficeIncludes> = {},
-): UserWithBackofficeIncludes {
+function buildUser(overrides: Partial<UserWithAdminIncludes> = {}): UserWithAdminIncludes {
   return {
     id: "user_1",
     name: "Test User",
@@ -24,7 +22,7 @@ function buildUser(
     deactivatedAt: null,
     orgMemberships: [],
     ...overrides,
-  } as UserWithBackofficeIncludes;
+  } as UserWithAdminIncludes;
 }
 
 interface Project {
@@ -84,7 +82,7 @@ function buildProject(overrides: Partial<Project> = {}): Project {
   };
 }
 
-describe("mapUserToBackofficeRow", () => {
+describe("mapUserToAdminRow", () => {
   describe("given a user with an org membership but no team membership", () => {
     it("still surfaces every project in the org's teams", () => {
       // No TeamUser rows anywhere — only the organization membership.
@@ -95,7 +93,7 @@ describe("mapUserToBackofficeRow", () => {
       const team = buildTeam({ projects: [project] });
       const org = buildOrg({ teams: [team] });
 
-      const row = mapUserToBackofficeRow(buildUser({ orgMemberships: [{ organization: org }] }));
+      const row = mapUserToAdminRow(buildUser({ orgMemberships: [{ organization: org }] }));
 
       expect(row.organizations).toEqual([{ id: org.id, name: org.name }]);
       expect(row.projects).toEqual([{ id: project.id, name: project.name, slug: project.slug }]);
@@ -122,7 +120,7 @@ describe("mapUserToBackofficeRow", () => {
         ],
       });
 
-      const row = mapUserToBackofficeRow(
+      const row = mapUserToAdminRow(
         buildUser({
           orgMemberships: [
             { organization: orgA },
@@ -139,7 +137,7 @@ describe("mapUserToBackofficeRow", () => {
 
   describe("given a user with no memberships", () => {
     it("returns empty organization and project lists", () => {
-      const row = mapUserToBackofficeRow(buildUser());
+      const row = mapUserToAdminRow(buildUser());
       expect(row.organizations).toEqual([]);
       expect(row.projects).toEqual([]);
     });
@@ -151,7 +149,7 @@ describe("mapUserToBackofficeRow", () => {
         teams: [buildTeam({ projects: [] })],
       });
 
-      const row = mapUserToBackofficeRow(buildUser({ orgMemberships: [{ organization: org }] }));
+      const row = mapUserToAdminRow(buildUser({ orgMemberships: [{ organization: org }] }));
 
       expect(row.projects).toEqual([]);
       expect(row.organizations).toHaveLength(1);
@@ -169,7 +167,7 @@ describe("mapUserToBackofficeRow", () => {
         teams: [buildTeam({ projects: [alive] })],
       });
 
-      const row = mapUserToBackofficeRow(buildUser({ orgMemberships: [{ organization: org }] }));
+      const row = mapUserToAdminRow(buildUser({ orgMemberships: [{ organization: org }] }));
 
       expect(row.projects.map((p) => p.id)).toEqual(["p_alive"]);
     });

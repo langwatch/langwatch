@@ -2,7 +2,7 @@
   "name": "@langwatch/ops-process",
   "version": "0.1.0",
   "private": true,
-  "description": "Platform operations and backoffice server implementation.",
+  "description": "Platform operations and admin server implementation.",
   "files": [
     "src"
   ],

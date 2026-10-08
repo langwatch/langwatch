@@ -13,7 +13,7 @@ import type {
 } from "./datastore-health.repository.ts";
 import type { EventExplorerRepository } from "./event-explorer.repository.ts";
 import type { ImpersonationRepository } from "./impersonation.repository.ts";
-import type { AdminBackofficeRepository } from "./instance-admin.repository.ts";
+import type { InstanceAdminRepository } from "./instance-admin.repository.ts";
 import type { MigrationMembershipRepository } from "./migration-membership.repository.ts";
 import type { OpsMetricsRepository } from "./ops-metrics.repository.ts";
 import type { OpsSnapshotRepository } from "./ops-snapshot.repository.ts";
@@ -55,7 +55,7 @@ export interface OpsRepositories {
   readonly projectTenants: ProjectTenantSourceRepository;
   readonly userTenants: UserTenantSourceRepository;
   readonly organizationMemberTenants: OrganizationMemberTenantSourceRepository;
-  readonly instanceAdmin: AdminBackofficeRepository;
+  readonly instanceAdmin: InstanceAdminRepository;
   readonly impersonation: ImpersonationRepository;
   readonly processFleet: ProcessOpsRepository;
   readonly postgresHealth: PostgresHealthRepository;

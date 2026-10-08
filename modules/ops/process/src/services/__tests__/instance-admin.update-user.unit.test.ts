@@ -1,13 +1,13 @@
 import type { AdminOperationInput, AdminOperationResult } from "@langwatch/ops-contract";
 import { describe, expect, it } from "vitest";
 
-import { AdminBackofficeRepository } from "../../repositories/instance-admin.repository.ts";
-import { AdminBackofficeService } from "../admin-backoffice.service.ts";
+import { InstanceAdminRepository } from "../../repositories/instance-admin.repository.ts";
 import { AdminAuditSink } from "../impersonation.service.ts";
-import { backofficeOperator } from "./support/backoffice-doubles.ts";
+import { InstanceAdminService } from "../instance-admin.service.ts";
+import { adminOperator } from "./support/admin-doubles.ts";
 import { TestUserApi } from "./support/test-user-api.ts";
 
-class RecordingRepository extends AdminBackofficeRepository {
+class RecordingRepository extends InstanceAdminRepository {
   constructor(private readonly log: unknown[]) {
     super();
   }
@@ -35,20 +35,20 @@ class RecordingAudit extends AdminAuditSink {
 
 async function updateUser(data: Record<string, unknown>) {
   const log: unknown[] = [];
-  const service = AdminBackofficeService.create({
+  const service = InstanceAdminService.create({
     repository: new RecordingRepository(log),
     users: new TestUserApi({
       reactivate: async ({ id, actor }) => {
         log.push(["users.reactivate", id, actor]);
-        return { ...backofficeOperator, id };
+        return { ...adminOperator, id };
       },
       deactivate: async ({ id, actor }) => {
         log.push(["users.deactivate", id, actor]);
-        return { ...backofficeOperator, id };
+        return { ...adminOperator, id };
       },
       updateProfile: async ({ id, email }) => {
         log.push(["users.updateProfile", id, email]);
-        return { ...backofficeOperator, id, email: email ?? null };
+        return { ...adminOperator, id, email: email ?? null };
       },
     }),
     audit: new RecordingAudit(log),
@@ -63,7 +63,7 @@ async function updateUser(data: Record<string, unknown>) {
   return { log, result };
 }
 
-describe("AdminBackofficeService user update", () => {
+describe("InstanceAdminService user update", () => {
   it.each([
     ["reactivates on a null deactivation", { deactivatedAt: null }],
     ["reactivates on a blank deactivation and saves the rest", { deactivatedAt: "", name: "X" }],
@@ -85,7 +85,7 @@ describe("AdminBackofficeService user update", () => {
 
   it("refuses an unrecognised deactivation value with validation_error and writes nothing", async () => {
     const log: unknown[] = [];
-    const service = AdminBackofficeService.create({
+    const service = InstanceAdminService.create({
       repository: new RecordingRepository(log),
       users: new TestUserApi({}),
       audit: new RecordingAudit(log),
@@ -105,7 +105,7 @@ describe("AdminBackofficeService user update", () => {
   });
 });
 
-describe("AdminBackofficeService user writes past the user module", () => {
+describe("InstanceAdminService user writes past the user module", () => {
   /** @scenario "The Back office refuses user writes the user module does not serve" */
   it.each<[AdminOperationInput["method"], AdminOperationInput["params"]]>([
     ["updateMany", { ids: ["user-1"], data: { deactivatedAt: null } }],
@@ -113,7 +113,7 @@ describe("AdminBackofficeService user writes past the user module", () => {
     ["deleteMany", { ids: ["user-1"] }],
   ])("refuses %s with validation_error and writes nothing", async (method, params) => {
     const log: unknown[] = [];
-    const service = AdminBackofficeService.create({
+    const service = InstanceAdminService.create({
       repository: new RecordingRepository(log),
       users: new TestUserApi({}),
       audit: new RecordingAudit(log),
@@ -126,13 +126,13 @@ describe("AdminBackofficeService user writes past the user module", () => {
   });
 });
 
-describe("AdminBackofficeService user create", () => {
+describe("InstanceAdminService user create", () => {
   /** @scenario "The Back office creates an account only as active" */
   it.each([null, "2026-01-02T03:04:05.000Z", 5])(
     "refuses a deactivation value of %s with validation_error and writes nothing",
     async (deactivatedAt) => {
       const log: unknown[] = [];
-      const service = AdminBackofficeService.create({
+      const service = InstanceAdminService.create({
         repository: new RecordingRepository(log),
         users: new TestUserApi({}),
         audit: new RecordingAudit(log),
@@ -166,7 +166,7 @@ type AuditCase = [
   AdminOperationInput["params"],
 ];
 
-describe("AdminBackofficeService audit before write", () => {
+describe("InstanceAdminService audit before write", () => {
   /** @scenario "A Back office write is audited before it is applied" */
   it.each<AuditCase>([
     [
@@ -185,9 +185,9 @@ describe("AdminBackofficeService audit before write", () => {
       const log: unknown[] = [];
       const record = (name: string) => async (args: unknown) => {
         log.push([name, args]);
-        return { ...backofficeOperator, id: "user-1" };
+        return { ...adminOperator, id: "user-1" };
       };
-      const service = AdminBackofficeService.create({
+      const service = InstanceAdminService.create({
         repository: new RecordingRepository(log),
         users: new TestUserApi({
           reactivate: record("users.reactivate"),
@@ -206,7 +206,7 @@ describe("AdminBackofficeService audit before write", () => {
 
   it("records every row of a bulk write before writing any of them", async () => {
     const log: unknown[] = [];
-    const service = AdminBackofficeService.create({
+    const service = InstanceAdminService.create({
       repository: new RecordingRepository(log),
       users: new TestUserApi({}),
       audit: new RecordingAudit(log),
@@ -233,7 +233,7 @@ describe("AdminBackofficeService audit before write", () => {
     ["an organization", "organization"],
   ])("records only the changed fields' prior values for %s", async (_label, resource) => {
     const log: unknown[] = [];
-    const service = AdminBackofficeService.create({
+    const service = InstanceAdminService.create({
       repository: new RecordingRepository(log),
       users: new TestUserApi({}),
       audit: new RecordingAudit(log),
@@ -260,7 +260,7 @@ describe("AdminBackofficeService audit before write", () => {
 
   it("records a create's intended data before the row exists", async () => {
     const log: unknown[] = [];
-    const service = AdminBackofficeService.create({
+    const service = InstanceAdminService.create({
       repository: new RecordingRepository(log),
       users: new TestUserApi({}),
       audit: new RecordingAudit(log),

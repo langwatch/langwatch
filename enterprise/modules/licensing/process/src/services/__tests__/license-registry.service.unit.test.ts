@@ -144,7 +144,7 @@ function issueInput(overrides: Partial<IssueInput> = {}): IssueInput {
 }
 
 describe("the license registry", () => {
-  /** @scenario "A license issued from the backoffice is recorded" */
+  /** @scenario "A license issued from the admin console is recorded" */
   /** @scenario A customer organization is marked as a self-hosted customer */
   /** @scenario Issuing a license never asks the operator for the private key */
   it("records the license it signs, active, linked and unbound", async () => {

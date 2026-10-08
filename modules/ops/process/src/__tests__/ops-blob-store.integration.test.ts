@@ -25,7 +25,7 @@ import type {
   QueuePayloadDecoding,
 } from "../app/ops.app.ts";
 import { PrismaImpersonationRepository } from "../repositories/prisma/prisma.admin.repository.ts";
-import { PrismaAdminBackofficeRepository } from "../repositories/prisma/prisma.instance-admin.repository.ts";
+import { PrismaInstanceAdminRepository } from "../repositories/prisma/prisma.instance-admin.repository.ts";
 import { QueueRedisRepository } from "../repositories/redis/queue.repository.ts";
 import { RedisAnomalyStateRepository } from "../repositories/redis/redis.anomaly-state.repository.ts";
 import { BlobStoreRedisRepository } from "../repositories/redis/redis.blob-store.repository.ts";
@@ -80,7 +80,7 @@ describe.skipIf(!hasRedis)("Ops blob store delete", () => {
     });
     ops = OpsOperations.create({
       repositories: {
-        instanceAdmin: PrismaAdminBackofficeRepository.create(database),
+        instanceAdmin: PrismaInstanceAdminRepository.create(database),
         impersonation: PrismaImpersonationRepository.create(database),
         queues: QueueRedisRepository.create({ redis, payloads: new NoopQueuePayloadDecoder() }),
         blobStore: BlobStoreRedisRepository.create(redis),

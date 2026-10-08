@@ -1,25 +1,25 @@
-export interface BackofficeOrganizationRef {
+export interface AdminOrganizationRef {
   id: string;
   name: string;
 }
 
-export interface BackofficeProjectRef {
+export interface AdminProjectRef {
   id: string;
   name: string;
   slug: string;
 }
 
-export interface UserWithBackofficeIncludes {
+export interface UserWithAdminIncludes {
   id: string;
   [key: string]: unknown;
   orgMemberships: {
-    organization: BackofficeOrganizationRef & {
-      teams: { projects: BackofficeProjectRef[] }[];
+    organization: AdminOrganizationRef & {
+      teams: { projects: AdminProjectRef[] }[];
     };
   }[];
 }
 
-export type BackofficeUserRow = UserWithBackofficeIncludes & {
-  organizations: BackofficeOrganizationRef[];
-  projects: BackofficeProjectRef[];
+export type AdminUserRow = UserWithAdminIncludes & {
+  organizations: AdminOrganizationRef[];
+  projects: AdminProjectRef[];
 };

@@ -13,7 +13,7 @@ import type {
   RunAdminOperationInput,
   StartAdminImpersonationInput,
   StopAdminImpersonationInput,
-} from "./admin-backoffice.ts";
+} from "./admin-operation.ts";
 import type { AdminIdentity, StartImpersonationInput, StopImpersonationInput } from "./admin.ts";
 import type {
   DeleteBlobInput,

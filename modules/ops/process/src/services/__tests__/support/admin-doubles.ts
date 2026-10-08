@@ -1,5 +1,5 @@
 /**
- * The collaborators the backoffice's organization edit does NOT reach: a
+ * The collaborators the admin console's organization edit does NOT reach: a
  * legacy single sign-on refusal happens before storage, so the repository
  * records whether it was called at all and the rest throw.
  */
@@ -12,10 +12,10 @@ import type { AdminOperationInput, AdminOperationResult } from "@langwatch/ops-c
 import type { UserProfile } from "@langwatch/user-contract";
 import { vi } from "vitest";
 
-import { AdminBackofficeRepository } from "../../../repositories/instance-admin.repository.ts";
+import { InstanceAdminRepository } from "../../../repositories/instance-admin.repository.ts";
 import { AdminAuditSink } from "../../impersonation.service.ts";
 
-export const backofficeOperator: UserProfile = {
+export const adminOperator: UserProfile = {
   id: "olive",
   name: "Olive",
   email: "olive@example.com",
@@ -119,11 +119,11 @@ export class AuthStub implements BrowserSessionApi {
   async revokeCliAccessToken(): Promise<void> {}
 }
 
-export class RepositoryStub extends AdminBackofficeRepository {
+export class RepositoryStub extends InstanceAdminRepository {
   execute = vi.fn(async (_input: AdminOperationInput): Promise<AdminOperationResult> => ({
     data: {},
   }));
-  findUserById = vi.fn(async () => ({ data: backofficeOperator }));
+  findUserById = vi.fn(async () => ({ data: adminOperator }));
 }
 
 export class AuditStub extends AdminAuditSink {

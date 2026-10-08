@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`AdminBackofficeService user update > changes the email through user 1`] = `
+exports[`InstanceAdminService user update > changes the email through user 1`] = `
 {
   "log": [
     [
@@ -29,7 +29,7 @@ exports[`AdminBackofficeService user update > changes the email through user 1`]
 }
 `;
 
-exports[`AdminBackofficeService user update > combines every side effect 1`] = `
+exports[`InstanceAdminService user update > combines every side effect 1`] = `
 {
   "log": [
     [
@@ -89,7 +89,7 @@ exports[`AdminBackofficeService user update > combines every side effect 1`] = `
 }
 `;
 
-exports[`AdminBackofficeService user update > deactivates on an unreadable picked date as on a readable one 1`] = `
+exports[`InstanceAdminService user update > deactivates on an unreadable picked date as on a readable one 1`] = `
 {
   "log": [
     [
@@ -121,7 +121,7 @@ exports[`AdminBackofficeService user update > deactivates on an unreadable picke
 }
 `;
 
-exports[`AdminBackofficeService user update > deactivates through user, as the operator, keeping no picked date 1`] = `
+exports[`InstanceAdminService user update > deactivates through user, as the operator, keeping no picked date 1`] = `
 {
   "log": [
     [
@@ -153,7 +153,7 @@ exports[`AdminBackofficeService user update > deactivates through user, as the o
 }
 `;
 
-exports[`AdminBackofficeService user update > normalises the email before handing it to user 1`] = `
+exports[`InstanceAdminService user update > normalises the email before handing it to user 1`] = `
 {
   "log": [
     [
@@ -182,7 +182,7 @@ exports[`AdminBackofficeService user update > normalises the email before handin
 }
 `;
 
-exports[`AdminBackofficeService user update > reactivates on a blank deactivation and saves the rest 1`] = `
+exports[`InstanceAdminService user update > reactivates on a blank deactivation and saves the rest 1`] = `
 {
   "log": [
     [
@@ -229,7 +229,7 @@ exports[`AdminBackofficeService user update > reactivates on a blank deactivatio
 }
 `;
 
-exports[`AdminBackofficeService user update > reactivates on a null deactivation 1`] = `
+exports[`InstanceAdminService user update > reactivates on a null deactivation 1`] = `
 {
   "log": [
     [
@@ -261,7 +261,7 @@ exports[`AdminBackofficeService user update > reactivates on a null deactivation
 }
 `;
 
-exports[`AdminBackofficeService user update > saves plain fields only 1`] = `
+exports[`InstanceAdminService user update > saves plain fields only 1`] = `
 {
   "log": [
     [

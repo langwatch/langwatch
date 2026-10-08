@@ -2,7 +2,7 @@
   "name": "@langwatch/ops-contract",
   "version": "0.1.0",
   "private": true,
-  "description": "Portable platform operations and backoffice contracts.",
+  "description": "Portable platform operations and admin contracts.",
   "files": [
     "src"
   ],

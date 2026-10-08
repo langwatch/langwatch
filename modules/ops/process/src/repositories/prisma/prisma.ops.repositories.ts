@@ -10,7 +10,7 @@ import { PrismaImpersonationRepository } from "./prisma.admin.repository.ts";
 import { PrismaBugReportRepository } from "./prisma.bug-report.repository.ts";
 import { PrismaCredentialsResealRepository } from "./prisma.credentials-reseal.repository.ts";
 import { PrismaPostgresHealthRepository } from "./prisma.datastore-health.repository.ts";
-import { PrismaAdminBackofficeRepository } from "./prisma.instance-admin.repository.ts";
+import { PrismaInstanceAdminRepository } from "./prisma.instance-admin.repository.ts";
 import { PrismaMigrationMembershipRepository } from "./prisma.migration-membership.repository.ts";
 import { PrismaOrganizationTenantSourceRepository } from "./prisma.organization-tenant-source.repository.ts";
 import { PrismaProjectTenantSourceRepository } from "./prisma.project-tenant-source.repository.ts";
@@ -67,7 +67,7 @@ export const PostgresOpsRepositories = {
       projectTenants: PrismaProjectTenantSourceRepository.create(prisma),
       userTenants: PrismaUserTenantSourceRepository.create({ prisma }),
       organizationMemberTenants: PrismaOrganizationMemberTenantSourceRepository.create({ prisma }),
-      instanceAdmin: PrismaAdminBackofficeRepository.create(prisma),
+      instanceAdmin: PrismaInstanceAdminRepository.create(prisma),
       impersonation: PrismaImpersonationRepository.create(prisma),
       processFleet: PrismaProcessAdmin.create({ database: prisma }),
       postgresHealth: PrismaPostgresHealthRepository.create(prisma),

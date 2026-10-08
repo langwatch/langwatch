@@ -4,17 +4,17 @@ import {
   AuditStub,
   organizationEdit,
   RepositoryStub,
-} from "../../services/__tests__/support/backoffice-doubles.ts";
+} from "../../services/__tests__/support/admin-doubles.ts";
 import { TestUserApi } from "../../services/__tests__/support/test-user-api.ts";
-import { AdminBackofficeService } from "../../services/admin-backoffice.service.ts";
+import { InstanceAdminService } from "../../services/instance-admin.service.ts";
 import {
   legacySsoStringColumnsIn,
   legacySsoStringWritesToRefuse,
 } from "../legacy-sso-string-writes.rules.ts";
 
-function backoffice(connectionDecides: boolean) {
+function buildInstanceAdmin(connectionDecides: boolean) {
   const repository = new RepositoryStub();
-  const service = AdminBackofficeService.create({
+  const service = InstanceAdminService.create({
     repository,
     users: new TestUserApi(),
     audit: new AuditStub(),
@@ -28,7 +28,7 @@ describe("the legacy single sign-on string columns", () => {
     describe("when a staff member edits the string columns", () => {
       /** @scenario "Which routing decides is asked per organization, never set fleet-wide" */
       it("keeps accepting the edit, because the strings still decide sign-in", async () => {
-        const { repository, service } = backoffice(false);
+        const { repository, service } = buildInstanceAdmin(false);
 
         await service.execute(organizationEdit({ ssoDomain: " ACME.com ", ssoProvider: "okta" }));
 
@@ -45,7 +45,7 @@ describe("the legacy single sign-on string columns", () => {
     describe("when a staff member edits the string columns", () => {
       /** @scenario "Once a connection decides, the strings stop being written" */
       it("refuses the edit and writes nothing", async () => {
-        const { repository, service } = backoffice(true);
+        const { repository, service } = buildInstanceAdmin(true);
 
         await expect(
           service.execute(organizationEdit({ name: "Acme", ssoDomain: "acme.com" })),
@@ -66,7 +66,7 @@ describe("the legacy single sign-on string columns", () => {
     describe("when the edit names no string column", () => {
       /** @scenario "Once a connection decides, the strings stop being written" */
       it("leaves every other organization edit alone", async () => {
-        const { repository, service } = backoffice(true);
+        const { repository, service } = buildInstanceAdmin(true);
 
         await service.execute(organizationEdit({ name: "Acme" }));
 

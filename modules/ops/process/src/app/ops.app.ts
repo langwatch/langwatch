@@ -284,10 +284,6 @@ import {
   type AdminAccessServiceOptions,
 } from "../services/admin-access.service.ts";
 import { AdminAuditService } from "../services/admin-audit.service.ts";
-import {
-  AdminBackofficeService,
-  type OrganizationSsoRouting,
-} from "../services/admin-backoffice.service.ts";
 import { AnomalyDetectorService } from "../services/anomaly-detector.service.ts";
 import { BlobStoreService } from "../services/blob-store.service.ts";
 import { EventExplorerService } from "../services/event-explorer.service.ts";
@@ -297,6 +293,10 @@ import {
   ImpersonationService,
   type ImpersonationSessions,
 } from "../services/impersonation.service.ts";
+import {
+  InstanceAdminService,
+  type OrganizationSsoRouting,
+} from "../services/instance-admin.service.ts";
 import { ManagerExplorerService } from "../services/manager-explorer.service.ts";
 import { OpsCheckupService } from "../services/ops-checkup.service.ts";
 import { OpsHealthService } from "../services/ops-health.service.ts";
@@ -2301,7 +2301,7 @@ function buildOpsInfrastructure(input: {
         repositories,
         // Where an organization's connection decides its sign-in, editing
         // the legacy `ssoDomain`/`ssoProvider` strings changes nothing a
-        // person experiences, so the backoffice refuses rather than accepting
+        // person experiences, so the admin console refuses rather than accepting
         // a no-op. Asked of identity per organization (ADR-117 §5).
         ssoRouting: organizationSsoRouting(dependencies.identity),
         audit: AdminAuditService.create({ auditLog: dependencies.auditLog }),
@@ -2433,7 +2433,7 @@ export class OpsOperations {
 
     return OpsService.create({
       access,
-      adminBackoffice: AdminBackofficeService.create({
+      instanceAdmin: InstanceAdminService.create({
         repository: repositories.instanceAdmin,
         users: this.options.users,
         audit: this.options.audit,

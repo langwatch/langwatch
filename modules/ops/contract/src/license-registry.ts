@@ -8,7 +8,7 @@ const issuedLicenseStatusSchema = z.enum(["active", "revoked", "superseded", "ex
 
 const seatCurrencySchema = z.enum(["USD", "EUR"]);
 
-/** A registry row as the backoffice reads it — never the held license itself. */
+/** A registry row as the admin console reads it — never the held license itself. */
 export const issuedLicenseViewSchema = z.object({
   id: z.string(),
   licenseId: z.string(),

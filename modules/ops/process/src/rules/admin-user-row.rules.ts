@@ -1,14 +1,14 @@
 import type {
-  BackofficeOrganizationRef,
-  BackofficeProjectRef,
-  BackofficeUserRow,
-  UserWithBackofficeIncludes,
+  AdminOrganizationRef,
+  AdminProjectRef,
+  AdminUserRow,
+  UserWithAdminIncludes,
 } from "@langwatch/ops-contract";
 
 /** One user row with the organizations and live projects its memberships reach. */
-export function toBackofficeUserRow(user: UserWithBackofficeIncludes): BackofficeUserRow {
-  const organizations = new Map<string, BackofficeOrganizationRef>();
-  const projects = new Map<string, BackofficeProjectRef>();
+export function toAdminUserRow(user: UserWithAdminIncludes): AdminUserRow {
+  const organizations = new Map<string, AdminOrganizationRef>();
+  const projects = new Map<string, AdminProjectRef>();
   for (const membership of user.orgMemberships ?? []) {
     const organization = membership.organization;
     organizations.set(organization.id, {

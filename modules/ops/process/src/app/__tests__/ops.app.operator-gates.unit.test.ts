@@ -80,18 +80,18 @@ describe("given the platform-operator grant answers through authz", () => {
 });
 
 describe("given an impersonating operator in the Back office", () => {
-  const backOfficeCalls: AdminOperationInput[] = [];
-  const { app: backOffice } = createOpsTestApp({
+  const adminCalls: AdminOperationInput[] = [];
+  const { app: adminApp } = createOpsTestApp({
     authz: platformOperatorAuthz({ holders: { [MANAGER.id]: ["ops:view", "ops:manage"] } }),
     capability: {
       adminOperation: async (input) => {
-        backOfficeCalls.push(input);
+        adminCalls.push(input);
         return { data: { id: input.params.id } };
       },
     },
   });
   const run = (method: "create" | "update", data: Record<string, unknown>) =>
-    backOffice.runAdminOperation({
+    adminApp.runAdminOperation({
       actor: IMPERSONATING_MANAGER,
       req: { headers: {} },
       resource: "user",
@@ -110,22 +110,22 @@ describe("given an impersonating operator in the Back office", () => {
   ])(
     "refuses %s with a deactivation of %s and never reaches the back office or user",
     async (method, deactivatedAt) => {
-      backOfficeCalls.length = 0;
+      adminCalls.length = 0;
       await expect(run(method, { deactivatedAt })).rejects.toMatchObject({
         code: "ops_impersonated_operator_refused",
       });
-      expect(backOfficeCalls).toEqual([]);
+      expect(adminCalls).toEqual([]);
     },
   );
 
   /** @scenario "An impersonating operator cannot deactivate or reactivate an account from the back office" */
   /** @scenario "An impersonating admin stays the acting person" */
   it("still lets the impersonating operator update a user's other fields", async () => {
-    backOfficeCalls.length = 0;
+    adminCalls.length = 0;
     await expect(run("update", { name: "Renamed" })).resolves.toEqual({
       data: { id: "user_target" },
     });
-    expect(backOfficeCalls.map((call) => [call.method, call.params.data, call.actorId])).toEqual([
+    expect(adminCalls.map((call) => [call.method, call.params.data, call.actorId])).toEqual([
       ["update", { name: "Renamed" }, MANAGER.id],
     ]);
   });

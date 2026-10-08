@@ -878,8 +878,8 @@ Platform permission `ops:manage`. Credential `browser`. Declared at `src/transpo
 Answers at `/api/admin/impersonate`, `/api/v1/admin/impersonate`.
 
 ```typescript
-type Body = z.infer<typeof adminImpersonationRequestSchema>; // ../contract/src/admin-backoffice.ts:75
-type Response = z.infer<typeof adminImpersonationStartedSchema>; // ../contract/src/admin-backoffice.ts:88
+type Body = z.infer<typeof adminImpersonationRequestSchema>; // ../contract/src/admin-operation.ts:75
+type Response = z.infer<typeof adminImpersonationStartedSchema>; // ../contract/src/admin-operation.ts:88
 ```
 
 #### `DELETE /api/admin/impersonate` · `stopAdminImpersonation`
@@ -889,8 +889,8 @@ Platform permission `ops:manage`. Credential `browser`. Declared at `src/transpo
 Answers at `/api/admin/impersonate`, `/api/v1/admin/impersonate`.
 
 ```typescript
-type Body = z.infer<typeof adminEmptyRequestSchema>; // ../contract/src/admin-backoffice.ts:80
-type Response = z.infer<typeof adminImpersonationStoppedSchema>; // ../contract/src/admin-backoffice.ts:91
+type Body = z.infer<typeof adminEmptyRequestSchema>; // ../contract/src/admin-operation.ts:80
+type Response = z.infer<typeof adminImpersonationStoppedSchema>; // ../contract/src/admin-operation.ts:91
 ```
 
 #### `POST /api/admin/:resource` · `runAdminOperation`
@@ -900,9 +900,9 @@ Platform permission `ops:view`. Credential `browser`. Declared at `src/transport
 Answers at `/api/admin/:resource`, `/api/v1/admin/:resource`.
 
 ```typescript
-type Params = z.infer<typeof adminResourceParamsSchema>; // ../contract/src/admin-backoffice.ts:82
-type Body = z.infer<typeof adminOperationBodySchema>; // ../contract/src/admin-backoffice.ts:83
-type Response = z.infer<typeof adminOperationResponseSchema>; // ../contract/src/admin-backoffice.ts:106
+type Params = z.infer<typeof adminResourceParamsSchema>; // ../contract/src/admin-operation.ts:82
+type Body = z.infer<typeof adminOperationBodySchema>; // ../contract/src/admin-operation.ts:83
+type Response = z.infer<typeof adminOperationResponseSchema>; // ../contract/src/admin-operation.ts:106
 ```
 
 ### `checkupRest`

@@ -1,11 +1,11 @@
 /** The registry of self-hosted installs (ADR-156, section 10), as the
- * backoffice reads it. `licensing` is enterprise, so every shape here is
+ * admin console reads it. `licensing` is enterprise, so every shape here is
  * declared locally rather than imported from it (as `license-registry.ts`). */
 import { z } from "zod";
 
 const selfHostedInstanceActivitySchema = z.enum(["reporting", "quiet", "gone"]);
 
-/** One install as the backoffice reads it. */
+/** One install as the admin console reads it. */
 export const selfHostedInstanceViewSchema = z.object({
   id: z.string(),
   instanceId: z.string(),

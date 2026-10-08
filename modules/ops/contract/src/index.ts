@@ -1,5 +1,5 @@
 export * from "./admin.ts";
-export * from "./admin-backoffice.ts";
+export * from "./admin-operation.ts";
 export * from "./admin.errors.ts";
 export * from "./ops.errors.ts";
 export * from "./admin.queries.ts";

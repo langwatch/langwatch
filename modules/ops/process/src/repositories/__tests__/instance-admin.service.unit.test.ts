@@ -3,9 +3,9 @@ import type { UserApi, UserProfile } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { TestUserApi } from "../../services/__tests__/support/test-user-api.ts";
-import { AdminBackofficeService } from "../../services/admin-backoffice.service.ts";
 import { AdminAuditSink } from "../../services/impersonation.service.ts";
-import { AdminBackofficeRepository } from "../instance-admin.repository.ts";
+import { InstanceAdminService } from "../../services/instance-admin.service.ts";
+import { InstanceAdminRepository } from "../instance-admin.repository.ts";
 
 const user: UserProfile = {
   id: "user-1",
@@ -24,7 +24,7 @@ const user: UserProfile = {
 const updateProfileFake = (email = user.email) =>
   vi.fn(async (): Promise<UserProfile> => ({ ...user, email }));
 
-class RepositoryFake extends AdminBackofficeRepository {
+class RepositoryFake extends InstanceAdminRepository {
   execute = vi.fn();
   findUserById = vi.fn(async () => ({ data: user }));
 }
@@ -44,14 +44,14 @@ function input(email: string): AdminOperationInput {
 }
 
 function serviceWith(updateProfile: UserApi["updateProfile"]) {
-  return AdminBackofficeService.create({
+  return InstanceAdminService.create({
     repository: new RepositoryFake(),
     users: new TestUserApi({ updateProfile }),
     audit: new AuditFake(),
   });
 }
 
-describe("AdminBackofficeService user email updates", () => {
+describe("InstanceAdminService user email updates", () => {
   /** @scenario "An operator changing a user's email revokes their browser sessions" */
   it("hands the normalised email to user, which revokes on a real change", async () => {
     const updateProfile = updateProfileFake("new@example.com");
@@ -70,7 +70,7 @@ describe("AdminBackofficeService user email updates", () => {
     expect(updateProfile).toHaveBeenCalledWith({ id: user.id, email: user.email });
   });
 
-  /** @scenario "A failed revocation still leaves the new backoffice email in place" */
+  /** @scenario "A failed revocation still leaves the new admin email in place" */
   it("surfaces a revocation failure from user, which saved the email first", async () => {
     const updateProfile = vi.fn(async (): Promise<UserProfile> => {
       throw new Error("redis unavailable");

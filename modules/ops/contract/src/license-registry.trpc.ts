@@ -1,5 +1,5 @@
 /**
- * The license registry surface (ADR-156), as the Backoffice reads and writes
+ * The license registry surface (ADR-156), as the admin console reads and writes
  * it: every issue path writes a row here, so a signed license is shown
  * exactly once, when it is issued or reissued, and never read back.
  */

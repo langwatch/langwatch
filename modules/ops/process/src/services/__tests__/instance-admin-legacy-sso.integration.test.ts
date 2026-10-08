@@ -1,6 +1,6 @@
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 /**
- * The backoffice's organization edit, with the routing flip on. The
+ * The admin console's organization edit, with the routing flip on. The
  * refusal is raised in the ops service graph, and its copy is read from
  * the presentation registry. Spec: specs/identity/sso-onboarding-tiers.feature
  */
@@ -16,8 +16,8 @@ import { describe, expect, it } from "vitest";
 import { OpsOperations } from "../../app/ops.app.ts";
 import type { OpsEventExplorer, OpsProcessExplorer, OpsReplayRunner } from "../../app/ops.app.ts";
 import { MemoryOpsRepositories } from "../../repositories/memory/memory.ops.repositories.ts";
-import { PrismaAdminBackofficeRepository } from "../../repositories/prisma/prisma.instance-admin.repository.ts";
-import { AuditStub, organizationEdit } from "./support/backoffice-doubles.ts";
+import { PrismaInstanceAdminRepository } from "../../repositories/prisma/prisma.instance-admin.repository.ts";
+import { AuditStub, organizationEdit } from "./support/admin-doubles.ts";
 import { TestUserApi } from "./support/test-user-api.ts";
 
 /** Reached only if the refusal fails to happen; every call here is a failure. */
@@ -31,18 +31,18 @@ const refuseEveryQuery = new Proxy(
           get:
             () =>
             (...args: unknown[]) => {
-              throw new Error(`the backoffice reached storage: ${JSON.stringify(args)}`);
+              throw new Error(`the admin console reached storage: ${JSON.stringify(args)}`);
             },
         },
       ),
   },
 );
 
-function backoffice(connectionDecides = true) {
+function buildInstanceAdmin(connectionDecides = true) {
   return OpsOperations.create({
     repositories: {
       ...MemoryOpsRepositories.create({ eventing: { definitions: [] } }),
-      instanceAdmin: PrismaAdminBackofficeRepository.create(refuseEveryQuery as never),
+      instanceAdmin: PrismaInstanceAdminRepository.create(refuseEveryQuery as never),
     },
     audit: new AuditStub(),
     sessions: createApiFixture<AuthApi>(),
@@ -67,7 +67,7 @@ describe("given an organization whose own connection decides its sign-in", () =>
   describe("when an operator edits the organization's older single sign-on fields", () => {
     /** @scenario "The old single sign-on fields stop being where single sign-on is set up" */
     it("refuses the edit with sso_connection_string_edit_retired and points at the connection", async () => {
-      const ops = backoffice();
+      const ops = buildInstanceAdmin();
 
       const refusal = await ops
         .adminOperation(organizationEdit({ ssoDomain: "acme.com", ssoProvider: "okta" }))
@@ -92,7 +92,7 @@ describe("given an organization that has no connection at all", () => {
   describe("when an operator edits its older single sign-on fields", () => {
     /** @scenario "Which routing decides is asked per organization, never set fleet-wide" */
     it("accepts the edit, because that organization's strings still decide", async () => {
-      const ops = backoffice(false);
+      const ops = buildInstanceAdmin(false);
 
       const refusal = await ops
         .adminOperation(organizationEdit({ ssoDomain: "globex.com", ssoProvider: "okta" }))

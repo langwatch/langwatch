@@ -9,7 +9,7 @@ import {
 } from "@langwatch/ops-contract";
 import type { UserApi } from "@langwatch/user-contract";
 
-import type { AdminBackofficeRepository } from "../repositories/instance-admin.repository.ts";
+import type { InstanceAdminRepository } from "../repositories/instance-admin.repository.ts";
 import { legacySsoStringWritesToRefuse } from "../rules/legacy-sso-string-writes.rules.ts";
 import { isOrganizationDatasetLimitWriteAllowed } from "../rules/organization-dataset-limit.rules.ts";
 import type { AdminAuditSink } from "./impersonation.service.ts";
@@ -18,8 +18,8 @@ const MUTATING_METHODS = new Set(["create", "update", "updateMany", "delete", "d
 /** User writes that would skip the user module's facts and last-operator rule. */
 const USER_METHODS_REFUSED = new Set(["updateMany", "delete", "deleteMany"]);
 
-interface AdminBackofficeServiceOptions {
-  repository: AdminBackofficeRepository;
+interface InstanceAdminServiceOptions {
+  repository: InstanceAdminRepository;
   users: UserApi;
   audit: AdminAuditSink;
   /** Whether an organization's own connection decides its sign-in, asked of
@@ -45,14 +45,14 @@ const STRINGS_STILL_DECIDE: OrganizationSsoRouting = {
 /** Ops-owned application service for the legacy react-admin wire surface. */
 type UserSideEffectAudit = { action: string; payload: Record<string, unknown> };
 
-export class AdminBackofficeService {
-  private readonly repository: AdminBackofficeRepository;
+export class InstanceAdminService {
+  private readonly repository: InstanceAdminRepository;
   private readonly users: UserApi;
   private readonly audit: AdminAuditSink;
   private readonly ssoRouting: OrganizationSsoRouting;
 
   private constructor(deps: {
-    repository: AdminBackofficeRepository;
+    repository: InstanceAdminRepository;
     users: UserApi;
     audit: AdminAuditSink;
     ssoRouting: OrganizationSsoRouting;
@@ -63,8 +63,8 @@ export class AdminBackofficeService {
     this.ssoRouting = deps.ssoRouting;
   }
 
-  static create(options: AdminBackofficeServiceOptions): AdminBackofficeService {
-    return new AdminBackofficeService({
+  static create(options: InstanceAdminServiceOptions): InstanceAdminService {
+    return new InstanceAdminService({
       repository: options.repository,
       users: options.users,
       audit: options.audit,

@@ -1,4 +1,4 @@
-/** The registry of self-hosted installs (ADR-156 §10), as the Backoffice
+/** The registry of self-hosted installs (ADR-156 §10), as the admin console
  * reads it. Read only: an install reported every number here. */
 import { defineTrpcContract } from "@langwatch/module";
 

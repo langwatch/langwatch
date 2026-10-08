@@ -191,6 +191,28 @@ describe("deleted-spellings-in-code", () => {
     });
   });
 
+  describe("when the list exempts a path for a spelling", () => {
+    /** @scenario "A file the list exempts by path keeps a ruled use of the spelling" */
+    it("skips the exempt file and still reports the spelling elsewhere", () => {
+      write({
+        path: DELETED_SPELLINGS_LIST,
+        content: JSON.stringify({
+          ...LIST,
+          spellings: [
+            { ...LIST.spellings[0], exemptPaths: ["apps/demo/src/redirects.ts"] },
+            ...LIST.spellings.slice(1),
+          ],
+        }),
+      });
+      write({ path: "apps/demo/src/redirects.ts", content: "oldThing();\n" });
+      write({ path: "apps/demo/src/other.ts", content: "oldThing();\n" });
+
+      const findings = lintDeletedSpellingsInCode(snapshotOf({ root }));
+
+      expect(findings.map(({ file }) => file)).toEqual(["apps/demo/src/other.ts"]);
+    });
+  });
+
   describe("when a count is compared with the shrink-only list", () => {
     /** @scenario "A new use over the list is refused and a removal must lower it" */
     it("refuses a rise and asks for a fall to be written down", () => {
