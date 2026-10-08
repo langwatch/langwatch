@@ -2155,9 +2155,6 @@ importers:
       '@langwatch/notification-browser':
         specifier: workspace:*
         version: link:../../modules/notification/browser
-      '@langwatch/notification-contract':
-        specifier: workspace:*
-        version: link:../../modules/notification/contract
       '@langwatch/onboarding-browser':
         specifier: workspace:*
         version: link:../../modules/onboarding/browser

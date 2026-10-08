@@ -22,10 +22,6 @@
     "./public-app-config": {
       "types": "./dist/public-app-config.d.ts",
       "default": "./src/public-app-config.ts"
-    },
-    "./public-app-config/projection": {
-      "types": "./dist/public-app-config.projection.d.ts",
-      "default": "./src/public-app-config.projection.ts"
     }
   },
   "scripts": {

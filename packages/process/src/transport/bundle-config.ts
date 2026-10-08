@@ -1,4 +1,3 @@
-import fs from "node:fs";
 import path from "node:path";
 
 import {
@@ -32,9 +31,8 @@ export type BrowserConfigOwner = Readonly<{
   publicConfig?: (config: unknown, api: unknown) => unknown;
 }>;
 
-export function resolveUiBundle(config: BundleConfig): ApiUiBundle | undefined {
+export function resolveUiBundle(config: BundleConfig): ApiUiBundle {
   const directory = path.resolve(config.directory);
-  if (!fs.existsSync(path.join(directory, "index.html"))) return void 0;
   const assetBase = normalizeAssetBase(config.assetBase);
   return {
     directory,

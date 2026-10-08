@@ -25,7 +25,7 @@ exported here and may be re-bound only as the same leaf. A leaf that claims a se
 ## Public surfaces and transports
 
 The root exports `Config`, `ConfigLeaf`, `parseProcessConfig`, the three error classes, the
-deployment-fact leaves and the dev-port alignment. `./public-app-config` and its projection export
+deployment-fact leaves and the dev-port alignment. `./public-app-config` exports
 the browser-safe subset the UI bootstrap reads.
 
 ## Dependencies

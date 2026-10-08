@@ -63,3 +63,10 @@ Feature: HTTP hosting for API and browser surfaces
     Then the policy redirects before public config is projected
     And the redirect retains security headers
     And static assets remain available
+
+  @unit
+  Scenario: A development api renders the shell's public config without a built bundle
+    Given an api whose bundle directory holds no built index.html
+    When /index.html is requested
+    Then a bare shell answers carrying the public config meta
+    And any other document path still answers 404
