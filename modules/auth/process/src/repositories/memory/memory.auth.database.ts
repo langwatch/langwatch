@@ -40,6 +40,7 @@ export type MemoryUserRow = {
   id: string;
   email?: string | null;
   name?: string | null;
+  emailVerified?: boolean;
   deactivatedAt?: Date | null;
   pendingSsoSetup?: boolean;
   signupConfirmationPending?: boolean;

@@ -15,6 +15,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant } from "@langwatch/time";
 import { memoryAdapter } from "better-auth/adapters/memory";
 
+import type { LinkProposals } from "../../channels/http/http.better-auth-hooks.channel.ts";
 import {
   createBetterAuthTransport,
   type BetterAuthDeploymentConfiguration,
@@ -90,6 +91,7 @@ export function betterAuthTransportFor(
     authzGrants: {} as never,
     arrivals: createApiFixture<SsoArrivalApi>({ admit: async () => undefined }),
     ssoActivity: createApiFixture<SsoAuthenticationActivityApi>({ record: async () => undefined }),
+    linkProposals: createApiFixture<LinkProposals>(),
     ssoMigration: createApiFixture<SsoMigrationCallbackApi>({
       decideAccountLink: async () => ({ kind: "not_migrating" }),
     }),

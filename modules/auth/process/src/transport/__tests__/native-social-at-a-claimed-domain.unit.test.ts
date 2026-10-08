@@ -21,6 +21,7 @@ import {
   createBeforeAccountCreateHook,
   type FindGoverningConnections,
   type SsoDomainOrganizations,
+  type LinkProposals,
 } from "../../channels/http/http.better-auth-hooks.channel.ts";
 import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";
 
@@ -56,6 +57,7 @@ function repoFor({
       deactivatedAt: null,
       pendingSsoSetup: false,
       signupConfirmationPending: false,
+      emailVerified: true,
     }),
     countAccountsForUser: async () => 1,
     findFederatedAccountsForUser: async () => [],
@@ -95,6 +97,7 @@ function collaborators({
     authzGrants: createApiFixture<BetterAuthHookCollaborators["authzGrants"]>(),
     arrivals: createApiFixture<SsoArrivalApi>({ admit }),
     ssoActivity: createApiFixture<SsoAuthenticationActivityApi>({ record: async () => undefined }),
+    linkProposals: createApiFixture<LinkProposals>(),
     ssoMigration: createApiFixture<SsoMigrationCallbackApi>({
       decideAccountLink: async () => ({ kind: "not_migrating" }),
     }),
@@ -112,6 +115,7 @@ function signUp({
 }) {
   return createBeforeAccountCreateHook({
     repo,
+    linkProposals: createApiFixture<LinkProposals>(),
     organizations: repoFor().organizations,
     federation: licensed,
     findGoverningConnections: acmeGoverned,
@@ -191,6 +195,7 @@ describe("the legacy ssoDomain columns", () => {
     await expect(
       createBeforeAccountCreateHook({
         repo,
+        linkProposals: createApiFixture<LinkProposals>(),
         organizations,
         federation: licensed,
         findGoverningConnections: nobodyGoverns,
@@ -205,6 +210,7 @@ describe("the legacy ssoDomain columns", () => {
     await expect(
       createBeforeAccountCreateHook({
         repo,
+        linkProposals: createApiFixture<LinkProposals>(),
         organizations,
         federation: licensed,
         findGoverningConnections: acmeBrokered,
@@ -232,6 +238,7 @@ describe("the legacy ssoDomain columns", () => {
     });
     await createBeforeAccountCreateHook({
       repo,
+      linkProposals: createApiFixture<LinkProposals>(),
       organizations,
       federation: licensed,
       findGoverningConnections: nobodyGoverns,

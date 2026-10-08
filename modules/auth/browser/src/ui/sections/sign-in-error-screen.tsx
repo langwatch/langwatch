@@ -68,6 +68,8 @@ const errorTitle = (error: string): string => {
     case "SSO_PROVIDER_NOT_ALLOWED":
     case "SSO_REQUIRED_BY_ORGANIZATION":
       return "Use your organization's sign-in";
+    case "LINK_NEEDS_APPROVAL":
+      return "This sign-in method needs approval";
     default:
       return (
         cutoverSignInRefusal(error)?.title ??
@@ -283,6 +285,26 @@ function SignInErrorDescription({
           <Text>
             Your organization requires single sign-on. Sign out and sign in again by entering your
             company email address, then choose your organization's login.
+          </Text>
+          <Button {...FRONT_DOOR_PRIMARY_STYLE} asChild marginTop={4}>
+            <a href={FEDERATED_LOGOUT_PATH}>Sign out &amp; try again</a>
+          </Button>
+        </VStack>
+      </Alert.Description>
+    );
+  }
+
+  if (error === "LINK_NEEDS_APPROVAL") {
+    return (
+      <Alert.Description>
+        <VStack gap={1} align="start">
+          <Text>
+            We could not confirm that this login belongs to your LangWatch account, so it has not
+            been added to it.
+            <br />
+            <br />
+            An administrator in your organization can review the request and approve it. In the
+            meantime, sign in with a method you have used before.
           </Text>
           <Button {...FRONT_DOOR_PRIMARY_STYLE} asChild marginTop={4}>
             <a href={FEDERATED_LOGOUT_PATH}>Sign out &amp; try again</a>

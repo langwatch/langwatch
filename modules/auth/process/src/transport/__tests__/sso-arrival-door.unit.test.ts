@@ -23,6 +23,7 @@ import type {
 import type {
   BetterAuthHookCollaborators,
   SsoDomainOrganizations,
+  LinkProposals,
 } from "../../channels/http/http.better-auth-hooks.channel.ts";
 import {
   afterAccountCreate,
@@ -40,6 +41,7 @@ const WORKER: BetterAuthHookUser = {
   deactivatedAt: null,
   pendingSsoSetup: false,
   signupConfirmationPending: false,
+  emailVerified: true,
 };
 
 function repoFor(user: Partial<BetterAuthHookUser> | null = {}): BetterAuthHooksRepository {
@@ -66,6 +68,7 @@ function collaboratorsFor(
     authzGrants: createApiFixture<AuthzGrantsService>(),
     arrivals: createApiFixture<SsoArrivalApi>({ admit }),
     ssoActivity: createApiFixture<SsoAuthenticationActivityApi>({ record }),
+    linkProposals: createApiFixture<LinkProposals>(),
     ssoMigration: createApiFixture<SsoMigrationCallbackApi>({
       decideAccountLink: async () => ({ kind: "not_migrating" }),
     }),

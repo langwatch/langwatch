@@ -42,6 +42,7 @@ export class MemoryBetterAuthHooksRepository extends BetterAuthHooksRepository {
       id: user.id,
       email: user.email ?? null,
       name: user.name ?? null,
+      emailVerified: user.emailVerified ?? false,
       deactivatedAt: user.deactivatedAt ? fromDate(user.deactivatedAt) : null,
       pendingSsoSetup: user.pendingSsoSetup ?? false,
       signupConfirmationPending: user.signupConfirmationPending ?? false,

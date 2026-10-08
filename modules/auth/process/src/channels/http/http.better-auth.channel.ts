@@ -597,6 +597,7 @@ export const createAuthOptions = ({
             organizations: hooks.organizations,
             federation,
             findGoverningConnections,
+            linkProposals: hooks.linkProposals,
           })(account, context);
           // ADR-101 §2: the account row is an identifier attach. Returning
           // the row data pins its id, which is what makes the live identifier id and the backfill's
@@ -888,6 +889,8 @@ type BetterAuthTransportOptions = Readonly<{
   ssoActivity: BetterAuthHookCollaborators["ssoActivity"];
   /** Which of a cutover's two connections a callback belongs to. */
   ssoMigration: BetterAuthHookCollaborators["ssoMigration"];
+  /** Where a refused sign-in link leaves a proposal for an administrator. */
+  linkProposals: BetterAuthHookCollaborators["linkProposals"];
   /**
    * Sends the password-reset link.
    */
@@ -938,6 +941,7 @@ const transportOptions = ({
   signUpPolicy,
   passkeySignUpEligibility,
   ssoMigration,
+  linkProposals,
   storage,
   users,
   idTokenIssuerRefusals,
@@ -969,6 +973,7 @@ const transportOptions = ({
       arrivals,
       ssoActivity,
       ssoMigration,
+      linkProposals,
     },
   });
   return {

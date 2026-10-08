@@ -24,6 +24,7 @@ import {
   createBeforeAccountCreateHook,
   type BetterAuthHookCollaborators,
   type SsoDomainOrganizations,
+  type LinkProposals,
 } from "../../channels/http/http.better-auth-hooks.channel.ts";
 import type {
   BetterAuthHookUser,
@@ -133,6 +134,7 @@ function accountRepo({
       name: null,
       pendingSsoSetup: false,
       signupConfirmationPending: false,
+      emailVerified: true,
     }),
     findBySsoDomain: vi
       .fn<SsoDomainOrganizations["findBySsoDomain"]>()
@@ -159,6 +161,7 @@ describe("signing in through a domain-matched organization's identity provider",
       await afterUserCreate({
         user: { id: "user_new", email: "new@acme.com", name: "New User", emailVerified: true },
         collaborators: {
+          linkProposals: createApiFixture<LinkProposals>(),
           organizations,
           federation: new LicensedFederation(),
           invites: new NoInvites(),
@@ -192,6 +195,7 @@ describe("signing in through a domain-matched organization's identity provider",
       await afterUserCreate({
         user: { id: "user_new", email: "invited@acme.com", name: "New User", emailVerified: true },
         collaborators: {
+          linkProposals: createApiFixture<LinkProposals>(),
           organizations,
           federation: new LicensedFederation(),
           invites,
@@ -231,6 +235,7 @@ describe("signing in through a domain-matched organization's identity provider",
           emailVerified: false,
         },
         collaborators: {
+          linkProposals: createApiFixture<LinkProposals>(),
           organizations,
           federation: new LicensedFederation(),
           invites: new NoInvites(),
@@ -265,6 +270,7 @@ describe("signing in through a domain-matched organization's identity provider",
           emailVerified: false,
         },
         collaborators: {
+          linkProposals: createApiFixture<LinkProposals>(),
           organizations,
           federation: new LicensedFederation(),
           invites,
@@ -298,6 +304,7 @@ describe("signing in through a domain-matched organization's identity provider",
 
       await createBeforeAccountCreateHook({
         repo,
+        linkProposals: createApiFixture<LinkProposals>(),
         organizations,
         federation: new LicensedFederation(),
         findGoverningConnections: async () => [],
@@ -321,6 +328,7 @@ describe("signing in through a domain-matched organization's identity provider",
 
       await createBeforeAccountCreateHook({
         repo,
+        linkProposals: createApiFixture<LinkProposals>(),
         organizations,
         federation: new LicensedFederation(),
         findGoverningConnections: async () => [],
@@ -348,6 +356,7 @@ describe("signing in through a domain-matched organization's identity provider",
       await expect(
         createBeforeAccountCreateHook({
           repo,
+          linkProposals: createApiFixture<LinkProposals>(),
           organizations,
           federation: new LicensedFederation(),
           findGoverningConnections: async () => [],

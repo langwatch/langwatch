@@ -29,6 +29,7 @@ function repoAnswering(deactivatedAt: Instant | null, signupConfirmationPending 
     deactivatedAt,
     pendingSsoSetup: false,
     signupConfirmationPending,
+    emailVerified: true,
   }));
   const findFederatedAccountsForUser = vi.fn(async () => [
     { providerId: "auth0", accountId: "waad|acme|sam" },

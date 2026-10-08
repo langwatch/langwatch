@@ -17,14 +17,22 @@ import {
   type SsoAuthenticationActivityApi,
   type SsoMigrationAccountLinkDecision,
   type SsoMigrationCallbackApi,
+  identifierProviderFor,
+  type IdentityLedgerApi,
+  type LinkProposalReason,
 } from "@langwatch/identity-contract";
+import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import { fromDate } from "@langwatch/time";
+import { fromDate, nowInstant } from "@langwatch/time";
 import type { BetterAuthOptions } from "better-auth";
 import { APIError } from "better-auth/api";
 
-import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";
+import type {
+  BetterAuthHookUser,
+  BetterAuthHooksRepository,
+} from "../../repositories/better-auth-hooks.repository.ts";
+import { assertedAddressOf, linkVerdictFor } from "../../rules/link-evidence.rules.ts";
 import type { BetterAuthAnnouncements, BetterAuthFederation } from "../better-auth.channel.ts";
 import type {
   AcceptedCallbackAccount,
@@ -49,6 +57,8 @@ export type BetterAuthHookCollaborators = Readonly<{
   ssoActivity: SsoAuthenticationActivityApi;
   /** Which of a cutover's two connections this callback belongs to. */
   ssoMigration: SsoMigrationCallbackApi;
+  /** Where a refused link leaves a proposal an administrator resolves (ADR-117 §3). */
+  linkProposals: LinkProposals;
 }>;
 
 /** Organization reads and writes the hooks make through organization's own Api. */
@@ -56,6 +66,9 @@ export type SsoDomainOrganizations = Pick<
   OrganizationApi,
   "findBySsoDomain" | "createSsoDomainMembership" | "countMembershipsForUser"
 >;
+
+/** The one identity ledger write the account hook makes: a link proposal. */
+export type LinkProposals = Pick<IdentityLedgerApi, "proposeLink">;
 
 /** Whether the installation admits a new account for an address. */
 export type SignUpPolicy = Pick<OrganizationApi, "checkSignUp">;
@@ -379,6 +392,81 @@ async function refuseWrongProvider({
   });
 }
 
+/** ADR-117 §3's evidence rule: asked before the `ssoDomain` rules, being none of them. */
+async function refuseLinkOnInsufficientEvidence({
+  repo,
+  linkProposals,
+  user,
+  account,
+}: {
+  repo: BetterAuthHooksRepository;
+  linkProposals: LinkProposals;
+  user: BetterAuthHookUser;
+  account: { providerId: string; accountId: string; idToken?: string | null };
+}): Promise<void> {
+  const address = assertedAddressOf({ idToken: account.idToken });
+  // A provider that asserted nothing gave no evidence either way: the link proceeds as before.
+  if (!address.asserted) return;
+  const verdict = linkVerdictFor({
+    address,
+    holdsVerifiedEmail: user.emailVerified,
+    attachedAccounts: await repo.countAccountsForUser({ userId: user.id }),
+  });
+  if (!verdict.refused) return;
+  await recordLinkProposal({
+    linkProposals,
+    userId: user.id,
+    providerId: account.providerId,
+    providerAccountId: account.accountId,
+    value: address.email,
+    reason: verdict.reason,
+  });
+  logger.warn(
+    { userId: user.id, providerId: account.providerId, reason: verdict.reason },
+    "Refused a sign-in link on insufficient evidence; a proposal was recorded for an administrator",
+  );
+  // APIError so better-auth carries the code into the callback redirect.
+  throw APIError.from("FORBIDDEN", { code: "LINK_NEEDS_APPROVAL", message: "LINK_NEEDS_APPROVAL" });
+}
+
+/** Best-effort: the refusal stands alone, so a failed proposal write never becomes a link. */
+async function recordLinkProposal({
+  linkProposals,
+  userId,
+  providerId,
+  providerAccountId,
+  value,
+  reason,
+}: {
+  linkProposals: LinkProposals;
+  userId: string;
+  providerId: string;
+  providerAccountId: string;
+  value: string;
+  reason: LinkProposalReason;
+}): Promise<void> {
+  try {
+    await linkProposals.proposeLink({
+      tenantId: userId,
+      userId,
+      commandId: generate("idcmd").toString(),
+      proposalId: generate("idlink").toString(),
+      connectionId: null,
+      provider: identifierProviderFor(providerId),
+      providerAccountId,
+      value,
+      reason,
+      occurredAtMs: nowInstant().epochMilliseconds,
+      actor: { type: "system", id: null },
+    });
+  } catch (error) {
+    logger.error(
+      { userId, providerId, reason, error },
+      "Refused a sign-in link but could not record the proposal an administrator would resolve",
+    );
+  }
+}
+
 /**
  * Called before a new Account row is created. Ports the provider-linking and
  * pendingSsoSetup logic from the NextAuth signIn callback.
@@ -388,8 +476,10 @@ export function createBeforeAccountCreateHook({
   organizations,
   federation,
   findGoverningConnections,
+  linkProposals,
 }: {
   repo: BetterAuthHooksRepository;
+  linkProposals: LinkProposals;
   organizations: Pick<SsoDomainOrganizations, "findBySsoDomain">;
   federation: BetterAuthFederation;
   findGoverningConnections: FindGoverningConnections;
@@ -413,6 +503,8 @@ export function createBeforeAccountCreateHook({
         message: "USER_DEACTIVATED",
       });
     }
+
+    await refuseLinkOnInsufficientEvidence({ repo, linkProposals, user, account });
 
     // ADR-027: when the platform SSO gate denies, all ssoDomain enforcement is
     // off (site #4, mirroring `afterUserCreate`).

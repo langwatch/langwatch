@@ -25,6 +25,7 @@ export class PrismaBetterAuthHooksRepository extends BetterAuthHooksRepository {
         id: true,
         email: true,
         name: true,
+        emailVerified: true,
         deactivatedAt: true,
         pendingSsoSetup: true,
         signupConfirmationPending: true,

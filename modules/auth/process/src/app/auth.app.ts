@@ -1710,6 +1710,9 @@ async function buildBetterAuth(options: BuildBetterAuthOptions): Promise<BetterA
     ssoActivity: {
       record: (args) => options.identityApi.ssoActivity().record(args),
     },
+    linkProposals: {
+      proposeLink: (input) => options.identityApi.identity().proposeLink(input),
+    },
     ssoAssertions: {
       decide: (args) => options.identityApi.ssoAssertion().decide(args),
       resolveUser: (args) => options.identityApi.ssoAssertion().resolveUser(args),

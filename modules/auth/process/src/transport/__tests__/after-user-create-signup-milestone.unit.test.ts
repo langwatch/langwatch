@@ -42,6 +42,7 @@ import type { BetterAuthFederation } from "../../channels/better-auth.channel.ts
 import {
   afterAccountCreate,
   afterUserCreate,
+  type LinkProposals,
   type SsoDomainOrganizations,
 } from "../../channels/http/http.better-auth-hooks.channel.ts";
 import { MemorySignupAnnouncementChannel } from "../../channels/memory/memory.signup-announcement.channel.ts";
@@ -213,6 +214,7 @@ describe("afterUserCreate", () => {
       ssoActivity: createApiFixture<SsoAuthenticationActivityApi>({
         record: async () => undefined,
       }),
+      linkProposals: createApiFixture<LinkProposals>(),
       ssoMigration: createApiFixture<SsoMigrationCallbackApi>({
         decideAccountLink: async () => ({ kind: "not_migrating" }),
       }),
@@ -244,6 +246,7 @@ describe("afterUserCreate", () => {
           deactivatedAt: null,
           pendingSsoSetup: false,
           signupConfirmationPending: false,
+          emailVerified: true,
         }),
         findFederatedAccountsForUser: async () => [],
       });

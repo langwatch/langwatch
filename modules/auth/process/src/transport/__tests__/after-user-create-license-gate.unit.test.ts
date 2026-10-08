@@ -18,6 +18,7 @@ import type {
 } from "../../channels/better-auth.channel.ts";
 import {
   afterUserCreate,
+  type LinkProposals,
   type SsoDomainOrganizations,
 } from "../../channels/http/http.better-auth-hooks.channel.ts";
 import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";
@@ -106,6 +107,7 @@ describe("the ssoDomain auto-join on an unlicensed deployment", () => {
         emailVerified: true,
       },
       collaborators: {
+        linkProposals: createApiFixture<LinkProposals>(),
         organizations,
         federation,
         invites: new StubInvites(),

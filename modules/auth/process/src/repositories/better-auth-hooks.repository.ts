@@ -6,6 +6,8 @@ export type BetterAuthHookUser = {
   email: string | null;
   /** What an admitted arrival is announced under; absent on older rows. */
   name: string | null;
+  /** Whether the account's own address was ever confirmed. */
+  emailVerified: boolean;
   deactivatedAt: Instant | null;
   pendingSsoSetup: boolean;
   /** A password sign-up still awaiting its emailed proof: no session until it lands. */
