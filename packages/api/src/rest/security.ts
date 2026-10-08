@@ -8,6 +8,7 @@ import type { Context, ErrorHandler, MiddlewareHandler } from "hono";
 
 import type { Credential } from "../access/access.ts";
 import { allRegisteredRoutes, type RegisteredRoute } from "../route-registry.ts";
+import { VERSION_NAMESPACE } from "./addressing.ts";
 import type { IdempotentRunner } from "./idempotency.ts";
 
 // Everything a REST door needs from the process it runs in. Authentication (API keys,
@@ -198,7 +199,9 @@ export function undeclaredRoutes(options: {
     if (isUnenumerableMount(route.method, route.path)) continue;
 
     const address = `${route.method.toUpperCase()} ${route.path}`;
-    const guard = route.method.toUpperCase() === "ALL" && paths.has(route.path);
+    const guard =
+      route.method.toUpperCase() === "ALL" &&
+      (paths.has(route.path) || paths.has(route.path.replace(VERSION_NAMESPACE, "")));
     if (!addresses.has(address) && !guard) undeclared.add(address);
   }
 

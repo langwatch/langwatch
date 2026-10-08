@@ -54,6 +54,13 @@ Feature: A REST path served outside its owner's namespace says so on the route
       Then the mount is refused, naming the module that claims the namespace
 
     @unit
+    Scenario: The dated middleware scopes of a shared family are not undeclared endpoints
+      Given a dated family sharing a namespace, whose middleware is mounted at the dated address of each route
+      When the mounted routes are cross-checked against the registry
+      Then a dated any-method mount over a registered path is not reported
+      And a dated any-method mount over a path no route registers is still reported
+
+    @unit
     Scenario: A dated family that both owns and shares its namespace is refused at mount
       Given a dated family where one route declares a shared path and another does not, or two routes name different owners
       When the family is mounted
