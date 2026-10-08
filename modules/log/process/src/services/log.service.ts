@@ -1,10 +1,4 @@
-import type {
-  CanonicalTraceLogRecord,
-  LogPiiRedactionLevel,
-  LogPreparation,
-} from "@langwatch/log-contract";
-
-import type { CanonicalLogRecordRepository } from "../repositories/canonical-log-record.repository.ts";
+import type { LogPiiRedactionLevel, LogPreparation } from "@langwatch/log-contract";
 
 export type LogPreparationInput = {
   tenantId: string;
@@ -18,18 +12,12 @@ export interface LogPreparer {
   prepare(input: LogPreparationInput): Promise<LogPreparation>;
 }
 
-/** Canonical log preparation and the trace-scoped read, over one repository. */
+/** Canonical log preparation. */
 export class LogService {
-  private constructor(
-    private readonly preparation: LogPreparer,
-    private readonly repository: CanonicalLogRecordRepository,
-  ) {}
+  private constructor(private readonly preparation: LogPreparer) {}
 
-  static create(deps: {
-    preparation: LogPreparer;
-    repository: CanonicalLogRecordRepository;
-  }): LogService {
-    return new LogService(deps.preparation, deps.repository);
+  static create(deps: { preparation: LogPreparer }): LogService {
+    return new LogService(deps.preparation);
   }
 
   prepareCanonicalLogRecords(input: {
@@ -40,14 +28,5 @@ export class LogService {
     acceptedAt?: number;
   }): Promise<LogPreparation> {
     return this.preparation.prepare(input);
-  }
-
-  getLogsByTraceId(input: {
-    tenantId: string;
-    traceId: string;
-    occurredAtMs?: number;
-    limit?: number;
-  }): Promise<CanonicalTraceLogRecord[]> {
-    return this.repository.findLogsByTraceId(input);
   }
 }

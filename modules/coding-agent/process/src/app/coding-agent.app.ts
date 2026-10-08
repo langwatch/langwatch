@@ -10,7 +10,6 @@ import {
   type CodingAgentPersonalPullRequestUsage,
   type CodingAgentPersonalPullRequestUsageInput,
   type CodingAgentPullRequestDetail,
-  type CodingAgentPullRequestMappingBackfillInput,
   type CodingAgentPullRequestUsage,
   type CodingAgentRecentSessionsInput,
   type CodingAgentSession,
@@ -362,15 +361,6 @@ export class CodingAgentModule implements CodingAgentApi {
   /** The project's recent sessions in a window, newest first. */
   listRecent(input: CodingAgentRecentSessionsInput): Promise<CodingAgentSession[]> {
     return this.#codingAgents.listRecent(input);
-  }
-
-  /**
-   * The installation follow-up: the branches this organization's own sessions
-   * already named, mapped against the connection just made. Fire-and-forget at
-   * its caller, and fail-open — the branch recheck rebuilds the same mapping.
-   */
-  backfillPullRequestMappings(input: CodingAgentPullRequestMappingBackfillInput): Promise<void> {
-    return this.#codingAgents.backfillPullRequestMappings(input);
   }
 
   /**

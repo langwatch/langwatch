@@ -14,18 +14,12 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The portable canonical log capability shared by process features.
 
-Peers call these through the token, declared at `../contract/src/log.api.ts:40`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/log.api.ts:35`; nothing else in this package is public.
 
 #### `prepareCanonicalLogRecords`
 
 ```typescript
 prepareCanonicalLogRecords(input: { tenantId: string; organizationId: string; request: unknown; piiRedactionLevel: LogPiiRedactionLevel; acceptedAt?: number; }): Promise<LogPreparation>;
-```
-
-#### `getLogsByTraceId`
-
-```typescript
-getLogsByTraceId(input: { tenantId: string; traceId: string; occurredAtMs?: number; limit?: number; }): Promise<CanonicalTraceLogRecord[]>;
 ```
 
 #### `receiveOtlpLogs`
@@ -81,7 +75,7 @@ Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI docu
 Answers at `/:otlpBase{.+}/v1/logs`.
 
 ```typescript
-type Params = z.infer<typeof otlpLogAliasParamsSchema>; // ../contract/src/log.api.ts:29
+type Params = z.infer<typeof otlpLogAliasParamsSchema>; // ../contract/src/log.api.ts:24
 // Rawbody: "bytes" (inline, src/transport/otlp-logs.rest.ts:57)
 // Response: "protocol" (inline, src/transport/otlp-logs.rest.ts:60)
 ```
@@ -93,7 +87,7 @@ Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI docu
 Answers at `/:otlpBase{.+}/v1/logs/`.
 
 ```typescript
-type Params = z.infer<typeof otlpLogAliasParamsSchema>; // ../contract/src/log.api.ts:29
+type Params = z.infer<typeof otlpLogAliasParamsSchema>; // ../contract/src/log.api.ts:24
 // Rawbody: "bytes" (inline, src/transport/otlp-logs.rest.ts:76)
 // Response: "protocol" (inline, src/transport/otlp-logs.rest.ts:79)
 ```

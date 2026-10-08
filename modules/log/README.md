@@ -11,7 +11,7 @@ Logs: receiving OTLP logs, canonicalising and recording them, and reading a trac
 | Classification | core (`modules/catalogue.json`)                                                      |
 | Subjects       | log, log-ingestion                                                                   |
 | Halves         | [contract](contract) · [process](process/README.md)                                  |
-| Api token      | `LogApi` = `moduleApi<LogApi>()("log")`, `contract/src/log.api.ts:62` (5 operations) |
+| Api token      | `LogApi` = `moduleApi<LogApi>()("log")`, `contract/src/log.api.ts:55` (4 operations) |
 | Installed by   | api, worker, tasks (process)                                                         |
 
 ## What log owns
@@ -35,6 +35,6 @@ Anything else log needs belongs to another module and is reached through its `*A
 
 ## Who depends on log
 
-[governance](../../enterprise/modules/governance/README.md), [trace](../trace/README.md) (as a peer).
+[governance](../../enterprise/modules/governance/README.md) (as a peer).
 
 <!-- readme:generated:end -->

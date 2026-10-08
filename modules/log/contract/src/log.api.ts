@@ -2,12 +2,7 @@ import { moduleApi } from "@langwatch/module";
 import type { OtlpDoorRefusal, OtlpDoorRequest } from "@langwatch/otlp";
 import { z } from "zod";
 
-import type {
-  LogPiiRedactionLevel,
-  LogPreparation,
-  CanonicalLogRecord,
-  CanonicalTraceLogRecord,
-} from "./log-record.ts";
+import type { LogPiiRedactionLevel, LogPreparation, CanonicalLogRecord } from "./log-record.ts";
 
 /**
  * An OTLP log request's outcome. `unavailable` means nothing was durably accepted, so the sender
@@ -45,12 +40,6 @@ export interface LogApi {
     piiRedactionLevel: LogPiiRedactionLevel;
     acceptedAt?: number;
   }): Promise<LogPreparation>;
-  getLogsByTraceId(input: {
-    tenantId: string;
-    traceId: string;
-    occurredAtMs?: number;
-    limit?: number;
-  }): Promise<CanonicalTraceLogRecord[]>;
   /** One exporter request at the logs door: key, allowance, parse, then collection. */
   receiveOtlpLogs(request: OtlpDoorRequest): Promise<LogOtlpDoorResult>;
   /** Prepares and records one OTLP log export, for a receiver that authenticated it itself. */

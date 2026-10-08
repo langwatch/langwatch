@@ -1,15 +1,10 @@
-import type { CanonicalLogRecordRepository } from "../../repositories/canonical-log-record.repository.ts";
 import type { LogRedaction } from "../canonical-log.service.ts";
 import { CanonicalLogService } from "../canonical-log.service.ts";
 import { LogService } from "../log.service.ts";
 
 /** The log service over the real preparation adapter, for tests that drive it. */
-export function createLogTestService(options: {
-  redaction: LogRedaction;
-  repository: CanonicalLogRecordRepository;
-}): LogService {
+export function createLogTestService(options: { redaction: LogRedaction }): LogService {
   return LogService.create({
     preparation: CanonicalLogService.create({ redaction: options.redaction }),
-    repository: options.repository,
   });
 }

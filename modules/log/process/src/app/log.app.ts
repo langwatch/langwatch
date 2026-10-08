@@ -6,7 +6,6 @@ import {
   LOG_DEFAULT_RETENTION_DAYS,
   logConfig,
   type CanonicalLogRecord,
-  type CanonicalTraceLogRecord,
   type LogApi as LogApiContract,
   type LogCollectionInput,
   type LogRequestCollectionResult,
@@ -66,7 +65,6 @@ export class LogModule implements LogApiContract {
     const repository = repositories.logRecords;
     const service = LogService.create({
       preparation: CanonicalLogService.create({ redaction: dependencies.dataPrivacy }),
-      repository,
     });
     const pipeline = LogProcessingAdapter.create({
       repository,
@@ -109,15 +107,6 @@ export class LogModule implements LogApiContract {
 
   collectOtlpLogs(input: LogCollectionInput): Promise<LogRequestCollectionResult> {
     return this.#collection.handleOtlpLogRequest(input);
-  }
-
-  getLogsByTraceId(input: {
-    tenantId: string;
-    traceId: string;
-    occurredAtMs?: number;
-    limit?: number;
-  }): Promise<CanonicalTraceLogRecord[]> {
-    return this.#service.getLogsByTraceId(input);
   }
 
   async recordCanonicalLogRecords(records: readonly CanonicalLogRecord[]): Promise<void> {

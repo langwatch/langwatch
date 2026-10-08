@@ -12,7 +12,6 @@ import type {
   CodingAgentGithubConnection,
   CodingAgentPersonalPullRequestUsage,
   CodingAgentPullRequestDetail,
-  CodingAgentPullRequestMappingBackfillInput,
   CodingAgentPullRequestUsage,
   CodingAgentRecentSessionsInput,
   CodingAgentSession,
@@ -84,7 +83,6 @@ export interface CodingAgentApi {
   ): Promise<CodingAgentSessionEventsPage>;
   getUsageTotals(input: CodingAgentUsageTotalsInput): Promise<CodingAgentUsageTotals>;
   listRecent(input: CodingAgentRecentSessionsInput): Promise<CodingAgentSession[]>;
-  backfillPullRequestMappings(input: CodingAgentPullRequestMappingBackfillInput): Promise<void>;
   /**
    * The Sessions screen's rows, cut to what this viewer may see: the generated
    * title follows the project's content visibility, the cost follows

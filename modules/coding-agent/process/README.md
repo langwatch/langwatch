@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`CodingAgentApi`)
 
-Peers call these through the token, declared at `../contract/src/coding-agent.api.ts:62`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/coding-agent.api.ts:61`; nothing else in this package is public.
 
 #### `findBySessionId`
 
@@ -62,12 +62,6 @@ getUsageTotals(input: CodingAgentUsageTotalsInput): Promise<CodingAgentUsageTota
 
 ```typescript
 listRecent(input: CodingAgentRecentSessionsInput): Promise<CodingAgentSession[]>;
-```
-
-#### `backfillPullRequestMappings`
-
-```typescript
-backfillPullRequestMappings(input: CodingAgentPullRequestMappingBackfillInput): Promise<void>;
 ```
 
 #### `listForProject`
