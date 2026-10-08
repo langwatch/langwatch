@@ -50,7 +50,6 @@ import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import { getWorkflowsRequiredFields } from "@langwatch/workflow-contract";
-import { HTTPException } from "hono/http-exception";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { ZodError as ZodErrorClass } from "zod";
 import { fromZodError } from "zod-validation-error";
@@ -87,10 +86,6 @@ const EVALUATE_MAX_BYTES = 30 * 1024 * 1024;
  * through zod and drop whatever it does not name.
  */
 const PRODUCES_JSON = "application/json";
-
-/** The 413 a body past its cap earns, in the plain sentence it has always been. */
-const payloadTooLarge = (): Error =>
-  new HTTPException(413, { res: new Response("Payload Too Large", { status: 413 }) });
 
 const LEGACY_PROTOCOL_REASON =
   "Released SDKs parse these doors' own statuses and bodies, refusals included";
@@ -209,7 +204,7 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
   .withParams(evaluatorParamsSchema)
   .withRawBody("text", { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })
   .withPermission("evaluations:manage")
-  .withBodyLimit({ maxBytes: EVALUATE_MAX_BYTES, onExceeded: payloadTooLarge })
+  .withBodyLimit({ maxBytes: EVALUATE_MAX_BYTES })
   .withResponse("protocol", {
     produces: PRODUCES_JSON,
     because: LEGACY_PROTOCOL_REASON,
@@ -243,7 +238,7 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
   .withParams(namespacedEvaluatorParamsSchema)
   .withRawBody("text", { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })
   .withPermission("evaluations:manage")
-  .withBodyLimit({ maxBytes: EVALUATE_MAX_BYTES, onExceeded: payloadTooLarge })
+  .withBodyLimit({ maxBytes: EVALUATE_MAX_BYTES })
   .withResponse("protocol", {
     produces: PRODUCES_JSON,
     because: LEGACY_PROTOCOL_REASON,
@@ -273,7 +268,7 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
   .withParams(evaluatorParamsSchema)
   .withRawBody("text", { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })
   .withPermission("evaluations:manage")
-  .withBodyLimit({ maxBytes: EVALUATE_MAX_BYTES, onExceeded: payloadTooLarge })
+  .withBodyLimit({ maxBytes: EVALUATE_MAX_BYTES })
   .withResponse("protocol", {
     produces: PRODUCES_JSON,
     because: LEGACY_PROTOCOL_REASON,

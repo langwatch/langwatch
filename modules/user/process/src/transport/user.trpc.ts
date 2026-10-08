@@ -19,7 +19,7 @@ const ANY_SIGNED_IN =
   "a photo shows wherever a person is shown, across organizations; the object's purpose and owner kind gate it";
 
 /** Why reactivation decides standing in the application. */
-const SELF_OR_OPERATOR =
+const OPERATOR_ONLY =
   "operator-only for the named account; the application enforces operator standing itself, against the platform operator list rather than a tenant";
 
 /**
@@ -127,7 +127,7 @@ export const userTrpcTransport: TrpcRouterDeclaration<UserApi, typeof userTrpc> 
   .handle(async ({ app, actor }) => ({ hasPassword: await app.hasPassword({ id: actor.id }) }))
 
   .procedure("reactivate")
-  .noPermission({ reason: SELF_OR_OPERATOR })
+  .noPermission({ reason: OPERATOR_ONLY })
   .handle(async ({ app, actor, input }) => {
     await app.reactivateAccount({ userId: input.userId, caller: callerOf(actor) });
 

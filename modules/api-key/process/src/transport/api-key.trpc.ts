@@ -13,32 +13,40 @@ import { ApiKeyApi, apiKeyTrpc } from "@langwatch/api-key-contract";
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 
 /**
- * One shared reason: nothing here is gated on a permission, because a personal
+ * Nothing here is gated on a permission, because a personal
  * key belongs to its owner and the application proves that itself.
  */
 const OWN_KEYS_REASON =
   "personal API keys are the caller's own; the application proves organization membership and ownership itself";
+const KEY_ASSIGNMENT_REASON =
+  "any member assigning a key needs the organization's projects, teams and members; the application refuses a non-member before reading";
 
 export const apiKeyTrpcTransport: TrpcRouterDeclaration<ApiKeyApi, typeof apiKeyTrpc> =
   defineTrpcRouter(ApiKeyApi, apiKeyTrpc)
     .procedure("myBindings")
     .noPermission({
       reason: OWN_KEYS_REASON,
-      allow: { organizationId: "listing caller's own role bindings" },
+      allow: {
+        organizationId: "the application refuses a caller who is not a member of this organization",
+      },
     })
     .handle(({ app, input, actor }) => app.listCallerBindings(input, { id: actor.id }))
 
     .procedure("nameById")
     .noPermission({
       reason: OWN_KEYS_REASON,
-      allow: { organizationId: "naming an API key the caller can already see" },
+      allow: {
+        organizationId: "the application refuses a caller who is not a member of this organization",
+      },
     })
     .handle(({ app, input, actor }) => app.findKeyName(input, { id: actor.id }))
 
     .procedure("list")
     .noPermission({
       reason: OWN_KEYS_REASON,
-      allow: { organizationId: "listing API keys" },
+      allow: {
+        organizationId: "the application refuses a caller who is not a member of this organization",
+      },
     })
     .handle(({ app, input, actor }) => app.listKeys(input, { id: actor.id }))
 
@@ -46,7 +54,9 @@ export const apiKeyTrpcTransport: TrpcRouterDeclaration<ApiKeyApi, typeof apiKey
     .mintsCredential("organization:view")
     .noPermission({
       reason: OWN_KEYS_REASON,
-      allow: { organizationId: "creating API key for user's own org" },
+      allow: {
+        organizationId: "the application refuses a caller who is not a member of this organization",
+      },
     })
     // Mints a key and hands back its plaintext token — once, here, and nowhere
     // else. Only the key's identity rides beside it, which is also all the
@@ -63,7 +73,9 @@ export const apiKeyTrpcTransport: TrpcRouterDeclaration<ApiKeyApi, typeof apiKey
     .procedure("update")
     .noPermission({
       reason: OWN_KEYS_REASON,
-      allow: { organizationId: "updating API key" },
+      allow: {
+        organizationId: "the application refuses a caller who is not a member of this organization",
+      },
     })
     .handle(async ({ app, input, actor }) => {
       const updated = await app.updateKey(input, { id: actor.id });
@@ -74,7 +86,9 @@ export const apiKeyTrpcTransport: TrpcRouterDeclaration<ApiKeyApi, typeof apiKey
     .procedure("revoke")
     .noPermission({
       reason: OWN_KEYS_REASON,
-      allow: { organizationId: "revoking API key" },
+      allow: {
+        organizationId: "the application refuses a caller who is not a member of this organization",
+      },
     })
     .handle(async ({ app, input, actor }) => {
       await app.revokeKey(input, { id: actor.id });
@@ -84,22 +98,28 @@ export const apiKeyTrpcTransport: TrpcRouterDeclaration<ApiKeyApi, typeof apiKey
 
     .procedure("orgProjects")
     .noPermission({
-      reason: OWN_KEYS_REASON,
-      allow: { organizationId: "listing org projects for permission picker" },
+      reason: KEY_ASSIGNMENT_REASON,
+      allow: {
+        organizationId: "the application refuses a caller who is not a member of this organization",
+      },
     })
     .handle(({ app, input, actor }) => app.listOrganizationProjects(input, { id: actor.id }))
 
     .procedure("orgTeams")
     .noPermission({
-      reason: OWN_KEYS_REASON,
-      allow: { organizationId: "listing org teams for scope picker" },
+      reason: KEY_ASSIGNMENT_REASON,
+      allow: {
+        organizationId: "the application refuses a caller who is not a member of this organization",
+      },
     })
     .handle(({ app, input, actor }) => app.listOrganizationTeams(input, { id: actor.id }))
 
     .procedure("orgMembers")
     .noPermission({
-      reason: OWN_KEYS_REASON,
-      allow: { organizationId: "listing org members for key assignment" },
+      reason: KEY_ASSIGNMENT_REASON,
+      allow: {
+        organizationId: "the application refuses a caller who is not a member of this organization",
+      },
     })
     .handle(({ app, input, actor }) => app.listOrganizationMembers(input, { id: actor.id }))
 

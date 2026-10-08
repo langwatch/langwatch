@@ -153,17 +153,21 @@ code slug. Register the code in `packages/handled-error/src/app-codes.ts` and it
 
 ## Traps
 
-| Trap                                                 | Instead                                                |
-| ---------------------------------------------------- | ------------------------------------------------------ |
-| `c.json(...)`, `try/catch` into a status             | return the value; throw a HandledError                 |
-| checking `typeof body.x` in a handler                | tighten the Zod schema in the contract                 |
-| `:id` on a new route                                 | `:<thing>Id`                                           |
-| a docs object in `*-openapi.rules.ts` (deleted, §15) | `.withDocs()` on the route                             |
-| a handler calling two `*Api` operations              | one operation that carries both                        |
-| a new procedure name chosen casually                 | the wire name is the browser's cache key; choose once  |
-| a secret in a query output                           | a mutation returns it once; forms read blank           |
-| a raw `/api/cron/*` route                            | a scheduled process manager (`eventing-and-worker`)    |
-| REST route for the UI                                | the UI uses tRPC; REST is key-authenticated public API |
+| Trap                                                                      | Instead                                                           |
+| ------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `c.json(...)`, `try/catch` into a status                                  | return the value; throw a HandledError                            |
+| checking `typeof body.x` in a handler                                     | tighten the Zod schema in the contract                            |
+| `:id` on a new route                                                      | `:<thing>Id`                                                      |
+| a docs object in `*-openapi.rules.ts` (deleted, §15)                      | `.withDocs()` on the route                                        |
+| a handler calling two `*Api` operations                                   | one operation that carries both                                   |
+| a new procedure name chosen casually                                      | the wire name is the browser's cache key; choose once             |
+| a secret in a query output                                                | a mutation returns it once; forms read blank                      |
+| a raw `/api/cron/*` route                                                 | a scheduled process manager (`eventing-and-worker`)               |
+| REST route for the UI                                                     | the UI uses tRPC; REST is key-authenticated public API            |
+| a route escaping access without a reason (`langwatch/access-escape-kind`) | `.withPermission(...)`, or pass `{ reason }` to the escape        |
+| reading the auth header in a handler (`langwatch/auth-header-read`)       | take `actor` and `scope` from the handler the door resolved       |
+| a hand-rolled credential reader (`langwatch/credential-reader-owner`)     | declare `.withPermission(...)` or `.withAccess(...)` on the route |
+| reading the raw body (`langwatch/raw-body-bypass`)                        | `.withInput(schema)`; `.withRawBody` needs `{ because }`          |
 
 ## Tests
 

@@ -24,18 +24,17 @@ import {
   type TraceSharedFiltersInput,
   type TracesForProjectResult,
 } from "@langwatch/trace-contract";
-import { HTTPException } from "hono/http-exception";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { z } from "zod";
 
+import { unkeyedLegacyFilterViolations } from "#features/legacy/rules/trace-legacy-filter-keys.rules";
+import { traceLegacySearchBodySchema } from "#features/legacy/rules/trace-legacy-search-body.rules";
 import { enrichTracesWithEvaluations } from "#rules/trace-evaluation-enrichment.rules";
 import {
   formatTraceSummaryDigest,
   generateAsciiTree,
   toLLMModeTrace,
 } from "#rules/trace-formatting.rules";
-import { unkeyedLegacyFilterViolations } from "#features/legacy/rules/trace-legacy-filter-keys.rules";
-import { traceLegacySearchBodySchema } from "#features/legacy/rules/trace-legacy-search-body.rules";
 
 import { tracesRestCredential } from "./traces.rest.ts";
 /**
@@ -52,10 +51,6 @@ const PRODUCES_JSON = "application/json";
  * explicit size is clamped to the caller's tier by the application, not here.
  */
 const DEFAULT_TRACES_PAGE_SIZE = resolveRequestBound("tracesPageSizeMax", "FREE");
-
-/** The 413 a body past its cap earns, in the plain sentence it has always been. */
-const payloadTooLarge = (): Error =>
-  new HTTPException(413, { res: new Response("Payload Too Large", { status: 413 }) });
 
 /** Search filters can name many ids; the bulk cap is the ceiling they get. */
 const BODY_LIMIT_BULK_BYTES = resolveRequestBound("bodyLimitBulkBytes", "ENTERPRISE");
@@ -479,7 +474,7 @@ export const traceLegacyRest = defineRestRouter(TraceLegacyApi)
   // schema, so a malformed payload earns the sentence a deployed SDK parses.
   .post("/api/trace/search", "searchLegacyTraces")
   .withRawBody("text", { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })
-  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
   .withPermission("traces:view")
   .withMiddleware(tracesRestCredential)
   .withResponse("protocol", {

@@ -14,10 +14,10 @@ import {
 const COST_WRITE_PERMISSIONS = ["project:update", "team:manage", "organization:manage"] as const;
 
 const WRITTEN_SCOPE_DECIDES =
-  "assertCanManageScope: manage is required on the written scope, which defaults to this project; the scope then resolves to a single organization the cost is anchored to";
+  "manage is asked on the written scope (default this project), known only after parsing; that scope resolves to the one organization the cost is anchored to";
 
 const STORED_SCOPE_DECIDES =
-  "not trusted — the scope is derived from the stored row and assertCanManageScope runs against that scope, never the caller-supplied projectId";
+  "the scope is the stored row's, never the caller's projectId; manage is asked on it";
 
 export const llmModelCostTrpcTransport: TrpcRouterDeclaration<
   ModelProviderApi,

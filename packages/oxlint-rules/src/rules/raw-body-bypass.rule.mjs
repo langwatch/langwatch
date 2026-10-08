@@ -43,22 +43,22 @@ export const rawBodyBypassRule = defineRule({
     rawBodyBecause: {
       what: "`.withRawBody(...)` in `{{path}}` gives no `because`.",
       why: "A raw body skips the framework's validation, so each one states why the bytes are needed.",
-      fix: 'Pass `{ because: "<why this route needs the exact body>" }` in `.withRawBody`\'s options.',
+      fix: 'Pass `{ because: "<why this route needs the exact body>" }` in `.withRawBody`\'s options. Read the `api-transports` skill.',
     },
     rawBodyMediaType: {
       what: "`.withRawBody(...)` in `{{path}}` names no non-JSON `mediaType`.",
       why: "Only a body that is not JSON needs its exact bytes; a JSON body is the framework's to parse and validate.",
-      fix: "Declare a JSON body with `.withInput(schema)`, or pass the non-JSON `mediaType` the route reads.",
+      fix: "Declare a JSON body with `.withInput(schema)`, or pass the non-JSON `mediaType` the route reads. Read the `api-transports` skill.",
     },
     jsonParse: {
       what: "`JSON.parse` in the transport `{{path}}`.",
       why: "Parsing a body by hand skips the framework's validation and its 400 and 422 answers.",
-      fix: "Declare the body with `.withInput(schema)` and read `input` in the handler.",
+      fix: "Declare the body with `.withInput(schema)` and read `input` in the handler. Read the `api-transports` skill.",
     },
     honoException: {
       what: "`{{path}}` imports `hono/http-exception`.",
       why: "A module answers with a HandledError; a raw HTTPException skips the framework's error mapping.",
-      fix: "Throw the module's HandledError from its contract errors file instead.",
+      fix: "Drop the hand-built answer: `.withBodyLimit` refuses with `PayloadTooLargeError`; throw a HandledError otherwise. Read the `api-transports` skill.",
     },
   },
   create(context, file) {

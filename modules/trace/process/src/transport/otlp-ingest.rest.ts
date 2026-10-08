@@ -35,7 +35,6 @@ import {
 } from "@langwatch/trace-contract";
 import { SpanKind, SpanStatusCode, type Span } from "@opentelemetry/api";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
-import { HTTPException } from "hono/http-exception";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { getLangWatchTracer } from "langwatch";
 
@@ -291,10 +290,6 @@ const PUBLIC_ACCESS = {
   reason: AUTH_REASON,
 };
 
-/** The 413 a body past its cap earns, in the plain sentence it has always been. */
-const payloadTooLarge = (): Error =>
-  new HTTPException(413, { res: new Response("Payload Too Large", { status: 413 }) });
-
 /** Wire-body cap; the decompressed cap is separate. */
 const BODY_LIMIT_BULK_BYTES = resolveRequestBound("bodyLimitBulkBytes", "ENTERPRISE");
 
@@ -332,7 +327,7 @@ export const otlpIngestRest = defineRestRouter(TraceApi)
 
   .post("/api/otel/v1/traces", "ingestOtlpTraces")
   .withRawBody("bytes")
-  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
   .withAccess(PUBLIC_ACCESS)
   .withResponse("protocol", {
     produces: PRODUCES_JSON,
@@ -355,7 +350,7 @@ export const otlpIngestRest = defineRestRouter(TraceApi)
   .post("/:otlpBase{.+}/v1/traces", "ingestOtlpTracesAlias")
   .withParams(otlpTraceAliasParamsSchema)
   .withRawBody("bytes")
-  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
   .withAccess(PUBLIC_ACCESS)
   .withResponse("protocol", {
     produces: PRODUCES_JSON,
@@ -370,7 +365,7 @@ export const otlpIngestRest = defineRestRouter(TraceApi)
   .post("/:otlpBase{.+}/v1/traces/", "ingestOtlpTracesAliasSlash")
   .withParams(otlpTraceAliasParamsSchema)
   .withRawBody("bytes")
-  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
   .withAccess(PUBLIC_ACCESS)
   .withResponse("protocol", {
     produces: PRODUCES_JSON,
@@ -384,7 +379,7 @@ export const otlpIngestRest = defineRestRouter(TraceApi)
 
   .post("/v1/traces", "ingestOtlpTracesRootV1")
   .withRawBody("bytes")
-  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
   .withAccess(PUBLIC_ACCESS)
   .withResponse("protocol", {
     produces: PRODUCES_JSON,
@@ -398,7 +393,7 @@ export const otlpIngestRest = defineRestRouter(TraceApi)
 
   .post("/v1/traces/", "ingestOtlpTracesRootV1Slash")
   .withRawBody("bytes")
-  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
   .withAccess(PUBLIC_ACCESS)
   .withResponse("protocol", {
     produces: PRODUCES_JSON,

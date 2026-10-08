@@ -16,11 +16,6 @@ import {
   trackEventResponseSchema,
   trackEventRESTParamsValidatorSchema,
 } from "@langwatch/trace-contract";
-import { HTTPException } from "hono/http-exception";
-
-/** The 413 a body past its cap earns, in the plain sentence it has always been. */
-const payloadTooLarge = (): Error =>
-  new HTTPException(413, { res: new Response("Payload Too Large", { status: 413 }) });
 
 /** Telemetry posts; the bulk cap is the ceiling a misbehaving SDK can hit. */
 const BODY_LIMIT_BULK_BYTES = resolveRequestBound("bodyLimitBulkBytes", "ENTERPRISE");
@@ -52,7 +47,7 @@ export const trackedEventRest = defineRestRouter(TrackedEventApi)
 
   .post("/track", "trackEvent")
   .withRawBody("text", { mediaType: "application/json" })
-  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
   .withPermission("traces:create")
   .withOutput(trackEventResponseSchema)
   .withDocs({
@@ -91,7 +86,7 @@ export const trackedEventLegacyPathRest = defineRestRouter(TrackedEventApi)
   .withCredential("project")
   .post(TRACKED_EVENT_LEGACY_PATH, "trackEventLegacyAlias")
   .withRawBody("text", { mediaType: "application/json" })
-  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
   .withPermission("traces:create")
   .withOutput(trackEventResponseSchema)
   .withDocs({

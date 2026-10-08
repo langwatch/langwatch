@@ -27,7 +27,6 @@ import {
   workbenchStateQuerySchema,
 } from "@langwatch/experiment-contract";
 import { resolveRequestBound } from "@langwatch/plans";
-import { HTTPException } from "hono/http-exception";
 
 import {
   experimentWorkbenchCredential,
@@ -35,9 +34,6 @@ import {
   runEventsOf,
   negotiatedRunAnswer,
 } from "./experiment-v3.rest.ts";
-
-const payloadTooLarge = (): Error =>
-  new HTTPException(413, { res: new Response("Payload Too Large", { status: 413 }) });
 
 const BODY_LIMIT_JSON_BYTES = resolveRequestBound("bodyLimitJsonBytes", "ENTERPRISE");
 
@@ -51,7 +47,7 @@ export const experimentV3LegacyRest = defineRestRouter(ExperimentV3RestApi)
   .post("/:evaluationSlug/run", "postApiEvaluationsV3BySlugRun")
   .withParams(evaluationSlugParamsSchema)
   .withRawBody("text", { mediaType: "application/json", mismatch: "accepted" })
-  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
   .withPermission("evaluations:create")
   .withResponse("negotiated", {})
   .withDocs(HIDDEN)

@@ -19,7 +19,6 @@ import {
 import { ExperimentApi, type DatasetEvaluationOutcome } from "@langwatch/experiment-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import { HTTPException } from "hono/http-exception";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { fromZodError, isZodErrorLike } from "zod-validation-error";
 
@@ -29,10 +28,6 @@ const EVALUATE_MAX_BYTES = 30 * 1024 * 1024;
 
 /** The door writes its own response: the bodies are the ones released SDKs already parse. */
 const PRODUCES_JSON = "application/json";
-
-/** The 413 a body past its cap earns, in the plain sentence it has always been. */
-const payloadTooLarge = (): Error =>
-  new HTTPException(413, { res: new Response("Payload Too Large", { status: 413 }) });
 
 const LEGACY_PROTOCOL_REASON =
   "Released SDKs parse these doors' own statuses and bodies, refusals included";
@@ -86,7 +81,7 @@ export const experimentDatasetEvaluationRest = defineRestRouter(ExperimentApi)
   .withSharedPath(DATASET_NAMESPACE)
   .withRawBody("text", { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })
   .withPermission("evaluations:manage")
-  .withBodyLimit({ maxBytes: EVALUATE_MAX_BYTES, onExceeded: payloadTooLarge })
+  .withBodyLimit({ maxBytes: EVALUATE_MAX_BYTES })
   .withResponse("protocol", {
     produces: PRODUCES_JSON,
     because: LEGACY_PROTOCOL_REASON,
@@ -122,8 +117,7 @@ export const experimentDatasetEvaluationRest = defineRestRouter(ExperimentApi)
       },
       413: {
         description:
-          "The body is larger than 30MB. Refused before it is read, so the response is the plain sentence `Payload Too Large` rather than a JSON error",
-        content: { "text/plain": { schema: { type: "string" } } },
+          "The body is larger than 30MB; refused before it is read with the `payload_too_large` HandledError",
       },
     },
   })

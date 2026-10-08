@@ -24,7 +24,6 @@ import { moduleApi } from "@langwatch/module";
 import { createLogger } from "@langwatch/observability";
 import { resolveRequestBound } from "@langwatch/plans";
 import { nowInstant } from "@langwatch/time";
-import { HTTPException } from "hono/http-exception";
 
 import type {
   GithubWebhookDelivery,
@@ -76,22 +75,18 @@ const INSTALL_PROTOCOL_REASON =
   "GitHub App install, setup and webhook callbacks answer GitHub's own redirects, popup " +
   "documents and bare JSON bodies, which a registered App already depends on.";
 
-/** The 413 a body past its cap earns, in the plain sentence it has always been. */
-const payloadTooLarge = (): Error =>
-  new HTTPException(413, { res: new Response("Payload Too Large", { status: 413 }) });
-
 const BODY_LIMIT_JSON_BYTES = resolveRequestBound("bodyLimitJsonBytes", "ENTERPRISE");
 
 // /setup is GitHub's Setup URL — a protocol-mandated public redirect target.
 // All sensitive state is signed and bound to the session that started the flow.
 const SETUP_PUBLIC_REASON =
-  "GitHub App Setup URL — protocol-mandated public endpoint; all sensitive " +
+  "GitHub App Setup URL: protocol-mandated public endpoint; all sensitive " +
   "state is HMAC-signed and bound to the session that started the flow.";
 
 // /webhook is GitHub's webhook delivery target — public by protocol, verified
 // in-handler by the X-Hub-Signature-256 HMAC against the shared webhook secret.
 const WEBHOOK_PUBLIC_REASON =
-  "GitHub App webhook delivery URL — protocol-mandated public endpoint; " +
+  "GitHub App webhook delivery URL: protocol-mandated public endpoint; " +
   "every payload is verified in-handler by its X-Hub-Signature-256 HMAC.";
 
 /**
@@ -129,7 +124,7 @@ export const githubInstallRest = defineRestRouter(GithubInstallApi)
   // The body IS the evidence: the HMAC is computed over the exact bytes GitHub
   // sent, spacing included, so nothing parses it first.
   .withRawBody("text", { mediaType: "application/json" })
-  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
   .withAccess(publicRoute({ reason: WEBHOOK_PUBLIC_REASON }))
   .withResponse("protocol", { produces: GITHUB_MEDIA_TYPES, because: INSTALL_PROTOCOL_REASON })
   .handle(async ({ app, request, raw, response }) =>
@@ -153,7 +148,7 @@ export const githubInstallRest = defineRestRouter(GithubInstallApi)
 
   .post("/api/github-langy/webhook", "receiveGithubWebhookOnLegacyPath")
   .withRawBody("text", { mediaType: "application/json" })
-  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
   .withAccess(publicRoute({ reason: WEBHOOK_PUBLIC_REASON }))
   .withResponse("protocol", { produces: GITHUB_MEDIA_TYPES, because: INSTALL_PROTOCOL_REASON })
   .handle(async ({ app, request, raw, response }) =>

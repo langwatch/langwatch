@@ -6,7 +6,6 @@
 import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
 import { LogApi, otlpLogAliasParamsSchema } from "@langwatch/log-contract";
 import { resolveRequestBound } from "@langwatch/plans";
-import { HTTPException } from "hono/http-exception";
 
 import { otlpLogAnswer } from "../rules/otlp-log-answer.rules.ts";
 
@@ -20,10 +19,6 @@ const PUBLIC_ACCESS = {
   reason: "OTLP ingestion API key resolved in-handler",
 };
 
-/** The 413 a body past its cap earns, in the plain sentence it has always been. */
-const payloadTooLarge = (): Error =>
-  new HTTPException(413, { res: new Response("Payload Too Large", { status: 413 }) });
-
 /** Wire-body cap; the decompressed cap is separate. */
 const BODY_LIMIT_BULK_BYTES = resolveRequestBound("bodyLimitBulkBytes", "ENTERPRISE");
 
@@ -34,7 +29,7 @@ export const otlpLogsRest = defineRestRouter(LogApi)
 
   .post("/api/otel/v1/logs", "ingestOtlpLogs")
   .withRawBody("bytes")
-  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
   .withAccess(PUBLIC_ACCESS)
   .withResponse("protocol", { produces: PRODUCES_JSON, because: OTLP_PROTOCOL_REASON })
   .withDocs({ hide: true })
@@ -55,7 +50,7 @@ export const otlpLogsRest = defineRestRouter(LogApi)
   .post("/:otlpBase{.+}/v1/logs", "ingestOtlpLogsAlias")
   .withParams(otlpLogAliasParamsSchema)
   .withRawBody("bytes")
-  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
   .withAccess(PUBLIC_ACCESS)
   .withResponse("protocol", { produces: PRODUCES_JSON, because: OTLP_PROTOCOL_REASON })
   .withDocs({ hide: true })
@@ -74,7 +69,7 @@ export const otlpLogsRest = defineRestRouter(LogApi)
   .post("/:otlpBase{.+}/v1/logs/", "ingestOtlpLogsAliasSlash")
   .withParams(otlpLogAliasParamsSchema)
   .withRawBody("bytes")
-  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
   .withAccess(PUBLIC_ACCESS)
   .withResponse("protocol", { produces: PRODUCES_JSON, because: OTLP_PROTOCOL_REASON })
   .withDocs({ hide: true })
@@ -92,7 +87,7 @@ export const otlpLogsRest = defineRestRouter(LogApi)
 
   .post("/v1/logs", "ingestOtlpLogsRootV1")
   .withRawBody("bytes")
-  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
   .withAccess(PUBLIC_ACCESS)
   .withResponse("protocol", { produces: PRODUCES_JSON, because: OTLP_PROTOCOL_REASON })
   .withDocs({ hide: true })
@@ -110,7 +105,7 @@ export const otlpLogsRest = defineRestRouter(LogApi)
 
   .post("/v1/logs/", "ingestOtlpLogsRootV1Slash")
   .withRawBody("bytes")
-  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
   .withAccess(PUBLIC_ACCESS)
   .withResponse("protocol", { produces: PRODUCES_JSON, because: OTLP_PROTOCOL_REASON })
   .withDocs({ hide: true })

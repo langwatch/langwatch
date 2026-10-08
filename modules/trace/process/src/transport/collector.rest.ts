@@ -22,7 +22,6 @@ import {
   type CollectorRESTParamsValidator,
   type Span,
 } from "@langwatch/trace-contract";
-import { HTTPException } from "hono/http-exception";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
@@ -140,10 +139,6 @@ const collectorRefusal: RestProtocolRefusal = (context) =>
         body: JSON.stringify({ message: "Invalid body, expecting json" }),
       })
     : ingestPlanLimitRefusal(context);
-
-/** The 413 a body past its cap earns, in the plain sentence it has always been. */
-const payloadTooLarge = (): Error =>
-  new HTTPException(413, { res: new Response("Payload Too Large", { status: 413 }) });
 
 /** The request body as a JSON object, or the refusal reading it earned. */
 function readCollectorBody(raw: string): CollectorBody | CollectorRejection {
@@ -347,7 +342,7 @@ export const collectorRest = defineRestRouter(CollectorApi)
         "Trace collection API key resolved in-handler, so the refusal carries the credential chain's own body; the route itself is gated on traces:create",
     }),
   )
-  .withBodyLimit({ maxBytes: COLLECTOR_MAX_BODY_BYTES, onExceeded: payloadTooLarge })
+  .withBodyLimit({ maxBytes: COLLECTOR_MAX_BODY_BYTES })
   .withResponse("protocol", {
     produces: PRODUCES_JSON,
     because: COLLECTOR_PROTOCOL_REASON,
