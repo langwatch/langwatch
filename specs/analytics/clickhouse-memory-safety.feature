@@ -144,6 +144,13 @@ Feature: ClickHouse Query Memory Safety Regression Tests
     And other projects' queries do not wait behind them
 
   @unit
+  Scenario: A panel waiting too long for its tenant's turn fails as a transient overload
+    Given a project whose panel queries are all busy
+    When another panel query waits longer than the wait bound
+    Then it is refused as a transient overload without running
+    And the panel shows its retry state instead of hanging
+
+  @unit
   Scenario: The evaluations summary reads the slim evaluation table
     When the evaluations summary asks for evaluation runs grouped by pass or fail with an empty evaluator key
     Then the query runs on the slim evaluation table instead of the full evaluation runs table

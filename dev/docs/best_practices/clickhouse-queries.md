@@ -110,7 +110,7 @@ Rules for this form:
 - **Use `latestVersionSubquery`** (`src/server/analytics/clickhouse/latest-version-dedup.ts`). It emits the shape above.
 - **Carry the row as a tuple.** `argMax` on a `Nullable` column skips NULLs and returns an older version's value. `argMax(tuple(x), v).1` keeps the NULL.
 - **Rename inside the inner subquery.** An outer `argMax(OccurredAt, UpdatedAt) AS OccurredAt` shadows the column the WHERE filters on and fails with `ILLEGAL_AGGREGATION`. The `__latest_row` / `__version` names avoid it.
-- **Carry only narrow columns.** The newest row is buffered per key. Never carry a whole `Map`: narrow it to the keys the query reads (`narrowMapColumnProjection`), or keep the IN-tuple form.
+- **Carry only narrow columns.** The newest row is buffered per key. Never carry a whole `Map`: narrow it to the keys the query reads (`narrowMapColumnProjection` in `field-mappings.ts`), or keep the IN-tuple form.
 - **Evaluate predicates on the newest version.** A predicate that must hold for the newest row (a filter, a has-signal check) is carried as a boolean column and checked in the outer WHERE, the same place the IN-tuple form checked it.
 
 The two forms pick the same row. They differ only on two versions tied on `UpdatedAt`: the collapse keeps one, the IN-tuple form keeps both.

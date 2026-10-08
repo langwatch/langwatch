@@ -30,7 +30,7 @@ describe("currentVsPreviousDates", () => {
           startDate,
           endDate,
           filters: {},
-          skipPreviousPeriod: true,
+          shouldSkipPreviousPeriod: true,
         });
 
       expect(previousPeriodStartDate.getTime()).toBe(start.getTime());

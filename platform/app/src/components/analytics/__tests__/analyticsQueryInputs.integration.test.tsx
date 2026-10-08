@@ -125,7 +125,7 @@ describe("<CustomGraph /> previous period", () => {
         <CustomGraph input={graph({ includePrevious: false })} />,
       );
 
-      expect(mainQueryInput()?.skipPreviousPeriod).toBe(true);
+      expect(mainQueryInput()?.shouldSkipPreviousPeriod).toBe(true);
     });
   });
 
@@ -135,7 +135,7 @@ describe("<CustomGraph /> previous period", () => {
         <CustomGraph input={graph({ includePrevious: true })} />,
       );
 
-      expect(mainQueryInput()?.skipPreviousPeriod).toBe(false);
+      expect(mainQueryInput()?.shouldSkipPreviousPeriod).toBe(false);
     });
   });
 
@@ -147,7 +147,7 @@ describe("<CustomGraph /> previous period", () => {
         />,
       );
 
-      expect(mainQueryInput()?.skipPreviousPeriod).toBe(false);
+      expect(mainQueryInput()?.shouldSkipPreviousPeriod).toBe(false);
     });
   });
 });

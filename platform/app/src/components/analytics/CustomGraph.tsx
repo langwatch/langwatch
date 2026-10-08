@@ -396,7 +396,7 @@ const CustomGraph_ = React.memo(
         ...queryInput,
         timeScale,
         timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        skipPreviousPeriod: shouldSkipPreviousPeriod(input),
+        shouldSkipPreviousPeriod: shouldSkipPreviousPeriod(input),
       },
       { ...queryOpts, enabled: queryOpts.enabled && load },
     );
@@ -425,7 +425,7 @@ const CustomGraph_ = React.memo(
         timeScale: "full",
         timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         // The monitor headline reads only the current period.
-        skipPreviousPeriod: true,
+        shouldSkipPreviousPeriod: true,
       },
       {
         ...queryOpts,

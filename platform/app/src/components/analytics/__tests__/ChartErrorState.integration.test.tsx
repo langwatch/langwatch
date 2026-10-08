@@ -91,5 +91,23 @@ describe("<ChartErrorState />", () => {
       expect(screen.queryByRole("button")).not.toBeInTheDocument();
       expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     });
+
+    describe("when the failure is unhandled", () => {
+      it("names what failed with the caller's fallback title", () => {
+        render(
+          <ChakraProvider value={defaultSystem}>
+            <ChartErrorIndicator
+              error={new Error("boom")}
+              fallbackTitle="Couldn't load the documents count"
+            />
+          </ChakraProvider>,
+        );
+
+        expect(
+          screen.getByText(/^Couldn't load the documents count/),
+        ).toBeInTheDocument();
+        expect(screen.queryByText("boom")).not.toBeInTheDocument();
+      });
+    });
   });
 });

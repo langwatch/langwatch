@@ -450,7 +450,7 @@ export const timeseriesSeriesInput = z.object({
    * response then carries an empty `previousPeriod`. Absent means the previous
    * period is computed, so stored graphs and server-side readers keep it.
    */
-  skipPreviousPeriod: z.optional(z.boolean()),
+  shouldSkipPreviousPeriod: z.optional(z.boolean()),
 });
 
 export type TimeseriesSeriesInputType = z.infer<typeof timeseriesSeriesInput>;

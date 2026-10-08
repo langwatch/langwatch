@@ -65,20 +65,20 @@ function splitCarriedColumns({
   keyColumns: readonly string[];
   columns: readonly LatestVersionColumn[];
   versionColumn: string;
-}): { carried: LatestVersionColumn[]; carriesVersion: boolean } {
+}): { carried: LatestVersionColumn[]; isVersionCarried: boolean } {
   const keys = new Set(keyColumns);
   const seen = new Set<string>();
   const carried: LatestVersionColumn[] = [];
-  let carriesVersion = false;
+  let isVersionCarried = false;
   for (const column of columns) {
     if (column.name === versionColumn && !column.expression) {
-      carriesVersion = true;
+      isVersionCarried = true;
     } else if (!keys.has(column.name) && !seen.has(column.name)) {
       seen.add(column.name);
       carried.push(column);
     }
   }
-  return { carried, carriesVersion };
+  return { carried, isVersionCarried };
 }
 
 /**
@@ -122,7 +122,7 @@ export function latestVersionSubquery({
   versionColumn?: string;
   sourceAlias?: string;
 }): string {
-  const { carried, carriesVersion } = splitCarriedColumns({
+  const { carried, isVersionCarried } = splitCarriedColumns({
     keyColumns,
     columns,
     versionColumn,
@@ -145,7 +145,7 @@ export function latestVersionSubquery({
       );
     });
   }
-  if (carriesVersion) {
+  if (isVersionCarried) {
     outerSelect.push(`max(${VERSION}) AS ${versionColumn}`);
   }
 
@@ -158,34 +158,4 @@ export function latestVersionSubquery({
     )
     GROUP BY ${keyColumns.join(", ")}
   ) ${alias}`;
-}
-
-/**
- * Narrow a `Map` column to a reconstructed map of the keys a query reads, when
- * every reference to it is a literal keyed access (`Attributes['key']`).
- *
- * Returns the projection (`map('k', Attributes['k']) AS Attributes`), or `null`
- * when the map is used generically (`mapKeys(Attributes)`, a parameterised key
- * `Attributes[{p:String}]`) and no key list covers every read.
- */
-export function narrowMapColumnProjection({
-  column,
-  alias,
-  expressions,
-}: {
-  column: string;
-  alias: string;
-  expressions: readonly string[];
-}): string | null {
-  const joined = expressions.join(" ");
-  const escapedColumn = column.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const prefix = `(?<![\\w."])(?:${alias}\\.)?${escapedColumn}`;
-  const allRefs = joined.match(new RegExp(`${prefix}\\b`, "g")) ?? [];
-  const keyed = [
-    ...joined.matchAll(new RegExp(`${prefix}\\['([^'\\]\\\\]+)'\\]`, "g")),
-  ];
-  if (keyed.length === 0 || keyed.length !== allRefs.length) return null;
-  const keys = [...new Set(keyed.map((match) => match[1]!))];
-  const entries = keys.map((key) => `'${key}', ${column}['${key}']`).join(", ");
-  return `map(${entries}) AS ${column}`;
 }

@@ -13,6 +13,10 @@ export type TopUsedDocumentsParams = Pick<
   "filterParams" | "queryOpts"
 >;
 
+/**
+ * The most used documents for the analytics window, read from the caller's
+ * shared window and filters when given, or from its own `useFilterParams`.
+ */
 export function useTopUsedDocuments(params?: TopUsedDocumentsParams) {
   const own = useFilterParams();
   const { filterParams, queryOpts } = params ?? own;

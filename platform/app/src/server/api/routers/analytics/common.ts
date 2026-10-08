@@ -8,7 +8,7 @@ const getDaysDifference = (startDate: Date, endDate: Date) =>
 
 export const currentVsPreviousDates = (
   input: z.infer<typeof sharedFiltersInputSchema> & {
-    skipPreviousPeriod?: boolean;
+    shouldSkipPreviousPeriod?: boolean;
   },
   period?: number | string,
 ) => {
@@ -28,7 +28,7 @@ export const currentVsPreviousDates = (
   // Skipping the previous period collapses its window to [startDate,
   // startDate): every builder's previous-period predicate then matches no row
   // and prunes no extra partition, so the scan covers the current window only.
-  const previousPeriodStartDate = input.skipPreviousPeriod
+  const previousPeriodStartDate = input.shouldSkipPreviousPeriod
     ? startDate
     : addDays(startDate, -daysDifference);
 

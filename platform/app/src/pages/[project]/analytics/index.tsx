@@ -12,6 +12,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { ArrowUpRight, Plus } from "lucide-react";
+import { useMemo } from "react";
 import { BarChart2 } from "react-feather";
 import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
 import { dashboardContextChip } from "~/features/langy/logic/langyContextChips";
@@ -71,7 +72,10 @@ function AnalyticsContent() {
 
 function DocumentsMetrics() {
   const { filterParams, queryOpts } = useFilterParams();
-  const params = { filterParams, queryOpts };
+  const params = useMemo(
+    () => ({ filterParams, queryOpts }),
+    [filterParams, queryOpts],
+  );
   const documents = useTopUsedDocuments(params);
 
   const count = documents.data?.totalUniqueDocuments;

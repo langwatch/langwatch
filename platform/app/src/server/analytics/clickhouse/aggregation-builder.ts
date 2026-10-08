@@ -16,6 +16,7 @@ import {
   extractReferencedEvaluationColumns,
   extractReferencedSpanColumns,
   extractReferencedTraceColumns,
+  narrowMapColumnProjection,
   narrowSpanAttributesColumns,
   spanAttributesNarrowProjection,
   TRACE_ANALYTICS_COLUMNS,
@@ -25,7 +26,6 @@ import {
 import { translateAllFilters } from "./filter-translator";
 import {
   latestVersionSubquery,
-  narrowMapColumnProjection,
   parseLatestVersionColumn,
 } from "./latest-version-dedup";
 import {
@@ -238,11 +238,7 @@ function referencedTraceColumns(
   // A map read by literal keys only is carried as a map of those keys, which
   // keeps the deduped row narrow (see dedupedTraceSummaries).
   const narrowedAttributes = columns.includes("Attributes")
-    ? narrowMapColumnProjection({
-        column: "Attributes",
-        alias: tableAliases.trace_summaries,
-        expressions,
-      })
+    ? narrowMapColumnProjection({ column: "Attributes", expressions })
     : null;
   return narrowedAttributes
     ? columns.map((column) =>

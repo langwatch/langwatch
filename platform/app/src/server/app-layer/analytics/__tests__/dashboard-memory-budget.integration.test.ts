@@ -324,7 +324,7 @@ describe("dashboard panels under a memory cap", () => {
           series: [{ metric: "metadata.trace_id", aggregation: "cardinality" }],
           timeScale: 1440,
           groupBy: "error.has_error",
-          skipPreviousPeriod: true,
+          shouldSkipPreviousPeriod: true,
         } as PanelInput),
       );
       expect(query.table).toBe("trace_analytics");
@@ -352,7 +352,7 @@ describe("dashboard panels under a memory cap", () => {
             { metric: "performance.first_token", aggregation: "median" },
           ],
           timeScale: 1440,
-          skipPreviousPeriod: true,
+          shouldSkipPreviousPeriod: true,
         } as PanelInput),
       );
       expect(query.table).toBe("trace_analytics");
@@ -397,7 +397,7 @@ describe("dashboard panels under a memory cap", () => {
           series: [{ metric: "metadata.trace_id", aggregation: "cardinality" }],
           timeScale: 1440,
           groupBy: "metadata.model",
-          skipPreviousPeriod: true,
+          shouldSkipPreviousPeriod: true,
         } as PanelInput),
       );
       expect(query.table).toBe("trace_summaries");

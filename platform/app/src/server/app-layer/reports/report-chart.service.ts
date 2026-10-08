@@ -368,7 +368,7 @@ async function buildChart({
     // in the report's timezone, so the buckets only need to be stable.
     timeZone: "UTC",
     // A report chart draws only the current period.
-    skipPreviousPeriod: true,
+    shouldSkipPreviousPeriod: true,
   });
 
   const buckets = timeseries.currentPeriod;
