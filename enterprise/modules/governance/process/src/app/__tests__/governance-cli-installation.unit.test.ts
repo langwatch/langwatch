@@ -105,7 +105,9 @@ describe("the governance installation's CLI plane", () => {
     const runtime = await boot(rest);
 
     try {
-      const mounted = governanceProcessModule.transports.includes(governanceCliRest);
+      const transports = governanceProcessModule.transports;
+      if (!transports) throw new Error("the governance module declares no transports");
+      const mounted = transports.includes(governanceCliRest);
       const routes = governanceCliRest
         .router()
         .routes.map((route) => `${route.method.toUpperCase()} ${route.path}`);

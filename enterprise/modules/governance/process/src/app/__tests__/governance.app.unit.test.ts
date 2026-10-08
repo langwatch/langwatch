@@ -279,7 +279,10 @@ describe("GovernanceModule as the module a process installs", () => {
     it("answers every capability the declarations name from the one app", async () => {
       const { app } = await buildCliApp();
 
-      expect(governanceProcessModule.transports.map((transport) => transport.protocol)).toEqual([
+      const transports = governanceProcessModule.transports;
+      if (!transports) throw new Error("the governance module declares no transports");
+
+      expect(transports.map((transport) => transport.protocol)).toEqual([
         "rest",
         "rest",
         "rest",
