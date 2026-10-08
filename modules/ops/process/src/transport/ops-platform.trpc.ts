@@ -1,5 +1,5 @@
 /**
- * The server half of the feature-flag, blob-store and system-migration
+ * The server half of the feature-flag and blob-store
  * procedures. Platform-tier, asked at the door. Anything
  * destructive passes a second gate: a real signed-in operator, not an impersonation.
  */
@@ -92,107 +92,5 @@ export const opsPlatformTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsP
         hash: input.hash,
         requestedBy: actor.id,
       });
-    })
-
-    .procedure("listSystemMigrations")
-    .withPermission("ops:view", { at: "platform" })
-    .handle(({ app }) => app.listSystemMigrations())
-
-    .procedure("listMigrationEnrollments")
-    .withPermission("ops:view", { at: "platform" })
-    .handle(({ app, actor }) => app.listMigrationEnrollments({ requestedBy: actor.id }))
-
-    .procedure("searchMigrationOrganizations")
-    .withPermission("ops:view", { at: "platform" })
-    .handle(({ app, input }) => app.searchMigrationOrganizations({ query: input.query }))
-
-    .procedure("enrollMigrationTenant")
-    .withFacts(opsOperatorFact)
-    .withPermission("ops:manage", { at: "platform" })
-    .handle(async ({ app, input }, operator) => {
-      await app.enrollMigrationTenant({
-        organizationId: input.organizationId,
-        migrationName: input.migrationName,
-        operator,
-        confirm: input.confirm,
-      });
-
-      return { enrolled: true as const };
-    })
-
-    .procedure("enrollMigrationCohort")
-    .withFacts(opsOperatorFact)
-    .withPermission("ops:manage", { at: "platform" })
-    .handle(({ app, input }, operator) =>
-      app.enrollMigrationCohort({
-        migrationName: input.migrationName,
-        sampleSize: input.sampleSize,
-        includeEnterprise: input.includeEnterprise,
-        includePrivateDataplane: input.includePrivateDataplane,
-        operator,
-        confirm: input.confirm,
-      }),
-    )
-
-    .procedure("withdrawMigrationTenant")
-    .withPermission("ops:manage", { at: "platform" })
-    .handle(async ({ app, input, actor }) => {
-      await app.withdrawMigrationTenant({
-        organizationId: input.organizationId,
-        migrationName: input.migrationName,
-        actorUserId: actor.id,
-      });
-
-      return { withdrawn: true as const };
-    })
-
-    .procedure("runSystemMigrationForOrganization")
-    .withFacts(opsOperatorFact)
-    .withPermission("ops:manage", { at: "platform" })
-    .handle(({ app, input }, operator) =>
-      app.runSystemMigrationForOrganization({
-        organizationId: input.organizationId,
-        migrationName: input.migrationName,
-        operator,
-        confirm: input.confirm,
-      }),
-    )
-
-    .procedure("runSystemMigrationPass")
-    .withFacts(opsOperatorFact)
-    .withPermission("ops:manage", { at: "platform" })
-    .handle(async ({ app }, operator) => {
-      await app.runSystemMigrationPass({ operator });
-
-      return { started: true as const };
-    })
-
-    .procedure("assertSystemMigrationLegacyWritersDrained")
-    .withFacts(opsOperatorFact)
-    .withPermission("ops:manage", { at: "platform" })
-    .handle(async ({ app, input }, operator) => {
-      await app.assertSystemMigrationLegacyWritersDrained({
-        migrationName: input.migrationName,
-        tenantId: input.tenantId,
-        minimumWriterGeneration: input.minimumWriterGeneration,
-        operator,
-        confirm: input.confirm,
-      });
-
-      return { asserted: true as const };
-    })
-
-    .procedure("rollBackSystemMigrationTenant")
-    .withFacts(opsOperatorFact)
-    .withPermission("ops:manage", { at: "platform" })
-    .handle(async ({ app, input }, operator) => {
-      await app.rollBackSystemMigrationTenant({
-        migrationName: input.migrationName,
-        tenantId: input.tenantId,
-        operator,
-        confirm: input.confirm,
-      });
-
-      return { rolledBack: true as const };
     })
     .build();

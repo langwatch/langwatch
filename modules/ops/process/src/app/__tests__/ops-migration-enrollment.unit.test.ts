@@ -12,7 +12,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { opsTrpcMembers } from "../../transport/__tests__/ops.trpc.harness.ts";
 import { opsOperatorFact } from "../../transport/ops-operator.trpc.ts";
-import { opsPlatformTrpcTransport } from "../../transport/ops-platform.trpc.ts";
+import { opsUpgradeTrpcTransport } from "../../transport/ops-upgrade.trpc.ts";
 import type { OpsSystemMigrationRunner } from "../ops.app.ts";
 import { createOpsTestApp, OPS_STAFF_ADDRESS, platformOperatorAuthz } from "./ops.fixture.ts";
 
@@ -76,7 +76,7 @@ function callerFor(operator: OpsOperator) {
       holders: { user_alex: ["ops:view", "ops:manage"] },
       asked: (permission) => demandedPermissions.set(current, permission),
     }),
-  }).mount(opsPlatformTrpcTransport, () => app, {
+  }).mount(opsUpgradeTrpcTransport, () => app, {
     facts: [bindTrpcFact(opsOperatorFact, (ctx: MigrationTestContext) => ctx.operator)],
   });
 

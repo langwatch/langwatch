@@ -1487,30 +1487,20 @@ interface Output {
 
 ### `ops`
 
-Contract `../contract/src/ops-platform.trpc.ts:50`, router `src/transport/ops-platform.trpc.ts:15`.
+Contract `../contract/src/ops-platform.trpc.ts:29`, router `src/transport/ops-platform.trpc.ts:15`.
 
-| Procedure                                       | Kind     | Gate                             | Input                                             | Output                                |
-| ----------------------------------------------- | -------- | -------------------------------- | ------------------------------------------------- | ------------------------------------- |
-| `ops.listFeatureFlags`                          | query    | Platform permission `ops:view`   | inline                                            | `operatorFeatureFlagCatalogueSchema`  |
-| `ops.setFeatureFlag`                            | mutation | Platform permission `ops:manage` | `opsSetFeatureFlagInputSchema`                    | `opsOkOutputSchema`                   |
-| `ops.setFeatureFlagRules`                       | mutation | Platform permission `ops:manage` | `opsSetFeatureFlagRulesInputSchema`               | `opsOkOutputSchema`                   |
-| `ops.clearFeatureFlag`                          | mutation | Platform permission `ops:manage` | `opsFeatureFlagKeyInputSchema`                    | `opsOkOutputSchema`                   |
-| `ops.listBlobQueues`                            | query    | Platform permission `ops:view`   | inline                                            | `opsQueueNameListSchema`              |
-| `ops.getBlobStoreStats`                         | query    | Platform permission `ops:view`   | inline                                            | `opsBlobStoreStatsSchema`             |
-| `ops.listBlobs`                                 | query    | Platform permission `ops:view`   | `listBlobsInputSchema`                            | `opsBlobPageSchema`                   |
-| `ops.getBlob`                                   | query    | Platform permission `ops:view`   | `getBlobInputSchema`                              | inline                                |
-| `ops.runBlobCleanup`                            | mutation | Platform permission `ops:manage` | `runBlobCleanupOperatorInputSchema`               | `blobSweepReportSchema`               |
-| `ops.deleteBlob`                                | mutation | Platform permission `ops:manage` | `deleteBlobOperatorInputSchema`                   | `deleteBlobResultSchema`              |
-| `ops.listSystemMigrations`                      | query    | Platform permission `ops:view`   | inline                                            | inline                                |
-| `ops.listMigrationEnrollments`                  | query    | Platform permission `ops:view`   | inline                                            | `opsMigrationEnrollmentListingSchema` |
-| `ops.searchMigrationOrganizations`              | query    | Platform permission `ops:view`   | `opsSearchMigrationOrganizationsInputSchema`      | inline                                |
-| `ops.enrollMigrationTenant`                     | mutation | Platform permission `ops:manage` | `opsEnrollMigrationTenantInputSchema`             | `opsMigrationEnrolledSchema`          |
-| `ops.enrollMigrationCohort`                     | mutation | Platform permission `ops:manage` | `opsEnrollMigrationCohortInputSchema`             | `opsMigrationCohortResultSchema`      |
-| `ops.withdrawMigrationTenant`                   | mutation | Platform permission `ops:manage` | `opsMigrationTenantInputSchema`                   | `opsMigrationWithdrawnSchema`         |
-| `ops.runSystemMigrationForOrganization`         | mutation | Platform permission `ops:manage` | `opsRunSystemMigrationForOrganizationInputSchema` | `opsMigrationTargetedRunResultSchema` |
-| `ops.runSystemMigrationPass`                    | mutation | Platform permission `ops:manage` | inline                                            | `opsMigrationPassStartedSchema`       |
-| `ops.assertSystemMigrationLegacyWritersDrained` | mutation | Platform permission `ops:manage` | `opsAssertLegacyWritersDrainedInputSchema`        | `opsMigrationDrainAssertedSchema`     |
-| `ops.rollBackSystemMigrationTenant`             | mutation | Platform permission `ops:manage` | `opsRollBackSystemMigrationTenantInputSchema`     | `opsMigrationRolledBackSchema`        |
+| Procedure                 | Kind     | Gate                             | Input                               | Output                               |
+| ------------------------- | -------- | -------------------------------- | ----------------------------------- | ------------------------------------ |
+| `ops.listFeatureFlags`    | query    | Platform permission `ops:view`   | inline                              | `operatorFeatureFlagCatalogueSchema` |
+| `ops.setFeatureFlag`      | mutation | Platform permission `ops:manage` | `opsSetFeatureFlagInputSchema`      | `opsOkOutputSchema`                  |
+| `ops.setFeatureFlagRules` | mutation | Platform permission `ops:manage` | `opsSetFeatureFlagRulesInputSchema` | `opsOkOutputSchema`                  |
+| `ops.clearFeatureFlag`    | mutation | Platform permission `ops:manage` | `opsFeatureFlagKeyInputSchema`      | `opsOkOutputSchema`                  |
+| `ops.listBlobQueues`      | query    | Platform permission `ops:view`   | inline                              | `opsQueueNameListSchema`             |
+| `ops.getBlobStoreStats`   | query    | Platform permission `ops:view`   | inline                              | `opsBlobStoreStatsSchema`            |
+| `ops.listBlobs`           | query    | Platform permission `ops:view`   | `listBlobsInputSchema`              | `opsBlobPageSchema`                  |
+| `ops.getBlob`             | query    | Platform permission `ops:view`   | `getBlobInputSchema`                | inline                               |
+| `ops.runBlobCleanup`      | mutation | Platform permission `ops:manage` | `runBlobCleanupOperatorInputSchema` | `blobSweepReportSchema`              |
+| `ops.deleteBlob`          | mutation | Platform permission `ops:manage` | `deleteBlobOperatorInputSchema`     | `deleteBlobResultSchema`             |
 
 ```typescript
 // ops.listFeatureFlags
@@ -2257,16 +2247,26 @@ interface Output {
 
 ### `ops.upgrade`
 
-Contract `../contract/src/ops-upgrade.ts:148`, router `src/transport/ops-upgrade.trpc.ts:9`.
+Contract `../contract/src/ops-upgrade.ts:170`, router `src/transport/ops-upgrade.trpc.ts:12`.
 
-| Procedure                  | Kind  | Gate                           | Input                            | Output                        |
-| -------------------------- | ----- | ------------------------------ | -------------------------------- | ----------------------------- |
-| `ops.upgrade.status`       | query | Platform permission `ops:view` | inline                           | `opsUpgradeStatusSchema`      |
-| `ops.upgrade.listReleases` | query | Platform permission `ops:view` | inline                           | `opsUpgradeReleasePageSchema` |
-| `ops.upgrade.listSteps`    | query | Platform permission `ops:view` | `opsUpgradeListStepsInputSchema` | `opsUpgradeStepPageSchema`    |
-| `ops.upgrade.getStep`      | query | Platform permission `ops:view` | `opsUpgradeIdInputSchema`        | `opsUpgradeStepDetailSchema`  |
-| `ops.upgrade.listRuns`     | query | Platform permission `ops:view` | `opsUpgradeListRunsInputSchema`  | `opsUpgradeRunPageSchema`     |
-| `ops.upgrade.getRun`       | query | Platform permission `ops:view` | `opsUpgradeIdInputSchema`        | `opsUpgradeRunSchema`         |
+| Procedure                                               | Kind     | Gate                             | Input                                             | Output                                |
+| ------------------------------------------------------- | -------- | -------------------------------- | ------------------------------------------------- | ------------------------------------- |
+| `ops.upgrade.status`                                    | query    | Platform permission `ops:view`   | inline                                            | `opsUpgradeStatusSchema`              |
+| `ops.upgrade.listReleases`                              | query    | Platform permission `ops:view`   | inline                                            | `opsUpgradeReleasePageSchema`         |
+| `ops.upgrade.listSteps`                                 | query    | Platform permission `ops:view`   | `opsUpgradeListStepsInputSchema`                  | `opsUpgradeStepPageSchema`            |
+| `ops.upgrade.getStep`                                   | query    | Platform permission `ops:view`   | `opsUpgradeIdInputSchema`                         | `opsUpgradeStepDetailSchema`          |
+| `ops.upgrade.listRuns`                                  | query    | Platform permission `ops:view`   | `opsUpgradeListRunsInputSchema`                   | `opsUpgradeRunPageSchema`             |
+| `ops.upgrade.getRun`                                    | query    | Platform permission `ops:view`   | `opsUpgradeIdInputSchema`                         | `opsUpgradeRunSchema`                 |
+| `ops.upgrade.listSystemMigrations`                      | query    | Platform permission `ops:view`   | inline                                            | inline                                |
+| `ops.upgrade.listMigrationEnrollments`                  | query    | Platform permission `ops:view`   | inline                                            | `opsMigrationEnrollmentListingSchema` |
+| `ops.upgrade.searchMigrationOrganizations`              | query    | Platform permission `ops:view`   | `opsSearchMigrationOrganizationsInputSchema`      | inline                                |
+| `ops.upgrade.enrollMigrationTenant`                     | mutation | Platform permission `ops:manage` | `opsEnrollMigrationTenantInputSchema`             | `opsMigrationEnrolledSchema`          |
+| `ops.upgrade.enrollMigrationCohort`                     | mutation | Platform permission `ops:manage` | `opsEnrollMigrationCohortInputSchema`             | `opsMigrationCohortResultSchema`      |
+| `ops.upgrade.withdrawMigrationTenant`                   | mutation | Platform permission `ops:manage` | `opsMigrationTenantInputSchema`                   | `opsMigrationWithdrawnSchema`         |
+| `ops.upgrade.runSystemMigrationForOrganization`         | mutation | Platform permission `ops:manage` | `opsRunSystemMigrationForOrganizationInputSchema` | `opsMigrationTargetedRunResultSchema` |
+| `ops.upgrade.runSystemMigrationPass`                    | mutation | Platform permission `ops:manage` | inline                                            | `opsMigrationPassStartedSchema`       |
+| `ops.upgrade.assertSystemMigrationLegacyWritersDrained` | mutation | Platform permission `ops:manage` | `opsAssertLegacyWritersDrainedInputSchema`        | `opsMigrationDrainAssertedSchema`     |
+| `ops.upgrade.rollBackSystemMigrationTenant`             | mutation | Platform permission `ops:manage` | `opsRollBackSystemMigrationTenantInputSchema`     | `opsMigrationRolledBackSchema`        |
 
 ```typescript
 // ops.upgrade.status
