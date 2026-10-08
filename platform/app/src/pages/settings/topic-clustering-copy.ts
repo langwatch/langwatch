@@ -75,7 +75,7 @@ export const RUN_MODE_COPY: Record<TopicClusteringRunMode, string> = {
   incremental: "Sorted new traces into your existing topics",
 };
 
-export interface ClusteringRunDetail {
+interface ClusteringRunDetail {
   outcome: string;
   mode: string | null;
   skippedReason: string | null;

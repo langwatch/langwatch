@@ -52,9 +52,8 @@ export const CONNECTION_TEST_FEATURE_KEY = "model_provider.connection_test";
  * (langevals/litellm), whose codex backstop refuses codex models outright —
  * codex's only execution road is the AI gateway Responses endpoint, which
  * topic clustering never uses. Licensing the model at RESOLUTION while
- * refusing it at EXECUTION produced a daily silent failure: scheduled
- * clustering resolved FAST=codex, then threw at the litellm layer with a
- * customer-hostile "coding-assistant surfaces only" message (issue #8287).
+ * refusing it at EXECUTION would fail at the litellm layer with a
+ * customer-hostile "coding-assistant surfaces only" message.
  * Excluding it here makes the cascade resolver skip the codex value and keep
  * walking the scope chain (project → team → organization) for this feature,
  * raising ModelRestrictedForFeatureError when no other configured value exists

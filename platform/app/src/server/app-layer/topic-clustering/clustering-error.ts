@@ -39,7 +39,7 @@ export const CLUSTERING_ERROR_CODES = {
    * topic clustering (langevals/litellm refuses codex; codex runs only through
    * the AI gateway). The customer fixes it by choosing another model for topic
    * clustering. Distinct from MODEL_NOT_CONFIGURED: something IS configured, it
-   * just is not usable here (issue #8287).
+   * just is not usable here.
    */
   MODEL_RESTRICTED: "model_restricted",
   /**

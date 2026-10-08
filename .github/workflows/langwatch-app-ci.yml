@@ -337,7 +337,7 @@ jobs:
         with:
           # HEAD is the PR merge commit; depth 2 gives it both parents so the
           # `--changed origin/main` three-dot diff has a merge base without
-          # relying on the later deepen fetch. See CodeRabbit on PR #8291.
+          # relying on the later deepen fetch.
           fetch-depth: 2
           # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
           sparse-checkout: |
@@ -620,7 +620,7 @@ jobs:
         with:
           # HEAD is the PR merge commit; depth 2 gives it both parents so the
           # `--changed origin/main` three-dot diff has a merge base without
-          # relying on the later deepen fetch. See CodeRabbit on PR #8291.
+          # relying on the later deepen fetch.
           fetch-depth: 2
           # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
           sparse-checkout: |
@@ -817,7 +817,7 @@ jobs:
         with:
           # HEAD is the PR merge commit; depth 2 gives it both parents so the
           # `--changed origin/main` three-dot diff has a merge base without
-          # relying on the later deepen fetch. See CodeRabbit on PR #8291.
+          # relying on the later deepen fetch.
           fetch-depth: 2
           # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
           sparse-checkout: |

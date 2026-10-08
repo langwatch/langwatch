@@ -594,8 +594,7 @@ const getProjectTopicClusteringModelProvider = async (project: Project) => {
   // resolver keeps walking the scope chain (project → team → organization)
   // skipping codex values and raises this error when no other configured value
   // exists — it never substitutes a model or falls back to another role. That
-  // surfaces as the user-actionable model_restricted code with its own guidance
-  // (issue #8287).
+  // surfaces as the user-actionable model_restricted code with its own guidance.
   const resolved = await resolveModelForFeature(
     "analytics.topic_clustering_llm",
     { prisma, projectId: project.id },
