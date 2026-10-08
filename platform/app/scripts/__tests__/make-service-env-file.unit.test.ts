@@ -87,15 +87,20 @@ describe("load-dev-env.sh", () => {
   });
 
   describe("when the env file loads", () => {
-    it("exports only the file's variables", () => {
-      const script = `. "${HELPER}" && load_dev_env .env && env`;
-      const env = execFileSync("/bin/sh", ["-c", script], {
-        cwd: workDir,
-        encoding: "utf8",
-        env: { PATH: "/usr/bin:/bin" },
-      });
-      expect(env).toContain("LOAD_DEV_ENV_TEST=loaded");
-      expect(env).not.toMatch(/^_load_dev_env/m);
+    it("adds only the variables the file sets", () => {
+      fs.writeFileSync(path.join(workDir, "empty.env"), "");
+      const envAfter = (file: string) =>
+        execFileSync(
+          "/bin/sh",
+          ["-c", `. "${HELPER}" && load_dev_env "$1" && env`, "sh", file],
+          { cwd: workDir, encoding: "utf8", env: { PATH: "/usr/bin:/bin" } },
+        )
+          .trim()
+          .split("\n")
+          .filter((line) => !line.startsWith("_="));
+      const empty = new Set(envAfter("empty.env"));
+      const added = envAfter(".env").filter((line) => !empty.has(line));
+      expect(added).toEqual(["LOAD_DEV_ENV_TEST=loaded"]);
     });
   });
 
