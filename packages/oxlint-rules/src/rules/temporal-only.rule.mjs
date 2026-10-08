@@ -16,6 +16,8 @@ const PUBLISHED_ARTEFACT =
 // Eventing's Prisma stores predate `repositories/prisma/`; the path goes when they move.
 const PERSISTENCE_SEAM =
   /(?:^|\/)repositories\/(?:prisma|clickhouse)\/|^packages\/eventing\/src\/server\/adapters\/postgres\/|^modules\/auth\/process\/src\/repositories\/memory\/memory\.auth\.database\.ts$/;
+// Vendored chart bundle built by dev/scripts/build-charts-lib.mjs; not hand-written.
+const CHARTS_LIB = /^modules\/analytics\/browser\/src\/model\/dashboard-widget\/chartsLib\//;
 const DECLARATION = /\.d\.[cm]?ts$/;
 const BOUNDARY_HELPER = new Set(["fromDate", "toDate"]);
 const GLOBAL_OBJECTS = new Set(["globalThis", "window", "global", "self"]);
@@ -38,6 +40,7 @@ function isTemporalOnlySource(file) {
   if (PUBLISHED_ARTEFACT.test(path)) return false;
   if (TIME_PACKAGE.test(path)) return false;
   if (PERSISTENCE_SEAM.test(path)) return false;
+  if (CHARTS_LIB.test(path)) return false;
   if (DECLARATION.test(path)) return false;
 
   return file.isProduction;

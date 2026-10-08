@@ -4,7 +4,6 @@
  * instance.
  */
 
-import { Temporal } from "@langwatch/time";
 import type * as RechartsLibrary from "recharts";
 
 type Row = Record<string, unknown>;
@@ -120,20 +119,11 @@ function isNumeric(value: unknown): boolean {
   return typeof value === "number" && !isNaN(value);
 }
 
-function parseInstantEpochMs(value: unknown): number | undefined {
-  if (typeof value !== "string") return undefined;
-  try {
-    return Temporal.Instant.from(value).epochMilliseconds;
-  } catch {
-    return undefined;
-  }
-}
-
 /** A column reads as time-like by name, or by its first value parsing as a date. */
 function isTimeLikeColumn(data: Row[], key: string): boolean {
   if (/date|time|timestamp|day|hour|week|month|bucket/i.test(key)) return true;
   const sample = data[0]?.[key];
-  if (parseInstantEpochMs(sample) !== undefined) return true;
+  if (typeof sample === "string" && !isNaN(Date.parse(sample))) return true;
   return false;
 }
 
@@ -146,9 +136,7 @@ function axisTickFormatter(key: string, data: Row[]): (value: unknown) => string
   const timeLike = isTimeLikeColumn(data, key);
   let spansMultipleDays = false;
   if (timeLike) {
-    const times = data
-      .map((row) => parseInstantEpochMs(row[key]))
-      .filter((t): t is number => t !== undefined);
+    const times = data.map((row) => Date.parse(String(row[key]))).filter((t) => !isNaN(t));
     if (times.length > 0) {
       spansMultipleDays = Math.max(...times) - Math.min(...times) > 24 * 60 * 60 * 1000;
     }
@@ -156,16 +144,16 @@ function axisTickFormatter(key: string, data: Row[]): (value: unknown) => string
   return (value: unknown): string => {
     const raw = String(value);
     if (!timeLike) return raw;
-    const instant = parseInstantEpochMs(raw);
-    if (instant === undefined) return raw;
-    const date = Temporal.Instant.fromEpochMilliseconds(instant).toZonedDateTimeISO("UTC");
+    const parsed = Date.parse(raw);
+    if (isNaN(parsed)) return raw;
+    const date = new Date(parsed);
     if (spansMultipleDays) {
-      const mm = String(date.month).padStart(2, "0");
-      const dd = String(date.day).padStart(2, "0");
+      const mm = String(date.getMonth() + 1).padStart(2, "0");
+      const dd = String(date.getDate()).padStart(2, "0");
       return `${mm}-${dd}`;
     }
-    const hh = String(date.hour).padStart(2, "0");
-    const min = String(date.minute).padStart(2, "0");
+    const hh = String(date.getHours()).padStart(2, "0");
+    const min = String(date.getMinutes()).padStart(2, "0");
     return `${hh}:${min}`;
   };
 }

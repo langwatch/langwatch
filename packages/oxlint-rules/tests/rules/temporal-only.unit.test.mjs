@@ -207,4 +207,15 @@ describe("given a file outside the governed source", () => {
       expect(ids("const at = new Date();", "packages/time/src/zoned.ts")).toEqual([]);
     });
   });
+  describe("when it is the generated charts bundle", () => {
+    /** @scenario "The generated charts bundle keeps its Date" */
+    it("reports nothing", () => {
+      expect(
+        ids(
+          "const at = new Date();",
+          "modules/analytics/browser/src/model/dashboard-widget/chartsLib/index.ts",
+        ),
+      ).toEqual([]);
+    });
+  });
 });

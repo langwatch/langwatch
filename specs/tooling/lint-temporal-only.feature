@@ -117,6 +117,12 @@ Feature: The linter keeps one clock
       Then it reports nothing
 
     @unit
+    Scenario: The generated charts bundle keeps its Date
+      Given a file in analytics' generated chartsLib bundle
+      When the rule runs
+      Then it reports nothing
+
+    @unit
     Scenario: A member call on another object is left alone
       Given production source that calls now on an injected clock
       When the rule runs
