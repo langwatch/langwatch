@@ -248,7 +248,6 @@ export class OrganizationInvitationDoorService {
     // invitation is marked ACCEPTED only once everything before it has landed.
     await this.deps.invitations.apply({ userId: by.id, invite, viaIdentifierId });
 
-    await this.#withdrawOpenRequest({ userId: by.id, organizationId: invite.organizationId });
     await this.#provisionPersonalWorkspace({ organizationId: invite.organizationId, by });
 
     void this.deps.signals
@@ -259,6 +258,7 @@ export class OrganizationInvitationDoorService {
       })
       .catch((failure: unknown) => this.deps.signals.reportError(failure));
 
+    // Identity withdraws the same person's open join request from this fact (§9, R7).
     this.deps.lifecycle.inviteAccepted({
       organizationId: invite.organization.id,
       userId: by.id,
@@ -337,17 +337,6 @@ export class OrganizationInvitationDoorService {
         }
       }),
     );
-  }
-
-  async #withdrawOpenRequest(input: { userId: string; organizationId: string }): Promise<void> {
-    const joinRequests = this.deps.joinRequests;
-    if (!joinRequests) return;
-
-    try {
-      await joinRequests.withdrawOnInvitationAccepted(input);
-    } catch (error) {
-      this.deps.signals.reportError(error, { tags: { organizationId: input.organizationId } });
-    }
   }
 
   /**

@@ -82,10 +82,6 @@ export interface OrganizationJoinRequests {
   resolveByInvitation(
     input: Readonly<{ userId: string; organizationId: string; inviteId: string }>,
   ): Promise<void>;
-  /** Accepting an invitation WITHDRAWS the same person's open request. */
-  withdrawOnInvitationAccepted(
-    input: Readonly<{ userId: string; organizationId: string }>,
-  ): Promise<void>;
 }
 
 /**
@@ -112,7 +108,6 @@ export class OrganizationJoinRequestsService {
       readJoining: (input) => ledger().readJoining(input),
       setJoining: (input) => ledger().setJoining(input),
       resolveByInvitation: (input) => ledger().resolveByInvitation(input),
-      withdrawOnInvitationAccepted: (input) => ledger().withdrawOnInvitationAccepted(input),
     };
   }
 }

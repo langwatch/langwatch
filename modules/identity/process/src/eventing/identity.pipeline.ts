@@ -25,6 +25,10 @@ import {
   breakGlassExpiryWarnSchema,
   breakGlassExpiryWarnWake,
 } from "./break-glass-expiry-warn.process.ts";
+import {
+  JOIN_REQUEST_INVITE_ACCEPTED_SUBSCRIBER_NAME,
+  joinRequestInviteAcceptedSubscriber,
+} from "./join-request-invite-accepted.subscriber.ts";
 import { runSsoDomainReproofSweep } from "./sso-domain-reproof-sweep.intent.ts";
 import {
   SSO_DOMAIN_REPROOF_SWEEP_INITIAL_STATE,
@@ -52,6 +56,10 @@ export const identityEventing = defineEventingModule({
         data: userRegisteredEventDataSchema,
         handle: (registration) => app.signUpIdentifiers().attachRegistered({ registration }),
       })
+      .withPeerSubscriber(
+        JOIN_REQUEST_INVITE_ACCEPTED_SUBSCRIBER_NAME,
+        joinRequestInviteAcceptedSubscriber({ joinRequests: () => app.joinRequests() }),
+      )
       .withProcessManager(BREAK_GLASS_EXPIRY_WARN_PROCESS_NAME, (pm) =>
         pm
           .state(breakGlassExpiryWarnStateSchema, BREAK_GLASS_EXPIRY_WARN_INITIAL_STATE)
