@@ -23,10 +23,20 @@ vi.mock("../../../behavior/model-provider-api.ts", () => ({
 }));
 
 import { LLMModelDisplay } from "../llm-model-display.tsx";
+import { ModelChip } from "../model-chip.tsx";
 import { ModelSelector } from "../model-selector.tsx";
 
 const BUILT_IN = { value: "langwatch/instant-evals", label: "Instant Evals" };
 const LABELLED_NOT_OFFERED = { ...BUILT_IN, isOffered: false };
+const MARK = "langwatch-mark";
+
+/** The mark is framed square, so it fills the icon box as every provider's does. */
+function expectSquareMark({ within: scope }: { within: HTMLElement }) {
+  const mark = scope.querySelector(`[data-testid="${MARK}"]`);
+  expect(mark).not.toBeNull();
+  const [, , width, height] = (mark?.getAttribute("viewBox") ?? "").split(" ").map(Number);
+  expect(width).toBe(height);
+}
 
 beforeEach(() => {
   state.providers = [];
@@ -86,6 +96,40 @@ describe("<ModelSelector/>", () => {
         expect(screen.queryByText("langwatch/instant-evals")).not.toBeInTheDocument();
         expect(screen.queryByText(/Update needed/i)).not.toBeInTheDocument();
       });
+
+      /** @scenario "Instant Evals shows the LangWatch mark wherever it is named as a model" */
+      it("shows the LangWatch mark as its chosen model", () => {
+        renderWithDesignSystem(
+          <ModelSelector
+            model="langwatch/instant-evals"
+            options={["openai/gpt-5-mini"]}
+            onChange={() => undefined}
+            builtInModels={[LABELLED_NOT_OFFERED]}
+          />,
+        );
+
+        expectSquareMark({ within: screen.getByRole("combobox") });
+      });
+    });
+
+    describe("when the picker offers a built-in model", () => {
+      /** @scenario "Instant Evals shows the LangWatch mark wherever it is named as a model" */
+      it("shows the LangWatch mark on its option and as the chosen model", () => {
+        renderWithDesignSystem(
+          <ModelSelector
+            model="langwatch/instant-evals"
+            options={["openai/gpt-5-mini"]}
+            onChange={() => undefined}
+            builtInModels={[BUILT_IN]}
+          />,
+        );
+
+        const listbox = screen.getByRole("listbox", { hidden: true });
+        const option = within(listbox).getByText("Instant Evals").closest("[role=option]");
+        expectSquareMark({ within: option as HTMLElement });
+        expectSquareMark({ within: screen.getByRole("combobox") });
+        expect(screen.queryByText(/Update needed/i)).not.toBeInTheDocument();
+      });
     });
   });
 });
@@ -100,6 +144,16 @@ describe("<LLMModelDisplay/>", () => {
       expect(await screen.findByText("Instant Evals")).toBeInTheDocument();
       expect(screen.queryByText(/Update needed/i)).not.toBeInTheDocument();
     });
+
+    /** @scenario "Instant Evals shows the LangWatch mark wherever it is named as a model" */
+    it("shows the LangWatch mark", async () => {
+      const { container } = renderWithDesignSystem(
+        <LLMModelDisplay model="langwatch/instant-evals" builtInModels={[BUILT_IN]} />,
+      );
+
+      await screen.findByText("Instant Evals");
+      expectSquareMark({ within: container });
+    });
   });
 
   describe("given a chosen built-in model that is labelled but not offered", () => {
@@ -109,6 +163,28 @@ describe("<LLMModelDisplay/>", () => {
       );
 
       expect(await screen.findByText("Instant Evals")).toBeInTheDocument();
+      expect(screen.queryByText(/Update needed/i)).not.toBeInTheDocument();
+    });
+
+    /** @scenario "Instant Evals shows the LangWatch mark wherever it is named as a model" */
+    it("shows the LangWatch mark", async () => {
+      const { container } = renderWithDesignSystem(
+        <LLMModelDisplay model="langwatch/instant-evals" builtInModels={[LABELLED_NOT_OFFERED]} />,
+      );
+
+      await screen.findByText("Instant Evals");
+      expectSquareMark({ within: container });
+    });
+  });
+});
+
+describe("<ModelChip/>", () => {
+  describe("given Instant Evals as the model", () => {
+    /** @scenario "Instant Evals shows the LangWatch mark wherever it is named as a model" */
+    it("shows the LangWatch mark", () => {
+      const { container } = renderWithDesignSystem(<ModelChip model="langwatch/instant-evals" />);
+
+      expectSquareMark({ within: container });
       expect(screen.queryByText(/Update needed/i)).not.toBeInTheDocument();
     });
   });
