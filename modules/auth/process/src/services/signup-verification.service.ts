@@ -30,6 +30,8 @@ export interface SignUpVerificationDeps {
   tokens: SignUpVerificationTokenRepository;
   mailer: SignUpVerificationMailChannel;
   users: Pick<UserApi, "findByEmail" | "adoptUnconfirmedAccount">;
+  /** Ends every browser session of an account: an adoption ends those opened before the proof. */
+  revokeAllBrowserSessions(input: Readonly<{ userId: string }>): Promise<void>;
   /** Where the address signs in; an organization's own connection refuses a password sign-up. */
   route(input: Readonly<{ identifier: string; breakGlass: boolean }>): Promise<RoutingDecision>;
   isWithinBudget(
@@ -278,6 +280,10 @@ export class SignUpVerificationService {
 
     const adoption = await this.deps.users.adoptUnconfirmedAccount({ email });
     if (adoption !== "adopted") throw new IdentityVerificationExpiredError();
+
+    // A session opened before the proof is as untrusted as the methods user just dropped.
+    const adopted = await this.deps.users.findByEmail({ email });
+    if (adopted) await this.deps.revokeAllBrowserSessions({ userId: adopted.id });
 
     // No proof: the account exists, so the door opens a session on it for this fresh claim.
     return {

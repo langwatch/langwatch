@@ -56,11 +56,17 @@ import type { UserLifecycleNoticeService } from "./user-lifecycle-notice.service
 
 type PlatformOperatorList = Pick<AuthzApi, "listPlatformOperators">;
 
+/** What the service asks of auth: the credential revokes, and the SSO set-up read. */
+type UserAuthCalls = Pick<
+  AuthApi,
+  "revokeAllBrowserSessions" | "revokeCliTokens" | "getSsoSetupStatus"
+>;
+
 export class UserService {
   private readonly avatars = UserAvatarCodecService.create();
   private readonly repository: UserRepository;
   private readonly organizations: OrganizationApi;
-  private readonly auth: AuthApi;
+  private readonly auth: UserAuthCalls;
   private readonly avatarStorage: UserAvatarStorage;
   /** The issuer every credential account row this service mints is stored under. */
   private readonly credentialIssuer: string;
@@ -80,7 +86,7 @@ export class UserService {
   }: {
     repository: UserRepository;
     organizations: OrganizationApi;
-    auth: AuthApi;
+    auth: UserAuthCalls;
     avatarStorage: UserAvatarStorage;
     credentialIssuer: string;
     now: () => Instant;
@@ -100,7 +106,7 @@ export class UserService {
   static create(options: {
     repository: UserRepository;
     organizations: OrganizationApi;
-    auth: AuthApi;
+    auth: UserAuthCalls;
     avatarStorage: UserAvatarStorage;
     credentialIssuer: string;
     now?: () => Instant;
@@ -166,17 +172,14 @@ export class UserService {
   }
 
   /**
-   * Adoption by an address proof (rulings 2026-10-06, Auth 32). A session opened before the
-   * proof is as untrusted as the methods it was opened with, so an adoption ends them all.
+   * Adoption by an address proof (rulings 2026-10-06, Auth 32): the methods set before the proof
+   * go. Auth, which asked, ends the sessions opened with them (round 48, A1-d).
    */
   async adoptUnconfirmedAccount(input: UserEmailInput): Promise<AdoptUnconfirmedAccountOutcome> {
     const account = await this.findByEmail(input);
     if (!account) return "no_account";
 
-    const outcome = await this.repository.adoptUnconfirmed({ id: account.id });
-    if (outcome === "adopted") await this.auth.revokeAllBrowserSessions({ userId: account.id });
-
-    return outcome;
+    return this.repository.adoptUnconfirmed({ id: account.id });
   }
 
   /** A case-twin beside a taken address would leave two accounts answering for one person. */

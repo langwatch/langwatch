@@ -195,11 +195,12 @@ describe("setting a first password", () => {
     /** @scenario "An organization's own connection still refuses a local password" */
     it("sets a first password for an ordinary address", async () => {
       const account = passwordlessAccount();
-      const auth = createUserTestAuth("auth0", {
-        issuesOwnPasswords: true,
-        governedDomain: "other.com",
+      const auth = createUserTestAuth("auth0", { governedDomain: "other.com" });
+      const app = createUserTestApp({
+        repositories: account.repositories,
+        dependencies: { auth },
+        facts: { localPasswords: true },
       });
-      const app = createUserTestApp({ repositories: account.repositories, dependencies: { auth } });
       const created = await account.create();
 
       await app.setOwnFirstPassword({
@@ -215,11 +216,12 @@ describe("setting a first password", () => {
     /** @scenario "An organization's own connection still refuses a local password" */
     it("refuses a first password for an address its organization routes to its own provider", async () => {
       const account = passwordlessAccount();
-      const auth = createUserTestAuth("auth0", {
-        issuesOwnPasswords: true,
-        governedDomain: "acme.com",
+      const auth = createUserTestAuth("auth0", { governedDomain: "acme.com" });
+      const app = createUserTestApp({
+        repositories: account.repositories,
+        dependencies: { auth },
+        facts: { localPasswords: true },
       });
-      const app = createUserTestApp({ repositories: account.repositories, dependencies: { auth } });
       const created = await account.create();
 
       await expect(

@@ -24,7 +24,14 @@ function process(
   return createApp({ role })
     .withModules([userProcessModule])
     .withStores(memoryStores())
-    .withConfig({ user: { publicBaseUrl: undefined } })
+    .withConfig({
+      user: {
+        publicBaseUrl: undefined,
+        passkeysEnabled: false,
+        mfaEnrollmentOpen: false,
+        localPasswords: false,
+      },
+    })
     .withEventing(
       new EventSourcing({ enabled: false, processStore: InMemoryProcessStore.createForTesting() }),
     )
