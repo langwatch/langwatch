@@ -7,7 +7,6 @@ import {
 } from "./agent.commands.ts";
 import {
   agentCascadeArchiveSchema,
-  agentCopyCreatedSchema,
   agentCopySchema,
   agentHistoryEntrySchema,
   agentPushToCopiesSchema,
@@ -18,7 +17,6 @@ import {
 import {
   agentApiAgentInputSchema,
   agentApiAgentReferenceInputSchema,
-  agentApiCopyRequestSchema,
   agentApiProjectInputSchema,
   agentApiPushToCopiesInputSchema,
 } from "./agent.schemas.ts";
@@ -52,10 +50,6 @@ export const agentTrpc = defineTrpcContract("agents")
   .query("getCopies")
   .withInput(agentApiAgentReferenceInputSchema)
   .withOutput(agentCopySchema.array())
-
-  .mutation("copy")
-  .withInput(agentApiCopyRequestSchema)
-  .withOutput(agentCopyCreatedSchema)
 
   .mutation("pushToCopies")
   .withInput(agentApiPushToCopiesInputSchema)

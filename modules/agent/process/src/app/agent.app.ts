@@ -153,7 +153,6 @@ export class AgentModule implements AgentApi {
     });
     this.#copies = AgentCopyService.create({
       repository: repositories.agents,
-      workflows: dependencies.workflows,
       voiceRelease: this.#voiceRelease,
     });
     this.#publicBaseUrl = config.publicBaseUrl ?? "";
@@ -345,13 +344,8 @@ export class AgentModule implements AgentApi {
     });
   }
 
-  copy(input: CopyAgentCommand): Promise<{
-    id: string;
-    projectId: string;
-    name: string;
-    copiedFromAgentId: string;
-  }> {
-    return this.#copies.copy(input);
+  createCopy(input: CopyAgentCommand): Promise<AgentCopyCreated> {
+    return this.#copies.createCopy(input);
   }
   pushToCopies(input: PushAgentCopiesInput): Promise<{
     pushedTo: number;
@@ -373,11 +367,6 @@ export class AgentModule implements AgentApi {
     const copies = await this.getCopies({ sourceAgentId: input.agentId });
     const allowed = await this.#permittedCopies(copies, input.actorId, "evaluations:view");
     return copies.filter((copy) => allowed.has(copy.id));
-  }
-
-  async copyForActor(input: CopyAgentCommand & { actorId: string }): Promise<AgentCopyCreated> {
-    await this.#assertSourcePermission(input.actorId, input.sourceProjectId);
-    return this.copy(input);
   }
 
   async pushToCopiesForActor(
@@ -403,13 +392,20 @@ export class AgentModule implements AgentApi {
 
   async getHistory(input: AgentReferenceInput): Promise<AgentHistoryEntry[]> {
     await this.#agents.getById({ id: input.agentId, projectId: input.projectId });
-    const entries = await this.#auditLog.listEntityHistory({
+    const query = {
       projectId: input.projectId,
       entityId: input.agentId,
-      actionPrefix: "agents.",
       argumentNames: ["id", "agentId", "newAgentId"],
       limit: 100,
-    });
+    };
+    /** Copies are audited at workflow's door; older ones stay under `agents.copy`. */
+    const [own, copies] = await Promise.all([
+      this.#auditLog.listEntityHistory({ ...query, actionPrefix: "agents." }),
+      this.#auditLog.listEntityHistory({ ...query, actionPrefix: "workflow.copyAgent" }),
+    ]);
+    const entries = [...own, ...copies]
+      .toSorted((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .slice(0, query.limit);
     const userIds = [...new Set(entries.flatMap((entry) => (entry.userId ? [entry.userId] : [])))];
     const users = userIds.length ? await this.#users.getProfiles({ userIds }) : [];
     const byId = new Map(

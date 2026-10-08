@@ -96,7 +96,7 @@ export class TrpcAgentClient implements AgentClient {
   }
 
   async copy(input: AgentCopyInput) {
-    const output = await this.rpc.mutate("agents.copy", input);
+    const output = await this.rpc.mutate("workflow.copyAgent", input);
     return agentCopyCreatedSchema.parse(output);
   }
 

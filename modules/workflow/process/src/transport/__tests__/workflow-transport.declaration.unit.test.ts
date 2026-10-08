@@ -88,6 +88,7 @@ describe("the workflow module's transport declarations", () => {
         ["cascadeArchive", "mutation", "workflows:delete"],
         ["archive", "mutation", "workflows:delete"],
         ["generateCommitMessage", "mutation", "workflows:update"],
+        ["copyAgent", "mutation", "evaluations:manage"],
       ]);
     });
 

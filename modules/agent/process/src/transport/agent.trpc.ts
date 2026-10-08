@@ -50,19 +50,6 @@ export const agentTrpcTransport: TrpcRouterDeclaration<AgentApi, typeof agentTrp
     .withPermission("evaluations:view")
     .handle(({ app, input, actor }) => app.getCopiesForActor({ ...input, actorId: actor.id }))
 
-    .procedure("copy")
-    .withPermission("evaluations:manage")
-    .handle(({ app, input, actor }) =>
-      app.copyForActor({
-        sourceAgentId: input.agentId,
-        sourceProjectId: input.sourceProjectId,
-        targetProjectId: input.projectId,
-        newAgentId: input.newAgentId,
-        actorUserId: actor.id,
-        actorId: actor.id,
-      }),
-    )
-
     .procedure("pushToCopies")
     .withPermission("evaluations:manage")
     .handle(({ app, input, actor }) => app.pushToCopiesForActor({ ...input, actorId: actor.id }))

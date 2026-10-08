@@ -95,10 +95,11 @@ Feature: Agents package boundary
     Then the archived agent is absent
 
   @unit @agents
-  Scenario: Linked workflow behaviour uses the injected Workflow API
-    Given an agent operation needs to copy or archive a linked workflow
-    When AgentModule performs the operation
-    Then it invokes the complete WorkflowApi supplied by the composition root
+  Scenario: Linked workflow behaviour is left to the workflow owner
+    Given an agent is copied or archived with a linked workflow
+    When AgentModule writes the copy or archives the agent
+    Then the copy points at the graph Workflow copied and the archive is recorded for Workflow
+    And AgentModule calls no Workflow operation for either
     And Agents server imports no Workflows server or repository implementation
 
   @unit @architecture @web @typecheck

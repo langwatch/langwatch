@@ -103,9 +103,6 @@ export interface AgentApi {
     projectId: string;
     actorId: string;
   }): Promise<AgentCopy[]>;
-  copyForActor(
-    input: CopyAgentCommand & { actorId: string },
-  ): Promise<agentQueriesModule.AgentCopyCreated>;
   pushToCopiesForActor(input: {
     agentId: string;
     projectId: string;
@@ -132,12 +129,8 @@ export interface AgentApi {
   ): Promise<{ agent: Agent; archivedWorkflow: { id: string } | null }>;
   getCopies(input: { sourceAgentId: string; allowedProjectIds?: string[] }): Promise<AgentCopy[]>;
   getSourceOfCopy(input: { agentId: string; projectId: string }): Promise<Agent>;
-  copy(input: CopyAgentCommand): Promise<{
-    id: string;
-    projectId: string;
-    name: string;
-    copiedFromAgentId: string;
-  }>;
+  /** Writes the copy's row; workflow's `copyAgent` door copied a workflow agent's graph first. */
+  createCopy(input: CopyAgentCommand): Promise<agentQueriesModule.AgentCopyCreated>;
   pushToCopies(input: {
     sourceAgentId: string;
     sourceProjectId: string;

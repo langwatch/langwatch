@@ -261,12 +261,10 @@ describe("AgentModule HTTP agent credentials", () => {
         permissions: createApiFixture<AuthzApi>({ hasProjectPermission: async () => true }),
       });
 
-      await app.copyForActor({
+      await app.createCopy({
         sourceAgentId: agent.id,
         sourceProjectId: projectId,
         targetProjectId: "project_2",
-        actorId: "user_1",
-        actorUserId: "user_1",
       });
 
       const [copy] = await repositories.agents.findAll({ projectId: "project_2" });

@@ -120,12 +120,13 @@ export const archiveAgentCommandSchema = z.object({
   projectId: z.string(),
 });
 
+/** A copy's row; `workflowId` names the graph copy workflow wrote first for a workflow agent. */
 export const copyAgentCommandSchema = z.object({
   sourceAgentId: z.string(),
   sourceProjectId: z.string(),
   targetProjectId: z.string(),
-  actorUserId: z.string(),
   newAgentId: z.string().optional(),
+  workflowId: z.string().optional(),
 });
 
 export type CreateAgentCommand = z.input<typeof createAgentCommandSchema>;

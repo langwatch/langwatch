@@ -198,6 +198,40 @@ Feature: Workflow service boundary
     Then permission_denied is reported with status 401 and nothing is copied
 
   @unit
+  Scenario: Copying a workflow agent copies its graph first
+    Given a workflow agent points to a graph in the source project
+    When the caller copies the agent into the target project through workflow.copyAgent
+    Then Workflow copies the graph into the target project, authored by the caller
+    And AgentApi writes the new agent pointing at that copied graph
+    And the source graph and agent are unchanged
+
+  @unit
+  Scenario: Copying an agent with no graph asks Agent alone
+    Given a signature agent in the source project
+    When the caller copies it into the target project through workflow.copyAgent
+    Then no graph is copied and AgentApi writes the new agent with no graph
+
+  @unit
+  Scenario: Copying an agent from a project the caller cannot manage is refused
+    Given the caller cannot manage evaluations in the source project
+    When they copy an agent from it through workflow.copyAgent
+    Then agent_source_permission_denied is reported before the agent is read and nothing is copied
+
+  @unit
+  Scenario: A failed agent write removes the copied graph
+    Given Workflow copied a workflow agent's graph into the target project
+    When AgentApi refuses to write the new agent
+    Then Workflow deletes the uncommitted graph copy
+    And the original failure reaches the caller
+    And a failed removal is logged without replacing the original failure
+
+  @unit
+  Scenario: The agent copy door keeps the agents.copy input, output and permission
+    Given the copy door moved from agents.copy to workflow.copyAgent
+    When the browser copies an agent
+    Then the input, the output and the evaluations:manage permission are the ones agents.copy had
+
+  @unit
   Scenario: A workflow that is not a copy has nothing to sync from
     Given a workflow that was never copied from another
     When the caller syncs it from its source

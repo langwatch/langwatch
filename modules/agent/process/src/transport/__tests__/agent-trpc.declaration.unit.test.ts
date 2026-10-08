@@ -22,7 +22,6 @@ it("binds every existing tRPC procedure once and preserves its permission", () =
     ["cascadeArchive", "mutation", "evaluations:manage"],
     ["delete", "mutation", "evaluations:manage"],
     ["getCopies", "query", "evaluations:view"],
-    ["copy", "mutation", "evaluations:manage"],
     ["pushToCopies", "mutation", "evaluations:manage"],
     ["syncFromSource", "mutation", "evaluations:manage"],
     ["getHistory", "query", "evaluations:view"],

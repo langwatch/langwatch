@@ -32,28 +32,6 @@ async function fixture() {
 
 describe("Agent copy authorization", () => {
   /** @scenario "Copy operations check both project boundaries" */
-  it("refuses copying from an unauthorized source before persisting a target agent", async () => {
-    const { app, repositories, hasProjectPermission } = await fixture();
-    const before = await repositories.agents.findAll({ projectId: "target" });
-    await expect(
-      app.copyForActor({
-        sourceAgentId: "source_agent",
-        sourceProjectId: "source",
-        targetProjectId: "target",
-        actorId: "actor",
-        actorUserId: "actor",
-      }),
-    ).rejects.toBeInstanceOf(AgentSourcePermissionDeniedError);
-
-    expect(hasProjectPermission).toHaveBeenCalledWith({
-      userId: "actor",
-      projectId: "source",
-      permission: "evaluations:manage",
-    });
-    expect(await repositories.agents.findAll({ projectId: "target" })).toEqual(before);
-  });
-
-  /** @scenario "Copy operations check both project boundaries" */
   it("refuses synchronization from an unauthorized source without changing the copy", async () => {
     const { app, repositories, hasProjectPermission } = await fixture();
     const reference = { id: "allowed_copy", projectId: "target" };

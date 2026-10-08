@@ -1,6 +1,10 @@
 import { CloudWatchLogsClient } from "@aws-sdk/client-cloudwatch-logs";
 import { LambdaClient } from "@aws-sdk/client-lambda";
-import { AgentApi } from "@langwatch/agent-contract";
+import {
+  AgentApi,
+  type AgentApiCopyRequest,
+  type AgentCopyCreated,
+} from "@langwatch/agent-contract";
 import { ApiKeyApi, ApiKeyPermissionDeniedError } from "@langwatch/api-key-contract";
 import { ProjectPermissionDeniedError, type AuthzPermission } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
@@ -131,6 +135,7 @@ import {
 import { NlpLambdaCleanupService } from "../services/nlp-lambda-cleanup.service.ts";
 import { NlpLambdaRuntimeService } from "../services/nlp-lambda-runtime.service.ts";
 import { StudioEventPreparerService } from "../services/studio-event-preparer.service.ts";
+import { WorkflowAgentCopyService } from "../services/workflow-agent-copy.service.ts";
 import { WorkflowAgentMappingService } from "../services/workflow-agent-mapping.service.ts";
 import { WorkflowCodeCompletionService } from "../services/workflow-code-completion.service.ts";
 import { WorkflowCommitMessageService } from "../services/workflow-commit-message.service.ts";
@@ -150,6 +155,7 @@ import { WorkflowStudioDispatchService } from "../services/workflow-studio-dispa
 import { ModelProviderWorkflowStudioDslService } from "../services/workflow-studio-dsl.service.ts";
 import { WorkflowStudioVersionService } from "../services/workflow-studio-version.service.ts";
 import { WorkflowService } from "../services/workflow.service.ts";
+import type { WorkflowBrowserApi } from "../transport/workflow.trpc.ts";
 
 const logger = createLogger("langwatch:workflows");
 
@@ -321,6 +327,8 @@ interface WorkflowInfrastructure {
   httpSecrets: WorkflowHttpSecrets;
   /** The agent mappings a saved Studio graph refreshes, best effort. */
   agentMappings: WorkflowAgentMapping;
+  /** Writes the row of an agent copy whose graph this module copied first. */
+  agents: AgentApi;
   /** The bare row a Studio copy lands in, before its first version exists. */
   workflowRows: WorkflowRowRepository;
   permissions: WorkflowPermissionProbe;
@@ -582,7 +590,7 @@ function relatedProjectIdsOf(workflow: WorkflowLineageRow): readonly string[] {
   ];
 }
 
-export class WorkflowModule implements WorkflowApi {
+export class WorkflowModule implements WorkflowApi, WorkflowBrowserApi {
   static readonly contract = WorkflowApi;
   static readonly dependencies = {
     /** The evaluators a workflow is published as - a peer's App, not a member. */
@@ -670,6 +678,7 @@ export class WorkflowModule implements WorkflowApi {
       }),
       httpSecrets: WorkflowHttpSecretsService.create(setup.dependencies.secrets),
       agentMappings: WorkflowAgentMappingService.create({ agents: setup.dependencies.agents }),
+      agents: setup.dependencies.agents,
       workflowRows: setup.repositories.workflowRows,
       evaluations: {
         trigger: (input) => setup.dependencies.experiments.triggerWorkflowEvaluation(input),
@@ -699,6 +708,7 @@ export class WorkflowModule implements WorkflowApi {
   #studioCopies: WorkflowStudioCopyService;
   #publication: WorkflowPublicationService;
   #copyLineage: WorkflowCopyLineageService;
+  #agentCopies: WorkflowAgentCopyService;
 
   private constructor(infrastructure: WorkflowInfrastructure) {
     this.#infrastructure = infrastructure;
@@ -721,6 +731,11 @@ export class WorkflowModule implements WorkflowApi {
       permissions: infrastructure.permissions,
       workflows: infrastructure.workflows,
       studioVersions: this.#studioVersions,
+    });
+    this.#agentCopies = WorkflowAgentCopyService.create({
+      agents: infrastructure.agents,
+      permissions: infrastructure.permissions,
+      workflows: infrastructure.workflows,
     });
   }
 
@@ -901,6 +916,16 @@ export class WorkflowModule implements WorkflowApi {
     by: WorkflowCaller,
   ): Promise<{ workflow: WorkflowWithVersion; version: WorkflowVersion }> {
     return this.#infrastructure.workflows.copy({ ...input, authorId: by.id });
+  }
+
+  /** This module's own application, which the browser door reads through. */
+  workflows(): WorkflowApi {
+    return this;
+  }
+
+  /** Copies an agent into another project, bringing a copy of a workflow agent's graph. */
+  copyAgent(input: AgentApiCopyRequest, by: WorkflowCaller): Promise<AgentCopyCreated> {
+    return this.#agentCopies.copyAgent(input, by);
   }
 
   /** Copies a workflow once the caller may create workflows in its source project too. */
