@@ -284,6 +284,7 @@ func (values *runFlagValues) declareCapture(flags *flag.FlagSet) {
 	flags.BoolVar(&values.noBaseline, "no-baseline", false, "render the base every time and cache nothing")
 	flags.BoolVar(&options.RefreshBaseline, "refresh-baseline", false, "render the base and replace its cached baseline")
 	flags.BoolVar(&values.noFailFast, "no-fail-fast", false, "keep capturing even when the candidate's shell does not render")
+	flags.BoolVar(&options.Judge, "judge", false, "ask Haiku whether each flagged screen pair is a real regression (needs ANTHROPIC_API_KEY); verdict.md shows its findings and cost")
 	flags.BoolVar(&options.Fast, "fast", false, "render on a lean Chromium for a quick look; never caches a baseline or publishes to the pull request")
 	flags.BoolVar(&values.noPublish, "no-publish", false, "do not show the run's screens on the branch's pull request")
 	flags.BoolVar(&options.DevUI, "dev-ui", false, "capture both sides from their Vite dev servers instead of a production build of each UI")

@@ -59,3 +59,24 @@ Feature: visualdiff judge keeps only agreed regressions between main and branch 
       When a flagged pair is judged
       Then no regression is reported and nothing is cached
       And the ledger counts the failure with its first message
+
+  Rule: The run asks for the judge and the verdict shows what it decided
+
+    @unit
+    Scenario: The judge flag gives the runner a cache that outlives the run
+      Given a visualdiff run started with -judge
+      When its runner plan is built
+      Then the plan's judge cache file is .visualdiff/judge-cache.json under the repository root
+
+    @unit
+    Scenario: An agreed regression fails the pair in the verdict
+      Given a run whose judge.json names an agreed regression for a screen's diff
+      When verdict.md is written
+      Then the screen is a regression with the judge's reason
+      And the judge's calls, tokens and cost in dollars are listed
+
+    @unit
+    Scenario: A judged pair with no regression is marked judged-harmless
+      Given a run whose judge.json judged a screen's diff with no regression
+      When verdict.md is written
+      Then the screen is marked judged-harmless

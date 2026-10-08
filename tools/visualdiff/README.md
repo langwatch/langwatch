@@ -863,5 +863,10 @@ of both screenshots, so a later run never pays twice for the same pair; failures
 Each run writes `<outDir>/judge.json`: calls, tokens, dollars, cache hits, failures and every
 flagged pair with its regressions. The key is `ANTHROPIC_API_KEY` (and optional
 `ANTHROPIC_BASE_URL`), read only by `runner/src/capture.entrypoint.ts`. Code: `runner/src/judge.ts`;
-spec: `specs/tooling/visualdiff-judge.feature`. The Go side does not yet set `judge` or read
-`judge.json`.
+spec: `specs/tooling/visualdiff-judge.feature`.
+
+`visualdiff run -judge` sets the plan's `cacheFile` to `.visualdiff/judge-cache.json` (ignored by
+git). `verdict.md` then reads each edition's `shots/<edition>/judge.json`: a screen whose pair has
+an agreed regression becomes a `regression` with the judge's reason, a judged finding with none
+is marked `judged-harmless`, and a `judge` section lists each edition's calls, tokens and dollars.
+Code: `judge.go`.

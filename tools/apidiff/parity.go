@@ -79,6 +79,19 @@ var acceptedProcedureMoves = map[string]string{
 	"group.addBinding":                "group.addGrant",
 	"group.removeBinding":             "group.removeGrant",
 	"team.getTeamsWithRoleBindings":   "team.getTeamsWithGrants",
+
+	// Q-U9 (rulings-2026-10-06-rounds.md:73, d421aa2649): migrations under ops.upgrade;
+	// CD-2 (rulings-2026-10-07.md:198): monitor performance moved with its owner.
+	"ops.listSystemMigrations":              "ops.upgrade.listSystemMigrations",
+	"ops.listMigrationEnrollments":          "ops.upgrade.listMigrationEnrollments",
+	"ops.searchMigrationOrganizations":      "ops.upgrade.searchMigrationOrganizations",
+	"ops.enrollMigrationTenant":             "ops.upgrade.enrollMigrationTenant",
+	"ops.enrollMigrationCohort":             "ops.upgrade.enrollMigrationCohort",
+	"ops.withdrawMigrationTenant":           "ops.upgrade.withdrawMigrationTenant",
+	"ops.runSystemMigrationForOrganization": "ops.upgrade.runSystemMigrationForOrganization",
+	"ops.runSystemMigrationPass":            "ops.upgrade.runSystemMigrationPass",
+	"ops.rollBackSystemMigrationTenant":     "ops.upgrade.rollBackSystemMigrationTenant",
+	"monitors.getPerformanceForProject":     "evaluations.getMonitorPerformanceForProject",
 }
 
 // retiredProcedures are main procedures ruled out of the branch: publicEnv
@@ -90,6 +103,8 @@ var retiredProcedures = map[string]bool{
 	"project.getProjectAPIKey":         true,
 	"project.regenerateApiKey":         true,
 	"roleBinding.getMyAccessBreakdown": true,
+	// EF-3 (rulings-2026-10-07.md:164): the browser composes member provenance.
+	"organization.getMemberProvenance": true,
 }
 
 // movedPath is where an accepted namespace move put a main procedure path.

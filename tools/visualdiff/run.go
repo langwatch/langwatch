@@ -57,6 +57,8 @@ type Options struct {
 	// Fast renders on a lean Chromium (no GPU, no anti-aliasing), so its
 	// pixels are never cached as a baseline or published (runner/src/capture.ts).
 	Fast bool
+	// Judge asks a vision model about each flagged pair (judge.go).
+	Judge bool
 	// Resume continues a -keep run in RunDir: its prepared worktrees and
 	// running stacks are reused, and its fixtures are not seeded twice.
 	Resume bool
@@ -857,6 +859,7 @@ func (run *session) capture(ctx context.Context, edition Edition, baseline Basel
 	if !options.RoutesOnly {
 		runnerPlan.Flows = config.Flows
 	}
+	runnerPlan.Judge = judgeFor(options)
 	var arrived <-chan baseArrival
 	if run.baseArrival != nil && !baseline.Cached {
 		pending := filepath.Join(options.RunDir, PendingBaseFile)
