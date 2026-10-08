@@ -54,8 +54,10 @@ export type ReadResource = keyof typeof READ_RESOURCES;
  * `traces:view`. No production read asks for `analytics` yet (analytics
  * across an aggregate's members is not delivered), so minting under
  * `analytics:view` would cost an engine pass and a shared-read lookup that
- * nothing consumes. The `analytics` resource stays so the client still
- * refuses a proof minted for traces when analytics is asked of it. Widening
+ * nothing consumes. The `analytics` resource stays so a read can ask for it:
+ * a traces-minted proof asked for analytics reads the own project alone (its
+ * shared grants carry only `traces:view` and contribute nothing), and only a
+ * proof whose own grant lacks `analytics:view` is refused. Widening
  * this to every route is the foundation branch's job (PR 7536).
  */
 export const PROOF_BEARING_PERMISSIONS: ReadonlySet<AuthzPermission> = new Set([
