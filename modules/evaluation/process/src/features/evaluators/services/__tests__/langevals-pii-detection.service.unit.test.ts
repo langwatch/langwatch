@@ -1,7 +1,7 @@
 import { LangevalsPiiDetectionError } from "@langwatch/evaluation-contract";
 import { describe, expect, it } from "vitest";
 
-import { MemoryLangevalsChannel } from "../../channels/memory/memory.langevals.channel.ts";
+import { MemoryLangevalsChannel } from "../../../../channels/memory/memory.langevals.channel.ts";
 import { LangevalsPiiDetectionService } from "../langevals-pii-detection.service.ts";
 
 const ENDPOINT = "https://langevals.example";

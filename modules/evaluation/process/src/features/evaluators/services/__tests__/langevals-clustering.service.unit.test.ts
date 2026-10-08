@@ -2,7 +2,7 @@ import { LangevalsClusteringError } from "@langwatch/evaluation-contract";
 import type { BatchClusteringParams, IncrementalClusteringParams } from "@langwatch/topic-contract";
 import { describe, expect, it } from "vitest";
 
-import { MemoryLangevalsChannel } from "../../channels/memory/memory.langevals.channel.ts";
+import { MemoryLangevalsChannel } from "../../../../channels/memory/memory.langevals.channel.ts";
 import { LangevalsClusteringService } from "../langevals-clustering.service.ts";
 
 const ENDPOINT = "https://langevals.example";

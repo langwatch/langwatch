@@ -14,9 +14,9 @@ import type { Trace } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { vi } from "vitest";
 
-import { EvaluationExecutionIntentService } from "../../services/evaluation-execution-intent.service.ts";
-import { EvaluationExecutionReceiptService } from "../../services/evaluation-execution-receipt.service.ts";
-import { EvaluationExecutionService } from "../../services/evaluation-execution.service.ts";
+import { EvaluationExecutionIntentService } from "../../features/execution/services/evaluation-execution-intent.service.ts";
+import { EvaluationExecutionReceiptService } from "../../features/execution/services/evaluation-execution-receipt.service.ts";
+import { EvaluationExecutionService } from "../../features/execution/services/evaluation-execution.service.ts";
 import {
   buildExecutionDeps,
   buildMonitor,

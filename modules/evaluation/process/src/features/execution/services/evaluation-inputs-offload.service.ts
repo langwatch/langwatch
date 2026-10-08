@@ -1,13 +1,13 @@
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 
-import type { EvaluationInputRepository } from "../repositories/evaluation-input.repository.ts";
-import type { EvaluationRetentionLookup } from "../repositories/evaluation.repository.ts";
+import type { EvaluationInputRepository } from "../../../repositories/evaluation-input.repository.ts";
+import type { EvaluationRetentionLookup } from "../../../repositories/evaluation.repository.ts";
 import {
   isSha256Hex,
   legacyEvaluationInputKey,
   retentionClassOf,
-} from "../rules/evaluation-input-object.rules.ts";
+} from "../../../rules/evaluation-input-object.rules.ts";
 
 export const STORED_OBJECT_MARKER_KEY = "__lw_stored_object" as const;
 

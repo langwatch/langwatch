@@ -10,9 +10,12 @@ import {
 } from "@langwatch/evaluator-contract";
 import { createLogger } from "@langwatch/observability";
 
-import { type LangevalsChannel, PayloadTooLargeError } from "../channels/langevals.channel.ts";
-import { toLangevalsContexts } from "../rules/langevals-contexts.rules.ts";
-import type { EvaluationExecutionMetricsService } from "./evaluation-execution-metrics.service.ts";
+import {
+  type LangevalsChannel,
+  PayloadTooLargeError,
+} from "../../../channels/langevals.channel.ts";
+import { toLangevalsContexts } from "../../../rules/langevals-contexts.rules.ts";
+import type { EvaluationExecutionMetricsService } from "../../execution/services/evaluation-execution-metrics.service.ts";
 
 const logger = createLogger("langwatch:langevals-http-client");
 

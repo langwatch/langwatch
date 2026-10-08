@@ -7,7 +7,7 @@ import type { MonitorPerformanceQuery } from "@langwatch/evaluation-contract";
 import type { MonitorWithEvaluator } from "@langwatch/monitor-contract";
 import { describe, expect, it } from "vitest";
 
-import { previousPeriodStartMs } from "../../rules/monitor-performance-window.rules.ts";
+import { previousPeriodStartMs } from "../../../../rules/monitor-performance-window.rules.ts";
 import { MonitorTrendService } from "../monitor-trend.service.ts";
 
 const PROJECT_ID = "project-1";

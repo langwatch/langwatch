@@ -15,10 +15,10 @@ import type { Trace } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import type { EvaluatorModelEnvService } from "../../../evaluators/services/evaluator-model-env.service.ts";
+import type { LangevalsEvaluatorService } from "../../../evaluators/services/langevals-evaluator.service.ts";
 import { EvaluationExecutionService } from "../evaluation-execution.service.ts";
 import { EvaluationGuardrailCheckService } from "../evaluation-guardrail-check.service.ts";
-import type { EvaluatorModelEnvService } from "../evaluator-model-env.service.ts";
-import type { LangevalsEvaluatorService } from "../langevals-evaluator.service.ts";
 
 const PROJECT_ID = "proj-1";
 const PRICE_USD = 0.00042;

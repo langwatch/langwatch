@@ -5,7 +5,7 @@ import {
 } from "@langwatch/evaluation-contract";
 import { batchEvaluationResultSchema } from "@langwatch/evaluator-contract";
 
-import type { LangevalsChannel } from "../channels/langevals.channel.ts";
+import type { LangevalsChannel } from "../../../channels/langevals.channel.ts";
 
 const PII_DETECTION_PATH = "/presidio/pii_detection/evaluate";
 const PII_DETECTION_MIN_THRESHOLD = 0.5;

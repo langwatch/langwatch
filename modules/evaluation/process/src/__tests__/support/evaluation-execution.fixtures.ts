@@ -19,10 +19,10 @@ import type {
 } from "@langwatch/trace-contract";
 import { vi } from "vitest";
 
-import type { EvaluationAzureSafetyCredentialsResolution } from "../../services/azure-safety-credentials.service.ts";
-import type { EvaluationCostService } from "../../services/evaluation-cost.service.ts";
-import type { ExecuteEvaluationCommandDeps } from "../../services/evaluation-execution-intent.service.ts";
-import type { EvaluationExecutionReceiptService } from "../../services/evaluation-execution-receipt.service.ts";
+import type { EvaluationAzureSafetyCredentialsResolution } from "../../features/evaluators/services/azure-safety-credentials.service.ts";
+import type { EvaluationCostService } from "../../features/execution/services/evaluation-cost.service.ts";
+import type { ExecuteEvaluationCommandDeps } from "../../features/execution/services/evaluation-execution-intent.service.ts";
+import type { EvaluationExecutionReceiptService } from "../../features/execution/services/evaluation-execution-receipt.service.ts";
 
 export function buildExecuteCommand(
   overrides: Partial<ExecuteEvaluationCommandData> = {},

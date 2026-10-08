@@ -9,11 +9,11 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, type Mock, vi } from "vitest";
 
+import type { LangevalsEvaluatorService } from "../../../evaluators/services/langevals-evaluator.service.ts";
 import {
   EvaluationExecutionService,
   type EvaluationExecutionDeps,
 } from "../evaluation-execution.service.ts";
-import type { LangevalsEvaluatorService } from "../langevals-evaluator.service.ts";
 
 /**
  * Only executeNative and augmentResult are exercised by this dispatch path;

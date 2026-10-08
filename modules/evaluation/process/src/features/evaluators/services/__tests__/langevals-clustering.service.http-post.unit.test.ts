@@ -1,8 +1,8 @@
 import type { BatchClusteringParams } from "@langwatch/topic-contract";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { HttpLangevalsChannel } from "../../channels/http/http.langevals.channel.ts";
-import { STAGED_PAYLOAD_HEADER } from "../../channels/langevals.channel.ts";
+import { HttpLangevalsChannel } from "../../../../channels/http/http.langevals.channel.ts";
+import { STAGED_PAYLOAD_HEADER } from "../../../../channels/langevals.channel.ts";
 import { LangevalsClusteringService } from "../langevals-clustering.service.ts";
 
 const ENDPOINT = "https://langevals.example";

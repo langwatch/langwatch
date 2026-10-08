@@ -6,7 +6,7 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { topicClusteringResponseSchema } from "@langwatch/topic-contract";
 
-import type { LangevalsChannel } from "../channels/langevals.channel.ts";
+import type { LangevalsChannel } from "../../../channels/langevals.channel.ts";
 
 const logger = createLogger("langwatch:evaluation:langevals-clustering");
 

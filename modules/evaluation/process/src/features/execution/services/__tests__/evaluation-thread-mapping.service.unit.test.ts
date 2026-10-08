@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   hasThreadMappings,
   resolveThreadMappingsIntoData,
-} from "../../rules/evaluation-thread-mapping-service.rules.ts";
+} from "../../../../rules/evaluation-thread-mapping-service.rules.ts";
 import type { EvaluationSpanDigestService } from "../evaluation-span-digest.service.ts";
 
 const spanDigest: Pick<EvaluationSpanDigestService, "format" | "formatThread"> = {

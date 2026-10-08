@@ -17,14 +17,14 @@ import {
 } from "@langwatch/evaluation-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
+import type { EvaluationExecutionService } from "../features/execution/services/evaluation-execution.service.ts";
+import type { EvaluationInputsOffloadService } from "../features/execution/services/evaluation-inputs-offload.service.ts";
+import { MonitorPerformanceService } from "../features/monitors/services/monitor-performance.service.ts";
 import type {
   EvaluationRunRepository,
   EvaluationRetentionLookup,
 } from "../repositories/evaluation.repository.ts";
 import type { MonitorPerformanceRepository } from "../repositories/monitor-performance.repository.ts";
-import type { EvaluationExecutionService } from "./evaluation-execution.service.ts";
-import type { EvaluationInputsOffloadService } from "./evaluation-inputs-offload.service.ts";
-import { MonitorPerformanceService } from "./monitor-performance.service.ts";
 
 type EvaluationServiceOptions = {
   repository: EvaluationRunRepository;

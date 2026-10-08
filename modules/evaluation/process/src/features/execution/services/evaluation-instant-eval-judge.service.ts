@@ -8,17 +8,17 @@ import type { GuardrailCheckDirection } from "@langwatch/evaluation-contract";
 import type { EvaluatorApi, SingleEvaluationResult } from "@langwatch/evaluator-contract";
 import type { InstantEvalJudgeApi } from "@langwatch/instant-eval-judge-contract";
 
-import { instantEvalGuardrailSkipOf } from "../rules/instant-eval-guardrail-skip.rules.ts";
-import { instantEvalJudgeInputsOf } from "../rules/instant-eval-judge-dispatch.rules.ts";
+import { instantEvalGuardrailSkipOf } from "../../../rules/instant-eval-guardrail-skip.rules.ts";
+import { instantEvalJudgeInputsOf } from "../../../rules/instant-eval-judge-dispatch.rules.ts";
 import {
   buildInstantEvalJudgeRequest,
   type InstantEvalJudge,
-} from "../rules/instant-eval-judge-question.rules.ts";
+} from "../../../rules/instant-eval-judge-question.rules.ts";
 import {
   instantEvalJudgeResult,
   instantEvalRefusalResultOf,
   instantEvalSkipResultOf,
-} from "../rules/instant-eval-judge-result.rules.ts";
+} from "../../../rules/instant-eval-judge-result.rules.ts";
 
 type EvaluationInstantEvalJudgeDeps = Readonly<{
   judges: Pick<InstantEvalJudgeApi, "judge">;

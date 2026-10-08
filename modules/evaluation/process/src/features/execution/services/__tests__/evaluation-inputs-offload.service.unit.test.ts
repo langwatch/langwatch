@@ -3,9 +3,9 @@ import { memoryObjectStorage } from "@langwatch/process-stores";
 import type { ObjectStorage } from "@langwatch/process-stores/members";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { EvaluationRetentionLookup } from "../../repositories/evaluation.repository.ts";
-import { ObjectStorageEvaluationInputRepository } from "../../repositories/object-storage/object-storage.evaluation-input.repository.ts";
-import { legacyEvaluationInputKey } from "../../rules/evaluation-input-object.rules.ts";
+import type { EvaluationRetentionLookup } from "../../../../repositories/evaluation.repository.ts";
+import { ObjectStorageEvaluationInputRepository } from "../../../../repositories/object-storage/object-storage.evaluation-input.repository.ts";
+import { legacyEvaluationInputKey } from "../../../../rules/evaluation-input-object.rules.ts";
 import {
   EvaluationInputsOffloadService,
   EVAL_INPUTS_HARD_CEILING_BYTES,

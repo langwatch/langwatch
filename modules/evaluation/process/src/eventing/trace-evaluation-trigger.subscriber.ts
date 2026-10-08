@@ -16,7 +16,7 @@ import { z } from "zod";
 import type {
   EvaluationLoopBlockReason,
   EvaluationLoopMetrics,
-} from "../services/evaluation-loop-metrics.service.ts";
+} from "../features/execution/services/evaluation-loop-metrics.service.ts";
 
 /** Main's 30s quiet window per trace, before the trace's monitors are offered it. */
 export const TRACE_EVALUATION_TRIGGER_SETTLE_MS = 30_000;

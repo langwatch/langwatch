@@ -21,16 +21,16 @@ import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { MemoryLangevalsChannel } from "../../channels/memory/memory.langevals.channel.ts";
 import { evaluationProcessModule } from "../../evaluation.module.ts";
 import { EvaluationProcessingStoresAdapter } from "../../eventing/evaluation-processing-stores.pipeline.ts";
+import type { EvaluatorEnvironmentService } from "../../features/evaluators/services/evaluator-environment.service.ts";
+import { LangevalsClusteringService } from "../../features/evaluators/services/langevals-clustering.service.ts";
+import { LangevalsPiiDetectionService } from "../../features/evaluators/services/langevals-pii-detection.service.ts";
+import type { EvaluationExecutionService } from "../../features/execution/services/evaluation-execution.service.ts";
+import type { EvaluationInputsOffloadService } from "../../features/execution/services/evaluation-inputs-offload.service.ts";
 import type { EvaluationRepositories } from "../../repositories/evaluation.repositories.ts";
 import type { EvaluationRetentionLookup } from "../../repositories/evaluation.repository.ts";
 import { MemoryEvaluationRepositories } from "../../repositories/memory/memory.evaluation.repositories.ts";
 import type { EvaluationCommandDispatcherService } from "../../services/evaluation-command-dispatcher.service.ts";
-import type { EvaluationExecutionService } from "../../services/evaluation-execution.service.ts";
-import type { EvaluationInputsOffloadService } from "../../services/evaluation-inputs-offload.service.ts";
 import { EvaluationRunProjectionService } from "../../services/evaluation-run-projection.service.ts";
-import type { EvaluatorEnvironmentService } from "../../services/evaluator-environment.service.ts";
-import { LangevalsClusteringService } from "../../services/langevals-clustering.service.ts";
-import { LangevalsPiiDetectionService } from "../../services/langevals-pii-detection.service.ts";
 import {
   EvaluationModule,
   type EvaluationCustomEvaluators,

@@ -3,7 +3,7 @@ import type { EvaluationCostRecord, EvaluationSlugMatch } from "@langwatch/evalu
 import {
   EvaluationCostAlreadyRecordedError,
   type EvaluationCostRepository,
-} from "../repositories/evaluation-cost.repository.ts";
+} from "../../../repositories/evaluation-cost.repository.ts";
 
 /** The row id one run's cost is written under, derived from its idempotency key. */
 function costIdOf(idempotencyKey: string): string {

@@ -9,8 +9,8 @@ import type { InstantEvalJudgeApi } from "@langwatch/instant-eval-judge-contract
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
-import { EvaluationExecutionService } from "../../services/evaluation-execution.service.ts";
-import { EvaluationGuardrailCheckService } from "../../services/evaluation-guardrail-check.service.ts";
+import { EvaluationExecutionService } from "../../features/execution/services/evaluation-execution.service.ts";
+import { EvaluationGuardrailCheckService } from "../../features/execution/services/evaluation-guardrail-check.service.ts";
 
 function unreachable(what: string): () => never {
   return () => {

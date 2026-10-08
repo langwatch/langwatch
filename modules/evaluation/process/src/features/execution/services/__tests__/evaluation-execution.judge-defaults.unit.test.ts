@@ -10,12 +10,12 @@ import type { Trace } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
+import type { LangevalsEvaluatorService } from "../../../evaluators/services/langevals-evaluator.service.ts";
 import {
   EvaluationExecutionService,
   type EvaluationExecutionDeps,
 } from "../evaluation-execution.service.ts";
 import type { EvaluationSpanDigestService } from "../evaluation-span-digest.service.ts";
-import type { LangevalsEvaluatorService } from "../langevals-evaluator.service.ts";
 
 const DIGEST = "get_quote -> total 1387.50";
 const THREAD = "turn 1: get_quote -> 1387.50";

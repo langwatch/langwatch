@@ -7,7 +7,7 @@ import {
 import type { Command, CommandHandler } from "@langwatch/eventing";
 import { defineCommandSchema } from "@langwatch/eventing";
 
-import type { EvaluationExecutionIntentService } from "../services/evaluation-execution-intent.service.ts";
+import type { EvaluationExecutionIntentService } from "../features/execution/services/evaluation-execution-intent.service.ts";
 
 const schema = defineCommandSchema(
   EXECUTE_EVALUATION_COMMAND_TYPE,

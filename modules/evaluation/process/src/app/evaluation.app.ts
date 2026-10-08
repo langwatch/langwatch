@@ -60,43 +60,43 @@ import { EvaluationProcessingStoresAdapter } from "../eventing/evaluation-proces
 import { createTraceCollectorEvaluationReport } from "../eventing/trace-collector-evaluation.subscriber.ts";
 import { createTraceCustomEvaluationSync } from "../eventing/trace-custom-evaluation-sync.subscriber.ts";
 import { createTraceEvaluationTrigger } from "../eventing/trace-evaluation-trigger.subscriber.ts";
-import type { EvaluationRepositories } from "../repositories/evaluation.repositories.ts";
-import type { EvaluationRetentionLookup } from "../repositories/evaluation.repository.ts";
-import { findUnavailability } from "../rules/evaluator-availability-service.rules.ts";
-import { AzureSafetyCredentialsService } from "../services/azure-safety-credentials.service.ts";
-import { EvaluationCommandDispatcherService } from "../services/evaluation-command-dispatcher.service.ts";
-import { EvaluationCostService } from "../services/evaluation-cost.service.ts";
-import { EvaluationDatasetLookupService } from "../services/evaluation-dataset-lookup.service.ts";
-import { EvaluationExecutionIntentService } from "../services/evaluation-execution-intent.service.ts";
-import { EvaluationExecutionMetricsService } from "../services/evaluation-execution-metrics.service.ts";
-import { EvaluationExecutionReceiptService } from "../services/evaluation-execution-receipt.service.ts";
-import { EvaluationExecutionService } from "../services/evaluation-execution.service.ts";
-import { EvaluationFilterMatchingService } from "../services/evaluation-filter-matching.service.ts";
-import { EvaluationGuardrailCheckService } from "../services/evaluation-guardrail-check.service.ts";
-import { FlaggedEvaluationInputsOffloadService } from "../services/evaluation-inputs-offload-switch.service.ts";
+import { AzureSafetyCredentialsService } from "../features/evaluators/services/azure-safety-credentials.service.ts";
+import { EvaluationSavedEvaluatorService } from "../features/evaluators/services/evaluation-saved-evaluator.service.ts";
+import { EvaluatorEnvironmentService } from "../features/evaluators/services/evaluator-environment.service.ts";
+import { EvaluatorModelEnvService } from "../features/evaluators/services/evaluator-model-env.service.ts";
+import { LangevalsClusteringService } from "../features/evaluators/services/langevals-clustering.service.ts";
+import { LangevalsEvaluatorService } from "../features/evaluators/services/langevals-evaluator.service.ts";
+import { LangevalsPiiDetectionService } from "../features/evaluators/services/langevals-pii-detection.service.ts";
+import { WorkflowEvaluationService } from "../features/evaluators/services/workflow-evaluation.service.ts";
+import { EvaluationCostService } from "../features/execution/services/evaluation-cost.service.ts";
+import { EvaluationExecutionIntentService } from "../features/execution/services/evaluation-execution-intent.service.ts";
+import { EvaluationExecutionMetricsService } from "../features/execution/services/evaluation-execution-metrics.service.ts";
+import { EvaluationExecutionReceiptService } from "../features/execution/services/evaluation-execution-receipt.service.ts";
+import { EvaluationExecutionService } from "../features/execution/services/evaluation-execution.service.ts";
+import { EvaluationFilterMatchingService } from "../features/execution/services/evaluation-filter-matching.service.ts";
+import { EvaluationGuardrailCheckService } from "../features/execution/services/evaluation-guardrail-check.service.ts";
+import { FlaggedEvaluationInputsOffloadService } from "../features/execution/services/evaluation-inputs-offload-switch.service.ts";
 import {
   EVAL_INPUTS_HARD_CEILING_BYTES,
   EVAL_INPUTS_INLINE_MAX_BYTES,
   EVAL_INPUTS_PREVIEW_BYTES,
   EvaluationInputsOffloadService,
-} from "../services/evaluation-inputs-offload.service.ts";
+} from "../features/execution/services/evaluation-inputs-offload.service.ts";
+import { EvaluationLoopMetricsService } from "../features/execution/services/evaluation-loop-metrics.service.ts";
+import { EvaluationModelCascadeService } from "../features/execution/services/evaluation-model-cascade.service.ts";
+import { EvaluationSettingsRecoverySwitchService } from "../features/execution/services/evaluation-settings-recovery-switch.service.ts";
+import { EvaluationSpanDigestService } from "../features/execution/services/evaluation-span-digest.service.ts";
+import { EvaluationMonitorLookupService } from "../features/monitors/services/evaluation-monitor-lookup.service.ts";
+import { MonitorTrendService } from "../features/monitors/services/monitor-trend.service.ts";
+import type { EvaluationRepositories } from "../repositories/evaluation.repositories.ts";
+import type { EvaluationRetentionLookup } from "../repositories/evaluation.repository.ts";
+import { findUnavailability } from "../rules/evaluator-availability-service.rules.ts";
+import { EvaluationCommandDispatcherService } from "../services/evaluation-command-dispatcher.service.ts";
+import { EvaluationDatasetLookupService } from "../services/evaluation-dataset-lookup.service.ts";
 import { EvaluationLifecycleService } from "../services/evaluation-lifecycle.service.ts";
-import { EvaluationLoopMetricsService } from "../services/evaluation-loop-metrics.service.ts";
-import { EvaluationModelCascadeService } from "../services/evaluation-model-cascade.service.ts";
-import { EvaluationMonitorLookupService } from "../services/evaluation-monitor-lookup.service.ts";
 import { EvaluationRetentionDaysService } from "../services/evaluation-retention-days.service.ts";
 import { EvaluationRunProjectionService } from "../services/evaluation-run-projection.service.ts";
-import { EvaluationSavedEvaluatorService } from "../services/evaluation-saved-evaluator.service.ts";
-import { EvaluationSettingsRecoverySwitchService } from "../services/evaluation-settings-recovery-switch.service.ts";
-import { EvaluationSpanDigestService } from "../services/evaluation-span-digest.service.ts";
 import { EvaluationService } from "../services/evaluation.service.ts";
-import { EvaluatorEnvironmentService } from "../services/evaluator-environment.service.ts";
-import { EvaluatorModelEnvService } from "../services/evaluator-model-env.service.ts";
-import { LangevalsClusteringService } from "../services/langevals-clustering.service.ts";
-import { LangevalsEvaluatorService } from "../services/langevals-evaluator.service.ts";
-import { LangevalsPiiDetectionService } from "../services/langevals-pii-detection.service.ts";
-import { MonitorTrendService } from "../services/monitor-trend.service.ts";
-import { WorkflowEvaluationService } from "../services/workflow-evaluation.service.ts";
 
 export type EvaluationInfrastructure = Readonly<{
   retention: EvaluationRetentionLookup;

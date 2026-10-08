@@ -21,9 +21,9 @@ import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { evaluationProcessModule } from "../../evaluation.module.ts";
+import { EvaluationExecutionService } from "../../features/execution/services/evaluation-execution.service.ts";
 import { ClickHouseEvaluationRepository } from "../../repositories/clickhouse/evaluation.repository.ts";
 import { MemoryEvaluationRunRepository } from "../../repositories/memory/memory.evaluation-run.repository.ts";
-import { EvaluationExecutionService } from "../../services/evaluation-execution.service.ts";
 import { EVALUATION_TEST_CONFIG, installableEvaluation } from "./evaluation.fixture.ts";
 
 const TENANT = "project-1";

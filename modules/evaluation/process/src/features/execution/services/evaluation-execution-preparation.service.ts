@@ -8,14 +8,14 @@ import type { MonitorWithEvaluator } from "@langwatch/monitor-contract";
 import { createLogger } from "@langwatch/observability";
 import type { EvaluationTraceEvent } from "@langwatch/trace-contract";
 
-import type { AzureSafetyCredentialsService } from "./azure-safety-credentials.service.ts";
-import type { ExecuteEvaluationCommandDeps } from "./evaluation-execution-intent.service.ts";
-import { EvaluationPreconditionService } from "./evaluation-precondition.service.ts";
-import type { EvaluationSettingsRecoverySwitchService } from "./evaluation-settings-recovery-switch.service.ts";
+import type { AzureSafetyCredentialsService } from "../../evaluators/services/azure-safety-credentials.service.ts";
 import {
   EvaluatorSettingsService,
   type EvaluatorSettingsSource,
-} from "./evaluator-settings.service.ts";
+} from "../../evaluators/services/evaluator-settings.service.ts";
+import type { ExecuteEvaluationCommandDeps } from "./evaluation-execution-intent.service.ts";
+import { EvaluationPreconditionService } from "./evaluation-precondition.service.ts";
+import type { EvaluationSettingsRecoverySwitchService } from "./evaluation-settings-recovery-switch.service.ts";
 
 const logger = createLogger("langwatch:evaluation-processing:execute-evaluation");
 

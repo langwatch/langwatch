@@ -21,7 +21,7 @@ import { describe, expect, it, vi } from "vitest";
 import type {
   EvaluationLoopMetrics,
   EvaluationLoopBlockReason,
-} from "../../services/evaluation-loop-metrics.service.ts";
+} from "../../features/execution/services/evaluation-loop-metrics.service.ts";
 import { createTraceEvaluationTrigger } from "../trace-evaluation-trigger.subscriber.ts";
 
 const TRACE_ID = "trace-1";

@@ -26,19 +26,19 @@ import type { WorkflowApi } from "@langwatch/workflow-contract";
 import {
   maxCausalityDepthOfSpans,
   extractParentTraceForNlpgo,
-} from "../rules/evaluation-causality.rules.ts";
-import { executionResultOf } from "../rules/evaluation-execution-result.rules.ts";
-import { evaluationRenderBudget } from "../rules/evaluation-render-budget.rules.ts";
-import { hasThreadMappings } from "../rules/evaluation-thread-mapping-service.rules.ts";
-import { type EvaluatorInstallEnvironment } from "../rules/evaluator-availability-service.rules.ts";
-import { instantEvalJudgeOf } from "../rules/instant-eval-judge-dispatch.rules.ts";
-import { EvaluationDataService } from "./evaluation-data.service.ts";
+} from "../../../rules/evaluation-causality.rules.ts";
+import { executionResultOf } from "../../../rules/evaluation-execution-result.rules.ts";
+import { evaluationRenderBudget } from "../../../rules/evaluation-render-budget.rules.ts";
+import { hasThreadMappings } from "../../../rules/evaluation-thread-mapping-service.rules.ts";
+import { type EvaluatorInstallEnvironment } from "../../../rules/evaluator-availability-service.rules.ts";
+import { instantEvalJudgeOf } from "../../../rules/instant-eval-judge-dispatch.rules.ts";
+import { EvaluationDataService } from "../../../services/evaluation-data.service.ts";
+import type { EvaluatorModelEnvService } from "../../evaluators/services/evaluator-model-env.service.ts";
+import type { LangevalsEvaluatorService } from "../../evaluators/services/langevals-evaluator.service.ts";
+import type { WorkflowEvaluationService } from "../../evaluators/services/workflow-evaluation.service.ts";
 import type { EvaluationExecutionMetricsService } from "./evaluation-execution-metrics.service.ts";
 import { EvaluationInstantEvalJudgeService } from "./evaluation-instant-eval-judge.service.ts";
 import type { EvaluationSpanDigestService } from "./evaluation-span-digest.service.ts";
-import type { EvaluatorModelEnvService } from "./evaluator-model-env.service.ts";
-import type { LangevalsEvaluatorService } from "./langevals-evaluator.service.ts";
-import type { WorkflowEvaluationService } from "./workflow-evaluation.service.ts";
 
 // Evaluations need full access to trace data — no user-facing redaction.
 /** The three redactions a trace read honours. */

@@ -7,7 +7,8 @@ import type { MonitorApi } from "@langwatch/monitor-contract";
 import { createLogger } from "@langwatch/observability";
 import type { TraceApi } from "@langwatch/trace-contract";
 
-import type { AzureSafetyCredentialsService } from "./azure-safety-credentials.service.ts";
+import { EvaluationReportedEventService } from "../../../services/evaluation-reported-event.service.ts";
+import type { AzureSafetyCredentialsService } from "../../evaluators/services/azure-safety-credentials.service.ts";
 import { EvaluationExecutionOutcomeService } from "./evaluation-execution-outcome.service.ts";
 import {
   EvaluationExecutionPreparationService,
@@ -15,7 +16,6 @@ import {
 } from "./evaluation-execution-preparation.service.ts";
 import type { EvaluationExecutionReceiptService } from "./evaluation-execution-receipt.service.ts";
 import type { EvaluationInputsOffload } from "./evaluation-inputs-offload.service.ts";
-import { EvaluationReportedEventService } from "./evaluation-reported-event.service.ts";
 import type { EvaluationSettingsRecoverySwitchService } from "./evaluation-settings-recovery-switch.service.ts";
 
 const logger = createLogger("langwatch:evaluation-processing:execute-evaluation");

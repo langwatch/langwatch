@@ -6,12 +6,12 @@ import { deriveVerdictPassed, deriveVerdictScore } from "@langwatch/evaluation-c
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 
-import type { PreparedEvaluation } from "./evaluation-execution-preparation.service.ts";
-import type { EvaluationExecutionReceiptService } from "./evaluation-execution-receipt.service.ts";
 import {
   type EvaluationReportedEventService,
   type EvaluationReportedResult,
-} from "./evaluation-reported-event.service.ts";
+} from "../../../services/evaluation-reported-event.service.ts";
+import type { PreparedEvaluation } from "./evaluation-execution-preparation.service.ts";
+import type { EvaluationExecutionReceiptService } from "./evaluation-execution-receipt.service.ts";
 
 const logger = createLogger("langwatch:evaluation-processing:execute-evaluation");
 

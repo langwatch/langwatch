@@ -7,8 +7,8 @@ import type { EvaluationProcessingEvent } from "@langwatch/evaluation-contract";
 import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
 import { describe, expect, it } from "vitest";
 
+import { EvaluationExecutionIntentService } from "../features/execution/services/evaluation-execution-intent.service.ts";
 import { executionResultOf } from "../rules/evaluation-execution-result.rules.ts";
-import { EvaluationExecutionIntentService } from "../services/evaluation-execution-intent.service.ts";
 import {
   buildExecuteCommand,
   buildExecutionDeps,

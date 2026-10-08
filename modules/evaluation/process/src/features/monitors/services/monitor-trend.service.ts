@@ -7,7 +7,7 @@ import { findEvaluatorDefinitions } from "@langwatch/evaluator-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import { nowInstant } from "@langwatch/time";
 
-import { previousPeriodStartMs } from "../rules/monitor-performance-window.rules.ts";
+import { previousPeriodStartMs } from "../../../rules/monitor-performance-window.rules.ts";
 import type { MonitorPerformanceService } from "./monitor-performance.service.ts";
 
 /** The window the performance strip reports, and compares to the one before it. */

@@ -5,9 +5,9 @@ import { EvaluatorExecutionError } from "@langwatch/evaluation-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { HttpLangevalsChannel } from "../../channels/http/http.langevals.channel.ts";
-import type { LangevalsPayloadStaging } from "../../channels/langevals.channel.ts";
-import { NullLangevalsChannel } from "../../channels/null.langevals.channel.ts";
+import { HttpLangevalsChannel } from "../../../../channels/http/http.langevals.channel.ts";
+import type { LangevalsPayloadStaging } from "../../../../channels/langevals.channel.ts";
+import { NullLangevalsChannel } from "../../../../channels/null.langevals.channel.ts";
 import { LangevalsEvaluatorService } from "../langevals-evaluator.service.ts";
 import type { LangevalsEvaluateParams } from "../langevals-evaluator.service.ts";
 
