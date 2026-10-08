@@ -351,6 +351,15 @@ Feature: An aggregate project reads its member projects
     Then the strict policy's redaction applies to every row
 
   @integration
+  Scenario: A member trace whose content was dropped says so under the aggregate
+    Given an aggregate project with a member whose privacy policy drops input and output
+    And that member holds a trace recorded under that policy
+    When ana opens that trace from the aggregate
+    Then the trace header says its input and output were dropped, as it does on the member
+    # The dropped notice reads the policy of the member the trace belongs to,
+    # the same project its redaction follows, never the aggregate's own.
+
+  @integration
   Scenario: Any read of the aggregate writes the admin view audit row
     Given an aggregate project with one member holding one trace
     When ana opens the aggregate's trace list and then that trace within five minutes

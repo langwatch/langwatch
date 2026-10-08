@@ -54,6 +54,10 @@ let dropper: Project;
 let restricter: Project;
 /** Reads the dropper and the restricter. */
 let attributeAggregate: Project;
+/** Drops input and output at ingestion, so its traces store neither. */
+let contentDropper: Project;
+/** Reads the loose member and the content dropper. */
+let dropAggregate: Project;
 let window: { from: number; to: number };
 /** One evaluation per content member, each recording inputs and prose. */
 const evaluationIdOf = (handle: string) => `agg-privacy-eval-${handle}-${run}`;
@@ -127,6 +131,33 @@ beforeAll(async () => {
     where: { slug: attributeView.projectSlug, teamId: fixture.team.id },
   });
 
+  contentDropper = await fixture.makeTeamProject("content-dropper");
+  await getDataPrivacyPolicyService().setForScope({
+    scope: { scopeType: "PROJECT", scopeId: contentDropper.id },
+    personalOnly: false,
+    config: {
+      categories: {
+        input: { disposition: "drop" },
+        output: { disposition: "drop" },
+      },
+    },
+  });
+  const dropView = await admin.project.create({
+    organizationId: fixture.organizationId,
+    teamId: fixture.team.id,
+    name: `Drop view ${run}`,
+    language: "other",
+    framework: "other",
+    kind: AGGREGATE_PROJECT_KIND,
+    aggregateRule: {
+      kind: "explicit",
+      projectIds: [loose.id, contentDropper.id],
+    },
+  });
+  dropAggregate = await prisma.project.findFirstOrThrow({
+    where: { slug: dropView.projectSlug, teamId: fixture.team.id },
+  });
+
   const { projectSlug } = await admin.project.create({
     organizationId: fixture.organizationId,
     teamId: fixture.team.id,
@@ -156,6 +187,16 @@ beforeAll(async () => {
         traceId: traceIdOf("strict"),
         occurredAt,
       }),
+      // Recorded under the drop rule, so its content was never stored.
+      {
+        ...summaryRow({
+          tenantId: contentDropper.id,
+          traceId: traceIdOf("dropped"),
+          occurredAt,
+        }),
+        ComputedInput: "",
+        ComputedOutput: "",
+      },
     ],
   });
   const evaluations = evaluationRunRepositoryFor({
@@ -340,6 +381,30 @@ describe("Feature: an aggregate read applies the strictest member policy", () =>
           inputs: null,
         });
         expect(inputs).toBeNull();
+      });
+    });
+  });
+
+  describe("given an aggregate with a member that drops input and output", () => {
+    describe("when ana opens that member's trace from the aggregate", () => {
+      /** @scenario "A member trace whose content was dropped says so under the aggregate" */
+      it("says the input and output were dropped, as on the member", async () => {
+        const viaAggregate = await admin.tracesV2.header({
+          projectId: dropAggregate.id,
+          traceId: traceIdOf("dropped"),
+          tenantId: contentDropper.id,
+          full: false,
+        });
+        const viaMember = await admin.tracesV2.header({
+          projectId: contentDropper.id,
+          traceId: traceIdOf("dropped"),
+          full: false,
+        });
+
+        expect(viaAggregate.privacy).toEqual({
+          droppedCategories: ["input", "output"],
+        });
+        expect(viaAggregate.privacy).toEqual(viaMember.privacy);
       });
     });
   });

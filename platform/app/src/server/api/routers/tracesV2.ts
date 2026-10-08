@@ -1672,7 +1672,11 @@ export const tracesV2Router = createTRPCRouter({
         header: redactV2Content(rawHeader, protections),
         protections,
       });
-      header.privacy = await deriveTraceDropPrivacy(rawHeader, input.projectId);
+      // The dropped notice reads the same member's policy as the protections.
+      header.privacy = await deriveTraceDropPrivacy(
+        rawHeader,
+        summary.tenantId,
+      );
       header.projectId = summary.tenantId;
 
       return header;
