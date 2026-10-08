@@ -840,6 +840,7 @@ export class OpsModule implements OpsApi {
         findDashboardData: () => app.findDashboardData(),
         getFleetSummary: () => app.getFleetSummary(),
         listSystemMigrations: () => app.listSystemMigrations(),
+        getUpgradeStatus: () => app.getUpgradeStatus(),
       }),
     });
 

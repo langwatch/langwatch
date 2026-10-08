@@ -169,6 +169,7 @@ Optional, like the rest of this category. Counts only, keyed by LangWatch's own 
 | `queues` | Per queue with anything waiting or dead: jobs waiting, and jobs moved to its dead-letter queue. |
 | `pipelines` | Per pipeline with anything waiting, failing or stuck: jobs waiting, groups blocked on a failing projection or subscriber, process messages waiting and dead, and processes whose wake is overdue or whose lease lapsed. |
 | `migrations` | Per in-place data migration with a problem: organizations parked on an error, and organizations rolled back. |
+| `upgrade` | Where the install's release upgrade stands, for the one fleet page. Null where the upgrade ledger could not be read. |
 
 ## Never collected
 
