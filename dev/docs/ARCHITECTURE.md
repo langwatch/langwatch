@@ -2825,7 +2825,9 @@ collapsed into `withStores`) · absence classes (`Logged*Absence`, `Absent*`) ·
 `ApplicationBuilder`'s public surface · per-process host files · per-module
 composition files under `apps/*` · hand-projected per-module config · bespoke
 member bags · `*App` classes inside modules · `RestErrorHandler` · error envelopes in
-transports · re-exports for backwards compatibility · the ops "backoffice" (now Ops instance admin or Cloud admin, §3.5) · `refusing*` twins ·
+transports · re-exports for backwards compatibility · the ops "backoffice" (now Ops instance admin or Cloud admin, §3.5;
+every other spelling is renamed "Admin", for example `ssoAdmin()`, and only the `/ops/backoffice` redirect files
+keep it, Alex 2026-10-08, round 39 DS-A) · `refusing*` twins ·
 `try*`/`require*` method names · `T | null` returns in new code (`find*` =
 array; `get*` = one or throws; `list*` = a page, Alex 2026-09-24) · `static readonly configSchema` and its
 `*AppConfigSchema`/`*ServerConfigSchema` consts · a module declaring an env
@@ -2837,7 +2839,8 @@ into the route's own `.withDocs()` call and drop any hand-written success
 body outright; an error keeps only its status and a sentence via `errors`,
 and a response that truly needs its own schema goes through
 `documentedResponses()`, never raw JSON. · the eventing `ScheduledJob` scheduler
-(`PrismaScheduledJobStore`, `computeNextRunAt` on `Date`): a keyed process manager (§9). · slots:
+(`PrismaScheduledJobStore`, `computeNextRunAt` on `Date`): a keyed process manager (§9); the cron helper is
+`nextCronFireAt` in `@langwatch/time` (Alex 2026-10-08, round 39 DS-B; 8448173df4). · slots:
 `withSlots`, `UiSlots`/`uiSlots`, `useUiSlot`/`useUiSlots`, `<UiSlot>` and the `slots` host service: a
 core screen renders the enterprise module's lent component, and a shell-wide surface is its owner's declared mount (§11;
 Alex, 2026-09-29) · a mail member (notification owns mail, §3.3) · `AesGcmSecretEncryptionService` (§6) ·
@@ -2882,19 +2885,28 @@ chain. **Landed 2026-10-01 (the rename window):** `@langwatch/module`, `@langwat
 `<id>ProcessModule`, `XModule` + `.withApi(...)`, `<f>.module.ts` stems (the installer; the module class
 lives in `app/<f>.app.ts`, Alex 2026-10-05), `test-harness/api-fixture`,
 `handled-error` presentation subpaths, the ledger actor in `@langwatch/authorization`, the generated
-per-app module lists, and `audit-log-null` deleted (their old spellings are in §15). The rows below
+per-app module lists, and `audit-log-null` deleted (their old spellings are in §15). **Landed 2026-10-06 to 2026-10-08:**
+`defineChannels` and `.withChannels(registry)` on the installer (a1dceaa990; slack and webhook converted in
+79c9eda397), `nodeEnvironment` and `outboundProxy` as deployment-fact leaves (5e2b4004fc), the cron helper
+`nextCronFireAt` replacing the deleted `computeNextRunAt` (§15; 8448173df4), and the door moves ruled in rounds
+26 to 36: `identity.joinRequests.*` with identity-client (62e728e272), `evaluators.disableAsEvaluator` and
+`evaluators.toggleSaveAsEvaluator` (90960559fb), `topics.getTopicCounts` (1bcd286460) and the HTTP agent test
+turn in scenario (2b419687d9). The rows below
 have not landed: code spells the right column until its row lands, and this record's prose names
 the left, the target.
 
-| Target                                                                                   | Today                                                                                                                                                                                                                     |
-| ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| host services (`@langwatch/browser-host`: session, navigation, storage, toasts, drawers) | "capabilities" (§3.5 reserves the word for the four layers)                                                                                                                                                               |
-| `enterprise/modules/audit-log` (§4)                                                      | `modules/audit-log`                                                                                                                                                                                                       |
-| `processFacts` in `@langwatch/config`, picked by each slice (§6)                         | single leaves in `deployment-facts.ts` picked by name (`publicBaseUrl`, `isSaas`, `nlpServiceUrl`, `serviceVersion`, `otelResourceAttributes`; §6, 2026-10-05); `owner.ts` still holds `nodeEnvironment`, `outboundProxy` |
-| store clients reach registries only; `.withChannels(registry)` on the installer (§5)     | `static reads` + `setup.members`; channel registries built by hand in `create()`                                                                                                                                          |
-| `secrets.into({ … }, build)` (§6)                                                        | nested `secrets.into(handle, …)`                                                                                                                                                                                          |
-| `hostedStores(stores)` (§4)                                                              | `hostedMembers(stores)`                                                                                                                                                                                                   |
-| "store client" (`the clickhouse client`)                                                 | "member" in §7, §9 and §13 prose, and `bootInstalledProcess({ members })`                                                                                                                                                 |
+| Target                                                                                                                      | Today                                                                                                                                                                                              |
+| --------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| host services (`@langwatch/browser-host`: session, navigation, storage, toasts, drawers)                                    | "capabilities" (§3.5 reserves the word for the four layers)                                                                                                                                        |
+| `enterprise/modules/audit-log` (§4)                                                                                         | `modules/audit-log`                                                                                                                                                                                |
+| `processFacts` in `@langwatch/config`, picked by each slice (§6)                                                            | single leaves in `deployment-facts.ts` picked by name (`publicBaseUrl`, `isSaas`, `nlpServiceUrl`, `serviceVersion`, `otelResourceAttributes`, `nodeEnvironment`, `outboundProxy`; §6, 2026-10-05) |
+| store clients reach registries only; every channel registry installed by `.withChannels(registry)` (§5)                     | `static reads` in auth's and prompt's app classes and `setup.members` in `packages/process`; registries' `.live.create` called by hand in billing, nurturing and 14 more modules (round 33 ST-1)   |
+| `secrets.into({ … }, build)` (§6)                                                                                           | nested `secrets.into(handle, …)`                                                                                                                                                                   |
+| `hostedStores(stores)` (§4)                                                                                                 | `hostedMembers(stores)`                                                                                                                                                                            |
+| "store client" (`the clickhouse client`)                                                                                    | "member" in §7, §9 and §13 prose, and `bootInstalledProcess({ members })`                                                                                                                          |
+| `instantEval.*`, served by instant-eval (Alex 2026-10-08, round 36 D4)                                                      | `traces.instantEval.*`, served by trace (`traces-instant-eval.trpc.ts:20`)                                                                                                                         |
+| "Admin" (`ssoAdmin()`; Alex 2026-10-08, round 39 DS-A)                                                                      | the "backoffice" spelling §15 deletes, still in the UI shell route table and billing                                                                                                               |
+| the licence in a licensing-owned table, cleared through `LicensingApi.removeLicense` (Alex 2026-10-08, rounds 37 D6 and 42) | `OrganizationApi.setLicense` / `clearLicense` over organization's columns (`organization.api.ts:565-574`)                                                                                          |
 
 `createProcessApp` is no longer a target: the container is (Alex, 2026-10-01). Its previous implementation, the
 generated `createServerApp` and its `serverModuleChunk0..9`,
@@ -2914,15 +2926,15 @@ Homes for the no-members migration (coordinator, 2026-10-01; the members wave's 
 Also open, each a worklist: the no-members migration (process facts, store clients into
 registries, container-installed channels, record `into`, owner-held handles, the dev UI projection),
 ruled to finish now, before other module work (Alex, 2026-10-05; §3.3); eventing's client for both roles,
-and a per-module event store handle (§7); the four process-framework builds (Alex, 2026-10-05): main-loop
-stall liveness with metrics proxied to the main thread, a typed shared-secret supply that refuses a
-misspelled shared secret where it is written, the `LANGWATCH_TASK_MODULES` task-module loader, and
-host-supplied gating for agents, authz, tenancy and eventing in the api process; `browserModules` is
-empty (no module exports `./declaration` yet — the browser serves chrome
-only); the ClickHouse resolver ruling (§7); background loops main runs that this
+and a per-module event store handle (§7); the four process-framework builds (Alex, 2026-10-05), of which the typed shared-secret supply
+(93dd485569), the `LANGWATCH_TASK_MODULES` task-module loader and main-loop stall liveness with the rest
+proxied to the main door (f890f35491) landed, leaving host-supplied gating for agents, authz, tenancy and
+eventing in the api process; deleting the members family's framework
+definitions once their last callers convert (Alex, 2026-10-08, round 38 DS-C); the ClickHouse resolver ruling (§7); background loops main runs that this
 branch never starts, each to become a scheduled process manager.
 Lent tokens in contracts → each owner's `<name>-client` (§10.1; Alex, 2026-10-06, round 7b): the four
-conversions `r-lends-1` to `r-lends-4`; §15 gains nothing until they finish.
+conversions `r-lends-1` to `r-lends-4` landed (last 068818f25e and 4675456fcb; no contract imports a browser
+package); §15's entry for a lent token in a contract awaits its ruled spelling.
 
 **Open for Alex** (2026-10-05; proposals, not rulings): the E1 to E8 open questions (§8), which Alex answers
 by number. Answered that evening (Alex, 2026-10-05): the usage-named files are renamed `annotation-count`,

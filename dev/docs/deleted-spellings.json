@@ -183,9 +183,9 @@
       "spelling": "the ops \"backoffice\"",
       "kind": "identifier",
       "pattern": "\\b[Bb]ack-?[Oo]ffice",
-      "replacement": "Ops instance admin or Cloud admin",
+      "replacement": "\"Admin\" (Ops instance admin, Cloud admin, `ssoAdmin()`; round 39 DS-A)",
       "section": "§3.5",
-      "ruled": null
+      "ruled": "2026-10-08"
     },
     {
       "spelling": "`refusing*` twins",
@@ -290,9 +290,9 @@
       "spelling": "computeNextRunAt",
       "kind": "identifier",
       "pattern": "\\bcomputeNextRunAt\\b",
-      "replacement": "a keyed process manager (`.schedule({ everyMs }).onWake`)",
+      "replacement": "`nextCronFireAt` in `@langwatch/time` (renamed, round 39 DS-B); schedules stay keyed process managers setting `nextWakeAt`",
       "section": "§9",
-      "ruled": null
+      "ruled": "2026-10-08"
     },
     {
       "spelling": "the eventing `ScheduledJob` scheduler",
