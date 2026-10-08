@@ -31,27 +31,6 @@ export const userApiLinkedAccountSchema = z
 
 export const userApiLinkedAccountsSchema = z.array(userApiLinkedAccountSchema);
 
-/**
- * The budget banner's state — two shapes, and the bare one is not a
- * degenerate case of the other: it is what a caller with no personal
- * workspace, no virtual key, or no analytics store gets — no budget to describe.
- */
-export const userApiPersonalBudgetSchema = z.union([
-  z.object({ status: z.literal("ok") }).strict(),
-  z
-    .object({
-      status: z.enum(["ok", "warning", "exceeded"]),
-      scope: z.string(),
-      spentUsd: z.string(),
-      limitUsd: z.string(),
-      period: z.string(),
-      /** Absent when the deployment publishes no base URL to link to. */
-      requestIncreaseUrl: z.string().optional(),
-      adminEmail: z.string().nullable(),
-    })
-    .strict(),
-]);
-
 /** Who the budget-increase request was mailed to. */
 export const userApiBudgetIncreaseRequestedSchema = z
   .object({ ok: z.literal(true), sentTo: z.string() })
@@ -65,7 +44,6 @@ export const userApiHomePagePickerStateSchema = z
   })
   .strict();
 
-export type UserPersonalBudget = z.infer<typeof userApiPersonalBudgetSchema>;
 export type UserBudgetIncreaseRequested = z.infer<typeof userApiBudgetIncreaseRequestedSchema>;
 export type UserHomePagePickerState = z.infer<typeof userApiHomePagePickerStateSchema>;
 

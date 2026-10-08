@@ -1,8 +1,6 @@
 /** The User application: one object behind every user door this product opens. */
 import { AuthApi, type AuthApi as AuthApiContract } from "@langwatch/auth-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
-import { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
-import { GatewayApi, type GatewayBudgetCheckResult } from "@langwatch/gateway-contract";
 import { ValidationError } from "@langwatch/handled-error";
 import {
   IdentityVerificationExpiredError,
@@ -58,7 +56,6 @@ import type {
   UserPasskeyNudgeStatus,
   UserSecureAccountOffer,
   UserPasswordRotationOutcome,
-  UserPersonalBudget,
   UserProfile,
   UserProfilesInput,
   UserSsoStatus,
@@ -140,18 +137,14 @@ const CREDENTIAL_ISSUER = "local:credential";
 interface UserAppDependencies {
   auth: AuthApiContract;
   authz: AuthzApi;
-  /** The personal keys behind the /me budget banner. */
-  enterpriseGateway: Pick<EnterpriseGatewayApi, "personalVirtualKeyList">;
-  /** The budget pre-check the /me banner runs at a projected cost of zero. */
-  gateway: Pick<GatewayApi, "checkBudget">;
   organizations: OrganizationApi;
   projects: ProjectApi;
   /** Where avatar bytes are kept, as user-owned objects in a personal project. */
   storedObjects: Pick<StoredObjectApi, "storeFromBytes" | "readById" | "getReadUrlForPurpose">;
 }
 
-/** `PASSKEYS_ENABLED` is auth's, asked of that peer; the base URL is user's config leaf. */
-export type UserFacts = Readonly<{ passkeysEnabled: boolean; baseUrl: string | null }>;
+/** `PASSKEYS_ENABLED` is auth's, asked of that peer. */
+export type UserFacts = Readonly<{ passkeysEnabled: boolean }>;
 
 type UserSetup = FeatureSetup<
   typeof UserModule.dependencies,
@@ -176,8 +169,6 @@ export class UserModule implements UserApi {
   static readonly dependencies: {
     auth: typeof AuthApi;
     authz: typeof AuthzApi;
-    enterpriseGateway: typeof EnterpriseGatewayApi;
-    gateway: typeof GatewayApi;
     notifications: typeof NotificationService;
     organizations: typeof OrganizationApi;
     projects: typeof ProjectApi;
@@ -185,8 +176,6 @@ export class UserModule implements UserApi {
   } = {
     auth: AuthApi,
     authz: AuthzApi,
-    enterpriseGateway: EnterpriseGatewayApi,
-    gateway: GatewayApi,
     notifications: NotificationService,
     organizations: OrganizationApi,
     projects: ProjectApi,
@@ -210,7 +199,6 @@ export class UserModule implements UserApi {
         get passkeysEnabled() {
           return setup.dependencies.auth.offersPasskeys();
         },
-        baseUrl: setup.config.publicBaseUrl ?? null,
       },
     });
   }
@@ -254,7 +242,6 @@ export class UserModule implements UserApi {
       }),
       directory: UserOrganizationDirectoryService.create({
         directory: repositories.organizationDirectory,
-        organizations: dependencies.organizations,
       }),
       avatarObjects,
       rateLimits: repositories.rateLimits,
@@ -843,53 +830,6 @@ export class UserModule implements UserApi {
   }
 
   /**
-   * The /me budget banner, delegated to the gateway's own check at a projected
-   * cost of zero — the same code path a request runs — so the banner and the
-   * command line's pre-check can never disagree.
-   */
-  async getPersonalBudget({
-    userId,
-    organizationId,
-  }: {
-    userId: string;
-    organizationId: string;
-  }): Promise<UserPersonalBudget> {
-    const workspace = await this.#account.findPersonalWorkspace({ userId, organizationId });
-
-    if (!workspace) return { status: "ok" };
-
-    const keys = await this.#peers.enterpriseGateway.personalVirtualKeyList({
-      userId,
-      organizationId,
-    });
-    // OTLP-only people intentionally hold no personal gateway key. A sentinel
-    // that matches no key-scoped budget keeps them on the principal scope,
-    // which is what `principalUserId` resolves regardless.
-    const virtualKeyId = keys[0]?.id ?? `_ingestion_:user:${userId}`;
-    const decision = await this.#peers.gateway.checkBudget({
-      organizationId,
-      teamId: workspace.team.id,
-      projectId: workspace.project.id,
-      virtualKeyId,
-      principalUserId: userId,
-      projectedCostUsd: 0,
-    });
-    const topScope = findTopBudgetScope(decision);
-
-    if (!topScope) return { status: "ok" };
-
-    return {
-      status: budgetStatusOf({ decision: decision.decision, pctUsed: topScope.pctUsed }),
-      scope: normalizeScope(topScope.scope),
-      spentUsd: topScope.spentUsd,
-      limitUsd: topScope.limitUsd,
-      period: topScope.window.toLowerCase(),
-      ...this.#requestIncreaseUrl(topScope),
-      adminEmail: await this.#directory.findSupportContact({ organizationId }),
-    };
-  }
-
-  /**
    * Mails the organization's administrator the scope, the limit, the spend and
    * an optional message. Triggered from the budget-request page the gateway's
    * 402 and the command line both link to.
@@ -1063,87 +1003,4 @@ export class UserModule implements UserApi {
 
     return project;
   }
-
-  #requestIncreaseUrl(scope: {
-    scope: string;
-    scopeId: string;
-    limitUsd: string;
-    spentUsd: string;
-  }): { requestIncreaseUrl?: string } {
-    const baseUrl = this.#facts.baseUrl;
-
-    if (!baseUrl) return {};
-
-    const params = new URLSearchParams({
-      scope: normalizeScope(scope.scope),
-      scope_id: scope.scopeId,
-      limit_usd: scope.limitUsd,
-      spent_usd: scope.spentUsd,
-    });
-
-    return {
-      requestIncreaseUrl: `${baseUrl.replace(/\/$/, "")}/me/budget/request?${params.toString()}`,
-    };
-  }
-}
-
-/** One budget the gateway weighed, as the banner and the chip read it. */
-type BudgetScope =
-  | GatewayBudgetCheckResult["scopes"][number]
-  | GatewayBudgetCheckResult["blockedBy"][number];
-
-/** One weighed budget, with the percentage the chip renders. */
-type WeighedBudgetScope = BudgetScope & { pctUsed: number };
-
-/**
- * The budget the banner and the chip speak about: the blocking one where the gateway
- * named one, else the fullest. `blockedBy` carries the same scopes without the derived
- * percentage, so it's weighed the same way rather than tested for the field.
- */
-function findTopBudgetScope(decision: GatewayBudgetCheckResult): WeighedBudgetScope | undefined {
-  const blocking = decision.blockedBy[0];
-
-  if (blocking) return weigh(blocking);
-
-  return decision.scopes.map(weigh).toSorted((a, b) => b.pctUsed - a.pctUsed)[0];
-}
-
-function weigh(scope: BudgetScope): WeighedBudgetScope {
-  return { ...scope, pctUsed: percentUsed(scope.spentUsd, scope.limitUsd) };
-}
-
-/**
- * `hard_block` reddens the banner and `soft_warn` yellows it; `allow` still
- * carries the snapshot the chip renders, which is why "ok" is an answer with
- * numbers rather than an early return without them.
- */
-function budgetStatusOf({
-  decision,
-  pctUsed,
-}: {
-  decision: string;
-  pctUsed: number;
-}): "ok" | "warning" | "exceeded" {
-  if (decision === "hard_block") return "exceeded";
-  if (decision === "soft_warn" || pctUsed >= 80) return "warning";
-
-  return "ok";
-}
-
-function percentUsed(spentUsd: string, limitUsd: string): number {
-  const limit = Number.parseFloat(limitUsd);
-
-  if (!Number.isFinite(limit) || limit <= 0) return 0;
-
-  return (Number.parseFloat(spentUsd) / limit) * 100;
-}
-
-/**
- * The scope codes the banner and the command line's budget box accept.
- * Virtual-key blocks read as "personal" in both.
- */
-function normalizeScope(scope: string): string {
-  const normalized = scope.toLowerCase();
-
-  return normalized === "virtual_key" ? "personal" : normalized;
 }

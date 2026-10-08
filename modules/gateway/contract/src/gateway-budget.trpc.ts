@@ -19,6 +19,7 @@ import {
   gatewayBudgetDtoResponseSchema,
   gatewayBudgetGroupTargetsSchema,
   gatewayBudgetListSchema,
+  gatewayPersonalBudgetSchema,
 } from "./gateway.responses.ts";
 
 export const gatewayBudgetTrpc = defineTrpcContract("gatewayBudgets")
@@ -39,6 +40,11 @@ export const gatewayBudgetTrpc = defineTrpcContract("gatewayBudgets")
   .query("groupTargets")
   .withInput(gatewayBudgetApiOrganizationInputSchema)
   .withOutput(gatewayBudgetGroupTargetsSchema)
+
+  /** The /me budget banner for the caller's own personal key in one organization. */
+  .query("personalBudget")
+  .withInput(gatewayBudgetApiOrganizationInputSchema)
+  .withOutput(gatewayPersonalBudgetSchema)
 
   .mutation("create")
   .withInput(gatewayBudgetApiCreateInputSchema)

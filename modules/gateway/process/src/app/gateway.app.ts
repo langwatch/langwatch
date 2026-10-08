@@ -20,6 +20,7 @@ import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import {
   virtualKeyBudgetInputSchema,
   type GatewayBudgetOverviewForUser,
+  type GatewayPersonalBudget,
   type GatewayAuthorizedKeyCaller,
   type GatewayAuthorizedVirtualKeyCaller,
   type GatewayKeyCaller,
@@ -220,6 +221,7 @@ import { GatewayInternalProtocolService } from "../services/gateway-internal-pro
 import type { GatewaySpendCommandSender } from "../services/gateway-internal-protocol.service.ts";
 import { GatewayJwtService } from "../services/gateway-jwt.service.ts";
 import { GatewayOrganizationDirectoryService } from "../services/gateway-organization-directory.service.ts";
+import { GatewayPersonalBudgetService } from "../services/gateway-personal-budget.service.ts";
 import {
   GatewayRealtimeSessionReconciliationService,
   realtimeSessionReconciliationConfig,
@@ -724,6 +726,8 @@ type GatewayBudgetOverviewDeps = Readonly<{
   organizations: OrganizationApi;
   featureFlags: FeatureFlagApi;
   traces: Pick<TraceApi, "findModelSpend">;
+  /** Where the /me banner's request-increase link points; absent, it carries none. */
+  publicBaseUrl: string | undefined;
 }>;
 
 /** Unread by `overviewForUser`; only the budget's own `findBudgetOverview` uses this port. */
@@ -1304,6 +1308,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
         organizations: setup.dependencies.organizations,
         featureFlags: setup.dependencies.featureFlags,
         traces: setup.dependencies.traces,
+        publicBaseUrl: setup.config?.publicBaseUrl,
       },
       addresses: {
         baseUrl: setup.config?.internalUrl ?? setup.config?.baseUrl,
@@ -1327,6 +1332,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
   #settlementPolicy: FixedGatewaySettlementPolicyService | undefined;
   #budgetOverviewDeps: GatewayBudgetOverviewDeps | undefined;
   #budgetOverview: BudgetOverviewService | undefined;
+  #personalBudget: GatewayPersonalBudgetService | undefined;
   #budgetLedger: GatewayBudgetLedgerService | undefined;
   #internalProtocol: GatewayInternalProtocolService;
   #internalAnswers: GatewayInternalDoorService;
@@ -1852,6 +1858,27 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     includeTopModels?: boolean;
   }): Promise<GatewayBudgetOverviewForUser> {
     return this.#budgetOverviewService.overviewForUser(input);
+  }
+
+  /** Built once and reused, on the /me banner every personal page reads. */
+  get #personalBudgetService(): GatewayPersonalBudgetService {
+    const deps = this.#budgetOverviewDeps;
+    if (!deps)
+      throw new Error("The gateway personal-budget family was mounted without its members");
+
+    return (this.#personalBudget ??= GatewayPersonalBudgetService.create({
+      personalKeys: this.#dependencies.virtualKeys,
+      budgetDecisions: this.#dependencies.budgetDecisions,
+      organizations: deps.organizations,
+      publicBaseUrl: deps.publicBaseUrl,
+    }));
+  }
+
+  getPersonalBudget(input: {
+    userId: string;
+    organizationId: string;
+  }): Promise<GatewayPersonalBudget> {
+    return this.#personalBudgetService.getPersonalBudget(input);
   }
 
   #agentCacheService(): GatewayAgentCacheService {

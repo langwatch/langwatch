@@ -186,16 +186,11 @@ export class TestUserApi implements UserApi {
   setLastHomePath: UserApi["setLastHomePath"] = (input) =>
     this.overrides.setLastHomePath?.(input) ?? this.unimplemented("setLastHomePath");
 
-
-  getPersonalBudget: UserApi["getPersonalBudget"] = (input) =>
-    this.overrides.getPersonalBudget?.(input) ?? this.unimplemented("getPersonalBudget");
-
   requestBudgetIncrease: UserApi["requestBudgetIncrease"] = (input) =>
     this.overrides.requestBudgetIncrease?.(input) ?? this.unimplemented("requestBudgetIncrease");
 
   getHomePagePickerState: UserApi["getHomePagePickerState"] = (input) =>
     this.overrides.getHomePagePickerState?.(input) ?? this.unimplemented("getHomePagePickerState");
-
 
   getKeyProject: UserApi["getKeyProject"] = (input) =>
     this.overrides.getKeyProject?.(input) ?? this.unimplemented("getKeyProject");

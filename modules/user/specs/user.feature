@@ -190,15 +190,6 @@ Feature: Canonical user lifecycle
     And the panel says the token can only send data to this project and cannot read or change anything
     And the token fills the snippet while the panel is open and is held in memory only
 
-  # main's user.personalBudget reads the caller's personal key and the
-  # gateway's budget check. The personal context is enterprise-gateway's.
-  @unit
-  Scenario: The personal budget warns at the gateway's soft warning on the caller's own key
-    Given a member holding a personal gateway key whose budget is at a soft warning
-    When they read their personal budget in that organization
-    Then the gateway checks the budget against that key at no projected cost
-    And the personal budget answers a warning with the spend and the limit
-
   # main's handler passed scope, scope id, limit, spend and period through
   # unchecked, and its mail rendered each one blank rather than refusing.
   @unit

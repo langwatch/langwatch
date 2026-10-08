@@ -1,7 +1,5 @@
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
-import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { RoutingDecision } from "@langwatch/identity-contract";
 import {
   type OrganizationApi,
@@ -173,24 +171,6 @@ export function createUserTestStoredObjects() {
   });
 }
 
-/** The gateway peers behind /me: no personal key, every budget allowed. */
-export function createUserTestGateways() {
-  return {
-    enterpriseGateway: createApiFixture<EnterpriseGatewayApi>({
-      personalVirtualKeyList: vi.fn(async () => []),
-    }),
-    gateway: createApiFixture<GatewayApi>({
-      checkBudget: vi.fn(async () => ({
-        decision: "allow" as const,
-        warnings: [],
-        blockReason: null,
-        scopes: [],
-        blockedBy: [],
-      })),
-    }),
-  };
-}
-
 /** A reversible stand-in for bcrypt, so a hash is recognisable in assertions. */
 export class TestPasswordHasher {
   async hash({ password }: { password: string }): Promise<string> {
@@ -202,8 +182,8 @@ export class TestPasswordHasher {
   }
 }
 
-/** The deployment a suite runs against: no passkeys, no public base URL. */
-export const TEST_USER_CONFIG: UserFacts = { passkeysEnabled: false, baseUrl: null };
+/** The deployment a suite runs against: no passkeys. */
+export const TEST_USER_CONFIG: UserFacts = { passkeysEnabled: false };
 
 /** The whole application over memory repositories, recorded mail and a test's own peers. */
 export function createUserTestApp(
@@ -212,8 +192,6 @@ export function createUserTestApp(
     dependencies?: Partial<{
       auth: AuthApi;
       authz: AuthzApi;
-      enterpriseGateway: EnterpriseGatewayApi;
-      gateway: GatewayApi;
       organizations: OrganizationApi;
       projects: ProjectApi;
       storedObjects: StoredObjectApi;
@@ -224,7 +202,6 @@ export function createUserTestApp(
     now?: () => Instant;
   }> = {},
 ): UserModule {
-  const gateways = createUserTestGateways();
   const app = UserModule.createForTesting({
     repositories: input.repositories ?? MemoryUserRepositories.create(),
     facts: input.facts ?? TEST_USER_CONFIG,
@@ -234,8 +211,6 @@ export function createUserTestApp(
     dependencies: {
       auth: input.dependencies?.auth ?? createUserTestAuth(),
       authz: input.dependencies?.authz ?? createUserTestAuthorization(),
-      enterpriseGateway: input.dependencies?.enterpriseGateway ?? gateways.enterpriseGateway,
-      gateway: input.dependencies?.gateway ?? gateways.gateway,
       organizations: input.dependencies?.organizations ?? createUserTestOrganizations(),
       projects: input.dependencies?.projects ?? createUserTestProjects(),
       storedObjects: input.dependencies?.storedObjects ?? createUserTestStoredObjects(),

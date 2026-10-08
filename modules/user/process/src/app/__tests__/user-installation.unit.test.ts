@@ -1,15 +1,6 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type {
-  EnterpriseGatewayApi,
-  PersonalVirtualKey,
-} from "@langwatch/enterprise-gateway-contract";
-import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { NotificationService } from "@langwatch/notification-contract";
-import type {
-  OrganizationApi,
-  OrganizationSettings,
-  PersonalWorkspace,
-} from "@langwatch/organization-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -17,7 +8,7 @@ import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { UserApi } from "@langwatch/user-contract";
 import { hash } from "bcrypt";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { userProcessModule } from "../../user.module.ts";
 import { createUserTestAuth, createUserTestOrganizations } from "./user.fixture.ts";
@@ -26,8 +17,6 @@ function process(
   role: "api" | "worker",
   peers: Readonly<{
     authz?: AuthzApi;
-    enterpriseGateway?: EnterpriseGatewayApi;
-    gateway?: GatewayApi;
     organization?: OrganizationApi;
   }> = {},
 ) {
@@ -38,8 +27,6 @@ function process(
     .provide({
       auth: createUserTestAuth(),
       authz: peers.authz ?? createApiFixture<AuthzApi>(),
-      "enterprise-gateway": peers.enterpriseGateway ?? createApiFixture<EnterpriseGatewayApi>(),
-      gateway: peers.gateway ?? createApiFixture<GatewayApi>(),
       notification: createApiFixture<NotificationService>(),
       organization: peers.organization ?? createUserTestOrganizations(),
       project: createApiFixture<ProjectApi>(),
@@ -121,85 +108,3 @@ describe("user app installation", () => {
     }
   });
 });
-
-describe("the /me gateway reads", () => {
-  const workspace: PersonalWorkspace = {
-    team: { id: "team-1", name: "Ada's workspace", slug: "ada", createdAtMs: 0 },
-    project: { id: "project-1", name: "Ada", slug: "ada", apiKey: "sk-lw-1", createdAtMs: 0 },
-  };
-  const organization = Object.assign(createUserTestOrganizations(), {
-    getPersonalWorkspace: vi.fn(async () => workspace),
-    getSettings: vi.fn(async (): Promise<OrganizationSettings> => ({
-      id: "org-1",
-      name: "Acme",
-      slug: "acme",
-      supportContact: "it@example.com",
-      presenceEnabled: false,
-      traceSharingEnabled: false,
-      primaryIntent: null,
-      s3Endpoint: null,
-      s3AccessKeyId: null,
-      s3Bucket: null,
-      createdAt: new Date(0),
-      updatedAt: new Date(0),
-    })),
-  });
-
-  /** @scenario "The personal budget warns at the gateway's soft warning on the caller's own key" */
-  it("checks the caller's own key with the gateway and answers a warning", async () => {
-    const checkBudget = vi.fn(async () => ({
-      decision: "soft_warn" as const,
-      warnings: [],
-      blockReason: null,
-      blockedBy: [],
-      scopes: [
-        { scope: "PRINCIPAL", scopeId: "user-1", window: "MONTH", spentUsd: "85", limitUsd: "100" },
-      ],
-    }));
-    const personalVirtualKeyList = vi.fn(async () => [personalKey({ id: "vk-1" })]);
-    const runtime = await process("api", {
-      enterpriseGateway: createApiFixture<EnterpriseGatewayApi>({ personalVirtualKeyList }),
-      gateway: createApiFixture<GatewayApi>({ checkBudget }),
-      organization,
-    }).boot();
-
-    try {
-      const budget = await runtime
-        .service(UserApi)
-        .getPersonalBudget({ userId: "user-1", organizationId: "org-1" });
-
-      expect(budget).toMatchObject({ status: "warning", spentUsd: "85", limitUsd: "100" });
-      expect(personalVirtualKeyList).toHaveBeenCalledWith({
-        userId: "user-1",
-        organizationId: "org-1",
-      });
-      expect(checkBudget).toHaveBeenCalledWith({
-        organizationId: "org-1",
-        teamId: "team-1",
-        projectId: "project-1",
-        virtualKeyId: "vk-1",
-        principalUserId: "user-1",
-        projectedCostUsd: 0,
-      });
-    } finally {
-      await runtime.stop();
-    }
-  });
-});
-
-function personalKey({ id }: { id: string }): PersonalVirtualKey {
-  return {
-    id,
-    organizationId: "org-1",
-    name: "Ada's key",
-    description: null,
-    displayPrefix: "lw_vk_",
-    status: "ACTIVE",
-    principalUserId: "user-1",
-    routingPolicyId: null,
-    createdAtMs: 0,
-    updatedAtMs: 0,
-    lastUsedAtMs: null,
-    scopes: [],
-  };
-}

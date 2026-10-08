@@ -13,7 +13,6 @@ import {
   userApiLinkedAccountsSchema,
   userApiOkSchema,
   userApiUpdatedNameSchema,
-  userApiPersonalBudgetSchema,
   userApiBrowserSessionEndedSchema,
   userApiBrowserSessionSchema,
   userApiSuccessSchema,
@@ -151,10 +150,6 @@ export const userTrpc = defineTrpcContract("user")
   .mutation("removeAvatar")
   .withInput(userApiEmptyInputSchema)
   .withOutput(userApiSuccessSchema)
-
-  .query("personalBudget")
-  .withInput(userApiOrganizationInputSchema)
-  .withOutput(userApiPersonalBudgetSchema)
 
   .mutation("requestBudgetIncrease")
   .withInput(userApiRequestBudgetIncreaseInputSchema)

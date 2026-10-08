@@ -66,6 +66,7 @@ import type {
 } from "./gateway.budget.ts";
 import type { GatewayDeploymentAddresses } from "./gateway.config.ts";
 import type {
+  GatewayPersonalBudget,
   GatewaySpendEventPage,
   GatewayUsageSummary,
   GatewayVirtualKeyUsageSummary,
@@ -881,6 +882,14 @@ export interface GatewayApi extends GatewayInternalProtocol {
     /** Adds up to three top models to each personal budget. */
     includeTopModels?: boolean;
   }): Promise<GatewayBudgetOverviewForUser>;
+  /**
+   * The /me budget banner: the gateway's own check at a projected cost of zero on the
+   * caller's personal key, so the banner and the command line's pre-check agree.
+   */
+  getPersonalBudget(input: {
+    userId: string;
+    organizationId: string;
+  }): Promise<GatewayPersonalBudget>;
   spendByVirtualKey(input: {
     organizationId: string;
     virtualKeyIds: readonly string[];

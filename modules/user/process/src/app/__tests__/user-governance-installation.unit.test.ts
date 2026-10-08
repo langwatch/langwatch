@@ -1,8 +1,6 @@
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
-import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { NotificationService } from "@langwatch/notification-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
@@ -33,8 +31,6 @@ function process(
     .provide({
       auth: peers.auth ?? createUserTestAuth(),
       authz: createApiFixture<AuthzApi>({ listPlatformOperators: async () => [] }),
-      "enterprise-gateway": createApiFixture<EnterpriseGatewayApi>(),
-      gateway: createApiFixture<GatewayApi>(),
       notification: createApiFixture<NotificationService>(),
       organization: createUserTestOrganizations(),
       project: peers.project ?? createApiFixture<ProjectApi>(),

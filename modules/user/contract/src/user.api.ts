@@ -12,7 +12,6 @@ import type {
   UserBrowserSessionEnded,
   UserBudgetIncreaseRequested,
   UserHomePagePickerState,
-  UserPersonalBudget,
 } from "./user.responses.ts";
 import type {
   UserCodeAccessPreference,
@@ -165,7 +164,6 @@ export interface UserApi {
 
   // -- the /me dashboard -----------------------------------------------------
 
-  getPersonalBudget(input: { userId: string; organizationId: string }): Promise<UserPersonalBudget>;
   requestBudgetIncrease(
     input: UserApiRequestBudgetIncreaseInput & { userId: string },
   ): Promise<UserBudgetIncreaseRequested>;

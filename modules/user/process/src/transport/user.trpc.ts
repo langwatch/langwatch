@@ -249,12 +249,6 @@ export const userTrpcTransport: TrpcRouterDeclaration<UserApi, typeof userTrpc> 
     return { success: true as const };
   })
 
-  .procedure("personalBudget")
-  .withPermission("organization:view")
-  .handle(({ app, actor, input }) =>
-    app.getPersonalBudget({ userId: actor.id, organizationId: input.organizationId }),
-  )
-
   .procedure("requestBudgetIncrease")
   .withPermission("organization:view")
   .handle(({ app, actor, input }) => app.requestBudgetIncrease({ ...input, userId: actor.id }))

@@ -155,6 +155,14 @@ export const gatewayBudgetTrpcTransport: TrpcRouterDeclaration<
     };
   })
 
+  // Any member reads their own banner: the answer is about the caller's own
+  // key, so it asks organization:view, not a budget permission.
+  .procedure("personalBudget")
+  .withPermission("organization:view")
+  .handle(({ app, actor, input }) =>
+    app.getPersonalBudget({ userId: actor.id, organizationId: input.organizationId }),
+  )
+
   // group.listAll demands organization:manage; a creator only needs names and
   // sizes, so this stays gated by the same permission as the create it serves.
   .procedure("groupTargets")

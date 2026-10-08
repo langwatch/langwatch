@@ -15467,18 +15467,12 @@ importers:
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
-      '@langwatch/enterprise-gateway-contract':
-        specifier: workspace:*
-        version: link:../../../enterprise/modules/enterprise-gateway/contract
       '@langwatch/enterprise-governance-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/governance/contract
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../packages/eventing
-      '@langwatch/gateway-contract':
-        specifier: workspace:*
-        version: link:../../gateway/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error

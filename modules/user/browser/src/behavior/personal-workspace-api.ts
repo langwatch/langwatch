@@ -16,6 +16,7 @@ import type {
   ingestionKeyTrpc,
   personalSessionsTrpc,
 } from "@langwatch/enterprise-governance-contract";
+import type { gatewayBudgetTrpc } from "@langwatch/gateway-contract";
 import type { identityTrpc } from "@langwatch/identity-contract";
 import type { userTrpc } from "@langwatch/user-contract";
 
@@ -171,6 +172,7 @@ export type PersonalWorkspaceApiMap = ContractApiMap<typeof userTrpc> &
   ContractApiMap<typeof personalSessionsTrpc> &
   ContractApiMap<typeof governanceTrpc> &
   ContractApiMap<typeof ingestionKeyTrpc> &
+  ContractApiMap<typeof gatewayBudgetTrpc> &
   BorrowedProcedures;
 
 /**

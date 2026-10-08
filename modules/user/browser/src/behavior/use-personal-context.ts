@@ -1,4 +1,4 @@
-import type { UserPersonalBudget } from "@langwatch/user-contract";
+import type { GatewayPersonalBudget } from "@langwatch/gateway-contract";
 import { useMemo } from "react";
 
 import type { BudgetOverviewItemView } from "../model/budget-overview-item.ts";
@@ -75,7 +75,7 @@ export type PersonalContext = {
   apiKeys: PersonalApiKeyRow[];
 };
 
-function budgetStateFrom(raw: UserPersonalBudget): PersonalBudgetState {
+function budgetStateFrom(raw: GatewayPersonalBudget): PersonalBudgetState {
   if (!("limitUsd" in raw)) return { status: "ok" };
   return {
     status: raw.status,
@@ -121,7 +121,7 @@ export function usePersonalContext(): PersonalContext {
     { enabled: !!organization, refetchOnWindowFocus: false },
   );
 
-  const personalBudgetQuery = api.user.personalBudget.useQuery(
+  const personalBudgetQuery = api.gatewayBudgets.personalBudget.useQuery(
     { organizationId: orgId },
     { enabled: !!organization, refetchOnWindowFocus: false },
   );

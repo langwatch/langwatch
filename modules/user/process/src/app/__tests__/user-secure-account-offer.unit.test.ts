@@ -62,7 +62,7 @@ async function offerFor({
       credentials: MemoryUserCredentialRepository.create({ database }),
     },
     dependencies: { auth },
-    facts: { passkeysEnabled: passkeys, baseUrl: null },
+    facts: { passkeysEnabled: passkeys },
     now: () => fromDate(NOW),
   });
 
