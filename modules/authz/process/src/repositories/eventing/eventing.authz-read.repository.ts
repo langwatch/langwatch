@@ -59,6 +59,20 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
     return { role: row.role, disabled: row.disabledAt !== null };
   };
 
+  /** Organization's own administrator predicate (findActiveAdministratorIds there), read here. */
+  findActiveAdministratorIds = async ({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<string[]> => {
+    const rows = (await this.database.organizationUser.findMany({
+      where: { organizationId, role: "ADMIN", disabledAt: null },
+      select: { userId: true },
+      orderBy: { userId: "asc" },
+    })) as { userId: string }[];
+    return rows.map((row) => row.userId);
+  };
+
   findUserBindings = async ({
     userId,
     organizationId,

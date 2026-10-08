@@ -43,6 +43,18 @@ export class MemoryAuthzReadRepository extends AuthzReadRepository {
     return row ? { role: row.role, disabled: row.disabled } : null;
   };
 
+  findActiveAdministratorIds = async ({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<string[]> => {
+    const prefix = this.memory.membershipKey(organizationId, "");
+    return [...this.memory.memberships]
+      .filter(([key, row]) => key.startsWith(prefix) && row.role === "ADMIN" && !row.disabled)
+      .map(([key]) => key.slice(prefix.length))
+      .toSorted();
+  };
+
   findUserBindings = async ({
     userId,
     organizationId,

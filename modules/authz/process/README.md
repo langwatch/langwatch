@@ -285,6 +285,14 @@ isOnEngine(args: Queries.AuthzListOrganizationBindingsInput): Promise<boolean>;
 findEngineCutoverAt(args: Queries.AuthzListOrganizationBindingsInput): Promise<Instant | null>;
 ```
 
+#### `findActiveOrganizationAdministrators`
+
+User ids holding organisation role ADMIN on a seat not disabled; empty for an unknown one.
+
+```typescript
+findActiveOrganizationAdministrators(args: Queries.AuthzFindActiveOrganizationAdministratorsInput): Promise<Queries.AuthzActiveOrganizationAdministrators>;
+```
+
 #### `getSessionVersion`
 
 The caller's session version (ADR-170): 0 until first bumped; throws when unreadable.

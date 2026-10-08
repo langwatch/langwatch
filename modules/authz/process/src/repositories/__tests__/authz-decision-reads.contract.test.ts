@@ -45,6 +45,7 @@ type ReadsFixture = Readonly<{
     member?: boolean;
   }) => Promise<string>;
   disableMembership: (userId: string) => Promise<void>;
+  enableMembership: (userId: string) => Promise<void>;
   team: (organizationId?: string) => Promise<string>;
   project: (input: { teamId: string; apiKey?: string; archived?: boolean }) => Promise<string>;
   teamMember: (input: {
@@ -106,6 +107,10 @@ function memoryReadsFixture(): ReadsFixture {
     disableMembership: async (userId) => {
       const row = memory.memberships.get(memory.membershipKey(organizationId, userId));
       if (row) row.disabled = true;
+    },
+    enableMembership: async (userId) => {
+      const row = memory.memberships.get(memory.membershipKey(organizationId, userId));
+      if (row) row.disabled = false;
     },
     team: async (orgId = organizationId) => {
       const teamId = id("team");
@@ -213,6 +218,12 @@ async function postgresReadsFixture(): Promise<ReadsFixture> {
       await database.organizationUser.update({
         where: { userId_organizationId: { userId, organizationId } },
         data: { disabledAt: new Date() },
+      });
+    },
+    enableMembership: async (userId) => {
+      await database.organizationUser.update({
+        where: { userId_organizationId: { userId, organizationId } },
+        data: { disabledAt: null },
       });
     },
     team: async (orgId = organizationId) => {
@@ -470,6 +481,70 @@ describe.each(backends)("given the decision reads on the $name backend", (backen
           viaGroupId: groupId,
         },
       ]);
+    });
+  });
+
+  describe.skipIf(backend.skip)("when an organization's active administrators are read", () => {
+    /** @scenario "A seat-disabled administrator is not counted" */
+    it("names only the administrators whose seat is not disabled", async () => {
+      const fixture = await open();
+      const { organizationId } = fixture;
+      const kept = await fixture.user({ role: "ADMIN" });
+      const disabled = await fixture.user({ role: "ADMIN" });
+
+      await fixture.disableMembership(disabled);
+
+      await expect(
+        fixture.repositories.read.findActiveAdministratorIds({ organizationId }),
+      ).resolves.toEqual([kept]);
+    });
+
+    /** @scenario "A re-enabled administrator is counted again" */
+    it("names an administrator again once the seat is enabled", async () => {
+      const fixture = await open();
+      const { organizationId } = fixture;
+      const administrator = await fixture.user({ role: "ADMIN" });
+      await fixture.disableMembership(administrator);
+
+      await fixture.enableMembership(administrator);
+
+      await expect(
+        fixture.repositories.read.findActiveAdministratorIds({ organizationId }),
+      ).resolves.toEqual([administrator]);
+    });
+
+    /** @scenario "A member who is not an administrator is not counted" */
+    it("leaves out members holding any other organization role", async () => {
+      const fixture = await open();
+      const { organizationId } = fixture;
+      const administrator = await fixture.user({ role: "ADMIN" });
+      await fixture.user({ role: "MEMBER" });
+      await fixture.user({ role: "EXTERNAL" });
+
+      await expect(
+        fixture.repositories.read.findActiveAdministratorIds({ organizationId }),
+      ).resolves.toEqual([administrator]);
+    });
+
+    /** @scenario "An unknown organisation has no active administrators" */
+    it("answers an empty list for an organization id that names none", async () => {
+      const fixture = await open();
+
+      await expect(
+        fixture.repositories.read.findActiveAdministratorIds({ organizationId: id("org") }),
+      ).resolves.toEqual([]);
+    });
+
+    /** @scenario "Another organisation's administrators are not counted" */
+    it("leaves out another organization's administrators", async () => {
+      const fixture = await open();
+      const { organizationId, foreignOrganizationId } = fixture;
+      const administrator = await fixture.user({ role: "ADMIN" });
+      await fixture.user({ role: "ADMIN", organizationId: foreignOrganizationId });
+
+      await expect(
+        fixture.repositories.read.findActiveAdministratorIds({ organizationId }),
+      ).resolves.toEqual([administrator]);
     });
   });
 

@@ -143,6 +143,10 @@ export interface AuthzApi {
   ): Promise<Binding.AuthzAccessBreakdownOutput>;
   isOnEngine(args: Queries.AuthzListOrganizationBindingsInput): Promise<boolean>;
   findEngineCutoverAt(args: Queries.AuthzListOrganizationBindingsInput): Promise<Instant | null>;
+  /** User ids holding organisation role ADMIN on a seat not disabled; empty for an unknown one. */
+  findActiveOrganizationAdministrators(
+    args: Queries.AuthzFindActiveOrganizationAdministratorsInput,
+  ): Promise<Queries.AuthzActiveOrganizationAdministrators>;
   /** The caller's session version (ADR-170): 0 until first bumped; throws when unreadable. */
   getSessionVersion(input: { userId: string }): Promise<number>;
   revoke(args: Commands.AuthzRevokeGrantInput): Promise<void>;

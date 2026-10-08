@@ -22,6 +22,8 @@ import {
   type ApiKeyPermissionCheck,
   type ApiKeyProjectDecision,
   type AuthzAccessBinding,
+  type AuthzActiveOrganizationAdministrators,
+  type AuthzFindActiveOrganizationAdministratorsInput,
   type AuthzBindingForSynthesis,
   type AuthzCustomRole,
   type AuthzFindRolePermissionsInput,
@@ -230,6 +232,13 @@ export class AuthzService extends AuthzServiceContract {
     organizationId: string;
   }): Promise<Instant | null> {
     return this.options.findEngineCutoverAt?.(organizationId) ?? null;
+  }
+
+  /** Organization's "administrator who can sign in": role ADMIN and a seat not disabled. */
+  async findActiveOrganizationAdministrators({
+    organizationId,
+  }: AuthzFindActiveOrganizationAdministratorsInput): Promise<AuthzActiveOrganizationAdministrators> {
+    return this.options.repository.findActiveAdministratorIds({ organizationId });
   }
 
   async authorize<Tier extends DeclaredScopeTier, Permission extends AuthzPermission>({

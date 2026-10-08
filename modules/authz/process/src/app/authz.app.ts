@@ -143,6 +143,11 @@ export class AuthzModule implements AuthzApi {
   /** Absent on an app built by {@link AuthzModule.fromServices}, which composes no migration. */
   #migration: SystemMigration | undefined;
   /**
+   * The permission service as built here, for the membership reads the contract's service does
+   * not declare; absent on an app built by {@link AuthzModule.fromServices}.
+   */
+  #memberships: AuthzPermissionService | undefined;
+  /**
    * Absent on an app built by {@link AuthzModule.fromServices}, which composes no version store.
    */
   #sessionVersions: AuthzSessionVersionService | undefined;
@@ -159,6 +164,7 @@ export class AuthzModule implements AuthzApi {
       demoProjectUserId?: string | undefined;
       admissions?: AuthzAdmissionService;
       migration?: SystemMigration;
+      memberships?: AuthzPermissionService;
       sessionVersions?: AuthzSessionVersionService;
       platformOperators?: AuthzPlatformOperatorsService;
       eventing?: Readonly<{
@@ -173,6 +179,7 @@ export class AuthzModule implements AuthzApi {
     this.#dispatcher = options.eventing?.dispatcher;
     this.#demoProjectId = options.demoProjectId;
     this.#demoProjectUserId = options.demoProjectUserId;
+    this.#memberships = options.memberships;
     this.#admissions = options.admissions;
     this.#migration = options.migration;
     this.#sessionVersions = options.sessionVersions;
@@ -268,6 +275,7 @@ export class AuthzModule implements AuthzApi {
       demoProjectUserId: serverConfig.demoProjectUserId,
       admissions: AuthzAdmissionService.create({ admissions: repositories.admissions }),
       migration,
+      memberships: permissions,
       sessionVersions,
       platformOperators,
       eventing: { pipeline, dispatcher },
@@ -397,6 +405,8 @@ export class AuthzModule implements AuthzApi {
   isOnEngine: AuthzApi["isOnEngine"] = (a) => this.#permissions.isOnEngine(a);
   findEngineCutoverAt: AuthzApi["findEngineCutoverAt"] = (a) =>
     this.#permissions.findEngineCutoverAt(a);
+  findActiveOrganizationAdministrators: AuthzApi["findActiveOrganizationAdministrators"] = (a) =>
+    this.memberships().findActiveOrganizationAdministrators(a);
   readPendingAdmission: AuthzApi["readPendingAdmission"] = (a) =>
     this.admissions().readPendingAdmission(a);
   completeAdmission: AuthzApi["completeAdmission"] = (a) => this.admissions().completeAdmission(a);
@@ -492,6 +502,16 @@ export class AuthzModule implements AuthzApi {
       );
     }
     return this.#platformOperators;
+  }
+
+  private memberships(): AuthzPermissionService {
+    if (!this.#memberships) {
+      throw new Error(
+        "This AuthzModule was composed from already-built services, so it holds no membership " +
+          "reads: compose it through AuthzModule.create to read an organization's administrators.",
+      );
+    }
+    return this.#memberships;
   }
 
   private admissions(): AuthzAdmissionService {
