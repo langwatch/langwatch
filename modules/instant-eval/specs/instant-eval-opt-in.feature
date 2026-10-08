@@ -18,7 +18,7 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
     admin can still switch hosted judging off in Settings, Connect;
   - a self-hosted install that is not released is told why in its own terms: its license does
     not include Instant Evals, an admin switched them off, it is not connected to LangWatch, or it
-    judges with its own key and its operator decides;
+    has judging turned off, since judging runs on LangWatch Cloud only, and its operator decides;
   - the operator's release flag stays as it was, and the flag, the license or the switch makes a
     project judgeable.
 
@@ -63,8 +63,8 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
       Then it may not
 
     @unit
-    Scenario: An install with its own judge key still waits for the release flag
-      Given a self-hosted install that judges with its own key, with the release flag off
+    Scenario: An install with judging turned off still waits for the release flag
+      Given a self-hosted install with judging turned off, with the release flag off
       When the project asks whether it may judge
       Then the license is not what releases it
 
@@ -75,7 +75,7 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
       Then an install whose license does not include Instant Evals, or that holds no license, is told its license does not include them
       And an install whose admin switched hosted judging off is told where to switch it back on
       And an install with Connect switched off, or that holds no credential to present, is told it is not connected to LangWatch
-      And an install that judges with its own key, or with judging turned off, is told to ask whoever runs it
+      And an install that has judging turned off is told to ask whoever runs it
 
     @integration
     Scenario: Each self-hosted refusal says what to do about it
@@ -84,7 +84,7 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
       Then a license without Instant Evals offers to contact us to add them
       And a switched-off organization names Settings, Connect, and offers no "Contact us"
       And an install that is not connected to LangWatch names connect.langwatch.ai and gateway.langwatch.ai and links "Read more"
-      And an install that judges with its own key offers no "Contact us"
+      And an install that has judging turned off offers no "Contact us"
 
     @integration
     Scenario: A judgement that fails on an install judging through LangWatch names the addresses it needs
@@ -155,4 +155,4 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
       Given an organization that is offered a word with us
       When a request tries to throw the switch anyway
       Then it is refused as not offered, and nothing is recorded
-      And the refusal says what turns Instant Evals on instead: the plan, or on a self-hosted install its license, or whoever runs it when it has its own judge key
+      And the refusal says what turns Instant Evals on instead: the plan, or on a self-hosted install its license, or whoever runs it when it has judging turned off

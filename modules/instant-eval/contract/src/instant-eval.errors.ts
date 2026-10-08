@@ -49,7 +49,7 @@ export class InstantEvalOptInNotOfferedError extends HandledError {
     super(
       "instant_eval_opt_in_not_offered",
       deployment === "self_hosted"
-        ? "A self-hosted install gets Instant Evals from its license, or from whoever runs it when it has its own judge key, never from this switch. Contact us to add them to your license."
+        ? "A self-hosted install gets Instant Evals from its license, or from whoever runs it when it has judging turned off, never from this switch. Contact us to add them to your license."
         : "LangWatch switches Instant Evals on for an enterprise plan. Contact us to get them.",
       {
         httpStatus: 403,

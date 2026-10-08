@@ -262,9 +262,9 @@ describe("given a self-hosted install that judges through LangWatch, with the re
   });
 });
 
-describe("given a self-hosted install that judges with its own key, with the release flag off", () => {
+describe("given a self-hosted install with judging turned off, with the release flag off", () => {
   describe("when the project asks whether it may judge", () => {
-    /** @scenario "An install with its own judge key still waits for the release flag" */
+    /** @scenario "An install with judging turned off still waits for the release flag" */
     it("is not released by the license", async () => {
       const access = InstantEvalAccessService.create({
         flags: { isEnabled: async () => false },

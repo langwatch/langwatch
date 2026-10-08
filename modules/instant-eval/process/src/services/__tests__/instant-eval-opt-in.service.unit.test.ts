@@ -123,13 +123,13 @@ describe("given a self-hosted install", () => {
 
   describe("when a request tries to throw the switch anyway", () => {
     /** @scenario "The server refuses a switch the popover did not offer" */
-    it("refuses it naming the license, or whoever runs an install with its own key", async () => {
+    it("refuses it naming the license, or whoever runs an install with judging turned off", async () => {
       const { optIns, recorded } = service({ isSaas: () => false });
       await expect(optIns.optIn(asked)).rejects.toMatchObject({
         code: "instant_eval_opt_in_not_offered",
         meta: { deployment: "self_hosted" },
         message:
-          "A self-hosted install gets Instant Evals from its license, or from whoever runs it when it has its own judge key, never from this switch. Contact us to add them to your license.",
+          "A self-hosted install gets Instant Evals from its license, or from whoever runs it when it has judging turned off, never from this switch. Contact us to add them to your license.",
       });
       expect(recorded).toEqual([]);
     });

@@ -42,8 +42,8 @@ export function instantEvalJudgeKind({
 }
 
 /**
- * Where the deployment's judge runs, as a refusal reads it (main #8416): `off`, its own key
- * (LangWatch Cloud's, or the deterministic stand-in), through LangWatch, or a Connect judge
+ * Where the deployment's judge runs, as a refusal reads it (main #8416): `off`, `own_key`
+ * (LangWatch Cloud's key, or the deterministic stand-in), through LangWatch, or a Connect judge
  * with Connect switched off for the deployment, which nothing can judge through.
  */
 export type InstantEvalJudgeRoute = "off" | "own_key" | "connect" | "disconnected";

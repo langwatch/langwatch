@@ -63,7 +63,7 @@ export class InstantEvalAccessService {
     projects: InstantEvalProjectReader;
     /**
      * A self-hosted install judging through LangWatch: there the license that names hosted
-     * judging, left on by an admin, releases them; an install's own key never does.
+     * judging, left on by an admin, releases them; an install with judging turned off never does.
      */
     judgesThroughConnect?: boolean;
     /** The organization's own switch, read only when the flag says no. */
