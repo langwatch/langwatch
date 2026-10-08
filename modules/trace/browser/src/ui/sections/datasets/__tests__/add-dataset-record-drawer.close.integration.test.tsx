@@ -1,4 +1,4 @@
-import type * as HostDrawer from "@langwatch/browser-host/use-drawer";
+import type * as HostDrawer from "@langwatch/browser-host/drawer";
 /**
  * Leaving the "Add to Dataset" drawer hands the reader back to the drawer it was opened
  * from.
@@ -63,7 +63,7 @@ vi.mock("../../../../behavior/use-local-storage-selected-dataset-id.ts", () => (
 }));
 
 // The real navigator, with the hop to dataset's editor recorded rather than taken.
-vi.mock("@langwatch/browser-host/use-drawer", async (importOriginal) => {
+vi.mock("@langwatch/browser-host/drawer", async (importOriginal) => {
   const actual = await importOriginal<typeof HostDrawer>();
   return {
     ...actual,
@@ -148,7 +148,7 @@ vi.mock("@langwatch/design-system/toaster", () => ({
   toaster: { create: vi.fn() },
 }));
 
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 
 import { useAnnotationQueueSessionStore } from "../../../../features/annotation/behavior/annotation-queue-session.store.ts";
 import { AddDatasetRecordDrawer } from "../add-dataset-record-drawer.tsx";

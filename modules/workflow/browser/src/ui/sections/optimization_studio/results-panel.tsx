@@ -1,4 +1,4 @@
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { ExternalImage } from "@langwatch/design-system/external-image";
 import { HStack, type StackProps } from "@langwatch/design-system/primitives";

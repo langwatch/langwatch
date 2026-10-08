@@ -35,7 +35,10 @@ vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => {
 
 vi.mock("@langwatch/browser-host/address", () => ({ useUiAddress: () => "/settings/api-keys" }));
 const drawer = { openDrawer: vi.fn() };
-vi.mock("@langwatch/browser-host/use-drawer", () => ({ useDrawer: () => drawer }));
+vi.mock("@langwatch/browser-host/drawer", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useDrawer: () => drawer,
+}));
 const graph = { organization: void 0, activeProject: void 0 };
 vi.mock("../api-key-organization-graph.ts", () => ({ useApiKeyOrganizationGraph: () => graph }));
 

@@ -1,4 +1,4 @@
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import type { TraceHeader } from "@langwatch/trace-contract";
 
 import { useFilterStore } from "../../../behavior/explorer.store.ts";

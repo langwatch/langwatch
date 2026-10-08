@@ -49,7 +49,8 @@ vi.mock("@tanstack/react-query", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   useQueryClient: () => ({ prefetchQuery: vi.fn() }),
 }));
-vi.mock("@langwatch/browser-host/use-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   useDrawer: () => ({
     openDrawer: harness.openDrawer,
     currentDrawer: null,

@@ -1,4 +1,4 @@
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import { scenarioClient } from "@langwatch/scenario-client";
 
 import { useIsReadOnlyTrace } from "../../../behavior/explorer/context/trace-viewer-context.tsx";

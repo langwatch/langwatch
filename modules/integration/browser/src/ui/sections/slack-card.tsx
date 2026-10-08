@@ -5,7 +5,7 @@
  */
 
 import { describeError } from "@langwatch/browser-host/errors";
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import {
   Alert,

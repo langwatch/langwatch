@@ -11,7 +11,7 @@ import {
 } from "@langwatch/browser-host/capabilities";
 import type { UiDrawerToken } from "@langwatch/browser-host/declarations";
 import { useLent, useLentAll } from "@langwatch/browser-host/lent";
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import { DirectorySummaryToken } from "@langwatch/enterprise-scim-client";
 import { AuthenticationOverviewCardToken } from "@langwatch/organization-client";
 import { ProjectSwitcherToken } from "@langwatch/project-client";

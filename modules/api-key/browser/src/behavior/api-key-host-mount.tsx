@@ -11,7 +11,7 @@ import {
   useUiScope,
 } from "@langwatch/browser-host/capabilities";
 import type { UiDrawerToken } from "@langwatch/browser-host/declarations";
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import { useMemo, type ReactNode } from "react";
 
 import {

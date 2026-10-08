@@ -2,9 +2,9 @@ import {
   readDrawerAncestors,
   readDrawerLocation,
   updateDrawerParams,
+  useDrawer,
   useDrawerRouter,
 } from "@langwatch/browser-host/drawer";
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { useCallback, useMemo } from "react";
 
 import {

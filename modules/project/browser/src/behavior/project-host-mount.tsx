@@ -6,7 +6,7 @@
 
 import { useUiCapabilities, useUiScope } from "@langwatch/browser-host/capabilities";
 import { useLent } from "@langwatch/browser-host/lent";
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import type { UiScopeHost } from "@langwatch/browser-host/use-organization-team-project";
 import { ProjectSwitcherToken } from "@langwatch/project-client";
 import type { ProjectSwitcherProps } from "@langwatch/project-contract";

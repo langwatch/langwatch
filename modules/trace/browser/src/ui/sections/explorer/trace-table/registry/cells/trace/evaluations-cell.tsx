@@ -1,4 +1,4 @@
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import { Badge, Box, HStack, Text } from "@langwatch/design-system/primitives";
 import type React from "react";
 import { useCallback, useLayoutEffect, useRef, useState } from "react";

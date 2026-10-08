@@ -71,7 +71,7 @@ vi.mock("../../hooks/use-trace-refresh.ts", () => ({
   useTraceRefresh: () => ({ refresh: vi.fn() }),
 }));
 
-const { getDrawerStack, useDrawer } = await import("@langwatch/browser-host/use-drawer");
+const { getDrawerStack, useDrawer } = await import("@langwatch/browser-host/drawer");
 const { getTraceDrawer } = await import("../../../../../behavior/trace-drawer.ts");
 const { useTraceDrawerScaffold } = await import("../use-trace-drawer-scaffold.ts");
 

@@ -21,7 +21,8 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("../annotation-api.ts", () => ({
   annotationApi: { organization: { getScopeGraph: { useQuery: () => ({ data: [] }) } } },
 }));
-vi.mock("@langwatch/browser-host/use-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   useDrawer: () => ({ openDrawer: () => void 0, drawerOpen: () => false }),
 }));
 

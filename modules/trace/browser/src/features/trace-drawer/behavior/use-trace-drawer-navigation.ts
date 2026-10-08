@@ -1,4 +1,4 @@
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import { useCallback } from "react";
 
 import { drawerChrome } from "../../../behavior/drawer-chrome.store.ts";

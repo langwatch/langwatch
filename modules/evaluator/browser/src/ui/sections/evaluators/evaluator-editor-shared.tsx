@@ -6,7 +6,7 @@ import {
   getFlowCallbacks,
   useDrawer,
   useDrawerParams,
-} from "@langwatch/browser-host/use-drawer";
+} from "@langwatch/browser-host/drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import {
   Box,

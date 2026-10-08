@@ -20,7 +20,8 @@ import { buildTracePlaceholderRows } from "../skeleton-placeholders.ts";
 
 const harness = vi.hoisted(() => ({ turns: [] as unknown[] }));
 
-vi.mock("@langwatch/browser-host/use-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   useDrawer: () => ({ openDrawer: vi.fn(), currentDrawer: null, closeDrawer: vi.fn() }),
   useDrawerParams: () => ({}),
 }));

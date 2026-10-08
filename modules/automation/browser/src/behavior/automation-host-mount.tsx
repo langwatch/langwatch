@@ -14,7 +14,7 @@ import {
   type UiSession,
 } from "@langwatch/browser-host/capabilities";
 import { resolveUiFailureCopy } from "@langwatch/browser-host/feedback";
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import type { UiScopeHost } from "@langwatch/browser-host/use-organization-team-project";
 import { AddOrEditDatasetRoutedDrawerToken } from "@langwatch/dataset-client";
 import type { DatasetColumns } from "@langwatch/dataset-contract";

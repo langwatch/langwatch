@@ -37,7 +37,8 @@ vi.mock("../../../../behavior/trace-api.ts", () => {
   return { api: { useUtils: () => ({ traces }) } };
 });
 
-vi.mock("@langwatch/browser-host/use-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   useDrawer: () => ({
     openDrawer: (name: string, params: unknown) =>
       seen.calls.push(`open ${name} ${JSON.stringify(params)}`),

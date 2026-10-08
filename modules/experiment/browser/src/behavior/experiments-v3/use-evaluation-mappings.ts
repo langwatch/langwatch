@@ -2,7 +2,7 @@
  * Hook for deriving mappings and sources in evaluations context.
  */
 
-import { setComplexProps, useDrawer, useDrawerParams } from "@langwatch/browser-host/use-drawer";
+import { setComplexProps, useDrawer, useDrawerParams } from "@langwatch/browser-host/drawer";
 import { PromptEditorDrawerToken } from "@langwatch/prompt-client";
 import {
   type AvailableSource,

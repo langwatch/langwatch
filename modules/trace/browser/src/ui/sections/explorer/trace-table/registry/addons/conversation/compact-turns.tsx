@@ -1,4 +1,4 @@
-import { useDrawer, useDrawerParams } from "@langwatch/browser-host/use-drawer";
+import { useDrawer, useDrawerParams } from "@langwatch/browser-host/drawer";
 import {
   formatCost,
   formatDuration,

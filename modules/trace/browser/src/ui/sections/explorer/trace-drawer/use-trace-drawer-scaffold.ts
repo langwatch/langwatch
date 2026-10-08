@@ -1,4 +1,4 @@
-import { getTopDrawer, useDrawer } from "@langwatch/browser-host/use-drawer";
+import { getTopDrawer, useDrawer } from "@langwatch/browser-host/drawer";
 import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { type RefObject, useCallback, useEffect, useMemo, useRef } from "react";
 

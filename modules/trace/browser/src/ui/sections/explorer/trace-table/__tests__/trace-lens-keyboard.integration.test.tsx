@@ -21,7 +21,8 @@ const host = vi.hoisted(() => ({
   openTrace: vi.fn(),
 }));
 
-vi.mock("@langwatch/browser-host/use-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   useDrawer: () => ({ closeDrawer: host.closeDrawer, currentDrawer: host.currentDrawer }),
   useDrawerParams: () => host.params,
 }));

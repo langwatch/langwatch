@@ -1,5 +1,5 @@
 import { Link } from "@langwatch/browser-host/link";
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import {
   Badge,
   Box,

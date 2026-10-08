@@ -12,7 +12,8 @@ import { describe, expect, it, vi } from "vitest";
 const closeDrawer = vi.fn();
 const created = vi.fn();
 
-vi.mock("@langwatch/browser-host/use-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   useDrawer: () => ({ closeDrawer }),
 }));
 

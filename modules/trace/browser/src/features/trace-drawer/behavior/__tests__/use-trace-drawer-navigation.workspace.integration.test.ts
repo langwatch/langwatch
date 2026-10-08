@@ -11,7 +11,8 @@ vi.mock("react-router", async (importOriginal) => ({
   ...(await import("../../../../__tests__/window-location-router.ts")).windowLocationRouter,
 }));
 
-vi.mock("@langwatch/browser-host/use-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   useDrawer: () => ({
     openDrawer: mocks.openDrawer,
     closeDrawer: vi.fn(),

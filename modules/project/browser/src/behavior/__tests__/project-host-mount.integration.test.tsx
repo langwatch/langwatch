@@ -71,7 +71,10 @@ vi.mock("../project-api.ts", () => ({
 }));
 
 const drawer = { openDrawer: vi.fn() };
-vi.mock("@langwatch/browser-host/use-drawer", () => ({ useDrawer: () => drawer }));
+vi.mock("@langwatch/browser-host/drawer", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useDrawer: () => drawer,
+}));
 
 import { useProjectHost } from "../../model/project-host.ts";
 import ProjectHostMount from "../project-host-mount.tsx";

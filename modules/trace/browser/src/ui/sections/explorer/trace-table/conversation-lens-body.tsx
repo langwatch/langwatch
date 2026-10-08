@@ -1,4 +1,4 @@
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import { Flex, Text } from "@langwatch/design-system/primitives";
 import {
   getCoreRowModel,

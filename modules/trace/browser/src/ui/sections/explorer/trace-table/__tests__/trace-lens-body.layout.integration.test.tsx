@@ -18,7 +18,8 @@ import { buildTracePlaceholderRows } from "../skeleton-placeholders.ts";
 import { TraceLensBody } from "../trace-lens-body.tsx";
 import { TraceTableLayout } from "../trace-table-layout.tsx";
 
-vi.mock("@langwatch/browser-host/use-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   useDrawer: () => ({ closeDrawer: vi.fn(), currentDrawer: null, openDrawer: vi.fn() }),
   useDrawerParams: () => ({}),
 }));

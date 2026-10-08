@@ -3,7 +3,7 @@
  * rule 7): the item's thread, or its trace as the only turn when it has none.
  */
 
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { CodeBlock } from "@langwatch/design-system/primitives";
 import { useShikiAdapter } from "@langwatch/design-system/shiki";

@@ -1,4 +1,4 @@
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import { AddOrEditDatasetRoutedDrawerToken, UploadCsvDrawerToken } from "@langwatch/dataset-client";
 import {
   datasetColumnsSchema,

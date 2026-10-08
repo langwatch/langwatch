@@ -1,5 +1,5 @@
 import { Link } from "@langwatch/browser-host/link";
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import { Kbd } from "@langwatch/design-system/kbd";
 import { Button, HStack, Icon, Text, VStack } from "@langwatch/design-system/primitives";
 import { nowInstant } from "@langwatch/time";
