@@ -5,7 +5,10 @@
  */
 
 import { MAX_LWQL_LENGTH } from "@langwatch/analytics-contract";
-import { dashboardWidgetSourceSchema } from "@langwatch/analytics-contract/dashboard-widget-definition";
+import {
+  dashboardWidgetQueryScopeSchema,
+  dashboardWidgetSourceSchema,
+} from "@langwatch/analytics-contract/dashboard-widget-definition";
 import { z } from "zod";
 
 /** The version this build writes, and the only one it reads. */
@@ -126,6 +129,7 @@ export const dashboardWidgetQuerySchema = z.object({
     ),
   sql: z.string().min(1).max(MAX_LWQL_LENGTH),
   parameters: z.array(queryParameterDeclarationSchema).max(MAX_PARAMETERS_PER_QUERY).optional(),
+  scope: dashboardWidgetQueryScopeSchema.optional(),
 });
 
 /**

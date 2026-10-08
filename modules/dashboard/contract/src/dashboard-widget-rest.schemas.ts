@@ -2,7 +2,10 @@
  * The dashboard-widget REST family's wire shapes. Bounds mirror
  * `DashboardWidgetDefinition` in `@langwatch/analytics-contract/dashboard-widget-definition`.
  */
-import { dashboardWidgetSourceSchema } from "@langwatch/analytics-contract/dashboard-widget-definition";
+import {
+  dashboardWidgetQueryScopeSchema,
+  dashboardWidgetSourceSchema,
+} from "@langwatch/analytics-contract/dashboard-widget-definition";
 import { z } from "zod";
 
 const MAX_WIDGET_NAME_LENGTH = 200;
@@ -35,6 +38,8 @@ const dashboardWidgetQuerySchema = z.object({
   name: z.string().min(1).max(MAX_QUERY_NAME_LENGTH).regex(QUERY_NAME_PATTERN),
   sql: z.string().min(1).max(MAX_QUERY_SQL_LENGTH),
   parameters: z.array(dashboardWidgetQueryParameterSchema).max(MAX_PARAMETERS_PER_QUERY).optional(),
+  /** "organization" runs the query once per project the member can read in its organization. */
+  scope: dashboardWidgetQueryScopeSchema.optional(),
 });
 
 const dashboardWidgetQueriesSchema = z

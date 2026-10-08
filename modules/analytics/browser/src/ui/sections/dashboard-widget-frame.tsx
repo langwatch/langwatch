@@ -77,11 +77,14 @@ export function DashboardWidgetFrameOverWindow({
   timeWindow,
   granularitySeconds,
   onAskLangyToSetUp,
+  onContentHeight,
 }: DashboardWidgetFrameProps & {
   readonly timeWindow: { start: number; end: number };
   readonly granularitySeconds?: LangWatchQLAcceptedGranularityStep;
   /** Drafts the step that sends a field no trace carries; absent, the setup view has no button. */
   readonly onAskLangyToSetUp?: (missing: { field: string; label: string }) => void;
+  /** The height the widget asks for, for a grid that sizes cards to their content. */
+  readonly onContentHeight?: (px: number) => void;
 }) {
   const { colorMode } = useColorMode();
   const refreshedAt = useDashboardRefreshedAt();
@@ -170,6 +173,7 @@ export function DashboardWidgetFrameOverWindow({
           onLog={onLog}
           onNavigate={onNavigate}
           maxHeight={maxHeight}
+          onContentHeight={onContentHeight}
         />
       </Box>
       {cover && (

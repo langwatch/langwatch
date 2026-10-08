@@ -115,6 +115,14 @@ const queryParameterDeclarationSchema = z
     }
   });
 
+/**
+ * Where a query runs: the board's project (the default), or once per project the member can
+ * read in its organization, each row tagged with its project. Every run is still one ordinary
+ * per-project query, so the server checks each project's permissions as it always does.
+ */
+export const dashboardWidgetQueryScopeSchema = z.enum(["project", "organization"]);
+export type DashboardWidgetQueryScope = z.infer<typeof dashboardWidgetQueryScopeSchema>;
+
 export const dashboardWidgetQuerySchema = z.object({
   name: z
     .string()
@@ -126,6 +134,7 @@ export const dashboardWidgetQuerySchema = z.object({
     ),
   sql: z.string().min(1).max(MAX_LWQL_LENGTH),
   parameters: z.array(queryParameterDeclarationSchema).max(MAX_PARAMETERS_PER_QUERY).optional(),
+  scope: dashboardWidgetQueryScopeSchema.optional(),
 });
 
 /**

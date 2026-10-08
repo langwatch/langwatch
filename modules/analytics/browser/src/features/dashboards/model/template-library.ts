@@ -183,6 +183,13 @@ export const TEMPLATE_LIBRARY: readonly LibraryTemplate[] = BOARD_TEMPLATES.flat
   return template && !isHidden(template) ? [libraryTemplate({ board, template })] : [];
 });
 
+/** A template's card even where the finder hides it: the org Flight deck is From LangWatch. */
+export function libraryCardOf(templateId: string): LibraryTemplate | undefined {
+  const board = BOARD_TEMPLATES.find(({ id }) => id === templateId);
+  const template = CATALOGUE_BY_ID.get(templateId);
+  return board && template ? libraryTemplate({ board, template }) : void 0;
+}
+
 /** The templates that can be made today; one still missing widget code is not offered. */
 const READY_TEMPLATES = TEMPLATE_LIBRARY.filter(({ board }) => board.comingSoon === void 0);
 

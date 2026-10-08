@@ -11,13 +11,14 @@ import {
   stackWidgets,
 } from "../catalogue/index.ts";
 import type { BoardTemplateWidget } from "../templates/index.ts";
-import { TEMPLATE_LIBRARY, type LibraryTemplate } from "./template-library.ts";
+import { libraryCardOf, type LibraryTemplate } from "./template-library.ts";
 
 /**
  * The one From LangWatch list, in order; every surface follows it (the sidebar group and
- * the empty board's cards). Release check, then "Can I trust my numbers?", then where it breaks.
+ * the empty board's cards). The org Flight deck, the release check, "Can I trust my numbers?",
+ * then where it breaks.
  */
-export const CURATED_TEMPLATE_IDS = ["release", "data", "breaks"] as const;
+export const CURATED_TEMPLATE_IDS = ["flight-deck", "release", "data", "breaks"] as const;
 
 /** What the From LangWatch group is, under its heading's (i); the prototype says the same. */
 export const FROM_LANGWATCH_ABOUT =
@@ -41,7 +42,7 @@ function curatedWidgets(template: CatalogueTemplate): BoardTemplateWidget[] {
 
 function curatedBoard(templateId: string): CuratedBoard[] {
   const template = CATALOGUE_TEMPLATES.find(({ id }) => id === templateId);
-  const card = TEMPLATE_LIBRARY.find(({ board }) => board.id === templateId);
+  const card = libraryCardOf(templateId);
   if (!template || !card) return [];
   return [
     {

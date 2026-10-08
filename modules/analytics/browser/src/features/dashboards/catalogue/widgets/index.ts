@@ -3,6 +3,8 @@
  * its named queries and its place on a board. A widget without an entry is coming soon.
  */
 
+import type { DashboardWidgetQueryScope } from "@langwatch/analytics-contract/dashboard-widget-definition";
+
 import * as deckChart from "../../templates/model/flight-deck-chart-widgets.ts";
 import * as deck from "../../templates/model/flight-deck-queries.ts";
 import * as deckTable from "../../templates/model/flight-deck-table-widgets.ts";
@@ -15,6 +17,7 @@ import { AGENT_KIND_WIDGET_BUILDS } from "./agent-kind-widgets.ts";
 import { ANSWERS_ASKS_WIDGET_BUILDS } from "./answers-asks-widgets.ts";
 import { BREAKS_RELEASE_WIDGET_BUILDS } from "./breaks-release-widgets.ts";
 import { FLIGHT_DECK_COSTS_BUILDS } from "./flight-deck-costs-widgets.ts";
+import { FLIGHT_DECK_ORG_BUILDS } from "./flight-deck-org-widgets.ts";
 import { trustWidgetBuilds } from "./trust-widgets.ts";
 
 /** One built widget: its code, its named queries and its place on a board. */
@@ -24,6 +27,8 @@ export interface CatalogueWidgetBuild {
   readonly width: "full" | "half";
   /** Board rows high: a chart is 6, a table 4, a strip of tiles 3. */
   readonly rows: number;
+  /** "organization": its queries run once per project the member can see (the Flight deck). */
+  readonly scope?: DashboardWidgetQueryScope;
 }
 
 const CHART = 6;
@@ -214,6 +219,7 @@ const BUILDS: Readonly<Record<string, CatalogueWidgetBuild>> = {
   ...ANSWERS_ASKS_WIDGET_BUILDS,
   ...BREAKS_RELEASE_WIDGET_BUILDS,
   ...FLIGHT_DECK_COSTS_BUILDS,
+  ...FLIGHT_DECK_ORG_BUILDS,
   ...AGENT_KIND_WIDGET_BUILDS,
 };
 

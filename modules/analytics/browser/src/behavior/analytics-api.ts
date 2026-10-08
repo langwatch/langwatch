@@ -29,6 +29,7 @@ import type { FilterField } from "../model/analytics-filter-definition.ts";
 import type { FilterParam } from "../model/analytics-filter-params.ts";
 import type { ChartGridPlacement } from "../model/chart-grid.ts";
 import type { LangWatchQLParameterValue } from "../model/lwql-request-state.ts";
+import type { ScopeGraphOrganization } from "../model/organization-query-fan-out.ts";
 
 /** Dashboard owns these wire schemas; WireOf maps persisted values to their wire representation. */
 type DashboardSummaryRow = WireOf<z.infer<typeof dashboardTrpcSummarySchema>>;
@@ -352,6 +353,10 @@ type BorrowedProcedures = {
         input: { isDemo?: boolean };
         output: unknown;
       };
+    };
+    /** What the member can reach; organization-scoped widgets fan out over its projects. */
+    getScopeGraph: {
+      query: { input: Record<string, never>; output: ScopeGraphOrganization[] };
     };
   };
   project: {

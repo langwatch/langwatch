@@ -464,6 +464,8 @@ export interface WidgetCodeSpec {
   readonly source?: WidgetSource;
   /** Recharts components the panel imports, if it draws a chart. */
   readonly recharts?: readonly string[];
+  /** React hooks the panel imports, if it keeps state such as a fold. */
+  readonly react?: readonly string[];
   /** Helper snippets from this file, in the order the widget reads them. */
   readonly parts: readonly string[];
   /** The widget's own components, after the helpers. */
@@ -478,9 +480,18 @@ export interface WidgetCodeSpec {
 /** The chart kit helpers a widget may call; each is imported only by the code that calls it. */
 const CHART_KIT_HELPERS = ["isLowerBound", "mergeBuckets"] as const;
 
-function importsOf({ recharts, code }: { recharts?: readonly string[]; code: string }): string {
+function importsOf({
+  recharts,
+  react,
+  code,
+}: {
+  recharts?: readonly string[];
+  react?: readonly string[];
+  code: string;
+}): string {
   const charts = CHART_KIT_HELPERS.filter((name) => code.includes(`${name}(`));
   return [
+    ...(react ? [`import { ${react.join(", ")} } from "react";`] : []),
     ...(recharts ? [`import { ${recharts.join(", ")} } from "recharts";`] : []),
     ...(charts.length > 0 ? [`import { ${charts.join(", ")} } from "@langwatch/charts";`] : []),
   ]
@@ -494,6 +505,7 @@ export function widgetCode({
   subtitle,
   source,
   recharts,
+  react,
   parts,
   components,
   queries,
@@ -509,7 +521,7 @@ export function widgetCode({
     `export default function Widget() {\n${queryStatesCode(queries)}\n${body}\n}`,
   ];
   const code = sections.join("\n\n");
-  const imports = importsOf({ recharts, code });
+  const imports = importsOf({ recharts, react, code });
   const tsx = `// ${summary}\n${imports}${imports ? "\n" : ""}${code}\n`;
   return { tsx, ...(source ? { source } : {}), description: subtitle };
 }

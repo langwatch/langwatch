@@ -498,6 +498,21 @@ const AUTHORED_TEMPLATES: readonly AuthoredTemplate[] = [
       'Write a short report on my "Outputs users keep" dashboard for the dashboard period. See whether users keep what my agent writes. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) At which step do users drop what my agent wrote? (2) How does my agent do for each of my customers? (3) Did my last change break my agent for any customer? (4) Which of my customers or teams cost the most? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
   },
   {
+    id: "flight-deck",
+    name: "Flight deck",
+    job: "What needs me now across every project, and is every agent running as it normally does?",
+    personas: ["leader", "ops", "eng"],
+    trunk: "Grow",
+    origin: "prototype",
+    scope: "org",
+    isDefault: false,
+    widgets: ["fd-org-attention", "fd-org-agents", "fd-org-quality", "fd-org-behaviour", "fd-org-value"],
+    byAgentKind: {},
+    preloadFor: [],
+    reportPrompt:
+      'Write a short report on my "Flight deck" dashboard for the dashboard period. What needs me now across every project, and is every agent running as it normally does? For each of these, answer in one or two sentences with the real numbers from LangWatchQL, project by project: (1) Needs attention (2) Agents at a glance (3) Quality (4) Behaviour (5) Value. Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
+  },
+  {
     id: "org",
     name: "LangWatch at a glance",
     job: "See every agent, team and AI tool across my whole org.",
@@ -701,13 +716,6 @@ function focusTemplates({ byAgentKind, ...base }: AuthoredTemplate): CatalogueTe
   );
 }
 
-/** Every template, each base followed by its focus templates. */
-export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = AUTHORED_TEMPLATES.flatMap(
-  (template) => [baseTemplate(template), ...focusTemplates(template)],
-).map((template) => ({
-  ...template,
-  reportPrompt: `${template.reportPrompt} ${setupCheckFor(template.widgets)}`,
-}));
 const REQUIREMENTS = new Map(DATA_REQUIREMENTS.map((need) => [need.key, need] as const));
 const WIDGET_NEEDS = new Map(CATALOGUE_WIDGETS.map(({ id, requirements }) => [id, requirements]));
 
@@ -749,3 +757,11 @@ function setupCheckFor(widgets: readonly string[]): string {
     "and offer to help me set up each piece.",
   ].join(" ");
 }
+
+/** Every template, each base followed by its focus templates. */
+export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = AUTHORED_TEMPLATES.flatMap(
+  (template) => [baseTemplate(template), ...focusTemplates(template)],
+).map((template) => ({
+  ...template,
+  reportPrompt: `${template.reportPrompt} ${setupCheckFor(template.widgets)}`,
+}));

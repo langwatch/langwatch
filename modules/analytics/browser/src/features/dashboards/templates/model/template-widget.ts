@@ -4,6 +4,8 @@
  * source to set up, and the full-width and half-width places on the chart grid.
  */
 
+import type { DashboardWidgetQueryScope } from "@langwatch/analytics-contract/dashboard-widget-definition";
+
 import { CHART_GRID_COLUMNS } from "../../../../model/chart-grid.ts";
 import {
   DASHBOARD_WIDGET_DEFINITION_VERSION,
@@ -16,15 +18,23 @@ import type { WidgetCode } from "./widget-code-parts.ts";
 export function definition({
   code,
   queries,
+  scope,
 }: {
   code: WidgetCode;
   queries: Readonly<Record<string, string>>;
+  /** "organization" runs every query once per project the member can see. */
+  scope?: DashboardWidgetQueryScope;
 }): DashboardWidgetDefinition {
   const all = code.source ? { ...queries, present: PRESENCE_SQL[code.source] } : queries;
   return {
     version: DASHBOARD_WIDGET_DEFINITION_VERSION,
     code: code.tsx,
-    queries: Object.entries(all).map(([name, text]) => ({ name, sql: text, parameters: [] })),
+    queries: Object.entries(all).map(([name, text]) => ({
+      name,
+      sql: text,
+      parameters: [],
+      ...(scope ? { scope } : {}),
+    })),
     description: code.description,
   };
 }

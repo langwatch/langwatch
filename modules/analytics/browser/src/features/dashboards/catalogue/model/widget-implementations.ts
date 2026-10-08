@@ -48,7 +48,7 @@ export function implementedWidget(id: string): BoardTemplateWidget | undefined {
     key: id,
     name: widget.question,
     definition: {
-      ...definition({ code: build.code, queries: build.queries }),
+      ...definition({ code: build.code, queries: build.queries, scope: build.scope }),
       description: descriptionOf({ subtitle: build.code.description, why: widget.why }),
       prompt: promptFor(widget),
     },

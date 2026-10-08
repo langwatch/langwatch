@@ -13,13 +13,19 @@ import {
   sampleNote,
   type WidgetCompleteness,
 } from "../../../../model/dashboard-widget/widget-completeness.ts";
-import { boardCardHeightPx } from "../../model/board-grid.ts";
+import { BOARD_MIN_ROW_SPAN, boardCardHeightPx } from "../../model/board-grid.ts";
 import { WidgetInfoTip } from "./widget-info-tip.tsx";
 
 /** The title row's height: its top padding and one 24px row of controls. */
 const HEADER_HEIGHT_PX = 34;
 /** The room the title row, the body's bottom padding and the border take from a card. */
 const CARD_CHROME_PX = HEADER_HEIGHT_PX + 8 + 2;
+
+/** The fewest board rows whose card body holds `px` of content. */
+export function rowSpanForBodyHeightPx(px: number): number {
+  const step = boardCardHeightPx(2) - boardCardHeightPx(1);
+  return Math.max(BOARD_MIN_ROW_SPAN, Math.ceil((px + CARD_CHROME_PX - boardCardHeightPx(1)) / step) + 1);
+}
 
 /** The height a card's body may take at `rowSpan` board rows. */
 export function widgetBodyHeightPx(rowSpan: number): number {
@@ -34,7 +40,7 @@ export function WidgetCardShell({
 }: {
   name: string;
   description?: string;
-  /** Absent on a read-only board. */
+  /** Absent when the widget offers no action, as on a read-only board without Langy. */
   controls?: ReactNode;
   children: ReactNode;
 }) {

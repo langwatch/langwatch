@@ -1,7 +1,7 @@
 /**
  * Resolves an `LW.navigate(target, params)` call from a sandboxed, semi-trusted chart frame
- * into a real page navigation. `projectId` always comes from host context, never the frame's
- * params, so a widget cannot navigate into a different project's traces.
+ * into a real page navigation. The project is the board's, or a `project` slug the member can
+ * already see in this organization (organization-scoped widgets); any other slug is refused.
  */
 
 import {
@@ -13,6 +13,8 @@ import { escapeValue, SEARCH_FIELDS } from "@langwatch/trace-contract";
 import { useCallback } from "react";
 
 import { useAnalyticsHost } from "../model/analytics-host.ts";
+import { projectsOfOrganization } from "../model/organization-query-fan-out.ts";
+import { analyticsApi } from "./analytics-api.ts";
 
 /** The Explorer's default lens — the one an unfiltered explorer opens on. */
 const TRACE_EXPLORER_LENS = "all-traces";
@@ -71,7 +73,7 @@ function buildClause({ field, value }: { field: string; value: string | string[]
 function buildLiqeQuery(params: Readonly<Record<string, unknown>>): string {
   const clauses: string[] = [];
   for (const [key, value] of Object.entries(params)) {
-    if (key === "projectId" || key === "startDate" || key === "endDate") {
+    if (key === "projectId" || key === "project" || key === "startDate" || key === "endDate") {
       continue;
     }
 
@@ -157,6 +159,34 @@ export function useDashboardWidgetChartNavigate(
   projectSlug: string,
 ): (args: { target: string; params: Readonly<Record<string, unknown>> }) => void {
   const host = useAnalyticsHost();
+  const utils = analyticsApi.useUtils();
+
+  const go = useCallback(
+    ({
+      target,
+      params,
+      slug,
+    }: {
+      target: NavigableTarget;
+      params: Readonly<Record<string, unknown>>;
+      slug: string;
+    }) => {
+      if (target === "trace") {
+        const traceId = params.traceId;
+        if (typeof traceId !== "string" || !traceId) return;
+        host.navigate(`/${slug}/traces/${encodeURIComponent(traceId)}`);
+        return;
+      }
+
+      if (target === "traces") {
+        host.navigate(`/${slug}/traces#${buildTracesFragment(params)}`);
+        return;
+      }
+
+      host.navigate(PAGE_PATHS[target](slug));
+    },
+    [host],
+  );
 
   return useCallback(
     ({ target, params }: { target: string; params: Readonly<Record<string, unknown>> }) => {
@@ -164,21 +194,18 @@ export function useDashboardWidgetChartNavigate(
         console.warn("[playground] blocked navigate target: " + target);
         return;
       }
-
-      if (target === "trace") {
-        const traceId = params.traceId;
-        if (typeof traceId !== "string" || !traceId) return;
-        host.navigate(`/${projectSlug}/traces/${encodeURIComponent(traceId)}`);
+      const other = params.project;
+      if (typeof other !== "string" || other === projectSlug) {
+        go({ target, params, slug: projectSlug });
         return;
       }
-
-      if (target === "traces") {
-        host.navigate(`/${projectSlug}/traces#${buildTracesFragment(params)}`);
-        return;
-      }
-
-      host.navigate(PAGE_PATHS[target](projectSlug));
+      void utils.organization.getScopeGraph.fetch({}).then((graph) => {
+        const projects = projectsOfOrganization({ graph, organizationId: host.organizationId() });
+        if (projects.some(({ slug }) => slug === other)) {
+          go({ target, params, slug: other });
+        } else console.warn("[playground] blocked navigate project: " + other);
+      });
     },
-    [host, projectSlug],
+    [go, host, utils, projectSlug],
   );
 }

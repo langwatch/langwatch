@@ -24,9 +24,26 @@ import {
   validateDashboardWidgetQueryParams,
 } from "../model/dashboard-widget-definition.ts";
 import type { LangWatchQLParameterValue } from "../model/lwql-request-state.ts";
+import {
+  createConcurrencyLimit,
+  createRunShare,
+  FAN_OUT_CONCURRENCY,
+  FAN_OUT_REUSE_MS,
+  mergeProjectRuns,
+  projectsOfOrganization,
+  type ProjectRun,
+} from "../model/organization-query-fan-out.ts";
+import { useAnalyticsHost } from "../model/analytics-host.ts";
 import { analyticsApi } from "./analytics-api.ts";
 import type { ChartFrameExecuteQuery } from "./frame-bridge.ts";
 import { createLangWatchQLExecute } from "./lwql-execute.ts";
+
+/** One lane for every organization-scoped widget on the page, so a board never floods the API. */
+const fanOutLimit = createConcurrencyLimit(FAN_OUT_CONCURRENCY);
+const fanOutShare = createRunShare({
+  reuseMs: FAN_OUT_REUSE_MS,
+  now: () => nowInstant().epochMilliseconds,
+});
 
 /** Widgets run against the last 24 hours at an hourly step — no toolbar. */
 const DEFAULT_GRANULARITY: LangWatchQLGranularityStep = 3600;
@@ -64,6 +81,7 @@ export function useDashboardWidgetExecutor(
   overrides?: DashboardWidgetExecutorOverrides,
 ) {
   const utils = analyticsApi.useUtils();
+  const organizationId = useAnalyticsHost().organizationId();
   // The playground editor has no period control, so it defaults to a fixed
   // window computed once at mount; a dashboard card passes its own via
   // `overrides.timeWindow` instead, tracking the grid's period control.
@@ -90,12 +108,55 @@ export function useDashboardWidgetExecutor(
     setLastRuns((prev) => ({ ...prev, [name]: run }));
   }, []);
 
-  const runValidated = useCallback(
+  const runAcrossOrganization = useCallback(
     async (
       query: Pick<DashboardWidgetQuery, "sql">,
       params: Readonly<Record<string, LangWatchQLParameterValue>>,
+    ): Promise<ChartQueryResult> => {
+      const graph = await utils.organization.getScopeGraph.fetch({});
+      const projects = projectsOfOrganization({ graph, organizationId });
+      const request = {
+        sql: query.sql,
+        parameters: params,
+        timeWindow: pageWindow,
+        granularitySeconds,
+      };
+      const key = JSON.stringify(request);
+      const runs = await Promise.all(
+        projects.map(async (project): Promise<ProjectRun> => {
+          const run = () =>
+            fanOutLimit(async () => {
+              const executeForProject = createLangWatchQLExecute({
+                transport: {
+                  mutate: (input, options) => utils.client.analytics.lwql.query.mutate(input, options),
+                },
+                projectId: project.id,
+              });
+              // Shared by every widget asking the same, so one widget leaving cannot abort it.
+              const result = await executeForProject(request, {
+                signal: new AbortController().signal,
+              });
+              return toChartQueryResult(result);
+            });
+          try {
+            return { project, ok: true, result: await fanOutShare(`${project.id}:${key}`, run) };
+          } catch (error) {
+            return { project, ok: false, error: toChartQueryError(error) };
+          }
+        }),
+      );
+      return mergeProjectRuns(runs);
+    },
+    [utils, organizationId, pageWindow, granularitySeconds],
+  );
+
+  const runValidated = useCallback(
+    async (
+      query: Pick<DashboardWidgetQuery, "sql" | "scope">,
+      params: Readonly<Record<string, LangWatchQLParameterValue>>,
       signal?: AbortSignal,
     ): Promise<ChartQueryResult> => {
+      if (query.scope === "organization") return runAcrossOrganization(query, params);
       const result = await execute(
         {
           sql: query.sql,
@@ -109,7 +170,7 @@ export function useDashboardWidgetExecutor(
       );
       return toChartQueryResult(result);
     },
-    [execute, pageWindow, granularitySeconds],
+    [execute, runAcrossOrganization, pageWindow, granularitySeconds],
   );
 
   const executeQuery: ChartFrameExecuteQuery = useCallback(

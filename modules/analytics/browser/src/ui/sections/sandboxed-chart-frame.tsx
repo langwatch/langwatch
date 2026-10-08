@@ -51,6 +51,8 @@ export interface SandboxedChartFrameProps {
    * card gives the chart more room without lifting the bridge's own clamp.
    */
   maxHeight?: number;
+  /** Hears the height a widget asks for with LW.setHeight, so a read-only card can fit it. */
+  onContentHeight?: (px: number) => void;
 }
 
 // One component wiring the iframe, bridge lifecycle, and render states together.
@@ -63,6 +65,7 @@ export function SandboxedChartFrame({
   onLog,
   onNavigate,
   maxHeight = CHART_FRAME_MAX_HEIGHT_PX,
+  onContentHeight,
 }: SandboxedChartFrameProps) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const [generation, setGeneration] = useState(0);
@@ -100,6 +103,8 @@ export function SandboxedChartFrame({
   onLogRef.current = onLog;
   const onNavigateRef = useRef(onNavigate);
   onNavigateRef.current = onNavigate;
+  const onContentHeightRef = useRef(onContentHeight);
+  onContentHeightRef.current = onContentHeight;
   const dashboardContextRef = useRef(dashboardContext);
   dashboardContextRef.current = dashboardContext;
   const { theme } = dashboardContext;
@@ -120,7 +125,10 @@ export function SandboxedChartFrame({
       params: paramsRef.current,
       source: codeRef.current,
       onLog: (entry) => onLogRef.current(entry),
-      onHeightChange: setHeight,
+      onHeightChange: (px) => {
+        setHeight(px);
+        onContentHeightRef.current?.(px);
+      },
       onNavigate: (args) => onNavigateRef.current?.(args),
       onTeardown: noteTornDown,
     });
