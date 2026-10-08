@@ -15,3 +15,4 @@ export * from "./dataset-record.trpc.ts";
 export * from "./batch-evaluation.schemas.ts";
 export * from "./trace-mapping.ts";
 export * from "./evaluator-mappings.ts";
+export * from "./dataset.config.ts";

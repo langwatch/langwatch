@@ -1,4 +1,3 @@
-import { Config, type ConfigOf, publicBaseUrl } from "@langwatch/config";
 import { moduleApi } from "@langwatch/module";
 import { z } from "zod";
 
@@ -101,8 +100,3 @@ export interface PlatformHealthApi {
 }
 
 export const PlatformHealthApi = moduleApi<PlatformHealthApi>()("platform-health");
-
-/** Platform health's settings: only the shared deployment origin its report links are built on. */
-export const platformHealthConfig = Config.define(() => ({ publicBaseUrl }));
-
-export type PlatformHealthServerConfig = ConfigOf<typeof platformHealthConfig>;
