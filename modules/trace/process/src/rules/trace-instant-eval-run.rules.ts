@@ -1,6 +1,6 @@
 /**
  * A checked Instant Eval run as the Explorer's filter compiler binds it. Pure;
- * the peer call itself is the service's.
+ * the shared-table read itself is the service's.
  */
 import type { InstantEvalRunWindow } from "@langwatch/instant-eval-contract";
 import type { ResolvedInstantEvalRun } from "@langwatch/trace-contract";

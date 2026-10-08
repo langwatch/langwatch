@@ -25,6 +25,7 @@ import { MemoryTraceEditOverlayRepository } from "./memory.trace-edit-overlay.re
 import { MemoryTraceExistenceRepository } from "./memory.trace-existence.repository.ts";
 import { MemoryTraceExportSlotRepository } from "./memory.trace-export-slot.repository.ts";
 import { MemoryTraceIngestSourceBillingRepository } from "./memory.trace-ingest-source-billing.repository.ts";
+import { MemoryTraceInstantEvalRunsRepository } from "./memory.trace-instant-eval-runs.repository.ts";
 import { MemoryTraceModelSpendRepository } from "./memory.trace-model-spend.repository.ts";
 import { MemoryTraceRateLimitRepository } from "./memory.trace-rate-limit.repository.ts";
 import { MemoryTraceSpanDedupRepository } from "./memory.trace-span-dedup.repository.ts";
@@ -120,6 +121,7 @@ export class MemoryTraceRepositories {
       // empty rather than pretending to hold logs.
       logRecords: new NullLogRecordStorageRepository(),
       topicNames: MemoryTraceTopicNamesRepository.create(),
+      instantEvalRuns: MemoryTraceInstantEvalRunsRepository.create(),
       annotations: MemoryTraceAnnotationsRepository.create(),
       annotationScores: MemoryTraceAnnotationScoresRepository.create(),
       // The list and the session rollup are ClickHouse aggregations over the

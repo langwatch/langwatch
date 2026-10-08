@@ -289,6 +289,7 @@ describe("ClickHouse ownership records", () => {
         "evaluation_runs",
         "gateway_spend",
         "log_records",
+        "instant_eval_runs",
       ]);
     });
   });

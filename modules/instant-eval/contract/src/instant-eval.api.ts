@@ -180,16 +180,6 @@ export interface InstantEvalApi {
   }): Promise<InstantEvalRunProgress[]>;
 
   /**
-   * The runs a reader named, dated, so a judgement read can be bounded by the
-   * window each was written in. Lenient like {@link findRunProgress}: a run
-   * this project does not own is dropped rather than refused.
-   */
-  findRunWindows(input: {
-    projectId: string;
-    references: readonly InstantEvalRunReference[];
-  }): Promise<InstantEvalRunWindow[]>;
-
-  /**
    * One classification of a peer's own text rather than a run's rows, which is
    * how the trace search bar routes a sentence. A judge that cannot answer
    * skips, so the caller falls back instead of failing the read.

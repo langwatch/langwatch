@@ -20,8 +20,6 @@ import {
   type InstantEvalSampleWire,
   type InstantEvalRunProgress,
   type InstantEvalUsageCount,
-  type InstantEvalRunReference,
-  type InstantEvalRunWindow,
   type InstantEvalRunWire,
   type InstantEvalServerConfig,
   instantEvalConfig,
@@ -681,13 +679,6 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
     runIds: readonly string[];
   }): Promise<InstantEvalRunProgress[]> {
     return this.reads.findRunProgress(input);
-  }
-
-  async findRunWindows(input: {
-    projectId: string;
-    references: readonly InstantEvalRunReference[];
-  }): Promise<InstantEvalRunWindow[]> {
-    return this.reads.findRunWindows(input);
   }
 
   async classify(input: {

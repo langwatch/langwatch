@@ -187,6 +187,13 @@ export const DECLARED_OWNERSHIP: DeclaredOwnership = {
       reason:
         "trace's log read and session groups select over log's records, never a copy (R40, 2026-10-07)",
     },
+    {
+      table: "instant_eval_runs",
+      owner: "instant-eval",
+      readers: ["trace"],
+      reason:
+        "trace dates the runs an Explorer eval chip claims from instant-eval's runs, not an InstantEvalApi call (R40; round 47, 2026-10-08)",
+    },
   ],
 };
 
@@ -483,7 +490,21 @@ function insertedTable(reader: Reader, node: ts.CallExpression): string | undefi
   const value = property.initializer;
   if (ts.isStringLiteralLike(value)) return value.text;
 
+  if (ts.isTemplateExpression(value)) return qualifiedConstant(reader, value);
+
   return ts.isIdentifier(value) ? reader.constant(value.text) : void 0;
+}
+
+/** `${database}.${CONSTANT}`: the table is the declared constant after the database dot. */
+function qualifiedConstant(reader: Reader, template: ts.TemplateExpression): string | undefined {
+  const spans = template.templateSpans;
+  const last = spans[spans.length - 1];
+  if (!last || spans.length < 2 || last.literal.text !== "") return void 0;
+
+  if (!ts.isIdentifier(last.expression)) return void 0;
+
+  const before = spans[spans.length - 2]?.literal.text;
+  return before === "." ? reader.constant(last.expression.text) : void 0;
 }
 
 function readFile({

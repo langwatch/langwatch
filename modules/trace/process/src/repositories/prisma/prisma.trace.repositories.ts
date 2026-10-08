@@ -12,6 +12,7 @@ import { SpanStorageClickHouseRepository } from "../clickhouse/span-storage.repo
 import { TraceAnalyticsRollupClickHouseRepository } from "../clickhouse/trace-analytics-rollup.repository.ts";
 import { TraceDerivationSpanClickHouseRepository } from "../clickhouse/trace-derivation-span.repository.ts";
 import { ClickHouseTraceExistenceRepository } from "../clickhouse/trace-existence.repository.ts";
+import { ClickHouseTraceInstantEvalRunsRepository } from "../clickhouse/trace-instant-eval-runs.repository.ts";
 import { TraceListClickHouseRepository } from "../clickhouse/trace-list.repository.ts";
 import { TraceAnalyticsClickHouseRepository } from "../clickhouse/trace-metrics-analytics.repository.ts";
 import {
@@ -69,6 +70,9 @@ export class PostgresTraceRepositories {
       summary: TraceSummaryClickHouseRepository.create(storage),
       logRecords: LogRecordStorageClickHouseRepository.create(traceClickHouse),
       topicNames: PrismaTraceTopicNamesRepository.create({ prisma: members.prisma }),
+      instantEvalRuns: ClickHouseTraceInstantEvalRunsRepository.create({
+        resolveClient: traceClickHouse,
+      }),
       annotations: PrismaTraceAnnotationsRepository.create({ prisma: members.prisma }),
       annotationScores: PrismaTraceAnnotationScoresRepository.create({ prisma: members.prisma }),
       list: TraceListClickHouseRepository.create(traceClickHouse),

@@ -247,6 +247,26 @@ Feature: Instant Evals inside the Trace Explorer
       And a run the project does not own leaves its chip pending, selecting no rows
 
     @unit
+    Scenario: A claimed run is dated from the run table instant-eval shares with trace
+      Given instant-eval recorded a run for the project, accepted at 10:00 and finished at 11:00
+      When an Explorer read checks the chip that claims it
+      Then trace reads the run from instant-eval's run table, shared with it for reading, without calling instant-eval
+      And the window opens an hour before acceptance and closes an hour after the finish, for the writers' clock skew
+      And the resolved run keeps the chip's own question and target
+
+    @unit
+    Scenario: A claimed run still judging is dated up to the read
+      Given a claimed run instant-eval has not finished
+      When an Explorer read checks the claim
+      Then the window closes an hour after the read
+
+    @unit
+    Scenario: A claimed run another project recorded is not dated
+      Given a chip claiming a run instant-eval recorded for another project
+      When an Explorer read checks the claim
+      Then no window is answered for it, so the chip stays pending
+
+    @unit
     Scenario: The eval field cannot be evaluated in memory
       Given a trigger evaluating a saved query with a forcing eval chip
       When the field is evaluated against a trace in memory

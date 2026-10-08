@@ -17,6 +17,7 @@ import type { TraceEditOverlayRepository } from "./trace-edit-overlay.repository
 import type { TraceExistenceRepository } from "./trace-existence.repository.ts";
 import type { TraceExportSlotRepository } from "./trace-export-slot.repository.ts";
 import type { TraceIngestSourceBillingRepository } from "./trace-ingest-source-billing.repository.ts";
+import type { TraceInstantEvalRunsReadRepository } from "./trace-instant-eval-runs.repository.ts";
 import type { TraceModelSpendRepository } from "./trace-model-spend.repository.ts";
 import type { TracePayloadReaderRepository } from "./trace-payload-reader.repository.ts";
 import type { TraceRateLimitRepository } from "./trace-rate-limit.repository.ts";
@@ -49,6 +50,8 @@ export interface TraceRepositories {
   readonly logRecords: LogRecordStorageRepository;
   /** Topic's names read through topic's shared table; the list labels topic facets from it. */
   readonly topicNames: TraceTopicNamesReadRepository;
+  /** Instant-eval's runs, read through its shared table to date an Explorer eval chip. */
+  readonly instantEvalRuns: TraceInstantEvalRunsReadRepository;
   /** Annotation's rows and score names, read through its shared tables for the legacy read. */
   readonly annotations: TraceAnnotationsReadRepository;
   readonly annotationScores: TraceAnnotationScoresReadRepository;

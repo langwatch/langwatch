@@ -679,11 +679,12 @@ export interface TraceAppDependencies {
   spanCostSuggestions: TraceSpanCostSuggestion;
   evaluations: EvaluationApi;
   /**
-   * The Instant Eval peer the Explorer's judged searches run through. Absent
-   * on a process that composed Trace without it, and then the four Explorer
-   * operations refuse by name rather than answering an empty run.
+   * The Instant Eval peer the search router classifies a sentence and reads
+   * the release through. Absent, the router decides with the model alone.
    */
-  instantEvals?: InstantEvalApi;
+  instantEvals?: Pick<InstantEvalApi, "classify" | "isReleased">;
+  /** Dates eval chips' runs from instant-eval's shared table; absent, chips stay pending. */
+  explorerEvalRuns?: TraceInstantEvalRunService;
   /** The AI search composer's model seam; absent, the three AI operations refuse by name. */
   models?: Pick<ModelProviderApi, "generateText" | "generateStructured">;
   presence?: PresenceApi;
@@ -795,7 +796,7 @@ type TraceReaderCompositionOptions = {
    */
   ingestCodingAgents?: CodingAgentIngestFilter | undefined;
   evaluations: TraceAppDependencies["evaluations"];
-  /** The Instant Eval peer the Explorer's judged searches run through. */
+  /** The Instant Eval peer the search router classifies a sentence through. */
   instantEvals?: TraceAppDependencies["instantEvals"];
   storedObjects: TraceAppDependencies["storedObjects"];
   /**
@@ -1107,6 +1108,9 @@ export class TraceModule implements TraceApi, CollectorApp {
       }),
       evaluations: options.evaluations,
       ...(options.instantEvals ? { instantEvals: options.instantEvals } : {}),
+      explorerEvalRuns: TraceInstantEvalRunService.create({
+        runs: options.repositories.instantEvalRuns,
+      }),
       storedObjects: options.storedObjects,
       ...(options.presence ? { presence: options.presence } : {}),
       share: options.share,
@@ -1301,9 +1305,7 @@ export class TraceModule implements TraceApi, CollectorApp {
             mappers: traceReadMapperPorts,
           })
         : null;
-    this.#explorerEvals = dependencies.instantEvals
-      ? TraceInstantEvalRunService.create({ instantEvals: dependencies.instantEvals })
-      : null;
+    this.#explorerEvals = dependencies.explorerEvalRuns ?? null;
     const ai = dependencies.models
       ? TraceAiQueryService.create({ models: dependencies.models, facets: this })
       : null;
@@ -1343,9 +1345,9 @@ export class TraceModule implements TraceApi, CollectorApp {
   }
 
   /**
-   * The runs a query's `eval` chips claim, checked against the project. A
-   * process composed without the Instant Eval peer can check none, so every
-   * chip stays pending and the read answers what the rest of the query selects.
+   * The runs a query's `eval` chips claim, checked against the project
+   * through instant-eval's shared run table. A claim the project did not
+   * record stays pending, and the read answers what the rest selects.
    */
   async findExplorerEvalRuns(input: {
     projectId: string;

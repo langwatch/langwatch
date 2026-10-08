@@ -4,6 +4,8 @@
  * @see modules/instant-eval/specs/instant-eval-api.feature
  */
 
+import type { Instant } from "@langwatch/time";
+
 /** Rows a run judges when the caller asks for no particular number. */
 export const INSTANT_EVAL_DEFAULT_ROW_CAP = 10_000;
 
@@ -67,4 +69,22 @@ export type InstantEvalRunStatus = (typeof INSTANT_EVAL_RUN_STATUSES)[number];
 /** Whether the run is still judging, so a client keeps polling. */
 export function isInstantEvalRunActive(status: InstantEvalRunStatus): boolean {
   return status === "queued" || status === "planning" || status === "running";
+}
+
+/**
+ * How far past its last write a run's judgements may still land, and how far
+ * before its acceptance one could have been written: clock skew between the
+ * service that accepted the run and the worker that judged it.
+ */
+const INSTANT_EVAL_WRITE_SKEW_HOURS = 1;
+
+/** A run's written window for a reader of writes another process made, widened by that skew. */
+export function instantEvalSkewedWrittenWindow(
+  row: Readonly<{ createdAt: Instant; finishedAt: Instant | null }>,
+  now: Instant,
+): { readonly writtenFrom: Instant; readonly writtenUntil: Instant } {
+  return {
+    writtenFrom: row.createdAt.subtract({ hours: INSTANT_EVAL_WRITE_SKEW_HOURS }),
+    writtenUntil: (row.finishedAt ?? now).add({ hours: INSTANT_EVAL_WRITE_SKEW_HOURS }),
+  };
 }
