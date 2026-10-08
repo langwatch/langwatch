@@ -40,6 +40,14 @@ Feature: SCIM folds identity's SSO connection facts into its own connection list
     And running it fills the view with the activated connection
     And a second run from the first run's cursor replays nothing and leaves the view as it was
 
+  # Plan pr-7536 S09: an old pod may append identity's facts after the first pass discovered them.
+  @unit
+  Scenario: SCIM's connection view replay takes a trailing pass from the cursor its first pass completed
+    Given a worker installs SCIM over identity's connection log
+    When SCIM's connection view replay step runs
+    Then it replays identity's connection log a second time from the cursor its first pass completed through
+    And the view holds each connection once
+
   @unit
   Scenario: SCIM reads back every connection state identity's reducer folds
     Given identity's reducer folded a connection through a rejection, an attestation and a ceremony in flight

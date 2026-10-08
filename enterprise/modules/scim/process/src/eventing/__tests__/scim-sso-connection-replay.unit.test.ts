@@ -256,7 +256,35 @@ describe("given a worker installing SCIM over an empty connection view and ident
       ]);
       expect(second).toMatchObject({ aggregatesReplayed: 0 });
       await expect(scim.findConnections({ organizationId: "org_acme" })).resolves.toEqual(filled);
+      // Each run takes a first and a trailing pass, each over its own engine.
+      expect(closed).toEqual(["engine", "engine", "engine", "engine"]);
+    } finally {
+      await runtime.stop();
+    }
+  });
+});
+
+describe("given a worker installing SCIM over identity's connection log", () => {
+  /** @scenario "SCIM's connection view replay takes a trailing pass from the cursor its first pass completed" */
+  it("commits the first pass's cursor, replays again from it and holds each connection once", async () => {
+    const { runtime, closed } = await bootWorker();
+    const saved: MigrationStepReport[] = [];
+    const step = runtime.migrationSteps(isMigrationStep).find(({ id }) => id === STEP_ID);
+
+    try {
+      await step?.run({
+        checkpoint: { resumeFrom: null, save: async ({ report }) => void saved.push(report) },
+        dryRun: false,
+        signal: new AbortController().signal,
+      });
+
+      const committed = saved.find((save) => Object.keys(save).length === 2);
+      expect(committed?.replayedThrough).toEqual(expect.any(String));
+      expect(committed?.replayedThrough).not.toBe("1970-01-01T00:00:00Z");
       expect(closed).toEqual(["engine", "engine"]);
+      await expect(
+        runtime.service(ScimApi).findConnections({ organizationId: "org_acme" }),
+      ).resolves.toHaveLength(1);
     } finally {
       await runtime.stop();
     }

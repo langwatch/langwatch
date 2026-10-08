@@ -40,6 +40,7 @@ export const entitlementProcessModule: PublishedProcessModule<
         .toInstant()
         .toString(),
       needsOldWritersGone: true,
+      trailingPass: true,
       replayer,
     }),
   ]);

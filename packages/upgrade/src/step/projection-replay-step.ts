@@ -38,9 +38,9 @@ export interface LaneReplayer {
 }
 
 /**
- * A background data step that fills a projection lane (local or peer) from its owner's log at
- * deploy from `since` (default: the start), resuming from the last cursor it completed. Specs:
- * specs/upgrade/projection-replay-step.feature and packages/upgrade/specs (its `since` scenarios).
+ * A background data step filling a projection lane from its owner's log from `since` (default:
+ * the start), resuming from its last cursor; `trailingPass` replays once more from that cursor.
+ * Specs: specs/upgrade/projection-replay-step.feature and packages/upgrade/specs (`since`).
  */
 export function defineProjectionReplayStep({
   id,
@@ -49,6 +49,7 @@ export function defineProjectionReplayStep({
   replayer,
   since = PROJECTION_REPLAY_FROM_START,
   needsOldWritersGone,
+  trailingPass = false,
 }: {
   id: string;
   description: string;
@@ -57,6 +58,8 @@ export function defineProjectionReplayStep({
   /** The instant a first run replays from: aggregates with an event since then refold whole. */
   since?: string;
   needsOldWritersGone?: boolean;
+  /** After the first pass, replay again from the cursor it completed through. */
+  trailingPass?: boolean;
 }): MigrationStep {
   return defineMigrationStep({
     id,
@@ -65,7 +68,7 @@ export function defineProjectionReplayStep({
     description,
     ...(needsOldWritersGone === undefined ? {} : { needsOldWritersGone }),
     run: async ({ checkpoint, dryRun, signal }) => {
-      const cursor = resumeCursor({ resumeFrom: checkpoint.resumeFrom, lane, since });
+      let cursor = resumeCursor({ resumeFrom: checkpoint.resumeFrom, lane, since });
       if (signal.aborted) return { lane, replayedThrough: cursor };
       const resume = resumeTenants({ resumeFrom: checkpoint.resumeFrom, lane });
       // The cursor stays the last completed one until the run ends; tenants done ride beside it.
@@ -93,7 +96,7 @@ export function defineProjectionReplayStep({
         save(progress);
       };
       try {
-        const result = await replayer.replayLane({
+        const first = await replayer.replayLane({
           lane,
           since: cursor,
           dryRun,
@@ -102,8 +105,28 @@ export function defineProjectionReplayStep({
           onBatchComplete,
           onTenantComplete,
         });
+        if (!trailingPass || dryRun || signal.aborted) {
+          await saving;
+          return { ...first };
+        }
+        // The first pass is done: commit its cursor, then replay what became readable after it.
+        cursor = first.replayedThrough;
+        progress = { lane, [PROJECTION_REPLAY_CURSOR]: cursor };
+        save(progress);
+        const trailing = await replayer.replayLane({
+          lane,
+          since: cursor,
+          dryRun,
+          signal,
+          onBatchComplete,
+          onTenantComplete,
+        });
         await saving;
-        return { ...result };
+        return {
+          ...trailing,
+          aggregatesReplayed: first.aggregatesReplayed + trailing.aggregatesReplayed,
+          totalEvents: first.totalEvents + trailing.totalEvents,
+        };
       } catch (error) {
         await saving.catch(() => undefined);
         throw error;

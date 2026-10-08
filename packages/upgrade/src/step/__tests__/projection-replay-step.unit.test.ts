@@ -66,11 +66,13 @@ function runOnce({
   resumeFrom,
   dryRun = false,
   signal = new AbortController().signal,
+  trailingPass,
 }: {
   replayer: LaneReplayer;
   resumeFrom: MigrationStepReport | null;
   dryRun?: boolean;
   signal?: AbortSignal;
+  trailingPass?: boolean;
 }) {
   const saved: MigrationStepReport[] = [];
   const step = defineProjectionReplayStep({
@@ -78,6 +80,7 @@ function runOnce({
     description: "Fills the directory members lane from identity's log.",
     lane: LANE,
     replayer,
+    ...(trailingPass === undefined ? {} : { trailingPass }),
   });
   const report = step.run({
     checkpoint: { resumeFrom, save: async ({ report: next }) => void saved.push(next) },
@@ -245,6 +248,81 @@ describe("defineProjectionReplayStep", () => {
 
       expect(calls).toEqual([]);
       expect(report).toEqual({ lane: LANE, replayedThrough: PROJECTION_REPLAY_FROM_START });
+    });
+  });
+
+  describe("given a step declared with a trailing pass", () => {
+    /** @scenario "A step with a trailing pass replays again from the cursor its first pass completed through" */
+    it("commits the first pass's cursor, replays from it and reports both passes", async () => {
+      const replayer = replayerOverLog();
+
+      const { report, saved } = runOnce({ replayer, resumeFrom: null, trailingPass: true });
+
+      expect(await report).toMatchObject({
+        lane: LANE,
+        aggregatesReplayed: 2,
+        totalEvents: 3,
+        replayedThrough: CURSOR,
+      });
+      expect(replayer.sinces).toEqual([PROJECTION_REPLAY_FROM_START, CURSOR]);
+      expect(saved.at(-1)).toEqual({ lane: LANE, replayedThrough: CURSOR });
+    });
+
+    /** @scenario "A trailing pass interrupted by a worker stop resumes from the first pass's cursor" */
+    it("resumes from the first pass's cursor after a stop in the trailing pass", async () => {
+      const calls: string[] = [];
+      const stopping: LaneReplayer = {
+        async replayLane({ lane, since }) {
+          calls.push(since);
+          if (calls.length === 2) throw new Error("worker stopping");
+          return {
+            lane,
+            kind: "fold",
+            aggregatesReplayed: 0,
+            totalEvents: 0,
+            replayedThrough: CURSOR,
+          };
+        },
+      };
+      const stopped = runOnce({ replayer: stopping, resumeFrom: null, trailingPass: true });
+      await expect(stopped.report).rejects.toThrow("worker stopping");
+
+      const replayer = replayerOverLog();
+      await runOnce({ replayer, resumeFrom: stopped.saved.at(-1) ?? null, trailingPass: true })
+        .report;
+
+      expect(replayer.sinces[0]).toBe(CURSOR);
+    });
+
+    /** @scenario "A dry run or a stopped run takes no trailing pass" */
+    it("replays once on a dry run", async () => {
+      const replayer = replayerOverLog();
+
+      await runOnce({ replayer, resumeFrom: null, dryRun: true, trailingPass: true }).report;
+
+      expect(replayer.sinces).toEqual([PROJECTION_REPLAY_FROM_START]);
+    });
+
+    it("replays once when its signal aborts during the first pass", async () => {
+      const stop = new AbortController();
+      const sinces: string[] = [];
+      const replayer: LaneReplayer = {
+        async replayLane({ lane, since }) {
+          sinces.push(since);
+          stop.abort();
+          return {
+            lane,
+            kind: "fold",
+            aggregatesReplayed: 1,
+            totalEvents: 1,
+            replayedThrough: CURSOR,
+          };
+        },
+      };
+
+      await runOnce({ replayer, resumeFrom: null, signal: stop.signal, trailingPass: true }).report;
+
+      expect(sinces).toEqual([PROJECTION_REPLAY_FROM_START]);
     });
   });
 });

@@ -104,3 +104,26 @@ Feature: A module fills a new read model at deploy by replaying a projection lan
     Given a pipeline that declares each tenant's retention
     When one of its lanes, or a peer lane it declares, is replayed
     Then the rebuilt rows carry the retention the pipeline resolves for their tenant, not the platform default
+
+  # Round 49 (data-meter R1): a writer an image older than the step's own may append after the first
+  # pass discovered its tenant; a trailing pass from the first pass's cursor replays what it missed.
+
+  @unit
+  Scenario: A step with a trailing pass replays again from the cursor its first pass completed through
+    Given a projection replay step declared with a trailing pass
+    When the worker runs it and its first pass completes through a cursor
+    Then the step saves that cursor before the trailing pass starts
+    And the lane is replayed a second time from that cursor
+    And the step reports the cursor the trailing pass completed through and the work of both passes
+
+  @unit
+  Scenario: A trailing pass interrupted by a worker stop resumes from the first pass's cursor
+    Given a step with a trailing pass whose first pass completed and whose trailing pass was stopped
+    When the worker runs it again
+    Then the lane is replayed from the cursor the first pass completed through, not from the start
+
+  @unit
+  Scenario: A dry run or a stopped run takes no trailing pass
+    Given a projection replay step declared with a trailing pass
+    When it runs as a dry run, or its signal aborts during the first pass
+    Then the lane is replayed only once

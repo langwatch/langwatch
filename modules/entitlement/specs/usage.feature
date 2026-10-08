@@ -91,7 +91,7 @@ Feature: Entitlement's meters, decisions and who learns them
     Then each tenant is replayed on its own
     And each completed tenant is saved with the cursor the run completes through
 
-  @unit @usage @unimplemented
+  @unit @usage
   Scenario: The trace meter seed takes a trailing pass from the cursor its first pass completed
     Given a span an old pod appended that became readable after the first pass discovered its tenant
     When the trace meter seed's first pass completes through its cursor

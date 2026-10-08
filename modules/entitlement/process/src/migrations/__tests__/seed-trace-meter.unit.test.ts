@@ -144,6 +144,7 @@ describe("given a worker installing entitlement over trace's span log", () => {
     expect(report).toMatchObject({ lane: LANE, aggregatesReplayed: 0 });
     expect(log.discoveries.map(({ eventTypes }) => eventTypes)).toEqual([
       [SPAN_RECEIVED_EVENT_TYPE],
+      [SPAN_RECEIVED_EVENT_TYPE],
     ]);
   });
 
@@ -153,9 +154,25 @@ describe("given a worker installing entitlement over trace's span log", () => {
 
     await runSeed({ log });
 
+    expect(log.discoveries[0]).toEqual({
+      eventTypes: [SPAN_RECEIVED_EVENT_TYPE],
+      sinceMs: FIRST_OF_MONTH_MS,
+    });
+  });
+
+  /** @scenario "The trace meter seed takes a trailing pass from the cursor its first pass completed" */
+  it("replays the lane a second time from the cursor its first pass completed through", async () => {
+    const log = new RecordingSpanLog();
+
+    const { report, saves } = await runSeed({ log });
+
+    const firstCursor = saves.at(-1)?.replayedThrough;
+    expect(typeof firstCursor).toBe("string");
     expect(log.discoveries).toEqual([
       { eventTypes: [SPAN_RECEIVED_EVENT_TYPE], sinceMs: FIRST_OF_MONTH_MS },
+      { eventTypes: [SPAN_RECEIVED_EVENT_TYPE], sinceMs: Date.parse(String(firstCursor)) },
     ]);
+    expect(report).toMatchObject({ lane: LANE, aggregatesReplayed: 0 });
   });
 
   /** @scenario "The trace meter seed waits until no old writer remains" */
@@ -171,12 +188,12 @@ describe("given a worker installing entitlement over trace's span log", () => {
 
     const { report, saves } = await runSeed({ log });
 
-    expect(log.discoveries).toEqual([
+    expect(log.discoveries.slice(0, 2)).toEqual([
       { eventTypes: [SPAN_RECEIVED_EVENT_TYPE], sinceMs: FIRST_OF_MONTH_MS, tenantId: "tenant-a" },
       { eventTypes: [SPAN_RECEIVED_EVENT_TYPE], sinceMs: FIRST_OF_MONTH_MS, tenantId: "tenant-b" },
     ]);
     const runCursor = report?.replayedThrough;
-    expect(saves.filter((save) => "lastTenantDone" in save)).toEqual([
+    expect(saves.filter((save) => "lastTenantDone" in save).slice(0, 2)).toEqual([
       expect.objectContaining({ lastTenantDone: "tenant-a", runReplaysThrough: runCursor }),
       expect.objectContaining({ lastTenantDone: "tenant-b", runReplaysThrough: runCursor }),
     ]);
