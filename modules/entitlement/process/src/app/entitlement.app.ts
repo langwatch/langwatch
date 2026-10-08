@@ -37,7 +37,6 @@ import {
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant } from "@langwatch/time";
-import { UserApi } from "@langwatch/user-contract";
 
 import { buildUsageWarningPipeline } from "../eventing/entitlement-usage-warning.pipeline.ts";
 import { CountMonthCommand } from "../eventing/usage.commands.ts";
@@ -122,11 +121,11 @@ type EntitlementSetup = FeatureSetup<
 type EntitlementDependencies = EntitlementSetup["dependencies"];
 
 /**
- * What the constructor actually reads off `dependencies`: the caller
- * directory alone. `license` is consumed once, by `create`, to build
+ * What the constructor actually reads off `dependencies`: the organization peer
+ * alone. `license` is consumed once, by `create`, to build
  * {@link EntitlementInfrastructure} — a hand-built test app needs no license source.
  */
-type EntitlementCallerLookup = Pick<EntitlementDependencies, "users" | "organizations">;
+type EntitlementCallerLookup = Pick<EntitlementDependencies, "organizations">;
 
 /** The repositories the app reads directly; the meters reach it only through its usage pipeline. */
 type EntitlementReadRepositories = Pick<EntitlementRepositories, "membership" | "spend">;
@@ -138,7 +137,6 @@ type UsagePipelineBuild = (send: () => UsageSenders) => UsagePipelineDefinition;
 export class EntitlementModule implements EntitlementApiContract {
   static readonly contract = EntitlementApi;
   static readonly dependencies = {
-    users: UserApi,
     license: LicensingApi,
     billing: BillingApi,
     organizations: OrganizationApi,
@@ -152,7 +150,6 @@ export class EntitlementModule implements EntitlementApiContract {
   #nextStep: PlanNextStepService;
   #warnings: UsageWarning;
   #spend: EntitlementRepositories["spend"];
-  #users: UserApi;
   #organizations: OrganizationApi;
   #requestBoundOverrides: RequestBoundsOverrides;
   #buildUsagePipeline: UsagePipelineBuild | undefined;
@@ -184,7 +181,6 @@ export class EntitlementModule implements EntitlementApiContract {
     });
     this.#warnings = infrastructure.warnings;
     this.#spend = repositories.spend;
-    this.#users = dependencies.users;
     this.#organizations = dependencies.organizations;
     this.#requestBoundOverrides = config.requestBounds ?? {};
     this.#buildUsagePipeline = usagePipeline;
@@ -275,7 +271,7 @@ export class EntitlementModule implements EntitlementApiContract {
   async getActivePlan(input: ResolvePlanInput): Promise<Plan> {
     return this.#plans.getActivePlan({
       organizationId: input.organizationId,
-      user: await this.#resolveCaller(input),
+      user: this.#resolveCaller(input),
     });
   }
 
@@ -326,7 +322,7 @@ export class EntitlementModule implements EntitlementApiContract {
   }
 
   async getUsage(input: GetUsageInput): Promise<UsageStats> {
-    const user = await this.#resolveCaller(input);
+    const user = this.#resolveCaller(input);
 
     return this.#usage.getUsageStats(input.organizationId, user);
   }
@@ -399,28 +395,17 @@ export class EntitlementModule implements EntitlementApiContract {
   }
 
   /**
-   * The person a plan is resolved for. A door names them by identifier alone,
-   * and the subscription source reads an email off the operator impersonating
-   * them, so the directory lookup happens here rather than in a transport.
+   * The person a plan is resolved for. A door names them by identifier alone, and the only
+   * reader downstream, billing's subscription source, decides the override from the
+   * impersonator's id, so no directory lookup is needed (peer cut, round 22).
    */
-  async #resolveCaller(
+  #resolveCaller(
     input: Readonly<{ user?: PlanProviderUser; operator?: EntitlementOperator }>,
-  ): Promise<PlanProviderUser | undefined> {
+  ): PlanProviderUser | undefined {
     if (input.user) return input.user;
     if (!input.operator) return undefined;
+    const { id, impersonatorId } = input.operator;
 
-    const [caller, impersonator] = await Promise.all([
-      this.#users.findById({ id: input.operator.id }),
-      input.operator.impersonatorId
-        ? this.#users.findById({ id: input.operator.impersonatorId })
-        : Promise.resolve(null),
-    ]);
-
-    return {
-      id: input.operator.id,
-      email: caller?.email ?? null,
-      name: caller?.name ?? null,
-      ...(impersonator ? { impersonator: { id: impersonator.id, email: impersonator.email } } : {}),
-    };
+    return { id, ...(impersonatorId ? { impersonator: { id: impersonatorId } } : {}) };
   }
 }

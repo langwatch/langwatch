@@ -14,7 +14,6 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { TraceApi } from "@langwatch/trace-contract";
-import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
 import { entitlementProcessModule } from "../../entitlement.module.ts";
@@ -25,7 +24,6 @@ import type { OrganizationSpendRepository } from "../../repositories/organizatio
 import { EntitlementModule } from "../entitlement.app.ts";
 import {
   createEntitlementTestApp,
-  createEntitlementTestUsers,
   fixedEntitlementSource,
   TestUsageWarnings,
 } from "./entitlement.fixture.ts";
@@ -41,30 +39,6 @@ const free: Plan = {
   canPublish: false,
   prices: { USD: 0, EUR: 0 },
 };
-
-function operatorDirectory(
-  profiles: Record<string, { email: string | null; name: string | null }>,
-) {
-  return createApiFixture<UserApi>({
-    findById: async ({ id }) => {
-      const profile = profiles[id];
-      if (!profile) return null;
-
-      return {
-        id,
-        name: profile.name,
-        email: profile.email,
-        emailVerified: true,
-        image: null,
-        pendingSsoSetup: false,
-        createdAt: new Date(0),
-        updatedAt: new Date(0),
-        lastLoginAt: null,
-        deactivatedAt: null,
-      };
-    },
-  });
-}
 
 /** A rollup reader that answers nothing and remembers what it was asked. */
 class RecordingSpendRepository implements OrganizationSpendRepository {
@@ -108,7 +82,6 @@ describe("entitlement app installation", () => {
         .withStores(memoryStores())
         .withObservability((observability) => observability.withLogging(logger))
         .provide({
-          user: createEntitlementTestUsers(),
           billing: createApiFixture<BillingApi>({
             getActiveSubscriptionPlan: async () => free,
             getPricingModel: async () => ({ pricingModel: null }),
@@ -183,7 +156,6 @@ describe("entitlement app installation", () => {
         .withStores(memoryStores())
         .withObservability((observability) => observability.withLogging(logger))
         .provide({
-          user: createEntitlementTestUsers(),
           billing: createApiFixture<BillingApi>({ getActiveSubscriptionPlan: async () => free }),
           organization: createApiFixture<OrganizationApi>({
             countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),
@@ -315,27 +287,19 @@ describe("entitlement app installation", () => {
   });
 
   describe("given a plan resolved for the operator behind a request", () => {
-    /** @scenario "An impersonating operator is resolved through the user directory" */
-    it("looks the impersonator's address up before the sources see it", async () => {
-      const seen: (string | null | undefined)[] = [];
+    /** @scenario "An impersonating operator reaches the sources by identifier" */
+    it("names the impersonator by id, with no directory lookup", async () => {
+      const seen: (string | undefined)[] = [];
       const app = createEntitlementTestApp({
         infrastructure: {
           baseline: free,
           authorization: {
             resolve: (user) => {
-              seen.push(user?.impersonator?.email);
+              seen.push(user?.impersonator?.id);
 
-              return {
-                overrideAddingLimitations: user?.impersonator?.email === "staff@langwatch.ai",
-              };
+              return { overrideAddingLimitations: user?.impersonator?.id === "staff-1" };
             },
           },
-        },
-        dependencies: {
-          users: operatorDirectory({
-            "user-1": { email: "person@example.com", name: "Person" },
-            "staff-1": { email: "staff@langwatch.ai", name: "Staff" },
-          }),
         },
       });
 
@@ -350,7 +314,7 @@ describe("entitlement app installation", () => {
         app.getActivePlan({ organizationId: "organization-1", operator: { id: "user-1" } }),
       ).resolves.toMatchObject({ overrideAddingLimitations: false });
 
-      expect(seen).toEqual(["staff@langwatch.ai", undefined]);
+      expect(seen).toEqual(["staff-1", undefined]);
     });
   });
 

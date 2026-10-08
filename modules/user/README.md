@@ -42,6 +42,6 @@ Anything else user needs belongs to another module and is reached through its `*
 
 ## Who depends on user
 
-[agent](../agent/README.md), [annotation](../annotation/README.md), [auth](../auth/README.md), [coding-agent](../coding-agent/README.md), [data-retention](../data-retention/README.md), [enterprise-gateway](../../enterprise/modules/enterprise-gateway/README.md), [entitlement](../entitlement/README.md), [evaluator](../evaluator/README.md), [governance](../../enterprise/modules/governance/README.md), [identity](../identity/README.md), [langy](../langy/README.md), [nurturing](../../enterprise/modules/nurturing/README.md), [ops](../ops/README.md), [organization](../organization/README.md), [scenario](../scenario/README.md), [scim](../../enterprise/modules/scim/README.md) (as a peer).
+[agent](../agent/README.md), [annotation](../annotation/README.md), [auth](../auth/README.md), [coding-agent](../coding-agent/README.md), [data-retention](../data-retention/README.md), [enterprise-gateway](../../enterprise/modules/enterprise-gateway/README.md), [evaluator](../evaluator/README.md), [governance](../../enterprise/modules/governance/README.md), [identity](../identity/README.md), [langy](../langy/README.md), [nurturing](../../enterprise/modules/nurturing/README.md), [ops](../ops/README.md), [organization](../organization/README.md), [scenario](../scenario/README.md), [scim](../../enterprise/modules/scim/README.md) (as a peer).
 
 <!-- readme:generated:end -->

@@ -181,6 +181,12 @@ Feature: Enterprise licensing lifecycle
       Then only the applicable budgets are listed, and the contract budget is marked as the contract
 
     @unit
+    Scenario: Hosted usage resolves no team for a project authz does not know
+      Given the calling key names a project authz holds no scope for
+      When a connected install reads its hosted usage
+      Then the budgets are resolved with no team rather than the read failing
+
+    @unit
     Scenario: Hosted usage reports spend as unknown when live spend cannot be read
       Given live spend cannot be read
       When a connected install reads its hosted usage

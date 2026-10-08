@@ -1,3 +1,4 @@
+import { type AuthzApi, AuthzScopeNotFoundError } from "@langwatch/authz-contract";
 import type {
   GatewayApi,
   GatewayBudgetResolutionTarget,
@@ -5,7 +6,6 @@ import type {
   GatewayMoney,
   GatewayVirtualKeyRecord,
 } from "@langwatch/gateway-contract";
-import { type Project, type ProjectApi, projectSchema } from "@langwatch/project-contract";
 /**
  * @vitest-environment node
  * @see enterprise/modules/licensing/specs/licensing.feature
@@ -18,7 +18,6 @@ import { CONTRACT_BUDGET_EXTERNAL_ID } from "../contract-budget-store.service.ts
 import { HostedUsageReaderService } from "../hosted-usage-reader.service.ts";
 
 const AT = Temporal.Instant.from("2026-09-29T00:00:00Z");
-const CREATED = new Date("2026-01-01T00:00:00Z");
 const CALLER = { virtualKeyId: "vk-1", organizationId: "org-1", projectId: "project-1" };
 
 function money(value: string): GatewayMoney {
@@ -52,39 +51,6 @@ function budget(overrides: Partial<GatewayBudgetWithSeats>): GatewayBudgetWithSe
     managedByVirtualKeyId: null,
     ...overrides,
   };
-}
-
-function project(): Project {
-  return projectSchema.parse({
-    id: "project-1",
-    name: "Hidden",
-    slug: "hidden",
-    apiKey: "api-key",
-    lwqlKey: "lwql-key",
-    teamId: "team-1",
-    language: "other",
-    framework: "other",
-    kind: "application",
-    firstMessage: false,
-    integrated: false,
-    createdAt: CREATED,
-    updatedAt: CREATED,
-    userLinkTemplate: null,
-    traceSharingEnabled: false,
-    presenceEnabled: false,
-    s3Endpoint: null,
-    s3AccessKeyId: null,
-    s3SecretAccessKey: null,
-    s3Bucket: null,
-    archivedAt: null,
-    isPersonal: false,
-    ownerUserId: null,
-    personalFeatures: {},
-    departmentId: null,
-    langyEgressAllowlist: null,
-    lastCodingAgentSessionAt: null,
-    lastCodingAgentPullRequestAt: null,
-  });
 }
 
 function virtualKey(): GatewayVirtualKeyRecord {
@@ -122,18 +88,27 @@ function virtualKey(): GatewayVirtualKeyRecord {
   };
 }
 
+const KNOWN_PROJECT: AuthzApi["getScope"] = async () => ({
+  type: "project",
+  id: "project-1",
+  teamId: "team-1",
+  organizationId: "org-1",
+});
+
 function readerOver({
   budgets,
   applicableIds,
   spendAvailable = true,
+  getScope = KNOWN_PROJECT,
 }: {
   budgets: GatewayBudgetWithSeats[];
   applicableIds: string[];
   spendAvailable?: boolean;
+  getScope?: AuthzApi["getScope"];
 }) {
   const targets: GatewayBudgetResolutionTarget[] = [];
   const reader = HostedUsageReaderService.create({
-    projects: createApiFixture<ProjectApi>({ findById: async () => project() }),
+    scopes: createApiFixture<AuthzApi>({ getScope }),
     gateway: createApiFixture<GatewayApi>({
       findVirtualKeyById: async () => virtualKey(),
       resolveApplicableBudgets: async (target) => {
@@ -202,6 +177,22 @@ describe("the hosted usage a connected install reads", () => {
         },
         expect.objectContaining({ id: "budget-key", onBreach: "warn", isContract: false }),
       ]);
+    });
+  });
+
+  describe("given the caller's project is unknown to authz", () => {
+    /** @scenario "Hosted usage resolves no team for a project authz does not know" */
+    it("resolves the budgets with no team rather than failing the read", async () => {
+      const { reader, targets } = readerOver({
+        budgets: [],
+        applicableIds: [],
+        getScope: async (ids) => {
+          throw new AuthzScopeNotFoundError(ids);
+        },
+      });
+
+      await expect(reader.read(CALLER)).resolves.toMatchObject({ budgets: [] });
+      expect(targets).toEqual([expect.objectContaining({ teamId: null, projectId: "project-1" })]);
     });
   });
 

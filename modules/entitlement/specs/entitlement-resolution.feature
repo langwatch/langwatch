@@ -59,10 +59,10 @@ Feature: Provider-neutral entitlement resolution
     And any limitation override is derived from the operator context once
 
   @unit @authorization
-  Scenario: An impersonating operator is resolved through the user directory
+  Scenario: An impersonating operator reaches the sources by identifier
     Given a request names its caller and the platform operator acting as them
     When Entitlements resolves the active plan for that request
-    Then the operator's address is read from the user directory before any source sees it
+    Then the sources see the operator by identifier, with no user directory lookup
     And a request with no operator acting as the caller resolves the organization's own limitations
 
   @unit @architecture @typecheck

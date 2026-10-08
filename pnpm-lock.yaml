@@ -3900,6 +3900,9 @@ importers:
       '@langwatch/authorization':
         specifier: workspace:*
         version: link:../../../../packages/authorization
+      '@langwatch/authz-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/authz/contract
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../../packages/config
@@ -3960,9 +3963,6 @@ importers:
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../../packages/process-stores
-      '@langwatch/project-contract':
-        specifier: workspace:*
-        version: link:../../../../modules/project/contract
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../../../packages/secrets
@@ -7941,9 +7941,6 @@ importers:
       '@langwatch/upgrade':
         specifier: workspace:*
         version: link:../../../packages/upgrade
-      '@langwatch/user-contract':
-        specifier: workspace:*
-        version: link:../../user/contract
       '@trpc/server':
         specifier: 'catalog:'
         version: 11.18.0(typescript@7.0.2)

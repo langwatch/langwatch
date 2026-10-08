@@ -11,11 +11,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { createAbsentRequestBound, entitlementProcessModule } from "../../entitlement.module.ts";
-import {
-  createEntitlementTestApp,
-  createEntitlementTestUsers,
-  fixedEntitlementSource,
-} from "./entitlement.fixture.ts";
+import { createEntitlementTestApp, fixedEntitlementSource } from "./entitlement.fixture.ts";
 
 const free: Plan = {
   planSource: "free",
@@ -152,7 +148,6 @@ describe("EntitlementModule.requestBound", () => {
       .withStores(memoryStores())
       .withObservability((observability) => observability.withLogging(logger))
       .provide({
-        user: createEntitlementTestUsers(),
         billing: createApiFixture<BillingApi>({ getActiveSubscriptionPlan: async () => free }),
         organization: createApiFixture<OrganizationApi>({}),
         project: createApiFixture<ProjectApi>({}),

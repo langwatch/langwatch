@@ -1,4 +1,5 @@
 import { SYSTEM_ACTORS } from "@langwatch/authorization";
+import { AuthzApi } from "@langwatch/authz-contract";
 import { releaseVersionOf } from "@langwatch/config";
 import { parseOutboundProxyConfig } from "@langwatch/egress";
 import {
@@ -70,7 +71,6 @@ import { createLogger } from "@langwatch/observability";
 import { optionalUsageReportKeys } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
-import { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant, Temporal } from "@langwatch/time";
 
 import type { ConnectGatewayChannel } from "../channels/connect-gateway.channel.ts";
@@ -169,7 +169,7 @@ export class LicensingModule implements LicensingApiContract {
     /** The judge a hosted classify call reaches, its price, and where its spend is recorded. */
     instantEval: InstantEvalApi,
     /** Whose team a hosted caller's project belongs to, for the budgets that apply to it. */
-    projects: ProjectApi,
+    scopes: AuthzApi,
   };
   static readonly config = licensingConfig;
   /**
@@ -930,7 +930,7 @@ function licenseRegistryOver({
 function hostedServicesOverPeers({
   gateway,
   instantEval,
-  projects,
+  scopes,
 }: {
   gateway: Pick<
     GatewayApi,
@@ -942,11 +942,11 @@ function hostedServicesOverPeers({
     | "resolveApplicableBudgets"
   >;
   instantEval: Pick<InstantEvalApi, "classify" | "priceOf" | "recordSpendForHostedCalls">;
-  projects: Pick<ProjectApi, "findById">;
+  scopes: Pick<AuthzApi, "getScope">;
 }): HostedServicesInfrastructure {
   return {
     budgets: ContractBudgetStoreService.create({ gateway }),
-    usage: HostedUsageReaderService.create({ gateway, projects }),
+    usage: HostedUsageReaderService.create({ gateway, scopes }),
     judge: {
       classify: (input, signal) =>
         instantEval.classify({ ...input, ...(signal ? { signal } : {}) }),

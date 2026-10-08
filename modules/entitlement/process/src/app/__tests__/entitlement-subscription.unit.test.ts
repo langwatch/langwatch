@@ -10,7 +10,6 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { entitlementProcessModule } from "../../entitlement.module.ts";
-import { createEntitlementTestUsers } from "./entitlement.fixture.ts";
 
 const free: Plan = {
   planSource: "free",
@@ -43,7 +42,6 @@ async function boot({ isSaas, billing }: { isSaas: boolean; billing: BillingApi 
     .withStores(memoryStores())
     .withObservability((observability) => observability.withLogging(logger))
     .provide({
-      user: createEntitlementTestUsers(),
       licensing: createApiFixture<LicensingApi>({
         resolve: async () => ({ granted: true, plan: free }),
       }),

@@ -34,7 +34,6 @@ Anything else entitlement needs belongs to another module and is reached through
 | `license`       | `LicensingApi`    | [licensing](../../enterprise/modules/licensing/README.md) |
 | `organizations` | `OrganizationApi` | [organization](../organization/README.md)                 |
 | `projects`      | `ProjectApi`      | [project](../project/README.md)                           |
-| `users`         | `UserApi`         | [user](../user/README.md)                                 |
 
 ## Who depends on entitlement
 

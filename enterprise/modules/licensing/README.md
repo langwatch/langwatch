@@ -32,7 +32,7 @@ Anything else licensing needs belongs to another module and is reached through i
 | `gateway`       | `GatewayApi`      | [gateway](../../../modules/gateway/README.md)           |
 | `instantEval`   | `InstantEvalApi`  | [instant-eval](../../../modules/instant-eval/README.md) |
 | `organizations` | `OrganizationApi` | [organization](../../../modules/organization/README.md) |
-| `projects`      | `ProjectApi`      | [project](../../../modules/project/README.md)           |
+| `scopes`        | `AuthzApi`        | [authz](../../../modules/authz/README.md)               |
 
 ## Who depends on licensing
 

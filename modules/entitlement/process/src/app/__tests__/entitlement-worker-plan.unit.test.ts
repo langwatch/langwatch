@@ -16,7 +16,6 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { entitlementProcessModule } from "../../entitlement.module.ts";
-import { createEntitlementTestUsers } from "./entitlement.fixture.ts";
 
 const ORGANIZATION = "organization-1";
 
@@ -61,7 +60,6 @@ function bootOn({ role = "worker", isSaas, billing, licence = unlicensed }: Sour
     .withStores(memoryStores())
     .withObservability((observability) => observability.withLogging(logger))
     .provide({
-      user: createEntitlementTestUsers(),
       licensing: createApiFixture<LicensingApi>({ resolve: async () => licence }),
       billing: billing ?? createApiFixture<BillingApi>({}),
       organization: createApiFixture<OrganizationApi>({}),
@@ -182,7 +180,6 @@ describe("given the entitlement module installed on the worker role", () => {
           .withStores(memoryStores())
           .withObservability((observability) => observability.withLogging(logger))
           .provide({
-            user: createEntitlementTestUsers(),
             licensing: createApiFixture<LicensingApi>({ resolve: async () => unlicensed }),
             organization: createApiFixture<OrganizationApi>({}),
             project: createApiFixture<ProjectApi>({}),
@@ -209,7 +206,6 @@ describe("given the entitlement module installed on the worker role", () => {
         .withStores(memoryStores())
         .withObservability((observability) => observability.withLogging(createTestLogger().logger))
         .provide({
-          user: createEntitlementTestUsers(),
           licensing: createApiFixture<LicensingApi>({
             resolve: async ({ organizationId }) => {
               asked.push(organizationId);

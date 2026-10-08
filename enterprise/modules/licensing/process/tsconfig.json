@@ -22,6 +22,9 @@
       "path": "../../../../packages/authorization/tsconfig.build.json"
     },
     {
+      "path": "../../../../modules/authz/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../../packages/config/tsconfig.build.json"
     },
     {
@@ -80,9 +83,6 @@
     },
     {
       "path": "../../../../packages/process-stores/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../modules/project/contract/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/secrets/tsconfig.build.json"

@@ -42,7 +42,6 @@
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/upgrade": "workspace:*",
-    "@langwatch/user-contract": "workspace:*",
     "@trpc/server": "catalog:",
     "zod": "catalog:"
   },
