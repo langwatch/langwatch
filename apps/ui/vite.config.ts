@@ -15,8 +15,10 @@ import dotenv from "dotenv";
 import { defineConfig, type Plugin, type UserConfig } from "vite";
 
 import { UI_ASSET_URL_GLOBAL } from "./vite/asset-base";
+import { chunkImportRetry } from "./vite/chunk-import-retry";
 import { designSystemStorybook } from "./vite/design-system-storybook";
 import { createDevLogger } from "./vite/dev-logging";
+import { entryCoreChunkGroup, hostMountsChunkGroup } from "./vite/entry-core-chunks";
 import { havenHmrGate } from "./vite/havenHmrGate";
 import { pushServiceWorker } from "./vite/push-service-worker";
 import { rootDiscoveryProxyPattern } from "./vite/root-discovery-proxy";
@@ -43,11 +45,16 @@ function manualChunkFor(id: string): string | undefined {
 // helper landed wherever Rolldown looked first. Priorities make it deterministic: the small
 // chunks claim their modules before the shiki chunk can, highest first.
 const NAMED_CHUNKS = ["preload-helper", "hast-helpers", "shiki-langs", "shiki"] as const;
-const CHUNK_GROUPS = NAMED_CHUNKS.map((name, index) => ({
-  name,
-  test: (id: string) => manualChunkFor(id) === name,
-  priority: NAMED_CHUNKS.length - index,
-}));
+// The first-paint core comes last, so it never takes a module a named chunk claims.
+const CHUNK_GROUPS = [
+  ...NAMED_CHUNKS.map((name, index) => ({
+    name,
+    test: (id: string) => manualChunkFor(id) === name,
+    priority: NAMED_CHUNKS.length - index + 1,
+  })),
+  entryCoreChunkGroup({ priority: 1 }),
+  hostMountsChunkGroup({ priority: 1 }),
+];
 
 type PackageExportTarget = string | { default?: string };
 
@@ -278,6 +285,7 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
       workspaceSourcePlugin(),
       pushServiceWorker(),
       shikiReachGuard(),
+      chunkImportRetry({ repoRoot }),
     ],
     resolve: {
       // ONE zod instance for the app AND linked workspace packages

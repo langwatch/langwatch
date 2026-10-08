@@ -154,6 +154,23 @@ export function uiOpenExternal(url: string): void {
  * Spec: specs/navigation/chunk-load-retry.feature
  */
 
+/**
+ * What the boot recovery script in apps/ui/index.html listens for. Until the first page
+ * commits it owns chunk failures, and reloads with a capped counter; after that it stands down.
+ * Spec: specs/ui/boot-recovery.feature
+ */
+export const UI_BOOT_EVENTS = { mounted: "ui:mounted", chunkFailed: "ui:chunk-failed" } as const;
+
+/** Tells the boot recovery the first page committed, so it clears its counter and stands down. */
+export function signalUiMounted(): void {
+  window.dispatchEvent(new Event(UI_BOOT_EVENTS.mounted));
+}
+
+/** Whether the boot recovery took a chunk failure (it reloads the page itself). */
+function bootRecoveryTook(): boolean {
+  return !window.dispatchEvent(new Event(UI_BOOT_EVENTS.chunkFailed, { cancelable: true }));
+}
+
 const RELOAD_COOLDOWN_MS = 10_000;
 export const RELOAD_AT_KEY = "chunk-reload-at";
 
@@ -241,29 +258,59 @@ function waitMs(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/**
- * Loads a chunk, retrying after each wait in `delaysMs` while the failure is a chunk that
- * did not load. A browser may remember a failed `import()` and reject the same address at
- * once, so a retry asks for the address the failure named under a fresh query.
- */
-export async function loadChunk<T>(
-  load: () => Promise<T>,
-  { delaysMs = CHUNK_RETRY_DELAYS_MS, wait = waitMs } = {},
-): Promise<T> {
+/** Failures a retry loop already gave up on, so a loader wrapped around it does not retry. */
+const exhaustedFailures = new WeakSet<object>();
+
+type ChunkRetryOptions = { delaysMs?: readonly number[]; wait?: (ms: number) => Promise<void> };
+
+/** The one retry loop: `attempt` runs each try, given the last failure after the first. */
+async function retryChunk<T>({
+  attempt,
+  delaysMs = CHUNK_RETRY_DELAYS_MS,
+  wait = waitMs,
+}: ChunkRetryOptions & { attempt: (n: number, failure: unknown) => Promise<T> }): Promise<T> {
   let failure: unknown;
-  for (let attempt = 0; attempt <= delaysMs.length; attempt++) {
-    if (attempt > 0) await wait(delaysMs[attempt - 1] ?? 0);
-    const url = attempt === 0 ? void 0 : chunkUrlOf(failure);
+  for (let n = 0; n <= delaysMs.length; n++) {
+    if (n > 0) await wait(delaysMs[n - 1] ?? 0);
     try {
-      return await (url === void 0 ? load() : importChunkAgain<T>({ url, attempt }));
+      return await attempt(n, failure);
     } catch (error) {
       ownFailure(error);
-      if (!isChunkLoadError(error)) throw error;
+      const exhausted = typeof error === "object" && error !== null && exhaustedFailures.has(error);
+      if (!isChunkLoadError(error) || exhausted) throw error;
       failure = error;
     }
   }
-  await reloadIfDeployRemoved(failure);
+  if (typeof failure === "object" && failure !== null) exhaustedFailures.add(failure);
+  if (!bootRecoveryTook()) await reloadIfDeployRemoved(failure);
   throw failure;
+}
+
+/**
+ * Runs any chunk loader, retrying it after each wait in `delaysMs` while the failure is a
+ * chunk that did not load. Each retry calls `load` again, so a loader that reshapes what it
+ * imports keeps its shape; the bare `import()` inside it is retried by `importChunk`.
+ */
+export function loadChunk<T>(load: () => Promise<T>, options: ChunkRetryOptions = {}): Promise<T> {
+  return retryChunk({ ...options, attempt: () => load() });
+}
+
+/**
+ * `loadChunk` for a bare `() => import(x)`, as the build wraps every one of ours (ADR-173).
+ * A browser may reject a failed address at once, so a retry imports the address the failure
+ * named under a fresh query: the same module, because `load` is a bare import.
+ */
+export function importChunk<T>(
+  load: () => Promise<T>,
+  options: ChunkRetryOptions = {},
+): Promise<T> {
+  return retryChunk({
+    ...options,
+    attempt: (n, failure) => {
+      const url = n === 0 ? void 0 : chunkUrlOf(failure);
+      return url === void 0 ? load() : importChunkAgain<T>({ url, attempt: n });
+    },
+  });
 }
 
 /** `React.lazy` over `loadChunk`: a code-split component that survives a dropped request. */

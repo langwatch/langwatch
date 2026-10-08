@@ -4,9 +4,12 @@
 # Browsers that follow the HTML spec before whatwg/html#10327 (merged July 2026) remember a
 # failed module fetch for the life of the page, so importing the same address again rejects
 # at once. A retry therefore asks for the address the failure named under a fresh query.
+# That returns the module itself, so the build wraps each bare `import()` in our code
+# (importChunk); a loader around it (loadChunk) retries by calling itself again.
 #
-# Implementation: packages/browser-host/src/navigation.ts (loadChunk, lazyChunk, lazyRoute,
-# registerChunkReloadListener), packages/browser-host/src/chunk-refetch.ts
+# Implementation: packages/browser-host/src/navigation.ts (importChunk, loadChunk, lazyChunk,
+# lazyRoute, registerChunkReloadListener), packages/browser-host/src/chunk-refetch.ts,
+# apps/ui/vite/chunk-import-retry.ts
 
 Feature: A chunk that does not arrive is retried, then explained
 
@@ -23,6 +26,20 @@ Feature: A chunk that does not arrive is retried, then explained
       Given a browser that remembers a failed fetch of an address
       When a chunk is retried
       Then it is asked for under the address the failure named, with a new query each time
+
+    @unit
+    Scenario: A loader that reshapes its module keeps its shape on a retry
+      Given a loader that returns "{ default: module.Thing }"
+      When its chunk is dropped once
+      Then the retry calls the loader again, never the bare address
+      And a failure the import inside it already retried is not retried again
+
+    @unit
+    Scenario: The build retries every import in our code where it is made
+      Given a module of ours with an "import()" expression
+      When the application is built
+      Then the expression is wrapped in importChunk
+      And dependencies and the retry helper itself are left alone
 
     @unit
     Scenario: A chunk that never arrives fails after three retries

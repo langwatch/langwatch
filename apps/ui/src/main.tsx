@@ -13,6 +13,7 @@ import { BrowserUiFeedback, resolveUiFailureCopy } from "@langwatch/browser-host
 import {
   isChunkLoadFailure,
   registerChunkReloadListener,
+  signalUiMounted,
 } from "@langwatch/browser-host/navigation";
 import { SessionVersionWatch, sessionVersionFetch } from "@langwatch/browser-host/session-version";
 import {
@@ -43,7 +44,7 @@ import {
 } from "@langwatch/browser/transport";
 import { configureDocsRuntime } from "@langwatch/handled-error/docs-url";
 import posthog from "posthog-js";
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect } from "react";
 import type { FallbackProps } from "react-error-boundary";
 import { useLocation, useRouteError } from "react-router";
 
@@ -105,6 +106,8 @@ function UiPageError({ error }: FallbackProps) {
 
 /** The last resort: plain, because it must render when nothing else loaded. */
 function UiBootPageError() {
+  // The app answered: the boot recovery must not reload over its message.
+  useEffect(signalUiMounted, []);
   if (isChunkLoadFailure(useRouteError())) {
     return (
       <div role="alert" style={{ padding: "3rem", textAlign: "center" }}>

@@ -9,13 +9,6 @@ import { createContext, useContext, type ReactNode } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// A retry asks for the chunk by address; here every address stays dropped.
-vi.mock("../../../browser-host/src/chunk-refetch.ts", () => ({
-  importChunkAgain: async () => {
-    throw new TypeError("Failed to fetch dynamically imported module: http://localhost/x.js");
-  },
-}));
-
 import { createUiModuleHostStack } from "../ui-module-hosts.tsx";
 import { UiChunkLoadFailure } from "../ui-page-fallbacks.tsx";
 

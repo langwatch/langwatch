@@ -10,10 +10,13 @@ vi.mock("../chunk-refetch.ts", () => refetch);
 import {
   CHUNK_RETRY_DELAYS_MS,
   chunkUrlOf,
+  importChunk,
   isChunkLoadFailure,
   lazyRoute,
   loadChunk,
   registerChunkReloadListener,
+  signalUiMounted,
+  UI_BOOT_EVENTS,
   warmChunk,
 } from "../navigation.ts";
 
@@ -65,7 +68,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("loadChunk", () => {
+describe("loadChunk and importChunk", () => {
   describe("given a chunk that loads", () => {
     it("returns it without waiting", async () => {
       const { waits, wait } = recordedWaits();
@@ -83,7 +86,7 @@ describe("loadChunk", () => {
         .mockRejectedValueOnce(dropped(`${CHUNK}?retry=1`))
         .mockResolvedValueOnce(MODULE);
 
-      await expect(loadChunk(() => Promise.reject(dropped()), { wait })).resolves.toBe(MODULE);
+      await expect(importChunk(() => Promise.reject(dropped()), { wait })).resolves.toBe(MODULE);
       expect(waits).toEqual([500, 1_000]);
     });
 
@@ -94,12 +97,41 @@ describe("loadChunk", () => {
         .mockRejectedValueOnce(dropped(`${CHUNK}?retry=1`))
         .mockResolvedValueOnce(MODULE);
 
-      await loadChunk(() => Promise.reject(dropped()), { wait });
+      await importChunk(() => Promise.reject(dropped()), { wait });
 
       expect(refetch.importChunkAgain.mock.calls).toEqual([
         [{ url: CHUNK, attempt: 1 }],
         [{ url: CHUNK, attempt: 2 }],
       ]);
+    });
+  });
+
+  describe("given a loader that reshapes what it imports", () => {
+    /** @scenario "A loader that reshapes its module keeps its shape on a retry" */
+    it("retries through the loader, never by the address", async () => {
+      const { wait } = recordedWaits();
+      refetch.importChunkAgain.mockResolvedValue({ Thing: "the raw module" });
+      const load = vi
+        .fn<() => Promise<typeof MODULE>>()
+        .mockRejectedValueOnce(dropped())
+        .mockResolvedValueOnce(MODULE);
+
+      await expect(loadChunk(load, { wait })).resolves.toBe(MODULE);
+      expect(refetch.importChunkAgain).not.toHaveBeenCalled();
+    });
+
+    it("does not retry again what the import inside it gave up on", async () => {
+      const { waits, wait } = recordedWaits();
+      serverUnreachable();
+      refetch.importChunkAgain.mockRejectedValue(dropped());
+
+      const loading = loadChunk(
+        async () => ({ default: await importChunk(() => Promise.reject(dropped()), { wait }) }),
+        { wait },
+      );
+
+      await expect(loading).rejects.toBeTruthy();
+      expect(waits).toEqual([...CHUNK_RETRY_DELAYS_MS]);
     });
   });
 
@@ -111,7 +143,7 @@ describe("loadChunk", () => {
         .mockRejectedValueOnce(droppedInSafari())
         .mockResolvedValueOnce(MODULE);
 
-      await expect(loadChunk(load, { wait })).resolves.toBe(MODULE);
+      await expect(importChunk(load, { wait })).resolves.toBe(MODULE);
       expect(load).toHaveBeenCalledTimes(2);
       expect(refetch.importChunkAgain).not.toHaveBeenCalled();
     });
@@ -138,7 +170,7 @@ describe("loadChunk", () => {
         .mockRejectedValueOnce(dropped(`${CHUNK}?retry=2`))
         .mockRejectedValueOnce(last);
 
-      await expect(loadChunk(() => Promise.reject(dropped()), { wait })).rejects.toBe(last);
+      await expect(importChunk(() => Promise.reject(dropped()), { wait })).rejects.toBe(last);
       expect(waits).toEqual([...CHUNK_RETRY_DELAYS_MS]);
     });
 
@@ -162,14 +194,50 @@ describe("loadChunk", () => {
       expect(reloaded()).toBe(true);
     });
   });
+
+  describe("given the first page has not shown yet", () => {
+    /** @scenario "A chunk that outlived its retries before the first page reloads the page" */
+    it("hands the failure to the boot recovery, and probes nothing itself", async () => {
+      const { wait } = recordedWaits();
+      const fetchSpy = vi.fn(async () => new Response(null, { status: 404 }));
+      vi.stubGlobal("fetch", fetchSpy);
+      refetch.importChunkAgain.mockRejectedValue(dropped());
+      const takeIt = (event: Event) => event.preventDefault();
+      window.addEventListener(UI_BOOT_EVENTS.chunkFailed, takeIt);
+
+      try {
+        await expect(loadChunk(() => Promise.reject(dropped()), { wait })).rejects.toBeTruthy();
+      } finally {
+        window.removeEventListener(UI_BOOT_EVENTS.chunkFailed, takeIt);
+      }
+
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(reloaded()).toBe(false);
+    });
+  });
+});
+
+describe("signalUiMounted", () => {
+  it("tells the boot recovery the first page showed", () => {
+    const heard = vi.fn();
+    window.addEventListener(UI_BOOT_EVENTS.mounted, heard);
+
+    signalUiMounted();
+
+    window.removeEventListener(UI_BOOT_EVENTS.mounted, heard);
+    expect(heard).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("lazyRoute", () => {
   describe("given a route chunk dropped once", () => {
     it("retries it and hands React Router the component", async () => {
       vi.useFakeTimers();
-      refetch.importChunkAgain.mockResolvedValueOnce({ default: Page });
-      const route = lazyRoute(() => Promise.reject(dropped()));
+      const load = vi
+        .fn<() => Promise<{ default: typeof Page }>>()
+        .mockRejectedValueOnce(dropped())
+        .mockResolvedValueOnce({ default: Page });
+      const route = lazyRoute(load);
 
       const loading = route.lazy();
       await vi.runAllTimersAsync();
@@ -201,7 +269,7 @@ describe("registerChunkReloadListener", () => {
       refetch.importChunkAgain.mockResolvedValueOnce(MODULE);
       const failure = dropped();
 
-      const loading = loadChunk(
+      const loading = importChunk(
         () => {
           // Vite reports the failure, then rejects the import with it.
           window.dispatchEvent(preloadError(failure));
