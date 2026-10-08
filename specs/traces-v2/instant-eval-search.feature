@@ -159,9 +159,9 @@ Feature: Instant Evals inside the Trace Explorer
     # Round 36 D4: the namespace moves with its owner; traces.instantEval.* is no longer served.
 
     @unit
-    Scenario: The Explorer's six procedures are served under instantEval
+    Scenario: The Explorer's seven procedures are served under instantEval
       When the instant-eval tRPC contract is read
-      Then it declares estimate, start, cancel, get, access and enable under instantEval
+      Then it declares estimate, start, cancel, get, access, enable and classifySearch under instantEval
       And trace's tRPC contracts declare no instantEval procedure
 
     @unit
@@ -403,3 +403,64 @@ Feature: Instant Evals inside the Trace Explorer
       Then trace routes the search with no classification
       And the model decides and builds the route, as when no classifier is configured
       And Instant Evals count as unavailable unless the browser says otherwise
+
+  Rule: Instant Eval classifies a search sentence in the context trace routes it in
+
+    # Coordinator 2026-10-08 (T2 D3): instantEval.classifySearch takes instant-eval-owned plain
+    # fields, so the classifier keeps today's context and never answers langy without Langy.
+
+    @unit
+    Scenario: The classifier reads the sentence next to the search's context
+      Given Instant Evals are released for the project
+      And the project has evaluator "ragas/faithfulness" and event "thumbs_up_down" in the window
+      When the browser asks instantEval.classifySearch for "frustrated users status:error" in the conversations lens over 24 hours, after "model:gpt-5-mini"
+      Then the classifier reads the sentence, the lens, the window, the filters typed beside it, the search applied before it and the known evaluators and events
+      And the answer is the classifier's route with Instant Evals available
+
+    @unit
+    Scenario: Without Langy the classifier is never offered langy
+      Given the browser says Langy is not open to the user
+      When the browser asks instantEval.classifySearch for "why did costs rise this week"
+      Then the routing question offers filter, instant_eval and free_text, and not langy
+
+    @unit
+    Scenario: Instant Evals not released are neither offered nor reported available
+      Given Instant Evals are not released for the project, or the release cannot be read
+      When the browser asks instantEval.classifySearch for "frustrated users"
+      Then the routing question does not offer instant_eval
+      And the answer reports Instant Evals unavailable
+
+    @unit
+    Scenario: A classifier that has no route answers no classification
+      Given the classifier skips, fails, or answers a label that names no route
+      When the browser asks instantEval.classifySearch for "frustrated users"
+      Then the answer has no classification and reports the release as read
+
+    @unit
+    Scenario: Known signals that cannot be read leave the context without them
+      Given the project's evaluator and event names cannot be read
+      When the browser asks instantEval.classifySearch for "frustrated users"
+      Then the classifier is still asked, with no evaluators and no events in its context
+
+    @unit
+    Scenario: Text with no sentence asks the classifier nothing
+      When the browser asks instantEval.classifySearch for "status:error"
+      Then the classifier is not asked and the answer has no classification
+
+    @unit
+    Scenario: Classifying a search asks analytics:view
+      Given a member without analytics:view on the project
+      When they ask instantEval.classifySearch
+      Then it is refused as forbidden before the classifier is asked
+
+    @integration
+    Scenario: The search bar asks Instant Eval to classify, then trace to route
+      When the user submits "frustrated users"
+      Then the browser asks instantEval.classifySearch with the text, the window, the applied query, the lens and whether Langy is open
+      And hands traces.routeSearch the classification when it names a route, with Instant Evals' availability
+
+    @integration
+    Scenario: A classification the browser could not get still routes the sentence
+      Given instantEval.classifySearch fails
+      When the user submits "frustrated users"
+      Then traces.routeSearch is asked with no classification and no availability

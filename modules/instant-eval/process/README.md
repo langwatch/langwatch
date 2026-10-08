@@ -6,7 +6,7 @@ The server half of [instant-eval](../README.md). Instant evaluations: the opt-in
 
 ## Installation
 
-`defineProcessModule("instant-eval").withRepositories(instantEvalRepositories).withApi(InstantEvalModule).withTransports(instantEvalRest).withTransportFacts(…).withEventing(instantEvalEventing).withTasks(…)`, `src/instant-eval.module.ts:15`.
+`defineProcessModule("instant-eval").withRepositories(instantEvalRepositories).withChannels(instantEvalChannels).withApi(InstantEvalModule).withTransports(instantEvalRest, instantEvalTrpcTransport).withTransportFacts(…).withEventing(instantEvalEventing).withTasks(…)`, `src/instant-eval.module.ts:17`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -106,14 +106,6 @@ The counters of the runs a client named, dropping ids it may not read. Lenient b
 
 ```typescript
 findRunProgress(input: { projectId: string; runIds: readonly string[]; }): Promise<InstantEvalRunProgress[]>;
-```
-
-#### `findRunWindows`
-
-The runs a reader named, dated, so a judgement read can be bounded by the window each was written in. Lenient like {@link findRunProgress}: a run this project does not own is dropped rather than refused.
-
-```typescript
-findRunWindows(input: { projectId: string; references: readonly InstantEvalRunReference[]; }): Promise<InstantEvalRunWindow[]>;
 ```
 
 #### `classify`
@@ -271,7 +263,19 @@ type Response = z.infer<typeof instantEvalSampleSchema>; // ../contract/src/inst
 
 ## tRPC transport
 
-None: this module declares no tRPC router.
+### `instantEval`
+
+Contract `../contract/src/instant-eval.trpc.ts:20`, router `src/transport/instant-eval.trpc.ts:50`.
+
+| Procedure                    | Kind     | Gate                                            | Input                                     | Output                               |
+| ---------------------------- | -------- | ----------------------------------------------- | ----------------------------------------- | ------------------------------------ |
+| `instantEval.estimate`       | mutation | Permission `analytics:manage`                   | `explorerInstantEvalRunSchema`            | `instantEvalEstimateSchema`          |
+| `instantEval.start`          | mutation | Permission `analytics:manage`                   | `explorerInstantEvalRunSchema`            | `explorerInstantEvalProgressSchema`  |
+| `instantEval.cancel`         | mutation | Permission `analytics:manage`                   | `explorerInstantEvalRunIdSchema`          | `explorerInstantEvalProgressSchema`  |
+| `instantEval.get`            | query    | Permission `analytics:view`                     | `explorerInstantEvalRunIdSchema`          | `explorerInstantEvalProgressSchema`  |
+| `instantEval.access`         | query    | Permission `analytics:view`                     | `explorerInstantEvalProjectSchema`        | `instantEvalOptInAccessSchema`       |
+| `instantEval.enable`         | mutation | Permission `organization:manage, via projectId` | `explorerInstantEvalProjectSchema`        | `instantEvalOptInAccessSchema`       |
+| `instantEval.classifySearch` | mutation | Permission `analytics:view`                     | `explorerSearchClassificationInputSchema` | `explorerSearchClassificationSchema` |
 
 ## Sockets
 
@@ -299,7 +303,7 @@ Run by the tasks process, before serve.
 
 | Task                                | Class                              | Declared at                                              |
 | ----------------------------------- | ---------------------------------- | -------------------------------------------------------- |
-| `instant-eval-judge-spend-catch-up` | `InstantEvalJudgeSpendCatchUpTask` | `src/tasks/instant-eval-judge-spend-catch-up.task.ts:21` |
+| `instant-eval-judge-spend-catch-up` | `InstantEvalJudgeSpendCatchUpTask` | `src/tasks/instant-eval-judge-spend-catch-up.task.ts:20` |
 
 ## Configuration
 

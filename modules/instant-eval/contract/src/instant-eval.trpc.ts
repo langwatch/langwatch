@@ -1,6 +1,7 @@
 /**
  * Every `instantEval.*` procedure: an Instant Eval as the Explorer drives it,
- * priced, started, stopped and read back (round 36 D4: the namespace moved with its owner).
+ * priced, started, stopped and read back (round 36 D4: the namespace moved with its owner),
+ * and the search bar's sentence classified before trace routes it (T2 D3).
  * @see specs/traces-v2/instant-eval-search.feature
  */
 import { defineTrpcContract } from "@langwatch/module";
@@ -11,6 +12,8 @@ import {
   explorerInstantEvalProjectSchema,
   explorerInstantEvalRunIdSchema,
   explorerInstantEvalRunSchema,
+  explorerSearchClassificationInputSchema,
+  explorerSearchClassificationSchema,
 } from "./instant-eval-explorer.schemas.ts";
 import { instantEvalEstimateSchema, instantEvalOptInAccessSchema } from "./instant-eval.schemas.ts";
 
@@ -40,4 +43,8 @@ export const instantEvalTrpc = defineTrpcContract("instantEval")
   .mutation("enable")
   .withInput(explorerInstantEvalProjectSchema)
   .withOutput(instantEvalOptInAccessSchema)
+
+  .mutation("classifySearch")
+  .withInput(explorerSearchClassificationInputSchema)
+  .withOutput(explorerSearchClassificationSchema)
   .build();

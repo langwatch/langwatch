@@ -6,6 +6,8 @@ import { GatewayApi } from "@langwatch/gateway-contract";
 import {
   type ExplorerInstantEvalProgress,
   type ExplorerInstantEvalRunInput,
+  type ExplorerSearchClassification,
+  type ExplorerSearchClassificationInput,
   type InstantEvalActor,
   type InstantEvalApi as InstantEvalApiContract,
   InstantEvalApi,
@@ -66,6 +68,7 @@ import {
 } from "../rules/instant-eval-wire.rules.ts";
 import { InstantEvalAccessService } from "../services/instant-eval-access.service.ts";
 import { InstantEvalCancelService } from "../services/instant-eval-cancel.service.ts";
+import { InstantEvalClassifySearchService } from "../services/instant-eval-classify-search.service.ts";
 import { InstantEvalClassifyService } from "../services/instant-eval-classify.service.ts";
 import { InstantEvalCloudJudgeService } from "../services/instant-eval-cloud-judge.service.ts";
 import { InstantEvalCommandDispatcherService } from "../services/instant-eval-command-dispatcher.service.ts";
@@ -153,6 +156,7 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
   private readonly access: InstantEvalAccessService;
   private readonly optIns: InstantEvalOptInService;
   private readonly classifications: InstantEvalClassifyService;
+  private readonly searchClassifications: InstantEvalClassifySearchService;
   private readonly reads: InstantEvalReadsService;
   private readonly runs: InstantEvalRunService;
   private readonly dispatcher: InstantEvalCommandDispatcherService;
@@ -165,6 +169,7 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
     access: InstantEvalAccessService;
     optIns: InstantEvalOptInService;
     classifications: InstantEvalClassifyService;
+    searchClassifications: InstantEvalClassifySearchService;
     reads: InstantEvalReadsService;
     runs: InstantEvalRunService;
     dispatcher: InstantEvalCommandDispatcherService;
@@ -176,6 +181,7 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
     this.access = options.access;
     this.optIns = options.optIns;
     this.classifications = options.classifications;
+    this.searchClassifications = options.searchClassifications;
     this.reads = options.reads;
     this.runs = options.runs;
     this.dispatcher = options.dispatcher;
@@ -281,6 +287,7 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
       queryTokenBudget: setup.config.queryTokenBudget,
     });
 
+    const classifications = InstantEvalClassifyService.create({ judge });
     return new InstantEvalModule({
       hostedSpend,
       queries,
@@ -294,7 +301,11 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
       }),
       access,
       optIns,
-      classifications: InstantEvalClassifyService.create({ judge }),
+      classifications,
+      searchClassifications: InstantEvalClassifySearchService.create({
+        classifications,
+        peers: { isReleased: (input) => access.isReleased(input), traces },
+      }),
       reads,
       runs: InstantEvalRunService.create({
         units: {
@@ -673,6 +684,10 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
     runIds: readonly string[];
   }): Promise<InstantEvalRunProgress[]> {
     return this.reads.findRunProgress(input);
+  }
+
+  classifySearch(input: ExplorerSearchClassificationInput): Promise<ExplorerSearchClassification> {
+    return this.searchClassifications.classifySearch(input);
   }
 
   async classify(input: {

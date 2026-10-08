@@ -47,6 +47,10 @@ function harness({ permitted = () => true }: { permitted?: (permission: string) 
   const estimateExplorerRun = vi.fn<InstantEvalBrowserApi["estimateExplorerRun"]>(async () => {
     throw new InstantEvalClassifierNotConfiguredError();
   });
+  const classifySearch = vi.fn<InstantEvalBrowserApi["classifySearch"]>(async () => ({
+    classified: "instant_eval",
+    isInstantEvalAvailable: true,
+  }));
   const getOptInAccess = vi.fn(async () => OFFERED);
   const optIn = vi.fn(async () => ({
     released: true,
@@ -59,6 +63,7 @@ function harness({ permitted = () => true }: { permitted?: (permission: string) 
     cancelExplorerRun,
     startExplorerRun,
     estimateExplorerRun,
+    classifySearch,
   });
   const permissions: string[] = [];
   const auditRows: TrpcRuntimeAuditEntry[] = [];
@@ -93,6 +98,7 @@ function harness({ permitted = () => true }: { permitted?: (permission: string) 
     getExplorerRun,
     startExplorerRun,
     estimateExplorerRun,
+    classifySearch,
     getOptInAccess,
     optIn,
     permissions,
@@ -120,8 +126,8 @@ function traceTrpcNamespaces(): string[] {
 
 describe("given the instantEval tRPC contract", () => {
   describe("when its members are read", () => {
-    /** @scenario "The Explorer's six procedures are served under instantEval" */
-    it("declares the six procedures under instantEval, and trace declares none of them", () => {
+    /** @scenario "The Explorer's seven procedures are served under instantEval" */
+    it("declares the seven procedures under instantEval, and trace declares none of them", () => {
       expect(
         Object.entries(instantEvalTrpc.members).map(([name, member]) => [name, member.kind]),
       ).toEqual([
@@ -131,6 +137,7 @@ describe("given the instantEval tRPC contract", () => {
         ["get", "query"],
         ["access", "query"],
         ["enable", "mutation"],
+        ["classifySearch", "mutation"],
       ]);
       expect([instantEvalTrpc.namespace, instantEvalTrpcTransport.namespace]).toEqual([
         "instantEval",
@@ -180,7 +187,44 @@ describe("given a member the project's permissions refuse", () => {
   });
 });
 
+const CLASSIFY_REQUEST = {
+  projectId: "project-1",
+  text: "frustrated users",
+  timeRange: { from: 1_000, to: 2_000 },
+  lensId: "conversations",
+  isLangyAvailable: false,
+};
+
+describe("given a member without analytics:view asking to classify a search", () => {
+  describe("when they ask instantEval.classifySearch", () => {
+    /** @scenario "Classifying a search asks analytics:view" */
+    it("is refused as forbidden before the classifier is asked", async () => {
+      const { caller, classifySearch } = harness({
+        permitted: (permission) => permission !== "analytics:view",
+      });
+
+      await expect(caller.classifySearch(CLASSIFY_REQUEST)).rejects.toMatchObject({
+        code: "FORBIDDEN",
+      });
+      expect(classifySearch).not.toHaveBeenCalled();
+    });
+  });
+});
+
 describe("given the instantEval router", () => {
+  describe("when a search sentence is classified", () => {
+    it("hands the search context to the app under analytics:view and answers its classification", async () => {
+      const { caller, classifySearch, permissions } = harness();
+
+      await expect(caller.classifySearch(CLASSIFY_REQUEST)).resolves.toEqual({
+        classified: "instant_eval",
+        isInstantEvalAvailable: true,
+      });
+      expect(classifySearch).toHaveBeenCalledWith(CLASSIFY_REQUEST);
+      expect(permissions).toEqual(["analytics:view"]);
+    });
+  });
+
   describe("when a run is read back", () => {
     it("reads it for the project under analytics:view", async () => {
       const { caller, getExplorerRun, permissions } = harness();
