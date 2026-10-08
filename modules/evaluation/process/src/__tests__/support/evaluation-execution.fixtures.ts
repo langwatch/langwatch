@@ -2,10 +2,8 @@ import {
   type EvaluationExecutionResult,
   type EvaluationRunData,
   type ExecuteEvaluationCommandData,
-  type EvaluationSummary,
   type MonitorPerformanceQuery,
   type OnlineEvaluationPerformance,
-  type TraceEvaluationData,
   executeEvaluationCommandDataSchema,
   EXECUTE_EVALUATION_COMMAND_TYPE,
   type ExecuteEvaluationCommand as ExecuteEvaluationInput,
@@ -146,14 +144,6 @@ export class TestEvaluationService {
 
   async findRunsByTraceId(_input: never): Promise<EvaluationRunData[]> {
     return [];
-  }
-
-  async findSummariesByTraceIds(_input: never): Promise<Record<string, EvaluationSummary[]>> {
-    return {};
-  }
-
-  async findTraceEvaluations(_input: never): Promise<Record<string, TraceEvaluationData[]>> {
-    return {};
   }
 
   async findInputs(_input: never): Promise<Record<string, unknown> | null> {

@@ -95,10 +95,6 @@ describe("given a process that installs the evaluation module over its repositor
         await expect(app.findRunsByTraceId({ tenantId: TENANT, traceId: TRACE })).resolves.toEqual([
           run(),
         ]);
-        const evaluations = await app.findTraceEvaluations({ tenantId: TENANT, traceIds: [TRACE] });
-        expect(evaluations[TRACE]).toMatchObject([
-          { evaluationId: "evaluation-1", status: "processed", inputs: { output: "hello" } },
-        ]);
         await expect(
           app.getRunByEvaluationId({ tenantId: "project-2", evaluationId: "evaluation-1" }),
         ).rejects.toMatchObject({ code: "evaluation_not_found" });

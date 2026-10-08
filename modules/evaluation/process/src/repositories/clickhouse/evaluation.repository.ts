@@ -2,10 +2,6 @@ import type {
   EvaluationInputsQuery,
   EvaluationRunData,
   EvaluationRunsByTraceQuery,
-  EvaluationSummariesByTraceIdsQuery,
-  EvaluationSummary,
-  TraceEvaluationData,
-  TraceEvaluationsQuery,
 } from "@langwatch/evaluation-contract";
 
 import {
@@ -57,18 +53,6 @@ export class ClickHouseEvaluationRepository extends EvaluationRunRepository {
 
   findByTraceId(input: EvaluationRunsByTraceQuery): Promise<EvaluationRunData[]> {
     return this.reader.findByTraceId(input);
-  }
-
-  findSummariesByTraceIds(
-    input: EvaluationSummariesByTraceIdsQuery,
-  ): Promise<Record<string, EvaluationSummary[]>> {
-    return this.reader.findSummariesByTraceIds(input);
-  }
-
-  findTraceEvaluations(
-    input: TraceEvaluationsQuery,
-  ): Promise<Record<string, TraceEvaluationData[]>> {
-    return this.reader.findTraceEvaluations(input);
   }
 
   findInputs(input: EvaluationInputsQuery): Promise<Record<string, unknown> | null> {

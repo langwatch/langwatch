@@ -37,7 +37,10 @@ function repositoryOver(ch: ReturnType<typeof client>) {
 
 describe("given evaluation has recorded runs against a trace", () => {
   describe("when trace reads the runs recorded against that trace", () => {
-    /** @scenario "A trace's evaluation runs are the latest version of each run from the last seven days" */
+    /**
+     * @scenario "A trace's evaluation runs are the latest version of each run from the last seven days"
+     * @scenario "A trace whose evaluation has landed still reads"
+     */
     it("reads the tenant's latest version of each run over seven days and maps each row", async () => {
       const ch = client(() => [
         {

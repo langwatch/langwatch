@@ -5,17 +5,13 @@ import {
   evaluationRunLookupSchema,
   evaluationRunsByTraceQuerySchema,
   evaluationExecutionResultSchema,
-  evaluationSummariesByTraceIdsQuerySchema,
-  traceEvaluationsQuerySchema,
   executeEvaluationCommandSchema,
   upsertEvaluationRunCommandSchema,
   type EvaluationExecutionResult,
   type EvaluationRunData,
   type EvaluationRunLookup,
-  type EvaluationSummary,
   type MonitorPerformanceQuery,
   type OnlineEvaluationPerformance,
-  type TraceEvaluationData,
   type ExecuteEvaluationCommand,
   type UpsertEvaluationRunCommand,
 } from "@langwatch/evaluation-contract";
@@ -107,23 +103,6 @@ export class EvaluationService {
 
   findRunsByTraceId(input: { tenantId: string; traceId: string }): Promise<EvaluationRunData[]> {
     return this.options.repository.findByTraceId(evaluationRunsByTraceQuerySchema.parse(input));
-  }
-
-  findSummariesByTraceIds(input: {
-    tenantId: string;
-    traceIds: string[];
-    since: number;
-  }): Promise<Record<string, EvaluationSummary[]>> {
-    return this.options.repository.findSummariesByTraceIds(
-      evaluationSummariesByTraceIdsQuerySchema.parse(input),
-    );
-  }
-
-  findTraceEvaluations(input: {
-    tenantId: string;
-    traceIds: string[];
-  }): Promise<Record<string, TraceEvaluationData[]>> {
-    return this.options.repository.findTraceEvaluations(traceEvaluationsQuerySchema.parse(input));
   }
 
   async findInputs(input: {

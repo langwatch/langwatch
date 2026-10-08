@@ -16,6 +16,7 @@ import {
   EvaluatorMissingFieldError,
   evaluateErrorSchema,
   evaluateResponseSchema,
+  deriveEvaluatorId,
   evaluationInputSchema,
   evaluatorCatalogueResponseSchema,
   evaluatorParamsSchema,
@@ -628,7 +629,7 @@ async function runAndReport({
     saved.savedEvaluatorId ??
     monitor?.id ??
     params.evaluator_id ??
-    app.deriveEvaluatorId(params.name ?? checkType);
+    deriveEvaluatorId({ name: params.name ?? checkType });
   const evaluatorName = saved.name;
 
   const runEval = () =>
