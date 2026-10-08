@@ -26,6 +26,7 @@ describe("the identity tRPC surface", () => {
         addEmailIdentifier: "mutation",
         resendIdentifierConfirmation: "mutation",
         removeIdentifier: "mutation",
+        getJoinAdmissions: "query",
       });
     });
 

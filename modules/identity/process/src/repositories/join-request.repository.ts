@@ -44,10 +44,9 @@ export abstract class JoinRequestListReadRepository extends JoinRequestReadRepos
   /** Everything one person is waiting on. */
   abstract findPendingForUser(args: { userId: string }): Promise<JoinRequestAggregateState[]>;
 
-  /** The approved requests of these people on one organization; bounded by both. */
-  abstract findApprovedForMembers(args: {
+  /** The approved requests on one organization, newest first. */
+  abstract findApprovedForOrganization(args: {
     organizationId: string;
-    userIds: readonly string[];
   }): Promise<JoinRequestAggregateState[]>;
 }
 

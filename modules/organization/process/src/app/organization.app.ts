@@ -109,7 +109,7 @@ import {
   type GroupMembershipView,
   type TeamWithProjects,
   type OrganizationDirectoryCounts,
-  type OrganizationMemberProvenance,
+  type OrganizationInvitedMemberIds,
   type OrganizationGroupService,
   type OrganizationFounding,
   type OrganizationMemberSeats,
@@ -404,9 +404,6 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     });
     application.#memberProvenance = MemberProvenanceService.create({
       members: membershipRepository,
-      admissions: {
-        findForMembers: (args) => setup.dependencies.identity.joinAdmissions().findForMembers(args),
-      },
     });
     application.#visibility = OrganizationVisibilityService.create({
       reader: {
@@ -427,7 +424,6 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     application.#invitationDoor = OrganizationInvitationDoorService.create({
       invitations: infrastructure.invitations,
       directory: infrastructure.directory,
-      joinRequests: infrastructure.joinRequests,
       signals: infrastructure.signals,
       lifecycle: infrastructure.lifecycle,
       creationThrottle: infrastructure.inviteCreationThrottle,
@@ -1016,11 +1012,9 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     return this.#dependencies.membership.findMemberById({ ...input, currentUserId: by.id });
   }
 
-  /** Why each member is here, keyed by user id. */
-  getMemberProvenance(input: {
-    organizationId: string;
-  }): Promise<Record<string, OrganizationMemberProvenance>> {
-    return this.#memberProvenance.getForOrganization(input);
+  /** The organization's members and which of them an invitation brought. */
+  getInvitedMemberIds(input: { organizationId: string }): Promise<OrganizationInvitedMemberIds> {
+    return this.#memberProvenance.getInvitedMemberIds(input);
   }
 
   /** Every member of one organization, for the member pickers. */

@@ -153,16 +153,13 @@ export class PrismaJoinRequestReadRepository implements JoinRequestListReadRepos
     return rows.map((row) => PrismaJoinRequestProjectionRepository.rowToJoinRequest(row));
   }
 
-  async findApprovedForMembers({
+  async findApprovedForOrganization({
     organizationId,
-    userIds,
   }: {
     organizationId: string;
-    userIds: readonly string[];
   }): Promise<JoinRequestAggregateState[]> {
-    if (userIds.length === 0) return [];
     const rows = await this.prisma.joinRequest.findMany({
-      where: { organizationId, userId: { in: [...userIds] }, state: "APPROVED" },
+      where: { organizationId, state: "APPROVED" },
       orderBy: { createdAt: "desc" },
     });
     return rows.map((row) => PrismaJoinRequestProjectionRepository.rowToJoinRequest(row));

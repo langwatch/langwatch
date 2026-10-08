@@ -119,3 +119,18 @@ Feature: Invitation acceptance and role recomputation
     Then the answer is absent
     And nothing is thrown
 
+
+  # Identity closes open join requests from this fact (specs/identity/join-requests.feature).
+  @unit
+  Scenario: An invitation batch names the invitees who already hold an account
+    Given an administrator invites "sam", who has an account, and "kim", who has none
+    When the batch is created
+    Then the batch's fact names "sam" with the invitation sent to him
+    And it does not name "kim"
+
+  @unit
+  Scenario: A failed invitee lookup still records the batch
+    Given the accounts behind the invited addresses cannot be read
+    When the batch is created
+    Then the invitations are created and the batch's fact names no invitees
+    And the failure is reported

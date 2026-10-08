@@ -10,6 +10,7 @@ import type {
   scimReconciliationTrpc,
   scimTokenTrpc,
 } from "@langwatch/enterprise-scim-contract";
+import type { identityTrpc } from "@langwatch/identity-contract";
 import type { groupTrpc, organizationTrpc } from "@langwatch/organization-contract";
 
 /** One bearer token, as the table renders it: metadata, never the secret. */
@@ -53,12 +54,13 @@ export type OversightSyncRow =
   OutputsFromMap<ScimApiMap>["scimOversight"]["getAll"]["syncs"][number];
 
 /**
- * The two organization reads the directory card states its numbers from:
- * which groups the directory sent, and who it did not create. Called through
- * organization's contract, never its browser package.
+ * The reads the directory card states its numbers from: which groups the directory sent, and why
+ * each member is here (organization's invited ids joined to identity's admissions). Called through
+ * the owners' contracts, never their browser packages.
  */
 export type DirectoryMembershipApiMap = ContractApiMap<typeof groupTrpc> &
-  ContractApiMap<typeof organizationTrpc>;
+  ContractApiMap<typeof organizationTrpc> &
+  ContractApiMap<typeof identityTrpc>;
 
 export const directoryMembershipApi = createModuleApi<DirectoryMembershipApiMap>();
 

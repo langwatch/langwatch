@@ -199,9 +199,9 @@ export const organizationTrpcTransport: TrpcRouterDeclaration<
   )
 
   /** Bounded by the organization's own membership, never a caller-supplied id list. */
-  .procedure("getMemberProvenance")
+  .procedure("getInvitedMemberIds")
   .withPermission("organization:manage")
-  .handle(({ app, input }) => app.getMemberProvenance(input))
+  .handle(({ app, input }) => app.getInvitedMemberIds(input))
 
   .procedure("updateTeamMemberRole")
   .withEntitlement("enterprise", customRoleGate)

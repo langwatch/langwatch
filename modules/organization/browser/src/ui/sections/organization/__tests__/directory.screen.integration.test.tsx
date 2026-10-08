@@ -20,6 +20,18 @@ const state = vi.hoisted(() => ({
   extraGroups: [] as unknown[],
 }));
 
+vi.mock("../../../../behavior/use-member-provenance.ts", () => ({
+  useMemberProvenance: () => ({
+    data: {
+      sam: { source: "domain", domain: "acme.com", automatic: true },
+      ana: { source: "unknown" },
+    },
+    isError: false,
+    error: null,
+    refetch: () => Promise.resolve([]),
+  }),
+}));
+
 vi.mock("../../../../behavior/organization-api.ts", () => {
   const member = (userId: string, name: string) => ({
     userId,
@@ -56,10 +68,6 @@ vi.mock("../../../../behavior/organization-api.ts", () => {
       invite("ian", "PENDING"),
       invite("old", "ACCEPTED"),
     ],
-    "organization.getMemberProvenance": {
-      sam: { source: "domain", domain: "acme.com", automatic: true },
-      ana: { source: "unknown" },
-    },
     "plan.getActivePlan": { type: "ENTERPRISE", free: false, maxMembers: 100 },
     "departments.assignments": { users: [], teams: [], projects: [] },
     "limits.getUsage": { membersCount: 2, membersLiteCount: 0 },

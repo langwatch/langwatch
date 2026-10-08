@@ -16,7 +16,6 @@ function door({ proven }: { proven: string[] }) {
   const service = OrganizationInvitationDoorService.create({
     invitations: createApiFixture<OrganizationInvitations>({ findPendingForAddresses }),
     directory: { findProvenAddresses },
-    joinRequests: null,
     signals: createApiFixture<OrganizationSignals>({ trackServerEvent: vi.fn() }),
     lifecycle: { membersInvited: vi.fn(), inviteAccepted: vi.fn() },
     creationThrottle: { assertCreationAllowed: async () => {} },

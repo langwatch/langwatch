@@ -448,12 +448,12 @@ Points one team at a department, or clears it; false when no such team (main `de
 assignTeamDepartment(input: { organizationId: string; teamId: string; departmentId: string | null; }): Promise<boolean>;
 ```
 
-#### `getMemberProvenance`
+#### `getInvitedMemberIds`
 
-Why each member is here, keyed by user id; explains, never grants.
+The organization's members and which of them an invitation brought; explains, never grants.
 
 ```typescript
-getMemberProvenance(input: Readonly<{ organizationId: string }>): Promise<Record<string, OrganizationMemberProvenance>>;
+getInvitedMemberIds(input: Readonly<{ organizationId: string }>): Promise<OrganizationInvitedMemberIds>;
 ```
 
 #### `findAdministrators`
@@ -1668,22 +1668,22 @@ Contract `../contract/src/license-enforcement.trpc.ts:24`, router `src/transport
 
 Contract `../contract/src/organization.trpc.ts:60`, router `src/transport/organization.trpc.ts:81`.
 
-| Procedure                                              | Kind     | Gate                                                                                                                                  | Input                                            | Output                                     |
-| ------------------------------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | ------------------------------------------ |
-| `organization.createAndAssign`                         | mutation | No permission: runs before or across organization membership: creating an organization, listing the caller's own, accepting an invite | `organizationApiCreateAndAssignInputSchema`      | `organizationCreatedSchema`                |
-| `organization.deleteMember`                            | mutation | Permission `organization:manage`                                                                                                      | `organizationApiMemberScopeSchema`               | `organizationWriteAckSchema`               |
-| `organization.setMemberDisabled`                       | mutation | Permission `organization:manage`                                                                                                      | `organizationApiSetMemberDisabledInputSchema`    | `organizationWriteAckSchema`               |
-| `organization.getAll`                                  | query    | No permission: runs before or across organization membership: creating an organization, listing the caller's own, accepting an invite | `organizationApiGetAllInputSchema`               | `organizationFullyLoadedListSchema`        |
-| `organization.getScopeGraph`                           | query    | No permission: runs before or across organization membership: creating an organization, listing the caller's own, accepting an invite | `organizationApiScopeGraphInputSchema`           | `scopeGraphSchema`                         |
-| `organization.update`                                  | mutation | Permission `organization:manage`                                                                                                      | `organizationApiUpdateInputSchema`               | `organizationWriteAckSchema`               |
-| `organization.getOrganizationWithMembersAndTheirTeams` | query    | Permission `organization:view`                                                                                                        | `organizationApiWithMembersInputSchema`          | `organizationMemberDirectorySchema`        |
-| `organization.getDirectoryCounts`                      | query    | Permission `organization:manage`                                                                                                      | `organizationApiScopeSchema`                     | `organizationDirectoryCountsSchema`        |
-| `organization.getMemberById`                           | query    | Permission `organization:manage`                                                                                                      | `organizationApiMemberScopeSchema`               | `organizationMemberRecordSchema`           |
-| `organization.getMemberProvenance`                     | query    | Permission `organization:manage`                                                                                                      | `organizationApiScopeSchema`                     | `organizationMemberProvenanceByUserSchema` |
-| `organization.updateTeamMemberRole`                    | mutation | Permission `organization:manage, via teamId`; Entitlement `enterprise` (feature `RBAC`)                                               | `organizationApiUpdateTeamMemberRoleInputSchema` | `organizationWriteAckSchema`               |
-| `organization.getAllOrganizationMembers`               | query    | Permission `organization:manage`                                                                                                      | `organizationApiScopeSchema`                     | `organizationUserRowsSchema`               |
-| `organization.updateMemberRole`                        | mutation | Permission `organization:manage`; Entitlement `enterprise` (feature `RBAC`)                                                           | `organizationApiUpdateMemberRoleInputSchema`     | `organizationMemberRoleChangedSchema`      |
-| `organization.getAuditLogs`                            | query    | Permission `auditLog:view, via organizationId`; Entitlement `enterprise` (feature `AUDIT_LOGS`)                                       | `organizationApiAuditLogsInputSchema`            | `organizationAuditLogPageSchema`           |
+| Procedure                                              | Kind     | Gate                                                                                                                                  | Input                                            | Output                                |
+| ------------------------------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | ------------------------------------- |
+| `organization.createAndAssign`                         | mutation | No permission: runs before or across organization membership: creating an organization, listing the caller's own, accepting an invite | `organizationApiCreateAndAssignInputSchema`      | `organizationCreatedSchema`           |
+| `organization.deleteMember`                            | mutation | Permission `organization:manage`                                                                                                      | `organizationApiMemberScopeSchema`               | `organizationWriteAckSchema`          |
+| `organization.setMemberDisabled`                       | mutation | Permission `organization:manage`                                                                                                      | `organizationApiSetMemberDisabledInputSchema`    | `organizationWriteAckSchema`          |
+| `organization.getAll`                                  | query    | No permission: runs before or across organization membership: creating an organization, listing the caller's own, accepting an invite | `organizationApiGetAllInputSchema`               | `organizationFullyLoadedListSchema`   |
+| `organization.getScopeGraph`                           | query    | No permission: runs before or across organization membership: creating an organization, listing the caller's own, accepting an invite | `organizationApiScopeGraphInputSchema`           | `scopeGraphSchema`                    |
+| `organization.update`                                  | mutation | Permission `organization:manage`                                                                                                      | `organizationApiUpdateInputSchema`               | `organizationWriteAckSchema`          |
+| `organization.getOrganizationWithMembersAndTheirTeams` | query    | Permission `organization:view`                                                                                                        | `organizationApiWithMembersInputSchema`          | `organizationMemberDirectorySchema`   |
+| `organization.getDirectoryCounts`                      | query    | Permission `organization:manage`                                                                                                      | `organizationApiScopeSchema`                     | `organizationDirectoryCountsSchema`   |
+| `organization.getMemberById`                           | query    | Permission `organization:manage`                                                                                                      | `organizationApiMemberScopeSchema`               | `organizationMemberRecordSchema`      |
+| `organization.getInvitedMemberIds`                     | query    | Permission `organization:manage`                                                                                                      | `organizationApiScopeSchema`                     | `organizationInvitedMemberIdsSchema`  |
+| `organization.updateTeamMemberRole`                    | mutation | Permission `organization:manage, via teamId`; Entitlement `enterprise` (feature `RBAC`)                                               | `organizationApiUpdateTeamMemberRoleInputSchema` | `organizationWriteAckSchema`          |
+| `organization.getAllOrganizationMembers`               | query    | Permission `organization:manage`                                                                                                      | `organizationApiScopeSchema`                     | `organizationUserRowsSchema`          |
+| `organization.updateMemberRole`                        | mutation | Permission `organization:manage`; Entitlement `enterprise` (feature `RBAC`)                                                           | `organizationApiUpdateMemberRoleInputSchema`     | `organizationMemberRoleChangedSchema` |
+| `organization.getAuditLogs`                            | query    | Permission `auditLog:view, via organizationId`; Entitlement `enterprise` (feature `AUDIT_LOGS`)                                       | `organizationApiAuditLogsInputSchema`            | `organizationAuditLogPageSchema`      |
 
 ### `personalWorkspaceFeatures`
 
@@ -1727,17 +1727,18 @@ Declared at `src/eventing/organization-audit.pipeline.ts:46`. Events: `organizat
 
 ### Pipeline `organization_lifecycle` (aggregate `organization`)
 
-Declared at `src/eventing/organization-lifecycle.pipeline.ts:32`. Events: `organizationSignedUpEventSchema`, `membersInvitedEventSchema`, `inviteAcceptedEventSchema`, `integrationMethodChosenEventSchema`, `personalWorkspaceProvisionedEventSchema`, `organizationPresenceSettingChangedEventSchema`, `organizationTraceSharingDisabledEventSchema`.
+Declared at `src/eventing/organization-lifecycle.pipeline.ts:34`. Events: `organizationSignedUpEventSchema`, `membersInvitedEventSchema`, `inviteAcceptedEventSchema`, `integrationMethodChosenEventSchema`, `personalWorkspaceProvisionedEventSchema`, `organizationPresenceSettingChangedEventSchema`, `organizationTraceSharingDisabledEventSchema`, `organizationMemberDisabledEventSchema`.
 
 | Kind    | Name                                 | Handles | Declared at                                          |
 | ------- | ------------------------------------ | ------- | ---------------------------------------------------- |
-| command | `recordSignedUp`                     | –       | `src/eventing/organization-lifecycle.pipeline.ts:45` |
-| command | `recordMembersInvited`               | –       | `src/eventing/organization-lifecycle.pipeline.ts:46` |
-| command | `recordInviteAccepted`               | –       | `src/eventing/organization-lifecycle.pipeline.ts:47` |
-| command | `recordIntegrationMethodChosen`      | –       | `src/eventing/organization-lifecycle.pipeline.ts:48` |
-| command | `recordPersonalWorkspaceProvisioned` | –       | `src/eventing/organization-lifecycle.pipeline.ts:49` |
-| command | `recordPresenceSettingChanged`       | –       | `src/eventing/organization-lifecycle.pipeline.ts:50` |
-| command | `recordTraceSharingDisabled`         | –       | `src/eventing/organization-lifecycle.pipeline.ts:51` |
+| command | `recordSignedUp`                     | –       | `src/eventing/organization-lifecycle.pipeline.ts:48` |
+| command | `recordMembersInvited`               | –       | `src/eventing/organization-lifecycle.pipeline.ts:49` |
+| command | `recordInviteAccepted`               | –       | `src/eventing/organization-lifecycle.pipeline.ts:50` |
+| command | `recordIntegrationMethodChosen`      | –       | `src/eventing/organization-lifecycle.pipeline.ts:51` |
+| command | `recordPersonalWorkspaceProvisioned` | –       | `src/eventing/organization-lifecycle.pipeline.ts:52` |
+| command | `recordPresenceSettingChanged`       | –       | `src/eventing/organization-lifecycle.pipeline.ts:53` |
+| command | `recordTraceSharingDisabled`         | –       | `src/eventing/organization-lifecycle.pipeline.ts:54` |
+| command | `recordMemberDisabled`               | –       | `src/eventing/organization-lifecycle.pipeline.ts:55` |
 
 ### Pipeline `organization_seat_limit` (aggregate `organization_seat_limit`)
 
@@ -1759,7 +1760,7 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                          | Environment variable      | Declared at                                 |
 | ------ | ----------------------------- | ------------------------- | ------------------------------------------- |
-| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:346`           |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:343`           |
 | config | `signUp.mode`                 | `SIGN_UP_MODE`            | `../contract/src/organization.config.ts:17` |
 | config | `signUp.allowedDomains`       | `SIGN_UP_ALLOWED_DOMAINS` | `../contract/src/organization.config.ts:18` |
 | config | `signUp.adminEmails`          | `ADMIN_EMAILS`            | `../contract/src/organization.config.ts:19` |

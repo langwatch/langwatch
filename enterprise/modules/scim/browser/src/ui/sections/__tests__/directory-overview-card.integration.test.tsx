@@ -17,6 +17,13 @@ const { state } = vi.hoisted(() => ({
   },
 }));
 
+vi.mock("../../../behavior/use-member-provenance.ts", () => ({
+  useMemberProvenance: ({ enabled }: { enabled: boolean }) => {
+    if (enabled) state.membershipQueried.push("organization.getMemberProvenance");
+    return { data: enabled ? state.provenance : void 0, isLoading: false, isError: false };
+  },
+}));
+
 vi.mock("../../../behavior/scim-api.ts", () => {
   const read = (data: () => unknown) => ({ data: data(), isLoading: false, isError: false });
   return {
@@ -37,16 +44,6 @@ vi.mock("../../../behavior/scim-api.ts", () => {
             if (options.enabled) state.membershipQueried.push("group.listAll");
             return options.enabled
               ? read(() => state.groups)
-              : { data: void 0, isLoading: false, isError: false };
-          },
-        },
-      },
-      organization: {
-        getMemberProvenance: {
-          useQuery: (_input: unknown, options: { enabled: boolean }) => {
-            if (options.enabled) state.membershipQueried.push("organization.getMemberProvenance");
-            return options.enabled
-              ? read(() => state.provenance)
               : { data: void 0, isLoading: false, isError: false };
           },
         },

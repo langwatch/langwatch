@@ -29,6 +29,10 @@ import {
   JOIN_REQUEST_INVITE_ACCEPTED_SUBSCRIBER_NAME,
   joinRequestInviteAcceptedSubscriber,
 } from "./join-request-invite-accepted.subscriber.ts";
+import {
+  JOIN_REQUEST_MEMBERS_INVITED_SUBSCRIBER_NAME,
+  joinRequestMembersInvitedSubscriber,
+} from "./join-request-members-invited.subscriber.ts";
 import { runSsoDomainReproofSweep } from "./sso-domain-reproof-sweep.intent.ts";
 import {
   SSO_DOMAIN_REPROOF_SWEEP_INITIAL_STATE,
@@ -59,6 +63,10 @@ export const identityEventing = defineEventingModule({
       .withPeerSubscriber(
         JOIN_REQUEST_INVITE_ACCEPTED_SUBSCRIBER_NAME,
         joinRequestInviteAcceptedSubscriber({ joinRequests: () => app.joinRequests() }),
+      )
+      .withPeerSubscriber(
+        JOIN_REQUEST_MEMBERS_INVITED_SUBSCRIBER_NAME,
+        joinRequestMembersInvitedSubscriber({ joinRequests: () => app.joinRequests() }),
       )
       .withProcessManager(BREAK_GLASS_EXPIRY_WARN_PROCESS_NAME, (pm) =>
         pm

@@ -1,5 +1,6 @@
 import { moduleApi } from "@langwatch/module";
 import type { SystemMigration } from "@langwatch/system-migrations";
+import type { z } from "zod";
 
 import type {
   AccountIdentifier,
@@ -47,6 +48,7 @@ import type {
 } from "./facts.ts";
 import type { IdentityEmailResolution } from "./identity-email.service.ts";
 import type { VerifiedUserDomain } from "./identity-lookup.ts";
+import type { identityDomainAdmissionSchema } from "./identity.trpc.ts";
 import type {
   DomainJoinSetting,
   JoinerRole,
@@ -608,18 +610,11 @@ export interface SsoArrivalApi {
 export type SsoArrivalAdmission = { user: SsoArrivingUser; connectionId: string; domain: string };
 
 /** A member a matching domain admitted, and whether the policy did it with nobody approving. */
-export interface IdentityDomainAdmission {
-  userId: string;
-  domain: string;
-  automatic: boolean;
-}
+export type IdentityDomainAdmission = z.infer<typeof identityDomainAdmissionSchema>;
 
-/** Which of an organization's members joined by domain (D12), for the members list. */
+/** Who a domain admitted to an organization (D12), for the members list's provenance. */
 export interface JoinAdmissionsApi {
-  findForMembers(args: {
-    organizationId: string;
-    userIds: readonly string[];
-  }): Promise<IdentityDomainAdmission[]>;
+  findForOrganization(args: { organizationId: string }): Promise<IdentityDomainAdmission[]>;
 }
 
 /** Both values and both domain lists of a saved joining setting, for its audit row. */

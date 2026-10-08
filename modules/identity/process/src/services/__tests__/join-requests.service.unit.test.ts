@@ -125,7 +125,7 @@ function harness({
     findPendingForOrganization: vi.fn(async () => []),
     findPendingForUser: vi.fn(async () => []),
     findAutomaticJoinsForOrganization: vi.fn(async () => []),
-    findApprovedForMembers: vi.fn(async () => []),
+    findApprovedForOrganization: vi.fn(async () => []),
   };
   const dismissals = {
     dismissedDomains: vi.fn(async () => dismissedDomains),

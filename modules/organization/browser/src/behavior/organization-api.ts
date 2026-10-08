@@ -37,7 +37,7 @@ import type {
   OrganizationDirectoryCounts,
   OrganizationInvite,
   OrganizationMemberDirectory,
-  OrganizationMemberProvenance,
+  OrganizationInvitedMemberIds,
   OrganizationMemberRecord,
   OrganizationMemberUser,
   PendingInvitationsForCaller,
@@ -290,11 +290,11 @@ export type OrganizationApiMap = ContractApiMap<typeof licenseEnforcementTrpc> &
         };
       };
 
-      /** Why each member is here, keyed by user id; asked apart so failing costs only the chips. */
-      getMemberProvenance: {
+      /** Organization's half of provenance: its members and whom an invitation brought. */
+      getInvitedMemberIds: {
         query: {
           input: { organizationId: string };
-          output: Record<string, OrganizationMemberProvenance>;
+          output: OrganizationInvitedMemberIds;
         };
       };
 

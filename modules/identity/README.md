@@ -12,7 +12,7 @@ The platform operator's identity lookup: find a person by address, review propos
 | Subjects       | identity                                                                                                                  |
 | Halves         | [contract](contract) · [process](process/README.md)                                                                       |
 | Api token      | `IdentityLookupApi` = `moduleApi<IdentityLookupApi>()("identity")`, `contract/src/identity-lookup.ts:241` (11 operations) |
-| Other token    | `IdentityApi`, `contract/src/identity.api.ts:825`                                                                         |
+| Other token    | `IdentityApi`, `contract/src/identity.api.ts:820`                                                                         |
 | Other token    | `TwoStepVerificationApi`, `contract/src/two-step-verification.ts:118`                                                     |
 | Installed by   | api, worker, tasks (process)                                                                                              |
 

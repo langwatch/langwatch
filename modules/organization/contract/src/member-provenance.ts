@@ -1,4 +1,4 @@
-import type { OrganizationMemberProvenance } from "@langwatch/organization-contract";
+import type { OrganizationMemberProvenance } from "./organization.responses.ts";
 
 /** A member a matching domain admitted, as identity answers it. */
 export interface MemberDomainAdmission {

@@ -34,7 +34,6 @@ import type {
   OrganizationIntendedGrant,
 } from "./organization-grant-ceiling.service.ts";
 import type { OrganizationInvitations } from "./organization-invitations.service.ts";
-import type { OrganizationJoinRequests } from "./organization-join-requests.service.ts";
 import type { OrganizationLifecycleNoticeService } from "./organization-lifecycle-notice.service.ts";
 import type { OrganizationSignals } from "./organization-signals.service.ts";
 
@@ -43,7 +42,6 @@ interface OrganizationInvitationDoorDependencies {
   readonly invitations: OrganizationInvitations;
   /** The one proven-address rule the join door also reads. */
   readonly directory: Pick<OrganizationDirectory, "findProvenAddresses">;
-  readonly joinRequests: OrganizationJoinRequests | null;
   readonly signals: OrganizationSignals;
   /** Where an invitation batch and an acceptance are recorded as organization's events. */
   readonly lifecycle: Pick<OrganizationLifecycleNoticeService, "membersInvited" | "inviteAccepted">;
@@ -113,14 +111,13 @@ export class OrganizationInvitationDoorService {
 
     if (withUrls.length === 0) return withUrls;
 
-    await this.#answerOpenJoinRequests(created.invites);
-
     this.deps.lifecycle.membersInvited({
       organizationId: input.organizationId,
       userId: by.id,
       inviteIds: created.invites.map((record) => record.invite.id),
       roles: created.invites.map((record) => record.invite.role),
       teamMemberCount: created.organization.members.length + created.invites.length,
+      invitees: await this.#inviteesWithAccounts(created.invites),
     });
 
     return withUrls;
@@ -307,36 +304,24 @@ export class OrganizationInvitationDoorService {
   }
 
   /**
-   * A formal invitation ANSWERS the same person's open request: it owns role
-   * and teams, so the request resolves approved-by-invitation rather than
-   * staying open beside it. Silent when nothing is open, never fatal.
+   * The invitees who already hold an account, named on the batch's fact so identity answers
+   * their open join requests from its own side (R7). Spec: specs/identity/join-requests.feature
    */
-  async #answerOpenJoinRequests(
-    invites: readonly Readonly<{ invite: { id: string; email: string; organizationId: string } }>[],
-  ): Promise<void> {
-    const joinRequests = this.deps.joinRequests;
-    if (!joinRequests) return;
-
-    await Promise.all(
-      invites.map(async (record) => {
-        const invitedUserId = await this.deps.invitations.findUserIdByEmail({
-          email: record.invite.email,
-        });
-        if (!invitedUserId) return;
-
-        try {
-          await joinRequests.resolveByInvitation({
-            userId: invitedUserId,
-            organizationId: record.invite.organizationId,
-            inviteId: record.invite.id,
+  async #inviteesWithAccounts(
+    invites: readonly Readonly<{ invite: { id: string; email: string } }>[],
+  ): Promise<{ inviteId: string; userId: string }[]> {
+    const invitees = await Promise.all(
+      invites.map(async ({ invite }) => {
+        const userId = await this.deps.invitations
+          .findUserIdByEmail({ email: invite.email })
+          .catch((failure: unknown) => {
+            this.deps.signals.reportError(failure);
+            return null;
           });
-        } catch (error) {
-          this.deps.signals.reportError(error, {
-            tags: { organizationId: record.invite.organizationId },
-          });
-        }
+        return userId ? { inviteId: invite.id, userId } : null;
       }),
     );
+    return invitees.filter((invitee) => invitee !== null);
   }
 
   /**

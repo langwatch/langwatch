@@ -13,6 +13,13 @@ import { ssoTestArrivalStandingSchema } from "./sso-admission.ts";
 
 const emptyInputSchema = z.object({});
 
+/** A member a matching domain admitted, and whether the policy did it with nobody approving. */
+export const identityDomainAdmissionSchema = z.object({
+  userId: z.string(),
+  domain: z.string(),
+  automatic: z.boolean(),
+});
+
 /** Both proofs together: the emailed token and the PKCE verifier the starting browser kept. */
 export const completeVerificationInputSchema = z.object({
   identifierId: z.string().min(1),
@@ -52,4 +59,9 @@ export const identityTrpc = defineTrpcContract("identity")
   .mutation("removeIdentifier")
   .withInput(z.object({ identifierId: z.string().min(1) }))
   .withOutput(z.object({ removed: z.literal(true) }).strict())
+
+  /** An administrator's read: which members a domain admitted, for member provenance. */
+  .query("getJoinAdmissions")
+  .withInput(z.object({ organizationId: z.string().min(1) }))
+  .withOutput(z.array(identityDomainAdmissionSchema))
   .build();

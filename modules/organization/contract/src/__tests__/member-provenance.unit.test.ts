@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { memberProvenanceFor } from "../member-provenance.rules.ts";
+import { memberProvenanceFor } from "../member-provenance.ts";
 
 describe("memberProvenanceFor", () => {
   describe("given members who arrived three different ways", () => {

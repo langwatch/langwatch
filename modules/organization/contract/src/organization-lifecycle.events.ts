@@ -58,6 +58,10 @@ export const membersInvitedEventDataSchema = z.object({
   inviteIds: z.array(z.string().min(1)).min(1),
   roles: z.array(z.string()).min(1),
   teamMemberCount: z.number().int().nonnegative(),
+  /** Invitees who already hold an account; identity closes their open join requests from this. */
+  invitees: z
+    .array(z.object({ inviteId: z.string().min(1), userId: z.string().min(1) }))
+    .optional(),
 });
 export type MembersInvitedEventData = z.infer<typeof membersInvitedEventDataSchema>;
 

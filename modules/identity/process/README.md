@@ -191,7 +191,7 @@ Contract `../contract/src/identity-lookup.trpc.ts:24`, router `src/transport/ide
 
 ### `identity`
 
-Contract `../contract/src/identity.trpc.ts:25`, router `src/transport/identity.trpc.ts:25`.
+Contract `../contract/src/identity.trpc.ts:32`, router `src/transport/identity.trpc.ts:25`.
 
 | Procedure                               | Kind     | Gate                                                                                                                                                              | Input                             | Output                         |
 | --------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- | ------------------------------ |
@@ -202,6 +202,7 @@ Contract `../contract/src/identity.trpc.ts:25`, router `src/transport/identity.t
 | `identity.addEmailIdentifier`           | mutation | No permission: adds an identifier to the session user's own account; no organization scope applies                                                                | inline                            | `emailIdentifierAddedSchema`   |
 | `identity.resendIdentifierConfirmation` | mutation | No permission: re-sends the session user's own address confirmation; the ceremony proves the identifier is theirs                                                 | inline                            | inline                         |
 | `identity.removeIdentifier`             | mutation | No permission: removes an identifier from the session user's own account; the identity guards decide, and no organization scope applies                           | inline                            | inline                         |
+| `identity.getJoinAdmissions`            | query    | Permission `organization:manage`                                                                                                                                  | inline                            | inline                         |
 
 ### `twoStepVerification`
 
@@ -224,13 +225,15 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `identity_maintenance` (aggregate `global`)
 
-Declared at `src/eventing/identity.pipeline.ts:43`.
+Declared at `src/eventing/identity.pipeline.ts:51`.
 
-| Kind            | Name                    | Handles                                                                                           | Declared at                            |
-| --------------- | ----------------------- | ------------------------------------------------------------------------------------------------- | -------------------------------------- |
-| process manager | `breakGlassExpiryWarn`  | every 1 h (`BREAK_GLASS_EXPIRY_WARN_INTERVAL_MS = 60 * 60 * 1000`); intents `warn` (outbox)       | `src/eventing/identity.pipeline.ts:55` |
-| process manager | `ssoDomainReproofSweep` | every 8 h (`SSO_DOMAIN_REPROOF_SWEEP_INTERVAL_MS = 8 * 60 * 60 * 1000`); intents `sweep` (outbox) | `src/eventing/identity.pipeline.ts:71` |
-| peer subscriber | `userRegistered`        | `lw.user.registered` from [user](../../user/README.md)                                            | `src/eventing/identity.pipeline.ts:50` |
+| Kind            | Name                        | Handles                                                                                           | Declared at                            |
+| --------------- | --------------------------- | ------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| process manager | `breakGlassExpiryWarn`      | every 1 h (`BREAK_GLASS_EXPIRY_WARN_INTERVAL_MS = 60 * 60 * 1000`); intents `warn` (outbox)       | `src/eventing/identity.pipeline.ts:71` |
+| process manager | `ssoDomainReproofSweep`     | every 8 h (`SSO_DOMAIN_REPROOF_SWEEP_INTERVAL_MS = 8 * 60 * 60 * 1000`); intents `sweep` (outbox) | `src/eventing/identity.pipeline.ts:87` |
+| peer subscriber | `userRegistered`            | `lw.user.registered` from [user](../../user/README.md)                                            | `src/eventing/identity.pipeline.ts:58` |
+| peer subscriber | `joinRequestInviteAccepted` | ≈ event type not read                                                                             | `src/eventing/identity.pipeline.ts:63` |
+| peer subscriber | `joinRequestMembersInvited` | ≈ event type not read                                                                             | `src/eventing/identity.pipeline.ts:67` |
 
 ### Pipeline `join-requests` (aggregate `join_request`)
 

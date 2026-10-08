@@ -32,6 +32,7 @@ import { useDrawer } from "../../../behavior/use-drawer.ts";
 import { useInviteActions } from "../../../behavior/use-invite-actions.ts";
 import { useJoinRequests } from "../../../behavior/use-join-requests.ts";
 import { useMemberDisableAction } from "../../../behavior/use-member-disable-action.ts";
+import { useMemberProvenance } from "../../../behavior/use-member-provenance.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { usePublicEnv } from "../../../behavior/use-public-env.ts";
 import { useRequiredSession } from "../../../behavior/use-required-session.ts";
@@ -853,10 +854,10 @@ function usePeopleListReads({
   pendingInvites: { data: Invite[] | undefined };
 }) {
   // Asked apart from the list: a failed read leaves everybody listed, without chips.
-  const provenance = api.organization.getMemberProvenance.useQuery(
-    { organizationId: organization.id },
-    { enabled: !!organization.id && canManage },
-  );
+  const provenance = useMemberProvenance({
+    organizationId: organization.id,
+    enabled: !!organization.id && canManage,
+  });
 
   const sortedMembers = useMemo(
     () =>

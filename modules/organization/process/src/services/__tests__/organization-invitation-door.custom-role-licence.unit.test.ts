@@ -35,7 +35,6 @@ function door(options: { beyondCaller?: string[] }) {
     service: OrganizationInvitationDoorService.create({
       invitations,
       directory: { findProvenAddresses: async () => [] },
-      joinRequests: null,
       signals,
       lifecycle: { membersInvited: vi.fn(), inviteAccepted: vi.fn() },
       creationThrottle: { assertCreationAllowed: async () => {} },

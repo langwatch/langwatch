@@ -47,7 +47,7 @@ import type {
   OrganizationInviteExtended,
   OrganizationInviteResent,
   OrganizationListedInvite,
-  OrganizationMemberProvenance,
+  OrganizationInvitedMemberIds,
   OrganizationPendingInviteApplied,
 } from "./organization.responses.ts";
 import type {
@@ -503,10 +503,10 @@ export interface OrganizationApi {
     teamId: string;
     departmentId: string | null;
   }): Promise<boolean>;
-  /** Why each member is here, keyed by user id; explains, never grants. */
-  getMemberProvenance(
+  /** The organization's members and which of them an invitation brought; explains, never grants. */
+  getInvitedMemberIds(
     input: Readonly<{ organizationId: string }>,
-  ): Promise<Record<string, OrganizationMemberProvenance>>;
+  ): Promise<OrganizationInvitedMemberIds>;
   /**
    * Every administrator who can still sign in, with what to call them. Asked
    * by a peer choosing somebody for a decision of an administrator's weight —

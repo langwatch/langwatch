@@ -4372,6 +4372,9 @@ importers:
       '@langwatch/error-views':
         specifier: workspace:*
         version: link:../../../../packages/error-views
+      '@langwatch/identity-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/identity/contract
       '@langwatch/organization-contract':
         specifier: workspace:*
         version: link:../../../../modules/organization/contract

@@ -1,7 +1,7 @@
 /**
- * The server half of `identity.*`: the session user's own identity. No permission applies and
- * none is missing — the session proves who the caller is, and every operation acts on that user
- * alone. Spec: specs/identity/identifier-model.feature.
+ * The server half of `identity.*`: the session user's own identity, where the session proves who
+ * the caller is and no permission applies; `getJoinAdmissions` alone is an administrator's read.
+ * Spec: specs/identity/identifier-model.feature.
  */
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { IdentityApi, identityTrpc } from "@langwatch/identity-contract";
@@ -54,6 +54,12 @@ export const identityTrpcTransport: TrpcRouterDeclaration<IdentityApi, typeof id
 
       return { sent: true as const };
     })
+
+    .procedure("getJoinAdmissions")
+    .withPermission("organization:manage")
+    .handle(({ app, input }) =>
+      app.joinAdmissions().findForOrganization({ organizationId: input.organizationId }),
+    )
 
     .procedure("removeIdentifier")
     .noPermission({ reason: OWN_REMOVE_IDENTIFIER })

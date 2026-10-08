@@ -203,7 +203,6 @@ describe("OrganizationInvitationDoorService.create", () => {
       const door = OrganizationInvitationDoorService.create({
         invitations,
         directory: { findProvenAddresses: async () => [] },
-        joinRequests: null,
         signals: { trackServerEvent: () => {} } as never,
         lifecycle: { membersInvited: () => {}, inviteAccepted: () => {} },
         creationThrottle: throttle,

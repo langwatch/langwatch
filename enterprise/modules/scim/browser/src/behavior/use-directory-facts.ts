@@ -6,6 +6,7 @@
  */
 import { directoryFactsOf } from "../model/directory-facts.ts";
 import { directoryMembershipApi, scimApi } from "./scim-api.ts";
+import { useMemberProvenance } from "./use-member-provenance.ts";
 
 export function useDirectoryFacts({
   organizationId,
@@ -19,10 +20,10 @@ export function useDirectoryFacts({
     { organizationId },
     { enabled: canReadMembership && !!organizationId },
   );
-  const provenance = directoryMembershipApi.organization.getMemberProvenance.useQuery(
-    { organizationId },
-    { enabled: canReadMembership && !!organizationId },
-  );
+  const provenance = useMemberProvenance({
+    organizationId,
+    enabled: canReadMembership && !!organizationId,
+  });
 
   return {
     reconciliation,

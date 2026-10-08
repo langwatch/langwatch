@@ -78,10 +78,6 @@ export interface OrganizationJoinRequests {
       nextJoinerRole: JoinRequestJoining["joinerRole"];
     }>
   >;
-  /** A formal invitation ANSWERS the same person's open request. */
-  resolveByInvitation(
-    input: Readonly<{ userId: string; organizationId: string; inviteId: string }>,
-  ): Promise<void>;
 }
 
 /**
@@ -107,7 +103,6 @@ export class OrganizationJoinRequestsService {
       reject: (input) => ledger().reject(input),
       readJoining: (input) => ledger().readJoining(input),
       setJoining: (input) => ledger().setJoining(input),
-      resolveByInvitation: (input) => ledger().resolveByInvitation(input),
     };
   }
 }
