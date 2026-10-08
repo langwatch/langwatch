@@ -43,6 +43,7 @@ import type {
 import type { z } from "zod";
 import {
   resolveGraphTimeScale,
+  shouldSkipPreviousPeriod,
   withGroupedPipeline,
 } from "~/features/analytics/logic/graphQueryCompensation";
 import { resolveSeriesValueFormat } from "~/features/analytics/logic/seriesValueFormat";
@@ -395,6 +396,7 @@ const CustomGraph_ = React.memo(
         ...queryInput,
         timeScale,
         timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        skipPreviousPeriod: shouldSkipPreviousPeriod(input),
       },
       { ...queryOpts, enabled: queryOpts.enabled && load },
     );
@@ -422,6 +424,8 @@ const CustomGraph_ = React.memo(
         ...queryInput,
         timeScale: "full",
         timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        // The monitor headline reads only the current period.
+        skipPreviousPeriod: true,
       },
       {
         ...queryOpts,

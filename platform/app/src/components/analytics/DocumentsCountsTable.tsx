@@ -1,19 +1,21 @@
 import { Box, Table, Text, VStack } from "@chakra-ui/react";
-import { useFilterParams } from "../../hooks/useFilterParams";
-import { api } from "../../utils/api";
 import { Tooltip } from "../ui/tooltip";
 import { ChartErrorIndicator, ChartErrorState } from "./ChartErrorState";
 import { SummaryMetricValue } from "./SummaryMetric";
 import { useRetryFailedAnalytics } from "./useRetryFailedAnalytics";
+import {
+  type TopUsedDocumentsParams,
+  useTopUsedDocuments,
+} from "./useTopUsedDocuments";
 
 const DOCUMENTS_FALLBACK_TITLE = "Couldn't load documents";
 
-export const DocumentsCountsTable = () => {
-  const { filterParams, queryOpts } = useFilterParams();
-  const documents = api.analytics.topUsedDocuments.useQuery(
-    filterParams,
-    queryOpts,
-  );
+export const DocumentsCountsTable = ({
+  params,
+}: {
+  params?: TopUsedDocumentsParams;
+} = {}) => {
+  const documents = useTopUsedDocuments(params);
   const retryFailedAnalytics = useRetryFailedAnalytics();
 
   if (documents.isLoading) return <Box>Loading...</Box>;
@@ -75,12 +77,12 @@ export const DocumentsCountsTable = () => {
   );
 };
 
-export const DocumentsCountsSummary = () => {
-  const { filterParams, queryOpts } = useFilterParams();
-  const documents = api.analytics.topUsedDocuments.useQuery(
-    filterParams,
-    queryOpts,
-  );
+export const DocumentsCountsSummary = ({
+  params,
+}: {
+  params?: TopUsedDocumentsParams;
+} = {}) => {
+  const documents = useTopUsedDocuments(params);
 
   if (documents.error && !documents.data) {
     return (
