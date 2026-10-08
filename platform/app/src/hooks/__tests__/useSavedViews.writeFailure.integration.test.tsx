@@ -15,28 +15,52 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 type MutationName = "create" | "rename" | "delete" | "reorder";
 
-const { mutationFor, invalidate, setData, toast } = vi.hoisted(() => {
-  const refusal = new Error("aggregate_project_is_read_only");
-  const options: Partial<
-    Record<string, { onError?: (error: unknown) => void }>
-  > = {};
-  const mutationFor = (name: string) => ({
-    useMutation: (hookOptions: { onError?: (error: unknown) => void }) => {
-      options[name] = hookOptions;
-      return {
-        mutate: () => {
-          options[name]?.onError?.(refusal);
+interface DbView {
+  id: string;
+  name: string;
+  filters: Record<string, unknown>;
+  query: string | null;
+  period: unknown;
+}
+
+type MutateOptions = { onError?: (error: unknown) => void };
+
+const { mutationFor, invalidate, setData, toast, cache, filterParams } =
+  vi.hoisted(() => {
+    const refusal = new Error("aggregate_project_is_read_only");
+    const options: Partial<Record<string, MutateOptions>> = {};
+    // The server refuses every write: the hook's own handler runs first, then
+    // the one passed to the single call, as react-query orders them.
+    const mutationFor = (name: string) => ({
+      useMutation: (hookOptions: MutateOptions) => {
+        options[name] = hookOptions;
+        return {
+          mutate: (_input: unknown, callOptions?: MutateOptions) => {
+            options[name]?.onError?.(refusal);
+            callOptions?.onError?.(refusal);
+          },
+        };
+      },
+    });
+    // The query cache the hook edits optimistically, so a rollback is
+    // visible in what the hook renders next.
+    const cache: { views: DbView[] } = { views: [] };
+    return {
+      mutationFor,
+      invalidate: vi.fn(),
+      setData: vi.fn(
+        (
+          _key: unknown,
+          updater: (old: DbView[] | undefined) => DbView[] | undefined,
+        ) => {
+          cache.views = updater(cache.views) ?? [];
         },
-      };
-    },
+      ),
+      toast: vi.fn<(args: { title?: string; type?: string }) => void>(),
+      cache,
+      filterParams: { filters: {} as Record<string, unknown> },
+    };
   });
-  return {
-    mutationFor,
-    invalidate: vi.fn(),
-    setData: vi.fn(),
-    toast: vi.fn<(args: { title?: string; type?: string }) => void>(),
-  };
-});
 
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
@@ -52,7 +76,7 @@ vi.mock("../useOrganizationTeamProject", () => ({
 }));
 
 vi.mock("../useFilterParams", () => ({
-  useFilterParams: () => ({ filters: {} }),
+  useFilterParams: () => filterParams,
 }));
 
 // The toast goes through the real `showErrorToast`, so the title asserted is
@@ -63,25 +87,7 @@ vi.mock("../../utils/api", () => ({
   api: {
     savedViews: {
       getAll: {
-        useQuery: () => ({
-          data: [
-            {
-              id: "view-1",
-              name: "Old View",
-              filters: {},
-              query: null,
-              period: null,
-            },
-            {
-              id: "view-2",
-              name: "Other View",
-              filters: {},
-              query: null,
-              period: null,
-            },
-          ],
-          isFetched: true,
-        }),
+        useQuery: () => ({ data: cache.views, isFetched: true }),
       },
       create: mutationFor("create"),
       rename: mutationFor("rename"),
@@ -129,9 +135,22 @@ const changes: Array<{
   },
 ];
 
+const serverViews: DbView[] = [
+  { id: "view-1", name: "Old View", filters: {}, query: null, period: null },
+  {
+    id: "view-2",
+    name: "Other View",
+    filters: {},
+    query: null,
+    period: null,
+  },
+];
+
 beforeEach(() => {
   vi.clearAllMocks();
   localStorage.clear();
+  cache.views = [...serverViews];
+  filterParams.filters = {};
 });
 
 afterEach(() => {
@@ -156,6 +175,29 @@ describe("useSavedViews()", () => {
           }),
         );
         expect(invalidate).toHaveBeenCalledWith({ projectId: "test-project" });
+      });
+    });
+  });
+
+  describe("given the user has filters on that match no saved view", () => {
+    beforeEach(() => {
+      filterParams.filters = { "traces.error": ["true"] };
+    });
+
+    describe("when the server refuses to save them as a view", () => {
+      /** @scenario "A refused saved-view create leaves no temporary view selected" */
+      it("removes the temporary view and selects nothing", () => {
+        const { result } = renderHook(() => useSavedViews(), { wrapper });
+
+        act(() => {
+          result.current.saveView("New View");
+        });
+
+        expect(result.current.customViews.map((view) => view.id)).toEqual([
+          "view-1",
+          "view-2",
+        ]);
+        expect(result.current.selectedViewId).toBeNull();
       });
     });
   });

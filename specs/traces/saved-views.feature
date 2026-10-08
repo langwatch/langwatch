@@ -328,6 +328,14 @@ Feature: Saved Views on Analytics
       | delete a view                  | Couldn't delete the view    |
       | reorder the views              | Couldn't reorder the views  |
 
+  @integration
+  Scenario: A refused saved-view create leaves no temporary view selected
+    Given the bar shows the saved views from the server
+    And my current filters match none of them
+    When I save the current filters as a view and the server refuses it
+    Then the new view disappears from the bar without waiting for the reload
+    And no view is selected
+
   # ─── Step 5: View Matching and Edge Cases ───────────────────────────
 
   @unit @unimplemented

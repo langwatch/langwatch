@@ -455,6 +455,7 @@ function useSavedViewsInternal() {
           } as (typeof old)[number],
         ];
       });
+      setSelectedViewIdState(tempId);
 
       createMutation.mutate(
         {
@@ -470,10 +471,23 @@ function useSavedViewsInternal() {
             setSelectedViewIdState(newView.id);
             writeSelectedViewId(projectId, newView.id);
           },
+          // The temporary view never reached the server, so take it out of
+          // the list now rather than waiting for the reload, and drop the
+          // selection that points at it. Selecting nothing lets view
+          // matching pick the highlight again, as it does on first load.
+          // The temporary id was never written to localStorage, so the
+          // stored selection is left as it was.
+          onError: () => {
+            utils.savedViews.getAll.setData({ projectId }, (old) =>
+              old?.filter((v) => v.id !== tempId),
+            );
+            setSelectedViewIdState((current) =>
+              current === tempId ? null : current,
+            );
+          },
         },
       );
 
-      setSelectedViewIdState(tempId);
       return optimisticView;
     },
     [
