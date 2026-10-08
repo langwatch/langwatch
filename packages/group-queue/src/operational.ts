@@ -53,6 +53,13 @@ export {
   PayloadTooLargeError,
   splitEnvelope,
 } from "./jobEnvelope.ts";
+export {
+  MemoryQueueDrainAudit,
+  type QueueDrainAudit,
+  type QueueDrainBlocker,
+  type QueueDrainRedis,
+  RedisQueueDrainAudit,
+} from "./drainAudit.ts";
 export { RedisJobBlobStore } from "./redisJobBlobStore.ts";
 export {
   GROUP_QUEUE_REGISTRY_KEY,
