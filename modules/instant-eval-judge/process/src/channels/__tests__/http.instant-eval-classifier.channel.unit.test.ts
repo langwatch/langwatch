@@ -22,6 +22,7 @@ import {
   JEV_DEFAULT_BASE_URL,
 } from "../http/http.instant-eval-classifier.channel.ts";
 import type {
+  InstantEvalClassifyRequest,
   InstantEvalPermit,
   InstantEvalRateLimiterChannel,
 } from "../instant-eval-classifier.channel.ts";
@@ -47,14 +48,17 @@ let waits: number[];
 function judge(
   limiter: InstantEvalRateLimiterChannel = MemoryInstantEvalRateLimiterChannel.create(),
 ) {
-  return HttpInstantEvalClassifierChannel.create({
+  const channel = HttpInstantEvalClassifierChannel.create({
     apiKey: "test-key",
-    limiter,
     dispatcher: agent,
     sleep: async (ms: number) => {
       waits.push(ms);
     },
   });
+  return {
+    classify: (request: Omit<InstantEvalClassifyRequest, "limiter">, signal?: AbortSignal) =>
+      channel.classify({ ...request, limiter }, signal),
+  };
 }
 
 const endpoint = () => agent.get(JEV_DEFAULT_BASE_URL);

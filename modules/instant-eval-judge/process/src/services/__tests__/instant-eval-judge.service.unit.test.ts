@@ -12,8 +12,9 @@ import { createTestLogger } from "@langwatch/test-harness";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
-import { instantEvalClassifierChannels } from "../../channels/instant-eval-classifier-channels.registry.ts";
 import type { InstantEvalClassifyRequest } from "../../channels/instant-eval-classifier.channel.ts";
+import { MemoryInstantEvalClassifierChannel } from "../../channels/memory/memory.instant-eval-classifier.channel.ts";
+import { MemoryInstantEvalRateLimiterChannel } from "../../channels/memory/memory.instant-eval-rate-limiter.channel.ts";
 import {
   MemoryInstantEvalJudgeProjectRepository,
   MemoryInstantEvalJudgeRepositories,
@@ -69,14 +70,15 @@ function harness({
       rows: new Map(isProjectKnown ? [[PROJECT_ID, { organizationId: ORGANIZATION_ID }]] : []),
     }),
   };
-  const classifier = instantEvalClassifierChannels.memory.create({ answer: classify });
-  vi.spyOn(classifier, "classify");
+  const classifier = MemoryInstantEvalClassifierChannel.create({ answer: classify });
+  const classifySpy = vi.spyOn(classifier, "classify");
   const recorded: InstantEvalJudgeSpendPricedEventData[] = [];
   const { logger, lines } = createTestLogger();
   let minted = 0;
   const service = InstantEvalJudgeService.create({
     repositories,
     classifier: hasClassifier ? classifier : undefined,
+    limiter: MemoryInstantEvalRateLimiterChannel.create(),
     isCloud,
     // The spend pipeline's subscriber, stood in: one row per request, never rewritten.
     recordSpendPriced: async (fact) => {
@@ -110,7 +112,7 @@ function harness({
       });
     }
   };
-  return { service, classifier, recorded, repositories, lines, seed };
+  return { service, classifier: { classify: classifySpy }, recorded, repositories, lines, seed };
 }
 
 const call = { projectId: PROJECT_ID, text: "Input: hi\nOutput: hello", questions: [QUESTION] };
@@ -355,6 +357,7 @@ describe("given a judge call the classifier answers", () => {
       const { logger, lines } = createTestLogger();
       const service = InstantEvalJudgeService.create({
         repositories,
+        limiter: MemoryInstantEvalRateLimiterChannel.create(),
         classifier: { classify: async () => answered(500) },
         isCloud: true,
         recordSpendPriced: async () => {
@@ -423,6 +426,7 @@ describe("given an Instant Evals run's spend, for a project the judge has not le
     it("throws, so the run's finish retries onto the same request id", async () => {
       const service = InstantEvalJudgeService.create({
         repositories: MemoryInstantEvalJudgeRepositories.create(),
+        limiter: MemoryInstantEvalRateLimiterChannel.create(),
         classifier: undefined,
         isCloud: true,
         recordSpendPriced: async () => {

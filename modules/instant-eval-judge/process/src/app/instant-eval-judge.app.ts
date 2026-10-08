@@ -14,11 +14,14 @@ import {
 } from "@langwatch/instant-eval-judge-contract";
 import { generate } from "@langwatch/ksuid";
 import type { FeatureSetup } from "@langwatch/process";
-import { Secret } from "@langwatch/secrets";
 import { nowInstant } from "@langwatch/time";
 
-import { instantEvalClassifierChannels } from "../channels/instant-eval-classifier-channels.registry.ts";
-import type { InstantEvalClassifierChannel } from "../channels/instant-eval-classifier.channel.ts";
+import {
+  classifierApiKey,
+  type InstantEvalClassifierChannel,
+  type InstantEvalRateLimiterChannel,
+} from "../channels/instant-eval-classifier.channel.ts";
+import type { InstantEvalJudgeChannels } from "../channels/instant-eval-judge.channels.ts";
 import {
   buildInstantEvalJudgeFactsPipeline,
   type InstantEvalJudgeFactsPipeline,
@@ -28,7 +31,6 @@ import {
   type InstantEvalJudgeSpendPipeline,
 } from "../eventing/instant-eval-judge-spend.pipeline.ts";
 import type { InstantEvalJudgeRepositories } from "../repositories/instant-eval-judge.repositories.ts";
-import { cloudClassifierKeyOf } from "../rules/instant-eval-judge-cloud-key.rules.ts";
 import { InstantEvalJudgeFactsService } from "../services/instant-eval-judge-facts.service.ts";
 import { InstantEvalJudgeService } from "../services/instant-eval-judge.service.ts";
 import { InstantEvalRateLimiterService } from "../services/instant-eval-rate-limiter.service.ts";
@@ -36,7 +38,8 @@ import { InstantEvalRateLimiterService } from "../services/instant-eval-rate-lim
 type InstantEvalJudgeSetup = FeatureSetup<
   typeof InstantEvalJudgeModule.dependencies,
   InstantEvalJudgeServerConfig,
-  InstantEvalJudgeRepositories
+  InstantEvalJudgeRepositories,
+  InstantEvalJudgeChannels
 >;
 
 /** Seconds of refill a bucket holds as burst, at the sustained rate. */
@@ -55,27 +58,23 @@ export class InstantEvalJudgeModule implements InstantEvalJudgeApi {
   static readonly dependencies = {};
   static readonly config = instantEvalJudgeConfig;
   /** LangWatch's own classifier key, read on LangWatch Cloud only; elsewhere nothing classifies. */
-  static readonly secrets = {
-    classifierApiKey: Secret.load("JEV_API_KEY", { optional: true }),
-  } as const;
+  static readonly secrets = { classifierApiKey } as const;
 
   readonly #facts: InstantEvalJudgeFactsService;
   readonly #classifier: InstantEvalClassifierChannel | undefined;
+  readonly #limiter: InstantEvalRateLimiterChannel;
   readonly #judge: InstantEvalJudgeService;
   #spendCommands: EventingCommands<InstantEvalJudgeSpendPipeline> | undefined;
 
-  private constructor({
-    setup,
-    classifier,
-  }: {
-    setup: InstantEvalJudgeSetup;
-    classifier: InstantEvalClassifierChannel | undefined;
-  }) {
+  private constructor(setup: InstantEvalJudgeSetup) {
+    const { classifier } = setup.channels;
     this.#facts = InstantEvalJudgeFactsService.create({ repositories: setup.repositories });
     this.#classifier = classifier;
+    this.#limiter = InstantEvalJudgeModule.limiterOf(setup);
     this.#judge = InstantEvalJudgeService.create({
       repositories: setup.repositories,
       classifier,
+      limiter: this.#limiter,
       isCloud: setup.config.isSaas,
       recordSpendPriced: async (fact) => {
         if (!this.#spendCommands) {
@@ -89,40 +88,28 @@ export class InstantEvalJudgeModule implements InstantEvalJudgeApi {
   }
 
   static async create(setup: InstantEvalJudgeSetup): Promise<InstantEvalJudgeModule> {
-    return setup.secrets.into(InstantEvalJudgeModule.secrets.classifierApiKey, (secretKey) => {
-      const apiKey = cloudClassifierKeyOf({ isCloud: setup.config.isSaas, apiKey: secretKey });
-      const classifier = apiKey ? InstantEvalJudgeModule.classifierOf({ setup, apiKey }) : void 0;
-      if (classifier) {
-        setup.resources.own(
-          "Instant Evals classifier",
-          () => classifier.close?.() ?? Promise.resolve(),
-        );
-      }
-      return new InstantEvalJudgeModule({ setup, classifier });
-    });
+    const { classifier } = setup.channels;
+    if (classifier) {
+      setup.resources.own(
+        "Instant Evals classifier",
+        () => classifier.close?.() ?? Promise.resolve(),
+      );
+    }
+    return new InstantEvalJudgeModule(setup);
   }
 
-  private static classifierOf({
-    setup,
-    apiKey,
-  }: {
-    setup: InstantEvalJudgeSetup;
-    apiKey: string;
-  }): InstantEvalClassifierChannel {
-    const { config } = setup;
+  private static limiterOf({
+    config,
+    repositories,
+  }: InstantEvalJudgeSetup): InstantEvalRateLimiterChannel {
     const tokensPerSecond = config.globalTokensPerSecond;
     const tenantTokensPerSecond = Math.min(tokensPerSecond, config.tenantTokensPerSecond);
-    return instantEvalClassifierChannels.live.create({
-      apiKey,
-      ...(config.classifierBaseUrl ? { baseUrl: config.classifierBaseUrl } : {}),
-      ...(config.classifierModel ? { model: config.classifierModel } : {}),
-      limiter: InstantEvalRateLimiterService.create({
-        buckets: setup.repositories.rateLimits,
-        tokensPerSecond,
-        capacity: tokensPerSecond * BUCKET_BURST_SECONDS,
-        tenantTokensPerSecond,
-        tenantCapacity: tenantTokensPerSecond * BUCKET_BURST_SECONDS,
-      }),
+    return InstantEvalRateLimiterService.create({
+      buckets: repositories.rateLimits,
+      tokensPerSecond,
+      capacity: tokensPerSecond * BUCKET_BURST_SECONDS,
+      tenantTokensPerSecond,
+      tenantCapacity: tenantTokensPerSecond * BUCKET_BURST_SECONDS,
     });
   }
 
@@ -137,7 +124,10 @@ export class InstantEvalJudgeModule implements InstantEvalJudgeApi {
     signal,
   }: InstantEvalClassification): Promise<InstantEvalJudgement> {
     if (!this.#classifier) return instantEvalSkipped("classifier_not_configured");
-    return this.#classifier.classify({ projectId, text, questions }, ...(signal ? [signal] : []));
+    return this.#classifier.classify(
+      { projectId, text, questions, limiter: this.#limiter },
+      ...(signal ? [signal] : []),
+    );
   }
 
   judge(input: InstantEvalJudgeCall): Promise<InstantEvalJudgeAnswer> {

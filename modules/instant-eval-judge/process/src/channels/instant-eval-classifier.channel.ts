@@ -8,6 +8,10 @@ import type {
   InstantEvalJudgement,
   InstantEvalQuestion,
 } from "@langwatch/instant-eval-judge-contract";
+import { Secret } from "@langwatch/secrets";
+
+/** LangWatch's own classifier key, read on LangWatch Cloud only; elsewhere nothing classifies. */
+export const classifierApiKey = Secret.load("JEV_API_KEY", { optional: true });
 
 export interface InstantEvalClassifyRequest {
   /** Names the share of the rate this request draws on; the classifier never sees it. */
@@ -16,6 +20,8 @@ export interface InstantEvalClassifyRequest {
   readonly text: string;
   /** Every question about that text, asked in one request. */
   readonly questions: readonly InstantEvalQuestion[];
+  /** Paces each send; the service owns it, over the module's own buckets. */
+  readonly limiter: InstantEvalRateLimiterChannel;
 }
 
 export interface InstantEvalClassifierChannel {

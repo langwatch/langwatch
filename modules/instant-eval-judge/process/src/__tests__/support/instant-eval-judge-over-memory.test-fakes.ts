@@ -10,6 +10,7 @@ import type {
 import { Temporal } from "@langwatch/time";
 
 import { MemoryInstantEvalClassifierChannel } from "../../channels/memory/memory.instant-eval-classifier.channel.ts";
+import { MemoryInstantEvalRateLimiterChannel } from "../../channels/memory/memory.instant-eval-rate-limiter.channel.ts";
 import {
   buildInstantEvalJudgeFactsPipeline,
   type InstantEvalJudgeFactsPipeline,
@@ -67,6 +68,7 @@ export function instantEvalJudgeOverMemory({
   let sendPriced: ((fact: InstantEvalJudgeSpendPricedEventData) => Promise<void>) | undefined;
   const judge = InstantEvalJudgeService.create({
     repositories,
+    limiter: MemoryInstantEvalRateLimiterChannel.create(),
     classifier: MemoryInstantEvalClassifierChannel.create({
       answer: async ({ questions }) => ({
         verdicts: questions.map((question) => ({ questionId: question.id, probability: 1 })),

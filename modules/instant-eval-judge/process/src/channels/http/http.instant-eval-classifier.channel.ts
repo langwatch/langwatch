@@ -27,7 +27,6 @@ import {
 import type {
   InstantEvalClassifierChannel,
   InstantEvalClassifyRequest,
-  InstantEvalRateLimiterChannel,
 } from "../instant-eval-classifier.channel.ts";
 
 const logger = createLogger("langwatch:instant-evals:jev");
@@ -57,7 +56,6 @@ interface HttpInstantEvalClassifierOptions {
   /** Origin only; the path is this channel's own. */
   readonly baseUrl?: string;
   readonly model?: string;
-  readonly limiter: InstantEvalRateLimiterChannel;
   /** Injected by suites; a keep-alive pool to the judge otherwise. */
   readonly dispatcher?: Dispatcher;
   readonly sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
@@ -155,7 +153,7 @@ export class HttpInstantEvalClassifierChannel implements InstantEvalClassifierCh
 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       const waitedFrom = nowInstant().epochMilliseconds;
-      await this.options.limiter.acquire(
+      await request.limiter.acquire(
         {
           tokens:
             estimateJudgedTextTokens({ text: state.text, limits: this.limits }) + questionTokens,

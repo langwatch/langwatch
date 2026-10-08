@@ -17,7 +17,10 @@ import {
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { Instant } from "@langwatch/time";
 
-import type { InstantEvalClassifierChannel } from "../channels/instant-eval-classifier.channel.ts";
+import type {
+  InstantEvalClassifierChannel,
+  InstantEvalRateLimiterChannel,
+} from "../channels/instant-eval-classifier.channel.ts";
 import type { InstantEvalJudgeRepositories } from "../repositories/instant-eval-judge.repositories.ts";
 import { instantEvalJudgeBudgetOf } from "../rules/instant-eval-judge-budget.rules.ts";
 import {
@@ -39,6 +42,8 @@ type InstantEvalJudgeServiceDeps = Readonly<{
   repositories: Pick<InstantEvalJudgeRepositories, "projects" | "usageBilling" | "spend">;
   /** LangWatch's own classifier; absent where the deployment holds no key. */
   classifier: InstantEvalClassifierChannel | undefined;
+  /** Paces every classify send over the module's own rate buckets. */
+  limiter: InstantEvalRateLimiterChannel;
   /** LangWatch cloud, the only install a judge call is answered on. */
   isCloud: boolean;
   /** Appends the priced fact; the judge's spend row and gateway's ledger row follow from it. */
@@ -94,7 +99,7 @@ export class InstantEvalJudgeService {
     }
 
     const judgement = await classifier.classify(
-      { projectId, text, questions },
+      { projectId, text, questions, limiter: this.deps.limiter },
       ...(signal ? [signal] : []),
     );
     // A skip billed nothing, so it records nothing.
