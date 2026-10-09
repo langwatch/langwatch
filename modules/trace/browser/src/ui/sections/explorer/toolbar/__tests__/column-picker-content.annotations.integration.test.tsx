@@ -10,11 +10,16 @@ const harness = vi.hoisted(() => ({
   permissions: { annotationsView: true },
 }));
 
+vi.mock("../../../../../behavior/trace-host.ts", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useTraceHost: () => ({
+    hasPermission: (permission: string) =>
+      permission === "annotations:view" ? harness.permissions.annotationsView : true,
+  }),
+}));
 vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1", slug: "acme" },
-    hasPermission: (permission: string) =>
-      permission === "annotations:view" ? harness.permissions.annotationsView : true,
   }),
 }));
 

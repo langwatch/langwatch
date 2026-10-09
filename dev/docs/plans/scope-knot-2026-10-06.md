@@ -120,6 +120,14 @@ does not rise); `pnpm lint:architecture --policies peer-cycles` (must not rise).
   answer and the demo flag under the module host. The batch 2 outline stays `@unimplemented`: it
   needs the real public-route session under each host mount, so it binds in an `apps/ui` test.
 
+- Batch 4a landed: trace's 19 production permission readers ask `useTraceHost().hasPermission`
+  (including `redacted-field.tsx`, which read the browser-host hook); trace's scope shim no longer
+  offers `hasPermission`; 37 tests mock `useTraceHost` instead. Bound: "A migrated screen answers
+  ... the same as before" (trace-host-permission-reads test). Batches 4b-4d not started.
+- The batch 2 outline's `apps/ui` test is blocked on a decision: apps/ui reaches a module only
+  through `./declaration`, so it cannot import `useTraceHost`/`useScenarioHost` to ask the host;
+  see the sk-batch4 handoff for options.
+
 ## Wire and data
 
 No route, procedure, input or output changes. Behaviour changes against the branch: defect 1

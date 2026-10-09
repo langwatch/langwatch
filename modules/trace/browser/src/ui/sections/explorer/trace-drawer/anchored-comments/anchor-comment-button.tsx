@@ -3,8 +3,8 @@ import { Button, Icon, type SystemStyleObject, Text } from "@langwatch/design-sy
 import { forwardRef, useState } from "react";
 import { LuMessageSquare } from "react-icons/lu";
 
+import { useTraceHost } from "../../../../../behavior/trace-host.ts";
 import type { AnnotationByTrace } from "../../../../../behavior/use-annotations-by-trace-ids.ts";
-import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
 import type { TraceAnchor } from "../../../../../features/annotation/behavior/use-anchored-annotations.ts";
 import { PersonalFeatureGateDialog } from "../../../me/personal-feature-gate-dialog.tsx";
 import { usePersonalFeatureGate } from "../../../me/use-personal-feature-gate.ts";
@@ -46,10 +46,10 @@ export function AnchorCommentButton({
   dense = false,
   reveal = "always",
 }: AnchorCommentButtonProps) {
-  const { hasPermission } = useOrganizationTeamProject();
+  const traceHost = useTraceHost();
   const [open, setOpen] = useState(false);
   const annotationsGate = usePersonalFeatureGate("annotations");
-  const canManage = hasPermission("annotations:manage");
+  const canManage = traceHost.hasPermission("annotations:manage");
 
   if (!canManage && comments.length === 0) return null;
 

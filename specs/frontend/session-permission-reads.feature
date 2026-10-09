@@ -133,7 +133,7 @@ Feature: Permission reads come from the session, and a public page holds none
     Then no second grant read is sent for that project
     And the actions it offers match the session's answer
 
-  @integration @unimplemented
+  @integration
   Scenario: A migrated screen answers a signed-in reader the same as before
     Given a signed-in reader whose role grants some permissions and not others in the active project
     When a screen that read a permission through the legacy scope hook reads it from its module host instead

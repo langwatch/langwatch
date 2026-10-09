@@ -18,6 +18,10 @@ import { buildTracePlaceholderRows } from "../skeleton-placeholders.ts";
 import { TraceLensBody } from "../trace-lens-body.tsx";
 import { TraceTableLayout } from "../trace-table-layout.tsx";
 
+vi.mock("../../../../../behavior/trace-host.ts", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useTraceHost: () => ({ hasPermission: () => true }),
+}));
 vi.mock("@langwatch/browser-host/drawer", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useDrawer: () => ({ closeDrawer: vi.fn(), currentDrawer: null, openDrawer: vi.fn() }),
@@ -26,7 +30,6 @@ vi.mock("@langwatch/browser-host/drawer", async (importOriginal) => ({
 vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1", slug: "acme" },
-    hasPermission: () => true,
   }),
 }));
 vi.mock("../../../../../features/trace-drawer/behavior/use-open-trace-drawer.ts", () => ({

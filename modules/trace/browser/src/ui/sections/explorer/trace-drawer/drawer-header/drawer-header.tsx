@@ -38,6 +38,7 @@ import { useFilterStore } from "../../../../../behavior/explorer.store.ts";
 import { useRetainedTraceHeader } from "../../../../../behavior/explorer/trace-drawer/drawer-header/use-retained-trace-header.ts";
 import { guardTraceEditExit } from "../../../../../behavior/explorer/utils/trace-edit-mode.ts";
 import { useTraceDrawer, type TraceDrawerState } from "../../../../../behavior/trace-drawer.ts";
+import { useTraceHost } from "../../../../../behavior/trace-host.ts";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
 import { useConversationContext } from "../../../../../features/conversation/behavior/use-conversation-context.ts";
 import { usePinnedAttributes } from "../../../../../features/facet/behavior/use-pinned-attributes.ts";
@@ -434,11 +435,12 @@ export const DrawerHeader = memo(function DrawerHeader({
   const { canGoBack, goBack, goBackTo, backStackDepth, backStack } = useTraceDrawerNavigation();
 
   const statusColor = STATUS_COLORS[trace.status] as string;
-  const { project, hasPermission } = useOrganizationTeamProject();
+  const { project } = useOrganizationTeamProject();
+  const traceHost = useTraceHost();
   // Sharing a trace is how a reviewer hands it to someone without an account,
   // which is frequent enough that it earns a button rather than a click into
   // the overflow menu. Gated on the same permission the menu item used.
-  const canShare = hasPermission("traces:share");
+  const canShare = traceHost.hasPermission("traces:share");
   const dejaView = useDejaViewLink({
     aggregateId: trace.traceId,
     tenantId: project?.id,

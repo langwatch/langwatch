@@ -10,6 +10,10 @@ import "@testing-library/jest-dom/vitest";
 
 import type { AnnotationByTrace } from "../../../../../../behavior/use-annotations-by-trace-ids.ts";
 
+vi.mock("../../../../../../behavior/trace-host.ts", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useTraceHost: () => ({ hasPermission: () => true }),
+}));
 vi.mock("react-router", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   ...(await import("../../../../../../__tests__/window-location-router.ts")).windowLocationRouter,
@@ -18,7 +22,6 @@ vi.mock("react-router", async (importOriginal) => ({
 vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1" },
-    hasPermission: () => true,
   }),
 }));
 

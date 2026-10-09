@@ -3,6 +3,7 @@ import { useFeatureFlag } from "@langwatch/feature-flag-client";
 import { FrontendFlags } from "@langwatch/feature-flag-contract";
 
 import { useRequiredSession } from "../../../../behavior/auth-session.ts";
+import { useTraceHost } from "../../../../behavior/trace-host.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { LANGY_RELEASE_FLAG } from "../../../../model/langy-release-flag.ts";
 import { OrganizationUserRole } from "../../../../model/prisma-types.ts";
@@ -28,12 +29,12 @@ export function useLangyVisibility(): LangyVisibility {
     project,
     organization,
     organizationRole,
-    hasPermission,
     isLoading: contextLoading,
   } = useOrganizationTeamProject({
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
   });
+  const traceHost = useTraceHost();
   const { demoProjectSlug } = useUiDeployment();
 
   const user = session?.user;
@@ -45,7 +46,7 @@ export function useLangyVisibility(): LangyVisibility {
     isOnOwnPersonalProject ||
     (team?.members?.some((member) => member.userId === user?.id) ?? false) ||
     organizationRole === OrganizationUserRole.ADMIN;
-  const mayReadLangy = userIsPartOfTeam && !isDemoProject && hasPermission("langy:view");
+  const mayReadLangy = userIsPartOfTeam && !isDemoProject && traceHost.hasPermission("langy:view");
 
   // Skip the flag query entirely for callers who are already excluded; the answer is
   // decided without a round-trip.

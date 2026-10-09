@@ -1,10 +1,10 @@
 import { Link as RoutedLink } from "@langwatch/browser-host/link";
-import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { HStack, Icon, Link, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type React from "react";
 import { Lock } from "react-feather";
 
+import { useTraceHost } from "../../behavior/trace-host.ts";
 import { useFieldRedaction } from "./use-field-redaction.ts";
 
 interface RedactedFieldProps {
@@ -49,9 +49,9 @@ export const RedactedInline: React.FC<{
   visibleTo?: string | null;
   size?: "xs" | "sm";
 }> = ({ visibleTo = null, size = "sm" }) => {
-  const { hasPermission } = useOrganizationTeamProject();
+  const traceHost = useTraceHost();
   const hint = audienceHint(visibleTo);
-  const canOpenSettings = hasPermission("project:view");
+  const canOpenSettings = traceHost.hasPermission("project:view");
   return (
     <Tooltip
       interactive

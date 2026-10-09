@@ -2,6 +2,7 @@ import { useMemo } from "react";
 
 import { useViewStore } from "../../../behavior/explorer.store.ts";
 import type { TraceListItem } from "../../../behavior/explorer/types/trace.ts";
+import { useTraceHost } from "../../../behavior/trace-host.ts";
 import {
   type AnnotationByTrace,
   useAnnotationsByTraceIds,
@@ -23,9 +24,10 @@ export function useTraceListAnnotations({
   /** Fixture rows are not traces anyone can have reviewed. */
   isSamplePreview?: boolean;
 }): TraceListItem[] {
-  const { project, hasPermission } = useOrganizationTeamProject();
+  const { project } = useOrganizationTeamProject();
+  const traceHost = useTraceHost();
   const needsAnnotations = useViewStore((state) => state.columnOrder.includes("annotations"));
-  const canRead = hasPermission("annotations:view");
+  const canRead = traceHost.hasPermission("annotations:view");
 
   // Sorted so two renders of the same page share a query key regardless of the
   // sort column, and joined because the key is compared structurally.

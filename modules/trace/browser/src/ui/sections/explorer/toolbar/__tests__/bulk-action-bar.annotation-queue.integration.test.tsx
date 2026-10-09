@@ -14,6 +14,12 @@ const mocks = vi.hoisted(() => ({
   permissions: new Set<string>(["annotations:create"]),
 }));
 
+vi.mock("../../../../../behavior/trace-host.ts", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useTraceHost: () => ({
+    hasPermission: (permission: string) => mocks.permissions.has(permission),
+  }),
+}));
 vi.mock("../../../../../behavior/langy/use-can-ask-langy.ts", () => ({
   useCanAskLangy: () => true,
 }));
@@ -29,7 +35,6 @@ vi.mock("@langwatch/browser-host/drawer", async (importOriginal) => ({
 vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1", slug: "acme" },
-    hasPermission: (permission: string) => mocks.permissions.has(permission),
   }),
 }));
 vi.mock("../../../me/use-personal-feature-gate.ts", () => ({

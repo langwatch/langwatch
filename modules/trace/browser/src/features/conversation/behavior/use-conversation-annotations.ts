@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 
+import { useTraceHost } from "../../../behavior/trace-host.ts";
 import {
   type AnnotationByTrace,
   useAnnotationsByTraceIds,
@@ -28,12 +29,13 @@ interface ConversationAnnotations {
  * Every annotation on a conversation, read once for all of its turns.
  */
 export function useConversationAnnotations(traceIds: string[]): ConversationAnnotations {
-  const { project, hasPermission } = useOrganizationTeamProject();
+  const { project } = useOrganizationTeamProject();
+  const traceHost = useTraceHost();
 
   const query = useAnnotationsByTraceIds({
     projectId: project?.id ?? "",
     traceIds,
-    enabled: !!project?.id && hasPermission("annotations:view"),
+    enabled: !!project?.id && traceHost.hasPermission("annotations:view"),
     keepPreviousData: true,
     anchor: "all",
   });

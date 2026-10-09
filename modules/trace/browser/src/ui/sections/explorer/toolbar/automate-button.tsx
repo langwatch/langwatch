@@ -4,16 +4,16 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Zap } from "lucide-react";
 
 import { getCurrentFilterText } from "../../../../behavior/explorer.store.ts";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { useTraceHost } from "../../../../behavior/trace-host.ts";
 
 /**
  * Filtered traces → automation entry point (ADR-043).
  */
 export const AutomateButton: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
-  const { hasPermission } = useOrganizationTeamProject();
+  const traceHost = useTraceHost();
   const { openDrawer } = useDrawer();
 
-  if (!hasPermission("triggers:manage")) return null;
+  if (!traceHost.hasPermission("triggers:manage")) return null;
 
   return (
     <Tooltip
