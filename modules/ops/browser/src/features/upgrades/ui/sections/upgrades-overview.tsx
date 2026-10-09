@@ -42,6 +42,11 @@ export type UpgradesOverviewProps = {
   releases: readonly UpgradeReleaseView[];
   runs: readonly UpgradeRunSummaryView[];
   failedSteps: readonly UpgradeStepView[];
+  /** Background steps not yet done, from `listSteps({ mode: "background" })`. */
+  backgroundSteps?: readonly UpgradeStepView[];
+  /** Given only to an `ops:manage` reader: a failed background step then offers Retry. */
+  onRetryStep?: (stepId: string) => void;
+  retryingStepId?: string | null;
   /** The eventing upcaster's "active upcasts" reading, mounted by the screen once it exists. */
   activeUpcasts?: ReactNode;
   onOpenRelease: (release: string) => void;
@@ -226,6 +231,66 @@ function RunsTable({
   );
 }
 
+function BackgroundSteps({
+  steps,
+  onOpenStep,
+  onRetryStep,
+  retryingStepId,
+}: {
+  steps: readonly UpgradeStepView[];
+  onOpenStep: (stepId: string) => void;
+  onRetryStep?: (stepId: string) => void;
+  retryingStepId?: string | null;
+}) {
+  return (
+    <ListTable data-testid="upgrade-background-steps">
+      <Table.Header>
+        <Table.Row>
+          <Table.ColumnHeader>Step</Table.ColumnHeader>
+          <Table.ColumnHeader>Status</Table.ColumnHeader>
+          <Table.ColumnHeader>Release</Table.ColumnHeader>
+          <Table.ColumnHeader>Last error</Table.ColumnHeader>
+          <Table.ColumnHeader />
+        </Table.Row>
+      </Table.Header>
+      <Table.Body>
+        {steps.map((step) => (
+          <Table.Row
+            key={step.id}
+            cursor="pointer"
+            onClick={() => onOpenStep(step.id)}
+            data-testid={`upgrade-background-step-${step.id}`}
+          >
+            <Table.Cell fontFamily="mono">{step.id}</Table.Cell>
+            <Table.Cell>
+              <UpgradeStatusBadge
+                label={{ label: step.statusLabel, tone: statusTone(step.status) }}
+              />
+            </Table.Cell>
+            <Table.Cell fontFamily="mono">{step.release ?? "Unreleased"}</Table.Cell>
+            <Table.Cell>{step.lastError}</Table.Cell>
+            <Table.Cell textAlign="end">
+              {onRetryStep && step.status === "failed" && (
+                <Button
+                  size="xs"
+                  variant="outline"
+                  loading={retryingStepId === step.id}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onRetryStep(step.id);
+                  }}
+                >
+                  Retry
+                </Button>
+              )}
+            </Table.Cell>
+          </Table.Row>
+        ))}
+      </Table.Body>
+    </ListTable>
+  );
+}
+
 function OverviewBlock({ title, children }: { title: string; children: ReactNode }) {
   return (
     <Stack gap={3}>
@@ -241,6 +306,9 @@ export function UpgradesOverview({
   releases,
   runs,
   failedSteps,
+  backgroundSteps = [],
+  onRetryStep,
+  retryingStepId,
   activeUpcasts,
   onOpenRelease,
   onOpenRun,
@@ -263,10 +331,20 @@ export function UpgradesOverview({
       <OverviewBlock title="Releases">
         <ReleasesTable releases={releases} onOpenRelease={onOpenRelease} />
       </OverviewBlock>
-      {(status.state === "finishing-in-background" || activeUpcasts) && (
-        <OverviewBlock title="Background work">
+      {(status.state === "finishing-in-background" ||
+        backgroundSteps.length > 0 ||
+        activeUpcasts) && (
+        <OverviewBlock title="Finishing in background">
           {status.state === "finishing-in-background" && (
             <Text textStyle="sm">{status.summary}</Text>
+          )}
+          {backgroundSteps.length > 0 && (
+            <BackgroundSteps
+              steps={backgroundSteps}
+              onOpenStep={onOpenStep}
+              onRetryStep={onRetryStep}
+              retryingStepId={retryingStepId}
+            />
           )}
           {activeUpcasts}
         </OverviewBlock>

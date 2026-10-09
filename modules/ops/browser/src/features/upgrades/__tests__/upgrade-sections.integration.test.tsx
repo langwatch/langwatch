@@ -71,9 +71,13 @@ const noop = () => undefined;
 function renderOverview({
   status,
   failedSteps = [],
+  backgroundSteps = [],
+  onRetryStep,
 }: {
   status: UpgradeStatusView;
   failedSteps?: UpgradeStepView[];
+  backgroundSteps?: UpgradeStepView[];
+  onRetryStep?: (stepId: string) => void;
 }) {
   const onOpenStep = vi.fn();
   renderIn(
@@ -84,6 +88,8 @@ function renderOverview({
       ]}
       runs={[]}
       failedSteps={failedSteps}
+      backgroundSteps={backgroundSteps}
+      onRetryStep={onRetryStep}
       onOpenRelease={noop}
       onOpenRun={noop}
       onOpenStep={onOpenStep}
@@ -184,6 +190,53 @@ describe("UpgradesOverview", () => {
       expect(attention).toHaveTextContent("Owner column missing: run the Prisma migration first");
       fireEvent.click(within(attention).getByRole("button", { name: /ops:backfill-owner/ }));
       expect(onOpenStep).toHaveBeenCalledWith("ops:backfill-owner");
+    });
+  });
+
+  describe("when a background step failed", () => {
+    const failed = stepWith({
+      id: "ops:backfill-owner",
+      mode: "background",
+      status: "failed",
+      statusLabel: "Failed",
+      lastError: "Owner column missing",
+    });
+    const running = stepWith({
+      id: "ops:backfill-names",
+      mode: "background",
+      status: "running",
+      statusLabel: "Running",
+    });
+    const finishing = statusWith({
+      state: "finishing-in-background",
+      label: "Finishing in background",
+      tone: "info",
+    });
+
+    /** @scenario "A failed background step offers Retry to a manager" */
+    it("offers Retry on the failed step only, to a manager", () => {
+      const onRetryStep = vi.fn();
+      renderOverview({ status: finishing, backgroundSteps: [failed, running], onRetryStep });
+
+      const list = screen.getByTestId("upgrade-background-steps");
+      expect(within(list).getAllByRole("button", { name: "Retry" })).toHaveLength(1);
+      const failedRow = screen.getByTestId("upgrade-background-step-ops:backfill-owner");
+      fireEvent.click(within(failedRow).getByRole("button", { name: "Retry" }));
+      expect(onRetryStep).toHaveBeenCalledWith("ops:backfill-owner");
+    });
+
+    /** @scenario "A view-only operator sees the list and no Retry" */
+    it("shows the failed step with its error and offers no Retry to a view-only reader", () => {
+      renderOverview({ status: finishing, backgroundSteps: [failed, running] });
+
+      const failedRow = screen.getByTestId("upgrade-background-step-ops:backfill-owner");
+      expect(failedRow).toHaveTextContent("Failed");
+      expect(failedRow).toHaveTextContent("Owner column missing");
+      expect(
+        within(screen.getByTestId("upgrade-background-steps")).queryByRole("button", {
+          name: "Retry",
+        }),
+      ).toBeNull();
     });
   });
 });

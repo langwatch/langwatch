@@ -147,7 +147,7 @@ Feature: Ops shows an installation's release upgrades, read-only
     And each shows the release it must finish before
     And the waiting step names the processes it waits on by role, image and last seen
 
-  @unimplemented
+  @integration
   Scenario: A failed background step offers Retry to a manager
     Given a background step that failed
     When an operator holding ops:manage opens the list
@@ -160,7 +160,7 @@ Feature: Ops shows an installation's release upgrades, read-only
     Then the ledger records the step as pending
     And the worker runs it again from its checkpoint
 
-  @unimplemented
+  @integration
   Scenario: A view-only operator sees the list and no Retry
     Given a background step that failed
     When an operator holding ops:view only opens the list

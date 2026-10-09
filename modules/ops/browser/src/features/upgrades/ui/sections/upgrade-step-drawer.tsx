@@ -2,8 +2,8 @@ import { Drawer } from "@langwatch/design-system/drawer";
 import { Button } from "@langwatch/design-system/primitives";
 
 import { api } from "../../../../behavior/ops-api.ts";
-import { useOpsToaster } from "../../../../behavior/ops-feedback.ts";
 import { useOpsHost } from "../../../../model/ops-host.ts";
+import { useRetryUpgradeStep } from "../../behavior/use-retry-upgrade-step.ts";
 import { UpgradeReadState } from "./upgrade-read-state.tsx";
 import { UpgradeStepDetail } from "./upgrade-step-detail.tsx";
 
@@ -14,12 +14,7 @@ export const UPGRADE_STEP_OVERLAY = "upgradeStep";
 export function UpgradeStepDrawer({ stepId, onClose }: { stepId: string; onClose: () => void }) {
   const step = api.ops.upgrade.getStep.useQuery({ id: stepId });
   const canManage = useOpsHost().isOpsAdmin();
-  const utils = api.useUtils();
-  const toaster = useOpsToaster();
-  const retry = api.ops.upgrade.retryStep.useMutation({
-    onSuccess: () => void utils.ops.upgrade.invalidate(),
-    onError: () => toaster.create({ type: "error", title: "The step could not be retried" }),
-  });
+  const { retryStep, retryingStepId } = useRetryUpgradeStep();
   return (
     <Drawer.Root open={true} placement="end" size="lg" onOpenChange={() => onClose()}>
       <Drawer.Content bg="bg">
@@ -34,8 +29,8 @@ export function UpgradeStepDrawer({ stepId, onClose }: { stepId: string; onClose
         {canManage && step.data?.status === "failed" && (
           <Drawer.Footer>
             <Button
-              loading={retry.isPending}
-              onClick={() => retry.mutate({ id: stepId })}
+              loading={retryingStepId === stepId}
+              onClick={() => retryStep(stepId)}
               data-testid="upgrade-step-retry"
             >
               Retry
