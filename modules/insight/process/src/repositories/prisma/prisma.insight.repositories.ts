@@ -1,11 +1,11 @@
 import { prismaRepositories } from "@langwatch/prisma-client";
 
-import { PrismaInsightReaderProjectionStore } from "./prisma.insight-reader.store.ts";
+import { PrismaInsightProjectionRepository } from "./prisma.insight-projection.repository.ts";
+import { PrismaInsightReaderProjectionRepository } from "./prisma.insight-reader-projection.repository.ts";
 import { PrismaInsightRepository } from "./prisma.insight.repository.ts";
-import { PrismaInsightProjectionStore } from "./prisma.insight.store.ts";
 
 export const PostgresInsightRepositories = prismaRepositories({
   insights: PrismaInsightRepository,
-  insightProjection: PrismaInsightProjectionStore,
-  insightReaderProjection: PrismaInsightReaderProjectionStore,
+  insightProjection: PrismaInsightProjectionRepository,
+  insightReaderProjection: PrismaInsightReaderProjectionRepository,
 });

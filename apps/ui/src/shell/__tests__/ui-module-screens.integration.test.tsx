@@ -83,6 +83,7 @@ describe("given the installed web modules", () => {
         "/:project/automations/activity",
         "/:project/datasets",
         "/:project/datasets/:id",
+        "/:project/insights",
         "/:project/online-evaluations",
         "/:project",
         "/:project/prompts",

@@ -9,12 +9,12 @@ import type { InsightReaderState } from "../../eventing/insight-reader.projectio
 import { parseInsightReaderKey } from "../../rules/insight-reader-key.rules.ts";
 import { InsightMemoryStore } from "./insight-memory.store.ts";
 
-/** The memory twin of `PrismaInsightReaderProjectionStore`. */
-export class MemoryInsightReaderProjectionStore implements StateProjectionStore<InsightReaderState> {
+/** The memory twin of `PrismaInsightReaderProjectionRepository`. */
+export class MemoryInsightReaderProjectionRepository implements StateProjectionStore<InsightReaderState> {
   private constructor(private readonly rows: InsightMemoryStore) {}
 
-  static create({ rows }: { rows: InsightMemoryStore }): MemoryInsightReaderProjectionStore {
-    return new MemoryInsightReaderProjectionStore(rows);
+  static create({ rows }: { rows: InsightMemoryStore }): MemoryInsightReaderProjectionRepository {
+    return new MemoryInsightReaderProjectionRepository(rows);
   }
 
   async get(

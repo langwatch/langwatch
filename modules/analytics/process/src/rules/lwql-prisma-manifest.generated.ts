@@ -709,6 +709,42 @@ export interface LwqlPrismaRows {
     readonly position: "Int";
     readonly createdAt: "DateTime";
   };
+  readonly InsightProjection: {
+    readonly id: "String";
+    readonly projectId: "String";
+    readonly title: "String";
+    readonly body: "String";
+    readonly tone: "String";
+    readonly topic: "String?";
+    readonly validDays: "Int";
+    readonly lwql: "String?";
+    readonly sourceConversationId: "String?";
+    readonly sourceMessageId: "String?";
+    readonly filedByUserId: "String?";
+    readonly filedAt: "Float";
+    readonly renewedAt: "Float?";
+    readonly createdAt: "Float";
+    readonly updatedAt: "Float";
+    readonly occurredAt: "Float";
+    readonly acceptedAt: "Float";
+    readonly lastEventId: "String";
+    readonly projectionVersion: "String";
+  };
+  readonly InsightReaderProjection: {
+    readonly id: "String";
+    readonly projectId: "String";
+    readonly insightId: "String";
+    readonly userId: "String";
+    readonly seenAt: "Float?";
+    readonly archivedAt: "Float?";
+    readonly keptAt: "Float?";
+    readonly createdAt: "Float";
+    readonly updatedAt: "Float";
+    readonly occurredAt: "Float";
+    readonly acceptedAt: "Float";
+    readonly lastEventId: "String";
+    readonly projectionVersion: "String";
+  };
   readonly SavedView: {
     readonly id: "String";
     readonly projectId: "String";

@@ -8,12 +8,12 @@ import type {
 import type { InsightState } from "../../eventing/insight.projection.ts";
 import { InsightMemoryStore } from "./insight-memory.store.ts";
 
-/** The memory twin of `PrismaInsightProjectionStore`. */
-export class MemoryInsightProjectionStore implements StateProjectionStore<InsightState> {
+/** The memory twin of `PrismaInsightProjectionRepository`. */
+export class MemoryInsightProjectionRepository implements StateProjectionStore<InsightState> {
   private constructor(private readonly rows: InsightMemoryStore) {}
 
-  static create({ rows }: { rows: InsightMemoryStore }): MemoryInsightProjectionStore {
-    return new MemoryInsightProjectionStore(rows);
+  static create({ rows }: { rows: InsightMemoryStore }): MemoryInsightProjectionRepository {
+    return new MemoryInsightProjectionRepository(rows);
   }
 
   async get(

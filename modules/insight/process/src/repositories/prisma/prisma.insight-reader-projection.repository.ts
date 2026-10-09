@@ -23,11 +23,13 @@ function fromRow(row: InsightReaderRow): StoredProjection<InsightReaderState> {
 }
 
 /** Postgres row I/O for one reader's state on one insight, keyed `insightId:userId`. */
-export class PrismaInsightReaderProjectionStore
+export class PrismaInsightReaderProjectionRepository
   extends PrismaRepository.for("InsightReaderProjection")
   implements StateProjectionStore<InsightReaderState>
 {
-  static readonly create = this.factory((prisma) => new PrismaInsightReaderProjectionStore(prisma));
+  static readonly create = this.factory(
+    (prisma) => new PrismaInsightReaderProjectionRepository(prisma),
+  );
 
   async get(
     key: string,
