@@ -12,6 +12,7 @@ import {
   openApiDoor,
   type RestIdentity,
 } from "../api-door.ts";
+import { authorizeDefaults } from "../../__tests__/api-double.ts";
 
 const refuse = () => Promise.reject(new Error("this door decides nothing"));
 const nobody: RestIdentity = { authenticate: refuse, identify: refuse };
@@ -20,6 +21,7 @@ function door(): ApiDoor {
   return {
     sessions: () => Promise.resolve(null),
     authz: {
+      ...authorizeDefaults,
       getDecision: refuse,
       getProjectAnyDecision: refuse,
       checkScopeLineage: refuse,

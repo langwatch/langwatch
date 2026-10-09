@@ -8,6 +8,7 @@ import type { Authorize } from "../../access/access.ts";
 import { createErrorHandler, SurfaceUnverifiedError } from "../../errors.ts";
 import { defineRestRouter } from "../declaration.ts";
 import { createRestRuntime } from "../runtime.ts";
+import { authorizeDefaults } from "../../__tests__/api-double.ts";
 
 type EventsApi = { post(input: { raw: string }): Promise<{ ran: boolean }> };
 
@@ -17,6 +18,7 @@ function mounted({ signedIn = true, granted = true, kind = "application" } = {})
   const post = vi.fn(async (_input: { raw: string }) => ({ ran: true }));
   const authorizeDoor = vi.fn(() => ({ permitted: granted, organizationRole: null }));
   const authorize: Authorize = {
+    ...authorizeDefaults,
     getDecision: async () => ({ permitted: true, organizationRole: "ADMIN" }),
     getProjectAnyDecision: async () => ({ permitted: true, organizationRole: "ADMIN" }),
     checkScopeLineage: async () => ({ kind: "consistent" }),

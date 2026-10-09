@@ -14,6 +14,7 @@ import { ClientAddress } from "../../policy/client-address.ts";
 import { composeTrpcRouters } from "../compose.ts";
 import { TrpcHost } from "../host.ts";
 import { defineTrpcRouter } from "../runtime.ts";
+import { authorizeDefaults } from "../../__tests__/api-double.ts";
 
 interface AccountApi {
   register(input: { email: string }): { id: string };
@@ -40,7 +41,8 @@ function served() {
 
   const trpc = TrpcHost.create({
     sessions: SessionReader.unverified(),
-    authz: { getDecision: refuse, getProjectAnyDecision: refuse, checkScopeLineage: refuse },
+    authz: {
+    ...authorizeDefaults, getDecision: refuse, getProjectAnyDecision: refuse, checkScopeLineage: refuse },
     throttle: {
       limiter: {
         check: async (key) => {

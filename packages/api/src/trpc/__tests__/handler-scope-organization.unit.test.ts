@@ -13,6 +13,7 @@ import {
   TrpcRootDefinition,
   type TrpcRuntimeMembers,
 } from "../runtime.ts";
+import { authorizeDefaults } from "../../__tests__/api-double.ts";
 
 interface ScopeApi {
   seen(input: unknown): Promise<unknown>;
@@ -63,6 +64,7 @@ function probe({ resolves }: { resolves: boolean }) {
     identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
     authorization: {
       forRequest: () => ({
+        ...authorizeDefaults,
         getDecision: async () => ({ permitted: true, organizationRole: null }),
         getProjectAnyDecision: async () => ({ permitted: true, organizationRole: null }),
         checkScopeLineage: async () => ({ kind: "consistent" }),

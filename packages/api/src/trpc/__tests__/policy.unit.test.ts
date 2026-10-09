@@ -24,6 +24,7 @@ import {
   type TrpcDeclaredAuthzMembers,
   type TrpcMiddlewareContext,
 } from "../policy.ts";
+import { authorizeDefaults } from "../../__tests__/api-double.ts";
 
 /**
  * `actorId: undefined` is the anonymous caller, so it cannot be a destructuring
@@ -40,7 +41,9 @@ function makePorts(
     >;
   } = {},
 ): TrpcDeclaredAuthzMembers<TrpcDeclaredAuthzContext> & {
-  decisions: { [K in keyof Authorize]: Mock<NonNullable<Authorize[K]>> };
+  decisions: Authorize & {
+    [K in "getDecision" | "getProjectAnyDecision" | "checkScopeLineage"]: Mock<Authorize[K]>;
+  };
 } {
   const actorId = "actorId" in options ? options.actorId : "alice";
 
@@ -60,6 +63,7 @@ function makePorts(
     vi.fn<(input: AuthzScopeLineageInput) => Promise<AuthzScopeLineageResult>>();
 
   const decisions = {
+    ...authorizeDefaults,
     getDecision,
     getProjectAnyDecision,
     checkScopeLineage,
@@ -462,6 +466,7 @@ function lineagePorts(
   return {
     authorization: {
       forRequest: () => ({
+        ...authorizeDefaults,
         checkScopeLineage,
         getDecision: vi.fn(),
         getProjectAnyDecision: vi.fn(),

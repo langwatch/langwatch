@@ -25,6 +25,7 @@ import {
   type TrpcRuntimeAuditEntry,
   type TrpcRuntimeMembers,
 } from "../runtime.ts";
+import { authorizeDefaults } from "../../__tests__/api-double.ts";
 
 const logged: unknown[] = [];
 
@@ -153,6 +154,7 @@ function harness() {
     },
     authorization: {
       forRequest: () => ({
+        ...authorizeDefaults,
         getDecision: async ({ permission, scope }) => {
           steps.push(`decide:${permission}:${scope.tier}:${scope.id}`);
 
@@ -622,6 +624,7 @@ function accountHarness({
     },
     authorization: {
       forRequest: () => ({
+        ...authorizeDefaults,
         getDecision: async ({ permission }) => {
           asked.push(permission);
 
@@ -975,6 +978,7 @@ describe("a procedure that asks whether its tenant holds an entitlement", () => 
       identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
       authorization: {
         forRequest: () => ({
+          ...authorizeDefaults,
           getDecision: async () => ({ permitted: true, organizationRole: null }),
           getProjectAnyDecision: async () => ({ permitted: true, organizationRole: null }),
           checkScopeLineage: async () => ({ kind: "consistent" }),
@@ -1146,6 +1150,7 @@ describe("a procedure declared as minting a credential", () => {
         identity: { caller: (ctx) => ({ actor: { type: "user", ...ctx.actor } }) },
         authorization: {
           forRequest: () => ({
+            ...authorizeDefaults,
             getDecision: async () => ({ permitted: true, organizationRole: null }),
             getProjectAnyDecision: async () => ({ permitted: true, organizationRole: null }),
             checkScopeLineage: async () => ({ kind: "consistent" }),

@@ -13,6 +13,7 @@ import {
   TrpcRootDefinition,
   type TrpcRuntimeMembers,
 } from "../runtime.ts";
+import { authorizeDefaults } from "../../__tests__/api-double.ts";
 
 interface OpsApi {
   listQueues(input: unknown): Promise<{ queues: string[] }>;
@@ -42,6 +43,7 @@ function members({ holders, answers }: { holders: readonly string[]; answers: bo
     identity: { caller: (ctx) => ({ actor: ctx.actor as never }) },
     authorization: {
       forRequest: () => ({
+        ...authorizeDefaults,
         getDecision: async () => ({ permitted: false, organizationRole: null }),
         getProjectAnyDecision: async () => ({ permitted: false, organizationRole: null }),
         checkScopeLineage: async () => ({ kind: "consistent" }),

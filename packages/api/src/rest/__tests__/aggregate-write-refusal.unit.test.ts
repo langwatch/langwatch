@@ -11,6 +11,7 @@ import { createErrorHandler } from "../../errors.ts";
 import type { RestIdentity } from "../../hosting/api-door.ts";
 import { defineRestRouter } from "../declaration.ts";
 import { createRestRuntime } from "../runtime.ts";
+import { authorizeDefaults } from "../../__tests__/api-double.ts";
 
 type RunsApi = { run(): Promise<{ ran: boolean }> };
 
@@ -26,6 +27,7 @@ function mounted({ kind }: { kind: string }) {
     }),
   };
   const authorize: Authorize = {
+    ...authorizeDefaults,
     getDecision: async () => ({ permitted: true, organizationRole: "ADMIN" }),
     getProjectAnyDecision: async () => ({ permitted: true, organizationRole: "ADMIN" }),
     checkScopeLineage: async () => ({ kind: "consistent" }),

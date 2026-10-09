@@ -12,6 +12,7 @@ import type { Authorize } from "../../access/access.ts";
 import { createErrorHandler } from "../../errors.ts";
 import { defineRestRouter } from "../declaration.ts";
 import { createRestRuntime } from "../runtime.ts";
+import { authorizeDefaults } from "../../__tests__/api-double.ts";
 
 class HeldAtTheGateError extends HandledError {
   constructor() {
@@ -31,6 +32,7 @@ function mounted({ held }: { held: boolean }) {
     if (held) throw new HeldAtTheGateError();
   });
   const authorize: Authorize = {
+    ...authorizeDefaults,
     getDecision: async () => ({ permitted: true, organizationRole: "MEMBER" }),
     getProjectAnyDecision: async () => ({ permitted: true, organizationRole: "MEMBER" }),
     checkScopeLineage: async () => ({ kind: "consistent" }),

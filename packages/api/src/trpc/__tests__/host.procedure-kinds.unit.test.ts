@@ -11,6 +11,7 @@ import { SessionReader } from "../../hosting/session-reader.ts";
 import { composeTrpcRouters } from "../compose.ts";
 import { TrpcHost } from "../host.ts";
 import { defineTrpcRouter } from "../runtime.ts";
+import { authorizeDefaults } from "../../__tests__/api-double.ts";
 
 interface ReviewApi {
   read(input: { id: string }): { id: string };
@@ -54,6 +55,7 @@ function host(): TrpcHost {
   return TrpcHost.create({
     sessions: SessionReader.unverified(),
     authz: {
+      ...authorizeDefaults,
       getDecision: () => Promise.reject(new Error("no decision is asked here")),
       getProjectAnyDecision: () => Promise.reject(new Error("no decision is asked here")),
       checkScopeLineage: () => Promise.reject(new Error("no decision is asked here")),

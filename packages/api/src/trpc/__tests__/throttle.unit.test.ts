@@ -16,6 +16,7 @@ import {
   type TrpcRuntimeMembers,
 } from "../runtime.ts";
 import type { TrpcThrottle, TrpcThrottlePolicy } from "../throttle.ts";
+import { authorizeDefaults } from "../../__tests__/api-double.ts";
 
 vi.mock("@langwatch/observability", async (importOriginal) => ({
   ...((await importOriginal()) as object),
@@ -72,6 +73,7 @@ function harness({ policies }: { policies: Readonly<Record<string, TrpcThrottleP
     },
     authorization: {
       forRequest: () => ({
+        ...authorizeDefaults,
         getDecision: async () => ({ permitted: true, organizationRole: null }),
         getProjectAnyDecision: async () => ({ permitted: true, organizationRole: null }),
         checkScopeLineage: async () => ({ kind: "consistent" }),

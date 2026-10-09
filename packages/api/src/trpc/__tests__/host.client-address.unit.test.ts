@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { SessionReader } from "../../hosting/session-reader.ts";
 import { ClientAddress } from "../../policy/client-address.ts";
 import { TrpcHost } from "../host.ts";
+import { authorizeDefaults } from "../../__tests__/api-double.ts";
 
 const refuse = () => Promise.reject(new Error("no decision is asked here"));
 
@@ -12,7 +13,8 @@ describe("the context a signed-out tRPC request runs in", () => {
   it("keys on the socket address the resolver chose, though a forwarding header arrived", async () => {
     const trpc = TrpcHost.create({
       sessions: SessionReader.unverified(),
-      authz: { getDecision: refuse, getProjectAnyDecision: refuse, checkScopeLineage: refuse },
+      authz: {
+    ...authorizeDefaults, getDecision: refuse, getProjectAnyDecision: refuse, checkScopeLineage: refuse },
     });
 
     const addresses = ClientAddress.fromTrustedProxies({ addresses: [] });

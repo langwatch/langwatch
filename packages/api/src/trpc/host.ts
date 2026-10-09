@@ -427,19 +427,17 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
   }
 }
 
-/** The same decisions, each distinct question asked once and its answer shared. */
-function decidingOnce(authz: Authorize): Authorize {
+/**
+ * The same decisions, each distinct question asked once and its answer shared. `Required`
+ * keeps a member added to `Authorize` from compiling here until it is forwarded.
+ */
+function decidingOnce(authz: Authorize): Required<Authorize> {
   const decisions = new Map<string, Promise<PermissionDecision>>();
   const lineages = new Map<string, Promise<AuthzScopeLineageResult>>();
   const platform = new Map<string, Promise<PlatformDecision>>();
-  const askPlatform = authz.getPlatformDecision?.bind(authz);
   const organizations = new Map<string, Promise<string | null>>();
-  const askOrganization = authz.organizationOf?.bind(authz);
   const secondFactors = new Map<string, Promise<void>>();
-  const askSecondFactor = authz.assertSecondFactor?.bind(authz);
   const kinds = new Map<string, Promise<string | null>>();
-  const askKind = authz.projectKindOf?.bind(authz);
-  const mint = authz.authorization?.bind(authz);
 
   return {
     getDecision: (input) =>
@@ -451,35 +449,20 @@ function decidingOnce(authz: Authorize): Authorize {
       askOnce(lineages, JSON.stringify([input.organizationId, input.teamId, input.projectId]), () =>
         authz.checkScopeLineage(input),
       ),
-    ...(askPlatform === void 0
-      ? {}
-      : {
-          getPlatformDecision: (input) =>
-            askOnce(platform, JSON.stringify(input), () => askPlatform(input)),
-        }),
-    ...(askOrganization === void 0
-      ? {}
-      : {
-          organizationOf: (scope) =>
-            askOnce(organizations, `${scope.tier}:${scope.id}`, () => askOrganization(scope)),
-        }),
+    getPlatformDecision: (input) =>
+      askOnce(platform, JSON.stringify(input), () => authz.getPlatformDecision(input)),
+    organizationOf: (scope) =>
+      askOnce(organizations, `${scope.tier}:${scope.id}`, () => authz.organizationOf(scope)),
     // A batch over one scope asks the organization's requirement once, refusal included.
-    ...(askSecondFactor === void 0
-      ? {}
-      : {
-          assertSecondFactor: (input) =>
-            askOnce(
-              secondFactors,
-              JSON.stringify([input.userId, input.sessionId, input.scope.tier, input.scope.id]),
-              () => askSecondFactor(input),
-            ),
-        }),
-    // Dropping either silently opens the aggregate gate or refuses every proof-bearing read.
-    ...(askKind === void 0
-      ? {}
-      : { projectKindOf: (projectId) => askOnce(kinds, projectId, () => askKind(projectId)) }),
+    assertSecondFactor: (input) =>
+      askOnce(
+        secondFactors,
+        JSON.stringify([input.userId, input.sessionId, input.scope.tier, input.scope.id]),
+        () => authz.assertSecondFactor(input),
+      ),
+    projectKindOf: (projectId) => askOnce(kinds, projectId, () => authz.projectKindOf(projectId)),
     // Each proof names its route, so one is minted per procedure, never shared.
-    ...(mint === void 0 ? {} : { authorization: mint }),
+    authorization: (input) => authz.authorization(input),
   };
 }
 

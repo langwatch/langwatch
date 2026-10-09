@@ -40,6 +40,7 @@ import {
 } from "../access/input-permission.ts";
 import { PayloadTooLargeError } from "../errors.ts";
 import type { ApiHandlerArguments } from "../handler-arguments.ts";
+import { assertHoldReason, type UpgradeHoldReason } from "../route-registry.ts";
 import {
   assertAddressingOptions,
   assertVersionLabel,
@@ -521,8 +522,8 @@ export type RestTransportRoute<Api> = Readonly<{
   readonly operation: string;
   readonly version: DateVersion;
   readonly docs?: RestTransportDocs;
-  /** UIW-6: answers while the installation upgrades; every other route is held before the door. */
-  readonly servesWhileUpgrading?: true;
+  /** Held before the door until the ledger is current; every other route serves (API-UP). */
+  readonly holdsWhileUpgrading?: UpgradeHoldReason;
   readonly params?: z.ZodObject;
   readonly input?: SourceSchema;
   /** Present exactly when the body is a JSON array: `input` is then `{ [as]: schema }`. */
@@ -618,7 +619,7 @@ export type RestArrayBodyDeclared = Readonly<{ as: string; schema: z.ZodArray }>
 
 /** Everything a route has declared so far, before `handle` freezes it. */
 type RouteState = Readonly<{
-  servesWhileUpgrading?: true;
+  holdsWhileUpgrading?: UpgradeHoldReason;
   params?: z.ZodObject;
   input?: SourceSchema;
   arrayBody?: RestArrayBodyDeclared;
@@ -1173,14 +1174,15 @@ class RouteBuilder<Api, S extends RouteShape> {
     });
   }
 
-  /** Serves while the installation upgrades (UIW-6); its permission is still asked as declared. */
-  servesWhileUpgrading(): RouteBuilder<Api, S> {
+  /** Every route serves while upgrading; this one holds until the ledger is current (API-UP). */
+  holdsWhileUpgrading(reason: UpgradeHoldReason): RouteBuilder<Api, S> {
+    assertHoldReason({ address: `${this.method.toUpperCase()} ${this.path}`, reason });
     return new RouteBuilder<Api, S>({
       router: this.router,
       method: this.method,
       path: this.path,
       operation: this.operation,
-      state: { ...this.state, servesWhileUpgrading: true },
+      state: { ...this.state, holdsWhileUpgrading: { because: reason.because } },
     });
   }
 
@@ -1661,7 +1663,7 @@ function doorParts(state: RouteState): Partial<RestTransportRoute<unknown>> {
   return {
     ...(state.entitlement ? { entitlement: state.entitlement } : {}),
     ...(state.mintsCredential ? { mintsCredential: state.mintsCredential } : {}),
-    ...(state.servesWhileUpgrading ? { servesWhileUpgrading: true as const } : {}),
+    ...(state.holdsWhileUpgrading ? { holdsWhileUpgrading: state.holdsWhileUpgrading } : {}),
     ...(state.credential ? { credential: state.credential } : {}),
     ...(state.key ? { key: state.key } : {}),
     ...(state.keyKinds ? { keyKinds: state.keyKinds } : {}),

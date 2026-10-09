@@ -109,12 +109,6 @@ export class BrowserSessionIdentity implements RestIdentity {
     caller: RestCaller;
     permission: PlatformTierPermission;
   }): Promise<PlatformDecision> {
-    if (!this.#authz.getPlatformDecision) {
-      throw new Error(
-        `"${permission}" is asked at the platform, and authz answers no platform question`,
-      );
-    }
-
     const userId = platformPrincipalOf(caller.actor);
     if (!userId) return { permitted: false };
 

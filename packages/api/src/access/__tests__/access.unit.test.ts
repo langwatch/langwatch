@@ -19,6 +19,7 @@ import {
   type Authorize,
   type Caller,
 } from "../access.ts";
+import { authorizeDefaults } from "../../__tests__/api-double.ts";
 
 const reviewer: Caller = { actor: { type: "user", id: "reviewer-1" } };
 
@@ -33,6 +34,7 @@ function authorize(
   seen: { decisions: unknown[] } = { decisions: [] },
 ): Authorize {
   return {
+    ...authorizeDefaults,
     getDecision: async (input) => {
       seen.decisions.push(input);
 
@@ -153,6 +155,7 @@ describe("deciding access for one call", () => {
   describe("given the scope ids do not share one organization", () => {
     it("refuses before any permission is checked", async () => {
       const mismatched = authorize({
+        ...authorizeDefaults,
         checkScopeLineage: async () => ({
           kind: "mismatch",
           widest: { tier: "organization", id: "organization-2" },

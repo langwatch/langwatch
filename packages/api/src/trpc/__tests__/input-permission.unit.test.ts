@@ -14,6 +14,7 @@ import {
   TrpcRootDefinition,
   type TrpcRuntimeMembers,
 } from "../runtime.ts";
+import { authorizeDefaults } from "../../__tests__/api-double.ts";
 
 /** The refusal a process gives for the webhook endpoints capability. */
 class NoWebhookEndpointsError extends HandledError {
@@ -79,6 +80,7 @@ function members({
     identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
     authorization: {
       forRequest: () => ({
+        ...authorizeDefaults,
         getDecision: async ({ permission, scope }) => {
           asked.push({ permission, scope });
 

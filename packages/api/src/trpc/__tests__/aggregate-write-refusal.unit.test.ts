@@ -13,6 +13,7 @@ import {
   TrpcRootDefinition,
   type TrpcRuntimeMembers,
 } from "../runtime.ts";
+import { authorizeDefaults } from "../../__tests__/api-double.ts";
 
 interface RowsApi {
   create(input: { projectId: string }): Promise<{ created: boolean }>;
@@ -40,6 +41,7 @@ function membersFor({ kind }: { kind: string }): TrpcRuntimeMembers<RowsContext>
     identity: { caller: (ctx) => ({ actor: ctx.actor }) },
     authorization: {
       forRequest: () => ({
+        ...authorizeDefaults,
         getDecision: async () => ({ permitted: true, organizationRole: "ADMIN" }),
         getProjectAnyDecision: async () => ({ permitted: true, organizationRole: "ADMIN" }),
         checkScopeLineage: async () => ({ kind: "consistent" }),

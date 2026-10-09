@@ -13,6 +13,7 @@ import {
   TrpcRootDefinition,
   type TrpcRuntimeMembers,
 } from "../runtime.ts";
+import { authorizeDefaults } from "../../__tests__/api-double.ts";
 
 interface LookupApi {
   resolve(input: unknown): Promise<{ found: boolean }>;
@@ -46,6 +47,7 @@ function members(grants: Grants): TrpcRuntimeMembers<LookupContext> {
     identity: { caller: (ctx) => ({ actor: ctx.actor as never }) },
     authorization: {
       forRequest: () => ({
+        ...authorizeDefaults,
         getDecision: async () => ({ permitted: false, organizationRole: null }),
         getProjectAnyDecision: async () => ({ permitted: false, organizationRole: null }),
         checkScopeLineage: async () => ({ kind: "consistent" }),

@@ -201,7 +201,8 @@ export class WebSocketProtocol<
 > {
   readonly protocol = "websocket" as const;
   readonly #options: ProtocolOptions<App, Facts, Session>;
-  #server: WebSocketServer | null = null;
+  /** One server per mount: a dev reload mounts the next generation before the old one drains. */
+  readonly #servers = new Set<WebSocketServer>();
 
   static create<App, Facts extends z.ZodObject, Session extends z.ZodType = z.ZodType>(
     options: ProtocolOptions<App, Facts, Session>,
@@ -222,15 +223,13 @@ export class WebSocketProtocol<
     router: ConnectUpgradeRouter,
     app: App,
     doors: ProtocolDoors = { project: () => null, session_key: () => null },
-  ): void {
-    if (this.#server) throw new Error("The WebSocket protocol is already mounted.");
-
+  ): () => Promise<void> {
     const server = new WebSocketServer({
       noServer: true,
       maxPayload: this.#options.maxPayloadBytes,
     });
 
-    this.#server = server;
+    this.#servers.add(server);
 
     router.register(this.#options.path, (request, socket, head) => {
       const values = Object.fromEntries(
@@ -293,13 +292,17 @@ export class WebSocketProtocol<
         refuse,
       });
     });
+
+    return () => this.#closeServer(server);
   }
 
+  /** Closes every mount; a host closes only its own through the closer `mount` answered. */
   async close(): Promise<void> {
-    const server = this.#server;
-    if (!server) return;
+    await Promise.all([...this.#servers].map((server) => this.#closeServer(server)));
+  }
 
-    this.#server = null;
+  async #closeServer(server: WebSocketServer): Promise<void> {
+    if (!this.#servers.delete(server)) return;
     for (const connection of server.clients) connection.terminate();
 
     await new Promise<void>((resolve) => server.close(() => resolve()));
@@ -452,12 +455,12 @@ export class WebSocketHost extends ConnectUpgradeRouter {
     const sessionKey = (options.facts ?? []).find(
       (binding) => isRestCredentialBinding(binding) && binding.credential === "session_key",
     );
-    declaration.mount(this, app(), {
+    const close = declaration.mount(this, app(), {
       project: () => this.#door,
       session_key: () =>
         sessionKey && isRestCredentialBinding(sessionKey) ? sessionKey.resolveIdentity() : null,
     });
-    this.#closers.push(() => declaration.close());
+    this.#closers.push(close);
   }
 
   upgrade(request: IncomingMessage, socket: Duplex, head: Buffer): void {

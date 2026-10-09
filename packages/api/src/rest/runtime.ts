@@ -32,6 +32,7 @@ import {
   decide,
   decideEntitlement,
   decidePlatform,
+  gatedDecision,
   mintAuthorization,
   platformRefusal,
   refuseImpersonatedMint,
@@ -53,7 +54,11 @@ import {
 } from "../errors.ts";
 import type { RestAuditSink, RestCaller, RestIdentity } from "../hosting/api-door.ts";
 import type { RateLimiter, ResponseCache } from "../ports.ts";
-import { type RegisteredSharedPath, registerRoutePolicy } from "../route-registry.ts";
+import {
+  type RegisteredSharedPath,
+  registerRoutePolicy,
+  type UpgradeHoldReason,
+} from "../route-registry.ts";
 import {
   addressesOf,
   basePathOf,
@@ -1271,7 +1276,7 @@ async function assertRouteSecondFactor({
   scope: AuthzDeclaredScopeId | null;
   authorize: Authorize | undefined;
 }): Promise<void> {
-  if (!scope || !authorize) return;
+  if (!scope) return;
 
   const browserSession = caller.browserSession ? { browserSession: caller.browserSession } : {};
   await assertSecondFactor({ caller: { actor, ...browserSession }, scope, authorize });
@@ -1992,13 +1997,14 @@ async function checkRouteScope({
 
   if (!asked) return null;
 
+  const authorize = ports.authorization?.forRequest(context.req.raw);
   for (const permission of asked.permissions) {
     const decision = await requireAuthorize(door)({ caller, permission, target: asked.target });
 
     assertRouteScopePermission({
       permission,
       target: asked.target,
-      decision,
+      decision: await gatedDecision({ decisions: authorize, scope: asked.target, decision }),
       ...(ports.denials ? { denials: ports.denials } : {}),
     });
   }
@@ -3070,7 +3076,9 @@ function mountCredential<Api>({
   return named;
 }
 
-/** UIW-6: the registry records a route declared to serve while upgrading. */
-function upgradingFlag<Api>(route: RestTransportRoute<Api>): { servesWhileUpgrading?: true } {
-  return route.servesWhileUpgrading ? { servesWhileUpgrading: true } : {};
+/** API-UP: the registry records a route declared to hold while upgrading, with its reason. */
+function upgradingFlag<Api>(route: RestTransportRoute<Api>): {
+  holdsWhileUpgrading?: UpgradeHoldReason;
+} {
+  return route.holdsWhileUpgrading ? { holdsWhileUpgrading: route.holdsWhileUpgrading } : {};
 }

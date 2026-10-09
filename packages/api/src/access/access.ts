@@ -173,32 +173,31 @@ export type Caller = Readonly<{
   browserSession?: Readonly<{ id: string | null }>;
 }>;
 
-/** The authorization decisions one request asks for, and nothing else. */
+/** The authorization decisions one request asks for; every member is required (fails closed). */
 export interface Authorize {
   getDecision(input: AuthzGetDecisionInput): Promise<PermissionDecision>;
   getProjectAnyDecision(input: AuthzGetProjectAnyDecisionInput): Promise<PermissionDecision>;
   checkScopeLineage(input: AuthzScopeLineageInput): Promise<AuthzScopeLineageResult>;
-  /** The organization holding a project or team (AuthzApi.getScope); absent hands a null one. */
-  organizationOf?(
+  /** The organization holding a project or team (AuthzApi.getScope); null when unknown. */
+  organizationOf(
     scope: Readonly<{ tier: "project" | "team"; id: string }>,
   ): Promise<string | null>;
-  /** Whether this user holds a platform-tier permission at the PLATFORM (E4); absent refuses. */
-  getPlatformDecision?(input: {
+  /** Whether this user holds a platform-tier permission at the PLATFORM (E4). */
+  getPlatformDecision(input: {
     userId: string;
     permission: PlatformTierPermission;
   }): Promise<PlatformDecision>;
-  /** A project's `kind` (ADR-177), null when unknown; absent reads none and gates nothing. */
-  projectKindOf?(projectId: string): Promise<string | null>;
-  /** AuthzApi.authorize's sealed proof for one admitted project read (ADR-166); absent
-   *  mints none. */
-  authorization?(input: {
+  /** A project's `kind` (ADR-177), null when unknown; every door gates with it. */
+  projectKindOf(projectId: string): Promise<string | null>;
+  /** AuthzApi.authorize's sealed proof for one admitted project read (ADR-166). */
+  authorization(input: {
     actor: Actor;
     permission: AuthzPermission;
     projectId: string;
     purpose: AuthorizationPurpose;
   }): Promise<Authorization>;
-  /** Refuses a person the organization holds at its second-factor gate; absent asks nothing. */
-  assertSecondFactor?(input: {
+  /** Refuses a person the organization holds at its second-factor gate. */
+  assertSecondFactor(input: {
     userId: string;
     sessionId: string | null;
     organizationId: string;
@@ -555,13 +554,11 @@ export async function decide({
   const credentialScope = caller.scope ?? null;
   assertInputScope({ input, scope: credentialScope });
 
-  if (authorize) await assertScopeLineage({ declaration, input, authorize });
+  await assertScopeLineage({ declaration, input, authorize });
 
   const decision = await decideDeclared({ declaration, caller, input, authorize, denials });
-  if (authorize) {
-    for (const scope of secondFactorScopes({ declaration, input, decision })) {
-      await assertSecondFactor({ caller, scope, authorize });
-    }
+  for (const scope of secondFactorScopes({ declaration, input, decision })) {
+    await assertSecondFactor({ caller, scope, authorize });
   }
 
   return decision;
@@ -634,15 +631,16 @@ export async function assertSecondFactor({
 }: {
   caller: Caller;
   scope: AuthzDeclaredScopeId;
-  authorize: Authorize;
+  authorize: Authorize | undefined;
 }): Promise<void> {
   const session = caller.browserSession;
-  if (!session || !authorize.assertSecondFactor || caller.actor?.type !== "user") return;
+  if (!session || caller.actor?.type !== "user") return;
+  if (!authorize) throw new Error("the second-factor gate needs an authorization port");
 
   const organizationId =
     scope.tier === "organization"
       ? scope.id
-      : ((await authorize.organizationOf?.({ tier: scope.tier, id: scope.id })) ?? null);
+      : await authorize.organizationOf({ tier: scope.tier, id: scope.id });
   if (organizationId === null) return;
 
   await authorize.assertSecondFactor({
@@ -667,10 +665,10 @@ export async function scopeWithOrganization({
   if (scope === null) return null;
   if (scope.tier === "organization") return { ...scope, organizationId: scope.id };
 
-  const organizationId = authorize?.organizationOf
-    ? await authorize.organizationOf({ tier: scope.tier, id: scope.id })
-    : null;
-  if (scope.tier === "team" || !authorize?.projectKindOf) return { ...scope, organizationId };
+  if (!authorize) throw new Error("a scope's organization needs an authorization port");
+
+  const organizationId = await authorize.organizationOf({ tier: scope.tier, id: scope.id });
+  if (scope.tier === "team") return { ...scope, organizationId };
 
   return { ...scope, organizationId, kind: await authorize.projectKindOf(scope.id) };
 }
@@ -725,7 +723,7 @@ async function decidePlatformCaller({
   await decidePlatform({
     declaration,
     actor: caller.actor,
-    ask: authorize?.getPlatformDecision?.bind(authorize),
+    ask: authorize?.getPlatformDecision.bind(authorize),
   });
 
   return { actor: caller.actor, scope: null };
@@ -891,19 +889,19 @@ async function decidePermissionByInput({
  * ADR-177 decision 5 on a project decision: a permitted non-admin pays one kind read and is
  * refused an aggregate; an admin and a refusal pass untouched without a read.
  */
-async function gatedDecision({
+export async function gatedDecision({
   decisions,
   scope,
   decision,
 }: {
-  decisions: Authorize;
+  decisions: Pick<Authorize, "projectKindOf"> | undefined;
   scope: AuthzDeclaredScopeId;
   decision: PermissionDecision;
 }): Promise<PermissionDecision> {
   if (scope.tier !== "project" || !decision.permitted || decision.organizationRole === "ADMIN") {
     return decision;
   }
-  if (!decisions.projectKindOf) return decision;
+  if (!decisions) throw new Error("the aggregate admin gate needs an authorization port");
 
   return applyAggregateAdminGate({ decision, kind: await decisions.projectKindOf(scope.id) });
 }
@@ -927,7 +925,7 @@ export async function mintAuthorization({
   route: string;
 }): Promise<Authorization | null> {
   if (!permission || !PROOF_BEARING_PERMISSIONS.has(permission)) return null;
-  if (scope?.tier !== "project" || !actor || !authorize?.authorization) {
+  if (scope?.tier !== "project" || !actor || !authorize) {
     throw new PermissionDeniedError({
       permission,
       scope: scope ? { type: scope.tier, id: scope.id } : { type: "resource", id: route },
@@ -1080,11 +1078,14 @@ async function assertScopeLineage({
 }: {
   declaration: AccessDeclaration;
   input: unknown;
-  authorize: Authorize;
+  authorize: Authorize | undefined;
 }): Promise<void> {
-  const lineage = await authorize.checkScopeLineage(
-    typeof input === "object" && input !== null ? (input as AuthzScopeLineageInput) : {},
-  );
+  if (typeof input !== "object" || input === null) return;
+  const named = SCOPE_INPUT_FIELDS.some((field) => Object.hasOwn(input, field));
+  if (!named) return;
+  if (!authorize) throw new Error("a scope named in the input needs an authorization port");
+
+  const lineage = await authorize.checkScopeLineage(input as AuthzScopeLineageInput);
 
   if (lineage.kind === "consistent") return;
 

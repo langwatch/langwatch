@@ -13,6 +13,7 @@ import {
   TrpcRootDefinition,
   type TrpcRuntimeMembers,
 } from "../runtime.ts";
+import { authorizeDefaults } from "../../__tests__/api-double.ts";
 
 interface ReadsApi {
   read(input: { projectId: string }): Promise<{ found: boolean }>;
@@ -35,6 +36,7 @@ const members: TrpcRuntimeMembers<ReadsContext> = {
   identity: { caller: (ctx) => ({ actor: ctx.actor }) },
   authorization: {
     forRequest: () => ({
+      ...authorizeDefaults,
       getDecision: async () => ({ permitted: true, organizationRole: "MEMBER" }),
       getProjectAnyDecision: async () => ({ permitted: true, organizationRole: "MEMBER" }),
       checkScopeLineage: async () => ({ kind: "consistent" }),

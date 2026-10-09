@@ -119,6 +119,29 @@ describe("WebSocketHost", () => {
     });
   });
 
+  describe("when a dev reload mounts one declaration again before the old generation drains", () => {
+    it("serves the next generation and keeps serving once the old one closes", async () => {
+      const declaration = echoProtocol("/api/v1/agents/connect");
+      const old = WebSocketHost.create();
+      old.mount(declaration, () => ({ name: "old" }));
+      const next = WebSocketHost.create();
+      next.mount(declaration, () => ({ name: "next" }));
+      const listener = createServer((_request, response) => response.writeHead(404).end());
+      listener.on("upgrade", (request, socket, head) => next.upgrade(request, socket, head));
+      await new Promise<void>((resolve) => listener.listen(0, resolve));
+      const address = listener.address();
+      if (address === null || typeof address === "string") throw new Error("no port bound");
+
+      await old.close();
+      await expect(
+        firstMessage(`ws://127.0.0.1:${address.port}/api/v1/agents/connect`),
+      ).resolves.toEqual({ app: "next", authorization: "Bearer key" });
+
+      await next.close();
+      await new Promise<void>((resolve) => listener.close(() => resolve()));
+    });
+  });
+
   describe("when a transport that is not a socket protocol is mounted", () => {
     it("refuses it by kind", () => {
       expect(() => WebSocketHost.create().mount({}, () => ({}))).toThrow(TypeError);

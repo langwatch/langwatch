@@ -15,6 +15,7 @@ import {
   type Authorize,
   type Caller,
 } from "../access.ts";
+import { authorizeDefaults } from "../../__tests__/api-double.ts";
 
 const sam: Caller = { actor: { type: "user", id: "user_sam" } };
 const PROOF = sealAuthorization({
@@ -39,6 +40,7 @@ function door({
   const decision: PermissionDecision = { permitted: true, organizationRole: role };
 
   return {
+    ...authorizeDefaults,
     minted,
     kindReads,
     getDecision: async () => decision,

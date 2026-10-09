@@ -9,6 +9,7 @@ import {
   TrpcRootDefinition,
   type TrpcRuntimeMembers,
 } from "../runtime.ts";
+import { authorizeDefaults } from "../../__tests__/api-double.ts";
 
 // Rulings 2026-10-06, round 7 (Q39): JSON text is parsed at the door, not in the handler.
 
@@ -33,6 +34,7 @@ const members: TrpcRuntimeMembers<ChartContext> = {
   identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
   authorization: {
     forRequest: () => ({
+      ...authorizeDefaults,
       getDecision: async () => ({ permitted: true, organizationRole: null }),
       getProjectAnyDecision: async () => ({ permitted: true, organizationRole: null }),
       checkScopeLineage: async () => ({ kind: "consistent" }),

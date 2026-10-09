@@ -12,6 +12,7 @@ import { SessionReader } from "../../hosting/session-reader.ts";
 import { composeTrpcRouters } from "../compose.ts";
 import { TrpcHost } from "../host.ts";
 import { defineTrpcRouter } from "../runtime.ts";
+import { authorizeDefaults } from "../../__tests__/api-double.ts";
 
 interface ReviewApi {
   read(input: { id: string }): { id: string };
@@ -41,6 +42,7 @@ async function callThroughHost(): Promise<{
   const trpc = TrpcHost.create({
     sessions: SessionReader.create({ verify: async () => ({ userId: "sam" }) }),
     authz: {
+      ...authorizeDefaults,
       getDecision: async () => ({ permitted: true, organizationRole: "MEMBER" }),
       getProjectAnyDecision: async () => ({ permitted: true, organizationRole: "MEMBER" }),
       checkScopeLineage: async () => ({ kind: "consistent" }),
