@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The portable, callable Langy capability shared by process transports.
 
-Peers call these through the token, declared at `../contract/src/langy.api.ts:272`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/langy.api.ts:279`; nothing else in this package is public.
 
 #### `ingestInternalTurnResult`
 
@@ -329,7 +329,7 @@ cancelLocalControlRequest(input: LangyControlRequestInput): Promise<LangyControl
 The session-key door's check: who holds a minted key; any other key throws its refusal.
 
 ```typescript
-verifyLocalControlSessionKey(presented: SessionKeyPresented): Promise<SessionKeyHolder>;
+verifyLocalControlSessionKey(presented: SessionKeyPresented): Promise<LocalControlKeyHolder>;
 ```
 
 #### `registerLocalControlSession`
@@ -361,7 +361,7 @@ postLocalControlFrames(input: LangyControlFramesInput): Promise<{ accepted: numb
 Holds one folder's socket from its register frame until it closes; refusals are frames.
 
 ```typescript
-acceptLocalControlConnection(connection: ProtocolConnection, credentials: LocalControlConnectCredentials): Promise<void>;
+acceptLocalControlConnection(connection: ProtocolConnection, opened: LocalControlConnectionOpened): Promise<void>;
 ```
 
 #### `listConversations`
@@ -610,18 +610,17 @@ interface Response {
 
 |             |                                                        |
 | ----------- | ------------------------------------------------------ |
-| Declared at | `src/transport/langy-local-control-connect.rest.ts:56` |
+| Declared at | `src/transport/langy-local-control-connect.rest.ts:57` |
 | Base URL    | ≈ namespace `langy`                                    |
 | Addressing  | literal                                                |
 | Credential  | project                                                |
 
 #### `POST ≈ `/api/langy/control${mount}/connect/register`` · `langyControlConnectRegister`
 
-Authenticated: a Langy session key is minted for one conversation and holds no RBAC permission; the key is the whole grant. Credential `session_key`. Declared at `src/transport/langy-local-control-connect.rest.ts:62`.
+Authenticated: a Langy session key is minted for one conversation and holds no RBAC permission; the key is the whole grant. Credential `session_key`. Declared at `src/transport/langy-local-control-connect.rest.ts:63`.
 
 ```typescript
 type Body = z.infer<typeof registerFrameSchema>; // ../contract/src/features/local-control/langy.local-control-protocol.ts:158
-// Headers: z.object({ authorization: z.string() }) (inline, src/transport/langy-local-control-connect.rest.ts:71)
 // Response: inline, src/transport/langy-local-control-connect.rest.ts:72
 type Response = unknown;
 ```
@@ -635,7 +634,7 @@ Public: addressed by the pod-local instance token register handed out, as on mai
 interface Query {
   inFlight?: string;
 }
-type Headers = z.infer<typeof instanceTokenHeaders>; // src/transport/langy-local-control-connect.rest.ts:53
+type Headers = z.infer<typeof instanceTokenHeaders>; // src/transport/langy-local-control-connect.rest.ts:54
 // Response: inline, src/transport/langy-local-control-connect.rest.ts:104
 type Response = unknown;
 ```
@@ -646,7 +645,7 @@ Public: addressed by the pod-local instance token register handed out, as on mai
 
 ```typescript
 type Body = z.infer<typeof langyControlFramesBodySchema>; // ../contract/src/langy-rest.schemas.ts:136
-type Headers = z.infer<typeof instanceTokenHeaders>; // src/transport/langy-local-control-connect.rest.ts:53
+type Headers = z.infer<typeof instanceTokenHeaders>; // src/transport/langy-local-control-connect.rest.ts:54
 // Response: inline, src/transport/langy-local-control-connect.rest.ts:135
 type Response = unknown;
 ```
@@ -1324,7 +1323,7 @@ interface Output {
 
 | Protocol  | Paths                           | Prefixes | Declared at                                  |
 | --------- | ------------------------------- | -------- | -------------------------------------------- |
-| websocket | `/api/v1/langy/control/connect` | –        | `src/transport/langy-local-control.ws.ts:17` |
+| websocket | `/api/v1/langy/control/connect` | –        | `src/transport/langy-local-control.ws.ts:27` |
 
 ## Workers
 
@@ -1352,7 +1351,7 @@ Declared at `src/eventing/langy-maintenance.pipeline.ts:30`.
 
 | Kind   | Leaf                 | Environment variable        | Declared at                          |
 | ------ | -------------------- | --------------------------- | ------------------------------------ |
-| secret | `–`                  | `LANGY_INTERNAL_SECRET`     | `src/app/langy.app.ts:282`           |
+| secret | `–`                  | `LANGY_INTERNAL_SECRET`     | `src/app/langy.app.ts:283`           |
 | config | `agentUrl`           | `LANGY_AGENT_URL`           | `../contract/src/langy.config.ts:18` |
 | config | `workerCallbackUrl`  | `LANGY_WORKER_CALLBACK_URL` | `../contract/src/langy.config.ts:19` |
 | config | `workerGatewayUrl`   | `LANGY_WORKER_GATEWAY_URL`  | `../contract/src/langy.config.ts:20` |

@@ -10,7 +10,7 @@ import {
   type CliFrame,
   cliFrameSchema,
   LOCAL_CONTROL_PROTOCOL_VERSION,
-  type LocalControlConnectCredentials,
+  type LocalControlConnectionOpened,
   type LocalControlRefusedCode,
   type PlatformFrame,
 } from "@langwatch/langy-contract";
@@ -76,27 +76,16 @@ export class LocalControlConnectionService {
   }
 
   /**
-   * Authenticates the upgrade, then waits for the register frame. Holds the first frame (sent
-   * before auth resolves) and drops later ones, so an unauthenticated peer cannot fill memory.
+   * Takes the socket the session key door admitted or refused before it opened, then waits for
+   * the register frame; later frames before it registers are dropped.
    */
-  async accept(ws: ProtocolConnection, credentials: LocalControlConnectCredentials): Promise<void> {
-    let held: string | undefined;
-    const stopHolding = ws.onMessage((raw) => {
-      held ??= raw;
-    });
-
-    const authenticated = await this.core.authenticate(credentials);
-    stopHolding();
-    if (!authenticated.ok) {
-      this.refuse(ws, authenticated.code, authenticated.message);
+  async accept(ws: ProtocolConnection, opened: LocalControlConnectionOpened): Promise<void> {
+    if ("refused" in opened) {
+      this.refuse(ws, opened.refused.code, opened.refused.message);
       return;
     }
 
-    const credential = authenticated.credential;
-    if (held !== undefined) {
-      void this.register(ws, credential, held);
-      return;
-    }
+    const credential = opened.admitted;
     const stopWaiting = ws.onMessage((raw) => {
       stopWaiting();
       void this.register(ws, credential, raw);

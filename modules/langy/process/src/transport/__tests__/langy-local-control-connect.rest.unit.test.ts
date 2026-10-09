@@ -25,6 +25,14 @@ import {
 
 const LIVE_KEY = "sk-lw-session-live";
 const HOLDER = { type: "user", id: "user-1" } as const;
+const CREDENTIAL = {
+  apiKeyId: "key-1",
+  projectId: "project-1",
+  projectSlug: "project-one",
+  userId: "user-1",
+  conversationId: "conversation-1",
+  requestId: "request-1",
+};
 
 const REGISTER_FRAME = {
   protocol: LOCAL_CONTROL_PROTOCOL_VERSION,
@@ -64,7 +72,7 @@ function family(router = langyLocalControlConnectRest, mount = "") {
     verifyLocalControlSessionKey: vi.fn<LangyApi["verifyLocalControlSessionKey"]>(async (key) => {
       const refusal = KEY_REFUSALS[key.token];
       if (refusal) throw refusal();
-      return { actor: HOLDER, projectId: "project-1" };
+      return { actor: HOLDER, ...CREDENTIAL };
     }),
     registerLocalControlSession: vi.fn<LangyApi["registerLocalControlSession"]>(
       async () => REGISTERED,
@@ -128,7 +136,7 @@ describe("registering a folder over long-poll", () => {
       expect(api.ops.registerLocalControlSession).toHaveBeenCalledWith({
         actor: HOLDER,
         projectId: "project-1",
-        authorization: `Bearer ${LIVE_KEY}`,
+        credential: CREDENTIAL,
         frame: REGISTER_FRAME,
       });
     });
@@ -149,7 +157,7 @@ describe("registering a folder over long-poll", () => {
         instanceToken: null,
       });
       expect(api.ops.registerLocalControlSession).toHaveBeenCalledWith(
-        expect.objectContaining({ authorization }),
+        expect.objectContaining({ credential: CREDENTIAL }),
       );
     });
   });

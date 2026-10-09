@@ -11,10 +11,13 @@ import { createLogger } from "@langwatch/observability";
 import { WebSocket, WebSocketServer } from "ws";
 import type { z } from "zod";
 
+import { SurfaceUnverifiedError } from "./errors.ts";
 import type { ApiDoor, RestIdentity } from "./hosting/api-door.ts";
+import type { TransportFactBinding } from "./hosting/transport-hosts.ts";
 import { ConnectUpgradeRouter, type UpgradeHandler } from "./ports.ts";
 import { projectCredentialOfRequest } from "./rest/credential.ts";
 import { assertKeyKind, keyCredentialOf, type RestKeyKinds } from "./rest/key-credential.ts";
+import { isRestCredentialBinding } from "./rest/request.ts";
 
 const logger = createLogger("langwatch:api:websocket-door");
 
@@ -117,6 +120,20 @@ export type WebSocketCaller = Readonly<{
   credential: RestResolvedProjectCredential;
 }>;
 
+/** A module's own session key door, asked at upgrade as a REST route behind it asks it (E2). */
+export type WebSocketSessionKeyDoor<Session extends z.ZodType> = Readonly<{
+  credential: "session_key";
+  /** The door's session as the protocol reads it; one it refuses is no credential. */
+  session: Session;
+}>;
+
+/** Who the module's session key door admitted, and the session it resolved. */
+export type WebSocketSessionCaller<Session extends z.ZodType> = Readonly<{
+  actor: Actor | null;
+  scope: AuthzDeclaredScopeId | null;
+  session: z.output<Session>;
+}>;
+
 type ProtocolShape<Facts extends z.ZodObject> = Readonly<{
   path: string;
   maxPayloadBytes: number;
@@ -142,25 +159,57 @@ type DooredProtocol<App, Facts extends z.ZodObject> = ProtocolShape<Facts> &
     refuse: (app: App, connection: ProtocolConnection, failure: Error) => Promise<void>;
   }>;
 
-type ProtocolOptions<App, Facts extends z.ZodObject> =
-  | OpenProtocol<App, Facts>
-  | DooredProtocol<App, Facts>;
+type SessionKeyProtocol<
+  App,
+  Facts extends z.ZodObject,
+  Session extends z.ZodType,
+> = ProtocolShape<Facts> &
+  Readonly<{
+    door: WebSocketSessionKeyDoor<Session>;
+    handle: (
+      app: App,
+      connection: ProtocolConnection,
+      admitted: Readonly<{ facts: z.output<Facts>; caller: WebSocketSessionCaller<Session> }>,
+    ) => Promise<void>;
+    refuse: (app: App, connection: ProtocolConnection, failure: Error) => Promise<void>;
+  }>;
 
-type Admission = Readonly<{ caller: WebSocketCaller }> | Readonly<{ failure: Error }>;
+type ProtocolOptions<App, Facts extends z.ZodObject, Session extends z.ZodType> =
+  | OpenProtocol<App, Facts>
+  | DooredProtocol<App, Facts>
+  | SessionKeyProtocol<App, Facts, Session>;
+
+type Admission<Caller> = Readonly<{ caller: Caller }> | Readonly<{ failure: Error }>;
+
+/** The doors a protocol may name, each resolved when an upgrade asks it. */
+type ProtocolDoors = Readonly<{
+  project: () => RestIdentity | null;
+  session_key: () => RestIdentity | null;
+}>;
+
+function isSessionKeyProtocol<App, Facts extends z.ZodObject, Session extends z.ZodType>(
+  options: ProtocolOptions<App, Facts, Session>,
+): options is SessionKeyProtocol<App, Facts, Session> {
+  return options.door?.credential === "session_key";
+}
 
 /** Owns the upgrade and socket lifecycle; feature code receives only declared facts. */
-export class WebSocketProtocol<App, Facts extends z.ZodObject> {
+export class WebSocketProtocol<
+  App,
+  Facts extends z.ZodObject,
+  Session extends z.ZodType = z.ZodType,
+> {
   readonly protocol = "websocket" as const;
-  readonly #options: ProtocolOptions<App, Facts>;
+  readonly #options: ProtocolOptions<App, Facts, Session>;
   #server: WebSocketServer | null = null;
 
-  static create<App, Facts extends z.ZodObject>(
-    options: ProtocolOptions<App, Facts>,
-  ): WebSocketProtocol<App, Facts> {
+  static create<App, Facts extends z.ZodObject, Session extends z.ZodType = z.ZodType>(
+    options: ProtocolOptions<App, Facts, Session>,
+  ): WebSocketProtocol<App, Facts, Session> {
     return new WebSocketProtocol(options);
   }
 
-  private constructor(options: ProtocolOptions<App, Facts>) {
+  private constructor(options: ProtocolOptions<App, Facts, Session>) {
     this.#options = options;
   }
 
@@ -172,7 +221,7 @@ export class WebSocketProtocol<App, Facts extends z.ZodObject> {
   mount(
     router: ConnectUpgradeRouter,
     app: App,
-    door: () => RestIdentity | null = () => null,
+    doors: ProtocolDoors = { project: () => null, session_key: () => null },
   ): void {
     if (this.#server) throw new Error("The WebSocket protocol is already mounted.");
 
@@ -212,7 +261,7 @@ export class WebSocketProtocol<App, Facts extends z.ZodObject> {
         return;
       }
 
-      const identity = door();
+      const identity = doors[options.door.credential]();
       if (!identity) {
         logger.error({ path: options.path }, "no API door is open for a doored upgrade");
         socket.write("HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\n\r\n");
@@ -221,17 +270,27 @@ export class WebSocketProtocol<App, Facts extends z.ZodObject> {
         return;
       }
 
-      void admit({ door: options.door, identity, request }).then((admission) => {
-        server.handleUpgrade(request, socket, head, (opened) => {
-          const connection = openConnection(opened);
-          const answered =
-            "caller" in admission
-              ? options.handle(app, connection, { facts: facts.data, caller: admission.caller })
-              : options.refuse(app, connection, admission.failure);
-          void answered.catch(() => {
-            connection.close(1011, "Connection setup failed");
-          });
+      const upgrade = { server, request, socket, head };
+      const refuse = (connection: ProtocolConnection, failure: Error) =>
+        options.refuse(app, connection, failure);
+      if (isSessionKeyProtocol(options)) {
+        openAfter({
+          ...upgrade,
+          admitted: admitSessionKey({ door: options.door, identity, request }),
+          handle: (connection, caller) =>
+            options.handle(app, connection, { facts: facts.data, caller }),
+          refuse,
         });
+
+        return;
+      }
+
+      openAfter({
+        ...upgrade,
+        admitted: admit({ door: options.door, identity, request }),
+        handle: (connection, caller) =>
+          options.handle(app, connection, { facts: facts.data, caller }),
+        refuse,
       });
     });
   }
@@ -256,6 +315,38 @@ function openConnection(socket: WebSocket): WebSocketConnection {
   return connection;
 }
 
+/** Opens the socket once the door answered, for the caller it admitted or the refusal it raised. */
+function openAfter<Caller>({
+  server,
+  request,
+  socket,
+  head,
+  admitted,
+  handle,
+  refuse,
+}: {
+  server: WebSocketServer;
+  request: IncomingMessage;
+  socket: Duplex;
+  head: Buffer;
+  admitted: Promise<Admission<Caller>>;
+  handle: (connection: ProtocolConnection, caller: Caller) => Promise<void>;
+  refuse: (connection: ProtocolConnection, failure: Error) => Promise<void>;
+}): void {
+  void admitted.then((admission) => {
+    server.handleUpgrade(request, socket, head, (opened) => {
+      const connection = openConnection(opened);
+      const answered =
+        "caller" in admission
+          ? handle(connection, admission.caller)
+          : refuse(connection, admission.failure);
+      void answered.catch(() => {
+        connection.close(1011, "Connection setup failed");
+      });
+    });
+  });
+}
+
 /** The project door asked at upgrade time, as a REST route behind it asks it per request. */
 async function admit({
   door,
@@ -265,7 +356,7 @@ async function admit({
   door: WebSocketDoor;
   identity: RestIdentity;
   request: IncomingMessage;
-}): Promise<Admission> {
+}): Promise<Admission<WebSocketCaller>> {
   const asked = requestOf(request);
   try {
     const caller = await identity.authenticate({
@@ -280,6 +371,28 @@ async function admit({
     caller.markUsed?.();
 
     return { caller: { actor: caller.actor, scope: caller.scope, credential } };
+  } catch (error) {
+    return { failure: error instanceof Error ? error : new Error(String(error)) };
+  }
+}
+
+/** A module's session key door asked at upgrade: no permission; its session parsed as on REST. */
+async function admitSessionKey<Session extends z.ZodType>({
+  door,
+  identity,
+  request,
+}: {
+  door: WebSocketSessionKeyDoor<Session>;
+  identity: RestIdentity;
+  request: IncomingMessage;
+}): Promise<Admission<WebSocketSessionCaller<Session>>> {
+  try {
+    if (!identity.identify) throw new SurfaceUnverifiedError(door.credential);
+    const caller = await identity.identify({ request: requestOf(request) });
+    const session = door.session.safeParse(caller.session);
+    if (!session.success) throw new SurfaceUnverifiedError(door.credential);
+
+    return { caller: { actor: caller.actor, scope: caller.scope, session: session.data } };
   } catch (error) {
     return { failure: error instanceof Error ? error : new Error(String(error)) };
   }
@@ -327,11 +440,23 @@ export class WebSocketHost extends ConnectUpgradeRouter {
     this.#handlers.set(pathname, handler);
   }
 
-  mount(declaration: object, app: () => unknown): void {
+  /** `facts` are the module's own bindings; its session key door is the one a socket may name. */
+  mount(
+    declaration: object,
+    app: () => unknown,
+    options: Readonly<{ facts?: readonly TransportFactBinding[] }> = {},
+  ): void {
     if (!(declaration instanceof WebSocketProtocol))
       throw new TypeError("A websocket transport must be declared with WebSocketProtocol.create.");
 
-    declaration.mount(this, app(), () => this.#door);
+    const sessionKey = (options.facts ?? []).find(
+      (binding) => isRestCredentialBinding(binding) && binding.credential === "session_key",
+    );
+    declaration.mount(this, app(), {
+      project: () => this.#door,
+      session_key: () =>
+        sessionKey && isRestCredentialBinding(sessionKey) ? sessionKey.resolveIdentity() : null,
+    });
     this.#closers.push(() => declaration.close());
   }
 
