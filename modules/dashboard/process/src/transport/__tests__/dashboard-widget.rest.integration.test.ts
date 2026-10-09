@@ -8,7 +8,11 @@ import { bindRestMiddleware, canonicalErrorResponse, createRestRuntime } from "@
 import { describe, expect, it } from "vitest";
 
 import { createDashboardTestApp } from "../../app/__tests__/dashboard.fixture.ts";
-import { dashboardWidgetRest, dashboardWidgetUrl } from "../dashboard-widget.rest.ts";
+import {
+  dashboardWidgetCallerSource,
+  dashboardWidgetRest,
+  dashboardWidgetUrl,
+} from "../dashboard-widget.rest.ts";
 
 const CODE = "export default function Widget() { return null; }";
 const SQL = "SELECT count() AS value FROM analytics.traces";
@@ -28,7 +32,10 @@ function mountKey() {
   });
   const hono = runtime.mount(dashboardWidgetRest.router(), {
     app: () => app,
-    facts: [bindRestMiddleware(dashboardWidgetUrl, () => "https://app.langwatch.test/dashboards")],
+    facts: [
+      bindRestMiddleware(dashboardWidgetUrl, () => "https://app.langwatch.test/dashboards"),
+      bindRestMiddleware(dashboardWidgetCallerSource, () => ({ kind: "api" as const })),
+    ],
     onError: canonicalErrorResponse,
   });
   const base = "/api/v1/projects/project-1/analytics/dashboard-widgets";

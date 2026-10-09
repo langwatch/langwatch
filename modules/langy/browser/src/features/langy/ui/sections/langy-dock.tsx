@@ -12,7 +12,7 @@ import type { LangySidecarProps } from "./langy-panel.tsx";
 
 // The panel (chat engine, cards, markdown, charts) is most of Langy's weight, so a page
 // loads it when Langy opens, not on every visit.
-const LangySidecar = lazyChunk(() =>
+const LangySidecar = lazyChunk<LangySidecarProps>(() =>
   import("./langy-panel.tsx").then((module) => ({ default: module.LangySidecar })),
 );
 

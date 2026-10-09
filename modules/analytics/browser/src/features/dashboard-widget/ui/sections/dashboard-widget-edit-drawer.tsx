@@ -50,8 +50,8 @@ interface DashboardWidgetEditDrawerProps<Tab extends string> {
   isSaving: boolean;
   onClose: () => void;
   onSave: () => void;
-  activeTab: WidgetEditTab | Tab;
-  onTabChange: (tab: WidgetEditTab | Tab) => void;
+  activeTab: WidgetEditTab | NoInfer<Tab>;
+  onTabChange: (tab: WidgetEditTab | NoInfer<Tab>) => void;
   /** Tabs after Code and Queries. */
   extraTabs?: readonly WidgetEditExtraTab<Tab>[];
   /** Shown between the preview and the tabs, such as an assistant's suggestions. */

@@ -21,7 +21,8 @@ export type DashboardUpdate = Readonly<{
   description?: string | null;
   createdById?: string;
 }>;
-export type DashboardSummaryRecord = DashboardSummary;
+/** The stored summary: a star belongs to a member, so the service adds `isStarred`. */
+export type DashboardSummaryRecord = Omit<DashboardSummary, "isStarred">;
 export type GraphRecord = Graph;
 
 /** The stored chart before its definition is parsed against the contract. */

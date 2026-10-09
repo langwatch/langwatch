@@ -454,7 +454,7 @@ describe("Picking a widget in Add a widget", () => {
   /** @scenario "Add a widget: a picked widget shows on the board at once" */
   it("closes the picker and shows the widget before the server has stored it", async () => {
     const server = inMemoryServer();
-    let land = () => void 0;
+    let land: () => void = () => void 0;
     server.state.held.set("dashboardWidgets.create", new Promise((open) => (land = open)));
     const host = openBoard({ server, query: { addBlock: "open" } });
 
@@ -526,7 +526,7 @@ describe("Undo", () => {
     /** @scenario "Delete: a widget leaves the board at once, with Undo" */
     it("hides it and offers Undo before the delete lands, then Undo waits and restores it", async () => {
       const server = inMemoryServer();
-      let land = () => void 0;
+      let land: () => void = () => void 0;
       server.state.held.set("dashboardWidgets.delete", new Promise((open) => (land = open)));
       openBoard({ server });
 

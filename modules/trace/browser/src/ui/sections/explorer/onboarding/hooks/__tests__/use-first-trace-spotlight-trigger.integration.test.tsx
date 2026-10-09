@@ -32,7 +32,8 @@ const onboardingLends = uiDeclarations([
   },
 ]);
 
-vi.mock("@langwatch/browser-host/capabilities", () => ({
+vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   useUiDeclarations: () => (isOnboardingInstalled ? onboardingLends : uiDeclarations([])),
 }));
 
