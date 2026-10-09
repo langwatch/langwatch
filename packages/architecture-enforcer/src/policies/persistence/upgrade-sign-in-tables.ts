@@ -6,8 +6,9 @@ import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
 import { POSTGRES_TOUCH, postgresOwners, SQL_COMMENT } from "./migration-owners.ts";
 
 /**
- * The api serves sign-in while the worker runs blocking upgrade steps, so a blocking step's
- * frozen SQL never touches a table the sign-in owners claim (Alex, 2026-10-09, UIW-9).
+ * The api serves sign-in and ingestion while the worker runs blocking upgrade steps, so a
+ * blocking step's frozen SQL never touches a table those doors read or write: sign-in's owners
+ * and the ingest door's (Alex, 2026-10-09, UIW-9, API-UP-DURING-UPGRADE).
  */
 
 const POLICY = "upgrade-sign-in-tables";
@@ -17,9 +18,15 @@ const SIGN_IN_OWNERS: ReadonlySet<string> = new Set([
   "organization",
   "authz",
   "identity",
+  "api-key",
+  "project",
+  "evaluator",
+  "monitor",
+  "experiment",
+  "governance",
 ]);
 const ALLOWED =
-  "Ship the change as a background step (expand/contract); the api serves sign-in while the worker runs blocking steps (Alex, 2026-10-09, UIW-9).";
+  "Ship the change as a background step (expand/contract); the api serves sign-in and ingestion while the worker runs blocking steps (Alex, 2026-10-09, UIW-9).";
 const TS_COMMENT = /^\s*\/\/.*$/gm;
 const MIGRATION_REPOSITORY = /^prisma\..+-migration\.repository\.ts$/;
 const NEXT_MEMBER = /\n {2}(?:(?:async|static|private|public|protected)\s+)*\w+\s*[(<]/;

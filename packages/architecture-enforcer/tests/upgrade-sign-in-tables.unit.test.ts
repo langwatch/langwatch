@@ -20,7 +20,7 @@ const REPOSITORY_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", ".."
 
 const roots: string[] = [];
 
-const SCHEMA = ["User", "Organization", "Session", "SsoConnection", "Role", "Dataset"]
+const SCHEMA = ["User", "Organization", "Session", "SsoConnection", "Role", "Dataset", "ApiKey", "Project", "Monitor"]
   .map((model) => `model ${model} {\n  id String @id\n}\n`)
   .join("");
 
@@ -146,17 +146,23 @@ describe("upgrade sign-in tables", () => {
   });
 
   /** @scenario "The sign-in owners are read from ownership claims" */
-  it("resolves exactly the tables the five sign-in owners claim", () => {
+  it("resolves exactly the tables the sign-in and ingest owners claim", () => {
     const world = fixture();
     world.claims("auth", "Session");
     world.claims("user", "User");
     world.claims("organization", "Organization");
     world.claims("authz", "Role");
     world.claims("identity", "SsoConnection");
+    world.claims("api-key", "ApiKey");
+    world.claims("project", "Project");
+    world.claims("monitor", "Monitor");
     world.claims("dataset", "Dataset");
 
     expect(world.tables()).toEqual([
+      ["ApiKey", "api-key"],
+      ["Monitor", "monitor"],
       ["Organization", "organization"],
+      ["Project", "project"],
       ["Role", "authz"],
       ["Session", "auth"],
       ["SsoConnection", "identity"],
