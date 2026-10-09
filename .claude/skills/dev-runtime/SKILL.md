@@ -42,8 +42,9 @@ as shipped"). The open questions at the foot of the ADR that remain are Alex's, 
   unchanged, `/api` still proxied) and loads api and worker through a Vite module runner.
 - `app.entrypoint.ts --backend-only`: the split shape's api lane (`pnpm --filter
 @langwatch/dev-runtime dev`), the same host without the UI's Vite server. The supervisor
-  keeps the process: it restarts it only for a `package.json`, a file in the host's own
-  `src/` (Node loaded both natively), or a crash after `backend ready`.
+  keeps the process: it restarts it only for a crash after `backend ready`. An edit to the
+  host's own `src/` (Node loaded it natively) logs that it applies on the next restart:
+  `haven restart app`.
 - `backend.entrypoint.main.ts`: api and worker in one Node process with no reload
   (`pnpm start`, and the `LANGWATCH_DEV_RELOAD=process` fallback's boot shape).
 - `backend.reload.ts`: finds the loaded modules a changed file reaches
