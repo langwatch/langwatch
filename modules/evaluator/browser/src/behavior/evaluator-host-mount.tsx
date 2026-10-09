@@ -1,6 +1,6 @@
 /**
  * Evaluator's answer to the port its screens declare: every method projects
- * a `@langwatch/browser-host` capability, so the module mounts it, not the
+ * a `@langwatch/browser-host` host service, so the module mounts it, not the
  * application. ARCHITECTURE.md §10.1.
  */
 
@@ -26,7 +26,7 @@ import {
   type EvaluatorSuccessNotice,
 } from "../model/evaluator-host.ts";
 
-class CapabilityEvaluatorHost extends EvaluatorHostApi {
+class HostServiceEvaluatorHost extends EvaluatorHostApi {
   private readonly hostScope: EvaluatorScope;
   private readonly session: UiSession;
   private readonly lent: UiCopyTargets;
@@ -119,7 +119,7 @@ export default function EvaluatorHostMount({ children }: { children?: ReactNode 
   );
 
   const host = useMemo(
-    () => new CapabilityEvaluatorHost({ hostScope, session, lent, uiRoute: route, feedback }),
+    () => new HostServiceEvaluatorHost({ hostScope, session, lent, uiRoute: route, feedback }),
     [hostScope, session, lent, route, feedback],
   );
 

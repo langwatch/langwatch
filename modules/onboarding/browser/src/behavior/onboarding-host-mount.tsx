@@ -1,6 +1,6 @@
 /**
  * Onboarding's answer to the port its screens declare: scope and the legacy
- * project key project a `@langwatch/browser-host` capability plus this
+ * project key project a `@langwatch/browser-host` host service plus this
  * family's own borrowed `organization.getAll` query. ARCHITECTURE.md §10.1.
  */
 
@@ -96,7 +96,7 @@ function sessionStatusOf(hasActor: boolean, isSettled: boolean): OnboardingSessi
   return isSettled ? "unauthenticated" : "loading";
 }
 
-class CapabilityOnboardingHost extends OnboardingHostApi {
+class HostServiceOnboardingHost extends OnboardingHostApi {
   constructor(
     private readonly deps: {
       scope: OnboardingScope;
@@ -252,7 +252,7 @@ export default function OnboardingHostMount({ children }: { children?: ReactNode
 
   const host = useMemo(
     () =>
-      new CapabilityOnboardingHost({
+      new HostServiceOnboardingHost({
         scope,
         actor: sessionActor
           ? { id: sessionActor.id, email: sessionActor.email ?? void 0, name: sessionActor.name }

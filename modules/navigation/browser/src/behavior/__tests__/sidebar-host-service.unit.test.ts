@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { sidebarCapability } from "../sidebar-capability.ts";
+import { sidebarHostService } from "../sidebar-host-service.ts";
 import {
   clearSidebarSectionOverrides,
   getSidebarSectionOverride,
   subscribeSidebarSectionOverrides,
 } from "../sidebar-section-store.ts";
 
-describe("sidebarCapability", () => {
+describe("sidebarHostService", () => {
   beforeEach(() => {
     clearSidebarSectionOverrides();
   });
@@ -16,23 +16,23 @@ describe("sidebarCapability", () => {
     const listener = vi.fn();
     subscribeSidebarSectionOverrides(listener);
 
-    sidebarCapability.expandGroup("build");
+    sidebarHostService.expandGroup("build");
 
     expect(getSidebarSectionOverride("build")).toBe(true);
     expect(listener).toHaveBeenCalledTimes(1);
   });
 
   it("collapseGroup sets the override false", () => {
-    sidebarCapability.collapseGroup("build");
+    sidebarHostService.collapseGroup("build");
 
     expect(getSidebarSectionOverride("build")).toBe(false);
   });
 
   it("restoreAll drops every override", () => {
-    sidebarCapability.expandGroup("build");
-    sidebarCapability.expandGroup("workflows");
+    sidebarHostService.expandGroup("build");
+    sidebarHostService.expandGroup("workflows");
 
-    sidebarCapability.restoreAll();
+    sidebarHostService.restoreAll();
 
     expect(getSidebarSectionOverride("build")).toBeUndefined();
     expect(getSidebarSectionOverride("workflows")).toBeUndefined();

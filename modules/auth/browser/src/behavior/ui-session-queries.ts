@@ -1,5 +1,5 @@
 /**
- * The read a session capability is built out of — cached under the
+ * The read a session host service is built out of — cached under the
  * key `trpcQueryKey` would produce for the same procedure, so this
  * package's queries and the application's own share ONE cache entry.
  */

@@ -71,7 +71,7 @@ class AnsweringSession extends UiSession {
   }
 }
 
-function capabilities(session: UiSession): UiHostServices {
+function hostServices(session: UiSession): UiHostServices {
   return {
     documentTitle: BrowserUiDocumentTitle.create({ title: "" }),
     feedback: new SilentFeedback(),
@@ -98,7 +98,7 @@ function renderGuarded(session: AnsweringSession) {
   })(Page);
 
   render(
-    <UiHostServicesContextProvider value={capabilities(session)}>
+    <UiHostServicesContextProvider value={hostServices(session)}>
       <UiHostServiceProvider
         value={
           new Map([
@@ -314,7 +314,7 @@ describe("given a module declaring a screen that requires a grant", () => {
 
     renderWithDesignSystem(
       <UiHostServicesContextProvider
-        value={capabilities(new AnsweringSession({ flags, permissions, settled: true }))}
+        value={hostServices(new AnsweringSession({ flags, permissions, settled: true }))}
       >
         <UiHostServiceProvider
           value={

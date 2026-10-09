@@ -121,7 +121,7 @@ describe("given an automation host above the drawer that writes through it", () 
       render(<ScopeReader />, { wrapper: Harness });
 
       expect(screen.getByTestId("org")).toHaveTextContent("local-dev-organization");
-      // The port wants the team's slug; the scope capability carries only its id.
+      // The port wants the team's slug; the scope host service carries only its id.
       expect(screen.getByTestId("team")).toHaveTextContent("local-dev-team");
     });
   });

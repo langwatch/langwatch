@@ -11,7 +11,7 @@ import {
   setSidebarSectionOverride,
 } from "./sidebar-section-store.ts";
 
-export const sidebarCapability: NavigationSidebar = {
+export const sidebarHostService: NavigationSidebar = {
   expandGroup(id) {
     setSidebarSectionOverride(id, true);
   },
@@ -23,4 +23,4 @@ export const sidebarCapability: NavigationSidebar = {
   },
 };
 
-export default sidebarCapability;
+export default sidebarHostService;

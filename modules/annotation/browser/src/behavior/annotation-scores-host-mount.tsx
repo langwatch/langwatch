@@ -1,6 +1,6 @@
 /**
  * Annotation Scores' answer to the port its screen declares: every method
- * projects a `@langwatch/browser-host` capability, so the module mounts it,
+ * projects a `@langwatch/browser-host` host service, so the module mounts it,
  * not the application. ARCHITECTURE.md §10.1.
  */
 
@@ -24,7 +24,7 @@ import {
 /** The name the editor answers to in the address, as registered in annotation.web.ts. */
 const ANNOTATION_SCORE_EDITOR_DRAWER = "addOrEditAnnotationScore";
 
-class CapabilityAnnotationScoresHost extends AnnotationScoresHostApi {
+class HostServiceAnnotationScoresHost extends AnnotationScoresHostApi {
   constructor(
     private readonly deps: {
       projectId: string | undefined;
@@ -93,7 +93,7 @@ export default function AnnotationScoresHostMount({ children }: { children?: Rea
 
   const host = useMemo(
     () =>
-      new CapabilityAnnotationScoresHost({
+      new HostServiceAnnotationScoresHost({
         projectId: projectId ?? void 0,
         isLiteMember,
         editor,

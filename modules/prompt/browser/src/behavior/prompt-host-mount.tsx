@@ -1,6 +1,6 @@
 /**
  * Prompt's answer to the port its screen declares: every method projects a
- * `@langwatch/browser-host` capability; organization lends `copyTargets`. §10.1.
+ * `@langwatch/browser-host` host service; organization lends `copyTargets`. §10.1.
  */
 
 import {
@@ -65,7 +65,7 @@ function sweepDeviceWideTabs(): void {
 /** The API always mounts the execution door the Conversation tab posts to. */
 const PLAYGROUND_CHAT_AVAILABILITY: PromptPlaygroundChatAvailability = { available: true };
 
-class CapabilityPromptHost extends PromptHostApi {
+class HostServicePromptHost extends PromptHostApi {
   private readonly hostScope: PromptHostScope;
   private readonly session: UiSession;
   private readonly lent: UiCopyTargets;
@@ -194,7 +194,7 @@ export default function PromptHostMount({ children }: { children?: ReactNode }) 
 
   const host = useMemo(
     () =>
-      new CapabilityPromptHost({ hostScope, session, lent, navigation, uiRoute: route, feedback }),
+      new HostServicePromptHost({ hostScope, session, lent, navigation, uiRoute: route, feedback }),
     [hostScope, session, lent, navigation, route, feedback],
   );
 

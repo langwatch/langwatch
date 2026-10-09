@@ -1,6 +1,6 @@
 /**
  * The instrumentation destinations this application composes, behind the one
- * `UiAnalytics` capability (ARCHITECTURE.md §10.1). Every destination name and
+ * `UiAnalytics` host service (ARCHITECTURE.md §10.1). Every destination name and
  * payload below is what react-contextual-analytics sent before it was evicted.
  */
 

@@ -26,7 +26,7 @@ describe("browser feature configuration", () => {
       });
     });
 
-    it("reads the deployment capability and the telemetry off those projections", async () => {
+    it("reads the deployment host service and the telemetry off those projections", async () => {
       const config = await uiFeatureConfigFrom(servedConfig);
 
       expect(uiDeploymentOf({ config, origin: "https://page.langwatch.test" })).toMatchObject({

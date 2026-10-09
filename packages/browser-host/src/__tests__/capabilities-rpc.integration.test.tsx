@@ -1,5 +1,5 @@
 /**
- * The by-path dispatcher reaches a screen as a CAPABILITY, not through a
+ * The by-path dispatcher reaches a screen as a HOST SERVICE, not through a
  * context of its own — record 10.1 rules out ambient React context as a
  * cross-module transport.
  * @vitest-environment jsdom
@@ -52,7 +52,7 @@ class RecordedUiRpc extends UiRpc {
   }
 }
 
-function capabilitiesWith(rpc?: UiRpc): UiHostServices {
+function hostServicesWith(rpc?: UiRpc): UiHostServices {
   return resolveUiHostServices({
     install: {},
     documentTitle: BrowserUiDocumentTitle.create(),
@@ -62,16 +62,16 @@ function capabilitiesWith(rpc?: UiRpc): UiHostServices {
   });
 }
 
-function mounted(capabilities: UiHostServices) {
+function mounted(hostServices: UiHostServices) {
   return ({ children }: { children: ReactNode }) => (
-    <UiHostServicesContextProvider value={capabilities}>{children}</UiHostServicesContextProvider>
+    <UiHostServicesContextProvider value={hostServices}>{children}</UiHostServicesContextProvider>
   );
 }
 
 describe("given a shell that composed the by-path dispatcher", () => {
-  it("hands it to a screen through the capabilities", async () => {
+  it("hands it to a screen through the host services", async () => {
     const { result } = renderHook(() => useUiRpc(), {
-      wrapper: mounted(capabilitiesWith(new RecordedUiRpc())),
+      wrapper: mounted(hostServicesWith(new RecordedUiRpc())),
     });
 
     await expect(result.current.query("organization.getAll", {})).resolves.toEqual({
@@ -82,7 +82,7 @@ describe("given a shell that composed the by-path dispatcher", () => {
 
 describe("given a screen mounted with no dispatcher above it", () => {
   it("refuses by name rather than answering with a fabricated result", () => {
-    const { result } = renderHook(() => useUiRpc(), { wrapper: mounted(capabilitiesWith()) });
+    const { result } = renderHook(() => useUiRpc(), { wrapper: mounted(hostServicesWith()) });
 
     expect(() => result.current.query("organization.getAll", {})).toThrow(
       UiHostServiceUnavailableError,

@@ -141,7 +141,7 @@ export function useUiSessionReading({
 }: {
   /** Where a refused session read is told, since nobody else sees it. */
   feedback: UiFeedback;
-  /** Whether this address renders without a session — the scope capability reads it. */
+  /** Whether this address renders without a session — the scope host service reads it. */
   isPublicRoute: boolean;
   /** The deployment's own client unless a test answers with a recorded session. */
   authClient?: UiAuthClient;

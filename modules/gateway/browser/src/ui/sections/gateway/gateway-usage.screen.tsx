@@ -207,7 +207,7 @@ function GatewayUsagePage() {
   // Both of these rewrite the query of the page the reader is already on. The
   // compat router spelled that `push({ pathname: router.pathname, query })`,
   // which needed the route pattern; a bare `"?..."` says the same thing without
-  // one, and is what the host's route capability writes.
+  // one, and is what the route host service writes.
   const setDays = (next: number | "mtd") => {
     router.push(`?${queryString({ ...router.query, days: next.toString() })}`);
   };

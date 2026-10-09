@@ -10,7 +10,7 @@ import { createUiHostServicesFromHost } from "../testing.ts";
 const host = { route: () => ({ params: {}, query: {} }), navigate: () => {} };
 
 describe("the shared UI session reading", () => {
-  it("reads the capability root's published snapshot", () => {
+  it("reads the host service root's published snapshot", () => {
     const reading: UiSessionSnapshot = {
       session: { status: "anonymous", user: null },
       scope: { status: "ready", organization: undefined, team: undefined, project: undefined },
@@ -25,8 +25,8 @@ describe("the shared UI session reading", () => {
     expect(result.current).toEqual({ status: "anonymous", user: null });
   });
 
-  it("refuses when the capability root is absent", () => {
-    expect(() => renderHook(() => useSession())).toThrow(/UI capabilities/);
+  it("refuses when the host service root is absent", () => {
+    expect(() => renderHook(() => useSession())).toThrow(/UI host services/);
   });
 });
 

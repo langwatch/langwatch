@@ -1,7 +1,7 @@
 import type { UiFeatureConfig } from "../ui-feature-config";
 import type { UiRootHostServices } from "./ui-root-host-services";
 
-/** The frames the shell draws pages in; the chrome draws over the loaded capabilities. */
+/** The frames the shell draws pages in; the chrome draws over the loaded host services. */
 export function uiShellLayouts({
   root,
   config,
@@ -18,7 +18,7 @@ export function uiShellLayouts({
       const { default: UiAppChrome } = await import("./ui-app-chrome");
       return {
         default: function UiAppChromeOverHostServices() {
-          return <UiAppChrome capabilities={root} process={config.process} />;
+          return <UiAppChrome rootHostServices={root} process={config.process} />;
         },
       };
     },
@@ -26,7 +26,7 @@ export function uiShellLayouts({
       const { default: UiAppChrome } = await import("./ui-app-chrome");
       return {
         default: function UiFullScreenOverHostServices() {
-          return <UiAppChrome capabilities={root} process={config.process} fullScreen />;
+          return <UiAppChrome rootHostServices={root} process={config.process} fullScreen />;
         },
       };
     },

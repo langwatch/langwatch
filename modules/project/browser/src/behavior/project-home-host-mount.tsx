@@ -1,6 +1,6 @@
 /**
  * Project home's answer to the port its screen declares: every method
- * projects a `@langwatch/browser-host` capability, so the module mounts it,
+ * projects a `@langwatch/browser-host` host service, so the module mounts it,
  * not the application. ARCHITECTURE.md §10.1.
  */
 
@@ -31,7 +31,7 @@ const LANGY_RELEASE_FLAG = FrontendFlags.release_langy_enabled;
 /** Main's `OrganizationUserRole.ADMIN`, as team-visibility.rules.ts:2 spells it. */
 const ORGANIZATION_ADMIN_ROLE = "ADMIN";
 
-class CapabilityProjectHomeHost extends ProjectHomeHost {
+class HostServiceProjectHomeHost extends ProjectHomeHost {
   private readonly project_: ProjectHomeProject | undefined;
   private readonly organization_: ProjectHomeOrganization | undefined;
   private readonly currentUser_: ProjectHomeUser | undefined;
@@ -180,7 +180,7 @@ export default function ProjectHomeHostMount({ children }: { children?: ReactNod
   // and a fresh object every render would remount the whole tree under it.
   const host = useMemo(
     () =>
-      new CapabilityProjectHomeHost({
+      new HostServiceProjectHomeHost({
         project:
           projectId !== void 0
             ? {

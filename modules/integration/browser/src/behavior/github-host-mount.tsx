@@ -1,6 +1,6 @@
 /**
  * Integration's answer to the GitHub port its screen declares: every method projects a
- * `@langwatch/browser-host` capability, so integration mounts it, not the
+ * `@langwatch/browser-host` host service, so integration mounts it, not the
  * application. ARCHITECTURE.md §10.1.
  */
 
@@ -22,7 +22,7 @@ import {
   type GithubRouteReading,
 } from "../model/github-host.ts";
 
-class CapabilityGithubHost extends GithubHostApi {
+class HostServiceGithubHost extends GithubHostApi {
   constructor(
     private readonly deps: {
       organizationId: string | undefined;
@@ -77,7 +77,7 @@ export default function GithubHostMount({ children }: { children?: ReactNode }) 
   const { organizationId } = useUiScope().activeScope();
   const host = useMemo(
     () =>
-      new CapabilityGithubHost({
+      new HostServiceGithubHost({
         organizationId: organizationId ?? void 0,
         route,
         feedback,

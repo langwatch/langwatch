@@ -1,5 +1,5 @@
 /**
- * The feedback capability, over the Design System's toaster. A screen
+ * The feedback host service, over the Design System's toaster. A screen
  * hands over the raw error; the words are resolved HERE from its `code`
  * via `@langwatch/handled-error/presentation` — never `error.message`.
  */

@@ -1,6 +1,6 @@
 /**
  * The two handoff screens' answer to their port, over `@langwatch/browser-host`
- * capabilities and this family's own `organization.getAll` query.
+ * host services and this family's own `organization.getAll` query.
  * ARCHITECTURE.md §10.1.
  */
 
@@ -36,7 +36,7 @@ function sessionStatusOf(hasActor: boolean, isSettled: boolean): AuthorizeSessio
   return isSettled ? "unauthenticated" : "loading";
 }
 
-class CapabilityAuthorizeHost extends AuthorizeHostApi {
+class HostServiceAuthorizeHost extends AuthorizeHostApi {
   constructor(
     private readonly deps: {
       scope: AuthorizeScope;
@@ -140,7 +140,7 @@ export default function AuthorizeHostMount({ children }: { children?: ReactNode 
 
   const host = useMemo(
     () =>
-      new CapabilityAuthorizeHost({
+      new HostServiceAuthorizeHost({
         scope: {
           projectId: activeScope.projectId ?? void 0,
           projectName: graph.activeProject?.project.name,

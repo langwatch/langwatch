@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * SSO's answer to the port its screens declare: every method projects a
- * `@langwatch/browser-host` capability. ARCHITECTURE.md §10.1.
+ * `@langwatch/browser-host` host service. ARCHITECTURE.md §10.1.
  */
 import {
   normalizeSignInErrorCode,
@@ -41,7 +41,7 @@ const INERT_TEST_SIGN_IN: SsoTestSignIn = () => {
 const SSO_MANAGE_PERMISSION = "sso:manage";
 const SSO_VIEW_PERMISSION = "sso:view";
 
-class CapabilitySsoHost extends SsoHostApi {
+class HostServiceSsoHost extends SsoHostApi {
   constructor(
     private readonly deps: {
       orgId: string | undefined;
@@ -111,7 +111,7 @@ export default function SsoHostMount({ children }: { children?: ReactNode }) {
 
   const host = useMemo(
     () =>
-      new CapabilitySsoHost({
+      new HostServiceSsoHost({
         orgId: organizationId ?? void 0,
         feedback,
         route,

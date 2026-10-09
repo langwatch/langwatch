@@ -47,12 +47,12 @@ export type UiSessionSnapshot = Readonly<{
   permissions: UiPermissionsReading;
 }>;
 
-/** Reads the session snapshot the application's one capability publisher resolved. */
+/** Reads the session snapshot the application's one host service publisher resolved. */
 export function useSession(): UiSessionReading {
   return useUiSessionSnapshot().session;
 }
 
-/** Reads the active scope from the application's one capability publisher. */
+/** Reads the active scope from the application's one host service publisher. */
 export function useActiveScope(): UiActiveScopeReading {
   return useUiSessionSnapshot().scope;
 }

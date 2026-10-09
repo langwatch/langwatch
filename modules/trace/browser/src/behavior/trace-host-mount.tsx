@@ -1,6 +1,6 @@
 /**
  * Trace's answer to the port its screens declare: every method projects a
- * `@langwatch/browser-host` capability, so the module mounts it, not the
+ * `@langwatch/browser-host` host service, so the module mounts it, not the
  * application. ARCHITECTURE.md §10.1.
  */
 
@@ -42,7 +42,7 @@ type TraceHostActions = {
   readonly failed: (failure: TraceFailureNotice) => void;
 };
 
-class CapabilityTraceHost extends TraceHostApi {
+class HostServiceTraceHost extends TraceHostApi {
   constructor(
     private readonly readings: TraceHostReadings,
     private readonly actions: TraceHostActions,
@@ -110,7 +110,7 @@ class CapabilityTraceHost extends TraceHostApi {
   }
 
   /**
-   * No `@langwatch/browser-host` capability carries the agent's page
+   * No `@langwatch/browser-host` host service carries the agent's page
    * registry, so the port is told absence rather than a guess: a composition
    * that installs Langy answers this from Langy's published capability.
    */
@@ -244,7 +244,7 @@ export default function TraceHostMount({ children }: { children?: ReactNode }) {
 
   const host = useMemo(
     () =>
-      new CapabilityTraceHost(
+      new HostServiceTraceHost(
         {
           project: projectReading({
             id: projectId,

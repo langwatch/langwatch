@@ -95,7 +95,7 @@ function UiBootPageError() {
 }
 
 /**
- * Where the two capabilities meet, and the only place they do — in the order
+ * Where the two host services meet, and the only place they do — in the order
  * record 10.1 rules. `auth` and `organization` never import each other.
  */
 function browserUiHostServicesHook({
@@ -155,7 +155,7 @@ class BrowserUiShell extends UiShell {
     sessionVersions,
     hosts,
     failures,
-    rootCapabilities,
+    rootHostServices,
     hostServices,
   }: {
     config: UiFeatureConfig;
@@ -168,7 +168,7 @@ class BrowserUiShell extends UiShell {
     sessionVersions: SessionVersionWatch;
     hosts: readonly UiModuleHostMount[];
     failures: readonly UiFailureInterceptor[];
-    rootCapabilities: UiRootHostServices;
+    rootHostServices: UiRootHostServices;
     hostServices: UiRenderResult["hostServices"];
   }): BrowserUiShell {
     const telemetry = uiTelemetryOf(config);
@@ -176,7 +176,7 @@ class BrowserUiShell extends UiShell {
     return new BrowserUiShell({
       errorPages,
       application: createUiApplication({
-        sessionQueryKey: rootCapabilities.session.UI_SESSION_QUERY_KEY,
+        sessionQueryKey: rootHostServices.session.UI_SESSION_QUERY_KEY,
         drawers,
         features: {
           loaders: screens.loaders,
@@ -188,7 +188,7 @@ class BrowserUiShell extends UiShell {
           sessionVersions,
           // Without these the shell resolves the REFUSING defaults, so the first
           // session read throws instead of answering. See ARCHITECTURE.md 10.1.
-          session: browserUiHostServicesHook(rootCapabilities),
+          session: browserUiHostServicesHook(rootHostServices),
           hostServices,
           footer: UiSaasFooter,
           capabilities: {
@@ -212,7 +212,7 @@ class BrowserUiShell extends UiShell {
           session: UiPendingProvider,
           transport: UiPendingProvider,
           graphicsQuality: GraphicsQualityProvider,
-          designSystem: composeUiDesignSystem(rootCapabilities),
+          designSystem: composeUiDesignSystem(rootHostServices),
           commandBar: UiPendingProvider,
           toaster: UiErrorToaster,
           usePublicAppConfig: () => ({ data: telemetry }),
@@ -221,7 +221,7 @@ class BrowserUiShell extends UiShell {
         pages: {
           loaders: uiUnservedPageLoaders,
           table: uiRouteTable,
-          shellLayouts: uiShellLayouts({ root: rootCapabilities, config }),
+          shellLayouts: uiShellLayouts({ root: rootHostServices, config }),
           errorFallback: errorPages.page,
           rootErrorBoundary: errorPages.route,
         },
@@ -273,7 +273,7 @@ export async function startUi(): Promise<void> {
     fetch: sessionVersionFetch({ watch: sessionVersions }),
     isDevelopment: process.mode === "development",
   });
-  const rootCapabilities = await loadUiRootHostServices();
+  const rootHostServices = await loadUiRootHostServices();
   const installed = await createUi({ document, mount: "root" })
     .withModules(browserModules)
     .withTransport(transport)
@@ -295,7 +295,7 @@ export async function startUi(): Promise<void> {
       sessionVersions,
       hosts: installedModuleHostMounts(installed.modules),
       failures: installedModuleFailures(installed.modules),
-      rootCapabilities,
+      rootHostServices,
       hostServices: installed.hostServices,
     }),
   }).start();

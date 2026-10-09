@@ -1,6 +1,6 @@
 /**
  * Dataset's answer to the port its screens declare: every method projects a
- * `@langwatch/browser-host` capability. `isLiteMember` reads the scope
+ * `@langwatch/browser-host` host service. `isLiteMember` reads the scope
  * host's organization role. ARCHITECTURE.md §10.1.
  */
 
@@ -27,7 +27,7 @@ import {
   type DatasetSuccessNotice,
 } from "../model/dataset-host.ts";
 
-class CapabilityDatasetHost extends DatasetHostApi {
+class HostServiceDatasetHost extends DatasetHostApi {
   private readonly scopeHost: UiScopeHost | undefined;
   private readonly session: UiSession;
   private readonly lent: UiCopyTargets;
@@ -128,7 +128,7 @@ export default function DatasetHostMount({ children }: { children?: ReactNode })
 
   const host = useMemo(
     () =>
-      new CapabilityDatasetHost({ scopeHost, session, lent, uiRoute: route, navigation, feedback }),
+      new HostServiceDatasetHost({ scopeHost, session, lent, uiRoute: route, navigation, feedback }),
     [scopeHost, session, lent, route, navigation, feedback],
   );
 

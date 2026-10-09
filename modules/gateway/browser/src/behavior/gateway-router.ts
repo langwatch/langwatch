@@ -1,5 +1,5 @@
 /**
- * Gateway router address: re-bound to host's route capability with merged
+ * Gateway router address: re-bound to route host service with merged
  * query parameters shape.
  */
 

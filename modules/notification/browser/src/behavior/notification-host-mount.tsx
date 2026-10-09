@@ -1,6 +1,6 @@
 /**
  * Notification's answer to the port its screen declares: every method
- * projects a `@langwatch/browser-host` capability. ARCHITECTURE.md §10.1.
+ * projects a `@langwatch/browser-host` host service. ARCHITECTURE.md §10.1.
  */
 
 import {
@@ -19,7 +19,7 @@ import {
   type NotificationSuccessNotice,
 } from "../model/notification-host.ts";
 
-class CapabilityNotificationHost extends NotificationHostApi {
+class HostServiceNotificationHost extends NotificationHostApi {
   constructor(
     private readonly hostProject: NotificationHostProject | undefined,
     private readonly session: UiSession,
@@ -55,7 +55,7 @@ export default function NotificationHostMount({ children }: { children?: ReactNo
   const { projectId } = useUiScope().activeScope();
 
   const host = useMemo(
-    () => new CapabilityNotificationHost(projectId ? { id: projectId } : void 0, session, feedback),
+    () => new HostServiceNotificationHost(projectId ? { id: projectId } : void 0, session, feedback),
     [projectId, session, feedback],
   );
 
