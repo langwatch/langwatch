@@ -17595,6 +17595,9 @@ importers:
       '@opentelemetry/sdk-trace-base':
         specifier: 'catalog:'
         version: 2.10.0(@opentelemetry/api@1.9.1)
+      '@pyroscope/nodejs':
+        specifier: 0.6.2
+        version: 0.6.2(express@5.2.1(supports-color@10.2.2))(supports-color@10.2.2)
       langwatch:
         specifier: workspace:*
         version: link:../../sdks/typescript
@@ -17614,9 +17617,6 @@ importers:
       '@opentelemetry/sdk-trace-node':
         specifier: 'catalog:'
         version: 2.10.0(@opentelemetry/api@1.9.1)
-      '@pyroscope/nodejs':
-        specifier: 0.6.2
-        version: 0.6.2(express@5.2.1(supports-color@10.2.2))(supports-color@10.2.2)
       '@types/node':
         specifier: ^26.0.1
         version: 26.2.0
