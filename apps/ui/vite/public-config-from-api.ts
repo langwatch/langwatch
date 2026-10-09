@@ -7,13 +7,12 @@ import {
   type PublicAppConfig,
 } from "@langwatch/config/public-app-config";
 
+import { WAITING_FOR_API_PAGE } from "./waiting-for-api-page";
+
+export { WAITING_FOR_API_PAGE };
+
 const META_CONTENT = new RegExp(`<meta name="${PUBLIC_APP_CONFIG_META_NAME}" content="([^"]+)"`);
 const RETRY_EVERY_MS = 500;
-
-/** Served instead of the app until the api has answered once: it reloads itself, never a 500. */
-export const WAITING_FOR_API_PAGE =
-  '<!doctype html><meta http-equiv="refresh" content="2"><title>Waiting for the api</title>' +
-  "<p>The dev server is waiting for the api to answer; this page reloads itself.</p>";
 
 /**
  * The meta tag the api renders into its own shell, lifted unchanged. The api may still be
