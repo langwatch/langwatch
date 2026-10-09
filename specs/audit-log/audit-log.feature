@@ -158,7 +158,8 @@ Feature: Unified Audit Log
   @integration
   Scenario: A row written by a system actor says so rather than naming nobody
     Given a row whose userId is null, written by a background job
-    Then the User column reads "User not found" rather than rendering empty
+    Then the User column reads "System" rather than rendering empty or a lookup failure
+    And a row whose userId names a user that no longer resolves reads "User not found"
 
   @integration
   Scenario: An empty audit history says so
@@ -219,7 +220,7 @@ Feature: Unified Audit Log
   Scenario: The user search resolves a typed name or address to one actor
     Given alice types part of a member's name or email address
     Then the read is filtered by that member's user id, not by the typed string
-    And a search matching nobody applies no user filter rather than filtering to nobody
+    And a search matching nobody shows the empty state and offers no export, rather than the whole log
 
   # ──────────────────────────────────────────────────────────────────────────
   # Export — a report taken over anything wider than the view on screen is a
