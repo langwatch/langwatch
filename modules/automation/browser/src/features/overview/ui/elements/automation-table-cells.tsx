@@ -497,6 +497,7 @@ export function describeSchedule(cron: string, timezone: string): string {
   const parts = cron.trim().split(/\s+/);
   if (parts.length !== 5) return `${cron} (${timezone})`;
   const [min, hour, dom, , dow] = parts;
+  if (!/^\d+$/.test(min ?? "") || !/^\d+$/.test(hour ?? "")) return `${cron} (${timezone})`;
   const at = `${String(hour).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
   if (dom === "*" && dow !== "*") {
     const day = WEEKDAYS[Number(dow) % 7] ?? `day ${dow}`;
