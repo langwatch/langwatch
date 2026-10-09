@@ -197,6 +197,12 @@ Feature: Share a trace behind a secret, scoped, expiring link
       When the holder opens the link
       Then the payload carries no conversation
 
+    @unit
+    Scenario: A shared link never reveals which API key sent the trace
+      Given a share link for a trace ingested with a project API key
+      When the holder opens the link
+      Then the payload carries no API key identifier
+
   Rule: The shared link renders the new Trace Explorer, read-only
 
     @integration
