@@ -49,6 +49,7 @@
     "@langwatch/enterprise-demo-data-process": "workspace:*",
     "@langwatch/enterprise-gateway-process": "workspace:*",
     "@langwatch/enterprise-governance-process": "workspace:*",
+    "@langwatch/enterprise-connect-process": "workspace:*",
     "@langwatch/enterprise-licensing-process": "workspace:*",
     "@langwatch/enterprise-managed-provider-process": "workspace:*",
     "@langwatch/enterprise-nurturing-process": "workspace:*",

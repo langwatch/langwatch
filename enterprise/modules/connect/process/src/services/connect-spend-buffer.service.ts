@@ -4,9 +4,8 @@
  * write. The bounded loss on a dying process is stated in ADR-156 §5.
  */
 
+import type { Logger } from "@langwatch/observability";
 import { nowInstant, type Instant } from "@langwatch/time";
-
-import type { LicenseLogger } from "./license.service.ts";
 
 export interface ConnectSpendEntry {
   virtualKeyId: string;
@@ -22,7 +21,7 @@ interface Pending extends ConnectSpendEntry {
 
 interface ConnectSpendBufferCollaborators {
   recorder: HostedSpendRecorder;
-  logger?: LicenseLogger;
+  logger?: Pick<Logger, "error">;
   /** How long spend waits before it is written. */
   flushIntervalMs?: number;
   /** Calls under one key that force a write before the interval is up. */

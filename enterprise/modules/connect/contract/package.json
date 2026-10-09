@@ -1,0 +1,32 @@
+{
+  "name": "@langwatch/enterprise-connect-contract",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Portable contracts of the hosted end of LangWatch Connect.",
+  "license": "SEE LICENSE IN ../../../LICENSE.md",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/enterprise-licensing-contract": "workspace:*",
+    "@langwatch/module": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

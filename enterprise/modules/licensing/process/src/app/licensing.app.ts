@@ -33,9 +33,7 @@ import {
   type ConnectStatus,
   type InstanceIdentityView,
   type ContractTerms,
-  type HostedCapAnswer,
   type HostedCaller,
-  type HostedClassifyAnswer,
   type HostedUsageAnswer,
   type IncomingUsageReport,
   type SelfHostedInstanceDetail,
@@ -67,7 +65,6 @@ import {
 import type { EntitlementGrant, ResolvePlanInput } from "@langwatch/entitlement-contract";
 import type { EventingCommands } from "@langwatch/eventing";
 import { GatewayApi } from "@langwatch/gateway-contract";
-import { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import { createLogger } from "@langwatch/observability";
 import { optionalUsageReportKeys } from "@langwatch/ops-contract";
 import type { FeatureSetup } from "@langwatch/process";
@@ -101,14 +98,11 @@ import {
 import { ConnectCredentialService } from "../services/connect-credential.service.ts";
 import { ConnectInstallService } from "../services/connect-install.service.ts";
 import type { ConnectUpstreamSlot } from "../services/connect-install.service.ts";
-import { ConnectSpendBufferService } from "../services/connect-spend-buffer.service.ts";
-import type { HostedSpendRecorder } from "../services/connect-spend-buffer.service.ts";
 import { ContractBudgetStoreService } from "../services/contract-budget-store.service.ts";
 import { ContractBudgetService } from "../services/contract-budget.service.ts";
 import type { ContractBudgetStore } from "../services/contract-budget.service.ts";
 import { DomainClaimAuthorityService } from "../services/domain-claim-authority.service.ts";
 import { HostedServicesService } from "../services/hosted-services.service.ts";
-import type { HostedJudge } from "../services/hosted-services.service.ts";
 import { HostedUsageReaderService } from "../services/hosted-usage-reader.service.ts";
 import type { HostedUsageReader } from "../services/hosted-usage-reader.service.ts";
 import { InstanceIdentityService } from "../services/instance-identity.service.ts";
@@ -170,9 +164,7 @@ export class LicensingModule implements LicensingApiContract {
   static readonly dependencies = {
     /** Where an install's hosted provider slot is kept: a gateway fact licensing writes. */
     gateway: GatewayApi,
-    /** The judge a hosted classify call reaches, its price, and where its spend is recorded. */
-    instantEval: InstantEvalApi,
-    /** Whose team a hosted caller's project belongs to, for the budgets that apply to it. */
+    /** Whose team a hosted caller's project belongs to, for the usage billing reads. */
     scopes: AuthzApi,
   };
   static readonly config = licensingConfig;
@@ -195,7 +187,6 @@ export class LicensingModule implements LicensingApiContract {
   readonly #contractBudgets: ContractBudgetService;
   readonly #activation: ActivationCodeService;
   readonly #hosted: HostedServicesService;
-  readonly #hostedSpend: ConnectSpendBufferService;
   readonly #instances: SelfHostedInstanceService;
   readonly #install: ConnectInstallService;
   readonly #identity: InstanceIdentityService;
@@ -259,7 +250,6 @@ export class LicensingModule implements LicensingApiContract {
     this.#contractBudgets = registry.contractBudgets;
     this.#activation = registry.activation;
     this.#hosted = registry.hosted;
-    this.#hostedSpend = registry.spend;
     this.#instances = registry.instances;
     this.#install = install.install;
     this.#identity = install.identity;
@@ -364,8 +354,6 @@ export class LicensingModule implements LicensingApiContract {
         organizations: repositories.connectOrganizations,
       }),
     });
-    // Hosted spend a gateway reported but the buffer has not written yet is written at shutdown.
-    resources.own("hosted-service spend buffer", () => app.flushHostedSpend());
     if (!config.isSaas && configured.form === "activation_code") {
       app.#configuredActivation = ConfiguredActivationService.create({
         configured,
@@ -698,21 +686,8 @@ export class LicensingModule implements LicensingApiContract {
     return this.#refresh.refresh(input.organizationId);
   }
 
-  /** The hosted end of Connect (ADR-156, section 5), on LangWatch Cloud. */
-  classifyForHostedCaller(input: {
-    caller: HostedCaller;
-    payload: unknown;
-    signal?: AbortSignal;
-  }): Promise<HostedClassifyAnswer> {
-    return this.#hosted.classify(input);
-  }
-
   getHostedUsage(input: { caller: HostedCaller }): Promise<HostedUsageAnswer> {
     return this.#hosted.usage(input);
-  }
-
-  setHostedBudgetCap(input: { caller: HostedCaller; payload: unknown }): Promise<HostedCapAnswer> {
-    return this.#hosted.setBudget(input);
   }
 
   getContractTerms(input: { organizationId: string }): Promise<ContractTerms> {
@@ -748,6 +723,13 @@ export class LicensingModule implements LicensingApiContract {
     organizationId: string;
   }): Promise<ConnectService[]> {
     return this.#credentials.findEntitledServices(input);
+  }
+
+  findManagedKeyLicense(input: {
+    virtualKeyId: string;
+    organizationId: string;
+  }): Promise<{ services: ConnectService[] }[]> {
+    return this.#hosted.findManagedKeyLicense(input);
   }
 
   /** Activation codes (ADR-156, section 5). */
@@ -786,11 +768,6 @@ export class LicensingModule implements LicensingApiContract {
   getSelfHostedInstance(input: { id: string }): Promise<SelfHostedInstanceDetail> {
     return this.#instances.getById(input);
   }
-
-  /** Writes hosted spend the buffer still holds. Called by the drain. */
-  flushHostedSpend(): Promise<void> {
-    return this.#hostedSpend.flush();
-  }
 }
 
 /** A redemption at start gives up well before the transport's own timeout. */
@@ -804,7 +781,6 @@ type LicenseRegistryParts = Readonly<{
   contractBudgets: ContractBudgetService;
   activation: ActivationCodeService;
   hosted: HostedServicesService;
-  spend: ConnectSpendBufferService;
   instances: SelfHostedInstanceService;
 }>;
 
@@ -825,12 +801,6 @@ function licenseRegistryParts({
   const contractBudgets = ContractBudgetService.create({
     store: hosted.budgets,
     licensesOf: (organizationId) => infrastructure.repository.findAllByOrganization(organizationId),
-    systemActorId: infrastructure.systemActorId,
-    now,
-  });
-  const spend = ConnectSpendBufferService.create({
-    recorder: hosted.spend,
-    ...(logger ? { logger } : {}),
     now,
   });
   const credentials = ConnectCredentialService.create({
@@ -854,7 +824,6 @@ function licenseRegistryParts({
     credentials,
     contractBudgets,
     registry,
-    spend,
     instances: SelfHostedInstanceService.create({
       repository: instances.repository,
       licenses: instances.licenses,
@@ -880,8 +849,6 @@ function licenseRegistryParts({
     }),
     hosted: HostedServicesService.create({
       licenses: infrastructure.repository,
-      judge: hosted.judge,
-      spend,
       usage: hosted.usage,
       contractBudgets,
       now,
@@ -955,13 +922,11 @@ function licenseRegistryOver({
 }
 
 /**
- * The hosted end of Connect composed from its owners, as main composed it on every deployment:
- * instant-eval judges, prices and records the spend, and the gateway keeps the budgets. The door
- * the family answers behind is the gateway's own, bound in licensing.module.ts.
+ * The contract budget and the hosted usage billing reads, over the gateway's budgets and authz's
+ * scopes. The hosted routes, their judge and their spend are the connect module's.
  */
 function hostedServicesOverPeers({
   gateway,
-  instantEval,
   scopes,
 }: {
   gateway: Pick<
@@ -973,18 +938,11 @@ function hostedServicesOverPeers({
     | "findVirtualKeyById"
     | "resolveApplicableBudgets"
   >;
-  instantEval: Pick<InstantEvalApi, "classify" | "priceOf" | "recordSpendForHostedCalls">;
   scopes: Pick<AuthzApi, "getScope">;
 }): HostedServicesInfrastructure {
   return {
     budgets: ContractBudgetStoreService.create({ gateway }),
     usage: HostedUsageReaderService.create({ gateway, scopes }),
-    judge: {
-      classify: (input, signal) =>
-        instantEval.classify({ ...input, ...(signal ? { signal } : {}) }),
-      priceOf: (input) => instantEval.priceOf(input),
-    },
-    spend: { recordSpend: (entry) => instantEval.recordSpendForHostedCalls(entry) },
   };
 }
 
@@ -1138,12 +1096,10 @@ function connectInstallParts({
   };
 }
 
-/** The hosted end of Connect (ADR-156, section 5), composed on every deployment. */
+/** The contract budget and the hosted usage licensing still answers, on every deployment. */
 type HostedServicesInfrastructure = Readonly<{
   budgets: ContractBudgetStore;
   usage: HostedUsageReader;
-  judge: HostedJudge;
-  spend: HostedSpendRecorder;
 }>;
 
 /** Everything the license registry needs from the rest of the deployment. */

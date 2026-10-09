@@ -1,48 +1,30 @@
 /**
- * The hosted services a self-hosted license calls on LangWatch Cloud (ADR-156
- * §5). The gateway authenticated the caller and applied the budget stop; what
- * is decided here is whether the key's license includes the service.
+ * Licensing's half of the hosted end of Connect (ADR-156 §5): which active license
+ * a managed key runs under, and the hosted usage billing still reads through
+ * licensing. The hosted routes themselves are the connect module's.
  */
 
 import {
-  ConnectLicenseRequiredError,
-  ConnectServiceNotEntitledError,
+  entitledConnectServices,
+  type ConnectService,
   type ContractTerms,
   type HostedBudgetWire,
-  type HostedCapAnswer,
   type HostedCaller,
-  type HostedClassifyAnswer,
   type HostedUsageAnswer,
 } from "@langwatch/enterprise-licensing-contract";
-import type {
-  InstantEvalJudgement,
-  InstantEvalQuestion,
-} from "@langwatch/instant-eval-judge-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 
-import type {
-  IssuedLicenseRecord,
-  IssuedLicenseRepository,
-} from "../repositories/issued-license.repository.ts";
-import {
-  hostedBudgetPayloadSchema,
-  hostedClassifyPayloadSchema,
-  parseHostedPayload,
-} from "../rules/hosted-payload.rules.ts";
+import type { IssuedLicenseRepository } from "../repositories/issued-license.repository.ts";
 import { statusOfIssuedLicense } from "../rules/issued-license.rules.ts";
-import type { ConnectSpendEntry } from "./connect-spend-buffer.service.ts";
 import type { ContractBudgetService } from "./contract-budget.service.ts";
 import type { HostedBudgetUsage, HostedUsageReader } from "./hosted-usage-reader.service.ts";
 
 const CENTS = 100;
-const INSTANT_EVALS = "instant_evals";
 
 interface HostedServicesCollaborators {
   licenses: Pick<IssuedLicenseRepository, "findByVirtualKeyId">;
-  judge: HostedJudge;
-  spend: { add(entry: ConnectSpendEntry): void };
   usage: HostedUsageReader;
-  contractBudgets: Pick<ContractBudgetService, "setCap" | "termsOf">;
+  contractBudgets: Pick<ContractBudgetService, "termsOf">;
   now?: () => Instant;
 }
 
@@ -57,62 +39,33 @@ export class HostedServicesService {
     this.#now = collaborators.now ?? nowInstant;
   }
 
-  async classify({
-    caller,
-    payload,
-    signal,
+  /**
+   * The active license of this organization that holds the key, with the services it
+   * is entitled to; empty for a plain virtual key, another customer's license, or one
+   * that is no longer active. State is read on every call, never cached.
+   */
+  async findManagedKeyLicense({
+    virtualKeyId,
+    organizationId,
   }: {
-    caller: HostedCaller;
-    payload: unknown;
-    signal?: AbortSignal;
-  }): Promise<HostedClassifyAnswer> {
-    const license = await this.#activeLicenseOf(caller);
-    if (!license?.services.includes(INSTANT_EVALS)) {
-      throw new ConnectServiceNotEntitledError(INSTANT_EVALS);
-    }
-    const request = parseHostedPayload(hostedClassifyPayloadSchema, payload);
-    // The rate share is per customer: the hidden project is one per
-    // organization, and a key with none falls back to itself.
-    const projectId = caller.projectId ?? caller.virtualKeyId;
-
-    const judgement = await this.collaborators.judge.classify(
-      { projectId, text: request.text, questions: request.questions },
-      signal,
-    );
-    const { costUsd, priceUsd } = this.collaborators.judge.priceOf({
-      inputTokens: judgement.inputTokens,
-    });
-
-    // A skipped judgement billed no tokens, so there is nothing to meter.
-    if (judgement.inputTokens > 0) {
-      this.collaborators.spend.add({
-        virtualKeyId: caller.virtualKeyId,
-        projectId,
-        inputTokens: judgement.inputTokens,
-        costUsd,
-        priceUsd,
-      });
-    }
-
-    // The list price is what the customer is charged and all it is told. What
-    // the judge costs LangWatch stays on the spend row.
-    return {
-      verdicts: judgement.verdicts.map((verdict) => ({ ...verdict })),
-      ...(judgement.skippedReason ? { skipped_reason: judgement.skippedReason } : {}),
-      input_tokens: judgement.inputTokens,
-      is_text_truncated: judgement.isTextTruncated,
-      charged_usd: priceUsd,
-    };
+    virtualKeyId: string;
+    organizationId: string;
+  }): Promise<{ services: ConnectService[] }[]> {
+    const license = await this.collaborators.licenses.findByVirtualKeyId(virtualKeyId);
+    if (!license || license.organizationId !== organizationId) return [];
+    if (statusOfIssuedLicense(license, this.#now()) !== "active") return [];
+    return [{ services: entitledConnectServices(license.services) }];
   }
 
   async usage({ caller }: { caller: HostedCaller }): Promise<HostedUsageAnswer> {
-    const [license, reading] = await Promise.all([
-      this.#activeLicenseOf(caller),
+    const [licenses, reading] = await Promise.all([
+      this.findManagedKeyLicense(caller),
       this.collaborators.usage.read(caller),
     ]);
-    const terms: ContractTerms | null = license
-      ? await this.collaborators.contractBudgets.termsOf(caller.organizationId)
-      : null;
+    const terms: ContractTerms | null =
+      licenses.length > 0
+        ? await this.collaborators.contractBudgets.termsOf(caller.organizationId)
+        : null;
     const contract = reading.budgets.find((budget) => budget.isContract);
 
     return {
@@ -132,35 +85,6 @@ export class HostedServicesService {
       budgets: reading.budgets.map(budgetWire),
     };
   }
-
-  async setBudget({
-    caller,
-    payload,
-  }: {
-    caller: HostedCaller;
-    payload: unknown;
-  }): Promise<HostedCapAnswer> {
-    const license = await this.#activeLicenseOf(caller);
-    if (!license) throw new ConnectLicenseRequiredError();
-    const { cap_usd } = parseHostedPayload(hostedBudgetPayloadSchema, payload);
-
-    const { capUsdCents, maximumUsdCents } = await this.collaborators.contractBudgets.setCap({
-      organizationId: caller.organizationId,
-      capUsdCents: Math.round(cap_usd * CENTS),
-    });
-    return { cap_usd: capUsdCents / CENTS, maximum_cap_usd: maximumUsdCents / CENTS };
-  }
-
-  /**
-   * The license the calling key belongs to, or null for a plain virtual key.
-   * The credential was checked when the gateway resolved it, but a gateway
-   * serves a cached credential for minutes, so state is read again here.
-   */
-  async #activeLicenseOf(caller: HostedCaller): Promise<IssuedLicenseRecord | null> {
-    const license = await this.collaborators.licenses.findByVirtualKeyId(caller.virtualKeyId);
-    if (!license || license.organizationId !== caller.organizationId) return null;
-    return statusOfIssuedLicense(license, this.#now()) === "active" ? license : null;
-  }
 }
 
 function budgetWire(budget: HostedBudgetUsage): HostedBudgetWire {
@@ -175,17 +99,4 @@ function budgetWire(budget: HostedBudgetUsage): HostedBudgetWire {
     period_started_at: budget.periodStartedAt.toString(),
     is_contract: budget.isContract,
   };
-}
-
-/**
- * The judge a hosted classify call reaches, and what its answer is worth. Both
- * belong to instant-eval; licensing states only what a hosted call needs.
- */
-export interface HostedJudge {
-  classify(
-    input: { projectId: string; text: string; questions: readonly InstantEvalQuestion[] },
-    signal?: AbortSignal,
-  ): Promise<InstantEvalJudgement>;
-  /** What one judgement cost LangWatch, and what the customer is charged. */
-  priceOf(input: { inputTokens: number }): { costUsd: number; priceUsd: number };
 }
