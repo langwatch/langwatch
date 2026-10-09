@@ -133,7 +133,6 @@ export const organizationTrpcTransport: TrpcRouterDeclaration<
 
   /** The shell's scope skeleton: what every page resolves its scope against. */
   .procedure("getScopeGraph")
-  .servesWhileUpgrading()
   .withFacts(organizationSessionPersonFact)
   .noPermission({
     reason: "answers the scope skeleton of the caller's own memberships; no single scope holds it",
