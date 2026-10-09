@@ -18,15 +18,7 @@ export class HttpGithubChannels {
     secrets: ScopedSecrets;
   }): Promise<GithubChannels> {
     const privateKey = await secrets.into(githubSecrets.privateKey, (value) => value ?? "");
-    const clientSecret = await secrets.into(githubSecrets.clientSecret, (value) => value ?? "");
     const host = githubHostOf({ host: config.host });
-    return {
-      api: HttpGithubApiAdapter.create({
-        appId: config.appId ?? "",
-        privateKey,
-        host,
-        userAuthorization: { clientId: config.clientId ?? "", clientSecret },
-      }),
-    };
+    return { api: HttpGithubApiAdapter.create(config.appId ?? "", privateKey, host) };
   }
 }

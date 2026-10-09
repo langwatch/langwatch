@@ -112,7 +112,7 @@ function sweep(client: PrismaClient) {
       installations: PrismaGithubInstallationsRepository.create(client),
       pullRequests: PrismaGithubPullRequestsRepository.create(client),
     },
-    api: HttpGithubApiAdapter.create({ appId: "1234", privateKey, host: githubHostOf() }),
+    api: HttpGithubApiAdapter.create("1234", privateKey, githubHostOf()),
   });
 }
 
@@ -167,7 +167,7 @@ describe("the GitHub branch sweep composed from Postgres alone", () => {
           installations: PrismaGithubInstallationsRepository.create(client),
           pullRequests: PrismaGithubPullRequestsRepository.create(client),
         },
-        api: HttpGithubApiAdapter.create({ appId: "", privateKey: "", host: githubHostOf() }),
+        api: HttpGithubApiAdapter.create("", "", githubHostOf()),
       });
 
       await expect(uncredentialed.recheckDueBranches()).resolves.toBe(1);
@@ -185,7 +185,7 @@ describe("the GitHub branch sweep composed from Postgres alone", () => {
           installations: PrismaGithubInstallationsRepository.create(client),
           pullRequests: PrismaGithubPullRequestsRepository.create(client),
         },
-        api: HttpGithubApiAdapter.create({ appId: "", privateKey: "", host: githubHostOf() }),
+        api: HttpGithubApiAdapter.create("", "", githubHostOf()),
       });
 
       await expect(uncredentialed.pruneStaleBranchLinkage()).resolves.toEqual({

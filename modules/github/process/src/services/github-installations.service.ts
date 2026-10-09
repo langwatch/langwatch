@@ -83,14 +83,13 @@ export class GithubInstallationsService {
 
   /**
    * Binds an installation to the organization whose flow produced it. `flowStartedAt` is the
-   * signed state's issue time; `userAuthorizationCode` proves who installed it; the expected
-   * account and installation are what the flow recorded about where it is coming back from.
+   * signed state's issue time; `expectedAccountLogin` and `expectedInstallationId` are what
+   * the flow recorded about which installation it is coming back for.
    */
   async recordInstallation(input: {
     installationId: string;
     organizationId: string;
     flowStartedAt: number;
-    userAuthorizationCode: string;
     expectedAccountLogin?: string | undefined;
     expectedInstallationId?: string | undefined;
   }): Promise<{ accountLogin: string }> {
@@ -101,14 +100,8 @@ export class GithubInstallationsService {
       expectedAccountLogin: input.expectedAccountLogin,
       expectedInstallationId: input.expectedInstallationId,
     });
-    const installerReachesIt = await this.appTokens.userCanAccessInstallation({
-      code: input.userAuthorizationCode,
-      installationId: details.installationId,
-    });
     const alreadyRecorded = await this.repository.findByInstallationId(details.installationId);
-    const fromThisFlow =
-      alreadyRecorded !== null || installationBelongsToFlow(details.createdAt, input.flowStartedAt);
-    if (!installerReachesIt || !fromThisFlow) {
+    if (!alreadyRecorded && !installationBelongsToFlow(details.createdAt, input.flowStartedAt)) {
       throw new GithubInstallationNotFromFlowError({
         installationId: details.installationId,
         attemptedOrganizationId: input.organizationId,

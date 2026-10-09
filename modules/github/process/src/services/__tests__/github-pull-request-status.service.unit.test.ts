@@ -111,9 +111,6 @@ class TestAppTokens implements GithubAppTokenCache {
     ) => Promise<GithubPullRequestSummary>,
   ) {}
 
-  userCanAccessInstallation(): Promise<boolean> {
-    return Promise.reject(new Error("not used"));
-  }
   getInstallation(installationId: string): Promise<GithubInstallationDetails> {
     return Promise.resolve({
       installationId,

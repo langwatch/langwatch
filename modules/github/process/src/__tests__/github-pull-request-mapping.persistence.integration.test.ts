@@ -187,11 +187,11 @@ function harness(input: { host?: string } = {}) {
         webhookSecret: "test-webhook-secret",
         signingKey: "test-signing-key",
       },
-      api: HttpGithubApiAdapter.create({
-        appId: "test-app",
-        privateKey: testGithubPrivateKey,
-        host: githubHostOf({ host: input.host }),
-      }),
+      api: HttpGithubApiAdapter.create(
+        "test-app",
+        testGithubPrivateKey,
+        githubHostOf({ host: input.host }),
+      ),
       organization: new TestOrganizationService().api,
       project: projects,
       ...(input.host ? { hostConfig: { host: input.host } } : {}),

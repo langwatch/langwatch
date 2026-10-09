@@ -74,7 +74,6 @@ function mount(
   } = {},
 ) {
   const recorded: { installationId: string; organizationId: string }[] = [];
-  const codes: unknown[] = [];
   const webhookEvents: { action: string; installationId: string }[] = [];
   const memberChecks: { userId: string; organizationId: string }[] = [];
   const audits: { action: string }[] = [];
@@ -97,7 +96,6 @@ function mount(
       return options.member ?? true;
     },
     recordInstallation: async (input) => {
-      codes.push(input.userAuthorizationCode);
       recorded.push({
         installationId: input.installationId,
         organizationId: input.organizationId,
@@ -182,7 +180,6 @@ function mount(
 
   return {
     recorded,
-    codes,
     webhookEvents,
     memberChecks,
     audits,
@@ -339,7 +336,7 @@ describe("given the GitHub installation routes", () => {
 
       const response = await api.setup(
         "/github/setup",
-        `state=${encodeURIComponent(signedState())}&installation_id=555&code=gh_code`,
+        `state=${encodeURIComponent(signedState())}&installation_id=555`,
       );
 
       expect(response.status).toBe(302);
@@ -353,7 +350,7 @@ describe("given the GitHub installation routes", () => {
 
       const response = await api.setup(
         "/github-langy/setup",
-        `state=${encodeURIComponent(signedState())}&installation_id=777&code=gh_code`,
+        `state=${encodeURIComponent(signedState())}&installation_id=777`,
       );
 
       expect(response.status).toBe(302);
@@ -375,34 +372,6 @@ describe("given the GitHub installation routes", () => {
     });
   });
 
-  describe("when the setup callback carries no GitHub user authorisation", () => {
-    it("records nothing", async () => {
-      const api = mount();
-
-      const response = await api.setup(
-        "/github/setup",
-        `state=${encodeURIComponent(signedState())}&installation_id=555`,
-      );
-
-      expect(response.status).toBe(302);
-      expect(response.headers.get("location")).toContain("githubError");
-      expect(api.recorded).toEqual([]);
-    });
-  });
-
-  describe("when the setup callback carries the user's authorisation code", () => {
-    it("hands the code to the binding so it can prove the installer", async () => {
-      const api = mount();
-
-      await api.setup(
-        "/github/setup",
-        `state=${encodeURIComponent(signedState())}&installation_id=555&code=gh_code`,
-      );
-
-      expect(api.codes).toEqual(["gh_code"]);
-    });
-  });
-
   describe("when the single-use link could not be registered", () => {
     it("refuses to start the flow", async () => {
       const api = mount({ nonceRegistered: false });
@@ -417,7 +386,7 @@ describe("given the GitHub installation routes", () => {
 
       const response = await api.setup(
         "/github/setup",
-        `state=${encodeURIComponent(signedState({ nonceRegistered: false }))}&installation_id=555&code=gh_code`,
+        `state=${encodeURIComponent(signedState({ nonceRegistered: false }))}&installation_id=555`,
       );
 
       expect(response.headers.get("location")).toContain("githubError");
@@ -431,7 +400,7 @@ describe("given the GitHub installation routes", () => {
 
       const response = await api.setup(
         "/github/setup",
-        `state=${encodeURIComponent(signedState())}&installation_id=555&code=gh_code`,
+        `state=${encodeURIComponent(signedState())}&installation_id=555`,
       );
 
       expect(response.headers.get("location")).toContain("githubError");

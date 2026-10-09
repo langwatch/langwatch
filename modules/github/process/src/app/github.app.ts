@@ -92,8 +92,6 @@ export interface GithubAppClient {
   readonly configured: boolean;
   signAppJwt(nowSec?: number): string;
   getInstallation(installationId: string): Promise<GithubInstallationDetails>;
-  /** Whether the user who authorised `code` can reach the installation, as GitHub lists it. */
-  userCanAccessInstallation(input: { code: string; installationId: string }): Promise<boolean>;
   mintInstallationToken(input: MintInstallationTokenInput): Promise<GithubInstallationToken>;
   listInstallationRepositories(token: string): Promise<GithubRepository[]>;
   listPullRequestsForHead(input: {
@@ -114,7 +112,6 @@ export interface GithubAppClient {
 export interface GithubAppTokenCache {
   readonly configured: boolean;
   getInstallation(installationId: string): Promise<GithubInstallationDetails>;
-  userCanAccessInstallation(input: { code: string; installationId: string }): Promise<boolean>;
   mintInstallationToken(input: MintInstallationTokenInput): Promise<GithubInstallationToken>;
   listInstallationRepositories(installationId: string): Promise<GithubRepository[]>;
   listPullRequestsForHead(input: {
@@ -462,7 +459,6 @@ export class GithubModule implements GithubApiContract {
     installationId: string;
     organizationId: string;
     flowStartedAt: number;
-    userAuthorizationCode: string;
     expectedAccountLogin?: string;
     expectedInstallationId?: string;
   }): Promise<{ accountLogin: string }> {

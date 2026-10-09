@@ -47,9 +47,7 @@ async function bootGithub() {
   const runtime = await bootInstalledProcess({
     role: "api",
     modules: [githubProcessModule],
-    config: {
-      github: { appId: undefined, host: undefined, appSlug: undefined, clientId: undefined },
-    },
+    config: { github: { appId: undefined, host: undefined, appSlug: undefined } },
     stores: memberSource(),
     secrets: (owner, declared) => resolver.scopeTo(owner, declared),
     peers: [

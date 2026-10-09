@@ -355,19 +355,7 @@ async function completeInstallation({
 
   if (setup.rejected) return setup.answer;
 
-  // GitHub sends `code` only once the installing user authorised the App.
-  const userAuthorizationCode = query.get("code");
-
-  if (!userAuthorizationCode) {
-    return setupError({
-      app,
-      state,
-      errorMessage: "GitHub did not confirm who installed the app",
-      status: 400,
-    });
-  }
-
-  return recordInstallation({ app, state, installationId, userAuthorizationCode });
+  return recordInstallation({ app, state, installationId });
 }
 
 /** The write, its audit line, and the two ways it is reported back. */
@@ -375,12 +363,10 @@ async function recordInstallation({
   app,
   state,
   installationId,
-  userAuthorizationCode,
 }: {
   app: GithubInstallApi;
   state: GithubInstallStatePayload;
   installationId: string;
-  userAuthorizationCode: string;
 }): Promise<GithubAnswer> {
   const service = app.github();
   const returnTo = safeReturnTo(state.returnTo);
@@ -391,7 +377,6 @@ async function recordInstallation({
       installationId,
       organizationId: state.organizationId,
       flowStartedAt: state.issuedAt,
-      userAuthorizationCode,
       expectedAccountLogin: state.expectedAccountLogin,
       expectedInstallationId: state.expectedInstallationId,
     }));

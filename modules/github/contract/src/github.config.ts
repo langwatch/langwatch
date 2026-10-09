@@ -11,7 +11,6 @@ export const githubConfig = Config.define((c) => ({
   appId: c.env("GITHUB_LANGY_APP_ID", z.string().optional()),
   host: c.env("GITHUB_LANGY_HOST", z.string().optional()),
   appSlug: c.env("GITHUB_LANGY_APP_SLUG", z.string().optional()),
-  clientId: c.env("GITHUB_LANGY_CLIENT_ID", z.string().optional()),
 }));
 
 export type GithubServerConfig = ConfigOf<typeof githubConfig>;
@@ -20,7 +19,6 @@ export type GithubServerConfig = ConfigOf<typeof githubConfig>;
 export const githubSecrets = {
   privateKey: Secret.load("GITHUB_LANGY_PRIVATE_KEY", { optional: true }),
   webhookSecret: Secret.load("GITHUB_LANGY_WEBHOOK_SECRET", { optional: true }),
-  clientSecret: Secret.load("GITHUB_LANGY_CLIENT_SECRET", { optional: true }),
   signingKey: credentialsSecret,
   signingKeyFallback: sessionSecret,
 } as const;
