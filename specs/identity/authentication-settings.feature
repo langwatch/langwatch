@@ -409,3 +409,11 @@ Feature: Authentication settings - every way in, in one place, with the guards v
     When "sam" confirms unlinking it
     Then the confirmation said another way in becomes primary first
     And the unlink completes as one action
+
+  @integration
+  Scenario: The page is a narrow column of divided sections with bordered rows
+    Given "sam" holds a linked account
+    When the authentication settings are shown
+    Then the page column is no wider than 820px
+    And each section has a hairline divider above it
+    And each row of a section has its own border

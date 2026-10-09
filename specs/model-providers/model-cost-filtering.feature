@@ -33,3 +33,9 @@ Feature: Filtering the model costs table
     When I clear the filters
     Then every model is listed again
     And the count line reads "What each of the 3 models costs per token."
+
+  @integration
+  Scenario: The wide table scrolls inside its card instead of the page
+    Given the table is wider than the page column
+    Then the card scrolls horizontally
+    And the page itself does not scroll sideways
