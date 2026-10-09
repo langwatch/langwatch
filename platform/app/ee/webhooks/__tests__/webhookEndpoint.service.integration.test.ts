@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { Organization, Prisma } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
 import { raceOnOneRow } from "~/test-utils/rowLockInterleaving";
+import { PrismaProcessStore } from "~/server/event-sourcing/process-manager/stores/prismaProcessStore";
 import {
   disableEndpointForFailureStreak,
   WEBHOOK_AUTO_DISABLE_AFTER_MS,
@@ -16,7 +17,11 @@ const ns = `webhook-svc-${nanoid(8)}`;
 
 let organization: Organization;
 const notifyAutoDisabled = vi.fn().mockResolvedValue(undefined);
-const service = new WebhookEndpointService({ prisma, notifyAutoDisabled });
+const service = new WebhookEndpointService({
+  prisma,
+  processStore: new PrismaProcessStore(prisma),
+  notifyAutoDisabled,
+});
 
 beforeAll(async () => {
   organization = await prisma.organization.create({

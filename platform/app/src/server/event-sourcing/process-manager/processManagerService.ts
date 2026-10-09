@@ -2,8 +2,6 @@ import { performance } from "node:perf_hooks";
 import { createLogger } from "@langwatch/observability";
 import {
   type Attributes,
-  context,
-  propagation,
   SpanKind,
   SpanStatusCode,
   type Tracer,
@@ -15,6 +13,7 @@ import {
   observeEsProcessManagerDuration,
 } from "~/server/metrics";
 import { toSafeFailureDiagnostic } from "./failureDiagnostic";
+import { captureTraceCarrier } from "./traceCarrier";
 import { ensureJsonSafe, isDeepJsonEqual } from "./json";
 import type {
   ProcessDefinition,
@@ -354,7 +353,7 @@ export class ProcessManagerService<State> {
     intents: ProcessIntent[];
     userId?: string;
   }): NewOutboxMessage[] {
-    const traceCarrier = this.captureTraceCarrier();
+    const traceCarrier = captureTraceCarrier();
     return intents.map((intent) => {
       ensureJsonSafe(intent.payload);
       return {
@@ -365,17 +364,6 @@ export class ProcessManagerService<State> {
         ...(userId ? { userId } : {}),
       };
     });
-  }
-
-  /**
-   * Captures the full active W3C propagation carrier
-   * (traceparent/tracestate/baggage as configured on the global propagator)
-   * so the outbox dispatch can continue this trace as its remote parent.
-   */
-  private captureTraceCarrier(): Record<string, string> {
-    const carrier: Record<string, string> = {};
-    propagation.inject(context.active(), carrier);
-    return carrier;
   }
 
   private async inEvolveSpan<T extends HandleResult>(params: {
