@@ -37,7 +37,7 @@ the grant or role aggregate ID.
 
 ## Installation
 
-`defineProcessModule("authz").withRepositories(authzRepositories).withApi(AuthzModule).withTransports(authzGrantRest, authzRoleBindingRest, authzTrpcTransport).withTransportFacts(…).withEventing(authzEventing)`, `src/authz.module.ts:27`.
+`defineProcessModule("authz").withRepositories(authzRepositories).withApi(AuthzModule).withTransports(authzGrantRest, authzRoleBindingRest, authzTrpcTransport).withTransportFacts(…).withEventing(authzEventing).withEventing(authzAggregateReadEventing).withEventing(authzMemberOffboardedEventing)`, `src/authz.module.ts:29`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -45,7 +45,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The complete callable authorization boundary. This is deliberately a structural interface: callers can use an installed AuthzModule without receiving its services, repositories, or transport adapters.
 
-Peers call these through the token, declared at `../contract/src/authz.api.ts:46`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/authz.api.ts:49`; nothing else in this package is public.
 
 #### `isDemoProject`
 
@@ -89,8 +89,18 @@ can(args: Queries.AuthzCanInput): Promise<boolean>;
 
 #### `authorize`
 
+With `proof` on a project scope, also mints the sealed `Authorization` its reads carry (ADR-166, ADR-177 block B); `authorization` is null everywhere else.
+
 ```typescript
-authorize(args: { principal: AuthzPrincipalRef; permission: Permission; scope: Extract<AuthzScopeRef, { type: Tier }>; }): Promise<Authorized<Tier, Permission>>;
+authorize(args: { principal: AuthzPrincipalRef; permission: Permission; scope: Extract<AuthzScopeRef, { type: Tier }>; proof?: Readonly<{ actor: Actor; purpose: AuthorizationPurpose }>; }): Promise<Authorized<Tier, Permission> & Readonly<{ authorization: Authorization | null }>>;
+```
+
+#### `authorizeInternal`
+
+The own-only proof platform code reads its own project with (ADR-177); evaluates nothing.
+
+```typescript
+authorizeInternal(args: { actor: Extract<Actor, { type: "internal" | "system" }>; projectId: string; permission: AuthzPermission; purpose: AuthorizationPurpose; }): Promise<Authorization>;
 ```
 
 #### `effectivePermissions`
@@ -335,6 +345,38 @@ attachResourceGrant(args: Commands.AuthzAttachResourceGrantInput): Promise<Comma
 
 ```typescript
 revokeResourceGrants(args: Commands.AuthzRevokeResourceGrantsInput): Promise<Commands.AuthzRevokeResourceGrantsOutput>;
+```
+
+#### `findLiveSharedProjectGrants`
+
+The live shared reads (ADR-177) one reader project holds, one per member project.
+
+```typescript
+findLiveSharedProjectGrants(args: Commands.AuthzFindLiveSharedProjectGrantsInput): Promise<Commands.AuthzSharedProjectGrant[]>;
+```
+
+#### `attachSharedProjectGrant`
+
+A `project-reader` grant from reader to member carrying `condition`; idempotent per pair.
+
+```typescript
+attachSharedProjectGrant(args: Commands.AuthzAttachSharedProjectGrantInput): Promise<Commands.AuthzAttachSharedProjectGrantOutput>;
+```
+
+#### `awaitSharedProjectGrants`
+
+One read-your-writes wait for shared reads attached with `awaitProjection: false`.
+
+```typescript
+awaitSharedProjectGrants(args: Commands.AuthzAwaitSharedProjectGrantsInput): Promise<void>;
+```
+
+#### `revokeSharedProjectGrants`
+
+Revokes a reader's live shared reads (all, or those on `memberProjectIds`); answers ids.
+
+```typescript
+revokeSharedProjectGrants(args: Commands.AuthzRevokeSharedProjectGrantsInput): Promise<string[]>;
 ```
 
 #### `changeBindingRole`
@@ -838,7 +880,7 @@ interface Input {
     scopeId: string;
   }[];
 }
-// Output: authzBindingMutationSuccessSchema, ../contract/src/authz.grant-management.ts:192
+// Output: authzBindingMutationSuccessSchema, ../contract/src/authz.grant-management.ts:193
 interface Output {
   success: true;
 }
@@ -849,6 +891,14 @@ interface Output {
 None: this module declares no websocket, rawsocket or rawhttp door.
 
 ## Workers
+
+### Pipeline `authz_aggregate_read` (aggregate `authz_aggregate_read`)
+
+Declared at `src/eventing/authz-aggregate-read.pipeline.ts:18`. Events: `authzAggregateReadEventSchema`.
+
+| Kind    | Name                  | Handles | Declared at                                        |
+| ------- | --------------------- | ------- | -------------------------------------------------- |
+| command | `recordAggregateRead` | –       | `src/eventing/authz-aggregate-read.pipeline.ts:23` |
 
 ### Pipeline `authz_grant` (aggregate `authz_grant`)
 
@@ -872,6 +922,14 @@ The chain builds early when `!sessionVersions` (`src/eventing/authz-grant.pipeli
 | peer subscriber           | `userErased`                                                   | `lw.identity.user_erased` from [identity](../../identity/README.md) | `src/eventing/authz-grant.pipeline.ts:116` | always               |
 | ClickHouse map projection | `≈ AuthzGrantProjection.create(options.authzGrantsWriteStore)` | –                                                                   | `src/eventing/authz-grant.pipeline.ts:64`  | always               |
 | projection subscriber     | `sessionVersion`                                               | –                                                                   | `src/eventing/authz-grant.pipeline.ts:126` | past the early build |
+
+### Pipeline `authz_member_offboarded` (aggregate `authz_member_offboarded`)
+
+Declared at `src/eventing/authz-member-offboarded.pipeline.ts:18`. Events: `authzMemberOffboardedEventSchema`.
+
+| Kind    | Name                     | Handles | Declared at                                           |
+| ------- | ------------------------ | ------- | ----------------------------------------------------- |
+| command | `recordMemberOffboarded` | –       | `src/eventing/authz-member-offboarded.pipeline.ts:23` |
 
 ## Configuration
 
