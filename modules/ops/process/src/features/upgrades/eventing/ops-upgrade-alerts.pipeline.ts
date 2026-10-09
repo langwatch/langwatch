@@ -19,7 +19,7 @@ import {
   upgradeAlertsWake,
 } from "./ops-upgrade-alerts.process.ts";
 
-export const UPGRADE_ALERTS_PIPELINE_NAME = "ops_upgrade_alerts";
+const UPGRADE_ALERTS_PIPELINE_NAME = "ops_upgrade_alerts";
 
 interface UpgradeAlertsApp {
   checkUpgradeAlerts(input: { since: number; until: number }): Promise<unknown>;

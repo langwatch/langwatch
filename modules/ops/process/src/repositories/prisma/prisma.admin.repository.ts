@@ -78,8 +78,7 @@ export const ORGANIZATION_SAFE_SELECT = {
   // `license` is omitted on purpose: a connected install derives its hosted
   // services credential from the license key (ADR-156), so the key is
   // credential material and, like the S3 fields, write-only over the wire.
-  licenseExpiresAt: true,
-  licenseLastValidatedAt: true,
+  // Its dates are licensing's to read, not this generic admin's.
 } as const satisfies Prisma.OrganizationSelect;
 
 export const PROJECT_SAFE_SELECT = {
