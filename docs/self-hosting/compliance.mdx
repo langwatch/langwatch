@@ -147,21 +147,27 @@ another obligation you have taken on. That, with §164.312(c)(1)
 integrity when you need cryptographic tamper-evidence, is what points
 to Enterprise.
 
-## EU AI Act: Art. 12 logging + Art. 18 record-keeping
+## EU AI Act: Art. 12 logging + Art. 19 log retention
 
-The EU AI Act's high-risk-AI logging requirements (Art. 12) and the
-provider/deployer record-keeping (Art. 18) map onto:
+The EU AI Act's high-risk-AI logging capability (Art. 12) and the
+retention of the logs it generates (Art. 19) map onto:
 
-- **Art. 12(1) automatic recording of events**: Apache 2.0 unified trace store + 49d retention
+- **Art. 12(1) automatic recording of events**: Apache 2.0 unified trace store (the logging capability; Art. 12 sets no retention period)
 - **Art. 12(2)(a) period of operation**: Apache 2.0 (trace timestamps in event_log)
 - **Art. 12(2)(b) reference DB used**: Apache 2.0 (`gen_ai.system` + `gen_ai.request.model` attrs on each span)
 - **Art. 12(2)(c) input data check**: Apache 2.0 (prompt + tool-call payloads on traces, redacted via Presidio)
 - **Art. 12(2)(d) human oversight**: **Enterprise** anomaly-rule webhook dispatch (it delivers the flagged event to a URL you control; the human review of what arrives there is your receiving process, not something LangWatch performs or records today), with OCSF/SIEM forwarding of governance events alongside it. The two are separate paths: anomaly alerts arrive over the webhook, never as a record in the OCSF export
-- **Art. 18(1) record-keeping ≥10y**: Enterprise extended retention policies, with windows set in years to match the record-keeping clause your assessment requires.
+- **Art. 19 log retention (≥6 months)**: **Enterprise** extended retention policies, with windows set in whole weeks. Art. 19 governs how long the automatically generated logs are kept: at least six months, unless other Union or national law provides otherwise. The Apache 2.0 default 49d window sits below that floor, so a deployment in scope of Art. 19 raises the window to at least 27 whole weeks (189 days).
 
-Most enterprise-deploying-an-LLM-agent uses fall under Art. 12 (1-3
-year retention windows). Art. 18 record-keeping for high-risk systems
-explicitly requires the Enterprise retention extension.
+Where an LLM-agent deployment is high-risk under the Act, the logging
+capability (Art. 12) and the retention of those logs both attach, but
+the retention duty falls on different roles: Art. 19 puts it on the
+**provider**, while Art. 26(6) puts the equivalent duty on the
+**deployer** for logs under its control. Art. 18 is a separate provider
+duty: keeping the system's *technical documentation* available to
+authorities for ten years. That documentation set is not the operational
+log data LangWatch stores, so Art. 18 does not drive the trace-retention
+window.
 
 ## What's *intentionally* unavailable on Apache 2.0
 
