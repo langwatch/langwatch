@@ -4,10 +4,11 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { storesOwner } from "@langwatch/process-stores/config";
 import type { ScopedSecrets } from "@langwatch/secrets";
 import pg from "pg";
+import { z } from "zod";
 
 import { BackgroundStepsService, startBackgroundSteps } from "../background/index.ts";
 import { UpgradeLedgerRepository } from "../ledger.repository.ts";
-import type { UpgradeLease } from "../ledger.ts";
+import type { UpgradeLease, UpgradeRun } from "../ledger.ts";
 import { loadReleases } from "../manifest/manifest-loader.ts";
 import type { ReleaseTreeSteps } from "../manifest/stamp.ts";
 import type { UpgradePostgres } from "../ports.ts";
@@ -142,6 +143,9 @@ export function upgradeGateOver({
       .filter((step) => step.status === "failed")
       .map(({ id, lastError }) => ({ id, error: lastError }));
   };
+  const blocking = new Set(blockingSteps);
+  const findBlockingFailures = async () =>
+    (await findFailedSteps()).filter(({ id }) => blocking.has(id));
   const findLeaseHolder = () => liveLeaseHolder({ runner });
   let closed: Promise<void> | null = null;
   const closeOnce = () => (closed ??= close());
@@ -158,7 +162,11 @@ export function upgradeGateOver({
                 findLeaseHolder,
                 wait,
               })
-            : await gate.admit();
+            : await failedRunOnHold({
+                verdict: await gate.admit(),
+                findFailedSteps: findBlockingFailures,
+                findRuns: () => ledger.findRuns(),
+              });
         if (closesOn(verdict)) await closeOnce();
         return verdict;
       } catch (error) {
@@ -174,6 +182,7 @@ export function upgradeGateOver({
       }
     },
     serving: () => gate.serving(),
+    ...consoleRetryFor({ role, findFailures: findBlockingFailures, runner }),
     ...(role === "worker"
       ? {
           backgroundSteps: backgroundStepsOver({
@@ -187,6 +196,46 @@ export function upgradeGateOver({
         }
       : {}),
   };
+}
+
+const logTailSchema = z.array(z.string()).catch([]);
+
+/** The api's console Retry: each failed blocking step back to `pending` (UIW-7, Q10). */
+function consoleRetryFor({
+  role,
+  findFailures,
+  runner,
+}: {
+  role: ServingRole;
+  findFailures: () => Promise<UpgradeFailedRun["failedSteps"]>;
+  runner: Pick<UpgradeRunnerRepository, "retryFailedStep">;
+}) {
+  if (role !== "api") return {};
+  return {
+    retryFailedSteps: async () => {
+      for (const { id } of await findFailures()) await runner.retryFailedStep({ id });
+    },
+  };
+}
+
+/**
+ * UIW-7: a holding api reads a failure from the ledger, never from a run of its own: its image's
+ * failed blocking steps and the last failed run report's log tail. Upgrading opens no console.
+ */
+export async function failedRunOnHold({
+  verdict,
+  findFailedSteps,
+  findRuns,
+}: {
+  verdict: ServingVerdict;
+  findFailedSteps: () => Promise<UpgradeFailedRun["failedSteps"]>;
+  findRuns: () => Promise<readonly Pick<UpgradeRun, "outcome" | "report">[]>;
+}): Promise<ServingVerdict> {
+  if (verdict.outcome !== "holding") return verdict;
+  const failedSteps = await findFailedSteps();
+  if (failedSteps.length === 0) return verdict;
+  const report = (await findRuns()).findLast((run) => run.outcome === "failed")?.report;
+  return { ...verdict, failedRun: { failedSteps, logTail: logTailSchema.parse(report?.logTail) } };
 }
 
 /** Who holds the upgrade lease now, or null when it is free (a lapsed lease is free). */

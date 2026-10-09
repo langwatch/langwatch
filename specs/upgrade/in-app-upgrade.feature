@@ -143,7 +143,6 @@ Feature: The new image's worker runs its blocking upgrade while the api holds, t
   # --- On failure: the upgrade console, behind a one-time token ---
   # Rulings: Alex, 2026-10-09 (UPGRADE-CONSOLE): token in api memory as SHA-256, 30 min, once,
   # swapped for a console cookie; 5 wrong tokens a minute. UIW-7: only for a holding-phase failure.
-  # The bound tests still drive the api's own run; slice 6 of the plan rebinds them to the worker's.
 
   @unit
   Scenario: A failed upgrade keeps the api holding the door and prints a console token to its log
@@ -220,20 +219,20 @@ Feature: The new image's worker runs its blocking upgrade while the api holds, t
     When the same token is submitted again
     Then it is refused with the same answer an expired token gets
 
-  @unimplemented
+  @unit
   Scenario: Retry from the console returns the failed step to pending and the api moves on when the worker's run succeeds
     Given an operator opened the console of a failed upgrade
     When the operator presses Retry and the worker's next run succeeds
     Then the ledger recorded the step as pending before the run
     And the api leaves the holding phase and the console and its token no longer answer
 
-  @unimplemented
+  @unit
   Scenario: The console shows the failure from the run report in the ledger
     Given the worker's upgrade failed on a Postgres schema step
     When the operator opens the console with the token
     Then the console shows the failed step, its error and the last 50 lines of the run report's log
 
-  @unimplemented
+  @unit
   Scenario: A failure after the schema phase opens no console
     Given the worker's upgrade failed on a blocking data step and the api is in upgrading mode
     When a browser requests any page that is not served

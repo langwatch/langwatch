@@ -373,7 +373,11 @@ export class UpgradeRunnerService {
     report: Record<string, unknown>;
     phases: RunPhases;
   }): Promise<void> {
-    await this.ledger.finishRun({ runId, outcome, report: { ...report, phases: phases.list() } });
+    await this.ledger.finishRun({
+      runId,
+      outcome,
+      report: { ...report, phases: phases.list(), logTail: this.narrate.tail() },
+    });
     await this.hint({ runId, phase: null, release: this.options.image.release, outcome });
   }
 

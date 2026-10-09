@@ -6,6 +6,8 @@ import type { UpgradeOutcome, UpgradeOutcomeCode } from "./upgrade-outcome.ts";
 /** The commands an operator is pointed at (specs/upgrade/upgrade-logging.feature). */
 export const UPGRADE_RUN_COMMAND = "pnpm task upgrade";
 export const UPGRADE_STATUS_COMMAND = "pnpm task upgrade status";
+/** How many of the run's last lines the upgrade console shows (in-app-upgrade.feature). */
+export const UPGRADE_LOG_TAIL_LINES = 50;
 
 const RUN = `\`${UPGRADE_RUN_COMMAND}\``;
 const STATUS = `\`${UPGRADE_STATUS_COMMAND}\``;
@@ -65,6 +67,8 @@ const countOf = (count: number, noun: string) => `${count} ${noun}${count === 1 
  */
 export class UpgradeRunLog implements UpgradeRunnerLog {
   private startedAt = performance.now();
+  /** The run's last redacted lines, for the run report the api's console reads (UIW-7). */
+  private readonly lines: string[] = [];
   private readonly phaseStarts = new Map<string, number>();
   private readonly stepStarts = new Map<string, number>();
 
@@ -75,14 +79,26 @@ export class UpgradeRunLog implements UpgradeRunnerLog {
     this.startedAt = performance.now();
     this.phaseStarts.clear();
     this.stepStarts.clear();
+    this.lines.length = 0;
+  }
+
+  /** The last {@link UPGRADE_LOG_TAIL_LINES} lines this run said, redacted. */
+  tail(): readonly string[] {
+    return [...this.lines];
   }
 
   info(message: string, fields?: Record<string, unknown>): void {
-    this.log.info(redactSecrets(message), this.fields(fields));
+    this.log.info(this.keep(redactSecrets(message)), this.fields(fields));
   }
 
   warn(message: string, fields?: Record<string, unknown>): void {
-    this.log.warn(redactSecrets(message), this.fields(fields));
+    this.log.warn(this.keep(redactSecrets(message)), this.fields(fields));
+  }
+
+  private keep(line: string): string {
+    this.lines.push(line);
+    this.lines.splice(0, Math.max(0, this.lines.length - UPGRADE_LOG_TAIL_LINES));
+    return line;
   }
 
   firstRun(): void {

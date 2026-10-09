@@ -42,6 +42,8 @@ export type ServingVerdict =
       outcome: "holding" | "upgrading";
       outstanding: readonly string[];
       refusal: string;
+      /** UIW-7: a holding api whose image's blocking step failed shows the token console. */
+      failedRun?: UpgradeFailedRun;
     }>
   | Readonly<{
       admitted: false;

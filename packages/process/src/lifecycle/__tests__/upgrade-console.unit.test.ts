@@ -110,7 +110,7 @@ const settledWithin = (promise: Promise<boolean>, ms: number) =>
   ]);
 
 describe("the upgrade console", () => {
-  describe("given the api's upgrade failed", () => {
+  describe("given the ledger records a failure in the holding phase", () => {
     describe("when a browser asks for a page without a console session", () => {
       /** @scenario "The holding page of a failed upgrade asks for the token and shows no failure detail" */
       it("answers 503 asking for the token and names no step, error or host", async () => {
@@ -344,9 +344,9 @@ describe("the upgrade console", () => {
       });
     });
 
-    describe("when the console session presses Retry and the upgrade then succeeds", () => {
-      /** @scenario "Retry from the console runs the upgrade again and serves on success" */
-      it("asks for a run, and once the hold lifts neither the console nor its token answers", async () => {
+    describe("when the console session presses Retry and the worker's next run succeeds", () => {
+      /** @scenario "Retry from the console returns the failed step to pending and the api moves on when the worker's run succeeds" */
+      it("hands the Retry to the gate, and once the hold lifts neither the console nor its token answers", async () => {
         const thread = await bootThread();
         const { retried } = await showConsole(thread);
         const cookie = await openSession(thread);

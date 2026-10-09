@@ -8,15 +8,26 @@ import { createTestLogger } from "@langwatch/test-harness";
 import { describe, expect, it, vi } from "vitest";
 
 import type { UpgradeConsole } from "../../lifecycle/liveness-thread.ts";
-import { type UpgradeGateVerdict, upgradeGateComponent } from "../upgrade-gate.ts";
+import {
+  type UpgradeGateFailedRun,
+  type UpgradeGateVerdict,
+  upgradeGateComponent,
+} from "../upgrade-gate.ts";
 
-const HOLDING = { phase: "upgrade-gate", outstandingStepIds: [] };
 const PINO_WARN = 40;
+const SCHEMA_STEP = "prisma:20261009_add_column";
 
-const failedAt = (id: string): UpgradeGateVerdict => ({
+const failedRun = (id: string): UpgradeGateFailedRun => ({
+  failedSteps: [{ id, error: `${id} broke` }],
+  logTail: [`${id} failed`],
+});
+
+/** What the ledger answers a holding api: a Postgres schema step outstanding, maybe failed. */
+const holding = (run?: UpgradeGateFailedRun): UpgradeGateVerdict => ({
   admitted: false,
-  refusal: "behind this image",
-  failedRun: { failedSteps: [{ id, error: `${id} broke` }], logTail: [`${id} failed`] },
+  outcome: "holding",
+  outstanding: [SCHEMA_STEP],
+  ...(run ? { failedRun: run } : {}),
 });
 
 function hostGate({
@@ -30,40 +41,43 @@ function hostGate({
   const admit = vi.fn(
     async (): Promise<UpgradeGateVerdict> => verdicts.shift() ?? { admitted: true },
   );
+  const retryFailedSteps = vi.fn(async () => undefined);
   const onHolding = vi.fn(async () => undefined);
+  const consoles: UpgradeConsole[] = [];
   const hosted = upgradeGateComponent({
     server: "console-test",
     role: "api",
-    gate: { admit, release: async () => undefined },
+    gate: { admit, release: async () => undefined, retryFailedSteps },
     logger,
     onHolding,
-    onFailed,
+    onFailed: (upgradeConsole) => {
+      consoles.push(upgradeConsole);
+      return onFailed(upgradeConsole);
+    },
+    reAskMs: 1,
   });
   const tokens = () =>
     lines
       .map((line) => /valid once for \d+ minutes: ([\w-]+)/.exec(JSON.stringify(line))?.[1])
       .filter((token) => token !== undefined);
-  return { hosted, lines, admit, onHolding, tokens };
+  return { hosted, lines, admit, onHolding, retryFailedSteps, consoles, tokens };
 }
 
+const never = () => new Promise<boolean>(() => undefined);
+
 describe("the upgrade gate's console", () => {
-  describe("given the api's upgrade run fails", () => {
+  describe("given the ledger records a failed step while the api holds", () => {
     /** @scenario "A failed upgrade keeps the api holding the door and prints a console token to its log" */
     it("keeps holding, prints one token on one line and hands the console only its hash", async () => {
-      const consoles: UpgradeConsole[] = [];
-      const { hosted, lines, onHolding, tokens } = hostGate({
-        verdicts: [failedAt("dataset:move")],
-        onFailed: (upgradeConsole) => {
-          consoles.push(upgradeConsole);
-          return new Promise<boolean>(() => undefined);
-        },
+      const { hosted, lines, consoles, tokens } = hostGate({
+        verdicts: [holding(failedRun(SCHEMA_STEP))],
+        onFailed: never,
       });
 
       void hosted.start?.();
       await vi.waitFor(() => expect(consoles).toHaveLength(1));
       const token = tokens()[0] ?? "no token printed";
 
-      expect(onHolding.mock.calls).toEqual([[HOLDING]]);
       expect(createHash("sha256").update(token).digest("hex")).toBe(consoles[0]?.tokenSha256);
       const tokenLines = lines.filter((line) => JSON.stringify(line).includes(token));
       expect(tokenLines).toHaveLength(1);
@@ -71,35 +85,28 @@ describe("the upgrade gate's console", () => {
       expect(JSON.stringify(tokenLines[0])).toContain("kubectl port-forward pod/");
       expect(JSON.stringify(consoles)).not.toContain(token);
       expect(consoles[0]?.failedSteps).toEqual([
-        { id: "dataset:move", error: "dataset:move broke" },
+        { id: SCHEMA_STEP, error: `${SCHEMA_STEP} broke` },
       ]);
     });
 
     /** @scenario "The console shows a failed run's errors and log lines with connection passwords redacted" */
     it("redacts a connection URL's password in the step errors and log lines it hands the console", async () => {
-      const consoles: UpgradeConsole[] = [];
       const leaked = "postgres://langwatch:s3cret-pw@db:5432/langwatch";
-      const { hosted } = hostGate({
+      const { hosted, consoles } = hostGate({
         verdicts: [
-          {
-            admitted: false,
-            refusal: "behind this image",
-            failedRun: {
-              failedSteps: [
-                { id: "a:url", error: `could not reach ${leaked}` },
-                { id: "b:none", error: null },
-              ],
-              logTail: [`[upgrade] connecting to ${leaked}`, "[upgrade] plain line"],
-            },
-          },
+          holding({
+            failedSteps: [
+              { id: "a:url", error: `could not reach ${leaked}` },
+              { id: "b:none", error: null },
+            ],
+            logTail: [`[upgrade] connecting to ${leaked}`, "[upgrade] plain line"],
+          }),
         ],
-        onFailed: async (upgradeConsole) => {
-          consoles.push(upgradeConsole);
-          return false;
-        },
+        onFailed: never,
       });
 
-      await expect(hosted.start?.()).rejects.toThrow("refuses to serve");
+      void hosted.start?.();
+      await vi.waitFor(() => expect(consoles).toHaveLength(1));
 
       expect(JSON.stringify(consoles)).not.toContain("s3cret-pw");
       expect(consoles[0]?.failedSteps).toEqual([
@@ -112,49 +119,76 @@ describe("the upgrade gate's console", () => {
       ]);
     });
 
-    it("refuses as before when there is no console to show, and runs nothing again", async () => {
-      const { hosted, admit } = hostGate({
-        verdicts: [failedAt("dataset:move")],
-        onFailed: async () => false,
+    it("keeps one console and one token while the ledger answers the same failure", async () => {
+      const failure = failedRun(SCHEMA_STEP);
+      const { hosted, admit, consoles, tokens } = hostGate({
+        verdicts: [holding(failure), holding(failure), holding(failure)],
+        onFailed: never,
       });
 
-      await expect(hosted.start?.()).rejects.toThrow("refuses to serve");
-      expect(admit).toHaveBeenCalledTimes(1);
+      void hosted.start?.();
+      await vi.waitFor(() => expect(admit.mock.calls.length).toBeGreaterThan(3));
+
+      expect(consoles).toHaveLength(1);
+      expect(tokens()).toHaveLength(1);
+    });
+  });
+
+  describe("given the failure is in the upgrading phase", () => {
+    /** @scenario "A failure after the schema phase opens no console" */
+    it("boots without a console and prints no token", async () => {
+      const { hosted, consoles, tokens } = hostGate({
+        verdicts: [
+          {
+            admitted: false,
+            outcome: "upgrading",
+            outstanding: ["dataset:move"],
+            failedRun: failedRun("dataset:move"),
+          },
+        ],
+        onFailed: never,
+      });
+
+      await hosted.start?.();
+
+      expect(consoles).toHaveLength(0);
+      expect(tokens()).toHaveLength(0);
     });
   });
 
   describe("given an operator presses Retry in the console", () => {
-    /** @scenario "Retry from the console runs the upgrade again and serves on success" */
-    it("holds the upgrading page again, asks again and serves once admitted", async () => {
-      const { hosted, admit, onHolding } = hostGate({
-        verdicts: [failedAt("dataset:move"), { admitted: true }],
+    /** @scenario "Retry from the console returns the failed step to pending and the api moves on when the worker's run succeeds" */
+    it("returns the failed steps to pending in the ledger, then serves once the ledger is current", async () => {
+      const { hosted, admit, onHolding, retryFailedSteps } = hostGate({
+        verdicts: [holding(failedRun(SCHEMA_STEP)), holding()],
         onFailed: async () => true,
       });
 
       await hosted.start?.();
 
-      expect(admit).toHaveBeenCalledTimes(2);
-      expect(onHolding.mock.calls).toEqual([[HOLDING], [HOLDING], [undefined]]);
+      expect(retryFailedSteps).toHaveBeenCalledTimes(1);
+      expect(admit).toHaveBeenCalledTimes(3);
+      expect(retryFailedSteps.mock.invocationCallOrder[0]).toBeLessThan(
+        admit.mock.invocationCallOrder[1] ?? 0,
+      );
+      expect(onHolding).toHaveBeenLastCalledWith(undefined);
     });
 
     /** @scenario "A retry that fails again keeps the console and names the new failure" */
     it("shows the new failure under a new token", async () => {
-      const consoles: UpgradeConsole[] = [];
-      const { hosted, tokens } = hostGate({
-        verdicts: [failedAt("a:first"), failedAt("b:second"), { admitted: true }],
-        onFailed: async (upgradeConsole) => {
-          consoles.push(upgradeConsole);
-          return true;
-        },
+      const { hosted, consoles, tokens, retryFailedSteps } = hostGate({
+        verdicts: [holding(failedRun("prisma:first")), holding(failedRun("prisma:first"))],
+        onFailed: async () => true,
       });
 
       await hosted.start?.();
 
       expect(consoles.map(({ failedSteps }) => failedSteps[0]?.id)).toEqual([
-        "a:first",
-        "b:second",
+        "prisma:first",
+        "prisma:first",
       ]);
       expect(new Set(tokens()).size).toBe(2);
+      expect(retryFailedSteps).toHaveBeenCalledTimes(2);
     });
   });
 });
