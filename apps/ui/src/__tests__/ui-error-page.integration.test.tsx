@@ -6,18 +6,34 @@
 
 import { createUiRootLayout } from "@langwatch/browser/root-layout";
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
-import { cleanup, screen } from "@testing-library/react";
+import { act, cleanup, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { createMemoryRouter, RouterProvider } from "react-router";
+import { createMemoryRouter, Outlet, RouterProvider } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { uiErrorPages } from "../shell/ui-error-page";
+import { UiScreenErrorBoundary, uiErrorPages } from "../shell/ui-error-page";
 
 const THROWN = "host mount exploded";
 
 /** Stands where the module host stack renders: the root layout's feature shell. */
 function ThrowingHostMount(): ReactNode {
   throw new Error(THROWN);
+}
+
+function ThrowingScreen(): ReactNode {
+  throw new Error(THROWN);
+}
+
+/** Stands for the navigation shell: the chrome around the routed screen, as ui-app-chrome does. */
+function StandInChrome() {
+  return (
+    <>
+      <nav>sidebar and top bar</nav>
+      <UiScreenErrorBoundary isDevelopment={false}>
+        <Outlet />
+      </UiScreenErrorBoundary>
+    </>
+  );
 }
 
 function Passthrough({ children }: { children: ReactNode }) {
@@ -60,6 +76,40 @@ describe("given a module host mount that throws while rendering", () => {
       expect(screen.queryByText("home screen")).toBeNull();
       expect(screen.queryByText(new RegExp(THROWN))).toBeNull();
       expect(screen.queryByTestId("app-error-stack")).toBeNull();
+    });
+  });
+});
+
+describe("given the reader is on a screen inside the application chrome", () => {
+  describe("when the screen throws while rendering", () => {
+    /** @scenario "A screen that throws shows the error card inside the chrome" */
+    it("shows the error card in place of the screen, keeps the chrome, and resets on navigation", async () => {
+      const router = createMemoryRouter(
+        [
+          {
+            path: "/",
+            Component: StandInChrome,
+            children: [
+              { path: "broken", Component: ThrowingScreen },
+              { path: "fine", Component: () => <p>fine screen</p> },
+            ],
+          },
+        ],
+        { initialEntries: ["/broken"] },
+      );
+
+      renderWithDesignSystem(<RouterProvider router={router} />);
+
+      expect(await screen.findByTestId("app-error-page")).toBeTruthy();
+      expect(screen.getByText("sidebar and top bar")).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Reload" })).toBeTruthy();
+      expect(screen.queryByText(new RegExp(THROWN))).toBeNull();
+
+      await act(() => router.navigate("/fine"));
+
+      expect(await screen.findByText("fine screen")).toBeTruthy();
+      expect(screen.queryByTestId("app-error-page")).toBeNull();
+      expect(screen.getByText("sidebar and top bar")).toBeTruthy();
     });
   });
 });

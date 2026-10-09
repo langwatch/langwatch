@@ -13,3 +13,11 @@ Feature: The application shows a branded error page when it throws
     Then the reader sees the branded error page instead of an empty page
     And the page offers "Reload" and "Go home"
     And the thrown message is not shown outside development
+
+  @integration
+  Scenario: A screen that throws shows the error card inside the chrome
+    Given the reader is on a screen inside the application chrome
+    When the screen throws while rendering
+    Then the branded error card is shown in place of the screen
+    And the sidebar and top bar stay so the reader can navigate away
+    And navigating to another address renders that address again
