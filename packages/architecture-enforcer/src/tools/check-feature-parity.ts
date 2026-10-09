@@ -275,6 +275,9 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // slugs it started (specs/tooling/apidiff-on-haven.feature) - is asserted by
   // these Go tests and by nothing else.
   "tools/apidiff",
+  // upgradelab: snapshot format, restore guards, scrub and generation (specs/upgrade/*.feature)
+  // are asserted by these Go tests only.
+  "tools/upgradelab",
   // ClickHouse serverless chart configuration rendering. Scenarios describing
   // keeper-backed replicated access storage binding through unit tests in
   // internal/render/render_test.go that verify the XML config is generated
