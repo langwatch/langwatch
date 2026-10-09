@@ -152,6 +152,7 @@ describe("the tasks process installation", () => {
         "slack-alert",
         "report-schedule-backfill",
         "usage-billing-catch-up",
+        "tiered-free-to-seat-event",
         "stripe-prices-sync",
         "dataset-content-backfill",
         "demo-data",

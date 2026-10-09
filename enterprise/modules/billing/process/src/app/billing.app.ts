@@ -813,6 +813,17 @@ export class BillingModule
     return this.#lifecycle.usageBillingCaughtUp({ organizationId, isDryRun });
   }
 
+  /** Records billing's pricing-model fact, for the tiered-free-to-seat-event hand-run task. */
+  async pricingModelChanged(input: {
+    organizationId: string;
+    pricingModel: BillingPricingModel;
+  }): Promise<void> {
+    if (!this.#lifecycle) {
+      throw new Error("This billing app was composed without a lifecycle pipeline");
+    }
+    await this.#lifecycle.pricingModelChanged(input);
+  }
+
   /** Binds the lifecycle pipeline's own senders. */
   connectLifecycleCommands(commands: EventingCommands<BillingLifecyclePipeline>): void {
     if (!this.#lifecycle) {
