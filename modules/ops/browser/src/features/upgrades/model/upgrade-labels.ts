@@ -70,10 +70,8 @@ export function preflightLabel(outcome: string): UpgradeLabel {
     : { label: "Not checked", tone: "neutral" };
 }
 
-/** The order a release's step groups are shown in (UI plan W2). */
-export const UPGRADE_MODE_ORDER = ["blocking", "background", "operator"] as const;
-
 const MODE_LABELS: Record<string, string> = {
+  schema: "Schema",
   blocking: "Blocking",
   background: "Background",
   operator: "Operator",
@@ -121,18 +119,6 @@ export function modeLabel(mode: string): string {
 /** The command the installation's state asks the operator to run, if any. */
 export function upgradeCommandFor({ reason }: { reason: string }): string | null {
   return REASONS_FIXED_BY_UPGRADING.has(reason) ? UPGRADE_COMMAND : null;
-}
-
-/** Steps grouped by mode in the page's order, any unknown mode after them. */
-export function groupStepsByMode<Step extends { mode: string }>(
-  steps: readonly Step[],
-): { mode: string; label: string; steps: Step[] }[] {
-  const unknown = steps
-    .map((step) => step.mode)
-    .filter((mode) => !Object.hasOwn(MODE_LABELS, mode));
-  return [...UPGRADE_MODE_ORDER, ...new Set(unknown)]
-    .map((mode) => ({ mode, label: modeLabel(mode), steps: steps.filter((s) => s.mode === mode) }))
-    .filter((group) => group.steps.length > 0);
 }
 
 /** Steps grouped by release in the reader's order; a step with no release goes last. */

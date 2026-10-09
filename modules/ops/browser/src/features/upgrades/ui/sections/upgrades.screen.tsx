@@ -22,7 +22,7 @@ import {
 /** How many recent runs the overview lists. */
 const RECENT_RUNS = 20;
 
-/** W1: where the installation stands, its releases, failed steps and runs; tenant migrations are a tab. */
+/** W1: where the installation stands, its releases, steps and runs; tenant migrations are a tab. */
 export default function UpgradesScreen() {
   useUpgradeReadHints();
   const router = useOpsRouter();

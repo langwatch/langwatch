@@ -51,10 +51,33 @@ Feature: Ops shows an installation's release upgrades, read-only
     And the line opens the step
 
   @integration
-  Scenario: A release's steps are grouped by mode
-    Given a release with a blocking, a background and an operator step
+  Scenario: A release's steps read as a summary, the unfinished ones first, the applied ones collapsed
+    Given a release with hundreds of applied steps and a few still to do
     When an operator opens that release
-    Then the steps are listed under Blocking, Background and Operator in that order
+    Then it shows how many steps sit in each status and of each kind
+    And the unfinished steps are listed first with their mode and what they wait on
+    And the applied steps are one collapsed group that says whether each ran or was recorded done
+    And an empty owner, zero attempts and a duration that never started are not shown
+
+  @unit
+  Scenario: The releases list puts unreleased first, then the newest release, and calls out what is left
+    Given releases 3.19.0, 3.19.4 and 3.20.1 and unreleased steps
+    When an operator opens Ops, Upgrades
+    Then the unreleased steps are listed first and the releases newest first after them
+    And each release calls out how many of its steps are still pending
+
+  @unit
+  Scenario: A long step error reads as a one-line summary with the full text a click away
+    Given a step whose last error is a long runner message with parenthesised detail
+    When an operator reads the step lists
+    Then the error reads as its first clause on one line
+    And the full text shows on hover and in the step drawer
+
+  @integration
+  Scenario: Tenant migrations are a tab of the Upgrades page
+    When an operator opens the Tenant migrations tab on Ops, Upgrades
+    Then the tenant migrations, their enrolment and per-organization actions are shown
+    And the retired Ops, Migrations address opens this tab
 
   @integration
   Scenario: The step drawer shows a step's error, fix and checkpoint, read-only

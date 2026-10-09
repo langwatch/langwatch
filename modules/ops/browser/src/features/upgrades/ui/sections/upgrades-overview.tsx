@@ -1,5 +1,6 @@
 import { CopyButton } from "@langwatch/design-system/copy-button";
 import { ListTable } from "@langwatch/design-system/list-table";
+import { MeterBar } from "@langwatch/design-system/meter-bar";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import {
   Alert,
@@ -14,7 +15,6 @@ import {
   Text,
   Wrap,
 } from "@langwatch/design-system/primitives";
-import { MeterBar } from "@langwatch/design-system/meter-bar";
 import { StatTile, StatTileFigure, StatTileGrid } from "@langwatch/design-system/stat-tile";
 import { readableDate } from "@langwatch/time";
 import { DatabaseZap } from "lucide-react";
@@ -42,6 +42,7 @@ import type {
 } from "../../model/upgrade-view.ts";
 import { UpgradeErrorSummary } from "../elements/upgrade-error-summary.tsx";
 import { UpgradeStatusBadge } from "../elements/upgrade-status-badge.tsx";
+import { UpgradeStepState } from "../elements/upgrade-step-state.tsx";
 
 /** U4: one tenant step (`name` is its step id) with its tenants' state counts, as served. */
 export type UpgradeTenantStepView = RouterOutputs["ops"]["upgrade"]["listSystemMigrations"][number];
@@ -168,7 +169,9 @@ function RemainingBadges({ counts }: { counts: Record<string, number> }) {
             key={status}
             size="sm"
             variant="solid"
-            colorPalette={statusTone(status) === "neutral" ? "orange" : tonePalette(statusTone(status))}
+            colorPalette={
+              statusTone(status) === "neutral" ? "orange" : tonePalette(statusTone(status))
+            }
           >
             {count} {statusWords(status)}
           </Badge>
@@ -312,32 +315,6 @@ function RunsTable({
   );
 }
 
-/** An old serving process by role, release (else image) and when it was last seen. */
-function waitingWriterLabel(writer: UpgradeStepView["waitingOn"][number]): string {
-  const name = writer.release ?? writer.image;
-  if (!writer.lastSeenAt) return `${writer.role} (${name})`;
-  return `${writer.role} (${name}, last seen ${readableDate(writer.lastSeenAt).toLocaleString()})`;
-}
-
-/** The status badge, with progress or what the step waits on as one muted line under it. */
-function StepState({ step }: { step: UpgradeStepView }) {
-  const detail = step.progress
-    ? `${Math.floor((step.progress.done / step.progress.total) * 100)}% · ${step.progress.done} of ${step.progress.total}`
-    : step.waitingOn.length > 0
-      ? `Waiting on ${step.waitingOn.map(waitingWriterLabel).join(", ")}`
-      : null;
-  return (
-    <Stack gap={1} align="start">
-      <UpgradeStatusBadge label={{ label: step.statusLabel, tone: statusTone(step.status) }} />
-      {detail && (
-        <Text textStyle="xs" color="fg.muted">
-          {detail}
-        </Text>
-      )}
-    </Stack>
-  );
-}
-
 function PendingSteps({
   group,
   steps,
@@ -381,7 +358,7 @@ function PendingSteps({
               {step.id}
             </Table.Cell>
             <Table.Cell verticalAlign="top">
-              <StepState step={step} />
+              <UpgradeStepState step={step} />
             </Table.Cell>
             {show.release && (
               <Table.Cell fontFamily="mono" verticalAlign="top">

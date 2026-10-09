@@ -3,10 +3,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   UPGRADE_COMMAND,
-  groupStepsByMode,
   groupStepsByRelease,
+  orderReleasesNewestFirst,
+  remainingCount,
   runOutcomeLabel,
   statusTone,
+  summariseError,
   upgradeCommandFor,
 } from "../model/upgrade-labels.ts";
 
@@ -42,23 +44,53 @@ describe("statusTone() and runOutcomeLabel()", () => {
   });
 });
 
-describe("groupStepsByMode()", () => {
-  describe("when a release has steps of every mode and one unknown", () => {
-    it("orders blocking, background, operator, then the unknown mode", () => {
-      const groups = groupStepsByMode([
-        { id: "a", mode: "operator" },
-        { id: "b", mode: "later" },
-        { id: "c", mode: "background" },
-        { id: "d", mode: "blocking" },
+describe("orderReleasesNewestFirst()", () => {
+  describe("when the reader lists releases oldest first with the unreleased steps last", () => {
+    /** @scenario "The releases list puts unreleased first, then the newest release, and calls out what is left" */
+    it("puts unreleased first, then the newest release", () => {
+      const ordered = orderReleasesNewestFirst([
+        { release: "3.19.0" },
+        { release: "3.19.4" },
+        { release: "3.20.1" },
+        { release: "3.9.10" },
+        { release: null },
       ]);
 
-      expect(groups.map((group) => group.label)).toEqual([
-        "Blocking",
-        "Background",
-        "Operator",
-        "later",
+      expect(ordered.map((entry) => entry.release)).toEqual([
+        null,
+        "3.20.1",
+        "3.19.4",
+        "3.19.0",
+        "3.9.10",
       ]);
     });
+  });
+});
+
+describe("remainingCount()", () => {
+  it("counts every status but done and not-needed", () => {
+    expect(remainingCount({ done: 473, "not-needed": 34, pending: 3, failed: 1 })).toBe(4);
+  });
+});
+
+describe("summariseError()", () => {
+  describe("when an error is long and carries parenthesised detail", () => {
+    /** @scenario "A long step error reads as a one-line summary with the full text a click away" */
+    it("keeps its first clause without the detail, capitalised and cut to one line", () => {
+      const summary = summariseError(
+        "reopened: image 3.20.1 (host:port:worker) served after upgrade run local_upgraderun_01JABCDEFGHJKMNPQRSTVWXYZ0 recorded the step done; the roster still lists it",
+      );
+
+      expect(summary.startsWith("Reopened: image 3.20.1 served after upgrade run")).toBe(true);
+      expect(summary).not.toContain("host:port");
+      expect(summary).not.toContain("roster");
+      expect(summary.length).toBeLessThanOrEqual(90);
+      expect(summary.endsWith("…")).toBe(true);
+    });
+  });
+
+  it("leaves a short error whole", () => {
+    expect(summariseError("Owner column missing")).toBe("Owner column missing");
   });
 });
 

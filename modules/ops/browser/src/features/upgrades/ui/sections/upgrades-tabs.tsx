@@ -56,7 +56,7 @@ function TargetsTable({ targets }: { targets: readonly UpgradeTargetSummaryView[
   );
 }
 
-/** Overview and Tenant migrations, plus Dataplanes only when the ledger records a private target. */
+/** Overview and Tenant migrations, plus Dataplanes when the ledger records a private target. */
 export function UpgradesTabs({
   targets,
   overview,

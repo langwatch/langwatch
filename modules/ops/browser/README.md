@@ -24,9 +24,8 @@ Installed by ui, from the app's generated module list (`pnpm generate:modules`).
 | `pages/ops/blobs`                       | `/ops/blobs` (route table)                       | –        | –       | `ops:view`   | –     |
 | `pages/ops/feature-flags`               | `/ops/feature-flags` (route table)               | –        | –       | `ops:view`   | –     |
 | `pages/ops/foundry`                     | `/ops/foundry` (route table)                     | –        | –       | `ops:view`   | –     |
-| `pages/ops/migrations`                  | `/ops/migrations` (route table)                  | –        | –       | `ops:view`   | –     |
 | `pages/ops/upgrades`                    | `/ops/upgrades` (route table)                    | –        | –       | `ops:view`   | –     |
-| `pages/ops/upgrades/preview`            | –                                                | –        | –       | `ops:view`   | –     |
+| `pages/ops/upgrades/preview`            | `/ops/upgrades/preview` (route table)            | –        | –       | `ops:view`   | –     |
 | `pages/ops/upgrades/releases/[release]` | `/ops/upgrades/releases/:release` (route table)  | –        | –       | `ops:view`   | –     |
 | `pages/ops/upgrades/runs/[runId]`       | `/ops/upgrades/runs/:runId` (route table)        | –        | –       | `ops:view`   | –     |
 | `pages/ops/projections/[runId]`         | `/ops/projections/:runId` (route table)          | –        | –       | `ops:view`   | –     |
