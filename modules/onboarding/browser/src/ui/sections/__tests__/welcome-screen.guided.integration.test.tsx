@@ -537,5 +537,16 @@ describe("WelcomeScreen in the classic variant", () => {
 
       expect(hardRedirects).toEqual(["/onboarding/product?projectSlug=acme-proj"]);
     });
+
+    it.each(["/\\evil.example/steal", "/\t/evil.example/steal"])(
+      "ignores a continuation a browser reads as another host (%j)",
+      async (returnTo) => {
+        routerState.query = { return_to: returnTo };
+
+        await finishClassicFlow();
+
+        expect(hardRedirects).toEqual(["/onboarding/product?projectSlug=acme-proj"]);
+      },
+    );
   });
 });

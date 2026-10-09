@@ -520,7 +520,7 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
 
   @integration
   Scenario: A directory adopts a member who already had an account
-    Given somebody already has an account but no membership in "acme"
+    Given somebody already has an account on a domain "acme" proved, but no membership in "acme"
     When "okta-primary" pushes them
     Then their existing account gains the membership
     And no second account is created for the same address

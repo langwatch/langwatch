@@ -1,6 +1,6 @@
 ---
 name: clickhouse-migration
-description: "Change the ClickHouse schema without breaking any release still in the supported window: where the goose migrations live, `clickhouse:<NNNNN>` numbering and the migration-order check for collisions, one owner per file, one statement per StatementBegin block, IF NOT EXISTS / IF EXISTS on every statement, why a variable-size column added by ALTER needs a DEFAULT, why down migrations stay commented out, partition keys and TTL, deduped tables and argMax, the LTS floor (3.20.1) and the retirement note required before any DROP or type change, historic values by a background .withMigrations step instead of an operator comment, a changed view under a new name, every ClickHouse target applied by `pnpm task upgrade`, keeping the LWQL catalogue in step, and the expand/contract recipes. Use whenever someone says 'add a ClickHouse column', 'add a ClickHouse table', 'change that column type', 'drop the old table', 'replace the view', 'backfill a ClickHouse column', 'MATERIALIZE', 'write a goose migration', 'goose number taken', 'Code 173', 'Code 241', or the migration-safety test named their migration."
+description: "Change the ClickHouse schema without breaking any release still in the supported window: where the goose migrations live, `clickhouse:<NNNNN>` numbering and the migration-order check for collisions, one owner per file, one statement per StatementBegin block, IF NOT EXISTS / IF EXISTS on every statement, why a variable-size column added by ALTER needs a DEFAULT, why down migrations stay commented out, partition keys and TTL, deduped tables and argMax, the LTS floor (3.20.1) and the retirement note required before any DROP or type change, historic values by a background .withMigrations step instead of an operator comment, the `-- background step:` note on a mutation (MODIFY TTL needs materialize_ttl_after_modify = 0) and the deploy-time rewrites it never excuses (MODIFY ORDER BY, OPTIMIZE FINAL, POPULATE), a changed view under a new name, every ClickHouse target applied by `pnpm task upgrade`, keeping the LWQL catalogue in step, and the expand/contract recipes. Use whenever someone says 'add a ClickHouse column', 'add a ClickHouse table', 'change that column type', 'drop the old table', 'replace the view', 'backfill a ClickHouse column', 'MATERIALIZE', 'write a goose migration', 'goose number taken', 'Code 173', 'Code 241', or the migration-safety test named their migration."
 user-invocable: true
 argument-hint: "<the schema change, or the migration name the scanner refused>"
 ---
@@ -101,7 +101,11 @@ run on the worker, never a comment asking the operator to run it (plan 6.12, the
 column" row; today's comments in `00034`, `00035`, `00062`, `00063`, `00076` are what that replaces,
 plan 3.2 K2). A mutation is asynchronous and rewrites parts: the step starts it, watches
 `system.mutations`, and is level-triggered. Declare it with `.withMigrations` as a `data` step,
-mode `background`, on the module that owns the table (the `migration-data-step` skill).
+mode `background`, on the module that owns the table (the `migration-data-step` skill). A goose file
+that still starts the mutation puts `-- background step: <step id>` above it, naming the step that
+waits on it (`00103`, `trace:track-updated-at-index-materialisation`); without the note the scanner
+refuses it (Alex, 2026-10-09). The note excuses a mutation only: `MODIFY ORDER BY`, `OPTIMIZE ... FINAL`
+and `POPULATE` are refused with or without it, because they run inside goose and block the upgrade.
 
 ## Recipe: change a column's type
 
@@ -177,7 +181,14 @@ with the fix:
 | `ddl-without-if-exists`                    | DDL without `IF [NOT] EXISTS`                             |
 | `live-down-migration`                      | a down migration that is not commented out                |
 | `view-replaced-in-place`                   | a view dropped and recreated                              |
+| `untracked-mutation`                       | `ALTER ... UPDATE/DELETE`, `DELETE FROM`, `MATERIALIZE COLUMN/INDEX/PROJECTION/TTL`, `MODIFY TTL` without `materialize_ttl_after_modify = 0`, with no `-- background step:` note |
+| `unknown-background-step`                  | a `-- background step:` note naming no declared code step |
+| `modify-order-by`                          | `MODIFY ORDER BY` (a new sort key is a new table)         |
+| `optimize-final`                           | `OPTIMIZE TABLE ... FINAL`                                |
+| `materialized-view-populate`               | `CREATE MATERIALIZED VIEW ... POPULATE`                   |
 
-The baseline is **frozen**; adding your migration to it is refused.
+The last five rows keep reads fast while the api serves through the upgrade (Alex, 2026-10-09).
+Goose files in the newest `langwatch@v*` tag (read from git; a clone without tags fails with the fetch
+command) are history they skip; above it there is no allow-list. The baseline is **frozen**; adding your migration to it is refused.
 
 Spec: `specs/ops/migration-safety.feature`. Postgres: the `postgres-migration` skill.

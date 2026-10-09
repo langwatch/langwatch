@@ -18,6 +18,7 @@ import {
   type DatasetApi,
   type DatasetSummary,
 } from "@langwatch/dataset-contract";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
@@ -85,6 +86,7 @@ function mount(overrides: Partial<DatasetApi> = {}, options: { refuse?: boolean 
   });
 
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     rateLimiter: { check: async () => ({ allowed: true }) },
     identity: {
       authenticate: () => {

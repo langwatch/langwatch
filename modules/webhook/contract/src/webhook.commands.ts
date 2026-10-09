@@ -15,6 +15,7 @@ export const createWebhookEndpointCommandSchema = z.object({
   sqs: sqsDestinationInputSchema.optional(),
   enabledEvents: z.array(z.string()).min(1),
   ...webhookDeliveryControlsSchema.partial().shape,
+  allowSelfSignedCertificate: z.boolean().optional(),
   /** Governance's migration of inline anomaly destinations only; no door accepts it. */
   signatureScheme: webhookSignatureSchemeSchema.optional(),
   /** The same migration only: the rule's existing secret signs, so its receiver keeps verifying. */
@@ -32,6 +33,7 @@ export const updateWebhookEndpointCommandSchema = z.object({
   sqs: sqsDestinationInputSchema.partial().optional(),
   enabledEvents: z.array(z.string()).min(1).optional(),
   ...webhookDeliveryControlsSchema.partial().shape,
+  allowSelfSignedCertificate: z.boolean().optional(),
 });
 export type UpdateWebhookEndpointCommand = z.infer<typeof updateWebhookEndpointCommandSchema>;
 

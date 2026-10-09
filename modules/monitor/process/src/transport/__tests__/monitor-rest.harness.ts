@@ -11,6 +11,7 @@ import {
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { type MonitorApi, type MonitorWithEvaluator } from "@langwatch/monitor-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 
 import {
   createMonitorTestApp,
@@ -52,6 +53,7 @@ export function mountMonitorRest(
   });
 
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({
         actor: { type: "user", id: "user-1" },

@@ -1,3 +1,4 @@
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { fromDate } from "@langwatch/time";
@@ -74,6 +75,7 @@ async function seeded() {
     repository,
     credentials: ProjectCredentialsService.create(),
     organizations: createApiFixture<OrganizationApi>({}),
+    authorization: createApiFixture<AuthzApi>({}),
   });
 }
 

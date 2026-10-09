@@ -6,6 +6,7 @@ import {
 } from "@langwatch/api/trpc";
 import type { IdentityLookupApi } from "@langwatch/identity-contract";
 import type { OpsOperator } from "@langwatch/ops-contract";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 
 import { identityLookupTrpcTransport, operatorFact } from "../../transport/identity-lookup.trpc.ts";
 
@@ -25,6 +26,7 @@ export function identityLookupDoor({
     identity: { caller: (ctx) => ({ actor: ctx.actor }) },
     authorization: {
       forRequest: () => ({
+        ...testAuthorizeDefaults,
         getDecision: async () => ({ permitted: false, organizationRole: null }),
         getProjectAnyDecision: async () => ({ permitted: false, organizationRole: null }),
         checkScopeLineage: async () => ({ kind: "consistent" }),

@@ -3,8 +3,8 @@ import type { OtlpSpan } from "@langwatch/trace-contract";
 import { decodeOtlpSpan } from "@langwatch/trace-contract/otlp-decoding";
 import { describe, expect, it } from "vitest";
 
-import { SpanNormalizationPipelineService } from "../../features/span/services/span-normalization.service.ts";
 import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
+import { SpanNormalizationPipelineService } from "../../features/span/services/span-normalization.service.ts";
 import type { TraceLegacyRead } from "../../services/trace-viewer.service.ts";
 import { TraceModule, type TraceAppDependencies } from "../trace.app.ts";
 

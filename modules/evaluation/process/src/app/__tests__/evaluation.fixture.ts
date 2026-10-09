@@ -1,4 +1,5 @@
 import type { AnalyticsApi } from "@langwatch/analytics-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type {
@@ -18,6 +19,10 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
+import {
+  ownProof,
+  ownProofAuthorizer,
+} from "../../__tests__/support/authorization-proofs.fixture.ts";
 import { MemoryLangevalsChannel } from "../../channels/memory/memory.langevals.channel.ts";
 import { evaluationProcessModule } from "../../evaluation.module.ts";
 import { EvaluationProcessingStoresAdapter } from "../../eventing/evaluation-processing-stores.pipeline.ts";
@@ -194,6 +199,7 @@ export function createEvaluationTestApp(
       analytics: AnalyticsApi;
       datasets: DatasetApi;
       judges: InstantEvalJudgeApi;
+      authz: AuthzApi;
     }>;
     clustering?: LangevalsClusteringService;
   }> = {},
@@ -216,6 +222,11 @@ export function createEvaluationTestApp(
       analytics: input.dependencies?.analytics ?? createApiFixture<AnalyticsApi>(),
       datasets: input.dependencies?.datasets ?? createApiFixture<DatasetApi>(),
       judges: input.dependencies?.judges ?? createApiFixture<InstantEvalJudgeApi>(),
+      authz:
+        input.dependencies?.authz ??
+        createApiFixture<AuthzApi>({
+          authorizeInternal: async ({ projectId }) => ownProof({ projectId }),
+        }),
     },
     clustering:
       input.clustering ??
@@ -241,6 +252,7 @@ export function createEvaluationTestApp(
       analyticsFoldCache: repositories.analyticsFoldCache,
       defaultRetentionDays: () => 30,
       tenantRetention: { resolve: async () => null },
+      authorizeFoldRead: ownProofAuthorizer,
     }),
   });
 }

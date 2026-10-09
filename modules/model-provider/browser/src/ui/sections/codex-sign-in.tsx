@@ -1,5 +1,14 @@
 import { Link } from "@langwatch/browser-host/link";
-import { Box, Button, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
+import {
+  Box,
+  Button,
+  HStack,
+  IconButton,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
+import { modelProviderIcons } from "@langwatch/design-system/provider-icons";
 import { Check, Copy, ExternalLink, LogOut, RefreshCw } from "lucide-react";
 import { useEffect, useEffectEvent, useState } from "react";
 
@@ -48,7 +57,7 @@ export function CodexSignIn({
     if (failedCode) reportFailure(failedCode);
   }, [failedCode]);
 
-  if (connected && phase.name !== "pending" && phase.name !== "starting") {
+  if (!guided && connected && phase.name !== "pending" && phase.name !== "starting") {
     return (
       <ConnectedPanel
         account={connected}
@@ -59,10 +68,13 @@ export function CodexSignIn({
       />
     );
   }
-  if (phase.name === "pending") {
-    return <PendingApprovalPanel guided={guided} pending={phase} onCancel={signIn.cancel} />;
+  if (guided) {
+    return <GuidedCodexActions signIn={signIn} disabled={!projectId} />;
   }
-  return <StartPanel guided={guided} phase={phase} onStart={() => void signIn.begin()} />;
+  if (phase.name === "pending") {
+    return <PendingApprovalPanel pending={phase} onCancel={signIn.cancel} />;
+  }
+  return <StartPanel phase={phase} onStart={() => void signIn.begin()} />;
 }
 
 /** Connected state: who is signed in, plus re-authenticate / disconnect. */
@@ -116,11 +128,9 @@ function ConnectedPanel({
 
 /** Pending state: the one-time code, the OpenAI link, and the poll spinner. */
 function PendingApprovalPanel({
-  guided,
   pending,
   onCancel,
 }: {
-  guided: boolean;
   pending: Extract<CodexSignInPhase, { name: "pending" }>;
   onCancel: () => void;
 }) {
@@ -137,7 +147,6 @@ function PendingApprovalPanel({
         >
           {pending.userCode}
         </Text>
-        {guided && <CopyCodeButton code={pending.userCode} />}
         <Button asChild size="sm" colorPalette="orange">
           {/* The link recipe's own text colour would override the solid
               button's white label, and Langy's leave-confirmation dialog
@@ -157,9 +166,7 @@ function PendingApprovalPanel({
       </HStack>
       <HStack gap={2} color="fg.muted" data-testid="codex-waiting">
         <Spinner size="xs" />
-        <Text fontSize="xs">
-          {guided ? "Waiting for ChatGPT…" : "Waiting for you to approve in the browser…"}
-        </Text>
+        <Text fontSize="xs">Waiting for you to approve in the browser…</Text>
         <Button size="2xs" variant="ghost" onClick={onCancel}>
           Cancel
         </Button>
@@ -172,38 +179,176 @@ function failureCodeOf({ timedOut }: { timedOut: boolean }) {
   return timedOut ? "codex_sign_in_timed_out" : "codex_sign_in_failed";
 }
 
-function startLabel({ phase, guided }: { phase: CodexSignInPhase; guided: boolean }): string {
+function startLabel(phase: CodexSignInPhase): string {
   if (phase.name === "error" && phase.timedOut) return "Start sign-in again";
-  return guided ? "Sign in with ChatGPT" : "Sign in with OpenAI";
+  return "Sign in with OpenAI";
 }
 
 /** Copies the one-time code and confirms with a check. */
 function CopyCodeButton({ code }: { code: string }) {
   const [copied, setCopied] = useState(false);
   return (
-    <Button
-      size="xs"
-      variant="ghost"
+    <IconButton
       aria-label={copied ? "Code copied" : "Copy code"}
+      title="Copy code"
+      variant="ghost"
+      size="sm"
+      borderRadius="8px"
+      color={copied ? "green.fg" : "fg.subtle"}
+      _hover={{ bg: "bg.muted", color: copied ? "green.fg" : "fg" }}
       onClick={() => {
         void navigator.clipboard.writeText(code).then(() => setCopied(true));
       }}
     >
-      {copied ? <Check size={13} /> : <Copy size={13} />}
+      {copied ? <Check size={16} /> : <Copy size={16} />}
+    </IconButton>
+  );
+}
+
+/** Onboarding's dark, full-width ChatGPT button with the OpenAI mark. */
+function GuidedSignInButton({
+  connected,
+  disabled,
+  onStart,
+}: {
+  connected: boolean;
+  disabled: boolean;
+  onStart: () => void;
+}) {
+  return (
+    <Button
+      onClick={onStart}
+      disabled={connected || disabled}
+      w="full"
+      h="44px"
+      borderRadius="12px"
+      fontSize="13.5px"
+      fontWeight="600"
+      gap={2.5}
+      bg="fg"
+      color="bg.panel"
+      _hover={{ opacity: 0.9 }}
+      _disabled={{ opacity: 0.7, cursor: "not-allowed" }}
+    >
+      <Box
+        w="16px"
+        h="16px"
+        flexShrink={0}
+        aria-hidden="true"
+        css={{ "& > svg": { w: "full", h: "full", fill: "currentColor" } }}
+      >
+        {modelProviderIcons.openai}
+      </Box>
+      {connected ? "Signed in" : "Sign in with ChatGPT"}
     </Button>
   );
 }
 
-/** Idle / starting / error state: the pitch line and the sign-in button. */
-function StartPanel({
-  guided,
-  phase,
-  onStart,
+/** The waiting row that replaces the button: a spinner, the status and a Cancel. */
+function GuidedWaitingRow({ onCancel }: { onCancel: () => void }) {
+  return (
+    <HStack justify="space-between" gap={3} data-testid="codex-waiting">
+      <HStack as="output" gap={2} minW={0} color="fg.muted">
+        <Spinner size="xs" flexShrink={0} />
+        <Text fontSize="13.5px" fontWeight="500">
+          Waiting for ChatGPT…
+        </Text>
+      </HStack>
+      <Button
+        variant="outline"
+        onClick={onCancel}
+        h="36px"
+        px={4}
+        borderRadius="10px"
+        border="1px solid"
+        borderColor="border"
+        bg="bg.panel"
+        color="fg.muted"
+        fontSize="12.5px"
+        fontWeight="600"
+        flexShrink={0}
+        _hover={{ bg: "bg.muted", color: "fg" }}
+      >
+        Cancel
+      </Button>
+    </HStack>
+  );
+}
+
+/** The one-time code with its copy button, and the link to OpenAI's device page. */
+function GuidedPendingCode({
+  pending,
 }: {
-  guided: boolean;
-  phase: CodexSignInPhase;
-  onStart: () => void;
+  pending: Extract<CodexSignInPhase, { name: "pending" }>;
 }) {
+  return (
+    <VStack align="stretch" gap={5} mt={1} data-testid="codex-pending">
+      <Text fontSize="12.5px" color="fg.muted">
+        Enter this code on OpenAI's device page to approve the sign-in:
+      </Text>
+      <HStack justify="space-between" gap={3} wrap="wrap">
+        <HStack gap={1} minW={0}>
+          <Text
+            fontSize="2xl"
+            fontWeight="700"
+            fontFamily="mono"
+            letterSpacing="0.12em"
+            aria-label="One-time sign-in code"
+          >
+            {pending.userCode}
+          </Text>
+          <CopyCodeButton code={pending.userCode} />
+        </HStack>
+        <Button asChild size="sm" colorPalette="orange">
+          <Link
+            href={pending.verificationUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            color="white"
+            _hover={{ textDecoration: "none", color: "white" }}
+            {...langyFirstPartyLinkProps}
+          >
+            Open openai.com
+          </Link>
+        </Button>
+      </HStack>
+    </VStack>
+  );
+}
+
+/** Onboarding's Codex panel body: error, the button or the waiting row, then the code. */
+function GuidedCodexActions({
+  signIn,
+  disabled,
+}: {
+  signIn: ReturnType<typeof useCodexDeviceSignIn>;
+  disabled: boolean;
+}) {
+  const { phase } = signIn;
+  const waiting = phase.name === "starting" || phase.name === "pending";
+  return (
+    <VStack align="stretch" gap={4} width="full">
+      {phase.name === "error" && (
+        <Text fontSize="11.5px" color="fg.error" role="alert">
+          {phase.message}
+        </Text>
+      )}
+      {waiting ? (
+        <GuidedWaitingRow onCancel={signIn.cancel} />
+      ) : (
+        <GuidedSignInButton
+          connected={phase.name === "complete"}
+          disabled={disabled}
+          onStart={() => void signIn.begin()}
+        />
+      )}
+      {phase.name === "pending" && <GuidedPendingCode pending={phase} />}
+    </VStack>
+  );
+}
+
+/** Idle / starting / error state: the pitch line and the sign-in button. */
+function StartPanel({ phase, onStart }: { phase: CodexSignInPhase; onStart: () => void }) {
   return (
     <VStack align="stretch" gap={2}>
       {phase.name === "error" ? (
@@ -222,7 +367,7 @@ function StartPanel({
           loading={phase.name === "starting"}
           onClick={onStart}
         >
-          {startLabel({ phase, guided })}
+          {startLabel(phase)}
         </Button>
       </Box>
     </VStack>

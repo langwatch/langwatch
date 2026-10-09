@@ -1,6 +1,5 @@
 {
   "name": "@langwatch/aws-client",
-  "langwatch": { "group": "data" },
   "version": "0.1.0",
   "private": true,
   "description": "Shared SES/SQS AWS transport policy: typed credentials and retry policy, proxy-aware bounded handlers, and process-owned socket pools composed with a supplied outbound-proxy resolver.",
@@ -31,5 +30,8 @@
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "langwatch": {
+    "group": "data"
   }
 }

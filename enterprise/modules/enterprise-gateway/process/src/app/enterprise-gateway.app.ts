@@ -189,7 +189,7 @@ export class EnterpriseGatewayModule implements EnterpriseGatewayApiContract {
       throw new PermissionDeniedError({
         permission: "virtualKeys:create",
         scope: { type: "organization", id: issue.organizationId },
-        denialReason: "no-binding",
+        denialReason: "no-grant",
       });
     }
     return this.#personalKeyDoors.issue(issue);

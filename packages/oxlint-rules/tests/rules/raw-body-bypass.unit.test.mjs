@@ -75,7 +75,6 @@ describe("given a module transport", () => {
       expect(messageIds("const body = JSON.parse(raw);")).toEqual(["jsonParse"]);
     });
   });
-
 });
 
 describe("given a module service", () => {

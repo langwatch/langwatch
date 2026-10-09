@@ -52,11 +52,12 @@ import {
   type WebhookDeliveryRow,
   type AutomationUsageCount,
 } from "@langwatch/automation-contract";
+import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { DatasetApi } from "@langwatch/dataset-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
 import { EvaluatorApi } from "@langwatch/evaluator-contract";
-import type { EventingCommands, ProcessStore } from "@langwatch/eventing";
+import type { EventingCommands, ProcessStore, RetentionPolicyResolver } from "@langwatch/eventing";
 import { ReactEmailMailRenderer } from "@langwatch/mail";
 import type { ResolvedTokens } from "@langwatch/module";
 import {
@@ -166,7 +167,6 @@ import {
 const logger = createLogger("langwatch:automation");
 
 export type { AutomationWebhookStoredParams };
-export type { AutomationProjectIdentity };
 
 // ---------------------------------------------------------------------------
 // The technical ports the process supplies: an HTTP client, a
@@ -178,7 +178,7 @@ export type { AutomationProjectIdentity };
  * the schema comes from the process's provider registry, which is compiled
  * against its own copy of zod.
  */
-export type AutomationActionParamsParse =
+type AutomationActionParamsParse =
   | Readonly<{ success: true; data: unknown }>
   | Readonly<{
       success: false;
@@ -186,7 +186,7 @@ export type AutomationActionParamsParse =
     }>;
 
 /** The per-action `actionParams` parser the process's provider registry owns. */
-export interface AutomationActionParamsSchema {
+interface AutomationActionParamsSchema {
   safeParse(value: unknown): AutomationActionParamsParse;
 }
 
@@ -334,6 +334,7 @@ type AutomationDependencies = Readonly<{
   slack: typeof SlackApi;
   /** Where a webhook action's attempt is sent and logged; webhook owns the log (ADR-167). */
   webhooks: typeof WebhookApi;
+  retention: typeof DataRetentionApi;
 }>;
 
 /** Peers only `create` composes (settlement's and mail's); `fromInfrastructure` never sees them. */
@@ -397,6 +398,8 @@ export class AutomationModule implements AutomationApi {
     slack: SlackApi,
     /** Sends and logs each webhook action attempt (ADR-167). */
     webhooks: WebhookApi,
+    /** Each tenant's retention, which the trigger event rows are stamped with. */
+    retention: DataRetentionApi,
   };
   static readonly config = automationServerConfig;
   /** Unsubscribe links are signed with auth's session key, as main signed them (§6). */
@@ -445,11 +448,16 @@ export class AutomationModule implements AutomationApi {
         infrastructure,
         automation,
       );
+      automation.#tenantRetention = {
+        resolve: (tenantId) =>
+          setup.dependencies.retention.getResolvedForProject({ projectId: tenantId }),
+      };
       automation.#reportDispatcher = ReportDispatcherService.create({
         repositories: setup.repositories,
         projects: setup.dependencies.projects,
         analytics: setup.dependencies.analytics,
         traces: setup.dependencies.traces,
+        authz: setup.dependencies.authorization,
         delivery: infrastructure.delivery,
         slackDestinations: infrastructure.slackDestinations,
         suppression: automation.#automation,
@@ -799,6 +807,7 @@ export class AutomationModule implements AutomationApi {
   #slackClaims: AutomationSlackClaimReconcileService | undefined;
   #settlement: AutomationSettlement | undefined;
   #reportDispatcher: ReportDispatcher | undefined;
+  #tenantRetention: RetentionPolicyResolver | undefined;
   #reportInstances: Pick<ProcessStore, "findByRef"> | undefined;
 
   private constructor(collaborators: AutomationAppCollaborators) {
@@ -833,6 +842,7 @@ export class AutomationModule implements AutomationApi {
       reports: this.#reportDispatcher,
       reportRuns: this.#reportSchedules,
       peerReactions: this.#evaluations,
+      tenantRetention: this.#tenantRetention,
     });
   }
 

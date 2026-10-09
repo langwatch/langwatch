@@ -11,7 +11,9 @@ import (
 
 type consoleTestSender func(d delivery) int
 
-func (f consoleTestSender) send(_ context.Context, d delivery) (int, error) { return f(d), nil }
+func (f consoleTestSender) send(_ context.Context, d delivery) (answer, error) {
+	return answer{status: f(d)}, nil
+}
 
 func consoleRequest(t *testing.T, s *Server, method, path, body string) *httptest.ResponseRecorder {
 	t.Helper()

@@ -109,6 +109,10 @@ export const KNOWN_LANGY_ERROR_KINDS = [
   "langy_egress_misconfigured",
   "langy_insufficient_scope",
   "langy_turn_in_progress",
+  // The project is an aggregate, which takes no writes, and a turn writes a
+  // conversation under it. Refused before anything is written, with the
+  // shared read-only refusal rather than a Langy code of its own.
+  "aggregate_project_is_read_only",
   // Sending faster than the per-user limit allows. Explicit copy matters more
   // here than almost anywhere: the generic default titles every unknown kind
   // "Langy couldn't finish that" and hands it a "Try again" button, which tells
@@ -626,6 +630,12 @@ export function explainLangyError(received: LangyDomainError): LangyErrorPresent
       // resets, so the useful moves are waiting or switching models; retry is
       // still offered for after the reset.
       return { ...copy, render: "card", action: retry, ...debug };
+
+    case "aggregate_project_is_read_only":
+      // An aggregate reads other projects and takes no writes, so a turn on it
+      // is refused every time. No retry, which would be refused the same way:
+      // the shared copy says to open the project the data belongs to.
+      return { ...copy, render: "card", ...debug };
 
     case "langy_turn_in_progress":
       // One turn at a time per conversation. A retry would just 409 again, so

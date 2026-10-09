@@ -145,6 +145,8 @@ const DEFAULT_TEST_ROOTS: string[] = [
   // The fuzz browser runner (@langwatch/fuzz-runner): its vision judge's
   // scenarios are proved by its vitest suite and by nothing else.
   "tools/fuzz/runner/src",
+  // The seed runner's tests bind specs/setup/seedgen-runner.feature.
+  "tools/seedgen/runner/src",
   // The contributor-only backend launcher (tools/dev-runtime): the API and the
   // worker in one local process. Its boot order and its shutdown ordering —
   // drain the worker, then close the API listener — are asserted by its own
@@ -240,10 +242,12 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   "services/analyticssim",
   "services/voicesim",
   "services/outboundsim",
+  "services/paymentsim",
   "services/telemetrysim",
   "tools/diffsuite",
   "tools/fuzz",
   "tools/workerrun",
+  "tools/seedgen",
   // The Go SDK. Its span-attribute scenarios (typed input/output envelopes,
   // binary content parts, metadata hoisting, data capture) are satisfied by Go
   // tests and by nothing else, so without this root those scenarios could only
@@ -351,7 +355,6 @@ const LEGACY_INERT: string[] = [
   // would bind them (packages/architecture-enforcer's unspecced-core report),
   // every scenario @unimplemented on purpose. Remove each entry with its
   // first real binding.
-  "modules/authz/specs/offboarding.feature",
   "modules/scenario/specs/simulation-run.feature",
   "specs/agents/create-workflow-agent.feature",
   "specs/agents/workflow-agent-editor.feature",

@@ -1,15 +1,14 @@
 import {
   EvaluationNotFoundError,
   evaluationRunDataSchema,
-  evaluationRunLookupSchema,
   upsertEvaluationRunCommandSchema,
   type EvaluationRunData,
-  type EvaluationRunLookup,
   type UpsertEvaluationRunCommand,
 } from "@langwatch/evaluation-contract";
 
 import { EvaluationRunProjectionRepository } from "../repositories/evaluation-run-projection.repository.ts";
 import type {
+  EvaluationRunProofLookup,
   EvaluationRunRepository,
   EvaluationRetentionLookup,
 } from "../repositories/evaluation.repository.ts";
@@ -53,12 +52,9 @@ export class EvaluationRunProjectionService extends EvaluationRunProjectionRepos
     );
   }
 
-  async findRunByEvaluationId(input: EvaluationRunLookup): Promise<EvaluationRunData | null> {
+  async findRunByEvaluationId(input: EvaluationRunProofLookup): Promise<EvaluationRunData | null> {
     try {
-      return await this.repository.getByEvaluationId({
-        ...evaluationRunLookupSchema.parse(input),
-        retention: this.retention,
-      });
+      return await this.repository.getByEvaluationId({ ...input, retention: this.retention });
     } catch (error) {
       if (error instanceof EvaluationNotFoundError) return null;
       throw error;

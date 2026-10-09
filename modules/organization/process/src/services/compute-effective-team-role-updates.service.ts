@@ -2,13 +2,13 @@ import { OrganizationUserRole, TeamUserRole } from "@langwatch/organization-cont
 
 import type { TeamRoleValue } from "../rules/member-role-constraints.rules.ts";
 
-export interface TeamRoleUpdate {
+interface TeamRoleUpdate {
   teamId: string;
   role: TeamRoleValue;
   customRoleId?: string;
 }
 
-export interface CurrentTeamMembership {
+interface CurrentTeamMembership {
   teamId: string;
   role: TeamUserRole;
 }

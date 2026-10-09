@@ -11,6 +11,7 @@ import {
   UnauthorizedError,
 } from "@langwatch/api/rest";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 
 import { experimentV3Rest, experimentWorkbenchCredential } from "../experiment-v3.rest.ts";
@@ -20,6 +21,7 @@ import { experimentWorkbenchRunRest } from "../experiment-workbench-run.rest.ts"
 /** The key door as it answers a request carrying neither header it reads. */
 function keyDoorOver(app: Partial<ExperimentV3RestApi>) {
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: ({ request }) => {
         if (!request.headers.get("X-Auth-Token") && !request.headers.get("Authorization")) {
@@ -97,6 +99,7 @@ describe("given the experiment doors behind an identity door that finds no crede
         throw new UnauthorizedError("Please log in");
       };
       const runtime = createRestRuntime({
+        authorization: restTestAuthorization(),
         identity: { identify: noSession, authenticate: noSession, authorize: noSession },
       });
       const hono = runtime.mount(experimentWorkbenchRunRest.router(), {

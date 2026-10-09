@@ -1,6 +1,6 @@
 ---
 name: api-transports
-description: "Declare a REST route, a tRPC procedure or an SSE/subscription stream on a module: defineRestRouter, defineTrpcRouter, defineTrpcContract, .withInput/.withOutput/.withPermission/.withDocs, /api/<x> paths (/v1 optional), framework-owned validation (malformed_request 400 vs validation_error 422), throwing a HandledError, why a handler returns a plain value, invalidatedBy read hints and fromProjection cursor reads. Use when someone says 'add a route', 'add an endpoint', 'add a procedure', 'new tRPC query', 'REST handler', 'OpenAPI docs for a route', 'withDocs', 'servesWhileUpgrading', 'validate the body', 'return a 404', 'streaming endpoint', 'subscription', 'read hint', 'why is my read stale', or opens a *.rest.ts / *.trpc.ts file."
+description: "Declare a REST route, a tRPC procedure or an SSE/subscription stream on a module: defineRestRouter, defineTrpcRouter, defineTrpcContract, .withInput/.withOutput/.withPermission/.withDocs, /api/<x> paths (/v1 optional), framework-owned validation (malformed_request 400 vs validation_error 422), throwing a HandledError, why a handler returns a plain value, invalidatedBy read hints and fromProjection cursor reads. Use when someone says 'add a route', 'add an endpoint', 'add a procedure', 'new tRPC query', 'REST handler', 'OpenAPI docs for a route', 'withDocs', 'upgrade_in_progress', 'validate the body', 'return a 404', 'streaming endpoint', 'subscription', 'read hint', 'why is my read stale', or opens a *.rest.ts / *.trpc.ts file."
 user-invocable: true
 ---
 
@@ -39,11 +39,10 @@ anything; the process mounts every installed module's declarations.
 6. **Every wire schema imports from the module's own contract.** No schema declared in the transport file.
 7. **Docs live on the route.** `.withDocs({ tags, description, errors? })` in the same `*.rest.ts` file.
    Never a `*-openapi.rules.ts`. An extra status or non-JSON body goes through `documentedResponses()`.
-7a. **Serving while the installation upgrades is declared.** `.servesWhileUpgrading()` on a REST route
-   or a tRPC procedure (`packages/api`, UIW-6); the api in upgrading mode answers only those, and a
-   tRPC batch only if every procedure declares it. The door still asks the declared permission. Only
-   sign-in, the permission and scope reads and the Ops Upgrades procedures do (`upgrade` skill); never
-   a route that reads a table a blocking step touches.
+7a. **Every route serves while the installation upgrades; nothing is declared** (NO-HOLDS, Alex
+   2026-10-09). A query the Postgres schema is not ready for answers the handled
+   `upgrade_in_progress` (503, Retry-After) on REST, tRPC and SSE alike, mapped once in
+   `promoteStoreFailure` (`packages/api/src/errors.ts`); never catch it per route (`upgrade` skill).
 8. **Paths are `/api/<x>`; `/api/v1/<x>` also answers.** Dated and `latest` versions exist but stay
    hidden (ADR `packages/api/adrs/004-public-rest-v1-and-date-negotiation.md`). A path parameter is named
    for what it identifies (`:triggerId`, never `:id`), except a route main already publishes.

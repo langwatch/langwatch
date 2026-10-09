@@ -64,7 +64,8 @@ export class EvaluationReportedEventService {
       type: EVALUATION_REPORTED_EVENT_TYPE,
       version: EVALUATION_REPORTED_EVENT_VERSION_LATEST,
       data: eventData,
-      occurredAt: data.occurredAt,
+      // Business time is the evaluated span's (spec: monitor-evaluation-business-time.feature)
+      occurredAt: data.spanEndedAt ?? data.occurredAt,
       idempotencyKey: `${data.tenantId}:${data.evaluationId}:reported`,
     });
 

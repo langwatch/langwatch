@@ -2,13 +2,17 @@
  * Trace's read of evaluation's shared `evaluation_runs`.
  * @see modules/trace/specs/trace-evaluation-runs-read.feature
  */
+import { AuthorizedClickHouse, type QueryRequest } from "@langwatch/clickhouse-client";
+import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it, vi } from "vitest";
 
+import { ownProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
 import { ClickHouseTraceEvaluationRunsRepository } from "../trace-evaluation-runs.repository.ts";
 
 type ChQuery = { query: string; query_params?: Record<string, unknown> };
 
 const TENANT = "project-1";
+const authorization = ownProof({ projectId: TENANT });
 const SUMMARY_ROW = {
   EvaluationId: "eval-1",
   EvaluatorId: "customeval_tone",
@@ -32,7 +36,17 @@ function client(answer: (request: ChQuery) => unknown[] | Error) {
 }
 
 function repositoryOver(ch: ReturnType<typeof client>) {
-  return ClickHouseTraceEvaluationRunsRepository.create({ resolveClient: async () => ch });
+  // The proof-checked reader hands its expanded statement to the same recording client.
+  const authorized = clickHouseQueryClientDouble({
+    query: async (request: QueryRequest) => {
+      const result = await ch.query({ query: request.sql, query_params: request.params });
+      return { rows: await result.json() };
+    },
+  });
+  return ClickHouseTraceEvaluationRunsRepository.create({
+    resolveClient: async () => ch,
+    clickhouse: new AuthorizedClickHouse({ resolveClient: async () => authorized }),
+  });
 }
 
 describe("given evaluation has recorded runs against a trace", () => {
@@ -90,25 +104,36 @@ describe("given evaluation has recorded runs against the traces on one list page
     /** @scenario "The trace list's evaluation summaries are read per trace since the window opened" */
     it("reads the tenant's latest runs scheduled since the window opened, grouped by trace", async () => {
       const ch = client(() => [
-        SUMMARY_ROW,
-        { ...SUMMARY_ROW, EvaluationId: "eval-2", TraceId: "trace-2", Passed: null },
+        { ...SUMMARY_ROW, TenantId: TENANT },
+        {
+          ...SUMMARY_ROW,
+          TenantId: TENANT,
+          EvaluationId: "eval-2",
+          TraceId: "trace-2",
+          Passed: null,
+        },
       ]);
 
       const summaries = await repositoryOver(ch).findSummariesByTraceIds({
-        tenantId: TENANT,
+        authorization,
         traceIds: ["trace-1", "trace-2"],
         since: 1_000,
       });
 
       const request = ch.query.mock.calls[0]?.[0];
       expect(request?.query).toContain("ScheduledAt >= fromUnixTimestamp64Milli({since:Int64})");
-      expect(request?.query_params).toEqual({
-        tenantId: TENANT,
+      expect(request?.query).toContain("TenantId IN ({tenantScope");
+      expect(request?.query_params).toMatchObject({
         traceIds: ["trace-1", "trace-2"],
         since: 1_000,
       });
-      expect(Object.keys(summaries)).toEqual(["trace-1", "trace-2"]);
-      expect(summaries["trace-2"]?.[0]).toMatchObject({ evaluationId: "eval-2", passed: null });
+      expect(Object.values(request?.query_params ?? {})).toContainEqual([TENANT]);
+      expect(summaries.map((summary) => summary.traceId)).toEqual(["trace-1", "trace-2"]);
+      expect(summaries[1]).toMatchObject({
+        tenantId: TENANT,
+        evaluationId: "eval-2",
+        passed: null,
+      });
     });
   });
 });
@@ -156,8 +181,8 @@ describe("given no traces", () => {
       const repository = repositoryOver(ch);
 
       expect(
-        await repository.findSummariesByTraceIds({ tenantId: TENANT, traceIds: [], since: 0 }),
-      ).toEqual({});
+        await repository.findSummariesByTraceIds({ authorization, traceIds: [], since: 0 }),
+      ).toEqual([]);
       expect(await repository.findTraceEvaluations({ tenantId: TENANT, traceIds: [] })).toEqual({});
       expect(ch.query).not.toHaveBeenCalled();
     });

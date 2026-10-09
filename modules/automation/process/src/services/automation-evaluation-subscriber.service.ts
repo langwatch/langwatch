@@ -70,13 +70,14 @@ export class AutomationEvaluationSubscriberService {
     status: EvaluationStatus;
     traceId?: string | null;
     occurredAt: number;
+    createdAt: number;
   }): Promise<void> {
     const { projectId, evaluationId } = input;
     const traceId =
       input.traceId ??
       (await this.deps.runs.findRunByEvaluationId({ tenantId: projectId, evaluationId }))?.traceId;
     await this.handleEvaluationTriggerMatch(
-      { occurredAt: input.occurredAt },
+      { occurredAt: input.occurredAt, createdAt: input.createdAt },
       { tenantId: projectId, state: { status: input.status, traceId } },
     );
   }

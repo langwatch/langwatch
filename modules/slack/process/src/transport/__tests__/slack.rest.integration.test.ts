@@ -5,6 +5,7 @@
  * @see specs/automations/public-api.feature
  */
 import { canonicalErrorResponse, createRestRuntime, UnauthorizedError } from "@langwatch/api/rest";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -50,6 +51,7 @@ async function mount() {
     secret: `${WEBHOOK}2`,
   });
   const hono = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: ({ request }) => {
         const key = request.headers.get("X-Auth-Token");

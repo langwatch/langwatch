@@ -302,11 +302,13 @@ describe("board scope on the server", () => {
           projectId: HOME,
           userId: (viewer ?? TEAMMATE).userId,
         });
-        const first = await app.getOrCreateFirst({ projectId: HOME, viewer });
+        const [first, ...more] = await app.getOrCreateFirst({ projectId: HOME, viewer });
+        if (first === undefined) throw new Error("no first board was found or made");
         // `order` counts every board of the project, hidden ones too: a known side channel.
         const { name, scope, createdById, description, organizationId } = first;
         const made = { name, scope, createdById, description, organizationId };
-        return { starred, first: made, isTheBoard: first.id === target.dashboardId };
+        const isTheBoard = first.id === target.dashboardId;
+        return { starred, first: made, isTheBoard, others: more.length };
       };
       const deleted = async () => {
         const world = await boardAt("PROJECT");

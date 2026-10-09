@@ -21,7 +21,14 @@ Feature: haven automatic preparation
   Scenario: A missing database is created, migrated, and seeded
     Given this worktree has no databases yet
     When the developer runs "haven up"
-    Then its databases exist, are migrated, and are seeded before the app starts
+    Then its databases exist, the worker migrates them, and the seed runs once the api reports ready
+
+  @unit
+  Scenario: The keeper seeds once the api reports ready
+    Given an up whose worker is running the upgrade
+    When the api reports ready
+    Then the keeper runs the seed once
+    And a keeper stopped before then seeds nothing
 
   @integration @unimplemented
   Scenario: A stopped database server is started, not reported

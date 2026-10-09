@@ -7,6 +7,7 @@ import { Pool } from "pg";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { UpgradeLedgerRepository } from "../ledger.repository.ts";
+import { UpgradeRunnerRepository } from "../runner/runner-ledger.repository.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 const schema = `upgrade_upcast_${Date.now().toString(36)}`;
@@ -52,6 +53,11 @@ describe.skipIf(!DB_URL)("the migrations ledger", () => {
       await ledger.recordUpcastSteps({ runId: run.id, steps: [upcast(3)] });
       const pending = await ledger.findSteps();
       await ledger.recordUpcastSteps({ runId: run.id, steps: [upcast(0)] });
+      await UpgradeRunnerRepository.create({ postgres }).reopenDoneSteps({
+        ids: [upcast(0).id],
+        reason: "reopened: image 3.20.1 served after upgrade run",
+      });
+      await ledger.recordUpcastSteps({ runId: run.id, steps: [upcast(0)] });
       const done = await ledger.findSteps();
 
       expect(pending).toEqual([
@@ -67,6 +73,7 @@ describe.skipIf(!DB_URL)("the migrations ledger", () => {
       expect(done).toEqual([
         expect.objectContaining({
           status: "done",
+          lastError: null,
           report: expect.objectContaining({ storedEvents: 0 }),
         }),
       ]);

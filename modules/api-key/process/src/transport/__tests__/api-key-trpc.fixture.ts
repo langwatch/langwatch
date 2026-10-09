@@ -14,6 +14,7 @@ import type {
 import { createTrpcRuntime, redactAuditArgs } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authorization";
 import type { TrpcContract } from "@langwatch/module";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 import { initTRPC } from "@trpc/server";
 
 type TestContext = object;
@@ -28,6 +29,7 @@ function permissivePorts(
     identity: { caller: () => ({ actor }) },
     authorization: {
       forRequest: () => ({
+        ...testAuthorizeDefaults,
         getDecision: async () => ({ permitted: true, organizationRole: null }),
         getProjectAnyDecision: async () => ({ permitted: true, organizationRole: null }),
         checkScopeLineage: async () => ({ kind: "consistent" }),

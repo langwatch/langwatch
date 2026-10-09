@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { projectRest } from "../project.rest.ts";
+import { projectRest, projectRestCaller } from "../project.rest.ts";
 
 const declaration = projectRest.router();
 
@@ -95,10 +95,12 @@ describe("the projects REST declaration", () => {
       ]);
     });
 
-    // The collection, the one place a credential fact was read, is api-key's now.
-    it("binds no credential fact on any route", () => {
+    // Only the aggregate gate reads the key owner's role (ADR-177 decision 5).
+    it("binds only the caller on the project routes", () => {
+      const callerRoutes = ["getProject", "updateProject", "archiveProject"];
       for (const route of declaration.routes) {
-        expect([route.operation, route.middleware ?? []]).toEqual([route.operation, []]);
+        const expected = callerRoutes.includes(route.operation) ? [projectRestCaller] : [];
+        expect([route.operation, route.middleware ?? []]).toEqual([route.operation, expected]);
       }
     });
 

@@ -72,7 +72,8 @@ export class WorkflowHttpCredentialsBackfillService {
     }
     if (report.held > 0) {
       throw new Error(
-        `${report.held} workflow version(s) still hold HTTP credentials that could not be stored as project secrets; the worker log names each version. Retry the step once the cause is fixed.`,
+        `${report.held} workflow version(s) still hold HTTP credentials that could not be stored as project secrets; ` +
+          "the worker log names each version. Retry the step once the cause is fixed.",
       );
     }
 

@@ -18,6 +18,15 @@ there is no `src/pages/` file-based routing, and no server components.
   browser package's `ui/` folders. Nothing is shared between browser packages
   except through the design system, a contract, or a `<name>-client` package.
 
+## Memoisation
+
+The React Compiler (Oxc's Rust implementation, enabled in
+`apps/ui/vite.config.ts`) memoises components and hooks automatically. Don't
+write `useMemo`, `useCallback` or `React.memo`, and remove them from code you
+touch. The dev server logs each component the compiler skipped and why (a ref
+read during render, a suppressed `react-hooks` rule); fix the cause instead of
+memoising by hand.
+
 ## File Organization
 
 A browser package layers `model/` (pure) → `behavior/` (hooks, API bindings,
@@ -35,6 +44,6 @@ stores) → `ui/elements|blocks|sections` (ARCHITECTURE.md §3.4).
 
 ## Page headings
 
-- **Page titles use `<PageLayout.Heading>` with no size.** Account pages (every `/me` page, Settings > Profile and Settings > Security) get the large title from the route table: their entry in `apps/ui/src/shell/ui-route-table.ts` carries `heading: "account"`, and the shell draws the page under the large heading size (ruled 2026-10-02, Alex). A page never sets a heading size, never a `fontSize`, and never hand-rolls a title with `<Text fontSize="lg">`. `PageLayout.Heading` omits `size` and `fontSize` at the type level, so the typechecker rejects an override.
+- **Page titles use `<PageLayout.Heading>` with no size.** Every page, account pages included, draws the same title size (Alex 2026-10-09, reversing the 2026-10-02 large account title). A page never sets a heading size, never a `fontSize`, and never hand-rolls a title with `<Text fontSize="lg">`. `PageLayout.Heading` omits `size` and `fontSize` at the type level, so the typechecker rejects an override.
 - A reusable component that renders its own title (for example the dataset editor) uses the Chakra `<Heading>` component at its default size, not a sized `<Text>`.
 - `size` on a raw Chakra `<Heading>` is fine for _sub_-headings: drawer and dialog titles, card and section labels. The rule above is specifically about top-level page titles, not every heading on the page.

@@ -96,6 +96,8 @@ export type RestCaller = Readonly<{
   markUsed?: () => void;
   /** What a session-bearing door resolved beside the actor; a route parses it by its schema. */
   session?: unknown;
+  /** A person in a browser session, the caller the second-factor gate holds (Q184). */
+  browserSession?: Readonly<{ id: string | null }>;
 }>;
 
 /**

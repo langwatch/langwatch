@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import type { IconType } from "react-icons";
 import { LuLanguages, LuLightbulb, LuMessageSquare, LuPlay } from "react-icons/lu";
 
-import { useGoToSpanInPlaygroundTabUrlBuilder } from "../../../../behavior/prompts/use-load-span-into-prompt-playground.ts";
+import { useSpanPlaygroundHref } from "../../../../behavior/prompts/use-span-playground-href.ts";
 import { useTraceHost } from "../../../../behavior/trace-host.ts";
 import {
   type TraceAnchor,
@@ -115,7 +115,7 @@ function useIOActionGates({
 }) {
   const traceHost = useTraceHost();
   const annotations = useAnchoredAnnotations();
-  const { buildUrl } = useGoToSpanInPlaygroundTabUrlBuilder();
+  const playgroundHrefFor = useSpanPlaygroundHref();
 
   const canAnnotate = traceHost.hasPermission("annotations:manage");
   return {
@@ -126,7 +126,7 @@ function useIOActionGates({
     // existing managed prompt at the traced version when one is linked,
     // creates a fresh tab when not. One button, smart default.
     playgroundHref:
-      spanType === "llm" && spanId && mode === "input" ? (buildUrl(spanId)?.toString() ?? "") : "",
+      spanType === "llm" && spanId && mode === "input" ? playgroundHrefFor(spanId) : "",
   };
 }
 

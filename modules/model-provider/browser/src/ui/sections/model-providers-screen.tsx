@@ -19,7 +19,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { modelProviderIcons } from "@langwatch/design-system/provider-icons";
+import { isProviderKey, ProviderIconGlyph } from "@langwatch/design-system/provider-icons";
 import { ProviderScopeChips } from "@langwatch/design-system/provider-scope-chips";
 import {
   ScopeFilter,
@@ -97,16 +97,15 @@ function ProviderRow({
     ...scope,
     name: scopeNameById.get(scope.scopeId),
   }));
-  const providerIcon = modelProviderIcons[provider.provider as keyof typeof modelProviderIcons];
   const isSystem = provider.isSystem === true;
 
   return (
     <Table.Row data-testid={`model-provider-row-${provider.provider}`}>
       <Table.Cell>
         <HStack gap={3} align="center">
-          <Box width="24px" height="24px">
-            {providerIcon}
-          </Box>
+          {isProviderKey(provider.provider) && (
+            <ProviderIconGlyph provider={provider.provider} size="24px" />
+          )}
           <VStack gap={0} align="start">
             <Text fontWeight="medium">{provider.name}</Text>
             <ConnectionTestVerdict
@@ -398,7 +397,9 @@ export default function ModelProvidersScreen() {
     () =>
       addableProviders().map((entry) => ({
         ...entry,
-        icon: modelProviderIcons[entry.provider as keyof typeof modelProviderIcons],
+        icon: isProviderKey(entry.provider) ? (
+          <ProviderIconGlyph provider={entry.provider} size="20px" />
+        ) : null,
       })),
     [],
   );
@@ -640,9 +641,7 @@ function AddModelProviderMenu({
             onClick={() => onPick(provider.provider)}
           >
             <HStack gap={3}>
-              <Box width="20px" height="20px">
-                {provider.icon}
-              </Box>
+              {provider.icon}
               <Text>{provider.name}</Text>
             </HStack>
           </Menu.Item>

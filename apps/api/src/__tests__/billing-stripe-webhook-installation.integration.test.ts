@@ -6,6 +6,7 @@
  */
 import { RestHost } from "@langwatch/api/rest";
 import { ModuleApiToken } from "@langwatch/module";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
 import { processModules } from "../process-modules.generated.ts";
@@ -24,6 +25,7 @@ describe("the api process installation", () => {
 
     try {
       const host = RestHost.create({
+        authz: restTestAuthorization().forRequest(),
         identities: {
           project: closed,
           organization: closed,

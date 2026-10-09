@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The callable Hosted MCP capability exposed to process transports.
 
-Peers call these through the token, declared at `../contract/src/mcp-authorize.schemas.ts:59`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/mcp-authorize.schemas.ts:60`; nothing else in this package is public.
 
 #### `createHandler`
 

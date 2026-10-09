@@ -157,6 +157,7 @@
   "/ops/foundry",
   "/ops/migrations",
   "/ops/upgrades",
+  "/ops/upgrades/preview",
   "/ops/upgrades/releases/:release",
   "/ops/upgrades/runs/:runId",
   "/ops/projections",

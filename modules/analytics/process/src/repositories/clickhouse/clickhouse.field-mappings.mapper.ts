@@ -605,7 +605,7 @@ export function extractReferencedSpanColumns(expressions: string[]): ReadonlySet
  * 3.5 GiB MEMORY_LIMIT_EXCEEDED in prod. The reconstructed map keeps the column
  * name and type identical, so outer `alias.Column['key']` accesses are unchanged.
  */
-export function mapNarrowProjection({
+function mapNarrowProjection({
   column,
   keys,
 }: {
@@ -617,9 +617,7 @@ export function mapNarrowProjection({
 }
 
 /** {@link mapNarrowProjection} for stored_spans `SpanAttributes`. */
-export function spanAttributesNarrowProjection(
-  keys: readonly string[],
-): string {
+export function spanAttributesNarrowProjection(keys: readonly string[]): string {
   return mapNarrowProjection({ column: "SpanAttributes", keys });
 }
 
@@ -644,9 +642,7 @@ export function narrowMapColumnProjection({
   const escaped = column.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const allRefs = joined.match(new RegExp(`(?<!\\w)${escaped}\\b`, "g")) ?? [];
   const keyMatches = [
-    ...joined.matchAll(
-      new RegExp(`(?<!\\w)${escaped}\\['([^'\\]\\\\]+)'\\]`, "g"),
-    ),
+    ...joined.matchAll(new RegExp(`(?<!\\w)${escaped}\\['([^'\\]\\\\]+)'\\]`, "g")),
   ];
   if (keyMatches.length === 0 || keyMatches.length !== allRefs.length) {
     return null;

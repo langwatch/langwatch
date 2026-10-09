@@ -11,6 +11,7 @@ import {
   UnauthorizedError,
 } from "@langwatch/api/rest";
 import { LocalFeatureApis } from "@langwatch/process";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 
 import { organizationKeyFacts } from "../organization-management.rest.ts";
 import { teamsRest, TeamManagementApi } from "../team.rest.ts";
@@ -71,6 +72,7 @@ export function mountTeamsRestApplication(
   };
 
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       identify: ({ request }) => admit(request),
       authenticate: ({ request, permission }) => {

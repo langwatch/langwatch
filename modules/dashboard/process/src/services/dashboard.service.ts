@@ -243,11 +243,15 @@ export class DashboardService {
     return { success: true as const };
   }
 
-  /** The project's first board the viewer may see, or a new one after the last. */
+  /**
+   * The project's first board the viewer may see, or a new one after the last where the
+   * project takes writes (ADR-177).
+   */
   async getOrCreateFirst(input: {
     projectId: string;
+    acceptsWrites: boolean;
     viewer?: DashboardViewer;
-  }): Promise<Dashboard> {
+  }): Promise<Dashboard[]> {
     const projectId = projectIdSchema.parse(input.projectId);
 
     const boards = await this.#repository.findAllDashboards({ projectId, graphKinds: [] });
@@ -255,14 +259,17 @@ export class DashboardService {
     const first = boards.find(({ id }) => !hidden.has(id));
     if (first) {
       const { graphCount: _graphCount, ...dashboard } = first;
-      return dashboard;
+      return [dashboard];
     }
+    if (!input.acceptsWrites) return [];
 
-    return this.create({
+    const created = await this.create({
       projectId,
       name: "Reports",
       ...(input.viewer === undefined ? {} : { createdById: input.viewer.userId }),
     });
+
+    return [created];
   }
 
   // -- graphs ----------------------------------------------------------------

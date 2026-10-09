@@ -12,7 +12,7 @@ const logger = createLogger("langwatch:voice:public-url");
 export type VoicePublicUrl = { url: string } | { unavailable: string };
 
 /** What the worker resolved, and how to release the tunnel it may have opened. */
-export type ResolvedVoicePublicUrl = Readonly<{
+type ResolvedVoicePublicUrl = Readonly<{
   publicUrl: VoicePublicUrl;
   close: () => Promise<void>;
 }>;

@@ -7,12 +7,12 @@ import {
 import Stripe from "stripe";
 
 import type { BillingStripeChannels } from "../billing-stripe.channels.ts";
-import { connectedInvoicingChannels } from "../connected-invoicing-channels.registry.ts";
-import { stripeCustomersChannels } from "../stripe-customers-channels.registry.ts";
-import { stripeInvoicesChannels } from "../stripe-invoices-channels.registry.ts";
-import { stripeMetersChannels } from "../stripe-meters-channels.registry.ts";
-import { stripePricesChannels } from "../stripe-prices-channels.registry.ts";
-import { stripeSubscriptionsChannels } from "../stripe-subscriptions-channels.registry.ts";
+import { HttpConnectedInvoicingChannel } from "./http.connected-invoicing.channel.ts";
+import { HttpStripeCustomersChannel } from "./http.stripe-customers.channel.ts";
+import { HttpStripeInvoicesChannel } from "./http.stripe-invoices.channel.ts";
+import { HttpStripeMetersChannel } from "./http.stripe-meters.channel.ts";
+import { HttpStripePricesChannel } from "./http.stripe-prices.channel.ts";
+import { HttpStripeSubscriptionsChannel } from "./http.stripe-subscriptions.channel.ts";
 
 /** Stripe API version billing's one client speaks; meter event shapes are frozen to it. */
 const STRIPE_API_VERSION = "2024-04-10";
@@ -28,22 +28,33 @@ type HttpBillingStripeSubjects = Omit<BillingStripeChannels, "webhooks">;
 export function composeHttpBillingStripe({
   secretKey,
   nodeEnvironment,
+  apiBase,
 }: {
   secretKey: string;
   nodeEnvironment: string | undefined;
+  /** Another origin speaking Stripe's API (paymentsim); unset is Stripe itself. */
+  apiBase?: string;
 }): HttpBillingStripeSubjects {
-  const stripe = new Stripe(secretKey, { apiVersion: STRIPE_API_VERSION });
+  const stripe = new Stripe(secretKey, { apiVersion: STRIPE_API_VERSION, ...hostOf(apiBase) });
   return {
-    customers: stripeCustomersChannels.http.create({ stripe }),
-    subscriptions: stripeSubscriptionsChannels.http.create({ stripe }),
-    invoices: stripeInvoicesChannels.http.create({ stripe }),
-    prices: stripePricesChannels.http.create({ stripe }),
-    meters: stripeMetersChannels.http.create({ stripe }),
-    connectedInvoicing: connectedInvoicingChannels.http.create({
+    customers: HttpStripeCustomersChannel.create({ stripe }),
+    subscriptions: HttpStripeSubscriptionsChannel.create({ stripe }),
+    invoices: HttpStripeInvoicesChannel.create({ stripe }),
+    prices: HttpStripePricesChannel.create({ stripe }),
+    meters: HttpStripeMetersChannel.create({ stripe }),
+    connectedInvoicing: HttpConnectedInvoicingChannel.create({
       stripe,
       usagePriceId: () =>
         BillingPriceCatalogue.create(getStripeEnvironmentFromNodeEnv(nodeEnvironment)).prices
           .CONNECTED_HOSTED_USAGE_QUARTERLY,
     }),
   };
+}
+
+/** The SDK's host, port and protocol for an API origin. */
+function hostOf(apiBase: string | undefined): Stripe.StripeConfig {
+  if (!apiBase) return {};
+  const url = new URL(apiBase);
+  const protocol = url.protocol === "http:" ? "http" : "https";
+  return { host: url.hostname, port: url.port || (protocol === "http" ? 80 : 443), protocol };
 }

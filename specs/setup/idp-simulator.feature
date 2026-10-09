@@ -56,6 +56,32 @@ Feature: Local IdP simulator (idpsim)
     When a client completes the authorization code flow
     Then the ID token's subject carries the samlp| prefix Auth0 uses for brokered SAML connections
 
+  # --- Social sign-in ---------------------------------------------------
+
+  @unit
+  Scenario: Signing in with GitHub at the simulator round-trips a GitHub-shaped profile
+    Given a client sent through the tenant's GitHub authorize endpoint as a seeded user
+    When the client exchanges the code without asking for JSON
+    Then the token endpoint answers a form-encoded bearer access token, as GitHub does
+    And the user and user emails endpoints return the person with a numeric id and a primary verified address
+    And the tenant's activity records the GitHub authorize, token and profile reads
+
+  @unit
+  Scenario: Signing in with Google or Microsoft at the simulator returns a signed ID token in the provider's shape
+    Given a client sent through the tenant's Google or Microsoft authorize endpoint as a seeded user
+    When the client exchanges the code
+    Then the ID token verifies against the tenant's published keys
+    And a Google token carries a 21-digit subject under the tenant's Google issuer
+    And a Microsoft token carries the tenant's directory id under its Entra v2.0 issuer
+
+  @unit
+  Scenario: The social account picker links back into the provider and can be cancelled
+    When a client is sent through a social provider's authorize endpoint with no login hint
+    Then the account picker names the provider and links each person back into that provider's endpoint
+    When the person presses Cancel
+    Then the client is sent back access_denied with its state and no code
+    And the tenant's activity records the refusal
+
   # --- Registering an application ---------------------------------------
 
   @unit

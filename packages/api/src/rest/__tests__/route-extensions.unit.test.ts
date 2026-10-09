@@ -10,6 +10,7 @@ import { generateSpecs } from "hono-openapi";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import { authorizationPort } from "../../__tests__/api-double.ts";
 import type { Entitlements } from "../../access/access.ts";
 import { permissionBy } from "../../access/input-permission.ts";
 import { createErrorHandler } from "../../errors.ts";
@@ -63,7 +64,7 @@ function door({
         throw new PermissionDeniedError({
           permission: missing,
           scope: { type: "project", id: "project-1" },
-          denialReason: "no-binding",
+          denialReason: "no-grant",
         });
       }
 
@@ -91,7 +92,11 @@ function mount(
   identity: RestIdentity,
   entitlements?: Entitlements,
 ) {
-  return createRestRuntime({ identity, ...(entitlements ? { entitlements } : {}) }).mount(router, {
+  return createRestRuntime({
+    identity,
+    authorization: authorizationPort,
+    ...(entitlements ? { entitlements } : {}),
+  }).mount(router, {
     app: () => runsApp,
     onError: createErrorHandler(),
   });
@@ -386,7 +391,11 @@ describe("a route that chooses its permission from its parsed input", () => {
       .router();
 
     expect(() =>
-      createRestRuntime({ identity, doors: { browser: identity } }).mount(browser, {
+      createRestRuntime({
+        identity,
+        doors: { browser: identity },
+        authorization: authorizationPort,
+      }).mount(browser, {
         app: () => runsApp,
         onError: createErrorHandler(),
       }),

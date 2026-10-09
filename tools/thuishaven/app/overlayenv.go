@@ -107,19 +107,7 @@ func (o *Orchestrator) Env(p UpParams, asJSON bool, reveal bool) error {
 	if err != nil {
 		return err
 	}
-	// Masked unless the caller asked for the values: `haven env` is pasted into
-	// issues and read over a shoulder far more often than it is evaluated, and a
-	// registry this checkout cannot read masks on the key's shape instead.
-	var classes map[string]domain.SecretClass
-	if !reveal {
-		classes = domain.SecretClasses(p.WorktreeDir)
-	}
-	shown := func(key, value string) string {
-		if reveal {
-			return value
-		}
-		return domain.MaskEnvValue(classes, key, value)
-	}
+	shown := envShower(p.WorktreeDir, reveal)
 	if asJSON {
 		masked := make(map[string]string, len(env))
 		for key, value := range domain.EnvMap(env) {
@@ -137,6 +125,18 @@ func (o *Orchestrator) Env(p UpParams, asJSON bool, reveal bool) error {
 		fmt.Printf("export %s=%s\n", key, shellSingleQuoted(shown(key, value)))
 	}
 	return nil
+}
+
+// envShower is how `haven env` and `haven seed` print a value. Masked unless the
+// caller asked for it: the output is pasted into issues and read over a
+// shoulder far more often than it is evaluated, and a registry this checkout
+// cannot read masks on the key's shape instead.
+func envShower(worktreeDir string, reveal bool) func(key, value string) string {
+	if reveal {
+		return func(_, value string) string { return value }
+	}
+	classes := domain.SecretClasses(worktreeDir)
+	return func(key, value string) string { return domain.MaskEnvValue(classes, key, value) }
 }
 
 // overlayKeys lists the overlay's keys in a stable order, for the status

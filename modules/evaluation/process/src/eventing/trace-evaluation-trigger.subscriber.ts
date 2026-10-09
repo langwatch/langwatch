@@ -222,6 +222,11 @@ function buildTraceEvaluationFields(foldState: TraceSummaryData) {
     customMetadata: extractCustomMetadata(attrs),
     computedInput: foldState.computedInput ?? undefined,
     computedOutput: foldState.computedOutput ?? undefined,
+    // Last span end: span-seeded start plus wall-clock duration; none before a span is folded
+    spanEndedAt:
+      foldState.occurredAt > 0
+        ? foldState.occurredAt + Math.max(0, foldState.totalDurationMs)
+        : undefined,
   };
 }
 

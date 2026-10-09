@@ -45,8 +45,8 @@ import type {
 } from "./schema-applier.ts";
 import { type UpgradeOutcome, upgradeOutcome, UpgradeRunFailure } from "./upgrade-outcome.ts";
 
-/** Defaults proposed in the handoff (Risks): `lock_timeout` and the transient-failure retry. */
-export const DEFAULT_LOCK_TIMEOUT_MS = 10_000;
+/** `lock_timeout` about 2 s, so live reads never queue long behind DDL (Alex, 2026-10-09). */
+export const DEFAULT_LOCK_TIMEOUT_MS = 2_000;
 export const DEFAULT_RETRY = { attempts: 3, backoffMs: 2_000 };
 
 export interface UpgradeRunnerOptions {

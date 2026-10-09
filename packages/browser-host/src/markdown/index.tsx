@@ -21,6 +21,9 @@ function codeText(children: ReactNode): string {
 
 const logger = createLogger("langwatch:components:Markdown");
 
+/** The only `data:` addresses kept: inline raster pictures, as an image source. */
+const RASTER_DATA_URL_RE = /^data:image\/(?:png|jpe?g|gif|webp|avif|bmp)[;,]/i;
+
 export const proxyMarkdownImageUrls = (markdown: string): string => {
   // Matches markdown image syntax: ![description](url)
   const imageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
@@ -61,7 +64,8 @@ function MarkdownWithPluginsAndProxy({
     );
   }
 
-  const urlTransform = (url: string) => (url.startsWith("data:") ? url : defaultUrlTransform(url));
+  const urlTransform = (url: string, key: string) =>
+    key === "src" && RASTER_DATA_URL_RE.test(url) ? url : defaultUrlTransform(url);
 
   return (
     <Prose className={className} fontSize={fontSize} maxWidth="none" {...(color ? { color } : {})}>

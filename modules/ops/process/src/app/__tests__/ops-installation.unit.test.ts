@@ -260,7 +260,7 @@ describe("ops app installation", () => {
       registeredMigrations: () => [migration("authz-grants-genesis-import", "Grant import")],
     });
 
-    /** @scenario "The migrations page lists every registered migration when served by the api role" */
+    /** @scenario "The tenant migrations tab lists every registered migration when served by the api role" */
     /** @scenario "A migration registered by a peer module appears on the page with its title and description" */
     it("lists each peer's migrations, in running order, with the owner's title and description", async () => {
       vi.spyOn(

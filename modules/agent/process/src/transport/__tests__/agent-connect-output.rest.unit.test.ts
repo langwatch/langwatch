@@ -15,6 +15,8 @@ vi.mock("@langwatch/observability", async (importOriginal) => ({
   createLogger: () => log,
 }));
 
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
+
 import { createAgentConnectRest } from "../agent-connect.rest.ts";
 import { connectCredentialsFact, connectDoor } from "./agent-connect-door.fixture.ts";
 
@@ -23,6 +25,7 @@ const CONTENT_MARKER = "content-marker";
 function buildApi(connectFrames: AgentApi["connectFrames"]) {
   const app = createApiFixture<AgentApi>({ connectFrames });
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: connectDoor(),
   } as never);
   const hono = new Hono();

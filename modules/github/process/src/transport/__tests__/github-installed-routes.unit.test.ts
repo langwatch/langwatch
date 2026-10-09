@@ -13,6 +13,7 @@ import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
  * @see modules/github/specs/github-install-routes.feature
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
 import { githubProcessModule } from "../../github.module.ts";
@@ -75,6 +76,7 @@ function restHost(): RestHost {
   const closed = BearerIdentity.create({ name: "unconfigured", token: undefined });
 
   return RestHost.create({
+    authz: restTestAuthorization().forRequest(),
     identities: {
       project: closed,
       organization: closed,
@@ -98,6 +100,7 @@ function restHost(): RestHost {
 
 /** GitHub's redirect back to `/setup`, carrying a state the flow signed for user-1. */
 async function setupAfterSignedFlow(runtime: Awaited<ReturnType<typeof installedGithub>>) {
+  await runtime.service(GithubApi).registerInstallNonce({ nonce: "flow-nonce", ttlSec: 600 });
   const state = runtime.service(GithubApi).signInstallState({
     userId: "user-1",
     organizationId: "org-1",
@@ -105,7 +108,7 @@ async function setupAfterSignedFlow(runtime: Awaited<ReturnType<typeof installed
     returnTo: "/settings/github",
     issuedAt: Date.now(),
     nonce: "flow-nonce",
-    nonceRegistered: false,
+    nonceRegistered: true,
   });
   const host = restHost();
   host.mount(githubInstallRest.router(), () => runtime.module(githubProcessModule).provided);

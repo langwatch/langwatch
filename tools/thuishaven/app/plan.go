@@ -194,7 +194,7 @@ func (o *Orchestrator) newChildPlan(st domain.Stack, opts PlanOptions, repoDir s
 	// The simulators' provider settings (mail, storage, voice, analytics, LLM),
 	// computed before `base` feeds the ui/backend lanes (and mono's own copy)
 	// below, so a monolith checkout's one lane gets them too.
-	for _, name := range []string{domain.MailService, domain.StorageService, domain.VoiceService, domain.AnalyticsService, domain.OutboundService, domain.LLMService} {
+	for _, name := range []string{domain.MailService, domain.StorageService, domain.VoiceService, domain.AnalyticsService, domain.OutboundService, domain.PaymentService, domain.LLMService} {
 		for _, svc := range st.Services {
 			if svc.Name == name {
 				p.base = append(p.base, simulatorBaseEnv(opts.Selection, svc, repoDir)...)
@@ -221,6 +221,8 @@ func simulatorBaseEnv(sel domain.Selection, svc domain.Service, repoDir string) 
 		return domain.AnalyticsProviderEnv(resolvedDevEnv(repoDir), svc.URL)
 	case svc.Name == domain.OutboundService && sel.Outbound && svc.Port != 0:
 		return domain.OutboundProviderEnv(resolvedDevEnv(repoDir), svc.URL)
+	case svc.Name == domain.PaymentService && sel.Payment && svc.Port != 0:
+		return domain.PaymentProviderEnv(resolvedDevEnv(repoDir), svc.URL)
 	case svc.Name == domain.LLMService && sel.LLM && svc.Port != 0:
 		return domain.LLMProviderEnv(resolvedDevEnv(repoDir), svc.Port)
 	}
@@ -396,7 +398,7 @@ func (p *childPlan) planSimulators() simulatorPlan {
 	return sp
 }
 
-// hostBundledSimulators places storage, voice, LLM, analytics, outbound and telemetry, in that order.
+// hostBundledSimulators places storage, voice, LLM, analytics, outbound, payment and telemetry, in that order.
 func (p *childPlan) hostBundledSimulators(sp *simulatorPlan) {
 	o, st, sel, repoRoot, base := p.o, p.st, p.opts.Selection, p.opts.RepoRoot, p.base
 	for _, sim := range []struct {
@@ -410,6 +412,7 @@ func (p *childPlan) hostBundledSimulators(sp *simulatorPlan) {
 		{sel.LLM, "llmsim", func() []string { return llmEnv(st) }, func() Child { return o.llmChild(st, repoRoot, base) }},
 		{sel.Analytics, "analyticssim", func() []string { return analyticsEnv(st) }, func() Child { return o.analyticsChild(st, repoRoot, base) }},
 		{sel.Outbound, "outboundsim", func() []string { return outboundEnv(st) }, func() Child { return o.outboundChild(st, repoRoot, base) }},
+		{sel.Payment, "paymentsim", func() []string { return paymentEnv(st, repoRoot) }, func() Child { return o.paymentChild(st, repoRoot, base) }},
 		{sel.Telemetry, "telemetrysim", func() []string { return telemetryEnv(st) }, func() Child { return o.telemetryChild(st, repoRoot, base) }},
 	} {
 		if sim.isSelected {

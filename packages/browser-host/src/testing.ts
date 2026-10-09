@@ -1,5 +1,5 @@
 /**
- * The capabilities a test mounts when it renders a screen outside the shell. In the product the
+ * The host services a test mounts when it renders a screen outside the shell. In the product the
  * application shell answers `UiRoute`, `UiNavigation` and `UiFeedback` above every
  * route, and a screen rendered with none of them degrades — an empty address, an inert link.
  */
@@ -99,7 +99,7 @@ class HostUiFeedback extends UiFeedback {
   }
 }
 
-/** The capabilities a screen under test reads, answered by the host double. */
+/** The host services a screen under test reads, answered by the host double. */
 export function createUiHostServicesFromHost(
   host: UiTestHost,
   session: UiSession = UNAVAILABLE_UI_SESSION,

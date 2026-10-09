@@ -1,6 +1,6 @@
 /**
  * Data Privacy's answer to the port its screen declares: every method
- * projects a `@langwatch/browser-host` capability, so the module mounts it,
+ * projects a `@langwatch/browser-host` host service, so the module mounts it,
  * not the application. ARCHITECTURE.md §10.1.
  */
 
@@ -21,7 +21,7 @@ import {
   type PrivacySuccessNotice,
 } from "../model/data-privacy-host.ts";
 
-class CapabilityDataPrivacyHost extends DataPrivacyHostApi {
+class HostServiceDataPrivacyHost extends DataPrivacyHostApi {
   constructor(
     private readonly deps: { scope: PrivacyHostScope; route: UiRoute; feedback: UiFeedback },
   ) {
@@ -66,7 +66,7 @@ export default function DataPrivacyHostMount({ children }: { children?: ReactNod
 
   const host = useMemo(
     () =>
-      new CapabilityDataPrivacyHost({
+      new HostServiceDataPrivacyHost({
         scope: {
           organizationId: organizationId ?? void 0,
           teamId,

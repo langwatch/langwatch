@@ -3,6 +3,7 @@ import { generateSpecs } from "hono-openapi";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { authorizationPort } from "../../__tests__/api-double.ts";
 import { createErrorHandler } from "../../errors.ts";
 import type { RestIdentity } from "../../hosting/api-door.ts";
 import { defineRestRouter } from "../declaration.ts";
@@ -52,7 +53,10 @@ const organizationDoor: RestIdentity = {
 type PublishedBody = Readonly<{ required?: boolean }> | undefined;
 
 async function publishedBodies(): Promise<Record<string, PublishedBody>> {
-  const app = createRestRuntime({ identity: organizationDoor }).mount(widgets.router(), {
+  const app = createRestRuntime({
+    authorization: authorizationPort,
+    identity: organizationDoor,
+  }).mount(widgets.router(), {
     app: () => application,
     credential: "organization",
     onError: createErrorHandler(),

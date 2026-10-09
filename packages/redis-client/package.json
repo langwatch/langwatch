@@ -1,6 +1,5 @@
 {
   "name": "@langwatch/redis-client",
-  "langwatch": { "group": "data" },
   "version": "0.1.0",
   "private": true,
   "description": "The shared Redis client contract: configuration resolved from a supplied environment, standalone and cluster connection construction with TLS and database-index handling, and a readiness probe the caller owns - with no connection opened as an import side effect.",
@@ -34,5 +33,8 @@
     "@langwatch/vitest-config": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "langwatch": {
+    "group": "data"
   }
 }

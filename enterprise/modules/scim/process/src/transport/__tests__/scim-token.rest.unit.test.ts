@@ -8,6 +8,7 @@
 import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import { permissionsConferred } from "@langwatch/authz-contract";
 import { ScimTokenNotFoundError } from "@langwatch/enterprise-scim-contract";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 
 import { scimTokenRest, scimTokenRestActor } from "../scim-token.rest.ts";
@@ -39,6 +40,7 @@ function mount(
 ) {
   const { app, audited, findPermissionsBeyondCaller } = scimTestApp({ scim, minterLacks });
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({
         actor: { type: "user", id: "user_ana" },

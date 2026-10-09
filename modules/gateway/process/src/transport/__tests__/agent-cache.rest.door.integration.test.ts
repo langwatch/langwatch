@@ -13,6 +13,7 @@ import {
 import { PermissionDeniedError } from "@langwatch/authorization";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
@@ -56,12 +57,13 @@ function mount({ grants }: { grants: readonly string[] }) {
       throw new PermissionDeniedError({
         permission,
         scope: { type: "project", id: PROJECT_ID },
-        denialReason: "no-binding",
+        denialReason: "no-grant",
       });
     }
     return caller;
   };
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: { authenticate, identify },
   });
   const hono = runtime.mount(agentCacheRest.router(), {

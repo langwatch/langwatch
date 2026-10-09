@@ -40,7 +40,10 @@ export class LiveEvaluationRepositories {
 
     return {
       ...PostgresEvaluationRepositories.create({ prisma }),
-      runs: ClickHouseEvaluationRepository.create({ resolveClient }),
+      runs: ClickHouseEvaluationRepository.create({
+        resolveClient,
+        resolveQueryClient: async () => clickhouse,
+      }),
       monitorPerformance: ClickHouseMonitorPerformanceRepository.create({ resolveClient }),
       analyticsFoldCache: RedisEvaluationAnalyticsFoldCacheRepository.create({
         redis,

@@ -15,8 +15,6 @@ import {
 import { loadConfigFromFile } from "vite";
 import { describe, expect, it } from "vitest";
 
-import { WAITING_FOR_API_PAGE } from "../public-config-from-api";
-
 const apiConfig = {
   process: {
     appBaseUrl: "http://localhost:5560",
@@ -151,10 +149,12 @@ describe("given the apps/ui Vite config", () => {
   });
 });
 
+const BARE_SHELL = "<html><head></head><body></body></html>";
+
 describe("given no api answering yet", () => {
   describe("when the dev server serves a page", () => {
     /** @scenario "The api is unreachable when the dev server starts" */
-    it("loads its config and serves the self-reloading waiting page", async () => {
+    it("loads its config and serves the bare shell at once, which boots into the waiting page", async () => {
       const dead = createServer();
       await new Promise<void>((resolve) => dead.listen(0, "127.0.0.1", resolve));
       const address = dead.address();
@@ -177,10 +177,10 @@ describe("given no api answering yet", () => {
               (plugin) =>
                 plugin && "name" in plugin && plugin.name === "inject-development-public-config",
             );
-          return transformIndexHtmlOf(inject)("<html><head></head><body></body></html>");
+          return transformIndexHtmlOf(inject)(BARE_SHELL);
         }),
       );
-      expect(html).toBe(WAITING_FOR_API_PAGE);
+      expect(html).toBe(BARE_SHELL);
     }, 15_000);
   });
 });

@@ -52,7 +52,6 @@ export function scimRepositoryFixture(overrides: Partial<ScimRepository> = {}): 
     })),
     markUserResourceDeleted: vi.fn(async () => undefined),
     addMembership: vi.fn(async () => undefined),
-    removeMembership: vi.fn(async () => undefined),
     findDirectoryGroupIds: vi.fn(async () => []),
     findGroup: vi.fn(async () => null),
     findGroupByExternalId: vi.fn(async () => null),

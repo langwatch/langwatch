@@ -37,14 +37,14 @@ describe("MemoryTopicRepository", () => {
   /** @scenario "resolve names for trace facets" */
   it("names the topics the project holds and leaves unknown ids out", async () => {
     await expect(
-      repository().findNamesByIds({ projectId: PROJECT_ID, ids: ["topic-2", "topic-absent"] }),
+      repository().findNamesByIds({ projectIds: [PROJECT_ID], ids: ["topic-2", "topic-absent"] }),
     ).resolves.toEqual(new Map([["topic-2", "Payments"]]));
   });
 
   it("does not answer a name lookup for an empty id list", async () => {
-    await expect(repository().findNamesByIds({ projectId: PROJECT_ID, ids: [] })).resolves.toEqual(
-      new Map(),
-    );
+    await expect(
+      repository().findNamesByIds({ projectIds: [PROJECT_ID], ids: [] }),
+    ).resolves.toEqual(new Map());
   });
 
   describe("when the clustering projections have not been written", () => {

@@ -42,7 +42,10 @@ describe("the trace times a reader sees", () => {
   describe("given a trace whose only signal is a log record", () => {
     /** @scenario The trace list shows the same fallback time, not the epoch */
     it("the list row falls back to the storage anchor", () => {
-      const item = mapToTraceListItem(summary({ occurredAt: 0, storageAnchorMs: ANCHOR_MS }));
+      const item = mapToTraceListItem({
+        ...summary({ occurredAt: 0, storageAnchorMs: ANCHOR_MS }),
+        tenantId: "project-1",
+      });
 
       expect(item.timestamp).toBe(ANCHOR_MS);
     });
@@ -65,7 +68,9 @@ describe("the trace times a reader sees", () => {
         storageAnchorMs: ANCHOR_MS,
       });
 
-      expect(mapToTraceListItem(withSpans).timestamp).toBe(ANCHOR_MS + 250);
+      expect(mapToTraceListItem({ ...withSpans, tenantId: "project-1" }).timestamp).toBe(
+        ANCHOR_MS + 250,
+      );
       expect(mapTraceSummaryToHeader(withSpans).timestamp).toBe(ANCHOR_MS + 250);
     });
   });

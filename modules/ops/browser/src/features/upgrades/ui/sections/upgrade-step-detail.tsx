@@ -72,6 +72,7 @@ export function UpgradeStepDetail({ step }: { step: UpgradeStepDetailView }) {
         <Fact label="Kind" value={step.kind} />
         <Fact label="Mode" value={modeLabel(step.mode)} />
         <Fact label="Release" value={step.release ?? "Unreleased"} />
+        {step.finishBy && <Fact label="Finish by" value={step.finishBy} />}
         <Fact label="Owner" value={step.owner ?? "Unattributed"} />
         <Fact label="Started" value={moment(step.startedAt)} />
         <Fact label="Finished" value={moment(step.finishedAt)} />

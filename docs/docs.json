@@ -923,8 +923,11 @@
             "group": "Investigate With Your Agent",
             "pages": [
               "coding-agents/explore-your-usage-with-your-own-agent",
+              "coding-agents/reduce-coding-agent-cost",
               "coding-agents/find-your-context-sweet-spot",
-              "coding-agents/compare-provider-costs"
+              "coding-agents/compare-provider-costs",
+              "coding-agents/cost-experiments",
+              "coding-agents/codebase-experiment"
             ]
           }
         ]

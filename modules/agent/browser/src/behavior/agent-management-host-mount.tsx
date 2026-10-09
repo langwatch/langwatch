@@ -1,6 +1,6 @@
 /**
  * Agent Management's answer to the port its screen declares: every method
- * projects a `@langwatch/browser-host` capability, so the module mounts it,
+ * projects a `@langwatch/browser-host` host service, so the module mounts it,
  * not the application. ARCHITECTURE.md §10.1.
  */
 
@@ -32,7 +32,7 @@ import {
 } from "../model/agent-management-host.ts";
 import { TrpcAgentClient } from "./trpc-agent-client.ts";
 
-class CapabilityAgentManagementHost implements AgentManagementHost {
+class HostServiceAgentManagementHost implements AgentManagementHost {
   constructor(
     private readonly deps: {
       project: AgentHostProject | undefined;
@@ -151,7 +151,7 @@ export default function AgentManagementHostMount({ children }: { children?: Reac
 
   const host = useMemo(
     () =>
-      new CapabilityAgentManagementHost({
+      new HostServiceAgentManagementHost({
         project: hostProject
           ? { id: hostProject.id, slug: hostProject.slug, name: hostProject.name }
           : void 0,

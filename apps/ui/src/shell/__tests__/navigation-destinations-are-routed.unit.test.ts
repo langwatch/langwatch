@@ -44,7 +44,7 @@ function ownsSubtree({ resolved, declared }: { resolved: string; declared: strin
 
 /** The links the menus write directly, as absolute addresses. */
 const writtenLinks = [
-  ...[opsGroup(), instanceGroup(), cloudAdminGroup()].flatMap((group) =>
+  ...[opsGroup({ hasCloudOps: true }), instanceGroup(), cloudAdminGroup()].flatMap((group) =>
     group.items.map((item) => item.href),
   ),
   ...gatewayNavItems.map((item) => item.href),

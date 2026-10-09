@@ -32,6 +32,7 @@ const identity = (organizationId: string): ProjectIdentity => ({
   organizationId,
   isPersonal: false,
   ownerUserId: null,
+  kind: "application",
 });
 
 function harness() {
@@ -519,6 +520,24 @@ describe("checking an API key through the shared answers", () => {
       await expect(podA.findResolvedToken({ token })).resolves.toMatchObject({
         isUnattendedRunKey: false,
       });
+    });
+  });
+
+  describe("when a held legacy answer predates the project kind", () => {
+    /** @scenario A held project without its kind is read again */
+    it("ignores it and reads the project from Postgres", async () => {
+      const { podA, reads } = harness();
+      const { kind: _kind, ...withoutKind } = identity("acme");
+      reads.held.mockImplementation(async ({ key }) =>
+        key.startsWith("legacy:") ? [JSON.stringify({ project: withoutKind })] : [],
+      );
+
+      await expect(podA.findResolvedToken({ token: "legacy-acme" })).resolves.toMatchObject({
+        type: "legacyProjectKey",
+        project: { id: "project-acme", kind: "application" },
+      });
+      expect(reads.legacy).toHaveBeenCalledTimes(1);
+      expect(reads.identity).toHaveBeenCalledTimes(1);
     });
   });
 

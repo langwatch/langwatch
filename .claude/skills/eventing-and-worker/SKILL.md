@@ -139,7 +139,7 @@ worker serves pages and silently processes no jobs.
 A backfill or data move is a migration step declared with `.withMigrations` (`defineMigrationStep`,
 the `migration-data-step` skill): the ledger records it, the Upgrades page shows it, a rollback
 reopens it. A `Task` (`@langwatch/task`) is for work an operator invokes by name:
-`modules/automation/process/src/tasks/report-schedule-backfill.task.ts` (`name`, `description`,
+`modules/automation/process/src/tasks/slack-alert.task.ts` (`name`, `description`,
 `run()`), run by the `tasks` app. Recurring work is a scheduled process manager instead.
 
 ## Upcasts: renaming or reshaping a stored event type

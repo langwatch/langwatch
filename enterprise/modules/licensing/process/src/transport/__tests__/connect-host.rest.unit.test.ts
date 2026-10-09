@@ -11,6 +11,7 @@ import {
  * install as the same code. Spec: specs/self-hosting/connected-services/
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 
 import { HttpConnectLicenseChannel } from "../../channels/http/http.connect-license.channel.ts";
@@ -22,6 +23,7 @@ const seats = { members: 12, liteMembers: 3 };
 
 function mount(app: Partial<LicensingApi>) {
   const hono = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => {
         throw new Error("the connect host reads its own bearer");

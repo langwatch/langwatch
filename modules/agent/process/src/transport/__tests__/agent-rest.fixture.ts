@@ -10,6 +10,7 @@ import {
 } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import type { UserApi } from "@langwatch/user-contract";
 import { Hono } from "hono";
 /**
@@ -76,6 +77,7 @@ export async function buildAgentApps(
   // Every request authenticates as the same project and person; a route's
   // declared permission is granted unless `denyPermission` names it.
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: ({ permission, request }): RestCaller => {
         if (options.denyPermission === permission) {

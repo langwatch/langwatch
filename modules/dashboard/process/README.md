@@ -64,8 +64,10 @@ reorder(input: { projectId: string; dashboardIds: string[]; viewer?: DashboardVi
 
 #### `getOrCreateFirst`
 
+The first dashboard, created on demand; empty on an aggregate that has none (ADR-177).
+
 ```typescript
-getOrCreateFirst(input: { projectId: string; viewer?: DashboardViewer }): Promise<Dashboard>;
+getOrCreateFirst(input: { projectId: string; viewer?: DashboardViewer }): Promise<Dashboard[]>;
 ```
 
 #### `listStarred`
@@ -936,7 +938,7 @@ Contract `../contract/src/dashboard.trpc.ts:32`, router `src/transport/dashboard
 | `dashboards.rename`            | mutation | Permission `analytics:update` | inline               | `dashboardTrpcRowSchema`         |
 | `dashboards.delete`            | mutation | Permission `analytics:delete` | `dashboardRefSchema` | `dashboardTrpcRowSchema`         |
 | `dashboards.reorderDashboards` | mutation | Permission `analytics:update` | inline               | `dashboardReorderResponseSchema` |
-| `dashboards.getOrCreateFirst`  | query    | Permission `analytics:view`   | `projectScopeSchema` | `dashboardTrpcRowSchema`         |
+| `dashboards.getOrCreateFirst`  | query    | Permission `analytics:view`   | `projectScopeSchema` | inline                           |
 | `dashboards.updateDetails`     | mutation | Permission `analytics:update` | inline               | `dashboardTrpcRowSchema`         |
 | `dashboards.setScope`          | mutation | Permission `analytics:update` | inline               | `dashboardTrpcRowSchema`         |
 | `dashboards.scopeImpact`       | query    | Permission `analytics:view`   | `dashboardRefSchema` | `dashboardScopeImpactSchema`     |
@@ -1010,7 +1012,19 @@ type Output = z.infer<typeof dashboardReorderResponseSchema>; // ../contract/src
 interface Input {
   projectId: string;
 }
-type Output = z.infer<typeof dashboardTrpcRowSchema>; // ../contract/src/dashboard.responses.ts:38
+// Output: inline, ../contract/src/dashboard.trpc.ts:76
+type Output = {
+  id: string;
+  projectId: string;
+  name: string;
+  order: number;
+  description: string | null;
+  createdById: string | null;
+  scope: "PRIVATE" | "PROJECT" | "ORGANIZATION";
+  organizationId: string | null;
+  createdAt: unknown;
+  updatedAt: unknown;
+} | null;
 
 // dashboards.updateDetails
 // Input: inline, ../contract/src/dashboard.trpc.ts:84

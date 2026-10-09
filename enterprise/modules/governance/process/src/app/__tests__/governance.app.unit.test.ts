@@ -26,6 +26,7 @@ import { ResourceScope } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import type { WebhookApi } from "@langwatch/webhook-contract";
@@ -368,6 +369,7 @@ describe("GovernanceModule as the module a process installs", () => {
     it("writes a plan refusal behind its CLI token door in main's CLI body (Q31)", async () => {
       const { app } = await buildCliApp();
       const routes = createRestRuntime({
+        authorization: restTestAuthorization(),
         identity: app.cliTokenDoor,
         entitlements: {
           holds: async () => false,

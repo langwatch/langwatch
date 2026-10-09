@@ -1,7 +1,7 @@
 /**
  * Governance's answer to the port its screens declare: organization graph
  * and plan come from this module's own tRPC reads, everything else projects
- * a `@langwatch/browser-host` capability. ARCHITECTURE.md §10.1.
+ * a `@langwatch/browser-host` host service. ARCHITECTURE.md §10.1.
  */
 
 import {
@@ -29,7 +29,7 @@ import { governanceApi } from "./governance-api.ts";
 /** A stable reference, so a query still loading never re-triggers a memo below it. */
 const NO_ORGANIZATIONS: readonly GovernanceOrganization[] = [];
 
-class CapabilityGovernanceHost extends GovernanceHostApi {
+class HostServiceGovernanceHost extends GovernanceHostApi {
   constructor(
     private readonly inputs: {
       orgs: readonly GovernanceOrganization[];
@@ -139,7 +139,7 @@ export default function GovernanceHostMount({ children }: { children?: ReactNode
 
   const host = useMemo(
     () =>
-      new CapabilityGovernanceHost({
+      new HostServiceGovernanceHost({
         orgs,
         org,
         plan,

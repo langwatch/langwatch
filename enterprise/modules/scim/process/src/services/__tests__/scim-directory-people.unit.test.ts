@@ -90,8 +90,19 @@ function world() {
       return store.users.get(created.id)!;
     }),
   } satisfies ScimUserProvisioning;
+  const connections = HeldConnectionsFake.of([OKTA, ENTRA]);
+  connections.hold({ connectionId: OKTA, verifiedDomains: ["acme.test"] });
   const service = ScimService.create({
-    connections: HeldConnectionsFake.of([OKTA, ENTRA]),
+    // Organization owns the membership row; a delete asks it to remove the member.
+    members: {
+      deleteMember: vi.fn(async ({ organizationId, userId }) => {
+        const at = store.memberships.findIndex(
+          (row) => row.organizationId === organizationId && row.userId === userId,
+        );
+        if (at !== -1) store.memberships.splice(at, 1);
+      }),
+    },
+    connections,
     prisma: store,
     writer,
     users,

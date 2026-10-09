@@ -7,14 +7,11 @@
 import { PrismaTenancyGuardService } from "@langwatch/prisma-client";
 import { describe, expect, it } from "vitest";
 
-import {
-  PrismaCustomGraphRepository,
-  type CustomGraphDatabase,
-} from "../prisma.custom-graph.repository.ts";
-import {
-  PrismaGraphTriggerSentRepository,
-  type GraphTriggerSentDatabase,
-} from "../prisma.graph-trigger-sent.repository.ts";
+import { PrismaCustomGraphRepository } from "../prisma.custom-graph.repository.ts";
+import { PrismaGraphTriggerSentRepository } from "../prisma.graph-trigger-sent.repository.ts";
+
+type CustomGraphDatabase = Parameters<typeof PrismaCustomGraphRepository.create>[0];
+type GraphTriggerSentDatabase = Parameters<typeof PrismaGraphTriggerSentRepository.create>[0];
 
 const NOT_ON_AN_ONLY_ME_BOARD = {
   OR: [{ dashboardId: null }, { dashboard: { scope: { not: "PRIVATE" } } }],

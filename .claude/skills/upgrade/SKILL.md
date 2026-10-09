@@ -1,6 +1,6 @@
 ---
 name: upgrade
-description: "How the upgrade system works end to end, for an engineer changing or debugging it: `pnpm task upgrade` (`status`, `plan`, `steps`), the ledger schema, the runner lease and the serving roster, release manifests in `packages/upgrade/releases/`, blocking, background and operator steps, `.withMigrations`, the code-step generator and `code-step-ids.generated.ts`, `-- after:` notes, the serving gate and the floor refusal, rollback, the Ops Upgrades console and `retryStep`, the worker running the upgrade, upgrading mode (`servesWhileUpgrading`), the holding page, and how to test it (live fixture, migration-compat, rehearsal, upgradelab). Use when someone says 'how does the upgrade work', 'pnpm task upgrade', 'the ledger', 'upgrade lease', 'serving roster', 'serving gate', 'refuses to serve', 'behind this image', 'release manifest', 'stamp the release', 'code-step-ids', 'image-code-steps', 'CodeStepId', 'after: note', 'refused_below_floor', 'servesWhileUpgrading', 'upgrading mode', 'holding page', 'the worker runs the upgrade', 'rollback reopened', 'Upgrades page', 'retry a failed step', 'upgradelab', 'upgrade rehearsal' or 'migration-compat'."
+description: "How the upgrade system works end to end, for an engineer changing or debugging it: `pnpm task upgrade` (`status`, `plan`, `steps`), the ledger schema, the runner lease and the serving roster, release manifests in `packages/upgrade/releases/`, blocking, background and operator steps, `.withMigrations`, the code-step generator and `code-step-ids.generated.ts`, `-- after:` notes, the serving gate and the floor refusal, rollback, the Ops Upgrades console and `retryStep`, the worker running the upgrade, serving while upgrading (no holds, `upgrade_in_progress`, `ClickHouseColumns`), the first-install token console, and how to test it (live fixture, migration-compat, rehearsal, upgradelab). Use when someone says 'how does the upgrade work', 'pnpm task upgrade', 'the ledger', 'upgrade lease', 'serving roster', 'serving gate', 'refuses to serve', 'behind this image', 'release manifest', 'stamp the release', 'code-step-ids', 'image-code-steps', 'CodeStepId', 'after: note', 'refused_below_floor', 'upgrade_in_progress', 'serves while upgrading', 'no holds', 'token console', 'the worker runs the upgrade', 'rollback reopened', 'Upgrades page', 'retry a failed step', 'upgradelab', 'upgrade rehearsal' or 'migration-compat'."
 user-invocable: true
 argument-hint: "<the part of the upgrade you are changing or debugging>"
 ---
@@ -22,9 +22,10 @@ new image ─► worker boot ─► gate.admit (behind or first install)
                  ▼
              ledger current ─► takes jobs ─► background steps (per-step leases)
 
-new image ─► api boot ─► never runs a step
-   a Postgres schema step outstanding ─► HOLDING (holding page, not ready)
-   schema done, blocking steps left   ─► UPGRADING (routes declared servesWhileUpgrading only)
+new image ─► api boot (beside the worker, never after it) ─► never runs a step
+   any blocking step outstanding       ─► UPGRADING: every route serves at once, not ready (NO-HOLDS)
+     Postgres ahead of the schema       ─► 503 upgrade_in_progress (retry); ClickHouse ─► column default
+     first install failed               ─► token console in front of every route but health
    ledger current (re-read every 10 s) ─► SERVING ─► roster row every 15 s
 ```
 
@@ -54,7 +55,9 @@ worker as a sidecar (metrics on 9465, so it never clashes with the api's 9464). 
 | Step declaration | `packages/upgrade/src/step/migration-step.ts`, `projection-replay-step.ts` |
 | Collection over the installed list | `packages/process/src/migration/migration-steps.ts` |
 | Serving gate; the worker's wait loop (`admitAfterFirstInstall`) | `packages/process/src/migration/upgrade-gate.ts` → `packages/upgrade/src/gate/serving-upgrade-gate.ts`; the child is `gate/first-install-upgrade.ts` |
-| Holding page, upgrading pass-through, sign-in link | `packages/process/src/lifecycle/liveness-thread.ts` (`UPGRADING_PHASE`, `UPGRADE_SIGN_IN_HREF`) |
+| Liveness door and the token console | `packages/process/src/lifecycle/liveness-thread.ts` |
+| `upgrade_in_progress` mapping (all transports) | `packages/api/src/errors.ts` (`promoteStoreFailure`) |
+| Defensive ClickHouse reads | `packages/clickhouse-client/src/present-columns.ts` (`ClickHouseColumns`) |
 | Roster and rollback | `packages/upgrade/src/serving-roster/` (`rollback.ts`) |
 | Background steps on the worker | `packages/upgrade/src/background/background-steps.service.ts` |
 | Status reader (CLI, Ops, Checkup) | `packages/upgrade/src/reader/` |
@@ -111,16 +114,17 @@ It runs `pnpm task upgrade steps --json` and writes the committed step list plus
 `packages/upgrade/src/step/code-step-ids.generated.ts` (the `CodeStepId` union). Commit both
 (`packages/upgrade/specs/image-code-steps.feature`).
 
-## Upgrading mode
+## Serving while upgrading (no holds)
 
-While the api is upgrading it answers only routes declared to serve: a REST or tRPC declaration
-carries `.servesWhileUpgrading()` (`packages/api`; auth's sign-in, authz's permissions read and the
-scope graph, ops' upgrade reads and `retryStep`), and a declared wildcard skips undeclared literals.
-The bundle's assets, sign-in and the Upgrades paths pass too; a tRPC batch passes only if every
-procedure declares it. Anything else answers the holding page (HTML) or 503 with `Retry-After: 10`;
-liveness answers in every phase. The holding page links "Sign in to follow the upgrade" to
-`UPGRADE_SIGN_IN_HREF`, returning to Ops > Upgrades. A blocking step may not touch a sign-in table
-(`upgrade-sign-in-tables` policy). The door still asks each declared permission.
+The api holds nothing (Alex, 2026-10-09, NO-HOLDS): from boot it serves every REST, tRPC and SSE
+route and reports not ready until the ledger is current, so a rolling deploy keeps the old pods
+serving. A Postgres query the schema is not ready for (P2021/P2022, 42P01/42703) becomes the
+handled `upgrade_in_progress` (503, `Retry-After: 10`) in `promoteStoreFailure`, the one mapping
+every transport uses; the browser's query client keeps retrying it with backoff. A repository
+reading a column a pending ClickHouse step adds selects it through `ClickHouseColumns`, which
+answers its typed default until the target has it. Ingest only enqueues, and a blocking step may
+not touch a sign-in or ingest table (`upgrade-sign-in-tables` policy). A failed step of either
+store shows on Ops > Upgrades with Retry; only a failed first install opens the token console.
 Specs: `specs/upgrade/in-app-upgrade.feature`, `packages/process/specs/upgrade-holding-page.feature`.
 
 ## Serving gate, roster and rollback
@@ -156,6 +160,7 @@ Unsupported. Specs: `modules/ops/specs/upgrades.feature`, `upgrade-alerts.featur
 ## Never
 
 - Run a step from the api, add a `migrate` compose service or an npx migration phase, or wait without a deadline.
-- Declare `.servesWhileUpgrading()` on a route that reads a table a blocking step can touch.
+- Hold a request while upgrading, or map a schema error per module: `promoteStoreFailure` is the one place.
+- Read a column a pending ClickHouse step adds without `ClickHouseColumns`.
 - Hand-edit a stamped manifest or a merged migration; move the floor outside `lts-release`.
 - Write the ledger by hand to unstick a run: fix the cause and re-run `upgrade`, or `retryStep`.

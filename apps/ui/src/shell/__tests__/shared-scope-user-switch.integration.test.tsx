@@ -40,7 +40,7 @@ const ACME: readonly UiScopeOrganization[] = [
   { id: "org-acme", slug: "acme", members: [{ role: "ADMIN" }], teams: [SHARED_TEAM] },
 ];
 
-/** The deployment's grants procedure, as the session capability asks it. */
+/** The deployment's grants procedure, as the session host service asks it. */
 const PERMISSIONS_PROCEDURE = "authz.effectivePermissions";
 
 /** Who the session endpoint says is signed in, until the test says otherwise. */

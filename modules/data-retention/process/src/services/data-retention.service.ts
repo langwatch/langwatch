@@ -19,7 +19,11 @@ import {
   type UnpinTraceInput,
   unpinTraceInputSchema,
 } from "@langwatch/data-retention-contract";
-import { ProjectNotFoundError } from "@langwatch/project-contract";
+import {
+  AggregateProjectIsReadOnlyError,
+  isAggregateProjectKind,
+  ProjectNotFoundError,
+} from "@langwatch/project-contract";
 
 import type { DataRetentionCacheRepository } from "../repositories/data-retention-cache.repository.ts";
 import type { DataRetentionProjectScopeRepository } from "../repositories/data-retention-project-scope.repository.ts";
@@ -176,13 +180,24 @@ export class DataRetentionService {
 
   async pin(input: PinTraceInput): Promise<PinnedTrace> {
     const parsed = pinTraceInputSchema.parse(input);
+    await this.refuseOnAggregate(parsed.projectId);
 
     return this.options.pins.create({ ...parsed, source: "manual" });
   }
 
   async unpin(input: UnpinTraceInput): Promise<void> {
     const parsed = unpinTraceInputSchema.parse(input);
+    await this.refuseOnAggregate(parsed.projectId);
     await this.options.pins.delete(parsed);
+  }
+
+  /**
+   * Pins sit under `project:update`, which the door exempts, so the service
+   * refuses: an aggregate takes no rows (ADR-177 decision 8).
+   */
+  private async refuseOnAggregate(projectId: string): Promise<void> {
+    const placement = await this.options.projectScopes.findProjectPlacement({ projectId });
+    if (isAggregateProjectKind(placement?.kind)) throw new AggregateProjectIsReadOnlyError();
   }
 
   async autoPin(input: UnpinTraceInput): Promise<PinnedTrace> {

@@ -22,7 +22,6 @@ import {
   ORGANIZATION_DATASET_ATTACHMENT_MIN_MB,
   organizationDatasetAttachmentMaxMbSchema,
 } from "@langwatch/ops-contract";
-import { Temporal, toEpochMs } from "@langwatch/time";
 import { MoreVertical, Pencil } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useDebounce } from "use-debounce";
@@ -31,7 +30,7 @@ import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedb
 import { useOpsRouter as useRouter } from "../../../../behavior/ops-router.ts";
 import { useAdminList, useAdminUpdate } from "../../behavior/use-admin-resource.ts";
 import { Currency, PricingModel } from "../../model/admin-enums.ts";
-import { dateInputToISO, EmptyCell, formatDate } from "../elements/admin-cells.tsx";
+import { EmptyCell, formatDate } from "../elements/admin-cells.tsx";
 import { AdminTable } from "./admin-table-shell.tsx";
 /**
  * Read-facing Organization shape - excludes the s3 credential fields. The
@@ -52,7 +51,6 @@ interface AdminOrganization {
   stripeCustomerId: string | null;
   currency: Currency;
   pricingModel: PricingModel;
-  licenseExpiresAt: string | null;
   useCustomS3: boolean;
   createdAt: string;
 }
@@ -168,19 +166,11 @@ interface FormState {
   currency: Currency;
   pricingModel: PricingModel;
   license: string;
-  licenseExpiresAt: string;
   useCustomS3: boolean;
   s3Endpoint: string;
   s3AccessKeyId: string;
   s3SecretAccessKey: string;
   s3Bucket: string;
-}
-
-function toDateInputValue(value: string | null | undefined): string {
-  if (!value) return "";
-  const epochMs = toEpochMs(value);
-  if (Number.isNaN(epochMs)) return "";
-  return Temporal.Instant.fromEpochMilliseconds(epochMs).toString().slice(0, 10);
 }
 
 function numOrNull(raw: string): number | null {
@@ -273,12 +263,8 @@ function serverRefusedFields(error: unknown): FieldErrors {
 
 /** Write-only, like the S3 credentials below: an empty input means leave the
  * stored license alone rather than clear it. */
-function changedLicenseFields({ form, organization }: FormDiff): Record<string, unknown> {
-  const data: Record<string, unknown> = {};
-  if (form.license.trim() !== "") data.license = form.license.trim();
-  const nextExpires = dateInputToISO(form.licenseExpiresAt);
-  if (nextExpires !== organization.licenseExpiresAt) data.licenseExpiresAt = nextExpires;
-  return data;
+function changedLicenseFields({ form }: FormDiff): Record<string, unknown> {
+  return form.license.trim() === "" ? {} : { license: form.license.trim() };
 }
 
 /** Credentials are write-only - the form starts empty and the server never
@@ -323,7 +309,6 @@ export function OrganizationEditDrawer({
       // A license key is credential material (a connected install derives its
       // token from it), so like the S3 fields below it is write-only.
       license: "",
-      licenseExpiresAt: toDateInputValue(organization.licenseExpiresAt),
       useCustomS3: !!organization.useCustomS3,
       // Credentials are write-only: the server doesn't echo them back in
       // list/getOne responses (see the Ops admin transport), so the form
@@ -569,14 +554,6 @@ function LicenseFields({ form, setField }: SectionProps) {
           Leave empty to keep the current license. Issue and manage licenses under Cloud admin,
           Licenses.
         </Field.HelperText>
-      </Field.Root>
-      <Field.Root>
-        <Field.Label>License expires at</Field.Label>
-        <Input
-          type="date"
-          value={form.licenseExpiresAt}
-          onChange={(e) => setField("licenseExpiresAt", e.target.value)}
-        />
       </Field.Root>
     </>
   );

@@ -7,8 +7,8 @@ import crypto from "crypto";
 
 import { describe, expect, it } from "vitest";
 
-import { SpanNormalizationPipelineService } from "#features/span/services/span-normalization.service";
 import { TraceCanonicalisationService } from "#features/derivation/services/trace-canonicalisation.service";
+import { SpanNormalizationPipelineService } from "#features/span/services/span-normalization.service";
 
 import { createTestSpan } from "../../eventing/__tests__/trace-summary-test.fixtures.ts";
 

@@ -14,6 +14,8 @@ export type Route =
 
 const TENANT_PATH = /^\/t\/(\d+)\/?$/u;
 const AUTHORIZE_PATH = /^\/t\/(\d+)\/oauth\/authorize\/?$/u;
+/** Social providers' endpoints answer JSON; the only page under them is the authorize picker. */
+const SOCIAL_PATH = /^\/t\/(\d+)\/social\/(google|github|gitlab|microsoft)\//u;
 
 export const routeOf = ({ pathname, search }: { pathname: string; search: string }): Route => {
   if (pathname === "/" || pathname === "") return { page: "landing" };
@@ -22,6 +24,12 @@ export const routeOf = ({ pathname, search }: { pathname: string; search: string
   const authorize = AUTHORIZE_PATH.exec(pathname)?.[1];
   if (authorize !== undefined) {
     return { page: "sign-in", tenantId: Number(authorize), query: search.replace(/^\?/u, "") };
+  }
+  const social = SOCIAL_PATH.exec(pathname);
+  if (social?.[1] !== undefined && social[2] !== undefined) {
+    const query = new URLSearchParams(search);
+    query.set("social", social[2]);
+    return { page: "sign-in", tenantId: Number(social[1]), query: query.toString() };
   }
   return { page: "not-found" };
 };

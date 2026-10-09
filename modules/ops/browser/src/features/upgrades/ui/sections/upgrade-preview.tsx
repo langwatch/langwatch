@@ -11,7 +11,7 @@ import {
   Wrap,
 } from "@langwatch/design-system/primitives";
 
-import { preflightLabel } from "../../model/upgrade-labels.ts";
+import { modeLabel, preflightLabel } from "../../model/upgrade-labels.ts";
 import type { UpgradePreviewView } from "../../model/upgrade-view.ts";
 import { UpgradeStatusBadge } from "../elements/upgrade-status-badge.tsx";
 
@@ -30,9 +30,7 @@ function PlannedReleases({ releases }: { releases: readonly PlannedRelease[] }) 
         <Table.Row>
           <Table.ColumnHeader>Release</Table.ColumnHeader>
           {STEP_GROUPS.map((group) => (
-            <Table.ColumnHeader key={group} textTransform="capitalize">
-              {group}
-            </Table.ColumnHeader>
+            <Table.ColumnHeader key={group}>{modeLabel(group)}</Table.ColumnHeader>
           ))}
         </Table.Row>
       </Table.Header>

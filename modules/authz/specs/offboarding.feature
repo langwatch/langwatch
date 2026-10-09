@@ -31,3 +31,10 @@ Feature: Offboarding removes access completely
     Given a role binding just written at project scope
     When the binding is read back
     Then it is present at that scope and at no ancestor scope
+
+  @unit
+  Scenario: A proven offboarding that took the seat records it once for organization
+    Given a member offboarded from an organization by an administrator
+    When the offboarding deletes their membership row
+    Then authz records one member_offboarded fact naming that administrator
+    And an offboarding that found the row already gone records nothing

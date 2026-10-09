@@ -7,6 +7,7 @@ import { gzipSync, gunzipSync } from "node:zlib";
 import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 
 import { scenarioRunExportRest } from "../scenario-run-export.rest.ts";
@@ -25,6 +26,7 @@ function buildApi(permitted = true) {
   const app = createApiFixture<ScenarioApi>({ downloadScenarioRunExport });
   const authorize = vi.fn(() => ({ permitted, organizationRole: null }));
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({ actor: null, scope: null }),
       identify: () => ({ actor: { type: "user", id: "user_1" }, scope: null }),

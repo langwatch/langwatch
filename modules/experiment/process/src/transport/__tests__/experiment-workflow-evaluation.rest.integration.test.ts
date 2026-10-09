@@ -14,6 +14,7 @@ import type { AuthzPermission } from "@langwatch/authorization";
 import type { ExperimentApi } from "@langwatch/experiment-contract";
 import { NotFoundError } from "@langwatch/handled-error";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import {
   WorkflowVersionRequiredError,
   type WorkflowEvaluationStarted,
@@ -40,6 +41,7 @@ function buildApi(options: {
   );
 
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: ({ permissions }) => {
         const missing = permissions.find(

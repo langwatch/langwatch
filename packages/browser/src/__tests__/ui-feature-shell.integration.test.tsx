@@ -114,7 +114,7 @@ function renderShell(Shell: UiProviderShell, page: ReactNode, host?: QueryClient
 }
 
 describe("given the shell apps/ui mounts around every routed page", () => {
-  describe("when a screen asks for a capability", () => {
+  describe("when a screen asks for a host service", () => {
     it("answers with the port the composition installed", () => {
       const shell = createUiFeatureShell({
         sessionQueryKey: TEST_SESSION_QUERY_KEY,
@@ -160,7 +160,7 @@ describe("given the shell apps/ui mounts around every routed page", () => {
 
   describe("when the composition installs a footer", () => {
     /** @scenario "The composition's footer reads the capabilities a screen does" */
-    it("draws it inside the capabilities, so it reads them as a screen does", () => {
+    it("draws it inside the host services, so it reads them as a screen does", () => {
       function Footer() {
         return <div data-testid="footer">{useUiHostServices().session.currentUser()?.id}</div>;
       }

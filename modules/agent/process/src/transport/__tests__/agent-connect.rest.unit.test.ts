@@ -12,6 +12,7 @@ import {
 import { ApiKeyPermissionDeniedError } from "@langwatch/api-key-contract";
 import { createRestRuntime, canonicalErrorResponse } from "@langwatch/api/rest";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { Hono } from "hono";
 /**
  * @vitest-environment node
@@ -30,6 +31,7 @@ function buildApi({
   const framesSpy = vi.fn(async () => ({ accepted: 1 }));
   const app = application ?? createApiFixture<AgentApi>({ connectFrames: framesSpy });
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: connectDoor(refusal ? { refusal } : {}),
   } as never);
   const hono = new Hono();

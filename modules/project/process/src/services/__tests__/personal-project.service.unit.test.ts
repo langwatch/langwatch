@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import { MemoryProjectDatabase } from "../../repositories/memory/memory.project.database.ts";
 import { MemoryProjectRepository } from "../../repositories/memory/memory.project.repository.ts";
 import { PersonalProjectService } from "../personal-project.service.ts";
+import { ProjectCredentialsService } from "../project-credentials.service.ts";
 
 const at = new Date("2026-01-01T00:00:00.000Z");
 const ALL_ON = { evaluations: true, datasets: true, annotations: true, automations: true };
@@ -48,16 +49,20 @@ function project(input: {
     langyEgressAllowlist: null,
     lastCodingAgentSessionAt: null,
     lastCodingAgentPullRequestAt: null,
+    aggregateRule: null,
   };
 }
 
 function setup(...rows: Project[]) {
   const memory = MemoryProjectDatabase.create();
   for (const row of rows) memory.putProject(row);
+  const revived: { projectId: string; organizationId: string }[] = [];
   const service = PersonalProjectService.create({
     projects: MemoryProjectRepository.create({ memory }),
+    credentials: ProjectCredentialsService.create(),
+    lifecycle: { revived: async (input) => void revived.push(input) },
   });
-  return { service, row: (id: string) => memory.findProject(id) };
+  return { service, revived, row: (id: string) => memory.findProject(id) };
 }
 
 describe("PersonalProjectService", () => {
@@ -88,13 +93,15 @@ describe("PersonalProjectService", () => {
 
   /** @scenario "A revived personal team revives its personal project" */
   it("revives the archived personal project in the revived team", async () => {
-    const { service, row } = setup(
+    const { service, row, revived } = setup(
       project({ id: "personal", teamId: "team-personal", isPersonal: true, archivedAt: at }),
     );
 
-    await service.revive({ teamId: "team-personal" });
+    await service.revive({ teamId: "team-personal", organizationId: "org_acme" });
+    await service.revive({ teamId: "team-personal", organizationId: "org_acme" });
 
     expect(row("personal")?.archivedAt).toBeNull();
+    expect(revived).toEqual([{ projectId: "personal", organizationId: "org_acme" }]);
   });
 
   /** @scenario "A personal workspace's feature switches land on its personal project" */
@@ -129,7 +136,7 @@ describe("creating a personal team's personal project", () => {
   };
 
   /** @scenario "A personal team's fact creates its personal project with a key project mints" */
-  it("creates the project under the fact's id and slug with a key in the pkey_ format", async () => {
+  it("creates the project under the fact's id and slug with a key no door resolves", async () => {
     const { service, row } = setup();
 
     await service.create(fact);
@@ -141,7 +148,7 @@ describe("creating a personal team's personal project", () => {
       isPersonal: true,
       ownerUserId: "user-1",
     });
-    expect(row("project-p")?.apiKey).toMatch(/^pkey_[A-Za-z0-9_-]{40}$/);
+    expect(row("project-p")?.apiKey).toMatch(/^lw-revoked-/);
   });
 
   /** @scenario "A personal team's fact delivered twice creates one personal project" */

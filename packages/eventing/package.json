@@ -1,6 +1,5 @@
 {
   "name": "@langwatch/eventing",
-  "langwatch": { "group": "framework" },
   "version": "0.1.0",
   "private": true,
   "description": "Event, aggregate, pipeline, projection, subscriber, process-manager, and replay contracts for LangWatch event-driven systems.",
@@ -35,6 +34,7 @@
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
+    "@langwatch/authorization": "workspace:*",
     "@langwatch/group-queue": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
@@ -56,5 +56,8 @@
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "langwatch": {
+    "group": "framework"
   }
 }

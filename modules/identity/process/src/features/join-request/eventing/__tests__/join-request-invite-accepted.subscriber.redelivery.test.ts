@@ -67,6 +67,7 @@ const CONTEXT = {
   tenantId: ACCEPTED.tenantId,
   aggregateId: ACCEPTED.organizationId,
   occurredAt: ACCEPTED.occurredAt,
+  createdAt: ACCEPTED.occurredAt,
   eventId: "event-1",
 };
 

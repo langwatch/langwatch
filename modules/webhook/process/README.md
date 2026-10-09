@@ -426,7 +426,7 @@ interface Response {
 
 ### `webhookEndpoints`
 
-Contract `../contract/src/webhook-endpoint.trpc.ts:72`, router `src/transport/webhook-endpoint.trpc.ts:13`.
+Contract `../contract/src/webhook-endpoint.trpc.ts:74`, router `src/transport/webhook-endpoint.trpc.ts:13`.
 
 | Procedure                     | Kind     | Gate                                 | Input                                    | Output                            |
 | ----------------------------- | -------- | ------------------------------------ | ---------------------------------------- | --------------------------------- |
@@ -447,7 +447,7 @@ Contract `../contract/src/webhook-endpoint.trpc.ts:72`, router `src/transport/we
 interface Input {
   organizationId: string;
 }
-// Output: inline, ../contract/src/webhook-endpoint.trpc.ts:76
+// Output: inline, ../contract/src/webhook-endpoint.trpc.ts:78
 type Output = {
   type: string;
   family: string;
@@ -458,7 +458,7 @@ type Output = {
 
 // webhookEndpoints.list
 type Input = z.infer<typeof webhookEndpointOrganizationScopeSchema>; // ../contract/src/webhook-endpoint.trpc.ts:19
-// Output: webhookEndpointViewSchema.array() (inline, ../contract/src/webhook-endpoint.trpc.ts:80)
+// Output: webhookEndpointViewSchema.array() (inline, ../contract/src/webhook-endpoint.trpc.ts:82)
 
 // webhookEndpoints.deliveries
 // Input: webhookEndpointDeliveriesInputSchema, ../contract/src/webhook-endpoint.trpc.ts:41
@@ -471,11 +471,11 @@ interface Input {
     id: string;
   };
 }
-type Output = z.infer<typeof webhookDeliveryPageSchema>; // ../contract/src/webhook.ts:120
+type Output = z.infer<typeof webhookDeliveryPageSchema>; // ../contract/src/webhook.ts:122
 
 // webhookEndpoints.create
 type Input = z.infer<typeof webhookEndpointCreateInputSchema>; // ../contract/src/webhook-endpoint.trpc.ts:47
-type Output = z.infer<typeof webhookEndpointWithSecretSchema>; // ../contract/src/webhook.ts:100
+type Output = z.infer<typeof webhookEndpointWithSecretSchema>; // ../contract/src/webhook.ts:102
 
 // webhookEndpoints.health
 // Input: webhookEndpointScopeSchema, ../contract/src/webhook-endpoint.trpc.ts:23
@@ -483,7 +483,7 @@ interface Input {
   organizationId: string;
   endpointId: string;
 }
-// Output: webhookEndpointHealthSchema, ../contract/src/webhook.ts:81
+// Output: webhookEndpointHealthSchema, ../contract/src/webhook.ts:83
 interface Output {
   status: "ACTIVE" | "DISABLED";
   disabledReason: string | null;
@@ -498,12 +498,12 @@ interface Output {
 }
 
 // webhookEndpoints.update
-type Input = z.infer<typeof webhookEndpointUpdateInputSchema>; // ../contract/src/webhook-endpoint.trpc.ts:58
+type Input = z.infer<typeof webhookEndpointUpdateInputSchema>; // ../contract/src/webhook-endpoint.trpc.ts:59
 type Output = z.infer<typeof webhookEndpointViewSchema>; // ../contract/src/webhook.ts:51
 
 // webhookEndpoints.rollSecret
 type Input = z.infer<typeof webhookEndpointScopeSchema>; // ../contract/src/webhook-endpoint.trpc.ts:23
-type Output = z.infer<typeof webhookEndpointWithSecretSchema>; // ../contract/src/webhook.ts:100
+type Output = z.infer<typeof webhookEndpointWithSecretSchema>; // ../contract/src/webhook.ts:102
 
 // webhookEndpoints.enable
 type Input = z.infer<typeof webhookEndpointScopeSchema>; // ../contract/src/webhook-endpoint.trpc.ts:23
@@ -515,7 +515,7 @@ type Output = z.infer<typeof webhookEndpointViewSchema>; // ../contract/src/webh
 
 // webhookEndpoints.archive
 type Input = z.infer<typeof webhookEndpointScopeSchema>; // ../contract/src/webhook-endpoint.trpc.ts:23
-// Output: inline, ../contract/src/webhook-endpoint.trpc.ts:112
+// Output: inline, ../contract/src/webhook-endpoint.trpc.ts:114
 type Output = unknown;
 ```
 
@@ -527,24 +527,25 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `webhook_delivery` (aggregate `webhook_spend_delivery`)
 
-Declared at `src/eventing/webhook-delivery.pipeline.ts:71`. Events: `webhookSpendDeliveryRequestedEventSchema`, `webhookGovernanceDeliveryRequestedEventSchema`.
+Declared at `src/eventing/webhook-delivery.pipeline.ts:74`. Events: `webhookSpendDeliveryRequestedEventSchema`, `webhookGovernanceDeliveryRequestedEventSchema`.
 
-The chain builds early when `!input.deliveryProcess || !input.governanceProcess || !input.gatewayEvents || !input.prune` (`src/eventing/webhook-delivery.pipeline.ts:81`); the rows built only past that return say so. The caller's arguments decide which role gets which build.
+The chain builds early when `!input.deliveryProcess || !input.governanceProcess || !input.gatewayEvents || !input.prune` (`src/eventing/webhook-delivery.pipeline.ts:85`); the rows built only past that return say so. The caller's arguments decide which role gets which build.
 
 | Kind            | Name                              | Handles                                                                                 | Declared at                                     | Built                |
 | --------------- | --------------------------------- | --------------------------------------------------------------------------------------- | ----------------------------------------------- | -------------------- |
-| command         | `requestSpendDelivery`            | –                                                                                       | `src/eventing/webhook-delivery.pipeline.ts:79`  | always               |
-| command         | `requestGovernanceDelivery`       | –                                                                                       | `src/eventing/webhook-delivery.pipeline.ts:80`  | always               |
-| process manager | `webhookDelivery`                 | ≈ applier `input.deliveryProcess`                                                       | `src/eventing/webhook-delivery.pipeline.ts:87`  | past the early build |
-| process manager | `governanceEventsDelivery`        | ≈ applier `input.governanceProcess`                                                     | `src/eventing/webhook-delivery.pipeline.ts:88`  | past the early build |
-| process manager | `webhookDeliveryPrune`            | every 1 d (`WEBHOOK_DELIVERY_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `prune` | `src/eventing/webhook-delivery.pipeline.ts:89`  | past the early build |
-| peer subscriber | `gatewaySpendAdmittedDelivery`    | `lw.gateway.spend.admitted` from [gateway](../../gateway/README.md)                     | `src/eventing/webhook-delivery.pipeline.ts:96`  | past the early build |
-| peer subscriber | `gatewaySpendConfirmedDelivery`   | `lw.gateway.spend.confirmed` from [gateway](../../gateway/README.md)                    | `src/eventing/webhook-delivery.pipeline.ts:97`  | past the early build |
-| peer subscriber | `gatewaySpendFailedDelivery`      | `lw.gateway.spend.failed` from [gateway](../../gateway/README.md)                       | `src/eventing/webhook-delivery.pipeline.ts:98`  | past the early build |
-| peer subscriber | `gatewaySpendSettledDelivery`     | `lw.gateway.spend.settled` from [gateway](../../gateway/README.md)                      | `src/eventing/webhook-delivery.pipeline.ts:99`  | past the early build |
-| peer subscriber | `gatewayBudgetCrossingDelivery`   | `lw.governance.budget_crossing` from [gateway](../../gateway/README.md)                 | `src/eventing/webhook-delivery.pipeline.ts:100` | past the early build |
-| peer subscriber | `gatewayVkLifecycleDelivery`      | `lw.governance.vk_lifecycle` from [gateway](../../gateway/README.md)                    | `src/eventing/webhook-delivery.pipeline.ts:101` | past the early build |
-| lane aliases    | `≈ MAIN_DELIVERY_MANAGER_ALIASES` | –                                                                                       | `src/eventing/webhook-delivery.pipeline.ts:102` | past the early build |
+| command         | `requestSpendDelivery`            | –                                                                                       | `src/eventing/webhook-delivery.pipeline.ts:82`  | always               |
+| command         | `requestGovernanceDelivery`       | –                                                                                       | `src/eventing/webhook-delivery.pipeline.ts:83`  | always               |
+| process manager | `webhookDelivery`                 | ≈ applier `input.deliveryProcess`                                                       | `src/eventing/webhook-delivery.pipeline.ts:91`  | past the early build |
+| process manager | `governanceEventsDelivery`        | ≈ applier `input.governanceProcess`                                                     | `src/eventing/webhook-delivery.pipeline.ts:92`  | past the early build |
+| process manager | `webhookDeliveryPrune`            | every 1 d (`WEBHOOK_DELIVERY_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `prune` | `src/eventing/webhook-delivery.pipeline.ts:93`  | past the early build |
+| peer subscriber | `gatewaySpendAdmittedDelivery`    | `lw.gateway.spend.admitted` from [gateway](../../gateway/README.md)                     | `src/eventing/webhook-delivery.pipeline.ts:100` | past the early build |
+| peer subscriber | `gatewaySpendConfirmedDelivery`   | `lw.gateway.spend.confirmed` from [gateway](../../gateway/README.md)                    | `src/eventing/webhook-delivery.pipeline.ts:101` | past the early build |
+| peer subscriber | `gatewaySpendFailedDelivery`      | `lw.gateway.spend.failed` from [gateway](../../gateway/README.md)                       | `src/eventing/webhook-delivery.pipeline.ts:102` | past the early build |
+| peer subscriber | `gatewaySpendSettledDelivery`     | `lw.gateway.spend.settled` from [gateway](../../gateway/README.md)                      | `src/eventing/webhook-delivery.pipeline.ts:103` | past the early build |
+| peer subscriber | `gatewayBudgetCrossingDelivery`   | `lw.governance.budget_crossing` from [gateway](../../gateway/README.md)                 | `src/eventing/webhook-delivery.pipeline.ts:104` | past the early build |
+| peer subscriber | `gatewayVkLifecycleDelivery`      | `lw.governance.vk_lifecycle` from [gateway](../../gateway/README.md)                    | `src/eventing/webhook-delivery.pipeline.ts:105` | past the early build |
+| retention       | `≈ input.retention`               | –                                                                                       | `src/eventing/webhook-delivery.pipeline.ts:84`  | always               |
+| lane aliases    | `≈ MAIN_DELIVERY_MANAGER_ALIASES` | –                                                                                       | `src/eventing/webhook-delivery.pipeline.ts:106` | past the early build |
 
 ### Tasks
 

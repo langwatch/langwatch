@@ -2,6 +2,7 @@ import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import { type LangyApi, LangyLocalRequestInvalidError } from "@langwatch/langy-contract";
 /** The control family hands the door's actor to one operation and answers its result (§8). */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 
 import { langyLocalControlDatedRests, langyLocalControlRest } from "../langy-local-control.rest.ts";
@@ -26,6 +27,7 @@ function family(actor: typeof OWNER | null, router = langyLocalControlRest) {
     })),
   };
   const hono = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: { authenticate: () => ({ actor, scope: { tier: "project", id: "project-1" } }) },
   }).mount(router.router(), {
     app: () => createApiFixture<LangyApi>(ops),

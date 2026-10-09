@@ -1,6 +1,5 @@
 {
   "name": "@langwatch/otlp",
-  "langwatch": { "group": "telemetry" },
   "version": "0.0.1",
   "private": true,
   "description": "The OTLP wire vocabulary shared by the log, metric and trace ingestion paths: the AnyValue schema, attribute-map flattening, and identifier decoding",
@@ -34,5 +33,8 @@
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
-  "packageManager": "pnpm@12.6.0"
+  "packageManager": "pnpm@12.6.0",
+  "langwatch": {
+    "group": "telemetry"
+  }
 }

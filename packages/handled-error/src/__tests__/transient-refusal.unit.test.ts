@@ -11,10 +11,10 @@ class Refusal extends HandledError {
 
 describe("isTransientRefusal", () => {
   /** @scenario "The transient allowlist is declared once" */
-  it("names exactly the two transient refusal codes", () => {
-    expect(TRANSIENT_REFUSAL_CODES).toHaveLength(2);
+  it("names exactly the three transient refusal codes", () => {
+    expect(TRANSIENT_REFUSAL_CODES).toHaveLength(3);
     expect(new Set(TRANSIENT_REFUSAL_CODES)).toEqual(
-      new Set(["clickhouse_overloaded", "service_unavailable"]),
+      new Set(["clickhouse_overloaded", "service_unavailable", "upgrade_in_progress"]),
     );
   });
 

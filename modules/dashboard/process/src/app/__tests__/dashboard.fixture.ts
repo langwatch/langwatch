@@ -92,6 +92,7 @@ export function createDashboardTestProjects(
     organizationId: organizationOf(id),
     isPersonal: false,
     ownerUserId: null,
+    kind: "application",
   });
   return createApiFixture<ProjectApi>({
     findSummaryById: async () => ({ name: "Project One", slug }),

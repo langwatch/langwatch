@@ -258,6 +258,7 @@ describe("the key row a project credential names", () => {
     organizationId: "organization-1",
     isPersonal: false,
     ownerUserId: null,
+    kind: "application",
   };
   const key = {
     type: "apiKey",

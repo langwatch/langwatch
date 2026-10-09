@@ -8,6 +8,7 @@ import { SessionReader, type SessionCaller } from "@langwatch/api/hosting";
 import { bindRestMiddleware, BrowserSessionIdentity, createRestRuntime } from "@langwatch/api/rest";
 import { AdminSurfaceHiddenError, type OpsApi } from "@langwatch/ops-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
@@ -51,7 +52,11 @@ function mount(app: OpsApi) {
     publicBaseUrl: void 0,
   });
 
-  return createRestRuntime({ identity: door, doors: { browser: door } }).mount(adminRest.router(), {
+  return createRestRuntime({
+    authorization: restTestAuthorization(),
+    identity: door,
+    doors: { browser: door },
+  }).mount(adminRest.router(), {
     app: () => app,
     onError: createErrorHandler(),
     facts: [

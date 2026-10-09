@@ -18,7 +18,7 @@ export const GRAPH_AUTOMATION_REACHES = {
  * Only what this repository touches, so composition names the slice it needs
  * rather than the whole generated client.
  */
-export type CustomGraphDatabase = Pick<PrismaClient, "customGraph">;
+type CustomGraphDatabase = Pick<PrismaClient, "customGraph">;
 
 export class PrismaCustomGraphRepository extends CustomGraphRepository {
   private constructor(private readonly database: CustomGraphDatabase) {

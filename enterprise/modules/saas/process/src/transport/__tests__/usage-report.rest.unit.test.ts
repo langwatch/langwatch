@@ -10,12 +10,14 @@ import {
  * operation behind each, a refusal crossing as its code.
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
 import { usageReportRest } from "../usage-report.rest.ts";
 
 function mount(app: Partial<SaasApi>) {
   return createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => {
         throw new Error("the usage-report receiver reads no credential");

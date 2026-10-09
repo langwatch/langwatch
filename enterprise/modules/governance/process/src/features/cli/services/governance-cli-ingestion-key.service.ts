@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import { AggregateProjectHasNoCredentialError } from "@langwatch/api-key-contract";
 import {
   governanceCliIngestionKeyAnswers,
   governanceCliIngestionKeysAnswers,
@@ -11,7 +13,6 @@ import {
   type GovernanceCliRawRequest,
   type GovernanceCliRequest,
 } from "@langwatch/enterprise-governance-contract";
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { HandledError } from "@langwatch/handled-error";
 
 import type { PersonalIngestionKeyService } from "../../personal/services/personal-ingestion-key.service.ts";
@@ -131,6 +132,10 @@ function renderIngestionKey(
         `No project "${outcome.projectRef}" in your organization`,
         404,
       );
+    case "aggregate-project-has-no-credential": {
+      const refusal = new AggregateProjectHasNoCredentialError();
+      return refuse(refusal.code, refusal.message, 403);
+    }
     case "personal-project-not-allowed":
       return refuse(
         "personal_project_not_allowed",

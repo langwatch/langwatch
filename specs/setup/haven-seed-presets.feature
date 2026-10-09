@@ -73,6 +73,16 @@ Feature: Seed presets — a database that is ready to look at
     When the prompt and the HTTP agent are opened
     Then both load the way the product reads them, ready to use
 
+  # The seed design (dev/docs/plans/seed-2026-10-09.md, 9.2) replaces the demo
+  # content with the startup persona. The scenario above is retired with
+  # storage-seed's HAVEN_SEED_PRESET=demo content when that is removed.
+  @unit
+  Scenario: The demo preset seeds the startup persona at the tiny tier
+    Given the stack is up
+    When I run "haven db seed demo"
+    Then "haven seed --size tiny --persona startup" runs against the stack
+    And the onboarding, post-onboarding and bare presets stay storage-seed switches
+
   # Cheap variants composed from switches the seed already understands:
   #   onboarding      — first-trace flag cleared: land on the onboarding journey
   #   post-onboarding — past onboarding without demo content

@@ -112,8 +112,16 @@ export default function ProjectsView() {
                 <Table.Cell fontSize="xs" color="fg.muted">
                   {project.id}
                 </Table.Cell>
-                <Table.Cell>{project.name}</Table.Cell>
-                <Table.Cell>{project.slug}</Table.Cell>
+                <Table.Cell maxWidth="280px">
+                  <Text truncate title={project.name}>
+                    {project.name}
+                  </Text>
+                </Table.Cell>
+                <Table.Cell maxWidth="200px">
+                  <Text truncate title={project.slug}>
+                    {project.slug}
+                  </Text>
+                </Table.Cell>
                 <Table.Cell>{project.language ?? <EmptyCell />}</Table.Cell>
                 <Table.Cell>{project.framework ?? <EmptyCell />}</Table.Cell>
                 <Table.Cell>

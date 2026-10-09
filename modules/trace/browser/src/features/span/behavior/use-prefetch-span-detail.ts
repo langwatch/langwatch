@@ -1,8 +1,7 @@
 import { useCallback } from "react";
 
+import { useTraceQueryArgs } from "../../../behavior/explorer/use-trace-query-args.ts";
 import { api } from "../../../behavior/trace-api.ts";
-import { useTraceDrawer } from "../../../behavior/trace-drawer.ts";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 
 /**
  * Returns a callback that prefetches span detail for a given span id under the
@@ -10,21 +9,22 @@ import { useOrganizationTeamProject } from "../../../behavior/use-organization-t
  * span list, span tabs) so detail is already cached by the time the user clicks.
  */
 export function usePrefetchSpanDetail() {
-  const { project } = useOrganizationTeamProject();
-  const traceId = useTraceDrawer((s) => s.traceId);
-  const occurredAtMs = useTraceDrawer((s) => s.occurredAtMs);
+  // The arguments `useSpanDetail` reads with, member included, as primitives so the
+  // callback keeps its identity across renders: span rows are memoised on it.
+  const { isReady, projectId, traceId, occurredAtMs, tenantId } = useTraceQueryArgs();
   const utils = api.useUtils();
 
   return useCallback(
     (spanId: string) => {
-      if (!project?.id || !traceId || !spanId) return;
+      if (!isReady || !traceId || !spanId) return;
       void utils.traces.spanDetail.prefetch({
-        projectId: project.id,
+        projectId,
         traceId,
-        spanId,
         ...(occurredAtMs !== null ? { occurredAtMs } : {}),
+        ...(tenantId !== null ? { tenantId } : {}),
+        spanId,
       });
     },
-    [project?.id, traceId, occurredAtMs, utils],
+    [isReady, projectId, traceId, occurredAtMs, tenantId, utils],
   );
 }

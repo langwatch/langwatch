@@ -44,7 +44,7 @@ function toPrismaJsonObject(value: Record<string, unknown>): Prisma.InputJsonObj
  * Only what this repository touches, so composition names the slice it needs
  * rather than the whole generated client.
  */
-export type TriggerDatabase = Pick<PrismaClient, "trigger" | "triggerSent" | "$queryRaw">;
+type TriggerDatabase = Pick<PrismaClient, "trigger" | "triggerSent" | "$queryRaw">;
 
 export class PrismaTriggerRepository extends TriggerRepository {
   private constructor(

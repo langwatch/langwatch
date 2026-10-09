@@ -21450,6 +21450,30 @@ func (e PostApiV1Query403JSONResponseBodyFault) Valid() bool {
 	}
 }
 
+// Defines values for PostApiV1Query404JSONResponseBodyFault.
+const (
+	PostApiV1Query404JSONResponseBodyFaultCustomer         PostApiV1Query404JSONResponseBodyFault = "customer"
+	PostApiV1Query404JSONResponseBodyFaultPlatform         PostApiV1Query404JSONResponseBodyFault = "platform"
+	PostApiV1Query404JSONResponseBodyFaultPresumedPlatform PostApiV1Query404JSONResponseBodyFault = "presumed_platform"
+	PostApiV1Query404JSONResponseBodyFaultProvider         PostApiV1Query404JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PostApiV1Query404JSONResponseBodyFault enum.
+func (e PostApiV1Query404JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PostApiV1Query404JSONResponseBodyFaultCustomer:
+		return true
+	case PostApiV1Query404JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiV1Query404JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PostApiV1Query404JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiV1Query422JSONResponseBodyFault.
 const (
 	PostApiV1Query422JSONResponseBodyFaultCustomer         PostApiV1Query422JSONResponseBodyFault = "customer"
@@ -23960,22 +23984,22 @@ func (e GetApiV1QuerySchema403JSONResponseBodyFault) Valid() bool {
 
 // Defines values for GetApiV1QuerySchema500JSONResponseBodyFault.
 const (
-	GetApiV1QuerySchema500JSONResponseBodyFaultCustomer         GetApiV1QuerySchema500JSONResponseBodyFault = "customer"
-	GetApiV1QuerySchema500JSONResponseBodyFaultPlatform         GetApiV1QuerySchema500JSONResponseBodyFault = "platform"
-	GetApiV1QuerySchema500JSONResponseBodyFaultPresumedPlatform GetApiV1QuerySchema500JSONResponseBodyFault = "presumed_platform"
-	GetApiV1QuerySchema500JSONResponseBodyFaultProvider         GetApiV1QuerySchema500JSONResponseBodyFault = "provider"
+	Customer         GetApiV1QuerySchema500JSONResponseBodyFault = "customer"
+	Platform         GetApiV1QuerySchema500JSONResponseBodyFault = "platform"
+	PresumedPlatform GetApiV1QuerySchema500JSONResponseBodyFault = "presumed_platform"
+	Provider         GetApiV1QuerySchema500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiV1QuerySchema500JSONResponseBodyFault enum.
 func (e GetApiV1QuerySchema500JSONResponseBodyFault) Valid() bool {
 	switch e {
-	case GetApiV1QuerySchema500JSONResponseBodyFaultCustomer:
+	case Customer:
 		return true
-	case GetApiV1QuerySchema500JSONResponseBodyFaultPlatform:
+	case Platform:
 		return true
-	case GetApiV1QuerySchema500JSONResponseBodyFaultPresumedPlatform:
+	case PresumedPlatform:
 		return true
-	case GetApiV1QuerySchema500JSONResponseBodyFaultProvider:
+	case Provider:
 		return true
 	default:
 		return false
@@ -44206,8 +44230,11 @@ type PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyScope string
 type PostApiV1QueryJSONBody struct {
 	GranularitySeconds *PostApiV1QueryJSONBody_GranularitySeconds                          `json:"granularitySeconds,omitempty"`
 	Parameters         *map[string]*PostApiV1QueryJSONBody_Parameters_AdditionalProperties `json:"parameters,omitempty"`
-	Sql                string                                                              `json:"sql"`
-	TimeWindow         *struct {
+
+	// ProjectId Narrows the run to this one project, which the key must hold analytics:view on. Without it the run spans every project the key can read.
+	ProjectId  *string `json:"projectId,omitempty"`
+	Sql        string  `json:"sql"`
+	TimeWindow *struct {
 		End   PostApiV1QueryJSONBody_TimeWindow_End   `json:"end"`
 		Start PostApiV1QueryJSONBody_TimeWindow_Start `json:"start"`
 	} `json:"timeWindow,omitempty"`
@@ -44289,6 +44316,9 @@ type PostApiV1Query401JSONResponseBodyFault string
 
 // PostApiV1Query403JSONResponseBodyFault defines parameters for PostApiV1Query.
 type PostApiV1Query403JSONResponseBodyFault string
+
+// PostApiV1Query404JSONResponseBodyFault defines parameters for PostApiV1Query.
+type PostApiV1Query404JSONResponseBodyFault string
 
 // PostApiV1Query422JSONResponseBodyFault defines parameters for PostApiV1Query.
 type PostApiV1Query422JSONResponseBodyFault string
@@ -157714,6 +157744,25 @@ type PostApiV1QueryResponse struct {
 		TraceId *string `json:"trace_id,omitempty"`
 		Type    string  `json:"type"`
 	}
+	JSON404 *struct {
+		Code      string                                  `json:"code"`
+		DocsUrl   *string                                 `json:"docs_url,omitempty"`
+		Fault     *PostApiV1Query404JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                  `json:"message"`
+		Meta      *map[string]interface{}                 `json:"meta,omitempty"`
+		Reasons   *[]interface{}                          `json:"reasons,omitempty"`
+		Retryable bool                                    `json:"retryable"`
+		SpanId    *string                                 `json:"span_id,omitempty"`
+		Tips      *[]string                               `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
 	JSON422 *struct {
 		Code      string                                  `json:"code"`
 		DocsUrl   *string                                 `json:"docs_url,omitempty"`
@@ -188351,6 +188400,31 @@ func ParsePostApiV1QueryResponse(rsp *http.Response) (*PostApiV1QueryResponse, e
 			return nil, err
 		}
 		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest struct {
+			Code      string                                  `json:"code"`
+			DocsUrl   *string                                 `json:"docs_url,omitempty"`
+			Fault     *PostApiV1Query404JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                  `json:"message"`
+			Meta      *map[string]interface{}                 `json:"meta,omitempty"`
+			Reasons   *[]interface{}                          `json:"reasons,omitempty"`
+			Retryable bool                                    `json:"retryable"`
+			SpanId    *string                                 `json:"span_id,omitempty"`
+			Tips      *[]string                               `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
 		var dest struct {

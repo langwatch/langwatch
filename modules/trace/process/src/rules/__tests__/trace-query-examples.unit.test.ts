@@ -14,7 +14,6 @@ import { describe, expect, it } from "vitest";
 
 import { traceQueryTranslation } from "../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
 
-const TENANT = "project-1";
 const WINDOW = { from: 1_700_000_000_000, to: 1_700_086_400_000 };
 
 describe("given the published trace filter examples", () => {
@@ -33,11 +32,10 @@ describe("given the published trace filter examples", () => {
         expect(describeAstProblem(parseTraceQuerySyntax(text))).toBeNull();
         const compiled = traceQueryTranslation.translateFilter({
           queryText: text,
-          tenantId: TENANT,
           timeRange: WINDOW,
         });
         expect(compiled?.sql).toBeTruthy();
-        expect(compiled?.params.tenantId).toBe(TENANT);
+        expect(compiled?.params).not.toHaveProperty("tenantId");
       },
     );
   });
@@ -46,15 +44,12 @@ describe("given the published trace filter examples", () => {
     /** @scenario "The filter's bound parameters cannot collide with the legacy filter's" */
     it("never emits a parameter the legacy builder also owns", () => {
       const legacyOwned = /^(f\d+_|spanWindowStart$|spanWindowEnd$)/;
-      const legacySharedValue = new Set(["tenantId"]);
       for (const example of TRACE_FILTER_EXAMPLES) {
         const compiled = traceQueryTranslation.translateFilter({
           queryText: example.text,
-          tenantId: TENANT,
           timeRange: WINDOW,
         });
         for (const name of Object.keys(compiled?.params ?? {})) {
-          if (legacySharedValue.has(name)) continue;
           expect(legacyOwned.test(name), `${example.id}: ${name}`).toBe(false);
         }
       }

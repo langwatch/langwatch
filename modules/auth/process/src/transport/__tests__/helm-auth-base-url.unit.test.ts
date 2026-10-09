@@ -34,23 +34,28 @@ const HELPERS = "charts/langwatch/templates/_helpers.tpl";
 const APP_DEPLOYMENT = "charts/langwatch/templates/app/deployment.yaml";
 const WORKERS_DEPLOYMENT = "charts/langwatch/templates/workers/deployment.yaml";
 
-/** The sharedEnv template block, from its define to the next define. */
-const sharedEnvBlock = (): string => {
+/** One template block of the helpers, from its define to the next define. */
+const defineBlock = ({ name }: { name: string }): string => {
   const helpers = read(HELPERS);
-  const start = helpers.indexOf('{{- define "langwatch.sharedEnv" }}');
+  const start = helpers.indexOf(`{{- define "${name}"`);
   if (start === -1) {
-    throw new Error(`no langwatch.sharedEnv define in ${HELPERS}`);
+    throw new Error(`no ${name} define in ${HELPERS}`);
   }
   const end = helpers.indexOf("{{- define ", start + 1);
   return helpers.slice(start, end === -1 ? undefined : end);
 };
+
+const sharedEnvBlock = (): string => defineBlock({ name: "langwatch.sharedEnv" });
 
 describe("helm chart auth base URL", () => {
   describe("when a pod other than the app runs the app image", () => {
     /** @scenario "The workers pod is told the public address" */
     it("carries NEXTAUTH_URL through sharedEnv into the workers container", () => {
       expect(sharedEnvBlock()).toContain("- name: NEXTAUTH_URL");
-      expect(read(WORKERS_DEPLOYMENT)).toContain('include "langwatch.sharedEnv"');
+      expect(read(WORKERS_DEPLOYMENT)).toContain('include "langwatch.workersContainer"');
+      expect(defineBlock({ name: "langwatch.workersContainer" })).toContain(
+        'include "langwatch.sharedEnv"',
+      );
       expect(read(APP_DEPLOYMENT)).toContain('include "langwatch.sharedEnv"');
     });
   });

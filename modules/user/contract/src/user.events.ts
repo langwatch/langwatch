@@ -44,3 +44,13 @@ export const userCreatedEventDataSchema = z.object({
   backfilled: z.boolean().optional(),
 });
 export type UserCreatedEventData = z.infer<typeof userCreatedEventDataSchema>;
+
+/**
+ * `organizationIds` names the organisations whose seat the erasure took; sole-owned ones went
+ * with it and are not named. Optional: facts recorded before 2026-10-09 carry none.
+ */
+export const userErasedEventDataSchema = z.object({
+  ...userLifecycleEventDataSchema.shape,
+  organizationIds: z.array(z.string().min(1)).optional(),
+});
+export type UserErasedEventData = z.infer<typeof userErasedEventDataSchema>;

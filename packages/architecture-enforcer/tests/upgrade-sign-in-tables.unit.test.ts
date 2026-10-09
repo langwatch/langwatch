@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import {
   lintUpgradeSignInTablesAt,
+  releasedThrough,
   signInTables,
 } from "../src/policies/persistence/upgrade-sign-in-tables.ts";
 import type { FeatureCatalogueEntry } from "../src/types.ts";
@@ -20,7 +21,20 @@ const REPOSITORY_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", ".."
 
 const roots: string[] = [];
 
-const SCHEMA = ["User", "Organization", "Session", "SsoConnection", "Role", "Dataset"]
+/** A fixture root is no clone, so it names the newest released migration itself. */
+const FIXTURE_RELEASED = "20261001120000_released";
+
+const SCHEMA = [
+  "User",
+  "Organization",
+  "Session",
+  "SsoConnection",
+  "Role",
+  "Dataset",
+  "ApiKey",
+  "Project",
+  "Monitor",
+]
   .map((model) => `model ${model} {\n  id String @id\n}\n`)
   .join("");
 
@@ -80,11 +94,13 @@ export class Repository { static readonly tables = prismaTables(${names}); }
       );
     },
     findings: () =>
-      lintUpgradeSignInTablesAt({ root, catalogue }).map((violation) => ({
-        file: violation.file.slice(root.length + 1),
-        message: violation.message,
-        allowed: violation.allowed,
-      })),
+      lintUpgradeSignInTablesAt({ root, catalogue, released: FIXTURE_RELEASED }).map(
+        (violation) => ({
+          file: violation.file.slice(root.length + 1),
+          message: violation.message,
+          allowed: violation.allowed,
+        }),
+      ),
     tables: () => [...signInTables({ root, catalogue })].toSorted(([a], [b]) => a.localeCompare(b)),
   };
 
@@ -146,17 +162,23 @@ describe("upgrade sign-in tables", () => {
   });
 
   /** @scenario "The sign-in owners are read from ownership claims" */
-  it("resolves exactly the tables the five sign-in owners claim", () => {
+  it("resolves exactly the tables the sign-in and ingest owners claim", () => {
     const world = fixture();
     world.claims("auth", "Session");
     world.claims("user", "User");
     world.claims("organization", "Organization");
     world.claims("authz", "Role");
     world.claims("identity", "SsoConnection");
+    world.claims("api-key", "ApiKey");
+    world.claims("project", "Project");
+    world.claims("monitor", "Monitor");
     world.claims("dataset", "Dataset");
 
     expect(world.tables()).toEqual([
+      ["ApiKey", "api-key"],
+      ["Monitor", "monitor"],
       ["Organization", "organization"],
+      ["Project", "project"],
       ["Role", "authz"],
       ["Session", "auth"],
       ["SsoConnection", "identity"],
@@ -164,9 +186,50 @@ describe("upgrade sign-in tables", () => {
     ]);
   });
 
+  /** @scenario "A blocking step touching a table an earlier release created is refused, naming it" */
+  it("reports a blocking step on a table created at or before the released migration", () => {
+    const world = fixture();
+    world.claims("dataset", "Dataset");
+    world.write(
+      "packages/prisma-client/prisma/migrations/20250101000000_dataset/migration.sql",
+      'CREATE TABLE "Dataset" ("id" TEXT);\n',
+    );
+    world.step({ owner: "dataset", mode: "blocking", sql: 'UPDATE "Dataset" SET "x" = 1' });
+
+    expect(world.findings()).toEqual([
+      {
+        file: "modules/dataset/process/src/repositories/prisma/prisma.dataset-migration.repository.ts",
+        message: 'Blocking step "dataset:fix-rows" touches Dataset, created before this release.',
+        allowed: expect.stringContaining("only tables created in its own release"),
+      },
+    ]);
+  });
+
+  /** @scenario "A blocking step touching only tables created in its own release passes" */
+  it("reports nothing when every table the step touches was created after the last release", () => {
+    const world = fixture();
+    world.claims("dataset", "Dataset");
+    world.write(
+      "packages/prisma-client/prisma/migrations/20991231000000_dataset/migration.sql",
+      'CREATE TABLE IF NOT EXISTS "Dataset" ("id" TEXT);\n',
+    );
+    world.step({ owner: "dataset", mode: "blocking", sql: 'UPDATE "Dataset" SET "x" = 1' });
+
+    expect(world.findings()).toEqual([]);
+    expect(releasedThrough({ root: REPOSITORY_ROOT }) >= "20261001120000").toBe(true);
+  });
+
+  /** @scenario "A clone without release tags fails the policy with the command that fetches them" */
+  it("refuses to guess the released migration where no release tag is readable", () => {
+    const root = mkdtempSync(join(tmpdir(), "upgrade-sign-in-tables-no-tags-"));
+    roots.push(root);
+
+    expect(() => releasedThrough({ root })).toThrow(/git fetch --tags origin/);
+  });
+
   describe("given the tree", () => {
     /** @scenario "The tree has no blocking step touching a sign-in table" */
-    it("finds no blocking step touching a sign-in table", () => {
+    it("finds no blocking step touching a sign-in table or an older one, beyond the open list", () => {
       const findings = lintUpgradeSignInTablesAt({
         root: REPOSITORY_ROOT,
         catalogue: readFeatureCatalogue(REPOSITORY_ROOT, []),

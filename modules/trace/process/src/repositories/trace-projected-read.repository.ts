@@ -1,3 +1,4 @@
+import type { Authorization } from "@langwatch/authorization";
 import type { ModelCostEstimateInput } from "@langwatch/model-provider-contract";
 import type {
   EvaluationTraceEvent,
@@ -32,7 +33,7 @@ export abstract class TraceProjectedReadRepository {
   abstract findIngestLag(input: { tenantId: string }): Promise<TraceIngestLagSample | null>;
 
   abstract listSummaryPage(input: {
-    tenantId: string;
+    authorization: Authorization;
     traceId: string;
     limit: number;
     cursor?: SpanTreeCursor;
@@ -45,7 +46,7 @@ export abstract class TraceProjectedReadRepository {
    * closing root span is observable by a live waterfall poll.
    */
   abstract findSummarySince(input: {
-    tenantId: string;
+    authorization: Authorization;
     traceId: string;
     sinceUpdatedAtMs: number;
   }): Promise<TraceSpanSummaryRecord[]>;

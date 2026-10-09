@@ -18,5 +18,5 @@ Feature: haven startup time
   # so each paid a cold transform of its whole module graph on every up.
   Scenario: The one-shot jobs reuse the stack's Node compile cache
     Given a stack whose lanes cache compiled modules per stack
-    When haven runs the codegen, prepare and seed jobs for an up
+    When haven runs the codegen, build and seed jobs for an up
     Then each job runs with the same per-stack compile cache as the lanes

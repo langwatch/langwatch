@@ -42,6 +42,9 @@ export interface ProjectionStoreContext {
    * on `readWindow` instead of deriving one from this value.
    */
   occurredAtMs?: number;
+  /** The event the executor is folding when it reads the store; anchors `readWindow`. A store
+   *  whose read is fenced by a proof (ADR-177 block C) names it as the read's purpose. */
+  eventId?: string;
 
   /**
    * Time bound for the store's backing-table read. Store passes it verbatim;

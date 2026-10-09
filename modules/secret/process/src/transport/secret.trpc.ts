@@ -38,5 +38,5 @@ export const secretTrpcTransport: TrpcRouterDeclaration<SecretApi, typeof secret
 
     .procedure("revealOnce")
     .withPermission("secrets:view")
-    .handle(async ({ app, input }) => app.revealOnce(input))
+    .handle(async ({ app, input, actor }) => app.revealOnce(input, actor))
     .build();

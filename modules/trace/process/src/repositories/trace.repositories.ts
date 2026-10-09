@@ -24,6 +24,7 @@ import type { TraceIndexMaterialisationRepository } from "./trace-index-material
 import type { TraceInstantEvalRunsReadRepository } from "./trace-instant-eval-runs.repository.ts";
 import type { TraceModelSpendRepository } from "./trace-model-spend.repository.ts";
 import type { TracePayloadReaderRepository } from "./trace-payload-reader.repository.ts";
+import type { TraceProjectedReadRepository } from "./trace-projected-read.repository.ts";
 import type { TraceSpanDedupRepository } from "./trace-span-dedup.repository.ts";
 import type { TraceSummaryFoldCacheRepository } from "./trace-summary-fold-cache.repository.ts";
 import type { TraceSummaryProjectionRepository } from "./trace-summary-projection.repository.ts";
@@ -46,6 +47,8 @@ export interface TraceRepositories {
   readonly summaryFoldCache: TraceSummaryFoldCacheRepository;
   readonly analyticsFoldCache: TraceAnalyticsFoldCacheRepository;
   readonly spanStorage: SpanStorageRepository;
+  /** The span tree's summary rows, read under the route's proof (ADR-177). */
+  readonly spanTree: TraceProjectedReadRepository;
   readonly existence: TraceExistenceRepository;
   readonly derivationSpans: TraceDerivationSpanReaderRepository;
   readonly summary: TraceSummaryRepository;

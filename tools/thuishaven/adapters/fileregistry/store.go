@@ -133,7 +133,11 @@ type selectionFields struct {
 	LLM          *bool `json:"llm"`
 	Analytics    *bool `json:"analytics"`
 	Outbound     *bool `json:"outbound"`
-	Telemetry    *bool `json:"telemetry"`
+	// Payment is stored as "paymentsim": every file written while the lane was
+	// opt-in says `"payment": false`, which would keep the new default off, so
+	// that key is no longer decoded (the "workers" precedent above).
+	Payment   *bool `json:"paymentsim"`
+	Telemetry *bool `json:"telemetry"`
 	// LegacyDesignSystem decodes the pre-rename key (`"storybook"`) a
 	// worktree's .haven.json may still carry. applyTo prefers the new key
 	// when both are present; WriteSelection never writes it, so the next
@@ -158,6 +162,7 @@ func (f selectionFields) applyTo(sel *domain.Selection) {
 		{f.LLM, nil, &sel.LLM},
 		{f.Analytics, nil, &sel.Analytics},
 		{f.Outbound, nil, &sel.Outbound},
+		{f.Payment, nil, &sel.Payment},
 		{f.Telemetry, nil, &sel.Telemetry},
 	} {
 		switch {
@@ -215,6 +220,7 @@ func (s *Store) WriteSelection(worktreeDir string, sel domain.Selection) error {
 		LLM:          &sel.LLM,
 		Analytics:    &sel.Analytics,
 		Outbound:     &sel.Outbound,
+		Payment:      &sel.Payment,
 		Telemetry:    &sel.Telemetry,
 	}}, "", "  ")
 	if err != nil {

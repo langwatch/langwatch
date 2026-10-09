@@ -4,6 +4,10 @@ import {
   type LangyCredentialSession,
 } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
+import {
+  AggregateProjectIsReadOnlyError,
+  isAggregateProjectKind,
+} from "@langwatch/project-contract";
 
 import type { LangyTurnServiceDeps } from "./langy-turn-shared.service.ts";
 
@@ -25,10 +29,27 @@ export class LangyTurnBaseDependenciesService {
     adoptConversationId?: boolean;
     modelOverride?: string;
   }): ReturnType<LangyTurnBaseDependenciesService["enrich"]> {
+    await this.refuseOnAggregate(input);
     const results = await this.read(input);
     const resolved = this.requireResolved(input.projectId, results);
 
     return this.enrich(input, resolved);
+  }
+
+  /**
+   * A turn writes a conversation, resolves a model and mints a key under the
+   * project; an aggregate takes none of it (ADR-177 decision 8), so the refusal
+   * comes first rather than whichever lookup fails on an aggregate.
+   */
+  private async refuseOnAggregate({
+    deps,
+    projectId,
+  }: {
+    deps: LangyTurnServiceDeps;
+    projectId: string;
+  }) {
+    const project = await deps.projects.findById(projectId);
+    if (isAggregateProjectKind(project?.kind)) throw new AggregateProjectIsReadOnlyError();
   }
 
   private read(input: Parameters<LangyTurnBaseDependenciesService["resolve"]>[0]) {

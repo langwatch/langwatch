@@ -20,6 +20,8 @@ const CONSOLES: Record<string, { label: string; group?: string }> = {
   voice: { label: "Voice", group: "Sims" },
   llm: { label: "LLM", group: "Sims" },
   analytics: { label: "Analytics", group: "Sims" },
+  outbound: { label: "Outbound", group: "Sims" },
+  telemetry: { label: "Telemetry", group: "Sims" },
   "design-system": { label: "Design system", group: "Tools" },
   "mail-room": { label: "Mail room", group: "Tools" },
   observability: { label: "Grafana", group: "Tools" },

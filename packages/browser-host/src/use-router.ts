@@ -121,11 +121,11 @@ function asAddress(to: UiRouterTarget, currentPathname: string): string {
  * `UiRoute.setQuery` takes. An address with a path is a navigation.
  */
 export function useRouter(): UiRouter {
-  const capabilities = useOptionalUiHostServices();
+  const hostServices = useOptionalUiHostServices();
 
   return useMemo(() => {
-    if (!capabilities) return NO_ROUTER;
-    const { route, navigation } = capabilities;
+    if (!hostServices) return NO_ROUTER;
+    const { route, navigation } = hostServices;
     const reading = route.reading();
     const pathname = reading.pathname ?? "";
 
@@ -153,5 +153,5 @@ export function useRouter(): UiRouter {
       replace: (to: UiRouterTarget) => go(to, { replace: true }),
       back: () => navigation.back(),
     };
-  }, [capabilities]);
+  }, [hostServices]);
 }

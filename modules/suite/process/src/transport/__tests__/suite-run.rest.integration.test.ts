@@ -12,6 +12,7 @@ import {
 import { HandledError } from "@langwatch/handled-error";
 import { suiteSchema, type SuiteApi, type SuiteRunResult } from "@langwatch/suite-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 
 import { suiteRunOriginFact } from "../../rules/suite-wire-v1.rules.ts";
@@ -57,6 +58,7 @@ function buildApi(run: (...args: never[]) => unknown) {
     getByIdOrTestSuite: async () => ({ kind: "suite", suite: storedPlan }),
   });
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } }),
     },

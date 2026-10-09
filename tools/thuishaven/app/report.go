@@ -161,6 +161,9 @@ func (o *Orchestrator) printStacks(r statusReport) {
 			}
 			fmt.Printf("  %s %-10s %s\n", dot, svc.Name, svc.URL)
 		}
+		if line := o.SeedStatusLine(s.Slug); line != "" {
+			fmt.Printf("  %s\n", line)
+		}
 	}
 }
 

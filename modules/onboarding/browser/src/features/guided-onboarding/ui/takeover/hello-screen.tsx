@@ -42,7 +42,7 @@ export function HelloScreen({
     <TakeoverRow fading={fading} maxWidth={640}>
       <Box
         minH="100px"
-        fontFamily="heading"
+        fontFamily="display"
         fontSize="36px"
         lineHeight="1.25"
         whiteSpace="pre-line"

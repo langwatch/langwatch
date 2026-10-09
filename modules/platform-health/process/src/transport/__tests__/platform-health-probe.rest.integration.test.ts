@@ -6,6 +6,7 @@ import type { SuiteApi } from "@langwatch/suite-contract";
  * `/api/health/*` pinned to main's statuses and bodies, over the real probes.
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
 import { MemorySubsystemProbeChannel } from "../../channels/memory/memory.subsystem-probe.channel.ts";
@@ -38,6 +39,7 @@ function probe() {
     }),
   });
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => {
         throw new Error("The probes resolve their own key.");

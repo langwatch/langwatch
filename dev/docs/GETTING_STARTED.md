@@ -86,9 +86,10 @@ stays as free to print, log and paste into an issue as it is today.
 Each application resolves the classified keys through an ordered chain before
 its Zod parse: shell environment and `.env` first, then 1Password if you opted
 in, then a refusal naming exactly what is missing. Do nothing and nothing
-changes. To keep credentials off your disk, set `LANGWATCH_SECRETS_VAULT` to a
-vault name and write `op://vault/item/field` where the value used to be.
-Resolution is never attempted when `NODE_ENV=production`, so a pod reads the
+changes. To keep credentials off your disk, set `LANGWATCH_OP_ACCOUNT`, put
+each one in your `Private` vault's `LangWatch` item as a field named after its
+id, and delete its `.env` line ([LOCAL_STACK.md](LOCAL_STACK.md#keeping-a-credential-in-1password)).
+`NODE_ENV=production` refuses the account by name, so a pod reads the
 environment Kubernetes gave it and holds no vault client.
 
 One rule, and it is not negotiable: never read `.env` to find a value, and never

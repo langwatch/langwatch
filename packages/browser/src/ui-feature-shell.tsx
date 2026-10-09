@@ -76,7 +76,7 @@ const EMPTY_QUERY_STORE: UiQueryStore = {
 export type UiFeatureShellInstall = {
   /** One entry per feature package whose hooks this application serves. */
   apis: readonly UiFeatureApiBinding[];
-  /** The capability ports the composing application answers itself. */
+  /** The host service ports the composing application answers itself. */
   capabilities: UiHostServiceInstall;
   /** Every installed module's drawers, as one registry. */
   drawers?: UiDrawerRegistry;
@@ -85,7 +85,7 @@ export type UiFeatureShellInstall = {
    * and the open drawer alike: a drawer reads the same `*HostApi` its screens do.
    */
   moduleHosts?: ComponentType<{ children?: ReactNode }>;
-  /** Drawn once beside the open drawer, so it reads the capabilities a screen does. */
+  /** Drawn once beside the open drawer, so it reads the host services a screen does. */
   footer?: ComponentType;
   /** The transport those hooks run on. Built same-origin when absent. */
   transport?: UiFeatureApiTransport;
@@ -262,7 +262,7 @@ export function createUiFeatureShell({
 }: UiFeatureShellInstall): UiProviderShell {
   // Chosen once per shell, never per render, so the hook it calls is the same
   // hook on every pass.
-  const useSessionCapability = session ?? useUnavailableUiSession;
+  const useSessionHostService = session ?? useUnavailableUiSession;
   // Every installed module's declared cache policies, as one plan.
   const cachePlan = cachePlanFor({ contracts: apis.flatMap((api) => api.contracts ?? []) });
   // The version each mirrored read was last stored under, shared by the mirror and the tab sync.
@@ -286,7 +286,7 @@ export function createUiFeatureShell({
     // read back out of the resolution: a refused session read is told through
     // it, and it is the only failure with nobody else to tell.
     const feedback = capabilities.feedback ?? UNAVAILABLE_UI_FEEDBACK;
-    const live: UiSessionHostServices = useSessionCapability({
+    const live: UiSessionHostServices = useSessionHostService({
       transport: sessionTransport,
       feedback,
     });

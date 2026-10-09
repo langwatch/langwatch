@@ -7,6 +7,7 @@ import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type * as observabilityModule from "@langwatch/observability";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 
 import { evaluationsLegacyRest } from "../evaluations-legacy.rest.ts";
@@ -32,6 +33,7 @@ describe("given an evaluate door", () => {
       "/api/guardrails/basic/evaluate",
     ])("answers %s with the framework's 400 malformed_request before the handler", async (path) => {
       const runtime = createRestRuntime({
+        authorization: restTestAuthorization(),
         identity: {
           authenticate: () => ({
             actor: { type: "user", id: "user-1" },
@@ -66,6 +68,7 @@ describe("given an evaluate door", () => {
 describe("given an evaluate door and a body that is JSON but not an evaluation", () => {
   const sendBody = (path: string, body: unknown) => {
     const runtime = createRestRuntime({
+      authorization: restTestAuthorization(),
       identity: {
         authenticate: () => ({
           actor: { type: "user", id: "user-1" },
@@ -117,6 +120,7 @@ describe("given an evaluate door reached with the evaluator in the path", () => 
   ])("resolves %s from the path value alone", async (path, slug) => {
     const findMonitorBySlug = vi.fn(() => Promise.resolve(null));
     const runtime = createRestRuntime({
+      authorization: restTestAuthorization(),
       identity: {
         authenticate: () => ({
           actor: { type: "user", id: "user-1" },

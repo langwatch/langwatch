@@ -15,6 +15,7 @@ import {
   isProjectScoped,
   leafCommands,
   projectSelectorOf,
+  QUERY_PROJECT_FLAG_HELP,
 } from "../utils/projectOption";
 
 // buildProgram() reads the tsup-injected __CLI_VERSION__ build constant,
@@ -91,6 +92,16 @@ describe("given the command tree the CLI runs", () => {
       expect(isProjectScoped(leafAt(program, path)), path).toBe(true);
     }
     expect(COMMANDS_ACROSS_PROJECTS).not.toHaveProperty("virtual-keys create");
+  });
+
+  it("tells query run's user that the flag narrows a run over every readable project", () => {
+    const run = leafAt(tree(), "query run");
+    const flag = run.options.find((option) => option.long === "--project");
+
+    expect(COMMANDS_ACROSS_PROJECTS).toHaveProperty("query run");
+    expect(isProjectScoped(run)).toBe(true);
+    expect(flag?.description).toBe(QUERY_PROJECT_FLAG_HELP);
+    expect(flag?.description).not.toContain("personal project");
   });
 
   it("records a reason for every command it exempts", () => {

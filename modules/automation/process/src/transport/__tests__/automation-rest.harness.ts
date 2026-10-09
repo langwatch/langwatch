@@ -12,6 +12,7 @@ import {
   type MountableRestApp,
 } from "@langwatch/api/rest";
 import type { AutomationApi } from "@langwatch/automation-contract";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 
 import { createAutomationRest } from "../automation.rest.ts";
 import { slackAutomationRest } from "../slack-trigger.rest.ts";
@@ -26,6 +27,7 @@ const defaultPlatformUrl = ({ projectSlug, path }: { projectSlug: string; path: 
 
 function runtime() {
   return createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({
         actor: { type: "user", id: "user_owner" },
@@ -99,6 +101,7 @@ export function mountSlackAutomationRest(app: Partial<AutomationApi>) {
 /** `/api/trigger/slack` for a caller the credential chain refuses: no handler is ever reached. */
 export function mountSlackAutomationRestForUnauthenticatedCaller(app: Partial<AutomationApi>) {
   const refusing = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => {
         throw new ProjectMissingCredentialsError();

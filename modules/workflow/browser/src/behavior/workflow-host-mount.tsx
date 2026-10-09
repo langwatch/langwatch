@@ -1,6 +1,6 @@
 /**
  * Workflow's answer to the host its screens, and experiment's, declare: every
- * action projects a `@langwatch/browser-host` capability and is published as the
+ * action projects a `@langwatch/browser-host` host service and is published as the
  * `workflow:host` slice, so the module mounts it, not the application.
  */
 
@@ -24,7 +24,7 @@ import type {
   WorkflowRouteReading,
   WorkflowScope,
 } from "../model/workflow-host.ts";
-import { workflowHostSlice } from "./workflow-host.store.ts";
+import { useWorkflowHostSlice } from "./workflow-host.store.ts";
 
 function capabilityWorkflowHost({
   scopeHost,
@@ -109,7 +109,7 @@ export default function WorkflowHostMount({ children }: { children?: ReactNode }
   );
 
   useLayoutEffect(() => {
-    workflowHostSlice.setState(host, true);
+    useWorkflowHostSlice.setState(host, true);
     setPublished(true);
   }, [host]);
 

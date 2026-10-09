@@ -1,10 +1,10 @@
 import type {
-  HttpDestinationRequest,
   HttpDestinationResponse,
+  HttpWebhookRequest,
 } from "../http/http.destination.channel.ts";
 import type { HttpWebhookSender } from "../webhook-destination.channel.ts";
 
-type RecordedHttpRequest = Omit<HttpDestinationRequest, "tls">;
+type RecordedHttpRequest = HttpWebhookRequest;
 
 /** The HTTP channel's memory twin: keeps each request, opens no connection, answers 200. */
 export class MemoryHttpDestinationChannel implements HttpWebhookSender {

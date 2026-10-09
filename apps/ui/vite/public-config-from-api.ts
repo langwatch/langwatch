@@ -10,11 +10,6 @@ import {
 const META_CONTENT = new RegExp(`<meta name="${PUBLIC_APP_CONFIG_META_NAME}" content="([^"]+)"`);
 const RETRY_EVERY_MS = 500;
 
-/** Served instead of the app until the api has answered once: it reloads itself, never a 500. */
-export const WAITING_FOR_API_PAGE =
-  '<!doctype html><meta http-equiv="refresh" content="2"><title>Waiting for the api</title>' +
-  "<p>The dev server is waiting for the api to answer; this page reloads itself.</p>";
-
 /**
  * The meta tag the api renders into its own shell, lifted unchanged. The api may still be
  * booting, so an unanswered address is retried until `waitMs` lapses, then named in the refusal.
@@ -55,8 +50,9 @@ export async function fetchPublicConfigFromApi({
 }
 
 /**
- * The page for a shell, read per request: waits only for the api's first answer, then keeps the
- * last config while a reload has it briefly down; with none yet, the waiting page.
+ * The page for a shell, read per request and never waited on: the api's config once it answers,
+ * the last config while a reload has it briefly down, and with none yet the bare shell, which
+ * boots into the browser's waiting page (apps/ui/src/shell/ui-waiting-for-api-page.tsx).
  */
 export function publicConfigPages({
   apiUrl,
@@ -68,13 +64,15 @@ export function publicConfigPages({
   fetchShell?: (url: string) => Promise<Response>;
 }): (html: string) => Promise<string> {
   let last: PublicAppConfig | undefined;
+  let warned = false;
   return async (html) => {
     try {
-      last = await fetchPublicConfigFromApi({ apiUrl, waitMs: last ? 0 : 3_000, fetchShell });
+      last = await fetchPublicConfigFromApi({ apiUrl, waitMs: 0, fetchShell });
     } catch (failure) {
-      if (!last) warn(failure instanceof Error ? failure.message : String(failure));
+      if (!last && !warned) warn(failure instanceof Error ? failure.message : String(failure));
+      warned = true;
     }
-    return last ? injectPublicAppConfigIntoHtml({ html, config: last }) : WAITING_FOR_API_PAGE;
+    return last ? injectPublicAppConfigIntoHtml({ html, config: last }) : html;
   };
 }
 

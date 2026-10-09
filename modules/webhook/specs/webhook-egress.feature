@@ -141,6 +141,21 @@ Feature: The fence a customer-supplied webhook leaves through
       When a real dispatch is attempted for a scope
       Then the cap is asked once, for that scope's hourly window
 
+  Rule: A receiver's certificate is verified unless a self-hosted endpoint opted out
+
+    @unit
+    Scenario: A self-hosted endpoint verifies the receiver's certificate unless it opted out
+      Given a self-hosted deployment
+      When an endpoint delivers without the self-signed certificate opt-in
+      Then the receiver's TLS certificate is verified
+      And an endpoint that opted in accepts a self-signed certificate
+
+    @unit
+    Scenario: The hosted product verifies every receiver's certificate
+      Given the hosted product
+      When any endpoint delivers, opted in or not
+      Then the receiver's TLS certificate is verified
+
   Rule: The receiver can prove the bytes are ours
 
     @unit

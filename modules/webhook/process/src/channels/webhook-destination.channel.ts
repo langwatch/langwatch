@@ -2,8 +2,8 @@ import type { MessageAttributeValue } from "@aws-sdk/client-sqs";
 import type { AwsClientConfig, AwsClientConfigInput } from "@langwatch/aws-client";
 
 import type {
-  HttpDestinationRequest,
   HttpDestinationResponse,
+  HttpWebhookRequest,
 } from "./http/http.destination.channel.ts";
 
 export type AwsClientConfigResolver = (input: AwsClientConfigInput) => AwsClientConfig;
@@ -30,5 +30,5 @@ export interface SqsWebhookSender {
 
 /** One request to a customer URL, through the address fence; TLS is the sender's own. */
 export interface HttpWebhookSender {
-  send(request: Omit<HttpDestinationRequest, "tls">): Promise<HttpDestinationResponse>;
+  send(request: HttpWebhookRequest): Promise<HttpDestinationResponse>;
 }

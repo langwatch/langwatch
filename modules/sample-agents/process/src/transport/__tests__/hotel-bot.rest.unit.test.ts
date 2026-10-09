@@ -16,6 +16,7 @@ import {
   type SampleAgentsApi,
 } from "@langwatch/sample-agents-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
 import { hotelBotRest } from "../hotel-bot.rest.ts";
@@ -44,16 +45,17 @@ function mount(app: Partial<SampleAgentsApi>) {
     publicBaseUrl: void 0,
   });
 
-  return createRestRuntime({ identity: door, doors: { browser: door } }).mount(
-    hotelBotRest.router(),
-    {
-      app: () => createApiFixture<SampleAgentsApi>(app),
-      onError: createCanonicalFamilyErrorHandler({
-        loggerName: "langwatch:test:hotel-bot",
-        label: "Hotel bot",
-      }),
-    },
-  );
+  return createRestRuntime({
+    authorization: restTestAuthorization(),
+    identity: door,
+    doors: { browser: door },
+  }).mount(hotelBotRest.router(), {
+    app: () => createApiFixture<SampleAgentsApi>(app),
+    onError: createCanonicalFamilyErrorHandler({
+      loggerName: "langwatch:test:hotel-bot",
+      label: "Hotel bot",
+    }),
+  });
 }
 
 function callHotelBot({ cookie }: { cookie: string | null }) {

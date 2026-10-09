@@ -1,4 +1,5 @@
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import {
   PrismaConfigService,
@@ -54,6 +55,7 @@ describe.skipIf(!DB_URL)("the live project repositories over Postgres", () => {
       repository: repositories.projects,
       credentials,
       organizations: createApiFixture<OrganizationApi>({}, "organizations"),
+      authorization: createApiFixture<AuthzApi>({}),
     }),
     storageSettings: repositories.storageSettings,
     auditLog: createApiFixture<AuditLogApi>({}, "auditLog"),

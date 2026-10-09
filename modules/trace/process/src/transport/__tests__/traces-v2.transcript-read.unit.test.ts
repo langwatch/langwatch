@@ -6,8 +6,9 @@
 
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { openProtections } from "../../repositories/clickhouse/__tests__/open-protections.ts";
+import { ownProof } from "../../__tests__/support/authorization-proofs.fixture.ts";
 import { TraceTranscriptReadService } from "../../features/read/services/trace-transcript-read.service.ts";
+import { openProtections } from "../../repositories/clickhouse/__tests__/open-protections.ts";
 import {
   createTranscriptApp,
   createTranscriptReadPorts,
@@ -64,6 +65,7 @@ describe("readCodingAgentTranscript", () => {
       const transcript = await traceTranscriptReadService.readCodingAgentTranscript({
         reads: app,
         ports,
+        authorization: ownProof({ projectId: PROJECT_ID }),
         projectId: PROJECT_ID,
         traceId: TRACE_ID,
         protections: openProtections,
@@ -96,6 +98,7 @@ describe("readCodingAgentTranscript", () => {
       const transcript = await traceTranscriptReadService.readCodingAgentTranscript({
         reads: app,
         ports,
+        authorization: ownProof({ projectId: PROJECT_ID }),
         projectId: PROJECT_ID,
         traceId: TRACE_ID,
         protections: openProtections,

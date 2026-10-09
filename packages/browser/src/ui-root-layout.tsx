@@ -15,7 +15,7 @@ export type UiRootLayoutInstall = {
   innerProvider: UiProviderShell;
   /**
    * What this package mounts around the page: the browser transport its
-   * feature packages run on, and the capability ports a screen asks. Inside
+   * feature packages run on, and the host service ports a screen asks. Inside
    * the error boundary, so a fault in either shows the page fallback.
    */
   featureShell: UiProviderShell;

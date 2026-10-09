@@ -245,6 +245,12 @@ const registry = {
       "If it persists, check the LangWatch status page or contact support",
     ],
   },
+  upgrade_in_progress: {
+    tips: [
+      "Wait the Retry-After seconds and send the call again; the upgrade finishes on its own",
+      "If it lasts, an operator can follow the upgrade on Ops > Upgrades",
+    ],
+  },
   clickhouse_overloaded: {
     tips: [
       "Too many queries were running at once; retry in a few seconds",

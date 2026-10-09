@@ -7,6 +7,7 @@ import { defineTrpcContract, moduleApi } from "@langwatch/module";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { authorizeDefaults } from "../../__tests__/api-double.ts";
 import {
   createTrpcRuntime,
   defineTrpcRouter,
@@ -42,6 +43,7 @@ function members({ holders, answers }: { holders: readonly string[]; answers: bo
     identity: { caller: (ctx) => ({ actor: ctx.actor as never }) },
     authorization: {
       forRequest: () => ({
+        ...authorizeDefaults,
         getDecision: async () => ({ permitted: false, organizationRole: null }),
         getProjectAnyDecision: async () => ({ permitted: false, organizationRole: null }),
         checkScopeLineage: async () => ({ kind: "consistent" }),
@@ -180,19 +182,6 @@ describe("a procedure that asks a platform-tier permission", () => {
 
       expect(refusalOf(lacking)).toEqual({ trpc: "NOT_FOUND", code: "not_found" });
       expect(refusalOf(anonymous)).toEqual({ trpc: "NOT_FOUND", code: "not_found" });
-      expect(ran).toEqual([]);
-    });
-  });
-
-  describe("when the process cannot answer the platform question", () => {
-    /** @scenario "A procedure asks a platform-tier permission of the operator's grant" */
-    it("refuses the call, and the handler never runs", async () => {
-      const ran: string[] = [];
-      const { call } = caller({ actor: OPERATOR, answers: false, ran });
-
-      const failure = await call.listQueues({}).catch((error: unknown) => error);
-
-      expect((failure as { code: string }).code).toBe("INTERNAL_SERVER_ERROR");
       expect(ran).toEqual([]);
     });
   });

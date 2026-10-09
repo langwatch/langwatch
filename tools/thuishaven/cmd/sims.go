@@ -15,7 +15,7 @@ import (
 // skill is the .claude/skills directory that teaches it.
 var simulators = []struct{ name, skill string }{
 	{"mail", "mailsim"}, {"idp", "idpsim"}, {"storage", "storagesim"}, {"llm", "llmsim"},
-	{"voice", "voicesim"}, {"analytics", "analyticssim"}, {"outbound", "outboundsim"}, {"telemetry", "telemetrysim"},
+	{"voice", "voicesim"}, {"analytics", "analyticssim"}, {"outbound", "outboundsim"}, {"payment", "paymentsim"}, {"telemetry", "telemetrysim"},
 }
 
 // simSpecs is the command table, read at init: the sims command sits in the

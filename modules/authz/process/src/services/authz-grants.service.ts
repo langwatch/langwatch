@@ -71,6 +71,10 @@ import {
   AuthzGrantWriterService,
   type AuthzGrantWriterPermissions,
 } from "./authz-grant-writer.service.ts";
+import {
+  AuthzMemberOffboardedNoticeService,
+  type AuthzMemberOffboardedNotice,
+} from "./authz-member-offboarded-notice.service.ts";
 import { AuthzOffboardingService } from "./authz-offboarding.service.ts";
 
 /**
@@ -87,6 +91,8 @@ type AuthzGrantsServiceOptions = {
   bindings: AuthzManagedGrantRepository;
   /** The permission side's reads the writer's guards need (escalation, limit, last admin). */
   permissions: AuthzGrantWriterPermissions;
+  /** Absent where nothing offboards; an unconnected notice refuses loudly when one does. */
+  offboarded?: AuthzMemberOffboardedNotice;
 };
 
 type AuthzAttachGrantRequest = Omit<AuthzAttachGrantInput, "actor" | "where"> & {
@@ -120,7 +126,10 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
         writer: bindingWriter,
         permissions: options.permissions,
       }),
-      offboarding: AuthzOffboardingService.create(options.repository),
+      offboarding: AuthzOffboardingService.create({
+        repository: options.repository,
+        offboarded: options.offboarded ?? AuthzMemberOffboardedNoticeService.create(),
+      }),
       guards: AuthzGrantGuardsService.create({ repository: options.repository }),
     });
   }
@@ -365,6 +374,18 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
   async revokeResourceGrants(args: AuthzRevokeResourceGrantsInput): Promise<void> {
     return this.options.ledger.revokeResourceGrants(args);
   }
+
+  findLiveSharedProjectGrants: AuthzCompatibilityLedger["findLiveSharedProjectGrants"] = (args) =>
+    this.options.ledger.findLiveSharedProjectGrants(args);
+
+  attachSharedProjectGrant: AuthzCompatibilityLedger["attachSharedProjectGrant"] = (args) =>
+    this.options.ledger.attachSharedProjectGrant(args);
+
+  awaitSharedProjectGrants: AuthzCompatibilityLedger["awaitSharedProjectGrants"] = (args) =>
+    this.options.ledger.awaitSharedProjectGrants(args);
+
+  revokeSharedProjectGrants: AuthzCompatibilityLedger["revokeSharedProjectGrants"] = (args) =>
+    this.options.ledger.revokeSharedProjectGrants(args);
 
   async changeBindingRole({ caller, ...args }: AuthzChangeBindingRoleInput): Promise<void> {
     await this.bindingWriter.assertRoleChangeWithinCaller({ ...args, caller });

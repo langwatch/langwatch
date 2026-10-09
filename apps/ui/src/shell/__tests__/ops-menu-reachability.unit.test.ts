@@ -46,7 +46,7 @@ function isClaimedBy({
 
 describe("given the internal ops pages the route table registers", () => {
   const addresses = registeredOpsRoutes();
-  const menu = [opsGroup(), instanceGroup(), cloudAdminGroup()];
+  const menu = [opsGroup({ hasCloudOps: true }), instanceGroup(), cloudAdminGroup()];
 
   // Both readings are of hand-maintained tables, so a rename that stops one
   // matching would otherwise leave a test passing on nothing at all.
@@ -85,7 +85,7 @@ describe("given the internal ops pages the route table registers", () => {
 
     /** @scenario "Every page this surface adds opens from the operator menu" */
     it("resolves to a route registered for that exact path", () => {
-      const groups = [opsGroup(), instanceGroup(), cloudAdminGroup()];
+      const groups = [opsGroup({ hasCloudOps: true }), instanceGroup(), cloudAdminGroup()];
       const offered = groups.flatMap((group) => group.items).find((item) => item.href === LOOKUP);
       expect(offered).toBeDefined();
 
@@ -103,12 +103,16 @@ describe("given the internal ops pages the route table registers", () => {
       // address through `alsoActiveAt` is how a workspace owns a page that
       // does not sit under its prefix — an entry of its own here would put
       // the tool back in the menu, which is what this change removed.
-      expect(opsGroup().items.some((item) => item.href === address)).toBe(false);
+      expect(opsGroup({ hasCloudOps: true }).items.some((item) => item.href === address)).toBe(
+        false,
+      );
     });
 
     /** @scenario The event-sourcing tools are offered inside their workspace */
     it.each(TOOLS)("%s is claimed by the Event Sourcing entry", (address) => {
-      const eventSourcing = opsGroup().items.find((item) => item.label === "Event Sourcing");
+      const eventSourcing = opsGroup({ hasCloudOps: true }).items.find(
+        (item) => item.label === "Event Sourcing",
+      );
       if (!eventSourcing) throw new Error("no Event Sourcing menu entry");
 
       expect(eventSourcing.alsoActiveAt).toContain(address);

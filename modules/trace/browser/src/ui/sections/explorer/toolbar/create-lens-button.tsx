@@ -1,9 +1,11 @@
 import { Box, Button, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { isAggregateProjectKind } from "@langwatch/project-contract";
 import type React from "react";
 import { LuPlus } from "react-icons/lu";
 
 import { useViewStore } from "../../../../behavior/explorer.store.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { LensNamePopover } from "../../../elements/explorer/toolbar/lens-name-popover.tsx";
 
 const BETA_TOOLTIP =
@@ -15,6 +17,10 @@ const BETA_TOOLTIP =
  */
 export const CreateLensButton: React.FC = () => {
   const createLens = useViewStore((s) => s.createLens);
+  const { project } = useOrganizationTeamProject();
+  const canSaveLenses = !isAggregateProjectKind(project?.kind);
+
+  if (!canSaveLenses) return null;
 
   return (
     // Tooltip wraps a Box that *contains* the Popover instead of wrapping the

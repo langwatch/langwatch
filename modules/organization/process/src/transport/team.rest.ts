@@ -56,6 +56,8 @@ export interface TeamManagementApi
   listProjectsByTeam(input: {
     organizationId: string;
     teamId: string;
+    /** The key owner; an aggregate is listed only to an organisation admin. */
+    callerUserId: string | null;
   }): Promise<Pick<Project, "id" | "name" | "slug" | "createdAt" | "updatedAt">[]>;
 }
 
@@ -295,7 +297,7 @@ export const teamsRest: Readonly<{
     tags: ["Teams"],
     description: "List projects in a team",
   })
-  .handle(async ({ app, input, scope }) => {
+  .handle(async ({ app, input, scope, actor }) => {
     await app.getTeam({
       teamId: input.teamId,
       organizationId: scope.id,
@@ -304,6 +306,7 @@ export const teamsRest: Readonly<{
     const projects = await app.listProjectsByTeam({
       organizationId: scope.id,
       teamId: input.teamId,
+      callerUserId: actor?.type === "user" ? (actor.id ?? null) : null,
     });
 
     return {

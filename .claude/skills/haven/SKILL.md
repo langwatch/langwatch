@@ -133,6 +133,14 @@ for ours (`tools/thuishaven/app/identity.go`).
   name that looks like a credential (`tools/thuishaven/domain/secretkeys.go`).
 - The workspace `.env` beats haven's overlay. A value you set there wins; haven fills only
   what is unset.
+- Stack credentials are made up by haven, per stack: `NEXTAUTH_SECRET`, `CREDENTIALS_SECRET`,
+  `LANGWATCH_INSTANCE_ADMIN_API_KEY`, `HAVEN_SEED_SCIM_TOKEN`. They live in haven's own state, survive
+  down/up and rotate only on `haven destroy`. No real key, no 1Password.
+- Stripe is paymentsim on every stack unless `.env` sets a Stripe key; then that key is used.
+  `haven up` prints `Stripe: paymentsim` or `Stripe: your key from .env` (`paymentsim` skill).
+- `haven seed` ends with the admin login, the org, team and project slugs, the project API key, the
+  personal access token, the SCIM token and the instance admin key: masked, `--reveal` shows them,
+  `--json` gives one object.
 
 ## Other commands you will want
 
@@ -145,6 +153,7 @@ for ours (`tools/thuishaven/app/identity.go`).
 | Add or drop a service, sticky              | `haven up +langy`, `haven up -mail`                 |
 | Evaluators (monitors, evaluations)         | `haven up +langevals`                               |
 | Zero-cost model answers                    | `haven up +llm`                                     |
+| Logins and stack credentials               | `haven seed --json --reveal`, `haven env --reveal`  |
 | Try a PR in its own worktree               | `haven pr <number>`                                 |
 | Run a heavy command under the machine slot | `haven run`, `haven slot run -- <cmd>`              |
 

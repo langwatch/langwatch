@@ -1,10 +1,4 @@
-import {
-  RawHttpHost,
-  RawSocketHost,
-  routesServingWhileUpgrading,
-  type TransportPeers,
-  WebSocketHost,
-} from "@langwatch/api";
+import { RawHttpHost, RawSocketHost, type TransportPeers, WebSocketHost } from "@langwatch/api";
 import type { SurfaceDefaultsOptions } from "@langwatch/api/policy";
 import { ModuleApiToken } from "@langwatch/module";
 import { OperatorReadsResolver } from "@langwatch/prisma-client";
@@ -14,7 +8,6 @@ import type { SecretsResolver } from "@langwatch/secrets";
 import { z } from "zod";
 
 import { bootInstalledProcess } from "./boot-installed-process.ts";
-import { UPGRADING_PHASE } from "./lifecycle/liveness-thread.ts";
 import { processShutdownDeadlineMs } from "./lifecycle/shutdown-deadline.ts";
 import {
   type UpgradeGate,
@@ -257,12 +250,8 @@ export class ProcessServer implements ProcessBoot {
         role,
         gate,
         logger,
-        onHolding: (holding) =>
-          this.server.holdForUpgrade(
-            holding,
-            holding?.phase === UPGRADING_PHASE ? routesServingWhileUpgrading() : [],
-          ),
         onFailed: (upgradeConsole) => this.server.consoleForUpgrade(upgradeConsole),
+        onConsoleLifted: () => this.server.liftUpgradeConsole(),
       }),
     );
   }

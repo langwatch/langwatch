@@ -283,6 +283,13 @@ Feature: Shared organization service
       Then no seat revocation is recorded
 
     @unit
+    Scenario: Re-enabling a member records that their seat was given back
+      Given a disabled member of an organization
+      When an administrator re-enables that member
+      Then the membership is written first
+      And organization records that member as re-enabled, naming who re-enabled them
+
+    @unit
     Scenario: A process that cannot record the seat revocation refuses the disable
       Given a process in which organization's lifecycle pipeline is not registered
       When an administrator disables a member
@@ -374,3 +381,17 @@ Feature: Shared organization service
     When the worker's installed modules list their upgrade steps
     Then organization:record-presence-settings is a background data step
     And it runs only once no older image serves
+
+  @unit
+  Scenario: A peer's member fact reaches organization with the fact's own moment
+    Given authz records a proven offboarding, or user records an erasure naming the organisations it sat in
+    When organization hears the fact from its own side
+    Then it records the member removal for each organisation named, keyed on the fact's occurredAt
+    And an erasure records nobody as the remover, so a redelivered fact records nothing new
+
+  @unit
+  Scenario: A member fact for a deleted organisation records nothing
+    Given an organisation was deleted before a proven offboarding or an erasure naming it arrived
+    When organization hears the fact from its own side
+    Then it records no member removal for the deleted organisation
+    And it still records the removal for every live organisation the fact names

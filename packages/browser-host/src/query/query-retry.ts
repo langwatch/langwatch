@@ -39,7 +39,16 @@ export function isPermanentFailure(error: unknown): boolean {
   return PERMANENT_ERROR_CODES.has(handled.code as AppErrorCode);
 }
 
+/**
+ * The api answers this while the worker upgrades the schema (NO-HOLDS): it clears on its own, so
+ * a read keeps trying past the cap, on the client's exponential backoff (capped at 30 s).
+ */
+function isUpgradeInProgress(error: unknown): boolean {
+  return readHandledError(error)?.code === "upgrade_in_progress";
+}
+
 export function shouldRetryQuery(failureCount: number, error: unknown): boolean {
+  if (isUpgradeInProgress(error)) return true;
   if (failureCount >= MAX_QUERY_RETRIES) return false;
   if (isPermanentFailure(error)) return false;
 

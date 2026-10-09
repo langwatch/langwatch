@@ -4,6 +4,7 @@ import type { Actor } from "@langwatch/authorization";
 import type { AuthzApi, AuthzListTeamMemberBindingsInput } from "@langwatch/authz-contract";
 import { SecretApi, secretPublicSchema } from "@langwatch/secret-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import {
@@ -19,6 +20,7 @@ const USER: Actor = { type: "user", id: "user-1" };
 function mount(options: { project?: string; actor?: Actor | null; peers?: SecretTestPeers } = {}) {
   const app = createSecretTestApp({ peers: options.peers });
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({
         actor: options.actor === void 0 ? USER : options.actor,

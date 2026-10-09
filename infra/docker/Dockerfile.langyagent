@@ -120,6 +120,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certifi
 # binary. `packages/langy` used to be copied here and no longer exists — the
 # canonical langy packages live under modules/langy.
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json .npmrc ./
+# pnpm-workspace.yaml patchedDependencies reads these at install.
+COPY patches ./patches
 COPY modules/langy/contract ./modules/langy/contract
 COPY sdks/typescript ./sdks/typescript
 # Full source for the langy-worker wrapper: its Bun compile below bundles

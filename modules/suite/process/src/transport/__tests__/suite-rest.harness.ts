@@ -29,6 +29,7 @@ import {
 } from "@langwatch/scenario-contract";
 import { suiteSchema, type Suite, type SuiteApi } from "@langwatch/suite-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { fromDate } from "@langwatch/time";
 
 import { CollapsingRunCommands } from "../../__tests__/support/collapsing-run-commands.ts";
@@ -470,6 +471,7 @@ export function mountSuiteFamilies(
   });
 
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({
         actor: caller.userId ? { type: "user", id: caller.userId } : null,

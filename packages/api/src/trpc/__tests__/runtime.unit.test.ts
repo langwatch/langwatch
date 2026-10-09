@@ -10,6 +10,7 @@ import type { TRPCDefaultErrorShape } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import { authorizeDefaults } from "../../__tests__/api-double.ts";
 import { publicRoute } from "../../access/access.ts";
 import {
   bindTrpcFact,
@@ -153,6 +154,7 @@ function harness() {
     },
     authorization: {
       forRequest: () => ({
+        ...authorizeDefaults,
         getDecision: async ({ permission, scope }) => {
           steps.push(`decide:${permission}:${scope.tier}:${scope.id}`);
 
@@ -248,8 +250,20 @@ describe("a mounted contract procedure", () => {
       await caller.getById({ projectId: "project-1", id: "annotation-1" });
 
       const args = seen[0]!;
-      expect(Object.keys(args).toSorted()).toEqual(["actor", "app", "input", "scope", "signal"]);
-      expect(args.scope).toEqual({ tier: "project", id: "project-1", organizationId: null });
+      expect(Object.keys(args).toSorted()).toEqual([
+        "actor",
+        "app",
+        "authorization",
+        "input",
+        "scope",
+        "signal",
+      ]);
+      expect(args.scope).toEqual({
+        tier: "project",
+        id: "project-1",
+        organizationId: null,
+        kind: "application",
+      });
       expect(args.actor).toEqual({ type: "user", id: "reviewer-1" });
       expect(args.input).toEqual({ projectId: "project-1", id: "annotation-1" });
       expect(Object.keys(args.input as object)).not.toContain("scope");
@@ -378,6 +392,36 @@ describe("a mounted contract procedure", () => {
         meta: { retryAfterMs: 1000 },
       });
     });
+  });
+
+  describe("given the code is ahead of a Postgres schema the worker still upgrades", () => {
+    /** @scenario "A Postgres read the schema is not ready for answers upgrade_in_progress" */
+    it.each(["P2021", "P2022", "42P01", "42703"])(
+      "fails %s as the retryable upgrade_in_progress",
+      async (code) => {
+        const { runtime } = harness();
+        const app: ReviewApi = { read: async () => ({ id: "annotation-1", comment: "" }) };
+        const declaration = reviewRouter({
+          getById: async () => {
+            throw Object.assign(new Error("The column `x` does not exist"), { code });
+          },
+        });
+
+        const call = runtime
+          .mount(declaration, () => app)
+          .createCaller({ actor: { id: "reviewer-1" } })
+          .getById({ projectId: "project-1", id: "annotation-1" });
+
+        await expect(call).rejects.toMatchObject({
+          code: "SERVICE_UNAVAILABLE",
+          cause: { code: "upgrade_in_progress", httpStatus: 503, retryable: true },
+        });
+        expect((await onTheWire(call)).data.error).toMatchObject({
+          code: "upgrade_in_progress",
+          meta: { retryAfterMs: 10_000 },
+        });
+      },
+    );
   });
 });
 
@@ -615,6 +659,7 @@ function accountHarness({
     },
     authorization: {
       forRequest: () => ({
+        ...authorizeDefaults,
         getDecision: async ({ permission }) => {
           asked.push(permission);
 
@@ -968,6 +1013,7 @@ describe("a procedure that asks whether its tenant holds an entitlement", () => 
       identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
       authorization: {
         forRequest: () => ({
+          ...authorizeDefaults,
           getDecision: async () => ({ permitted: true, organizationRole: null }),
           getProjectAnyDecision: async () => ({ permitted: true, organizationRole: null }),
           checkScopeLineage: async () => ({ kind: "consistent" }),
@@ -1139,6 +1185,7 @@ describe("a procedure declared as minting a credential", () => {
         identity: { caller: (ctx) => ({ actor: { type: "user", ...ctx.actor } }) },
         authorization: {
           forRequest: () => ({
+            ...authorizeDefaults,
             getDecision: async () => ({ permitted: true, organizationRole: null }),
             getProjectAnyDecision: async () => ({ permitted: true, organizationRole: null }),
             checkScopeLineage: async () => ({ kind: "consistent" }),

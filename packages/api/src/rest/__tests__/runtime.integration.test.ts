@@ -11,6 +11,7 @@ import { generateSpecs } from "hono-openapi";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import { authorizationPort } from "../../__tests__/api-double.ts";
 import {
   anyAuthenticated,
   deferredScope,
@@ -103,6 +104,7 @@ const application: AnnotationApi = {
 /** The runtime's mount: the process authenticates, the declaration is inert. */
 function runtimeApp(app: () => AnnotationApi = () => application): Hono {
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } }),
     },
@@ -163,6 +165,7 @@ const secretApplication: SecretApi = {
 /** The same mount, with the boundary that serialises a handled refusal. */
 function secretsApp(): Hono {
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } }),
     },
@@ -377,6 +380,7 @@ const reports = defineRestRouter(ReportApi)
 
 function reportsApp(): Hono {
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } }),
     },
@@ -447,6 +451,7 @@ const runPlans = defineRestRouter(ReportApi)
 
 function runPlansApp(): Hono {
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } }),
     },
@@ -533,6 +538,7 @@ function legacyReportsApp(deprecationLog?: RestDeprecationLog): {
   }));
 
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: { authenticate },
     ...(deprecationLog ? { deprecationLog } : {}),
   });
@@ -747,7 +753,10 @@ function rolesApp(
 ): { app: Hono; authenticate: ReturnType<typeof vi.fn> } {
   const authenticate = vi.fn(() => ({ actor: null, scope }));
 
-  const runtime = createRestRuntime({ identity: { authenticate } });
+  const runtime = createRestRuntime({
+    authorization: authorizationPort,
+    identity: { authenticate },
+  });
 
   const app = runtime.mount(roles.router(), {
     app: () => roleApplication,
@@ -875,6 +884,7 @@ const codingAgent = defineRestRouter(RoleApi)
 describe("a v1-only family on the organization door", () => {
   function codingAgentApp(): Hono {
     const runtime = createRestRuntime({
+      authorization: authorizationPort,
       identity: {
         authenticate: () => ({
           actor: null,
@@ -976,7 +986,10 @@ function projectsApp(permitted = true): {
 
   const authorize = vi.fn(() => ({ permitted, organizationRole: null }));
 
-  const runtime = createRestRuntime({ identity: { authenticate, identify, authorize } });
+  const runtime = createRestRuntime({
+    identity: { authenticate, identify, authorize },
+    authorization: authorizationPort,
+  });
 
   const app = runtime.mount(projects.router(), {
     app: () => projectApplication,
@@ -1049,6 +1062,7 @@ describe("a route whose permission is checked at the scope its path names", () =
     const authorize = vi.fn(() => ({ permitted: true, organizationRole: null }));
 
     const runtime = createRestRuntime({
+      authorization: authorizationPort,
       identity: {
         authenticate: () => ({
           actor: { type: "api_key", id: "key-1" } as const,
@@ -1161,6 +1175,7 @@ const webhooks = defineRestRouter(ProjectApi)
 
 function webhooksApp(): Hono {
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: () => ({ actor: null, scope: { tier: "project", id: PROJECT_ID } }),
     },
@@ -1258,6 +1273,7 @@ function platformHealthApp(
   );
 
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: () => {
         throw new Error("A platform-health route asks no permission of its credential.");
@@ -1386,6 +1402,7 @@ describe("a route that declares the several answers it may give", () => {
   /** @scenario "An endpoint that declares several answers may not also declare one" */
   it("fails rather than serving a status the declaration never named", async () => {
     const runtime = createRestRuntime({
+      authorization: authorizationPort,
       identity: {
         authenticate: () => ({
           actor: null,
@@ -1441,6 +1458,7 @@ const scimUsers = defineRestRouter(RoleApi)
 
 function scimApp(): Hono {
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: () => ({
         actor: null,
@@ -1518,6 +1536,7 @@ const hooks = defineRestRouter(HookApi)
 
 function hooksApp(): Hono {
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } as const }),
     },
@@ -1617,7 +1636,7 @@ const storedObjects = defineRestRouter(ObjectApi)
   .withAddressing("v1-only")
   .get("/:id", "readStoredObject")
   .withParams(z.object({ id: z.string() }))
-  .withPermission("traces:view")
+  .withPermission("annotations:view")
   .withRawResponse({ produces: ["application/octet-stream", "text/plain"] })
   .methods(["GET", "HEAD"])
   .handle(async ({ app, input }) => {
@@ -1633,6 +1652,7 @@ const storedObjects = defineRestRouter(ObjectApi)
 
 function storedObjectsApp(): Hono {
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } as const }),
     },
@@ -1721,6 +1741,7 @@ const aliases = defineRestRouter(ObjectApi)
 
 function aliasHost(): Hono {
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: { authenticate: () => ({ actor: null, scope: null }) },
   });
 
@@ -1856,6 +1877,7 @@ const runApplication: RunApi = {
 /** Both families on one host, in the order a module lists its transports. */
 function runsHost(): Hono {
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } }),
     },
@@ -1988,6 +2010,7 @@ const uploads = defineRestRouter(UploadApi)
 
 function uploadsApp(): Hono {
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } as const }),
     },
@@ -2079,6 +2102,7 @@ const evaluationsLegacy = defineRestRouter(EvaluationsApi)
 /** A sibling family under the same prefix, mounted after the literal one. */
 function evaluationsHost(): Hono {
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } as const }),
     },
@@ -2176,6 +2200,7 @@ const scimV2 = defineRestRouter(DirectoryApi)
 
 function scimV2App(): Hono {
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: () => ({
         actor: null,
@@ -2266,6 +2291,7 @@ const fileApplication: FilesApi = {
 function filesApp(options: { identified?: boolean } = {}): Hono {
   filesHanded.length = 0;
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: () => {
         throw new Error("A deferred route asks no permission of its credential.");
@@ -2362,6 +2388,7 @@ const datasetUploads = defineRestRouter(UploadsApi)
 
 function datasetApp(): Hono {
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } as const }),
     },
@@ -2533,6 +2560,7 @@ function bugReportsApp(options: { caller?: "none" | "project"; optional?: boolea
   );
 
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: () => {
         throw new Error("An optional-credential route asks no permission of its credential.");
@@ -2623,6 +2651,7 @@ const instanceSetup = defineRestRouter(InstanceApi)
 function instanceSetupApp(options: { tenanted?: boolean } = {}): Hono {
   instanceSetupHanded.length = 0;
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: () => {
         throw new Error("The instance setup door asks no permission of its key.");
@@ -2716,6 +2745,7 @@ function catalogueApp(options: { allowed?: boolean; ported?: boolean } = {}): {
   const reads = vi.fn(async ({ id }: { id: string }) => ({ id, evaluators: 41 }));
 
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } as const }),
     },
@@ -2803,6 +2833,7 @@ function meteredApp() {
   const reads: string[] = [];
 
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: ({ request }) => ({
         actor: null,
@@ -2944,6 +2975,7 @@ describe("a route whose answer stands for a while", () => {
     const { app } = catalogueApp();
 
     const runtime = createRestRuntime({
+      authorization: authorizationPort,
       identity: {
         authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } as const }),
       },
@@ -3008,6 +3040,7 @@ const waitlist = defineRestRouter(WaitlistApi)
 
 function waitlistApp(): Hono {
   return createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } }),
     },
@@ -3069,6 +3102,7 @@ describe("three families mounted on one host", () => {
 
   beforeEach(() => {
     const runtime = createRestRuntime({
+      authorization: authorizationPort,
       identity: { authenticate: () => ({ actor: null, scope: null }) },
     });
 

@@ -45,7 +45,7 @@ const STRIPE_EVENTUAL_CONSISTENCY_DELAY_MS = 2000;
 const waitForStripeConsistency = () =>
   new Promise((resolve) => setTimeout(resolve, STRIPE_EVENTUAL_CONSISTENCY_DELAY_MS));
 
-export type WebhookService = {
+type WebhookService = {
   /**
    * Dispatches a verified Stripe event to the right handler. Transport-agnostic
    * so it's reusable from workers, replays, and tests. Unexpected throws

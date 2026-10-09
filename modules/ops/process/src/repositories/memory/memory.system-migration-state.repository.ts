@@ -43,13 +43,6 @@ export class MemorySystemMigrationStateRepository implements SystemMigrationStat
     return true;
   }
 
-  /** Every tenant's record of one migration, for the copy twin. */
-  recordsOf({ migrationName }: { migrationName: string }): TenantMigrationRecord[] {
-    return this.#all()
-      .filter((record) => record.migrationName === migrationName)
-      .map(({ updatedAt: _updatedAt, ...stored }) => stored);
-  }
-
   async hasFinalizedTenant({ migrationName }: { migrationName: string }): Promise<boolean> {
     return this.#all().some(
       (record) => record.migrationName === migrationName && record.status === "finalized",

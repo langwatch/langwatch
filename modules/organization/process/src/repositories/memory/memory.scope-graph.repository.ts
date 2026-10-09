@@ -42,6 +42,7 @@ export class MemoryScopeGraphRepository implements OrganizationScopeGraphReader 
               id: project.id,
               slug: project.slug,
               name: project.name,
+              kind: "application",
               userLinkTemplate: null,
               presenceEnabled: true,
               lastCodingAgentSessionAt: null,

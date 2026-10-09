@@ -2,7 +2,11 @@ import {
   selectIsTraceEditDirty,
   useTraceEditStore,
 } from "../../../features/trace-drawer/behavior/trace-edit.store.ts";
-import { isUneditableViewMode, TRACE_DRAWER_NAME } from "../../../model/trace-drawer-params.ts";
+import {
+  isUneditableViewMode,
+  TRACE_DRAWER_NAME,
+  traceDrawerParams,
+} from "../../../model/trace-drawer-params.ts";
 import { getTraceDrawer } from "../../trace-drawer.ts";
 
 /**
@@ -44,10 +48,11 @@ export function openTraceEditorFromConversation({
 }): void {
   const openEditor = () => {
     // Opening a trace from the conversation view lands on its summary, for this one trace.
-    const leavesConversation = getTraceDrawer().viewMode === "conversation";
+    const drawer = getTraceDrawer();
+    const leavesConversation = drawer.viewMode === "conversation";
+    // A conversation's turns all belong to the member the drawer is on.
     openDrawer(TRACE_DRAWER_NAME, {
-      traceId,
-      ...(occurredAtMs === null ? {} : { t: String(occurredAtMs) }),
+      ...traceDrawerParams({ traceId, occurredAtMs, tenantId: drawer.tenantId }),
       ...(leavesConversation ? { mode: "summary" } : {}),
       urlParams: { edit: "1" },
     });

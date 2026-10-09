@@ -4,6 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 
+import { authorizeDefaults } from "../../__tests__/api-double.ts";
 import {
   type ApiDoor,
   bindApiDoor,
@@ -20,6 +21,7 @@ function door(): ApiDoor {
   return {
     sessions: () => Promise.resolve(null),
     authz: {
+      ...authorizeDefaults,
       getDecision: refuse,
       getProjectAnyDecision: refuse,
       checkScopeLineage: refuse,

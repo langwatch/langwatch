@@ -121,7 +121,7 @@ const BOB: UiActor = { id: "user_bob", name: "Bob", email: null, image: null };
 
 const CAMPAIGN = { utm_source: "newsletter", utm_campaign: "weekly-42" };
 
-function capabilities(
+function hostServices(
   user: UiActor | null,
   organizationId: string | undefined,
   analytics: UiAnalytics,
@@ -158,7 +158,7 @@ function Probe() {
 }
 function draw(user: UiActor | null, organizationId: string | undefined, analytics: UiAnalytics) {
   return render(
-    <UiHostServicesContextProvider value={capabilities(user, organizationId, analytics)}>
+    <UiHostServicesContextProvider value={hostServices(user, organizationId, analytics)}>
       <Probe />
     </UiHostServicesContextProvider>,
   );
@@ -181,7 +181,7 @@ describe("who the shell tells analytics is reading", () => {
     const analytics = new RecordingAnalytics();
     const view = draw(ADA, "org_1", analytics);
     view.rerender(
-      <UiHostServicesContextProvider value={capabilities(BOB, "org_1", analytics)}>
+      <UiHostServicesContextProvider value={hostServices(BOB, "org_1", analytics)}>
         <Probe />
       </UiHostServicesContextProvider>,
     );
@@ -214,7 +214,7 @@ describe("the signed_in event the shell sends for an identified person", () => {
   it("sends signed_in with no property when there is no attribution", () => {
     const analytics = new RecordingAnalytics();
     render(
-      <UiHostServicesContextProvider value={capabilities(ADA, "org_1", analytics, {})}>
+      <UiHostServicesContextProvider value={hostServices(ADA, "org_1", analytics, {})}>
         <Probe />
       </UiHostServicesContextProvider>,
     );
@@ -270,7 +270,7 @@ describe("the signed_in event the shell sends for an identified person", () => {
     const analytics = new RecordingAnalytics();
     const view = draw(ADA, "org_1", analytics);
     view.rerender(
-      <UiHostServicesContextProvider value={capabilities(BOB, "org_1", analytics)}>
+      <UiHostServicesContextProvider value={hostServices(BOB, "org_1", analytics)}>
         <Probe />
       </UiHostServicesContextProvider>,
     );
@@ -282,7 +282,7 @@ describe("the signed_in event the shell sends for an identified person", () => {
     const analytics = new RecordingAnalytics();
     draw(ADA, "org_1", analytics).unmount();
     render(
-      <UiHostServicesContextProvider value={capabilities(BOB, "org_1", analytics)}>
+      <UiHostServicesContextProvider value={hostServices(BOB, "org_1", analytics)}>
         <Probe />
       </UiHostServicesContextProvider>,
     ).unmount();

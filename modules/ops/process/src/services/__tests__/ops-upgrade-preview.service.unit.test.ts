@@ -40,7 +40,12 @@ const PLAN: Extract<UpgradePreview["plan"], { outcome: "planned" }> = {
 function service({
   status = statusOf(),
   targets = [],
-}: { status?: UpgradeStatus; targets?: UpgradeTargetSummary[] } = {}) {
+  plan = PLAN,
+}: {
+  status?: UpgradeStatus;
+  targets?: UpgradeTargetSummary[];
+  plan?: UpgradePreview["plan"];
+} = {}) {
   const reader = createUpgradeReader({
     postgres: { query: async () => ({ rows: [] }) },
     image: { release: IMAGE.release, steps: [] },
@@ -52,7 +57,7 @@ function service({
         ...reader,
         preview: async ({ to }) => ({
           installed: "3.21.0",
-          plan: previewUpgradeTo({ plan: PLAN, image: IMAGE, to }),
+          plan: plan.outcome === "planned" ? previewUpgradeTo({ plan, image: IMAGE, to }) : plan,
           preflight: preflightFrom({ status }),
         }),
         listTargets: async () => targets,
@@ -95,6 +100,27 @@ describe("OpsUpgradeService preview", () => {
 
     expect(plan).toMatchObject({ outcome: "refused", code: "target_not_in_image" });
     expect(plan.outcome === "refused" && plan.message).toContain("upgrade plan --to 3.24.0");
+  });
+
+  /** @scenario "An installation below the floor previews as refused with the LTS to upgrade to first" */
+  it("refuses an installation below the floor as below_lts_floor naming 3.20.1", async () => {
+    // The planner's own refusal for 3.18.0 under a 3.20.1 floor (plan-upgrade.unit.test.ts).
+    const plan: UpgradePreview["plan"] = {
+      outcome: "refused",
+      code: "below_lts_floor",
+      stopAt: "3.20.1",
+      message: "this installation is on 3.18.0; upgrade to 3.20.1 (LTS) first, then to this image",
+    };
+
+    const preview = opsUpgradePreviewSchema.parse(
+      await service({ plan }).preview({ to: IMAGE.release }),
+    );
+
+    expect(preview.plan).toMatchObject({
+      outcome: "refused",
+      code: "below_lts_floor",
+      stopAt: "3.20.1",
+    });
   });
 });
 

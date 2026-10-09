@@ -59,7 +59,8 @@ vi.mock("@langwatch/design-system/toaster", () => ({ toaster: { create: vi.fn() 
 vi.mock("../../../errors/index.ts", () => ({ showErrorToast: vi.fn() }));
 
 const { EditModeBar } = await import("../../trace-drawer/edit-mode/edit-mode-bar.tsx");
-const { drawerChrome, getTraceDrawer, useTraceEditStore } = await import("../../../../../index.ts");
+const { useDrawerChrome, getTraceDrawer, useTraceEditStore } =
+  await import("../../../../../index.ts");
 const { setWindowAddress } = await import("../../../../../__tests__/window-location-router.ts");
 const { guardTraceEditExit } =
   await import("../../../../../behavior/explorer/utils/trace-edit-mode.ts");
@@ -109,7 +110,7 @@ beforeEach(() => {
     setWindowAddress({ url: drawerAddress(TRACE, "&drawer.edit=1") });
   });
   mocks.backStack = [];
-  drawerChrome.setState(drawerChrome.getInitialState(), true);
+  useDrawerChrome.setState(useDrawerChrome.getInitialState(), true);
   useTraceEditStore.getState().discard();
   setWindowAddress({ url: drawerAddress(TRACE, "&drawer.edit=1") });
   useTraceEditStore.getState().startEditing({ traceId: TRACE });
@@ -328,11 +329,11 @@ describe("the trace the address names", () => {
     it("puts away what only made sense while it was open", () => {
       render(<HydratorOnlyHarness />);
       act(() => setWindowAddress({ url: drawerAddress("trace-99") }));
-      drawerChrome.getState().setMaximized(true);
+      useDrawerChrome.getState().setMaximized(true);
 
       act(() => setWindowAddress({ url: PAGE }));
 
-      expect(drawerChrome.getState().isMaximized).toBe(false);
+      expect(useDrawerChrome.getState().isMaximized).toBe(false);
     });
   });
 });

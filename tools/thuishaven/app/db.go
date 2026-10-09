@@ -158,6 +158,7 @@ func (o *Orchestrator) DBReset(ctx context.Context, p UpParams, preset string) e
 	if err := o.sup.RunOnce(ctx, "seed", p.WorktreeDir, seedShell("pnpm --silent run prisma:seed", env), env); err != nil {
 		return fmt.Errorf("seed failed: %w", err)
 	}
+	o.ClearSeedStatus(slug)
 	fmt.Printf("stack %q databases reset — migrated and seeded fresh\n", slug)
 	return o.runSeedIngest(ctx, p, pre, "haven db reset "+preset)
 }

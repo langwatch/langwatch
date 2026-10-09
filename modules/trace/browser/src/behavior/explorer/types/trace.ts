@@ -75,6 +75,9 @@ export const NO_TRACE_EVENTS: TraceListEvents = {
  */
 export interface TraceListItem {
   traceId: string;
+  /** The project that owns the trace; on an aggregate, the member it was
+   *  listed from. Absent on sample rows. */
+  projectId?: string;
   timestamp: number;
   name: string;
   serviceName: string;
@@ -84,8 +87,8 @@ export interface TraceListItem {
   totalCost: number;
   nonBilledCost: number;
   totalTokens: number;
-  inputTokens?: number;
-  outputTokens?: number;
+  inputTokens?: number | null;
+  outputTokens?: number | null;
   /** Cache + reasoning token sums (null when the model never reported them).
    *  The Tokens cell shows input+output; these drive the hover breakdown. */
   cacheReadTokens?: number | null;
@@ -122,10 +125,10 @@ export interface TraceListItem {
   outputRedacted?: boolean | null;
   inputVisibleTo?: string | null;
   outputVisibleTo?: string | null;
-  error?: string;
+  error?: string | null;
   errorSpanName?: string;
-  conversationId?: string;
-  userId?: string;
+  conversationId?: string | null;
+  userId?: string | null;
   origin:
     | "application"
     | "simulation"
@@ -140,7 +143,7 @@ export interface TraceListItem {
     // autocomplete/exhaustiveness while still accepting future values.
     | (string & {});
   tokensEstimated?: boolean;
-  ttft?: number;
+  ttft?: number | null;
   traceName?: string;
   rootSpanType?: string | null;
   evaluations: TraceEvalResult[];

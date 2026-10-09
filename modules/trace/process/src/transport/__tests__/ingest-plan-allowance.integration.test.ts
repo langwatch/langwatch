@@ -8,6 +8,7 @@ import { type EntitlementApi, PlanLimitExceededError } from "@langwatch/entitlem
 import { LocalFeatureApis } from "@langwatch/process";
 import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { TraceApi, type OtlpIngestCredential } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -98,6 +99,7 @@ function bootIngestDoors(assertWithinUsageLimit: EntitlementApi["assertWithinUsa
     }),
   });
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: { authenticate: () => ({ authenticated: false }) as never },
   });
   // The process hands every door the bound reference, never the bare module.

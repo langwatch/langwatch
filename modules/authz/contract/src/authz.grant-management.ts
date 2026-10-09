@@ -173,6 +173,7 @@ export const authzDeleteBindingInputSchema = z
     organizationId: z.string().min(1),
     bindingId: z.string().min(1),
     actor: ledgerActorSchema,
+    caller: callerSchema,
   })
   .strict();
 export type AuthzDeleteBindingInput = z.infer<typeof authzDeleteBindingInputSchema>;

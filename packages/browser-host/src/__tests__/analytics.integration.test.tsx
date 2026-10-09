@@ -34,15 +34,15 @@ class RecordingUiAnalytics extends UiAnalytics {
 
 const host = { route: () => ({ params: {}, query: {} }), navigate: () => {} };
 
-function mount(capabilities: UiHostServices) {
+function mount(hostServices: UiHostServices) {
   return renderHook(() => useUiAnalytics(), {
     wrapper: ({ children }: { children: ReactNode }) => (
-      <UiHostServicesContextProvider value={capabilities}>{children}</UiHostServicesContextProvider>
+      <UiHostServicesContextProvider value={hostServices}>{children}</UiHostServicesContextProvider>
     ),
   });
 }
 
-describe("the UI analytics capability", () => {
+describe("the UI analytics host service", () => {
   it("hands a module the destination the shell composed", () => {
     const analytics = new RecordingUiAnalytics();
     const { result } = mount({ ...createUiHostServicesFromHost(host), analytics });

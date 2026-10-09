@@ -5,6 +5,7 @@
  */
 import type { AnalyticsApi } from "@langwatch/analytics-contract";
 import { buildSeriesName } from "@langwatch/analytics-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { ReportSource } from "@langwatch/automation-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -83,6 +84,7 @@ function world() {
     projects: new OneProject(),
     analytics: createApiFixture<AnalyticsApi>({ getTimeseries }),
     traces: createApiFixture<TraceApi>({}),
+    authz: createApiFixture<AuthzApi>({}),
     delivery,
     slackDestinations: createTestSlackDestinations(),
     suppression: { filterSuppressed: async ({ emails }) => emails },

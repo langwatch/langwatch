@@ -13,6 +13,7 @@ import { LogApi } from "@langwatch/log-contract";
 import { resolveRequestBound } from "@langwatch/plans";
 import { LocalFeatureApis, type FeatureTransportDescriptor } from "@langwatch/process";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
@@ -85,6 +86,7 @@ function deployment() {
   apis.ready();
 
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => {
         throw new Error("the ingestion doors resolve their own credential");

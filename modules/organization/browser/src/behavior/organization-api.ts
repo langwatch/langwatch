@@ -36,6 +36,11 @@ import type {
   PendingInvitationsForCaller,
   ScopeGraphOrganization,
 } from "@langwatch/organization-contract";
+import type {
+  AggregateMemberCandidate,
+  AggregateRule,
+  PROJECT_KIND,
+} from "@langwatch/project-contract";
 
 import type { TeamRoleValue } from "../model/member-role-constraints.ts";
 import type { OrganizationUserRole, TeamUserRole } from "../model/prisma-types.ts";
@@ -222,6 +227,8 @@ export type OrganizationApiMap = ContractApiMap<typeof licenseEnforcementTrpc> &
             id: string;
             name: string;
             slug: string;
+            /** Narrowed by the wire to the caller's own row. */
+            members: { role: string }[];
             teams: {
               id: string;
               name: string;
@@ -429,9 +436,16 @@ export type OrganizationApiMap = ContractApiMap<typeof licenseEnforcementTrpc> &
             newTeamName?: string;
             language: string;
             framework: string;
+            kind?: typeof PROJECT_KIND.AGGREGATE;
+            aggregateRule?: AggregateRule;
           };
           output: { success: boolean; projectSlug: string };
         };
+      };
+
+      /** What a new aggregate may read, for the create drawer's member picker. */
+      aggregateMemberCandidates: {
+        query: { input: { organizationId: string }; output: AggregateMemberCandidate[] };
       };
 
       /**

@@ -151,12 +151,19 @@ export type TraceSessionGroupsInput = z.infer<typeof traceSessionGroupsInputSche
 const MAX_LIST_EVENT_TRACE_IDS = 1000;
 
 /**
- * Reusable Zod fields for span-read endpoints that accept the
- * partition-pruning hint the drawer carries in the URL. Spread into a
- * procedure's input shape with `...`.
+ * The project that owns the trace a detail read is for, as the list row or the
+ * header named it (ADR-177 block F). Optional: a plain project's reads never need
+ * it, and an aggregate's reads fall back to the member the summary read finds.
+ */
+const traceTenantShape = { tenantId: z.string().min(1).optional() } as const;
+
+/**
+ * Reusable Zod fields for span-read endpoints: the partition-pruning hint the
+ * drawer carries in the URL and the owning member. Spread with `...`.
  */
 const spanReadHintShape = {
   occurredAtMs: z.number().int().optional(),
+  ...traceTenantShape,
 } as const;
 
 export const tracesTrpc = defineTrpcContract("traces")
@@ -171,7 +178,7 @@ export const tracesTrpc = defineTrpcContract("traces")
   .withOutput(traceSchema)
 
   .query("getEvaluations")
-  .withInput(traceScopeSchema)
+  .withInput(z.object({ ...traceScopeSchema.shape, ...traceTenantShape }))
   .withOutput(evaluationSchema.array().optional())
 
   .query("getEvaluationsMultiple")
@@ -276,6 +283,9 @@ export const tracesTrpc = defineTrpcContract("traces")
         .object({
           sortValue: z.number().finite(),
           traceId: z.string().min(1),
+          // Absent on a cursor minted before the tenant was carried; the
+          // service reads such a cursor as the project's own tenant.
+          tenantId: z.string().min(1).optional(),
         })
         .optional(),
       query: z.string().nullish(),
@@ -327,6 +337,8 @@ export const tracesTrpc = defineTrpcContract("traces")
     z.object({
       projectId: z.string(),
       conversationId: z.string().min(1),
+      /** The member whose conversation this is, on an aggregate. */
+      ...traceTenantShape,
     }),
   )
   .withOutput(tracesConversationContextSchema)
@@ -426,6 +438,7 @@ export const tracesTrpc = defineTrpcContract("traces")
       traceId: z.string(),
       occurredAtMs: z.number().int().optional(),
       full: z.boolean().default(true),
+      ...traceTenantShape,
     }),
   )
   .withOutput(traceHeaderSchema)
@@ -455,6 +468,7 @@ export const tracesTrpc = defineTrpcContract("traces")
     z.object({
       projectId: z.string(),
       traceId: z.string(),
+      ...traceTenantShape,
     }),
   )
   .withOutput(tracesEvaluationRunsSchema)
@@ -498,7 +512,7 @@ export const tracesTrpc = defineTrpcContract("traces")
    * `nextCursor` is null on the final page.
    */
   .query("spanTreePaginated")
-  .withInput(spanTreeTransportInputSchema)
+  .withInput(z.object({ ...spanTreeTransportInputSchema.shape, ...traceTenantShape }))
   .withOutput(spanTreePageSchema)
 
   /**
@@ -507,7 +521,7 @@ export const tracesTrpc = defineTrpcContract("traces")
    * duration, status, cost) is picked up too.
    */
   .query("spanTreeDelta")
-  .withInput(spanTreeDeltaTransportInputSchema)
+  .withInput(z.object({ ...spanTreeDeltaTransportInputSchema.shape, ...traceTenantShape }))
   .withOutput(tracesSpanTreeNodesSchema)
 
   /**
@@ -615,6 +629,17 @@ export const spansTrpc = defineTrpcContract("spans")
   .withOutput(spansForTraceSchema)
 
   .query("getForPromptStudio")
-  .withInput(spanScopeSchema)
+  .withInput(
+    z.object({
+      ...spanScopeSchema.shape,
+      /**
+       * The trace the span belongs to, when the link names it: the read then
+       * goes through the proof narrowed to the member that holds the trace
+       * (ADR-177 block F). A link naming only the span reads the URL project.
+       */
+      traceId: z.string().min(1).optional(),
+      ...spanReadHintShape,
+    }),
+  )
   .withOutput(promptStudioSpanSchema)
   .build();

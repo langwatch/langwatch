@@ -23,6 +23,11 @@ export type {
   QueryResult,
 } from "./query.ts";
 export type { ClickHouseQueryClientOptions } from "./client.ts";
+export {
+  CLICKHOUSE_COLUMNS_QUERY,
+  CLICKHOUSE_COLUMNS_REFRESH_MS,
+  ClickHouseColumns,
+} from "./present-columns.ts";
 export { ClickHouseQueryClient } from "./client.ts";
 export {
   ClickHouseConfigService,
@@ -197,3 +202,26 @@ export type {
   WindowedReadMetrics,
   WindowedReadOutcome,
 } from "./windowedRead.ts";
+export type {
+  ClickHouseClientResolver,
+  ReadResource,
+  StatementScopeViolation,
+  TenantScopeTimeColumn,
+} from "./authorized-reads.ts";
+export {
+  AuthorizedClickHouse,
+  expandFragment,
+  expandStatement,
+  fenceExpression,
+  fenceFor,
+  HAND_WRITTEN_TENANT_PREDICATE,
+  ownProjectIdOf,
+  PROOF_BEARING_PERMISSIONS,
+  singleTenantOf,
+  StatementScopeError,
+  TenantReaderClientUnavailableError,
+  TenantScopedReader,
+  tenantScope,
+  tenantScopeKey,
+  tenantSet,
+} from "./authorized-reads.ts";

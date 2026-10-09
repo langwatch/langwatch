@@ -6,6 +6,7 @@
  * prober. enterprise/modules/scim/specs/scim-reconciliation-surfaces.feature
  */
 import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 
@@ -24,6 +25,7 @@ function testPorts(): TrpcRuntimeMembers<TestContext> {
     identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
     authorization: {
       forRequest: () => ({
+        ...testAuthorizeDefaults,
         getDecision: async () => ({ permitted: false, organizationRole: null }),
         getProjectAnyDecision: async () => ({ permitted: false, organizationRole: null }),
         checkScopeLineage: async () => ({ kind: "consistent" }),

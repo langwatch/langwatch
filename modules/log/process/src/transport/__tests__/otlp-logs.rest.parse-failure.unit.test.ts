@@ -8,6 +8,7 @@ import type { LogApi } from "@langwatch/log-contract";
 import type * as Observability from "@langwatch/observability";
 import type * as TestHarness from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type * as LangWatch from "langwatch";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -82,6 +83,7 @@ function mount() {
     receiveOtlpLogs: (request) => receiver.receive(request),
   });
   const hono = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => {
         throw new Error("the receiver resolves its own credential");

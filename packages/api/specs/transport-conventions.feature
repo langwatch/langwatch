@@ -50,6 +50,21 @@ Feature: The REST runtime renders what a transport may not hand-roll
       Then it is refused with 400 and the code malformed_request, never a 500
       And the handler is not reached, while a body without such a key reaches it unchanged
 
+    # Alex, round 86 (workflows post_event): the door asks at the project a raw JSON body names.
+    @unit
+    Scenario: A raw-body route asks its permission at the project its body names
+      Given a route that takes its JSON body raw and asks its permission at the body's projectId
+      When a signed-in caller posts a body naming a project
+      Then the permission is asked at that project and the handler is handed the raw body unchanged
+      And malformed JSON is refused with 400 malformed_request and a body without the project with 422 validation_error
+      And a caller with no session is refused 401 before the body is read
+
+    @unit
+    Scenario: A raw-body route refuses a write under an aggregate project its body names
+      Given a route that takes its JSON body raw and asks a write permission at the body's projectId
+      When the body names an aggregate project
+      Then it is refused 403 aggregate_project_is_read_only and the handler is not reached
+
   Rule: A protocol route renders every refusal in its protocol's own document
 
     @integration

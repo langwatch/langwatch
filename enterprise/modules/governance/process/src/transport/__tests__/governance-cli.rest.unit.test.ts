@@ -33,6 +33,7 @@ import type { ProjectApi } from "@langwatch/project-contract";
  * Spec: specs/ai-gateway/cli-token-revoke-on-deactivation.feature
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -221,6 +222,7 @@ function mountCli(world: World = {}) {
 
   // As composed: governance's door with main's CLI refusal wire, auth's plan port behind it.
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: CliTokenIdentity.create({
       verify: world.verify ?? (() => Promise.resolve(HOLDER)),
       permitted: () => ({
@@ -492,6 +494,28 @@ describe("the CLI governance plane", () => {
         projectRef: PROJECT.slug,
         organizationId: ORGANIZATION_ID,
       });
+    });
+
+    it("refuses an aggregate project before any permission is asked, and mints nothing", async () => {
+      const issueForProject = vi.fn();
+      const permittedOnProject = vi.fn().mockResolvedValue(true);
+      const api = mountCli({
+        ingestionKeys: { issueForProject },
+        projects: { findLiveByRef: vi.fn().mockResolvedValue([{ ...PROJECT, kind: "aggregate" }]) },
+        permittedOnProject,
+      });
+
+      const response = await api.post(
+        "/api/auth/cli/governance/ingestion-key",
+        mintFor(PROJECT.id),
+      );
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({
+        error: "aggregate_project_has_no_credential",
+      });
+      expect(permittedOnProject).not.toHaveBeenCalled();
+      expect(issueForProject).not.toHaveBeenCalled();
     });
 
     /** @scenario Minting into a project the caller cannot write to is refused */

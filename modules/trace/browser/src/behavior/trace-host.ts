@@ -11,6 +11,8 @@ export type TraceHostProject = {
   id: string;
   slug: string;
   name: string;
+  /** The project's kind (`application`, `aggregate`, ...), when the host has read it. */
+  kind?: string;
   /** Whether anything has ever been ingested — the empty state leads on it. */
   firstMessage?: boolean;
   /**
@@ -141,6 +143,11 @@ export abstract class TraceHostApi {
 
   /** Whether the session, the scope or the grants are still arriving. */
   abstract isLoading(): boolean;
+
+  /** The name of a project the reader can see (an aggregate's member), or undefined. */
+  projectName(_projectId: string): string | undefined {
+    return void 0;
+  }
 
   abstract route(): TraceRouteReading;
 

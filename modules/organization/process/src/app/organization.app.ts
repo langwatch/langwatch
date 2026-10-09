@@ -121,6 +121,7 @@ import {
 } from "@langwatch/organization-contract";
 import type * as organizationContractModule from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
+import { projectKindsHiddenFrom } from "@langwatch/project-contract";
 import { RoleApi } from "@langwatch/role-contract";
 import { internalSlackSignupsWebhook } from "@langwatch/secrets";
 import type { Instant } from "@langwatch/time";
@@ -200,7 +201,7 @@ type OrganizationMemberWithUser = OrganizationWithMembersAndTheirTeams["members"
 // ---------------------------------------------------------------------------
 
 /** Who a write is attributed to. */
-export interface OrganizationCaller {
+interface OrganizationCaller {
   readonly id: string;
   /** The session's address, where the transport read one; the sign-up policy matches it. */
   readonly email?: string | null;
@@ -209,7 +210,7 @@ export interface OrganizationCaller {
 }
 
 /** What the process composes this feature's application from. */
-export interface ServerOrganizationAppDependencies {
+interface ServerOrganizationAppDependencies {
   organizations: OrganizationEntityService;
   signInPolicies: OrganizationSignInPolicyService;
   membership: OrganizationMembershipService;
@@ -228,7 +229,7 @@ type OrganizationSetup = FeatureSetup<
   OrganizationChannels
 >;
 
-export type OrganizationInfrastructure = Readonly<{
+type OrganizationInfrastructure = Readonly<{
   identities: PersonalWorkspaceIdentity;
   teamIdentities: TeamIdentity;
   groupIdentities: GroupIdentity;
@@ -325,6 +326,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       repository: membershipRepository,
       creations: infrastructure.lifecycle,
       workspaceNotices: infrastructure.lifecycle,
+      memberNotices: infrastructure.lifecycle,
       seats: infrastructure.seats,
       seatNotices: infrastructure.lifecycle,
       grantCache: AuthzApiOrganizationGrantCache.create(setup.dependencies.permissions),
@@ -911,6 +913,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     {
       userId: string;
       departmentId: string | null;
+      disabledAt: Instant | null;
       user: { name: string | null; email: string | null };
     }[]
   > {
@@ -1509,7 +1512,45 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
 
   /** organization_lifecycle: the same in every role, since its peers react from their side (§9). */
   lifecyclePipeline(): OrganizationLifecycleDefinition {
-    return buildOrganizationLifecyclePipeline({ billingFacts: this, licensingFacts: this });
+    return buildOrganizationLifecyclePipeline({
+      billingFacts: this,
+      licensingFacts: this,
+      memberFacts: this,
+    });
+  }
+
+  /**
+   * Authz's proven offboarding took the seat. The fact's moment keys the removal, so a
+   * redelivered fact records it once; a deleted organisation throws OrganizationNotFoundError.
+   */
+  async recordMemberOffboarded(input: {
+    organizationId: string;
+    userId: string;
+    offboardedByUserId: string | null;
+    occurredAt: number;
+  }): Promise<void> {
+    await this.getWithAdministrators({ organizationId: input.organizationId });
+    await this.#infrastructure.lifecycle.memberRemoved({
+      organizationId: input.organizationId,
+      userId: input.userId,
+      removedByUserId: input.offboardedByUserId,
+      occurredAt: input.occurredAt,
+    });
+  }
+
+  /** User erased an account it held in this organisation: recorded once, by nobody; gone throws. */
+  async recordMemberErased(input: {
+    organizationId: string;
+    userId: string;
+    occurredAt: number;
+  }): Promise<void> {
+    await this.getWithAdministrators({ organizationId: input.organizationId });
+    await this.#infrastructure.lifecycle.memberRemoved({
+      organizationId: input.organizationId,
+      userId: input.userId,
+      removedByUserId: null,
+      occurredAt: input.occurredAt,
+    });
   }
 
   /** Records one organization's stored presence switch, for the backfill task. */
@@ -1675,6 +1716,10 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       this.listTeamsWithMembers({ organizationId: input.organizationId, callerCanManage }, by),
       this.#dependencies.organizations.listProjects({
         organizationId: input.organizationId,
+        hiddenKinds: await this.#projectKindsHiddenFrom({
+          organizationId: input.organizationId,
+          userId: by.id,
+        }),
         limit: TEAM_PROJECT_LIMIT,
       }),
     ]);
@@ -1688,9 +1733,15 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   /** The access matrix an administrator edits: who holds what, and through what. */
   async listTeamAccessMatrix(
     input: Readonly<{ organizationId: string }>,
+    by: OrganizationCaller,
   ): Promise<OrganizationTeamAccess[]> {
+    // organization:manage can come from a custom role, so it does not make the caller an admin.
     const projects = await this.#dependencies.organizations.listProjects({
       organizationId: input.organizationId,
+      hiddenKinds: await this.#projectKindsHiddenFrom({
+        organizationId: input.organizationId,
+        userId: by.id,
+      }),
       limit: TEAM_PROJECT_LIMIT,
     });
 
@@ -1709,6 +1760,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     const projects = await this.listProjectsByTeam({
       organizationId: input.organizationId,
       teamId: team.id,
+      callerUserId: by.id,
     });
 
     return { ...team, projects: projects.map(teamProjectOf) };
@@ -1899,12 +1951,34 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     });
   }
 
-  /** The projects that live in one team. */
-  listProjectsByTeam(input: {
+  /** The projects that live in one team, as this caller may see them; a null caller is no admin. */
+  async listProjectsByTeam(input: {
     organizationId: string;
     teamId: string;
+    callerUserId: string | null;
   }): Promise<OrganizationTeamProject[]> {
-    return this.#dependencies.organizations.listProjects(input);
+    return this.#dependencies.organizations.listProjects({
+      organizationId: input.organizationId,
+      teamId: input.teamId,
+      hiddenKinds: await this.#projectKindsHiddenFrom({
+        organizationId: input.organizationId,
+        userId: input.callerUserId,
+      }),
+    });
+  }
+
+  /** Only an organisation admin sees an aggregate project (ADR-177 decision 5). */
+  async #projectKindsHiddenFrom(input: {
+    organizationId: string;
+    userId: string | null;
+  }): Promise<string[]> {
+    const role = input.userId
+      ? await this.#dependencies.membership.findOrganizationRole({
+          organizationId: input.organizationId,
+          userId: input.userId,
+        })
+      : null;
+    return projectKindsHiddenFrom(role);
   }
 }
 

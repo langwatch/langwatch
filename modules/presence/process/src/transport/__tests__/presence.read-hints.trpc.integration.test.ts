@@ -10,6 +10,7 @@ import {
   type TrpcRuntimeMembers,
 } from "@langwatch/api/trpc";
 import type { AuthzScopeLineageResult } from "@langwatch/authorization";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -35,6 +36,7 @@ function members(): TrpcRuntimeMembers<DoorContext> {
     },
     authorization: {
       forRequest: () => ({
+        ...testAuthorizeDefaults,
         getDecision: async ({ userId, scope }) => ({
           permitted:
             userId === "u1" &&

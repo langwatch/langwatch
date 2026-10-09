@@ -9,12 +9,12 @@ export interface StudioDrawerFooterState {
 const nowhere = (): void => void 0;
 
 /** `workflow:drawer-footer`: the open studio drawer wrapper points `register` at its footer. */
-export const studioDrawerFooterSlice = defineSlice<StudioDrawerFooterState>({
+export const useStudioDrawerFooterSlice = defineSlice<StudioDrawerFooterState>({
   name: WORKFLOW_DRAWER_FOOTER_SLICE,
   create: () => ({ register: nowhere }),
 });
 
 export function offerStudioDrawerFooter(register: StudioDrawerFooterState["register"]): () => void {
-  studioDrawerFooterSlice.setState({ register });
-  return () => studioDrawerFooterSlice.setState({ register: nowhere });
+  useStudioDrawerFooterSlice.setState({ register });
+  return () => useStudioDrawerFooterSlice.setState({ register: nowhere });
 }

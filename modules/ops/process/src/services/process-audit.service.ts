@@ -2,7 +2,7 @@ import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { ProcessAuditEntryView } from "@langwatch/ops-contract";
 import { z } from "zod";
 
-export type ProcessControlAction =
+type ProcessControlAction =
   | "process_wake_now"
   | "process_redrive_dead_instance"
   | "process_redrive_dead_message"

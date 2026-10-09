@@ -14,6 +14,7 @@ import {
   type EventStore,
   EventStoreProducerOnly,
   EventUpcastReader,
+  pipelineRetentionOf,
   pipelineUpcastsOf,
   type ProcessStore,
   replayLeanOf,
@@ -32,6 +33,7 @@ import {
   OtelProcessRetentionMetricsAdapter,
   PrismaProcessStore,
   type EventingClickHouseClientResolver,
+  type EventLogRetentionPolicyLookup,
 } from "@langwatch/eventing/server";
 import {
   GroupQueueDependenciesAdapter,
@@ -80,9 +82,13 @@ export function buildEventing(options: {
 }): BuiltMember<EventSourcing> {
   const { config } = options;
   const processStore = PrismaProcessStore.create({ database: options.prisma });
+  // Read at append, after registration: each row takes its own pipeline's tenant retention.
+  const retentionPolicyFor = (aggregateType: string) =>
+    pipelineRetentionOf({ definitions: eventing.definitions, aggregateType });
   const eventStore = eventingEventStore({
     store: config.store,
     processName: options.processName,
+    retentionPolicyFor,
     ...(options.eventLog === undefined ? {} : { eventLog: options.eventLog }),
   });
   const eventReadSeat =
@@ -250,6 +256,7 @@ function upcastReaderOver({
 function eventingEventStore(options: {
   readonly store: EventingStoreConfig;
   readonly processName: string;
+  readonly retentionPolicyFor: EventLogRetentionPolicyLookup;
   readonly eventLog?: EventingEventLogMembers;
 }): EventStore {
   if (options.store.kind === "producer-only") {
@@ -271,6 +278,10 @@ function eventingEventStore(options: {
       retention,
     }),
     retention,
+    retentionPolicyFor: options.retentionPolicyFor,
+    ...(options.store.classifyEventLogRetention === undefined
+      ? {}
+      : { classifyEventLogRetention: options.store.classifyEventLogRetention }),
   });
 }
 

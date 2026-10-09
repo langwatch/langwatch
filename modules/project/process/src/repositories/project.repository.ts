@@ -1,6 +1,10 @@
 import type { OnboardingVariant } from "@langwatch/onboarding-contract";
 import type { PersonalFeatures } from "@langwatch/organization-contract";
 import type {
+  AggregateMemberCandidate,
+  AggregateRule,
+  LiveAggregate,
+  StoredAggregateProject,
   ActiveProjectsByScopesInput,
   CreateProjectInput,
   InternalProject,
@@ -22,6 +26,7 @@ import type {
   ProjectOrganizationPage,
   ProjectPrivateS3Page,
   ProjectUsageCount,
+  ProjectKind,
 } from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
 
@@ -46,6 +51,7 @@ export interface ProjectRepository {
   findPaths(input: { projectIds: string[] }): Promise<ProjectPath[]>;
   findProjectsWithDepartments(input: {
     organizationId: string;
+    hiddenKinds: readonly string[];
   }): Promise<{ id: string; name: string; departmentId: string | null }[]>;
   assignProjectDepartment(input: {
     organizationId: string;
@@ -86,6 +92,7 @@ export interface ProjectRepository {
     limit: number;
     projectIds?: string[];
     includeGovernance?: boolean;
+    hiddenKinds?: ProjectKind[];
   }): Promise<PaginatedProjects>;
   findAllByTeam(input: {
     organizationId: string;
@@ -127,8 +134,8 @@ export interface ProjectRepository {
   }): Promise<string>;
   /** Archives the live personal projects in these teams; a second call changes nothing. */
   archivePersonalInTeams(input: { teamIds: string[]; archivedAt: Instant }): Promise<void>;
-  /** Revives the archived personal project in this team; a second call changes nothing. */
-  revivePersonalInTeam(input: { teamId: string }): Promise<void>;
+  /** Revives this team's archived personal projects, answering their ids; a repeat revives none. */
+  revivePersonalInTeam(input: { teamId: string }): Promise<string[]>;
   /** Stores a personal project's feature switches; a shared project is left untouched. */
   updatePersonalFeatures(input: { projectId: string; features: PersonalFeatures }): Promise<void>;
   /** Main `personal-team-scope.ts:90-97`: a personal project's owner, archived or not. */
@@ -153,4 +160,22 @@ export interface ProjectRepository {
   listAllWithOrganization(input?: ProjectIdPageInput): Promise<ProjectOrganizationPage>;
   listAllWithPrivateS3(input?: ProjectIdPageInput): Promise<ProjectPrivateS3Page>;
   listLwqlKeys(input?: ProjectIdPageInput): Promise<ProjectLwqlKeyPage>;
+  /** Replaces a live aggregate's validated rule; `ProjectNotFoundError` when none has the id. */
+  updateAggregateRule(input: {
+    id: string;
+    organizationId: string;
+    aggregateRule: AggregateRule;
+  }): Promise<Project>;
+  findPersonalProjectIds(input: {
+    organizationId: string;
+    ownerUserIds?: readonly string[];
+  }): Promise<string[]>;
+  findReadableProjectIds(input: {
+    organizationId: string;
+    projectIds: readonly string[];
+  }): Promise<string[]>;
+  findCandidateMembers(input: { organizationId: string }): Promise<AggregateMemberCandidate[]>;
+  findAggregate(input: { aggregateProjectId: string }): Promise<StoredAggregateProject[]>;
+  findLiveAggregateIds(input: { organizationId: string }): Promise<string[]>;
+  findAllLiveAggregates(): Promise<LiveAggregate[]>;
 }

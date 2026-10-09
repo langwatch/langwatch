@@ -61,6 +61,22 @@
     "needsOldWritersGone": true
   },
   {
+    "id": "billing:fill-seat-change-organizations",
+    "kind": "data",
+    "mode": "background",
+    "owner": "billing",
+    "description": "Names the organization on each connected seat change recorded before seat changes stored it, from its billing account.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "data-retention:keep-control-plane-events-forever",
+    "kind": "data",
+    "mode": "background",
+    "owner": "data-retention",
+    "description": "Keeps every event that is not customer telemetry forever, including those already stamped to expire.",
+    "needsOldWritersGone": true
+  },
+  {
     "id": "dataset:move-content-to-object-storage",
     "kind": "data",
     "mode": "background",

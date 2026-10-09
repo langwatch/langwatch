@@ -17,26 +17,26 @@ import type { UiRootHostServices } from "./ui-root-host-services";
 import { useAnalyticsIdentity } from "./use-analytics-identity";
 
 export default function UiAppChrome({
-  capabilities: root,
+  rootHostServices: root,
   process,
   fullScreen = false,
 }: {
-  capabilities: UiRootHostServices;
+  rootHostServices: UiRootHostServices;
   /** The process owner's slice: the chrome's development badge reads it. */
   process: ProcessWebConfig;
   /** Draws the page with no top bar or sidebar, behind the same gates. */
   fullScreen?: boolean;
 }) {
-  const capabilities = useOptionalUiHostServices();
+  const hostServices = useOptionalUiHostServices();
   // Mounted outside an application shell, or inside one that declared no
   // scope — a route-table test, never the product, where the composition
   // always supplies both. Nothing has been read, so there is no host to mount
   // and the address draws bare. Scope is checked too because the host READS
-  // it, and an unavailable capability throws on read rather than answering.
-  if (!capabilities || capabilities.scope === UNAVAILABLE_UI_SCOPE) return <UiRouteOutlet />;
+  // it, and an unavailable host service throws on read rather than answering.
+  if (!hostServices || hostServices.scope === UNAVAILABLE_UI_SCOPE) return <UiRouteOutlet />;
 
   return (
-    <UiNavigationHost commandBar capabilities={root} process={process}>
+    <UiNavigationHost commandBar rootHostServices={root} process={process}>
       <UiAppChromeFrame
         scope={root.scope}
         navigationChrome={root.navigationChrome}

@@ -1,7 +1,7 @@
 ---
 name: lane-sonnet
 description: |
-  The lane agent pinned to Sonnet 5.5 (Alex, 2026-09-29): high effort: big scoped implementation lanes with a clear acceptance test. At high effort Sonnet costs about what Opus does, so judgement-heavy work goes to lane-opus instead.
+  The lane agent pinned to Sonnet 5.5 (Alex, 2026-09-29; medium effort by default since 2026-10-09): big scoped implementation lanes with a clear acceptance test. Judgement-heavy work goes to lane-opus; pass effort high only when a lane truly needs it.
   A bounded implementation lane in the LangWatch coordinator/lane workflow. Use
   when spawning work that has a manifest under .claude/manifests/ - the lane
   edits only its owned paths, runs only scoped checks, and stops with a handoff
@@ -11,7 +11,7 @@ description: |
   Spawn WITHOUT a model parameter: this agent pins Sonnet 5.5, and passing
   `model: "sonnet"` overrides it to Sonnet 5 (Alex, 2026-09-29).
 model: claude-sonnet-5-5
-effort: high
+effort: medium
 tools:
   - Read
   - Write

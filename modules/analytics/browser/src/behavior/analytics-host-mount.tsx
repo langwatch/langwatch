@@ -165,6 +165,7 @@ export default function AnalyticsHostMount({ children }: { children?: ReactNode 
   const scopeProjectSlug = scopeProject?.slug;
   const scopeProjectName = scopeProject?.name;
   const scopeOrganizationName = session.snapshot().scope.organization?.name;
+  const scopeProjectKind = scopeProject?.kind;
 
   const firstMessage = analyticsApi.project.getHasFirstMessage.useQuery(
     { projectId: scopeProjectId ?? "" },
@@ -185,6 +186,7 @@ export default function AnalyticsHostMount({ children }: { children?: ReactNode 
                 slug: scopeProjectSlug ?? "",
                 name: scopeProjectName ?? "",
                 hasFirstMessage,
+                ...(scopeProjectKind ? { kind: scopeProjectKind } : {}),
               }
             : void 0,
         organizationId_: organizationId ?? void 0,
@@ -200,6 +202,7 @@ export default function AnalyticsHostMount({ children }: { children?: ReactNode 
       scopeProjectId,
       scopeProjectSlug,
       scopeProjectName,
+      scopeProjectKind,
       hasFirstMessage,
       projectId,
       organizationId,

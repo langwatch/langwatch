@@ -1,6 +1,6 @@
 /**
  * The port that the Secrets screen asks from its host application. Encapsulates browser
- * capabilities the host resolves (avoiding restricted imports like @langwatch/ui, router,
+ * host services the host resolves (avoiding restricted imports like @langwatch/ui, router,
  * toast). Unique among host ports: includes projectSwitcher for per-project scoping.
  */
 

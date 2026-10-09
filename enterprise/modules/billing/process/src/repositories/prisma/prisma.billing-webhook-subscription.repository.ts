@@ -1,10 +1,9 @@
 import { createLogger } from "@langwatch/observability";
+
 /**
  * Subscription writes from Stripe webhooks. P2025 (missing row) reports
  * "missing_subscription"; other failures are rethrown so Stripe retries.
  */
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-
 import {
   BillingWebhookSubscriptionRepository,
   type ActivateSubscriptionResult,
@@ -15,27 +14,19 @@ import {
 import type {
   BillingSubscriptionRecord,
   BillingSubscriptionRepository,
-  BillingSubscriptionWithOrganization,
 } from "../subscription.repository.ts";
 
 const logger = createLogger("langwatch:billing:webhook-subscription-adapter");
 
-/** The one organization column the port carries that the repository does not select. */
-export type BillingWebhookTrialLicenseDatabase = Pick<PrismaClient, "organization">;
-
 export class PrismaBillingWebhookSubscriptionRepository extends BillingWebhookSubscriptionRepository {
-  private constructor(
-    private readonly subscriptions: BillingSubscriptionRepository,
-    private readonly database: BillingWebhookTrialLicenseDatabase,
-  ) {
+  private constructor(private readonly subscriptions: BillingSubscriptionRepository) {
     super();
   }
 
   static create(options: {
     subscriptions: BillingSubscriptionRepository;
-    database: BillingWebhookTrialLicenseDatabase;
   }): PrismaBillingWebhookSubscriptionRepository {
-    return new PrismaBillingWebhookSubscriptionRepository(options.subscriptions, options.database);
+    return new PrismaBillingWebhookSubscriptionRepository(options.subscriptions);
   }
 
   findLastNonCancelled(organizationId: string): Promise<BillingSubscriptionRecord | null> {
@@ -77,7 +68,7 @@ export class PrismaBillingWebhookSubscriptionRepository extends BillingWebhookSu
   }): Promise<ActivateSubscriptionResult> {
     const activated = await this.orNull("activate", () => this.subscriptions.activate(input));
     return activated
-      ? { outcome: "activated", subscription: await this.withTrialLicense(activated) }
+      ? { outcome: "activated", subscription: activated }
       : { outcome: "missing_subscription" };
   }
 
@@ -109,26 +100,8 @@ export class PrismaBillingWebhookSubscriptionRepository extends BillingWebhookSu
       this.subscriptions.updateQuantities(input),
     );
     return updated
-      ? { outcome: "updated", subscription: await this.withTrialLicense(updated) }
+      ? { outcome: "updated", subscription: updated }
       : { outcome: "missing_subscription" };
-  }
-
-  /**
-   * The trial licence a paid subscription retires, read beside the row
-   * rather than selected with it: the repository's organization shape is
-   * shared with every other billing surface, none of which needs a licence key.
-   */
-  private async withTrialLicense(
-    subscription: BillingSubscriptionWithOrganization,
-  ): Promise<SubscriptionWithOrg> {
-    const organization = await this.database.organization.findUnique({
-      where: { id: subscription.organizationId },
-      select: { license: true },
-    });
-    return {
-      ...subscription,
-      organization: { ...subscription.organization, license: organization?.license ?? null },
-    };
   }
 
   private async orNull<T>(operation: string, run: () => Promise<T>): Promise<T | null> {

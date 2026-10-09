@@ -11,6 +11,8 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { AggregateReadOnlyNotice } from "@langwatch/error-views";
+import { isAggregateProjectKind } from "@langwatch/project-contract";
 import type React from "react";
 import { LuCheckCheck, LuExternalLink } from "react-icons/lu";
 
@@ -20,8 +22,30 @@ import ObservabilityCard from "../../elements/welcome/observability-card.tsx";
 import { useIntegrationChecks } from "../integration-checks.tsx";
 import { ProjectTokenBanner } from "../observability/project-token-banner.tsx";
 
-/** A personal access token is minted on a click and held here, in memory only. */
+/**
+ * The setup page's card. An aggregate (ADR-177) owns no key and is never sent a
+ * trace, so it gets no key to copy and no first trace to wait for.
+ */
 const APICard: React.FC = () => {
+  const host = useOnboardingHost();
+  return isAggregateProjectKind(host.scope().project?.kind) ? (
+    <AggregateSetupCard />
+  ) : (
+    <ProjectKeyCard />
+  );
+};
+
+const AggregateSetupCard: React.FC = () => (
+  <VStack minH="80px" boxShadow="sm" borderRadius="xl" bg="bg" p={4} gap={2} align="stretch">
+    <Heading size="md" textAlign="left">
+      Connect to LangWatch
+    </Heading>
+    <AggregateReadOnlyNotice />
+  </VStack>
+);
+
+/** A personal access token is minted on a click and held here, in memory only. */
+const ProjectKeyCard: React.FC = () => {
   const host = useOnboardingHost();
   const minting = useMintPersonalToken({
     organizationId: host.scope().organization?.id,

@@ -1,6 +1,6 @@
 /**
  * Personal workspace's answer to the port its screens declare: every method
- * projects a `@langwatch/browser-host` capability, so the module mounts it,
+ * projects a `@langwatch/browser-host` host service, so the module mounts it,
  * not the application. ARCHITECTURE.md §10.1.
  */
 
@@ -101,7 +101,7 @@ function projectOf(
   return void 0;
 }
 
-class CapabilityPersonalWorkspaceHost extends PersonalWorkspaceHostApi {
+class HostServicePersonalWorkspaceHost extends PersonalWorkspaceHostApi {
   private readonly session: UiSession;
   private readonly flags: UiFlags;
   private readonly navigationCapability: UiNavigation;
@@ -320,7 +320,7 @@ export default function PersonalWorkspaceHostMount({ children }: { children?: Re
   // renders that carry the same reading.
   const host = useMemo(
     () =>
-      new CapabilityPersonalWorkspaceHost({
+      new HostServicePersonalWorkspaceHost({
         session,
         flags,
         navigationCapability: navigation,

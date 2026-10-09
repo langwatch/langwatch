@@ -35,7 +35,7 @@ class EmptyRoute extends UiRoute {
   setQuery(): void {}
 }
 
-const capabilities: UiHostServices = {
+const hostServices: UiHostServices = {
   documentTitle: BrowserUiDocumentTitle.create(),
   feedback: UNAVAILABLE_UI_FEEDBACK,
   navigation: new RecordingNavigation(),
@@ -50,7 +50,7 @@ function withChakra(children: ReactNode) {
 function mounted(link: ReactNode) {
   render(
     withChakra(
-      <UiHostServicesContextProvider value={capabilities}>{link}</UiHostServicesContextProvider>,
+      <UiHostServicesContextProvider value={hostServices}>{link}</UiHostServicesContextProvider>,
     ),
   );
 }
@@ -58,9 +58,9 @@ function mounted(link: ReactNode) {
 describe("Link", () => {
   beforeEach(() => navigate.mockClear());
 
-  describe("when capabilities are mounted above it", () => {
+  describe("when host services are mounted above it", () => {
     /** @scenario "A plain click on an in-app link routes through the navigation capability" */
-    it("routes a plain click through the navigation capability and prevents the document load", () => {
+    it("routes a plain click through the navigation host service and prevents the document load", () => {
       mounted(<Link href="/checkout/traces">Traces</Link>);
 
       const anchor = screen.getByRole("link", { name: "Traces" });
@@ -135,7 +135,7 @@ describe("Link", () => {
     });
   });
 
-  describe("when no capabilities are mounted", () => {
+  describe("when no host services are mounted", () => {
     /** @scenario "A link with no shell above it is left to the browser" */
     it("leaves the anchor to the browser rather than rendering a dead link", () => {
       render(withChakra(<Link href="/checkout/traces">Traces</Link>));

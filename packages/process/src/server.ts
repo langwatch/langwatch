@@ -14,7 +14,6 @@ import {
   type Heartbeat,
   type LivenessThread,
   type UpgradeConsole,
-  type UpgradeHolding,
 } from "./lifecycle/liveness-thread.ts";
 import { HTTP_CLOSE_PHASE_MS, HTTP_DRAIN_GRACE_MS } from "./lifecycle/shutdown-deadline.ts";
 import { ResourceScope } from "./resource-scope.ts";
@@ -211,21 +210,17 @@ export class Server {
   }
 
   /**
-   * Answers every request but the probes with the upgrade holding page until called with
-   * `undefined`. A door on the main loop has no thread to hold it.
-   * Spec: upgrade-holding-page.feature
+   * Shows a failed first install's console in front of every route but the probes; true on Retry,
+   * false with no thread to show it. Spec: upgrade-holding-page.feature
    */
-  async holdForUpgrade(
-    holding: UpgradeHolding | undefined,
-    routes: readonly string[] = [],
-  ): Promise<void> {
-    // The health routes answer in every phase; `routes` serve while upgrading (UIW-6).
-    await this.livenessThread?.hold(holding, { paths: [...this.healthRoutes.keys()], routes });
+  async consoleForUpgrade(upgradeConsole: UpgradeConsole): Promise<boolean> {
+    const passThrough = [...this.healthRoutes.keys()];
+    return (await this.livenessThread?.holdConsole({ ...upgradeConsole, passThrough })) ?? false;
   }
 
-  /** Shows a failed upgrade's console; true on Retry, false with no thread to show it. */
-  async consoleForUpgrade(upgradeConsole: UpgradeConsole): Promise<boolean> {
-    return (await this.livenessThread?.holdConsole(upgradeConsole)) ?? false;
+  /** Takes the upgrade console down once the ledger is current. */
+  async liftUpgradeConsole(): Promise<void> {
+    await this.livenessThread?.liftConsole();
   }
 
   private openHealth(): Promise<void> {
@@ -337,7 +332,33 @@ export class Server {
       return;
     }
 
-    void this.answer("application", () => application(request, response), response);
+    void this.answer(
+      "application",
+      () => this.whenStarted(application, request, response),
+      response,
+    );
+  }
+
+  /**
+   * A request that arrives while the components still start waits for them, so no handler runs
+   * before the runtime it calls into (API-UP); a start that failed answers 503.
+   */
+  private async whenStarted(
+    application: ApplicationHandler,
+    request: IncomingMessage,
+    response: ServerResponse,
+  ): Promise<void> {
+    if (!this.started) {
+      const started = await this.listening?.then(
+        () => true,
+        () => false,
+      );
+      if (started === false) {
+        response.writeHead(503, { "Content-Type": "text/plain" }).end(`${this.name} did not start`);
+        return;
+      }
+    }
+    await application(request, response);
   }
 
   private async answerReadiness(response: ServerResponse): Promise<void> {

@@ -5,11 +5,12 @@ import {
 } from "@langwatch/eventing";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { ownProofAuthorizer } from "../../__tests__/support/authorization-proofs.fixture.ts";
+import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
 import {
   TraceSummaryProjectionRepository,
   type TraceSummaryProjectionEntry,
 } from "../../repositories/trace-summary-projection.repository.ts";
-import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
 import type { TraceSummaryData } from "../trace-summary.projection.ts";
 import { TraceSummaryFoldProjection } from "../trace-summary.projection.ts";
 import { TraceSummaryStore } from "../trace-summary.store.ts";
@@ -55,7 +56,11 @@ describe("trace summary fold coalescing", () => {
 
   beforeEach(() => {
     storage = new MemoryProjection();
-    store = TraceSummaryStore.create({ storage, defaultRetentionDays: () => 90 });
+    store = TraceSummaryStore.create({
+      storage,
+      defaultRetentionDays: () => 90,
+      authorize: ownProofAuthorizer,
+    });
   });
 
   describe("given many spans for one trace folded as one coalesced batch", () => {

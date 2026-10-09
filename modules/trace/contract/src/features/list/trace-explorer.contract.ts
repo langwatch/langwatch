@@ -15,6 +15,8 @@ import { TRACE_NAME_MIN_LENGTH } from "../../trace.constants.ts";
 const traceHeaderReadInputSchema = z.object({
   projectId: z.string(),
   traceId: z.string(),
+  /** The member project the trace lives in, when `projectId` is an aggregate. */
+  tenantId: z.string().optional(),
   /**
    * Approximate trace timestamp (ms since epoch), used as a partition-pruning
    * hint. Omitting it makes the read walk every partition, cold S3 included.

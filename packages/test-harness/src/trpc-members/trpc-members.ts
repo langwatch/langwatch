@@ -1,5 +1,7 @@
 import type { TrpcRuntimeMembers } from "@langwatch/api/trpc";
 
+import { testAuthorizeDefaults } from "./test-authorization.ts";
+
 type Decisions<TContext> = ReturnType<TrpcRuntimeMembers<TContext>["authorization"]["forRequest"]>;
 type Permission<TContext> = Parameters<Decisions<TContext>["getDecision"]>[0]["permission"];
 
@@ -7,9 +9,9 @@ type Permission<TContext> = Parameters<Decisions<TContext>["getDecision"]>[0]["p
 export type TrpcTestDecision<TContext> = (permission: Permission<TContext>) => boolean;
 
 /**
- * The process members a mounted tRPC declaration runs on, as a test supplies them:
- * the signed-in person on the context (or nobody), and an authorization answer the
- * test decides. Audit and error reporting are silent; pass overrides to observe them.
+ * A mounted tRPC declaration's members as a test supplies them: the context's person, an
+ * authorization answer the test decides, an own-grant proof per proof-bearing read; audit
+ * and error reporting silent (pass overrides to observe them).
  */
 export function trpcTestMembers<TContext extends { actor: { id: string } | null }>({
   permits = () => true,
@@ -25,6 +27,7 @@ export function trpcTestMembers<TContext extends { actor: { id: string } | null 
     },
     authorization: {
       forRequest: () => ({
+        ...testAuthorizeDefaults,
         getDecision: async ({ permission }) => ({
           permitted: permits(permission),
           organizationRole: null,

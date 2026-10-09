@@ -1,3 +1,4 @@
+import type { Authorization } from "@langwatch/authorization";
 import {
   FIELD_VALUES,
   isInstantEvalField,
@@ -27,8 +28,11 @@ export class TraceQueryFieldCatalogueService {
     return new TraceQueryFieldCatalogueService(values);
   }
 
-  async build(input: TraceQueryFieldCatalogueInput): Promise<string> {
-    const dynamicValues = await this.fetchDynamicValues(input);
+  async build(request: {
+    input: TraceQueryFieldCatalogueInput;
+    authorization: Authorization;
+  }): Promise<string> {
+    const dynamicValues = await this.fetchDynamicValues(request);
     const lines: string[] = [];
 
     for (const [name, metadata] of Object.entries(SEARCH_FIELDS)) {
@@ -55,9 +59,13 @@ export class TraceQueryFieldCatalogueService {
     return Array.from(new Set([...dynamicValues, ...staticValues])).slice(0, SAMPLES_SHOWN);
   }
 
-  private async fetchDynamicValues(
-    input: TraceQueryFieldCatalogueInput,
-  ): Promise<Map<string, string[]>> {
+  private async fetchDynamicValues({
+    input,
+    authorization,
+  }: {
+    input: TraceQueryFieldCatalogueInput;
+    authorization: Authorization;
+  }): Promise<Map<string, string[]>> {
     const facetFields = Object.values(SEARCH_FIELDS)
       .filter(isCategoricalSearchField)
       .map((metadata) => metadata.facetField);
@@ -65,6 +73,7 @@ export class TraceQueryFieldCatalogueService {
       facetFields.map((facetKey) =>
         this.values.findAll({
           ...input,
+          authorization,
           facetKey,
           limit: DYNAMIC_VALUES_LIMIT,
           offset: 0,

@@ -21,12 +21,12 @@ import { getLangWatchTracer } from "langwatch";
 import type { TraceIOExtractionService } from "#features/derivation/services/trace-io-extraction.service";
 
 import type { TraceEvaluationRunsReadRepository } from "../../../repositories/trace-evaluation-runs.repository.ts";
-import type { TraceLegacyReadRepository } from "../repositories/trace-legacy-read.repository.ts";
-import { type TraceLogRecordReader } from "../../claude-code/rules/claude-code-log-enrichment.rules.ts";
 import { mapTraceEvaluationsToLegacyEvaluations } from "../../../rules/trace-evaluation-mapping.rules.ts";
-import type { TraceBlobStoreService } from "../../media/services/trace-blob-store.service.ts";
+import { type TraceLogRecordReader } from "../../claude-code/rules/claude-code-log-enrichment.rules.ts";
 import type { TraceEditOverlayService } from "../../edit-overlay/services/trace-edit-overlay.service.ts";
+import type { TraceBlobStoreService } from "../../media/services/trace-blob-store.service.ts";
 import { TraceReadEnrichmentService } from "../../read/services/trace-read-enrichment.service.ts";
+import type { TraceLegacyReadRepository } from "../repositories/trace-legacy-read.repository.ts";
 
 /**
  * Minimum prefix length we will attempt to resolve. Shorter strings fall through to "not found" —

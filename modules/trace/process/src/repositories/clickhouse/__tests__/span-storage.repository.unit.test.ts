@@ -1,7 +1,11 @@
+import { ForgedAuthorizationError } from "@langwatch/authorization";
+import { AuthorizedClickHouse, type QueryRequest } from "@langwatch/clickhouse-client";
 import { createTenantId, SecurityError } from "@langwatch/eventing";
+import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import type { SpanInsertData } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
+import { ownProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
 import { createTestSpan } from "../../../eventing/__tests__/trace-summary-test.fixtures.ts";
 import { SpanStorageStore } from "../../../eventing/span-storage.store.ts";
 import type {
@@ -85,7 +89,12 @@ class RecordingClickHouse {
 
 function repository() {
   const clickhouse = new RecordingClickHouse();
-  const repo = SpanStorageClickHouseRepository.create(clickhouse.resolve);
+  const repo = SpanStorageClickHouseRepository.create({
+    resolveClient: clickhouse.resolve,
+    clickhouse: new AuthorizedClickHouse({
+      resolveClient: async () => clickHouseQueryClientDouble(),
+    }),
+  });
   return { clickhouse, repo };
 }
 
@@ -388,20 +397,25 @@ describe("SpanStorageClickHouseRepository", () => {
  */
 class QueryingClickHouse {
   readonly queries: { query: string; params: Record<string, unknown>; settings?: unknown }[] = [];
+  readonly resolvedTenants: (string | undefined)[] = [];
   rows: Row[] = [];
   refuseWith: Error | null = null;
 
-  readonly resolve: TraceClickHouseWriteResolver = async () => ({
-    query: async (input) => {
-      if (this.refuseWith) throw this.refuseWith;
-      this.queries.push({
-        query: input.query,
-        params: input.query_params ?? {},
-        settings: input.clickhouse_settings,
+  readonly authorized = new AuthorizedClickHouse({
+    resolveClient: async (tenantId?: string) => {
+      this.resolvedTenants.push(tenantId);
+      return clickHouseQueryClientDouble({
+        query: async (request: QueryRequest) => {
+          if (this.refuseWith) throw this.refuseWith;
+          this.queries.push({
+            query: request.sql,
+            params: request.params ?? {},
+            settings: request.settings,
+          });
+          return { rows: this.rows };
+        },
       });
-      return { json: async () => this.rows as never[] };
     },
-    insert: async () => undefined,
   });
 }
 
@@ -433,9 +447,14 @@ function storedRow(overrides: Record<string, unknown> = {}): Row {
 
 function readRepository() {
   const clickhouse = new QueryingClickHouse();
-  const repo = SpanStorageClickHouseRepository.create(clickhouse.resolve);
+  const repo = SpanStorageClickHouseRepository.create({
+    resolveClient: new RecordingClickHouse().resolve,
+    clickhouse: clickhouse.authorized,
+  });
   return { clickhouse, repo };
 }
+
+const authorization = ownProof({ projectId: "project-1" });
 
 describe("SpanStorageClickHouseRepository.findNormalizedSpanById", () => {
   describe("given a span reference with the span's own start time", () => {
@@ -445,7 +464,7 @@ describe("SpanStorageClickHouseRepository.findNormalizedSpanById", () => {
       clickhouse.rows = [storedRow()];
 
       await repo.findNormalizedSpanById({
-        tenantId: "project-1",
+        authorization,
         traceId: "trace-1",
         spanId: "span-1",
         occurredAtMs: 1_700_000_000_000,
@@ -464,18 +483,18 @@ describe("SpanStorageClickHouseRepository.findNormalizedSpanById", () => {
       clickhouse.rows = [storedRow()];
 
       await repo.findNormalizedSpanById({
-        tenantId: "project-1",
+        authorization,
         traceId: "trace-1",
         spanId: "span-1",
         occurredAtMs: 1_700_000_000_000,
       });
 
       const read = clickhouse.queries[0];
-      expect(read?.query).toContain("TenantId = {tenantId:String}");
+      expect(read?.query).toContain("TenantId IN ({tenantScope");
       expect(read?.query).toContain("TraceId = {traceId:String}");
       expect(read?.query).toContain("SpanId = {spanId:String}");
+      expect(Object.values(read?.params ?? {})).toContainEqual(["project-1"]);
       expect(read?.params).toMatchObject({
-        tenantId: "project-1",
         traceId: "trace-1",
         spanId: "span-1",
       });
@@ -487,7 +506,7 @@ describe("SpanStorageClickHouseRepository.findNormalizedSpanById", () => {
       clickhouse.rows = [storedRow()];
 
       const foundSpan = await repo.findNormalizedSpanById({
-        tenantId: "project-1",
+        authorization,
         traceId: "trace-1",
         spanId: "span-1",
         occurredAtMs: 1_700_000_000_000,
@@ -507,7 +526,7 @@ describe("SpanStorageClickHouseRepository.findNormalizedSpanById", () => {
       clickhouse.rows = [storedRow()];
 
       await repo.findNormalizedSpanById({
-        tenantId: "project-1",
+        authorization,
         traceId: "trace-1",
         spanId: "span-1",
         occurredAtMs: 1_700_000_000_000,
@@ -526,7 +545,7 @@ describe("SpanStorageClickHouseRepository.findNormalizedSpanById", () => {
       clickhouse.rows = [storedRow()];
 
       const foundSpan = await repo.findNormalizedSpanById({
-        tenantId: "project-1",
+        authorization,
         traceId: "trace-1",
         spanId: "span-1",
         occurredAtMs: 1_700_000_000_000,
@@ -550,7 +569,7 @@ describe("SpanStorageClickHouseRepository.findNormalizedSpanById", () => {
       clickhouse.rows = [];
 
       const foundSpan = await repo.findNormalizedSpanById({
-        tenantId: "project-1",
+        authorization,
         traceId: "trace-1",
         spanId: "span-1",
         occurredAtMs: 1_700_000_000_000,
@@ -564,19 +583,21 @@ describe("SpanStorageClickHouseRepository.findNormalizedSpanById", () => {
     });
   });
 
-  describe("given a read with no tenant", () => {
+  describe("given a read with no sealed proof naming its tenant", () => {
     /** @scenario "A tenantless read is refused before it reaches ClickHouse" */
     it("refuses before resolving a client", async () => {
       const { clickhouse, repo } = readRepository();
 
       await expect(
         repo.findNormalizedSpanById({
-          tenantId: "",
+          // A copy is not sealed, so it names no tenant the reader will trust.
+          authorization: { ...authorization },
           traceId: "trace-1",
           spanId: "span-1",
           occurredAtMs: 1_700_000_000_000,
         }),
-      ).rejects.toThrow(/tenant/i);
+      ).rejects.toThrow(ForgedAuthorizationError);
+      expect(clickhouse.resolvedTenants).toEqual([]);
       expect(clickhouse.queries).toHaveLength(0);
     });
   });
@@ -589,7 +610,7 @@ describe("SpanStorageClickHouseRepository.findNormalizedSpanById", () => {
 
       await expect(
         repo.findNormalizedSpanById({
-          tenantId: "project-1",
+          authorization,
           traceId: "trace-1",
           spanId: "span-1",
           occurredAtMs: 1_700_000_000_000,

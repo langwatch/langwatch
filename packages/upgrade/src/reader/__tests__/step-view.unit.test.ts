@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { progressOf, waitingOnOf } from "../step-view.ts";
+import { progressOf, viewDeclaredStep, viewRecordedStep, waitingOnOf } from "../step-view.ts";
 
 describe("progressOf", () => {
   describe("when the report carries done and total", () => {
@@ -59,6 +59,49 @@ describe("waitingOnOf", () => {
       { status: "not-needed", declared },
     ])("waits on nothing for %o", ({ status, declared: step }) => {
       expect(waitingOnOf({ id: "ops:fill", status, declared: step, roster })).toEqual([]);
+    });
+  });
+});
+
+describe("finishBy", () => {
+  const declared = { id: "ops:fill", kind: "data", mode: "background", finishBy: "3.25.0" };
+  const row = {
+    id: "ops:fill",
+    kind: "data",
+    release: "3.23.0",
+    mode: "background",
+    status: "running",
+    inferred: false,
+    attempt: 1,
+    last_error: null,
+    report: null,
+    run_id: null,
+    started_at: null,
+    finished_at: null,
+    updated_at: null,
+    owner: null,
+    description: null,
+    finish_by: "3.24.0",
+  };
+
+  describe("when the ledger row names the release a background step must finish by", () => {
+    it("reads it from the row before the image's declaration", () => {
+      expect(viewRecordedStep({ row, declared, roster: [] }).finishBy).toBe("3.24.0");
+    });
+  });
+
+  describe("when only the image declares it", () => {
+    it("reads it from the declaration, and null when neither names one", () => {
+      expect(
+        viewRecordedStep({ row: { ...row, finish_by: null }, declared, roster: [] }).finishBy,
+      ).toBe("3.25.0");
+      expect(
+        viewDeclaredStep({ step: declared, imageRelease: "3.23.0", roster: [] }).finishBy,
+      ).toBe("3.25.0");
+      expect(
+        viewRecordedStep({ row: { ...row, finish_by: null }, declared: undefined, roster: [] })
+          .finishBy,
+      ).toBeNull();
     });
   });
 });

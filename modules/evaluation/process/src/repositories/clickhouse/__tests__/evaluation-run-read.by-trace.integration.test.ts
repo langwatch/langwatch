@@ -5,10 +5,16 @@
  * @see specs/automations/process-manager-dispatch.feature
  */
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
+import { narrowAuthorization } from "@langwatch/authorization";
+import { AuthorizedClickHouse } from "@langwatch/clickhouse-client";
 import { startTestClickHouseEndpoints } from "@langwatch/clickhouse-client/testing";
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import {
+  aggregateProof,
+  ownProof,
+} from "../../../__tests__/support/authorization-proofs.fixture.ts";
 import { EvaluationRunClickHouseReadRepository } from "../evaluation-run-read.repository.ts";
 import { EvaluationRunClickHouseWriteRepository } from "../evaluation-run-write.repository.ts";
 
@@ -89,7 +95,9 @@ describe("given a trace whose evaluation runs are stored", () => {
 
     const resolveClient = async () => client as never;
     const writes = EvaluationRunClickHouseWriteRepository.create({ resolveClient });
-    reads = EvaluationRunClickHouseReadRepository.create({ resolveClient });
+    reads = EvaluationRunClickHouseReadRepository.create({
+      clickhouse: new AuthorizedClickHouse({ resolveClient }),
+    });
     const runs = [
       evaluationRun({}),
       evaluationRun({
@@ -117,7 +125,10 @@ describe("given a trace whose evaluation runs are stored", () => {
 
   describe("when the trace's runs are read by trace", () => {
     it("returns the latest version of each run on the trace and no other trace's run", async () => {
-      const result = await reads.findByTraceId({ tenantId: TENANT, traceId: TRACE_ID });
+      const result = await reads.findByTraceId({
+        authorization: ownProof({ projectId: TENANT }),
+        traceId: TRACE_ID,
+      });
 
       const verdicts = Object.fromEntries(result.map((run) => [run.evaluationId, run.passed]));
       expect(verdicts).toEqual({
@@ -132,9 +143,66 @@ describe("given a trace whose evaluation runs are stored", () => {
 
   describe("when a trace with no runs is read", () => {
     it("returns no runs", async () => {
-      const result = await reads.findByTraceId({ tenantId: TENANT, traceId: "trace_without_runs" });
+      const result = await reads.findByTraceId({
+        authorization: ownProof({ projectId: TENANT }),
+        traceId: "trace_without_runs",
+      });
 
       expect(result).toEqual([]);
+    });
+  });
+
+  describe("when the read is fenced by an aggregate's proof", () => {
+    const SHARED_TRACE_ID = "trace_by_trace_shared";
+    const proof = () =>
+      aggregateProof({
+        projectId: "tenant_aggregate",
+        members: [
+          { projectId: "tenant_member_a", from: 0 },
+          { projectId: "tenant_member_b", from: 0 },
+        ],
+      });
+
+    beforeAll(async () => {
+      const writes = EvaluationRunClickHouseWriteRepository.create({
+        resolveClient: async () => client as never,
+      });
+      for (const [tenantId, evaluatorId] of [
+        ["tenant_member_a", "monitor-a"],
+        ["tenant_member_b", "monitor-b"],
+        ["tenant_outsider", "monitor-out"],
+      ] as const) {
+        await writes.upsert({
+          data: evaluationRun({
+            evaluationId: `eval_${evaluatorId}`,
+            evaluatorId,
+            traceId: SHARED_TRACE_ID,
+          }),
+          tenantId,
+        });
+      }
+    });
+
+    it("narrowed to one member, returns that member's run and not the other's of the same trace", async () => {
+      const narrowed = narrowAuthorization({
+        authorization: proof(),
+        projectId: "tenant_member_a",
+      });
+      expect(narrowed).not.toBeNull();
+      const result = narrowed
+        ? await reads.findByTraceId({ authorization: narrowed, traceId: SHARED_TRACE_ID })
+        : [];
+
+      expect(result.map((run) => run.evaluatorId)).toEqual(["monitor-a"]);
+    });
+
+    it("spanning every member, reads each member's run and nothing outside the proof", async () => {
+      const result = await reads.findByTraceId({
+        authorization: proof(),
+        traceId: SHARED_TRACE_ID,
+      });
+
+      expect(result.map((run) => run.evaluatorId).toSorted()).toEqual(["monitor-a", "monitor-b"]);
     });
   });
 });

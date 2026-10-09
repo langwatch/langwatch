@@ -13,7 +13,7 @@ import { GRAPH_AUTOMATION_REACHES } from "./prisma.custom-graph.repository.ts";
  * Only what this repository touches, so composition names the slice it needs
  * rather than the whole generated client.
  */
-export type GraphTriggerSentDatabase = Pick<
+type GraphTriggerSentDatabase = Pick<
   PrismaClient,
   "customGraph" | "project" | "trigger" | "triggerSent"
 >;

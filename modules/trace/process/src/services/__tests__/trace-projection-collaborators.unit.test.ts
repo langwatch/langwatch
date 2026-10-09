@@ -19,16 +19,16 @@ import {
   TENANT_ID,
   TRACE_ID,
 } from "../../eventing/__tests__/trace-subscriber.fixtures.ts";
+import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
+import { TraceIOExtractionService } from "../../features/derivation/services/trace-io-extraction.service.ts";
+import { TraceModelCostService } from "../../features/derivation/services/trace-model-cost.service.ts";
+import { TraceMediaReferenceService } from "../../features/media/services/trace-media-reference.service.ts";
 import {
   leanForProjection,
   IO_ATTR_KEYS,
   IO_PREVIEW_BYTES,
 } from "../../features/projection/rules/trace-projection-lean.rules.ts";
 import { SpanCostService } from "../../features/span/services/span-cost.service.ts";
-import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
-import { TraceIOExtractionService } from "../../features/derivation/services/trace-io-extraction.service.ts";
-import { TraceMediaReferenceService } from "../../features/media/services/trace-media-reference.service.ts";
-import { TraceModelCostService } from "../../features/derivation/services/trace-model-cost.service.ts";
 
 /**
  * The four collaborators the trace pipeline definition is built from, harvested

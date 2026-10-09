@@ -9,6 +9,7 @@ import {
   OrganizationMissingCredentialsError,
 } from "@langwatch/api";
 import { createCanonicalFamilyErrorHandler, createRestRuntime } from "@langwatch/api/rest";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -63,6 +64,7 @@ async function storedSlugs(
 /** The family mounted as the instance administrator's own door: a key, and no tenant. */
 function mountProvisioning(app: OrganizationModule) {
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       identify: ({ request }) => {
         const presented = request.headers.get("Authorization");

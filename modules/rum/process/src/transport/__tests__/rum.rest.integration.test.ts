@@ -5,6 +5,7 @@
 import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import { RUM_MAX_BODY_BYTES, RUM_SERVICE_NAME } from "@langwatch/react-rum/constants";
 import { RumApi } from "@langwatch/rum-contract";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -28,6 +29,7 @@ async function door({
   }).boot();
   const api = runtime.service(RumApi);
   const hono = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => {
         throw new Error("The ingest door is public.");

@@ -12,6 +12,7 @@ import {
   SecretRevealExpiredError,
   type RevealedSecret,
   type RevealOnceInput,
+  type SecretCaller,
   type StashedReveal,
   type StashRevealInput,
 } from "@langwatch/secret-contract";
@@ -37,6 +38,7 @@ export class OneTimeRevealService {
     const revealId = generate(ONE_TIME_REVEAL_KSUID_RESOURCE).toString();
     await this.deps.store.put({
       organizationId: input.organizationId,
+      recipientUserId: input.recipientUserId,
       revealId,
       reveal: {
         kind: input.kind,
@@ -54,21 +56,25 @@ export class OneTimeRevealService {
   }
 
   /**
-   * Serves the secret and forgets it. A second read of the same id is refused
-   * as already revealed; an id with nothing behind it - expired, never
-   * stashed, or another organization's - is refused as expired.
+   * Serves the secret to its recipient and forgets it. A second read of the
+   * same id is refused as already revealed; an id with nothing behind it -
+   * expired, never stashed, or another organization's or person's - as expired.
    */
-  async reveal({ organizationId, revealId }: RevealOnceInput): Promise<RevealedSecret> {
-    const taken = await this.deps.store.take({ organizationId, revealId });
+  async reveal(
+    { organizationId, revealId }: RevealOnceInput,
+    by: SecretCaller,
+  ): Promise<RevealedSecret> {
+    const address = { organizationId, recipientUserId: by.id, revealId };
+    const taken = await this.deps.store.take(address);
     if (!taken.taken) {
-      const served = await this.deps.store.wasServed({ organizationId, revealId });
+      const served = await this.deps.store.wasServed(address);
       throw served
         ? new SecretAlreadyRevealedError(revealId)
         : new SecretRevealExpiredError(revealId);
     }
 
     const stored = taken.reveal;
-    await this.deps.store.markServed({ organizationId, revealId, ttlMs: this.ttlMs });
+    await this.deps.store.markServed({ ...address, ttlMs: this.ttlMs });
     logger.info(
       { organizationId, kind: stored.kind, keyId: stored.keyId },
       "Served a one-time reveal",

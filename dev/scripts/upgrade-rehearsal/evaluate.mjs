@@ -456,10 +456,24 @@ function products({ productSeeds, productReadback }) {
       id,
       title,
       verdict: read.found ? VERDICT.notReproduced : VERDICT.reproduced,
-      detail: read.found ? "read back" : `missing on head${read.error ? `: ${read.error}` : ""}`,
+      detail: `${read.found ? "read back" : "missing on head"}${read.created === undefined ? "" : ` (${read.foundCount} of ${read.created})`}${read.error ? `: ${read.error}` : ""}`,
       evidence: ["product-seeds.json", "product-readback.json"],
     };
   });
+}
+
+/** Every span the old api accepted is stored by the time head settles. */
+function spans({ spanCounts }) {
+  const title = "Every span accepted through the old api is stored after the upgrade";
+  if (!spanCounts) return missing("SPANS", title, ["spans.json"]);
+  const lost = spanCounts.stored < spanCounts.sent;
+  return {
+    id: "SPANS",
+    title,
+    verdict: lost ? VERDICT.reproduced : VERDICT.notReproduced,
+    detail: `${spanCounts.stored} of ${spanCounts.sent} accepted spans stored`,
+    evidence: ["spans.json", "ingest.log"],
+  };
 }
 
 /** Every finding the rehearsal reports, in plan order. */
@@ -478,6 +492,7 @@ export function evaluate(evidence) {
     noop(evidence),
     scale(evidence),
     events(evidence),
+    spans(evidence),
     ...products(evidence),
   ];
 }
@@ -543,6 +558,7 @@ function readEvidence({ dir }) {
     eventParse: json("event-parse.json"),
     productSeeds: json("product-seeds.json"),
     productReadback: json("product-readback.json"),
+    spanCounts: json("spans.json"),
   };
 }
 

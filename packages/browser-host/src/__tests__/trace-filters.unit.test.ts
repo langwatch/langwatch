@@ -45,9 +45,9 @@ function resolve({ install, live }: { install?: UiTraceFilters; live?: UiTraceFi
   });
 }
 
-describe("the trace filters capability", () => {
+describe("the trace filters host service", () => {
   describe("given no module lent it", () => {
-    it("resolves to no capability", () => {
+    it("resolves to no host service", () => {
       expect(resolve({}).traceFilters).toBeUndefined();
     });
   });

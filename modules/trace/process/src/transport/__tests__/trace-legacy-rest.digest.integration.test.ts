@@ -3,6 +3,7 @@
  * GET /api/trace/:id?format=digest answers the rendered digest, not a pending read.
  */
 import { bindRestMiddleware, createRestRuntime } from "@langwatch/api/rest";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -13,6 +14,7 @@ import {
 import { tracesRestCredential } from "../traces.rest.ts";
 
 const runtime = createRestRuntime({
+  authorization: restTestAuthorization(),
   identity: {
     authenticate: () => ({
       actor: { type: "user" as const, id: "user-1" },

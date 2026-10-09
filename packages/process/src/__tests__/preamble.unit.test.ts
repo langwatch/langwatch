@@ -56,7 +56,9 @@ describe("the §4 preamble", () => {
       .withSecrets((_, secrets) => secrets.withEnv())
       .start();
     try {
-      const runtime = await server.container("worker").boot();
+      const runtime = await server
+        .container("worker")
+        .boot({ classifyEventLogRetention: () => "traces" });
       expect(runtime.name).toBe("worker");
       await server.run(runtime);
     } finally {

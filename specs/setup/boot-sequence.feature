@@ -81,10 +81,11 @@ Feature: The stack migrates once, quietly, under a lock
     Then it starts the process it supervises and nothing else
 
   @unit
-  Scenario: The orchestrator prepares the worktree through the same step
-    Given haven bringing a stack up
-    When it reaches the preparation step
-    Then it runs the same one script the local launcher runs
+  Scenario: A modular stack boots without a migration step
+    Given haven bringing a modular stack up
+    When it prepares the worktree
+    Then it runs no migration before the services boot, because the worker runs the upgrade
+    And it hands the seed to the keeper, to run once the api reports ready
 
   # --- Two runners, one schema ---
 

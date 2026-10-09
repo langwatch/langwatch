@@ -160,7 +160,7 @@ make herrgen lint-rules test-scripts        # each calls its cached Nx target
   nx run-many       ->  prisma:generate, generate:langy-skills, generate:feature-map,
                         generate:setup-skill-bodies, generate:evaluators (all cached)
   ensure-built      ->  rebuild the few packages that ship built output,
-                        only if stale, through Nx so it's usually a cache hit
+                        only if their input content changed, with each package's own build
 ```
 
 ## Everyday commands

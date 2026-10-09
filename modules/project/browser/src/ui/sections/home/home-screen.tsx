@@ -8,6 +8,7 @@ import {
   Spacer,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { projectEntryPath, projectNavigation } from "@langwatch/project-contract";
 import { useEffect } from "react";
 import { LuCalendarClock } from "react-icons/lu";
 
@@ -243,20 +244,29 @@ function LangyHome() {
 }
 
 /**
- * The home route the page loader resolves. A safe `return_to` from a project switch
- * lands back there once the scope has resolved (so the switch is remembered first),
- * as main's `HomePageWithReturnTo` did; nothing renders meanwhile.
+ * The home route the page loader resolves. A safe `return_to` lands back there once the
+ * scope has resolved; a project whose navigation has no home (an aggregate, ADR-177) is
+ * replaced by its entry path, so Back leaves the project. Nothing renders meanwhile.
  */
 export function HomeScreen() {
   const host = useProjectHomeHost();
   const returnTo = safeReturnToPath(host.returnTo());
   const isReady = !host.isLoading();
+  const project = host.project();
+  const entryPath =
+    project && !projectNavigation(project.kind).home
+      ? projectEntryPath({ slug: project.slug, kind: project.kind })
+      : null;
 
   useEffect(() => {
-    if (returnTo && isReady) host.navigate(returnTo);
-  }, [host, returnTo, isReady]);
+    if (returnTo) {
+      if (isReady) host.navigate(returnTo);
+      return;
+    }
+    if (entryPath) host.navigate(entryPath, { replace: true });
+  }, [host, returnTo, isReady, entryPath]);
 
-  return returnTo ? null : <HomePage />;
+  return returnTo || entryPath ? null : <HomePage />;
 }
 
 export default HomeScreen;

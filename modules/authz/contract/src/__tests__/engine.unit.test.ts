@@ -168,7 +168,7 @@ describe("authz engine decide()", () => {
         scope: projectScope,
       });
       expect(decision.allowed).toBe(false);
-      expect(decision.denialReason).toBe("no-binding");
+      expect(decision.denialReason).toBe("no-grant");
     });
 
     /** @scenario "Narrow access is expressed by granting less, not by overriding" */
@@ -782,7 +782,7 @@ describe("authz engine decideWithCeiling()", () => {
         scope: projectScope,
       });
       expect(decision.allowed).toBe(false);
-      expect(decision.denialReason).toBe("no-binding");
+      expect(decision.denialReason).toBe("no-grant");
     });
 
     /** @scenario "Promotion does not grow a scoped API key" */
@@ -900,7 +900,7 @@ describe("authz engine explain()", () => {
     const lines = engine.explain({ decision, grants });
     expect(lines[0]).toContain("DENIED datasets:delete");
     expect(lines.join("\n")).toContain("via group group-9");
-    expect(lines.join("\n")).toContain("denial reason: no-binding");
+    expect(lines.join("\n")).toContain("denial reason: no-grant");
   });
   describe("given a membership an admin disabled to free its seat", () => {
     /** These cases pin what the ENGINE does with a disabled snapshot: deny

@@ -244,7 +244,7 @@ describe.skipIf(!DB_URL)("servingUpgradeGate over a ledger", () => {
     });
 
     /** @scenario "The api never runs the upgrade on a first install" */
-    it("answers the api holding and runs nothing", async () => {
+    it("answers the api upgrading and runs nothing", async () => {
       let runs = 0;
       const verdict = await gateFor({
         role: "api",
@@ -254,7 +254,11 @@ describe.skipIf(!DB_URL)("servingUpgradeGate over a ledger", () => {
         },
       }).admit();
 
-      expect(verdict).toMatchObject({ admitted: false, outcome: "holding", outstanding: [PRISMA] });
+      expect(verdict).toMatchObject({
+        admitted: false,
+        outcome: "upgrading",
+        outstanding: [PRISMA],
+      });
       expect(runs).toBe(0);
     });
   });

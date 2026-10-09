@@ -155,6 +155,37 @@ export class MemoryConnectedBillingRepository extends ConnectedBillingRepository
       .toSorted((a, b) => b.changedAt.epochMilliseconds - a.changedAt.epochMilliseconds);
   }
 
+  async fillSeatChangeOrganizations({
+    after,
+    limit,
+    dryRun,
+  }: {
+    after: string | null;
+    limit: number;
+    dryRun: boolean;
+  }): Promise<{ filled: number; lastLicenseRowId: string | null }> {
+    const accounts = [...this.store.connectedBillingAccounts.values()];
+    const rows = [...this.store.connectedSeatChanges.values()]
+      .filter((change) => change.organizationId === null && change.accountId !== null)
+      .filter((change) => after === null || change.licenseRowId > after)
+      .toSorted((a, b) => a.licenseRowId.localeCompare(b.licenseRowId))
+      .slice(0, limit);
+    let filled = 0;
+    for (const change of rows) {
+      const owner = accounts.find((account) => account.id === change.accountId);
+      if (!owner) continue;
+      filled += 1;
+      if (!dryRun) {
+        this.store.connectedSeatChanges.set(change.licenseRowId, {
+          ...change,
+          organizationId: owner.organizationId,
+        });
+      }
+    }
+
+    return { filled, lastLicenseRowId: rows.at(-1)?.licenseRowId ?? null };
+  }
+
   async addInvoice(accountId: string, invoice: ConnectedInvoiceRecord): Promise<void> {
     this.store.connectedInvoices.set(invoice.stripeInvoiceId, { ...invoice, accountId });
   }

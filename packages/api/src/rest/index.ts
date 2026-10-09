@@ -137,6 +137,7 @@ export {
 // principal a second permission question is asked with, the scope a handler
 // reads back, and who is behind a personal-workspace key.
 export {
+  admittedOwnerlessProjectKeyFor,
   type AppRestOrganizationVariables,
   type AppRestProjectVariables,
   browserCallerOfRequest,
@@ -149,6 +150,7 @@ export {
   organizationCredentialPrincipalOfToken,
   organizationOf,
   type OrganizationScopedContext,
+  OWNERLESS_PROJECT_KEY_PROOF_CODE_PATH,
   PersonalProjectKeyRequiredError,
   PersonalUsageKeyMismatchError,
   PersonalUsageServiceKeyUnsupportedError,

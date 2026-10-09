@@ -4,8 +4,8 @@
  * Spec: modules/slack/specs/slack-connections.feature.
  */
 
-import { describeError } from "@langwatch/browser-host/errors";
 import { useDrawer } from "@langwatch/browser-host/drawer";
+import { describeError } from "@langwatch/browser-host/errors";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import {
   Alert,

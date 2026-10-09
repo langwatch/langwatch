@@ -6,6 +6,7 @@ import {
 } from "@langwatch/api/rest";
 /** `PATCH /api/v1/traces/:traceId/metadata`: main's post-creation metadata amendment. */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -14,6 +15,7 @@ import { tracesRestCredential, tracesRest } from "../traces.rest.ts";
 
 function mount(updateTraceMetadata: TraceApi["updateTraceMetadata"]) {
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({
         actor: { type: "user" as const, id: "user-1" },

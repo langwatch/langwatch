@@ -1,8 +1,10 @@
+import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import type {
   EventingCommandSender,
   EventingParticipation,
   ProcessStore,
+  RetentionPolicyResolver,
 } from "@langwatch/eventing";
 import { GatewayApi } from "@langwatch/gateway-contract";
 /**
@@ -155,6 +157,7 @@ type WebhookDeliveryParts = Readonly<{
   retention: WebhookRepositories["retention"];
   getPlan: WebhookDeliveryProcessDeps["getPlan"];
   dispatch: () => WebhookDeliveryProcessDeps["dispatch"];
+  tenantRetention: RetentionPolicyResolver;
 }>;
 
 export class WebhookModule implements WebhookApiContract, WebhookSpendReplayDoorApi {
@@ -165,6 +168,8 @@ export class WebhookModule implements WebhookApiContract, WebhookSpendReplayDoor
     entitlement: EntitlementApi,
     gateway: GatewayApi,
     projects: ProjectApi,
+    /** Each tenant's retention, which the delivery event rows are stamped with. */
+    retention: DataRetentionApi,
   };
   static readonly config = webhookConfig;
 
@@ -208,6 +213,10 @@ export class WebhookModule implements WebhookApiContract, WebhookSpendReplayDoor
       retention: input.repositories.retention,
       getPlan: (organizationId) => entitlement.getActivePlan({ organizationId }),
       dispatch: () => deliver,
+      tenantRetention: {
+        resolve: (tenantId) =>
+          input.dependencies.retention.getResolvedForProject({ projectId: tenantId }),
+      },
     };
     return app;
   }
@@ -232,7 +241,8 @@ export class WebhookModule implements WebhookApiContract, WebhookSpendReplayDoor
         endpointStream: WebhookEndpointStreamService.create({ processStore }),
       };
     }
-    if (participation === "produce" || !parts) return buildWebhookDeliveryPipeline({});
+    const retention = parts?.tenantRetention;
+    if (participation === "produce" || !parts) return buildWebhookDeliveryPipeline({ retention });
     const deps = {
       processStore,
       endpoints: parts.endpoints,
@@ -242,6 +252,7 @@ export class WebhookModule implements WebhookApiContract, WebhookSpendReplayDoor
       getPlan: parts.getPlan,
     };
     return buildWebhookDeliveryPipeline({
+      retention,
       deliveryProcess: WebhookDeliveryService.create(deps).processManager(),
       governanceProcess: WebhookGovernanceDeliveryService.create(deps).processManager(),
       gatewayEvents: (request) => this.requestGatewayEventDelivery(request),

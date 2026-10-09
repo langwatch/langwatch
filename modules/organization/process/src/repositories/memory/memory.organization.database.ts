@@ -170,6 +170,8 @@ interface MemoryProjectRow {
   apiKey: string;
   /** The stored LangWatchQL key; absent reads as none. */
   lwqlKey?: string;
+  /** The project's kind; absent reads as an application project. */
+  kind?: string;
   teamId: string;
   isPersonal: boolean;
   ownerUserId: string | null;
@@ -228,9 +230,6 @@ export function organizationOfRow(row: MemoryOrganizationRow): Organization {
     stripeCustomerId: row.stripeCustomerId,
     currency: "USD",
     pricingModel: "SEAT_EVENT",
-    license: row.license ?? null,
-    licenseExpiresAt: row.licenseExpiresAt ?? null,
-    licenseLastValidatedAt: row.licenseLastValidatedAt ?? null,
   };
 }
 

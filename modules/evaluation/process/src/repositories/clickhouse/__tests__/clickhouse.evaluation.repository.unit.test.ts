@@ -1,7 +1,12 @@
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
 import { SecurityError } from "@langwatch/eventing";
+import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it, vi } from "vitest";
 
+import {
+  aggregateProof,
+  ownProof,
+} from "../../../__tests__/support/authorization-proofs.fixture.ts";
 import type { EvaluationRetentionLookup } from "../../evaluation.repository.ts";
 import type {
   EvaluationClickHouseClient,
@@ -87,10 +92,17 @@ class TestRetention implements EvaluationRetentionLookup {
 
 function harness(rows: Record<string, unknown>[][] = []): {
   client: TestClient;
+  reader: ReturnType<typeof readerQuery>;
   floor: TestRetention;
   repository: ClickHouseEvaluationRepository;
 } {
   const queue = [...rows];
+  // The proof-fenced reader records into the same log and answers from the same queue.
+  const reader = readerQuery(({ sql, params }) => {
+    client.queries.push(sql);
+    client.queryParams.push(params);
+    return queue.shift() ?? [];
+  });
   const client: TestClient = {
     queries: [],
     queryParams: [],
@@ -105,13 +117,24 @@ function harness(rows: Record<string, unknown>[][] = []): {
     }),
   };
   const floor = new TestRetention();
+  const queryClient = clickHouseQueryClientDouble({ query: reader });
   return {
     client,
+    reader,
     floor,
     repository: ClickHouseEvaluationRepository.create({
       resolveClient: async () => client,
+      resolveQueryClient: async () => queryClient,
     }),
   };
+}
+
+function readerQuery(
+  answer: (input: { sql: string; params: Record<string, unknown> }) => Record<string, unknown>[],
+) {
+  return vi.fn(async (input: { sql: string; params: Record<string, unknown> }) => ({
+    rows: answer(input),
+  }));
 }
 
 describe("ClickHouseEvaluationRepository", () => {
@@ -168,7 +191,7 @@ describe("ClickHouseEvaluationRepository", () => {
     ]);
     await expect(
       repository.getByEvaluationId({
-        tenantId: "org_1",
+        authorization: ownProof({ projectId: "org_1" }),
         evaluationId: "evaluation_1",
         retention: floor,
       }),
@@ -192,7 +215,7 @@ describe("ClickHouseEvaluationRepository", () => {
 
       await expect(
         repository.getByEvaluationId({
-          tenantId: "org_1",
+          authorization: ownProof({ projectId: "org_1" }),
           evaluationId: "evaluation_1",
           retention: floor,
         }),
@@ -226,7 +249,7 @@ describe("ClickHouseEvaluationRepository", () => {
 
       await expect(
         repository.getByEvaluationId({
-          tenantId: "org_1",
+          authorization: ownProof({ projectId: "org_1" }),
           evaluationId: "missing",
           retention: floor,
         }),
@@ -250,29 +273,108 @@ describe("ClickHouseEvaluationRepository", () => {
     }
   });
 
+  it("fences every run read by the proof, reading an aggregate's members, never a bare tenant", async () => {
+    const row = fixtureRow({ TenantId: "member_2" });
+    const { client, floor, repository } = harness([
+      [{ scheduledAtMs: null }],
+      [{ scheduledAtMs: null }],
+      [row],
+      [row],
+    ]);
+    const authorization = aggregateProof({
+      projectId: "aggregate_1",
+      members: [
+        { projectId: "member_1", from: 0 },
+        { projectId: "member_2", from: 0 },
+      ],
+    });
+
+    await expect(
+      repository.getByEvaluationId({
+        authorization,
+        evaluationId: "evaluation_1",
+        retention: floor,
+      }),
+    ).resolves.toMatchObject({ evaluationId: "evaluation_1" });
+    await expect(repository.findByTraceId({ authorization, traceId: "trace_1" })).resolves.toEqual([
+      expect.objectContaining({ evaluationId: "evaluation_1" }),
+    ]);
+
+    // An aggregate spans several projects, so the unhinted floor is read for its own project.
+    expect(floor.findRetentionDays).toHaveBeenCalledWith({
+      table: "evaluation_runs",
+      tenantId: "aggregate_1",
+    });
+    expect(client.queries).toHaveLength(4);
+    for (const [index, query] of client.queries.entries()) {
+      expect(query).not.toContain("{tenantId:String}");
+      expect(query).not.toContain("{{tenant");
+      const params = JSON.stringify(client.queryParams[index]);
+      expect(params).toContain("member_1");
+      expect(params).toContain("member_2");
+    }
+  });
+
   /** @scenario A single evaluation's inputs can be fetched without scanning the trace */
   it("reads one evaluation's inputs by its sort key and degrades unavailable reads", async () => {
-    const { client, repository } = harness([[{ Inputs: '{"input":"hello","output":"world"}' }]]);
+    const { client, repository } = harness([
+      [{ TenantId: "org_1", Inputs: '{"input":"hello","output":"world"}' }],
+    ]);
 
     await expect(
       repository.findInputs({
-        tenantId: "org_1",
+        authorization: ownProof({ projectId: "org_1" }),
         evaluationId: "evaluation_1",
       }),
-    ).resolves.toEqual({ input: "hello", output: "world" });
+    ).resolves.toEqual({ tenantId: "org_1", inputs: { input: "hello", output: "world" } });
     expect(client.queries[0]).toContain("EvaluationId = {evaluationId:String}");
     expect(client.queries[0]).not.toContain("TraceId");
+    // The tenant comes from the proof's fence, never from the caller.
+    expect(client.queryParams[0]).toMatchObject({ evaluationId: "evaluation_1" });
+    expect(JSON.stringify(client.queryParams[0])).toContain("org_1");
 
+    const down = async (): Promise<never> => {
+      throw new Error("ClickHouse unavailable");
+    };
     const unavailable = ClickHouseEvaluationRepository.create({
-      resolveClient: async () => {
-        throw new Error("ClickHouse unavailable");
-      },
+      resolveClient: down,
+      resolveQueryClient: down,
     });
     await expect(
       unavailable.findInputs({
-        tenantId: "org_1",
+        authorization: ownProof({ projectId: "org_1" }),
         evaluationId: "evaluation_1",
       }),
     ).resolves.toBeNull();
+  });
+
+  describe("given no project the proof reads holds the evaluation", () => {
+    it("answers no inputs", async () => {
+      const { repository } = harness([[]]);
+
+      await expect(
+        repository.findInputs({
+          authorization: ownProof({ projectId: "org_1" }),
+          evaluationId: "evaluation_1",
+        }),
+      ).resolves.toBeNull();
+    });
+  });
+
+  describe("given the inputs read fails", () => {
+    it("degrades the memory ceiling to none and throws any other failure", async () => {
+      const { reader, repository } = harness();
+      const read = () =>
+        repository.findInputs({
+          authorization: ownProof({ projectId: "org_1" }),
+          evaluationId: "evaluation_1",
+        });
+
+      reader.mockRejectedValueOnce(new Error("Query memory limit exceeded: would use 4 GiB"));
+      await expect(read()).resolves.toBeNull();
+
+      reader.mockRejectedValueOnce(new Error("Code: 62. Syntax error"));
+      await expect(read()).rejects.toThrow("Code: 62");
+    });
   });
 });

@@ -567,6 +567,7 @@ export interface LwqlPrismaRows {
     readonly language: "String";
     readonly framework: "String";
     readonly kind: "String";
+    readonly aggregateRule: "Json?";
     readonly firstMessage: "Boolean";
     readonly integrated: "Boolean";
     readonly createdAt: "DateTime";
@@ -848,6 +849,7 @@ export interface LwqlPrismaRows {
     readonly maxBatchSize: "Int";
     readonly maxBatchDelayMs: "Int";
     readonly maxInFlight: "Int";
+    readonly allowSelfSignedCertificate: "Boolean";
     readonly lastSuccessAt: "DateTime?";
     readonly lastFailureAt: "DateTime?";
     readonly archivedAt: "DateTime?";
@@ -1601,6 +1603,7 @@ export interface LwqlPrismaRows {
     readonly createdByUserId: "String?";
     readonly expiresAt: "DateTime?";
     readonly maxViews: "Int?";
+    readonly condition: "Json?";
     readonly occurredAt: "DateTime";
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";

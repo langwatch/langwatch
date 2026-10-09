@@ -6,8 +6,8 @@ import type { FilterField, PreconditionTraceData } from "@langwatch/analytics-co
  */
 import { describe, expect, it } from "vitest";
 
-import { LegacyFilterMatchingService } from "../legacy-filter-matching.service.ts";
 import { PreconditionTraceDataService } from "../../../../services/precondition-trace-data.service.ts";
+import { LegacyFilterMatchingService } from "../legacy-filter-matching.service.ts";
 
 const SUBJECT = LegacyFilterMatchingService.create({
   preconditionTraceData: PreconditionTraceDataService.create(),

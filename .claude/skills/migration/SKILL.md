@@ -78,7 +78,7 @@ Kinds and modes are `upgradeStepKindSchema` and `upgradeStepModeSchema` in
   Prisma folders and goose `up-to` its last version, then its blocking steps, so a blocking step sees
   its own release's schema** (`specs/upgrade/stepping.feature`). Unreleased schema goes in one pass at
   the end. Write a blocking step as stepped (frozen SQL, its own release's columns). Postgres sessions
-  carry `lock_timeout` (10 s) and a failed apply is attempted up to 3 times (2 s, then 4 s;
+  carry `lock_timeout` (2 s, Alex, 2026-10-09) and a failed apply is attempted up to 3 times (2 s, then 4 s;
   `DEFAULT_LOCK_TIMEOUT_MS`, `DEFAULT_RETRY`, `packages/upgrade/src/runner/upgrade-runner.ts`). A Prisma migration newer than `RERUNNABLE_PRISMA_FROM` that fails (a
   `lock_timeout` cancel) is marked rolled back and retried, logged by name; an older one stops the
   run `failed_prisma_migration` naming the `prisma migrate resolve` command
@@ -92,9 +92,9 @@ Kinds and modes are `upgradeStepKindSchema` and `upgradeStepModeSchema` in
   deployment the **new image's worker runs the upgrade** at boot under the runner's lease; there is
   no compose `migrate` service, no npx migration phase, and Helm's pre-roll Job renders only with
   `serializeUpgrades` (`specs/upgrade/entry-points.feature`, UPGRADE-IN-WORKER).
-- The **api never migrates**. While a Postgres schema step of its image is outstanding it serves
-  the holding page; then, until the ledger is current, it serves only routes declared
-  `servesWhileUpgrading`, and reports not ready. Its serving gate refuses to start, by name, while
+- The **api never migrates** and holds nothing (NO-HOLDS): it serves every route and reports not
+  ready until the ledger is current; a Postgres read ahead of the schema answers
+  `upgrade_in_progress`, a ClickHouse read of a pending column goes through `ClickHouseColumns`. Its serving gate refuses to start, by name, while
   its release is below the floor, and the worker takes no job until the ledger is current. ClickHouse
   steps always count: an install with a database and no ClickHouse refuses, naming `CLICKHOUSE_URL`
   (round 20; `NO_CLICKHOUSE_REFUSAL`). Admitted, each writes a

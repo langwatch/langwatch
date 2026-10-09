@@ -26,11 +26,18 @@ Feature: Eventing's own surfaces over its tables
       And it touches only rows of that category's aggregate types that may expire
       And it carries the category's marker
 
+    # Only customer telemetry expires (Alex, 2026-10-09): an unlisted aggregate type is kept forever.
     @unit
-    Scenario: The fallback category keeps every other finite category's rows out
-      Given a classification whose unlisted aggregate types fall back to one category
-      When the fallback category's retention is applied
-      Then the rewrite excludes every aggregate type of the other finite categories
+    Scenario: An aggregate type mapped to no category is never rewritten
+      Given a classification whose unlisted aggregate types are mapped to no category
+      When a category's retention is applied
+      Then the rewrite touches only the aggregate types that category lists
+
+    @unit
+    Scenario: Every never-expiring row on a target is re-stamped to be kept forever
+      When the never-expiring rows are kept forever on one ClickHouse target
+      Then one rewrite stamps every tenant's never-expiring and unlisted rows there to 0 days
+      And it carries the indefinite marker, read back as the indefinite class
 
     @unit
     Scenario: Rows that never expire are never rewritten

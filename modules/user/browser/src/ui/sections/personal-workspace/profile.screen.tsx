@@ -4,7 +4,8 @@
  * Spec: specs/settings/profile.feature
  */
 
-import { Box, Heading, Text, VStack } from "@langwatch/design-system/primitives";
+import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Box, Text } from "@langwatch/design-system/primitives";
 import { SETTINGS_BAND_PADDING_Y } from "@langwatch/design-system/settings-section";
 
 import { BrowserSessionsSection } from "../browser-sessions-section.tsx";
@@ -14,16 +15,20 @@ import { SignInMethodsSummary } from "../sign-in-methods-summary.tsx";
 
 export default function ProfileScreen() {
   return (
-    <Box paddingX={{ base: 4, md: 6 }} paddingY={4} width="full" maxWidth="820px">
-      <VStack align="start" gap={1} paddingBottom={SETTINGS_BAND_PADDING_Y}>
-        <Heading size="lg">Profile</Heading>
-        <Text color="fg.muted">Who you are here, how you get in, and where you are signed in.</Text>
-      </VStack>
+    <>
+      <PageLayout.Header>
+        <PageLayout.Heading>Profile</PageLayout.Heading>
+      </PageLayout.Header>
+      <Box paddingTop={4} width="full" maxWidth="820px">
+        <Text color="fg.muted" paddingBottom={SETTINGS_BAND_PADDING_Y}>
+          Who you are here, how you get in, and where you are signed in.
+        </Text>
 
-      <ProfileDetailsSection />
-      <SignInMethodsSummary />
-      <BrowserSessionsSection />
-      <PersonalApiKeysSummary />
-    </Box>
+        <ProfileDetailsSection />
+        <SignInMethodsSummary />
+        <BrowserSessionsSection />
+        <PersonalApiKeysSummary />
+      </Box>
+    </>
   );
 }

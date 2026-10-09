@@ -11,7 +11,7 @@ import { moduleApi } from "@langwatch/module";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import { createApiDouble } from "../../__tests__/api-double.ts";
+import { createApiDouble, authorizationPort } from "../../__tests__/api-double.ts";
 import { anyAuthenticated } from "../../access/access.ts";
 import {
   createErrorHandler,
@@ -137,6 +137,7 @@ function notesApp() {
   });
 
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: ({ request }) => keyDoor(request),
       identify,

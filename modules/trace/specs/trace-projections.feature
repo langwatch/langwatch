@@ -56,3 +56,9 @@ Feature: Trace rollups and span storage fold idempotently
     When a project's first real trace is processed
     Then the project is marked integrated
     And no "Failed to update project metadata" error is logged
+
+  @unit
+  Scenario: A trace fold job main queued without event metadata parses on this worker
+    Given main queued a log-contributed or metric-correlated event with no metadata field
+    When this release's worker parses the queued trace fold job
+    Then the event parses and folds instead of blocking its trace's group

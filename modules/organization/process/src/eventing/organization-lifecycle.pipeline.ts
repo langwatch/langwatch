@@ -1,4 +1,8 @@
 import {
+  AUTHZ_MEMBER_OFFBOARDED_EVENT_TYPE,
+  authzMemberOffboardedEventDataSchema,
+} from "@langwatch/authz-contract";
+import {
   CHECKOUT_CURRENCY_SELECTED_EVENT_TYPE,
   checkoutCurrencySelectedEventDataSchema,
   PLAN_LIMIT_ALERT_SENT_EVENT_TYPE,
@@ -30,6 +34,7 @@ import {
 } from "@langwatch/eventing";
 import { OrganizationNotFoundError } from "@langwatch/organization-contract";
 import { Temporal } from "@langwatch/time";
+import { USER_ERASED_EVENT_TYPE, userErasedEventDataSchema } from "@langwatch/user-contract";
 
 import type { OrganizationModule } from "../app/organization.app.ts";
 import type { OrganizationRepositories } from "../repositories/organization.repositories.ts";
@@ -39,6 +44,9 @@ import {
   RecordInviteAcceptedCommand,
   RecordMembersInvitedCommand,
   RecordMemberDisabledCommand,
+  RecordMemberEnabledCommand,
+  RecordMemberRemovedCommand,
+  RecordMemberDepartmentChangedCommand,
   RecordPersonalWorkspaceProvisionedCommand,
   RecordPersonalTeamCreatedCommand,
   RecordPersonalWorkspaceArchivedCommand,
@@ -56,6 +64,9 @@ import {
   ORGANIZATION_LIFECYCLE_PIPELINE_NAME,
   organizationCreatedEventSchema,
   organizationMemberDisabledEventSchema,
+  organizationMemberEnabledEventSchema,
+  organizationMemberRemovedEventSchema,
+  organizationMemberDepartmentChangedEventSchema,
   organizationPresenceSettingChangedEventSchema,
   organizationSignedUpEventSchema,
   organizationTraceSharingDisabledEventSchema,
@@ -86,6 +97,12 @@ export type LicensingFactsApplier = Pick<
   | "clearLicense"
 >;
 
+/** Where authz's offboarding and user's erasure land: organization records the removals (§9). */
+export type MemberFactsApplier = Pick<
+  OrganizationModule,
+  "recordMemberOffboarded" | "recordMemberErased"
+>;
+
 /** An organisation gone before its fact arrived has no row to apply it to. */
 async function onLiveOrganization(apply: () => Promise<void>): Promise<void> {
   try {
@@ -113,6 +130,9 @@ function lifecycleCommands() {
       organizationPresenceSettingChangedEventSchema,
       organizationTraceSharingDisabledEventSchema,
       organizationMemberDisabledEventSchema,
+      organizationMemberEnabledEventSchema,
+      organizationMemberRemovedEventSchema,
+      organizationMemberDepartmentChangedEventSchema,
       organizationCreatedEventSchema,
     ])
     .withCommand("recordSignedUp", RecordSignedUpCommand)
@@ -130,6 +150,9 @@ function lifecycleCommands() {
     .withCommand("recordPresenceSettingChanged", RecordPresenceSettingChangedCommand)
     .withCommand("recordTraceSharingDisabled", RecordTraceSharingDisabledCommand)
     .withCommand("recordMemberDisabled", RecordMemberDisabledCommand)
+    .withCommand("recordMemberEnabled", RecordMemberEnabledCommand)
+    .withCommand("recordMemberRemoved", RecordMemberRemovedCommand)
+    .withCommand("recordMemberDepartmentChanged", RecordMemberDepartmentChangedCommand)
     .withCommand("recordCreated", RecordCreatedCommand);
 }
 
@@ -144,9 +167,11 @@ export type OrganizationLifecycleDefinition = ReturnType<
 export function buildOrganizationLifecyclePipeline({
   billingFacts,
   licensingFacts,
+  memberFacts,
 }: {
   billingFacts: BillingFactsApplier;
   licensingFacts: LicensingFactsApplier;
+  memberFacts: MemberFactsApplier;
 }): OrganizationLifecycleDefinition {
   return lifecycleCommands()
     .withPeerSubscriber("organizationLicensingSelfHostedCustomerLicensed", {
@@ -229,6 +254,30 @@ export function buildOrganizationLifecyclePipeline({
       data: seatCheckoutsAbandonedEventDataSchema,
       handle: ({ organizationId, subscriptionIds }) =>
         billingFacts.cancelPaymentPendingInvites({ organizationId, subscriptionIds }),
+    })
+    .withPeerSubscriber("organizationAuthzMemberOffboarded", {
+      eventType: AUTHZ_MEMBER_OFFBOARDED_EVENT_TYPE,
+      data: authzMemberOffboardedEventDataSchema,
+      handle: ({ organizationId, userId, offboardedByUserId, occurredAt }) =>
+        onLiveOrganization(() =>
+          memberFacts.recordMemberOffboarded({
+            organizationId,
+            userId,
+            offboardedByUserId,
+            occurredAt,
+          }),
+        ),
+    })
+    .withPeerSubscriber("organizationUserErased", {
+      eventType: USER_ERASED_EVENT_TYPE,
+      data: userErasedEventDataSchema,
+      handle: async ({ userId, organizationIds, occurredAt }) => {
+        for (const organizationId of organizationIds ?? []) {
+          await onLiveOrganization(() =>
+            memberFacts.recordMemberErased({ organizationId, userId, occurredAt }),
+          );
+        }
+      },
     })
     .build();
 }

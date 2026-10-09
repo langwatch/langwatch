@@ -1,3 +1,4 @@
+import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { EventingCommands } from "@langwatch/eventing";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
@@ -60,6 +61,8 @@ export class TopicModule implements TopicApi, TopicBrowserApi {
     evaluations: EvaluationApi,
     traces: TraceApi,
     modelProviders: ModelProviderApi,
+    /** Each tenant's retention, which the clustering event rows are stamped with. */
+    retention: DataRetentionApi,
   };
 
   readonly #topics: TopicService;
@@ -141,6 +144,10 @@ export class TopicModule implements TopicApi, TopicBrowserApi {
       manualRun: TopicClusteringManualRunService.create({ runner }),
       seeds: migration,
       pipeline: createTopicClusteringProcessingPipeline({
+        retention: {
+          resolve: (tenantId) =>
+            dependencies.retention.getResolvedForProject({ projectId: tenantId }),
+        },
         topicClusteringRunStatusStore: repositories.runStatus,
         topicClusteringRunHistoryStore: repositories.runHistory,
         topicModelStore: repositories.topicModel,

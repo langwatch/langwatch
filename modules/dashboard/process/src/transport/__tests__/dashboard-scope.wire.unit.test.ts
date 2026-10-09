@@ -8,6 +8,7 @@ import { langWatchQLCallerProtections } from "@langwatch/analytics-contract";
 import { bindRestMiddleware, canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import type { TrpcProcedureFactory } from "@langwatch/api/trpc";
 import type { DashboardApi, DashboardScope } from "@langwatch/dashboard-contract";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -99,6 +100,7 @@ function credentialDoors(app: DashboardApi, projectId: string) {
     scope: { tier: "project" as const, id: projectId },
   };
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: { authenticate: () => caller, identify: () => caller },
   });
   const mount = (family: typeof dashboardRest, facts: unknown[] = []) =>
@@ -399,9 +401,14 @@ describe("board scope at the doors", () => {
         const starred = await call(TEAMMATE, "dashboards.listStarred", { projectId: HOME });
         const first = (await call(TEAMMATE, "dashboards.getOrCreateFirst", {
           projectId: HOME,
-        })) as { name: string; scope: string; createdById: string | null };
+        })) as { name: string; scope: string; createdById: string | null } | null;
         // `order` counts every board of the project, hidden ones too: a known side channel.
-        return { starred, name: first.name, scope: first.scope, createdById: first.createdById };
+        return {
+          starred,
+          name: first?.name,
+          scope: first?.scope,
+          createdById: first?.createdById,
+        };
       };
       const deleted = await boardAt("PROJECT");
       await deleted.call(AUTHOR, "dashboards.delete", {

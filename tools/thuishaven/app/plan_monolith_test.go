@@ -186,8 +186,8 @@ func TestMonolithMigrationsRunUnderItsOwnScript(t *testing.T) {
 			if jobs.Seed == "" {
 				t.Error("no seed job was resolved; that checkout defines the same seed script at its root")
 			}
-			if modular := prepShellsFor(domain.LayoutModular); modular.Prepare != prepareDBShell {
-				t.Errorf("a modular checkout's migration job changed to %q", modular.Prepare)
+			if modular := prepShellsFor(domain.LayoutModular); modular.Prepare != "" {
+				t.Errorf("a modular checkout migrates before boot with %q; its worker runs the upgrade", modular.Prepare)
 			}
 		})
 	})
