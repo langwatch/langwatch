@@ -11,7 +11,8 @@ Feature: paymentsim, a local stand-in for Stripe
 
   # Bound by Go tests in services/paymentsim, tools/thuishaven/domain and
   # cmd/service. Billing's own handling of these deliveries is bound in
-  # enterprise/modules/billing; the end-to-end rows are listed as @unimplemented.
+  # enterprise/modules/billing; the rows against paymentsim are bound in billing-process's
+  # billing-paymentsim.integration.test.ts, which skips where no Go toolchain is present.
 
   Rule: Stripe's API surface
 
@@ -136,29 +137,29 @@ Feature: paymentsim, a local stand-in for Stripe
 
   Rule: Billing against paymentsim
 
-    @unimplemented
+    @integration
     Scenario: Billing refuses a delivery with a bad signature
       Given the stack runs with paymentsim
       When paymentsim delivers an event signed with the wrong secret
       Then /api/webhooks/stripe answers 400 and nothing changes
 
-    @unimplemented
+    @integration
     Scenario: A duplicate Stripe event leaves the subscription unchanged
       Given a completed checkout whose events were delivered
       When checkout.session.completed is delivered again
       Then the organization's subscription is unchanged
 
-    @unimplemented
+    @integration
     Scenario: Events out of order still activate the subscription
       When a checkout's invoice events arrive before checkout.session.completed
       Then the subscription ends ACTIVE
 
-    @unimplemented
+    @integration
     Scenario: A failed renewal payment is recorded
       When paymentsim declines a renewal charge
       Then billing records the payment failure on the subscription
 
-    @unimplemented
+    @integration
     Scenario: Reported usage reaches the meter exactly once
       When the usage reporting run sends a month's billable events
       Then paymentsim's usage total equals the events counted and a rerun adds nothing
