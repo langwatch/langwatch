@@ -1450,6 +1450,14 @@ A step that moves a stored value to a new shape annotates the old shape (an inli
 destination gains an optional `endpointId`) so a rolled-back image still reads it, and a contract step
 after the floor rewrites it to the new shape (Alex, 2026-10-09, D1-A).
 
+**A contract step never drops unarchived data** (Alex, 2026-10-09, ARCHIVE-OR-FAIL). Archive-or-fail
+lives in `packages/upgrade`: a contract's SQL names each table it retires with `-- archive: <table>`
+beside its `-- contract: retired in <release>` note, and before any schema apply the runner copies each
+such table still ahead into `_retired_<table>_<release>` and checks the copy holds the source's rows,
+or marks the contract step failed and applies nothing. A re-run copies only a stale archive; `upgrade
+plan` reports what would be archived. Only Postgres contracts archive so far; a goose contract that
+asks fails. A contract with no archive note behaves as before.
+
 **An LTS is an upgrade stop, never a maintained line** (Alex, 2026-10-09, LTS-SCHEDULE). An LTS is
 named every April and October; the first is 3.20.1 (2026-10-06), the next April 2027. Only the
 latest release gets fixes: no LTS or older line is ever patched. Naming an LTS moves the floor
