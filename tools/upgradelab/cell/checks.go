@@ -31,20 +31,40 @@ func (cell *run) checks(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	cell.report.Traffic, cell.report.Timeline = Summarize(cell.traffic.Calls(), cell.report.Phases, visible)
+	cell.report.Traffic, cell.report.Timeline = Summarize(cell.traffic.Calls(), ServedTimeline(cell.report.Phases, cell.marks["switched"]), visible)
 	cell.report.Queue = cell.queueSummary(ctx)
 	cell.report.Verdicts = append(cell.report.Verdicts,
 		cell.holdingVerdict(), ledgerVerdict(final), reopenedVerdict(cell.atReady, final), cell.rosterVerdict(ctx),
 		cell.copyVerdict(ctx), cell.readBackVerdict(ctx), cell.secondRunVerdict(ctx, final), cell.logVerdict(),
-		cell.apiEarlyVerdict(), droppedVerdict(cell.report.Traffic), lostVerdict(cell.report.Traffic), cell.queueVerdict(), cell.opsVerdict())
+		cell.apiEarlyVerdict(), cell.crashVerdict(), droppedVerdict(cell.report.Traffic), ingestVerdict(cell.report.Traffic), unansweredVerdict(cell.traffic.Calls()), lostVerdict(cell.report.Traffic), cell.queueVerdict(), cell.opsVerdict(final))
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.hybridVerdicts(ctx)...)
 	return nil
 }
 
+// crashVerdict: head's api, started before its worker, stays up until ready.
+func (cell *run) crashVerdict() Verdict {
+	first := ""
+	if len(cell.apiCrashes) > 0 {
+		first = "; first log " + cell.logPath("head-api-crash-1")
+	}
+	return verdict("N7", len(cell.apiCrashes) == 0, fmt.Sprintf("%d exits before ready, at ms %v%s", len(cell.apiCrashes), cell.apiCrashes, first))
+}
+
+// holdingVerdict: the api serves everything from boot while the upgrade runs (no request holds).
 func (cell *run) holdingVerdict() Verdict {
 	holding, ready := FirstAt(cell.report.Phases, "holding:"), FirstAt(cell.report.Phases, "ready")
-	upgrading := FirstAt(cell.report.Phases, "holding:upgrading")
-	return verdict("I0", holding >= 0 && ready > holding, fmt.Sprintf("holding at %d ms, upgrading mode at %d ms, ready at %d ms", holding, upgrading, ready))
+	return verdict("I0", holding < 0, fmt.Sprintf("holding page first answered at %d ms (-1: never), ready at %d ms", holding, ready))
+}
+
+// ingestVerdict: ingest never sees a non-2xx, on any attempt.
+func ingestVerdict(summaries []KindSummary) Verdict {
+	var seen []string
+	for _, each := range summaries {
+		if storedTable[each.Kind] != "" && each.NonOK > 0 {
+			seen = append(seen, fmt.Sprintf("%s %d", each.Kind, each.NonOK))
+		}
+	}
+	return verdict("N5", len(seen) == 0, fmt.Sprintf("non-2xx answers per ingest kind: %v", seen))
 }
 
 func ledgerVerdict(rows []LedgerRow) Verdict {
@@ -73,7 +93,7 @@ func countDone(rows []LedgerRow) int {
 }
 
 func (cell *run) rosterVerdict(ctx context.Context) Verdict {
-	out, err := psql(ctx, cell.stores.psqlURL(), `SELECT role || ':' || jsonb_array_length(steps) FROM mydb_upgrade_ledger._langwatch_serving_roster WHERE heartbeat_at > now() - interval '2 minutes' ORDER BY role`)
+	out, err := psql(ctx, cell.stores.psqlURL(), `SELECT role || ':' || jsonb_array_length(steps) FROM mydb_upgrade_ledger._langwatch_serving_roster WHERE heartbeat_at > (now() AT TIME ZONE 'UTC') - interval '2 minutes' ORDER BY role`)
 	if err != nil {
 		return Verdict{ID: "I3", Name: "roster", Result: "inconclusive", Detail: err.Error()}
 	}
@@ -102,12 +122,10 @@ func (cell *run) copyVerdict(ctx context.Context) Verdict {
 }
 
 func (cell *run) readBackVerdict(ctx context.Context) Verdict {
-	counts, err := cell.seeder.Count(ctx)
-	if err != nil {
-		return Verdict{ID: "I6", Name: "seeded product kinds read back through head", Result: "inconclusive", Detail: err.Error()}
-	}
-	err = seed.ExpectedKinds().Check(counts)
-	return verdict("I6", err == nil, fmt.Sprintf("counts %v %v", counts, errText(err)))
+	cell.seeder.PlainWire = true // the reads go to head
+	counts, readErr := cell.seeder.Count(ctx)
+	err := seed.ExpectedKinds().Check(counts)
+	return verdict("I6", err == nil && readErr == nil, fmt.Sprintf("counts %v; %s; refused reads: %.600s", counts, errText(err), errText(readErr)))
 }
 
 func errText(err error) string {
@@ -162,31 +180,45 @@ func appendDistinct(lines []string, line string) []string {
 	return append(lines, line)
 }
 
-// apiEarlyVerdict: the api answers ingest before the upgrade is done, i.e. before ready.
+// apiEarlyVerdict: head's api answers before the upgrade is done (before ready), so it is up as soon as it can be.
 func (cell *run) apiEarlyVerdict() Verdict {
 	started, ready := cell.marks["headApiStarted"], FirstAt(cell.report.Phases, "ready")
-	firstIngest := int64(-1)
-	for _, call := range cell.traffic.Calls() {
-		if storedTable[call.Kind] != "" && call.ok() && call.AtMs >= cell.marks["fromStopped"] && (firstIngest < 0 || call.AtMs < firstIngest) {
-			firstIngest = call.AtMs
+	answered := int64(-1)
+	for _, change := range cell.report.Phases {
+		if change.Phase != "down" {
+			answered = change.AtMs
+			break
 		}
 	}
-	return verdict("N1", firstIngest >= 0 && firstIngest < ready,
-		fmt.Sprintf("api started %d ms; first ingest 2xx %d ms; ready (upgrade done) %d ms; down from %d ms",
-			started, firstIngest, ready, cell.marks["fromStopped"]))
+	return verdict("N1", answered >= 0 && answered < ready,
+		fmt.Sprintf("head api started %d ms, first answered %d ms, ready (upgrade done) %d ms, balancer switched %d ms, old release stopped %d ms",
+			started, answered, ready, cell.marks["switched"], cell.marks["fromStopped"]))
+}
+
+// unansweredVerdict: no call met a closed door (refused, reset, or no release behind the balancer).
+func unansweredVerdict(calls []Call) Verdict {
+	unanswered := map[string]int{}
+	for index := range calls {
+		if calls[index].Status == 0 {
+			unanswered[calls[index].Kind]++
+		}
+	}
+	return verdict("N6", len(unanswered) == 0, fmt.Sprintf("unanswered per kind: %v", unanswered))
 }
 
 func droppedVerdict(summaries []KindSummary) Verdict {
-	failed, sent := 0, 0
+	failed, sent, retries, window := 0, 0, 0, int64(0)
 	var detail []string
 	for _, each := range summaries {
 		failed += each.Failed
 		sent += each.Sent
+		retries += each.Retries
+		window = max(window, each.MaxRetryWindowMs)
 		if each.Failed > 0 {
 			detail = append(detail, fmt.Sprintf("%s %d/%d", each.Kind, each.Failed, each.Sent))
 		}
 	}
-	return verdict("N2", failed == 0, fmt.Sprintf("%d of %d failed: %v", failed, sent, detail))
+	return verdict("N2", failed == 0, fmt.Sprintf("%d of %d failed: %v; %d upgrade_in_progress retries, longest retry window %d ms", failed, sent, detail, retries, window))
 }
 
 func lostVerdict(summaries []KindSummary) Verdict {
@@ -228,7 +260,8 @@ func (cell *run) queueVerdict() Verdict {
 }
 
 // opsVerdict: the Upgrades page answered a state, and after settle a finished one.
-func (cell *run) opsVerdict() Verdict {
+// opsVerdict: the settled page agrees with the ledger, "Finishing in background" while steps remain.
+func (cell *run) opsVerdict(final []LedgerRow) Verdict {
 	if !cell.options.Shots {
 		return Verdict{ID: "O1", Name: "Ops > Upgrades shows the right state", Result: "inconclusive", Detail: "-shots off"}
 	}
@@ -237,8 +270,11 @@ func (cell *run) opsVerdict() Verdict {
 	for _, shot := range cell.report.Shots {
 		states[shot.Phase] = shot.State + errSuffix(shot.Error)
 	}
-	settled := states["settled"]
-	return verdict("O1", settled == "Up to date", fmt.Sprintf("state by phase: %v", states))
+	want := "Up to date"
+	if len(Outstanding(final)) > 0 {
+		want = "Finishing in background"
+	}
+	return verdict("O1", states["settled"] == want, fmt.Sprintf("want %q settled; state by phase: %v", want, states))
 }
 
 func errSuffix(err string) string {
@@ -332,7 +368,7 @@ func (cell *run) misplacedTenants(ctx context.Context) ([]string, error) {
 	home := cell.homes()
 	var misplaced []string
 	for _, label := range append([]string{""}, cell.stores.Private...) {
-		tenants, err := tenantsOn(ctx, cell.stores.ClickHouseURL(label))
+		tenants, err := tenantsOn(ctx, cell.stores.queryURL(label))
 		if err != nil {
 			return misplaced, err
 		}

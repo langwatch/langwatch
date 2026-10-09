@@ -7,9 +7,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -31,31 +33,36 @@ type Options struct {
 	Before, AtCut, AfterReady        time.Duration // traffic on main, with main's worker paused, after head is ready
 	ReadyWithin, SettleWithin        time.Duration
 	WorkerDelay, Rate, Hold          time.Duration
+	SwitchOn                         string
 	Keep, Shots                      bool
 }
 
 // run is one cell in flight: its stores, processes, traffic and what it measured.
 type run struct {
-	options Options
-	profile Profile
-	stores  Stores
-	env     map[string]string
-	apiPort int
-	origin  time.Time
-	procs   []*Proc
-	report  *Report
-	seeder  *seed.Seeder
-	client  Client
-	before  snapshot.Fingerprint
-	traffic *Traffic
-	poller  *Poller
-	queue   []QueueSample
-	queueMu sync.Mutex
-	marks   map[string]int64
-	shotsWG sync.WaitGroup
-	atReady []LedgerRow
-	private map[string]string // label -> organization on that private ClickHouse target
-	tenancy seed.Tenancy
+	options            Options
+	profile            Profile
+	stores             Stores
+	env                map[string]string
+	apiPort            int
+	origin             time.Time
+	procs              []*Proc
+	report             *Report
+	seeder             *seed.Seeder
+	client             Client
+	before             snapshot.Fingerprint
+	traffic            *Traffic
+	poller             *Poller
+	queue              []QueueSample
+	queueMu            sync.Mutex
+	marks              map[string]int64
+	shotsWG            sync.WaitGroup
+	atReady            []LedgerRow
+	balancer           *Balancer
+	fromPort, headPort int
+	private            map[string]string // label -> organization on that private ClickHouse target
+	tenancy            seed.Tenancy
+	apiCrashes         []int64       // ms from start of each head api exit before ready
+	granted            chan struct{} // closed once the seed account is a platform operator on head
 
 	stopTraffic, stopPoller context.CancelFunc
 	trafficDone             chan struct{}
@@ -104,7 +111,7 @@ func (cell *run) partialTraffic() {
 	if cell.poller != nil {
 		cell.report.Phases = cell.poller.Timeline()
 	}
-	cell.report.Traffic, cell.report.Timeline = Summarize(cell.traffic.Calls(), cell.report.Phases, nil)
+	cell.report.Traffic, cell.report.Timeline = Summarize(cell.traffic.Calls(), ServedTimeline(cell.report.Phases, cell.marks["switched"]), nil)
 	cell.report.Notes = append(cell.report.Notes, "stopped early: writes were not checked, so Lost counts every 2xx write")
 }
 
@@ -126,7 +133,7 @@ func prepare(options Options) (*run, error) {
 	if err := os.MkdirAll(filepath.Join(options.RunDir, "shots"), 0o750); err != nil {
 		return nil, err
 	}
-	cell := &run{options: options, profile: profile, origin: time.Now(), marks: map[string]int64{}}
+	cell := &run{options: options, profile: profile, origin: time.Now(), marks: map[string]int64{}, granted: make(chan struct{})}
 	cell.report = &Report{Cell: options.Name(), Deployment: options.Deployment, Tier: options.Tier, Shape: options.Shape,
 		Release: options.Release, Head: options.HeadDir, Started: cell.origin.UTC().Format(time.RFC3339)}
 	return cell, nil
@@ -169,7 +176,10 @@ func (cell *run) freshStores(ctx context.Context) error {
 		return err
 	}
 	cell.procs = append(cell.procs, redis)
-	if cell.apiPort, err = apiPort(); err != nil {
+	if err := cell.ports(); err != nil {
+		return err
+	}
+	if cell.balancer, err = StartBalancer(cell.apiPort); err != nil {
 		return err
 	}
 	email, _ := generate.SeedAccount(cell.options.Seed)
@@ -177,7 +187,18 @@ func (cell *run) freshStores(ctx context.Context) error {
 	return err
 }
 
-// apiPort is the one public port both releases serve on; main's dev server binds PORT+1000.
+// ports picks the balancer's public port and one per release; main's dev server binds PORT+1000.
+func (cell *run) ports() error {
+	for _, port := range []*int{&cell.apiPort, &cell.fromPort, &cell.headPort} {
+		value, err := apiPort()
+		if err != nil {
+			return err
+		}
+		*port = value
+	}
+	return nil
+}
+
 func apiPort() (int, error) {
 	for range 20 {
 		port, err := FreePort()
@@ -191,7 +212,12 @@ func apiPort() (int, error) {
 	return 0, errors.New("no usable free port")
 }
 
+// url is the balancer: what every client, the seed and the screenshots speak to.
 func (cell *run) url() string { return "http://127.0.0.1:" + itoa(cell.apiPort) }
+
+func (cell *run) fromURL() string { return "http://127.0.0.1:" + itoa(cell.fromPort) }
+
+func (cell *run) headURL() string { return "http://127.0.0.1:" + itoa(cell.headPort) }
 
 func (cell *run) envWith(extra map[string]string) []string {
 	merged := map[string]string{}
@@ -218,8 +244,8 @@ func (cell *run) fromSchema(ctx context.Context) error {
 
 func (cell *run) fromUp(ctx context.Context) error {
 	dir := filepath.Join(cell.options.FromDir, "platform", "app")
-	base := map[string]string{"PORT": itoa(cell.apiPort - 1000)}
-	worker := map[string]string{"PORT": itoa(cell.apiPort - 1000), "WORKER_METRICS_PORT": itoa(mustPort())}
+	base := map[string]string{"PORT": itoa(cell.fromPort - 1000)}
+	worker := map[string]string{"PORT": itoa(cell.fromPort - 1000), "WORKER_METRICS_PORT": itoa(mustPort())}
 	for _, spec := range []ProcSpec{
 		{Name: "from-app", Args: []string{"pnpm", "-s", "run", "runtime:app:dev"}, Env: cell.envWith(base)},
 		{Name: "from-worker", Args: []string{"pnpm", "-s", "run", "runtime:workers:dev"}, Env: cell.envWith(worker)},
@@ -231,10 +257,14 @@ func (cell *run) fromUp(ctx context.Context) error {
 		}
 		cell.procs = append(cell.procs, proc)
 	}
-	return waitFor(ctx, cell.options.ReadyWithin, func() bool {
-		status, _, err := get(ctx, httpClient, cell.url()+"/api/health")
+	err := waitFor(ctx, cell.options.ReadyWithin, func() bool {
+		status, _, err := get(ctx, httpClient, cell.fromURL()+"/api/health")
 		return err == nil && status/100 == 2
 	})
+	if err != nil {
+		return err
+	}
+	return cell.balancer.Switch(cell.fromURL())
 }
 
 func mustPort() int {
@@ -289,7 +319,7 @@ func (cell *run) seed(ctx context.Context) error {
 }
 
 func (cell *run) basePrompt(ctx context.Context) error {
-	request, err := cell.client.post(ctx, "/api/prompts", map[string]any{"handle": cell.client.BasePrompt, "prompt": "base"})
+	request, err := cell.client.post(ctx, "/api/prompts", map[string]any{"handle": cell.client.BasePrompt, "prompt": "base", "model": "openai/gpt-5"})
 	if err != nil {
 		return err
 	}
@@ -375,33 +405,93 @@ func (cell *run) proc(name string) *Proc {
 	return &Proc{Name: name}
 }
 
-// switchToHead stops main and starts head's api, then its worker after WorkerDelay (api first).
+// switchToHead deploys head. Rolling (cloud, hybrid): head's api starts beside the old release, its
+// worker WorkerDelay later, the balancer switches once head answers SwitchOn, then the old release
+// stops. Stop-start (single-instance self-hosted): the old release stops first.
 func (cell *run) switchToHead(ctx context.Context) error {
-	cell.poller = &Poller{URL: cell.url(), Origin: cell.origin, Every: 500 * time.Millisecond, Notify: make(chan string, 8)}
+	cell.poller = &Poller{URL: cell.headURL(), Origin: cell.origin, Every: 500 * time.Millisecond, Notify: make(chan string, 8)}
 	watchCtx := cell.pollerCtx(ctx)
 	go cell.poller.Run(watchCtx)
 	if cell.options.Shots {
 		cell.shotsWG.Add(1)
 		go cell.shootPhases(watchCtx)
 	}
-	cell.proc("from-app").Stop(20 * time.Second)
-	cell.proc("from-worker").Stop(20 * time.Second)
-	cell.mark("fromStopped")
-	if err := cell.startHead("head-api", "apps/api", map[string]string{"API_PORT": itoa(cell.apiPort), "OTEL_EXPORTER_PROMETHEUS_PORT": itoa(mustPort())}); err != nil {
+	if cell.profile.StopStart {
+		cell.stopFrom()
+		if err := cell.balancer.Switch(cell.headURL()); err != nil {
+			return err
+		}
+		cell.mark("switched")
+	}
+	if err := cell.startHeadAPI(); err != nil {
 		return err
 	}
 	cell.mark("headApiStarted")
 	if err := sleep(ctx, cell.options.WorkerDelay); err != nil {
 		return err
 	}
+	cell.proc("from-worker").Stop(20 * time.Second)
 	cell.mark("headWorkerStarted")
-	return cell.startHead("head-worker", "apps/worker", map[string]string{"WORKER_METRICS_PORT": itoa(mustPort()), "OTEL_EXPORTER_PROMETHEUS_PORT": itoa(mustPort())})
+	if err := cell.startHead("head-worker", "apps/worker", map[string]string{"WORKER_METRICS_PORT": itoa(mustPort()), "OTEL_EXPORTER_PROMETHEUS_PORT": itoa(mustPort())}); err != nil {
+		return err
+	}
+	if cell.profile.StopStart {
+		return nil
+	}
+	return cell.rollOver(ctx)
+}
+
+// rollOver switches the balancer once head answers SwitchOn, then stops the old release.
+func (cell *run) rollOver(ctx context.Context) error {
+	err := waitFor(ctx, cell.options.ReadyWithin, func() bool {
+		cell.reviveAPI()
+		status, _, err := get(ctx, httpClient, cell.headURL()+cell.options.SwitchOn)
+		return (err == nil && status == http.StatusOK) || cell.headDied()
+	})
+	if err != nil || cell.headDied() {
+		return errors.Join(err, cell.deathNote())
+	}
+	if err := cell.balancer.Switch(cell.headURL()); err != nil {
+		return err
+	}
+	cell.mark("switched")
+	cell.stopFrom()
+	return nil
+}
+
+func (cell *run) stopFrom() {
+	cell.proc("from-app").Stop(20 * time.Second)
+	cell.proc("from-worker").Stop(20 * time.Second)
+	cell.mark("fromStopped")
 }
 
 func (cell *run) pollerCtx(ctx context.Context) context.Context {
 	pollCtx, stop := context.WithCancel(context.WithoutCancel(ctx))
 	cell.stopPoller = stop
 	return pollCtx
+}
+
+func (cell *run) startHeadAPI() error {
+	return cell.startHead("head-api", "apps/api", map[string]string{"API_PORT": itoa(cell.headPort), "OTEL_EXPORTER_PROMETHEUS_PORT": itoa(mustPort())})
+}
+
+// maxAPIRestarts bounds reviveAPI; past it the cell stops as if no orchestrator restarted the api.
+const maxAPIRestarts = 60
+
+// reviveAPI restarts a head api that exited before ready, as an orchestrator's restart policy does;
+// each crash keeps its log as head-api-crash-<n> and fails N7.
+func (cell *run) reviveAPI() {
+	api := cell.proc("head-api")
+	if exited, _ := api.Exited(); !exited || api.command == nil || len(cell.apiCrashes) >= maxAPIRestarts {
+		return
+	}
+	crashLog := cell.logPath(fmt.Sprintf("head-api-crash-%d", len(cell.apiCrashes)+1))
+	_ = os.Rename(cell.logPath("head-api"), crashLog)
+	cell.apiCrashes = append(cell.apiCrashes, time.Since(cell.origin).Milliseconds())
+	cell.procs = slices.DeleteFunc(cell.procs, func(proc *Proc) bool { return proc == api })
+	if err := cell.startHeadAPI(); err != nil {
+		cell.report.Notes = append(cell.report.Notes, "restarting head-api: "+err.Error())
+	}
 }
 
 func (cell *run) startHead(name, app string, extra map[string]string) error {
@@ -415,18 +505,33 @@ func (cell *run) startHead(name, app string, extra map[string]string) error {
 
 func (cell *run) awaitReady(ctx context.Context) error {
 	err := waitFor(ctx, cell.options.ReadyWithin, func() bool {
+		cell.reviveAPI()
 		return FirstAt(cell.poller.Timeline(), "ready") >= 0 || cell.headDied()
 	})
 	if err != nil || cell.headDied() {
 		return errors.Join(err, cell.deathNote())
 	}
 	cell.mark("ready")
+	cell.grantOperator(ctx)
 	ledger, err := Ledger(ctx, cell.stores)
 	cell.atReady = ledger
 	if err != nil {
 		return err
 	}
 	return sleep(ctx, cell.options.AfterReady)
+}
+
+// grantOperator makes the seed account a platform operator on head: ADMIN_EMAILS grants nothing there.
+func (cell *run) grantOperator(ctx context.Context) {
+	defer close(cell.granted)
+	email, _ := generate.SeedAccount(cell.options.Seed)
+	command := exec.CommandContext(ctx, "node", "--experimental-transform-types", "src/main.ts", "grant-platform-operator", email) // #nosec G204 -- fixed argv.
+	command.Dir, command.Env = filepath.Join(cell.options.HeadDir, "apps", "tasks"), cell.envWith(nil)
+	out, err := command.CombinedOutput()
+	_ = os.WriteFile(cell.logPath("grant-operator"), out, 0o600)
+	if err != nil {
+		cell.report.Notes = append(cell.report.Notes, "grant-platform-operator: "+err.Error()+": "+tail(out))
+	}
 }
 
 func (cell *run) headDied() bool {
@@ -451,11 +556,17 @@ func (cell *run) deathNote() error {
 func (cell *run) settle(ctx context.Context) error {
 	cell.finishTraffic()
 	cell.mark("trafficStopped")
-	return waitFor(ctx, cell.options.SettleWithin, func() bool {
+	err := waitFor(ctx, cell.options.SettleWithin, func() bool {
 		rows, err := Ledger(ctx, cell.stores)
 		depth, depthErr := QueueDepth(ctx, cell.stores.RedisPort)
 		return err == nil && depthErr == nil && len(rows) > 0 && len(Outstanding(rows)) == 0 && depth == 0
 	})
+	cell.mark("settled")
+	if err != nil && ctx.Err() == nil {
+		cell.report.Notes = append(cell.report.Notes, "settle: "+err.Error()+"; the invariants judge the stores as they are")
+		return nil
+	}
+	return err
 }
 
 func (cell *run) finishTraffic() {
@@ -474,6 +585,9 @@ func (cell *run) teardown() {
 	cell.shotsWG.Wait()
 	for index := len(cell.procs) - 1; index >= 0; index-- {
 		cell.procs[index].Stop(15 * time.Second)
+	}
+	if cell.balancer != nil {
+		cell.balancer.Close()
 	}
 	if !cell.options.Keep && cell.stores.Name != "" && cell.report.Error == "" {
 		_ = cell.stores.Drop(context.Background())
@@ -501,10 +615,21 @@ func (cell *run) shoot(ctx context.Context, phase string) {
 	if phase == "down" {
 		return
 	}
+	if signIn {
+		select { // a signed-in shot before the grant shows "Access Restricted"
+		case <-cell.granted:
+		case <-ctx.Done():
+			return
+		}
+	}
 	email, password := generate.SeedAccount(cell.options.Seed)
 	name := strings.NewReplacer(":", "-", "/", "-").Replace(phase) + ".png"
 	out := filepath.Join(cell.options.RunDir, "shots", name)
-	args, _ := json.Marshal(map[string]any{"url": cell.url(), "email": email, "password": password, "out": out, "signIn": signIn})
+	target := cell.url() // signing in needs the public origin; a bare page is head's own
+	if !signIn {
+		target = cell.headURL()
+	}
+	args, _ := json.Marshal(map[string]any{"url": target, "email": email, "password": password, "out": out, "signIn": signIn})
 	script := filepath.Join(cell.options.RunDir, "ops-upgrades.mjs")
 	if err := os.WriteFile(script, opsScript, 0o600); err != nil {
 		return
@@ -514,6 +639,10 @@ func (cell *run) shoot(ctx context.Context, phase string) {
 	command := exec.CommandContext(shotCtx, "node", script, string(args)) // #nosec G204 -- harness-written script.
 	command.Dir = filepath.Join(cell.options.HeadDir, "apps", "ui")
 	output, err := command.Output()
+	var exit *exec.ExitError
+	if errors.As(err, &exit) {
+		err = fmt.Errorf("%w: %s", err, tail(exit.Stderr))
+	}
 	shot := Shot{Phase: phase, AtMs: time.Since(cell.origin).Milliseconds(), File: filepath.Join("shots", name)}
 	var page struct{ URL, Text string }
 	if err != nil || json.Unmarshal(output, &page) != nil {

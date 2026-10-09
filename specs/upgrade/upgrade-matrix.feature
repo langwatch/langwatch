@@ -17,7 +17,7 @@ Feature: Every deployment upgrades to head with the api serving and nothing drop
     Given the old release of <deployment> runs on the cell's stores, seeded at tier <tier> with <shape> data
     And seeded traffic posts traces (OTLP and the collector), logs and metrics, and makes API and tRPC reads and writes
     When the old api and worker stop and head's api starts before head's worker
-    Then the api serves the holding page, then upgrading mode, then reports ready
+    Then the api serves every route from boot and reports ready once the ledger is current
     And head's worker ran the upgrade under the lease, with no manual upgrade run
     And the ledger is current on every ClickHouse target with nothing reopened after ready
     And no table holds fewer rows than it held at the cut, and every seeded product kind reads back through head
@@ -45,8 +45,11 @@ Feature: Every deployment upgrades to head with the api serving and nothing drop
   @e2e @unimplemented
   Scenario: No call fails and no write is lost through the switch
     Given seeded traffic running from before the switch until after ready
+    When a call is answered upgrade_in_progress (503 with Retry-After)
+    Then the client retries it after Retry-After, and the cell counts the retry and its window
     When the cell settles
-    Then every call was answered 2xx, a held request counting with its latency recorded
+    Then every call eventually answered 2xx
+    And no ingest call was ever answered a non-2xx
     And every write answered 2xx is visible after settle: spans, logs, metrics, prompts, prompt versions, datasets
     And the report counts sent, answered and stored per kind and the status codes per api phase
 
@@ -72,9 +75,9 @@ Feature: Every deployment upgrades to head with the api serving and nothing drop
     And the final fingerprint equals a clean run's
 
   @e2e @unimplemented
-  Scenario: Head's api started long before its worker holds and never runs a step
+  Scenario: Head's api started long before its worker serves and never runs a step
     Given head's api is started with no head worker for a minute
-    Then the api serves the holding page naming the outstanding steps and is not ready
+    Then the api answers ingest 2xx, answers a Postgres read on an unmigrated schema upgrade_in_progress, and is not ready
     And the ledger records no step started by the api
     When head's worker starts
     Then the upgrade runs and the api reports ready
@@ -105,3 +108,4 @@ Feature: Every deployment upgrades to head with the api serving and nothing drop
     Then each item's id is equal in both runs
     And a call answered 2xx whose write is not visible after settle counts as lost
     And a call with no answer counts as failed in the phase it was sent in
+    And a call answered upgrade_in_progress is retried after Retry-After and counted with its retry window

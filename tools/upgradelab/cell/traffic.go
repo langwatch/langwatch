@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -25,6 +26,12 @@ type Call struct {
 	Error   string `json:"error,omitempty"`
 	ID      string `json:"id,omitempty"` // what a write left behind, checked after settle
 	Write   bool   `json:"write"`
+	// Retries after upgrade_in_progress, the span they covered, and every non-2xx answer seen.
+	Retries           int   `json:"retries,omitempty"`
+	RetryWindowMs     int64 `json:"retryWindowMs,omitempty"`
+	UpgradeInProgress int   `json:"upgradeInProgress,omitempty"`
+	NonOK             int   `json:"nonOk,omitempty"`
+	firstRetryMs      int64
 }
 
 // Client is who the traffic speaks as: the seed project's API key and the seed account's session.
@@ -80,6 +87,9 @@ func (client Client) post(ctx context.Context, path string, body any) (*http.Req
 
 func nowNano() string { return strconv.FormatInt(time.Now().UnixNano(), 10) }
 
+// scope is the instrumentation scope every SDK sends.
+var scope = map[string]any{"name": "upgradelab", "version": "1"}
+
 func resource(name string) map[string]any {
 	return map[string]any{"attributes": []any{map[string]any{"key": "service.name", "value": map[string]any{"stringValue": name}}}}
 }
@@ -89,7 +99,7 @@ func otlpTrace(ctx context.Context, client Client, n int) (*http.Request, string
 	span := map[string]any{"traceId": id, "spanId": id[:16], "name": "upgradelab span " + strconv.Itoa(n), "kind": 1,
 		"startTimeUnixNano": nowNano(), "endTimeUnixNano": nowNano()}
 	body := map[string]any{"resourceSpans": []any{map[string]any{"resource": resource("upgradelab"),
-		"scopeSpans": []any{map[string]any{"spans": []any{span}}}}}}
+		"scopeSpans": []any{map[string]any{"scope": scope, "spans": []any{span}}}}}}
 	request, err := client.post(ctx, "/api/otel/v1/traces", body)
 	return request, id, err
 }
@@ -108,7 +118,7 @@ func otlpLog(ctx context.Context, client Client, n int) (*http.Request, string, 
 	record := map[string]any{"timeUnixNano": nowNano(), "severityNumber": 9, "severityText": "INFO", "traceId": id, "spanId": id[:16],
 		"body": map[string]any{"stringValue": "upgradelab log " + id}}
 	body := map[string]any{"resourceLogs": []any{map[string]any{"resource": resource("upgradelab"),
-		"scopeLogs": []any{map[string]any{"logRecords": []any{record}}}}}}
+		"scopeLogs": []any{map[string]any{"scope": scope, "logRecords": []any{record}}}}}}
 	request, err := client.post(ctx, "/api/otel/v1/logs", body)
 	return request, id, err
 }
@@ -118,7 +128,7 @@ func otlpMetric(ctx context.Context, client Client, n int) (*http.Request, strin
 	point := map[string]any{"timeUnixNano": nowNano(), "asDouble": float64(n)}
 	metric := map[string]any{"name": name, "unit": "1", "gauge": map[string]any{"dataPoints": []any{point}}}
 	body := map[string]any{"resourceMetrics": []any{map[string]any{"resource": resource("upgradelab"),
-		"scopeMetrics": []any{map[string]any{"metrics": []any{metric}}}}}}
+		"scopeMetrics": []any{map[string]any{"scope": scope, "metrics": []any{metric}}}}}}
 	request, err := client.post(ctx, "/api/otel/v1/metrics", body)
 	return request, name, err
 }
@@ -150,7 +160,7 @@ func trpcRead(ctx context.Context, client Client, _ int) (*http.Request, string,
 
 func promptCreate(ctx context.Context, client Client, n int) (*http.Request, string, error) {
 	handle := "upgradelab-" + SeededID(client.Seed, "prompt", n)[:12]
-	request, err := client.post(ctx, "/api/prompts", map[string]any{"handle": handle, "prompt": "seeded prompt " + strconv.Itoa(n)})
+	request, err := client.post(ctx, "/api/prompts", map[string]any{"handle": handle, "prompt": "seeded prompt " + strconv.Itoa(n), "model": "openai/gpt-5"})
 	return request, handle, err
 }
 
@@ -213,41 +223,65 @@ func (traffic *Traffic) fire(ctx context.Context, kind Kind) {
 	}
 }
 
+// one sends item n, retrying as a client would while the answer is upgrade_in_progress (waiting out
+// Retry-After) until it succeeds or Hold passes; the call keeps the final answer and the retries.
 func (traffic *Traffic) one(ctx context.Context, kind Kind, n int) Call {
 	started := time.Now()
 	call := Call{Kind: kind.Name, N: n, AtMs: started.Sub(traffic.Origin).Milliseconds(), Write: kind.Write}
-	request, id, err := kind.Do(ctx, traffic.Client, n)
-	call.ID = id
-	if err != nil {
-		call.Error = err.Error()
-		return call
+	for {
+		wait := traffic.attempt(ctx, kind, &call)
+		call.Latency = time.Since(started).Milliseconds()
+		if wait == 0 || time.Since(started)+wait > traffic.Hold {
+			return call
+		}
+		call.Retries++
+		if call.firstRetryMs == 0 {
+			call.firstRetryMs = time.Since(started).Milliseconds()
+		}
+		time.Sleep(wait)
+		call.RetryWindowMs = time.Since(started).Milliseconds() - call.firstRetryMs
 	}
-	response, err := traffic.http.Do(request)
-	call.Latency = time.Since(started).Milliseconds()
-	if err != nil {
-		call.Error = err.Error()
-		return call
-	}
-	defer func() { _ = response.Body.Close() }()
-	call.Status = response.StatusCode
-	if kind.Name == "dataset-create" && response.StatusCode/100 == 2 {
-		call.ID = datasetRef(response.Body, id)
-	}
-	if response.StatusCode/100 != 2 {
-		head, _ := io.ReadAll(io.LimitReader(response.Body, 240))
-		call.Error = string(head)
-	}
-	_, _ = io.Copy(io.Discard, response.Body)
-	return call
 }
 
-// datasetRef is the created dataset's id from the answer, else the name it was given.
-func datasetRef(body io.Reader, fallback string) string {
-	var answer struct{ ID, Slug string }
-	if json.NewDecoder(body).Decode(&answer) != nil {
-		return fallback
+// attempt sends once and answers how long to wait before retrying; 0 means the answer is final.
+func (traffic *Traffic) attempt(ctx context.Context, kind Kind, call *Call) time.Duration {
+	request, id, err := kind.Do(ctx, traffic.Client, call.N)
+	call.ID = id
+	if err != nil {
+		call.Status, call.Error = 0, err.Error()
+		return 0
 	}
-	return firstOf(answer.ID, answer.Slug, fallback)
+	response, err := traffic.http.Do(request)
+	if err != nil {
+		call.Status, call.Error = 0, err.Error()
+		return 0
+	}
+	defer func() { _ = response.Body.Close() }()
+	call.Status, call.Error = response.StatusCode, ""
+	if response.StatusCode/100 == 2 {
+		return 0
+	}
+	head, _ := io.ReadAll(io.LimitReader(response.Body, 240))
+	call.Error = string(head)
+	if response.StatusCode == http.StatusBadGateway && call.Error == unreachableBody {
+		call.Status = 0 // the balancer had no release to send it to: unanswered, not an api status
+		return 0
+	}
+	call.NonOK++
+	if response.StatusCode != http.StatusServiceUnavailable || !strings.Contains(call.Error, "upgrade_in_progress") {
+		return 0
+	}
+	call.UpgradeInProgress++
+	return retryAfter(response.Header.Get("Retry-After"))
+}
+
+// retryAfter reads seconds, defaulting to one and capping at ten.
+func retryAfter(header string) time.Duration {
+	seconds, err := strconv.Atoi(strings.TrimSpace(header))
+	if err != nil || seconds < 1 {
+		seconds = 1
+	}
+	return time.Duration(min(seconds, 10)) * time.Second
 }
 
 func firstOf(values ...string) string {

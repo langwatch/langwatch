@@ -43,6 +43,16 @@ func (stores Stores) ClickHouseURL(label string) string {
 	return stores.ClickHouseBase + "/" + stores.Name + "_p_" + label
 }
 
+// queryURL is where the harness posts a query against a target: ClickHouse's HTTP door takes the
+// database as a parameter, never as the path the apps' URLs carry.
+func (stores Stores) queryURL(label string) string {
+	database := stores.Name
+	if label != "" {
+		database += "_p_" + label
+	}
+	return stores.ClickHouseBase + "/?database=" + database
+}
+
 // RedisURL is the cell's own redis-server; the branch reads no db index, so no shared server is safe.
 func (stores Stores) RedisURL() string { return "redis://127.0.0.1:" + stores.RedisPort }
 

@@ -63,6 +63,7 @@ func parse(args []string) (Options, error) {
 	flags.DurationVar(&options.AfterReady, "after-ready", 20*time.Second, "traffic once head is ready")
 	flags.DurationVar(&options.ReadyWithin, "ready-within", 6*time.Minute, "bound on each boot and on head becoming ready")
 	flags.DurationVar(&options.SettleWithin, "settle-within", 4*time.Minute, "bound on background steps and queues settling")
+	flags.StringVar(&options.SwitchOn, "switch-on", "/readyz", "rolling deploys switch the balancer once head answers 200 here (/readyz, or /healthz for as soon as it listens)")
 	flags.DurationVar(&options.WorkerDelay, "worker-delay", 10*time.Second, "head's api starts this long before its worker")
 	flags.DurationVar(&options.Rate, "rate", time.Second, "each ingest kind fires once per rate; API kinds slower")
 	flags.DurationVar(&options.Hold, "hold", 60*time.Second, "how long a held request may take before it counts as failed")

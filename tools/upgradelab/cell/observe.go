@@ -200,12 +200,12 @@ func clickhouseExec(ctx context.Context, server, statement string) error {
 func StoredIDs(ctx context.Context, stores Stores, project string) (map[string]map[string]bool, error) {
 	queries := map[string]string{
 		"spans":   "SELECT DISTINCT TraceId FROM stored_spans WHERE TenantId = '%s' FORMAT TSV",
-		"logs":    "SELECT DISTINCT TraceId FROM stored_log_records WHERE TenantId = '%s' FORMAT TSV",
-		"metrics": "SELECT DISTINCT MetricName FROM stored_metric_records WHERE TenantId = '%s' FORMAT TSV",
+		"logs":    "SELECT DISTINCT WireTraceId FROM log_records WHERE TenantId = '%s' FORMAT TSV",
+		"metrics": "SELECT DISTINCT MetricName FROM metric_data_points WHERE TenantId = '%s' FORMAT TSV",
 	}
 	found := map[string]map[string]bool{}
 	for name, query := range queries {
-		out, err := clickhouseQuery(ctx, stores.ClickHouseURL(""), fmt.Sprintf(query, strings.ReplaceAll(project, "'", "")))
+		out, err := clickhouseQuery(ctx, stores.queryURL(""), fmt.Sprintf(query, strings.ReplaceAll(project, "'", "")))
 		if err != nil {
 			return nil, err
 		}

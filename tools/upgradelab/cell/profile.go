@@ -18,6 +18,8 @@ type Profile struct {
 	Shape   string
 	Extra   map[string]string
 	Missing string // non-empty: the profile cannot run yet, and why
+	// StopStart: one instance, so the old release stops before head starts; else a rolling deploy.
+	StopStart bool
 }
 
 // Profiles are the deployments a cell runs; a new deployment is one entry here.
@@ -25,7 +27,7 @@ var Profiles = map[string]Profile{
 	"cloud": {Shape: "saas", Extra: cloudBilling},
 	"hybrid": {Shape: "hybrid", Extra: cloudBilling,
 		Missing: "private S3 (DATAPLANE_S3__snap__snap_hybrid_org_4) needs an S3 with listing (MinIO); the private ClickHouse target is wired"},
-	"self-hosted": {Shape: "sh-free",
+	"self-hosted": {Shape: "sh-free", StopStart: true,
 		Missing: "a from-worktree at a release tag (3.20.1: -from-dir <worktree at v3.20.1> -release 3.20.1) and its boot commands; 3.20.1's source layout differs from main's"},
 }
 
