@@ -18,7 +18,7 @@ import { resolver, type DescribeRouteOptions, type ResponsesWithResolver } from 
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { z, type ZodType } from "zod";
 
-import { promoteStoreFailure } from "../errors.ts";
+import { promoteStoreFailure, retryAfterOf } from "../errors.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The request-context keys every layer of the transport reads off.
@@ -580,13 +580,11 @@ export function withRetryAfter(onError: ErrorHandler): ErrorHandler {
   return async (raised, c) => {
     const error = promoteStoreFailure(raised);
     const answer = await onError(error, c);
-    const waitMs = HandledError.isHandled(error) ? error.meta.retryAfterMs : undefined;
-
-    const isWait = typeof waitMs === "number" && Number.isFinite(waitMs) && waitMs >= 0;
-    if (!isWait || answer.headers.has("Retry-After")) return answer;
+    const retryAfter = retryAfterOf(error);
+    if (retryAfter === undefined || answer.headers.has("Retry-After")) return answer;
 
     const rendered = new Response(answer.body, answer);
-    rendered.headers.set("Retry-After", String(Math.ceil(waitMs / 1000)));
+    rendered.headers.set("Retry-After", retryAfter);
 
     return rendered;
   };

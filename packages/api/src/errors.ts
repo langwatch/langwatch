@@ -463,6 +463,14 @@ export class UpgradeInProgressError extends HandledError {
   }
 }
 
+/** A handled refusal's `meta.retryAfterMs` as `Retry-After` seconds; none without a wait. */
+export function retryAfterOf(error: unknown): string | undefined {
+  const waitMs = HandledError.isHandled(error) ? error.meta.retryAfterMs : undefined;
+  if (typeof waitMs !== "number" || !Number.isFinite(waitMs) || waitMs < 0) return undefined;
+
+  return String(Math.ceil(waitMs / 1000));
+}
+
 /** The one mapping of a store failure every boundary answers handled: busy pool, schema behind. */
 export function promoteStoreFailure<T>(raised: T): T | HandledError {
   if (isDatabaseBusy(raised)) return new DatabaseBusyError();
