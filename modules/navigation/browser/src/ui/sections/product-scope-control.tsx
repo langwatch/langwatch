@@ -132,6 +132,9 @@ function ProjectMenu({
           height="32px"
           color="fg"
           gap={2}
+          minWidth={0}
+          maxWidth="280px"
+          title={currentProjectName}
           _hover={{ backgroundColor: "bg.muted" }}
         >
           {currentProjectIsAggregate ? (
@@ -139,12 +142,12 @@ function ProjectMenu({
           ) : (
             <ProjectAvatar name={currentProjectName} />
           )}
-          <Text whiteSpace="nowrap">{currentProjectName}</Text>
+          <Text truncate>{currentProjectName}</Text>
           <ChevronsUpDown size={12} color="var(--chakra-colors-fg-muted)" />
         </Button>
       </Menu.Trigger>
       <Portal>
-        <Menu.Content minWidth="240px">
+        <Menu.Content minWidth="240px" maxWidth="min(360px, 90vw)">
           {groups.map(({ team, projects: teamProjects }) => (
             <Menu.ItemGroup key={team.teamId} title={showTeamHeaders ? team.label : "Projects"}>
               {teamProjects.map((candidate) => (
@@ -161,7 +164,9 @@ function ProjectMenu({
                       ) : (
                         <ProjectAvatar name={candidate.label} />
                       )}
-                      <Text flex={1}>{candidate.label}</Text>
+                      <Text flex={1} minWidth={0} truncate title={candidate.label}>
+                        {candidate.label}
+                      </Text>
                       {candidate.projectId === currentProjectId && (
                         <Check size={13} aria-label="Current project" />
                       )}

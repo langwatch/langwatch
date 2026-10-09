@@ -11,6 +11,9 @@ import { useNavigationHost } from "../../model/navigation-host.ts";
 import type { ProductId } from "../../model/products.ts";
 import { resolveOrgSwitchDestination } from "../../model/resolve-org-switch-destination.ts";
 
+const ORG_NAME_MAX_WIDTH = "280px";
+const NO_SHRINK = { flexShrink: 0 };
+
 function firstProjectSlug(organization: NavigationOrganization): string | null {
   for (const team of organization.teams ?? []) {
     if (team.isPersonal) continue;
@@ -40,9 +43,15 @@ export function OrganizationSelect({ activeProductId }: { activeProductId: Produ
     // Deliberate: bare muted text where a control could sit reads as a switcher that failed to
     // render. The mark and the weight of a name make it a statement of which organization this is.
     return (
-      <HStack gap={1.5} color="fg.muted" whiteSpace="nowrap">
-        <Building2 size={13} aria-hidden />
-        <Text fontSize="13px" fontWeight="medium" color="fg">
+      <HStack
+        gap={1.5}
+        color="fg.muted"
+        whiteSpace="nowrap"
+        minWidth={0}
+        maxWidth={ORG_NAME_MAX_WIDTH}
+      >
+        <Building2 size={13} aria-hidden style={NO_SHRINK} />
+        <Text fontSize="13px" fontWeight="medium" color="fg" truncate title={organization.name}>
           {organization.name}
         </Text>
       </HStack>
@@ -102,20 +111,25 @@ function OrganizationMenu({
           height="32px"
           color="fg.muted"
           gap={1.5}
+          minWidth={0}
+          maxWidth={ORG_NAME_MAX_WIDTH}
+          title={currentOrganizationName}
           _hover={{ backgroundColor: "bg.muted" }}
         >
-          <Text>{currentOrganizationName}</Text>
-          <ChevronsUpDown size={12} />
+          <Text truncate>{currentOrganizationName}</Text>
+          <ChevronsUpDown size={12} style={NO_SHRINK} />
         </Button>
       </Menu.Trigger>
       <Portal>
-        <Menu.Content minWidth="220px">
+        <Menu.Content minWidth="220px" maxWidth="min(360px, 90vw)">
           <Menu.ItemGroup title="Organizations">
             {organizations.map((org) => (
               <Menu.Item key={org.id} value={org.id} onClick={() => onSelect(org)} fontSize="13px">
-                <Text flex={1}>{org.name}</Text>
+                <Text flex={1} minWidth={0} truncate title={org.name}>
+                  {org.name}
+                </Text>
                 {org.id === currentOrganizationId && (
-                  <Check size={13} aria-label="Current organization" />
+                  <Check size={13} aria-label="Current organization" style={NO_SHRINK} />
                 )}
               </Menu.Item>
             ))}
