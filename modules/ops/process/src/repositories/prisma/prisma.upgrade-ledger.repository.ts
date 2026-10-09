@@ -1,5 +1,9 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { imageSteps } from "@langwatch/upgrade";
+import {
+  imageSteps,
+  type ServingRosterEntry,
+  UpgradeLedgerRepository as ServingLedger,
+} from "@langwatch/upgrade";
 import { readImageCodeSteps } from "@langwatch/upgrade/gate";
 import { loadReleases } from "@langwatch/upgrade/manifest";
 import {
@@ -42,6 +46,7 @@ export class PrismaUpgradeLedgerRepository implements UpgradeLedgerRepository {
   private constructor(
     private readonly reader: UpgradeReader,
     private readonly runner: UpgradeRunnerRepository,
+    private readonly serving: ServingLedger,
   ) {}
 
   static create({
@@ -74,6 +79,7 @@ export class PrismaUpgradeLedgerRepository implements UpgradeLedgerRepository {
         planning: { image: { release: release ?? null, steps: shipped }, releases },
       }),
       UpgradeRunnerRepository.create({ postgres }),
+      ServingLedger.create({ postgres }),
     );
   }
 
@@ -111,5 +117,9 @@ export class PrismaUpgradeLedgerRepository implements UpgradeLedgerRepository {
 
   reopenFailedStep({ id }: { id: string }): Promise<boolean> {
     return this.runner.retryFailedStep({ id });
+  }
+
+  findLiveRoster({ staleAfterMs }: { staleAfterMs: number }): Promise<ServingRosterEntry[]> {
+    return this.serving.findLiveRoster({ staleAfterMs });
   }
 }

@@ -157,7 +157,6 @@ describe("the tasks process installation", () => {
         "dataset-content-backfill",
         "demo-data",
         "trace-destination-report",
-        "virtual-key-config-backfill",
         "instant-eval-judge-spend-catch-up",
         "generate-license",
         "model-registry-sync",

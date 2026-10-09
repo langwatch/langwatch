@@ -140,11 +140,13 @@ export function ledgerTablesDdl({ tables }: { tables: LedgerTableNames }): reado
     "image" TEXT NOT NULL,
     "release" TEXT,
     "steps" JSONB NOT NULL DEFAULT '[]',
+    "credential_keys" JSONB NOT NULL DEFAULT '[]',
     "started_at" TIMESTAMP(3) NOT NULL,
     "heartbeat_at" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "_langwatch_serving_roster_pkey" PRIMARY KEY ("process_id")
 )`,
+    `ALTER TABLE ${tables.roster} ADD COLUMN IF NOT EXISTS "credential_keys" JSONB NOT NULL DEFAULT '[]'`,
     `CREATE TABLE IF NOT EXISTS ${tables.tenantState} (
     "step_id" TEXT NOT NULL,
     "tenant_id" TEXT NOT NULL,

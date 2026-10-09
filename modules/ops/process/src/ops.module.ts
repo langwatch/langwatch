@@ -68,6 +68,7 @@ export const opsProcessModule: PublishedProcessModule<"ops", OpsApi, OpsServerCo
       ProcessManagerPurgeTask.create({ repository: () => repositories.processManagerPurge }),
       CredentialsResealTask.create({
         repository: () => repositories.credentialsReseal,
+        roster: () => repositories.upgradeLedger,
         ciphers: await credentialsResealCiphers({ secrets, handles: OpsModule.secrets }),
       }),
       GrantPlatformOperatorTask.create({ operators: app }),

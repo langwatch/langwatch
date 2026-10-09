@@ -2,6 +2,11 @@ import { createLogger } from "@langwatch/observability";
 import { aesEncryption } from "@langwatch/process-stores";
 import type { ScopedSecrets, SecretHandle } from "@langwatch/secrets";
 import { Task } from "@langwatch/task";
+import { SERVING_ROSTER_TIMING } from "@langwatch/upgrade/gate";
+import {
+  credentialKeyFingerprint,
+  type ServingRosterLedger,
+} from "@langwatch/upgrade/serving-roster";
 
 import type {
   CredentialsResealRepository,
@@ -9,7 +14,11 @@ import type {
   SealedColumn,
   SealedReplacement,
 } from "../repositories/credentials-reseal.repository.ts";
-import { resealText, type CredentialCipher } from "../rules/credentials-reseal.rules.ts";
+import {
+  processesNotAccepting,
+  resealText,
+  type CredentialCipher,
+} from "../rules/credentials-reseal.rules.ts";
 
 const logger = createLogger("langwatch:task:credentials-reseal");
 
@@ -208,7 +217,11 @@ type CredentialsResealSecrets = Readonly<{
 }>;
 
 /** Keyed when the task runs: a malformed key refuses the re-seal, never another task's boot. */
-type CredentialsResealCipherSource = () => CredentialsResealCiphers;
+type CredentialsResealCipherSource = () => CredentialsResealCiphers &
+  Readonly<{ fingerprints: readonly string[] }>;
+
+/** The serving processes the ledger counts as live, with the keys each states it accepts. */
+type CredentialsResealRoster = Pick<ServingRosterLedger, "findLiveRoster">;
 
 /** A malformed key refuses under the name of the variable it came from. */
 function cipherKeyedBy({ hex, name }: { hex: string; name: string }): CredentialCipher {
@@ -244,6 +257,9 @@ export function credentialsResealCiphers({
           previous: previousKey
             ? cipherKeyedBy({ hex: previousKey, name: "CREDENTIALS_SECRET_PREVIOUS" })
             : undefined,
+          fingerprints: [currentKey, previousKey]
+            .filter((hex): hex is string => Boolean(hex))
+            .map((hex) => credentialKeyFingerprint({ hex })),
         });
       }),
     ),
@@ -262,6 +278,7 @@ export class CredentialsResealTask extends Task {
   private constructor(
     private readonly repository: () => CredentialsResealRepository,
     private readonly ciphers: CredentialsResealCipherSource,
+    private readonly roster: () => CredentialsResealRoster,
   ) {
     super();
   }
@@ -269,11 +286,13 @@ export class CredentialsResealTask extends Task {
   static create({
     repository,
     ciphers,
+    roster,
   }: {
     repository: () => CredentialsResealRepository;
     ciphers: CredentialsResealCipherSource;
+    roster: () => CredentialsResealRoster;
   }): CredentialsResealTask {
-    return new CredentialsResealTask(repository, ciphers);
+    return new CredentialsResealTask(repository, ciphers, roster);
   }
 
   async run({ args, signal }: { args: readonly string[]; signal: AbortSignal }): Promise<void> {
@@ -285,12 +304,39 @@ export class CredentialsResealTask extends Task {
       );
     }
 
+    const dryRun = args.includes("--dry-run");
+    const ciphers = this.ciphers();
+    if (ciphers.previous) await this.assertEveryProcessAcceptsBoth({ ciphers, dryRun });
     await resealCredentials({
       repository: this.repository(),
-      ciphers: this.ciphers(),
-      dryRun: args.includes("--dry-run"),
+      ciphers,
+      dryRun,
       signal,
       ...(batchSize ? { batchSize: Number(batchSize) } : {}),
     });
+  }
+  /** A process holding only one key would fail on values the re-seal moves (Alex, 2026-10-09). */
+  private async assertEveryProcessAcceptsBoth({
+    ciphers,
+    dryRun,
+  }: {
+    ciphers: ReturnType<CredentialsResealCipherSource>;
+    dryRun: boolean;
+  }): Promise<void> {
+    const roster = await this.roster().findLiveRoster({
+      staleAfterMs: SERVING_ROSTER_TIMING.staleAfterMs,
+    });
+    const lagging = processesNotAccepting({ roster, fingerprints: ciphers.fingerprints });
+    if (lagging.length === 0) return;
+    if (dryRun) {
+      logger.warn(
+        { processes: lagging },
+        "these running processes do not accept both CREDENTIALS_SECRET and CREDENTIALS_SECRET_PREVIOUS yet; applying the re-seal waits for them",
+      );
+      return;
+    }
+    throw new Error(
+      `credentials-reseal waits until every running process accepts both CREDENTIALS_SECRET and CREDENTIALS_SECRET_PREVIOUS; not yet: ${lagging.join(", ")}. Restart them with both set. Nothing was read or written`,
+    );
   }
 }

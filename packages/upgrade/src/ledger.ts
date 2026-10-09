@@ -108,6 +108,8 @@ export const servingRosterEntrySchema = z.object({
   image: z.string(),
   release: z.string().nullable(),
   steps: z.array(z.string()),
+  /** Absent on a row written before the field; such a process accepts no key it has stated. */
+  credentialKeys: z.array(z.string()).optional(),
   startedAt: z.date(),
   heartbeatAt: z.date(),
 });

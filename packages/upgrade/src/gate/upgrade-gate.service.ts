@@ -58,12 +58,15 @@ export function createUpgradeGate({
   roster,
   schemaIsEmpty,
   rollback,
+  credentialKeys = [],
 }: {
   role: ServingRole;
   processId: string;
   image: ServingGateImage;
   ledger: ServingGateLedger;
   roster: ServingRoster;
+  /** Fingerprints of the credential keys this process opens values with (a re-seal reads them). */
+  credentialKeys?: readonly string[];
   /** True when the application schema holds nothing yet (Q10's first install, the worker's). */
   schemaIsEmpty: () => Promise<boolean>;
   /** Round 9 (S3-ROLLBACK): absent, an admitted process reopens nothing. */
@@ -92,6 +95,7 @@ export function createUpgradeGate({
         image: image.name,
         release,
         steps: [...image.declaredSteps],
+        credentialKeys: [...credentialKeys],
       });
       admitted = true;
       if (rollback) await reopenAfterRollback({ ledger, roster, rollback });

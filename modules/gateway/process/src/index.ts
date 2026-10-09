@@ -135,18 +135,6 @@ export type { GatewaySpanIngestion } from "./features/realtime-session/services/
 export type { GatewaySpendConfirmation } from "./features/realtime-session/services/gateway-realtime-session.service.ts";
 export type { GatewaySpendRating } from "./features/spend/services/model-catalog-gateway-spend-rating.service.ts";
 
-// The R3 config walk, main's `scripts/migrations/backfill-vk-config-to-rp.ts`.
-export {
-  backfillVirtualKeyConfig,
-  VirtualKeyConfigBackfillTask,
-  type LegacyVirtualKeyConfig,
-  type VirtualKeyConfigBackfillOutcome,
-} from "./tasks/virtual-key-config-backfill.task.ts";
-export type {
-  VirtualKeyRow,
-  VirtualKeyScopeRow,
-} from "./repositories/gateway-virtual-key-config-backfill.repository.ts";
-
 // The pre-migration gate report, main's `report-trace-destination-backfill.ts`.
 export {
   reportTraceDestinationBackfill,

@@ -1,3 +1,4 @@
+import type { ServingRosterEntry } from "@langwatch/upgrade";
 import {
   createUpgradeReader,
   describeStepStatus,
@@ -87,5 +88,10 @@ export class MemoryUpgradeLedgerRepository implements UpgradeLedgerRepository {
     if (status !== "failed" || this.reopened.has(id)) return false;
     this.reopened.add(id);
     return true;
+  }
+
+  /** No process heartbeats into a database that holds no ledger. */
+  async findLiveRoster(): Promise<ServingRosterEntry[]> {
+    return [];
   }
 }

@@ -1,3 +1,4 @@
+import type { ServingRosterEntry } from "@langwatch/upgrade";
 import type {
   ListRunsInput,
   ListStepsFilter,
@@ -30,4 +31,6 @@ export interface UpgradeLedgerRepository {
   findTargets(): Promise<UpgradeTargetSummary[]>;
   /** Sets a failed step pending in one conditional write; false when it was not failed. */
   reopenFailedStep(input: { id: string }): Promise<boolean>;
+  /** The processes that heartbeat within `staleAfterMs`, with the credential keys each holds. */
+  findLiveRoster(input: { staleAfterMs: number }): Promise<ServingRosterEntry[]>;
 }

@@ -143,7 +143,8 @@ describe.skipIf(!DB_URL)("the credentials-reseal task over Postgres", () => {
     it("counts the values under the previous key and leaves every one as stored", async () => {
       await CredentialsResealTask.create({
         repository: () => repository,
-        ciphers: () => ciphers,
+        ciphers: () => ({ ...ciphers, fingerprints: [] }),
+        roster: () => ({ findLiveRoster: async () => [] }),
       }).run({
         args: ["--dry-run"],
         signal: new AbortController().signal,

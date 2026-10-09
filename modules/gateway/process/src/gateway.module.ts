@@ -27,7 +27,6 @@ import {
 import { gatewayRepositories } from "./repositories/gateway-repositories.registry.ts";
 import { RedisGatewayBudgetChangeDedupeRepository } from "./repositories/redis/redis.gateway-budget-change-dedupe.repository.ts";
 import { TraceDestinationReportTask } from "./tasks/trace-destination-report.task.ts";
-import { VirtualKeyConfigBackfillTask } from "./tasks/virtual-key-config-backfill.task.ts";
 import { agentCacheRest } from "./transport/agent-cache.rest.ts";
 import { elevenLabsSignature, elevenLabsWebhookRest } from "./transport/elevenlabs-webhook.rest.ts";
 import { gatewayBudgetTrpcTransport } from "./transport/gateway-budget.trpc.ts";
@@ -71,12 +70,8 @@ export const gatewayProcessModule: PublishedProcessModule<
   .withEventing(gatewayRealtimeSessionEventing)
   .withEventing(gatewayPulledUsageLedgerEventing)
   .withEventing(gatewayInstantEvalJudgeSpendEventing)
-  .withTasks(({ repositories, dependencies }) => [
+  .withTasks(({ repositories }) => [
     TraceDestinationReportTask.create({ repository: () => repositories.traceDestinationReport }),
-    VirtualKeyConfigBackfillTask.create({
-      repository: () => repositories.virtualKeyConfigBackfill,
-      organizations: dependencies.organizations,
-    }),
   ])
   .withTransportFacts(({ app }) => {
     if (!(app instanceof GatewayModule)) {

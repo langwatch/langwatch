@@ -7,6 +7,7 @@ import {
   ScopedSecrets,
   sessionSecret,
 } from "@langwatch/secrets";
+import { credentialKeyFingerprint } from "@langwatch/upgrade/serving-roster";
 import { describe, expect, it } from "vitest";
 
 import { MemoryCredentialsResealRepository } from "../../repositories/memory/memory.credentials-reseal.repository.ts";
@@ -181,7 +182,8 @@ describe("resealCredentials", () => {
       const { repository, values, valueOf } = seeded();
       const task = CredentialsResealTask.create({
         repository: () => repository,
-        ciphers: () => ({ current, previous }),
+        ciphers: () => ({ current, previous, fingerprints: [] }),
+        roster: () => ({ findLiveRoster: async () => [] }),
       });
 
       await expect(
@@ -210,7 +212,11 @@ describe("credentialsResealCiphers", () => {
       rows: new Map([["old", sealed]]),
     });
     const ciphers = await credentialsResealCiphers({ secrets: secretsHolding(values), handles });
-    const task = CredentialsResealTask.create({ repository: () => repository, ciphers });
+    const task = CredentialsResealTask.create({
+      repository: () => repository,
+      ciphers,
+      roster: () => ({ findLiveRoster: async () => [] }),
+    });
     return { task, repository, sealed };
   };
   const run = (task: CredentialsResealTask) =>
@@ -258,5 +264,81 @@ describe("credentialsResealCiphers", () => {
       const stored = repository.columns[0]?.rows.get("old") ?? "";
       expect(aesEncryption(Buffer.from(currentKey, "hex")).decrypt(stored)).toBe("moved");
     });
+  });
+});
+
+describe("given a previous secret and the processes serving", () => {
+  const currentHex = randomBytes(32).toString("hex");
+  const previousHex = randomBytes(32).toString("hex");
+  const signal = new AbortController().signal;
+  const accepting = (...hexes: string[]) => hexes.map((hex) => credentialKeyFingerprint({ hex }));
+  const values: Record<string, string> = {
+    CREDENTIALS_SECRET: currentHex,
+    CREDENTIALS_SECRET_PREVIOUS: previousHex,
+  };
+
+  const taskServing = async ({ credentialKeys }: { credentialKeys: string[] | undefined }) => {
+    const repository = MemoryCredentialsResealRepository.create();
+    const sealed = aesEncryption(Buffer.from(previousHex, "hex")).encrypt("before the rotation");
+    repository.columns.push({
+      table: "Secret",
+      column: "encryptedValue",
+      rows: new Map([["old", sealed]]),
+    });
+    const ciphers = await credentialsResealCiphers({
+      secrets: new ScopedSecrets(async (handle, build) => build(values[handle.id])),
+      handles: {
+        credentials: credentialsSecret,
+        credentialsFallback: sessionSecret,
+        credentialsPrevious: credentialsSecretPrevious,
+      },
+    });
+    const now = new Date();
+    const row = { processId: "api-1", role: "api", image: "next", release: null, steps: [] };
+    const live = { ...row, startedAt: now, heartbeatAt: now };
+    const task = CredentialsResealTask.create({
+      repository: () => repository,
+      ciphers,
+      roster: () => ({
+        findLiveRoster: async () => [credentialKeys ? { ...live, credentialKeys } : live],
+      }),
+    });
+    return { task, sealed, stored: () => repository.columns[0]?.rows.get("old") };
+  };
+
+  /** @scenario "The re-seal task refuses while a running process does not accept both secrets" */
+  it("refuses, naming the process, and changes nothing", async () => {
+    const { task, sealed, stored } = await taskServing({ credentialKeys: accepting(currentHex) });
+
+    await expect(task.run({ args: [], signal })).rejects.toThrow(/not yet: api-1/);
+    expect(stored()).toBe(sealed);
+  });
+
+  /** @scenario "The re-seal task refuses while a running process states no secrets" */
+  it("refuses while a build that predates the stated keys is serving", async () => {
+    const { task, sealed, stored } = await taskServing({ credentialKeys: undefined });
+
+    await expect(task.run({ args: [], signal })).rejects.toThrow(/not yet: api-1/);
+    expect(stored()).toBe(sealed);
+  });
+
+  /** @scenario "The re-seal task runs once every running process accepts both secrets" */
+  it("re-seals under the current secret", async () => {
+    const { task, sealed, stored } = await taskServing({
+      credentialKeys: accepting(currentHex, previousHex),
+    });
+
+    await task.run({ args: [], signal });
+
+    expect(stored()).not.toBe(sealed);
+  });
+
+  /** @scenario "A dry run while a running process does not accept both secrets changes nothing" */
+  it("reports without refusing and leaves every value as stored", async () => {
+    const { task, sealed, stored } = await taskServing({ credentialKeys: accepting(currentHex) });
+
+    await task.run({ args: ["--dry-run"], signal });
+
+    expect(stored()).toBe(sealed);
   });
 });

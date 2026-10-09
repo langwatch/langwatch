@@ -111,6 +111,7 @@ describe("servingImageTree", () => {
             const row = {
               ...declaration,
               steps: [...declaration.steps],
+              credentialKeys: [...(declaration.credentialKeys ?? [])],
               startedAt: at,
               heartbeatAt: at,
             };

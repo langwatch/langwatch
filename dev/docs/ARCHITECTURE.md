@@ -1386,6 +1386,13 @@ touches; a check refuses a migration touching two owners' tables (Alex, 2026-10-
 migration main has released keeps main's bytes even when it touches two owners: installs hold its
 checksum, so a later idempotent migration carries the split instead, and the check names it as
 released history (Alex, 2026-10-09).
+Operator-started jobs (re-sealing credentials after a `CREDENTIALS_SECRET` rotation, moving object
+storage to another provider) are not release steps: they stay named tasks an operator starts, safe to
+run again, outside the ledger (Alex, 2026-10-09). Main's virtual-key config backfill is deleted, not
+ported: its strip migration shipped in 3.19.0, below the 3.20.1 floor (Alex, 2026-10-09). Each serving
+process's roster row records `credentialKeyFingerprint` of every credential key it accepts, never the
+key, and `credentials-reseal` refuses to apply while any live row lacks the current or the previous
+key (Alex, 2026-10-09).
 
 **In-place system migrations belong to their subject; the framework runs, ops reads and requests**
 (Alex, 2026-10-06, round 14, Q-U8 and UP-3, amending "the runner belongs to ops"). The upgrade run
@@ -3112,9 +3119,11 @@ pushed directly to the branch; the first goal is the branch's CI green, and the 
 and the bypass guard rules (§8) come after. At most six lanes run at once, their owned paths checked
 disjoint at every spawn, and never two lanes in one module. From the main merge
 (`dev/docs/plans/main-merge-2026-10-05.md`), the developer seat (#8373) is ported now, the server half on
-Opus and the browser half on Sonnet. The webhook deploy drain is an approved operational step: before the
-last old worker stops, confirm the two deleted gateway delivery lanes have nothing queued; afterwards
-re-send blocked spend through the replay route, and governance is re-requested by hand.
+Opus and the browser half on Sonnet. The two retired gateway delivery lanes,
+`gateway_spend_processing:subscriber:pm:webhookDelivery` and
+`governance_events_processing:subscriber:pm:governanceEventsDelivery`, drain through `.withLaneAliases`
+on the webhook delivery pipeline until 3.21.0, so the new worker delivers what an old one queued; there
+is no manual drain (Alex, 2026-10-09, superseding the 2026-10-05 runbook).
 
 ## 19. The dev runtime and the sims
 

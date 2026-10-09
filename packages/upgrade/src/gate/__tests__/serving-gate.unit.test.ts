@@ -21,7 +21,13 @@ function memoryServingRosterLedger(): ServingRosterLedger & {
     rows,
     writeRosterEntry: async (declaration) => {
       const at = new Date(0);
-      const row = { ...declaration, steps: [...declaration.steps], startedAt: at, heartbeatAt: at };
+      const row = {
+        ...declaration,
+        steps: [...declaration.steps],
+        credentialKeys: [...(declaration.credentialKeys ?? [])],
+        startedAt: at,
+        heartbeatAt: at,
+      };
       rows.set(row.processId, row);
       return row;
     },

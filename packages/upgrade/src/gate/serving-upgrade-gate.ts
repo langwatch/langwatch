@@ -14,6 +14,7 @@ import type { UpgradePostgres } from "../ports.ts";
 import { UPGRADE_LEASE_NAME } from "../runner/runner-lease.ts";
 import { UpgradeRunnerRepository } from "../runner/runner-ledger.repository.ts";
 import { EXIT_CODES } from "../runner/upgrade-outcome.ts";
+import { credentialKeyFingerprint } from "../serving-roster/credential-key-fingerprint.ts";
 import { PreRosterRepository } from "../serving-roster/pre-roster.repository.ts";
 import {
   createServingRoster,
@@ -82,6 +83,7 @@ export function upgradeGateOver({
   withClickHouse,
   processId,
   firstInstall,
+  credentialKeys,
   warn = emitWarning,
   wait = (ms) => sleep(ms),
 }: {
@@ -93,6 +95,7 @@ export function upgradeGateOver({
   withClickHouse: boolean;
   processId: string;
   firstInstall: FirstInstallUpgrade;
+  credentialKeys?: readonly string[];
   warn?: ServingGateWarn;
   /** The worker's pause between asks; tests pass their own. */
   wait?: (ms: number) => Promise<unknown>;
@@ -125,6 +128,7 @@ export function upgradeGateOver({
       findRuns: async () => ((await runner.ledgerExists()) ? ledger.findRuns() : []),
     },
     roster,
+    credentialKeys,
     schemaIsEmpty: async () => !(await runner.prismaHistoryExists()),
     rollback: {
       reopen: (input) => runner.reopenDoneSteps(input),
@@ -387,22 +391,43 @@ export async function servingUpgradeGate({
   const release = loadReleases().manifests.at(-1)?.release ?? null;
   return secrets.into(storesOwner.secrets.database, (database) =>
     secrets.into(storesOwner.secrets.clickhouse, (clickhouse) =>
-      secrets.into(storesOwner.secrets.clickhouseRoutes, (routes) => {
-        if (!database?.trim()) return NO_LEDGER_GATE;
-        if (!clickhouse?.trim() && routes.size === 0) return NO_CLICKHOUSE_GATE;
-        const pool = new pg.Pool(gatePoolConfig({ databaseUrl: database }));
-        return upgradeGateOver({
-          role,
-          postgres: pool,
-          close: () => pool.end(),
-          tree,
-          release,
-          withClickHouse: true,
-          processId: `${hostname()}:${process.pid}:${role}`,
-          firstInstall: spawnFirstInstallUpgrade(),
-          warn,
-        });
-      }),
+      secrets.into(storesOwner.secrets.clickhouseRoutes, (routes) =>
+        withCredentialKeys(secrets, (credentialKeys) => {
+          if (!database?.trim()) return NO_LEDGER_GATE;
+          if (!clickhouse?.trim() && routes.size === 0) return NO_CLICKHOUSE_GATE;
+          const pool = new pg.Pool(gatePoolConfig({ databaseUrl: database }));
+          return upgradeGateOver({
+            role,
+            postgres: pool,
+            close: () => pool.end(),
+            tree,
+            release,
+            withClickHouse: true,
+            processId: `${hostname()}:${process.pid}:${role}`,
+            firstInstall: spawnFirstInstallUpgrade(),
+            credentialKeys,
+            warn,
+          });
+        }),
+      ),
+    ),
+  );
+}
+
+/** Fingerprints of the keys this process seals and opens credentials with (Alex, 2026-10-09). */
+function withCredentialKeys<T>(
+  secrets: ScopedSecrets,
+  build: (credentialKeys: string[]) => T | Promise<T>,
+): Promise<T> {
+  return secrets.into(storesOwner.secrets.encryption, (credentials) =>
+    secrets.into(storesOwner.secrets.encryptionFallback, (session) =>
+      secrets.into(storesOwner.secrets.encryptionPrevious, (previous) =>
+        build(
+          [(credentials ?? session)?.trim(), previous?.trim()]
+            .filter((key): key is string => Boolean(key))
+            .map((hex) => credentialKeyFingerprint({ hex })),
+        ),
+      ),
     ),
   );
 }
