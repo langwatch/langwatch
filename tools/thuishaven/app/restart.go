@@ -109,7 +109,7 @@ func (o *Orchestrator) restartServices(slug, name string) ([]string, error) {
 	for _, t := range targets {
 		pids := o.sys.PIDsOnPort(t.Port)
 		if len(pids) == 0 {
-			msgs = append(msgs, fmt.Sprintf("%-10s nothing on :%d, the supervisor will start it", t.Name, t.Port))
+			msgs = append(msgs, fmt.Sprintf("%-10s nothing on :%d, the launcher will start it", t.Name, t.Port))
 			continue
 		}
 		for _, pid := range pids {
@@ -120,7 +120,7 @@ func (o *Orchestrator) restartServices(slug, name string) ([]string, error) {
 			}
 			o.sys.TerminateGroup(pid)
 		}
-		msgs = append(msgs, fmt.Sprintf("%-10s bounced :%d, the supervisor brings it back", t.Name, t.Port))
+		msgs = append(msgs, fmt.Sprintf("%-10s bounced :%d, the launcher brings it back", t.Name, t.Port))
 	}
 	return msgs, nil
 }

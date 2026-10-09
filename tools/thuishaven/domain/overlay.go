@@ -310,6 +310,8 @@ func (s Stack) observabilityEnv() []string {
 		// forward to. The frontend half of a trace is exactly what a developer
 		// debugging their own worktree wants, so it is on whenever the stack is.
 		"RUM_ENABLED=true",
+		// Named explicitly so the rum module does not fall back to the deprecated OTEL endpoint and warn.
+		"RUM_COLLECTOR_ENDPOINT=" + otlp,
 	}
 	// The Grafana base URL, so the app can build clickable trace/log deep links.
 	// The proxied hostname when the portless proxy carries the route (stable,

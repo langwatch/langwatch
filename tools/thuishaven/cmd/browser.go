@@ -27,7 +27,7 @@ import (
 // re-signs a lane in when its page lands on sign-in and exits once no lane
 // is left; every command waits on page events, never a fixed sleep.
 
-const browserUsage = "usage: haven browser <open|goto|snapshot|click|fill|type|press|screenshot|eval|state-load|close|status|stop> [args] --lane <name> [--as admin|email]"
+const browserUsage = "usage: haven browser <open|goto|snapshot|click|fill|select|type|press|screenshot|eval|state-load|close|status|stop> [args] --lane <name> [--as admin|email]"
 
 // browserStartTimeout bounds the daemon's first line: a cold browser on a loaded machine.
 const browserStartTimeout = 90 * time.Second
@@ -35,8 +35,8 @@ const browserStartTimeout = 90 * time.Second
 func browserSpec() commandSpec {
 	return commandSpec{
 		name:    "browser",
-		summary: "one shared headless browser per stack, a signed-in context per --lane, playwright-cli's verbs: open | goto | snapshot | click | fill | type | press | screenshot | eval | state-load | close | status | stop",
-		args:    "<verb> [ref|url|text|key|expression|file] [text]",
+		summary: "one shared headless browser per stack, a signed-in context per --lane, playwright-cli's verbs: open | goto | snapshot | click | fill | select | type | press | screenshot | eval | state-load | close | status | stop",
+		args:    "<verb> [ref|selector|url|text|key|expression|file] [text]",
 		maxArgs: 3,
 		flags: []flagSpec{
 			{long: "--lane", takesValue: true, value: "<name>", summary: "the caller's own context; lanes never share one"},
@@ -149,7 +149,7 @@ func browserRequest(verb string, inv invocation) (map[string]any, error) {
 // browserVerbArgs names each verb's positionals, as playwright-cli spells them; "?" is optional.
 var browserVerbArgs = map[string][]string{
 	"open": {"url?"}, "goto": {"url"}, "snapshot": nil, "screenshot": nil, "close": nil,
-	"click": {"ref"}, "fill": {"ref", "text"}, "type": {"text"}, "press": {"key"},
+	"click": {"ref"}, "fill": {"ref", "text"}, "select": {"ref", "text"}, "type": {"text"}, "press": {"key"},
 	"eval": {"expression"}, "state-load": {"file"},
 }
 

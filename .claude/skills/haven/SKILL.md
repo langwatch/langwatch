@@ -173,10 +173,13 @@ left (idle lanes close after 5 minutes).
 
 ```bash
 haven browser open /settings --lane qa-1 --as admin        # url + title once the app shell mounted
-haven browser snap --lane qa-1 --as admin                  # accessibility snapshot of the page, as text
-haven browser shot /governance --lane qa-1 --as admin --out .claude/tmp/qa-1.png
+haven browser snapshot --lane qa-1 --as admin              # accessibility snapshot with element refs (e12), as text
+haven browser screenshot --lane qa-1 --as admin --out .claude/tmp/qa-1.png
+haven browser click e12 --lane qa-1 --as admin             # a ref from the last snapshot
+haven browser fill e14 "t1 name" --lane qa-1 --as admin    # also: select <ref> <option>, type <text>, press <key>, goto <url>
 haven browser eval "document.title" --lane qa-1 --as admin
 haven browser open /settings --lane qa-1 --as admin --wait-for 'text=Members'
+haven browser select e12 "Team" --lane qa-1 --as admin   # native <select> or combobox: opens it, picks the option by its text; target is a snapshot ref or CSS selector
 haven browser close --lane qa-1                            # status | stop for the whole browser
 haven auth admin --out state.json                          # just the Playwright storage state (mode 600)
 ```

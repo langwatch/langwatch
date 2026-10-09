@@ -334,6 +334,17 @@ const actions: Record<string, Act> = {
     await page.locator(`aria-ref=${body.ref}`).fill(body.text ?? "", { timeout });
     return afterInput({ page, timeout });
   },
+  select: async ({ page, body, timeout }) => {
+    const target = locatorFor({ page, ref: body.ref ?? "" });
+    const text = body.text ?? "";
+    const native = await target.evaluate((el) => el.tagName === "SELECT", undefined, { timeout });
+    if (native) await target.selectOption([{ label: text }], { timeout });
+    else {
+      await target.click({ timeout });
+      await page.getByRole("option", { name: text, exact: true }).first().click({ timeout });
+    }
+    return afterInput({ page, timeout });
+  },
   type: async ({ page, body, timeout }) => {
     await page.keyboard.type(body.text ?? "");
     return afterInput({ page, timeout });
@@ -347,6 +358,11 @@ const actions: Record<string, Act> = {
     value: await page.evaluate(body.expression ?? "undefined"),
   }),
 };
+
+/** A snapshot ref (`e12`, `f1e3`) or, failing that, a CSS selector. */
+function locatorFor({ page, ref }: { page: Page; ref: string }) {
+  return /^(f\d+)?e\d+$/.test(ref) ? page.locator(`aria-ref=${ref}`) : page.locator(ref).first();
+}
 
 /** After input the page's own requests settle (capped), as playwright-cli waits after an action. */
 async function afterInput({ page, timeout }: { page: Page; timeout: number }) {
