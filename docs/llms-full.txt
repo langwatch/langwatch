@@ -40952,7 +40952,7 @@ Both can also be created with `langwatch trigger create --graph-alert` and `--re
 
 ---
 title: Dashboards
-description: Build boards of charts over your LangWatch data, or start one from the Agent Flight Deck template for an at-a-glance view of your project.
+description: Build boards of charts over your LangWatch data, or start one from the Agent health template for an at-a-glance view of your project.
 ---
 
 ## Turn on Dashboards
@@ -40962,87 +40962,172 @@ It sits behind the `release_dashboards` feature flag, which is off by default.
 
 ## Your first board
 
-Opening Dashboards takes you to the first board you created. If you can see no
-board yet, LangWatch makes one for you, called "My dashboard", that only you can
-see.
+Opening Dashboards opens your board called "My dashboard", and it starts in your
+starred boards. If you have no such board yet, LangWatch makes one for you. It
+starts at the scope Only me, so only you see it. You can change its scope like
+any other board's (see [Who can see a board](#who-can-see-a-board)).
 
 ## The sidebar
 
-The sidebar has a quick search box and the list of saved boards, grouped into
-Mine, Team and Organisation. The **+** button creates a new board.
+The sidebar lists, in order:
+
+- **Your dashboards**: your "My dashboard" first, then the project's other
+  boards by name. The **+** next to the heading makes a blank board at once and
+  opens it.
+- **Starred**: the boards you starred, in your own order. Stars are yours alone.
+  The menu of a starred board has Move up and Move down.
+- **From your organisation**: the heading reads "From" and your organisation's
+  name. It lists the boards that other projects of your organisation set to
+  Organization, by name, and shows only when there is such a board.
+- **From LangWatch**: boards LangWatch made for you. Click the heading to fold
+  the group; it stays folded until you click it again.
+
+A board set to Only me has a small lock next to its name, and a board set to
+Organization has a building. A Project board has no mark.
+
+The **⋮** menu of a board offers Star or Unstar, Rename, Duplicate and Delete.
+On a board you made it also offers the three scope choices. On a board you
+cannot edit it offers Star or Unstar and **Duplicate to edit**. "My dashboard"
+cannot be renamed or deleted.
 
 ## Start from a template
 
-A board without widgets offers its templates under "Start from a template":
-the Agent Flight Deck, then one template for every section of the question
-picker ("What happened?", "What changed?" and so on).
+A board without widgets shows the ask bar, suggested questions, and "Or start
+from a template" with the three From LangWatch boards and a **View all
+templates** link. The templates library lists every ready template by Grow,
+Protect, Profit and Trust, with a search box and filters for the category and
+the agent type.
 
-Choosing one creates a new board named after it (numbered "Agent Flight Deck 2"
-and so on if the name is taken), visible only to you, with a widget answering
-each question in that section.
+**Add to this project** on a card creates a new board named after the template
+(numbered "Agent health 2" and so on if the name is taken), at the scope Project,
+with the template's widgets. A template you already added shows **Added**,
+linking to its board.
+
+When Langy is enabled for your project, Langy opens with the template's report
+prompt ready in the composer, unsent. The prompt also asks Langy to check what
+the board needs that your project has not set up yet, and names the widgets
+that wait for that data. Without Langy the board is made and no
+prompt is drafted.
 
 A widget whose data is not set up yet says what is missing and links to the
 page that sets it up, such as evaluations, scenarios or feedback.
 
-The Agent Flight Deck holds ten widgets:
+The Agent health template holds five widgets:
 
-- Status
-- Throughput, latency and errors
-- Cost efficiency
-- Failure intelligence
-- Scenario results
-- Quality signal
-- User feedback
-- Gateway routing
-- Your coding agents
-- Most impactful traces
+- This period
+- Status today
+- Needs attention
+- Top request my agent cannot serve
+- Conversations resolved per day
 
 A new board is yours like any other: every widget on it can be edited,
 duplicated, moved, resized or deleted, and your changes do not affect the
 template.
 
+## From LangWatch boards
+
+The From LangWatch group in the sidebar holds Release check, "Can I trust my
+numbers?" and Where my agent breaks. Each is a template shown live over your
+data and read-only: you cannot move, edit or add anything on it, and LangWatch
+stores no copy.
+
+To change one, open its **⋮** menu in the sidebar and pick **Duplicate to
+edit**. That makes your own board named "<name> (copy)" with the template's
+widgets and opens it. The board's header has no such button.
+
 ## Period and grain
 
-Every board has a period, from one hour to one year, defaulting to 30 days,
-and a grain: auto, hour, day or week. Every widget on the board reads over that
-period and grain.
+Every board has a period, from Live (the last hour) up to one year, defaulting
+to 30 days, and a grain: auto, minute, hour, day or week. A grain is offered only
+when it fits the period, and a grain that does not fit is greyed out. Every widget
+on the board reads over that period and grain.
 
 ## Keep the data fresh
 
-The board header shows when the data was last updated, as "Updated … ago".
-The refresh button reloads every widget on the board now. The auto-refresh
-menu next to it reloads every widget every minute, every 5 minutes, or never
+The header has one period control. Its menu has three columns, Range, Grain and
+Refresh, and ends with **Refresh now**, which reloads every widget on the board.
+The Refresh column reloads every widget every minute, every 5 minutes, or never
 (Off).
+
+Pick **Live** for the last hour, rolling and refreshed every minute. The other
+refresh choices are greyed out until you pick another range.
 
 ## Building your own board
 
-On a board, you can rename it and add a description. **Add chart** opens the
+On a board, you can rename it from the sidebar menu and add a description.
+**Add a widget** opens the picker; **I'll build it myself** there opens the
 widget editor, where you write the widget's code and its LangWatchQL queries.
 Move a widget by its drag handle and resize it from its corner. Each widget's
 menu offers:
 
-- **Edit**: opens the widget editor on that widget's code and queries.
-- **Duplicate**: adds a copy at the bottom of the board.
+- **Edit with Langy**: asks Langy to change the widget. Only when Langy is available.
+- **Edit code**: opens the widget editor on that widget's code and queries.
+- **Copy widget id** and **Copy API snippet**: copy what the REST API needs to
+  edit the widget.
+- **Set an alert** and **Send as a report**: draft Langy to alert on, or
+  schedule, that widget. Only when Langy is available.
+- **Duplicate**: adds a copy of the widget.
 - **Delete**: removes the widget.
 
-A board's visibility is Only me, Team or Organisation. Only the board's
-creator or a project admin can change its visibility or delete it.
+## Who can see a board
+
+Every board has a scope, shown next to its title:
+
+- **Only me**: only you see the board.
+- **Project**: everyone in the project sees it. A new board starts here.
+- **Organization**: everyone in your organisation sees it, in each of their
+  projects. In each project the board shows that project's own data, and each
+  member sees what their role lets them see.
+
+Only the member who made a board can change its scope, from the control next
+to the title or from the board's **⋮** menu in the sidebar. A project admin
+cannot. Everyone else sees the scope as a badge. Who can edit or delete a board
+does not change: that still follows your role's analytics permissions.
+
+LangWatch asks you to confirm a change only when somebody loses the board: when
+you set a board to Only me that other members starred, and when you lower a
+board from Organization. Every other change happens at once, and the note that
+follows has an **Undo**. Other members' stars are kept, and come back if you
+widen the scope again.
+
+The project where a board was made owns it. An Organization board can be edited
+only in that project. In every other project it is read-only: you cannot add,
+move, edit or delete a widget, and the header says which project owns the board.
+To change it, pick **Duplicate to edit** in the board's **⋮** menu in the
+sidebar. That makes your own copy in the project you are in.
+
+An Organization board also has a **Project** control in its header. It names the
+project whose data you see, and lists the projects of your organisation that you
+can open. Pick one to open the same board under that project.
+
+If you open the address of a board that you may not see, the page says "This
+dashboard is not available". The board was deleted, or the member who made it
+set its scope to Only me.
+
+A project API key reads the project's boards except the ones set to Only me.
 
 ## Asking questions
 
-The question picker lists suggested questions. Picking one adds that question's
-widget to the board, below the widgets already there. When Langy is enabled for
-your project, Langy then opens with the question's prompt ready in the composer,
-with the board as context, so you can read it and send it with one click.
+Every board has an ask bar under its header, reading "What do you want to
+know?". On a stored board, clicking it opens **Add a widget** with the cursor in
+its search. On a From LangWatch board, the bar opens Langy when Langy is
+available, with the board as context and no question sent yet.
+
+The picker lists suggested questions, grouped by the question tree, with a
+search and filters for the category and the agent type. Picking one adds that
+question's widget to the board, below the widgets already there. When Langy is
+enabled for your project, Langy then opens with the question's prompt ready in
+the composer, with the board as context, so you can read it and send it with one
+click.
 
 Without Langy the picker still lists every question, and picking one adds its
-widget. The pinned **Ask Langy** footer, and pressing Enter on a question you
-have typed, send your own question to Langy directly.
+widget. The pinned **Ask Langy** footer, and the **Ask** button next to the
+search field, send your own question to Langy directly.
 
-On a board that already has widgets, the **Add a block** area at the bottom of
-the board opens the question picker; an empty board shows only the templates and
-the ask bar. There is also an ask bar at the top of every board for asking Langy
-about that board directly.
+On a board that already has widgets, the **Add a widget** box below the widgets
+and the **Add a widget** button in the header both open the picker. Every widget
+has an **Ask Langy** button when Langy is available; it drafts a prompt with the
+widget's name, its queries and the period.
 
 ## How the data is read
 
@@ -73968,9 +74053,9 @@ Every tenant-scoped table of the application database, derived from the schema. 
 | `anomaly_alerts` | Persisted anomaly detection. | `output`, `costs` | one row per (TenantId, AnomalyAlertId); an organization-scoped row appears once per project | `TriggerWindowStart` |
 | `anomaly_rules` | Admin-defined anomaly detection rule. | `output` | one row per (TenantId, AnomalyRuleId); an organization-scoped row appears once per project | `CreatedAt` |
 | `costs` | Rows of the Cost table, one row per CostId. | `costs`, `output` | one row per CostId | `CreatedAt` |
-| `custom_graphs` | Rows of the CustomGraph table, one row per CustomGraphId. | `output` | one row per CustomGraphId | `CreatedAt` |
+| `custom_graphs` | Rows of the CustomGraph table, one row per CustomGraphId. Rows placed on a dashboard set to Only me are not queryable. | `output` | one row per CustomGraphId | `CreatedAt` |
 | `custom_llm_model_costs` | Rows of the CustomLLMModelCost table, one row per CustomLLMModelCostId. | `costs`, `output` | one row per CustomLLMModelCostId | `CreatedAt` |
-| `dashboards` | Rows of the Dashboard table, one row per DashboardId. | None | one row per DashboardId | `CreatedAt` |
+| `dashboards` | Rows of the Dashboard table, one row per DashboardId. Dashboards set to Only me are not queryable. | None | one row per DashboardId | `CreatedAt` |
 | `data_privacy_policies` | Rows of the DataPrivacyPolicy table, one row per (TenantId, DataPrivacyPolicyId); an organization-scoped row appears once per project. | `output` | one row per (TenantId, DataPrivacyPolicyId); an organization-scoped row appears once per project | `CreatedAt` |
 | `dataset_records` | Rows of the DatasetRecord table, one row per DatasetRecordId. | `output` | one row per DatasetRecordId | `CreatedAt` |
 | `datasets` | Rows of the Dataset table, one row per DatasetId. | `output` | one row per DatasetId | `CreatedAt` |
