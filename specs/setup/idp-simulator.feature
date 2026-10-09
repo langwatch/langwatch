@@ -398,3 +398,43 @@ Feature: Local IdP simulator (idpsim)
     And the tenant's activity shows the user being disabled
     And a change naming no active flag is refused as a bad request
     And a change naming an unknown user is refused as not found
+
+  @unit
+  Scenario: Resetting a tenant clears its clock skew
+    Given a tenant whose clock is skewed by ten minutes
+    When the tenant is reset
+    Then the tenant's clock runs true again
+    And the next replayed SAML assertion has no previous assertion to repeat
+
+  @unit
+  Scenario: A tenant's clock skew survives a simulator restart
+    Given a simulator that keeps its state on disk
+    And a tenant whose clock is skewed by ten minutes
+    When the simulator restarts
+    Then the tenant's clock is still skewed by ten minutes
+
+  @unit
+  Scenario: After a key rotation both keys are published and the new one signs
+    Given a tenant with one signing key
+    When the tenant's signing key is rotated through the control API
+    Then the tenant's JWKS publishes the new key and the previous one under different key ids
+    And the tenant's SAML metadata publishes a signing certificate for each key
+    And new ID tokens name the new key id and verify against the new key
+    And new SAML assertions verify against the new certificate
+    And the tenant's activity shows the rotation
+    And a rotated tenant keeps both keys across a simulator restart
+
+  @unit
+  Scenario: After the previous key is dropped only the new one is published
+    Given a tenant whose signing key has been rotated
+    When the previous key is dropped through the control API
+    Then the tenant's JWKS publishes only the new key
+    And the tenant's SAML metadata publishes only the new signing certificate
+    And dropping again when there is no previous key is refused as a conflict
+
+  @unit
+  Scenario: A token signed by a dropped key no longer verifies
+    Given an ID token signed before the tenant's key was rotated
+    When the key is rotated and the previous key is dropped
+    Then the old token finds no matching key in the tenant's JWKS
+    And a malformed rotation body is refused as a bad request

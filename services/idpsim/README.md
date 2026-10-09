@@ -316,6 +316,7 @@ unchanged: it runs the standalone simulator.
 | `legacy provider <t> <generic\|auth0\|okta\|cognito\|onelogin\|azure\|show>` / `legacy env <t>` | the legacy provider and the env lines that point a stack at it |
 | `tamper <t> <mode>` | break the next ID token (`bad-signature`, `wrong-audience`, `expired`, `replayed-nonce`) or SAML response (`saml-bad-signature`, `saml-unsigned`, `saml-wrong-audience`, `saml-wrong-recipient`, `saml-expired`, `saml-not-yet-valid`, `saml-replayed-assertion`, `saml-wrong-in-response-to`), once; `none` disarms |
 | `skew <t> <seconds>` | run the tenant's clock ahead (positive) or behind (negative) for every token and assertion |
+| `rotate-key <t> [--drop-previous]` | make a fresh signing key current while JWKS and SAML metadata still publish the previous one; `--drop-previous` then stops publishing it |
 | `user disable <t> <email>` / `user enable <t> <email>` | refuse (or allow again) that user's sign-in at the IdP, over OIDC and SAML |
 | `saml unsolicited <t> --acs-url <url> --email <e> [--entity-id <id>] [--relay-state <s>]` | an IdP-initiated response (no InResponseTo): prints the URL, SAMLResponse and RelayState to post |
 | `auth0-webhook <t> --event create\|deactivate --user <u> --target <stack-url> --secret-env <VAR>` | send one signed Auth0 SCIM event |

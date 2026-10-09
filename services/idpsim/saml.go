@@ -1,6 +1,7 @@
 package idpsim
 
 import (
+	"encoding/base64"
 	"encoding/xml"
 	"fmt"
 	"net/http"
@@ -13,16 +14,18 @@ import (
 // rebuilt per request: it is cheap, and the SSO handler customizes the
 // service-provider registry per request.
 func (s *Server) samlIDP(t *Tenant) saml.IdentityProvider {
+	current := t.currentKey()
 	return saml.IdentityProvider{
-		Key:         t.Key,
-		Certificate: t.Cert,
+		Key:         current.Key,
+		Certificate: current.Cert,
 		MetadataURL: mustParseURL(t.BaseURL + "/saml/metadata"),
 		SSOURL:      mustParseURL(t.BaseURL + "/saml/sso"),
 	}
 }
 
 // handleSAMLMetadata publishes the tenant's IdP metadata: entity id, SSO
-// endpoint and the signing certificate service providers pin.
+// endpoint and the signing certificates service providers pin, the previous
+// one too while a rotation has not dropped it.
 func (s *Server) handleSAMLMetadata(w http.ResponseWriter, r *http.Request) {
 	t, ok := s.tenantFor(r)
 	if !ok {
@@ -30,13 +33,27 @@ func (s *Server) handleSAMLMetadata(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	idp := s.samlIDP(t)
-	buf, err := xml.MarshalIndent(idp.Metadata(), "", "  ")
+	buf, err := xml.MarshalIndent(withRetiredCertificates(idp.Metadata(), t), "", "  ")
 	if err != nil {
 		http.Error(w, "rendering metadata failed", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/samlmetadata+xml")
 	_, _ = w.Write(buf)
+}
+
+// withRetiredCertificates adds a signing KeyDescriptor for each published key past the current one.
+func withRetiredCertificates(md *saml.EntityDescriptor, t *Tenant) *saml.EntityDescriptor {
+	sso := &md.IDPSSODescriptors[0]
+	for _, k := range t.SigningKeys()[1:] {
+		sso.KeyDescriptors = append(sso.KeyDescriptors, saml.KeyDescriptor{
+			Use: "signing",
+			KeyInfo: saml.KeyInfo{X509Data: saml.X509Data{X509Certificates: []saml.X509Certificate{
+				{Data: base64.StdEncoding.EncodeToString(k.Cert.Raw)},
+			}}},
+		})
+	}
+	return md
 }
 
 // permissiveSPProvider fabricates service-provider metadata from the incoming

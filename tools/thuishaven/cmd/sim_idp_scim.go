@@ -186,6 +186,11 @@ func idpSkew(c idpCall) error {
 	return c.postTenant("config", map[string]int{"skewSeconds": seconds})
 }
 
+// idpRotateKey makes a fresh signing key current, or with --drop-previous retires the old one.
+func idpRotateKey(c idpCall) error {
+	return c.postTenant("rotate-key", map[string]bool{"dropPrevious": c.inv.has("--drop-previous")})
+}
+
 func idpUserDisable(c idpCall) error { return idpUserActive(c, false) }
 
 func idpUserEnable(c idpCall) error { return idpUserActive(c, true) }

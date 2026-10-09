@@ -143,6 +143,7 @@ func (s *Server) routeControl(mux *http.ServeMux) {
 	mux.HandleFunc("POST /control/t/{tenant}/tamper", s.handleControlTamper)
 	mux.HandleFunc("POST /control/t/{tenant}/user-active", s.handleControlUserActive)
 	mux.HandleFunc("POST /control/t/{tenant}/saml/unsolicited", s.handleControlSAMLUnsolicited)
+	mux.HandleFunc("POST /control/t/{tenant}/rotate-key", s.handleControlRotateKey)
 	mux.HandleFunc("GET /control/t/{tenant}/legacy-env", s.handleControlLegacyEnv)
 	mux.HandleFunc("POST /control/t/{tenant}/auth0-webhook", s.handleControlAuth0Webhook)
 	mux.HandleFunc("PUT /control/t/{tenant}/scim-target", s.handleControlSCIMTarget)
