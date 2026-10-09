@@ -67,8 +67,10 @@ Feature: The new image runs its blocking upgrade behind a holding page
     Then the browser sees the holding page while the upgrade runs, not a refused connection
 
   # --- On failure: the upgrade console, behind a one-time token ---
+  # Rulings: Alex, 2026-10-09 (UPGRADE-CONSOLE): token in api memory as SHA-256, 30 min, once,
+  # swapped for a console cookie; 5 wrong tokens a minute; only the console's Retry runs again.
 
-  @unimplemented
+  @unit
   Scenario: A failed upgrade keeps the api holding the door and prints a console token to its log
     Given the api's upgrade fails on a blocking step
     When the run ends
@@ -76,60 +78,74 @@ Feature: The new image runs its blocking upgrade behind a holding page
     And it prints one console token to its log with how to open the console
     And the token appears in no page, header, URL or other log line
 
-  @unimplemented
+  @unit
   Scenario: The holding page of a failed upgrade asks for the token and shows no failure detail
     Given the api's upgrade failed
     When a browser requests any page
     Then it answers 503 with a page saying the upgrade needs an operator and asking for the token
     And it names no step, error, hostname or version
 
-  @unimplemented
+  @unit
   Scenario: The right token opens the upgrade console
     Given the api's upgrade failed and printed a console token
     When an operator submits that token in the request body
-    Then the console shows the failed step, its error, its fix and the last 50 lines of the run's log
-    And it offers Retry and "Mark the migration rolled back and retry"
-    And it says that setting the previous version back also serves this schema
+    Then the browser keeps an HttpOnly, SameSite=Strict console cookie in place of the token
+    And the console shows the failed step, its error and the last 50 lines of the run's log
+    And it offers Retry
 
   @unimplemented
+  Scenario: The console names the fix and offers to mark the migration rolled back
+    Given an operator opened the console of a failed upgrade
+    When the console shows the failure
+    Then it names the failed step's fix
+    And it offers "Mark the migration rolled back and retry"
+    And it says that setting the previous version back also serves this schema
+
+  @unit
+  Scenario: Five wrong tokens in a minute make every submission wait
+    Given the api's upgrade failed and printed a console token
+    When five wrong tokens were submitted within a minute
+    Then the next submission is answered 429, even with the right token
+
+  @unit
   Scenario: A wrong token is refused without detail
     Given the api's upgrade failed and printed a console token
     When someone submits a different token
     Then it is refused with the same answer an expired token gets
     And the console stays closed
 
-  @unimplemented
+  @unit
   Scenario: An expired token is refused
     Given a console token printed longer ago than the token's lifetime
     When an operator submits it
     Then it is refused and the page says how to get a new token
 
-  @unimplemented
+  @unit
   Scenario: A token opens the console once
     Given an operator opened the console with the printed token
     When the same token is submitted again
     Then it is refused with the same answer an expired token gets
 
-  @unimplemented
+  @unit
   Scenario: Retry from the console runs the upgrade again and serves on success
     Given an operator opened the console of a failed upgrade
     When the operator presses Retry and the upgrade succeeds
     Then the api serves
     And the console and its token no longer answer
 
-  @unimplemented
+  @unit
   Scenario: A retry that fails again keeps the console and names the new failure
     Given an operator opened the console of a failed upgrade
     When the operator presses Retry and the upgrade fails again
     Then the console shows the new failure and offers Retry again
 
-  @unimplemented
+  @unit
   Scenario: A console action without the console session is refused
     Given the api's upgrade failed
     When a request asks for Retry without the session the token opened
     Then it is refused and no upgrade runs
 
-  @unimplemented
+  @unit
   Scenario: Liveness still answers while the console is shown
     Given the api's upgrade failed and shows the console
     When the kubelet requests the liveness path

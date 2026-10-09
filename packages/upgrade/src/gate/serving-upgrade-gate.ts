@@ -19,7 +19,12 @@ import { isMigrationStep } from "../step/migration-step.ts";
 import { type FirstInstallUpgrade, spawnFirstInstallUpgrade } from "./first-install-upgrade.ts";
 import { IMAGE_CODE_STEPS_FILE, readImageCodeSteps } from "./image-code-steps.ts";
 import { imageGateSteps, readImageTree } from "./image-tree.ts";
-import { type ServingRole, type ServingVerdict, UPGRADE_COMMAND } from "./serving-gate.ts";
+import {
+  type ServingRole,
+  type ServingVerdict,
+  UPGRADE_COMMAND,
+  type UpgradeFailedRun,
+} from "./serving-gate.ts";
 import { createUpgradeGate, type UpgradeGate } from "./upgrade-gate.service.ts";
 
 /** Generous stale bound: a database blip must never take a process out of service (2026-10-09). */
@@ -122,6 +127,12 @@ export function upgradeGateOver({
       onError: (error) => warn("rollback detection failed", { processId, error: messageOf(error) }),
     },
   });
+  const findFailedSteps = async (): Promise<UpgradeFailedRun["failedSteps"]> => {
+    const steps = (await runner.ledgerExists()) ? await ledger.findSteps() : [];
+    return steps
+      .filter((step) => step.status === "failed")
+      .map(({ id, lastError }) => ({ id, error: lastError }));
+  };
   let closed: Promise<void> | null = null;
   const closeOnce = () => (closed ??= close());
   return {
@@ -129,9 +140,10 @@ export function upgradeGateOver({
       try {
         const verdict =
           role === "api"
-            ? await admitAfterFirstInstall({ gate, firstInstall, warn })
+            ? await admitAfterFirstInstall({ gate, firstInstall, warn, findFailedSteps })
             : await gate.admit();
-        if (!verdict.admitted) await closeOnce();
+        // A failed run keeps the connection: the console's Retry asks again over it.
+        if (!verdict.admitted && !("failedRun" in verdict)) await closeOnce();
         return verdict;
       } catch (error) {
         await closeOnce();
@@ -170,10 +182,12 @@ export async function admitAfterFirstInstall({
   gate,
   firstInstall,
   warn,
+  findFailedSteps = async () => [],
 }: {
   gate: Pick<UpgradeGate, "admit">;
   firstInstall: FirstInstallUpgrade;
   warn: ServingGateWarn;
+  findFailedSteps?: () => Promise<UpgradeFailedRun["failedSteps"]>;
 }): Promise<ServingVerdict> {
   const verdict = await gate.admit();
   if (verdict.outcome !== "first-install" && verdict.outcome !== "behind") return verdict;
@@ -186,9 +200,14 @@ export async function admitAfterFirstInstall({
     waitingOn: `\`${UPGRADE_COMMAND}\``,
     next: "nothing to do: the api serves when the upgrade finishes",
   });
-  const exitCode = await firstInstall();
+  const { exitCode, logTail } = await firstInstall();
   if (exitCode === 0) return gate.admit();
-  return { ...verdict, refusal: `${verdict.refusal} The api ran it; it exited ${exitCode}.` };
+  const failedSteps = await findFailedSteps().catch(() => []);
+  return {
+    ...verdict,
+    refusal: `${verdict.refusal} The api ran it; it exited ${exitCode}.`,
+    failedRun: { failedSteps, logTail },
+  };
 }
 
 /** The worker's background steps over the gate's own connection (round 14: framework runs). */

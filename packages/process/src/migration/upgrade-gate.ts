@@ -3,15 +3,24 @@
  * and before the application runs, an api or worker asks its gate and refuses to start by name.
  * `@langwatch/upgrade/gate` answers it. Spec: specs/upgrade/serving-gate.feature.
  */
+import { createHash, randomBytes } from "node:crypto";
+
 import type { ServerRole } from "../feature-installer.ts";
-import type { UpgradeHolding } from "../lifecycle/liveness-thread.ts";
+import {
+  UPGRADE_CONSOLE_TOKEN_TTL_MS,
+  type UpgradeConsole,
+  type UpgradeHolding,
+} from "../lifecycle/liveness-thread.ts";
 import type { ServerComponent, ServerLogger } from "../server.ts";
 
 /** Tasks runs `upgrade` itself and is never gated. */
 export type UpgradeGatedRole = Exclude<ServerRole, "tasks">;
 
+/** What the api's upgrade console shows of a run that failed (UPGRADE-CONSOLE, 2026-10-09). */
+export type UpgradeGateFailedRun = Pick<UpgradeConsole, "failedSteps" | "logTail">;
+
 export type UpgradeGateVerdict = Readonly<
-  { admitted: true } | { admitted: false; refusal: string }
+  { admitted: true } | { admitted: false; refusal: string; failedRun?: UpgradeGateFailedRun }
 >;
 
 /** A worker's declared background steps, run by the gate's package (round 14: framework runs). */
@@ -29,6 +38,7 @@ export type UpgradeGate = Readonly<{
 
 /** What an operator reads on the gate's lines: the phase, what it waits on, what to do next. */
 const GATE_PHASE = "upgrade-gate";
+const CONSOLE_PHASE = "upgrade-console";
 const LEDGER = "the upgrade ledger (DATABASE_URL)";
 const LEDGER_UNREADABLE_NEXT =
   "check DATABASE_URL reaches Postgres and `pnpm task upgrade status` answers, then start this process again";
@@ -64,8 +74,8 @@ export function assertGatedRole(role: string): asserts role is UpgradeGatedRole 
 
 /**
  * Hosted by the preamble: starts after boot and before the application runtime, stops after it.
- * A refusal, or an unanswering gate, throws; once admitted it serves until stopped: a roster
- * blip never takes it out of service (2026-10-09). `onHolding` holds the upgrading page (Q-U4).
+ * A refusal, or an unanswering gate, throws; once admitted it serves until stopped (2026-10-09).
+ * `onHolding` holds the upgrading page (Q-U4); `onFailed` shows a failed run's console (D5).
  */
 export function upgradeGateComponent({
   server,
@@ -73,14 +83,42 @@ export function upgradeGateComponent({
   gate,
   logger,
   onHolding,
+  onFailed,
 }: {
   server: string;
   role: UpgradeGatedRole;
   gate: UpgradeGate;
   logger: ServerLogger;
   onHolding?: (holding: UpgradeHolding | undefined) => Promise<void>;
+  onFailed?: (upgradeConsole: UpgradeConsole) => Promise<boolean>;
 }): ServerComponent {
   let admitted = false;
+  /** D1, D2: a fresh token per failed run, printed on one log line; only its hash is kept. */
+  const issueConsoleToken = (): Pick<UpgradeConsole, "tokenSha256" | "tokenTtlMs"> => {
+    const token = randomBytes(32).toString("base64url");
+    const minutes = UPGRADE_CONSOLE_TOKEN_TTL_MS / 60_000;
+    logger.error(
+      { role, phase: CONSOLE_PHASE, waitingOn: "an operator", next: "open the console" },
+      `${server} (${role}): the upgrade failed; this api holds the door with the upgrade console`,
+    );
+    logger.info(
+      { role, phase: CONSOLE_PHASE, waitingOn: "an operator", next: "open the console" },
+      `${server} (${role}): open any page of this api in a browser and enter this console token, valid once for ${minutes} minutes: ${token}`,
+    );
+    return {
+      tokenSha256: createHash("sha256").update(token).digest("hex"),
+      tokenTtlMs: UPGRADE_CONSOLE_TOKEN_TTL_MS,
+    };
+  };
+  /** D5: only the console's Retry runs the upgrade again; with no console to show, it refuses. */
+  const admitThroughConsole = async (): Promise<UpgradeGateVerdict> => {
+    for (;;) {
+      const verdict = await gate.admit();
+      if (verdict.admitted || !verdict.failedRun || !onFailed) return verdict;
+      if (!(await onFailed({ ...verdict.failedRun, ...issueConsoleToken() }))) return verdict;
+      await onHolding?.({ phase: GATE_PHASE, outstandingStepIds: [] });
+    }
+  };
   const refuse = (refusal: string, next: string): never => {
     const error = new UpgradeGateRefusedError({ server, role, refusal: redactUrls(refusal) });
     logger.error(
@@ -106,7 +144,7 @@ export function upgradeGateComponent({
       // Only the gate's phase: its steps are behind `admit`, and a refusal's text is never shown.
       await onHolding?.({ phase: GATE_PHASE, outstandingStepIds: [] });
       try {
-        verdict = await gate.admit();
+        verdict = await admitThroughConsole();
       } catch (error) {
         const cause = `the upgrade ledger could not be read (DATABASE_URL): ${messageOf(error)}`;
         return refuse(cause, LEDGER_UNREADABLE_NEXT);

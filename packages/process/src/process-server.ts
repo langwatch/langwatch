@@ -251,6 +251,7 @@ export class ProcessServer implements ProcessBoot {
         gate,
         logger,
         onHolding: (holding) => this.server.holdForUpgrade(holding),
+        onFailed: (upgradeConsole) => this.server.consoleForUpgrade(upgradeConsole),
       }),
     );
   }

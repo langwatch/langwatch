@@ -23,7 +23,7 @@ describe("admitAfterFirstInstall", () => {
         gate: { admit: async () => answers.shift() ?? firstInstallVerdict() },
         firstInstall: async () => {
           said.push({ message: "upgrade ran" });
-          return 0;
+          return { exitCode: 0, logTail: [] };
         },
         warn: (message, fields) => void said.push({ message, fields }),
       });
@@ -49,7 +49,7 @@ describe("admitAfterFirstInstall", () => {
         gate: { admit: async () => answers.shift() ?? { admitted: true, outcome: "current" } },
         firstInstall: async () => {
           said.push({ message: "upgrade ran" });
-          return 0;
+          return { exitCode: 0, logTail: [] };
         },
         warn: (message, fields) => void said.push({ message, fields }),
       });
@@ -76,7 +76,7 @@ describe("admitAfterFirstInstall", () => {
         },
         firstInstall: async () => {
           runs += 1;
-          return 0;
+          return { exitCode: 0, logTail: [] };
         },
         warn: () => undefined,
       });

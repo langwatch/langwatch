@@ -13,6 +13,7 @@ import {
   startLivenessThread,
   type Heartbeat,
   type LivenessThread,
+  type UpgradeConsole,
   type UpgradeHolding,
 } from "./lifecycle/liveness-thread.ts";
 import { HTTP_CLOSE_PHASE_MS, HTTP_DRAIN_GRACE_MS } from "./lifecycle/shutdown-deadline.ts";
@@ -214,6 +215,11 @@ export class Server {
    */
   async holdForUpgrade(holding: UpgradeHolding | undefined): Promise<void> {
     await this.livenessThread?.hold(holding);
+  }
+
+  /** Shows a failed upgrade's console; true on Retry, false with no thread to show it. */
+  async consoleForUpgrade(upgradeConsole: UpgradeConsole): Promise<boolean> {
+    return (await this.livenessThread?.holdConsole(upgradeConsole)) ?? false;
   }
 
   private openHealth(): Promise<void> {

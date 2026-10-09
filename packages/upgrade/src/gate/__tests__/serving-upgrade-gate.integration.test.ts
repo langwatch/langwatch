@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { createLedgerTables } from "../../ledger-tables.ts";
 import type { ReleaseTreeSteps } from "../../manifest/stamp.ts";
+import type { FirstInstallUpgrade } from "../first-install-upgrade.ts";
 import { readImageCodeSteps } from "../image-code-steps.ts";
 import { UPGRADE_COMMAND } from "../serving-gate.ts";
 import { gatePoolConfig, upgradeGateOver } from "../serving-upgrade-gate.ts";
@@ -66,12 +67,12 @@ async function recordSteps(steps: Record<string, "done" | "pending">): Promise<v
 function gateFor({
   role,
   withClickHouse = true,
-  firstInstall = async () => 0,
+  firstInstall = async () => ({ exitCode: 0, logTail: [] }),
   tree = TREE,
 }: {
   role: "api" | "worker";
   withClickHouse?: boolean;
-  firstInstall?: () => Promise<number>;
+  firstInstall?: FirstInstallUpgrade;
   tree?: ReleaseTreeSteps;
 }) {
   return upgradeGateOver({
@@ -116,7 +117,7 @@ describe.skipIf(!DB_URL)("servingUpgradeGate over a ledger", () => {
             `UPDATE "_langwatch_upgrade_step" SET "status" = 'done' WHERE "id" = $1`,
             [GOOSE],
           );
-          return 0;
+          return { exitCode: 0, logTail: [] };
         },
       });
 
@@ -133,7 +134,7 @@ describe.skipIf(!DB_URL)("servingUpgradeGate over a ledger", () => {
         role: "worker",
         firstInstall: async () => {
           runs += 1;
-          return 0;
+          return { exitCode: 0, logTail: [] };
         },
       }).admit();
 
@@ -175,7 +176,7 @@ describe.skipIf(!DB_URL)("servingUpgradeGate over a ledger", () => {
         release: null,
         withClickHouse: true,
         processId: "test:api",
-        firstInstall: async () => 1,
+        firstInstall: async () => ({ exitCode: 1, logTail: [] }),
       });
 
       await expect(gate.admit()).resolves.toMatchObject({ admitted: true });
@@ -192,7 +193,7 @@ describe.skipIf(!DB_URL)("servingUpgradeGate over a ledger", () => {
         firstInstall: async () => {
           runs += 1;
           await recordSteps({ [PRISMA]: "done", [GOOSE]: "done" });
-          return 0;
+          return { exitCode: 0, logTail: [] };
         },
       });
 
@@ -203,12 +204,16 @@ describe.skipIf(!DB_URL)("servingUpgradeGate over a ledger", () => {
 
     /** @scenario "The api refuses a first install whose upgrade failed" */
     it("refuses the api with the command and the exit code when the upgrade failed", async () => {
-      const verdict = await gateFor({ role: "api", firstInstall: async () => 3 }).admit();
+      const verdict = await gateFor({
+        role: "api",
+        firstInstall: async () => ({ exitCode: 3, logTail: [] }),
+      }).admit();
 
       expect(verdict).toMatchObject({ admitted: false, outcome: "first-install" });
       expect(verdict.admitted ? "" : verdict.refusal).toContain(UPGRADE_COMMAND);
       expect(verdict.admitted ? "" : verdict.refusal).toContain("exited 3");
-      expect(scratch.closed).toBe(true);
+      expect(verdict).toMatchObject({ failedRun: { failedSteps: [], logTail: [] } });
+      expect(scratch.closed).toBe(false);
     });
 
     /** @scenario "The worker never runs the upgrade on a first install" */
@@ -218,7 +223,7 @@ describe.skipIf(!DB_URL)("servingUpgradeGate over a ledger", () => {
         role: "worker",
         firstInstall: async () => {
           runs += 1;
-          return 0;
+          return { exitCode: 0, logTail: [] };
         },
       }).admit();
 
