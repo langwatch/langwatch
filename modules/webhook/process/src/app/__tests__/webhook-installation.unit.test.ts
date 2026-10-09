@@ -30,12 +30,16 @@ const entitledPlan: Plan = {
   prices: { USD: 0, EUR: 0 },
 };
 
-function process(role: "api" | "worker", plan: Plan = entitledPlan) {
+function process(
+  role: "api" | "worker",
+  plan: Plan = entitledPlan,
+  { allowInsecureLocalUrls = false }: { allowInsecureLocalUrls?: boolean } = {},
+) {
   return createApp({ role })
     .withModules([webhookProcessModule])
     .withConfig({
       webhook: {
-        allowInsecureLocalUrls: false,
+        allowInsecureLocalUrls,
         allowAmbientAwsCredentials: false,
         isSaas: false,
         outboundProxy: {
@@ -112,6 +116,50 @@ describe("webhook app installation", () => {
     });
   });
 
+  describe("when an endpoint is saved", () => {
+    const endpointAt = (url: string) => ({
+      organizationId: ORGANIZATION_ID,
+      url,
+      enabledEvents: ["gateway.request.completed"],
+    });
+
+    /** @scenario "An endpoint save is judged by the rule its delivery is judged by" */
+    it.each([
+      "https://127.0.0.1/hooks/spend",
+      "https://[::1]/hooks/spend",
+      "https://10.0.0.1/hooks/spend",
+      "https://192.168.1.20/hooks/spend",
+      "https://example.com:1355/hooks/spend",
+    ])("refuses %s with the escape hatch off", async (url) => {
+      const runtime = await process("api").boot();
+
+      try {
+        const app = runtime.service(WebhookApi);
+        await expect(app.create(endpointAt(url))).rejects.toMatchObject({
+          code: "webhook_endpoint_invalid",
+        });
+        await expect(app.getAll({ organizationId: ORGANIZATION_ID })).resolves.toEqual([]);
+      } finally {
+        await runtime.stop();
+      }
+    });
+
+    /** @scenario "An endpoint save is judged by the rule its delivery is judged by" */
+    it("saves an https endpoint on a local non-default port with the escape hatch on", async () => {
+      const runtime = await process("api", entitledPlan, { allowInsecureLocalUrls: true }).boot();
+
+      try {
+        const app = runtime.service(WebhookApi);
+        const { endpoint } = await app.create(
+          endpointAt("https://outbound.haven.localhost:1355/hooks/spend"),
+        );
+        expect(endpoint.url).toBe("https://outbound.haven.localhost:1355/hooks/spend");
+      } finally {
+        await runtime.stop();
+      }
+    });
+  });
+
   describe("when the API process is asked for a test fire", () => {
     /** @scenario "A test fire from the API process dispatches through the delivery egress" */
     it("dispatches it through the delivery egress rather than refusing", async () => {
@@ -121,7 +169,7 @@ describe("webhook app installation", () => {
         const app = runtime.service(WebhookApi);
         const { endpoint } = await app.create({
           organizationId: ORGANIZATION_ID,
-          url: "https://10.0.0.1/hooks/spend",
+          url: "https://example.com/hooks/spend",
           enabledEvents: ["gateway.request.completed"],
         });
 
@@ -135,10 +183,9 @@ describe("webhook app installation", () => {
           endpointId: endpoint.id,
         });
 
-        // The egress service's URL policy refuses the private address before any channel.
-        expect(result).toMatchObject({ delivered: false, responseStatus: null });
+        // The memory HTTP channel answers 200, so the fire went through the egress.
+        expect(result).toMatchObject({ delivered: true, responseStatus: 200 });
         expect(log.deliveries).toHaveLength(1);
-        expect(log.deliveries[0]?.error).toContain(`Webhook endpoint ${endpoint.id} (test)`);
       } finally {
         await runtime.stop();
       }
