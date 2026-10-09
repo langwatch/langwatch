@@ -58,3 +58,10 @@ Feature: Authentication reads are remembered briefly and never past a revocation
       When a member who is not an admin opens an aggregate project
       Then the project's kind is read
       And the request is refused before the handler runs
+
+    @unit
+    Scenario: Shared decisions still refuse a write on an aggregate project
+      Given a request whose procedure writes on one project
+      When an admin writes on an aggregate project
+      Then the project's kind is read
+      And the write is refused as read only before the handler runs
