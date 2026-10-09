@@ -5,7 +5,7 @@
  * Spec: specs/model-providers/model-cost-scoping.feature
  */
 
-import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -222,6 +222,74 @@ describe("given the LLM Model Costs screen", () => {
       onError(new Error("boom"));
 
       expect(host.failures).toEqual([]);
+    });
+  });
+
+  describe("when the reader filters the table", () => {
+    const THIRD_ROW = {
+      ...CATALOGUE_ROW,
+      model: "anthropic/claude-haiku-4-5",
+      regex: "^anthropic/claude-haiku",
+    };
+    const search = (value: string) =>
+      fireEvent.change(screen.getByRole("searchbox"), { target: { value } });
+
+    beforeEach(() => {
+      mockState.costs = [STORED_ROW, CATALOGUE_ROW, THIRD_ROW];
+    });
+
+    /** @scenario Searching narrows the table by model name or regex rule */
+    it("narrows rows by model name or regex, ignoring case", () => {
+      renderScreen();
+
+      search("HAIKU");
+
+      expect(screen.getByText("anthropic/claude-haiku-4-5")).toBeTruthy();
+      expect(screen.queryByText("openai/gpt-5.5")).toBeNull();
+      expect(screen.getByText("Showing 1 of 3 models.")).toBeTruthy();
+    });
+
+    /** @scenario The provider filter narrows the table to one provider */
+    it("narrows rows to the picked provider, with counts in the options", () => {
+      renderScreen();
+
+      const select = screen.getByLabelText("Filter by provider");
+      expect(within(select).getByText("anthropic (2)")).toBeTruthy();
+      fireEvent.change(select, { target: { value: "openai" } });
+
+      expect(screen.getByText("openai/gpt-5.5")).toBeTruthy();
+      expect(screen.queryByText("anthropic/claude-haiku-4-5")).toBeNull();
+    });
+
+    /** @scenario Custom only shows just the project's own cost rules */
+    it("shows only stored rules when custom only is on", () => {
+      renderScreen();
+
+      fireEvent.click(screen.getByText("Custom only"));
+
+      expect(screen.getByText("anthropic/claude-sonnet-4-6")).toBeTruthy();
+      expect(screen.queryByText("openai/gpt-5.5")).toBeNull();
+    });
+
+    /** @scenario A filter that matches nothing shows an empty state */
+    it("shows an empty state when nothing matches", () => {
+      renderScreen();
+
+      search("no-such-model");
+
+      expect(screen.getByText("No models match")).toBeTruthy();
+      expect(screen.getByText("Showing 0 of 3 models.")).toBeTruthy();
+    });
+
+    /** @scenario Clearing the filters restores every model */
+    it("restores every row once the filters are cleared", () => {
+      renderScreen();
+      search("no-such-model");
+
+      fireEvent.click(screen.getAllByText("Clear filters")[0]!);
+
+      expect(screen.getByText("What each of the 3 models costs per token.")).toBeTruthy();
+      expect(screen.getByText("openai/gpt-5.5")).toBeTruthy();
     });
   });
 });
