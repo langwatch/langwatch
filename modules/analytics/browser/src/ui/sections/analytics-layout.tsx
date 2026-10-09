@@ -77,9 +77,10 @@ export default function AnalyticsLayout({
         {...analyticsHeaderProps}
         extraHeaderButtons={extraHeaderButtons}
       />
-      <Box width="full" padding={4} paddingBottom={16}>
+      <Box width="full" paddingX={3} paddingTop={4} paddingBottom={16}>
         <SectionNavigationFrame
           label="Analytics"
+          hideTitle
           links={[entries.overview]}
           groups={groups}
           activeHref={activeHref}

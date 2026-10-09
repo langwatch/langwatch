@@ -62,6 +62,7 @@ function RailLink({
 
 export function SectionNavigationFrame({
   label,
+  hideTitle = false,
   links = [],
   groups = [],
   activeHref,
@@ -70,6 +71,8 @@ export function SectionNavigationFrame({
 }: {
   /** The section's name, over the rail and in the rail's accessible name. */
   label: string;
+  /** Hides the heading when the page names the section; label stays the accessible name. */
+  hideTitle?: boolean;
   links?: readonly SectionNavigationLink[];
   /** Labelled runs under `links`, for a rail with more than one kind of entry. */
   groups?: readonly SectionNavigationGroup[];
@@ -103,20 +106,22 @@ export function SectionNavigationFrame({
         paddingRight={{ base: 0, md: 4 }}
         paddingBottom={{ base: 2, md: 0 }}
       >
-        <Text
-          data-testid="section-navigation-title"
-          display={{ base: "none", md: "block" }}
-          fontSize="xs"
-          fontWeight="semibold"
-          color="fg.muted"
-          paddingX={3}
-          paddingTop={1}
-          paddingBottom={2}
-          textTransform="uppercase"
-          letterSpacing="wider"
-        >
-          {label}
-        </Text>
+        {hideTitle ? null : (
+          <Text
+            data-testid="section-navigation-title"
+            display={{ base: "none", md: "block" }}
+            fontSize="xs"
+            fontWeight="semibold"
+            color="fg.muted"
+            paddingX={3}
+            paddingTop={1}
+            paddingBottom={2}
+            textTransform="uppercase"
+            letterSpacing="wider"
+          >
+            {label}
+          </Text>
+        )}
         <Stack
           direction={{ base: "row", md: "column" }}
           alignItems="stretch"
