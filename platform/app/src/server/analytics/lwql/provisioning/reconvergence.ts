@@ -29,7 +29,7 @@
 import { createLogger } from "@langwatch/observability";
 
 import type { LwqlAccessModelOwner } from "./accessModelOwner";
-import { clickHouseErrorSummary } from "./clickhouseStatementRunner";
+import { clickHouseErrorSummary } from "./clickhouseErrors";
 
 const logger = createLogger("langwatch:analytics:lwql:reconvergence");
 
