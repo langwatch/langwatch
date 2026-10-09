@@ -25,6 +25,7 @@ import {
 } from "@langwatch/experiment-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { deriveRunActor } from "@langwatch/scenario-contract";
 import { nowInstant } from "@langwatch/time";
 import type { z } from "zod";
@@ -58,6 +59,8 @@ export type WorkbenchExecutionRequest = z.infer<typeof executionRequestSchema>;
 type WorkbenchRunDeps = {
   experiments: ExperimentService;
   observer: ExperimentWorkbenchObserver;
+  /** Refuses a run or an abort under an aggregate project, which accepts no writes (ADR-175). */
+  projects: Pick<ProjectApi, "assertAcceptsWrites">;
   /** Absent where a suite builds no run pipeline; a pipeline run is then refused by name. */
   runs?: WorkbenchRunPipeline;
 };
@@ -65,11 +68,13 @@ type WorkbenchRunDeps = {
 export class ExperimentWorkbenchRunService {
   private readonly experiments: ExperimentService;
   private readonly observer: ExperimentWorkbenchObserver;
+  private readonly projects: Pick<ProjectApi, "assertAcceptsWrites">;
   private readonly runs: WorkbenchRunPipeline | undefined;
 
   private constructor(deps: WorkbenchRunDeps) {
     this.experiments = deps.experiments;
     this.observer = deps.observer;
+    this.projects = deps.projects;
     this.runs = deps.runs;
   }
 
@@ -196,6 +201,8 @@ export class ExperimentWorkbenchRunService {
     const { projectId } = input;
 
     logger.info({ projectId, scope: input.scope }, "Starting experiment execution");
+    // ADR-175 decision 8: nothing runs under an aggregate's tenant, so refuse before any work.
+    await this.projects.assertAcceptsWrites({ projectId });
 
     // The refusal a process without Redis or a public address owes, as before the pipeline.
     const runs = this.#startable();
@@ -395,6 +402,8 @@ export class ExperimentWorkbenchRunService {
     by: Readonly<{ id: string }>,
   ): Promise<{ success: true; runId: string; message: "Abort requested" }> {
     const { projectId, runId } = input;
+    // ADR-175 decision 8: refused under an aggregate before the run is looked up, as main did.
+    await this.projects.assertAcceptsWrites({ projectId });
     const runState = (await this.#progressOf(runId)) ?? (await this.#startOf(runId));
     if (!runState || runState.projectId !== projectId) throw new RunNotFoundError(runId);
 

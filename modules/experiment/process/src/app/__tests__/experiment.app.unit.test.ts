@@ -10,11 +10,15 @@ import { credentialPrincipalOfToken } from "@langwatch/api/rest";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { Experiment } from "@langwatch/experiment-contract";
 import type { Monitor } from "@langwatch/monitor-contract";
+import { AggregateProjectIsReadOnlyError, type ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { WorkflowNotFoundError, type WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import type { ExperimentRunProcessing } from "../../features/run/services/experiment-run.service.ts";
+import type { WorkbenchExecutionRequest } from "../../features/workbench/services/experiment-workbench-run.service.ts";
 import type { WorkflowEvaluationService } from "../../features/workflow/services/experiment-workflow-evaluation.service.ts";
+import type { ExperimentRunFoldRepository } from "../../repositories/experiment-run-fold.repository.ts";
 import { ExperimentFindOrCreateService } from "../../services/experiment-find-or-create.service.ts";
 import type { ExperimentService } from "../../services/experiment.service.ts";
 import type { ExperimentV3RestApi } from "../../transport/experiment-v3.rest.ts";
@@ -84,14 +88,22 @@ const apiKeyToken = ({
   },
 });
 
+/** The project directory, answering every project as an ordinary one that accepts writes. */
+const ordinaryProjects = () =>
+  createApiFixture<ProjectApi>({ assertAcceptsWrites: async () => void 0 }, "ProjectApi");
+
 function harness({
   experiments = {},
   workflows = {},
   dataset = {},
+  projects = ordinaryProjects(),
+  runProcessing,
 }: {
   experiments?: Partial<ExperimentService>;
   workflows?: Partial<WorkflowApi>;
   dataset?: Partial<DatasetApi>;
+  projects?: ProjectApi;
+  runProcessing?: ExperimentRunProcessing;
 } = {}) {
   const datasetApi = createApiFixture<DatasetApi>(dataset);
   const experimentService = createApiFixture<ExperimentService>({
@@ -197,6 +209,8 @@ function harness({
       workbenchTargetNames: async () => ({}),
       workbenchObserver,
       workflowEvaluations: createApiFixture<WorkflowEvaluationService>({}, "workflowEvaluations"),
+      projects,
+      ...(runProcessing ? { runProcessing } : {}),
     }),
   };
 }
@@ -503,6 +517,98 @@ describe("given the workbench's own doors", () => {
       expect(workbenchObserver.reportError).toHaveBeenCalledWith(failure, {
         projectId: "project-1",
       });
+    });
+  });
+});
+
+describe("given a workbench run under an aggregate project", () => {
+  const AGGREGATE_ID = "project-aggregate";
+  /** Refuses the aggregate, as project answers it; every other project accepts writes. */
+  const aggregateRefusing = () =>
+    vi.fn(async ({ projectId }: { projectId: string }) => {
+      if (projectId === AGGREGATE_ID) throw new AggregateProjectIsReadOnlyError();
+    });
+  /** A run pipeline this process may not start on, whose folds know no run. */
+  const pipeline = () => {
+    const readRunProgress = vi.fn(async () => ({ kind: "empty" as const }));
+    const findRunStart = vi.fn(async () => []);
+    const runProcessing = createApiFixture<ExperimentRunProcessing>(
+      {
+        refusals: { start: { capability: "shared store" } },
+        folds: createApiFixture<ExperimentRunFoldRepository>(
+          { readRunProgress, findRunStart },
+          "folds",
+        ),
+      },
+      "runProcessing",
+    );
+    return { runProcessing, readRunProgress };
+  };
+  const execution = (projectId: string): WorkbenchExecutionRequest => ({
+    projectId,
+    name: "Support email classifier",
+    dataset: { id: "test-data", name: "Test data", type: "inline", columns: [] },
+    targets: [],
+    evaluators: [],
+    scope: { type: "full" },
+  });
+
+  describe("when the browser executes a run", () => {
+    /** ADR-175 decision 8: nothing is run under an aggregate's tenant. */
+    it("refuses an aggregate with the read-only code before the run pipeline is asked", async () => {
+      const { runProcessing } = pipeline();
+      const { app } = harness({
+        projects: createApiFixture<ProjectApi>({ assertAcceptsWrites: aggregateRefusing() }),
+        runProcessing,
+      });
+
+      await expect(
+        app.executeWorkbenchRun(execution(AGGREGATE_ID), { id: "user-1" }),
+      ).rejects.toMatchObject({ code: "aggregate_project_is_read_only" });
+    });
+
+    it("lets an ordinary project through to the run pipeline", async () => {
+      const assertAcceptsWrites = aggregateRefusing();
+      const { runProcessing } = pipeline();
+      const { app } = harness({
+        projects: createApiFixture<ProjectApi>({ assertAcceptsWrites }),
+        runProcessing,
+      });
+
+      await expect(
+        app.executeWorkbenchRun(execution("project-1"), { id: "user-1" }),
+      ).rejects.toMatchObject({ code: "service_unavailable" });
+      expect(assertAcceptsWrites).toHaveBeenCalledWith({ projectId: "project-1" });
+    });
+  });
+
+  describe("when a run is aborted", () => {
+    it("refuses an aggregate with the read-only code before the run is looked up", async () => {
+      const { runProcessing, readRunProgress } = pipeline();
+      const { app } = harness({
+        projects: createApiFixture<ProjectApi>({ assertAcceptsWrites: aggregateRefusing() }),
+        runProcessing,
+      });
+
+      await expect(
+        app.abortWorkbenchRun({ projectId: AGGREGATE_ID, runId: "run-1" }, { id: "user-1" }),
+      ).rejects.toMatchObject({ code: "aggregate_project_is_read_only" });
+      expect(readRunProgress).not.toHaveBeenCalled();
+    });
+
+    it("lets an ordinary project through to the run lookup", async () => {
+      const assertAcceptsWrites = aggregateRefusing();
+      const { runProcessing, readRunProgress } = pipeline();
+      const { app } = harness({
+        projects: createApiFixture<ProjectApi>({ assertAcceptsWrites }),
+        runProcessing,
+      });
+
+      await expect(
+        app.abortWorkbenchRun({ projectId: "project-1", runId: "run-1" }, { id: "user-1" }),
+      ).rejects.toMatchObject({ code: "run_not_found" });
+      expect(assertAcceptsWrites).toHaveBeenCalledWith({ projectId: "project-1" });
+      expect(readRunProgress).toHaveBeenCalledWith({ runId: "run-1" });
     });
   });
 });

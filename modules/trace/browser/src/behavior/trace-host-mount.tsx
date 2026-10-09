@@ -177,15 +177,17 @@ function projectReading(input: {
   name: string | undefined;
   firstMessage: boolean | undefined;
   presenceEnabled: boolean | undefined;
+  kind: string | null | undefined;
 }): TraceHostProject | undefined {
   if (input.id === void 0) return void 0;
-  const { firstMessage, presenceEnabled } = input;
+  const { firstMessage, presenceEnabled, kind } = input;
   return {
     id: input.id,
     slug: input.slug ?? "",
     name: input.name ?? "",
     ...(firstMessage === void 0 ? {} : { firstMessage }),
     ...(presenceEnabled === void 0 ? {} : { presenceEnabled }),
+    ...(kind === void 0 ? {} : { kind }),
   };
 }
 
@@ -220,6 +222,7 @@ export default function TraceHostMount({ children }: { children?: ReactNode }) {
   const projectId = project?.id;
   const projectName = project?.name;
   const projectSlug = project?.slug;
+  const projectKind = project?.kind;
   const organizationId = organization?.id;
   const organizationName = organization?.name;
   const teamId = team?.id;
@@ -242,6 +245,7 @@ export default function TraceHostMount({ children }: { children?: ReactNode }) {
             name: projectName,
             firstMessage,
             presenceEnabled,
+            kind: projectKind,
           }),
           organization: organizationReading({
             id: organizationId,
@@ -277,6 +281,7 @@ export default function TraceHostMount({ children }: { children?: ReactNode }) {
       projectId,
       projectName,
       projectSlug,
+      projectKind,
       firstMessage,
       presenceEnabled,
       organizationPresenceEnabled,

@@ -4,7 +4,20 @@ import { useEffect, useRef, useState } from "react";
 import { useFilterStore, useViewStore } from "../../../../behavior/explorer.store.ts";
 import { api } from "../../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
-import { readHandledError } from "../../errors/index.ts";
+import { useProjectAcceptsWrites } from "../../../../behavior/use-project-accepts-writes.ts";
+import { type AppErrorCode, readHandledError } from "../../errors/index.ts";
+
+const READ_ONLY_CODE: AppErrorCode = "aggregate_project_is_read_only";
+
+/**
+ * The answer to a lens the model asked for on an aggregate project, which keeps no
+ * lenses of its own (ADR-175). The store refuses the create without a word, so the
+ * action says so itself, in the envelope the server refuses any write there with.
+ */
+const LENS_REFUSED_ON_AGGREGATE: AiActionError = {
+  code: READ_ONLY_CODE,
+  cause: { error: { code: READ_ONLY_CODE }, httpStatus: 403 },
+};
 
 /**
  * Lifts the composer's detail rows out of a handled error's `meta`.
@@ -74,6 +87,7 @@ export function useAiTraceAction({
   const applyQueryText = useFilterStore((s) => s.applyQueryText);
   const recordAiTranslation = useFilterStore((s) => s.recordAiTranslation);
   const createLens = useViewStore((s) => s.createLens);
+  const projectAcceptsWrites = useProjectAcceptsWrites();
   const [error, setError] = useState<AiActionError | null>(null);
   // Track the prompt across the async boundary so onSuccess can save it
   // alongside the model's response — no plumbing through the mutation
@@ -98,15 +112,21 @@ export function useAiTraceAction({
   const aiAction = api.traces.aiAction.useMutation({
     onSuccess: (result) => {
       if (cancelledRef.current) return;
-      applyAiActionResult({
+      applyAiQuery({
         applyQueryText,
-        createLens,
-        mode,
         projectId: lastSubmittedProjectIdRef.current,
         prompt: lastSubmittedPromptRef.current,
         recordAiTranslation,
         result,
       });
+      const lensName = lensNameFor({ mode, result });
+      // The query above still applies, since reading is allowed; only the lens
+      // is refused, and the composer stays open with the refusal.
+      if (lensName !== null && !projectAcceptsWrites) {
+        setError(LENS_REFUSED_ON_AGGREGATE);
+        return;
+      }
+      if (lensName !== null) createLens(lensName);
       onDone?.();
     },
     onError: (e) => {
@@ -144,23 +164,21 @@ export function useAiTraceAction({
   };
 }
 
-/** What the model asked for, applied to the filter and lens stores. */
-function applyAiActionResult({
+type AiActionAnswer = { kind: string; name?: string; query: string };
+
+/** The query the model answered with, applied to the filter store. */
+function applyAiQuery({
   applyQueryText,
-  createLens,
-  mode,
   projectId,
   prompt,
   recordAiTranslation,
   result,
 }: {
   applyQueryText: (query: string) => void;
-  createLens: (name: string) => void;
-  mode: AiTraceActionMode;
   projectId: string | null;
   prompt: string;
   recordAiTranslation: (translation: { projectId: string; prompt: string; query: string }) => void;
-  result: { kind: string; name?: string; query: string };
+  result: AiActionAnswer;
 }): void {
   // Apply the query first so the resulting view is filtered (also so
   // that lens creation captures the right snapshot).
@@ -169,7 +187,19 @@ function applyAiActionResult({
   if (projectId && prompt) {
     recordAiTranslation({ projectId, prompt, query: result.query });
   }
-  const shouldCreateLens = mode === "lens" || (mode === "auto" && result.kind === "create_lens");
-  if (!shouldCreateLens) return;
-  createLens(result.kind === "create_lens" ? (result.name ?? "Untitled lens") : "Untitled lens");
+}
+
+/**
+ * The name of the lens this answer should create, or null when it creates
+ * none: `lens` mode always makes one, `auto` only when the model asked.
+ */
+function lensNameFor({
+  mode,
+  result,
+}: {
+  mode: AiTraceActionMode;
+  result: AiActionAnswer;
+}): string | null {
+  if (result.kind === "create_lens" && mode !== "filter") return result.name ?? "Untitled lens";
+  return mode === "lens" ? "Untitled lens" : null;
 }

@@ -6,6 +6,7 @@ import {
   type LangyMessagePart,
   LANGY_TURN_OVERRIDE_FALLBACK,
 } from "@langwatch/langy-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 
 import {
   type LangyWorker,
@@ -106,6 +107,11 @@ export interface LangyTurnServiceDeps {
   accessStore: LangyTurnAccessRepository;
   handoffStore: LangyTurnHandoffRepository;
   messages: LangyMessageRepository | null;
+  /**
+   * An aggregate project takes no writes (ADR-175 decision 8), so a turn on one
+   * is refused before anything is written, resolved or minted under it.
+   */
+  projects: Pick<ProjectApi, "assertAcceptsWrites">;
 }
 
 export type LangyTurnServiceDependencies = LangyTurnServiceDeps & {
@@ -130,6 +136,7 @@ export type LangyTurnTechnicalMembers = {
   metrics: LangyTurnMetrics;
   accessStore: LangyTurnAccessRepository;
   handoffStore: LangyTurnHandoffRepository;
+  projects: Pick<ProjectApi, "assertAcceptsWrites">;
 };
 
 export const LANGY_USER_MESSAGE_LABEL = "THE USER'S MESSAGE:";

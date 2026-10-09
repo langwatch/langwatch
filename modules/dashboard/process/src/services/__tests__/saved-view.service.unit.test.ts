@@ -66,7 +66,7 @@ describe("SavedViewService.getAll", () => {
     it("seeds it with the default views", async () => {
       const { service, calls } = serviceWith({ count: 0, existing: [] });
 
-      await service.getAll({ projectId: "project-1" });
+      await service.getAll({ projectId: "project-1", acceptsWrites: true });
 
       expect(calls.some((call) => call.method === "createMany")).toBe(true);
     });
@@ -75,7 +75,7 @@ describe("SavedViewService.getAll", () => {
     it("seeds exactly the 5 origin views, in order", async () => {
       const { service, calls } = serviceWith({ count: 0, existing: [] });
 
-      await service.getAll({ projectId: "project-1" });
+      await service.getAll({ projectId: "project-1", acceptsWrites: true });
 
       const created = calls.find((call) => call.method === "createMany");
       const names = (created?.views as { name: string }[] | undefined)?.map((v) => v.name);
@@ -90,7 +90,7 @@ describe("SavedViewService.getAll", () => {
       // customer's own edits survive.
       const { service, calls } = serviceWith({ existing: seeded(["All"]) });
 
-      await service.getAll({ projectId: "project-1" });
+      await service.getAll({ projectId: "project-1", acceptsWrites: true });
 
       const created = calls.find((call) => call.method === "createMany");
       const names = (created?.views as { name: string }[] | undefined)?.map((v) => v.name);
@@ -101,7 +101,7 @@ describe("SavedViewService.getAll", () => {
     /** @scenario A renamed default is not created again */
     it("writes nothing when it already has every default", async () => {
       const first = serviceWith({ count: 0, existing: [] });
-      await first.service.getAll({ projectId: "project-1" });
+      await first.service.getAll({ projectId: "project-1", acceptsWrites: true });
       const allSeeds = (
         first.calls.find((call) => call.method === "createMany")?.views as
           | { name: string }[]
@@ -109,7 +109,7 @@ describe("SavedViewService.getAll", () => {
       )?.map((view) => view.name);
 
       const { service, calls } = serviceWith({ existing: seeded(allSeeds ?? []) });
-      await service.getAll({ projectId: "project-1" });
+      await service.getAll({ projectId: "project-1", acceptsWrites: true });
 
       expect(calls.some((call) => call.method === "createMany")).toBe(false);
     });
@@ -121,7 +121,7 @@ describe("SavedViewService.getAll", () => {
       // Seeding here would double-populate the customer's tab strip.
       const { service, calls } = serviceWith({ count: 0, existing: [] });
 
-      await service.getAll({ projectId: "project-1", kind: "v2-traces-lens" });
+      await service.getAll({ projectId: "project-1", kind: "v2-traces-lens", acceptsWrites: true });
 
       expect(calls.some((call) => call.method === "createMany")).toBe(false);
     });
@@ -129,7 +129,7 @@ describe("SavedViewService.getAll", () => {
     it("still reads that kind's own views", async () => {
       const { service, calls } = serviceWith({ existing: [] });
 
-      await service.getAll({ projectId: "project-1", kind: "v2-traces-lens" });
+      await service.getAll({ projectId: "project-1", kind: "v2-traces-lens", acceptsWrites: true });
 
       expect(calls.find((call) => call.method === "findAll")?.kind).toBe("v2-traces-lens");
     });
@@ -139,7 +139,7 @@ describe("SavedViewService.getAll", () => {
     it("treats it as the legacy one and seeds", async () => {
       const { service, calls } = serviceWith({ count: 0, existing: [] });
 
-      await service.getAll({ projectId: "project-1" });
+      await service.getAll({ projectId: "project-1", acceptsWrites: true });
 
       expect(calls.some((call) => call.method === "createMany")).toBe(true);
     });

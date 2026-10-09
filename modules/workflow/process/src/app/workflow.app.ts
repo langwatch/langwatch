@@ -301,6 +301,8 @@ interface WorkflowInfrastructure {
   /** The bare row a Studio copy lands in, before its first version exists. */
   workflowRows: WorkflowRowRepository;
   permissions: WorkflowPermissionProbe;
+  /** Refuses a Studio run under an aggregate project, which accepts no writes (ADR-175). */
+  projects: WorkflowChannels["projects"];
   lineage: WorkflowLineageReads;
   publications: WorkflowPublicationReads;
   commitMessages: WorkflowCommitMessageWriter;
@@ -544,6 +546,7 @@ export class WorkflowModule implements WorkflowApi, WorkflowBrowserApi {
       ...(engine.fleet ? { nlpLambdaFleet: engine.fleet } : {}),
       perProjectEngines: engine.perProjectEngines,
       permissions: WorkflowPermissionService.create({ authz: setup.dependencies.authz }),
+      projects: setup.channels.projects,
       commitMessages: WorkflowCommitMessageService.create({ modelProviders }),
       codeCompletions: WorkflowCodeCompletionService.create({ modelProviders }),
       studioDispatch,
@@ -1065,6 +1068,8 @@ export class WorkflowModule implements WorkflowApi, WorkflowBrowserApi {
       permission: "workflows:manage",
     });
     if (!permitted) throw new ProjectPermissionDeniedError("workflows:manage");
+    // ADR-175 decision 8: nothing runs under an aggregate's tenant, so refuse before preparing.
+    await this.#infrastructure.projects.assertAcceptsWrites({ projectId });
 
     const message = await this.#preparedForDispatch({
       event: eventWithoutEnvs,

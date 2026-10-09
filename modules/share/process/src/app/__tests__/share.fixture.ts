@@ -41,9 +41,14 @@ export function createShareTestDataRetention(): DataRetentionApi {
   });
 }
 
-/** Both kill switches open, so a mint is only ever refused by the test that closes one. */
-export function createShareTestProjects(): ProjectApi {
+/**
+ * Both kill switches open, so a mint is only ever refused by the test that closes one, and an
+ * ordinary project that takes writes unless the overrides make it an aggregate.
+ */
+export function createShareTestProjects(overrides: Partial<ProjectApi> = {}): ProjectApi {
   return Object.assign(createApiFixture<ProjectApi>(), {
     findTraceSharingConfig: vi.fn(async () => ({ orgEnabled: true, projectEnabled: true })),
+    assertAcceptsWrites: vi.fn(async () => void 0),
+    ...overrides,
   });
 }

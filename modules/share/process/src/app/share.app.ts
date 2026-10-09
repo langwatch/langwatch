@@ -40,10 +40,16 @@ export class ShareModule implements ShareApiContract {
 
   readonly #shares: ShareService;
   readonly #retention: DataRetentionApi;
+  readonly #projects: ProjectApi;
 
-  private constructor(shares: ShareService, retention: DataRetentionApi) {
-    this.#shares = shares;
-    this.#retention = retention;
+  private constructor(parts: {
+    shares: ShareService;
+    retention: DataRetentionApi;
+    projects: ProjectApi;
+  }) {
+    this.#shares = parts.shares;
+    this.#retention = parts.retention;
+    this.#projects = parts.projects;
   }
 
   static create(setup: ShareSetup): ShareModule {
@@ -55,16 +61,17 @@ export class ShareModule implements ShareApiContract {
       projects,
     });
 
-    return new ShareModule(
-      ShareService.create({
+    return new ShareModule({
+      shares: ShareService.create({
         repository,
         dataRetention,
         permissions: authorization,
         projects,
         cache: setup.repositories.cache,
       }),
-      dataRetention,
-    );
+      retention: dataRetention,
+      projects,
+    });
   }
 
   /** Revokes a project's trace links once project records trace sharing disabled. */
@@ -96,12 +103,20 @@ export class ShareModule implements ShareApiContract {
     return this.#shares.revokeAllTraceShares(projectId);
   }
 
-  /** A pin is retention state; share only guards the trace's release. */
-  pinTrace(input: PinTraceInput): Promise<PinnedTrace> {
+  /**
+   * A pin is retention state; share only guards the trace's release. Pin and unpin are declared
+   * under `project:update`, which the permission-level write guard exempts so an admin can still
+   * manage an aggregate, so each asks the project itself before writing (ADR-175 decision 8).
+   */
+  async pinTrace(input: PinTraceInput): Promise<PinnedTrace> {
+    await this.#projects.assertAcceptsWrites({ projectId: input.projectId });
+
     return this.#retention.pin(input);
   }
 
-  unpinTrace(input: TracePinInput): Promise<void> {
+  async unpinTrace(input: TracePinInput): Promise<void> {
+    await this.#projects.assertAcceptsWrites({ projectId: input.projectId });
+
     return this.#shares.unpinTrace(input);
   }
 

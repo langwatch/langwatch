@@ -214,6 +214,7 @@ async function harness({
     workbenchObserver: { recordExperimentRan: vi.fn(), reportError: vi.fn() },
     workflowEvaluations: createApiFixture<WorkflowEvaluationService>({}, "workflowEvaluations"),
     runProcessing: pipeline.runProcessing,
+    projects: createApiFixture({ assertAcceptsWrites: async () => void 0 }),
   };
   const app = ExperimentModule.createForTesting(dependencies);
 

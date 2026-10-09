@@ -1,6 +1,8 @@
 import { CloudWatchLogsClient } from "@aws-sdk/client-cloudwatch-logs";
 import { LambdaClient } from "@aws-sdk/client-lambda";
 import { createLogger } from "@langwatch/observability";
+import type { BoundApis } from "@langwatch/process";
+import { ProjectApi } from "@langwatch/project-contract";
 import { nlpInternalSecret, type ScopedSecrets } from "@langwatch/secrets";
 import { nlpLambdaFleetFromSecret, type WorkflowServerConfig } from "@langwatch/workflow-contract";
 
@@ -38,14 +40,18 @@ const NLP_LAMBDA_CLIENT_MAX_ATTEMPTS = 6;
  */
 export class HttpWorkflowChannels {
   static readonly requires = [] as const;
+  static readonly binds = { projects: ProjectApi } as const;
 
   static async create({
     config,
     secrets,
+    bound,
   }: {
     config: WorkflowServerConfig;
     secrets: ScopedSecrets;
+    bound: BoundApis<typeof HttpWorkflowChannels.binds>;
   }): Promise<WorkflowChannels> {
+    const { projects } = bound;
     const named = await secrets.into(nlpLambdaFleetSecret, (raw) =>
       nlpLambdaFleetFromSecret.safeParse(raw),
     );
@@ -55,6 +61,7 @@ export class HttpWorkflowChannels {
       logger.error({ reason }, "the named NLP Lambda fleet is unusable; studio runs will refuse");
 
       return {
+        projects,
         engine: {
           kind: "single",
           stream: UnconfiguredWorkflowStudioStreamAdapter.create({ reason }),
@@ -103,6 +110,7 @@ export class HttpWorkflowChannels {
       const logs = new CloudWatchLogsClient({ region: lambdaConfig.region, credentials });
 
       return {
+        projects,
         engine: {
           kind: "lambda",
           resolver: AwsNlpLambdaArnResolverChannel.create({
@@ -132,6 +140,7 @@ export class HttpWorkflowChannels {
     const serviceUrl = config.nlpServiceUrl;
     if (!serviceUrl) {
       return {
+        projects,
         engine: {
           kind: "single",
           stream: UnconfiguredWorkflowStudioStreamAdapter.create(),
@@ -142,6 +151,7 @@ export class HttpWorkflowChannels {
     }
 
     return {
+      projects,
       engine: {
         kind: "single",
         stream: HttpWorkflowStudioStreamAdapter.create({

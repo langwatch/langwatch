@@ -296,6 +296,7 @@ function peersOf(overrides: PeerOverrides) {
     project: createApiFixture<ProjectApi>({
       getOrganizationId: async () => "organization_1",
       findOrganizationId: async () => "organization_1",
+      assertAcceptsWrites: async () => void 0,
     }),
     entitlement: createApiFixture<EntitlementApi>({ requestBound: async () => 1_000 }),
     evaluation: createApiFixture<EvaluationApi>({ reportEvaluation: async () => {} }),

@@ -17,6 +17,8 @@ export type TraceHostProject = {
    * Whether live cursors and presence dots are on for this project.
    */
   presenceEnabled?: boolean;
+  /** The project's kind, when the scope read carried it; an aggregate takes no writes. */
+  kind?: string | null;
 };
 
 /**

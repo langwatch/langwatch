@@ -65,9 +65,16 @@ export function createDashboardTestAutomation(triggers: Trigger[] = []): Automat
   });
 }
 
-export function createDashboardTestProjects(slug = "project-one"): ProjectApi {
+/** An ordinary project, which takes writes; pass overrides to make it an aggregate. */
+export function createDashboardTestProjects(
+  slug = "project-one",
+  overrides: Partial<ProjectApi> = {},
+): ProjectApi {
   return createApiFixture<ProjectApi>({
     findSummaryById: async () => ({ name: "Project One", slug }),
+    acceptsWrites: async () => true,
+    assertAcceptsWrites: async () => void 0,
+    ...overrides,
   });
 }
 

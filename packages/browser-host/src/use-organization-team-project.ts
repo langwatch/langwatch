@@ -12,6 +12,8 @@ export type UiHostProject = {
   slug: string;
   /** A Mustache template turning a `user_id` into a link, when the project set one. */
   userLinkTemplate?: string | null;
+  /** The project's kind, when the scope read carried it; an aggregate takes no writes. */
+  kind?: string | null;
 };
 
 export type UiHostOrganization = { id: string; name?: string };

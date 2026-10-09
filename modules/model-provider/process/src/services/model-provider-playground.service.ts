@@ -6,6 +6,7 @@ import type {
   ModelProviderPlaygroundStatus,
 } from "@langwatch/model-provider-contract";
 import { nlpInternalSecretHeaders } from "@langwatch/process/nlp-internal-secret";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { streamText, type ModelMessage } from "ai";
 
 import { getProjectModelProviders } from "../rules/legacy-model-provider.rules.ts";
@@ -16,37 +17,37 @@ type PlaygroundProvider = Readonly<{
   customKeys: Record<string, unknown> | null;
 }>;
 
+type PlaygroundServiceOptions = Readonly<{
+  modelProviders: ModelProviderApi;
+  /** Refuses a chat under an aggregate project, which accepts no writes (ADR-175). */
+  projects: Pick<ProjectApi, "assertAcceptsWrites">;
+  executionProxyBaseUrl: string;
+  /** The engine hop's shared credential, as the process resolved it. */
+  nlpInternalSecret?: string | undefined;
+}>;
+
 /** Owns provider selection, streaming and the one replayable credential refusal cache. */
 export class ModelProviderPlaygroundService {
   #credentialRefusals = new Map<string, { error: string }>();
   readonly #modelProviders: ModelProviderApi;
+  readonly #projects: Pick<ProjectApi, "assertAcceptsWrites">;
   readonly #executionProxyBaseUrl: string;
   readonly #nlpInternalSecret: string | undefined;
 
-  private constructor(
-    modelProviders: ModelProviderApi,
-    executionProxyBaseUrl: string,
-    nlpInternalSecret: string | undefined,
-  ) {
-    this.#modelProviders = modelProviders;
-    this.#executionProxyBaseUrl = executionProxyBaseUrl;
-    this.#nlpInternalSecret = nlpInternalSecret;
+  private constructor(options: PlaygroundServiceOptions) {
+    this.#modelProviders = options.modelProviders;
+    this.#projects = options.projects;
+    this.#executionProxyBaseUrl = options.executionProxyBaseUrl;
+    this.#nlpInternalSecret = options.nlpInternalSecret;
   }
 
-  static create(options: {
-    modelProviders: ModelProviderApi;
-    executionProxyBaseUrl: string;
-    /** The engine hop's shared credential, as the process resolved it. */
-    nlpInternalSecret?: string | undefined;
-  }): ModelProviderPlaygroundService {
-    return new ModelProviderPlaygroundService(
-      options.modelProviders,
-      options.executionProxyBaseUrl,
-      options.nlpInternalSecret,
-    );
+  static create(options: PlaygroundServiceOptions): ModelProviderPlaygroundService {
+    return new ModelProviderPlaygroundService(options);
   }
 
   async execute(input: ModelProviderPlaygroundRequest): Promise<ModelProviderPlaygroundCompletion> {
+    // ADR-175 decision 8: nothing runs under an aggregate's tenant, so refuse before the chat.
+    await this.#projects.assertAcceptsWrites({ projectId: input.projectId });
     const chosen = await this.#chooseProvider(input);
     if ("refusal" in chosen) return chosen.refusal;
 

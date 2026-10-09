@@ -75,6 +75,7 @@ function createOverRest() {
     workbenchTargetNames: async () => ({}),
     workbenchObserver: { recordExperimentRan: vi.fn(), reportError: vi.fn() },
     workflowEvaluations: createApiFixture(),
+    projects: createApiFixture({ assertAcceptsWrites: async () => void 0 }),
   });
   const { send } = mountExperimentRest({
     app: { createEvaluationsV3: (input, by) => application.createEvaluationsV3(input, by) },

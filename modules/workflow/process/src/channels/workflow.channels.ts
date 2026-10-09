@@ -1,3 +1,4 @@
+import type { ProjectApi } from "@langwatch/project-contract";
 import { Secret } from "@langwatch/secrets";
 
 import type { WorkflowNlpRuntime } from "../app/workflow.app.ts";
@@ -44,4 +45,9 @@ type WorkflowLambdaEngine = Readonly<{
 /** Every channel workflow holds, as the container hands them to the module class. */
 export interface WorkflowChannels {
   readonly engine: WorkflowSingleEngine | WorkflowLambdaEngine;
+  /**
+   * Whether a project accepts writes: an aggregate refuses every Studio run (ADR-175). Bound,
+   * not a peer (record §5), so project may reach workflow through its own peers.
+   */
+  readonly projects: Pick<ProjectApi, "assertAcceptsWrites">;
 }

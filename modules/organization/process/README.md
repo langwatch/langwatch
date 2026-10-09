@@ -1956,9 +1956,9 @@ interface Input {
 type Output = unknown[];
 
 // organization.getScopeGraph
-// Input: organizationApiScopeGraphInputSchema, ../contract/src/scope-graph.ts:50
+// Input: organizationApiScopeGraphInputSchema, ../contract/src/scope-graph.ts:52
 type Input = Record<string, unknown>;
-type Output = z.infer<typeof scopeGraphSchema>; // ../contract/src/scope-graph.ts:53
+type Output = z.infer<typeof scopeGraphSchema>; // ../contract/src/scope-graph.ts:55
 
 // organization.update
 // Input: organizationApiUpdateInputSchema, ../contract/src/organization.trpc-schemas.ts:93

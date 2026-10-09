@@ -16,10 +16,11 @@ Monitors: the checks that run an evaluator over incoming traces, their definitio
 
 ## What monitor owns
 
-| Kind           | Name                        | Declared at                                                       |
-| -------------- | --------------------------- | ----------------------------------------------------------------- |
-| Postgres table | `Monitor`                   | `process/src/repositories/prisma/prisma.monitor.repository.ts:69` |
-| Config         | `publicBaseUrl` (BASE_HOST) | `contract/src/monitor.config.ts:5`                                |
+| Kind            | Name                        | Declared at                                                       |
+| --------------- | --------------------------- | ----------------------------------------------------------------- |
+| Postgres table  | `Monitor`                   | `process/src/repositories/prisma/prisma.monitor.repository.ts:69` |
+| Stores required |                             | `process/src/channels/monitor.channels.ts:15`                     |
+| Config          | `publicBaseUrl` (BASE_HOST) | `contract/src/monitor.config.ts:5`                                |
 
 Anything else monitor needs belongs to another module and is reached through its `*Api`.
 

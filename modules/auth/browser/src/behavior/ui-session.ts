@@ -16,9 +16,11 @@ import type {
   UiSessionSnapshot,
 } from "@langwatch/browser-host/session";
 import { setUiStorageReader } from "@langwatch/browser-host/storage";
+import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { useEffect, useLayoutEffect } from "react";
 
+import { refusedOnAggregate } from "../model/refused-on-aggregate.ts";
 import {
   readUiActor,
   uiAuthClient,
@@ -220,7 +222,7 @@ export function useBrowserUiSession({
     scope,
     permissions: isPublicRoute
       ? NO_PERMISSIONS_ON_A_PUBLIC_PAGE
-      : readPermissions(scope.status, permissions),
+      : readPermissions(scope, permissions),
   };
 
   return BrowserUiSession.create({ snapshot, refresh });
@@ -246,15 +248,22 @@ function readSession(query: UseQueryResult<UiSessionResponse>): UiSessionReading
   return { status: "anonymous", user: null };
 }
 
-/** One grant read answers both, as on main: organization permissions follow it (scope knot Q2). */
+/**
+ * One grant read answers both, as on main: organization permissions follow it (scope knot Q2).
+ * The server refuses every write under an aggregate project whatever the role (ADR-175
+ * decision 8), so the session refuses the same writes there and no control offers one.
+ */
 function readPermissions(
-  scopeStatus: UiActiveScopeReading["status"],
+  scope: UiActiveScopeReading,
   grantRead: UseQueryResult<UiEffectivePermissionsRead>,
 ): UiSessionSnapshot["permissions"] {
-  const status = permissionStatus(scopeStatus, grantRead);
+  const status = permissionStatus(scope.status, grantRead);
   const grants = new Set(grantRead.isError ? [] : grantRead.data?.permissions);
+  const onAggregate = isAggregateProjectKind(scope.project?.kind);
   const can = (requested: string) =>
-    scopeStatus === "ready" && permissionSatisfiedBy({ granted: grants, requested });
+    scope.status === "ready" &&
+    !(onAggregate && refusedOnAggregate(requested)) &&
+    permissionSatisfiedBy({ granted: grants, requested });
   return { status, isLoading: status === "loading", can, canInOrganization: can };
 }
 

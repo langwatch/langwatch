@@ -4957,6 +4957,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
+      '@langwatch/project-contract':
+        specifier: workspace:*
+        version: link:../../project/contract
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -5914,6 +5917,9 @@ importers:
       '@langwatch/organization-contract':
         specifier: workspace:*
         version: link:../../organization/contract
+      '@langwatch/project-contract':
+        specifier: workspace:*
+        version: link:../../project/contract
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -11054,6 +11060,9 @@ importers:
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
+      '@langwatch/project-contract':
+        specifier: workspace:*
+        version: link:../../project/contract
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -12795,9 +12804,15 @@ importers:
 
   modules/project/contract:
     dependencies:
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/data-privacy-contract':
         specifier: workspace:*
         version: link:../../data-privacy/contract
+      '@langwatch/entitlement-contract':
+        specifier: workspace:*
+        version: link:../../entitlement/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
@@ -14858,6 +14873,9 @@ importers:
       '@langwatch/process':
         specifier: workspace:*
         version: link:../../../packages/process
+      '@langwatch/project-contract':
+        specifier: workspace:*
+        version: link:../../project/contract
       '@langwatch/redis-client':
         specifier: workspace:*
         version: link:../../../packages/redis-client
@@ -14997,6 +15015,9 @@ importers:
       '@langwatch/presence-contract':
         specifier: workspace:*
         version: link:../../presence/contract
+      '@langwatch/project-contract':
+        specifier: workspace:*
+        version: link:../../project/contract
       '@langwatch/prompt-client':
         specifier: workspace:*
         version: link:../../prompt/client
@@ -16246,6 +16267,9 @@ importers:
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
+      '@langwatch/project-contract':
+        specifier: workspace:*
+        version: link:../../project/contract
       '@langwatch/redis-client':
         specifier: workspace:*
         version: link:../../../packages/redis-client

@@ -2,6 +2,7 @@ import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { TopicApi } from "@langwatch/topic-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
@@ -16,6 +17,7 @@ function process(role: "api" | "worker") {
       evaluation: createApiFixture<EvaluationApi>({}),
       trace: createApiFixture<TraceApi>({}),
       "model-provider": createApiFixture<ModelProviderApi>({}),
+      project: createApiFixture<ProjectApi>({}),
     });
 }
 

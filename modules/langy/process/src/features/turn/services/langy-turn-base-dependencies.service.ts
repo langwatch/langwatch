@@ -25,6 +25,11 @@ export class LangyTurnBaseDependenciesService {
     adoptConversationId?: boolean;
     modelOverride?: string;
   }): ReturnType<LangyTurnBaseDependenciesService["enrich"]> {
+    // ADR-175 decision 8: a turn writes a conversation, runs a model and mints a
+    // key under the project, and an aggregate takes no writes. Refused first, so
+    // every way into Langy answers with the read-only refusal, not whichever
+    // step fails on an aggregate first.
+    await input.deps.projects.assertAcceptsWrites({ projectId: input.projectId });
     const results = await this.read(input);
     const resolved = this.requireResolved(input.projectId, results);
 

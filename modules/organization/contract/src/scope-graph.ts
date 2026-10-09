@@ -11,6 +11,8 @@ export const scopeGraphProjectSchema = z.object({
   id: z.string(),
   slug: z.string(),
   name: z.string(),
+  /** The browser refuses a write control on an aggregate (ADR-175 decision 8). */
+  kind: z.string().min(1),
   userLinkTemplate: z.string().nullable(),
   presenceEnabled: z.boolean(),
   lastCodingAgentSessionAt: z.date().nullable(),

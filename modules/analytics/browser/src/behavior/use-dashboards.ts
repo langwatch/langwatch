@@ -1,3 +1,6 @@
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { projectKindAcceptsWrites } from "@langwatch/project-contract";
+
 import { analyticsApi } from "./analytics-api.ts";
 
 /** The project's dashboards. */
@@ -5,11 +8,17 @@ export function useDashboards({ projectId }: { projectId: string }) {
   return analyticsApi.dashboards.getAll.useQuery({ projectId }, { enabled: !!projectId });
 }
 
-/** The project's first dashboard, created on demand. */
+/**
+ * The project's first dashboard, created on demand. Never asked on an aggregate
+ * project: the create is a write it refuses (ADR-175 decision 8), so its reports
+ * show no dashboard rather than the refusal.
+ */
 export function useFirstDashboard({ projectId, enabled }: { projectId: string; enabled: boolean }) {
+  const { project } = useOrganizationTeamProject();
+  const acceptsWrites = projectKindAcceptsWrites(project?.kind);
   return analyticsApi.dashboards.getOrCreateFirst.useQuery(
     { projectId },
-    { enabled: !!projectId && enabled },
+    { enabled: !!projectId && enabled && acceptsWrites },
   );
 }
 

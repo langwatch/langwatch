@@ -461,6 +461,7 @@ export class ModelProviderModule implements ModelProviderApi {
     });
     this.#playground = ModelProviderPlaygroundService.create({
       modelProviders: this,
+      projects: dependencies.projects,
       executionProxyBaseUrl,
       nlpInternalSecret,
     });

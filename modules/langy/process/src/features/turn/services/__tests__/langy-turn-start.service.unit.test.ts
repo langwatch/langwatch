@@ -9,6 +9,7 @@ import {
   LangyModelNotConfiguredError,
   LangyTurnInProgressError,
 } from "@langwatch/langy-contract";
+import { AggregateProjectIsReadOnlyError } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -151,6 +152,41 @@ describe("LangyTurnStartService", () => {
       expect(probe).not.toHaveBeenCalled();
       expect(fixture.mint).not.toHaveBeenCalled();
       expect(fixture.acceptTurn).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the project is an aggregate", () => {
+    /** @scenario "Langy refuses to start on an aggregate with the read-only refusal" */
+    it("refuses as read only before resolving a model or a key, or writing a conversation", async () => {
+      // An aggregate has no Langy model or key, so either lookup would fail
+      // first and answer with a conflict; the write check comes before both.
+      const resolveModel = vi.fn(async () => {
+        throw new Error("no model");
+      });
+      const getOrProvision = vi.fn(async () => workerCredentials());
+      const fixture = makeFixture({
+        projects: {
+          assertAcceptsWrites: async () => {
+            throw new AggregateProjectIsReadOnlyError();
+          },
+        },
+        models: { resolve: resolveModel },
+        credentials: {
+          getOrProvision,
+          findEgressAllowlist: vi.fn(async () => null),
+          resolveMirrorTier: vi.fn(async () => "content" as const),
+          findModelsAllowed: vi.fn(async () => null),
+        },
+      });
+
+      await expect(
+        LangyTurnService.create(fixture.deps).startConversationTurn(input()),
+      ).rejects.toMatchObject({ code: "aggregate_project_is_read_only", httpStatus: 403 });
+      expect(resolveModel).not.toHaveBeenCalled();
+      expect(getOrProvision).not.toHaveBeenCalled();
+      expect(fixture.ensureConversation).not.toHaveBeenCalled();
+      expect(fixture.claim).not.toHaveBeenCalled();
+      expect(fixture.mint).not.toHaveBeenCalled();
     });
   });
 

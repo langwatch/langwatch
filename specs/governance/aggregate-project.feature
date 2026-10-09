@@ -481,7 +481,7 @@ Feature: An aggregate project reads its member projects
     And the same calls on the member are not refused
     And ana can still edit the aggregate's rule, rename it and archive it
 
-  @unit @unimplemented
+  @unit
   Scenario: Langy refuses to start on an aggregate with the read-only refusal
     Given an aggregate project, which has no Langy model and accepts no key
     When ana starts a Langy turn on it, from the panel, the API or a connected folder
@@ -498,7 +498,7 @@ Feature: An aggregate project reads its member projects
     And no dashboard or saved view row exists under the aggregate
     And opening the member the same way still creates its first dashboard and default views
 
-  @unit @unimplemented
+  @unit
   Scenario: A read that seeds defaults must be told whether the project takes writes
     Given the services that seed a first dashboard or default views on read
     When a caller reads without saying whether the project takes writes
@@ -536,7 +536,7 @@ Feature: An aggregate project reads its member projects
     Then no lens is added to the strip and nothing is sent to save one
     And on an ordinary project the same request still creates the lens and saves it
 
-  @integration @unimplemented
+  @integration
   Scenario: An AI search asking for a lens on the aggregate is told it is read only
     Given an aggregate project
     When ana asks the AI search for something it answers with a new lens

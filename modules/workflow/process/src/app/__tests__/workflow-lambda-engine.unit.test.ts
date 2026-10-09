@@ -10,6 +10,7 @@ import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -106,7 +107,16 @@ async function appWith({
     config,
     resources: { own: () => void 0, ownService: () => void 0 },
     secrets,
-    channels: await HttpWorkflowChannels.create({ config, secrets }),
+    channels: await HttpWorkflowChannels.create({
+      config,
+      secrets,
+      bound: {
+        projects: createApiFixture<ProjectApi>(
+          { assertAcceptsWrites: async () => void 0 },
+          "ProjectApi",
+        ),
+      },
+    }),
     repositories,
   });
 }

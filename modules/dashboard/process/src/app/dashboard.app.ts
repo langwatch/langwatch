@@ -228,9 +228,14 @@ export class DashboardModule implements DashboardApi {
     return this.#dashboards.reorder(input);
   }
 
-  /** The project's first dashboard, created on demand. */
-  getOrCreateFirst(input: { projectId: string }): Promise<Dashboard> {
-    return this.#dashboards.getOrCreateFirst(input);
+  /**
+   * The project's first dashboard, created on demand. A query, so the permission-level write
+   * guard never sees it: an aggregate (ADR-175) creates nothing and is refused when it has none.
+   */
+  async getOrCreateFirst(input: { projectId: string }): Promise<Dashboard> {
+    const acceptsWrites = await this.#projects.acceptsWrites({ projectId: input.projectId });
+
+    return this.#dashboards.getOrCreateFirst({ projectId: input.projectId, acceptsWrites });
   }
 
   /** Where a reader opens each of these dashboards. */
@@ -606,9 +611,11 @@ export class DashboardModule implements DashboardApi {
   }
 
   // -- saved views -----------------------------------------------------------
+  // The writes are declared under `traces:view`, which the permission-level write guard reads
+  // as a read, so each asks the project itself whether it takes writes (ADR-175 decision 8).
 
-  /** The project's shared views plus the caller's own personal ones. */
-  listSavedViews(input: {
+  /** The project's shared views plus the caller's own personal ones; an aggregate seeds none. */
+  async listSavedViews(input: {
     projectId: string;
     actorId: string;
     kind?: string;
@@ -617,11 +624,12 @@ export class DashboardModule implements DashboardApi {
       projectId: input.projectId,
       userId: input.actorId,
       ...(input.kind === undefined ? {} : { kind: input.kind }),
+      acceptsWrites: await this.#projects.acceptsWrites({ projectId: input.projectId }),
     });
   }
 
   /** A new view, shared with the project or personal to the caller. */
-  createSavedView(input: {
+  async createSavedView(input: {
     projectId: string;
     actorId: string;
     id?: string;
@@ -632,6 +640,8 @@ export class DashboardModule implements DashboardApi {
     personal: boolean;
     kind?: string;
   }): Promise<SavedView> {
+    await this.#projects.assertAcceptsWrites({ projectId: input.projectId });
+
     return this.#savedViews.createView({
       projectId: input.projectId,
       input: {
@@ -647,11 +657,13 @@ export class DashboardModule implements DashboardApi {
   }
 
   /** Removes one view; a personal view only for the member who owns it. */
-  deleteSavedView(input: {
+  async deleteSavedView(input: {
     projectId: string;
     actorId: string;
     viewId: string;
   }): Promise<SavedView> {
+    await this.#projects.assertAcceptsWrites({ projectId: input.projectId });
+
     return this.#savedViews.delete({
       projectId: input.projectId,
       viewId: input.viewId,
@@ -660,12 +672,14 @@ export class DashboardModule implements DashboardApi {
   }
 
   /** Renames one view, under the same ownership rule. */
-  renameSavedView(input: {
+  async renameSavedView(input: {
     projectId: string;
     actorId: string;
     viewId: string;
     name: string;
   }): Promise<SavedView> {
+    await this.#projects.assertAcceptsWrites({ projectId: input.projectId });
+
     return this.#savedViews.rename({
       projectId: input.projectId,
       viewId: input.viewId,
@@ -675,11 +689,13 @@ export class DashboardModule implements DashboardApi {
   }
 
   /** The order the tab strip lists them in, under the same ownership rule. */
-  reorderSavedViews(input: {
+  async reorderSavedViews(input: {
     projectId: string;
     actorId: string;
     viewIds: string[];
   }): Promise<{ success: true }> {
+    await this.#projects.assertAcceptsWrites({ projectId: input.projectId });
+
     return this.#savedViews.reorder({
       projectId: input.projectId,
       viewIds: input.viewIds,

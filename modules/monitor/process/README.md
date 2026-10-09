@@ -6,7 +6,7 @@ The server half of [monitor](../README.md). Monitors: the checks that run an eva
 
 ## Installation
 
-`defineProcessModule("monitor").withRepositories(monitorRepositories).withApi(MonitorModule).withTransports(…, monitorTrpcTransport).withEventing(monitorEvaluatorCleanupEventing)`, `src/monitor.module.ts:14`.
+`defineProcessModule("monitor").withRepositories(monitorRepositories).withChannels(monitorChannels).withApi(MonitorModule).withTransports(…, monitorTrpcTransport).withEventing(monitorEvaluatorCleanupEventing)`, `src/monitor.module.ts:15`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 

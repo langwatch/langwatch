@@ -202,6 +202,16 @@ export interface ProjectApi {
    * because this runs once per authenticated request. Absent when missing.
    */
   findIdentity(id: string): Promise<ProjectIdentity | null>;
+  /**
+   * Whether data may be written under this project: false on an aggregate (ADR-175
+   * decision 8). A read that seeds a default on first open asks this before it writes.
+   */
+  acceptsWrites(input: { projectId: string }): Promise<boolean>;
+  /**
+   * Refuses a write under an aggregate with `aggregate_project_is_read_only`.
+   * Asked by every write whose declared permission does not already say so.
+   */
+  assertAcceptsWrites(input: { projectId: string }): Promise<void>;
   /** Lists active projects reached by the supplied organisation/team/project scopes. */
   listActiveByScopes(input: ActiveProjectsByScopesInput): Promise<ActiveProjectsByScopes>;
   updateMetadata(input: UpdateProjectMetadataInput): Promise<void>;

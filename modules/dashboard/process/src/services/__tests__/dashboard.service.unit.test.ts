@@ -247,6 +247,42 @@ describe("DashboardService", () => {
     });
   });
 
+  describe("when the first dashboard is asked for", () => {
+    describe("given a project with no dashboard that takes no writes", () => {
+      it("refuses as read-only and creates nothing", async () => {
+        const { service } = serviceWith();
+
+        await expect(
+          service.getOrCreateFirst({ projectId: PROJECT, acceptsWrites: false }),
+        ).rejects.toMatchObject({ code: "aggregate_project_is_read_only" });
+        await expect(
+          service.getAll({ projectId: PROJECT, graphCountScope: "builder" }),
+        ).resolves.toEqual([]);
+      });
+    });
+
+    describe("given a project with no dashboard that takes writes", () => {
+      it("creates the first dashboard", async () => {
+        const { service } = serviceWith();
+
+        const first = await service.getOrCreateFirst({ projectId: PROJECT, acceptsWrites: true });
+
+        expect(first).toMatchObject({ projectId: PROJECT, name: "Reports", order: 0 });
+      });
+    });
+
+    describe("given a project that already has a dashboard", () => {
+      it.each([true, false])("returns it when acceptsWrites is %s", async (acceptsWrites) => {
+        const { service } = serviceWith();
+        const existing = await service.create({ projectId: PROJECT, name: "Quality" });
+
+        await expect(
+          service.getOrCreateFirst({ projectId: PROJECT, acceptsWrites }),
+        ).resolves.toMatchObject({ id: existing.id });
+      });
+    });
+  });
+
   describe("given a graph name of twenty thousand characters", () => {
     const name = "A".repeat(20_000);
 

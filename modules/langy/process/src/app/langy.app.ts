@@ -546,6 +546,7 @@ export class LangyModule implements LangyApiContract {
         metrics: { count: () => undefined },
         accessStore: repositories.turnAccess,
         handoffStore: repositories.turnHandoff,
+        projects: dependencies.projects,
       },
       credentials: {
         sessionKeys,

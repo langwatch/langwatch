@@ -40,6 +40,7 @@ import {
 import type { FeatureSetup } from "@langwatch/process";
 import { WorkflowApi } from "@langwatch/workflow-contract";
 
+import type { MonitorChannels } from "../channels/monitor.channels.ts";
 import {
   buildMonitorEvaluatorCleanupPipeline,
   type MonitorEvaluatorCleanupPipeline,
@@ -56,7 +57,8 @@ const MONITOR_KSUID_RESOURCE = "monitor";
 type MonitorSetup = FeatureSetup<
   typeof MonitorModule.dependencies,
   MonitorServerConfig,
-  MonitorRepositories
+  MonitorRepositories,
+  MonitorChannels
 >;
 
 export class MonitorModule implements MonitorApi {
@@ -77,14 +79,11 @@ export class MonitorModule implements MonitorApi {
   #usage: MonitorRepositories["monitors"];
   #catalogue: MonitorCatalogService;
   #permissions: AuthzApi;
+  #projects: MonitorChannels["projects"];
   #replication: MonitorReplicationService;
   readonly #publicBaseUrl: string | undefined;
 
-  private constructor(
-    repositories: MonitorRepositories,
-    dependencies: MonitorSetup["dependencies"],
-    publicBaseUrl: string | undefined,
-  ) {
+  private constructor({ repositories, dependencies, channels, config }: MonitorSetup) {
     this.#monitors = MonitorService.create({
       repository: repositories.monitors,
       evaluators: dependencies.evaluators,
@@ -94,15 +93,16 @@ export class MonitorModule implements MonitorApi {
     this.#catalogue = MonitorCatalogService.create({ repository: repositories.monitors });
     this.#usage = repositories.monitors;
     this.#permissions = dependencies.permissions;
+    this.#projects = channels.projects;
     this.#replication = MonitorReplicationService.create({
       evaluators: dependencies.evaluators,
       workflows: dependencies.workflows,
     });
-    this.#publicBaseUrl = publicBaseUrl;
+    this.#publicBaseUrl = config.publicBaseUrl;
   }
 
   static create(setup: MonitorSetup): MonitorModule {
-    return new MonitorModule(setup.repositories, setup.dependencies, setup.config.publicBaseUrl);
+    return new MonitorModule(setup);
   }
 
   /** Removes the monitors that ran an evaluator once evaluator records it deleted. */
@@ -163,7 +163,10 @@ export class MonitorModule implements MonitorApi {
     if (!settings.success) throw new MonitorCheckSettingsInvalidError(checkType, settings.error);
   }
 
-  create(input: MonitorCreateInput): Promise<Monitor> {
+  /** Refuses a monitor under an aggregate before anything is written (ADR-175 decision 8). */
+  async create(input: MonitorCreateInput): Promise<Monitor> {
+    await this.#projects.assertAcceptsWrites({ projectId: input.projectId });
+
     return this.#monitors.create(input);
   }
 

@@ -55,6 +55,7 @@ export class PrismaScopeGraphRepository
                 id: true,
                 slug: true,
                 name: true,
+                kind: true,
                 userLinkTemplate: true,
                 presenceEnabled: true,
                 lastCodingAgentSessionAt: true,

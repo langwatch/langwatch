@@ -25,6 +25,7 @@ import {
   type DashboardUsageCount,
 } from "@langwatch/dashboard-contract";
 import { generate } from "@langwatch/ksuid";
+import { AggregateProjectIsReadOnlyError } from "@langwatch/project-contract";
 
 import type {
   DashboardGraphKind,
@@ -143,11 +144,17 @@ export class DashboardService {
     return { success: true as const };
   }
 
-  async getOrCreateFirst(input: { projectId: string }): Promise<Dashboard> {
+  /**
+   * The first dashboard, created when there is none. A project that takes no writes (an
+   * aggregate, ADR-175) gets its first dashboard if it has one and a read-only refusal otherwise.
+   * `acceptsWrites` is required so a caller that forgets it fails to compile.
+   */
+  async getOrCreateFirst(input: { projectId: string; acceptsWrites: boolean }): Promise<Dashboard> {
     const projectId = projectIdSchema.parse(input.projectId);
 
     const first = await this.#repository.findFirstDashboard({ projectId });
     if (first) return first;
+    if (!input.acceptsWrites) throw new AggregateProjectIsReadOnlyError();
 
     return this.#repository.createDashboard({
       id: generate(DASHBOARD_KSUID_RESOURCE).toString(),

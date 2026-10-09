@@ -11,7 +11,7 @@ Projects: finding them, their summaries and paths, and the departments they are 
 | Classification | core (`modules/catalogue.json`)                                                                        |
 | Subjects       | project                                                                                                |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser) · [client](client)            |
-| Api token      | `ProjectApi` = `moduleApi<ProjectApi>()("project")`, `contract/src/project.api.ts:246` (43 operations) |
+| Api token      | `ProjectApi` = `moduleApi<ProjectApi>()("project")`, `contract/src/project.api.ts:256` (45 operations) |
 | Other token    | `ProjectManagementApi`, `process/src/transport/project.rest.ts:85`                                     |
 | Other token    | `ProjectBrowserApi`, `process/src/transport/project.trpc.ts:69`                                        |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                             |
@@ -38,6 +38,6 @@ Anything else project needs belongs to another module and is reached through its
 
 ## Who depends on project
 
-[agent](../agent/README.md), [analytics](../analytics/README.md), [annotation](../annotation/README.md), [api-key](../api-key/README.md), [auth](../auth/README.md), [automation](../automation/README.md), [coding-agent](../coding-agent/README.md), [dashboard](../dashboard/README.md), [dataset](../dataset/README.md), [enterprise-gateway](../../enterprise/modules/enterprise-gateway/README.md), [evaluator](../evaluator/README.md), [experiment](../experiment/README.md), [gateway](../gateway/README.md), [github](../github/README.md), [governance](../../enterprise/modules/governance/README.md), [hosted-mcp](../hosted-mcp/README.md), [langy](../langy/README.md), [model-provider](../model-provider/README.md), [onboarding](../onboarding/README.md), [ops](../ops/README.md), [platform-health](../platform-health/README.md), [prompt](../prompt/README.md), [scenario](../scenario/README.md), [share](../share/README.md), [slack](../slack/README.md), [suite](../suite/README.md), [trace](../trace/README.md), [webhook](../webhook/README.md) (as a peer).
+[agent](../agent/README.md), [analytics](../analytics/README.md), [annotation](../annotation/README.md), [api-key](../api-key/README.md), [auth](../auth/README.md), [automation](../automation/README.md), [coding-agent](../coding-agent/README.md), [dashboard](../dashboard/README.md), [dataset](../dataset/README.md), [enterprise-gateway](../../enterprise/modules/enterprise-gateway/README.md), [evaluator](../evaluator/README.md), [experiment](../experiment/README.md), [gateway](../gateway/README.md), [github](../github/README.md), [governance](../../enterprise/modules/governance/README.md), [hosted-mcp](../hosted-mcp/README.md), [langy](../langy/README.md), [model-provider](../model-provider/README.md), [onboarding](../onboarding/README.md), [ops](../ops/README.md), [platform-health](../platform-health/README.md), [prompt](../prompt/README.md), [scenario](../scenario/README.md), [share](../share/README.md), [slack](../slack/README.md), [suite](../suite/README.md), [topic](../topic/README.md), [trace](../trace/README.md), [webhook](../webhook/README.md) (as a peer).
 
 <!-- readme:generated:end -->

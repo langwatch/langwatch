@@ -192,6 +192,8 @@ export interface ExperimentAppDependencies {
   batchLog?: Pick<ExperimentBatchLogService, "assertWithinLimit" | "log">;
   /** The SDK's dataset evaluation; absent where a suite builds none. */
   datasetEvaluation?: Pick<ExperimentDatasetEvaluationService, "evaluate">;
+  /** Refuses a workbench run or abort under an aggregate project (ADR-175 decision 8). */
+  projects: Pick<ProjectApi, "assertAcceptsWrites">;
 }
 
 /** An experiment nobody has run yet. Defaulted here so no door decides it. */
@@ -295,6 +297,7 @@ export class ExperimentModule implements ExperimentApi {
         experiments,
         evaluation: dependencies.evaluation,
       }),
+      projects: dependencies.projects,
     });
   }
 
@@ -319,6 +322,7 @@ export class ExperimentModule implements ExperimentApi {
     this.#workbenchRuns = ExperimentWorkbenchRunService.create({
       experiments: dependencies.experiments,
       observer: dependencies.workbenchObserver,
+      projects: dependencies.projects,
       ...(dependencies.runProcessing ? { runs: dependencies.runProcessing } : {}),
     });
     this.#workbenchVersions = ExperimentWorkbenchVersionService.create({

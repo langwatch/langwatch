@@ -873,9 +873,9 @@ Declared at `src/eventing/workflow-nlp-lambda-cleanup.pipeline.ts:31`.
 
 | Kind   | Leaf                         | Environment variable                      | Declared at                             |
 | ------ | ---------------------------- | ----------------------------------------- | --------------------------------------- |
-| secret | `nlpLambdaFleet`             | `LANGWATCH_NLP_LAMBDA_CONFIG`             | `src/app/workflow.app.ts:498`           |
-| secret | `nlpInternal`                | `LANGWATCH_NLP_INTERNAL_SECRET`           | `src/app/workflow.app.ts:499`           |
-| secret | `s3KeySalt`                  | `S3_KEY_SALT`                             | `src/app/workflow.app.ts:500`           |
+| secret | `nlpLambdaFleet`             | `LANGWATCH_NLP_LAMBDA_CONFIG`             | `src/app/workflow.app.ts:500`           |
+| secret | `nlpInternal`                | `LANGWATCH_NLP_INTERNAL_SECRET`           | `src/app/workflow.app.ts:501`           |
+| secret | `s3KeySalt`                  | `S3_KEY_SALT`                             | `src/app/workflow.app.ts:502`           |
 | config | `nlpServiceUrl`              | `LANGWATCH_NLP_SERVICE`                   | `../contract/src/workflow.config.ts:79` |
 | config | `stagingThresholdBytes`      | `LANGEVALS_STAGING_THRESHOLD_BYTES`       | `../contract/src/workflow.config.ts:81` |
 | config | `stagingTtlSeconds`          | `LANGEVALS_STAGING_TTL_SECONDS`           | `../contract/src/workflow.config.ts:82` |

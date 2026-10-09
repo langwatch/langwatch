@@ -12,6 +12,7 @@ import {
 } from "@langwatch/evaluator-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { ResourceScope } from "@langwatch/process";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
@@ -127,6 +128,8 @@ export function createMonitorTestApp(
     recoverySwitch?: FakeRecoverySwitch;
     replication?: FakeMonitorReplication;
     publicBaseUrl?: string;
+    /** The project directory; an ordinary project that accepts writes unless a test says not. */
+    projects?: ProjectApi;
   }> = {},
 ): MonitorModule {
   const evaluators = input.evaluators ?? new FakeMonitorEvaluators();
@@ -152,6 +155,11 @@ export function createMonitorTestApp(
       workflows: createApiFixture<WorkflowApi>({
         deleteUncommitted: (reference) => replication.deleteUncommitted(reference),
       }),
+    },
+    channels: {
+      projects:
+        input.projects ??
+        createApiFixture<ProjectApi>({ assertAcceptsWrites: async () => void 0 }, "ProjectApi"),
     },
     resources: new ResourceScope(),
     secrets: createApiFixture<MonitorTestSetup["secrets"]>(),

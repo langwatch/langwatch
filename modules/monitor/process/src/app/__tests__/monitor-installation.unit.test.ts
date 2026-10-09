@@ -8,6 +8,7 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { MonitorApi, type MonitorCreateInput } from "@langwatch/monitor-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
@@ -43,6 +44,7 @@ function process(role: "api" | "worker") {
       }),
       "feature-flag": createApiFixture<FeatureFlagApi>({ isEnabled: async () => false }),
       workflow: createApiFixture<WorkflowApi>(),
+      project: createApiFixture<ProjectApi>({ assertAcceptsWrites: async () => void 0 }),
     });
 }
 

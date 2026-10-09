@@ -3,6 +3,7 @@ import type { EventingCommands } from "@langwatch/eventing";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import type { FeatureSetup } from "@langwatch/process";
+import { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 import type {
   NamedTopicCounts,
@@ -60,8 +61,10 @@ export class TopicModule implements TopicApi, TopicBrowserApi {
     evaluations: EvaluationApi,
     traces: TraceApi,
     modelProviders: ModelProviderApi,
+    projects: ProjectApi,
   };
 
+  readonly #projects: ProjectApi;
   readonly #topics: TopicService;
   readonly #counts: TopicCountsService;
   readonly #commands: EventingTopicClusteringCommandsService;
@@ -72,6 +75,7 @@ export class TopicModule implements TopicApi, TopicBrowserApi {
   readonly #seeds: LegacyImportTopicClusteringMigration;
 
   private constructor(parts: {
+    projects: ProjectApi;
     topics: TopicService;
     counts: TopicCountsService;
     commands: EventingTopicClusteringCommandsService;
@@ -86,6 +90,7 @@ export class TopicModule implements TopicApi, TopicBrowserApi {
         triggerLogger.error({ error, projectId }, "Topic clustering request failed."),
       now: () => nowInstant().epochMilliseconds,
     });
+    this.#projects = parts.projects;
     this.#topics = parts.topics;
     this.#counts = parts.counts;
     this.#commands = parts.commands;
@@ -134,6 +139,7 @@ export class TopicModule implements TopicApi, TopicBrowserApi {
     const topics = TopicService.create({ repository: repositories.topics, schedule });
 
     return new TopicModule({
+      projects: dependencies.projects,
       topics,
       counts: TopicCountsService.create({ traces: dependencies.traces, topics }),
       commands,
@@ -164,10 +170,17 @@ export class TopicModule implements TopicApi, TopicBrowserApi {
     return this;
   }
 
-  triggerTopicClustering(input: {
+  /**
+   * Clustering writes topics under the project it names. It is declared under `project:update`,
+   * which the permission-level write guard exempts, so it asks the project itself before any run
+   * is requested and outside the trigger's failure report (ADR-175 decision 8).
+   */
+  async triggerTopicClustering(input: {
     projectId: string;
     by: Readonly<{ id: string }>;
   }): Promise<TopicClusteringTriggerResult> {
+    await this.#projects.assertAcceptsWrites({ projectId: input.projectId });
+
     return this.#trigger.trigger(input);
   }
 

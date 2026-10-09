@@ -41,6 +41,7 @@ import type { Instant } from "@langwatch/time";
 import type { ProjectRepositories } from "../repositories/project.repositories.ts";
 import { AggregateAccessService } from "../services/aggregate-access.service.ts";
 import { AggregateRuleService } from "../services/aggregate-rule.service.ts";
+import { AggregateWritesService } from "../services/aggregate-writes.service.ts";
 import { PersonalProjectService } from "../services/personal-project.service.ts";
 import {
   ProjectCreatedNoticeService,
@@ -113,6 +114,7 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
   readonly #personalProjects: PersonalProjectService;
   readonly #aggregateRules: AggregateRuleService;
   readonly #aggregateAccess: AggregateAccessService;
+  readonly #aggregateWrites: AggregateWritesService;
   readonly #management: ProjectManagementService;
   readonly #requests = ProjectRequestService.create({
     projects: this,
@@ -127,6 +129,7 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     personalProjects,
     aggregateRules,
     aggregateAccess,
+    aggregateWrites,
     management,
   }: {
     projectService: ProjectApplicationService;
@@ -137,6 +140,7 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     personalProjects: PersonalProjectService;
     aggregateRules: AggregateRuleService;
     aggregateAccess: AggregateAccessService;
+    aggregateWrites: AggregateWritesService;
     management: ProjectManagementService;
   }) {
     this.#projectService = projectService;
@@ -147,6 +151,7 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     this.#personalProjects = personalProjects;
     this.#aggregateRules = aggregateRules;
     this.#aggregateAccess = aggregateAccess;
+    this.#aggregateWrites = aggregateWrites;
     this.#management = management;
   }
 
@@ -191,6 +196,7 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
       personalProjects: PersonalProjectService.create({ projects: repositories.projects }),
       aggregateRules,
       aggregateAccess,
+      aggregateWrites: AggregateWritesService.create({ projects: repositories.projects }),
       management: ProjectManagementService.create({ projects, aggregateAccess }),
     });
   }
@@ -569,6 +575,14 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
 
   findIdentity(id: string): Promise<ProjectIdentity | null> {
     return this.#projectService.findIdentity(id);
+  }
+
+  acceptsWrites(input: { projectId: string }): Promise<boolean> {
+    return this.#aggregateWrites.acceptsWrites(input);
+  }
+
+  assertAcceptsWrites(input: { projectId: string }): Promise<void> {
+    return this.#aggregateWrites.assertAcceptsWrites(input);
   }
 
   listActiveByScopes(input: ActiveProjectsByScopesInput): Promise<ActiveProjectsByScopes> {

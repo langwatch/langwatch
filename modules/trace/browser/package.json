@@ -49,6 +49,7 @@
     "@langwatch/observability": "workspace:*",
     "@langwatch/onboarding-client": "workspace:*",
     "@langwatch/presence-contract": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
     "@langwatch/prompt-client": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",
     "@langwatch/redaction": "workspace:*",
