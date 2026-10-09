@@ -164,7 +164,10 @@ export function Toaster({
         toaster={toaster}
         insetInline={{ mdDown: "4" }}
         data-fan={open ? undefined : ""}
-        onClick={() => setOpen(true)}
+        onClick={(event) => {
+          if (event.target instanceof Element && event.target.closest("button")) return;
+          setOpen(true);
+        }}
         onMouseLeave={() => setOpen(false)}
       >
         {(toast) => {
