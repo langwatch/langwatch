@@ -450,6 +450,12 @@ export type RestRawBody = Readonly<{
  */
 export type RestMediaTypeMismatch = "unsupported_media_type" | "malformed_request" | "accepted";
 
+/**
+ * A JSON body that named its media type (Alex, G3b): any other Content-Type is refused with
+ * `mismatch` before the parser reads it, as a raw body's is.
+ */
+export type RestInputMediaType = Readonly<{ mediaType: string; mismatch: RestMediaTypeMismatch }>;
+
 /** What the handler is handed for the form it asked for. */
 export type RawBodyValue<Form extends RestRawBodyForm> = Form extends "text"
   ? string

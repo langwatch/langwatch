@@ -105,6 +105,7 @@ import {
   tracerMiddleware,
   type RestDoor,
   type RestRawAnswer,
+  type RestInputMediaType,
   type RestRawBody,
   type RestTransportMiddlewareBinding,
   type RestTransportMiddleware,
@@ -715,11 +716,10 @@ function routeStack<Api>({
     : [];
 
   const raw = route.rawBody ? [rawBodyMiddleware(route.rawBody)] : [];
-  const mismatch = route.rawBody?.mismatch;
+  const named = route.rawBody ?? route.inputMediaType;
+  const mismatch = named?.mismatch;
   const media =
-    route.rawBody && mismatch !== undefined && mismatch !== "accepted"
-      ? [mediaTypeMiddleware(route.rawBody)]
-      : [];
+    named && mismatch !== undefined && mismatch !== "accepted" ? [mediaTypeMiddleware(named)] : [];
 
   return [
     ...legacyErrorScopes(route),
@@ -885,14 +885,14 @@ function mediaTypeEssence(contentType: string | undefined): string | null {
 }
 
 /** Refuses a body sent under a media type its route did not declare; reads one header, no bytes. */
-function mediaTypeMiddleware(rawBody: RestRawBody): MiddlewareHandler {
+function mediaTypeMiddleware(declared: RestRawBody | RestInputMediaType): MiddlewareHandler {
   return async (context, next) => {
     const received = mediaTypeEssence(context.req.header("content-type"));
 
-    if (received !== rawBody.mediaType) {
-      const refusal = { received, expected: rawBody.mediaType };
+    if (received !== declared.mediaType) {
+      const refusal = { received, expected: declared.mediaType };
 
-      throw rawBody.mismatch === "malformed_request"
+      throw declared.mismatch === "malformed_request"
         ? new MediaTypeMalformedRequestError(refusal)
         : new UnsupportedMediaTypeError(refusal);
     }

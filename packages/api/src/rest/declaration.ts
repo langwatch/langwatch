@@ -64,6 +64,7 @@ import {
   type RestMultipart,
   type RestMultipartDeclared,
   type RestMultipartFiles,
+  type RestInputMediaType,
   type RestMediaTypeMismatch,
   type RestRateLimitPolicy,
   type RestRawAnswerDeclared,
@@ -541,6 +542,8 @@ export type RestTransportRoute<Api> = Readonly<{
   readonly answers?: RestRouteAnswers;
   /** Present exactly when the route reads its own body instead of parsing one. */
   readonly rawBody?: RestRawBody;
+  /** Present exactly when the JSON body named its media type. */
+  readonly inputMediaType?: RestInputMediaType;
   /** Present exactly when the route's request carries files beside its fields. */
   readonly multipart?: RestMultipart;
   /** Present exactly when the route counts how often one caller may ask. */
@@ -612,6 +615,7 @@ type RouteState = Readonly<{
   output?: OutputSchema;
   answers?: RestRouteAnswers;
   rawBody?: RestRawBody;
+  inputMediaType?: RestInputMediaType;
   multipart?: RestMultipart;
   rateLimit?: RestRateLimitPolicy;
   cache?: RestCachePolicy;
@@ -782,14 +786,19 @@ class RouteBuilder<Api, S extends RouteShape> {
     Api,
     With<S, { method: Exclude<HttpMethod, "get" | "head">; body: RestArrayBody<Field, Item> }>
   >;
+  /**
+   * A JSON body. A named `mediaType` is enforced after the door, as withRawBody's is: another
+   * Content-Type is refused with `mismatch` before the parser reads the body.
+   */
   withInput<Schema extends SourceSchema>(
     this: RouteBuilder<Api, With<S, { method: Exclude<HttpMethod, "get" | "head"> }>>,
     schema: Schema & DistinctSchema<Schema, S["params"]> & DistinctSchema<Schema, S["query"]>,
+    options?: Readonly<{ mediaType: string; mismatch?: RestMediaTypeMismatch }>,
   ): RouteBuilder<Api, With<S, { method: Exclude<HttpMethod, "get" | "head">; body: Schema }>>;
   withInput(
     this: RouteBuilder<Api, With<S, { method: Exclude<HttpMethod, "get" | "head"> }>>,
     declared: SourceSchema | z.ZodArray,
-    options?: Readonly<{ as: string }>,
+    options?: Readonly<{ as?: string; mediaType?: string; mismatch?: RestMediaTypeMismatch }>,
   ): unknown {
     assertBodyMethod(this.method, this.path);
     assertSourceUnset("input", this.state.input);
@@ -812,6 +821,15 @@ class RouteBuilder<Api, S extends RouteShape> {
         ...this.state,
         input: schema,
         ...(arrayBody ? { arrayBody } : {}),
+        ...(options?.mediaType === undefined
+          ? {}
+          : {
+              inputMediaType: inputMediaTypeOf({
+                operation: this.operation,
+                mediaType: options.mediaType,
+                mismatch: options.mismatch,
+              }),
+            }),
       },
     });
   }
@@ -1392,6 +1410,7 @@ class RouteBuilder<Api, S extends RouteShape> {
       ...(this.state.params ? { params: this.state.params } : {}),
       ...(this.state.input ? { input: this.state.input } : {}),
       ...(this.state.arrayBody ? { arrayBody: this.state.arrayBody } : {}),
+      ...(this.state.inputMediaType ? { inputMediaType: this.state.inputMediaType } : {}),
       ...(this.state.query ? { query: this.state.query } : {}),
       ...accessParts(this.state),
       output: this.state.output ?? successAnswerOf(this.state.answers) ?? z.void(),
@@ -1985,15 +2004,40 @@ function rawBodyOf({
     return { form, mediaType: DEFAULT_RAW_MEDIA_TYPE[form] };
   }
 
+  return { form, ...namedMediaType({ operation, mediaType, mismatch }) };
+}
+
+type NamedMediaType = Readonly<{
+  operation: string;
+  mediaType: string;
+  mismatch?: RestMediaTypeMismatch | undefined;
+}>;
+
+/** A named media type as one lower-cased essence, refused with 415 unless told otherwise. */
+function namedMediaType({ operation, mediaType, mismatch }: NamedMediaType): RestInputMediaType {
   const essence = mediaType.toLowerCase();
 
   if (!MEDIA_TYPE_ESSENCE.test(essence)) {
     throw new Error(
-      `REST ${operation} reads its raw body as "${mediaType}", which names no single media type`,
+      `REST ${operation} reads its body as "${mediaType}", which names no single media type`,
     );
   }
 
-  return { form, mediaType: essence, mismatch: mismatch ?? "unsupported_media_type" };
+  return { mediaType: essence, mismatch: mismatch ?? "unsupported_media_type" };
+}
+
+/** The only media types the JSON parser reads (Hono's validator); any other is handed `{}`. */
+const JSON_MEDIA_TYPE = /^application\/([a-z.-]+\+)?json$/;
+
+/** A JSON body's named media type: one the parser reads, so no unread body is admitted. */
+function inputMediaTypeOf({ operation, mediaType, mismatch }: NamedMediaType): RestInputMediaType {
+  const named = namedMediaType({ operation, mediaType, mismatch });
+
+  if (!JSON_MEDIA_TYPE.test(named.mediaType)) {
+    throw new Error(`REST ${operation} parses its body as JSON, and "${mediaType}" is not JSON`);
+  }
+
+  return named;
 }
 
 function assertBodyMethod(method: HttpMethod, path: string): void {
@@ -2503,7 +2547,7 @@ function bodySourceOf({
 }: {
   operation: string;
   declared: SourceSchema | z.ZodArray;
-  options: Readonly<{ as: string }> | undefined;
+  options: Readonly<{ as?: string }> | undefined;
 }): Readonly<{ schema: SourceSchema; arrayBody?: RestArrayBodyDeclared }> {
   if (!(declared instanceof z.ZodArray)) return { schema: declared };
 

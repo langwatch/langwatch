@@ -254,6 +254,22 @@ Feature: The REST runtime renders what a transport may not hand-roll
       Then the handler is handed the body as sent
       And a route that declares a refusal for a media type it never named, or names a media type with parameters or a wildcard, refuses to build
 
+  Rule: A JSON body that names its media type is read only under it (Alex, G3b)
+
+    @integration
+    Scenario: A JSON body sent under another media type than its route names is refused before it is parsed
+      Given a route that parses a JSON body and names the media type it reads
+      When it is called with a body under another media type, or with no Content-Type at all
+      Then it is refused with 415 and the code unsupported_media_type, and the handler is not reached
+      And a body under the named type, with parameters or in another letter case, is parsed and reaches the handler
+
+    @integration
+    Scenario: A JSON body route that keeps main's 400 declares it, and names only a JSON media type
+      Given a route that parses a JSON body and declares an unmatched media type a malformed request
+      When it is called with a body under another media type
+      Then it is refused with 400 and the code malformed_request, and the handler is not reached
+      And a route that names a media type the JSON parser cannot read refuses to build
+
   Rule: A JSON body may be an array, handed under the field its route names (Alex, 2026-10-05, E1)
 
     @integration
