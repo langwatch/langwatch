@@ -17,6 +17,7 @@ import { describe, expect, it } from "vitest";
 
 import { projectProcessModule } from "../../project.module.ts";
 import { projectTrpcTransport } from "../project.trpc.ts";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 
 const ACTOR = { id: "user-1" };
 const PROJECT_ID = "project_1";
@@ -78,6 +79,7 @@ async function doors(overrides: Partial<Peers> = {}) {
   const host = TrpcHost.create({
     sessions: SessionReader.create({ verify: async () => ({ userId: ACTOR.id }) }),
     authz: {
+      ...testAuthorizeDefaults,
       getDecision: async () => PERMITTED,
       getProjectAnyDecision: async () => PERMITTED,
       checkScopeLineage: async () => ({ kind: "consistent" }),
