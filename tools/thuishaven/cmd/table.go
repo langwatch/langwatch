@@ -236,7 +236,7 @@ var baseTable = []commandSpec{
 			{long: "--detach", short: "-d", summary: "run in the background without the log view"},
 			{long: "--force", short: "-f", summary: "restart the stack even when it already matches"},
 			{long: "--rebuild", summary: "rebuild container images even when unchanged"},
-			{long: "--ui", takesValue: true, value: "<dev|built>", summary: "built serves a production build of apps/ui from the api, no Vite; sticks; `haven reload ui` rebuilds"},
+			{long: "--ui", takesValue: true, value: "<dev|bundled|built>", summary: "bundled runs Vite on incrementally rebuilt bundles with HMR (edit and look); built serves a production build of apps/ui from the api, no Vite; sticks; `haven reload ui` rebuilds"},
 			{long: "--mode", takesValue: true, value: "<mode>", summary: "deployment mode from dev/tests/modes; sticks, none clears"},
 			{long: "--no-seed", summary: "skip the auto-seed of an empty stack (HAVEN_AUTO_SEED=0 does too)"},
 		},

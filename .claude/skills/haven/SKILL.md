@@ -82,7 +82,9 @@ haven restart sims                # bounce one lane; nothing else restarts
 haven restart api                 # restart the whole lane
 haven up --watch=false -f         # hold the stack (sticky): no backend reload on a file change
 haven reload [app|api|worker]     # apply changes to a held stack in place; waits for "reload finished"
-haven up --ui=built -f            # serve a production build of apps/ui from the api, no Vite (sticky; --ui=dev returns)
+haven up --ui=built -f            # testing without changing code (Haiku testers): production build served by the api, no Vite (sticky)
+haven up --ui=bundled -f          # editing and testing visually: Vite 8 bundled dev, in-memory bundles, HMR kept (sticky)
+haven up --ui=dev -f              # almost never: unbundled Vite, thousands of requests per page
 haven reload ui                   # --ui=built: rebuild the bundle and swap it in; returns once swapped
 ```
 
@@ -90,6 +92,7 @@ What `--ui=built` changes, measured on /governance with a signed-in headless pag
 
 | | dev | built |
 |---|---|---|
+| Role | almost never | testing without changing code |
 | Page memory | 708 MB | 396 MB |
 | JS heap | 242 MB | 69 MB |
 | Requests | 2289 | 563 |

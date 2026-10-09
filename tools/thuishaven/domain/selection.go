@@ -20,8 +20,11 @@ type Selection struct {
 	// BuiltUI is sticky `haven up --ui=built`: app.<slug> is the api serving a
 	// production build of apps/ui, as production does; no Vite. `haven reload ui` rebuilds.
 	BuiltUI bool `json:"built-ui,omitempty"`
-	Gateway bool `json:"gateway"`
-	NLP     bool `json:"nlp"`
+	// BundledUI is sticky `haven up --ui=bundled`: Vite serves incrementally
+	// rebuilt bundles from memory (LANGWATCH_UI_BUNDLED=1); HMR stays. Not with BuiltUI.
+	BundledUI bool `json:"bundled-ui,omitempty"`
+	Gateway   bool `json:"gateway"`
+	NLP       bool `json:"nlp"`
 	// Langy is off by default: it costs a container image and a hard memory
 	// cap that most worktrees never exercise. The worktrees that need it say
 	// `haven up +langy` once.

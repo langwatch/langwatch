@@ -264,6 +264,9 @@ func (p *childPlan) nodeEnv(lane string) []string {
 	}
 	if lane == "ui" || lane == AppLane {
 		env = append(env, "LANGWATCH_VITE_NO_POLLING=1")
+		if p.opts.Selection.BundledUI {
+			env = append(env, "LANGWATCH_UI_BUNDLED=1")
+		}
 		if v := os.Getenv("LANGWATCH_DEV_TOOLS_IDLE"); v != "" {
 			env = append(env, "LANGWATCH_DEV_TOOLS_IDLE="+v)
 		}

@@ -292,15 +292,15 @@ func (o *Orchestrator) ResolveHold(worktreeDir string, sel domain.Selection, hel
 	return sel, nil
 }
 
-// ResolveUI applies `up --ui=dev|built` to the sticky selection. Persists only a change.
+// ResolveUI applies `up --ui=dev|bundled|built` to the sticky selection. Persists only a change.
 func (o *Orchestrator) ResolveUI(worktreeDir string, sel domain.Selection, ui string) (domain.Selection, error) {
-	if ui != "dev" && ui != "built" {
-		return sel, fmt.Errorf("--ui takes dev or built, not %q", ui)
+	if ui != "dev" && ui != "bundled" && ui != "built" {
+		return sel, fmt.Errorf("--ui takes dev, bundled or built, not %q", ui)
 	}
-	if sel.BuiltUI == (ui == "built") {
+	if sel.BuiltUI == (ui == "built") && sel.BundledUI == (ui == "bundled") {
 		return sel, nil
 	}
-	sel.BuiltUI = ui == "built"
+	sel.BuiltUI, sel.BundledUI = ui == "built", ui == "bundled"
 	if err := o.store.WriteSelection(worktreeDir, sel); err != nil {
 		return sel, fmt.Errorf("saving the ui mode: %w", err)
 	}

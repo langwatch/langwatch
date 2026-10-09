@@ -101,6 +101,9 @@ const rootEnvPath = path.resolve(here, "../../.env");
 
 dotenv.config({ path: rootEnvPath, quiet: true });
 
+// Set by `haven up --ui=bundled`: Vite serves incrementally rebuilt bundles from memory.
+const IS_BUNDLED = process.env.LANGWATCH_UI_BUNDLED === "1";
+
 const FRONTEND_PORT = parseInt(process.env.LANGWATCH_APP_PORT ?? process.env.PORT ?? "5560");
 const API_PORT = FRONTEND_PORT + 1000;
 
@@ -205,6 +208,23 @@ function logDevelopmentTlsState(
   devLogger.info("[vite-config] HTTPS disabled (set LANGWATCH_DEV_HTTP2=1)");
 }
 
+const BUNDLED_ROLLDOWN = IS_BUNDLED ? { experimental: { devMode: { lazy: false } } } : {};
+
+/** Bundled dev runs plugin-react's preamble after the app's modules; stubs stop them throwing. */
+function bundledRefreshStub(): Plugin {
+  return {
+    name: "bundled-refresh-stub",
+    apply: "serve",
+    transformIndexHtml: () => [
+      {
+        tag: "script",
+        children: "window.$RefreshReg$=()=>{};window.$RefreshSig$=()=>(t)=>t;",
+        injectTo: "head-prepend",
+      },
+    ],
+  };
+}
+
 export default defineConfig(async ({ command }): Promise<UserConfig> => {
   const devHttpsCredentials = loadDevHttpsCredentials();
 
@@ -224,7 +244,9 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
       // The api renders the page's public config; the dev server lifts it from the api's shell.
       ...(command === "serve" ? [injectDevelopmentPublicConfig({ apiUrl: API_TARGET })] : []),
       havenHmrGate(),
-      havenOrb({ slug: process.env[HAVEN_SLUG_ENV] }),
+      ...(IS_BUNDLED ? [bundledRefreshStub()] : []),
+      // Skipped when bundled: its /@fs script is not in the bundle, so it 404s.
+      havenOrb({ slug: IS_BUNDLED ? undefined : process.env[HAVEN_SLUG_ENV] }),
       designSystemStorybook({ appPort: FRONTEND_PORT }),
       mailPreview({ appPort: FRONTEND_PORT }),
       workspaceSourcePlugin(),
@@ -262,6 +284,8 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
       outDir: "dist/client",
       sourcemap: true,
       rollupOptions: {
+        // Vite 8.3's bundled client lacks the `requestLazy` rolldown 1.2.9 emits for lazy imports.
+        ...BUNDLED_ROLLDOWN,
         // Both statically and dynamically imported means the `import()` splits
         // nothing -- the module stays in the importer's chunk. Rolldown always
         // detected this and we only logged it, which is how 468 kB of screens
@@ -284,6 +308,7 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
       },
     },
     experimental: {
+      bundledDev: IS_BUNDLED,
       // ADR-086: the base for content-hashed assets is chosen at container start, not
       // build time. JS-referenced assets call the runtime resolver
       // (vite/asset-base.ts); CSS-referenced assets stay relative to the CSS

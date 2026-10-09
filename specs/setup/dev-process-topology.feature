@@ -352,6 +352,13 @@ Feature: The local development process topology
     And the app hostname routes to the api port
 
   @unit
+  Scenario: A bundled UI stack runs Vite on bundled output and leaves the other modes
+    Given a stack started with "haven up --ui=bundled"
+    When haven plans the Node lanes
+    Then the app lane runs with LANGWATCH_UI_BUNDLED=1 and keeps its Vite server
+    And choosing "--ui=bundled" replaces "--ui=built" and an unknown value is refused
+
+  @unit
   Scenario: A built UI is rebuilt beside the served one and swapped in
     Given a stack serving a built UI
     When "haven reload ui" runs

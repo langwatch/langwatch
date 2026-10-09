@@ -83,6 +83,28 @@ func TestUIBuildShellSwapsTheBundleAndKeepsOldAssets(t *testing.T) {
 	}
 }
 
+// @scenario "A bundled UI stack runs Vite on bundled output and leaves the other modes"
+func TestBundledUISetsTheViteEnvAndIsExclusiveWithBuilt(t *testing.T) {
+	repo := t.TempDir()
+	o := &Orchestrator{cfg: Config{Home: t.TempDir()}, proxy: stubProxy{}, store: &fakeStore{}}
+	st := domain.Stack{Slug: "branch", WorktreeDir: repo}
+	sel := domain.DefaultSelection()
+	sel.BundledUI = true
+	children := o.planChildren(st, PlanOptions{Selection: sel, ShouldRunOneProcess: true, RepoRoot: repo}, repo)
+	child, ok := findChild(children, AppLane)
+	if !ok || !slices.Contains(child.Env, "LANGWATCH_UI_BUNDLED=1") {
+		t.Fatalf("want LANGWATCH_UI_BUNDLED=1 on the app lane, got %+v", child)
+	}
+	sel.BuiltUI = true
+	sel, err := o.ResolveUI(repo, sel, "bundled")
+	if err != nil || !sel.BundledUI || sel.BuiltUI {
+		t.Fatalf("bundled should replace built: %+v, %v", sel, err)
+	}
+	if _, err := o.ResolveUI(repo, sel, "turbo"); err == nil {
+		t.Fatal("an unknown --ui value should be refused")
+	}
+}
+
 // @scenario "A built UI stack runs no Vite and routes the app hostname to the api"
 func TestBuiltUIPlansTheBackendOnlyHost(t *testing.T) {
 	repo := t.TempDir()
