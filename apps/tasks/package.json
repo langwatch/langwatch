@@ -110,6 +110,7 @@
   },
   "devDependencies": {
     "@langwatch/prompt-contract": "workspace:*",
+    "@langwatch/seedgen-runner": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",

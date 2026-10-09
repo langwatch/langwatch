@@ -297,7 +297,7 @@ ENV CHECKPOINT_DISABLE=1
 # Every tiktoken encoding file, so token counting reads it from disk instead of
 # downloading it from openaipublic.blob.core.windows.net at runtime (about 8 MB).
 # The script resolves tiktoken from the working directory, so it runs in the
-# trace module's process package, which depends on it.
+# package that depends on it (the trace module's process half, not apps/worker).
 ENV TIKTOKENS_PATH=/app/tiktoken
 COPY dev/scripts/download-tiktoken-encodings.mjs ./dev/scripts/download-tiktoken-encodings.mjs
 RUN cd modules/trace/process && node ../../../dev/scripts/download-tiktoken-encodings.mjs "$TIKTOKENS_PATH"
@@ -307,21 +307,21 @@ EXPOSE 5560
 # Set bash as the default shell
 SHELL ["/bin/bash", "-c"]
 
-# Serving never migrates (specs/upgrade/entry-points.feature). `pnpm --silent run
-# start` runs the api alone: it reads the upgrade ledger at boot and refuses by
-# name, with the command to run, when a blocking step of this image is not done.
-# The one exception is a first install (an empty ledger on an empty schema), where
-# the api runs the upgrade once itself (Q10), so a Helm first install converges.
+# One image, three roles, chosen by working directory and command (no rebuild):
+#   api     (default) cd /app/apps/api    && pnpm --silent run start
+#           REST, tRPC, SSE and the browser bundle from /app/apps/ui/dist/client.
+#           Probes on API_PORT: startup and liveness /api/health, readiness /readyz.
+#   worker  cd /app/apps/worker && pnpm --silent run start
+#           Probes on WORKER_METRICS_PORT (2999): startup and liveness /healthz, readiness /readyz.
+#   task    cd /app/apps/tasks  && pnpm --silent task <name>   (e.g. `upgrade status`)
 #
-# The upgrade is a one-shot step BEFORE the serving containers, run on this image:
-#   cd /app/apps/api && pnpm --silent run start:prepare:db
-# which is `pnpm task upgrade` (Postgres, ClickHouse, LangWatchQL, under one lease).
-# The chart's pre-roll Job, the compose
-# `migrate` service and the npx server run it; it is written once, in apps/api,
-# so this file holds no copy of it.
-#
-# The API process serves the REST, tRPC and SSE families AND the browser bundle
-# it finds at /app/apps/ui/dist/client, so this one container is the whole
-# interactive tier. The worker deployment runs the same image from
-# /app/apps/worker, whose start script runs the worker alone, behind the same gate.
+# The api never runs an upgrade step: behind its ledger it serves every route (a
+# schema it is not ready for answers 503 upgrade_in_progress with Retry-After) and
+# stays not ready until the ledger is current (NO-HOLDS). The worker
+# runs `pnpm task upgrade` at boot under the runner's lease (UPGRADE-IN-WORKER,
+# dev/docs/runbooks/upgrade-on-deploy.md), so several workers are safe.
+# Docker's own check, for compose and `docker run`; Kubernetes uses the probes above.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40m --retries=3 \
+  CMD curl -fsS -o /dev/null "http://127.0.0.1:${API_PORT}/api/health" \
+   || curl -fsS -o /dev/null "http://127.0.0.1:${WORKER_METRICS_PORT:-2999}/healthz"
 CMD cd /app/apps/api && pnpm --silent run start

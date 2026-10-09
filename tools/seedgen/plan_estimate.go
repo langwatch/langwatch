@@ -8,16 +8,18 @@ import (
 	"time"
 )
 
-// Per-row sizes and the drain rate are estimates until SG5 measures them (design §4: 500-1,500 spans/s).
+// Measured by SG5 on a laptop haven stack, 2026-10-09: ClickHouse bytes on disk per row after a tiny
+// run (event-log bytes per span: ~5 event rows each), and the task route's S-tier send rate under the
+// guard with haven's 512 MB Redis. Postgres row size and actions/s are not measured yet.
 const (
 	postgresRowBytes  = 1_024
-	spanBytes         = 1_536
-	traceSummaryBytes = 1_024
+	spanBytes         = 130
+	traceSummaryBytes = 160
 	logBytes          = 400
-	metricPointBytes  = 150
-	eventLogRowBytes  = 600
+	metricPointBytes  = 170
+	eventLogRowBytes  = 960
 	spansPerTrace     = 5
-	spansPerSecond    = 1_000
+	spansPerSecond    = 55
 	actionsPerSecond  = 20
 )
 

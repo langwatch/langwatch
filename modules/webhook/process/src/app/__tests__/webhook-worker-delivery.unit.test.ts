@@ -1,3 +1,4 @@
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
@@ -62,6 +63,7 @@ function worker() {
     .withStores(memoryStores())
     .withEventing(eventing)
     .provide({
+      "data-retention": createApiFixture<DataRetentionApi>({}),
       entitlement: createApiFixture<EntitlementApi>({
         getActivePlan: async () => entitledPlan,
         requestBound: async () => 10,

@@ -210,6 +210,7 @@ export function createCanonicalAutomationApp(): {
         traces: createApiFixture<TraceApi>({}),
         evaluations: createApiFixture<EvaluationApi>({}),
         webhooks: createApiFixture<WebhookApi>({}),
+        retention: createApiFixture({}),
       },
       infrastructure,
       config: {

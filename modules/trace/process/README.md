@@ -1027,9 +1027,9 @@ Public: Trace collection API key resolved in-handler, so the refusal carries the
 Answers at `/api/collector`.
 
 ```typescript
-// Body: inline, src/transport/collector.rest.ts:297
+// Body: inline, src/transport/collector.rest.ts:296
 type Body = Record<string, unknown>;
-// Response: inline, src/transport/collector.rest.ts:305
+// Response: inline, src/transport/collector.rest.ts:304
 type Response = unknown;
 ```
 
@@ -1049,14 +1049,14 @@ Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI docu
 Answers at `/api/otel/v1/traces`.
 
 ```typescript
-// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:342)
-// Response: inline, src/transport/otlp-ingest.rest.ts:345
+// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:341)
+// Response: inline, src/transport/otlp-ingest.rest.ts:344
 type Response = unknown;
 ```
 
 #### `POST /:otlpBase{.+}/v1/traces` · `ingestOtlpTracesAlias`
 
-Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-ingest.rest.ts:363`.
+Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-ingest.rest.ts:362`.
 
 Answers at `/:otlpBase{.+}/v1/traces`.
 
@@ -1065,45 +1065,45 @@ Answers at `/:otlpBase{.+}/v1/traces`.
 interface Params {
   otlpBase: string;
 }
-// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:366)
-// Response: inline, src/transport/otlp-ingest.rest.ts:369
+// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:364)
+// Response: inline, src/transport/otlp-ingest.rest.ts:367
 type Response = unknown;
 ```
 
 #### `POST /:otlpBase{.+}/v1/traces/` · `ingestOtlpTracesAliasSlash`
 
-Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-ingest.rest.ts:379`.
+Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-ingest.rest.ts:377`.
 
 Answers at `/:otlpBase{.+}/v1/traces/`.
 
 ```typescript
 type Params = z.infer<typeof otlpTraceAliasParamsSchema>; // ../contract/src/features/ingest/otlp-ingest.rest.ts:11
-// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:382)
-// Response: inline, src/transport/otlp-ingest.rest.ts:385
+// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:379)
+// Response: inline, src/transport/otlp-ingest.rest.ts:382
 type Response = unknown;
 ```
 
 #### `POST /v1/traces` · `ingestOtlpTracesRootV1`
 
-Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-ingest.rest.ts:395`.
+Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-ingest.rest.ts:392`.
 
 Answers at `/v1/traces`.
 
 ```typescript
-// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:397)
-// Response: inline, src/transport/otlp-ingest.rest.ts:400
+// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:393)
+// Response: inline, src/transport/otlp-ingest.rest.ts:396
 type Response = unknown;
 ```
 
 #### `POST /v1/traces/` · `ingestOtlpTracesRootV1Slash`
 
-Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-ingest.rest.ts:410`.
+Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-ingest.rest.ts:406`.
 
 Answers at `/v1/traces/`.
 
 ```typescript
-// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:412)
-// Response: inline, src/transport/otlp-ingest.rest.ts:415
+// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:407)
+// Response: inline, src/transport/otlp-ingest.rest.ts:410
 type Response = unknown;
 ```
 
@@ -1333,7 +1333,7 @@ Permission `traces:create`. Declared at `src/transport/tracked-event.rest.ts:48`
 Answers at `/api/events/track`, `/api/v1/events/track`; also, undocumented, `/api/events/2026-08-07/track`, `/api/v1/events/2026-08-07/track`, `/api/events/latest/track`, `/api/v1/events/latest/track`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/tracked-event.rest.ts:50)
+// Rawbody: "text" (inline, src/transport/tracked-event.rest.ts:49)
 // Response: trackEventResponseSchema, ../contract/src/trace-rest.schemas.ts:230
 interface Response {
   message: "Event tracked";
@@ -1344,7 +1344,7 @@ interface Response {
 
 |             |                                          |
 | ----------- | ---------------------------------------- |
-| Declared at | `src/transport/tracked-event.rest.ts:83` |
+| Declared at | `src/transport/tracked-event.rest.ts:82` |
 | Base URL    | none: each route's path is its address   |
 | Addressing  | literal                                  |
 | Credential  | project                                  |
@@ -1353,12 +1353,12 @@ interface Response {
 
 Track an event (legacy path)
 
-Permission `traces:create`. Declared at `src/transport/tracked-event.rest.ts:88`.
+Permission `traces:create`. Declared at `src/transport/tracked-event.rest.ts:87`.
 
 Answers at `/api/track_event`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/tracked-event.rest.ts:90)
+// Rawbody: "text" (inline, src/transport/tracked-event.rest.ts:88)
 type Response = z.infer<typeof trackEventResponseSchema>; // ../contract/src/trace-rest.schemas.ts:230
 ```
 
@@ -2005,20 +2005,22 @@ Declared at `src/eventing/trace-processing-projections.pipeline.ts:104`. Events:
 
 ### Pipeline `trace_project_milestones` (aggregate `trace_project_milestone`)
 
-Declared at `src/eventing/trace-project-milestones.pipeline.ts:21`. Events: `firstTraceRecordedEventSchema`, `traceReceivedEventSchema`.
+Declared at `src/eventing/trace-project-milestones.pipeline.ts:22`. Events: `firstTraceRecordedEventSchema`, `traceReceivedEventSchema`.
 
-| Kind    | Name                  | Handles | Declared at                                            |
-| ------- | --------------------- | ------- | ------------------------------------------------------ |
-| command | `recordFirstTrace`    | –       | `src/eventing/trace-project-milestones.pipeline.ts:26` |
-| command | `recordTraceReceived` | –       | `src/eventing/trace-project-milestones.pipeline.ts:27` |
+| Kind      | Name                  | Handles | Declared at                                            |
+| --------- | --------------------- | ------- | ------------------------------------------------------ |
+| command   | `recordFirstTrace`    | –       | `src/eventing/trace-project-milestones.pipeline.ts:27` |
+| command   | `recordTraceReceived` | –       | `src/eventing/trace-project-milestones.pipeline.ts:28` |
+| retention | `≈ retention`         | –       | `src/eventing/trace-project-milestones.pipeline.ts:29` |
 
 ### Pipeline `trace_collector_evaluations` (aggregate `trace_collector_evaluation`)
 
-Declared at `src/features/ingestion/eventing/trace-collector-evaluations.pipeline.ts:17`. Events: `collectorEvaluationReceivedEventSchema`.
+Declared at `src/features/ingestion/eventing/trace-collector-evaluations.pipeline.ts:18`. Events: `collectorEvaluationReceivedEventSchema`.
 
-| Kind    | Name                        | Handles | Declared at                                                                  |
-| ------- | --------------------------- | ------- | ---------------------------------------------------------------------------- |
-| command | `recordCollectorEvaluation` | –       | `src/features/ingestion/eventing/trace-collector-evaluations.pipeline.ts:22` |
+| Kind      | Name                        | Handles | Declared at                                                                  |
+| --------- | --------------------------- | ------- | ---------------------------------------------------------------------------- |
+| command   | `recordCollectorEvaluation` | –       | `src/features/ingestion/eventing/trace-collector-evaluations.pipeline.ts:23` |
+| retention | `≈ retention`               | –       | `src/features/ingestion/eventing/trace-collector-evaluations.pipeline.ts:24` |
 
 ### Pipeline `trace_ingest_source_billing` (aggregate `global`)
 

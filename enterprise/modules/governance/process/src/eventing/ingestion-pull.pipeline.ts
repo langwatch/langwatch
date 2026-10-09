@@ -28,6 +28,7 @@ import {
   type EventingSetup,
   type Projection,
   type RegisteredCommand,
+  type RetentionPolicyResolver,
   type StateProjectionStore,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
@@ -55,6 +56,8 @@ type IngestionPullEventingAdapterOptions = {
   runStatusStore: StateProjectionStore<IngestionPullRunStatusData>;
   /** Absent until a process composes the pull runner; commands and run status still land. */
   process?: IngestionPullProcess;
+  /** Each tenant's retention, stamped on the source's event rows. */
+  retention?: RetentionPolicyResolver | undefined;
 };
 
 export type IngestionPullDefinition = StaticPipelineDefinition<
@@ -130,6 +133,7 @@ export class IngestionPullEventingAdapter {
       .withCommand("requestPeopleListing", RequestIngestionPullPeopleListingCommand)
       .withCommand("recordPeopleListed", RecordIngestionPullPeopleListedCommand)
       .withCommand("recordPeopleListingRefused", RecordIngestionPullPeopleListingRefusedCommand);
+    if (this.options.retention) pipeline.withRetention(this.options.retention);
     if (this.options.process) {
       pipeline.withProcessManager(
         INGESTION_PULL_PROCESS_NAME,

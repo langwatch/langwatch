@@ -12,13 +12,14 @@ import (
 
 const usage = "usage: seedgen plan|run [--size tiny|small|medium|large] [--spans N] [--days D] " +
 	"[--persona startup,enterprise,gateway,agent-eval|all] [--private N] [--seed S] [--anchor RFC3339] " +
-	"[--shape saas|sh-licensed|sh-free] [--dry-run]\n       seedgen coverage --static [--manifest FILE] [--json]"
+	"[--shape saas|sh-licensed|sh-free] [--dry-run]\n" +
+	"       run only: [--executor task|door] [--app URL] [--into ORG_ID/PROJECT_ID] [--run-dir DIR] [--resume]\n       seedgen coverage --static [--manifest FILE] [--json]"
 
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
 }
 
-// run exits 0 done, 1 a check failed, 2 refused before writing (design §9.2).
+// run exits 0 done, 1 a check failed, 2 refused before writing, 4 stalled (design §5.4, §9.2).
 func run(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
 		_, _ = fmt.Fprintln(stderr, usage)
@@ -32,7 +33,15 @@ func run(args []string, stdout, stderr io.Writer) int {
 		_, _ = fmt.Fprintf(stderr, "seedgen: unknown command %q\n%s\n", args[0], usage)
 		return 2
 	}
-	flags, err := seedgen.ParseFlags(args[1:], time.Now().UTC().Truncate(time.Hour))
+	options, rest, err := parseRunOptions(args[1:])
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "seedgen %s: %v\n", args[0], err)
+		return 2
+	}
+	flags, err := seedgen.ParseFlags(rest, time.Now().UTC().Truncate(time.Hour))
+	if err == nil && options.resume {
+		flags, err = resumedFlags(options.runDir)
+	}
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "seedgen %s: %v\n", args[0], err)
 		return 2
@@ -43,8 +52,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 	if args[0] == "run" && !flags.DryRun {
-		_, _ = fmt.Fprintln(stderr, "seedgen run: the executors are not built yet (SG5); use --dry-run")
-		return 2
+		return runSeed(options, plan, streams{stdout, stderr})
 	}
 	_, _ = fmt.Fprintf(stdout, "run %s, recipe %s, anchor %s, seed %d\n", plan.Run, seedgen.Recipe,
 		flags.Anchor.Format(time.RFC3339), flags.Seed)

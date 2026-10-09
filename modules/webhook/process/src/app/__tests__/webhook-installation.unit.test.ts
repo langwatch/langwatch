@@ -3,6 +3,7 @@
  * The feature installs: a memory-tier process gets a working `WebhookApi` over installer-built
  * repositories, with no repository class or tier named here.
  */
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import { createApp } from "@langwatch/process";
@@ -49,6 +50,7 @@ function process(role: "api" | "worker", plan: Plan = entitledPlan) {
     })
     .withStores(memoryStores())
     .provide({
+      "data-retention": createApiFixture<DataRetentionApi>({}),
       entitlement: createApiFixture<EntitlementApi>({
         getActivePlan: async () => plan,
         requestBound: async () => 10,

@@ -1,5 +1,5 @@
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
-import type { EventingCommands } from "@langwatch/eventing";
+import type { EventingCommands, RetentionPolicyResolver } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
@@ -13,14 +13,16 @@ const logger = createLogger("langwatch:evaluation:lifecycle");
  * one settled. Nurturing names the admin and counts them from its own side (§9).
  */
 export class EvaluationLifecycleService {
-  readonly pipeline: EvaluationLifecyclePipeline = buildEvaluationLifecyclePipeline();
+  readonly pipeline: EvaluationLifecyclePipeline;
   #commands: EventingCommands<EvaluationLifecyclePipeline> | undefined;
 
-  static create(): EvaluationLifecycleService {
-    return new EvaluationLifecycleService();
+  static create(input: { retention?: RetentionPolicyResolver } = {}): EvaluationLifecycleService {
+    return new EvaluationLifecycleService(input.retention);
   }
 
-  private constructor() {}
+  private constructor(retention: RetentionPolicyResolver | undefined) {
+    this.pipeline = buildEvaluationLifecyclePipeline(retention);
+  }
 
   /** Binds the lifecycle pipeline's own senders. */
   connect(commands: EventingCommands<EvaluationLifecyclePipeline>): void {
