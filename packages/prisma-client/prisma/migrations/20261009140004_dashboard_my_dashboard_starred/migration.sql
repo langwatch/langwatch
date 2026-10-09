@@ -25,4 +25,5 @@ WHERE d."name" = 'My dashboard'
     FROM "DashboardFavourite" AS f
     WHERE f."userId" = d."createdById"
       AND f."dashboardId" = d."id"
-  );
+  )
+ON CONFLICT DO NOTHING;

@@ -1,7 +1,7 @@
 -- A member's starred dashboards, in their own order within a project.
 -- Additive and standalone: no foreign key (per the database rule), so the
 -- dashboard service removes a board's favourites when it deletes the board.
-CREATE TABLE "DashboardFavourite" (
+CREATE TABLE IF NOT EXISTS "DashboardFavourite" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
     "dashboardId" TEXT NOT NULL,
@@ -12,8 +12,8 @@ CREATE TABLE "DashboardFavourite" (
     CONSTRAINT "DashboardFavourite_pkey" PRIMARY KEY ("id")
 );
 
-CREATE UNIQUE INDEX "DashboardFavourite_userId_dashboardId_key" ON "DashboardFavourite"("userId", "dashboardId");
+CREATE UNIQUE INDEX IF NOT EXISTS "DashboardFavourite_userId_dashboardId_key" ON "DashboardFavourite"("userId", "dashboardId");
 
-CREATE INDEX "DashboardFavourite_userId_projectId_position_idx" ON "DashboardFavourite"("userId", "projectId", "position");
+CREATE INDEX IF NOT EXISTS "DashboardFavourite_userId_projectId_position_idx" ON "DashboardFavourite"("userId", "projectId", "position");
 
-CREATE INDEX "DashboardFavourite_dashboardId_idx" ON "DashboardFavourite"("dashboardId");
+CREATE INDEX IF NOT EXISTS "DashboardFavourite_dashboardId_idx" ON "DashboardFavourite"("dashboardId");
