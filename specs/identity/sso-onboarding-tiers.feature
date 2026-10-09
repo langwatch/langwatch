@@ -71,7 +71,7 @@ Feature: Enterprise single sign-on onboarding - three tiers, in priority order
   # free-text single sign-on fields on the organization record with the
   # connection itself. Tiers 2 and 3 extend organization Settings.
   #
-  # Gated per organization by SELF_SERVE_SSO. Rollback is the flag: the
+  # Gated per organization by SELF_SERVE_SSO, on by default. Rollback is the flag: the
   # surfaces are additive and the commands underneath them are D04's.
 
   Background:
