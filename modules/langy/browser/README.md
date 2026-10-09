@@ -23,7 +23,7 @@ None.
 ## Calls
 
 - `withApi(langyApi)`, tRPC contracts: –.
-- Client packages (package.json): `@langwatch/langy-client`, `@langwatch/model-provider-client`, `@langwatch/onboarding-client`.
+- Client packages (package.json): `@langwatch/feature-flag-client`, `@langwatch/github-client`, `@langwatch/langy-client`, `@langwatch/model-provider-client`, `@langwatch/onboarding-client`.
 - Lends: `GuidedOnboardingToken`.
 - Host APIs it requires: `LangyHostApi`.
 

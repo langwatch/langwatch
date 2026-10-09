@@ -6,13 +6,13 @@ The server half of [ops](../README.md). Platform administration for every deploy
 
 ## Installation
 
-`defineProcessModule("ops").withRepositories(opsRepositories).withChannels(opsChannels).withApi(OpsModule).withTransports(adminRest, opsBugReportRest, opsClickHouseExplainRest, opsTrpcTransport, opsUpgradeTrpcTransport, opsBugReportTrpcTransport, checkupTrpcTransport, checkupRest).withTransportFacts(…).withEventing(usageReportEventing).withEventing(anomalyDetectionEventing).withEventing(storageStatsEventing).withEventing(groupQueueReaperEventing).withEventing(upgradeAlertsEventing).withEventing(projectionReplayEventing).withEventing(systemMigrationsEventing).withEventing(platformOperatorSeedEventing).withTasks(…)`, `src/ops.module.ts:30`.
+`defineProcessModule("ops").withRepositories(opsRepositories).withChannels(opsChannels).withApi(OpsModule).withTransports(adminRest, opsBugReportRest, opsClickHouseExplainRest, opsTrpcTransport, opsUpgradeTrpcTransport, opsBugReportTrpcTransport, checkupTrpcTransport, checkupRest).withTransportFacts(…).withEventing(usageReportEventing).withEventing(anomalyDetectionEventing).withEventing(storageStatsEventing).withEventing(groupQueueReaperEventing).withEventing(upgradeAlertsEventing).withEventing(projectionReplayEventing).withEventing(systemMigrationsEventing).withEventing(platformOperatorSeedEventing).withTasks(…).withMigrations(…)`, `src/ops.module.ts:36`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
 ## Module API (`OpsApi`)
 
-Peers call these through the token, declared at `../contract/src/ops.api.ts:419`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/ops.api.ts:422`; nothing else in this package is public.
 
 #### `startAdminImpersonation`
 
@@ -864,6 +864,20 @@ Refuses with `upgrade_not_found` when the ledger holds no such run.
 
 ```typescript
 getUpgradeRun(input: OpsUpgradeIdInput): Promise<OpsUpgradeRun>;
+```
+
+#### `previewUpgrade`
+
+The plan narrowed to `to`, beside the preflight; `upgrade_plan_unavailable` when unwired.
+
+```typescript
+previewUpgrade(input: OpsUpgradePreviewInput): Promise<OpsUpgradePreview>;
+```
+
+#### `listUpgradeTargets`
+
+```typescript
+listUpgradeTargets(): Promise<OpsUpgradeTargetSummary[]>;
 ```
 
 #### `retryUpgradeStep`
@@ -2155,7 +2169,7 @@ interface Output {
 
 ### `ops.upgrade`
 
-Contract `../contract/src/features/migrations/ops-upgrade.ts:177`, router `src/transport/ops-upgrade.trpc.ts:12`.
+Contract `../contract/src/features/migrations/ops-upgrade.ts:244`, router `src/transport/ops-upgrade.trpc.ts:12`.
 
 | Procedure                                               | Kind     | Gate                             | Input                                             | Output                                |
 | ------------------------------------------------------- | -------- | -------------------------------- | ------------------------------------------------- | ------------------------------------- |
@@ -2165,6 +2179,8 @@ Contract `../contract/src/features/migrations/ops-upgrade.ts:177`, router `src/t
 | `ops.upgrade.getStep`                                   | query    | Platform permission `ops:view`   | `opsUpgradeIdInputSchema`                         | `opsUpgradeStepDetailSchema`          |
 | `ops.upgrade.listRuns`                                  | query    | Platform permission `ops:view`   | `opsUpgradeListRunsInputSchema`                   | `opsUpgradeRunPageSchema`             |
 | `ops.upgrade.getRun`                                    | query    | Platform permission `ops:view`   | `opsUpgradeIdInputSchema`                         | `opsUpgradeRunSchema`                 |
+| `ops.upgrade.preview`                                   | query    | Platform permission `ops:view`   | `opsUpgradePreviewInputSchema`                    | `opsUpgradePreviewSchema`             |
+| `ops.upgrade.listTargets`                               | query    | Platform permission `ops:view`   | inline                                            | inline                                |
 | `ops.upgrade.retryStep`                                 | mutation | Platform permission `ops:manage` | `opsUpgradeIdInputSchema`                         | `opsUpgradeStepDetailSchema`          |
 | `ops.upgrade.listSystemMigrations`                      | query    | Platform permission `ops:view`   | inline                                            | inline                                |
 | `ops.upgrade.listMigrationEnrollments`                  | query    | Platform permission `ops:view`   | inline                                            | `opsMigrationEnrollmentListingSchema` |
@@ -2179,14 +2195,14 @@ Contract `../contract/src/features/migrations/ops-upgrade.ts:177`, router `src/t
 
 ```typescript
 // ops.upgrade.status
-// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:180
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:247
 type Input = unknown;
 type Output = z.infer<typeof opsUpgradeStatusSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:62
 
 // ops.upgrade.listReleases
-// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:185
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:252
 type Input = unknown;
-// Output: opsUpgradeReleasePageSchema, ../contract/src/features/migrations/ops-upgrade.ts:152
+// Output: opsUpgradeReleasePageSchema, ../contract/src/features/migrations/ops-upgrade.ts:162
 interface Output {
   items: {
     release: string | null;
@@ -2199,28 +2215,28 @@ interface Output {
 }
 
 // ops.upgrade.listSteps
-// Input: opsUpgradeListStepsInputSchema, ../contract/src/features/migrations/ops-upgrade.ts:160
+// Input: opsUpgradeListStepsInputSchema, ../contract/src/features/migrations/ops-upgrade.ts:170
 interface Input {
   release?: string | null;
   mode?: string;
   status?: string;
 }
-type Output = z.infer<typeof opsUpgradeStepPageSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:154
+type Output = z.infer<typeof opsUpgradeStepPageSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:164
 
 // ops.upgrade.getStep
-// Input: opsUpgradeIdInputSchema, ../contract/src/features/migrations/ops-upgrade.ts:174
+// Input: opsUpgradeIdInputSchema, ../contract/src/features/migrations/ops-upgrade.ts:184
 interface Input {
   id: string;
 }
-type Output = z.infer<typeof opsUpgradeStepDetailSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:127
+type Output = z.infer<typeof opsUpgradeStepDetailSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:137
 
 // ops.upgrade.listRuns
-// Input: opsUpgradeListRunsInputSchema, ../contract/src/features/migrations/ops-upgrade.ts:167
+// Input: opsUpgradeListRunsInputSchema, ../contract/src/features/migrations/ops-upgrade.ts:177
 interface Input {
   cursor?: string | null;
   limit?: number;
 }
-// Output: opsUpgradeRunPageSchema, ../contract/src/features/migrations/ops-upgrade.ts:156
+// Output: opsUpgradeRunPageSchema, ../contract/src/features/migrations/ops-upgrade.ts:166
 interface Output {
   items: {
     id: string;
@@ -2235,20 +2251,38 @@ interface Output {
 }
 
 // ops.upgrade.getRun
-type Input = z.infer<typeof opsUpgradeIdInputSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:174
-type Output = z.infer<typeof opsUpgradeRunSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:143
+type Input = z.infer<typeof opsUpgradeIdInputSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:184
+type Output = z.infer<typeof opsUpgradeRunSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:153
+
+// ops.upgrade.preview
+// Input: opsUpgradePreviewInputSchema, ../contract/src/features/migrations/ops-upgrade.ts:232
+interface Input {
+  to: string;
+}
+type Output = z.infer<typeof opsUpgradePreviewSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:225
+
+// ops.upgrade.listTargets
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:281
+type Input = unknown;
+// Output: inline, ../contract/src/features/migrations/ops-upgrade.ts:282
+type Output = {
+  target: string;
+  version: string | null;
+  outstanding: number;
+  lastError: string | null;
+}[];
 
 // ops.upgrade.retryStep
-type Input = z.infer<typeof opsUpgradeIdInputSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:174
-type Output = z.infer<typeof opsUpgradeStepDetailSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:127
+type Input = z.infer<typeof opsUpgradeIdInputSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:184
+type Output = z.infer<typeof opsUpgradeStepDetailSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:137
 
 // ops.upgrade.listSystemMigrations
-// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:218
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:295
 type Input = unknown;
-// Output: opsMigrationOverviewSchema.array() (inline, ../contract/src/features/migrations/ops-upgrade.ts:219)
+// Output: opsMigrationOverviewSchema.array() (inline, ../contract/src/features/migrations/ops-upgrade.ts:296)
 
 // ops.upgrade.listMigrationEnrollments
-// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:227
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:304
 type Input = unknown;
 // Output: opsMigrationEnrollmentListingSchema, ../contract/src/features/migrations/ops-system-migration.ts:101
 interface Output {
@@ -2268,7 +2302,7 @@ interface Output {
 interface Input {
   query: string;
 }
-// Output: inline, ../contract/src/features/migrations/ops-upgrade.ts:236
+// Output: inline, ../contract/src/features/migrations/ops-upgrade.ts:313
 type Output = {
   id: string;
   name: string;
@@ -2329,7 +2363,7 @@ interface Output {
 }
 
 // ops.upgrade.runSystemMigrationPass
-// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:279
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:356
 type Input = unknown;
 // Output: opsMigrationPassStartedSchema, ../contract/src/ops.responses.ts:259
 interface Output {
@@ -2442,7 +2476,7 @@ Run by the tasks process, before serve.
 | Task                      | Class                       | Declared at                                    |
 | ------------------------- | --------------------------- | ---------------------------------------------- |
 | `process-manager-purge`   | `ProcessManagerPurgeTask`   | `src/tasks/process-manager-purge.task.ts:135`  |
-| `credentials-reseal`      | `CredentialsResealTask`     | `src/tasks/credentials-reseal.task.ts:257`     |
+| `credentials-reseal`      | `CredentialsResealTask`     | `src/tasks/credentials-reseal.task.ts:273`     |
 | `grant-platform-operator` | `GrantPlatformOperatorTask` | `src/tasks/grant-platform-operator.task.ts:13` |
 | `system-migrations-pass`  | `SystemMigrationsPassTask`  | `src/tasks/system-migrations-pass.task.ts:15`  |
 
@@ -2450,11 +2484,11 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                             | Environment variable                | Declared at                        |
 | ------ | -------------------------------- | ----------------------------------- | ---------------------------------- |
-| secret | `licensePrivateKey`              | `LANGWATCH_LICENSE_PRIVATE_KEY`     | `src/app/ops.app.ts:772`           |
-| secret | `slackBugReportsBotToken`        | `SLACK_BUG_REPORTS_BOT_TOKEN`       | `src/app/ops.app.ts:773`           |
-| secret | `credentials`                    | `CREDENTIALS_SECRET`                | `src/app/ops.app.ts:775`           |
-| secret | `credentialsFallback`            | `NEXTAUTH_SECRET`                   | `src/app/ops.app.ts:776`           |
-| secret | `credentialsPrevious`            | `CREDENTIALS_SECRET_PREVIOUS`       | `src/app/ops.app.ts:777`           |
+| secret | `licensePrivateKey`              | `LANGWATCH_LICENSE_PRIVATE_KEY`     | `src/app/ops.app.ts:773`           |
+| secret | `slackBugReportsBotToken`        | `SLACK_BUG_REPORTS_BOT_TOKEN`       | `src/app/ops.app.ts:774`           |
+| secret | `credentials`                    | `CREDENTIALS_SECRET`                | `src/app/ops.app.ts:776`           |
+| secret | `credentialsFallback`            | `NEXTAUTH_SECRET`                   | `src/app/ops.app.ts:777`           |
+| secret | `credentialsPrevious`            | `CREDENTIALS_SECRET_PREVIOUS`       | `src/app/ops.app.ts:778`           |
 | config | `apiKey`                         | `LANGWATCH_OPS_API_KEY`             | `../contract/src/ops.config.ts:28` |
 | config | `clickhouseOpsUrl`               | `CLICKHOUSE_OPS_URL`                | `../contract/src/ops.config.ts:30` |
 | config | `usageStats.disabled`            | `DISABLE_USAGE_STATS`               | `../contract/src/ops.config.ts:32` |

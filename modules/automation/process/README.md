@@ -6,7 +6,7 @@ The server half of [automation](../README.md). Automations: triggers and their f
 
 ## Installation
 
-`defineProcessModule("automation").withRepositories(automationRepositories).withChannels(automationChannels).withApi(AutomationModule).withTransports(…, automationTrpcTransport, emailSuppressionTrpcTransport, slackAutomationRest, unsubscribeRest).withTasks(…).withMigrations(…).withEventing(automationsEventing)`, `src/automation.module.ts:35`.
+`defineProcessModule("automation").withRepositories(automationRepositories).withChannels(automationChannels).withApi(AutomationModule).withTransports(…, automationTrpcTransport, emailSuppressionTrpcTransport, slackAutomationRest, unsubscribeRest).withTasks(…).withMigrations(…).withEventing(automationsEventing)`, `src/automation.module.ts:21`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Callable automation capability shared by transports and process peers.
 
-Peers call these through the token, declared at `../contract/src/automation.api.ts:71`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/automation.api.ts:70`; nothing else in this package is public.
 
 #### `getAllForProject`
 
@@ -134,14 +134,6 @@ getRecentWebhookDeliveries(input: { projectId: string; triggerId: string; limit:
 
 ```typescript
 getReportSchedules(input: { projectId: string }): Promise<ReportSchedule[]>;
-```
-
-#### `registeredMigrations`
-
-The ORGANIZATION-rooted migrations automation registers (the Slack connection move).
-
-```typescript
-registeredMigrations(): readonly SystemMigration[];
 ```
 
 #### `listSlackChannels`
@@ -688,7 +680,7 @@ interface Input {
   projectId: string;
   triggerId: string;
 }
-// Output: automationDeletedSchema, ../contract/src/automation.responses.ts:35
+// Output: automationDeletedSchema, ../contract/src/automation.responses.ts:46
 interface Output {
   success: boolean;
 }
@@ -702,14 +694,14 @@ interface Input {
 
 // automation.getDailyCap
 type Input = z.infer<typeof automationApiProjectScopeSchema>; // ../contract/src/automation.trpc-schemas.ts:22
-// Output: automationDailyCapSchema, ../contract/src/automation.responses.ts:25
+// Output: automationDailyCapSchema, ../contract/src/automation.responses.ts:36
 interface Output {
   cap: number;
 }
 
 // automation.getDailyCapStatus
 type Input = z.infer<typeof automationApiProjectScopeSchema>; // ../contract/src/automation.trpc-schemas.ts:22
-// Output: automationDailyCapStatusSchema, ../contract/src/automation.responses.ts:28
+// Output: automationDailyCapStatusSchema, ../contract/src/automation.responses.ts:39
 interface Output {
   cap: number;
   counts: Record<
@@ -832,7 +824,7 @@ interface Input {
   projectId: string;
   slackIntegrationId: string;
 }
-// Output: slackChannelListingSchema, ../contract/src/automation.responses.ts:52
+// Output: slackChannelListingSchema, ../contract/src/automation.responses.ts:63
 interface Output {
   channels: {
     id: string;
@@ -967,10 +959,9 @@ Declared at `src/eventing/automation.pipeline.ts:182`. Events: `triggerMatchReco
 
 Run by the tasks process, before serve.
 
-| Task                       | Class                        | Declared at                                     |
-| -------------------------- | ---------------------------- | ----------------------------------------------- |
-| `slack-alert`              | `SlackAlertTask`             | `src/tasks/slack-alert.task.ts:9`               |
-| `report-schedule-backfill` | `ReportScheduleBackfillTask` | `src/tasks/report-schedule-backfill.task.ts:12` |
+| Task          | Class            | Declared at                       |
+| ------------- | ---------------- | --------------------------------- |
+| `slack-alert` | `SlackAlertTask` | `src/tasks/slack-alert.task.ts:9` |
 
 ## Configuration
 

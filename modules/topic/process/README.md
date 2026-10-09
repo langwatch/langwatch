@@ -6,7 +6,7 @@ The server half of [topic](../README.md). A project's conversation topics, and w
 
 ## Installation
 
-`defineProcessModule("topic").withRepositories(topicRepositories).withApi(TopicModule).withTransports(topicTrpcTransport).withEventing(topicClusteringEventing).withTasks(…)`, `src/topic.module.ts:12`.
+`defineProcessModule("topic").withRepositories(topicRepositories).withApi(TopicModule).withTransports(topicTrpcTransport).withEventing(topicClusteringEventing).withTasks(…).withMigrations(…)`, `src/topic.module.ts:11`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -81,7 +81,7 @@ type Output = {
 }[];
 
 // topics.getTopicCounts
-type Input = z.infer<typeof traceFilterInputSchema>; // ../../trace/contract/src/traces.trpc.ts:87
+type Input = z.infer<typeof traceFilterInputSchema>; // ../../trace/contract/src/traces.trpc.ts:90
 type Output = z.infer<typeof namedTopicCountsSchema>; // ../contract/src/topic.ts:88
 
 // topics.getClusteringStatus

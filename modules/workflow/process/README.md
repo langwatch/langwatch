@@ -6,7 +6,7 @@ The server half of [workflow](../README.md). Workflows: definitions, graph versi
 
 ## Installation
 
-`defineProcessModule("workflow").withRepositories(workflowRepositories).withChannels(workflowChannels).withApi(WorkflowModule).withTransports(…, workflowTrpcTransport, workflowOptimizationTrpcTransport, workflowRunRest, workflowStudioRest, workflowExecuteSyncRest).withEventing(workflowNlpLambdaCleanupEventing).withEventing(workflowLifecycleEventing).withEventing(workflowAgentArchiveCascadeEventing).withTasks(…).withMigrations(…).withTransportFacts(…)`, `src/workflow.module.ts:25`.
+`defineProcessModule("workflow").withRepositories(workflowRepositories).withChannels(workflowChannels).withApi(WorkflowModule).withTransports(…, workflowTrpcTransport, workflowOptimizationTrpcTransport, workflowRunRest, workflowStudioRest, workflowExecuteSyncRest).withEventing(workflowNlpLambdaCleanupEventing).withEventing(workflowLifecycleEventing).withEventing(workflowAgentArchiveCascadeEventing).withMigrations(…).withTransportFacts(…)`, `src/workflow.module.ts:30`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -869,20 +869,13 @@ Declared at `src/eventing/workflow-nlp-lambda-cleanup.pipeline.ts:31`.
 | --------------- | -------------------------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
 | process manager | `workflowNlpLambdaCleanup` | every 1 d (`NLP_LAMBDA_CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `sweep` (outbox) | `src/eventing/workflow-nlp-lambda-cleanup.pipeline.ts:36` |
 
-### Tasks
-
-Run by the tasks process, before serve.
-
-| Task                                   | Class                                 | Declared at                                               |
-| -------------------------------------- | ------------------------------------- | --------------------------------------------------------- |
-| `backfill-http-credentials-to-secrets` | `WorkflowHttpCredentialsBackfillTask` | `src/tasks/workflow-http-credentials-backfill.task.ts:27` |
-
 ## Configuration
 
 | Kind   | Leaf                         | Environment variable                      | Declared at                             |
 | ------ | ---------------------------- | ----------------------------------------- | --------------------------------------- |
-| secret | `nlpLambdaFleet`             | `LANGWATCH_NLP_LAMBDA_CONFIG`             | `src/app/workflow.app.ts:493`           |
-| secret | `nlpInternal`                | `LANGWATCH_NLP_INTERNAL_SECRET`           | `src/app/workflow.app.ts:494`           |
+| secret | `nlpLambdaFleet`             | `LANGWATCH_NLP_LAMBDA_CONFIG`             | `src/app/workflow.app.ts:498`           |
+| secret | `nlpInternal`                | `LANGWATCH_NLP_INTERNAL_SECRET`           | `src/app/workflow.app.ts:499`           |
+| secret | `s3KeySalt`                  | `S3_KEY_SALT`                             | `src/app/workflow.app.ts:500`           |
 | config | `nlpServiceUrl`              | `LANGWATCH_NLP_SERVICE`                   | `../contract/src/workflow.config.ts:79` |
 | config | `stagingThresholdBytes`      | `LANGEVALS_STAGING_THRESHOLD_BYTES`       | `../contract/src/workflow.config.ts:81` |
 | config | `stagingTtlSeconds`          | `LANGEVALS_STAGING_TTL_SECONDS`           | `../contract/src/workflow.config.ts:82` |

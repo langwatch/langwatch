@@ -6,7 +6,7 @@ The server half of [annotation](../README.md). Annotations on traces: comments, 
 
 ## Installation
 
-`defineProcessModule("annotation").withRepositories(annotationRepositories).withApi(AnnotationModule).withTransports(annotationRest, annotationTrpcTransport, annotationScoreTrpcTransport).withEventing(annotationLifecycleEventing).withTasks(…)`, `src/annotation.module.ts:18`.
+`defineProcessModule("annotation").withRepositories(annotationRepositories).withApi(AnnotationModule).withTransports(annotationRest, annotationTrpcTransport, annotationScoreTrpcTransport).withEventing(annotationLifecycleEventing).withMigrations(…).withTasks(…)`, `src/annotation.module.ts:20`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -606,7 +606,7 @@ Run by the tasks process, before serve.
 
 | Task                                 | Class                         | Declared at                                      |
 | ------------------------------------ | ----------------------------- | ------------------------------------------------ |
-| `backfill-annotations-to-clickhouse` | `AnnotationTraceBackfillTask` | `src/tasks/annotation-trace-backfill.task.ts:24` |
+| `backfill-annotations-to-clickhouse` | `AnnotationTraceBackfillTask` | `src/tasks/annotation-trace-backfill.task.ts:12` |
 
 ## Configuration
 

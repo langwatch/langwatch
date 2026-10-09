@@ -6,7 +6,7 @@ The server half of [dataset](../README.md). Datasets and their records: creating
 
 ## Installation
 
-`defineProcessModule("dataset").withRepositories(datasetRepositories).withApi(DatasetModule).withTransports(…, datasetTrpcTransport, datasetRecordTrpcTransport).withEventing(datasetNormalizationEventing).withMigrations(…).withTasks(…)`, `src/dataset.module.ts:18`.
+`defineProcessModule("dataset").withRepositories(datasetRepositories).withApi(DatasetModule).withTransports(…, datasetTrpcTransport, datasetRecordTrpcTransport).withEventing(datasetNormalizationEventing).withMigrations(…)`, `src/dataset.module.ts:17`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -865,14 +865,6 @@ Declared at `src/eventing/dataset-normalization.pipeline.ts:28`.
 | ------------ | ---------------------------------------------------------------------------------------------- | ------- | --------------------------------------------------- |
 | command      | –                                                                                              | –       | `src/eventing/dataset-normalization.pipeline.ts:33` |
 | lane aliases | `≈ [ { from: "trace_processing:job:datasetNormalize", to: { jobType: "command", lane: "datas…` | –       | `src/eventing/dataset-normalization.pipeline.ts:40` |
-
-### Tasks
-
-Run by the tasks process, before serve.
-
-| Task                       | Class                        | Declared at                                     |
-| -------------------------- | ---------------------------- | ----------------------------------------------- |
-| `dataset-content-backfill` | `DatasetContentBackfillTask` | `src/tasks/dataset-content-backfill.task.ts:46` |
 
 ## Configuration
 

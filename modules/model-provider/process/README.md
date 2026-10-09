@@ -6,7 +6,7 @@ The server half of [model-provider](../README.md). Model providers: the provider
 
 ## Installation
 
-`defineProcessModule("model-provider").withRepositories(modelProviderRepositories).withChannels(modelProviderChannels).withApi(ModelProviderModule).withTransports(modelProviderRest, modelDefaultsRest, playgroundRest, modelProviderTrpcTransport, llmModelCostTrpcTransport, translateTrpcTransport).withTransportFacts(…).withTasks(…)`, `src/model-provider.module.ts:29`.
+`defineProcessModule("model-provider").withRepositories(modelProviderRepositories).withChannels(modelProviderChannels).withApi(ModelProviderModule).withTransports(modelProviderRest, modelDefaultsRest, playgroundRest, modelProviderTrpcTransport, llmModelCostTrpcTransport, translateTrpcTransport).withTransportFacts(…).withTasks(…).withMigrations(…)`, `src/model-provider.module.ts:30`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -510,13 +510,13 @@ type Response = unknown;
 
 Contract `../contract/src/llm-model-cost.trpc.ts:19`, router `src/transport/llm-model-cost.trpc.ts:25`.
 
-| Procedure                           | Kind     | Gate                                                                                                                                                                                                                | Input                                 | Output                               |
-| ----------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- | ------------------------------------ |
-| `llmModelCost.getAllForProject`     | query    | Permission `project:view`                                                                                                                                                                                           | `modelCostProjectTrpcInputSchema`     | inline                               |
-| `llmModelCost.createOrUpdate`       | mutation | Service-authorized: COST_WRITE_PERMISSIONS; assertCanManageScope: manage is required on the written scope, which defaults to this project; the scope then resolves to a single organization the cost is anchored to | `modelCostWriteTrpcInputSchema`       | `modelCostSchema`                    |
-| `llmModelCost.delete`               | mutation | Service-authorized: COST_WRITE_PERMISSIONS; not trusted — the scope is derived from the stored row and assertCanManageScope runs against that scope, never the caller-supplied projectId                            | `modelCostDeleteTrpcInputSchema`      | –                                    |
-| `llmModelCost.getModelLimits`       | query    | Permission `project:view`                                                                                                                                                                                           | `modelCostModelLimitsTrpcInputSchema` | inline                               |
-| `llmModelCost.previewMatchingSpans` | query    | Permission `traces:view`                                                                                                                                                                                            | `modelCostPreviewTrpcInputSchema`     | `costRuleMatchingSpansPreviewSchema` |
+| Procedure                           | Kind     | Gate                                                                                                                                                                                                   | Input                                 | Output                               |
+| ----------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------- | ------------------------------------ |
+| `llmModelCost.getAllForProject`     | query    | Permission `project:view`                                                                                                                                                                              | `modelCostProjectTrpcInputSchema`     | inline                               |
+| `llmModelCost.createOrUpdate`       | mutation | Service-authorized: COST_WRITE_PERMISSIONS; manage is asked on the written scope (default this project), known only after parsing; that scope resolves to the one organization the cost is anchored to | `modelCostWriteTrpcInputSchema`       | `modelCostSchema`                    |
+| `llmModelCost.delete`               | mutation | Service-authorized: COST_WRITE_PERMISSIONS; the scope is the stored row's, never the caller's projectId; manage is asked on it                                                                         | `modelCostDeleteTrpcInputSchema`      | –                                    |
+| `llmModelCost.getModelLimits`       | query    | Permission `project:view`                                                                                                                                                                              | `modelCostModelLimitsTrpcInputSchema` | inline                               |
+| `llmModelCost.previewMatchingSpans` | query    | Permission `traces:view`                                                                                                                                                                               | `modelCostPreviewTrpcInputSchema`     | `costRuleMatchingSpansPreviewSchema` |
 
 ```typescript
 // llmModelCost.getAllForProject
@@ -844,15 +844,14 @@ Run by the tasks process, before serve.
 | Task                                   | Class                                  | Declared at                                                 |
 | -------------------------------------- | -------------------------------------- | ----------------------------------------------------------- |
 | `model-registry-sync`                  | `ModelRegistrySyncTask`                | `src/tasks/model-registry-sync.task.ts:358`                 |
-| `model-provider-migrate-credentials`   | `ModelProviderCredentialsMigrateTask`  | `src/tasks/model-provider-credentials-migrate.task.ts:49`   |
 | `model-provider-migrate-custom-models` | `ModelProviderCustomModelsMigrateTask` | `src/tasks/model-provider-custom-models-migrate.task.ts:62` |
 
 ## Configuration
 
 | Kind   | Leaf                                         | Environment variable                           | Declared at                                   |
 | ------ | -------------------------------------------- | ---------------------------------------------- | --------------------------------------------- |
-| secret | `...ModelProviderModule.platformCredentials` | ≈ `...ModelProviderModule.platformCredentials` | `src/app/model-provider.app.ts:256`           |
-| secret | `...ModelProviderModule.operationalSecrets`  | ≈ `...ModelProviderModule.operationalSecrets`  | `src/app/model-provider.app.ts:257`           |
+| secret | `...ModelProviderModule.platformCredentials` | ≈ `...ModelProviderModule.platformCredentials` | `src/app/model-provider.app.ts:254`           |
+| secret | `...ModelProviderModule.operationalSecrets`  | ≈ `...ModelProviderModule.operationalSecrets`  | `src/app/model-provider.app.ts:255`           |
 | config | `blockLocalHttpCalls`                        | `BLOCK_LOCAL_HTTP_CALLS`                       | `../contract/src/model-provider.config.ts:20` |
 | config | `allowedProxyHosts`                          | `ALLOWED_PROXY_HOSTS`                          | `../contract/src/model-provider.config.ts:21` |
 | config | `defaultModel`                               | `LANGWATCH_DEFAULT_MODEL`                      | `../contract/src/model-provider.config.ts:22` |

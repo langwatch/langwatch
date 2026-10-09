@@ -10,7 +10,7 @@ Webhook endpoints: creating and managing them, signing secrets, and delivering e
 | -------------- | ----------------------------------------------------------------------------------------------------- |
 | Classification | core (`modules/catalogue.json`)                                                                       |
 | Subjects       | webhook                                                                                               |
-| Halves         | [contract](contract) · [process](process/README.md)                                                   |
+| Halves         | [contract](contract) · [process](process/README.md) · [client](client)                                |
 | Api token      | `WebhookApi` = `moduleApi<WebhookApi>()("webhook")`, `contract/src/webhook.api.ts:89` (21 operations) |
 | Other token    | `WebhookSpendReplayApi`, `process/src/transport/webhook-spend-replay.rest.ts:27`                      |
 | Installed by   | api, worker, tasks (process)                                                                          |
@@ -19,8 +19,8 @@ Webhook endpoints: creating and managing them, signing secrets, and delivering e
 
 | Kind            | Name                                                                                                                                                                                     | Declared at                                                                 |
 | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| Postgres table  | `WebhookEndpoint`                                                                                                                                                                        | `process/src/repositories/prisma/prisma.webhook-endpoint.repository.ts:165` |
-| Postgres table  | `WebhookEndpointDelivery`                                                                                                                                                                | `process/src/repositories/prisma/prisma.webhook-endpoint.repository.ts:165` |
+| Postgres table  | `WebhookEndpoint`                                                                                                                                                                        | `process/src/repositories/prisma/prisma.webhook-endpoint.repository.ts:169` |
+| Postgres table  | `WebhookEndpointDelivery`                                                                                                                                                                | `process/src/repositories/prisma/prisma.webhook-endpoint.repository.ts:169` |
 | Stores required |                                                                                                                                                                                          | `process/src/channels/http/http.webhook.channels.ts:14`                     |
 | Stores required | prisma, encryption, redis, rateLimiter                                                                                                                                                   | `process/src/repositories/prisma/prisma.webhook.repositories.ts:54`         |
 | Config          | `allowInsecureLocalUrls` (WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS), `allowAmbientAwsCredentials` (WEBHOOKS_UNSAFE_ALLOW_AMBIENT_CREDENTIALS), `isSaas` (IS_SAAS), `outboundProxy` (HTTPS_PROXY) | `contract/src/webhook.config.ts:10`                                         |

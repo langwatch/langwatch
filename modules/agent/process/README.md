@@ -6,7 +6,7 @@ The server half of [agent](../README.md). Agents a project builds and runs: thei
 
 ## Installation
 
-`defineProcessModule("agent").withRepositories(agentRepositories).withApi(AgentModule).withTransports(…, …, …, agentLegacyRest, agentTrpcTransport).withEventing(agentLifecycleEventing).withEventing(agentWorkflowFieldsEventing).withTasks(…).withTransportFacts(…)`, `src/agent.module.ts:24`.
+`defineProcessModule("agent").withRepositories(agentRepositories).withApi(AgentModule).withTransports(…, …, …, agentLegacyRest, agentTrpcTransport).withEventing(agentLifecycleEventing).withEventing(agentWorkflowFieldsEventing).withMigrations(…).withTransportFacts(…)`, `src/agent.module.ts:25`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -678,14 +678,6 @@ Declared at `src/eventing/agent-workflow-fields.pipeline.ts:43`.
 | --------------- | ---------------------- | --------------------------------------------------------------------- | --------------------------------------------------- |
 | peer subscriber | `workflowVersionSaved` | `lw.workflow.version_saved` from [workflow](../../workflow/README.md) | `src/eventing/agent-workflow-fields.pipeline.ts:49` |
 | peer subscriber | `workflowArchived`     | `lw.workflow.archived` from [workflow](../../workflow/README.md)      | `src/eventing/agent-workflow-fields.pipeline.ts:62` |
-
-### Tasks
-
-Run by the tasks process, before serve.
-
-| Task                                         | Class                              | Declared at                                            |
-| -------------------------------------------- | ---------------------------------- | ------------------------------------------------------ |
-| `backfill-http-agent-credentials-to-secrets` | `AgentHttpCredentialsBackfillTask` | `src/tasks/agent-http-credentials-backfill.task.ts:16` |
 
 ## Configuration
 

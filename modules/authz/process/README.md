@@ -45,7 +45,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The complete callable authorization boundary. This is deliberately a structural interface: callers can use an installed AuthzModule without receiving its services, repositories, or transport adapters.
 
-Peers call these through the token, declared at `../contract/src/authz.api.ts:45`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/authz.api.ts:46`; nothing else in this package is public.
 
 #### `isDemoProject`
 
@@ -838,7 +838,7 @@ interface Input {
     scopeId: string;
   }[];
 }
-// Output: authzBindingMutationSuccessSchema, ../contract/src/authz.grant-management.ts:190
+// Output: authzBindingMutationSuccessSchema, ../contract/src/authz.grant-management.ts:192
 interface Output {
   success: true;
 }

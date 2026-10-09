@@ -6,7 +6,7 @@ The server half of [instant-eval-judge](../README.md). It keeps the judge's own 
 
 ## Installation
 
-`defineProcessModule("instant-eval-judge").withRepositories(instantEvalJudgeRepositories).withApi(InstantEvalJudgeModule).withEventing(instantEvalJudgeFactsEventing).withEventing(instantEvalJudgeSpendEventing)`, `src/instant-eval-judge.module.ts:16`.
+`defineProcessModule("instant-eval-judge").withRepositories(instantEvalJudgeRepositories).withChannels(instantEvalJudgeChannels).withApi(InstantEvalJudgeModule).withEventing(instantEvalJudgeFactsEventing).withEventing(instantEvalJudgeSpendEventing)`, `src/instant-eval-judge.module.ts:17`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -91,7 +91,7 @@ Declared at `src/eventing/instant-eval-judge-spend.pipeline.ts:41`. Events: `ins
 
 | Kind   | Leaf                    | Environment variable                    | Declared at                                       |
 | ------ | ----------------------- | --------------------------------------- | ------------------------------------------------- |
-| secret | `classifierApiKey`      | `JEV_API_KEY`                           | `src/app/instant-eval-judge.app.ts:59`            |
+| secret | `classifierApiKey`      | `JEV_API_KEY`                           | `src/app/instant-eval-judge.app.ts:61`            |
 | config | `classifierBaseUrl`     | `JEV_BASE_URL`                          | `../contract/src/instant-eval-judge.config.ts:10` |
 | config | `classifierModel`       | `JEV_MODEL`                             | `../contract/src/instant-eval-judge.config.ts:18` |
 | config | `globalTokensPerSecond` | `INSTANT_EVAL_GLOBAL_TOKENS_PER_SECOND` | `../contract/src/instant-eval-judge.config.ts:20` |

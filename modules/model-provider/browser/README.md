@@ -31,7 +31,7 @@ Opened from lists the other modules (and `ui`, the app) whose browser source nam
 ## Calls
 
 - `withApi(modelProviderApi)`, tRPC contracts: `modelProvider.*`.
-- Client packages (package.json): `@langwatch/enterprise-managed-provider-client`, `@langwatch/model-provider-client`.
+- Client packages (package.json): `@langwatch/enterprise-managed-provider-client`, `@langwatch/feature-flag-client`, `@langwatch/model-provider-client`.
 - Lends: `EditModelProviderFormToken`, `ModelDisplayToken`, `ModelSelectorToken`.
 - Host APIs it requires: `ModelProviderHostApi`.
 
