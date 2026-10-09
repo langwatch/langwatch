@@ -200,7 +200,7 @@ type OrganizationMemberWithUser = OrganizationWithMembersAndTheirTeams["members"
 // ---------------------------------------------------------------------------
 
 /** Who a write is attributed to. */
-export interface OrganizationCaller {
+interface OrganizationCaller {
   readonly id: string;
   /** The session's address, where the transport read one; the sign-up policy matches it. */
   readonly email?: string | null;
@@ -209,7 +209,7 @@ export interface OrganizationCaller {
 }
 
 /** What the process composes this feature's application from. */
-export interface ServerOrganizationAppDependencies {
+interface ServerOrganizationAppDependencies {
   organizations: OrganizationEntityService;
   signInPolicies: OrganizationSignInPolicyService;
   membership: OrganizationMembershipService;
@@ -228,7 +228,7 @@ type OrganizationSetup = FeatureSetup<
   OrganizationChannels
 >;
 
-export type OrganizationInfrastructure = Readonly<{
+type OrganizationInfrastructure = Readonly<{
   identities: PersonalWorkspaceIdentity;
   teamIdentities: TeamIdentity;
   groupIdentities: GroupIdentity;

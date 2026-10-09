@@ -6,7 +6,7 @@
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import { MemoryCliDeviceSettlementChannel } from "../../channels/memory/memory.cli-device-settlement.channel.ts";
+import { MemoryCliDeviceSettlementChannel } from "../../../../channels/memory/memory.cli-device-settlement.channel.ts";
 import { CliDeviceApprovalService } from "../cli-device-approval.service.ts";
 import type {
   CliDeviceCodeRecord,

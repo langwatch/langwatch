@@ -16,7 +16,7 @@ import {
   answer,
   type CliDeviceFlowAnswer,
 } from "../rules/cli-device-flow.rules.ts";
-import type { CliAccessProject } from "./api-rest-credentials.service.ts";
+import type { CliAccessProject } from "../../../services/api-rest-credentials.service.ts";
 import type { AuthDirectoryProject } from "./cli-device-directory.service.ts";
 import type { CliDeviceFlowCollaborators } from "./cli-device-flow.service.ts";
 import { type CliRefreshTokenRecord, type CliMintedSession } from "./cli-device-session.service.ts";

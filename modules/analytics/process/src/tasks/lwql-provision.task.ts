@@ -48,7 +48,7 @@ export type LwqlProvisioningDatabase = {
 };
 
 /** The one project read the key-map backfill makes (PO-1). */
-export type LwqlProjectKeys = Pick<ProjectApi, "listLwqlKeys">;
+type LwqlProjectKeys = Pick<ProjectApi, "listLwqlKeys">;
 
 /** Every project's LangWatchQL key, read from the project module a page at a time. */
 async function allLwqlKeys({ projects }: { projects: LwqlProjectKeys }) {

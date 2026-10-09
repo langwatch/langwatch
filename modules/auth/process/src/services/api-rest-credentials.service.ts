@@ -23,6 +23,7 @@ import { classifyForLangy } from "@langwatch/langy-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import { type OrganizationApi } from "@langwatch/organization-contract";
 
+import { CliDeviceSessionService } from "../features/cli-device/services/cli-device-session.service.ts";
 import {
   asked,
   extractApiKeyRequestCredentials,
@@ -33,7 +34,6 @@ import {
   ApiOrganizationCredentialsService,
   type ApiOrganizationCredential,
 } from "./api-organization-credentials.service.ts";
-import { CliDeviceSessionService } from "./cli-device-session.service.ts";
 
 export type ApiProjectCredential = Readonly<{
   project: RestProjectIdentity;

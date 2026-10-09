@@ -23,7 +23,7 @@ export type OrganizationPlanUser = Readonly<{
 }>;
 
 /** What a seat check answers, counts included: the `licenseEnforcement.*` answer. */
-export type OrganizationSeatDecision = LimitCheckResult;
+type OrganizationSeatDecision = LimitCheckResult;
 
 /**
  * The seat and plan gates on a membership write. Deliberately two methods rather than the

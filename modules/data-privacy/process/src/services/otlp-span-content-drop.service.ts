@@ -24,7 +24,7 @@ const EMPTY_DROP_RESULT: SpanContentDropResult = {
   droppedAttributeKeys: [],
 };
 
-export interface OtlpSpanContentDropServiceOptions {
+interface OtlpSpanContentDropServiceOptions {
   /**
    * Resolves the scope's policy. Narrowed to the one question this service
    * asks — `DataPrivacyService` satisfies it, as does the resolution-only

@@ -118,6 +118,16 @@ import {
   type AuthLifecycleDefinition,
   buildAuthLifecyclePipeline,
 } from "../eventing/auth-lifecycle.pipeline.ts";
+import type { CliDeviceApprovalFrame } from "../features/cli-device/services/cli-device-approval.service.ts";
+import { CliDeviceDirectoryService } from "../features/cli-device/services/cli-device-directory.service.ts";
+import {
+  CliDeviceFlowService,
+  type CliBrowserSession,
+  type CliDeviceCodeLookup,
+  type CliDeviceFlowAnswer,
+  type CliDeviceFlowCollaborators,
+} from "../features/cli-device/services/cli-device-flow.service.ts";
+import { CliDeviceSessionService } from "../features/cli-device/services/cli-device-session.service.ts";
 import type { AuthRateLimitRepository } from "../repositories/auth-rate-limit.repository.ts";
 import type { AuthRepositories } from "../repositories/auth.repositories.ts";
 import type { AuthSessionPoll } from "../rules/auth-session-poll.rules.ts";
@@ -136,16 +146,6 @@ import {
 } from "../services/auth-lifecycle-notice.service.ts";
 import { AuthProviderService } from "../services/auth-provider.service.ts";
 import { BrowserSessionService } from "../services/browser-session.service.ts";
-import type { CliDeviceApprovalFrame } from "../services/cli-device-approval.service.ts";
-import { CliDeviceDirectoryService } from "../services/cli-device-directory.service.ts";
-import {
-  CliDeviceFlowService,
-  type CliBrowserSession,
-  type CliDeviceCodeLookup,
-  type CliDeviceFlowAnswer,
-  type CliDeviceFlowCollaborators,
-} from "../services/cli-device-flow.service.ts";
-import { CliDeviceSessionService } from "../services/cli-device-session.service.ts";
 import { CredentialRegistrationService } from "../services/credential-registration.service.ts";
 import { CredentialSignInPolicyService } from "../services/credential-sign-in-policy.service.ts";
 import { FederatedAccountReadsService } from "../services/federated-account-reads.service.ts";

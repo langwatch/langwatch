@@ -8,8 +8,8 @@ import {
 } from "@langwatch/auth-contract";
 import { describe, expect, it } from "vitest";
 
-import { MemoryCliDeviceSettlementChannel } from "../../channels/memory/memory.cli-device-settlement.channel.ts";
-import { MemoryCliDeviceSessionRepository } from "../../repositories/memory/memory.cli-device-session.repository.ts";
+import { MemoryCliDeviceSettlementChannel } from "../../../../channels/memory/memory.cli-device-settlement.channel.ts";
+import { MemoryCliDeviceSessionRepository } from "../../../../repositories/memory/memory.cli-device-session.repository.ts";
 import { CliDeviceSessionService } from "../cli-device-session.service.ts";
 
 function setup({ refreshTokenTtlSeconds }: { refreshTokenTtlSeconds?: number } = {}) {

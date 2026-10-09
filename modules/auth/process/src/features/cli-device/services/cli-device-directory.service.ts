@@ -2,7 +2,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { OrganizationNotFoundError, type OrganizationApi } from "@langwatch/organization-contract";
 import { type Project, ProjectNotFoundError } from "@langwatch/project-contract";
 
-import type { AuthDirectoryRepository } from "../repositories/auth-directory.repository.ts";
+import type { AuthDirectoryRepository } from "../../../repositories/auth-directory.repository.ts";
 
 /** The project fields a device grant binds a session to. */
 export type AuthDirectoryProject = Pick<

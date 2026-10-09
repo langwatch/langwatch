@@ -15,7 +15,7 @@ import {
   posted,
   type CliDeviceFlowAnswer,
 } from "../rules/cli-device-flow.rules.ts";
-import type { CliAccessProject } from "./api-rest-credentials.service.ts";
+import type { CliAccessProject } from "../../../services/api-rest-credentials.service.ts";
 import {
   type CliDeviceApprovalFrame,
   CliDeviceApprovalService,

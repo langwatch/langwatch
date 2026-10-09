@@ -160,9 +160,7 @@ function dedupedTraceSummaries(
       where: `TenantId = {tenantId:String} ${dateClause}`,
     });
   }
-  const columnList = columns
-    ? Array.from(columns).join(", ")
-    : TRACE_ANALYTICS_COLUMNS.join(", ");
+  const columnList = columns ? Array.from(columns).join(", ") : TRACE_ANALYTICS_COLUMNS.join(", ");
   return `(
     SELECT ${columnList} FROM trace_summaries
     WHERE TenantId = {tenantId:String}
@@ -200,19 +198,14 @@ function referencedTraceColumns(
     return exprs;
   });
   const expressions = [...metricExpressions, ...extraExpressions];
-  const columns = [
-    ...TRACE_IDENTITY_COLUMNS,
-    ...extractReferencedTraceColumns(expressions),
-  ];
+  const columns = [...TRACE_IDENTITY_COLUMNS, ...extractReferencedTraceColumns(expressions)];
   // A map read by literal keys only is carried as a map of those keys, which
   // keeps the deduped row narrow (see dedupedTraceSummaries).
   const narrowedAttributes = columns.includes("Attributes")
     ? narrowMapColumnProjection({ column: "Attributes", expressions })
     : null;
   return narrowedAttributes
-    ? columns.map((column) =>
-        column === "Attributes" ? narrowedAttributes : column,
-      )
+    ? columns.map((column) => (column === "Attributes" ? narrowedAttributes : column))
     : columns;
 }
 
@@ -614,8 +607,7 @@ function spanFirstPositiveExpr(attrKeys: string[]): string {
 function buildSpanModelPartitionJoin(spanTimeFilter: string): string {
   const ts = tableAliases.trace_summaries;
   const smd = SPAN_MODEL_ALIAS;
-  const contribution = (expr: string) =>
-    `max(if(${SPAN_NOT_SKIPPED}, ${expr}, 0))`;
+  const contribution = (expr: string) => `max(if(${SPAN_NOT_SKIPPED}, ${expr}, 0))`;
   // TraceSpanCount = spans of the trace visible to THIS scan, summed over the
   // per-bucket groups BEFORE the zero-suppression filter (a suppressed
   // model-less bucket still holds real spans, e.g. the root).
@@ -887,7 +879,7 @@ interface BuiltQuery {
  * aggregation, which takes memory per thread; the panel runs slower (about
  * 5s to 9s at 3M traces in range) instead of failing.
  */
-export const SPAN_MODEL_PARTITION_SETTINGS = {
+const SPAN_MODEL_PARTITION_SETTINGS = {
   join_algorithm: "grace_hash",
   max_bytes_in_join: 200_000_000,
   max_threads: 4,
@@ -2119,9 +2111,7 @@ function buildArrayJoinTimeseriesQuery({
   const cteSelectList = cteSelectExprs.filter((expr) => {
     const alias = /\sAS\s+(trace_[a-z_]+)$/.exec(expr)?.[1];
     if (!alias || alias === "trace_id") return true;
-    return outerSelectExprs.some((outer) =>
-      new RegExp(`\\b${alias}\\b`).test(outer),
-    );
+    return outerSelectExprs.some((outer) => new RegExp(`\\b${alias}\\b`).test(outer));
   });
 
   // Columns the dedup subquery must expose: everything the CTE's SELECT list
@@ -2183,9 +2173,7 @@ function buildArrayJoinTimeseriesQuery({
       ...groupKeyFilterParams,
       ...(input.groupByKey ? { groupByKey: input.groupByKey } : {}),
     },
-    ...(spanModelPartitioned
-      ? { settings: SPAN_MODEL_PARTITION_SETTINGS }
-      : {}),
+    ...(spanModelPartitioned ? { settings: SPAN_MODEL_PARTITION_SETTINGS } : {}),
   };
 }
 
@@ -3510,9 +3498,7 @@ export function buildTopDocumentsQuery({
   // attributes in range (inputs, outputs, prompts) on the join side.
   const spanJoin = buildJoinClause({
     table: "stored_spans",
-    requiredColumns: new Set([
-      spanAttributesNarrowProjection([RAG_CONTEXTS_ATTRIBUTE]),
-    ]),
+    requiredColumns: new Set([spanAttributesNarrowProjection([RAG_CONTEXTS_ATTRIBUTE])]),
     spanTimeFilter: `${SPAN_TIME_FILTER_START_END} AND SpanAttributes['${RAG_CONTEXTS_ATTRIBUTE}'] != ''`,
   });
 

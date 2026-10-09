@@ -6,7 +6,7 @@ import { MemberNotFoundError, type OrganizationApi } from "@langwatch/organizati
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import type { AuthDirectoryRepository } from "../../repositories/auth-directory.repository.ts";
+import type { AuthDirectoryRepository } from "../../../../repositories/auth-directory.repository.ts";
 import {
   CliDeviceDirectoryService,
   type CliDeviceProjects,

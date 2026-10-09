@@ -15,8 +15,8 @@ import {
 } from "@langwatch/auth-contract";
 import { nowInstant } from "@langwatch/time";
 
-import type { CliDeviceSettlementChannel } from "../channels/cli-device-settlement.channel.ts";
-import type { CliDeviceSessionRepository } from "../repositories/cli-device-session.repository.ts";
+import type { CliDeviceSettlementChannel } from "../../../channels/cli-device-settlement.channel.ts";
+import type { CliDeviceSessionRepository } from "../../../repositories/cli-device-session.repository.ts";
 import {
   ACCESS_TOKEN_TTL_SECONDS,
   DEFAULT_REFRESH_TOKEN_TTL_SECONDS,

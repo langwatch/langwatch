@@ -8,12 +8,12 @@ const assertedClaimsSchema = z.looseObject({
 });
 
 /** What an ID token asserted about its address: both halves, or nothing to weigh. */
-export type AssertedAddress =
+type AssertedAddress =
   | { asserted: false }
   | { asserted: true; email: string; emailVerified: boolean };
 
 /** Whether an addition to an account may stand without an administrator (ADR-117 §3). */
-export type LinkVerdict = { refused: false } | { refused: true; reason: LinkProposalReason };
+type LinkVerdict = { refused: false } | { refused: true; reason: LinkProposalReason };
 
 const UNASSERTED: AssertedAddress = { asserted: false };
 const ALLOWED: LinkVerdict = { refused: false };

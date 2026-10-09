@@ -27,7 +27,7 @@ export type UserFactIntent =
 type UserFactAppend = Omit<Parameters<ProcessStore["appendIntents"]>[0], "transaction">;
 
 /** The key a fact's intent and its event share: once per user and kind. */
-export function userFactKey(intent: UserFactIntent): string {
+function userFactKey(intent: UserFactIntent): string {
   const kind = {
     [USER_FACTS_RECORD_CREATED_INTENT]: "created",
     [USER_FACTS_RECORD_REGISTERED_INTENT]: "registered",

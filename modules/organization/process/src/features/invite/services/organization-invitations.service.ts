@@ -22,11 +22,11 @@ import type { InviteSendThrottleService } from "./invite-send-throttle.service.t
 import { InviteService } from "./invite.service.ts";
 
 /** One invitation as the acceptance ceremony reads it: the row and its organization. */
-export type OrganizationInviteWithOrganization = OrganizationInvite &
+type OrganizationInviteWithOrganization = OrganizationInvite &
   Readonly<{ organization: Readonly<{ id: string; name: string }> }>;
 
 /** One batch of invitations, and the organization they were written against. */
-export type OrganizationInvitesCreated = Readonly<{
+type OrganizationInvitesCreated = Readonly<{
   organization: Readonly<{ members: readonly unknown[] }>;
   invites: readonly Readonly<{ invite: OrganizationInvite; emailNotSent: boolean }>[];
 }>;

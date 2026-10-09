@@ -5,7 +5,7 @@ import {
   type CliTokenRecordEntry,
 } from "@langwatch/auth-contract";
 
-import type { CliDeviceSessionRepository } from "../repositories/cli-device-session.repository.ts";
+import type { CliDeviceSessionRepository } from "../../../repositories/cli-device-session.repository.ts";
 import {
   decodeCliSession,
   familyIndexKey,

@@ -1,7 +1,7 @@
 import { createTestLogger } from "@langwatch/test-harness";
 import { describe, expect, it } from "vitest";
 
-import { MemorySignupAnnouncementChannel } from "../../channels/memory/memory.signup-announcement.channel.ts";
+import { MemorySignupAnnouncementChannel } from "../../channels/memory/memory.organization.channels.ts";
 import { SignupAnnouncementService } from "../signup-announcement.service.ts";
 
 const signup = {

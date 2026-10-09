@@ -45,7 +45,7 @@ import {
   type LinkProposals,
   type SsoDomainOrganizations,
 } from "../../channels/http/http.better-auth-hooks.channel.ts";
-import { MemorySignupAnnouncementChannel } from "../../channels/memory/memory.signup-announcement.channel.ts";
+import { MemorySignupAnnouncementChannel } from "../../channels/memory/memory.auth.channels.ts";
 import { RecordSignedUpCommand } from "../../eventing/auth-lifecycle.commands.ts";
 import type { SignedUpEvent } from "../../eventing/auth-lifecycle.events.ts";
 import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";

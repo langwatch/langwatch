@@ -39,17 +39,6 @@ export type PIICheckOptions = {
  */
 export const DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH = 250_000;
 
-/**
- * Function type for batch PII clearing.
- * Returns an array where each element is the anonymized text (or null if unchanged).
- */
-export type BatchClearPIIFunction = (
-  texts: string[],
-  options: PIICheckOptions,
-  /** Per text: a model, provider or tool name, spared name/place findings. */
-  spareNamesAndPlaces?: readonly boolean[],
-) => Promise<(string | null)[]>;
-
 /** One text to analyse, and whether its name/place findings are dropped. */
 export type PiiAnalysisItem = { text: string; isNameExempt: boolean };
 
