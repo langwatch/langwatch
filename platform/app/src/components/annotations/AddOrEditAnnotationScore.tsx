@@ -271,15 +271,15 @@ export const AddOrEditAnnotationScore = ({
                     width="full"
                     defaultValue={defaultRadioOption}
                     value={defaultRadioOption}
+                    onValueChange={({ value }) =>
+                      setDefaultRadioOption(value ?? "")
+                    }
                   >
                     <VStack align="start" width="full" gap={2}>
                       {scoreTypeOptions.map((option, index) => (
                         <HStack key={index} gap={2} width="full">
                           <Radio
                             value={option}
-                            onChange={(e) => {
-                              setDefaultRadioOption(e.target.value);
-                            }}
                             onClick={() => {
                               if (defaultRadioOption === option) {
                                 setTimeout(() => {
