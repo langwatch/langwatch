@@ -117,7 +117,8 @@ export const createManyDatasetRecords = async ({
   // For callers supplying deterministic ids: an id that already exists means
   // the row was already added, so it is skipped instead of failing the batch
   // (P2002). Only the postgres layout honors it; the s3_jsonl and legacy
-  // useS3 layouts append and do not dedupe against stored rows.
+  // useS3 layouts append and do not dedupe against stored rows. The record id
+  // is a global primary key, so an id existing in ANY dataset is skipped.
   skipDuplicates?: boolean;
 }) => {
   const db = tx ?? prisma;
@@ -148,6 +149,17 @@ export const createManyDatasetRecords = async ({
       const { id: _id, ...entryWithoutId } = entry;
       return entryWithoutId;
     });
+    if (skipDuplicates) {
+      logger.warn(
+        {
+          datasetId,
+          projectId,
+          contentLayout: dataset.contentLayout,
+          useS3: dataset.useS3,
+        },
+        "skipDuplicates is not supported on this dataset layout; existing rows may be duplicated",
+      );
+    }
     await appendS3JsonlRecords({
       prisma,
       dataset,
@@ -159,6 +171,17 @@ export const createManyDatasetRecords = async ({
   }
 
   if (dataset.useS3) {
+    if (skipDuplicates) {
+      logger.warn(
+        {
+          datasetId,
+          projectId,
+          contentLayout: dataset.contentLayout,
+          useS3: dataset.useS3,
+        },
+        "skipDuplicates is not supported on this dataset layout; existing rows may be duplicated",
+      );
+    }
     const recordData = createDatasetRecords({
       entries: datasetRecords,
       datasetId,

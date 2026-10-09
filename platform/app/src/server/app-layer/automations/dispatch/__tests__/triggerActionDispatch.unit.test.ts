@@ -292,39 +292,6 @@ describe("dispatchTriggerAction trace loading", () => {
       });
     });
 
-    describe("when the action is a dataset write", () => {
-      it("passes skipDuplicates so a re-add of an existing row is a no-op", async () => {
-        const deps = makeDeps();
-        await dispatchTriggerAction({
-          deps,
-          trigger: summary(TriggerAction.ADD_TO_DATASET),
-          traceId: "trace-1",
-          tenantId: "project-1",
-          foldState,
-        });
-
-        expect(deps.addToDataset).toHaveBeenCalledWith(
-          expect.objectContaining({ skipDuplicates: true }),
-        );
-      });
-
-      it("keeps the deterministic trigger-and-trace row id", async () => {
-        const deps = makeDeps();
-        await dispatchTriggerAction({
-          deps,
-          trigger: summary(TriggerAction.ADD_TO_DATASET),
-          traceId: "trace-1",
-          tenantId: "project-1",
-          foldState,
-        });
-
-        const call = vi.mocked(deps.addToDataset).mock.calls[0]![0];
-        expect(call.datasetRecords.map((r) => r.id)).toEqual(
-          expect.arrayContaining([expect.stringMatching(/-trace-1-0$/)]),
-        );
-      });
-    });
-
     describe("when the caller preloads the project row", () => {
       it("does not resolve the project again", async () => {
         const deps = makeDeps();

@@ -764,7 +764,7 @@ describe("trigger settlement intent handlers integration", () => {
         // unless the caller asks to skip duplicates, as Postgres createMany does.
         const store = new Map<string, { id: string }>();
         const dispatchedTraces: string[] = [];
-        for (const id of ["trigger-1-trace-1-0"]) store.set(id, { id });
+        store.set("trigger-1-trace-1-0", { id: "trigger-1-trace-1-0" });
         let traceTwoFailures = 0;
         made.raw.addToDataset.mockImplementation(
           async ({ datasetRecords, skipDuplicates }: Params) => {
@@ -797,8 +797,7 @@ describe("trigger settlement intent handlers integration", () => {
         traceIds: ["trace-1", "trace-2"],
       };
 
-      /** @scenario "A page whose dataset rows already exist retries only the failing trace" */
-      it("retries the page once with a retryable error", async () => {
+      it("retries the page with the failing trace's retryable error", async () => {
         const { deps } = setup();
 
         const thrown = await createPersistMatchHandler(deps)(
@@ -808,6 +807,9 @@ describe("trigger settlement intent handlers integration", () => {
 
         expect(isDispatchError(thrown)).toBe(true);
         expect((thrown as DispatchError).retryable).toBe(true);
+        expect((thrown as DispatchError).message).toContain(
+          "database unavailable",
+        );
       });
 
       it("claims the trace whose rows already existed", async () => {
@@ -849,7 +851,7 @@ describe("trigger settlement intent handlers integration", () => {
           return { ...made, retry };
         };
 
-        it("succeeds", async () => {
+        it("resolves without dead-lettering", async () => {
           const { retry } = await runBoth();
           await expect(retry).resolves.toBeUndefined();
         });
@@ -863,6 +865,7 @@ describe("trigger settlement intent handlers integration", () => {
           ]);
         });
 
+        /** @scenario "A page whose dataset rows already exist retries only the failing trace" */
         it("does not dispatch the claimed trace again", async () => {
           const { retry, dispatchedTraces } = await runBoth();
           await retry;

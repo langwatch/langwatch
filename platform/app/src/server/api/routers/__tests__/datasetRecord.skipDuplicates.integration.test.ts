@@ -91,7 +91,7 @@ describe("createManyDatasetRecords duplicate ids (integration)", () => {
 
       /** @scenario "A dataset row that already exists counts as added" */
       it("resolves without error", async () => {
-        await expect(result).resolves.toBeDefined();
+        await expect(result).resolves.toMatchObject({ count: 0 });
       });
 
       it("keeps one copy of the first row", async () => {
@@ -165,7 +165,7 @@ describe("createManyDatasetRecords duplicate ids (integration)", () => {
       });
 
       it("resolves without error", async () => {
-        await expect(result).resolves.toBeDefined();
+        await expect(result).resolves.toMatchObject({ count: 1 });
       });
 
       it("leaves the first row with its original content", async () => {
