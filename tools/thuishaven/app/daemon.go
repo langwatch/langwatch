@@ -229,6 +229,9 @@ const dailyCycles = int((24 * time.Hour) / (10 * time.Second))
 func (o *Orchestrator) reapDeadStacks() {
 	now := o.sys.Now()
 	for _, s := range o.store.Stacks() {
+		if o.superviseKeeper(s) {
+			continue
+		}
 		dead := s.LauncherPID != 0 && !o.launcherIsOurs(s)
 		if stale := s.Stale(now, o.cfg.IdleTTL); dead || stale {
 			o.reapStack(s, dead, stale)

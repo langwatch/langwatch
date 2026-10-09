@@ -64,7 +64,7 @@ func TestHandOverGivesTheStackToARealKeeper(t *testing.T) {
 	require.NoError(t, store.SaveStack(st))
 
 	lanes := []app.Child{{Name: "lane", Dir: wt, Shell: "sleep 30"}}
-	require.NoError(t, app.HandOver(o, st, lanes, true))
+	require.NoError(t, app.HandOver(o, context.Background(), st, app.KeeperPlanFor(o, lanes, true)))
 	got, ok := stackNamed(store, keeperTestSlug)
 	require.True(t, ok)
 	keeper := got.LauncherPID
@@ -83,4 +83,38 @@ func TestHandOverGivesTheStackToARealKeeper(t *testing.T) {
 	}, 10*time.Second, 50*time.Millisecond)
 	_, err = os.Stat(app.KeeperPlanPath(wt, keeperTestSlug))
 	assert.ErrorIs(t, err, os.ErrNotExist)
+}
+
+// A keeper SIGKILLed under a live owner is respawned by the daemon tick from
+// its plan: a new keeper takes the record (section 11.6, D3).
+func TestDaemonRespawnsAKilledKeeper(t *testing.T) {
+	home, wt := t.TempDir(), t.TempDir()
+	t.Setenv("HAVEN_KEEPER_TEST_HOME", home)
+	o, store := realKeeperOrch(home)
+	self := os.Getpid()
+	st := domain.Stack{Slug: keeperTestSlug, WorktreeDir: wt, LauncherPID: self, PortlessDisabled: true}
+	require.NoError(t, store.SaveStack(st))
+	lanes := []app.Child{{Name: "lane", Dir: wt, Shell: "sleep 30"}}
+	require.NoError(t, app.HandOver(o, context.Background(), st, app.KeeperPlanFor(o, lanes, true)))
+	got, _ := stackNamed(store, keeperTestSlug)
+	first := got.LauncherPID
+	require.NoError(t, syscall.Kill(first, syscall.SIGKILL))
+	require.Eventually(t, func() bool { return syscall.Kill(first, 0) != nil }, 5*time.Second, 20*time.Millisecond)
+
+	app.ReapDeadStacks(o)
+	var second int
+	require.Eventually(t, func() bool {
+		cur, ok := stackNamed(store, keeperTestSlug)
+		second = cur.LauncherPID
+		return ok && second != first && second != self
+	}, 10*time.Second, 50*time.Millisecond)
+	t.Cleanup(func() { _ = syscall.Kill(second, syscall.SIGKILL) })
+	cur, _ := stackNamed(store, keeperTestSlug)
+	assert.Equal(t, self, cur.OwnerPID)
+
+	require.NoError(t, syscall.Kill(second, syscall.SIGTERM))
+	require.Eventually(t, func() bool {
+		_, ok := stackNamed(store, keeperTestSlug)
+		return !ok
+	}, 10*time.Second, 50*time.Millisecond)
 }

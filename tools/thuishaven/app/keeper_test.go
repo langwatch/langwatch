@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -59,16 +60,16 @@ func TestReadKeeperPlanNamesNoContentWhenUnreadable(t *testing.T) {
 func TestAwaitKeeperReturnsOnlyOnceAnotherLiveLauncherHoldsTheRecord(t *testing.T) {
 	sys := &fakeSystem{alive: map[int]bool{1: true, 2: true}}
 	held := New(Deps{Sys: sys, Store: &fakeStore{stacks: []domain.Stack{{Slug: keeperTestSlug, LauncherPID: 2}}}})
-	require.NoError(t, held.awaitKeeper(keeperTestSlug, 1, time.Second))
+	require.NoError(t, held.awaitKeeper(context.Background(), keeperTestSlug, time.Second))
 
 	notYet := New(Deps{Sys: sys, Store: &fakeStore{stacks: []domain.Stack{{Slug: keeperTestSlug, LauncherPID: 1}}}})
-	require.Error(t, notYet.awaitKeeper(keeperTestSlug, 1, 100*time.Millisecond))
+	require.Error(t, notYet.awaitKeeper(context.Background(), keeperTestSlug, 100*time.Millisecond))
 
 	deadKeeper := New(Deps{Sys: sys, Store: &fakeStore{stacks: []domain.Stack{{Slug: keeperTestSlug, LauncherPID: 3}}}})
-	require.Error(t, deadKeeper.awaitKeeper(keeperTestSlug, 1, 100*time.Millisecond))
+	require.Error(t, deadKeeper.awaitKeeper(context.Background(), keeperTestSlug, 100*time.Millisecond))
 
 	gone := New(Deps{Sys: sys, Store: &fakeStore{}})
-	require.Error(t, gone.awaitKeeper(keeperTestSlug, 1, time.Second))
+	require.Error(t, gone.awaitKeeper(context.Background(), keeperTestSlug, time.Second))
 }
 
 func TestKeeperTeardownLeavesARecordAnotherLauncherHolds(t *testing.T) {

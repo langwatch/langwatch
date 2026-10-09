@@ -18,18 +18,22 @@ import (
 const keeperHandover = 10 * time.Second
 
 // KeeperPlan is what `haven keep` runs. Env is the up's base environment,
-// secrets included: the file is 0600, removed on down and never logged.
+// secrets included: the file is 0600, removed on down and never logged. The
+// provisioner is the up that wrote it, the one launcher a keeper may replace.
 type KeeperPlan struct {
-	Children   []Child   `json:"children"`
-	Env        []string  `json:"env"`
-	StartedAt  time.Time `json:"startedAt"`
-	OwnerPID   int       `json:"ownerPid,omitempty"`
-	OwnerStart string    `json:"ownerStart,omitempty"`
+	Children         []Child   `json:"children"`
+	Env              []string  `json:"env"`
+	StartedAt        time.Time `json:"startedAt"`
+	ProvisionerPID   int       `json:"provisionerPid"`
+	ProvisionerStart string    `json:"provisionerStart,omitempty"`
+	OwnerPID         int       `json:"ownerPid,omitempty"`
+	OwnerStart       string    `json:"ownerStart,omitempty"`
 }
 
+// keeperPlanPath sits in an owner-only run dir beside the logs, never in the
+// log dir people browse (ruling R1, 2026-10-09).
 func keeperPlanPath(worktreeDir, slug string) string {
-	dir, _ := domain.StackLogPaths(worktreeDir, slug)
-	return filepath.Join(dir, "plan.json")
+	return filepath.Join(filepath.Dir(domain.HavenLogsRoot(worktreeDir)), "run", slug, "plan.json")
 }
 
 // writeKeeperPlan creates the file afresh with O_EXCL, so the environment is
@@ -39,10 +43,15 @@ func writeKeeperPlan(path string, plan KeeperPlan) error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(filepath.Dir(dir), 0o700); err != nil {
 		return err
 	}
-	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+	// The run dir holds only this file: recreated, it is owner-only whatever was there.
+	if err := os.RemoveAll(dir); err != nil {
+		return err
+	}
+	if err := os.Mkdir(dir, 0o700); err != nil {
 		return err
 	}
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
@@ -79,7 +88,10 @@ func ignoreHavenState(worktreeDir string) error {
 }
 
 func removeKeeperPlan(worktreeDir, slug string) {
-	_ = os.Remove(keeperPlanPath(worktreeDir, slug))
+	_ = os.RemoveAll(filepath.Dir(keeperPlanPath(worktreeDir, slug)))
+	// shortcut: S4b wrote the plan into the log dir; drop this once no S4b stack can be left.
+	logDir, _ := domain.StackLogPaths(worktreeDir, slug)
+	_ = os.Remove(filepath.Join(logDir, "plan.json"))
 }
 
 // ReadKeeperPlan loads the plan of a registered stack. The keeper replays its
@@ -117,12 +129,16 @@ func isPrivateFile(f *os.File) bool {
 }
 
 // Keep is `haven keep <slug>`: it takes the record, runs the plan's lanes until
-// signaled, then tears the stack down as the launcher did. The caller has
-// already applied plan.Env.
+// signaled or until the record is no longer its own, then tears the stack down
+// as the launcher did. It never takes over a live keeper (ruling R3); the
+// caller has already applied plan.Env.
 func (o *Orchestrator) Keep(ctx context.Context, slug string, plan KeeperPlan) error {
 	st, ok := o.stackBySlug(slug)
 	if !ok {
 		return fmt.Errorf("no stack %q to keep", slug)
+	}
+	if st.LauncherPID != plan.ProvisionerPID && o.launcherIsOurs(st) {
+		return fmt.Errorf("stack %q already has a live keeper (pid %d)", slug, st.LauncherPID)
 	}
 	pid := o.sys.Getpid()
 	st.LauncherPID, st.LauncherStart = pid, o.sys.ProcessStart(pid)
@@ -131,9 +147,17 @@ func (o *Orchestrator) Keep(ctx context.Context, slug string, plan KeeperPlan) e
 	if err := o.store.SaveStack(st); err != nil {
 		return err
 	}
-	stopBeat := o.startHeartbeat(ctx, st)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	beat := make(chan struct{})
+	go func() {
+		defer close(beat)
+		o.heartbeat(ctx, st)
+		cancel() // the record was removed or taken: stop the lanes, never resurrect it
+	}()
 	o.sup.Supervise(ctx, plan.Children)
-	stopBeat()
+	cancel()
+	<-beat
 	o.dropKeptStack(st)
 	return nil
 }
@@ -172,36 +196,54 @@ func (o *Orchestrator) startHeartbeat(ctx context.Context, st domain.Stack) func
 	}
 }
 
+// keeperPlan is the plan this up hands over: its lanes, its environment, and
+// itself as provisioner and, in the foreground (D7), as owner.
+func (o *Orchestrator) keeperPlan(children []Child, isOwner bool) KeeperPlan {
+	self := o.sys.Getpid()
+	plan := KeeperPlan{
+		Children: children, Env: os.Environ(), StartedAt: o.sys.Now(),
+		ProvisionerPID: self, ProvisionerStart: o.sys.ProcessStart(self),
+	}
+	if isOwner {
+		plan.OwnerPID, plan.OwnerStart = self, plan.ProvisionerStart
+	}
+	return plan
+}
+
 // handOver gives a provisioned stack to its keeper: write the plan, start
 // `haven keep` in its own session and wait for the keeper's pid in the record.
 // The caller has stopped its heartbeat, so no beat overwrites the keeper's.
-// Until S4c the up starts the keeper itself.
-func (o *Orchestrator) handOver(st domain.Stack, children []Child, isOwner bool) error {
-	if len(o.cfg.KeepArgv) == 0 {
-		return errors.New("no keeper command configured")
-	}
-	self := o.sys.Getpid()
-	plan := KeeperPlan{Children: children, Env: os.Environ(), StartedAt: o.sys.Now()}
-	if isOwner {
-		plan.OwnerPID, plan.OwnerStart = self, o.sys.ProcessStart(self)
-	}
+func (o *Orchestrator) handOver(ctx context.Context, st domain.Stack, plan KeeperPlan) error {
 	if err := ignoreHavenState(st.WorktreeDir); err != nil {
 		return fmt.Errorf("keeping .haven out of git: %w", err)
 	}
 	if err := writeKeeperPlan(keeperPlanPath(st.WorktreeDir, st.Slug), plan); err != nil {
 		return fmt.Errorf("writing the keeper plan: %w", err)
 	}
+	if err := o.spawnKeeper(st); err != nil {
+		return err
+	}
+	return o.awaitKeeper(ctx, st.Slug, keeperHandover)
+}
+
+// spawnKeeper starts `haven keep <slug>` in its own session, its output in the
+// stack's combined log. The keeper replays the plan's environment itself.
+func (o *Orchestrator) spawnKeeper(st domain.Stack) error {
+	if len(o.cfg.KeepArgv) == 0 {
+		return errors.New("no keeper command configured")
+	}
 	argv := append(append([]string{}, o.cfg.KeepArgv...), st.Slug, "--agent")
 	_, combined := domain.StackLogPaths(st.WorktreeDir, st.Slug)
 	if err := o.sys.SpawnDetached(argv, st.WorktreeDir, combined); err != nil {
 		return fmt.Errorf("starting the keeper: %w", err)
 	}
-	return o.awaitKeeper(st.Slug, self, keeperHandover)
+	return nil
 }
 
 // awaitKeeper waits until the record names a launcher that is ours and is not
-// this process.
-func (o *Orchestrator) awaitKeeper(slug string, self int, timeout time.Duration) error {
+// this process. A canceled ctx (Ctrl-C) returns at once (ruling R4).
+func (o *Orchestrator) awaitKeeper(ctx context.Context, slug string, timeout time.Duration) error {
+	self := o.sys.Getpid()
 	deadline := time.Now().Add(timeout)
 	for {
 		st, ok := o.stackBySlug(slug)
@@ -214,7 +256,11 @@ func (o *Orchestrator) awaitKeeper(slug string, self int, timeout time.Duration)
 		if time.Now().After(deadline) {
 			return fmt.Errorf("the keeper for %q did not take the stack within %s", slug, timeout)
 		}
-		time.Sleep(50 * time.Millisecond)
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(50 * time.Millisecond):
+		}
 	}
 }
 

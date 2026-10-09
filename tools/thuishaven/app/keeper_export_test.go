@@ -4,4 +4,6 @@ package app
 var (
 	HandOver       = (*Orchestrator).handOver
 	KeeperPlanPath = keeperPlanPath
+	KeeperPlanFor  = (*Orchestrator).keeperPlan
+	ReapDeadStacks = (*Orchestrator).reapDeadStacks
 )
