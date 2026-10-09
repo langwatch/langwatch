@@ -154,7 +154,9 @@ function DatasetTableBody({
             <HStack wrap="wrap">
               {columnsOf(dataset).map(({ name }) => (
                 <Badge size="sm" key={name}>
-                  {name}
+                  <Text as="span" truncate maxWidth="160px" title={name}>
+                    {name}
+                  </Text>
                 </Badge>
               ))}
             </HStack>
