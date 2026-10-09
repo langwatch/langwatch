@@ -170,7 +170,7 @@ func (builder tenancyBuilder) teams() []Team {
 		team := Team{ID: builder.id("team", n), Name: fmt.Sprintf("Snapshot Team %d", n), Slug: fmt.Sprintf("snap-%s-team-%d", builder.cell, n),
 			OrganizationID: builder.id("org", org), CreatedAt: builder.instant("team", n)}
 		if n%3 == 0 {
-			team.Personal, team.OwnerUserID = true, builder.id("user", org)
+			team.Personal, team.OwnerUserID = true, builder.id("user", n) // user n is in team n's organization; one personal team per owner
 		}
 		teams = append(teams, team)
 	}
@@ -197,4 +197,21 @@ func (tenancy Tenancy) APIKeys() []string {
 		keys = append(keys, tenancy.Projects[i].APIKey)
 	}
 	return keys
+}
+
+// ProjectsOf is the ids of an organization's projects (through their teams).
+func (tenancy Tenancy) ProjectsOf(organization string) []string {
+	teams := map[string]bool{}
+	for _, team := range tenancy.Teams {
+		if team.OrganizationID == organization {
+			teams[team.ID] = true
+		}
+	}
+	var projects []string
+	for i := range tenancy.Projects {
+		if teams[tenancy.Projects[i].TeamID] {
+			projects = append(projects, tenancy.Projects[i].ID)
+		}
+	}
+	return projects
 }

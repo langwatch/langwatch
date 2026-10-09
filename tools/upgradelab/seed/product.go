@@ -32,7 +32,7 @@ type ProductInput struct {
 
 // ProductContext is what the seed's own setup learned from the old app's answers.
 type ProductContext struct {
-	OrganizationID, ProjectID, TraceID, Label string
+	OrganizationID, ProjectID, TraceID, Label, APIKey string
 }
 
 // productDoor is one kind's tRPC create input, its read-back query and the marker the answer must hold.
@@ -58,7 +58,7 @@ var productDoors = map[string]productDoor{
 		return map[string]any{"projectId": ctx.ProjectID, "scope": projectScope(ctx), "personalOnly": false, "config": map[string]any{}}
 	}},
 	"retention": {read: "dataRetention.getRules", input: projectInput, marker: projectMarker, create: func(ctx ProductContext) any {
-		return map[string]any{"projectId": ctx.ProjectID, "scope": projectScope(ctx), "category": "traces", "retentionDays": 45}
+		return map[string]any{"projectId": ctx.ProjectID, "scope": projectScope(ctx), "category": "traces", "retentionDays": 63}
 	}},
 	"annotation": {read: "annotation.getByTraceId", marker: named("rehearsal"), input: func(ctx ProductContext) any {
 		return map[string]any{"projectId": ctx.ProjectID, "traceId": ctx.TraceID}
@@ -217,6 +217,7 @@ func (seeder *Seeder) ingestTrace(ctx context.Context) error {
 	if err := seeder.trpc(ctx, trpcCall{path: "project.getProjectAPIKey", input: projectInput(seeder.Context), out: &key}); err != nil {
 		return err
 	}
+	seeder.Context.APIKey = key.APIKey
 	seeder.Context.TraceID = "rehearsal-" + randomHex()
 	now := time.Now().UnixMilli()
 	span := map[string]any{"type": "span", "span_id": "span-" + randomHex(), "name": "rehearsal seed",
@@ -276,6 +277,9 @@ func orNull(raw json.RawMessage) json.RawMessage {
 	}
 	return raw
 }
+
+// Session is the signed-in seed account's headers (Origin and the session cookie), for callers that drive the app as it.
+func (seeder *Seeder) Session() http.Header { return seeder.session() }
 
 func (seeder *Seeder) session() http.Header {
 	header := http.Header{"Origin": {seeder.input.AppURL}}

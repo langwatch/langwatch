@@ -1,0 +1,272 @@
+package cell
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"os/exec"
+	"regexp"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+)
+
+// Phase change: what the api answered from AtMs on (down, holding:<phase>, ready).
+type PhaseChange struct {
+	Phase string `json:"phase"`
+	AtMs  int64  `json:"atMs"`
+}
+
+var holdingPhase = regexp.MustCompile(`Phase: <strong>([^<]+)</strong>`)
+
+// PhaseOf reads one probe: no answer is down, /readyz 200 is ready, else the holding page's phase.
+func PhaseOf(ready int, page string, reached bool) string {
+	switch {
+	case !reached:
+		return "down"
+	case ready == http.StatusOK:
+		return "ready"
+	}
+	if match := holdingPhase.FindStringSubmatch(page); match != nil {
+		return "holding:" + match[1]
+	}
+	return "not-ready"
+}
+
+// Poller records the api's phase every Every from the switch on.
+type Poller struct {
+	URL    string
+	Origin time.Time
+	Every  time.Duration
+
+	Notify chan string // each new phase, for whoever screenshots it; a full channel drops it
+
+	mu      sync.Mutex
+	changes []PhaseChange
+}
+
+// Run polls until ctx ends.
+func (poller *Poller) Run(ctx context.Context) {
+	client := &http.Client{Timeout: 5 * time.Second}
+	ticker := time.NewTicker(poller.Every)
+	defer ticker.Stop()
+	for {
+		poller.observe(PhaseOf(probe(ctx, client, poller.URL)))
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+	}
+}
+
+func probe(ctx context.Context, client *http.Client, base string) (int, string, bool) {
+	ready, _, err := get(ctx, client, base+"/readyz", "")
+	if err != nil {
+		return 0, "", false
+	}
+	_, page, _ := get(ctx, client, base+"/", "text/html")
+	return ready, page, true
+}
+
+func get(ctx context.Context, client *http.Client, target, accept string) (int, string, error) {
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, target, http.NoBody)
+	if err != nil {
+		return 0, "", err
+	}
+	if accept != "" {
+		request.Header.Set("Accept", accept)
+	}
+	response, err := client.Do(request)
+	if err != nil {
+		return 0, "", err
+	}
+	defer func() { _ = response.Body.Close() }()
+	body, err := io.ReadAll(io.LimitReader(response.Body, 64<<10))
+	return response.StatusCode, string(body), err
+}
+
+func (poller *Poller) observe(phase string) {
+	poller.mu.Lock()
+	defer poller.mu.Unlock()
+	if n := len(poller.changes); n > 0 && poller.changes[n-1].Phase == phase {
+		return
+	}
+	poller.changes = append(poller.changes, PhaseChange{Phase: phase, AtMs: time.Since(poller.Origin).Milliseconds()})
+	select {
+	case poller.Notify <- phase:
+	default:
+	}
+}
+
+// Timeline is every change so far.
+func (poller *Poller) Timeline() []PhaseChange {
+	poller.mu.Lock()
+	defer poller.mu.Unlock()
+	return append([]PhaseChange(nil), poller.changes...)
+}
+
+// FirstAt is when phase was first seen (prefix match), or -1.
+func FirstAt(timeline []PhaseChange, phase string) int64 {
+	for _, change := range timeline {
+		if strings.HasPrefix(change.Phase, phase) {
+			return change.AtMs
+		}
+	}
+	return -1
+}
+
+// PhaseAt is the phase in force at atMs; before the first change it is "main".
+func PhaseAt(timeline []PhaseChange, atMs int64) string {
+	phase := "main"
+	for _, change := range timeline {
+		if change.AtMs > atMs {
+			break
+		}
+		phase = change.Phase
+	}
+	return phase
+}
+
+// queueDepthScript sums the waiting work in Redis: lists, sorted sets and streams, never a
+// completed, failed or bookkeeping key. ponytail: KEYS over a test-sized db; SCAN if a tier grows.
+const queueDepthScript = `local total = 0
+for _, key in ipairs(redis.call('KEYS', '*')) do
+  if not (string.find(key, ':completed$') or string.find(key, ':failed$') or string.find(key, ':events$') or string.find(key, ':meta$') or string.find(key, ':repeat$') or string.find(key, ':stalled') or string.find(key, 'dedup') or string.find(key, 'lock')) then
+    local kind = redis.call('TYPE', key).ok
+    if kind == 'zset' then total = total + redis.call('ZCARD', key)
+    elseif kind == 'list' then total = total + redis.call('LLEN', key)
+    elseif kind == 'stream' then total = total + redis.call('XLEN', key) end
+  end
+end
+return total`
+
+// QueueSample is one reading of the waiting work.
+type QueueSample struct {
+	AtMs  int64 `json:"atMs"`
+	Depth int   `json:"depth"`
+}
+
+// QueueDepth reads the cell's Redis once.
+func QueueDepth(ctx context.Context, port string) (int, error) {
+	out, err := exec.CommandContext(ctx, "redis-cli", "-p", port, "EVAL", queueDepthScript, "0").Output() // #nosec G204 -- fixed script.
+	if err != nil {
+		return 0, fmt.Errorf("redis-cli EVAL: %w", err)
+	}
+	return strconv.Atoi(strings.TrimSpace(string(out)))
+}
+
+// TopQueueKeys names the longest keys, so a report reader can judge what the depth counted.
+func TopQueueKeys(ctx context.Context, port string) string {
+	script := `local rows = {}
+for _, key in ipairs(redis.call('KEYS', '*')) do
+  local kind = redis.call('TYPE', key).ok
+  local size = 0
+  if kind == 'zset' then size = redis.call('ZCARD', key) elseif kind == 'list' then size = redis.call('LLEN', key) elseif kind == 'stream' then size = redis.call('XLEN', key) end
+  if size > 0 then table.insert(rows, key .. ' ' .. kind .. ' ' .. size) end
+end
+return rows`
+	out, _ := exec.CommandContext(ctx, "redis-cli", "-p", port, "EVAL", script, "0").Output() // #nosec G204 -- fixed script.
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	return strings.Join(lines[:min(len(lines), 25)], "\n")
+}
+
+// clickhouseQuery posts one statement to a server or database URL and answers its TSV.
+func clickhouseQuery(ctx context.Context, target, statement string) (string, error) {
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, target, strings.NewReader(statement))
+	if err != nil {
+		return "", err
+	}
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		return "", fmt.Errorf("clickhouse: %w", err)
+	}
+	defer func() { _ = response.Body.Close() }()
+	body, _ := io.ReadAll(io.LimitReader(response.Body, 8<<20))
+	if response.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("clickhouse %.60s answered %d: %.300s", statement, response.StatusCode, body)
+	}
+	return string(body), nil
+}
+
+func clickhouseExec(ctx context.Context, server, statement string) error {
+	_, err := clickhouseQuery(ctx, server+"/", statement)
+	return err
+}
+
+// StoredIDs answers which of the ids each ingest kind wrote are in ClickHouse for the project.
+func StoredIDs(ctx context.Context, stores Stores, project string) (map[string]map[string]bool, error) {
+	queries := map[string]string{
+		"spans":   "SELECT DISTINCT TraceId FROM stored_spans WHERE TenantId = '%s' FORMAT TSV",
+		"logs":    "SELECT DISTINCT TraceId FROM stored_log_records WHERE TenantId = '%s' FORMAT TSV",
+		"metrics": "SELECT DISTINCT MetricName FROM stored_metric_records WHERE TenantId = '%s' FORMAT TSV",
+	}
+	found := map[string]map[string]bool{}
+	for name, query := range queries {
+		out, err := clickhouseQuery(ctx, stores.ClickHouseURL(""), fmt.Sprintf(query, strings.ReplaceAll(project, "'", "")))
+		if err != nil {
+			return nil, err
+		}
+		found[name] = map[string]bool{}
+		for _, line := range strings.Fields(out) {
+			found[name][line] = true
+		}
+	}
+	return found, nil
+}
+
+// storedTable is where an ingest kind's id lands.
+var storedTable = map[string]string{"otlp-trace": "spans", "collector": "spans", "otlp-log": "logs", "otlp-metric": "metrics"}
+
+// LedgerRow is one step of the upgrade ledger, as far as the invariants read it.
+type LedgerRow struct {
+	ID       string `json:"id"`
+	Kind     string `json:"kind"`
+	Mode     string `json:"mode"`
+	Status   string `json:"status"`
+	Attempt  int    `json:"attempt"`
+	Finished string `json:"finished_at"`
+}
+
+// Ledger reads every step row; a missing ledger schema is an empty ledger.
+func Ledger(ctx context.Context, stores Stores) ([]LedgerRow, error) {
+	out, err := psql(ctx, stores.psqlURL(), `SELECT coalesce(json_agg(json_build_object('id', id, 'kind', kind, 'mode', mode, 'status', status, 'attempt', attempt, 'finished_at', finished_at::text) ORDER BY id), '[]') FROM mydb_upgrade_ledger._langwatch_upgrade_step`)
+	if err != nil {
+		if strings.Contains(err.Error(), "does not exist") {
+			return nil, nil
+		}
+		return nil, err
+	}
+	var rows []LedgerRow
+	return rows, json.Unmarshal([]byte(out), &rows)
+}
+
+// Outstanding is every step not done or not-needed, operator steps aside (an operator starts those).
+func Outstanding(rows []LedgerRow) []LedgerRow {
+	var left []LedgerRow
+	for _, row := range rows {
+		if row.Status != "done" && row.Status != "not-needed" && row.Mode != "operator" {
+			left = append(left, row)
+		}
+	}
+	return left
+}
+
+// Reopened is every step done in before that is not done, or ran again, in after.
+func Reopened(before, after []LedgerRow) []string {
+	index := map[string]LedgerRow{}
+	for _, row := range after {
+		index[row.ID] = row
+	}
+	var reopened []string
+	for _, row := range before {
+		now, ok := index[row.ID]
+		if row.Status == "done" && (!ok || now.Status != "done" || now.Attempt != row.Attempt || now.Finished != row.Finished) {
+			reopened = append(reopened, fmt.Sprintf("%s %s/%d -> %s/%d", row.ID, row.Status, row.Attempt, now.Status, now.Attempt))
+		}
+	}
+	return reopened
+}

@@ -107,3 +107,17 @@ var ProductKinds = []ProductKind{
 	{Kind: "sso", Unseedable: "no headless door: SSO connection by tenancy SQL (C2)"},
 	{Kind: "coding-assistant", Unseedable: "no headless seed: the old image's codingAgents router only reads"},
 }
+
+// PrivateTargets is the shape's tenant-to-target assignment, label -> organization id, read from its
+// CLICKHOUSE_URL__<label>__<organization> names; organizations not named stay on the shared target.
+func (env ShapeEnv) PrivateTargets() map[string]string {
+	targets := map[string]string{}
+	for _, name := range env.SecretNames {
+		if rest, ok := strings.CutPrefix(name, "CLICKHOUSE_URL__"); ok {
+			if label, organization, ok := strings.Cut(rest, "__"); ok {
+				targets[label] = organization
+			}
+		}
+	}
+	return targets
+}

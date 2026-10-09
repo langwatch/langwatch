@@ -1,0 +1,108 @@
+package cell
+
+import (
+	"fmt"
+	"maps"
+	"os"
+	"path/filepath"
+	"slices"
+	"strconv"
+	"strings"
+
+	"github.com/langwatch/langwatch/tools/upgradelab/seed"
+)
+
+// Profile is one deployment of the matrix (plan section 2.1): which shape env it boots with, what it
+// adds on top, and what it still lacks. Which tenants sit on a private target is the shape's (seed).
+type Profile struct {
+	Shape   string
+	Extra   map[string]string
+	Missing string // non-empty: the profile cannot run yet, and why
+}
+
+// Profiles are the deployments a cell runs; a new deployment is one entry here.
+var Profiles = map[string]Profile{
+	"cloud": {Shape: "saas", Extra: cloudBilling},
+	"hybrid": {Shape: "hybrid", Extra: cloudBilling,
+		Missing: "private S3 (DATAPLANE_S3__snap__snap_hybrid_org_4) needs an S3 with listing (MinIO); the private ClickHouse target is wired"},
+	"self-hosted": {Shape: "sh-free",
+		Missing: "a from-worktree at a release tag (3.20.1: -from-dir <worktree at v3.20.1> -release 3.20.1) and its boot commands; 3.20.1's source layout differs from main's"},
+}
+
+// cloudBilling: main's SaaS runtime refuses to boot without a Stripe key; this one never reaches Stripe.
+var cloudBilling = map[string]string{"STRIPE_SECRET_KEY": "sk_test_upgradelab_never_sent"}
+
+// Tiers and shapes a cell accepts today; L and XL wait for the scale generator (lane L4).
+var (
+	Tiers      = []string{"S"}
+	DataShapes = []string{"typical"}
+)
+
+// processKeys are the only parent variables a child sees: never a provider key or a store URL.
+var processKeys = []string{"PATH", "HOME", "USER", "TMPDIR", "LANG", "SHELL"}
+
+// EnvInput is what a release's processes share: the profile, the stores and the public address.
+type EnvInput struct {
+	Profile Profile
+	Stores  Stores
+	APIPort int
+	Admin   string
+}
+
+// BuildEnv is the whole environment of every process in a cell, both releases alike.
+func BuildEnv(input EnvInput) (map[string]string, error) {
+	shape, err := seed.LoadShapeEnv(input.Profile.Shape)
+	if err != nil {
+		return nil, err
+	}
+	env := map[string]string{}
+	for _, key := range processKeys {
+		if value, ok := os.LookupEnv(key); ok {
+			env[key] = value
+		}
+	}
+	maps.Copy(env, shape.Values)
+	maps.Copy(env, shape.Secrets)
+	maps.Copy(env, input.Profile.Extra)
+	origin := "http://127.0.0.1:" + strconv.Itoa(input.APIPort) // main realigns a localhost origin to its PORT (alignDevAuthUrlsToPort)
+	maps.Copy(env, map[string]string{
+		"NODE_ENV": "development", "SKIP_ENV_VALIDATION": "true",
+		"DATABASE_URL": input.Stores.DatabaseURL(), "CLICKHOUSE_URL": input.Stores.ClickHouseURL(""),
+		"REDIS_URL": input.Stores.RedisURL(), "REDIS_DB_INDEX": "0",
+		"BASE_HOST": origin, "NEXTAUTH_URL": origin, "LANGWATCH_ENDPOINT": origin,
+		"LANGWATCH_NLP_SERVICE": "http://127.0.0.1:9", "ADMIN_EMAILS": adminEmails(env["ADMIN_EMAILS"], input.Admin),
+		"HAVEN_SEED_MODEL_PROVIDERS": "0",
+	})
+	routePrivateTargets(env, input.Stores, shape.PrivateTargets())
+	return env, nil
+}
+
+func adminEmails(existing, admin string) string {
+	emails := slices.DeleteFunc(strings.Split(existing, ","), func(email string) bool { return email == "" })
+	return strings.Join(append(emails, admin), ",")
+}
+
+// routePrivateTargets drops the shape file's compose-network URLs and routes each organization to its cell database.
+func routePrivateTargets(env map[string]string, stores Stores, targets map[string]string) {
+	for key := range env {
+		if strings.HasPrefix(key, "CLICKHOUSE_URL__") || strings.HasPrefix(key, "DATAPLANE_S3__") {
+			delete(env, key)
+		}
+	}
+	for label, organization := range targets {
+		env["CLICKHOUSE_URL__"+label+"__"+organization] = stores.ClickHouseURL(label)
+	}
+}
+
+// CheckSourceDir refuses a release directory holding a .env: both releases read one when it exists.
+func CheckSourceDir(dir string) error {
+	if _, err := os.Stat(filepath.Join(dir, "package.json")); err != nil {
+		return fmt.Errorf("%s is not a checkout: %w", dir, err)
+	}
+	for _, candidate := range []string{".env", "platform/app/.env", "apps/api/.env", "apps/worker/.env", "apps/tasks/.env"} {
+		if _, err := os.Stat(filepath.Join(dir, candidate)); err == nil {
+			return fmt.Errorf("refusing %s: it holds %s, which the release would read; remove it (worktree hooks copy the root .env in)", dir, candidate)
+		}
+	}
+	return nil
+}

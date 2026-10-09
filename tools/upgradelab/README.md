@@ -2,9 +2,34 @@
 
 The upgrade harness (ruling D3 in `.claude/tmp/handoffs/plan-upgrade-snapshots.md`, "Rulings (Alex,
 2026-10-09)"). It will take over what `dev/scripts/upgrade-rehearsal/` does (phases 0 to 7); that
-script retires once upgradelab covers it. Today it holds the snapshot format (plan §4, lane L1).
+script retires once upgradelab covers it. It holds the snapshot format (plan §4, lane L1), the
+generator (`generate`, plan §3) and the matrix cell runner (`cell`, plan §5).
 
-Spec: `specs/upgrade/upgrade-snapshots.feature`.
+Specs: `specs/upgrade/upgrade-snapshots.feature`, `upgrade-snapshot-generation.feature`,
+`upgrade-matrix.feature`.
+
+## A matrix cell (`cell`)
+
+```bash
+go build -o .bin/upgradelab/upgradelab ./cmd/upgradelab        # from the repo root
+.bin/upgradelab/upgradelab cell -deployment cloud -tier S -shape typical -seed 1
+```
+
+One cell from source, no Docker: the release it upgrades from (`-from-dir`, default
+`.worktrees/upgradelab-main` at origin/main) runs `start:prepare:db` and boots its app and worker on
+dedicated stores (`upgradelab_<cell>` on haven's native Postgres and ClickHouse, from `haven db url`,
+plus its own `redis-server`); the tenancy SQL, the seed account and every product kind are seeded;
+seeded traffic (OTLP traces, collector, logs, metrics, API-key reads and writes, tRPC reads) runs
+from before the cut until after ready; the old worker pauses so jobs queue; the old processes stop;
+head's api starts (`-head-dir`), its worker `-worker-delay` later, and the worker runs the upgrade
+itself. A poller records the api's phases (down, `holding:<phase>`, ready), Playwright screenshots
+each phase and Ops > Upgrades (`shots/`), and after settle the cell judges I0, I2, I2b, I3, I4, I6,
+I8, I9, N1 to N4 and O1 into `report.md` and `report.json`. Exit 0 all pass, 1 an invariant failed,
+2 a step stopped the cell (its databases are kept for inspection).
+
+Both checkouts must hold no `.env` (worktree hooks copy one in: delete it); every process gets an
+environment built from `seed/env/<shape>.env` and the cell's stores only. `-deployment` picks a
+`Profile` (`cell/profile.go`); a new deployment, tier or shape is a new entry there.
 
 ## Commands
 
@@ -52,6 +77,10 @@ Deviation from plan §4.1: gzip, not zstd, because the standard library has no z
 `klauspost/compress` would be a new `tools/go.mod` dependency. Only a fake implements it today.
 
 ## Not yet
+
+Cell: the hybrid profile's private S3, the self-hosted profile's release-tag worktree, tiers L and
+XL, the error-path drills (Retry, worker restart, api long before the worker), and snapshot
+restore as the cell's origin instead of a live seed.
 
 A real S3 client for `Objects` (and its `-objects` flag), `readback.json`, zstd for `redis.jsonl`, 1 GiB splitting, gitleaks
 over the rendered dumps, OCI push and pull, and the harness phases. See
