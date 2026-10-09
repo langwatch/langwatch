@@ -4,11 +4,15 @@
  * opens the board's modal at once with the cursor in its own input, so it never holds text.
  */
 
-import { Box, chakra, HStack, VStack } from "@langwatch/design-system/primitives";
-import { Sparkles } from "lucide-react";
+import { chakra, HStack, VStack } from "@langwatch/design-system/primitives";
 
-/** The prototype's hover ring: purple at a tenth, outside the gradient edge. */
-const HALO = "0 0 0 4px color-mix(in srgb, var(--chakra-colors-purple-500) 10%, transparent)";
+import {
+  ASK_BAR_PROMPT,
+  ASK_BAR_PROMPT_COLOR,
+  ASK_BAR_WORDS,
+  AskBarShell,
+  AskPill,
+} from "../elements/ask-bar-shell.tsx";
 
 export function BoardAskBar({
   onOpen,
@@ -24,61 +28,12 @@ export function BoardAskBar({
 }) {
   return (
     <VStack marginX="auto" marginBottom={5} maxWidth="640px" width="full" gap={2.5}>
-      <Box
-        width="full"
-        borderRadius="full"
-        padding="1px"
-        bgGradient="to-r"
-        gradientFrom="purple.400/60"
-        gradientVia="pink.400/40"
-        gradientTo="teal.400/50"
-        transition="box-shadow 0.15s"
-        _hover={{ boxShadow: HALO }}
-        _focusWithin={{ boxShadow: HALO }}
-      >
-        <chakra.button
-          type="button"
-          aria-label="What do you want to know?"
-          onClick={onOpen}
-          display="flex"
-          alignItems="center"
-          width="full"
-          height="40px"
-          gap={2.5}
-          paddingX={4}
-          borderRadius="full"
-          background="bg.panel"
-          cursor="text"
-          outline="none"
-          textAlign="left"
-        >
-          <Box as="span" flexShrink={0} color="purple.600" display="flex">
-            <Sparkles size={15} aria-hidden />
-          </Box>
-          <chakra.span
-            flex={1}
-            minWidth={0}
-            truncate
-            fontSize="sm"
-            fontWeight="medium"
-            color="purple.600/70"
-          >
-            What do you want to know?
-          </chakra.span>
-          <chakra.span
-            flexShrink={0}
-            borderRadius="full"
-            paddingX={2.5}
-            paddingY={0.5}
-            background="purple.50"
-            color="purple.600"
-            fontSize="11px"
-            fontWeight="medium"
-          >
-            Ask
-          </chakra.span>
-        </chakra.button>
-      </Box>
+      <AskBarShell onPress={onOpen}>
+        <chakra.span truncate color={ASK_BAR_PROMPT_COLOR} {...ASK_BAR_WORDS}>
+          {ASK_BAR_PROMPT}
+        </chakra.span>
+        <AskPill />
+      </AskBarShell>
       {onAsk && chips.length > 0 && (
         // Wrapping, never scrolling or clipping: a chip cut at the row's edge reads as a typo.
         <HStack
