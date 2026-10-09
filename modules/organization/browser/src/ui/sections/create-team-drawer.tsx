@@ -9,6 +9,7 @@ import { useOrganizationToaster } from "../../behavior/organization-feedback.ts"
 import { useDrawer } from "../../behavior/use-drawer.ts";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
 import { useRequiredSession } from "../../behavior/use-required-session.ts";
+import { memberLabel } from "../../model/member-label.ts";
 import { TeamUserRole } from "../../model/prisma-types.ts";
 import { TeamForm, type TeamFormData } from "./team-form.tsx";
 import { teamRolesOptions } from "./team-user-role-field.tsx";
@@ -26,7 +27,7 @@ export function CreateTeamDrawer({ open = true }: UiCreateTeamDrawerProps): Reac
       members: [
         {
           userId: {
-            label: `${session?.user.name} (${session?.user.email})`,
+            label: memberLabel({ name: session?.user.name, email: session?.user.email }),
             value: session?.user.id ?? "",
           },
           role: teamRolesOptions[TeamUserRole.ADMIN],

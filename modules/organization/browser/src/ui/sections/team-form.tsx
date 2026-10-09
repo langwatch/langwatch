@@ -44,6 +44,7 @@ import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-
 import { Select } from "@langwatch/design-system/select";
 
 import { useOrganizationToaster } from "../../behavior/organization-feedback.ts";
+import { memberLabel } from "../../model/member-label.ts";
 import { useOrganizationHost } from "../../model/organization-host.ts";
 import {
   TeamRoleSelect,
@@ -232,7 +233,7 @@ export const TeamForm = ({
   const userOptions = useMemo(
     () =>
       users.data?.map((user) => ({
-        label: `${user.name} (${user.email})`,
+        label: memberLabel(user),
         value: user.id,
       })) ?? [],
     [users.data],

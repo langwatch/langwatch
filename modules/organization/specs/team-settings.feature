@@ -13,3 +13,9 @@ Feature: The team settings page reads as main's does
     Given a team the reader may edit
     When the team settings page opens
     Then "Manage organization members" is a link to "/settings/members"
+
+  @unit
+  Scenario: A member with no display name is labelled by their email in team pickers
+    Given an account with an email but no display name
+    When it is offered as a team member
+    Then its label is the email alone, never "null"
