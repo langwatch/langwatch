@@ -114,6 +114,12 @@ var invariantNames = map[string]string{
 	"N3":  "no lost write: every 2xx write visible after settle",
 	"N4":  "queued work drains once head's worker runs",
 	"O1":  "Ops > Upgrades shows the right state",
+	"H3":  "a private organization reads its own trace and dataset through head",
+	"H4":  "objects land only in their tenant's S3: the private bucket holds the private project's, the shared none of them",
+	"H5":  "the shared tenant cannot read the private tenant's trace or dataset",
+	"D1":  "api before worker: a read meets 503 upgrade_in_progress with Retry-After and succeeds on retry",
+	"D2":  "head's worker killed mid-upgrade and restarted: the upgrade still completes",
+	"D3":  "a failed background step retried from Ops > Upgrades runs again to done",
 }
 
 // Summarize folds the calls by kind and by phase; visible holds each write id seen after settle.

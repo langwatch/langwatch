@@ -127,9 +127,21 @@ Feature: paymentsim, a local stand-in for Stripe
 
     @unit
     Scenario: haven points billing at paymentsim only when no Stripe credential is set
-      Given `haven up +payment` and an .env without STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET or STRIPE_API_BASE
+      Given `haven up` and an .env without STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET or STRIPE_API_BASE
       Then the app gets STRIPE_API_BASE at paymentsim and the paymentsim key and signing secret
       And a developer's own Stripe setting is never rewired
+
+    @unit
+    Scenario: Every haven stack runs paymentsim unless the worktree turned it off
+      Given a worktree whose selection file predates paymentsim being on by default
+      When `haven up` reads it
+      Then paymentsim runs
+      And `haven up -payment` still turns it off and is remembered
+
+    @unit
+    Scenario: haven up says which Stripe billing talks to
+      When `haven up` starts a stack
+      Then it prints "Stripe: paymentsim", or "Stripe: your key from .env" when a Stripe key is set
 
     @unit
     Scenario: A dev build hosts paymentsim in the combined process

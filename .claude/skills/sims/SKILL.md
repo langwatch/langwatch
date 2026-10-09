@@ -25,7 +25,7 @@ built by Vite into the Go package's `web/dist` and embedded (ADR-160,
 | `voicesim`     | ElevenLabs voice, OpenAI audio                      | `+voice`     | `voicesim`                                 | `VOICESIM_SEED`        |
 | `telemetrysim` | OTLP senders (traces, logs, metrics, coding agents) | `+telemetry` | [`telemetrysim`](../telemetrysim/SKILL.md) | `--seed` per run       |
 | `outboundsim`  | Slack, webhook receivers, SQS                       | `+outbound`  | `outboundsim`                              | `OUTBOUNDSIM_SEED`     |
-| `paymentsim`   | Stripe (API, signed webhooks, meters)               | `+payment`   | `paymentsim`                               | `PAYMENTSIM_CATALOG`   |
+| `paymentsim`   | Stripe (API, signed webhooks, meters)               | default      | `paymentsim`                               | `PAYMENTSIM_CATALOG`   |
 
 Each has a console at `<name>.<slug>.langwatch.localhost` (names: `llm`, `mail`, `storage`,
 `analytics`, `idp`, `voice`, `outbound`, `telemetry`) and logs via `haven logs <name>`. `haven up +llm +analytics`

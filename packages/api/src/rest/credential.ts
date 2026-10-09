@@ -219,6 +219,30 @@ export function projectCredentialOfRequest(request: Request): RestResolvedProjec
   return credential;
 }
 
+/** The code path a project key that stands for nobody proves its own project's trace read under. */
+export const OWNERLESS_PROJECT_KEY_PROOF_CODE_PATH = "api.rest.ownerless-project-key";
+
+/**
+ * Whether the project door admitted, for `projectId`, a key that stands for nobody: a legacy
+ * project key, or an API key with no owner. A run key minted for an unattended run acts as the
+ * system instead, so it is not one.
+ */
+export function admittedOwnerlessProjectKeyFor({
+  request,
+  projectId,
+}: {
+  request: Request;
+  projectId: string;
+}): boolean {
+  const credential = projectCredentials.get(request);
+  if (!credential || credential.project.id !== projectId) return false;
+  if (credential.type === "legacyProjectKey") return true;
+
+  return (
+    credential.type === "apiKey" && credential.userId === null && !credential.isUnattendedRunKey
+  );
+}
+
 /** The same, for the organization door. */
 export function organizationCredentialOfRequest(
   request: Request,

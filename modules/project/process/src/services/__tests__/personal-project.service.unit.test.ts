@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import { MemoryProjectDatabase } from "../../repositories/memory/memory.project.database.ts";
 import { MemoryProjectRepository } from "../../repositories/memory/memory.project.repository.ts";
 import { PersonalProjectService } from "../personal-project.service.ts";
+import { ProjectCredentialsService } from "../project-credentials.service.ts";
 
 const at = new Date("2026-01-01T00:00:00.000Z");
 const ALL_ON = { evaluations: true, datasets: true, annotations: true, automations: true };
@@ -58,6 +59,7 @@ function setup(...rows: Project[]) {
   const revived: { projectId: string; organizationId: string }[] = [];
   const service = PersonalProjectService.create({
     projects: MemoryProjectRepository.create({ memory }),
+    credentials: ProjectCredentialsService.create(),
     lifecycle: { revived: async (input) => void revived.push(input) },
   });
   return { service, revived, row: (id: string) => memory.findProject(id) };
@@ -134,7 +136,7 @@ describe("creating a personal team's personal project", () => {
   };
 
   /** @scenario "A personal team's fact creates its personal project with a key project mints" */
-  it("creates the project under the fact's id and slug with a key in the pkey_ format", async () => {
+  it("creates the project under the fact's id and slug with a key no door resolves", async () => {
     const { service, row } = setup();
 
     await service.create(fact);
@@ -146,7 +148,7 @@ describe("creating a personal team's personal project", () => {
       isPersonal: true,
       ownerUserId: "user-1",
     });
-    expect(row("project-p")?.apiKey).toMatch(/^pkey_[A-Za-z0-9_-]{40}$/);
+    expect(row("project-p")?.apiKey).toMatch(/^lw-revoked-/);
   });
 
   /** @scenario "A personal team's fact delivered twice creates one personal project" */

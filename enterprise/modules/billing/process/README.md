@@ -6,7 +6,7 @@ The server half of [billing](../README.md). Billing: subscriptions, invoices and
 
 ## Installation
 
-`defineProcessModule("billing").withRepositories(billingRepositories).withChannels(billingChannels).withApi(BillingModule).withTransports(connectedBillingTrpcTransport, billingStripeWebhookRest, currencyTrpcTransport, subscriptionTrpcTransport).withEventing(connectedBillingEventing).withEventing(billingReportingEventing).withEventing(billingLifecycleEventing).withMigrations(…).withTasks(…)`, `src/billing.module.ts:42`.
+`defineProcessModule("billing").withRepositories(billingRepositories).withChannels(billingChannels).withApi(BillingModule).withTransports(connectedBillingTrpcTransport, billingStripeWebhookRest, currencyTrpcTransport, subscriptionTrpcTransport).withEventing(connectedBillingEventing).withEventing(billingReportingEventing).withEventing(billingLifecycleEventing).withMigrations(…).withTasks(…)`, `src/billing.module.ts:43`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -367,8 +367,9 @@ Run by the tasks process, before serve.
 | config | `hubspotFormId`                     | `HUBSPOT_FORM_ID`                              | `../contract/src/billing.config.ts:23` |
 | config | `hubspotReachedLimitFormId`         | `HUBSPOT_REACHED_LIMIT_FORM_ID`                | `../contract/src/billing.config.ts:24` |
 | config | `bankDetails`                       | `LANGWATCH_BILLING_BANK_DETAILS`               | `../contract/src/billing.config.ts:25` |
-| config | `isSaas`                            | `IS_SAAS`                                      | `../contract/src/billing.config.ts:27` |
-| config | `publicBaseUrl`                     | `BASE_HOST`                                    | `../contract/src/billing.config.ts:29` |
-| config | `nodeEnvironment`                   | `NODE_ENV`                                     | `../contract/src/billing.config.ts:31` |
+| config | `stripeApiBase`                     | `STRIPE_API_BASE`                              | `../contract/src/billing.config.ts:27` |
+| config | `isSaas`                            | `IS_SAAS`                                      | `../contract/src/billing.config.ts:29` |
+| config | `publicBaseUrl`                     | `BASE_HOST`                                    | `../contract/src/billing.config.ts:31` |
+| config | `nodeEnvironment`                   | `NODE_ENV`                                     | `../contract/src/billing.config.ts:33` |
 
 <!-- readme:generated:end -->

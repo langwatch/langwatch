@@ -69,8 +69,9 @@ type Selection struct {
 	// default: it keeps the product's outbound messages from their real
 	// destinations. `haven up +outbound` once.
 	Outbound bool `json:"outbound"`
-	// Payment is the Stripe stand-in (paymentsim). Off by default; when on and
-	// .env names no Stripe key, billing talks to it. `haven up +payment` once.
+	// Payment is the Stripe stand-in (paymentsim). On by default: when .env and
+	// the shell name no Stripe key, billing talks to it; a developer's own Stripe
+	// keys are used as they are. `haven up -payment` turns the lane off.
 	Payment bool `json:"payment"`
 	// Telemetry is the OTLP sender (telemetrysim). On by default like Mail: one
 	// small Go process that sends nothing until asked, and its console is
@@ -79,10 +80,10 @@ type Selection struct {
 }
 
 // DefaultSelection is a fresh worktree's lean default: the two Node lanes,
-// gateway, nlp, the idp simulator and the mail sink — no langy, no langevals,
-// and neither of the two developer tools (design-system, mail-room).
+// gateway, nlp, the idp, mail, storage, payment and telemetry simulators — no
+// langy, no langevals, and neither developer tool (design-system, mail-room).
 func DefaultSelection() Selection {
-	return Selection{Gateway: true, NLP: true, IDP: true, Mail: true, Storage: true, Telemetry: true}
+	return Selection{Gateway: true, NLP: true, IDP: true, Mail: true, Storage: true, Payment: true, Telemetry: true}
 }
 
 // SelectableServices are the names ±deltas accept, in display order.

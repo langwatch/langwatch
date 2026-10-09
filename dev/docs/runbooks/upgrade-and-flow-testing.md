@@ -309,6 +309,8 @@ haven status --agent          # slug = flows-<name>; app at https://app.flows-<n
   reaches a real provider, the `.env` names `OPENAI_BASE_URL`: remove that line in the worktree's
   `.env`, then `haven down` and `haven up` again.
 - Seed: `haven db seed demo` today; `haven seed --persona <p> --size <n> --days <d>` (planned, SG7).
+- Credentials: none to fetch. Stripe is paymentsim on every haven stack unless `.env` sets a Stripe
+  key; haven makes up the rest, and `haven seed --json --reveal` prints the logins, slugs and keys.
 - **Plug in after upgrade:** point a stack at a kept cell's stores (`-keep`) to prove each flow on
   upgraded data. ❌ There is no haven verb for "use these stores" yet (L9, `haven db snapshot`).
   Until then, run flows on a fresh head stack and on U1's restored snapshot once L6a lands.

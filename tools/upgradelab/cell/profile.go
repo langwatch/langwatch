@@ -1,6 +1,7 @@
 package cell
 
 import (
+	"encoding/json"
 	"fmt"
 	"maps"
 	"os"
@@ -20,15 +21,15 @@ type Profile struct {
 	Missing string // non-empty: the profile cannot run yet, and why
 	// StopStart: one instance, so the old release stops before head starts; else a rolling deploy.
 	StopStart bool
+	// Objects: the cell runs its own S3 (storagesim), shared and one per private object target.
+	Objects bool
 }
 
 // Profiles are the deployments a cell runs; a new deployment is one entry here.
 var Profiles = map[string]Profile{
-	"cloud": {Shape: "saas", Extra: cloudBilling},
-	"hybrid": {Shape: "hybrid", Extra: cloudBilling,
-		Missing: "private S3 (DATAPLANE_S3__snap__snap_hybrid_org_4) needs an S3 with listing (MinIO); the private ClickHouse target is wired"},
-	"self-hosted": {Shape: "sh-free", StopStart: true,
-		Missing: "a from-worktree at a release tag (3.20.1: -from-dir <worktree at v3.20.1> -release 3.20.1) and its boot commands; 3.20.1's source layout differs from main's"},
+	"cloud":       {Shape: "saas", Extra: cloudBilling},
+	"hybrid":      {Shape: "hybrid", Extra: cloudBilling, Objects: true},
+	"self-hosted": {Shape: "sh-free", StopStart: true}, // -from-dir a tree at a release tag; 3.20.1 boots as main does
 }
 
 // cloudBilling: main's SaaS runtime refuses to boot without a Stripe key; this one never reaches Stripe.
@@ -76,6 +77,7 @@ func BuildEnv(input EnvInput) (map[string]string, error) {
 		"HAVEN_SEED_MODEL_PROVIDERS": "0",
 	})
 	routePrivateTargets(env, input.Stores, shape.PrivateTargets())
+	routeObjects(env, input.Stores, shape.PrivateObjectTargets())
 	return env, nil
 }
 
@@ -93,6 +95,22 @@ func routePrivateTargets(env map[string]string, stores Stores, targets map[strin
 	}
 	for label, organization := range targets {
 		env["CLICKHOUSE_URL__"+label+"__"+organization] = stores.ClickHouseURL(label)
+	}
+}
+
+// routeObjects points the shared S3 settings and each private organization's account at the cell's storagesims.
+func routeObjects(env map[string]string, stores Stores, targets map[string]string) {
+	if _, ok := stores.S3[""]; !ok {
+		return
+	}
+	shared := stores.ObjectAccount("")
+	maps.Copy(env, map[string]string{"STORED_OBJECTS_BACKEND": "s3", "S3_ENDPOINT": shared.Endpoint, "S3_BUCKET_NAME": shared.Bucket,
+		"S3_ACCESS_KEY_ID": shared.AccessKeyID, "S3_SECRET_ACCESS_KEY": shared.SecretAccessKey, "S3_REGION": "auto"})
+	for label, organization := range targets {
+		if _, ok := stores.S3[label]; ok {
+			account, _ := json.Marshal(stores.ObjectAccount(label))
+			env["DATAPLANE_S3__"+label+"__"+organization] = string(account)
+		}
 	}
 }
 

@@ -48,6 +48,8 @@ func refused(format string, args ...any) error {
 type SeedRequest struct {
 	Args []string
 	Live bool
+	// JSON and Reveal shape the access block printed after a seed (SeedAccess).
+	JSON, Reveal bool
 }
 
 // seedTarget is the stack a seed writes into and the environment seedgen's task child runs with.
@@ -167,7 +169,7 @@ func (o *Orchestrator) Seed(ctx context.Context, p UpParams, req SeedRequest) er
 	if code != 0 {
 		return &SeedExit{Code: code, Err: fmt.Errorf("haven seed: seedgen exited %d; `haven seed status` shows the last run", code)}
 	}
-	return nil
+	return o.printSeedAccess(p, req.JSON, req.Reveal)
 }
 
 // seedableStack is the registered stack of slug, refused when its launcher or api is down.

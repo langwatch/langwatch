@@ -50,12 +50,12 @@ void describe("product seeds", () => {
       "workflow",
       "slack",
       "report",
-      "suite",
       "dataset",
       "evaluator",
       "prompt",
       "monitor",
       "scenario",
+      "suite",
     ]);
 
     const head = fakeWire({ failReads: ["suites.getAll"] });

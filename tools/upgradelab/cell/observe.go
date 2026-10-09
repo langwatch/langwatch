@@ -196,8 +196,8 @@ func clickhouseExec(ctx context.Context, server, statement string) error {
 	return err
 }
 
-// StoredIDs answers which of the ids each ingest kind wrote are in ClickHouse for the project.
-func StoredIDs(ctx context.Context, stores Stores, project string) (map[string]map[string]bool, error) {
+// StoredIDs answers which of the ids each ingest kind wrote are on one ClickHouse target for the project.
+func StoredIDs(ctx context.Context, stores Stores, label, project string) (map[string]map[string]bool, error) {
 	queries := map[string]string{
 		"spans":   "SELECT DISTINCT TraceId FROM stored_spans WHERE TenantId = '%s' FORMAT TSV",
 		"logs":    "SELECT DISTINCT WireTraceId FROM log_records WHERE TenantId = '%s' FORMAT TSV",
@@ -205,7 +205,7 @@ func StoredIDs(ctx context.Context, stores Stores, project string) (map[string]m
 	}
 	found := map[string]map[string]bool{}
 	for name, query := range queries {
-		out, err := clickhouseQuery(ctx, stores.queryURL(""), fmt.Sprintf(query, strings.ReplaceAll(project, "'", "")))
+		out, err := clickhouseQuery(ctx, stores.queryURL(label), fmt.Sprintf(query, strings.ReplaceAll(project, "'", "")))
 		if err != nil {
 			return nil, err
 		}

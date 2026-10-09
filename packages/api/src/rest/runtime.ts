@@ -4,6 +4,7 @@ import {
   type Authorization,
   type AuthzDeclaredScopeId,
   type AuthzPermission,
+  internalActor,
   writesUnderProject,
 } from "@langwatch/authorization";
 import { HandledError } from "@langwatch/handled-error";
@@ -67,6 +68,10 @@ import {
   type HttpMethod,
   type VersionStatus,
 } from "./addressing.ts";
+import {
+  admittedOwnerlessProjectKeyFor,
+  OWNERLESS_PROJECT_KEY_PROOF_CODE_PATH,
+} from "./credential.ts";
 import {
   DOOR_SCOPE_TIER,
   permissionOf,
@@ -1417,7 +1422,7 @@ function handlerMiddleware<Api>({
     const actor = doorActorOf({ credential, actor: decision.actor });
     const authorization = await mintAuthorization({
       permission: route.permission,
-      actor,
+      actor: actor ?? ownerlessKeyProofActor({ credential, request: context.req.raw, resolved }),
       scope: resolved,
       authorize,
       route: `${family}.${route.operation}`,
@@ -2322,6 +2327,26 @@ function doorActorOf({
   actor: Actor | null;
 }): Actor | null {
   return credential !== "browser" && DOOR_SCOPE_TIER[credential] === null ? null : actor;
+}
+
+/**
+ * A project key that stands for nobody proves its own project's read as the door's own,
+ * as main did; the door already asked the key's access. Nothing else gets an actor here.
+ */
+function ownerlessKeyProofActor({
+  credential,
+  request,
+  resolved,
+}: {
+  credential: RestDoorCredential;
+  request: Request;
+  resolved: AuthzDeclaredScopeId | null;
+}): Actor | null {
+  if (credential !== "project" || resolved?.tier !== "project") return null;
+
+  return admittedOwnerlessProjectKeyFor({ request, projectId: resolved.id })
+    ? internalActor(OWNERLESS_PROJECT_KEY_PROOF_CODE_PATH)
+    : null;
 }
 
 /**

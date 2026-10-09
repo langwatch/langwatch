@@ -51,7 +51,7 @@ func TestEveryProfileRoutesToTheCellsOwnStores(t *testing.T) {
 			t.Fatalf("%s: %v", name, err)
 		}
 		for key, value := range env {
-			if strings.Contains(value, "clickhouse-private:") || strings.Contains(value, "storagesim:") || strings.HasPrefix(key, "DATAPLANE_S3__") {
+			if strings.Contains(value, "clickhouse-private:") || strings.Contains(value, "storagesim:") {
 				t.Errorf("%s: compose-network value survived in %s", name, key)
 			}
 		}
@@ -65,6 +65,11 @@ func TestEveryProfileRoutesToTheCellsOwnStores(t *testing.T) {
 	hybrid, _ := BuildEnv(EnvInput{Profile: Profiles["hybrid"], Stores: stores, APIPort: 7100})
 	if got := hybrid["CLICKHOUSE_URL__snap__snap_hybrid_org_4"]; got != "http://d:p@127.0.0.1:8123/upgradelab_x_p_snap" {
 		t.Errorf("hybrid private target = %q", got)
+	}
+	stores.S3 = map[string]int{"": 7201, "snap": 7202}
+	hybrid, _ = BuildEnv(EnvInput{Profile: Profiles["hybrid"], Stores: stores, APIPort: 7100})
+	if got := hybrid["DATAPLANE_S3__snap__snap_hybrid_org_4"]; !strings.Contains(got, `"endpoint":"http://127.0.0.1:7202"`) || hybrid["S3_ENDPOINT"] != "http://127.0.0.1:7201" {
+		t.Errorf("hybrid object stores not the cell's: private %q shared %q", got, hybrid["S3_ENDPOINT"])
 	}
 }
 

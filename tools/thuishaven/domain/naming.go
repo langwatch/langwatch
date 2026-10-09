@@ -76,8 +76,8 @@ const AnalyticsService = "analytics"
 // outbound.<slug>.langwatch.localhost. Opt-in like analytics.
 const OutboundService = "outbound"
 
-// PaymentService is the Stripe stand-in (services/paymentsim), opt-in like
-// outbound. It answers billing's Stripe client and signs webhooks to the app.
+// PaymentService is the Stripe stand-in (services/paymentsim), on by default
+// like storage. It answers billing's Stripe client and signs webhooks to the app.
 const PaymentService = "payment"
 
 // TelemetryService is the OTLP sender (services/telemetrysim) that drives

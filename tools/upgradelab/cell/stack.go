@@ -25,7 +25,8 @@ type Stores struct {
 	PostgresBase, ClickHouseBase string // server URLs with credentials, no database
 	Name                         string // upgradelab_<cell>
 	RedisPort                    string
-	Private                      []string // private ClickHouse labels (hybrid)
+	Private                      []string       // private ClickHouse labels (hybrid)
+	S3                           map[string]int // storagesim port per object target: "" shared, else a private label
 }
 
 // DatabaseURL is the Prisma URL both releases share; schema mydb matches the tenancy SQL.

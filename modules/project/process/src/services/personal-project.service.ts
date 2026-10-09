@@ -1,5 +1,3 @@
-import { randomBytes } from "node:crypto";
-
 import type {
   PersonalFeatures,
   PersonalTeamCreatedEventData,
@@ -7,20 +5,13 @@ import type {
 import { Temporal } from "@langwatch/time";
 
 import type { ProjectRepository } from "../repositories/project.repository.ts";
+import type { ProjectCredentials } from "./project-credentials.service.ts";
 import type { ProjectCreatedNoticeService } from "./project-created-notice.service.ts";
-
-/** The personal project's ingestion key length, in the `pkey_` format organization minted. */
-const PERSONAL_PROJECT_API_KEY_CHARS = 40;
-
-function personalProjectApiKey(): string {
-  const random = randomBytes(Math.ceil((PERSONAL_PROJECT_API_KEY_CHARS * 3) / 4)).toString(
-    "base64url",
-  );
-  return `pkey_${random.slice(0, PERSONAL_PROJECT_API_KEY_CHARS)}`;
-}
 
 type PersonalProjectDependencies = Readonly<{
   projects: ProjectRepository;
+  /** Fills the required key column with a value no door resolves (ADR-002). */
+  credentials: Pick<ProjectCredentials, "generateApiKey">;
   lifecycle: Pick<ProjectCreatedNoticeService, "revived">;
 }>;
 
@@ -48,8 +39,7 @@ export class PersonalProjectService {
     return this.deps.projects.createPersonal({
       id: projectId,
       slug: projectSlug,
-      // Minted here, never carried by the fact, so no key enters the event log.
-      apiKey: personalProjectApiKey(),
+      apiKey: this.deps.credentials.generateApiKey(),
       teamId,
       ownerUserId: userId,
     });

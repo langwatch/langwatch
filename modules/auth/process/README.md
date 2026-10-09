@@ -610,40 +610,40 @@ Answers at `/api/auth/session`.
 
 ```typescript
 type Headers = z.infer<typeof COOKIE_HEADERS>; // src/transport/auth.rest.ts:70
-// Response: inline, src/transport/auth.rest.ts:111
+// Response: inline, src/transport/auth.rest.ts:110
 type Response = unknown;
 ```
 
 #### `GET /api/auth/logout` · `endBrowserSessionAndRedirect`
 
-Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:116`.
+Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:115`.
 
 Answers at `/api/auth/logout`.
 
 ```typescript
-// Response: inline, src/transport/auth.rest.ts:119
+// Response: inline, src/transport/auth.rest.ts:117
 type Response = unknown;
 ```
 
 #### `POST /api/auth/logout` · `endBrowserSession`
 
-Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:122`.
+Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:120`.
 
 Answers at `/api/auth/logout`.
 
 ```typescript
-// Response: inline, src/transport/auth.rest.ts:125
+// Response: inline, src/transport/auth.rest.ts:122
 type Response = unknown;
 ```
 
 #### `ALL /api/auth/*` · `betterAuthHandshake`
 
-Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:133`.
+Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:130`.
 
 Answers at `/api/auth/*`.
 
 ```typescript
-// Response: inline, src/transport/auth.rest.ts:136
+// Response: inline, src/transport/auth.rest.ts:132
 type Response = unknown;
 ```
 
