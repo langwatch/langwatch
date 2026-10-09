@@ -137,6 +137,7 @@ dev/tests/agentic-e2e/tests/seed.spec.ts
 dev/tests/agentic-e2e/node_modules/
 seed.spec.ts
 .playwright-mcp/
+.playwright-cli/
 .mcp.local.json
 
 # Browser-QA screenshot artifacts (published via the pr-screenshots repo, never committed here)
