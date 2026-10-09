@@ -74,6 +74,51 @@ Feature: The insights inbox
       And reading the row back gives the same pointer
 
     @integration
+    Scenario: The row shows the board and the widget an insight came from
+      Given an insight that came from a widget on a board
+      When a member reads the row
+      Then under the title the row hands the board and the widget, ids and names, to the dashboards trail
+      And where nothing draws the trail the names read as they were filed
+
+    @integration
+    Scenario: The row links to the board and the widget while they exist
+      Given an insight that came from a widget on a board
+      And the board and the widget still exist
+      When a member reads the row
+      Then the board's name and the widget's name each link to the board
+
+    @integration
+    Scenario: A deleted board leaves plain names on the row
+      Given an insight that came from a widget on a board
+      And the board was deleted
+      When a member reads the row
+      Then the board reads as its name as filed with "(deleted)" and has no link
+      And the widget's name as filed has no link
+
+    @integration
+    Scenario: A deleted widget leaves its name on the row
+      Given an insight that came from a widget on a board
+      And the widget was removed from the board
+      When a member reads the row
+      Then the board's name still links to the board
+      And the widget reads as its name as filed with "(deleted)" and has no link
+
+    @integration
+    Scenario: A reader without Dashboards reads the names without links
+      Given an insight that came from a widget on a board
+      And Dashboards is not open to the reader
+      When the reader reads the row
+      Then the board and the widget read as their names as filed, with no link
+      And neither is called deleted
+
+    @integration
+    Scenario: The row says how the insight was filed
+      Given an insight a member saved from a Langy answer
+      When a member reads the row
+      Then under the title it reads "Saved from a chat with Langy"
+      And an insight filed by a run reads "Daily run"
+
+    @integration
     Scenario: Saving a Langy answer about a board passes the pointer and the window
       Given a Langy answer that names the board, the widget, the query and the window it read
       When a member saves it as an insight

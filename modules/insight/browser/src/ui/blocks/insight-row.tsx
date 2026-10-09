@@ -9,14 +9,16 @@ import { type InsightEntry, type InsightFolder, insightSnippet } from "@langwatc
 import {
   Check,
   Clock3,
+  LayoutDashboard,
   type LucideIcon,
   MessageCircleMore,
   RotateCcw,
   ThumbsDown,
 } from "lucide-react";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 
 import {
+  FILED_VIA_WORDS,
   insightValidity,
   insightWhen,
   TONE_PRESENTATION,
@@ -43,6 +45,7 @@ export function InsightRow({
   unread,
   now,
   actions,
+  boardTrail,
 }: {
   entry: InsightEntry;
   folder: InsightFolder;
@@ -50,6 +53,8 @@ export function InsightRow({
   unread: boolean;
   now: number;
   actions: InsightRowActions;
+  /** "Board › Widget" for the pointer the insight carries; absent when it carries none. */
+  boardTrail?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const expanded = density === "expanded" || open;
@@ -108,6 +113,32 @@ export function InsightRow({
           >
             {entry.title}
           </Text>
+
+          <HStack
+            marginTop={1}
+            gap={1}
+            rowGap={0.5}
+            flexWrap="wrap"
+            minWidth={0}
+            fontSize="11px"
+            color="fg.muted"
+            data-testid="insight-origin"
+          >
+            {boardTrail && (
+              <>
+                <Box as="span" display="flex" flexShrink={0} color="fg.subtle">
+                  <LayoutDashboard size={11.5} aria-hidden />
+                </Box>
+                {boardTrail}
+                <Text as="span" color="fg.subtle" aria-hidden>
+                  ·
+                </Text>
+              </>
+            )}
+            <Text as="span" color="fg.subtle">
+              {FILED_VIA_WORDS[entry.filedVia]}
+            </Text>
+          </HStack>
 
           <Text marginTop={1} fontSize="10.5px" color={VALIDITY_COLOR[validity.tone]}>
             {validity.text}

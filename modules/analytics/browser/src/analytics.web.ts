@@ -6,6 +6,7 @@
 
 import {
   CustomGraphToken,
+  DashboardPointerToken,
   FilterSidebarToken,
   SavedDashboardsToken,
   StarredDashboardsToken,
@@ -112,6 +113,13 @@ export const analyticsWeb = defineBrowserModule("analytics")
     load: async () => ({
       default: (await import("./features/dashboards/ui/sections/starred-dashboards-section.tsx"))
         .StarredDashboardsSection,
+    }),
+  })
+  /** A kept pointer to a board and a widget, lent to the insight row that names its origin. */
+  .lends(DashboardPointerToken, {
+    load: async () => ({
+      default: (await import("./features/dashboards/ui/sections/dashboard-pointer.tsx"))
+        .DashboardPointer,
     }),
   })
   /** The trace filter sidebar, lent to the evaluator's sample picker (§3.4 rule 7). */

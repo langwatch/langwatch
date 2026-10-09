@@ -81,3 +81,17 @@ export type CustomGraphProps = {
 };
 
 export const CustomGraphToken = uiTokens("analytics").component<CustomGraphProps>("customGraph");
+
+/**
+ * A pointer a peer kept to a board and one widget on it: ids, and the names as they were.
+ * Analytics draws it as links while they exist and as the kept names once they are gone.
+ * Never a relation: the board or the widget may have been renamed or deleted since.
+ */
+export type DashboardPointerProps = {
+  boardId: string;
+  boardName: string;
+  widget?: { id: string; name: string };
+};
+
+export const DashboardPointerToken =
+  uiTokens("analytics").component<DashboardPointerProps>("dashboardPointer");

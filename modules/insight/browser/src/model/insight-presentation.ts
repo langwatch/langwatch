@@ -5,6 +5,7 @@
 
 import {
   type InsightEntry,
+  type InsightFiledVia,
   type InsightFolder,
   type InsightTone,
   insightEffectiveAt,
@@ -17,6 +18,12 @@ export const TONE_PRESENTATION: Record<InsightTone, { label: string; color: stri
   bad: { label: "Warning", color: "red.solid" },
   watch: { label: "Worth a look", color: "yellow.solid" },
   good: { label: "Good news", color: "green.solid" },
+};
+
+/** How it was filed, in words. Says nothing of who else sees it. */
+export const FILED_VIA_WORDS: Record<InsightFiledVia, string> = {
+  chat: "Saved from a chat with Langy",
+  run: "Daily run",
 };
 
 /** "Today · 07:00", "Yesterday · 07:00", or "Oct 3 · 07:00". */

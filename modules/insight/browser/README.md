@@ -23,7 +23,7 @@ None.
 ## Calls
 
 - `withApi(insightApi)`, tRPC contracts: `insights.*`.
-- Client packages (package.json): `@langwatch/langy-client`.
+- Client packages (package.json): `@langwatch/analytics-client`, `@langwatch/langy-client`.
 - Lends: `InsightsBellToken`, `InsightsNavCountToken`, `LangyAnswerActionToken`.
 - Host APIs it requires: `InsightHostApi`.
 

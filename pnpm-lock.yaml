@@ -9726,6 +9726,9 @@ importers:
 
   modules/insight/browser:
     dependencies:
+      '@langwatch/analytics-client':
+        specifier: workspace:*
+        version: link:../../analytics/client
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
