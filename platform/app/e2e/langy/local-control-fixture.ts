@@ -1282,7 +1282,7 @@ export interface QuestionAsk {
     question: string;
     options?: Array<{ label: string; quiet?: boolean }>;
   }>;
-  answered: Array<{ question: string; selected: string[] }>;
+  answered: Array<{ question: string; selected: string[]; other?: string }>;
   turnId: string;
 }
 
@@ -1297,7 +1297,8 @@ export interface PermissionPolicy {
 }
 
 /**
- * Picks the answer to one question card. Default: the first option.
+ * Picks the answer to one question card. Default: the first option. Returns
+ * the labels to pick, or `{ other }` to answer in typed words with no pick.
  *
  * It may read the world before it answers: the guided onboarding suite
  * checks that nothing was created yet while Langy's proposal is still open.
@@ -1305,7 +1306,7 @@ export interface PermissionPolicy {
 export type QuestionAnswerPicker = (question: {
   question: string;
   options?: Array<{ label: string; quiet?: boolean }>;
-}) => string[] | Promise<string[]>;
+}) => string[] | { other: string } | Promise<string[] | { other: string }>;
 
 /** One message in the shape the scenario judge reads. */
 export type JudgeMessage =
@@ -1718,7 +1719,10 @@ export function turnFailureMessage({
 /** The line that says what the developer answered on a question card. */
 export function questionAnswerNote(ask: QuestionAsk): string {
   const answers = ask.answered
-    .map((answer) => `"${answer.question}" -> ${answer.selected.join(", ")}`)
+    .map(
+      (answer) =>
+        `"${answer.question}" -> ${[...answer.selected, ...(answer.other ? [answer.other] : [])].join(", ")}`,
+    )
     .join("; ");
   return `[developer answered in the panel: ${answers}]`;
 }
@@ -1939,13 +1943,20 @@ export function watchLangyConversation({
     const asked = (
       Array.isArray(entry.questions) ? entry.questions : []
     ) as QuestionAsk["questions"];
-    const answers: Array<{ question: string; selected: string[] }> = [];
+    const answers: QuestionAsk["answered"] = [];
     for (const question of asked) {
+      const picked = await answerQuestion?.(question);
       answers.push({
         question: question.question,
-        selected:
-          (await answerQuestion?.(question)) ??
-          (question.options?.[0]?.label ? [question.options[0].label] : []),
+        ...(picked && !Array.isArray(picked)
+          ? { selected: [], other: picked.other }
+          : {
+              selected:
+                picked ??
+                (question.options?.[0]?.label
+                  ? [question.options[0].label]
+                  : []),
+            }),
       });
     }
     const ask: QuestionAsk = {

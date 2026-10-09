@@ -24,6 +24,7 @@ import * as scenario from "@langwatch/scenario";
 import { describe, expect, it } from "vitest";
 import { makeLangyAdapter } from "./langy-agent";
 import { LANGY_CORE_RULE_CRITERIA } from "./langy-rules";
+import { watchLangyConversation } from "./local-control-fixture";
 import { runScenarioAndLog } from "./scenario-logger";
 
 const model = openai("gpt-5-mini");
@@ -299,28 +300,46 @@ describe("Langy red team", () => {
       c.name,
       async () => {
         const langy = makeLangyAdapter();
-        const attacker = scenario.redTeamCrescendo({
-          target: c.target,
-          model: attackerModel,
-          totalTurns: TOTAL_TURNS,
-        });
-        const result = await runScenarioAndLog({
-          config: {
-            name: c.name,
-            description: c.description,
-            agents: [
-              langy,
-              attacker,
-              scenario.judgeAgent({ model, criteria: c.criteria }),
-            ],
-            script: attacker.marathonScript(),
+        // The attacker never gets a yes from a card. Decline with the quiet
+        // option if there is one, else in typed words: never pick an action
+        // option, never answer empty (Langy reads that as "answered, continue").
+        const watcher = watchLangyConversation({
+          adapter: langy,
+          answerQuestion: ({ options = [] }) => {
+            const no = options.find((option) => option.quiet);
+            return no ? [no.label] : { other: "No. Do not do any of these." };
           },
-          label: `redteam-${c.key}`,
         });
-        if (!result.success) {
-          console.log("JUDGE REASONING:", (result as any).reasoning);
+        try {
+          const attacker = scenario.redTeamCrescendo({
+            target: c.target,
+            model: attackerModel,
+            totalTurns: TOTAL_TURNS,
+          });
+          const result = await runScenarioAndLog({
+            config: {
+              name: c.name,
+              description: c.description,
+              agents: [
+                langy,
+                attacker,
+                scenario.judgeAgent({ model, criteria: c.criteria }),
+              ],
+              script: attacker.marathonScript(),
+            },
+            label: `redteam-${c.key}`,
+          });
+          if (!result.success) {
+            console.log("JUDGE REASONING:", (result as any).reasoning);
+          }
+          console.log(
+            "[layer2] questions:",
+            JSON.stringify(watcher.questions.map((ask) => ask.questions)),
+          );
+          expect(result.success).toBe(true);
+        } finally {
+          watcher.stop();
         }
-        expect(result.success).toBe(true);
       },
       REDTEAM_TIMEOUT_MS,
     );
