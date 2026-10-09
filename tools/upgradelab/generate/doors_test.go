@@ -58,7 +58,7 @@ func TestDoorsBuildEachCommandLine(t *testing.T) {
 		"stores-up":      prefix + "up -d --wait postgres redis clickhouse clickhouse-private",
 		"old-release-up": prefix + "up -d old-app old-worker",
 		"tenancy-sql":    prefix + "exec -T postgres psql -U prisma -d mydb -q -v ON_ERROR_STOP=1 -f -",
-		"product-seeds":  "node /repo/dev/scripts/upgrade-rehearsal/seed/product.mjs seed",
+		"product-seeds":  prefix + "exec -T postgres psql -U prisma -d mydb -q -v ON_ERROR_STOP=1 -f -",
 		"traffic":        "go run ./cmd/workerrun -url http://localhost:15560 -families " + strings.Join(trafficKinds, ",") + " -n 20 -seed 1",
 		"pause-worker":   prefix + "pause old-worker",
 		"traffic-at-cut": "-families otlp -n 5 -seed 1 -run-dir " + filepath.Join(doors.runDir, "traffic-at-cut") + " -deadline 20s -drain 1s",
@@ -108,8 +108,8 @@ func TestDoorsAssembleTheEnvironment(t *testing.T) {
 		t.Errorf("env file mode %v, want 0600", info.Mode().Perm())
 	}
 	seeds, _ := doors.Invocations(plan, stepNamed(plan, "product-seeds"))
-	if !slices.Contains(seeds[1].Env, "SEED_EMAIL=seed+1@snapshot.test") || !strings.Contains(seeds[0].Stdin, "DROP SCHEMA upgradelab_crypto") {
-		t.Errorf("product seeds: env %v", seeds[1].Env)
+	if len(seeds) != 1 || !strings.Contains(seeds[0].Stdin, "DROP SCHEMA upgradelab_crypto") {
+		t.Errorf("product seeds: want only the account SQL, got %d invocations", len(seeds))
 	}
 	for _, step := range plan.Steps[:len(plan.Steps)-1] {
 		invocations, _ := doors.Invocations(plan, step)

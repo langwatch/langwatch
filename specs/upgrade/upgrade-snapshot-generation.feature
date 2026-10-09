@@ -85,3 +85,49 @@ Feature: Generating a typical upgrade snapshot from an old release
     Given two generation runs planned at the same time
     When each builds its doors
     Then the app and the four store ports are all different across both runs
+
+  @unit
+  Scenario: each product kind is created through the old release's doors
+    Given an old app that answers its sign-in, tRPC and collector doors
+    When the product seeds run signed in as the seed account
+    Then privacy, retention, annotation, workflow, slack, report and suite are each created by their tRPC mutation
+    And the organisation, project, API key and trace come from the old app's own answers
+    And the kinds with no headless seed are skipped naming why
+    And no row is written by SQL
+
+  @unit
+  Scenario: a product kind the old app refuses fails the step naming the kind
+    Given an old app that refuses "workflow.create"
+    When the product seeds run
+    Then every other kind is still created
+    And the step fails naming "workflow" and the old app's answer
+
+  @unit
+  Scenario: a failed sign-in stops the run naming the step
+    Given an old app that refuses the seed account's sign-in
+    When the product seeds run
+    Then the step fails saying the sign-in was refused
+    And no product kind was requested
+
+  @unit
+  Scenario: a sign-in that sets no session cookie is refused
+    Given an old app whose sign-in answers 200 without a better-auth session cookie
+    When the product seeds run
+    Then the step fails saying the sign-in set no session cookie
+
+  @unit
+  Scenario: an unknown recipe version is refused
+    When a snapshot names recipe version 2
+    Then it is refused naming version 2 and the known version 1
+
+  @unit
+  Scenario: a generated snapshot holds every expected product kind
+    Given product seeds that created each seedable kind once
+    When the expectation is checked after capture
+    Then it passes
+
+  @unit
+  Scenario: an Expect miss names the kind and the count
+    Given a captured snapshot whose old app lists no "suite"
+    When the expectation is checked after capture
+    Then it fails naming "suite", the count 0 and the expected count 1
