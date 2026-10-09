@@ -63,7 +63,7 @@ Feature: One OpenTelemetry setup every process uses
       Given a process, in production or not, whose metrics exporter lists "prometheus" and no METRICS_API_KEY
       When its metrics are composed
       Then no pull port is opened and the boot log says to set METRICS_API_KEY
-      # Fail-closed in every environment, as the Go gateway's door is. LANGWATCH_METRICS_TOKEN never shipped and opens nothing.
+      # Fail-closed in every environment, as the Go gateway's door is. Only METRICS_API_KEY opens it.
 
     @unit
     Scenario: Metrics are switched off entirely

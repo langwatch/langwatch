@@ -64297,7 +64297,6 @@ Docker Compose starts the following services:
 | Service         | Image                                   | Host port | Description                 |
 | --------------- | --------------------------------------- | --------- | --------------------------- |
 | `app`           | `langwatch/langwatch:latest`            | 5560      | Main application            |
-| `migrate`       | `langwatch/langwatch:latest`            | -         | One-shot: runs `pnpm task upgrade`, then exits |
 | `workers`       | `langwatch/langwatch:latest`            | -         | Background job processing   |
 | `langwatch_nlp` | `langwatch/langwatch_nlp:latest`        | -         | NLP processing, workflows   |
 | `langevals`     | `langwatch/langevals:latest`            | 5562      | Evaluators, guardrails      |
@@ -64363,7 +64362,7 @@ docker compose -f infra/compose.yml --project-directory . pull
 docker compose -f infra/compose.yml --project-directory . up -d
 ```
 
-The one-shot `migrate` service runs `pnpm task upgrade` on the new image on every `up`; the app and the workers start only after it completes successfully. On a current installation it applies no step. If it fails, read `docker compose logs migrate`; the exit code is explained in the [Upgrade Guide](/self-hosting/upgrade#exit-codes-and-what-to-do).
+The workers run `pnpm task upgrade` on the new image when they start, and the app does not report ready until it completes. On a current installation it applies no step. If it fails, read `docker compose logs workers`; the exit code is explained in the [Upgrade Guide](/self-hosting/upgrade#exit-codes-and-what-to-do).
 
 ### Reset data
 
@@ -65123,7 +65122,7 @@ Three things to know when running it:
 
    The [Production Deployment](#production-deployment) section above lists the keys the Secret needs. With `autogen.enabled=false` and a required key missing, the pods that read it stay in `CreateContainerConfigError` naming the key (under plain `helm`, a missing `LANGY_INTERNAL_SECRET` in an existing Secret stops the render instead); under `autogen.enabled=true` the chart materialises the Secret on first install via lookup-or-rand.
 2. **A public route needs DNS + TLS.** The gateway is what your LLM clients hit, so it usually wants its own hostname (e.g. `gateway.your-corp.com`), separate cert, separate route. See [AI Gateway → Self-hosting → DNS & TLS](/ai-gateway/self-hosting/dns-and-tls).
-3. **Worker pods must be running.** Budget enforcement reads from a ClickHouse rollup that trace-processing folds into. If you deploy with `workers.enabled=false`, budgets stop accumulating spend and breach enforcement silently degrades. The default `workers.enabled=true` is correct for production.
+3. **Worker pods must be running.** Budget enforcement reads from a ClickHouse rollup that trace-processing folds into. The workers also run the upgrade, so the chart refuses `workers.enabled=false`.
 
 ## Upgrade
 
@@ -65135,9 +65134,9 @@ helm upgrade langwatch langwatch/langwatch \
   --wait --timeout 45m
 ```
 
-A pre-upgrade Job runs `pnpm task upgrade` on the new image before any pod rolls; on a first install the app runs it once on its first boot. If the upgrade fails, the Job fails the `helm upgrade` and the previous version keeps serving.
+The new worker pods run `pnpm task upgrade` on start, and the new api pods are not ready until it completes, so the previous version keeps serving meanwhile and if it fails. When upgrades are serialised (`serializeUpgrades` on and no `app.dataplane`), a pre-upgrade Job runs it on the new image before any pod rolls instead, and a failure fails the `helm upgrade`. On a first install the worker runs it once on its first boot.
 
-Follow it on **Ops > Upgrades** or with `pnpm task upgrade status`. To run the upgrade from your own pipeline instead, set `app.migrations.preRoll: false` and run it before `helm upgrade`; until then the new pods refuse to start.
+Follow it on **Ops > Upgrades** or with `pnpm task upgrade status`. With serialised upgrades, to run the upgrade from your own pipeline instead, set `app.migrations.preRoll: false` and run it before `helm upgrade`; until then the new api pods are not ready.
 
 See [Upgrade Guide](/self-hosting/upgrade) for version-specific instructions.
 
@@ -68378,7 +68377,7 @@ Common causes:
 First startup is slower because:
 
 - Docker pulls all images
-- The `migrate` service runs the upgrade (PostgreSQL and ClickHouse migrations) before the app starts
+- The workers run the upgrade (PostgreSQL and ClickHouse migrations), and the app is not ready until it is done
 - OpenSearch initializes its cluster
 
 Subsequent starts are faster. If it remains slow, check Docker resource allocation.
@@ -68532,30 +68531,31 @@ Ensure the service account has S3 access (IRSA) or static credentials are config
 
 ### The app refuses to start: the installation is behind
 
-The app and the workers never migrate. They log `refuses to serve: the installation is behind this image` with the outstanding steps when the upgrade has not run for their version. Run it from the new image (see [Run the upgrade](/self-hosting/upgrade#run-the-upgrade)), or check why the pre-upgrade Job (Helm) or the `migrate` service (Docker Compose) did not.
+The api never migrates; the workers run the upgrade when they start. The api logs `refuses to serve: the installation is behind this image` with the outstanding steps and is not ready while the upgrade has not run for its version. Check the workers' log for why the upgrade did not finish, or run it from the new image (see [Run the upgrade](/self-hosting/upgrade#run-the-upgrade)).
 
 The refusal names the cause: outstanding steps, a release below the installation's floor, or no ClickHouse configured (set `CLICKHOUSE_URL`, run the upgrade, start again). **Ops > Upgrades** and `pnpm task upgrade status` show the state.
 
-On Helm, read the pre-upgrade Job:
+On Helm, read the workers' log. When upgrades are serialised (`serializeUpgrades` on and no `app.dataplane`), the pre-upgrade Job runs it instead:
 
 ```bash
+kubectl -n langwatch logs deploy/<release>-workers --tail=100
 kubectl -n langwatch get jobs | grep migrate-pre-roll
 kubectl -n langwatch logs job/<release>-migrate-pre-roll --tail=100
 ```
 
-On Docker Compose, read the `migrate` service:
+On Docker Compose, read the `workers` service:
 
 ```bash
-docker compose -f infra/compose.yml --project-directory . logs migrate
+docker compose -f infra/compose.yml --project-directory . logs workers
 ```
 
 ### The upgrade failed
 
-A failed upgrade fails the `helm upgrade` before any pod rolls, so the previous version keeps serving. On Docker Compose, the `migrate` service exits non-zero and the app and workers do not start.
+A failed upgrade in the pre-upgrade Job fails the `helm upgrade` before any pod rolls, so the previous version keeps serving. When the new workers run it instead, the new api pods never become ready and the previous version keeps serving. On Docker Compose, the failure is in the `workers` log and the app does not become ready.
 
-The exit code and outcome code, and what to do for each, are in [Exit codes and what to do](/self-hosting/upgrade#exit-codes-and-what-to-do). The Job's log and **Ops > Upgrades** name the failed step. A failed PostgreSQL migration is named with the command that clears it: check what it left behind, then run `prisma migrate resolve --rolled-back <migration>` if none of it remains, and run the upgrade again. It resumes where it stopped.
+The exit code and outcome code, and what to do for each, are in [Exit codes and what to do](/self-hosting/upgrade#exit-codes-and-what-to-do). The Job's or the workers' log and **Ops > Upgrades** name the failed step. A failed PostgreSQL migration is named with the command that clears it: check what it left behind, then run `prisma migrate resolve --rolled-back <migration>` if none of it remains, and run the upgrade again. It resumes where it stopped.
 
-`SKIP_PRISMA_MIGRATE` and `SKIP_CLICKHOUSE_MIGRATE` do not get a stuck installation serving: the app refuses to start until the upgrade has applied every migration its version needs.
+`SKIP_PRISMA_MIGRATE` and `SKIP_CLICKHOUSE_MIGRATE` do not get a stuck installation serving: the api is not ready until the upgrade has applied every migration its version needs.
 
 ### Connection refused
 
@@ -69284,8 +69284,9 @@ The preparation step still fails in three cases: the migration runner itself
 fails outright, the queue behind it fails to drain, or the fleet makes no
 progress for 25 passes (about two minutes: for example because Redis is
 unreachable, or another process holds every claim). It exits non-zero, which
-fails the Helm pre-upgrade Job or the compose `migrate` service, so the
-previous version keeps serving; the next run retries from scratch.
+fails the upgrade (the Helm pre-upgrade Job where one renders, otherwise the
+workers), and the new api is not ready until the installation is current, so
+the previous version keeps serving; the next run retries from scratch.
 
 Keep the current identity-provider configuration, callback URLs, and
 `CREDENTIALS_SECRET` during the upgrade. The migration preserves the existing
@@ -69388,7 +69389,7 @@ docker compose pull
 docker compose up -d
 ```
 
-The one-shot `migrate` service runs the upgrade first; the app and the workers start only after it has completed successfully. If your compose file predates the `migrate` service, copy it from [`infra/compose.yml`](https://github.com/langwatch/langwatch/blob/main/infra/compose.yml), or the app will refuse to start (see [Run the upgrade](#run-the-upgrade)).
+The workers run the upgrade when they start, and the app does not report ready until it has completed (see [Run the upgrade](#run-the-upgrade)). Compose has no separate `migrate` service; if your compose file predates this, copy the current one from [`infra/compose.yml`](https://github.com/langwatch/langwatch/blob/main/infra/compose.yml). The workers must be enabled.
 
 ## Helm Chart
 
@@ -69403,7 +69404,7 @@ helm upgrade langwatch langwatch/langwatch \
   --wait --timeout 45m
 ```
 
-The pre-upgrade Job can run for up to 35 minutes on a large installation. Helm's default hook timeout is 5 minutes, and a shorter `--timeout` fails the release part-way through a migration.
+The upgrade can run for up to 35 minutes on a large installation, in the pre-upgrade Job where one renders (see [Run the upgrade](#run-the-upgrade)) and otherwise in the new worker pods. Helm's default hook timeout is 5 minutes, and a shorter `--timeout` fails the release part-way through a migration.
 
 ### Pin a Specific Version
 
@@ -69423,24 +69424,25 @@ helm upgrade langwatch langwatch/langwatch \
 ## Run the upgrade
 
 <Warning>
-The app and the workers **never migrate the database themselves**. When they start on an installation that has not been upgraded to their release, they **refuse to start** and log which steps are outstanding:
+The **api never migrates the database itself**. The workers run the upgrade when they start; until the installation is current the api reports **not ready**, and a process started on an installation that has not been upgraded to its release **refuses to serve** and logs which steps are outstanding:
 
 ```text
 langwatch-api (api) refuses to serve: the installation is behind this image: blocking steps not done: prisma:20261006180000_..., clickhouse:00042. Run `pnpm task upgrade` from this image, then start it again.
 ```
 
-Run the upgrade from the **new** image, then start the app again.
+Starting the workers on the **new** image runs the upgrade for you. To run it yourself, use the **new** image, then start the app again.
 </Warning>
 
 Each way of running LangWatch runs the upgrade for you:
 
 | How you run LangWatch | Who runs the upgrade |
 | --- | --- |
-| Helm, `helm upgrade` | the pre-upgrade Job, on the new image, before any pod rolls |
-| Helm, first install | the app's first boot, once, on the empty database; the workers restart until it is done |
-| Helm with `app.migrations.preRoll: false` | **you**, before `helm upgrade` (below) |
-| Docker Compose | the `migrate` service, on every `docker compose up` |
-| `npx @langwatch/server` | the CLI, before it starts the services |
+| Helm, `helm upgrade` with upgrades serialised (`serializeUpgrades` on and no `app.dataplane`) | the pre-upgrade Job, on the new image, before any pod rolls |
+| Helm, `helm upgrade` otherwise | the new worker pods, on start; the new api pods are not ready until it is done |
+| Helm, first install | the worker's first boot, once, on the empty database |
+| Helm with serialised upgrades and `app.migrations.preRoll: false` | **you**, before `helm upgrade` (below) |
+| Docker Compose | the workers, on every `docker compose up`; the app is not ready until it is done |
+| `npx @langwatch/server` | the workers the CLI starts; the CLI has no migration phase of its own |
 
 To run it yourself, from the new image with the app's environment (`DATABASE_URL`, `CLICKHOUSE_URL`, `REDIS_URL`):
 
@@ -69552,7 +69554,7 @@ A serving process that cannot read the ledger names `DATABASE_URL` in its refusa
 
 | Variable or value | Effect |
 | --- | --- |
-| `app.migrations.preRoll` (Helm, default `true`) | Runs the upgrade in a pre-upgrade Job. `false` leaves it to you; until you run it, new pods refuse to start. |
+| `app.migrations.preRoll` (Helm, default `true`) | Renders the pre-upgrade Job, only when upgrades are serialised (`serializeUpgrades` on and no `app.dataplane`); otherwise the new worker pods run the upgrade. `false` with serialised upgrades leaves it to you; until you run it, the new api is not ready. |
 | `app.migrations.preRollTimeoutSeconds` (Helm, default `2100`) | How long that Job may run. |
 | `CLICKHOUSE_MIGRATE_WAIT_SECONDS` (default `180`) | How long the upgrade waits for ClickHouse to accept connections. `0` fails on the first refused connection. A value that is not a number of seconds, 0 or more, is refused with `Invalid CLICKHOUSE_MIGRATE_WAIT_SECONDS`. |
 | `SKIP_PRISMA_MIGRATE` (`1` or `true`) | The upgrade leaves PostgreSQL alone, and cannot mark a failed migration rolled back. The app and the workers then refuse to start until an upgrade runs without it. |
@@ -69567,7 +69569,7 @@ For the split into api, worker and tasks applications, see [the chart's upgrade 
 
 ## Rollback
 
-A rollback never runs migrations and never needs a down migration. Every migration in the supported window only adds, so the previous version runs on the upgraded schema as it is. The pre-upgrade Job runs on `helm upgrade` only, never on `helm rollback`.
+A rollback never runs migrations and never needs a down migration. Every migration in the supported window only adds, so the previous version runs on the upgraded schema as it is. The pre-upgrade Job, where one renders, runs on `helm upgrade` only, never on `helm rollback`.
 
 - A version at or above the installation's floor starts on the newer schema. One below the floor refuses by name.
 - The Upgrades page shows **Rolled back** while the older version runs. Background steps that an older version can undo are reopened, and run again after you upgrade again.

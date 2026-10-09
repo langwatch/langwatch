@@ -37,7 +37,6 @@ Docker Compose starts the following services:
 | Service         | Image                                   | Host port | Description                 |
 | --------------- | --------------------------------------- | --------- | --------------------------- |
 | `app`           | `langwatch/langwatch:latest`            | 5560      | Main application            |
-| `migrate`       | `langwatch/langwatch:latest`            | -         | One-shot: runs `pnpm task upgrade`, then exits |
 | `workers`       | `langwatch/langwatch:latest`            | -         | Background job processing   |
 | `langwatch_nlp` | `langwatch/langwatch_nlp:latest`        | -         | NLP processing, workflows   |
 | `langevals`     | `langwatch/langevals:latest`            | 5562      | Evaluators, guardrails      |
@@ -103,7 +102,7 @@ docker compose -f infra/compose.yml --project-directory . pull
 docker compose -f infra/compose.yml --project-directory . up -d
 ```
 
-The one-shot `migrate` service runs `pnpm task upgrade` on the new image on every `up`; the app and the workers start only after it completes successfully. On a current installation it applies no step. If it fails, read `docker compose logs migrate`; the exit code is explained in the [Upgrade Guide](/self-hosting/upgrade#exit-codes-and-what-to-do).
+The workers run `pnpm task upgrade` on the new image when they start, and the app does not report ready until it completes. On a current installation it applies no step. If it fails, read `docker compose logs workers`; the exit code is explained in the [Upgrade Guide](/self-hosting/upgrade#exit-codes-and-what-to-do).
 
 ### Reset data
 

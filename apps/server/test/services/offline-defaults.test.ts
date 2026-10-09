@@ -122,7 +122,7 @@ afterEach(() => {
 });
 
 describe("outbound defaults in the service env", () => {
-  describe("when the launcher starts the app, the workers and the migrations", () => {
+  describe("when the launcher starts the app and the workers", () => {
     /** @scenario The app, the workers and the migrations turn off Prisma's version check */
     it("turns off Prisma's version check in each", async () => {
       await startLangwatch(ctx(), bus, {});
