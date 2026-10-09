@@ -7,7 +7,7 @@
 
 import {
   BrowserUiDocumentTitle,
-  UiCapabilityContextProvider,
+  UiHostServicesContextProvider,
   UiFeedback,
   UiNavigation,
   UiRoute,
@@ -15,7 +15,7 @@ import {
   UiSession,
   type UiActiveScope,
   type UiActor,
-  type UiCapabilities,
+  type UiHostServices,
   UiScope,
 } from "@langwatch/browser-host/capabilities";
 import { resetGraphicsQualityOverrideForTests } from "@langwatch/browser-host/facilities";
@@ -30,9 +30,9 @@ import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import UiAppChrome from "../ui-app-chrome";
-import { loadUiRootCapabilities } from "../ui-root-capabilities";
+import { loadUiRootHostServices } from "../ui-root-host-services";
 
-const LOADED = await loadUiRootCapabilities();
+const LOADED = await loadUiRootHostServices();
 /** The lent chrome capability stands in for the shell, so the test reads the host alone. */
 const ROOT: typeof LOADED = {
   ...LOADED,
@@ -137,7 +137,7 @@ class SignedInSession extends UiSession {
   }
 }
 
-const CAPABILITIES: UiCapabilities = {
+const CAPABILITIES: UiHostServices = {
   documentTitle: BrowserUiDocumentTitle.create(),
   feedback: new SilentFeedback(),
   navigation: new SilentNavigation(),
@@ -184,7 +184,7 @@ class SettlingSession extends SignedInSession {
 }
 
 function renderChrome(
-  capabilities: UiCapabilities = CAPABILITIES,
+  capabilities: UiHostServices = CAPABILITIES,
   address: { path: string; pattern: string } = {
     path: "/my-project/traces",
     pattern: "/:project/traces",
@@ -195,7 +195,7 @@ function renderChrome(
       <QueryClientProvider
         client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
       >
-        <UiCapabilityContextProvider value={capabilities}>
+        <UiHostServicesContextProvider value={capabilities}>
           <UiDesignSystemShell>
             <Routes>
               <Route element={<UiAppChrome capabilities={ROOT} process={PROCESS} />}>
@@ -203,7 +203,7 @@ function renderChrome(
               </Route>
             </Routes>
           </UiDesignSystemShell>
-        </UiCapabilityContextProvider>
+        </UiHostServicesContextProvider>
       </QueryClientProvider>
     </MemoryRouter>,
   );
@@ -253,7 +253,7 @@ describe("the application chrome", () => {
     const tree = (session: UiSession) => (
       <MemoryRouter initialEntries={["/my-project/traces"]}>
         <QueryClientProvider client={client}>
-          <UiCapabilityContextProvider value={{ ...CAPABILITIES, rpc, session }}>
+          <UiHostServicesContextProvider value={{ ...CAPABILITIES, rpc, session }}>
             <UiDesignSystemShell>
               <Routes>
                 <Route element={<UiAppChrome capabilities={ROOT} process={PROCESS} />}>
@@ -261,7 +261,7 @@ describe("the application chrome", () => {
                 </Route>
               </Routes>
             </UiDesignSystemShell>
-          </UiCapabilityContextProvider>
+          </UiHostServicesContextProvider>
         </QueryClientProvider>
       </MemoryRouter>
     );
@@ -423,7 +423,7 @@ describe("the application chrome", () => {
           <QueryClientProvider
             client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
           >
-            <UiCapabilityContextProvider value={{ ...CAPABILITIES, rpc: new FailingRpc() }}>
+            <UiHostServicesContextProvider value={{ ...CAPABILITIES, rpc: new FailingRpc() }}>
               <UiDesignSystemShell>
                 <Routes>
                   <Route element={<UiAppChrome capabilities={ROOT} process={PROCESS} />}>
@@ -431,7 +431,7 @@ describe("the application chrome", () => {
                   </Route>
                 </Routes>
               </UiDesignSystemShell>
-            </UiCapabilityContextProvider>
+            </UiHostServicesContextProvider>
           </QueryClientProvider>
         </MemoryRouter>,
       );

@@ -54,19 +54,26 @@ export function registerRefusalDocument(failure: Error): ConnectRefusalDocument 
     });
   }
 
-  const frameCode = HandledError.isHandled(failure)
-    ? FRAME_CODE_BY_REFUSAL[failure.code]
-    : undefined;
-  if (frameCode === undefined) return canonicalErrorFor(failure);
+  const door = sessionKeyRefusalOf(failure);
+  if (!door.framed) return canonicalErrorFor(failure);
 
-  return refusedFrame({
-    status: 403,
-    code: frameCode,
-    message:
-      HandledError.isHandled(failure) && failure.code === "missing_credentials"
-        ? "Send the Langy session key as a bearer token."
-        : failure.message,
-  });
+  return refusedFrame({ status: 403, ...door.refusal });
+}
+
+/** Whether a failure is a session key door refusal, and if so main's frame code and message. */
+export function sessionKeyRefusalOf(
+  failure: Error,
+):
+  | Readonly<{ framed: true; refusal: { code: LocalControlRefusedCode; message: string } }>
+  | Readonly<{ framed: false }> {
+  const code = HandledError.isHandled(failure) ? FRAME_CODE_BY_REFUSAL[failure.code] : undefined;
+  if (code === undefined) return { framed: false };
+  const message =
+    HandledError.isHandled(failure) && failure.code === "missing_credentials"
+      ? "Send the Langy session key as a bearer token."
+      : failure.message;
+
+  return { framed: true, refusal: { code, message } };
 }
 
 /** Poll's refusals: main's 410 with no frames when the instance token is not known. */

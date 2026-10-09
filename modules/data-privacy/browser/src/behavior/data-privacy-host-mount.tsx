@@ -5,7 +5,7 @@
  */
 
 import {
-  useUiCapabilities,
+  useUiHostServices,
   useUiScope,
   type UiFeedback,
   type UiRoute,
@@ -59,7 +59,7 @@ class CapabilityDataPrivacyHost extends DataPrivacyHostApi {
  * is what `mounts.load` resolves.
  */
 export default function DataPrivacyHostMount({ children }: { children?: ReactNode }) {
-  const { feedback, route } = useUiCapabilities();
+  const { feedback, route } = useUiHostServices();
   const uiScope = useUiScope();
   const { organizationId, projectId } = uiScope.activeScope();
   const teamId = uiScope.scopeHost()?.team()?.id;

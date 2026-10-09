@@ -681,17 +681,19 @@ Declared at `src/eventing/license-sync.pipeline.ts:57`.
 
 ### Pipeline `licensing_customer` (aggregate `licensing_customer`)
 
-Declared at `src/eventing/licensing-customer.pipeline.ts:67`. Events: `selfHostedCustomerLicensedEventSchema`, `connectServiceSwitchedEventSchema`, `licenseSyncFinishedEventSchema`, `licenseStoredEventSchema`, `licenseClearedEventSchema`, `managedKeyRetiredEventSchema`, `managedKeyInvalidatedEventSchema`.
+Declared at `src/eventing/licensing-customer.pipeline.ts:83`. Events: `selfHostedCustomerLicensedEventSchema`, `connectServiceSwitchedEventSchema`, `licenseSyncFinishedEventSchema`, `licenseStoredEventSchema`, `licenseClearedEventSchema`, `managedKeyRetiredEventSchema`, `managedKeyInvalidatedEventSchema`, `connectCredentialIssuedEventSchema`.
 
-| Kind    | Name                               | Handles | Declared at                                      |
-| ------- | ---------------------------------- | ------- | ------------------------------------------------ |
-| command | `recordSelfHostedCustomerLicensed` | –       | `src/eventing/licensing-customer.pipeline.ts:80` |
-| command | `recordConnectServiceSwitched`     | –       | `src/eventing/licensing-customer.pipeline.ts:81` |
-| command | `recordLicenseSyncFinished`        | –       | `src/eventing/licensing-customer.pipeline.ts:82` |
-| command | `recordLicenseStored`              | –       | `src/eventing/licensing-customer.pipeline.ts:83` |
-| command | `recordLicenseCleared`             | –       | `src/eventing/licensing-customer.pipeline.ts:84` |
-| command | `recordManagedKeyRetired`          | –       | `src/eventing/licensing-customer.pipeline.ts:85` |
-| command | `recordManagedKeyInvalidated`      | –       | `src/eventing/licensing-customer.pipeline.ts:86` |
+| Kind            | Name                               | Handles                                                                                    | Declared at                                       |
+| --------------- | ---------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------- |
+| command         | `recordSelfHostedCustomerLicensed` | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:97`  |
+| command         | `recordConnectServiceSwitched`     | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:98`  |
+| command         | `recordLicenseSyncFinished`        | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:99`  |
+| command         | `recordLicenseStored`              | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:100` |
+| command         | `recordLicenseCleared`             | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:101` |
+| command         | `recordManagedKeyRetired`          | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:102` |
+| command         | `recordManagedKeyInvalidated`      | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:103` |
+| command         | `recordConnectCredentialIssued`    | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:104` |
+| peer subscriber | `licensingManagedKeyProvisioned`   | `lw.gateway.managed_key_provisioned` from [gateway](../../../../modules/gateway/README.md) | `src/eventing/licensing-customer.pipeline.ts:106` |
 
 ### Tasks
 

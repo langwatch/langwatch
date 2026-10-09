@@ -1518,7 +1518,9 @@ class RouteBuilder<Api, S extends RouteShape> {
     Key extends boolean = false,
   >(
     credential: NewDoor,
-    options?: RouteCredentialOptions<NewDoor, NewSession> & Readonly<{ key?: Key }>,
+    // `session` is named again so the schema infers through the conditional options type.
+    options?: RouteCredentialOptions<NewDoor, NewSession> &
+      Readonly<{ key?: Key; session?: NewSession }>,
   ): RouteBuilder<Api, With<S, { door: NewDoor; session: NewSession; key: Key }>> {
     assertSourceUnset("credential", this.state.credential);
     const address = `REST ${this.operation}`;

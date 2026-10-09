@@ -3,6 +3,8 @@ package dashboard
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -256,5 +258,77 @@ func TestResetDatabasesFromTheBrowser(t *testing.T) {
 	}
 	if rec := post(actionServer(Actions{}), "/api/stacks/portless/reset-databases", confirm); rec.Code != http.StatusNotImplemented {
 		t.Errorf("unwired reset: status %d, want 501", rec.Code)
+	}
+}
+
+// @scenario "The daemon refuses to start a keeper for a stack it does not know"
+func TestStartKeeperRoute(t *testing.T) {
+	var started []string
+	s := actionServer(Actions{StartKeeper: func(_ context.Context, slug string) error {
+		started = append(started, slug)
+		return nil
+	}})
+	daemon := httptest.NewServer(s.routes())
+	defer daemon.Close()
+	port := daemon.Listener.Addr().(*net.TCPAddr).Port
+
+	t.Run("the CLI client starts a known stack's keeper", func(t *testing.T) {
+		if err := (Client{}).StartKeeper(context.Background(), port, "portless"); err != nil {
+			t.Fatal(err)
+		}
+		if len(started) != 1 || started[0] != "portless" {
+			t.Errorf("started %v", started)
+		}
+	})
+
+	t.Run("an unknown slug is a 404 and starts nothing", func(t *testing.T) {
+		if rec := post(s, "/api/stacks/nosuch/start", ""); rec.Code != http.StatusNotFound {
+			t.Errorf("status = %d, want 404", rec.Code)
+		}
+		if err := (Client{}).StartKeeper(context.Background(), port, "nosuch"); err == nil || !strings.Contains(err.Error(), "404") {
+			t.Errorf("client err = %v, want the 404", err)
+		}
+		if len(started) != 1 {
+			t.Errorf("started %v", started)
+		}
+	})
+
+	t.Run("a refusal from the app layer reaches the CLI", func(t *testing.T) {
+		refusing := httptest.NewServer(actionServer(Actions{StartKeeper: func(context.Context, string) error {
+			return errors.New(`stack "portless" is not waiting for a keeper`)
+		}}).routes())
+		defer refusing.Close()
+		err := (Client{}).StartKeeper(context.Background(), refusing.Listener.Addr().(*net.TCPAddr).Port, "portless")
+		if err == nil || !strings.Contains(err.Error(), "not waiting for a keeper") {
+			t.Errorf("err = %v", err)
+		}
+	})
+
+	t.Run("a daemon without the route is named as such", func(t *testing.T) {
+		old := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = w.Write([]byte("<!doctype html>"))
+		}))
+		defer old.Close()
+		err := (Client{}).StartKeeper(context.Background(), old.Listener.Addr().(*net.TCPAddr).Port, "portless")
+		if err == nil || !strings.Contains(err.Error(), "haven daemon restart") {
+			t.Errorf("err = %v", err)
+		}
+	})
+}
+
+// @scenario "A page on the app's origin cannot start a keeper"
+func TestStartKeeperRefusesTheAppOrigin(t *testing.T) {
+	s := actionServer(Actions{StartKeeper: func(context.Context, string) error { t.Fatal("must not run"); return nil }})
+	req := httptest.NewRequest(http.MethodPost, "/api/stacks/portless/start", nil)
+	req.Host = "portless.langwatch.localhost"
+	req.Header.Set("Sec-Fetch-Site", "same-site")
+	req.Header.Set("Origin", "https://app.portless.langwatch.localhost")
+	rec := httptest.NewRecorder()
+	s.routes().ServeHTTP(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("status = %d, want 403", rec.Code)
+	}
+	if rec := (orbCall{http.MethodOptions, "/api/stacks/portless/start", "https://app.portless.langwatch.localhost", ""}).on(s); rec.Header().Get("Access-Control-Allow-Origin") != "" {
+		t.Errorf("preflight allowed the app origin: %v", rec.Header())
 	}
 }

@@ -1,4 +1,5 @@
 import { defineRule } from "../define-rule.mjs";
+import { CREDENTIAL_OWNERS } from "./credential-reader-owner.rule.mjs";
 
 // Auth headers are the door's input (api-framework-bypass plan, guard 2).
 
@@ -7,6 +8,7 @@ const GOVERNED_FOLDERS = new Set(["app", "transport"]);
 
 function isGoverned(file) {
   if (!file.isProduction || !file.feature || file.role !== "process") return false;
+  if (CREDENTIAL_OWNERS.some((owner) => file.workspacePath.startsWith(owner))) return false;
   if (file.workspacePath.endsWith(".module.ts")) return true;
 
   return GOVERNED_FOLDERS.has(file.sourcePath?.split("/")[0]);
@@ -24,6 +26,16 @@ function isNamedHeader(node) {
       return up.arguments.includes(child);
 
   return false;
+}
+
+// `.withPermission(..., { at: "header", header: "x-project-id" })` tells the door which header to read.
+function isDeclaredScopeHeader(node) {
+  const property = node.parent;
+  if (property?.type !== "Property" || property.value !== node) return false;
+  if (nameOf(property.key) !== "header") return false;
+  const call = property.parent?.parent;
+
+  return call?.type === "CallExpression" && nameOf(call.callee) === "withPermission";
 }
 
 function nameOf(node) {
@@ -54,6 +66,7 @@ export const authHeaderReadRule = defineRule({
     return {
       Literal(node) {
         if (typeof node.value !== "string" || node.parent?.type === "TSLiteralType") return;
+        if (isDeclaredScopeHeader(node)) return;
         check(node, node.value);
       },
       TemplateLiteral(node) {

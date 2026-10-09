@@ -5,7 +5,7 @@
  */
 
 import {
-  useUiCapabilities,
+  useUiHostServices,
   useUiScope,
   useUiTraceFilters,
   type UiFeedback,
@@ -14,8 +14,8 @@ import {
   type UiSession,
   type UiTraceFilters,
 } from "@langwatch/browser-host/capabilities";
-import type { UiScopeStatus } from "@langwatch/browser-host/session";
 import { useDrawer } from "@langwatch/browser-host/drawer";
+import type { UiScopeStatus } from "@langwatch/browser-host/session";
 import { useMemo, type ReactNode } from "react";
 
 import {
@@ -132,7 +132,7 @@ class CapabilityAnnotationHost extends AnnotationHostApi {
  * is what `mounts.load` resolves.
  */
 export default function AnnotationHostMount({ children }: { children?: ReactNode }) {
-  const { session, navigation, route, feedback } = useUiCapabilities();
+  const { session, navigation, route, feedback } = useUiHostServices();
   const uiScope = useUiScope();
   const traceFilters = useUiTraceFilters();
   const { organizationId } = uiScope.activeScope();

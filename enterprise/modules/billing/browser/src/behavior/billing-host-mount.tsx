@@ -5,7 +5,7 @@
  */
 
 import {
-  useUiCapabilities,
+  useUiHostServices,
   useUiDeployment,
   useUiScope,
   type UiFeedback,
@@ -112,7 +112,7 @@ class CapabilityBillingHost extends BillingHostApi {
  * is what `mounts.load` resolves.
  */
 export default function BillingHostMount({ children }: { children?: ReactNode }) {
-  const { session, feedback, navigation, route } = useUiCapabilities();
+  const { session, feedback, navigation, route } = useUiHostServices();
   const { organizationId, projectId } = useUiScope().activeScope();
   const deployment = useUiDeployment();
   const organizations = billingApi.organization.getScopeGraph.useQuery(

@@ -5,7 +5,7 @@
  */
 
 import {
-  useUiCapabilities,
+  useUiHostServices,
   useUiScope,
   type UiFeedback,
   type UiSession,
@@ -81,7 +81,7 @@ class CapabilityAuthzHost extends AuthzHostApi {
  * is what `mounts.load` resolves.
  */
 export default function AuthzHostMount({ children }: { children?: ReactNode }) {
-  const { session, feedback, route } = useUiCapabilities();
+  const { session, feedback, route } = useUiHostServices();
   const { query } = route.reading();
   const { organizationId } = useUiScope().activeScope();
   // The plan tier only: the session-cached read, not the monthly usage count.

@@ -124,10 +124,10 @@ vi.mock("../../../features/guided-onboarding/ui/takeover/guided-takeover.tsx", (
 }));
 
 import {
-  UiCapabilityContextProvider,
+  UiHostServicesContextProvider,
   type UiDeployment,
 } from "@langwatch/browser-host/capabilities";
-import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
 
 import {
   OnboardingHostApi,
@@ -210,9 +210,9 @@ afterEach(cleanup);
 function renderWelcome() {
   return render(
     <DesignSystemProvider forcedTheme="light">
-      <UiCapabilityContextProvider
+      <UiHostServicesContextProvider
         value={{
-          ...createUiCapabilitiesFromHost({
+          ...createUiHostServicesFromHost({
             route: () => ({
               params: {},
               query: routerState.query,
@@ -226,7 +226,7 @@ function renderWelcome() {
         <OnboardingHostProvider value={new WelcomeTestHost()}>
           <WelcomeScreen />
         </OnboardingHostProvider>
-      </UiCapabilityContextProvider>
+      </UiHostServicesContextProvider>
     </DesignSystemProvider>,
   );
 }

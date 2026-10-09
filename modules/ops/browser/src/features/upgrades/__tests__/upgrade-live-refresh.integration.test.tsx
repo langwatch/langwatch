@@ -4,8 +4,8 @@
  * timer. Spec: modules/ops/specs/upgrades.feature
  */
 import {
-  resolveUiCapabilities,
-  UiCapabilityContextProvider,
+  resolveUiHostServices,
+  UiHostServicesContextProvider,
   UiDocumentTitle,
   UiNavigation,
   UiRoute,
@@ -110,7 +110,7 @@ function runWith(outcome: string | null): UpgradeRunDetailView {
 }
 
 function renderRunScreen(rpc: HintRpc) {
-  const capabilities = resolveUiCapabilities({
+  const capabilities = resolveUiHostServices({
     install: {},
     documentTitle: new InertUiDocumentTitle(),
     navigation: new InertUiNavigation(),
@@ -119,11 +119,11 @@ function renderRunScreen(rpc: HintRpc) {
   });
   render(
     <QueryClientProvider client={new QueryClient()}>
-      <UiCapabilityContextProvider value={capabilities}>
+      <UiHostServicesContextProvider value={capabilities}>
         <DesignSystemProvider forcedTheme="light">
           <UpgradeRunScreen />
         </DesignSystemProvider>
-      </UiCapabilityContextProvider>
+      </UiHostServicesContextProvider>
     </QueryClientProvider>,
   );
 }

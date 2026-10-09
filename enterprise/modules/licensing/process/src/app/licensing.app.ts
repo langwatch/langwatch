@@ -208,7 +208,9 @@ export class LicensingModule implements LicensingApiContract {
 
   /** The licensing_customer pipeline, whose facts organization applies (R42). */
   customerPipeline(): LicensingCustomerPipeline {
-    return buildLicensingCustomerPipeline();
+    return buildLicensingCustomerPipeline({
+      attachManagedKey: (provisioned) => this.#credentials.attachProvisioned(provisioned),
+    });
   }
 
   /** Binds the licensing_customer pipeline's senders into the facts service. */
@@ -912,13 +914,14 @@ function licenseRegistryOver({
   >;
   customerFacts: Pick<
     LicensingCustomerFactsService,
-    "selfHostedCustomerLicensed" | "managedKeyRetired" | "managedKeyInvalidated"
+    | "selfHostedCustomerLicensed"
+    | "managedKeyRetired"
+    | "managedKeyInvalidated"
+    | "connectCredentialIssued"
   >;
   gateway: Pick<
     GatewayApi,
-    | "provisionConnectManagedKey"
-    | "setManagedKeyConnectServicesInternal"
-    | "setManagedKeyLicenseInternal"
+    "setManagedKeyConnectServicesInternal" | "setManagedKeyLicenseInternal"
   >;
   signingKey: string | undefined;
 }): LicenseRegistryInfrastructure {
@@ -933,12 +936,7 @@ function licenseRegistryOver({
         customerFacts.selfHostedCustomerLicensed({ organizationId: id, name }),
     },
     managedKeys: {
-      provision: ({ organizationId, licenseId }) =>
-        gateway.provisionConnectManagedKey({
-          organizationId,
-          licenseId,
-          actorUserId: systemActorId,
-        }),
+      issue: (issued) => customerFacts.connectCredentialIssued(issued),
       retire: (key) => customerFacts.managedKeyRetired(key),
       invalidate: (key) => customerFacts.managedKeyInvalidated(key),
       setConnectServices: (key) => gateway.setManagedKeyConnectServicesInternal(key),

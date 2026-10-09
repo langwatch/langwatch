@@ -132,7 +132,7 @@ describe("the session-key door's check", () => {
 
     const holder = await longPoll.verifySessionKey({ token, projectId, instanceToken: null });
 
-    expect(holder).toEqual({ actor: { type: "user", id: userId }, projectId });
+    expect(holder).toMatchObject({ actor: { type: "user", id: userId }, projectId, userId });
   });
 
   it("refuses a key nobody minted as invalid", async () => {
@@ -151,11 +151,12 @@ describe("the session-key door's check", () => {
 describe("a long-poll share", () => {
   it("is addressed by the instance token register hands out, until it is retired", async () => {
     const token = await approvedKey();
-    const registered = await longPoll.register({
-      authorization: `Bearer ${token}`,
+    const { actor: _actor, ...credential } = await longPoll.verifySessionKey({
+      token,
       projectId,
-      frame: registerFrame,
+      instanceToken: null,
     });
+    const registered = await longPoll.register({ credential, frame: registerFrame });
 
     expect(registered.frame).toMatchObject({ type: "registered", instanceId: "lci_instance" });
     await expect(

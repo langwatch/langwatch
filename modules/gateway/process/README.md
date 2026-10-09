@@ -465,14 +465,6 @@ rotateVirtualKey(input: GatewayVirtualKeyCommand): Promise<GatewayMintedVirtualK
 revokeVirtualKey(input: GatewayVirtualKeyCommand): Promise<GatewayVirtualKeyRecord>;
 ```
 
-#### `provisionConnectManagedKey`
-
-The managed key a license resolves to (ADR-156 section 3): one per license, on the customer's hidden governance project, its secret discarded. Repeating this mints a second key; the registry calls it once.
-
-```typescript
-provisionConnectManagedKey(input: { organizationId: string; licenseId: string; actorUserId: string; }): Promise<{ id: string }>;
-```
-
 #### `revokeManagedInternal`
 
 Ends a managed key for the feature that owns it; customer-facing revocation refuses one. A key already gone is left alone, so this is safe to repeat, which is what makes revoking a license retryable.

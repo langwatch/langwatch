@@ -6,7 +6,7 @@
 
 import { useUiAddress } from "@langwatch/browser-host/address";
 import {
-  useUiCapabilities,
+  useUiHostServices,
   useUiDeployment,
   useUiScope,
 } from "@langwatch/browser-host/capabilities";
@@ -204,7 +204,7 @@ class CapabilityApiKeyHost extends ApiKeyHostApi {
 }
 
 export default function ApiKeyHostMount({ children }: { children?: ReactNode }) {
-  const { session, route, feedback, navigation } = useUiCapabilities();
+  const { session, route, feedback, navigation } = useUiHostServices();
   const apiEndpoint = useUiDeployment().appBaseUrl || DEFAULT_API_ENDPOINT;
   const activeScope = useUiScope().activeScope();
   const address = useUiAddress();

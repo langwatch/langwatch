@@ -4,15 +4,15 @@
  * still answered undefined. Spec: specs/ui/module-host-mounting.feature
  */
 import {
-  UiCapabilityContextProvider,
+  UiHostServicesContextProvider,
   UiScope,
   UiSession,
   type UiActiveScope,
   type UiActor,
-  type UiCapabilities,
+  type UiHostServices,
 } from "@langwatch/browser-host/capabilities";
 import { uiDeclarations, type UiDeclaringModule } from "@langwatch/browser-host/declarations";
-import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
 import { ProjectSwitcherToken } from "@langwatch/project-client";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
@@ -118,8 +118,8 @@ const PROJECT_LENDING_SWITCHER: UiDeclaringModule = {
 };
 
 function harness(scope: UiActiveScope, modules: readonly UiDeclaringModule[] = []) {
-  const capabilities: UiCapabilities = {
-    ...createUiCapabilitiesFromHost(
+  const capabilities: UiHostServices = {
+    ...createUiHostServicesFromHost(
       { route: () => ({ params: {}, query: {} }), navigate: () => void 0 },
       new SignedInSession(),
     ),
@@ -129,9 +129,9 @@ function harness(scope: UiActiveScope, modules: readonly UiDeclaringModule[] = [
 
   return function Harness({ children }: { children: ReactNode }) {
     return (
-      <UiCapabilityContextProvider value={capabilities}>
+      <UiHostServicesContextProvider value={capabilities}>
         <ProjectHostMount>{children}</ProjectHostMount>
-      </UiCapabilityContextProvider>
+      </UiHostServicesContextProvider>
     );
   };
 }

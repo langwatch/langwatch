@@ -9,15 +9,15 @@ import {
   TwoStepCeremoniesToken,
 } from "@langwatch/auth-contract";
 import {
-  UiCapabilityContextProvider,
+  UiHostServicesContextProvider,
   UiScope,
   UiSession,
   type UiActiveScope,
   type UiActor,
-  type UiCapabilities,
+  type UiHostServices,
 } from "@langwatch/browser-host/capabilities";
 import { uiDeclarations, type UiDeclaringModule } from "@langwatch/browser-host/declarations";
-import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
 import { render } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -100,8 +100,8 @@ const AUTH: UiDeclaringModule = {
 };
 
 function mountedHost(modules: readonly UiDeclaringModule[]): PersonalWorkspaceHostApi {
-  const capabilities: UiCapabilities = {
-    ...createUiCapabilitiesFromHost(
+  const capabilities: UiHostServices = {
+    ...createUiHostServicesFromHost(
       { route: () => ({ params: {}, query: {} }), navigate: () => void 0 },
       new SignedInSession(),
     ),
@@ -115,9 +115,9 @@ function mountedHost(modules: readonly UiDeclaringModule[]): PersonalWorkspaceHo
   }
   function Harness({ children }: { children: ReactNode }) {
     return (
-      <UiCapabilityContextProvider value={capabilities}>
+      <UiHostServicesContextProvider value={capabilities}>
         <PersonalWorkspaceHostMount>{children}</PersonalWorkspaceHostMount>
-      </UiCapabilityContextProvider>
+      </UiHostServicesContextProvider>
     );
   }
   render(<Capture />, { wrapper: Harness });

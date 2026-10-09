@@ -5,13 +5,13 @@
 
 import {
   BrowserUiDocumentTitle,
-  UiCapabilityContextProvider,
+  UiHostServicesContextProvider,
   UiNavigation,
   UiRoute,
   UiSession,
   type UiActiveScope,
   type UiActor,
-  type UiCapabilities,
+  type UiHostServices,
   UiFeedback,
   UiHostServiceProvider,
 } from "@langwatch/browser-host/capabilities";
@@ -71,7 +71,7 @@ class AnsweringSession extends UiSession {
   }
 }
 
-function capabilities(session: UiSession): UiCapabilities {
+function capabilities(session: UiSession): UiHostServices {
   return {
     documentTitle: BrowserUiDocumentTitle.create({ title: "" }),
     feedback: new SilentFeedback(),
@@ -98,7 +98,7 @@ function renderGuarded(session: AnsweringSession) {
   })(Page);
 
   render(
-    <UiCapabilityContextProvider value={capabilities(session)}>
+    <UiHostServicesContextProvider value={capabilities(session)}>
       <UiHostServiceProvider
         value={
           new Map([
@@ -111,7 +111,7 @@ function renderGuarded(session: AnsweringSession) {
       >
         <Guarded />
       </UiHostServiceProvider>
-    </UiCapabilityContextProvider>,
+    </UiHostServicesContextProvider>,
   );
 }
 
@@ -313,7 +313,7 @@ describe("given a module declaring a screen that requires a grant", () => {
     const { default: Screen } = await load();
 
     renderWithDesignSystem(
-      <UiCapabilityContextProvider
+      <UiHostServicesContextProvider
         value={capabilities(new AnsweringSession({ flags, permissions, settled: true }))}
       >
         <UiHostServiceProvider
@@ -323,7 +323,7 @@ describe("given a module declaring a screen that requires a grant", () => {
         >
           <Screen />
         </UiHostServiceProvider>
-      </UiCapabilityContextProvider>,
+      </UiHostServicesContextProvider>,
     );
   }
 

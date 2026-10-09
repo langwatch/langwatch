@@ -112,6 +112,13 @@ Feature: License sync
     Then the post is accepted as before
 
   @unit
+  Scenario: An install whose managed key is pending syncs that organisation again 30 seconds later
+    Given the connect host answers an organisation's sync with connect_credential_pending
+    When the daily sync pass runs
+    Then the pass waits 30 seconds and syncs that organisation once more
+    And it records how that second sync ended, retrying no further
+
+  @unit
   Scenario: An install without a license sends no sync
     Given an organization with no license
     When the daily jobs run

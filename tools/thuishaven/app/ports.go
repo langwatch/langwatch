@@ -358,6 +358,13 @@ type Dashboard interface {
 	Serve(ctx context.Context, port int) error
 }
 
+// DaemonClient is how an up asks the running daemon to act (ruling D-S4c-1).
+type DaemonClient interface {
+	// StartKeeper asks the daemon on port to start slug's keeper and returns
+	// once the keeper holds the stack's record.
+	StartKeeper(ctx context.Context, port int, slug string) error
+}
+
 // Semaphore is a machine-wide counting semaphore so parallel, memory-hungry work
 // across worktrees (tsgo typechecks) can be bounded to a slot count.
 type Semaphore interface {

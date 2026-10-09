@@ -1,12 +1,12 @@
 import {
-  UiCapabilityContextProvider,
+  UiHostServicesContextProvider,
   UiCopyTargets,
   UiScope,
   type UiActiveScope,
-  type UiCapabilities,
+  type UiHostServices,
   type UiCopyTarget,
 } from "@langwatch/browser-host/capabilities";
-import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
 import {
   createUiScopeHost,
   type UiScopeHost,
@@ -104,8 +104,8 @@ describe("given a reader who may create datasets in one of their projects and no
     it("offers only the project they may create datasets in", async () => {
       const Mount = await declaredMount();
       const lent = new LentCopyTargets();
-      const capabilities: UiCapabilities = {
-        ...createUiCapabilitiesFromHost({
+      const capabilities: UiHostServices = {
+        ...createUiHostServicesFromHost({
           route: () => ({ params: { project: "demo" }, query: {}, pathname: "/demo/datasets" }),
           navigate: vi.fn(),
         }),
@@ -121,11 +121,11 @@ describe("given a reader who may create datasets in one of their projects and no
       const user = userEvent.setup({ pointerEventsCheck: 0 });
 
       renderWithDesignSystem(
-        <UiCapabilityContextProvider value={capabilities}>
+        <UiHostServicesContextProvider value={capabilities}>
           <Mount>
             <CopyDatasetDialog open onClose={vi.fn()} datasetId="ds-1" datasetName="Golden" />
           </Mount>
-        </UiCapabilityContextProvider>,
+        </UiHostServicesContextProvider>,
       );
 
       await user.click(await screen.findByRole("combobox"));

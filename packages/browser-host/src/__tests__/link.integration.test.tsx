@@ -5,12 +5,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   BrowserUiDocumentTitle,
-  UiCapabilityContextProvider,
+  UiHostServicesContextProvider,
   UiNavigation,
   UiRoute,
   UNAVAILABLE_UI_FEEDBACK,
   UNAVAILABLE_UI_SESSION,
-  type UiCapabilities,
+  type UiHostServices,
   type UiRouteReadingValues,
 } from "../capabilities.ts";
 import { Link } from "../link.tsx";
@@ -35,7 +35,7 @@ class EmptyRoute extends UiRoute {
   setQuery(): void {}
 }
 
-const capabilities: UiCapabilities = {
+const capabilities: UiHostServices = {
   documentTitle: BrowserUiDocumentTitle.create(),
   feedback: UNAVAILABLE_UI_FEEDBACK,
   navigation: new RecordingNavigation(),
@@ -50,7 +50,7 @@ function withChakra(children: ReactNode) {
 function mounted(link: ReactNode) {
   render(
     withChakra(
-      <UiCapabilityContextProvider value={capabilities}>{link}</UiCapabilityContextProvider>,
+      <UiHostServicesContextProvider value={capabilities}>{link}</UiHostServicesContextProvider>,
     ),
   );
 }

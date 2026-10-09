@@ -6,7 +6,7 @@ import {
 } from "@langwatch/system-migrations";
 import { type Instant, nowInstant, toDate } from "@langwatch/time";
 
-import type { SystemMigrationStateRepository } from "../system-migration-state.repository.ts";
+import type { SystemMigrationStateRepository } from "../system-migration.repository.ts";
 
 type StoredRecord = TenantMigrationRecord & { updatedAt: Instant };
 

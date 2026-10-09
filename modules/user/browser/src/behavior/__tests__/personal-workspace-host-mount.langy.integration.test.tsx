@@ -4,17 +4,17 @@
  * Spec: modules/user/specs/user.feature
  */
 import {
-  UiCapabilityContextProvider,
+  UiHostServicesContextProvider,
   UiScope,
   UiHostServiceProvider,
   UiSession,
   type UiActiveScope,
   type UiActor,
-  type UiCapabilities,
+  type UiHostServices,
 } from "@langwatch/browser-host/capabilities";
 import { UiFlagsService } from "@langwatch/browser-host/feature-flag";
 import { defineSlice } from "@langwatch/browser-host/global-store";
-import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
 import {
   LANGY_ABSENT_SURFACE,
   LANGY_STORE_SLICE,
@@ -62,8 +62,8 @@ class TestScope extends UiScope {
 }
 
 function renderWith(grant: { permission: boolean; rolledOut: boolean }) {
-  const capabilities: UiCapabilities = {
-    ...createUiCapabilitiesFromHost(
+  const capabilities: UiHostServices = {
+    ...createUiHostServicesFromHost(
       { route: () => ({ params: {}, query: {} }), navigate: () => void 0 },
       new LangySession(grant),
     ),
@@ -81,13 +81,13 @@ function renderWith(grant: { permission: boolean; rolledOut: boolean }) {
   };
   function Harness({ children }: { children: ReactNode }) {
     return (
-      <UiCapabilityContextProvider value={capabilities}>
+      <UiHostServicesContextProvider value={capabilities}>
         <UiHostServiceProvider
           value={new Map([[UiFlagsService.name, { flag: () => grant.rolledOut }]])}
         >
           <PersonalWorkspaceHostMount>{children}</PersonalWorkspaceHostMount>
         </UiHostServiceProvider>
-      </UiCapabilityContextProvider>
+      </UiHostServicesContextProvider>
     );
   }
   render(<AssistantReader />, { wrapper: Harness });

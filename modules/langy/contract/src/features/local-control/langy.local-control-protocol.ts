@@ -385,9 +385,14 @@ export const platformFrameSchema = z.discriminatedUnion("type", [
 ]);
 export type PlatformFrame = z.infer<typeof platformFrameSchema>;
 
-/** What the local-control socket reads off its upgrade: the session key and its project. */
-export const localControlConnectCredentialsSchema = z.object({
-  authorization: z.string().optional(),
-  projectId: z.string().optional(),
+/** What langy's session key door resolves for a minted key: its owner and its conversation. */
+export const localControlCredentialSchema = z.object({
+  apiKeyId: z.string(),
+  projectId: z.string(),
+  /** The project's own address segment, so the follow along link names it. */
+  projectSlug: z.string(),
+  userId: z.string(),
+  conversationId: z.string(),
+  requestId: z.string(),
 });
-export type LocalControlConnectCredentials = z.infer<typeof localControlConnectCredentialsSchema>;
+export type LocalControlCredential = z.infer<typeof localControlCredentialSchema>;

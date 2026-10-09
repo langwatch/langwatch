@@ -5,7 +5,7 @@
  */
 
 import {
-  useUiCapabilities,
+  useUiHostServices,
   useUiDeployment,
   useUiScope,
 } from "@langwatch/browser-host/capabilities";
@@ -169,7 +169,7 @@ class CapabilityOrganizationHost extends OrganizationHostApi {
 }
 
 export default function OrganizationHostMount({ children }: { children?: ReactNode }) {
-  const { session, route, feedback, navigation } = useUiCapabilities();
+  const { session, route, feedback, navigation } = useUiHostServices();
   const deployment = useUiDeployment();
   const uiScope = useUiScope();
   const activeScope = uiScope.activeScope();

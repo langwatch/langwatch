@@ -18,7 +18,9 @@ import type {
   UpdateProjectMetadataInput,
   ProjectIdPage,
   ProjectIdPageInput,
+  ProjectLwqlKeyPage,
   ProjectOrganizationPage,
+  ProjectPrivateS3Page,
   ProjectUsageCount,
 } from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
@@ -149,4 +151,6 @@ export interface ProjectRepository {
   listAllIds(input?: ProjectIdPageInput): Promise<ProjectIdPage>;
   /** Every project with its team's organisation, archived included, paged like `listAllIds`. */
   listAllWithOrganization(input?: ProjectIdPageInput): Promise<ProjectOrganizationPage>;
+  listAllWithPrivateS3(input?: ProjectIdPageInput): Promise<ProjectPrivateS3Page>;
+  listLwqlKeys(input?: ProjectIdPageInput): Promise<ProjectLwqlKeyPage>;
 }

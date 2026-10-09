@@ -1,5 +1,5 @@
 import { useMintPersonalToken } from "@langwatch/api-key-client";
-import { useOptionalUiCapabilities } from "@langwatch/browser-host/capabilities";
+import { useOptionalUiHostServices } from "@langwatch/browser-host/capabilities";
 import { Link } from "@langwatch/browser-host/link";
 import { CopyButton } from "@langwatch/design-system/copy-button";
 import { API_KEY_PLACEHOLDER } from "@langwatch/design-system/personal-access-token-banner";
@@ -40,7 +40,7 @@ export function GeneratePromptApiSnippetDialog({
   const minting = useMintPersonalToken({
     organizationId,
     projectId: project?.id,
-    userId: useOptionalUiCapabilities()?.session.currentUser()?.id,
+    userId: useOptionalUiHostServices()?.session.currentUser()?.id,
     name: "Personal access token",
     permissions: ["prompts:view"],
   });

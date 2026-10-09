@@ -11,21 +11,6 @@ type Intersection<Union> = [Union] extends [never]
     ? Value
     : never;
 
-/**
- * Derived store clients (rateLimiter, cache, idempotency) keep their own names:
- * aliasing them to a base store let a per-store supply call satisfy the type
- * while boot refused at runtime; only the stores supply builds them.
- */
-export interface MemberNames {
-  prisma: "relational";
-  clickhouse: "analytical";
-  objectStorage: "blobs";
-  redis: "keyvalue";
-  logger: "logging";
-  telemetry: "metrics";
-}
-type SupplyNameOf<Name> = Name extends keyof MemberNames ? MemberNames[Name] : Name;
-
 type ProviderMembers<Provider> = Provider extends {
   readonly create: (...arguments_: infer Arguments) => unknown;
 }
@@ -48,10 +33,7 @@ type RepositoryMembers<Module> = Module extends {
     >
   : Record<never, never>;
 type Normalise<Members> = {
-  readonly [Name in keyof Members as SupplyNameOf<Name>]: Name extends
-    | "cache"
-    | "rateLimiter"
-    | "idempotency"
+  readonly [Name in keyof Members]: Name extends "cache" | "rateLimiter" | "idempotency"
     ? unknown
     : Members[Name];
 };
@@ -144,7 +126,7 @@ type Missing<Required, Supplied> = {
 type Prefix<Fields, Name extends string> = {
   readonly [Key in keyof Fields as `${Name}.${Key & string}`]: Fields[Key];
 };
-export type MissingSupplyFieldsFrom<
+export type MissingRequirementFieldsFrom<
   RequiredMemberSet,
   RequiredConfigSet,
   RequiredPeerSet,
@@ -162,13 +144,13 @@ export type MissingSupplyFieldsFrom<
       "duplicate-peer"
     >
 >;
-export type MissingSupplyFields<
+export type MissingRequirementFields<
   Modules extends readonly SupplyModule[],
   Members,
   Config,
   Peers,
 > = Simplify<
-  MissingSupplyFieldsFrom<
+  MissingRequirementFieldsFrom<
     RequiredMembers<Modules>,
     RequiredConfig<Modules>,
     RequiredPeers<Modules>,

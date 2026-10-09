@@ -5,7 +5,7 @@
  */
 
 import {
-  useUiCapabilities,
+  useUiHostServices,
   useUiScope,
   type UiFeedback,
 } from "@langwatch/browser-host/capabilities";
@@ -76,7 +76,7 @@ class CapabilityAnnotationScoresHost extends AnnotationScoresHostApi {
  * is what `mounts.load` resolves.
  */
 export default function AnnotationScoresHostMount({ children }: { children?: ReactNode }) {
-  const { feedback, route } = useUiCapabilities();
+  const { feedback, route } = useUiHostServices();
   const uiScope = useUiScope();
   const { projectId } = uiScope.activeScope();
   const isLiteMember = uiScope.scopeHost()?.organizationRole() === "EXTERNAL";

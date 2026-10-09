@@ -11,9 +11,9 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { BrowserRouter, Route, Routes } from "react-router";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { composeUiDesignSystem, loadUiRootCapabilities } from "../ui-root-capabilities";
+import { composeUiDesignSystem, loadUiRootHostServices } from "../ui-root-host-services";
 
-const uiDesignSystem = composeUiDesignSystem(await loadUiRootCapabilities());
+const uiDesignSystem = composeUiDesignSystem(await loadUiRootHostServices());
 
 // jsdom ships no matchMedia, and the colour-mode provider reads it on mount.
 beforeAll(() => {

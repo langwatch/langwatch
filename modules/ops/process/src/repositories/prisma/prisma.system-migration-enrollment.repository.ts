@@ -6,7 +6,7 @@ import {
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type { MigrationEnrollmentRecord } from "../../rules/system-migration-support.rules.ts";
-import type { SystemMigrationEnrollmentRepository } from "../system-migration-enrollment.repository.ts";
+import type { SystemMigrationEnrollmentRepository } from "../system-migration.repository.ts";
 
 /** Cloud rollout enrollment rows: which organizations each migration processes.
  * Uniqueness checks live here as the only race-free duplicate check. */

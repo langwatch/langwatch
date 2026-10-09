@@ -4,14 +4,14 @@
  * Spec: specs/ui/module-host-mounting.feature
  */
 import {
-  UiCapabilityContextProvider,
+  UiHostServicesContextProvider,
   UiScope,
   UiSession,
   type UiActiveScope,
   type UiActor,
-  type UiCapabilities,
+  type UiHostServices,
 } from "@langwatch/browser-host/capabilities";
-import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
 import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -74,8 +74,8 @@ class TestScope extends UiScope {
 }
 
 function harness(scope: UiActiveScope, session = new SignedInSession()) {
-  const capabilities: UiCapabilities = {
-    ...createUiCapabilitiesFromHost(
+  const capabilities: UiHostServices = {
+    ...createUiHostServicesFromHost(
       { route: () => ({ params: {}, query: {} }), navigate: () => void 0 },
       session,
     ),
@@ -94,9 +94,9 @@ function harness(scope: UiActiveScope, session = new SignedInSession()) {
 
   return function Harness({ children }: { children: ReactNode }) {
     return (
-      <UiCapabilityContextProvider value={capabilities}>
+      <UiHostServicesContextProvider value={capabilities}>
         <PersonalWorkspaceHostMount>{children}</PersonalWorkspaceHostMount>
-      </UiCapabilityContextProvider>
+      </UiHostServicesContextProvider>
     );
   };
 }

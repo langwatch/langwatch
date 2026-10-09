@@ -3,7 +3,7 @@ import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { SystemMigrationRecordNotFoundError } from "@langwatch/system-migrations";
 import type { TenantMigrationRecord, TenantMigrationStatus } from "@langwatch/system-migrations";
 
-import type { SystemMigrationStateRepository } from "../system-migration-state.repository.ts";
+import type { SystemMigrationStateRepository } from "../system-migration.repository.ts";
 
 const TENANT_STATUSES: readonly TenantMigrationStatus[] = [
   "migrated",

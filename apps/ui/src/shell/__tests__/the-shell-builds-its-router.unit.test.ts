@@ -10,7 +10,7 @@ import { servedConfig, uiFeatureConfigFrom } from "../../__tests__/ui-feature-co
  * key when the router is BUILT, so the first gap took the browser down at boot.
  */
 import { browserModules } from "../../browser-modules.generated.ts";
-import { loadUiRootCapabilities } from "../ui-root-capabilities";
+import { loadUiRootHostServices } from "../ui-root-host-services";
 import { uiRouteTable } from "../ui-route-table";
 import { uiShellLayouts } from "../ui-shell-layouts";
 import { uiUnservedPageLoaders } from "../ui-unserved-pages";
@@ -23,7 +23,7 @@ const loaders = mergeUiPageLoaders({
 
 /** Composed exactly as `main.tsx` composes it. */
 const shellLayouts = uiShellLayouts({
-  root: await loadUiRootCapabilities(),
+  root: await loadUiRootHostServices(),
   config: await uiFeatureConfigFrom(servedConfig),
 });
 

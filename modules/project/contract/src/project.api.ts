@@ -58,6 +58,28 @@ export interface ProjectOrganizationPage {
   next: string | null;
 }
 
+/** A project and its LangWatchQL key, as the key-map backfill reads them. */
+export interface ProjectLwqlKey {
+  id: string;
+  lwqlKey: string;
+}
+
+export interface ProjectLwqlKeyPage {
+  projects: ProjectLwqlKey[];
+  next: string | null;
+}
+
+/** A project and whether it names its own S3 bucket, as the storage migration reads it. */
+export interface ProjectPrivateS3 {
+  id: string;
+  privateS3: boolean;
+}
+
+export interface ProjectPrivateS3Page {
+  projects: ProjectPrivateS3[];
+  next: string | null;
+}
+
 /** The page size fleet scans pass to `listAllIds`. */
 export const PROJECT_ID_PAGE_LIMIT = 500;
 
@@ -215,6 +237,13 @@ export interface ProjectApi {
    * migration inventory (main `migrateObjectStorage.ts` `listProjectsPage`).
    */
   listAllWithOrganization(input?: ProjectIdPageInput): Promise<ProjectOrganizationPage>;
+  /**
+   * Every project with whether it names its own S3 bucket, paged like `listAllIds`, for the
+   * object-storage migration inventory: a global provider move leaves those projects out.
+   */
+  listAllWithPrivateS3(input?: ProjectIdPageInput): Promise<ProjectPrivateS3Page>;
+  /** Every project with its LangWatchQL key, paged like `listAllIds`, for the key-map backfill. */
+  listLwqlKeys(input?: ProjectIdPageInput): Promise<ProjectLwqlKeyPage>;
 }
 
 export const ProjectApi = moduleApi<ProjectApi>()("project");

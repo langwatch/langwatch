@@ -1,4 +1,4 @@
-import { useOptionalUiCapabilities } from "@langwatch/browser-host/capabilities";
+import { useOptionalUiHostServices } from "@langwatch/browser-host/capabilities";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
@@ -71,7 +71,7 @@ const AUTHENTICATION_LINKS: readonly SectionNavigationLink[] = [
 
 export default function SsoSetupScreen() {
   const organizationId = useSsoHost().organizationId();
-  const navigation = useOptionalUiCapabilities()?.navigation;
+  const navigation = useOptionalUiHostServices()?.navigation;
 
   if (!organizationId) return null;
 

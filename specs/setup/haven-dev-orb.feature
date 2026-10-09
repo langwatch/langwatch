@@ -1,7 +1,7 @@
 Feature: Haven dev orb
   As a developer or a coding agent building on a stack haven runs
   I want a floating orb in the app with dev tools and a feedback channel into haven
-  So that I can switch theme, reach the stack's consoles and hand page feedback to an agent
+  So that I can reach the stack's consoles and hand page feedback to an agent
 
   The orb is dev-server tooling: the ui lane's Vite plugin injects it into the page only
   when haven runs the stack, and it takes no part in a production build.
@@ -29,12 +29,14 @@ Feature: Haven dev orb
     When the reader opens the orb
     Then the panel shows the slug, branch and commit
     And it links the hub, this stack's logs page and the mail console
+    And a database's bare host and port is offered to copy, not as a link
 
   @integration
-  Scenario: the theme switch follows the reader's choice
-    Given the orb panel is open
-    When the reader picks "dark"
-    Then the app stores "dark" as its theme and switches to it
+  Scenario: the orb shows each service's health
+    Given haven runs the stack "feat-x" with mailsim
+    When the reader opens the orb
+    Then each service row carries the status the stack home shows for it
+    And the services sit in groups: Stack open, Sims, Data and Tools folded
 
   @integration
   Scenario: hiding the orb lasts for the tab's session
@@ -55,10 +57,29 @@ Feature: Haven dev orb
     Then haven stores it with the region's box and the note
 
   @integration
-  Scenario: the orb sits clear of Langy's launcher
-    Given Langy's launcher sits in the bottom-right corner
+  Scenario: the orb docks to Langy's launcher
+    Given Langy's launcher sits in a bottom corner
     When the orb renders
-    Then it sits centred above the launcher, smaller, in the same round surface family
+    Then it sits as a small glass satellite on the launcher's upper rim, on the side facing the page
+    And its panel morphs out of the satellite
+
+  @integration
+  Scenario: the orb stands alone without Langy's launcher
+    Given the page has no Langy launcher
+    When the orb renders
+    Then it sits as a glass orb 20px off the bottom-right corner
+
+  @integration
+  Scenario: the orb waits for the app to paint
+    Given the app has not rendered into the page yet
+    Then the orb is not shown
+    And the page buffer already records the page's requests
+
+  @integration
+  Scenario: the orb stays clickable above the app's overlays
+    Given the app has loaded with its fixed layers and overlays
+    When the reader clicks the orb
+    Then the click reaches the orb
 
   @integration
   Scenario: the element picker labels what it would pick
@@ -84,7 +105,7 @@ Feature: Haven dev orb
     Given haven does not answer the orb
     When the reader opens the orb
     Then the panel says so in one line with a retry
-    And retrying asks haven again
+    And retrying, reopening the orb or waiting 30 seconds asks haven again
 
   @integration
   Scenario: network capture never records bodies or headers

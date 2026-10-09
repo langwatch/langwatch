@@ -507,9 +507,7 @@ jobs:
           CLICKHOUSE_URL: ${{ env.CLICKHOUSE_BASE_URL }}/langwatch
         run: |
           set -euo pipefail
-          pnpm prisma:migrate
-          cd apps/tasks
-          pnpm task clickhouse-migrate
+          pnpm task upgrade
 
       # The floor image runs its own start-up migrations first, as an old pod
       # restarting mid-rollout would: on a schema head already migrated they
