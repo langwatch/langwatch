@@ -2,7 +2,7 @@
  * Integration coverage for the event-attribute-keys discovery facet against a
  * real ClickHouse.
  *
- * `Events.Attributes` is `Array(Map(LowCardinality(String), String))` — one
+ * `Events.Attributes` is `Array(Map(LowCardinality(String), String))`: one
  * map per event per span. Listing the distinct keys needs only the keys, but
  * touching the Map itself makes ClickHouse materialise the `String` values
  * beside them. On a tenant with busy events that is what tips the facet into
@@ -17,6 +17,8 @@
  * returns the correct key list while the pre-fix shape blows the same budget.
  * The budget is scaled down to container size; prod hits the identical wall
  * at 2 GiB.
+ *
+ * @see specs/traces-v2/search.feature
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
@@ -131,6 +133,7 @@ describe("event-attribute-keys facet integration", () => {
 
   describe("given seeded spans with event attributes", () => {
     describe("when discovering keys under a tight memory budget", () => {
+      /** @scenario Event-attribute keys load when events carry large values */
       it("completes and returns every distinct key exactly once", async () => {
         const query = forTenant(buildEventAttributeKeysFacetQuery(ctx));
         const result = await ch.query({
@@ -150,6 +153,7 @@ describe("event-attribute-keys facet integration", () => {
         expect(Number(rows[0]?.total_distinct)).toBe(EXPECTED_DISTINCT_KEYS);
       });
 
+      /** @scenario Event-attribute keys are listed once each with how often they occur */
       it("counts every (span, event) occurrence of a key, as before the fix", async () => {
         // The subcolumn must not change multiplicity: one row per key per event
         // per span, which is what orders the sidebar by frequency.
@@ -178,6 +182,7 @@ describe("event-attribute-keys facet integration", () => {
     });
 
     describe("when reading the whole Map instead of the keys subcolumn", () => {
+      /** @scenario Event-attribute keys load when events carry large values */
       it("blows the same memory budget (the bug this fixes)", async () => {
         // Identical query except both the projection and the empty
         // short-circuit go through the Map, dragging the values column in.

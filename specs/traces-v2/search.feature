@@ -2357,6 +2357,19 @@ Rule: Dynamic prefix sidebar parity
     Then an "Event attributes" section appears in the Trace group
     And toggling a value writes "@event.attribute.<key>:<value>" into the search bar
 
+  @integration
+  Scenario: Event-attribute keys are listed once each with how often they occur
+    Given some events carry every key, some carry a single key, and some carry none
+    When the sidebar discovers event-attribute keys
+    Then each key is listed once
+    And each key's count is the number of events that carry it
+
+  @regression @integration
+  Scenario: Event-attribute keys load when events carry large values
+    Given most of the project's events carry large attribute values
+    When the sidebar discovers event-attribute keys
+    Then the key list loads with every key
+
 
 Rule: Attribute sections list values from their own attribute store
   Each attribute flavour is backed by a different ClickHouse column

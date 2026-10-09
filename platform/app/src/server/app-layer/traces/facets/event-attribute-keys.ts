@@ -15,7 +15,7 @@ import { baseParams, buildTimeWhere, KEY_DISCOVERY_SETTINGS } from "./helpers";
  * Both the projection and the empty short-circuit go through the
  * `.keys` subcolumn, never `Events.Attributes` itself:
  *
- *   - `Events.Attributes.keys` is `Array(Array(LowCardinality(String)))` —
+ *   - `Events.Attributes.keys` is `Array(Array(LowCardinality(String)))`:
  *     the keys of every event's map, without the `String` values beside
  *     them. Reading the Map itself pulls those values into memory to
  *     produce a key list that never mentions them.
