@@ -297,10 +297,10 @@ ENV CHECKPOINT_DISABLE=1
 # Every tiktoken encoding file, so token counting reads it from disk instead of
 # downloading it from openaipublic.blob.core.windows.net at runtime (about 8 MB).
 # The script resolves tiktoken from the working directory, so it runs in the
-# worker app, which depends on it.
+# trace module's process package, which depends on it.
 ENV TIKTOKENS_PATH=/app/tiktoken
 COPY dev/scripts/download-tiktoken-encodings.mjs ./dev/scripts/download-tiktoken-encodings.mjs
-RUN cd apps/worker && node ../../dev/scripts/download-tiktoken-encodings.mjs "$TIKTOKENS_PATH"
+RUN cd modules/trace/process && node ../../../dev/scripts/download-tiktoken-encodings.mjs "$TIKTOKENS_PATH"
 
 EXPOSE 5560
 
