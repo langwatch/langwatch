@@ -11,8 +11,8 @@ Organisations and who is in them: membership, invites, teams, groups and persona
 | Classification | core (`modules/catalogue.json`)                                                                                             |
 | Subjects       | group, invite, membership, organization, personal-workspace, personal-workspace-features, team                              |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser) · [client](client)                                 |
-| Api token      | `OrganizationApi` = `moduleApi<OrganizationApi>()("organization")`, `contract/src/organization.api.ts:835` (139 operations) |
-| Other token    | `TeamManagementApi`, `process/src/transport/team.rest.ts:62`                                                                |
+| Api token      | `OrganizationApi` = `moduleApi<OrganizationApi>()("organization")`, `contract/src/organization.api.ts:837` (139 operations) |
+| Other token    | `TeamManagementApi`, `process/src/transport/team.rest.ts:64`                                                                |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                                                  |
 
 ## What organization owns
@@ -25,8 +25,9 @@ Organisations and who is in them: membership, invites, teams, groups and persona
 | Postgres table                 | `OrganizationInvite`                                                                                                                              | `process/src/repositories/prisma/prisma.sign-up-policy.repository.ts:9`              |
 | Postgres table                 | `Team`                                                                                                                                            | `process/src/repositories/prisma/prisma.team.repository.ts:31`                       |
 | Postgres, accessed not claimed | `User`                                                                                                                                            | `process/src/repositories/prisma/prisma.organization-user-directory.repository.ts:6` |
+| Stores required                |                                                                                                                                                   | `process/src/channels/http/http.organization.channels.ts:11`                         |
 | Stores required                | prisma, encryption, redis                                                                                                                         | `process/src/repositories/live/live.organization.repositories.ts:9`                  |
-| Secrets                        | `internalSlackSignupsWebhook` (SLACK_CHANNEL_SIGNUPS)                                                                                             | `process/src/app/organization.app.ts:297`                                            |
+| Secrets                        | `internalSlackSignupsWebhook` (SLACK_CHANNEL_SIGNUPS)                                                                                             | `process/src/app/organization.app.ts:298`                                            |
 | Config                         | `signUp.mode` (SIGN_UP_MODE), `signUp.allowedDomains` (SIGN_UP_ALLOWED_DOMAINS), `signUp.adminEmails` (ADMIN_EMAILS), `publicBaseUrl` (BASE_HOST) | `contract/src/organization.config.ts:17`                                             |
 
 Anything else organization needs belongs to another module and is reached through its `*Api`.
