@@ -30,6 +30,7 @@ import {
   type UseFormGetFieldState,
   type UseFormRegister,
   useForm,
+  useWatch,
 } from "react-hook-form";
 
 import { ProjectDepartmentField } from "../../../behavior/lent-peers.tsx";
@@ -584,6 +585,9 @@ function ProjectSettingsForm({ project }: { project: ProjectHostProject }) {
     defaultValues,
   });
   const { register, handleSubmit, control, formState } = form;
+  // The React Compiler memoises `form.watch()` on the stable form; useWatch subscribes.
+  const language = useWatch({ control, name: "language" });
+  const framework = useWatch({ control, name: "framework" });
   const updateProject = projectApi.project.update.useMutation();
   const apiContext = projectApi.useUtils();
   const [changeLanguageFramework, setChangeLanguageFramework] = useState(false);
@@ -687,11 +691,7 @@ function ProjectSettingsForm({ project }: { project: ProjectHostProject }) {
               invalid={!!formState.errors.language || !!formState.errors.framework}
             >
               {changeLanguageFramework ? (
-                <TechStackSelector
-                  form={form}
-                  language={form.watch("language")}
-                  framework={form.watch("framework")}
-                />
+                <TechStackSelector form={form} language={language} framework={framework} />
               ) : (
                 <HStack>
                   <ProjectTechStackIcon project={project} />

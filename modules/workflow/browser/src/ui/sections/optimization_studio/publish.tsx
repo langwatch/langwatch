@@ -35,7 +35,7 @@ import {
 import type { Edge } from "@xyflow/react";
 import { useCallback, useState } from "react";
 import { ArrowUp, ArrowUpCircle, ChevronDown, Code, Share2, XCircle } from "react-feather";
-import { FormProvider, useForm } from "react-hook-form";
+import { FormProvider, useForm, useWatch } from "react-hook-form";
 
 import { useModelProviderKeys } from "../../../behavior/optimization_studio/use-model-provider-keys.ts";
 import {
@@ -445,7 +445,8 @@ function PublishModalContent({
     },
   });
 
-  const formVersion = form.watch("version");
+  // The React Compiler memoises `form.watch()` on the stable form; useWatch subscribes.
+  const formVersion = useWatch({ control: form.control, name: "version" });
 
   const { versions, versionToBeEvaluated } = useVersionState({
     project,

@@ -3,7 +3,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Link } from "@langwatch/browser-host/link";
 import { Alert, Box, Input, VStack } from "@langwatch/design-system/primitives";
 import { useState } from "react";
-import { useForm, type UseFormReturn } from "react-hook-form";
+import { useForm, type UseFormReturn, useWatch } from "react-hook-form";
 import { z } from "zod";
 
 import { attemptCredentialSignIn } from "../../behavior/attempt-credential-sign-in.ts";
@@ -91,6 +91,8 @@ export function CredentialSignInForm({
     mode: "onSubmit",
     reValidateMode: "onSubmit",
   });
+  // The React Compiler memoises `form.watch()` on the stable form; useWatch subscribes.
+  const typedEmail = useWatch({ control: form.control, name: "email" });
 
   // A password you have typed something into can be judged when you leave it;
   // an empty one cannot, because you have not tried yet. Clicking past it to
@@ -190,7 +192,7 @@ export function CredentialSignInForm({
           labelEnd={
             <Box asChild>
               <Link
-                href={forgotPasswordHref({ email: asksForAddress ? form.watch("email") : email })}
+                href={forgotPasswordHref({ email: asksForAddress ? typedEmail : email })}
                 style={{
                   textDecoration: "underline",
                   textUnderlineOffset: "2px",
