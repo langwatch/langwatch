@@ -61,6 +61,7 @@ func New(opts Options) *Executor {
 		// dial-time safety.
 		transport := http.DefaultTransport.(*http.Transport).Clone()
 		transport.DialContext = SafeDialer(opts.SSRF)
+		transport.Proxy = SafeProxy(opts.SSRF, http.ProxyFromEnvironment)
 		opts.Client = &http.Client{Transport: transport}
 	}
 	if opts.DefaultTimeout == 0 {
