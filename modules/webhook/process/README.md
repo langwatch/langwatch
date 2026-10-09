@@ -426,7 +426,7 @@ interface Response {
 
 ### `webhookEndpoints`
 
-Contract `../contract/src/webhook-endpoint.trpc.ts:72`, router `src/transport/webhook-endpoint.trpc.ts:13`.
+Contract `../contract/src/webhook-endpoint.trpc.ts:74`, router `src/transport/webhook-endpoint.trpc.ts:13`.
 
 | Procedure                     | Kind     | Gate                                 | Input                                    | Output                            |
 | ----------------------------- | -------- | ------------------------------------ | ---------------------------------------- | --------------------------------- |
@@ -447,7 +447,7 @@ Contract `../contract/src/webhook-endpoint.trpc.ts:72`, router `src/transport/we
 interface Input {
   organizationId: string;
 }
-// Output: inline, ../contract/src/webhook-endpoint.trpc.ts:76
+// Output: inline, ../contract/src/webhook-endpoint.trpc.ts:78
 type Output = {
   type: string;
   family: string;
@@ -458,7 +458,7 @@ type Output = {
 
 // webhookEndpoints.list
 type Input = z.infer<typeof webhookEndpointOrganizationScopeSchema>; // ../contract/src/webhook-endpoint.trpc.ts:19
-// Output: webhookEndpointViewSchema.array() (inline, ../contract/src/webhook-endpoint.trpc.ts:80)
+// Output: webhookEndpointViewSchema.array() (inline, ../contract/src/webhook-endpoint.trpc.ts:82)
 
 // webhookEndpoints.deliveries
 // Input: webhookEndpointDeliveriesInputSchema, ../contract/src/webhook-endpoint.trpc.ts:41
@@ -471,11 +471,11 @@ interface Input {
     id: string;
   };
 }
-type Output = z.infer<typeof webhookDeliveryPageSchema>; // ../contract/src/webhook.ts:120
+type Output = z.infer<typeof webhookDeliveryPageSchema>; // ../contract/src/webhook.ts:122
 
 // webhookEndpoints.create
 type Input = z.infer<typeof webhookEndpointCreateInputSchema>; // ../contract/src/webhook-endpoint.trpc.ts:47
-type Output = z.infer<typeof webhookEndpointWithSecretSchema>; // ../contract/src/webhook.ts:100
+type Output = z.infer<typeof webhookEndpointWithSecretSchema>; // ../contract/src/webhook.ts:102
 
 // webhookEndpoints.health
 // Input: webhookEndpointScopeSchema, ../contract/src/webhook-endpoint.trpc.ts:23
@@ -483,7 +483,7 @@ interface Input {
   organizationId: string;
   endpointId: string;
 }
-// Output: webhookEndpointHealthSchema, ../contract/src/webhook.ts:81
+// Output: webhookEndpointHealthSchema, ../contract/src/webhook.ts:83
 interface Output {
   status: "ACTIVE" | "DISABLED";
   disabledReason: string | null;
@@ -498,12 +498,12 @@ interface Output {
 }
 
 // webhookEndpoints.update
-type Input = z.infer<typeof webhookEndpointUpdateInputSchema>; // ../contract/src/webhook-endpoint.trpc.ts:58
+type Input = z.infer<typeof webhookEndpointUpdateInputSchema>; // ../contract/src/webhook-endpoint.trpc.ts:59
 type Output = z.infer<typeof webhookEndpointViewSchema>; // ../contract/src/webhook.ts:51
 
 // webhookEndpoints.rollSecret
 type Input = z.infer<typeof webhookEndpointScopeSchema>; // ../contract/src/webhook-endpoint.trpc.ts:23
-type Output = z.infer<typeof webhookEndpointWithSecretSchema>; // ../contract/src/webhook.ts:100
+type Output = z.infer<typeof webhookEndpointWithSecretSchema>; // ../contract/src/webhook.ts:102
 
 // webhookEndpoints.enable
 type Input = z.infer<typeof webhookEndpointScopeSchema>; // ../contract/src/webhook-endpoint.trpc.ts:23
@@ -515,7 +515,7 @@ type Output = z.infer<typeof webhookEndpointViewSchema>; // ../contract/src/webh
 
 // webhookEndpoints.archive
 type Input = z.infer<typeof webhookEndpointScopeSchema>; // ../contract/src/webhook-endpoint.trpc.ts:23
-// Output: inline, ../contract/src/webhook-endpoint.trpc.ts:112
+// Output: inline, ../contract/src/webhook-endpoint.trpc.ts:114
 type Output = unknown;
 ```
 
