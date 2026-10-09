@@ -257,13 +257,12 @@ Feature: Ops shows an installation's release upgrades, read-only
     When an operator opens Ops, Upgrades
     Then no Dataplanes tab is offered
 
-  # Upgrading mode (UPGRADE-IN-WORKER slice 4, UIW-6; plan dev/docs/plans/upgrade-in-worker-2026-10-09.md section 4)
+  # Upgrading mode (UIW-6, then API-UP-DURING-UPGRADE, Alex 2026-10-09: every route serves by default)
   @unit
-  Scenario: The Upgrades reads and Retry serve while the installation upgrades and the migration procedures stay held
+  Scenario: The Upgrades and system-migration procedures serve while the installation upgrades
     Given the api is in upgrading mode
-    When a batched call names the eight upgrade reads and Retry
+    When a batched call names the upgrade reads, Retry and the system-migration procedures
     Then it passes the holding door to the door that asks ops:view or ops:manage at the platform
-    And a call naming any system-migration procedure answers 503 before the door
 
   # --- Tenant and operator steps on the Upgrades page (U4, U5) ---
 
