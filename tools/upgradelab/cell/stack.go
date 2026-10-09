@@ -190,7 +190,7 @@ func Start(spec ProcSpec) (*Proc, error) {
 	if err != nil {
 		return nil, err
 	}
-	command := exec.Command(spec.Args[0], spec.Args[1:]...) // #nosec G204 -- argv built by the harness.
+	command := exec.CommandContext(context.Background(), spec.Args[0], spec.Args[1:]...) // #nosec G204 -- argv built by the harness; the group outlives any ctx, Stop ends it.
 	command.Dir, command.Env, command.Stdout, command.Stderr = spec.Dir, spec.Env, logFile, logFile
 	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	if err := command.Start(); err != nil {

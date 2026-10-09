@@ -44,8 +44,7 @@ func (cell *run) checks(ctx context.Context) error {
 func (cell *run) holdingVerdict() Verdict {
 	holding, ready := FirstAt(cell.report.Phases, "holding:"), FirstAt(cell.report.Phases, "ready")
 	upgrading := FirstAt(cell.report.Phases, "holding:upgrading")
-	return verdict("I0", "api holds (holding page, then upgrading mode) until the ledger is current",
-		holding >= 0 && ready > holding, fmt.Sprintf("holding at %d ms, upgrading mode at %d ms, ready at %d ms", holding, upgrading, ready))
+	return verdict("I0", holding >= 0 && ready > holding, fmt.Sprintf("holding at %d ms, upgrading mode at %d ms, ready at %d ms", holding, upgrading, ready))
 }
 
 func ledgerVerdict(rows []LedgerRow) Verdict {
@@ -54,13 +53,13 @@ func ledgerVerdict(rows []LedgerRow) Verdict {
 	for _, row := range left {
 		names = append(names, row.ID+"="+row.Status)
 	}
-	return verdict("I2", "ledger current: every step done or not-needed (operator steps aside)", len(rows) > 0 && len(left) == 0,
+	return verdict("I2", len(rows) > 0 && len(left) == 0,
 		fmt.Sprintf("%d steps, outstanding: %v", len(rows), names))
 }
 
 func reopenedVerdict(atReady, final []LedgerRow) Verdict {
 	reopened := Reopened(atReady, final)
-	return verdict("I2b", "nothing reopened after ready", len(reopened) == 0, fmt.Sprintf("%d steps done at ready; reopened: %v", countDone(atReady), reopened))
+	return verdict("I2b", len(reopened) == 0, fmt.Sprintf("%d steps done at ready; reopened: %v", countDone(atReady), reopened))
 }
 
 func countDone(rows []LedgerRow) int {
@@ -80,8 +79,8 @@ func (cell *run) rosterVerdict(ctx context.Context) Verdict {
 	}
 	rows := strings.Fields(out)
 	declares := len(rows) > 0 && !slices.ContainsFunc(rows, func(row string) bool { return strings.HasSuffix(row, ":0") })
-	status, _, _ := get(ctx, httpClient, cell.url()+"/readyz", "")
-	return verdict("I3", "api ready and every live roster row declares the image's steps", status == http.StatusOK && declares,
+	status, _, _ := get(ctx, httpClient, cell.url()+"/readyz")
+	return verdict("I3", status == http.StatusOK && declares,
 		fmt.Sprintf("/readyz %d; live rows role:steps %v", status, rows))
 }
 
@@ -99,7 +98,7 @@ func (cell *run) copyVerdict(ctx context.Context) Verdict {
 			}
 		}
 	}
-	return verdict("I4", "copy never move: no table lost rows across the upgrade", len(shrunk) == 0, fmt.Sprintf("%d stores fingerprinted; shrunk: %v", len(cell.before), shrunk))
+	return verdict("I4", len(shrunk) == 0, fmt.Sprintf("%d stores fingerprinted; shrunk: %v", len(cell.before), shrunk))
 }
 
 func (cell *run) readBackVerdict(ctx context.Context) Verdict {
@@ -108,7 +107,7 @@ func (cell *run) readBackVerdict(ctx context.Context) Verdict {
 		return Verdict{ID: "I6", Name: "seeded product kinds read back through head", Result: "inconclusive", Detail: err.Error()}
 	}
 	err = seed.ExpectedKinds().Check(counts)
-	return verdict("I6", "seeded product kinds read back through head", err == nil, fmt.Sprintf("counts %v %v", counts, errText(err)))
+	return verdict("I6", err == nil, fmt.Sprintf("counts %v %v", counts, errText(err)))
 }
 
 func errText(err error) string {
@@ -121,12 +120,12 @@ func errText(err error) string {
 // secondRunVerdict: a second upgrade exits 0 and changes no ledger row.
 func (cell *run) secondRunVerdict(ctx context.Context, final []LedgerRow) Verdict {
 	command := exec.CommandContext(ctx, "node", "--experimental-transform-types", "src/main.ts", "upgrade") // #nosec G204 -- fixed argv.
-	command.Dir, command.Env = filepath.Join(cell.options.HeadDir, "apps/tasks"), cell.envWith(nil)
+	command.Dir, command.Env = filepath.Join(cell.options.HeadDir, "apps", "tasks"), cell.envWith(nil)
 	out, err := command.CombinedOutput()
 	_ = os.WriteFile(cell.logPath("second-upgrade"), out, 0o600)
 	again, ledgerErr := Ledger(ctx, cell.stores)
 	changed := Reopened(final, again)
-	return verdict("I8", "a second upgrade exits 0 and changes no ledger row", err == nil && ledgerErr == nil && len(changed) == 0,
+	return verdict("I8", err == nil && ledgerErr == nil && len(changed) == 0,
 		fmt.Sprintf("exit %v; changed %v", errText(err), changed))
 }
 
@@ -149,7 +148,7 @@ func (cell *run) logVerdict() Verdict {
 		}
 		_ = file.Close()
 	}
-	return verdict("I9", "no error lines in head's api and worker logs", len(counts) == 0, fmt.Sprintf("%v; first: %v", counts, first))
+	return verdict("I9", len(counts) == 0, fmt.Sprintf("%v; first: %v", counts, first))
 }
 
 func isErrorLine(line string) bool {
@@ -172,7 +171,7 @@ func (cell *run) apiEarlyVerdict() Verdict {
 			firstIngest = call.AtMs
 		}
 	}
-	return verdict("N1", "head api answers ingest before the upgrade is done", firstIngest >= 0 && firstIngest < ready,
+	return verdict("N1", firstIngest >= 0 && firstIngest < ready,
 		fmt.Sprintf("api started %d ms; first ingest 2xx %d ms; ready (upgrade done) %d ms; down from %d ms",
 			started, firstIngest, ready, cell.marks["fromStopped"]))
 }
@@ -187,7 +186,7 @@ func droppedVerdict(summaries []KindSummary) Verdict {
 			detail = append(detail, fmt.Sprintf("%s %d/%d", each.Kind, each.Failed, each.Sent))
 		}
 	}
-	return verdict("N2", "no failed call through the switch (held then answered counts)", failed == 0, fmt.Sprintf("%d of %d failed: %v", failed, sent, detail))
+	return verdict("N2", failed == 0, fmt.Sprintf("%d of %d failed: %v", failed, sent, detail))
 }
 
 func lostVerdict(summaries []KindSummary) Verdict {
@@ -199,7 +198,7 @@ func lostVerdict(summaries []KindSummary) Verdict {
 			detail = append(detail, fmt.Sprintf("%s %d", each.Kind, each.Lost))
 		}
 	}
-	return verdict("N3", "no lost write: every 2xx write visible after settle", lost == 0, fmt.Sprintf("%d lost: %v", lost, detail))
+	return verdict("N3", lost == 0, fmt.Sprintf("%d lost: %v", lost, detail))
 }
 
 func (cell *run) queueSummary(ctx context.Context) QueueSummary {
@@ -224,7 +223,7 @@ func (cell *run) queueSummary(ctx context.Context) QueueSummary {
 
 func (cell *run) queueVerdict() Verdict {
 	queue := cell.report.Queue
-	return verdict("N4", "queued work drains once head's worker runs", queue.DrainedMs >= 0,
+	return verdict("N4", queue.DrainedMs >= 0,
 		fmt.Sprintf("baseline %d, peak %d at %d ms, drained %d ms after the worker started", queue.Baseline, queue.Peak, queue.PeakAtMs, queue.DrainedMs))
 }
 
@@ -239,7 +238,7 @@ func (cell *run) opsVerdict() Verdict {
 		states[shot.Phase] = shot.State + errSuffix(shot.Error)
 	}
 	settled := states["settled"]
-	return verdict("O1", "Ops > Upgrades shows the right state", settled == "Up to date", fmt.Sprintf("state by phase: %v", states))
+	return verdict("O1", settled == "Up to date", fmt.Sprintf("state by phase: %v", states))
 }
 
 func errSuffix(err string) string {
@@ -256,23 +255,29 @@ func (cell *run) visibleWrites(ctx context.Context) (map[string]bool, error) {
 		return nil, err
 	}
 	visible := map[string]bool{}
-	versions := cell.promptVersions(ctx)
+	seen := evidence{stored: stored, versions: cell.promptVersions(ctx)}
 	for _, call := range cell.traffic.Calls() {
 		if !call.Write || !call.ok() {
 			continue
 		}
-		visible[call.Kind+"/"+call.ID] = cell.isVisible(ctx, call, stored, versions)
+		visible[call.Kind+"/"+call.ID] = cell.isVisible(ctx, call, seen)
 	}
 	return visible, nil
 }
 
-func (cell *run) isVisible(ctx context.Context, call Call, stored map[string]map[string]bool, versions string) bool {
+// evidence is what settle left: ClickHouse ids per table, and the base prompt's versions.
+type evidence struct {
+	stored   map[string]map[string]bool
+	versions string
+}
+
+func (cell *run) isVisible(ctx context.Context, call Call, seen evidence) bool {
 	if table := storedTable[call.Kind]; table != "" {
-		return stored[table][call.ID]
+		return seen.stored[table][call.ID]
 	}
 	switch call.Kind {
 	case "prompt-update":
-		return strings.Contains(versions, call.ID)
+		return strings.Contains(seen.versions, call.ID)
 	case "prompt-create":
 		return cell.found(ctx, "/api/prompts/"+call.ID)
 	case "dataset-create":
@@ -316,38 +321,39 @@ func (cell *run) hybridVerdicts(ctx context.Context) []Verdict {
 	if len(cell.private) == 0 {
 		return nil
 	}
-	privateProjects := map[string]string{} // project -> label
-	for label, organization := range cell.private {
-		for _, project := range cell.tenancy.ProjectsOf(organization) {
-			privateProjects[project] = label
-		}
-	}
-	shared, err := tenantsOn(ctx, cell.stores.ClickHouseURL(""))
-	if err != nil {
-		return []Verdict{{ID: "H1", Name: "tenants land only on their own target", Result: "inconclusive", Detail: err.Error()}}
-	}
+	misplaced, err := cell.misplacedTenants(ctx)
+	placement := verdict("H1", len(misplaced) == 0 && err == nil, fmt.Sprintf("misplaced: %v %s", misplaced, errText(err)))
+	return []Verdict{placement, cell.targetsVerdict(ctx),
+		{ID: "H3", Name: "a private organization's reads in the UI and API come from its target", Result: "inconclusive", Detail: "traffic speaks as the seed project (shared) only; next: a client per private organization"}}
+}
+
+// misplacedTenants names every tenant found on a target other than its own.
+func (cell *run) misplacedTenants(ctx context.Context) ([]string, error) {
+	home := cell.homes()
 	var misplaced []string
-	for tenant := range shared {
-		if label := privateProjects[tenant]; label != "" {
-			misplaced = append(misplaced, tenant+" on shared, belongs on "+label)
-		}
-	}
-	for label := range cell.private {
-		on, err := tenantsOn(ctx, cell.stores.ClickHouseURL(label))
+	for _, label := range append([]string{""}, cell.stores.Private...) {
+		tenants, err := tenantsOn(ctx, cell.stores.ClickHouseURL(label))
 		if err != nil {
-			misplaced = append(misplaced, err.Error())
+			return misplaced, err
 		}
-		for tenant := range on {
-			if privateProjects[tenant] != label {
-				misplaced = append(misplaced, tenant+" on "+label)
+		for tenant := range tenants {
+			if home[tenant] != label {
+				misplaced = append(misplaced, fmt.Sprintf("%s on %q, home %q", tenant, label, home[tenant]))
 			}
 		}
 	}
-	return []Verdict{
-		verdict("H1", "each tenant's telemetry and projections land only on its own target", len(misplaced) == 0, fmt.Sprintf("misplaced: %v", misplaced)),
-		cell.targetsVerdict(ctx),
-		{ID: "H3", Name: "a private organization's reads in the UI and API come from its target", Result: "inconclusive", Detail: "traffic speaks as the seed project (shared) only; next: a client per private organization"},
+	return misplaced, nil
+}
+
+// homes maps each private organization's project to its target label; an absent project is shared ("").
+func (cell *run) homes() map[string]string {
+	home := map[string]string{}
+	for label, organization := range cell.private {
+		for _, project := range cell.tenancy.ProjectsOf(organization) {
+			home[project] = label
+		}
 	}
+	return home
 }
 
 // tenantsOn lists the TenantIds holding spans or events on one ClickHouse target.
@@ -367,6 +373,6 @@ func (cell *run) targetsVerdict(ctx context.Context) Verdict {
 	}
 	rows := strings.Fields(out)
 	open := slices.ContainsFunc(rows, func(row string) bool { return !strings.Contains(row, ":0/") })
-	return verdict("H2", "the upgrade applied every ClickHouse target and the ledger shows each", len(rows) == 1+len(cell.private) && !open,
+	return verdict("H2", len(rows) == 1+len(cell.private) && !open,
 		fmt.Sprintf("target:open/steps %v, want %d targets", rows, 1+len(cell.private)))
 }

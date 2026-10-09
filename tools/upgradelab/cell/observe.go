@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-// Phase change: what the api answered from AtMs on (down, holding:<phase>, ready).
+// PhaseChange is what the api answered from AtMs on (down, holding:<phase>, ready).
 type PhaseChange struct {
 	Phase string `json:"phase"`
 	AtMs  int64  `json:"atMs"`
@@ -64,22 +64,21 @@ func (poller *Poller) Run(ctx context.Context) {
 }
 
 func probe(ctx context.Context, client *http.Client, base string) (int, string, bool) {
-	ready, _, err := get(ctx, client, base+"/readyz", "")
+	ready, _, err := get(ctx, client, base+"/readyz")
 	if err != nil {
 		return 0, "", false
 	}
-	_, page, _ := get(ctx, client, base+"/", "text/html")
+	_, page, _ := get(ctx, client, base+"/")
 	return ready, page, true
 }
 
-func get(ctx context.Context, client *http.Client, target, accept string) (int, string, error) {
+// get asks as a browser does (Accept: text/html), so a holding api answers its page.
+func get(ctx context.Context, client *http.Client, target string) (int, string, error) {
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, target, http.NoBody)
 	if err != nil {
 		return 0, "", err
 	}
-	if accept != "" {
-		request.Header.Set("Accept", accept)
-	}
+	request.Header.Set("Accept", "text/html")
 	response, err := client.Do(request)
 	if err != nil {
 		return 0, "", err
@@ -140,8 +139,8 @@ for _, key in ipairs(redis.call('KEYS', '*')) do
     if kind == 'zset' then total = total + redis.call('ZCARD', key)
     elseif kind == 'list' then total = total + redis.call('LLEN', key)
     elseif kind == 'stream' then total = total + redis.call('XLEN', key) end
-  end
-end
+  end -- if
+end -- for
 return total`
 
 // QueueSample is one reading of the waiting work.
@@ -166,8 +165,8 @@ for _, key in ipairs(redis.call('KEYS', '*')) do
   local kind = redis.call('TYPE', key).ok
   local size = 0
   if kind == 'zset' then size = redis.call('ZCARD', key) elseif kind == 'list' then size = redis.call('LLEN', key) elseif kind == 'stream' then size = redis.call('XLEN', key) end
-  if size > 0 then table.insert(rows, key .. ' ' .. kind .. ' ' .. size) end
-end
+  if size > 0 then table.insert(rows, key .. ' ' .. kind .. ' ' .. size) end -- if
+end -- for
 return rows`
 	out, _ := exec.CommandContext(ctx, "redis-cli", "-p", port, "EVAL", script, "0").Output() // #nosec G204 -- fixed script.
 	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
@@ -241,7 +240,8 @@ func Ledger(ctx context.Context, stores Stores) ([]LedgerRow, error) {
 		return nil, err
 	}
 	var rows []LedgerRow
-	return rows, json.Unmarshal([]byte(out), &rows)
+	err = json.Unmarshal([]byte(out), &rows)
+	return rows, err
 }
 
 // Outstanding is every step not done or not-needed, operator steps aside (an operator starts those).

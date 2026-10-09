@@ -65,7 +65,8 @@ func TestEveryProfileRoutesToTheCellsOwnStores(t *testing.T) {
 
 // @scenario "Traffic is seeded and judged per kind and per api phase"
 func TestTrafficIsSeededAndJudgedPerKindAndPhase(t *testing.T) {
-	if SeededID(1, "otlp-trace", 7) != SeededID(1, "otlp-trace", 7) || SeededID(1, "otlp-trace", 7) == SeededID(2, "otlp-trace", 7) {
+	first, again, other := SeededID(1, "otlp-trace", 7), SeededID(1, "otlp-trace", 7), SeededID(2, "otlp-trace", 7)
+	if first != again || first == other {
 		t.Fatal("seeded ids are not a function of (seed, kind, n)")
 	}
 	timeline := []PhaseChange{{Phase: "down", AtMs: 100}, {Phase: "holding:schema", AtMs: 200}, {Phase: "ready", AtMs: 300}}

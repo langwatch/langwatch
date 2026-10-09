@@ -63,7 +63,7 @@ func Mix(rate time.Duration) []Kind {
 	}
 }
 
-func post(ctx context.Context, client Client, path string, body any) (*http.Request, error) {
+func (client Client) post(ctx context.Context, path string, body any) (*http.Request, error) {
 	data, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
@@ -90,7 +90,7 @@ func otlpTrace(ctx context.Context, client Client, n int) (*http.Request, string
 		"startTimeUnixNano": nowNano(), "endTimeUnixNano": nowNano()}
 	body := map[string]any{"resourceSpans": []any{map[string]any{"resource": resource("upgradelab"),
 		"scopeSpans": []any{map[string]any{"spans": []any{span}}}}}}
-	request, err := post(ctx, client, "/api/otel/v1/traces", body)
+	request, err := client.post(ctx, "/api/otel/v1/traces", body)
 	return request, id, err
 }
 
@@ -99,7 +99,7 @@ func collectorTrace(ctx context.Context, client Client, n int) (*http.Request, s
 	now := time.Now().UnixMilli()
 	span := map[string]any{"type": "span", "span_id": id[:16], "name": "upgradelab collector " + strconv.Itoa(n),
 		"input": map[string]string{"type": "text", "value": "item " + strconv.Itoa(n)}, "timestamps": map[string]int64{"started_at": now - 10, "finished_at": now}}
-	request, err := post(ctx, client, "/api/collector", map[string]any{"trace_id": id, "spans": []any{span}})
+	request, err := client.post(ctx, "/api/collector", map[string]any{"trace_id": id, "spans": []any{span}})
 	return request, id, err
 }
 
@@ -109,7 +109,7 @@ func otlpLog(ctx context.Context, client Client, n int) (*http.Request, string, 
 		"body": map[string]any{"stringValue": "upgradelab log " + id}}
 	body := map[string]any{"resourceLogs": []any{map[string]any{"resource": resource("upgradelab"),
 		"scopeLogs": []any{map[string]any{"logRecords": []any{record}}}}}}
-	request, err := post(ctx, client, "/api/otel/v1/logs", body)
+	request, err := client.post(ctx, "/api/otel/v1/logs", body)
 	return request, id, err
 }
 
@@ -119,7 +119,7 @@ func otlpMetric(ctx context.Context, client Client, n int) (*http.Request, strin
 	metric := map[string]any{"name": name, "unit": "1", "gauge": map[string]any{"dataPoints": []any{point}}}
 	body := map[string]any{"resourceMetrics": []any{map[string]any{"resource": resource("upgradelab"),
 		"scopeMetrics": []any{map[string]any{"metrics": []any{metric}}}}}}
-	request, err := post(ctx, client, "/api/otel/v1/metrics", body)
+	request, err := client.post(ctx, "/api/otel/v1/metrics", body)
 	return request, name, err
 }
 
@@ -128,7 +128,7 @@ func restRead(ctx context.Context, client Client, n int) (*http.Request, string,
 	paths := []string{"/api/prompts", "/api/dataset", "/api/evaluators"}
 	if n%4 == 3 {
 		end := time.Now().UnixMilli()
-		request, err := post(ctx, client, "/api/traces/search", map[string]any{"startDate": end - 86_400_000, "endDate": end, "pageSize": 5})
+		request, err := client.post(ctx, "/api/traces/search", map[string]any{"startDate": end - 86_400_000, "endDate": end, "pageSize": 5})
 		return request, "", err
 	}
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, client.URL+paths[n%4], http.NoBody)
@@ -150,13 +150,13 @@ func trpcRead(ctx context.Context, client Client, _ int) (*http.Request, string,
 
 func promptCreate(ctx context.Context, client Client, n int) (*http.Request, string, error) {
 	handle := "upgradelab-" + SeededID(client.Seed, "prompt", n)[:12]
-	request, err := post(ctx, client, "/api/prompts", map[string]any{"handle": handle, "prompt": "seeded prompt " + strconv.Itoa(n)})
+	request, err := client.post(ctx, "/api/prompts", map[string]any{"handle": handle, "prompt": "seeded prompt " + strconv.Itoa(n)})
 	return request, handle, err
 }
 
 func promptUpdate(ctx context.Context, client Client, n int) (*http.Request, string, error) {
 	message := "upgradelab update " + SeededID(client.Seed, "prompt-update", n)[:12]
-	request, err := post(ctx, client, "/api/prompts/"+client.BasePrompt, map[string]any{"commitMessage": message, "prompt": message})
+	request, err := client.post(ctx, "/api/prompts/"+client.BasePrompt, map[string]any{"commitMessage": message, "prompt": message})
 	if err == nil {
 		request.Method = http.MethodPut
 	}
@@ -165,7 +165,7 @@ func promptUpdate(ctx context.Context, client Client, n int) (*http.Request, str
 
 func datasetCreate(ctx context.Context, client Client, n int) (*http.Request, string, error) {
 	name := "upgradelab-" + SeededID(client.Seed, "dataset", n)[:12]
-	request, err := post(ctx, client, "/api/dataset", map[string]any{"name": name})
+	request, err := client.post(ctx, "/api/dataset", map[string]any{"name": name})
 	return request, name, err
 }
 
@@ -176,6 +176,7 @@ type Traffic struct {
 	Origin time.Time
 	Hold   time.Duration
 
+	http  *http.Client
 	mu    sync.Mutex
 	calls []Call
 	wait  sync.WaitGroup
@@ -183,26 +184,26 @@ type Traffic struct {
 
 // Run fires each kind on its own ticker until ctx ends, then waits for calls in flight.
 func (traffic *Traffic) Run(ctx context.Context) {
-	http := &http.Client{Timeout: traffic.Hold}
+	traffic.http = &http.Client{Timeout: traffic.Hold}
 	for _, kind := range traffic.Kinds {
 		traffic.wait.Add(1)
 		go func() {
 			defer traffic.wait.Done()
-			traffic.fire(ctx, kind, http)
+			traffic.fire(ctx, kind)
 		}()
 	}
 	<-ctx.Done()
 	traffic.wait.Wait()
 }
 
-func (traffic *Traffic) fire(ctx context.Context, kind Kind, client *http.Client) {
+func (traffic *Traffic) fire(ctx context.Context, kind Kind) {
 	ticker := time.NewTicker(kind.Every)
 	defer ticker.Stop()
 	for n := 0; ; n++ {
 		traffic.wait.Add(1)
 		go func() {
 			defer traffic.wait.Done()
-			traffic.record(traffic.one(context.WithoutCancel(ctx), kind, client, n))
+			traffic.record(traffic.one(context.WithoutCancel(ctx), kind, n))
 		}()
 		select {
 		case <-ctx.Done():
@@ -212,7 +213,7 @@ func (traffic *Traffic) fire(ctx context.Context, kind Kind, client *http.Client
 	}
 }
 
-func (traffic *Traffic) one(ctx context.Context, kind Kind, client *http.Client, n int) Call {
+func (traffic *Traffic) one(ctx context.Context, kind Kind, n int) Call {
 	started := time.Now()
 	call := Call{Kind: kind.Name, N: n, AtMs: started.Sub(traffic.Origin).Milliseconds(), Write: kind.Write}
 	request, id, err := kind.Do(ctx, traffic.Client, n)
@@ -221,7 +222,7 @@ func (traffic *Traffic) one(ctx context.Context, kind Kind, client *http.Client,
 		call.Error = err.Error()
 		return call
 	}
-	response, err := client.Do(request)
+	response, err := traffic.http.Do(request)
 	call.Latency = time.Since(started).Milliseconds()
 	if err != nil {
 		call.Error = err.Error()

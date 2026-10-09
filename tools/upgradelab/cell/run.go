@@ -91,7 +91,21 @@ func Run(ctx context.Context, options Options) (*Report, error) {
 		}
 	}
 	cell.finishTraffic()
+	cell.partialTraffic()
 	return cell.report, cell.write()
+}
+
+// partialTraffic keeps what a stopped cell measured: calls and phases, writes unchecked.
+func (cell *run) partialTraffic() {
+	if cell.report.Traffic != nil || cell.traffic == nil {
+		return
+	}
+	cell.report.Marks = cell.marks
+	if cell.poller != nil {
+		cell.report.Phases = cell.poller.Timeline()
+	}
+	cell.report.Traffic, cell.report.Timeline = Summarize(cell.traffic.Calls(), cell.report.Phases, nil)
+	cell.report.Notes = append(cell.report.Notes, "stopped early: writes were not checked, so Lost counts every 2xx write")
 }
 
 func prepare(options Options) (*run, error) {
@@ -193,7 +207,7 @@ func (cell *run) envWith(extra map[string]string) []string {
 // fromSchema migrates the stores as the old release does before it serves (main: start:prepare:db).
 func (cell *run) fromSchema(ctx context.Context) error {
 	command := exec.CommandContext(ctx, "pnpm", "-s", "run", "start:prepare:db") // #nosec G204 -- fixed argv.
-	command.Dir, command.Env = filepath.Join(cell.options.FromDir, "platform/app"), cell.envWith(nil)
+	command.Dir, command.Env = filepath.Join(cell.options.FromDir, "platform", "app"), cell.envWith(nil)
 	out, err := command.CombinedOutput()
 	_ = os.WriteFile(cell.logPath("from-schema"), out, 0o600)
 	if err != nil {
@@ -203,7 +217,7 @@ func (cell *run) fromSchema(ctx context.Context) error {
 }
 
 func (cell *run) fromUp(ctx context.Context) error {
-	dir := filepath.Join(cell.options.FromDir, "platform/app")
+	dir := filepath.Join(cell.options.FromDir, "platform", "app")
 	base := map[string]string{"PORT": itoa(cell.apiPort - 1000)}
 	worker := map[string]string{"PORT": itoa(cell.apiPort - 1000), "WORKER_METRICS_PORT": itoa(mustPort())}
 	for _, spec := range []ProcSpec{
@@ -218,7 +232,7 @@ func (cell *run) fromUp(ctx context.Context) error {
 		cell.procs = append(cell.procs, proc)
 	}
 	return waitFor(ctx, cell.options.ReadyWithin, func() bool {
-		status, _, err := get(ctx, httpClient, cell.url()+"/api/health", "")
+		status, _, err := get(ctx, httpClient, cell.url()+"/api/health")
 		return err == nil && status/100 == 2
 	})
 }
@@ -275,7 +289,7 @@ func (cell *run) seed(ctx context.Context) error {
 }
 
 func (cell *run) basePrompt(ctx context.Context) error {
-	request, err := post(ctx, cell.client, "/api/prompts", map[string]any{"handle": cell.client.BasePrompt, "prompt": "base"})
+	request, err := cell.client.post(ctx, "/api/prompts", map[string]any{"handle": cell.client.BasePrompt, "prompt": "base"})
 	if err != nil {
 		return err
 	}
@@ -364,9 +378,11 @@ func (cell *run) proc(name string) *Proc {
 // switchToHead stops main and starts head's api, then its worker after WorkerDelay (api first).
 func (cell *run) switchToHead(ctx context.Context) error {
 	cell.poller = &Poller{URL: cell.url(), Origin: cell.origin, Every: 500 * time.Millisecond, Notify: make(chan string, 8)}
-	go cell.poller.Run(cell.pollerCtx(ctx))
+	watchCtx := cell.pollerCtx(ctx)
+	go cell.poller.Run(watchCtx)
 	if cell.options.Shots {
-		go cell.shootPhases(ctx)
+		cell.shotsWG.Add(1)
+		go cell.shootPhases(watchCtx)
 	}
 	cell.proc("from-app").Stop(20 * time.Second)
 	cell.proc("from-worker").Stop(20 * time.Second)
@@ -425,7 +441,7 @@ func (cell *run) headDied() bool {
 func (cell *run) deathNote() error {
 	for _, name := range []string{"head-api", "head-worker"} {
 		if exited, err := cell.proc(name).Exited(); exited && cell.proc(name).command != nil {
-			return fmt.Errorf("%s exited (%v); see %s", name, err, cell.logPath(name))
+			return fmt.Errorf("%s exited (%w); see %s", name, err, cell.logPath(name))
 		}
 	}
 	return nil
@@ -466,7 +482,6 @@ func (cell *run) teardown() {
 
 // shootPhases screenshots each phase the poller sees, and Ops > Upgrades once signing in can work.
 func (cell *run) shootPhases(ctx context.Context) {
-	cell.shotsWG.Add(1)
 	defer cell.shotsWG.Done()
 	for {
 		select {
@@ -497,7 +512,7 @@ func (cell *run) shoot(ctx context.Context, phase string) {
 	shotCtx, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
 	command := exec.CommandContext(shotCtx, "node", script, string(args)) // #nosec G204 -- harness-written script.
-	command.Dir = filepath.Join(cell.options.HeadDir, "apps/ui")
+	command.Dir = filepath.Join(cell.options.HeadDir, "apps", "ui")
 	output, err := command.Output()
 	shot := Shot{Phase: phase, AtMs: time.Since(cell.origin).Milliseconds(), File: filepath.Join("shots", name)}
 	var page struct{ URL, Text string }

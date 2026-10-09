@@ -24,19 +24,25 @@ func Command(ctx context.Context, args []string, stdout io.Writer) (int, error) 
 		}
 	}
 	report, err := Run(ctx, options)
-	if report != nil {
-		fmt.Fprint(stdout, report.Markdown())
-		fmt.Fprintf(stdout, "\nreport: %s\n", filepath.Join(options.RunDir, "report.md"))
-	}
-	if err != nil || report == nil || report.Error != "" {
+	if err != nil || report == nil {
 		return 2, err
+	}
+	fmt.Fprint(stdout, report.Markdown())
+	fmt.Fprintf(stdout, "\nreport: %s\n", filepath.Join(options.RunDir, "report.md"))
+	return report.ExitCode(), nil
+}
+
+// ExitCode is 2 when a step stopped the cell, 1 when an invariant did not pass, else 0.
+func (report *Report) ExitCode() int {
+	if report.Error != "" {
+		return 2
 	}
 	for _, each := range report.Verdicts {
 		if each.Result != "pass" {
-			return 1, nil
+			return 1
 		}
 	}
-	return 0, nil
+	return 0
 }
 
 func parse(args []string) (Options, error) {
@@ -76,14 +82,14 @@ func withDefaults(options Options) (Options, error) {
 		}
 	}
 	if options.Release == "" {
-		out, err := exec.Command("git", "-C", options.FromDir, "rev-parse", "--short=10", "HEAD").Output() // #nosec G204 -- fixed argv.
+		out, err := exec.CommandContext(context.Background(), "git", "-C", options.FromDir, "rev-parse", "--short=10", "HEAD").Output() // #nosec G204 -- fixed argv.
 		if err != nil {
 			return options, fmt.Errorf("from-dir commit: %w", err)
 		}
 		options.Release = "main@" + strings.TrimSpace(string(out))
 	}
 	if options.RunDir == "" {
-		options.RunDir = filepath.Join(".claude/tmp/upgradelab/cells", options.Name()+"-"+time.Now().Format("0102-150405"))
+		options.RunDir = filepath.Join(".claude", "tmp", "upgradelab", "cells", options.Name()+"-"+time.Now().Format("0102-150405"))
 	}
 	options.RunDir, err = filepath.Abs(options.RunDir)
 	if err == nil {

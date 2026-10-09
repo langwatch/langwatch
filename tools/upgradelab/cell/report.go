@@ -81,12 +81,31 @@ type Shot struct {
 	Error string `json:"error,omitempty"`
 }
 
-func verdict(id, name string, pass bool, detail string) Verdict {
+func verdict(id string, pass bool, detail string) Verdict {
 	result := "fail"
 	if pass {
 		result = "pass"
 	}
-	return Verdict{ID: id, Name: name, Result: result, Detail: detail}
+	return Verdict{ID: id, Name: invariantNames[id], Result: result, Detail: detail}
+}
+
+// invariantNames are the plan's I-ids plus the cell's own (N: nothing dropped, O: Ops page, H: hybrid).
+var invariantNames = map[string]string{
+	"H1":  "each tenant's telemetry and projections land only on its own target",
+	"H2":  "the upgrade applied every ClickHouse target and the ledger shows each",
+	"I0":  "api holds (holding page, then upgrading mode) until the ledger is current",
+	"I2":  "ledger current: every step done or not-needed (operator steps aside)",
+	"I2b": "nothing reopened after ready",
+	"I3":  "api ready and every live roster row declares the image's steps",
+	"I4":  "copy never move: no table lost rows across the upgrade",
+	"I6":  "seeded product kinds read back through head",
+	"I8":  "a second upgrade exits 0 and changes no ledger row",
+	"I9":  "no error lines in head's api and worker logs",
+	"N1":  "head api answers ingest before the upgrade is done",
+	"N2":  "no failed call through the switch (held then answered counts)",
+	"N3":  "no lost write: every 2xx write visible after settle",
+	"N4":  "queued work drains once head's worker runs",
+	"O1":  "Ops > Upgrades shows the right state",
 }
 
 // Summarize folds the calls by kind and by phase; visible holds each write id seen after settle.
@@ -160,18 +179,7 @@ func (report *Report) Markdown() string {
 	for _, each := range report.Traffic {
 		fmt.Fprintf(&text, "| %s | %d | %d | %d | %s | %s | %d |\n", each.Kind, each.Sent, each.OK, each.Failed, writeCell(each, each.Visible), writeCell(each, each.Lost), each.MaxLatency)
 	}
-	text.WriteString("\n| Api phase | From ms |\n| --- | --- |\n")
-	for _, each := range report.Phases {
-		fmt.Fprintf(&text, "| %s | %d |\n", each.Phase, each.AtMs)
-	}
-	text.WriteString("\n| Phase | Statuses |\n| --- | --- |\n")
-	for _, each := range report.Timeline {
-		fmt.Fprintf(&text, "| %s | %v |\n", each.Phase, each.Statuses)
-	}
-	text.WriteString("\n| Step | Ms |\n| --- | --- |\n")
-	for _, each := range report.Timings {
-		fmt.Fprintf(&text, "| %s | %d |\n", each.Step, each.Ms)
-	}
+	report.writeTimeline(&text)
 	fmt.Fprintf(&text, "\nMarks (ms from start): %v\n\nQueue: baseline %d, peak %d at %d ms, drained %d ms after head's worker started\n\n",
 		report.Marks, report.Queue.Baseline, report.Queue.Peak, report.Queue.PeakAtMs, report.Queue.DrainedMs)
 	for _, shot := range report.Shots {
@@ -186,6 +194,21 @@ func (report *Report) Markdown() string {
 		fmt.Fprintf(&text, "- note: %s\n", note)
 	}
 	return text.String()
+}
+
+func (report *Report) writeTimeline(text *strings.Builder) {
+	text.WriteString("\n| Api phase | From ms |\n| --- | --- |\n")
+	for _, each := range report.Phases {
+		fmt.Fprintf(text, "| %s | %d |\n", each.Phase, each.AtMs)
+	}
+	text.WriteString("\n| Phase | Statuses |\n| --- | --- |\n")
+	for _, each := range report.Timeline {
+		fmt.Fprintf(text, "| %s | %v |\n", each.Phase, each.Statuses)
+	}
+	text.WriteString("\n| Step | Ms |\n| --- | --- |\n")
+	for _, each := range report.Timings {
+		fmt.Fprintf(text, "| %s | %d |\n", each.Step, each.Ms)
+	}
 }
 
 func writeCell(summary KindSummary, value int) string {
