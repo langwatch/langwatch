@@ -2,6 +2,7 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type { ScimRepositories } from "../scim.repositories.ts";
+import { PrismaScimSeatRepository } from "./prisma.scim-seat.repository.ts";
 import { PrismaScimSsoConnectionRepository } from "./prisma.scim-sso-connection.repository.ts";
 import {
   PrismaScimSyncProjectionRepository,
@@ -21,6 +22,7 @@ export class PostgresScimRepositories {
       scim: PrismaScimRepository.create(prisma),
       scimSyncs: PrismaScimSyncProjectionRepository.create({ prisma, operatorReads }),
       scimSsoConnections: PrismaScimSsoConnectionRepository.create(prisma),
+      seats: PrismaScimSeatRepository.create(prisma),
     };
   }
 }

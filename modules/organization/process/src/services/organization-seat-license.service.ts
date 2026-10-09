@@ -7,7 +7,7 @@ import {
   type PlanProviderUser,
   type RoleChangeType,
 } from "@langwatch/entitlement-contract";
-import type { LimitCheckResult, LimitType } from "@langwatch/organization-contract";
+import { seatsFree, type LimitCheckResult, type LimitType } from "@langwatch/organization-contract";
 
 import type { OrganizationSeatRepository } from "../repositories/organization-seat.repository.ts";
 import type { SeatLimitNoticeService } from "./seat-limit-notice.service.ts";
@@ -82,8 +82,8 @@ export class OrganizationSeatLicenseService implements OrganizationSeatLicense {
       return { allowed: true, limitType: input.resource, current: 0, max };
     }
 
-    const current = await this.seatsTaken(input.organizationId, input.resource);
-    return { allowed: current < max, limitType: input.resource, current, max };
+    const { current, free } = await this.seatsFor({ plan, ...input });
+    return { allowed: free, limitType: input.resource, current, max };
   }
 
   async assertRoleChangeAllowed(input: {
@@ -121,8 +121,8 @@ export class OrganizationSeatLicenseService implements OrganizationSeatLicense {
 
     const resource = input.change === "lite-to-full" ? "members" : "membersLite";
     const max = this.allowance(input.plan, resource);
-    const current = await this.seatsTaken(input.organizationId, resource);
-    if (current >= max) {
+    const { current, free } = await this.seatsFor({ ...input, resource });
+    if (!free) {
       this.options.notices.reached({
         organizationId: input.organizationId,
         limitType: resource,
@@ -150,9 +150,20 @@ export class OrganizationSeatLicenseService implements OrganizationSeatLicense {
     return resource === "members" ? plan.maxMembers : plan.maxMembersLite;
   }
 
-  private seatsTaken(organizationId: string, resource: LimitType): Promise<number> {
+  /** The pool's seats taken, and whether one more fits, by the rule scim admits by too. */
+  private async seatsFor({
+    plan,
+    organizationId,
+    resource,
+  }: {
+    plan: Plan;
+    organizationId: string;
+    resource: LimitType;
+  }): Promise<{ current: number; free: boolean }> {
+    const seats = await this.options.memberships.countMemberSeats(organizationId);
+    const { fullSeatFree, liteSeatFree } = seatsFree({ plan, seats });
     return resource === "members"
-      ? this.options.memberships.getMemberCount(organizationId)
-      : this.options.memberships.getMembersLiteCount(organizationId);
+      ? { current: seats.fullMembers, free: fullSeatFree }
+      : { current: seats.liteMembers, free: liteSeatFree };
   }
 }

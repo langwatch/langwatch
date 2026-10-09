@@ -306,6 +306,7 @@ export class ScimModule implements ScimApiContract {
       users: dependencies.users,
       costCenterFacts,
       organization: dependencies.authorization,
+      seats: repositories.seats,
       entitlements: dependencies.entitlements,
       lifecycle,
       provenOffboarding: config.provenOffboarding,

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { countMemberSeats } from "@langwatch/entitlement-contract";
 import type { OrganizationMemberSeats } from "@langwatch/organization-contract";
 import {
@@ -9,10 +10,10 @@ import {
 } from "@langwatch/prisma-client/generated";
 import { z } from "zod";
 
-import type { MemberSeatRepository } from "../member-seat.repository.ts";
+import type { ScimSeatRepository } from "../scim-seat.repository.ts";
 
 /** Only what this repository needs, named so a caller never names Prisma's own types. */
-type PrismaMemberSeatDatabase = PrismaClient | Prisma.TransactionClient;
+type PrismaScimSeatDatabase = PrismaClient | Prisma.TransactionClient;
 
 /** An invitation's team assignments as stored; anything else reads as none. */
 const teamAssignmentsSchema = z.array(
@@ -22,13 +23,13 @@ const permissionsSchema = z.array(z.string());
 
 type Holder = Readonly<{ role: OrganizationUserRole; permissions: string[] | undefined }>;
 
-/** Seat counts over organization's membership and invitation rows, through its shares (R-C1f). */
-export class PrismaMemberSeatRepository implements MemberSeatRepository {
-  static create(prisma: PrismaMemberSeatDatabase): PrismaMemberSeatRepository {
-    return new PrismaMemberSeatRepository(prisma);
+/** Seat counts over organization's membership and invitation rows, through its shares (PC-SCIM-SEAT). */
+export class PrismaScimSeatRepository implements ScimSeatRepository {
+  static create(prisma: PrismaScimSeatDatabase): PrismaScimSeatRepository {
+    return new PrismaScimSeatRepository(prisma);
   }
 
-  private constructor(private readonly prisma: PrismaMemberSeatDatabase) {}
+  private constructor(private readonly prisma: PrismaScimSeatDatabase) {}
 
   async countMemberSeats({
     organizationId,

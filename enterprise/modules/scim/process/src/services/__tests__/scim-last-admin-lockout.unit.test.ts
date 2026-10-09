@@ -23,6 +23,11 @@ import type { ScimUserProvisioning } from "../scim-provisioning.service.ts";
 import { ScimService } from "../scim.service.ts";
 import { QuietScimSyncLifecycle } from "./support/quiet-scim-sync-lifecycle.ts";
 
+/** Every seat free, so these tests admit full members (seat-limit-at-provisioning.feature). */
+const openSeats = {
+  countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),
+};
+
 const ORGANIZATION = "org_acme";
 const ADMIN = "user_ana";
 const CONNECTION = "conn_okta_primary";
@@ -112,6 +117,7 @@ function stack({ provenOffboarding, refuses }: { provenOffboarding: boolean; ref
       lifecycle: new QuietScimSyncLifecycle(),
       provenOffboarding,
       tokenPepper: "scim-test-pepper",
+      seats: openSeats,
     }),
   };
 }

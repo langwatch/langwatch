@@ -22,6 +22,11 @@ import type { ScimUserProvisioning } from "../scim-provisioning.service.ts";
 import { ScimService } from "../scim.service.ts";
 import { QuietScimSyncLifecycle } from "./support/quiet-scim-sync-lifecycle.ts";
 
+/** Every seat free, so these tests admit full members (seat-limit-at-provisioning.feature). */
+const openSeats = {
+  countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),
+};
+
 const ORGANIZATION = "org-acme";
 const OTHER_ORGANIZATION = "org-globex";
 const USER_SCHEMA = "urn:ietf:params:scim:schemas:core:2.0:User";
@@ -215,6 +220,7 @@ function directory(store: DirectoryStore) {
       lifecycle: new QuietScimSyncLifecycle(),
       provenOffboarding: false,
       tokenPepper: "scim-test-pepper",
+      seats: openSeats,
     }),
   };
 }
@@ -473,6 +479,7 @@ describe("the organization's own directory resource", () => {
       lifecycle: new QuietScimSyncLifecycle(),
       provenOffboarding: false,
       tokenPepper: "scim-test-pepper",
+      seats: openSeats,
     });
 
     expect(

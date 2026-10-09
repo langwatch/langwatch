@@ -52,9 +52,10 @@ export const SHARED_PRISMA_TABLES: readonly SharedPrismaTable[] = [
       "nurturing",
       "user",
       "entitlement",
+      "scim",
     ],
     reason:
-      "data retention and data privacy read a team's organisation to place a project or a team-level rule, never a fold (round 46 E1, R40); the Instant Evals judge and nurturing read a project's organisation through its team and an organisation's teams for its earliest project (round 46 E1, R40); user reads the caller's personal team to find the personal-workspace project an avatar is stored under, never OrganizationApi (U1-AVATAR a, R40); entitlement reads an organisation's team ids to merge Lite Members' custom-role permissions when counting seats, never OrganizationApi (R-C1f, R40)",
+      "data retention and data privacy read a team's organisation to place a project or a team-level rule, never a fold (round 46 E1, R40); the Instant Evals judge and nurturing read a project's organisation through its team and an organisation's teams for its earliest project (round 46 E1, R40); user reads the caller's personal team to find the personal-workspace project an avatar is stored under, never OrganizationApi (U1-AVATAR a, R40); entitlement reads an organisation's team ids to merge Lite Members' custom-role permissions when counting seats, never OrganizationApi (R-C1f, R40); scim counts the same seats to place a provisioned person (PC-SCIM-SEAT, R40)",
   },
   {
     table: "OrganizationUser",

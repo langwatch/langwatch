@@ -18,6 +18,7 @@ import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { Instant } from "@langwatch/time";
 import type { UserProfile } from "@langwatch/user-contract";
 
+import type { ScimSeatRepository } from "../repositories/scim-seat.repository.ts";
 import type { ScimRepository } from "../repositories/scim.repository.ts";
 import type { ScimCostCenterFacts } from "./scim-cost-center.service.ts";
 import type { ScimOrganizationAdministration } from "./scim-deprovision.service.ts";
@@ -55,6 +56,7 @@ export class ScimService {
     users,
     costCenterFacts,
     organization,
+    seats,
     entitlements,
     lifecycle,
     provenOffboarding,
@@ -67,6 +69,7 @@ export class ScimService {
     users: ScimUserProvisioning;
     costCenterFacts: ScimCostCenterFacts;
     organization: ScimOrganizationAdministration;
+    seats: ScimSeatRepository;
     entitlements: Pick<EntitlementApi, "getActivePlan">;
     lifecycle: ScimSyncLifecycle;
     provenOffboarding: boolean;
@@ -89,6 +92,8 @@ export class ScimService {
       lifecycle,
       provenOffboarding,
       authority: this.identities,
+      seats,
+      plans: entitlements,
     });
     this.tokens = ScimTokenService.create({
       repository: prisma,
@@ -111,6 +116,7 @@ export class ScimService {
     users: ScimUserProvisioning;
     costCenterFacts: ScimCostCenterFacts;
     organization: ScimOrganizationAdministration;
+    seats: ScimSeatRepository;
     entitlements: Pick<EntitlementApi, "getActivePlan">;
     lifecycle: ScimSyncLifecycle;
     provenOffboarding: boolean;

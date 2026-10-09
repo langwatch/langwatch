@@ -338,9 +338,15 @@ export class PrismaScimRepository extends ScimRepository {
     organizationId: string;
     userId: string;
     role: string;
+    pending?: boolean;
   }): Promise<void> => {
     await this.prisma.organizationUser.create({
-      data: { ...input, role: organizationUserRole(input.role) },
+      data: {
+        organizationId: input.organizationId,
+        userId: input.userId,
+        role: organizationUserRole(input.role),
+        disabledAt: input.pending ? new Date() : null,
+      },
     });
   };
   removeMembership = async (input: { organizationId: string; userId: string }): Promise<void> => {
