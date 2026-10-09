@@ -235,3 +235,20 @@ func TestEnsureLangyWorkerBinary(t *testing.T) {
 		}
 	})
 }
+
+// @scenario "A Langy that cannot start leaves the app no dead agent address"
+func TestDropLocalLangyAgentLeavesNoAgentURL(t *testing.T) {
+	st := domain.Stack{Slug: "demo", Services: []domain.Service{{Name: "app", Port: 4000}, {Name: "langyagent", Port: 4123}}}
+	if !dropLocalLangyAgent(&st) {
+		t.Fatal("a local langyagent port was not dropped")
+	}
+	for _, line := range st.OverlayEnv() {
+		if strings.HasPrefix(line, "LANGY_AGENT_URL=") || strings.HasPrefix(line, "LANGY_INTERNAL_SECRET=") {
+			t.Fatalf("overlay still names the agent after Langy was skipped: %q", line)
+		}
+	}
+	fallback := domain.Stack{Services: []domain.Service{{Name: "langyagent", Port: 4124, IsFallback: true}}}
+	if dropLocalLangyAgent(&fallback) || fallback.Services[0].Port != 4124 {
+		t.Fatal("a baseline stack's langyagent was dropped")
+	}
+}
