@@ -10,7 +10,7 @@ Start here: `haven sims --json` lists every simulator with whether it runs in th
 console URL, the `haven up +<name>` it needs if off, its verbs (read from haven's own command
 table) and its skill path. `--stack <slug>` reads another worktree's stack.
 
-Seven Go simulators stand in for outside services so a stack runs offline, deterministically
+Eight Go simulators stand in for outside services so a stack runs offline, deterministically
 and for free. Code is `services/<name>` and each console is a React app, `apps/<name>-web`,
 built by Vite into the Go package's `web/dist` and embedded (ADR-160,
 `dev/docs/adr/160-internal-consoles-are-go-served-react.md`).
@@ -36,13 +36,13 @@ Chakra, no product design system.
 
 - The Go services are one binary, `cmd/service`. `service combined` hosts the data plane
   (aigateway, nlpgo) and, in a dev build only (`-tags dev`, `cmd/service/combined_dev.go`),
-  the six simulators. Release images build untagged: no simulator is linked.
+  the eight simulators. Release images build untagged: no simulator is linked.
 - In a dev checkout haven runs every selected sim in the `sims` lane: a second
   `service combined` process beside the `go` lane, so a sim under load cannot starve the
   gateway. `haven restart sims` bounces them all. `haven logs <name>` still reads each.
 - A checkout whose mono-binary has no `combined` subcommand, or a monolith build, runs
   haven's bundled copy of each sim as one lane each (`haven simulator <name>`, hidden).
-- Without haven: `make service svc=combined args="mailsim storagesim llmsim analyticssim voicesim idpsim"`,
+- Without haven: `make service svc=combined args="mailsim storagesim llmsim analyticssim voicesim idpsim telemetrysim outboundsim"`,
   or one sim: `make service svc=<name>`. `make service-watch svc=<name>` adds air reload.
   `make service` builds the console bundle first; a binary without it serves a one-line
   page naming the build command.
@@ -70,10 +70,10 @@ Every console action has a verb (`--json` on reads, non-zero exit on failure, `-
 
 | Sim       | Verbs                                                                                                                 |
 | --------- | --------------------------------------------------------------------------------------------------------------------- |
-| mail      | `haven mail address\|list\|get <id>\|links <id>\|wait\|delete <id>\|clear`                                            |
-| llm       | `haven llm info\|calls\|call <id>\|clear\|set --error --seed`                                                         |
-| analytics | `haven analytics status\|records\|clear\|wait --event`                                                                |
-| storage   | `haven storage buckets\|objects [bucket]\|object <bucket> <key> [--raw]\|requests`                                    |
+| mail      | `haven mail address\|inbox\|list\|get <id>\|links <id>\|wait\|delete <id>\|clear`                                    |
+| llm       | `haven llm info\|calls [--model <text>] [--failed]\|call <id>\|clear\|set --error --seed`                               |
+| analytics | `haven analytics status\|records\|record <id>\|clear\|wait --event`                                                   |
+| storage   | `haven storage buckets\|objects [bucket]\|object <bucket> <key> [--raw]\|presign\|delete\|clear [bucket]\|seed\|requests` |
 | voice     | `haven voice status\|calls\|call <id>\|clear`                                                                         |
 | telemetry | `haven telemetry send\|load\|fuzz\|status\|stop`                                                                      |
 | outbound  | `haven outbound status\|records\|deliveries\|wait --channel\|fault add\|list\|clear\|receiver set\|urls\|clear`       |

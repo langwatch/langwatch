@@ -22,7 +22,7 @@ implies. ClickHouse has no foreign keys; the no-relations ruling (the `postgres-
 asks nothing here.
 
 ```bash
-pnpm start:prepare:db   # apply the way every entry point does: `pnpm task upgrade`, then the pass
+pnpm start:prepare:db   # apply it the way a deployment does: `pnpm task upgrade` (the worker runs the same command at boot)
 ```
 
 `pnpm clickhouse:migrate` still exists but bypasses the ledger, so the api and worker keep refusing

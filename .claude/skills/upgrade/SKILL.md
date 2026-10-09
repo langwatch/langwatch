@@ -1,6 +1,6 @@
 ---
 name: upgrade
-description: "How the upgrade system works end to end, for an engineer changing or debugging it: `pnpm task upgrade` (`status`, `plan`, `steps`), the ledger schema, the runner lease and the serving roster, release manifests in `packages/upgrade/releases/`, blocking, background and operator steps, `.withMigrations`, the code-step generator and `code-step-ids.generated.ts`, `-- after:` notes, the serving gate and the floor refusal, rollback, the Ops Upgrades console and `retryStep`, the npx server's upgrade, and how to test it (live fixture, migration-compat, rehearsal, upgradelab). Use when someone says 'how does the upgrade work', 'pnpm task upgrade', 'the ledger', 'upgrade lease', 'serving roster', 'serving gate', 'refuses to serve', 'behind this image', 'release manifest', 'stamp the release', 'code-step-ids', 'image-code-steps', 'CodeStepId', 'after: note', 'refused_below_floor', 'rollback reopened', 'Upgrades page', 'retry a failed step', 'upgradelab', 'upgrade rehearsal' or 'migration-compat'."
+description: "How the upgrade system works end to end, for an engineer changing or debugging it: `pnpm task upgrade` (`status`, `plan`, `steps`), the ledger schema, the runner lease and the serving roster, release manifests in `packages/upgrade/releases/`, blocking, background and operator steps, `.withMigrations`, the code-step generator and `code-step-ids.generated.ts`, `-- after:` notes, the serving gate and the floor refusal, rollback, the Ops Upgrades console and `retryStep`, the worker running the upgrade, upgrading mode (`servesWhileUpgrading`), the holding page, and how to test it (live fixture, migration-compat, rehearsal, upgradelab). Use when someone says 'how does the upgrade work', 'pnpm task upgrade', 'the ledger', 'upgrade lease', 'serving roster', 'serving gate', 'refuses to serve', 'behind this image', 'release manifest', 'stamp the release', 'code-step-ids', 'image-code-steps', 'CodeStepId', 'after: note', 'refused_below_floor', 'servesWhileUpgrading', 'upgrading mode', 'holding page', 'the worker runs the upgrade', 'rollback reopened', 'Upgrades page', 'retry a failed step', 'upgradelab', 'upgrade rehearsal' or 'migration-compat'."
 user-invocable: true
 argument-hint: "<the part of the upgrade you are changing or debugging>"
 ---
@@ -14,19 +14,29 @@ Record: `dev/docs/ARCHITECTURE.md` §7 ("Upgrades run on deploy", the LTS paragr
 ## The shape
 
 ```
-deploy ─► pnpm start:prepare:db (apps/api) ─► pnpm task upgrade ─► system-migrations pass
-              │                                  │
-              │      ledger schema, lease, seed, floor check, plan
-              │      per release: schema (Prisma, goose) ─► blocking steps ─► reconcilers
-              ▼
-api / worker boot ─► serving gate (admit or refuse by name) ─► roster row every 15 s
-                                                   worker ─► background steps
+new image ─► worker boot ─► gate.admit (behind or first install)
+                 │            lease `upgrade` free? ─► child `pnpm task upgrade`
+                 │            held by a peer / failed run ─► wait, re-ask every 10 s, wait for Retry
+                 │              ledger schema, lease, seed, floor check, plan
+                 │              per release: schema (Prisma, goose) ─► blocking steps ─► reconcilers
+                 ▼
+             ledger current ─► takes jobs ─► background steps (per-step leases)
+
+new image ─► api boot ─► never runs a step
+   a Postgres schema step outstanding ─► HOLDING (holding page, not ready)
+   schema done, blocking steps left   ─► UPGRADING (routes declared servesWhileUpgrading only)
+   ledger current (re-read every 10 s) ─► SERVING ─► roster row every 15 s
 ```
 
-Entry points (`specs/upgrade/entry-points.feature`): the Helm pre-upgrade Job, the compose `migrate`
-service, the npx server (once, before its services; `doctor` prints `upgrade status` via
-`printUpgradeStatus`, `apps/server/src/cli.ts`), haven, and on a Helm first install the api's first
-boot (`packages/upgrade/src/gate/first-install-upgrade.ts`). api and worker never migrate.
+Entry points (`specs/upgrade/entry-points.feature`, UPGRADE-IN-WORKER): the worker's gate is the
+one runner of an image; every entry point reaches it. Helm upgrade: new worker pods run it, new api
+pods hold not ready, and the pre-roll Job renders only with `serializeUpgrades` (never a
+pre-install or pre-rollback hook). Helm with `workers.enabled: false`: each app pod carries the
+worker as a sidecar (metrics on 9465, so it never clashes with the api's 9464). Compose has no
+`migrate` service. The npx server has no migration phase (`doctor` prints `upgrade status` via
+`printUpgradeStatus`, `apps/server/src/cli.ts`). `pnpm dev` and haven run `start:prepare:db`
+(`pnpm task upgrade` alone, no system-migrations pass) once before the lanes. The root
+`prisma:migrate` and `clickhouse:migrate` scripts are aliases of the same command.
 
 ## Where it lives
 
@@ -43,7 +53,8 @@ boot (`packages/upgrade/src/gate/first-install-upgrade.ts`). api and worker neve
 | Manifests and floor | `packages/upgrade/releases/*.json`, `packages/upgrade/src/manifest/` |
 | Step declaration | `packages/upgrade/src/step/migration-step.ts`, `projection-replay-step.ts` |
 | Collection over the installed list | `packages/process/src/migration/migration-steps.ts` |
-| Serving gate | `packages/process/src/migration/upgrade-gate.ts` → `packages/upgrade/src/gate/serving-upgrade-gate.ts` |
+| Serving gate; the worker's wait loop (`admitAfterFirstInstall`) | `packages/process/src/migration/upgrade-gate.ts` → `packages/upgrade/src/gate/serving-upgrade-gate.ts`; the child is `gate/first-install-upgrade.ts` |
+| Holding page, upgrading pass-through, sign-in link | `packages/process/src/lifecycle/liveness-thread.ts` (`UPGRADING_PHASE`, `UPGRADE_SIGN_IN_HREF`) |
 | Roster and rollback | `packages/upgrade/src/serving-roster/` (`rollback.ts`) |
 | Background steps on the worker | `packages/upgrade/src/background/background-steps.service.ts` |
 | Status reader (CLI, Ops, Checkup) | `packages/upgrade/src/reader/` |
@@ -100,6 +111,18 @@ It runs `pnpm task upgrade steps --json` and writes the committed step list plus
 `packages/upgrade/src/step/code-step-ids.generated.ts` (the `CodeStepId` union). Commit both
 (`packages/upgrade/specs/image-code-steps.feature`).
 
+## Upgrading mode
+
+While the api is upgrading it answers only routes declared to serve: a REST or tRPC declaration
+carries `.servesWhileUpgrading()` (`packages/api`; auth's sign-in, authz's permissions read and the
+scope graph, ops' upgrade reads and `retryStep`), and a declared wildcard skips undeclared literals.
+The bundle's assets, sign-in and the Upgrades paths pass too; a tRPC batch passes only if every
+procedure declares it. Anything else answers the holding page (HTML) or 503 with `Retry-After: 10`;
+liveness answers in every phase. The holding page links "Sign in to follow the upgrade" to
+`UPGRADE_SIGN_IN_HREF`, returning to Ops > Upgrades. A blocking step may not touch a sign-in table
+(`upgrade-sign-in-tables` policy). The door still asks each declared permission.
+Specs: `specs/upgrade/in-app-upgrade.feature`, `packages/process/specs/upgrade-holding-page.feature`.
+
 ## Serving gate, roster and rollback
 
 The gate refuses to start, by name, while a blocking step of the image is not `done`/`not-needed`,
@@ -132,6 +155,7 @@ Unsupported. Specs: `modules/ops/specs/upgrades.feature`, `upgrade-alerts.featur
 
 ## Never
 
-- Migrate from an api or worker start, or wait without a deadline.
+- Run a step from the api, add a `migrate` compose service or an npx migration phase, or wait without a deadline.
+- Declare `.servesWhileUpgrading()` on a route that reads a table a blocking step can touch.
 - Hand-edit a stamped manifest or a merged migration; move the floor outside `lts-release`.
 - Write the ledger by hand to unstick a run: fix the cause and re-run `upgrade`, or `retryStep`.

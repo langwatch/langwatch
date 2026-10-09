@@ -160,6 +160,10 @@ listener**, because worker consumers call back into the api's in-process graph.
 Every eventing consumer registers **drain-first** on `server.graceful` — a
 structural fact, not a convention someone could skip.
 
+The worker also owns the upgrade: at boot, while the ledger is behind its image, its gate runs
+`pnpm task upgrade` under the runner's lease and takes no job until the ledger is current; the api
+holds, then serves only `servesWhileUpgrading` routes (`upgrade` skill, UPGRADE-IN-WORKER).
+
 A module declares its whole pipeline once:
 
 ```ts

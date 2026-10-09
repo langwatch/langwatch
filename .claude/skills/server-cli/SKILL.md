@@ -31,9 +31,11 @@ Entry: `apps/server/src/cli.ts` (commander). The published bin is `langwatch-ser
 ## What it manages
 
 `src/predeps/` installs what the machine lacks (Postgres, Redis, ClickHouse, uv, pnpm,
-goose, the AI gateway binary, opencode); `src/services/` starts each one in order and
-supervises it (`runtime.ts`): Postgres, Redis, ClickHouse, migrations, the LangWatch
-app, then its workers once the app is healthy, NLP, langevals, AI gateway, langyagent. `src/port-conflict/` shifts
+goose, the AI gateway binary, opencode for langyagent); `src/services/` starts each one in order and
+supervises it (`runtime.ts`): Postgres, Redis, ClickHouse, the LangWatch app, then its
+workers once the app is healthy, NLP, langevals, AI gateway, langyagent. There is no
+migration phase: the worker half's gate runs `pnpm task upgrade` when the installation is behind
+(`services/langwatch-workers.ts`) while the app holds, then serves only declared routes (see `upgrade`). `src/port-conflict/` shifts
 both port tiers by +10 when a slot is taken.
 
 - Ports (`src/shared/ports.ts`): app tier `base` (app), `+1` nlp, `+2` langevals, `+3`

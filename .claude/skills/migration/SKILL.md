@@ -87,12 +87,15 @@ Kinds and modes are `upgradeStepKindSchema` and `upgradeStepModeSchema` in
   `reconciler_failed`, `lease_lost`, `failed`); 2 the installation or the image below the floor
   (`refused_below_floor`, `refused_image_below_floor`); 3 lease not acquired
   (`packages/upgrade/src/runner/upgrade-outcome.ts`). Operator table: `docs/self-hosting/upgrade.mdx`.
-- `pnpm start:prepare:db` (apps/api) is the one preparation script: `upgrade`, then the
-  system-migrations pass. Every entry point runs it once (Helm pre-upgrade Job, the compose
-  `migrate` service, the npx server, haven); on a Helm first install the api runs `upgrade` once
-  itself (`specs/upgrade/entry-points.feature`).
-- api and worker **never migrate**. Their serving gate refuses to start, by name, while a blocking
-  step of their image is not `done` or `not-needed`, or their release is below the floor. ClickHouse
+- `pnpm start:prepare:db` (apps/api) is the one preparation script: `pnpm task upgrade` alone, no
+  system-migrations pass. Local launchers (`pnpm dev`, haven) run it once before the lanes. In a
+  deployment the **new image's worker runs the upgrade** at boot under the runner's lease; there is
+  no compose `migrate` service, no npx migration phase, and Helm's pre-roll Job renders only with
+  `serializeUpgrades` (`specs/upgrade/entry-points.feature`, UPGRADE-IN-WORKER).
+- The **api never migrates**. While a Postgres schema step of its image is outstanding it serves
+  the holding page; then, until the ledger is current, it serves only routes declared
+  `servesWhileUpgrading`, and reports not ready. Its serving gate refuses to start, by name, while
+  its release is below the floor, and the worker takes no job until the ledger is current. ClickHouse
   steps always count: an install with a database and no ClickHouse refuses, naming `CLICKHOUSE_URL`
   (round 20; `NO_CLICKHOUSE_REFUSAL`). Admitted, each writes a
   roster entry, refreshed every 15 s, stale after 10 min. A roster blip never takes a process out
@@ -150,8 +153,9 @@ What an agent reaches for first, and what to write instead:
   carries `-- contract: retired in <release>`; until then it is left out and named in the handoff.
 - **A blocking step that calls a service or the typed Prisma client**: blocking means frozen SQL
   through the owner's migration repository, or it is background.
-- **Running `pnpm prisma:migrate` or `pnpm clickhouse:migrate`** to apply: they bypass the ledger;
-  `pnpm start:prepare:db` is the path every entry point takes.
+- **Applying schema outside the ledger**: `pnpm prisma:migrate` and `pnpm clickhouse:migrate` are
+  aliases of `pnpm task upgrade`; use that or `pnpm start:prepare:db`, never raw `prisma migrate`
+  or `goose`.
 
 ## Never
 
