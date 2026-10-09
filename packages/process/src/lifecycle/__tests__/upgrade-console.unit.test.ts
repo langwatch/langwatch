@@ -282,7 +282,6 @@ describe("the upgrade console", () => {
     });
 
     describe("when another site posts Retry with the console session attached", () => {
-      /** @scenario "A cross-site Retry is refused even with the console session" */
       let thread: LivenessThread;
       let retried: Promise<boolean>;
       let cookie: string;
@@ -295,6 +294,7 @@ describe("the upgrade console", () => {
         own = `http://127.0.0.1:${thread.address.port}`;
       });
 
+      /** @scenario "A cross-site Retry is refused even with the console session" */
       it("refuses a cross-site or foreign-origin Retry and runs only the same-origin one", async () => {
         const crossSite = await post(thread, UPGRADE_RETRY_PATH, {}, cookie, {
           "Sec-Fetch-Site": "same-site",

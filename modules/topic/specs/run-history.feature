@@ -11,39 +11,46 @@ Feature: Topic clustering run history
   Background:
     Given a project whose clustering process has recorded runs
 
+  @unimplemented
   Scenario: Each finished run appears once in the run history
     When the user opens the topic clustering settings page
     Then they see the project's recent runs, newest first
     And each run shows when it ran, what started it, and its outcome
     And a completed run shows the traces processed and topics found
 
+  @unit
   Scenario: A multi-page run is one history entry
     Given a run that walked its backlog across several pages
     When the user views the run history
     Then that run appears as a single entry
     And its counts accumulate every page of the run
 
+  @unit
   Scenario: A failed run keeps its guidance without raw error detail
     Given a run that failed with a failure the user can fix
     When the user views the run history
     Then the failed run shows the same guidance as the status card
     And the raw error text is not part of the history read model
 
+  @unit
   Scenario: A run that is still working appears as running
     Given a clustering run has started and has not finished
     When the user views the run history
     Then the newest entry shows as running
 
+  @unit
   Scenario: A run abandoned by the scheduler is not shown as running forever
     Given a run whose terminal outcome was never recorded
     When a later run starts
     Then the abandoned run's entry stops reading as running
 
+  @unit
   Scenario: History is bounded
     Given a project with more recorded runs than the history keeps
     When the user views the run history
     Then only the most recent runs are shown
 
+  @unimplemented
   Scenario: History is rebuildable from the event log
     Given the run history read model is lost or corrupted
     When projections are replayed from the event log
