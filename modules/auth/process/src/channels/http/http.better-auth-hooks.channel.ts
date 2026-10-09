@@ -23,7 +23,7 @@ import {
 } from "@langwatch/identity-contract";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import type { OrganizationApi } from "@langwatch/organization-contract";
+import type { OrganizationApi, SignUpVerdict } from "@langwatch/organization-contract";
 import { fromDate, nowInstant } from "@langwatch/time";
 import type { BetterAuthOptions } from "better-auth";
 import { APIError } from "better-auth/api";
@@ -71,7 +71,9 @@ export type SsoDomainOrganizations = Pick<
 export type LinkProposals = Pick<IdentityLedgerApi, "proposeLink">;
 
 /** Whether the installation admits a new account for an address. */
-export type SignUpPolicy = Pick<OrganizationApi, "checkSignUp">;
+export type SignUpPolicy = Readonly<{
+  checkSignUp(input: Readonly<{ email: string }>): Promise<SignUpVerdict>;
+}>;
 
 const logger = createLogger("langwatch:better-auth:hooks");
 

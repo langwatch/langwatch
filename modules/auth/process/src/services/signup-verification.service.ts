@@ -11,7 +11,7 @@ import {
   normalizeIdentifierValue,
   type RoutingDecision,
 } from "@langwatch/identity-contract";
-import { type OrganizationApi, SignUpRestrictedError } from "@langwatch/organization-contract";
+import { SignUpRestrictedError, type SignUpVerdict } from "@langwatch/organization-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 import { EmailAlreadyRegisteredError, type UserApi } from "@langwatch/user-contract";
 
@@ -38,7 +38,7 @@ export interface SignUpVerificationDeps {
     input: Readonly<{ key: string; windowSeconds: number; max: number }>,
   ): Promise<Readonly<{ allowed: boolean; retryAfterSeconds?: number | undefined }>>;
   /** Whether the installation admits a new account for this address. */
-  checkSignUp: OrganizationApi["checkSignUp"];
+  checkSignUp(input: Readonly<{ email: string }>): Promise<SignUpVerdict>;
   /** Builds the link the email carries, from a minted token. */
   buildVerificationUrl(input: { token: string; callbackUrl?: string }): string;
   /** No email configured at all; a named but unusable provider is a misconfiguration, not this. */

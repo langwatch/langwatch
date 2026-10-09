@@ -123,7 +123,6 @@ import type { FeatureSetup } from "@langwatch/process";
 import { RoleApi } from "@langwatch/role-contract";
 import { internalSlackSignupsWebhook } from "@langwatch/secrets";
 import type { Instant } from "@langwatch/time";
-import { UserApi } from "@langwatch/user-contract";
 
 import { organizationInviteMailChannels } from "../channels/organization-invite-mail-channels.registry.ts";
 import { signupAnnouncementChannels } from "../channels/signup-announcement-channels.registry.ts";
@@ -276,7 +275,6 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   static readonly contract = OrganizationApi;
   static readonly dependencies = {
     permissions: AuthzApi,
-    users: UserApi,
     /** Identity application that answers for the caller's verified addresses. */
     identity: IdentityApi,
     /**
@@ -396,7 +394,6 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     application.#signUpPolicy = SignUpPolicyService.create({
       settings: setup.config.signUp,
       repository: setup.repositories.signUpPolicy,
-      users: setup.dependencies.users,
       authorization: setup.dependencies.permissions,
       // The addresses accepting an invitation takes; an account identity has not resolved yet
       // answers with none, and the caller's session address stands in.
@@ -544,7 +541,9 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   }
 
   /** Whether this address may create a new account here. */
-  async checkSignUp(input: Readonly<{ email: string }>): Promise<SignUpVerdict> {
+  async checkSignUp(
+    input: Readonly<{ email: string; hasAnyAccount: boolean }>,
+  ): Promise<SignUpVerdict> {
     return this.#signUpPolicy?.checkSignUp(input) ?? { allowed: true, via: "open" };
   }
 

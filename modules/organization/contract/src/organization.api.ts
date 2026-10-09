@@ -251,9 +251,10 @@ export interface OrganizationApi {
   }>;
   /**
    * Whether this address may create a new account on the installation
-   * (`SIGN_UP_MODE`, `SIGN_UP_ALLOWED_DOMAINS`). The default settings answer without a read.
+   * (`SIGN_UP_MODE`, `SIGN_UP_ALLOWED_DOMAINS`). The default settings answer without a read;
+   * `hasAnyAccount` (the caller's read) lets the first account bootstrap an invite-only one.
    */
-  checkSignUp(input: Readonly<{ email: string }>): Promise<SignUpVerdict>;
+  checkSignUp(input: Readonly<{ email: string; hasAnyAccount: boolean }>): Promise<SignUpVerdict>;
   /**
    * The invitation waiting for a caller who belongs to no organization yet, on an
    * installation where accounts are created by invitation. Only addresses the account
