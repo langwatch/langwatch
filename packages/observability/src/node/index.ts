@@ -35,7 +35,6 @@ export {
   otlpHeadersFrom,
   otlpHeadersSecret,
   resourceAttributesFrom,
-  type MetricsMode,
   type TelemetryContext,
   type TelemetrySecret,
   type TelemetrySecrets,

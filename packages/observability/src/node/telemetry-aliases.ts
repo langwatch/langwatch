@@ -3,7 +3,7 @@
  * main's older names are read as aliases with a boot warning, and an alias that
  * disagrees with its replacement refuses the boot rather than guessing.
  */
-import type { MetricsMode, TelemetrySettings } from "./telemetry-settings.ts";
+import type { TelemetrySettings } from "./telemetry-settings.ts";
 
 type Alias = Readonly<{
   deprecated: string;
@@ -43,7 +43,14 @@ export type ResolvedTelemetry = Readonly<{
     otelLevel: string;
     otelExport: boolean;
   }>;
-  metrics: Readonly<{ endpoint: string | undefined; mode: MetricsMode; enabled: boolean }>;
+  metrics: Readonly<{
+    endpoint: string | undefined;
+    /** `prometheus` is listed: a pull reader on its own port, beside any push. */
+    pull: boolean;
+    /** No exporter list written: main's health-door `/metrics` stays while a key is set (Q3). */
+    healthDoor: boolean;
+    enabled: boolean;
+  }>;
   /** One boot warning per old name in use. */
   deprecations: readonly string[];
 }>;
@@ -84,8 +91,8 @@ export function resolveTelemetry(settings: TelemetrySettings): ResolvedTelemetry
     },
     metrics: {
       endpoint: metricExporters.includes("otlp") ? endpoint : undefined,
-      // ponytail: pull still replaces push until the door gets its own reader and port (slice 1b).
-      mode: metricExporters.includes("prometheus") ? "prometheus" : "otlp",
+      pull: metricExporters.includes("prometheus"),
+      healthDoor: settings.metrics.exporter === undefined,
       enabled: !settings.sdkDisabled && metricExporters.length > 0,
     },
     deprecations,

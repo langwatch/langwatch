@@ -18,6 +18,10 @@ const optionalString = z.preprocess(
   (value) => (value === "" ? undefined : value),
   z.string().min(1).optional(),
 );
+const optionalPort = z.preprocess(
+  (value) => (value === "" ? undefined : value),
+  z.coerce.number().int().min(0).max(65535).optional(),
+);
 const truthy = z
   .string()
   .optional()
@@ -45,7 +49,11 @@ export const observabilityOwner = {
       otelLevel: c.env("LOG_OTEL_LEVEL", optionalString),
       exporter: c.env("OTEL_LOGS_EXPORTER", optionalString),
     },
-    metrics: { exporter: c.env("OTEL_METRICS_EXPORTER", optionalString) },
+    metrics: {
+      exporter: c.env("OTEL_METRICS_EXPORTER", optionalString),
+      prometheusHost: c.env("OTEL_EXPORTER_PROMETHEUS_HOST", optionalString),
+      prometheusPort: c.env("OTEL_EXPORTER_PROMETHEUS_PORT", optionalPort),
+    },
     /** main's names, read through `telemetryAliases` with a warning until the LTS floor passes. */
     deprecated: Object.fromEntries(
       telemetryAliases.map(({ deprecated }) => [deprecated, c.env(deprecated, optionalString)]),

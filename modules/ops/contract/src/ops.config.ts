@@ -26,8 +26,6 @@ const BACKUP_METRICS_OFF_VALUES = new Set(["false", "0", "no", "off"]);
 export const opsConfig = Config.define((c) => ({
   /** The ClickHouse EXPLAIN endpoint's operator secret. */
   apiKey: c.env("LANGWATCH_OPS_API_KEY", z.string().optional()),
-  /** The metrics-scrape bearer, under the name every LangWatch tier reads it by. */
-  metricsApiKey: c.env("METRICS_API_KEY", z.string().optional()),
   /** A third ClickHouse identity; never falls back to the tenant-keyed client. */
   clickhouseOpsUrl: c.env("CLICKHOUSE_OPS_URL", z.string().optional()),
   usageStats: {

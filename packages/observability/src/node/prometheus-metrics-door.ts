@@ -1,4 +1,4 @@
-import type { IncomingMessage, ServerResponse } from "node:http";
+import http, { type IncomingMessage, type ServerResponse } from "node:http";
 
 import type { Logger } from "../logger.ts";
 
@@ -43,6 +43,38 @@ export function prometheusMetrics(options: PrometheusMetricsOptions = {}): {
         response.writeHead(500).end();
       }
     },
+  };
+}
+
+/**
+ * The pull door on a listener of its own (ADR-175), never the public port:
+ * the scrape route above answers on `host:port`, and nothing else does.
+ */
+export function prometheusPullListener({
+  route,
+  host,
+  port,
+}: {
+  route: ReturnType<typeof prometheusMetrics>;
+  host: string | undefined;
+  port: number;
+}): Readonly<{ name: string; start: () => Promise<void>; stop: () => Promise<void> }> {
+  const listener = http.createServer((request, response) => {
+    if (request.url?.split("?")[0] === route.path) void route.handle(request, response);
+    else response.writeHead(404).end();
+  });
+  return {
+    name: "prometheus pull door",
+    start: () =>
+      new Promise((resolve, reject) => {
+        listener.once("error", reject);
+        listener.listen({ port, ...(host === undefined ? {} : { host }) }, () => resolve());
+      }),
+    stop: () =>
+      new Promise((resolve) => {
+        listener.close(() => resolve());
+        listener.closeAllConnections();
+      }),
   };
 }
 

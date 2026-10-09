@@ -4,9 +4,6 @@
  * package stays below configuration — the rule `otlp-metrics.ts` already follows.
  */
 
-/** A push to the collector, or a scrape door the collector pulls. */
-export type MetricsMode = "otlp" | "prometheus";
-
 export type TelemetrySettings = Readonly<{
   /** The collector's base URL; absent means this process exports nothing. */
   otlpEndpoint: string | undefined;
@@ -33,7 +30,13 @@ export type TelemetrySettings = Readonly<{
     otelLevel: string | undefined;
     exporter: string | undefined;
   }>;
-  metrics: Readonly<{ exporter: string | undefined }>;
+  metrics: Readonly<{
+    exporter: string | undefined;
+    /** `OTEL_EXPORTER_PROMETHEUS_HOST`; absent listens on every interface. */
+    prometheusHost?: string | undefined;
+    /** `OTEL_EXPORTER_PROMETHEUS_PORT`; absent is the OTel default, 9464. */
+    prometheusPort?: number | undefined;
+  }>;
   /** main's names keyed by env name, as `telemetryAliases` lists them. */
   deprecated?: Readonly<Record<string, string | undefined>>;
 }>;
@@ -58,9 +61,12 @@ export const otlpHeadersSecret: TelemetrySecret = {
   resolvesTo: void 0,
 };
 
-/** The bearer a Prometheus scrape presents. Absent leaves the door open. */
+/**
+ * The bearer a Prometheus scrape presents, main's name (ADR-175). Absent
+ * leaves the door open outside production.
+ */
 export const metricsScrapeTokenSecret: TelemetrySecret = {
-  id: "LANGWATCH_METRICS_TOKEN",
+  id: "METRICS_API_KEY",
   optional: true,
   schema: void 0,
   resolvesTo: void 0,

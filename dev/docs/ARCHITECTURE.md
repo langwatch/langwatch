@@ -814,12 +814,11 @@ OTel export variant can sit beside it without any main changing shape).
 2026-09-18): one named call, `initializeTelemetry(process.observability)`,
 wires traces, logs and metrics from config alone — no `instrumentation.node`
 preload file, and anything requiring preload is out of scope by design.
-**Metrics transport is a binary knob**, `process.observability.metrics.mode:
-"prometheus" | "otlp"` — absent means `prometheus` so no self-hosted scrape
-setup breaks on upgrade; LangWatch production sets `otlp` (a push is
-cheaper than a scrape at our cardinality). Under `otlp` the scrape endpoint
-is NOT mounted, and composing `prometheusMetrics` refuses by name — an
-unmounted endpoint is honest, a mounted-but-empty one lies to a prober.
+**Metrics are pushed and may also be pulled** (ADR-175): every process pushes over OTLP when
+`OTEL_EXPORTER_OTLP_ENDPOINT` is set (`OTEL_METRICS_EXPORTER=none` turns it off). A Prometheus
+`/metrics` door is off by default; `OTEL_METRICS_EXPORTER=otlp,prometheus` adds a pull reader to the
+same provider and serves it on its own port (`OTEL_EXPORTER_PROMETHEUS_PORT`, default 9464), never
+the public one, behind `METRICS_API_KEY`; production with no key leaves it unmounted.
 **Telemetry is recorded, never passed** (Alex, 2026-09-23): any package or module records counters,
 histograms and gauges through `@langwatch/observability`'s instruments directly — no `*Api` operation,
 channel or member carries a metric. Telemetry is write-only: a decision the app makes at runtime (an

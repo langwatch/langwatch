@@ -33,14 +33,16 @@ describe("the observability owner's declaration", () => {
   describe("given no metrics mode in the environment", () => {
     /** @scenario "No metrics mode is configured" */
     it("pushes over OTLP, which is cheaper than a scrape at our cardinality", () => {
-      expect(resolve({}).metrics.mode).toBe("otlp");
+      expect(resolve({}).metrics.pull).toBe(false);
     });
   });
 
   describe("given a deployment that asks for a scrape", () => {
     /** @scenario "A deployment asks for a Prometheus scrape instead" */
     it("reads the standard exporter list", () => {
-      expect(resolve({ OTEL_METRICS_EXPORTER: "otlp,prometheus" }).metrics.mode).toBe("prometheus");
+      const metrics = resolve({ OTEL_METRICS_EXPORTER: "otlp,prometheus" }).metrics;
+      expect(metrics.pull).toBe(true);
+      expect(metrics.healthDoor).toBe(false);
     });
   });
 

@@ -866,6 +866,14 @@ Refuses with `upgrade_not_found` when the ledger holds no such run.
 getUpgradeRun(input: OpsUpgradeIdInput): Promise<OpsUpgradeRun>;
 ```
 
+#### `retryUpgradeStep`
+
+Reopens a failed step for the worker; refuses a step not failed or not in the ledger.
+
+```typescript
+retryUpgradeStep(input: OpsUpgradeIdInput): Promise<OpsUpgradeStepDetail>;
+```
+
 ## REST transport
 
 ### `adminRest`
@@ -2147,7 +2155,7 @@ interface Output {
 
 ### `ops.upgrade`
 
-Contract `../contract/src/features/migrations/ops-upgrade.ts:170`, router `src/transport/ops-upgrade.trpc.ts:12`.
+Contract `../contract/src/features/migrations/ops-upgrade.ts:177`, router `src/transport/ops-upgrade.trpc.ts:12`.
 
 | Procedure                                               | Kind     | Gate                             | Input                                             | Output                                |
 | ------------------------------------------------------- | -------- | -------------------------------- | ------------------------------------------------- | ------------------------------------- |
@@ -2157,6 +2165,7 @@ Contract `../contract/src/features/migrations/ops-upgrade.ts:170`, router `src/t
 | `ops.upgrade.getStep`                                   | query    | Platform permission `ops:view`   | `opsUpgradeIdInputSchema`                         | `opsUpgradeStepDetailSchema`          |
 | `ops.upgrade.listRuns`                                  | query    | Platform permission `ops:view`   | `opsUpgradeListRunsInputSchema`                   | `opsUpgradeRunPageSchema`             |
 | `ops.upgrade.getRun`                                    | query    | Platform permission `ops:view`   | `opsUpgradeIdInputSchema`                         | `opsUpgradeRunSchema`                 |
+| `ops.upgrade.retryStep`                                 | mutation | Platform permission `ops:manage` | `opsUpgradeIdInputSchema`                         | `opsUpgradeStepDetailSchema`          |
 | `ops.upgrade.listSystemMigrations`                      | query    | Platform permission `ops:view`   | inline                                            | inline                                |
 | `ops.upgrade.listMigrationEnrollments`                  | query    | Platform permission `ops:view`   | inline                                            | `opsMigrationEnrollmentListingSchema` |
 | `ops.upgrade.searchMigrationOrganizations`              | query    | Platform permission `ops:view`   | `opsSearchMigrationOrganizationsInputSchema`      | inline                                |
@@ -2170,14 +2179,14 @@ Contract `../contract/src/features/migrations/ops-upgrade.ts:170`, router `src/t
 
 ```typescript
 // ops.upgrade.status
-// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:173
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:180
 type Input = unknown;
 type Output = z.infer<typeof opsUpgradeStatusSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:62
 
 // ops.upgrade.listReleases
-// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:178
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:185
 type Input = unknown;
-// Output: opsUpgradeReleasePageSchema, ../contract/src/features/migrations/ops-upgrade.ts:145
+// Output: opsUpgradeReleasePageSchema, ../contract/src/features/migrations/ops-upgrade.ts:152
 interface Output {
   items: {
     release: string | null;
@@ -2190,28 +2199,28 @@ interface Output {
 }
 
 // ops.upgrade.listSteps
-// Input: opsUpgradeListStepsInputSchema, ../contract/src/features/migrations/ops-upgrade.ts:153
+// Input: opsUpgradeListStepsInputSchema, ../contract/src/features/migrations/ops-upgrade.ts:160
 interface Input {
   release?: string | null;
   mode?: string;
   status?: string;
 }
-type Output = z.infer<typeof opsUpgradeStepPageSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:147
+type Output = z.infer<typeof opsUpgradeStepPageSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:154
 
 // ops.upgrade.getStep
-// Input: opsUpgradeIdInputSchema, ../contract/src/features/migrations/ops-upgrade.ts:167
+// Input: opsUpgradeIdInputSchema, ../contract/src/features/migrations/ops-upgrade.ts:174
 interface Input {
   id: string;
 }
-type Output = z.infer<typeof opsUpgradeStepDetailSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:120
+type Output = z.infer<typeof opsUpgradeStepDetailSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:127
 
 // ops.upgrade.listRuns
-// Input: opsUpgradeListRunsInputSchema, ../contract/src/features/migrations/ops-upgrade.ts:160
+// Input: opsUpgradeListRunsInputSchema, ../contract/src/features/migrations/ops-upgrade.ts:167
 interface Input {
   cursor?: string | null;
   limit?: number;
 }
-// Output: opsUpgradeRunPageSchema, ../contract/src/features/migrations/ops-upgrade.ts:149
+// Output: opsUpgradeRunPageSchema, ../contract/src/features/migrations/ops-upgrade.ts:156
 interface Output {
   items: {
     id: string;
@@ -2226,16 +2235,20 @@ interface Output {
 }
 
 // ops.upgrade.getRun
-type Input = z.infer<typeof opsUpgradeIdInputSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:167
-type Output = z.infer<typeof opsUpgradeRunSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:136
+type Input = z.infer<typeof opsUpgradeIdInputSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:174
+type Output = z.infer<typeof opsUpgradeRunSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:143
+
+// ops.upgrade.retryStep
+type Input = z.infer<typeof opsUpgradeIdInputSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:174
+type Output = z.infer<typeof opsUpgradeStepDetailSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:127
 
 // ops.upgrade.listSystemMigrations
-// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:206
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:218
 type Input = unknown;
-// Output: opsMigrationOverviewSchema.array() (inline, ../contract/src/features/migrations/ops-upgrade.ts:207)
+// Output: opsMigrationOverviewSchema.array() (inline, ../contract/src/features/migrations/ops-upgrade.ts:219)
 
 // ops.upgrade.listMigrationEnrollments
-// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:215
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:227
 type Input = unknown;
 // Output: opsMigrationEnrollmentListingSchema, ../contract/src/features/migrations/ops-system-migration.ts:101
 interface Output {
@@ -2255,7 +2268,7 @@ interface Output {
 interface Input {
   query: string;
 }
-// Output: inline, ../contract/src/features/migrations/ops-upgrade.ts:224
+// Output: inline, ../contract/src/features/migrations/ops-upgrade.ts:236
 type Output = {
   id: string;
   name: string;
@@ -2316,7 +2329,7 @@ interface Output {
 }
 
 // ops.upgrade.runSystemMigrationPass
-// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:267
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:279
 type Input = unknown;
 // Output: opsMigrationPassStartedSchema, ../contract/src/ops.responses.ts:259
 interface Output {
@@ -2443,22 +2456,21 @@ Run by the tasks process, before serve.
 | secret | `credentialsFallback`            | `NEXTAUTH_SECRET`                   | `src/app/ops.app.ts:776`           |
 | secret | `credentialsPrevious`            | `CREDENTIALS_SECRET_PREVIOUS`       | `src/app/ops.app.ts:777`           |
 | config | `apiKey`                         | `LANGWATCH_OPS_API_KEY`             | `../contract/src/ops.config.ts:28` |
-| config | `metricsApiKey`                  | `METRICS_API_KEY`                   | `../contract/src/ops.config.ts:30` |
-| config | `clickhouseOpsUrl`               | `CLICKHOUSE_OPS_URL`                | `../contract/src/ops.config.ts:32` |
-| config | `usageStats.disabled`            | `DISABLE_USAGE_STATS`               | `../contract/src/ops.config.ts:34` |
-| config | `usageStats.installMethod`       | `INSTALL_METHOD`                    | `../contract/src/ops.config.ts:35` |
-| config | `usageStats.chartVersion`        | `LANGWATCH_CHART_VERSION`           | `../contract/src/ops.config.ts:37` |
-| config | `collectClickHouseBackupMetrics` | `CLICKHOUSE_BACKUP_METRICS_ENABLED` | `../contract/src/ops.config.ts:39` |
-| config | `productAnalytics.key`           | `POSTHOG_KEY`                       | `../contract/src/ops.config.ts:46` |
-| config | `productAnalytics.host`          | `POSTHOG_HOST`                      | `../contract/src/ops.config.ts:46` |
-| config | `grafana`                        | `GRAFANA_BASE_URL`                  | `../contract/src/ops.config.ts:48` |
-| config | `bugReportSlackChannel`          | `SLACK_BUG_REPORTS_CHANNEL`         | `../contract/src/ops.config.ts:50` |
-| config | `cloudOps`                       | `LANGWATCH_CLOUD_OPS`               | `../contract/src/ops.config.ts:52` |
-| config | `adminEmails`                    | `ADMIN_EMAILS`                      | `../contract/src/ops.config.ts:54` |
-| config | `nodeEnvironment`                | `NODE_ENV`                          | `../contract/src/ops.config.ts:56` |
-| config | `isSaas`                         | `IS_SAAS`                           | `../contract/src/ops.config.ts:57` |
-| config | `publicBaseUrl`                  | `BASE_HOST`                         | `../contract/src/ops.config.ts:58` |
-| config | `serviceVersion`                 | `SERVICE_VERSION`                   | `../contract/src/ops.config.ts:60` |
-| config | `otelResourceAttributes`         | `OTEL_RESOURCE_ATTRIBUTES`          | `../contract/src/ops.config.ts:61` |
+| config | `clickhouseOpsUrl`               | `CLICKHOUSE_OPS_URL`                | `../contract/src/ops.config.ts:30` |
+| config | `usageStats.disabled`            | `DISABLE_USAGE_STATS`               | `../contract/src/ops.config.ts:32` |
+| config | `usageStats.installMethod`       | `INSTALL_METHOD`                    | `../contract/src/ops.config.ts:33` |
+| config | `usageStats.chartVersion`        | `LANGWATCH_CHART_VERSION`           | `../contract/src/ops.config.ts:35` |
+| config | `collectClickHouseBackupMetrics` | `CLICKHOUSE_BACKUP_METRICS_ENABLED` | `../contract/src/ops.config.ts:37` |
+| config | `productAnalytics.key`           | `POSTHOG_KEY`                       | `../contract/src/ops.config.ts:44` |
+| config | `productAnalytics.host`          | `POSTHOG_HOST`                      | `../contract/src/ops.config.ts:44` |
+| config | `grafana`                        | `GRAFANA_BASE_URL`                  | `../contract/src/ops.config.ts:46` |
+| config | `bugReportSlackChannel`          | `SLACK_BUG_REPORTS_CHANNEL`         | `../contract/src/ops.config.ts:48` |
+| config | `cloudOps`                       | `LANGWATCH_CLOUD_OPS`               | `../contract/src/ops.config.ts:50` |
+| config | `adminEmails`                    | `ADMIN_EMAILS`                      | `../contract/src/ops.config.ts:52` |
+| config | `nodeEnvironment`                | `NODE_ENV`                          | `../contract/src/ops.config.ts:54` |
+| config | `isSaas`                         | `IS_SAAS`                           | `../contract/src/ops.config.ts:55` |
+| config | `publicBaseUrl`                  | `BASE_HOST`                         | `../contract/src/ops.config.ts:56` |
+| config | `serviceVersion`                 | `SERVICE_VERSION`                   | `../contract/src/ops.config.ts:58` |
+| config | `otelResourceAttributes`         | `OTEL_RESOURCE_ATTRIBUTES`          | `../contract/src/ops.config.ts:59` |
 
 <!-- readme:generated:end -->
