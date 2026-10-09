@@ -1,4 +1,4 @@
-// specs/setup/dev-fixture-seeds.feature: the widget fixture seeds refuse any endpoint but a local host.
+// specs/setup/dev-fixture-seeds.feature: the widget seeds refuse any endpoint but a local host.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
