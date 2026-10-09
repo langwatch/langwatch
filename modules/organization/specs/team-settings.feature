@@ -19,3 +19,10 @@ Feature: The team settings page reads as main's does
     Given an account with an email but no display name
     When it is offered as a team member
     Then its label is the email alone, never "null"
+
+  @integration
+  Scenario: A blank team name is refused on the field
+    Given the Create New Team drawer
+    When Create is pressed with the name left blank
+    Then the name field says it is required, as on main
+    And no team is sent to be created

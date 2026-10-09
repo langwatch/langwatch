@@ -25,6 +25,7 @@ import {
   type SubmitHandler,
   type UseFormReturn,
   useFieldArray,
+  useFormState,
   useWatch,
 } from "react-hook-form";
 
@@ -195,7 +196,9 @@ export const TeamForm = ({
   isLoading: boolean;
 }) => {
   const toaster = useOrganizationToaster();
-  const { register, control, handleSubmit, getFieldState } = form;
+  const { register, control, handleSubmit } = form;
+  // A subscription, so a refused submit re-renders the field as invalid (WEB-5602).
+  const { errors } = useFormState({ control, name: "name" });
   const members = useFieldArray({
     control,
     name: "members",
@@ -262,7 +265,7 @@ export const TeamForm = ({
           <HorizontalFormControl
             label="Name"
             helper="The name of your team"
-            invalid={!!getFieldState("name").error}
+            invalid={!!errors.name}
           >
             <Input
               width="full"
