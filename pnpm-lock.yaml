@@ -18631,6 +18631,9 @@ importers:
       '@langwatch/data-retention-contract':
         specifier: workspace:*
         version: link:../../../modules/data-retention/contract
+      '@langwatch/enterprise-licensing-contract':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/licensing/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
@@ -18643,6 +18646,9 @@ importers:
       '@langwatch/organization-contract':
         specifier: workspace:*
         version: link:../../../modules/organization/contract
+      '@langwatch/plans':
+        specifier: workspace:*
+        version: link:../../../packages/plans
       '@langwatch/process':
         specifier: workspace:*
         version: link:../../../packages/process
