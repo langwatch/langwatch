@@ -17,6 +17,7 @@ import {
   composeSlackApi,
 } from "../../services/__tests__/slack-connection.fixture.ts";
 import { slackIntegrationTrpcTransport } from "../slack.trpc.ts";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 
 type Context = { actor: { id: string } | null };
 
@@ -30,6 +31,7 @@ function members(asked: string[]): TrpcRuntimeMembers<Context> {
     },
     authorization: {
       forRequest: () => ({
+        ...testAuthorizeDefaults,
         getDecision: async ({ permission }) => {
           asked.push(permission);
           return { permitted: true, organizationRole: null };
