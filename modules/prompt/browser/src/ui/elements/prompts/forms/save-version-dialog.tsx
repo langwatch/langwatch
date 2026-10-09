@@ -43,6 +43,8 @@ export function SaveVersionDialog({
     },
     resolver: zodResolver(saveVersionFormSchema),
   });
+  // The compiled dialog never re-calls register(), so a reset keeps its fields (WEB-5030).
+  const clear = useCallback(() => reset(undefined, { keepFieldsRef: true }), [reset]);
 
   const submitCallback = useCallback(
     async (data: z.infer<typeof saveVersionFormSchema>) => {
@@ -50,9 +52,9 @@ export function SaveVersionDialog({
         commitMessage: data.commitMessage,
         saveNewVersion: true,
       });
-      reset();
+      clear();
     },
-    [onSubmit, reset],
+    [onSubmit, clear],
   );
 
   return (
@@ -60,7 +62,7 @@ export function SaveVersionDialog({
       open={isOpen}
       onOpenChange={({ open }) => {
         if (!open) {
-          reset();
+          clear();
           onClose();
         }
       }}
