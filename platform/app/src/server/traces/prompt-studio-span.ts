@@ -11,7 +11,9 @@ import type { PromptStudioSpanResult } from "./types";
  * columns, with its attributes exactly as stored. Both reads build these
  * rows, the legacy one straight from `stored_spans` and the one fenced by the
  * proof from the span store's stored read, so the playground sees the same
- * values whichever read loaded the trace.
+ * values whichever read loaded the trace. The one exception is offloaded IO:
+ * the legacy read restores the llm row's full content before extraction, and
+ * the read fenced by the proof still loads the stored preview.
  */
 export interface PromptStudioSpanRow {
   SpanId: string;

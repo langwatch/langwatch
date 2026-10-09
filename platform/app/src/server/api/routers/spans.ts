@@ -134,8 +134,10 @@ async function readProjectSpanForPromptStudio({
 
 /**
  * The playground's read through the proof: every span of the named trace,
- * from the tenants the proof reads, with attributes as stored (so values
- * match the span-only read), resolved to the llm span to load.
+ * from the tenants the proof reads, with attributes as stored, resolved to
+ * the llm span to load. Offloaded IO is not restored here, so a prompt over
+ * the offload threshold loads as its stored preview, unlike the span-only
+ * read.
  */
 async function readTraceSpanForPromptStudio({
   authorization,
