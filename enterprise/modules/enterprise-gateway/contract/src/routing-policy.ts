@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { ensuredPersonalWorkspaceSchema } from "@langwatch/organization-contract";
+import { personalWorkspaceSchema } from "@langwatch/organization-contract";
 import { z } from "zod";
 
 export const routingPolicyScopeTypeSchema = z.enum(["ORGANIZATION", "TEAM", "PROJECT"]);
@@ -163,8 +163,9 @@ export class RoutingPolicyProviderScopeError extends Error {
 }
 
 /** `project.apiKey` is always blank: a cached read carries no credential. */
-const personalContextWorkspaceSchema = ensuredPersonalWorkspaceSchema.safeExtend({
-  project: ensuredPersonalWorkspaceSchema.shape.project.safeExtend({ apiKey: z.string() }),
+const personalContextWorkspaceSchema = personalWorkspaceSchema.safeExtend({
+  project: personalWorkspaceSchema.shape.project.safeExtend({ apiKey: z.string() }),
+  created: z.boolean(),
 });
 
 /**
