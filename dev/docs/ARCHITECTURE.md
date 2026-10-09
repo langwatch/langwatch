@@ -169,6 +169,12 @@ registered under `patchedDependencies` in `pnpm-workspace.yaml` for one exact ve
 or drops it. Each patch has one owning module and a test there that runs the patched path. First:
 `@better-auth/sso@1.7.1`, per-connection IdP-initiated SAML, owned by auth.
 
+**Build stamp** (Alex, 2026-10-09). `isReleaseBuild` in `packages/config/src/release-build.ts` is a
+committed `false`; the release image build sets it `true` in its builder stage (`infra/docker/Dockerfile`,
+build arg `LANGWATCH_RELEASE_BUILD`, default `true`) and `dev/scripts/pack-npm.sh` sets it on the npx
+staged copy. Runtime env cannot change it, only a rebuild can. A release build verifies licences
+against the embedded LangWatch key only and logs once, by name, that the public-key override is ignored.
+
 ---
 
 ## 3. A module

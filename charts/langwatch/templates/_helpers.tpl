@@ -1205,7 +1205,6 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 # the workers too, and a worker that reads a different entitlement than the
 # app would enforce different limits on the same organization.
 {{- include "langwatch.secretOrValue" (dict "envName" "LANGWATCH_LICENSE_KEY" "fieldValues" .Values.app.license.key) }}
-{{- include "langwatch.secretOrValue" (dict "envName" "LANGWATCH_LICENSE_PUBLIC_KEY" "fieldValues" .Values.app.license.publicKey) }}
 
 {{- /* The version this install reports in its license sync and its usage
        report, so we know which release each install runs. The app image tag is

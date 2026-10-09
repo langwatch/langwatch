@@ -1,6 +1,6 @@
 import { SYSTEM_ACTORS } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
-import { releaseVersionOf } from "@langwatch/config";
+import { isReleaseBuild, releaseVersionOf } from "@langwatch/config";
 import { parseOutboundProxyConfig } from "@langwatch/egress";
 import {
   LicenseGenerationService,
@@ -91,6 +91,7 @@ import type { LicensingRepositories } from "../repositories/licensing.repositori
 import type { SelfHostedInstanceRepository } from "../repositories/self-hosted-instance.repository.ts";
 import { ACTIVATION_ATTEMPTS_LIMIT } from "../rules/activation-code.rules.ts";
 import { LICENSE_SYNCS_LIMIT } from "../rules/issued-license.rules.ts";
+import { licenseVerifyingKeyOf } from "../rules/license-verifying-key.rules.ts";
 import { ActivationCodeService } from "../services/activation-code.service.ts";
 import type { ActivationRateLimit } from "../services/activation-code.service.ts";
 import {
@@ -280,7 +281,17 @@ export class LicensingModule implements LicensingApiContract {
       licensePrivateKey,
     }: { instanceLicenseKey: string | undefined; licensePrivateKey: string | undefined },
   ): LicensingModule {
-    const cryptography = NodeLicenseCryptographyService.create({ publicKey: config.publicKey });
+    const { publicKey, ignoredVariable } = licenseVerifyingKeyOf({
+      override: config.publicKey,
+      isReleaseBuild,
+    });
+    if (ignoredVariable) {
+      logger.warn(
+        { variable: ignoredVariable },
+        `${ignoredVariable} is ignored on a release build; licences verify against the embedded LangWatch key`,
+      );
+    }
+    const cryptography = NodeLicenseCryptographyService.create({ publicKey });
     // The variable takes a signed key or an activation code. A code is not a
     // license: it is redeemed at start and stored on an organization.
     const configured = detectLicenseInputForm(instanceLicenseKey);
@@ -337,6 +348,7 @@ export class LicensingModule implements LicensingApiContract {
         seats: repository,
         licenses: service,
         config,
+        publicKey,
         logger,
       }),
       isSaas: config.isSaas,
@@ -1070,6 +1082,7 @@ function connectInstallParts({
   seats,
   licenses,
   config,
+  publicKey,
   logger,
 }: {
   infrastructure: ConnectInstallInfrastructure;
@@ -1078,6 +1091,8 @@ function connectInstallParts({
   seats: LicenseStorage;
   licenses: LicenseService;
   config: LicensingServerConfig;
+  /** The key licences verify against, as the build allows it; undefined is the embedded key. */
+  publicKey: string | undefined;
   logger?: LicenseLogger;
 }): ConnectInstallParts {
   const identity = InstanceIdentityService.create({
@@ -1099,7 +1114,7 @@ function connectInstallParts({
     },
     ...(infrastructure.gateway ? { gateway: infrastructure.gateway } : {}),
     instanceLicenseKey: infrastructure.instanceLicenseKey,
-    ...(config.publicKey ? { publicKey: config.publicKey } : {}),
+    ...(publicKey ? { publicKey } : {}),
     ...(infrastructure.upstream ? { upstream: infrastructure.upstream } : {}),
     ...(logger ? { logger } : {}),
   });

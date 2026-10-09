@@ -55,6 +55,7 @@ export {
   telemetryExporterEndpoint,
   trustedIdpOrigins,
 } from "./deployment-facts.ts";
+export { isReleaseBuild } from "./release-build.ts";
 export {
   environmentBooleanSchema,
   environmentExactOneSchema,
