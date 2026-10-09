@@ -148,7 +148,7 @@ process out of service.
 Two migrations are heavy on a cloud-sized table (plan items P05 and C03).
 
 - **`AuditLog` unique index (P05).** The plain build holds a SHARE lock and blocks
-  audit writes. With the 10 second `lock_timeout` it can fail below the marker and
+  audit writes. With the 2 second `lock_timeout` it can fail below the marker and
   then needs a manual `prisma migrate resolve`. Run `CREATE UNIQUE INDEX
 CONCURRENTLY IF NOT EXISTS` ahead of the deploy so the migration finds it.
 - **`trace_summaries` index (C03).** `MATERIALIZE INDEX` starts a mutation over

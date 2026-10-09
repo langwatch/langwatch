@@ -1392,7 +1392,8 @@ route serves while upgrading, with an opt-out naming its reason; until that land
 is what serves. A blocking step never touches a table the sign-in or ingest doors read or write
 (auth, user, organization, authz, identity, api-key, project, evaluation, evaluator,
 model-provider, monitor, experiment, governance); `lint:architecture` refuses one that does
-(UIW-1..11). A background step names the background steps it runs after by their step
+(UIW-1..11). A blocking data step touches only tables created in its own release; anything older
+ships as a background step (Alex, 2026-10-09). A background step names the background steps it runs after by their step
 values (`after: [step]`, STEP-AFTER); the worker waits on them, the upgrade inlines them before a
 contract, and an unknown id or a cycle refuses the plan. A fact old images never recorded is
 recorded by its owner's background data step with `needsOldWritersGone`; `project:record-created-facts`
@@ -1400,7 +1401,13 @@ runs after `instant-eval:copy-judge-spend` (ADR-174 decision 17). Prisma migrati
 ClickHouse migrations are goose SQL files. A serving process holding DDL locks is how deploys die.
 A goose file that starts a background mutation (`MATERIALIZE INDEX`) is tracked by a background step in
 the table owner that waits on `system.mutations` and fails on its fail reason, so the ledger shows it
-(`trace:track-updated-at-index-materialisation`, Alex, 2026-10-09).
+(`trace:track-updated-at-index-materialisation`, Alex, 2026-10-09); the goose file names that step in a
+`-- background step: <id>` note above the statement. Migrations are graceful because the api serves
+through them (Alex, 2026-10-09): the runner sets `lock_timeout` 2 s with a bounded retry, and the
+migration-safety scanners refuse a Postgres `UPDATE`/`DELETE` on an existing table, a volatile
+`DEFAULT` on an added column, two `ALTER`s on one existing table and a longer `lock_timeout`, and a
+ClickHouse mutation without that note, `MODIFY TTL` that materialises, `MODIFY ORDER BY`,
+`OPTIMIZE ... FINAL` and `POPULATE`. Migrations in the LTS floor's tag are history and never rewritten.
 Because they run before any module boots, apps/tasks' migration-runner files (`src/*migrat*.ts`) may
 name process packages (Alex, 2026-09-27), and so may `lwql-provision.ts` and
 `lwql-render-access-config.ts`: LangWatchQL provisioning reads both schemas under the same migration
