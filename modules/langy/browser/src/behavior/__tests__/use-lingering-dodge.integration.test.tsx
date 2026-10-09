@@ -43,7 +43,7 @@ describe("useLingeringDodge", () => {
   });
 
   describe("given the drawer leaves", () => {
-    /** @scenario The floating panel returns to the right only after the drawer has left */
+    /** @scenario The minimised peek returns to the right only after the drawer has left */
     it("holds the dodge for the release delay, then lets go", () => {
       const { result, rerender } = renderDodge({ active: true });
 

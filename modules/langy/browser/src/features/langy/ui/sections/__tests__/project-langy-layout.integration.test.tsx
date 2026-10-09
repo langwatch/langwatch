@@ -441,17 +441,15 @@ describe("ProjectLangyLayout", () => {
       expect(useLangyStore.getState().dockShifted).toBe(false);
     });
 
-    /** @scenario "A drawer turns the DOCKED panel into its floating companion" */
-    it("releases the reservation while a drawer is open", async () => {
+    /** @scenario "A drawer leaves the DOCKED panel in its column below the top bar" */
+    it("keeps the reservation while a drawer is open", async () => {
       drawerState.current = "traceV2Details";
       renderAt("/demo/traces");
       act(() => {
         useLangyStore.setState({ panelMode: "sidebar" });
       });
       await openLangy();
-      // The panel rides beside the drawer as an overlay; the page keeps its
-      // full width underneath the pair.
-      expect(dockWrapper()?.getAttribute("data-langy-dock")).toBe("none");
+      expect(dockWrapper()?.getAttribute("data-langy-dock")).toBe("page");
     });
 
     /** @scenario "Closing the dock returns the page to full width" */

@@ -153,16 +153,10 @@ const FLUSH_DOCK_CHROME = {
  * Floating reads as glass, anchored in a bottom corner and growing UPWARD under a viewport cap;
  * the inset hairline gives its top edge a lit rim on the dark ground.
  */
-function floatingChrome({
-  dodgesDrawer,
-  minHeightPx,
-}: {
-  dodgesDrawer: boolean;
-  minHeightPx: number;
-}) {
+function floatingChrome({ minHeightPx }: { minHeightPx: number }) {
   const inset = `${FLOATING_PANEL_INSET}px`;
   return {
-    ...(dodgesDrawer ? { left: inset } : { right: inset }),
+    right: inset,
     bottom: inset,
     height: "auto",
     minHeight: `min(${minHeightPx}px, ${FLOATING_MAX_HEIGHT})`,
@@ -187,17 +181,15 @@ export function panelPlacementChrome({
   floating,
   isDrawerCompanion,
   dockShellClaimed,
-  dodgesDrawer,
   minHeightPx,
 }: {
   floating: boolean;
   isDrawerCompanion: boolean;
   dockShellClaimed: boolean;
-  dodgesDrawer: boolean;
   minHeightPx: number;
 }) {
   if (isDrawerCompanion) return DRAWER_COMPANION_CHROME;
-  if (floating) return floatingChrome({ dodgesDrawer, minHeightPx });
+  if (floating) return floatingChrome({ minHeightPx });
   return dockShellClaimed ? SHELL_DOCK_CHROME : FLUSH_DOCK_CHROME;
 }
 

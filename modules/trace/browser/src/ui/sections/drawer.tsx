@@ -12,6 +12,13 @@ import {
 import { CloseButton } from "../elements/close-button.tsx";
 import { IsolatedErrorBoundary } from "./isolated-error-boundary.tsx";
 
+/** The drawer's right margin beside an open Langy: the dock sits flush, the companion 8px in. */
+function langyYieldFor(panelMode: "floating" | "sidebar" | null): string | undefined {
+  if (panelMode === "sidebar") return `${SIDEBAR_PANEL_WIDTH + LANGY_DOCK_GAP}px`;
+  if (panelMode === "floating") return `${8 + SIDEBAR_PANEL_WIDTH + LANGY_DOCK_GAP}px`;
+  return undefined;
+}
+
 /**
  * Context to provide a margin-top offset to all Drawer.Content descendants. Used by
  * CurrentDrawer in the studio to push drawers below the header bar. Works with portaled
@@ -51,18 +58,15 @@ export const DrawerContent = React.forwardRef<HTMLDivElement, DrawerContentProps
     const marginTopProp =
       rest.marginTop ?? (contextMarginTop ? `${contextMarginTop}px` : undefined);
 
-    // Only the DOCKED (sidebar) Langy holds the right edge as the drawer's companion;
-    // the drawer then yields, sliding further left to leave the panel its slot plus a
-    // strip of space between the two cards.
+    // An open Langy holds the right edge: docked as the column below the top bar, floating as
+    // the drawer's companion card. The drawer yields its slot plus the gap between the cards.
     // Spec: specs/langy/langy-panel-layout.feature
-    const isLangyDockedCompanion = useLangyStore((s) => s.isOpen && s.panelMode === "sidebar");
-    const langyYieldMarginEnd = isLangyDockedCompanion
-      ? `${8 + SIDEBAR_PANEL_WIDTH + LANGY_DOCK_GAP}px`
-      : undefined;
+    const langyPanelMode = useLangyStore((s) => (s.isOpen ? s.panelMode : null));
+    const langyYieldMarginEnd = langyYieldFor(langyPanelMode);
 
-    // Floating Langy dodges to the left when a drawer opens.
-    const isLangyOpenFloating = useLangyStore((s) => s.isOpen && s.panelMode === "floating");
-    const [staggerBehindFloatingLangy] = React.useState(() => isLangyOpenFloating);
+    // Floating Langy moves beside the drawer when it opens. Hold the drawer's entrance back
+    // until the panel has settled, so the two never move in lockstep. Frozen at mount.
+    const [staggerBehindFloatingLangy] = React.useState(() => langyPanelMode === "floating");
     const langyStaggerEnter = staggerBehindFloatingLangy
       ? {
           animationDelay: `${LANGY_DODGE_STAGGER_MS}ms`,

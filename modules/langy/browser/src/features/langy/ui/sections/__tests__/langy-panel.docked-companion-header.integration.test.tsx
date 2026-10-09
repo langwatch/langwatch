@@ -37,9 +37,7 @@ vi.mock("@ai-sdk/react", () => ({
   }),
 }));
 
-/** The wrapper releases the dock reservation while a drawer is open — see
- * `ProjectLangyLayout`. Here the panel reads `currentDrawer` directly to know
- * it is riding beside one as a floating companion. */
+/** The panel reads `currentDrawer` directly to know it is riding beside one as its companion. */
 const currentDrawerRef = { current: undefined as string | undefined };
 vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({
@@ -209,23 +207,16 @@ describe("given the Langy panel is docked or floating on its own", () => {
   });
 });
 
-describe("given the Langy panel is riding beside an open drawer", () => {
+describe("given the floating Langy panel is riding beside an open drawer", () => {
   describe("when the header renders", () => {
-    /** @scenario The docked companion offers a single close affordance */
-    it("hides its own Minimise so the drawer owns the only dismissal", async () => {
-      // Only the DOCKED (sidebar) panel becomes the drawer's companion — the
-      // floating panel dodges sideways instead. See the note above
-      // `isDrawerCompanion` in the panel.
-      useLangyStore.setState({ panelMode: "sidebar" });
+    /** @scenario The drawer companion keeps its own Minimise */
+    it("still offers its own Minimise beside the drawer's close", async () => {
+      useLangyStore.setState({ panelMode: "floating" });
       currentDrawerRef.current = "traceV2Details";
       renderPanel();
 
-      // The panel is up (its new-chat control is present)...
       expect(await screen.findByRole("button", { name: "New chat" })).toBeInTheDocument();
-      // ...but the companion header carries no Minimise: a second dismissal
-      // beside the drawer's own X read as "close the drawer" and kept
-      // dismissing Langy instead.
-      expect(screen.queryByRole("button", { name: "Minimise Langy" })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Minimise Langy" })).toBeInTheDocument();
     });
   });
 });
