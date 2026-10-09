@@ -87,13 +87,19 @@ export const opsProcessModule: PublishedProcessModule<"ops", OpsApi, OpsServerCo
         kind: "data",
         mode: "blocking",
         description:
-          "Carries organizations that finished the Slack connections migration over to its new step, so it does not run for them again.",
+          "Carries organizations that finished or were enrolled in the Slack connections migration over to its new step, so it does not run for them again and keeps its enrolments.",
         run: async ({ dryRun }) => {
           const copied = await repositories.migration.copyTenantState({
             moves: MOVED_TO_AUTOMATION,
             dryRun,
           });
-          return dryRun ? { wouldCopy: copied } : { copied };
+          const enrolmentsCopied = await repositories.migration.copyEnrolments({
+            moves: MOVED_TO_AUTOMATION,
+            dryRun,
+          });
+          return dryRun
+            ? { wouldCopy: copied, wouldCopyEnrolments: enrolmentsCopied }
+            : { copied, enrolmentsCopied };
         },
       }),
     ]);

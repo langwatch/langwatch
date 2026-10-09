@@ -113,7 +113,7 @@
     "kind": "data",
     "mode": "blocking",
     "owner": "ops",
-    "description": "Carries organizations that finished the Slack connections migration over to its new step, so it does not run for them again."
+    "description": "Carries organizations that finished or were enrolled in the Slack connections migration over to its new step, so it does not run for them again and keeps its enrolments."
   },
   {
     "id": "scim:replay-sso-connection-view",

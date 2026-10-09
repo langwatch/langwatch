@@ -36,3 +36,11 @@ Feature: Ops runs the system migration passes and names their cohorts
     Then "acme" is finalized and "beta" rolled back under automation's step
     And "gamma" has no state under the new step, so the next pass runs it again
     And the legacy rows are left in place, and a second run copies nothing
+
+  @unit
+  Scenario: An organization enrolled in an ops-held migration stays enrolled after its owner declares it
+    Given organizations "acme" and "delta" are enrolled in the Slack connections migration under ops' legacy name
+    And "delta" is already enrolled under automation's step
+    When the upgrade runs the blocking step that copies the migration's state to automation's step
+    Then "acme" is enrolled under automation's step and "delta" keeps its one enrolment there
+    And the legacy enrolments are left in place, and a second run copies nothing

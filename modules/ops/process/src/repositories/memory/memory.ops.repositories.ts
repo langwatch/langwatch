@@ -138,6 +138,7 @@ export class MemoryOpsRepositories {
     const store = MemoryOpsStore.create();
     const migrationState = MemorySystemMigrationStateRepository.create();
     const tenantStepState = MemoryTenantStepStateRepository.create();
+    const migrationEnrollments = MemorySystemMigrationEnrollmentRepository.create();
 
     return {
       bugReports: MemoryBugReportRepository.create({ store }),
@@ -149,8 +150,9 @@ export class MemoryOpsRepositories {
       migration: MemoryOpsMigrationRepository.create({
         legacy: migrationState,
         steps: tenantStepState,
+        enrolments: migrationEnrollments,
       }),
-      migrationEnrollments: MemorySystemMigrationEnrollmentRepository.create(),
+      migrationEnrollments,
       migrationMemberships: MemoryMigrationMembershipRepository.create(),
       migrationLease: MemoryMigrationLeaseRepository.create(),
       organizationTenants: MemoryOrganizationTenantSourceRepository.create(),

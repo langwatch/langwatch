@@ -13,4 +13,10 @@ export abstract class OpsMigrationRepository {
    * Answers how many it copied, or would copy on a dry run.
    */
   abstract copyTenantState(args: { moves: MovedTenantSteps; dryRun: boolean }): Promise<number>;
+
+  /**
+   * Copies, never moves, each moved migration's enrolments to the new step id (S6-ENROLMENTS); an
+   * enrolment already there is kept. Answers how many it copied, or would copy on a dry run.
+   */
+  abstract copyEnrolments(args: { moves: MovedTenantSteps; dryRun: boolean }): Promise<number>;
 }
