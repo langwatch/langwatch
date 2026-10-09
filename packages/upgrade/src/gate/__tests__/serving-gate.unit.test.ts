@@ -7,6 +7,7 @@ import { assertCurrent, createUpgradeGate, ledgerFloor, UPGRADE_COMMAND } from "
 
 const PRISMA = "prisma:20261006180000_add_column";
 const GOOSE = "clickhouse:00042";
+const DATA = "trace:fill-cost";
 const image = { release: "3.21.0", blockingSteps: [PRISMA, GOOSE] };
 const allDone = [
   { id: PRISMA, status: "done" as const },
@@ -42,12 +43,14 @@ function gateOver({
   steps = allDone,
   runs = [],
   schemaIsEmpty = false,
+  blockingSteps = [PRISMA, GOOSE],
 }: {
   role?: "api" | "worker";
   release?: string | null;
   steps?: readonly { id: string; status: "done" | "not-needed" | "pending" | "failed" }[];
   runs?: readonly { floor: string | null }[];
   schemaIsEmpty?: boolean;
+  blockingSteps?: readonly string[];
 } = {}) {
   const ledger = memoryServingRosterLedger();
   const roster = createServingRoster({
@@ -61,7 +64,7 @@ function gateOver({
     image: {
       name: release ?? "git-abc1234",
       release,
-      blockingSteps: [PRISMA, GOOSE],
+      blockingSteps: [...blockingSteps],
       declaredSteps: ["trace:backfill-cost"],
     },
     ledger: {
@@ -181,7 +184,11 @@ describe("createUpgradeGate", () => {
 
   /** @scenario "An api whose image has a Postgres schema step outstanding holds" */
   it("answers holding to the api, naming the pending Postgres schema step", async () => {
-    const { gate } = gateOver({ role: "api", steps: [{ id: PRISMA, status: "pending" }] });
+    const steps = [
+      { id: PRISMA, status: "pending" as const },
+      { id: GOOSE, status: "done" as const },
+    ];
+    const { gate } = gateOver({ role: "api", steps });
     await expect(gate.admit()).resolves.toMatchObject({
       admitted: false,
       outcome: "holding",
@@ -189,17 +196,32 @@ describe("createUpgradeGate", () => {
     });
   });
 
-  /** @scenario "An api whose schema steps are done while a blocking step is outstanding is upgrading" */
-  it("answers upgrading to the api once its schema steps are done", async () => {
+  /** @scenario "An api whose image has a ClickHouse schema step outstanding holds" */
+  it("answers holding to the api while a ClickHouse schema step is pending", async () => {
     const steps = [
       { id: PRISMA, status: "done" as const },
       { id: GOOSE, status: "pending" as const },
     ];
-    const { gate, rows } = gateOver({ role: "api", steps });
+    const { gate } = gateOver({ role: "api", steps });
+    await expect(gate.admit()).resolves.toMatchObject({
+      admitted: false,
+      outcome: "holding",
+      outstanding: [GOOSE],
+    });
+  });
+
+  /** @scenario "An api whose schema steps are done while a blocking step is outstanding is upgrading" */
+  it("answers upgrading to the api once its schema steps are done", async () => {
+    const steps = [...allDone, { id: DATA, status: "pending" as const }];
+    const { gate, rows } = gateOver({
+      role: "api",
+      steps,
+      blockingSteps: [PRISMA, GOOSE, DATA],
+    });
     await expect(gate.admit()).resolves.toMatchObject({
       admitted: false,
       outcome: "upgrading",
-      outstanding: [GOOSE],
+      outstanding: [DATA],
     });
     expect(rows.size).toBe(0);
   });
