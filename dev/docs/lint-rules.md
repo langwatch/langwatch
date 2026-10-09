@@ -63,6 +63,7 @@ one-line `why`, then `fix`.
 - [`langwatch/service-loads-its-own-config`](#langwatchserviceloadsitsownconfig)
 - [`langwatch/shared-setup-is-a-hook`](#langwatchsharedsetupisahook)
 - [`langwatch/signature-mirror`](#langwatchsignaturemirror)
+- [`langwatch/slice-reader-is-a-hook`](#langwatchslicereaderisahook)
 - [`langwatch/stand-in-cast`](#langwatchstandincast)
 - [`langwatch/store-containment`](#langwatchstorecontainment)
 - [`langwatch/suppression-states-why`](#langwatchsuppressionstateswhy)
@@ -1277,6 +1278,23 @@ Messages:
   - what: This boundary type mirrors another signature through `{{name}}<…>`.
   - fix: Declare the input and output as named contract types (Zod schema plus `z.infer`) and type the `*Api` operation with them explicitly. Read the `contract` skill.
   - why: A mirrored type changes whenever the function does, so the contract no longer states what the boundary accepts.
+
+## `langwatch/slice-reader-is-a-hook`
+
+- Kind: problem
+- Applies to: applies
+- Fixable: no
+- Spec: `specs/tooling/lint-slice-reader-is-a-hook.feature`
+- Enforced: yes, at `error`
+
+Options: none.
+
+Messages:
+
+- `sliceReaderName`
+  - what: `{{name}}` holds a `{{factory}}(...)` reader, which is a hook.
+  - fix: Rename it `use{{suggestion}}` and call it only where a hook may be called.
+  - why: The React Compiler caches a call to a non-`use` name, so the hook runs on one render and not the next.
 
 ## `langwatch/stand-in-cast`
 

@@ -385,7 +385,7 @@ export class PrismaUserRepository
       this.prisma.passkey.count({ where: { userId: id } }),
       this.prisma.user.findUnique({
         where: { id },
-        select: { passkeyNudgeDismissedAt: true, twoFactorEnabled: true },
+        select: { passkeyNudgeDismissedAt: true, twoFactorEnabled: true, createdAt: true },
       }),
     ]);
 
@@ -393,6 +393,7 @@ export class PrismaUserRepository
       hasPasskey: passkeyCount > 0,
       twoStepEnabled: user?.twoFactorEnabled ?? false,
       dismissedAt: user?.passkeyNudgeDismissedAt ?? null,
+      accountCreatedAt: user?.createdAt ?? new Date(0),
     });
   }
 

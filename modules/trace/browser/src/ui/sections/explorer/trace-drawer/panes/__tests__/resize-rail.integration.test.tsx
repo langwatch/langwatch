@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   DRAWER_MAXIMIZE_EDGE_PX,
   DRAWER_MIN_WIDTH_PX,
-  drawerChrome,
+  useDrawerChrome,
 } from "../../../../../../behavior/drawer-chrome.store.ts";
 vi.mock("react-router", async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -29,7 +29,7 @@ beforeEach(() => {
     value: VIEWPORT_WIDTH,
   });
   localStorage.clear();
-  drawerChrome.setState(drawerChrome.getInitialState(), true);
+  useDrawerChrome.setState(useDrawerChrome.getInitialState(), true);
 });
 
 afterEach(cleanup);
@@ -84,7 +84,7 @@ describe("ResizeRail", () => {
       /** @scenario Drag the left-edge grip to resize the drawer */
       it("updates the drawer width to current + |dx|", () => {
         // Start from a known width so the math is checkable.
-        drawerChrome.getState().setWidthPx(640);
+        useDrawerChrome.getState().setWidthPx(640);
 
         render(<ResizeRail />, { wrapper });
         const el = getRail();
@@ -95,7 +95,7 @@ describe("ResizeRail", () => {
         fireEvent.pointerMove(el, { clientX: 800, pointerId: 1 });
 
         // Dragging the rail leftward by 200px widens the drawer to 840px.
-        expect(drawerChrome.getState().widthPx).toBe(840);
+        expect(useDrawerChrome.getState().widthPx).toBe(840);
 
         fireEvent.pointerUp(el, { clientX: 800, pointerId: 1 });
       });
@@ -104,7 +104,7 @@ describe("ResizeRail", () => {
     describe("when pointermove drags past the min clamp", () => {
       /** @scenario Width is clamped to a minimum */
       it("does not let widthPx drop below DRAWER_MIN_WIDTH_PX", () => {
-        drawerChrome.getState().setWidthPx(400);
+        useDrawerChrome.getState().setWidthPx(400);
 
         render(<ResizeRail />, { wrapper });
         const el = getRail();
@@ -113,7 +113,7 @@ describe("ResizeRail", () => {
         // Drag rightward 800px → propose 400 - 800 = -400, clamp to min.
         fireEvent.pointerMove(el, { clientX: 1800, pointerId: 1 });
 
-        expect(drawerChrome.getState().widthPx).toBe(DRAWER_MIN_WIDTH_PX);
+        expect(useDrawerChrome.getState().widthPx).toBe(DRAWER_MIN_WIDTH_PX);
 
         fireEvent.pointerUp(el, { clientX: 1800, pointerId: 1 });
       });
@@ -122,7 +122,7 @@ describe("ResizeRail", () => {
     describe("when pointermove drags past the max clamp", () => {
       /** @scenario Width is clamped to a maximum */
       it("does not let widthPx exceed viewport - edge", () => {
-        drawerChrome.getState().setWidthPx(800);
+        useDrawerChrome.getState().setWidthPx(800);
 
         render(<ResizeRail />, { wrapper });
         const el = getRail();
@@ -131,7 +131,7 @@ describe("ResizeRail", () => {
         // Drag leftward 2000px → propose 2800px, clamp to viewport-edge.
         fireEvent.pointerMove(el, { clientX: -1000, pointerId: 1 });
 
-        expect(drawerChrome.getState().widthPx).toBe(VIEWPORT_WIDTH - DRAWER_MAXIMIZE_EDGE_PX);
+        expect(useDrawerChrome.getState().widthPx).toBe(VIEWPORT_WIDTH - DRAWER_MAXIMIZE_EDGE_PX);
 
         fireEvent.pointerUp(el, { clientX: -1000, pointerId: 1 });
       });
@@ -142,11 +142,11 @@ describe("ResizeRail", () => {
     describe("when double-click fires", () => {
       /** @scenario Double-click the grip toggles maximize and restore */
       it("snaps the width to viewport - edge", () => {
-        drawerChrome.getState().setWidthPx(700);
+        useDrawerChrome.getState().setWidthPx(700);
         render(<ResizeRail />, { wrapper });
         const el = getRail();
         fireEvent.doubleClick(el);
-        expect(drawerChrome.getState().widthPx).toBe(VIEWPORT_WIDTH - DRAWER_MAXIMIZE_EDGE_PX);
+        expect(useDrawerChrome.getState().widthPx).toBe(VIEWPORT_WIDTH - DRAWER_MAXIMIZE_EDGE_PX);
       });
     });
   });
@@ -155,14 +155,14 @@ describe("ResizeRail", () => {
     describe("when only a pointerdown/up fires (no double click)", () => {
       /** @scenario Single-click the grip does NOT toggle width */
       it("does not change the width", () => {
-        drawerChrome.getState().setWidthPx(700);
+        useDrawerChrome.getState().setWidthPx(700);
         render(<ResizeRail />, { wrapper });
         const el = getRail();
 
         fireEvent.pointerDown(el, { clientX: 1000, button: 0, pointerId: 1 });
         fireEvent.pointerUp(el, { clientX: 1000, pointerId: 1 });
 
-        expect(drawerChrome.getState().widthPx).toBe(700);
+        expect(useDrawerChrome.getState().widthPx).toBe(700);
       });
     });
   });

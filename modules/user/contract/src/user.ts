@@ -96,6 +96,8 @@ export const userPasskeyNudgeStatusSchema = z
     /** Two-step verification is set up and confirmed on the account. */
     twoStepEnabled: z.boolean(),
     dismissedAt: z.date().nullable(),
+    /** When the account was created, so the session that created it is told apart. */
+    accountCreatedAt: z.date(),
   })
   .strict();
 export type UserPasskeyNudgeStatus = z.infer<typeof userPasskeyNudgeStatusSchema>;

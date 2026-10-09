@@ -366,6 +366,23 @@ function rawRequestHead({ req }: { req: http.IncomingMessage }): string {
   return `${lines.join("\r\n")}\r\n\r\n`;
 }
 
+/** Under haven an unnamed tool takes a free port: app port + N is one haven hands a sim. */
+export async function devToolPort({
+  explicit,
+  appPort,
+  offset,
+  env,
+}: {
+  explicit: string | undefined;
+  appPort: number;
+  offset: number;
+  env: NodeJS.ProcessEnv;
+}): Promise<number> {
+  if (explicit !== undefined && explicit !== "") return Number(explicit);
+  if (env.LANGWATCH_PORTLESS === "1") return freeLoopbackPort();
+  return appPort + offset;
+}
+
 export function freeLoopbackPort(): Promise<number> {
   return new Promise((resolve, reject) => {
     const probe = net.createServer();
