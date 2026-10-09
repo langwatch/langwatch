@@ -636,9 +636,9 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 ## Investigate With Your Agent
 
 - [Explore your usage with your own agent](https://langwatch.ai/docs/coding-agents/explore-your-usage-with-your-own-agent.md): Point Claude Code or any coding agent at your own LangWatch usage. One device login, one pasted prompt, and the agent answers where your tokens went.
+- [Reduce Coding Agent Cost](https://langwatch.ai/docs/coding-agents/reduce-coding-agent-cost.md): Seven Claude Code settings and habits that cut cost and context, how to check each one on your own sessions in LangWatch, and the saving to expect.
 - [Find Your Context Sweet Spot](https://langwatch.ai/docs/coding-agents/find-your-context-sweet-spot.md): Your agent investigates its own sessions to find where carrying a fat context stops paying for itself, measured in cache rebuilds, compactions and cost per turn.
 - [Compare Provider Costs](https://langwatch.ai/docs/coding-agents/compare-provider-costs.md): Your agent prices your real usage mix, with its cache read and write split, against other providers' current price cards.
-- [Reduce Coding Agent Cost](https://langwatch.ai/docs/coding-agents/reduce-coding-agent-cost.md): Seven Claude Code settings and habits that cut cost and context, how to check each one on your own sessions in LangWatch, and the saving to expect.
 - [Run Your Own Cost Experiments](https://langwatch.ai/docs/coding-agents/cost-experiments.md): A/B test a Claude Code setting on your own tasks before you roll it out, with the steps, the metric and where LangWatch shows the result. Includes the runs we did.
 - [Test How Your Codebase Steers an Agent](https://langwatch.ai/docs/coding-agents/codebase-experiment.md): Run the same coding agent task on two versions of your codebase and compare speed, cost and the defects the agent leaves behind. Includes the run we did on our own monorepo.
 
