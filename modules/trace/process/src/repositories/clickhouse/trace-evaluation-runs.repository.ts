@@ -42,6 +42,11 @@ const TRACE_EVALUATION_COLUMNS_LIGHT = [
   `toUnixTimestamp64Milli(${RUNS}.StartedAt) AS StartedAt`,
   `toUnixTimestamp64Milli(${RUNS}.CompletedAt) AS CompletedAt`,
 ].join(", ");
+/**
+ * The most of a run's error text the summary read pulls out of storage, so one huge
+ * provider error page per run never travels the whole way; room is left for leading space.
+ */
+const SUMMARY_ERROR_READ_CHARS = 1_024;
 const TRACE_EVALUATION_COLUMNS_WITH_INPUTS = `${TRACE_EVALUATION_COLUMNS_LIGHT}, Inputs`;
 const logger = createLogger("langwatch:trace:clickhouse.trace-evaluation-runs");
 
@@ -81,7 +86,9 @@ const runRowSchema = traceEvaluationRowSchema.safeExtend({
   LastEventOccurredAt: nullableNumber.optional(),
 });
 
-const tenantSummaryRowsSchema = z.array(summaryRowSchema.safeExtend({ TenantId: chString }));
+const tenantSummaryRowsSchema = z.array(
+  summaryRowSchema.safeExtend({ TenantId: chString, Error: nullableString }),
+);
 const traceEvaluationRowsSchema = z.array(traceEvaluationRowSchema);
 const runRowsSchema = z.array(runRowSchema);
 
@@ -249,7 +256,8 @@ export class ClickHouseTraceEvaluationRunsRepository extends TraceEvaluationRuns
       const result = await client.query({
         query: `
           SELECT TenantId, EvaluationId, EvaluatorId, EvaluatorType, EvaluatorName,
-            TraceId, IsGuardrail, Status, Score, Passed, Label
+            TraceId, IsGuardrail, Status, Score, Passed, Label,
+            substringUTF8(Error, 1, {errorReadChars:UInt32}) AS Error
           FROM ${EVALUATION_RUNS_TABLE}
           WHERE ${tenantScope("ScheduledAt")}
             AND ScheduledAt >= fromUnixTimestamp64Milli({since:Int64})
@@ -264,16 +272,23 @@ export class ClickHouseTraceEvaluationRunsRepository extends TraceEvaluationRuns
             )
           ORDER BY UpdatedAt DESC
         `,
-        query_params: { traceIds: [...input.traceIds], since: input.since },
+        query_params: {
+          traceIds: [...input.traceIds],
+          since: input.since,
+          errorReadChars: SUMMARY_ERROR_READ_CHARS,
+        },
         format: "JSONEachRow",
       });
-      return tenantSummaryRowsSchema
-        .parse(await result.json())
-        .flatMap((row) =>
-          row.TraceId
-            ? [{ tenantId: row.TenantId, ...evaluationSummarySchema.parse(summaryFields(row)) }]
-            : [],
-        );
+      return tenantSummaryRowsSchema.parse(await result.json()).flatMap((row) =>
+        row.TraceId
+          ? [
+              {
+                tenantId: row.TenantId,
+                ...evaluationSummarySchema.parse({ ...summaryFields(row), error: row.Error }),
+              },
+            ]
+          : [],
+      );
     } catch (error) {
       logger.warn(
         { traceIdCount: input.traceIds.length, error },

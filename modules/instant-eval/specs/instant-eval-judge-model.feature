@@ -876,3 +876,51 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
     Scenario: Any other autosave failure keeps its usual handling
       When a Studio or a workbench autosave fails for any other reason
       Then it is handled as before and raises no toast
+
+  Rule: An evaluator error shows its stored error text in the trace list
+
+    @integration
+    Scenario Outline: The trace list's evaluation summary carries the error text of an errored run only
+      Given a trace with an evaluation run that is <status> and stored an error text wrapped in whitespace
+      When the trace list reads the trace's evaluation summaries
+      Then the run's summary carries <summary>
+
+      Examples:
+        | status    | summary                                             |
+        | error     | that error text without the surrounding whitespace |
+        | processed | no error text                                       |
+        | skipped   | no error text                                       |
+
+    @unit
+    Scenario: A long error text is cut short in the summary
+      Given an errored run whose stored error text is longer than 300 characters
+      When its summary error text is read
+      Then it is the first 300 characters followed by an ellipsis
+
+    @unit
+    Scenario: An errored run on a trace past the visibility window shows only a teaser of its error text
+      Given a trace older than the plan's visibility window
+      And an evaluation run on it that errored with an error text of 300 characters
+      When the trace list reads the trace
+      Then the run's summary carries only the teaser of that error text, as the trace's own error does
+
+    @unit
+    Scenario: A viewer who may not read captured content sees no error text on a chip
+      Given a project whose captured input or output the viewer may not read
+      And a trace list row with an evaluator whose run errored with "free_budget_exhausted: spent"
+      When the viewer reads the trace list
+      Then the run's summary carries an empty error text, as the trace drawer's runs do
+
+    @integration
+    Scenario: Hovering an errored evaluator chip in the trace list shows its error text
+      Given a trace list row with an evaluator whose run errored with "free_budget_exhausted: spent"
+      When a member hovers the evaluator's chip
+      Then the hover card shows the status as error
+      And it shows the error text "free_budget_exhausted: spent"
+
+    @integration
+    Scenario: An evaluator chip with no error text shows no error row
+      Given a trace list row with an evaluator whose run errored with no stored error text
+      When a member hovers the evaluator's chip
+      Then the hover card shows the status as error
+      And it shows no error text

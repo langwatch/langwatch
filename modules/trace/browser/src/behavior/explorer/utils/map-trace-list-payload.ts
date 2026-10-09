@@ -21,6 +21,7 @@ export function mapTraceListPayload(
       score: e.score,
       passed: e.passed,
       label: e.label,
+      error: e.error,
     })),
     events: NO_TRACE_EVENTS,
   }));

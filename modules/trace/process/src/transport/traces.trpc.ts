@@ -19,6 +19,7 @@ import {
   tracesTrpc,
 } from "@langwatch/trace-contract";
 
+import { gateEvaluationContent } from "../rules/evaluation-content-gate.rules.ts";
 import {
   traceDerivedAttrPrefixes,
   traceReadMapperPorts,
@@ -334,11 +335,15 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
         }),
       );
 
+      // A chip's error text quotes captured content, so it is gated as the drawer's runs are.
       return {
         ...page,
-        items: page.items.map((item) =>
-          redactV2Content(item, protections, traceReadMapperPorts.contentPrivacy),
-        ),
+        items: page.items.map((item) => ({
+          ...redactV2Content(item, protections, traceReadMapperPorts.contentPrivacy),
+          evaluations: item.evaluations.map((evaluation) =>
+            gateEvaluationContent({ evaluation, protections }),
+          ),
+        })),
       };
     })
 

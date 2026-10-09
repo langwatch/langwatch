@@ -36,6 +36,7 @@ import type { FacetFilterResolver } from "../../facet/rules/trace-facet-filter.r
 import { TraceFacetValuesService } from "../../facet/services/trace-facet-values.service.ts";
 import type { TraceTopicNamesReadRepository } from "../../topic/repositories/trace-topic-names.repository.ts";
 import { TraceTopicNamingService } from "../../topic/services/trace-topic-naming.service.ts";
+import { deriveSummaryErrorText } from "../rules/evaluation-summary-error.rules.ts";
 
 interface ListParams {
   authorization: Authorization;
@@ -167,8 +168,8 @@ export class TraceListService {
   }
 
   /**
-   * Teases input/output/error previews and user-authored labels beyond the
-   * caller's visibility window — existence and counts stay untouched.
+   * Teases input/output/error previews, user-authored labels and evaluation error
+   * text beyond the caller's visibility window — existence and counts stay untouched.
    * Labels are gated alongside content to avoid leaking through on old traces.
    */
   static #gateItems(
@@ -191,6 +192,10 @@ export class TraceListService {
       output: item.output ? teaserOf(item.output) : item.output,
       error: item.error ? teaserOf(item.error) : item.error,
       labels: item.labels.map((label) => teaserOf(label)),
+      evaluations: item.evaluations.map((evaluation) => ({
+        ...evaluation,
+        error: evaluation.error ? teaserOf(evaluation.error) : evaluation.error,
+      })),
     };
   }
 
@@ -312,7 +317,8 @@ function evaluationsByListedRow(
   evaluations: readonly (ListedEvaluation & { tenantId: string })[],
 ): Map<string, ListedEvaluation[]> {
   const byRow = new Map<string, ListedEvaluation[]>();
-  for (const { tenantId, ...summary } of evaluations) {
+  for (const { tenantId, ...stored } of evaluations) {
+    const summary = { ...stored, error: deriveSummaryErrorText(stored) ?? null };
     const key = listedTraceKey({ projectId: tenantId, traceId: summary.traceId ?? "" });
     byRow.set(key, [...(byRow.get(key) ?? []), summary]);
   }

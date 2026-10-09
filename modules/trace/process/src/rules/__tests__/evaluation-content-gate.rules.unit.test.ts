@@ -84,4 +84,16 @@ describe("gateEvaluationContent", () => {
       expect("inputs" in gated).toBe(false);
     });
   });
+
+  describe("when the evaluation is a list summary, which carries no details", () => {
+    it("hides its error text and leaves details absent", () => {
+      const { inputs: _i, details: _d, errorDetails: _e, ...summary } = run;
+      const gated = gateEvaluationContent({
+        evaluation: summary,
+        protections: { canSeeCapturedInput: false },
+      });
+      expect(gated.error).toBe("");
+      expect("details" in gated).toBe(false);
+    });
+  });
 });

@@ -73,6 +73,34 @@ describe("mapTraceListPayload", () => {
     });
   });
 
+  describe("given a row whose evaluator run errored with a stored error text", () => {
+    it("carries the error text onto the row's evaluation", () => {
+      const rows = mapTraceListPayload({
+        items: [
+          row({
+            traceId: "t1",
+            evaluations: [
+              {
+                evaluationId: "ev1",
+                evaluatorId: "e1",
+                evaluatorType: "test/evaluator",
+                evaluatorName: "Faithfulness",
+                traceId: "t1",
+                isGuardrail: false,
+                status: "error",
+                score: null,
+                passed: null,
+                label: null,
+                error: "free_budget_exhausted: spent",
+              } as RowEvaluation,
+            ],
+          }),
+        ],
+      });
+      expect(rows[0]?.evaluations[0]?.error).toBe("free_budget_exhausted: spent");
+    });
+  });
+
   describe("given items that already carry spanCount", () => {
     describe("when mapping the payload", () => {
       it("preserves the supplied value", () => {

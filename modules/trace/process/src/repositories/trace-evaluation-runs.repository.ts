@@ -26,6 +26,7 @@ export abstract class TraceEvaluationRunsReadRepository {
   /**
    * The latest version of each run scheduled since `since`, read through the proof (ADR-177
    * block C). Each names the tenant it was read from: two members may hold the same trace id.
+   * Its error text is as stored, whatever the status; the live read bounds how much it pulls.
    */
   abstract findSummariesByTraceIds(input: {
     authorization: Authorization;

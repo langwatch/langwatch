@@ -1,9 +1,12 @@
 import { canReadCapturedContent, type Protections } from "@langwatch/trace-contract";
 
-/** The content an evaluation carries, in the shapes the in-app reads return. */
+/**
+ * The content an evaluation carries, in the shapes the in-app reads return; a list
+ * summary carries no details.
+ */
 type EvaluationContent = {
   inputs?: Record<string, unknown> | null;
-  details: string | null;
+  details?: string | null;
   error: string | null;
   errorDetails?: string | null;
 };
@@ -24,7 +27,7 @@ export function gateEvaluationContent<T extends EvaluationContent>({
   return {
     ...evaluation,
     ...(evaluation.inputs != null && { inputs: null }),
-    details: null,
+    ...(evaluation.details != null && { details: null }),
     error: evaluation.error === null ? null : "",
     ...(evaluation.errorDetails != null && { errorDetails: null }),
   };

@@ -104,13 +104,15 @@ describe("given evaluation has recorded runs against the traces on one list page
     /** @scenario "The trace list's evaluation summaries are read per trace since the window opened" */
     it("reads the tenant's latest runs scheduled since the window opened, grouped by trace", async () => {
       const ch = client(() => [
-        { ...SUMMARY_ROW, TenantId: TENANT },
+        { ...SUMMARY_ROW, TenantId: TENANT, Error: null },
         {
           ...SUMMARY_ROW,
           TenantId: TENANT,
           EvaluationId: "eval-2",
           TraceId: "trace-2",
+          Status: "error",
           Passed: null,
+          Error: "  boom ",
         },
       ]);
 
@@ -123,9 +125,11 @@ describe("given evaluation has recorded runs against the traces on one list page
       const request = ch.query.mock.calls[0]?.[0];
       expect(request?.query).toContain("ScheduledAt >= fromUnixTimestamp64Milli({since:Int64})");
       expect(request?.query).toContain("TenantId IN ({tenantScope");
+      expect(request?.query).toContain("substringUTF8(Error, 1, {errorReadChars:UInt32})");
       expect(request?.query_params).toMatchObject({
         traceIds: ["trace-1", "trace-2"],
         since: 1_000,
+        errorReadChars: 1_024,
       });
       expect(Object.values(request?.query_params ?? {})).toContainEqual([TENANT]);
       expect(summaries.map((summary) => summary.traceId)).toEqual(["trace-1", "trace-2"]);
@@ -133,6 +137,7 @@ describe("given evaluation has recorded runs against the traces on one list page
         tenantId: TENANT,
         evaluationId: "eval-2",
         passed: null,
+        error: "  boom ",
       });
     });
   });

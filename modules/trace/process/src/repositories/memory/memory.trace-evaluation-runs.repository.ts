@@ -64,6 +64,7 @@ export class MemoryTraceEvaluationRunsRepository extends TraceEvaluationRunsRead
         score: run.score,
         passed: run.passed,
         label: run.label,
+        error: run.error,
       });
     }
     return output;

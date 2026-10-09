@@ -41,6 +41,7 @@ const evaluationSummarySchemaDefinition = evaluationRunDataSchema.pick({
   score: true,
   passed: true,
   label: true,
+  error: true,
 });
 export interface EvaluationSummarySchema extends Named<typeof evaluationSummarySchemaDefinition> {}
 export const evaluationSummarySchema: EvaluationSummarySchema = evaluationSummarySchemaDefinition;
