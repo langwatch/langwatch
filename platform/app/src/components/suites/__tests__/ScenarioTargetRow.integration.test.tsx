@@ -29,6 +29,26 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 );
 
 describe("<ScenarioTargetRow/>", () => {
+  describe("given a completed run without evaluation results", () => {
+    /** @scenario "An ungraded completed run is not presented as passed" */
+    it("displays Not evaluated instead of Passed", () => {
+      render(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData({
+            status: ScenarioRunStatus.SUCCESS,
+            results: null,
+          })}
+          targetName="Prod Agent"
+          onClick={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.getByText("Not evaluated")).toBeInTheDocument();
+      expect(screen.queryByText(/^Passed/)).not.toBeInTheDocument();
+    });
+  });
+
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
@@ -176,13 +196,17 @@ describe("<ScenarioTargetRow/>", () => {
     });
   });
 
-  describe("given a successful run with no criteria results", () => {
+  describe("given an evaluated successful run with zero criteria", () => {
     it("displays 'passed' without count", () => {
       render(
         <ScenarioTargetRow
           scenarioRun={makeScenarioRunData({
             status: ScenarioRunStatus.SUCCESS,
-            results: null,
+            results: {
+              verdict: Verdict.SUCCESS,
+              metCriteria: [],
+              unmetCriteria: [],
+            },
           })}
           targetName="Prod Agent"
           onClick={vi.fn()}

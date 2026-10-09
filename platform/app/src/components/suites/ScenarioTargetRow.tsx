@@ -142,7 +142,13 @@ function MetricsTooltipContent({
   );
 }
 
-function StatusCircle({ status }: { status: ScenarioRunStatus }) {
+function StatusCircle({
+  status,
+  ungraded = false,
+}: {
+  status: ScenarioRunStatus;
+  ungraded?: boolean;
+}) {
   if (
     status === ScenarioRunStatus.QUEUED ||
     status === ScenarioRunStatus.RUNNING
@@ -155,7 +161,7 @@ function StatusCircle({ status }: { status: ScenarioRunStatus }) {
       width="10px"
       height="10px"
       borderRadius="full"
-      bg={STATUS_CIRCLE_COLORS[status] ?? "gray.400"}
+      bg={ungraded ? "gray.400" : (STATUS_CIRCLE_COLORS[status] ?? "gray.400")}
       flexShrink={0}
     />
   );
@@ -177,6 +183,8 @@ export function ScenarioTargetRow({
   });
 
   const config = SCENARIO_RUN_STATUS_CONFIG[scenarioRun.status];
+  const ungraded =
+    scenarioRun.status === ScenarioRunStatus.SUCCESS && !scenarioRun.results;
 
   const hasCancelButton = onCancel && isCancellableStatus(scenarioRun.status);
   const hasMetrics =
@@ -218,11 +226,11 @@ export function ScenarioTargetRow({
           aria-label={`View details for ${displayName}`}
         >
           <HStack>
-            <StatusCircle status={scenarioRun.status} />
+            <StatusCircle status={scenarioRun.status} ungraded={ungraded} />
             <Text
               fontSize="xs"
               fontWeight="semibold"
-              color={config.fgColor}
+              color={ungraded ? "fg.muted" : config.fgColor}
               minWidth="43px"
               textAlign="left"
               whiteSpace="nowrap"
