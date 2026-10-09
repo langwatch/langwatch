@@ -599,13 +599,15 @@ Feature: An aggregate project reads its member projects
     And a member whose name ana's project list lacks is shown by its id
     And a plain project's trace list has no Project column
 
-  @unit
+  @regression @unit
   Scenario: An empty aggregate says its traces start when it was created
     Given an aggregate project whose members only hold traces from before it was created
     When ana opens its Trace Explorer over a window that reaches back before the aggregate was created
     Then the empty state says the aggregate shows member traces from the date it was created
     And it says older traces stay in each member project
     And it neither suggests nor offers a wider time window
+    And a filter that matches nothing there is told to clear its filters, not to widen the window
+    And a window that ends before the aggregate was created says so on every lens, with or without filters
     And a plain project's empty state still suggests a wider time window
 
   @integration

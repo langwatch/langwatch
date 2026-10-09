@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { emptyContent, emptyStateActions } from "../EmptyFilterState";
 
+// Any window serves where the project is not an aggregate.
+const ANY_WINDOW = { rangeFrom: 0, rangeTo: 0 };
+
 describe("emptyContent", () => {
   describe("given an Instant Eval that is still judging", () => {
     describe("when the table has no rows yet", () => {
@@ -11,6 +14,7 @@ describe("emptyContent", () => {
           hasFilters: true,
           rangeHours: 24 * 7,
           isJudging: true,
+          ...ANY_WINDOW,
         });
         expect(content.title).toBe("No matches yet");
         expect(content.description).toContain("still judging");
@@ -26,6 +30,7 @@ describe("emptyContent", () => {
               hasFilters: true,
               rangeHours: 24,
               isJudging: true,
+              ...ANY_WINDOW,
             }).title,
           ).toBe("No matches yet");
         }
@@ -43,6 +48,7 @@ describe("emptyContent", () => {
           rangeHours: 24,
           isJudging: false,
           hasUnjudgedEval: true,
+          ...ANY_WINDOW,
         });
         expect(content.title).toBe("These results are not judged yet");
         expect(content.description).toContain("Judge these results");
@@ -62,6 +68,7 @@ describe("emptyContent", () => {
             hasFilters: true,
             rangeHours: 24 * 7,
             isJudging: false,
+            ...ANY_WINDOW,
           }).title,
         ).toBe("Nothing matches these filters");
       });
@@ -79,12 +86,14 @@ describe("emptyContent", () => {
     const noop = () => undefined;
     const actionsFor = ({
       aggregateCreatedAt,
+      hasFilters = false,
     }: {
       aggregateCreatedAt: number | null;
+      hasFilters?: boolean;
     }) =>
       emptyStateActions({
         activeLensId: "all-traces",
-        hasFilters: false,
+        hasFilters,
         isJudging: false,
         // The last three days, which reach back before the aggregate existed.
         rangeHours: 24 * 3,
@@ -136,6 +145,49 @@ describe("emptyContent", () => {
       it("offers no wider window, since a wider one reaches only further back", () => {
         expect(actionsFor({ aggregateCreatedAt: createdAt })).toEqual([]);
       });
+
+      describe("when a filter matches nothing", () => {
+        /** @scenario "An empty aggregate says its traces start when it was created" */
+        it("advises clearing the filters but not widening the window it no longer offers", () => {
+          const content = emptyContent({
+            activeLensId: "all-traces",
+            hasFilters: true,
+            rangeHours: 24 * 7,
+            isJudging: false,
+            aggregateCreatedAt: createdAt,
+            rangeFrom: lastSevenDays.from,
+            rangeTo: lastSevenDays.to,
+          });
+          expect(content.title).toBe("Nothing matches these filters");
+          expect(content.description).toContain("from 8 October 2026");
+          expect(content.description).toContain("clearing all filters");
+          expect(content.description).not.toContain("widening");
+          expect(
+            actionsFor({ aggregateCreatedAt: createdAt, hasFilters: true }),
+          ).toEqual(["Clear filters"]);
+        });
+
+        /** @scenario "An empty aggregate says its traces start when it was created" */
+        it("says the window ends before the aggregate existed on every lens", () => {
+          for (const activeLensId of [
+            "all-traces",
+            "errors",
+            "conversations",
+          ]) {
+            expect(
+              emptyContent({
+                activeLensId,
+                hasFilters: true,
+                rangeHours: 24,
+                isJudging: false,
+                aggregateCreatedAt: createdAt,
+                rangeFrom: createdAt - 3 * DAY,
+                rangeTo: createdAt - 2 * DAY,
+              }).title,
+            ).toBe("This window ends before the aggregate was created");
+          }
+        });
+      });
     });
 
     describe("when the window starts after the aggregate was created", () => {
@@ -171,6 +223,19 @@ describe("emptyContent", () => {
           "Last 7 days",
           "Last 30 days",
         ]);
+      });
+
+      it("still advises widening the window when a filter matches nothing", () => {
+        const content = emptyContent({
+          activeLensId: "all-traces",
+          hasFilters: true,
+          rangeHours: 24 * 7,
+          isJudging: false,
+          aggregateCreatedAt: null,
+          rangeFrom: lastSevenDays.from,
+          rangeTo: lastSevenDays.to,
+        });
+        expect(content.description).toContain("Try widening the window");
       });
     });
   });
