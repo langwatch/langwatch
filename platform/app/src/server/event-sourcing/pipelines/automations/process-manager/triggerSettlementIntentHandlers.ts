@@ -138,6 +138,7 @@ export interface TriggerSettlementDispatchDeps extends ConfirmSettledMatchDeps {
     datasetId: string;
     projectId: string;
     datasetRecords: DatasetRecordEntry[];
+    skipDuplicates?: boolean;
   }) => Promise<void>;
   /** ADR-040 §6 delivery-log writer. Optional: absent in tests. */
   recordWebhookDelivery?: WebhookDeliveryRecorder;

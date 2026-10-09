@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import type { Dataset, DatasetRecord, Prisma } from "~/generated/prisma/client";
@@ -17,6 +18,8 @@ import { stripNullBytes } from "../../datasets/sanitize";
 import type { DatasetRecordInput } from "../../datasets/types";
 import { prisma } from "../../db";
 import { StorageService } from "../../storage";
+
+const logger = createLogger("langwatch:api:datasetRecord");
 
 const storageService = new StorageService();
 
@@ -96,6 +99,7 @@ export const createManyDatasetRecords = async ({
   datasetRecords,
   tx,
   dataset: providedDataset,
+  skipDuplicates,
 }: {
   datasetId: string;
   projectId: string;
@@ -110,6 +114,11 @@ export const createManyDatasetRecords = async ({
   // Only used for the initial layout routing; the s3_jsonl path re-reads the
   // authoritative state under the advisory lock regardless.
   dataset?: Dataset | null;
+  // For callers supplying deterministic ids: an id that already exists means
+  // the row was already added, so it is skipped instead of failing the batch
+  // (P2002). Only the postgres layout honors it; the s3_jsonl and legacy
+  // useS3 layouts append and do not dedupe against stored rows.
+  skipDuplicates?: boolean;
 }) => {
   const db = tx ?? prisma;
   const dataset =
@@ -193,9 +202,23 @@ export const createManyDatasetRecords = async ({
       projectId,
     });
 
-    return db.datasetRecord.createMany({
+    const result = await db.datasetRecord.createMany({
       data: recordData as (DatasetRecord & { entry: any })[],
+      skipDuplicates,
     });
+
+    if (skipDuplicates && result.count < recordData.length) {
+      logger.info(
+        {
+          datasetId,
+          projectId,
+          skipped: recordData.length - result.count,
+        },
+        "skipped dataset records that already exist",
+      );
+    }
+
+    return result;
   }
 };
 

@@ -752,6 +752,126 @@ describe("trigger settlement intent handlers integration", () => {
       expect(triggers.claimSend).toHaveBeenCalledTimes(3);
     });
 
+    describe("when one trace's rows already exist and another fails retryably once", () => {
+      type Params = {
+        datasetRecords: { id: string }[];
+        skipDuplicates?: boolean;
+      };
+
+      const setup = () => {
+        const made = makeDeps(datasetTrigger());
+        // In-memory dataset: a repeated id is a unique violation (P2002)
+        // unless the caller asks to skip duplicates, as Postgres createMany does.
+        const store = new Map<string, { id: string }>();
+        const dispatchedTraces: string[] = [];
+        for (const id of ["trigger-1-trace-1-0"]) store.set(id, { id });
+        let traceTwoFailures = 0;
+        made.raw.addToDataset.mockImplementation(
+          async ({ datasetRecords, skipDuplicates }: Params) => {
+            const first = datasetRecords[0]!.id;
+            dispatchedTraces.push(
+              first.includes("trace-1") ? "trace-1" : "trace-2",
+            );
+            if (first.includes("trace-2") && traceTwoFailures++ === 0) {
+              throw new DispatchError({
+                message: "database unavailable",
+                retryable: true,
+              });
+            }
+            for (const record of datasetRecords) {
+              if (store.has(record.id)) {
+                if (skipDuplicates) continue;
+                throw Object.assign(new Error("Unique constraint failed"), {
+                  code: "P2002",
+                });
+              }
+              store.set(record.id, record);
+            }
+          },
+        );
+        return { ...made, store, dispatchedTraces };
+      };
+
+      const payload = {
+        triggerId: "trigger-1",
+        traceIds: ["trace-1", "trace-2"],
+      };
+
+      /** @scenario "A page whose dataset rows already exist retries only the failing trace" */
+      it("retries the page once with a retryable error", async () => {
+        const { deps } = setup();
+
+        const thrown = await createPersistMatchHandler(deps)(
+          payload,
+          context("process:trigger-1:persist:page-1"),
+        ).catch((error: unknown) => error);
+
+        expect(isDispatchError(thrown)).toBe(true);
+        expect((thrown as DispatchError).retryable).toBe(true);
+      });
+
+      it("claims the trace whose rows already existed", async () => {
+        const { deps, triggers } = setup();
+
+        await createPersistMatchHandler(deps)(
+          payload,
+          context("process:trigger-1:persist:page-1"),
+        ).catch(() => undefined);
+
+        expect(triggers.claimSend).toHaveBeenCalledWith({
+          triggerId: "trigger-1",
+          traceId: "trace-1",
+          projectId: "project-1",
+        });
+      });
+
+      describe("when the retry runs", () => {
+        const runBoth = async () => {
+          const made = setup();
+          // Fake claim store: a trace is claimed only once its claimSend succeeded.
+          const claimed = new Set<string>();
+          made.triggers.claimSend.mockImplementation(async ({ traceId }) => {
+            claimed.add(traceId);
+          });
+          made.triggers.filterSendClaimed.mockImplementation(
+            async ({ traceIds }) =>
+              new Set(traceIds.filter((id: string) => claimed.has(id))),
+          );
+          const handler = createPersistMatchHandler(made.deps);
+          await handler(
+            payload,
+            context("process:trigger-1:persist:page-1"),
+          ).catch(() => undefined);
+          const retry = handler(payload, {
+            ...context("process:trigger-1:persist:page-1"),
+            attempt: 2,
+          });
+          return { ...made, retry };
+        };
+
+        it("succeeds", async () => {
+          const { retry } = await runBoth();
+          await expect(retry).resolves.toBeUndefined();
+        });
+
+        it("leaves one copy of each row in the dataset", async () => {
+          const { retry, store } = await runBoth();
+          await retry;
+          expect([...store.keys()].sort()).toEqual([
+            "trigger-1-trace-1-0",
+            "trigger-1-trace-2-0",
+          ]);
+        });
+
+        it("does not dispatch the claimed trace again", async () => {
+          const { retry, dispatchedTraces } = await runBoth();
+          await retry;
+          // first run: trace-1 + trace-2; retry: trace-2 only
+          expect(dispatchedTraces).toEqual(["trace-1", "trace-2", "trace-2"]);
+        });
+      });
+    });
+
     it("claims on an inline retry so only the failed trace runs again", async () => {
       const { deps, triggers, raw } = makeDeps(datasetTrigger());
       let claimAttempts = 0;

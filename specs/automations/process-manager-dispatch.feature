@@ -191,6 +191,24 @@ Feature: Automation dispatch on the process-manager substrate
     Then the request goes through the SSRF-fenced sender with a stable event id
     And the delivery is recorded in the webhook delivery log
 
+  @integration
+  Scenario: A dataset row that already exists counts as added
+    Given an automation that adds matching traces to a dataset
+    And a trace whose rows were already added to the dataset by an earlier attempt
+    When the automation adds the same trace's rows again
+    Then the dataset holds one copy of each row
+    And the add does not fail
+
+  @unit
+  Scenario: A page whose dataset rows already exist retries only the failing trace
+    Given a page of two matched traces for a dataset automation
+    And the rows of one trace already exist in the dataset
+    And the other trace fails with an error that can be retried
+    When the page is dispatched
+    Then the page retries once
+    And the retry dispatches only the trace that failed
+    And the page does not dead-letter
+
   # --- Graph alerts ---
 
   Scenario: Trace activity evaluates graph triggers in near real time
