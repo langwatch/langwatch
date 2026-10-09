@@ -1,0 +1,33 @@
+{
+  "$comment": "Each declared migration step (plan section 3.4) and what feeds it. status: seeded (the seed door named writes it), pending (a seed is planned but not written yet), unheld (the old release cannot hold it).",
+  "steps": {
+    "analytics:fill-lwql-project-keys": { "status": "seeded", "seed": "tenancy-sql", "cells": ["C1", "C2", "C3", "C4"], "note": "projects; not in plan 3.4, confirm the input" },
+    "automation:reconcile-report-schedules": { "status": "seeded", "seed": "product-seeds:report", "cells": ["C1", "C3"] },
+    "automation:reconcile-report-schedules-after-rollout": { "status": "seeded", "seed": "product-seeds:report", "cells": ["C1", "C3"] },
+    "automation:reconcile-slack-claims": { "status": "pending", "seed": "product-seeds:slack", "cells": ["C1", "C3"], "note": "product.mjs writes one webhook; active and paused triggers still to add" },
+    "billing:record-usage-billing-catch-up": { "status": "seeded", "seed": "tenancy-sql:subscription", "cells": ["C3", "C4"], "note": "not in plan 3.4; needs usage traffic in the window" },
+    "dataset:move-content-to-object-storage": { "status": "pending", "seed": "product-seeds:dataset", "cells": ["C1", "C3"], "note": "product.mjs has no dataset kind yet" },
+    "entitlement:seed-trace-meter": { "status": "seeded", "seed": "traffic:otlp", "cells": ["C3", "C4", "C9"], "note": "spans this month and last; C4 holds the private target" },
+    "governance:migrate-anomaly-webhook-destinations": { "status": "pending", "seed": "tenancy-sql:governance", "cells": ["C2"], "note": "no headless door on the old image: SQL, flagged" },
+    "governance:record-coding-assistant-billing": { "status": "pending", "seed": "tenancy-sql:governance", "cells": ["C2"], "note": "codingAgents router only reads on the old image: SQL, flagged" },
+    "governance:replay-cost-charges": { "status": "pending", "seed": "tenancy-sql:governance", "cells": ["C2"], "note": "pulled usage has no headless door: SQL, flagged" },
+    "identity:reopen-unproven-accounts": { "status": "seeded", "seed": "tenancy-sql:unconfirmed-users", "cells": ["C1", "C2", "C3", "C4"] },
+    "identity:reopen-unproven-accounts-after-rollout": { "status": "seeded", "seed": "tenancy-sql:unconfirmed-users", "cells": ["C1", "C2", "C3", "C4"] },
+    "instant-eval:copy-judge-spend": { "status": "seeded", "seed": "traffic:evaluation", "cells": ["C3"], "note": "not in plan 3.4; confirm judge spend is written by the old evaluation path" },
+    "licensing:copy-organization-licenses": { "status": "pending", "seed": "product-seeds:license", "cells": ["C2"], "note": "license.upload with the test licence; product.mjs marks it unseedable without one" },
+    "scim:replay-sso-connection-view": { "status": "pending", "seed": "tenancy-sql:sso", "cells": ["C2"], "note": "SSO connection and SCIM state by SQL" },
+    "suite:replay-scenario-facts-for-open-runs": { "status": "seeded", "seed": "product-seeds:suite", "cells": ["C1", "C3"], "note": "open runs also from traffic:scenario" },
+    "user:record-created-facts": { "status": "seeded", "seed": "tenancy-sql", "cells": ["C1", "C2", "C3", "C4"] },
+    "workflow:record-current-version-fields": { "status": "seeded", "seed": "product-seeds:workflow", "cells": ["C1", "C3"] },
+    "upcast:entitlement:lw.usage.month_counted": { "status": "unheld", "note": "branch-era event type, never written by a release; the upcast-events overlay (L5) injects it" }
+  },
+  "systemMigrations": {
+    "authz legacy import": { "status": "seeded", "seed": "tenancy-sql", "note": "memberships; custom roles still to add for C2" },
+    "automations-slack-connections": { "status": "seeded", "seed": "product-seeds:slack" },
+    "identity connection grandfather": { "status": "pending", "seed": "tenancy-sql:sso", "cells": ["C2"] },
+    "identity sso domain ownership": { "status": "pending", "seed": "tenancy-sql:sso", "cells": ["C2"] },
+    "identity identifier backfill": { "status": "seeded", "seed": "tenancy-sql" },
+    "identity secret heal": { "status": "seeded", "seed": "tenancy-sql" },
+    "stored objects clickhouse import": { "status": "seeded", "seed": "traffic:otlp" }
+  }
+}

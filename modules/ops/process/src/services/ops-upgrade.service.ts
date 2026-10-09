@@ -14,6 +14,7 @@ import type {
   OpsUpgradeStepPage,
   OpsUpgradeTarget,
 } from "@langwatch/ops-contract";
+import { UpgradeStepNotFailedError } from "@langwatch/ops-contract";
 import type {
   UpgradeReleaseSummary,
   UpgradeRunDetail,
@@ -113,7 +114,7 @@ function runOf(run: UpgradeRunDetail): OpsUpgradeRun {
 
 /**
  * The Upgrades pages' reads over UpgradeReader (round 8, U2-API), mapped field by field into
- * ops' own contract shapes; the reader's `upgrade_not_found` passes through. Read only.
+ * ops' own contract shapes; the reader's `upgrade_not_found` passes through.
  * Spec: modules/ops/specs/upgrades.feature
  */
 export class OpsUpgradeService {
@@ -148,5 +149,16 @@ export class OpsUpgradeService {
 
   async getRun({ id }: OpsUpgradeIdInput): Promise<OpsUpgradeRun> {
     return runOf(await this.ledger.getRun({ id }));
+  }
+
+  /** Reopens a failed step for the worker's next sweep, its checkpoint kept (D6). */
+  async retryStep({ id }: OpsUpgradeIdInput): Promise<OpsUpgradeStepDetail> {
+    const step = await this.ledger.getStep({ id });
+    if (step.status !== "failed") {
+      throw new UpgradeStepNotFailedError({ stepId: id, status: step.status });
+    }
+    if (step.runId === null) throw new Error(`Failed upgrade step "${id}" names no run.`);
+    await this.ledger.reopenStep({ id, runId: step.runId });
+    return stepDetailOf(await this.ledger.getStep({ id }));
   }
 }

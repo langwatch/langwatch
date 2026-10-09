@@ -44,8 +44,7 @@ describe.skipIf(!TEST_DATABASE_URL)("the license registry on Postgres", () => {
     repository,
     organizations: {
       findById: async (id) => ({ id, name: organizationNames.get(id) ?? "" }),
-      requestSelfHostedCustomer: async () => undefined,
-      markSelfHostedCustomer: async () => undefined,
+      recordSelfHostedCustomerLicensed: async () => undefined,
     },
     managedKeys: {
       provision: async () => ({ id: `vk_${RUN}` }),

@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 
-import { createUi } from "@langwatch/browser";
+import { createUi, hostServiceFakes } from "@langwatch/browser";
 import { describe, expect, it } from "vitest";
 
 import { presenceWeb } from "../presence.web.ts";
@@ -17,7 +17,7 @@ describe("given a browser that installs presence", () => {
   describe("when the kernel renders with no screen requirement to satisfy", () => {
     it("installs the module", async () => {
       const installed = await createUi({ document: browserDocument(), mount: "root" })
-        .withModules([presenceWeb] as const)
+        .withModules([hostServiceFakes(), presenceWeb] as const)
         .render();
 
       expect(installed.modules).toContain(presenceWeb);

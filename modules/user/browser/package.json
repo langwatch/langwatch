@@ -21,7 +21,6 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@langwatch/langy-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/api-key-client": "workspace:*",
     "@langwatch/auth-contract": "workspace:*",
@@ -35,9 +34,11 @@
     "@langwatch/enterprise-gateway-contract": "workspace:*",
     "@langwatch/enterprise-governance-contract": "workspace:*",
     "@langwatch/error-views": "workspace:*",
+    "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/gateway-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/identity-contract": "workspace:*",
+    "@langwatch/langy-contract": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/onboarding-client": "workspace:*",
     "@langwatch/time": "workspace:*",

@@ -136,3 +136,52 @@ Feature: Ops shows an installation's release upgrades, read-only
     When they open the upgrade read-hint stream
     Then the stream is refused at the door
     And nothing listens on the platform upgrade scope
+
+  # --- Background steps and their Retry (Alex, 2026-10-09, UPGRADE-CONSOLE D6) ---
+
+  @unimplemented
+  Scenario: The background step list shows each step's state, progress and deadline
+    Given a background step at 63 percent, one waiting on old writers and one failed
+    When an operator opens "Finishing in background"
+    Then each step shows its id, status and progress from its checkpoint report
+    And each shows the release it must finish before
+    And the waiting step names the processes it waits on by role, image and last seen
+
+  @unimplemented
+  Scenario: A failed background step offers Retry to a manager
+    Given a background step that failed
+    When an operator holding ops:manage opens the list
+    Then the failed step offers Retry
+
+  @unit
+  Scenario: Retry sets a failed step pending and the worker runs it again
+    Given a background step that failed
+    When an operator holding ops:manage retries it
+    Then the ledger records the step as pending
+    And the worker runs it again from its checkpoint
+
+  @unimplemented
+  Scenario: A view-only operator sees the list and no Retry
+    Given a background step that failed
+    When an operator holding ops:view only opens the list
+    Then the step shows as failed with its error
+    And no Retry is offered
+
+  @unit
+  Scenario: Retry without ops:manage is refused by the door
+    Given a background step that failed
+    When a caller without ops:manage asks to retry it
+    Then the door refuses it as forbidden and the step stays failed
+
+  @unit
+  Scenario: Retrying a step that is not failed is refused
+    Given a background step that is running
+    When an operator holding ops:manage asks to retry it
+    Then it is refused as a conflict naming the step's status
+    And the step keeps running
+
+  @unit
+  Scenario: Retrying a step the ledger does not hold says it was not found
+    Given no step with the id asked for
+    When an operator holding ops:manage asks to retry it
+    Then it is refused as not found

@@ -93,14 +93,6 @@ Feature: The new image runs its blocking upgrade behind a holding page
     And the console shows the failed step, its error and the last 50 lines of the run's log
     And it offers Retry
 
-  @unimplemented
-  Scenario: The console names the fix and offers to mark the migration rolled back
-    Given an operator opened the console of a failed upgrade
-    When the console shows the failure
-    Then it names the failed step's fix
-    And it offers "Mark the migration rolled back and retry"
-    And it says that setting the previous version back also serves this schema
-
   @unit
   Scenario: Five wrong tokens in a minute make every submission wait
     Given the api's upgrade failed and printed a console token
@@ -151,51 +143,4 @@ Feature: The new image runs its blocking upgrade behind a holding page
     When the kubelet requests the liveness path
     Then it answers 200
 
-  # --- Background part: Ops > Upgrades, "Finishing in background" ---
-
-  @unimplemented
-  Scenario: The background step list shows each step's state, progress and deadline
-    Given a background step at 63 percent, one waiting on old writers and one failed
-    When an operator opens "Finishing in background"
-    Then each step shows its id, status and progress from its checkpoint report
-    And each shows the release it must finish before
-    And the waiting step names the processes it waits on by role, image and last seen
-
-  @unimplemented
-  Scenario: A failed background step offers Retry to a manager
-    Given a background step that failed
-    When an operator holding ops:manage opens the list
-    Then the failed step offers Retry
-
-  @unimplemented
-  Scenario: Retry sets a failed step pending and the worker runs it again
-    Given a background step that failed
-    When an operator holding ops:manage retries it
-    Then the ledger records the step as pending
-    And the worker runs it again from its checkpoint
-
-  @unimplemented
-  Scenario: A view-only operator sees the list and no Retry
-    Given a background step that failed
-    When an operator holding ops:view only opens the list
-    Then the step shows as failed with its error
-    And no Retry is offered
-
-  @unimplemented
-  Scenario: Retry without ops:manage is refused by the door
-    Given a background step that failed
-    When a caller without ops:manage asks to retry it
-    Then the door refuses it as forbidden and the step stays failed
-
-  @unimplemented
-  Scenario: Retrying a step that is not failed is refused
-    Given a background step that is running
-    When an operator holding ops:manage asks to retry it
-    Then it is refused as a conflict naming the step's status
-    And the step keeps running
-
-  @unimplemented
-  Scenario: Retrying a step the ledger does not hold says it was not found
-    Given no step with the id asked for
-    When an operator holding ops:manage asks to retry it
-    Then it is refused as not found
+  # The background part (Ops > Upgrades): modules/ops/specs/upgrades.feature.

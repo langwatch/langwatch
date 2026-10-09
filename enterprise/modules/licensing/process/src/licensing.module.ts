@@ -35,7 +35,7 @@ export const licensingProcessModule: PublishedProcessModule<
     GenerateLicenseTask.create({
       mint: LicenseMintService.create({
         licenses: app,
-        organizations: dependencies.organizations,
+        organizations: repositories.connectOrganizations,
         storage: OrganizationLicenseWriterService.create({
           licenses: repositories.organizationLicenses,
           organizations: dependencies.organizations,

@@ -9,11 +9,12 @@ import type {
   UiHostServiceValues,
 } from "@langwatch/browser-host/capabilities";
 import type { HostServiceIdentity } from "@langwatch/browser-host/declarations";
+import { UiFlagsService } from "@langwatch/browser-host/feature-flag";
 
 import type { SupplyModule } from "../web-module.ts";
 
-/** The host services the runtime resolves, in the order it runs them. None has landed yet. */
-export const UI_HOST_SERVICES: readonly HostServiceIdentity[] = [];
+/** The host services the runtime resolves, in the order it runs them. */
+export const UI_HOST_SERVICES: readonly HostServiceIdentity[] = [UiFlagsService];
 
 export class BrowserHostServiceRefusedError extends Error {
   readonly code = "browser_host_service_refused";

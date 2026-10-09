@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { SsoTestSignInToken } from "@langwatch/auth-contract";
-import { createUi } from "@langwatch/browser";
+import { createUi, hostServiceFakes } from "@langwatch/browser";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { authWeb } from "../auth.web.ts";
@@ -19,7 +19,7 @@ describe("given a browser that installs auth", () => {
   describe("when the kernel renders with a transport and the page's config supplied", () => {
     it("installs the module and projects the slice it claims", async () => {
       const installed = await createUi({ document: browserDocument(), mount: "root" })
-        .withModules([authWeb] as const)
+        .withModules([hostServiceFakes(), authWeb] as const)
         .withTransport({ query: () => Promise.resolve(null) })
         .withInjectedConfig(() => ({
           process: { mode: "test", deployment: "self-hosted", nlp: true },

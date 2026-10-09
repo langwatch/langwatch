@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 
-import { createUi } from "@langwatch/browser";
+import { createUi, hostServiceFakes } from "@langwatch/browser";
 import { describe, expect, it } from "vitest";
 
 import { notificationWeb } from "../notification.web.ts";
@@ -17,7 +17,7 @@ describe("given a browser that installs notification", () => {
   describe("when the kernel renders with a transport and the page's config supplied", () => {
     it("installs the module and projects the slice it claims", async () => {
       const installed = await createUi({ document: browserDocument(), mount: "root" })
-        .withModules([notificationWeb] as const)
+        .withModules([hostServiceFakes(), notificationWeb] as const)
         .withTransport({ query: () => Promise.resolve(null) })
         .withInjectedConfig(() => ({
           process: { mode: "test", deployment: "self-hosted", nlp: true },

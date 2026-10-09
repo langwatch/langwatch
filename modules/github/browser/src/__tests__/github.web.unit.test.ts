@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 
-import { createUi } from "@langwatch/browser";
+import { createUi, hostServiceFakes } from "@langwatch/browser";
 import { GithubConnectPopupToken } from "@langwatch/github-client";
 import { describe, expect, it } from "vitest";
 
@@ -18,7 +18,7 @@ describe("given a browser that installs github", () => {
   describe("when the kernel renders with only a transport supplied", () => {
     it("installs the module", async () => {
       const installed = await createUi({ document: browserDocument(), mount: "root" })
-        .withModules([githubWeb] as const)
+        .withModules([hostServiceFakes(), githubWeb] as const)
         .withTransport({ query: () => Promise.resolve(null) })
         .render();
 

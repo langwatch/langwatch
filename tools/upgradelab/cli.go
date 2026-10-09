@@ -16,6 +16,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/langwatch/langwatch/tools/upgradelab/generate"
 	"github.com/langwatch/langwatch/tools/upgradelab/snapshot"
 )
 
@@ -32,6 +33,8 @@ const usage = `upgradelab: upgrade snapshots (the upgrade harness lands here nex
   upgradelab snapshot restore     -from DIR [stores]   only empty databases named upgradelab_<name>
   upgradelab snapshot fingerprint [stores]             JSON on stdout
   upgradelab snapshot verify      -from DIR [stores]   exit 1 when the stores differ; no stores: checksums only
+  upgradelab generate --shape S --release R [--volume S] [--seed N] [--anchor YYYY-MM-DD] [-out DIR -image IMAGE -commit SHA]
+                                  prints the plan; with -out, runs it and captures a snapshot
 
 stores: -postgres URL   -clickhouse TARGET=URL (repeatable; TARGET is shared or private-<label>)   -redis URL
 `
@@ -51,12 +54,19 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprint(stdout, usage)
 		return exitOK
 	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	if len(args) > 0 && args[0] == "generate" {
+		if err := generate.Command(ctx, args[1:], stdout); err != nil {
+			fmt.Fprintf(stderr, "upgradelab generate: %v\n", err)
+			return exitError
+		}
+		return exitOK
+	}
 	if len(args) < 2 || args[0] != "snapshot" {
 		fmt.Fprint(stderr, usage)
 		return exitError
 	}
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
 	call := &invocation{verb: args[1], stdout: stdout}
 	code, err := call.run(ctx, args[2:])
 	if err != nil {

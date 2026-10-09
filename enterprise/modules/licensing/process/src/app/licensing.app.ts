@@ -297,15 +297,11 @@ export class LicensingModule implements LicensingApiContract {
       infrastructure: licenseRegistryOver({
         repositories,
         customerFacts,
-        organizations: dependencies.organizations,
         gateway: dependencies.gateway,
         signingKey: licensePrivateKey,
       }),
       hosted: hostedServicesOverPeers(dependencies),
-      instances: selfHostedInstancesOver({
-        repositories,
-        organizations: dependencies.organizations,
-      }),
+      instances: selfHostedInstancesOver({ repositories }),
       cryptography,
       logger,
     });
@@ -890,14 +886,15 @@ function licenseRegistryParts({
  */
 function licenseRegistryOver({
   repositories,
-  organizations,
   gateway,
   signingKey,
   customerFacts,
 }: {
-  repositories: Pick<LicensingRepositories, "issuedLicenses" | "activationCodes" | "rateLimits">;
+  repositories: Pick<
+    LicensingRepositories,
+    "issuedLicenses" | "activationCodes" | "rateLimits" | "connectOrganizations"
+  >;
   customerFacts: Pick<LicensingCustomerFactsService, "selfHostedCustomerLicensed">;
-  organizations: Pick<OrganizationApi, "findProvisioningSummary" | "markSelfHostedCustomer">;
   gateway: Pick<
     GatewayApi,
     | "provisionConnectManagedKey"
@@ -914,11 +911,9 @@ function licenseRegistryOver({
   return {
     repository: repositories.issuedLicenses,
     organizations: {
-      findById: customerLookup(organizations),
-      requestSelfHostedCustomer: ({ id, name }) =>
+      findById: customerLookup(repositories.connectOrganizations),
+      recordSelfHostedCustomerLicensed: ({ id, name }) =>
         customerFacts.selfHostedCustomerLicensed({ organizationId: id, name }),
-      markSelfHostedCustomer: (organizationId) =>
-        organizations.markSelfHostedCustomer({ organizationId }),
     },
     managedKeys: {
       provision: ({ organizationId, licenseId }) =>
@@ -978,13 +973,13 @@ function hostedServicesOverPeers({
   };
 }
 
-/** The customer's id and name, as the organization feature answers it. */
+/** The customer's id and name, read from organization's table through its share (R40). */
 function customerLookup(
-  organizations: Pick<OrganizationApi, "findProvisioningSummary">,
+  organizations: Pick<ConnectOrganizationRepository, "findCustomer">,
 ): LicenseCustomers["findById"] {
   return async (organizationId) => {
-    const summary = await organizations.findProvisioningSummary(organizationId);
-    return summary ? { id: summary.id, name: summary.name } : null;
+    const customer = await organizations.findCustomer(organizationId);
+    return customer ? { id: customer.id, name: customer.name } : null;
   };
 }
 
@@ -994,16 +989,17 @@ function customerLookup(
  */
 function selfHostedInstancesOver({
   repositories,
-  organizations,
 }: {
-  repositories: Pick<LicensingRepositories, "selfHostedInstances" | "issuedLicenses">;
-  organizations: Pick<OrganizationApi, "findProvisioningSummary">;
+  repositories: Pick<
+    LicensingRepositories,
+    "selfHostedInstances" | "issuedLicenses" | "connectOrganizations"
+  >;
 }): SelfHostedInstancesInfrastructure {
   return {
     repository: repositories.selfHostedInstances,
     licenses: repositories.issuedLicenses,
     organizations: {
-      findById: customerLookup(organizations),
+      findById: customerLookup(repositories.connectOrganizations),
     },
     optionalReportKeys: new Set(optionalUsageReportKeys()),
   };

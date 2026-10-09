@@ -197,6 +197,11 @@ export const opsUpgradeTrpc = defineTrpcContract("ops.upgrade")
   .withInput(opsUpgradeIdInputSchema)
   .withOutput(opsUpgradeRunSchema)
 
+  /** Sets a failed step pending for the worker; `upgrade_step_not_failed` when it is not failed. */
+  .mutation("retryStep")
+  .withInput(opsUpgradeIdInputSchema)
+  .withOutput(opsUpgradeStepDetailSchema)
+
   /**
    * The in-place system migrations, per migration: the status rollup plus the
    * tenants needing attention - held and parked. Finalized tenants are a

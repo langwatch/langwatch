@@ -2,9 +2,9 @@ import {
   OrganizationNotFoundError,
   type LicensingApi,
 } from "@langwatch/enterprise-licensing-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
 import { type Instant, Temporal, toDate } from "@langwatch/time";
 
+import type { ConnectOrganizationRepository } from "../repositories/connect-organization.repository.ts";
 import type { IssuedLicenseRepository } from "../repositories/issued-license.repository.ts";
 import type { OrganizationLicenseWriterService } from "./organization-license-writer.service.ts";
 
@@ -29,7 +29,7 @@ type LicenseMintResult = Readonly<{
 
 type LicenseMintPeers = Readonly<{
   licenses: Pick<LicensingApi, "generateLicenseKey" | "recordIssuedLicense">;
-  organizations: Pick<OrganizationApi, "findProvisioningSummary">;
+  organizations: Pick<ConnectOrganizationRepository, "findCustomer">;
   storage: Pick<OrganizationLicenseWriterService, "store">;
   registry: Pick<IssuedLicenseRepository, "delete">;
 }>;
@@ -50,9 +50,7 @@ export class LicenseMintService {
   private constructor(private readonly peers: LicenseMintPeers) {}
 
   async applyToOrganization(request: LicenseMintRequest): Promise<LicenseMintResult> {
-    const organization = await this.peers.organizations.findProvisioningSummary(
-      request.organizationId,
-    );
+    const organization = await this.peers.organizations.findCustomer(request.organizationId);
     if (organization === null) throw new OrganizationNotFoundError();
 
     const { licenseKey, licenseData } = await this.peers.licenses.generateLicenseKey({

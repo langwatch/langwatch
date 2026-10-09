@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 
-import { createUi, installedDrawerLoaders } from "@langwatch/browser";
+import { createUi, installedDrawerLoaders, hostServiceFakes } from "@langwatch/browser";
 import { describe, expect, it } from "vitest";
 
 import { automationWeb } from "../automation.web.ts";
@@ -19,7 +19,7 @@ describe("given a browser that installs automation", () => {
   describe("when the kernel renders with only a transport supplied", () => {
     it("installs the module", async () => {
       const installed = await createUi({ document: browserDocument(), mount: "root" })
-        .withModules([automationWeb] as const)
+        .withModules([hostServiceFakes(), automationWeb] as const)
         .withTransport({ query: () => Promise.resolve(null) })
         .render();
 
