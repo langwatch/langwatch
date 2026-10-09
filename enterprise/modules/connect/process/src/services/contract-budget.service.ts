@@ -1,7 +1,7 @@
 /**
- * The contract budget of a connected customer (ADR-156 §5): one blocking
- * organization budget the customer may move up to the commit plus the agreed
- * overage maximum. The terms are licensing's; the budget is the gateway's.
+ * The contract budget of a connected customer (ADR-156 §5): one blocking organization budget that
+ * follows the terms and that the customer may lower to the commit plus the agreed overage maximum.
+ * The terms are licensing's; the budget is the gateway's.
  */
 
 import {
@@ -26,6 +26,43 @@ export class ContractBudgetService {
   }
 
   private constructor(private readonly collaborators: ContractBudgetCollaborators) {}
+
+  /** Brings the budget in line with the customer's current terms; safe to repeat. */
+  async sync({
+    organizationId,
+    operatorId,
+  }: {
+    organizationId: string;
+    operatorId: string;
+  }): Promise<void> {
+    const terms = await this.collaborators.terms.getContractTerms({ organizationId });
+    // Nothing agreed, or nothing left: a budget is not created for it, and one
+    // that exists keeps its cap. Access is already closed by the credential.
+    if (terms.maximumUsdCents === 0) return;
+
+    const existing = await this.collaborators.store.findForOrganization(organizationId);
+    const followsTerms = terms.commitUsdCents > 0 ? terms.commitUsdCents : terms.maximumUsdCents;
+    if (!existing) {
+      await this.collaborators.store.create({
+        organizationId,
+        limitUsdCents: followsTerms,
+        operatorId,
+      });
+      return;
+    }
+
+    const target = existing.capSetByCustomer
+      ? Math.min(existing.limitUsdCents, terms.maximumUsdCents)
+      : followsTerms;
+    if (target === existing.limitUsdCents) return;
+    await this.collaborators.store.setLimit({
+      organizationId,
+      id: existing.id,
+      limitUsdCents: target,
+      capSetByCustomer: existing.capSetByCustomer,
+      actorId: operatorId,
+    });
+  }
 
   /** The customer sets its own cap. It may be below what is already spent. */
   async setCap({
@@ -69,6 +106,11 @@ export interface ContractBudget {
 /** Where the contract budget is kept: the gateway's own budget table, reached through its Api. */
 export interface ContractBudgetStore {
   findForOrganization(organizationId: string): Promise<ContractBudget | null>;
+  create(params: {
+    organizationId: string;
+    limitUsdCents: number;
+    operatorId: string;
+  }): Promise<void>;
   setLimit(params: {
     organizationId: string;
     id: string;

@@ -166,6 +166,22 @@ export class LicensingCustomerFactsService {
     });
   }
 
+  /** Connect syncs the organization's contract budget from this fact, seconds later. */
+  async contractTermsChanged({
+    organizationId,
+    operatorId,
+  }: {
+    organizationId: string;
+    operatorId: string;
+  }): Promise<void> {
+    await this.commands().recordContractTermsChanged.send({
+      tenantId: organizationId,
+      occurredAt: nowInstant().epochMilliseconds,
+      organizationId,
+      operatorId,
+    });
+  }
+
   private commands(): EventingCommands<LicensingCustomerPipeline> {
     if (!this.#commands) {
       throw new Error("licensing_customer pipeline senders are not connected yet");

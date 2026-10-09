@@ -1,6 +1,7 @@
 import type {
   ConnectCredentialIssuedEventData,
   ConnectServiceSwitchedEventData,
+  ContractTermsChangedEventData,
   LicenseClearedEventData,
   LicenseStoredEventData,
   LicenseSyncFinishedEventData,
@@ -30,6 +31,8 @@ import {
   RecordConnectCredentialIssuedCommand,
   type ConnectServiceSwitchedEvent,
   connectServiceSwitchedEventSchema,
+  type ContractTermsChangedEvent,
+  contractTermsChangedEventSchema,
   type LicenseClearedEvent,
   licenseClearedEventSchema,
   type LicenseStoredEvent,
@@ -41,6 +44,7 @@ import {
   type ManagedKeyRetiredEvent,
   managedKeyRetiredEventSchema,
   RecordConnectServiceSwitchedCommand,
+  RecordContractTermsChangedCommand,
   RecordLicenseClearedCommand,
   RecordLicenseStoredCommand,
   RecordLicenseSyncFinishedCommand,
@@ -61,7 +65,8 @@ export type LicensingCustomerPipeline = StaticPipelineDefinition<
   | LicenseClearedEvent
   | ManagedKeyRetiredEvent
   | ManagedKeyInvalidatedEvent
-  | ConnectCredentialIssuedEvent,
+  | ConnectCredentialIssuedEvent
+  | ContractTermsChangedEvent,
   Record<string, Projection>,
   | { name: "recordSelfHostedCustomerLicensed"; payload: SelfHostedCustomerLicensedEventData }
   | { name: "recordConnectServiceSwitched"; payload: ConnectServiceSwitchedEventData }
@@ -71,6 +76,7 @@ export type LicensingCustomerPipeline = StaticPipelineDefinition<
   | { name: "recordManagedKeyRetired"; payload: ManagedKeyRetiredEventData }
   | { name: "recordManagedKeyInvalidated"; payload: ManagedKeyInvalidatedEventData }
   | { name: "recordConnectCredentialIssued"; payload: ConnectCredentialIssuedEventData }
+  | { name: "recordContractTermsChanged"; payload: ContractTermsChangedEventData }
 >;
 
 /** licensing_customer: facts about licensing's customers; organization and gateway apply them. */
@@ -93,6 +99,7 @@ export function buildLicensingCustomerPipeline({
         managedKeyRetiredEventSchema,
         managedKeyInvalidatedEventSchema,
         connectCredentialIssuedEventSchema,
+        contractTermsChangedEventSchema,
       ])
       .withCommand("recordSelfHostedCustomerLicensed", RecordSelfHostedCustomerLicensedCommand)
       .withCommand("recordConnectServiceSwitched", RecordConnectServiceSwitchedCommand)
@@ -102,6 +109,7 @@ export function buildLicensingCustomerPipeline({
       .withCommand("recordManagedKeyRetired", RecordManagedKeyRetiredCommand)
       .withCommand("recordManagedKeyInvalidated", RecordManagedKeyInvalidatedCommand)
       .withCommand("recordConnectCredentialIssued", RecordConnectCredentialIssuedCommand)
+      .withCommand("recordContractTermsChanged", RecordContractTermsChangedCommand)
       // C3B-ORDER: attaches under the row's guard; a redelivery finds the key already attached.
       .withPeerSubscriber("licensingManagedKeyProvisioned", {
         eventType: GATEWAY_MANAGED_KEY_PROVISIONED_EVENT_TYPE,

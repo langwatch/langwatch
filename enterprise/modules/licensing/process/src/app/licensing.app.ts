@@ -100,7 +100,7 @@ import { ConnectInstallService } from "../services/connect-install.service.ts";
 import type { ConnectUpstreamSlot } from "../services/connect-install.service.ts";
 import { ContractBudgetStoreService } from "../services/contract-budget-store.service.ts";
 import { ContractBudgetService } from "../services/contract-budget.service.ts";
-import type { ContractBudgetStore } from "../services/contract-budget.service.ts";
+import type { ContractBudgets, ContractBudgetStore } from "../services/contract-budget.service.ts";
 import { DomainClaimAuthorityService } from "../services/domain-claim-authority.service.ts";
 import { HostedServicesService } from "../services/hosted-services.service.ts";
 import { HostedUsageReaderService } from "../services/hosted-usage-reader.service.ts";
@@ -711,7 +711,7 @@ export class LicensingModule implements LicensingApiContract {
   }
 
   syncContractBudget(input: { organizationId: string; operatorId: string }): Promise<void> {
-    return this.#contractBudgets.sync(input);
+    return this.#customerFacts.contractTermsChanged(input);
   }
 
   resetContractBudget(input: { organizationId: string; operatorId: string }): Promise<void> {
@@ -814,7 +814,7 @@ function licenseRegistryParts({
     repository: infrastructure.repository,
     organizations: infrastructure.organizations,
     managedKeys: infrastructure.managedKeys,
-    contractBudgets,
+    contractBudgets: infrastructure.contractBudgets,
     cryptography,
     generation: LicenseGenerationService.create(cryptography),
     signingKey: infrastructure.signingKey,
@@ -885,6 +885,7 @@ function licenseRegistryOver({
     | "managedKeyRetired"
     | "managedKeyInvalidated"
     | "connectCredentialIssued"
+    | "contractTermsChanged"
   >;
   gateway: Pick<
     GatewayApi,
@@ -909,6 +910,8 @@ function licenseRegistryOver({
       setConnectServices: (key) => gateway.setManagedKeyConnectServicesInternal(key),
       setLicense: (key) => gateway.setManagedKeyLicenseInternal(key),
     },
+    // Connect syncs the budget from the fact, so licensing writes none (C3a-S2).
+    contractBudgets: { sync: (input) => customerFacts.contractTermsChanged(input) },
     activationCodes: repositories.activationCodes,
     activationRateLimit: {
       allow: ({ codeHash }) => allowed(`activation_code:${codeHash}`, ACTIVATION_ATTEMPTS_LIMIT),
@@ -931,12 +934,7 @@ function hostedServicesOverPeers({
 }: {
   gateway: Pick<
     GatewayApi,
-    | "listBudgetsWithHealth"
-    | "createBudget"
-    | "updateBudget"
-    | "resetBudget"
-    | "findVirtualKeyById"
-    | "resolveApplicableBudgets"
+    "listBudgetsWithHealth" | "resetBudget" | "findVirtualKeyById" | "resolveApplicableBudgets"
   >;
   scopes: Pick<AuthzApi, "getScope">;
 }): HostedServicesInfrastructure {
@@ -1107,6 +1105,8 @@ type LicenseRegistryInfrastructure = Readonly<{
   repository: IssuedLicenseRepository;
   organizations: LicenseCustomers;
   managedKeys: ConnectManagedKeys;
+  /** Records that the customer's terms moved; connect syncs the budget from the fact. */
+  contractBudgets: ContractBudgets;
   /** The codes a fresh install pastes instead of a license blob (ADR-156 §5). */
   activationCodes: ActivationCodeRepository;
   /** What bounds guessing a code: one limiter, keyed by the code's own hash. */

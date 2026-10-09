@@ -1,7 +1,6 @@
 /**
- * The contract budget of a connected customer (ADR-156 §5): one blocking
- * organization budget, moved by LangWatch when the terms change. The customer
- * moves its own cap through the connect module.
+ * The contract budget of a connected customer (ADR-156 §5): licensing answers the terms and, until
+ * billing's renewal fact lands, starts a new window. The connect module syncs and caps the budget.
  */
 
 import type { ContractTerms } from "@langwatch/enterprise-licensing-contract";
@@ -16,7 +15,7 @@ interface ContractBudgetCollaborators {
   now?: () => Instant;
 }
 
-export class ContractBudgetService implements ContractBudgets {
+export class ContractBudgetService {
   static create(collaborators: ContractBudgetCollaborators): ContractBudgetService {
     return new ContractBudgetService(collaborators);
   }
@@ -31,43 +30,6 @@ export class ContractBudgetService implements ContractBudgets {
     return contractTermsOf({
       licenses: await this.collaborators.licensesOf(organizationId),
       now: this.#now(),
-    });
-  }
-
-  /** Brings the budget in line with the customer's current terms. */
-  async sync({
-    organizationId,
-    operatorId,
-  }: {
-    organizationId: string;
-    operatorId: string;
-  }): Promise<void> {
-    const terms = await this.termsOf(organizationId);
-    // Nothing agreed, or nothing left: a budget is not created for it, and one
-    // that exists keeps its cap. Access is already closed by the credential.
-    if (terms.maximumUsdCents === 0) return;
-
-    const existing = await this.collaborators.store.findForOrganization(organizationId);
-    const followsTerms = terms.commitUsdCents > 0 ? terms.commitUsdCents : terms.maximumUsdCents;
-    if (!existing) {
-      await this.collaborators.store.create({
-        organizationId,
-        limitUsdCents: followsTerms,
-        operatorId,
-      });
-      return;
-    }
-
-    const target = existing.capSetByCustomer
-      ? Math.min(existing.limitUsdCents, terms.maximumUsdCents)
-      : followsTerms;
-    if (target === existing.limitUsdCents) return;
-    await this.collaborators.store.setLimit({
-      organizationId,
-      id: existing.id,
-      limitUsdCents: target,
-      capSetByCustomer: existing.capSetByCustomer,
-      actorId: operatorId,
     });
   }
 
@@ -94,9 +56,8 @@ export class ContractBudgetService implements ContractBudgets {
 }
 
 /**
- * The customer's contract budget, which follows the commercial terms of its
- * licenses. Called after any change that can move those terms. The module owns
- * the behaviour; composition supplies only the store below.
+ * Says that the customer's commercial terms may have moved. Composition records the
+ * contract_terms_changed fact; connect syncs the budget from it.
  */
 export interface ContractBudgets {
   sync(params: { organizationId: string; operatorId: string }): Promise<void>;
@@ -113,22 +74,10 @@ export interface ContractBudget {
 /**
  * Where the contract budget is kept, which is the gateway's own budget table.
  * Declared here and answered by composition: licensing states what it needs of
- * a budget and never queries a table another feature owns.
+ * a budget and never queries a table another feature owns. S3 retires it.
  */
 export interface ContractBudgetStore {
   findForOrganization(organizationId: string): Promise<ContractBudget | null>;
-  create(params: {
-    organizationId: string;
-    limitUsdCents: number;
-    operatorId: string;
-  }): Promise<void>;
-  setLimit(params: {
-    organizationId: string;
-    id: string;
-    limitUsdCents: number;
-    capSetByCustomer: boolean;
-    actorId: string;
-  }): Promise<void>;
   /** Starts a new window: spend so far no longer counts against the cap. */
   reset(params: { organizationId: string; id: string; actorId: string }): Promise<void>;
 }

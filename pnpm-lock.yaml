@@ -2986,6 +2986,9 @@ importers:
       '@langwatch/enterprise-licensing-contract':
         specifier: workspace:*
         version: link:../../licensing/contract
+      '@langwatch/eventing':
+        specifier: workspace:*
+        version: link:../../../../packages/eventing
       '@langwatch/gateway-contract':
         specifier: workspace:*
         version: link:../../../../modules/gateway/contract

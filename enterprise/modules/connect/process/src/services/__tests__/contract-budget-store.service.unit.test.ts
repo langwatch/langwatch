@@ -49,6 +49,7 @@ function budget(overrides: Partial<GatewayBudgetWithSeats>): GatewayBudgetWithSe
 
 function storeOver(budgets: GatewayBudgetWithSeats[]) {
   const updated: Parameters<GatewayApi["updateBudget"]>[0][] = [];
+  const created: Parameters<GatewayApi["createBudget"]>[0][] = [];
   const store = ContractBudgetStoreService.create({
     gateway: createApiFixture<GatewayApi>({
       listBudgetsWithHealth: async () => ({
@@ -57,13 +58,17 @@ function storeOver(budgets: GatewayBudgetWithSeats[]) {
         readAt: AT,
         scopeReach: new Map(),
       }),
+      createBudget: async (input) => {
+        created.push(input);
+        return budget({});
+      },
       updateBudget: async (input) => {
         updated.push(input);
         return budget({});
       },
     }),
   });
-  return { store, updated };
+  return { store, updated, created };
 }
 
 describe("the contract budget kept in the gateway's budget table", () => {
@@ -109,6 +114,29 @@ describe("the contract budget kept in the gateway's budget table", () => {
           limitUsd: "250.50",
           metadata: { connect_cap_set_by: "customer" },
           actorUserId: "system:connect-license",
+        },
+      ]);
+    });
+  });
+
+  describe("when the contract budget is created", () => {
+    /** @scenario "A new contract budget is a blocking organization budget under the contract's id" */
+    it("writes a blocking organization budget under the contract's id, capped by LangWatch", async () => {
+      const { store, created } = storeOver([]);
+
+      await store.create({ organizationId: "org-1", limitUsdCents: 50000, operatorId: "op-1" });
+
+      expect(created).toMatchObject([
+        {
+          organizationId: "org-1",
+          scope: { kind: "ORGANIZATION", organizationId: "org-1" },
+          window: "MANUAL",
+          limitUsd: "500.00",
+          onBreach: "BLOCK",
+          externalId: CONTRACT_BUDGET_EXTERNAL_ID,
+          metadata: { connect_cap_set_by: "langwatch" },
+          allowUnreachable: true,
+          actorUserId: "op-1",
         },
       ]);
     });

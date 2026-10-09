@@ -26,6 +26,7 @@
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/enterprise-connect-contract": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*",
+    "@langwatch/eventing": "workspace:*",
     "@langwatch/gateway-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/instant-eval-contract": "workspace:*",

@@ -108,3 +108,17 @@ export const connectCredentialIssuedEventDataSchema = z.object({
 export type ConnectCredentialIssuedEventData = z.infer<
   typeof connectCredentialIssuedEventDataSchema
 >;
+
+export const CONTRACT_TERMS_CHANGED_EVENT_TYPE = "lw.licensing.contract_terms_changed" as const;
+
+/**
+ * A customer's contract terms may have moved (a licence issued, revoked, changed or linked);
+ * connect brings the contract budget in line with the terms licensing answers now.
+ */
+export const contractTermsChangedEventDataSchema = z.object({
+  tenantId: z.string().min(1),
+  occurredAt: z.number().int().nonnegative(),
+  organizationId: z.string().min(1),
+  operatorId: z.string().min(1),
+});
+export type ContractTermsChangedEventData = z.infer<typeof contractTermsChangedEventDataSchema>;

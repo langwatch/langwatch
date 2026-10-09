@@ -86,3 +86,38 @@ Feature: The hosted end of Connect
       Given a correctly signed hosted call from a key no licence carries
       When it asks for a hosted judgement
       Then it passes the gateway's door and is refused as connect_service_not_entitled
+
+  Rule: The contract budget follows licensing's contract_terms_changed fact
+
+    Licensing says the terms moved; connect brings the budget in line with the terms licensing
+    answers now and writes it only through the gateway's operations. Connect owns no table.
+
+    @unit
+    Scenario: A contract_terms_changed fact syncs the contract budget
+      Given licensing records a contract_terms_changed fact for an organization
+      When connect's subscriber receives it
+      Then the organization's contract budget is brought in line with its current terms
+
+    @unit
+    Scenario: A redelivered fact syncs to the same cap
+      Given connect has already synced an organization's contract budget from a fact
+      When the same fact is delivered again
+      Then the budget is left at the same cap and no second budget is created
+
+    @unit
+    Scenario: The contract budget is the organization's live gateway budget named by the contract's id
+      Given the organization's gateway budgets include one carrying the contract's external id
+      When connect reads the organization's contract budget
+      Then it answers that budget's limit in cents and whether the customer set the cap
+
+    @unit
+    Scenario: An archived contract budget is no contract budget
+      Given the organization's only contract budget is archived
+      When connect reads the organization's contract budget
+      Then it answers none
+
+    @unit
+    Scenario: A new contract budget is a blocking organization budget under the contract's id
+      Given an organization with agreed terms and no contract budget
+      When connect creates its contract budget
+      Then the gateway holds one blocking budget, capped by LangWatch, under the contract's id

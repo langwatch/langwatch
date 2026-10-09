@@ -10,11 +10,12 @@ const CENTS = 100;
 
 const contractBudgetMetadataSchema = z.object({ [CAP_SET_BY]: z.string().optional() });
 
-type GatewayBudgets = Pick<GatewayApi, "listBudgetsWithHealth" | "updateBudget">;
+type GatewayBudgets = Pick<GatewayApi, "listBudgetsWithHealth" | "createBudget" | "updateBudget">;
 
 /**
  * The contract budget kept in the gateway's own budget table, reached through the gateway's
- * operations, as main's `PrismaContractBudgetStore` kept it. Licensing creates and resets it.
+ * operations, as main's `PrismaContractBudgetStore` kept it. Licensing still starts its windows
+ * (S3).
  */
 export class ContractBudgetStoreService implements ContractBudgetStore {
   static create({ gateway }: { gateway: GatewayBudgets }): ContractBudgetStoreService {
@@ -36,6 +37,33 @@ export class ContractBudgetStoreService implements ContractBudgetStore {
       limitUsdCents: Math.round(Number(budget.limitUsd.toString()) * CENTS),
       capSetByCustomer: metadata.success && metadata.data[CAP_SET_BY] === "customer",
     };
+  }
+
+  async create({
+    organizationId,
+    limitUsdCents,
+    operatorId,
+  }: {
+    organizationId: string;
+    limitUsdCents: number;
+    operatorId: string;
+  }): Promise<void> {
+    await this.gateway.createBudget({
+      organizationId,
+      scope: { kind: "ORGANIZATION", organizationId },
+      name: "Hosted services contract",
+      description:
+        "Hard stop for LangWatch-hosted services used by this customer's self-hosted installs.",
+      // The period is the contract term, moved by renewal and not by a calendar.
+      window: "MANUAL",
+      limitUsd: (limitUsdCents / CENTS).toFixed(2),
+      onBreach: "BLOCK",
+      externalId: CONTRACT_BUDGET_EXTERNAL_ID,
+      metadata: { [CAP_SET_BY]: "langwatch" },
+      // The managed key that reaches it is created on the install's first call.
+      allowUnreachable: true,
+      actorUserId: operatorId,
+    });
   }
 
   async setLimit({
