@@ -8,6 +8,7 @@ import {
   Code,
   Heading,
   HStack,
+  Skeleton,
   Stack,
   Table,
   Text,
@@ -44,6 +45,8 @@ export type UpgradesOverviewProps = {
   failedSteps: readonly UpgradeStepView[];
   /** Background steps not yet done, from `listSteps({ mode: "background" })`. */
   backgroundSteps?: readonly UpgradeStepView[];
+  /** The background read is still loading: the list shows a skeleton. */
+  backgroundLoading?: boolean;
   /** Given only to an `ops:manage` reader: a failed background step then offers Retry. */
   onRetryStep?: (stepId: string) => void;
   retryingStepId?: string | null;
@@ -248,6 +251,7 @@ function BackgroundSteps({
         <Table.Row>
           <Table.ColumnHeader>Step</Table.ColumnHeader>
           <Table.ColumnHeader>Status</Table.ColumnHeader>
+          <Table.ColumnHeader>Progress</Table.ColumnHeader>
           <Table.ColumnHeader>Release</Table.ColumnHeader>
           <Table.ColumnHeader>Last error</Table.ColumnHeader>
           <Table.ColumnHeader />
@@ -266,6 +270,9 @@ function BackgroundSteps({
               <UpgradeStatusBadge
                 label={{ label: step.statusLabel, tone: statusTone(step.status) }}
               />
+            </Table.Cell>
+            <Table.Cell>
+              {step.progress && `${Math.floor((step.progress.done / step.progress.total) * 100)}%`}
             </Table.Cell>
             <Table.Cell fontFamily="mono">{step.release ?? "Unreleased"}</Table.Cell>
             <Table.Cell>{step.lastError}</Table.Cell>
@@ -307,6 +314,7 @@ export function UpgradesOverview({
   runs,
   failedSteps,
   backgroundSteps = [],
+  backgroundLoading = false,
   onRetryStep,
   retryingStepId,
   activeUpcasts,
@@ -333,11 +341,13 @@ export function UpgradesOverview({
       </OverviewBlock>
       {(status.state === "finishing-in-background" ||
         backgroundSteps.length > 0 ||
+        backgroundLoading ||
         activeUpcasts) && (
         <OverviewBlock title="Finishing in background">
           {status.state === "finishing-in-background" && (
             <Text textStyle="sm">{status.summary}</Text>
           )}
+          {backgroundLoading && <Skeleton height="120px" aria-label="Loading background steps" />}
           {backgroundSteps.length > 0 && (
             <BackgroundSteps
               steps={backgroundSteps}

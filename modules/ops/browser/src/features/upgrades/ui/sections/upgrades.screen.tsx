@@ -45,6 +45,7 @@ export default function UpgradesScreen() {
               backgroundSteps={(background.data?.items ?? []).filter(
                 (step) => !FINISHED.has(step.status),
               )}
+              backgroundLoading={background.isLoading}
               onRetryStep={canManage ? retryStep : void 0}
               retryingStepId={retryingStepId}
               onOpenRelease={(release) =>

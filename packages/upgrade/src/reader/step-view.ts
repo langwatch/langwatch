@@ -1,12 +1,24 @@
 import { describeStepStatus } from "./labels.ts";
 import type { LedgerStepRow } from "./reader.repository.ts";
-import type {
-  ListStepsFilter,
-  UpgradeImage,
-  UpgradeImageStep,
-  UpgradeStepView,
+import {
+  type ListStepsFilter,
+  type UpgradeImage,
+  type UpgradeImageStep,
+  type UpgradeStepProgress,
+  type UpgradeStepView,
+  upgradeStepProgressSchema,
 } from "./reader.schema.ts";
 import { compareReleasesNewestFirst } from "./release.ts";
+
+/** The report's `done` of `total`, or null when the step's report does not carry both. */
+export function progressOf({
+  report,
+}: {
+  report: Record<string, unknown> | null;
+}): UpgradeStepProgress | null {
+  const parsed = upgradeStepProgressSchema.safeParse(report);
+  return parsed.success ? parsed.data : null;
+}
 
 function viewRecorded({
   row,
@@ -29,6 +41,7 @@ function viewRecorded({
     attempt: row.attempt,
     lastError: row.last_error,
     report: row.report,
+    progress: progressOf({ report: row.report }),
     runId: row.run_id,
     startedAt: row.started_at,
     finishedAt: row.finished_at,
@@ -57,6 +70,7 @@ function viewDeclared({
     attempt: 0,
     lastError: null,
     report: null,
+    progress: null,
     runId: null,
     startedAt: null,
     finishedAt: null,

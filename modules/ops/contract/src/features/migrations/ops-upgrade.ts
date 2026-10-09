@@ -87,6 +87,12 @@ export const opsUpgradeReleaseSchema = z.object({
 });
 export type OpsUpgradeRelease = z.infer<typeof opsUpgradeReleaseSchema>;
 
+/** A step's `done` of `total` from its checkpoint report (STEP-PROGRESS, Alex 2026-10-09). */
+export const opsUpgradeStepProgressSchema = z.object({
+  done: z.number().int().nonnegative(),
+  total: z.number().int().positive(),
+});
+
 export const opsUpgradeStepSchema = z.object({
   id: z.string(),
   kind: z.string(),
@@ -101,6 +107,7 @@ export const opsUpgradeStepSchema = z.object({
   attempt: z.number().int(),
   lastError: z.string().nullable(),
   report: reportSchema,
+  progress: opsUpgradeStepProgressSchema.nullable(),
   runId: z.string().nullable(),
   startedAt: isoInstant.nullable(),
   finishedAt: isoInstant.nullable(),

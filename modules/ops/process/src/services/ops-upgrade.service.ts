@@ -81,6 +81,7 @@ function stepOf(step: UpgradeStepView): OpsUpgradeStep {
     attempt: step.attempt,
     lastError: step.lastError,
     report: step.report,
+    progress: step.progress,
     runId: step.runId,
     startedAt: step.startedAt,
     finishedAt: step.finishedAt,

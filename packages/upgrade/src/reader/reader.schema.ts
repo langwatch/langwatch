@@ -53,6 +53,16 @@ export const upgradeTargetViewSchema = z.object({
 });
 export type UpgradeTargetView = z.infer<typeof upgradeTargetViewSchema>;
 
+/**
+ * A step's progress, read from its checkpoint report's agreed keys `done` and `total`
+ * (STEP-PROGRESS, Alex 2026-10-09); a report without both reads as no progress.
+ */
+export const upgradeStepProgressSchema = z.object({
+  done: z.number().int().nonnegative(),
+  total: z.number().int().positive(),
+});
+export type UpgradeStepProgress = z.infer<typeof upgradeStepProgressSchema>;
+
 /** A ledger step, or a step the image declares and the ledger has no row for (`recorded` false). */
 export const upgradeStepViewSchema = z.object({
   id: z.string(),
@@ -68,6 +78,7 @@ export const upgradeStepViewSchema = z.object({
   attempt: z.number().int(),
   lastError: z.string().nullable(),
   report: z.record(z.string(), z.unknown()).nullable(),
+  progress: upgradeStepProgressSchema.nullable(),
   runId: z.string().nullable(),
   startedAt: isoInstant.nullable(),
   finishedAt: isoInstant.nullable(),

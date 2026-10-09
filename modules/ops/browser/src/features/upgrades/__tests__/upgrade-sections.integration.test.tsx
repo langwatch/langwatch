@@ -58,6 +58,7 @@ function stepWith(overrides: Partial<UpgradeStepView>): UpgradeStepView {
     attempt: 1,
     lastError: null,
     report: null,
+    progress: null,
     runId: null,
     startedAt: "2026-10-06T10:00:00.000Z",
     finishedAt: "2026-10-06T10:00:02.000Z",
@@ -72,11 +73,13 @@ function renderOverview({
   status,
   failedSteps = [],
   backgroundSteps = [],
+  backgroundLoading,
   onRetryStep,
 }: {
   status: UpgradeStatusView;
   failedSteps?: UpgradeStepView[];
   backgroundSteps?: UpgradeStepView[];
+  backgroundLoading?: boolean;
   onRetryStep?: (stepId: string) => void;
 }) {
   const onOpenStep = vi.fn();
@@ -89,6 +92,7 @@ function renderOverview({
       runs={[]}
       failedSteps={failedSteps}
       backgroundSteps={backgroundSteps}
+      backgroundLoading={backgroundLoading}
       onRetryStep={onRetryStep}
       onOpenRelease={noop}
       onOpenRun={noop}
@@ -237,6 +241,21 @@ describe("UpgradesOverview", () => {
           name: "Retry",
         }),
       ).toBeNull();
+    });
+
+    it("shows a running step's progress from its checkpoint report", () => {
+      const replaying = { ...running, progress: { done: 63, total: 100 } };
+      renderOverview({ status: finishing, backgroundSteps: [failed, replaying] });
+
+      const row = screen.getByTestId("upgrade-background-step-ops:backfill-names");
+      expect(row).toHaveTextContent("63%");
+    });
+
+    it("shows a skeleton while the background steps load", () => {
+      renderOverview({ status: finishing, backgroundLoading: true });
+
+      expect(screen.getByLabelText("Loading background steps")).toBeInTheDocument();
+      expect(screen.queryByTestId("upgrade-background-steps")).toBeNull();
     });
   });
 });
