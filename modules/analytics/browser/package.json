@@ -32,6 +32,7 @@
     "@langwatch/automation-contract": "workspace:*",
     "@langwatch/browser": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
+    "@langwatch/csv": "workspace:*",
     "@langwatch/dashboard-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/error-views": "workspace:*",

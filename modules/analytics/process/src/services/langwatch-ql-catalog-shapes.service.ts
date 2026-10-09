@@ -420,14 +420,34 @@ export class LangWatchQLCatalogShapesService {
     protections: LangWatchQLProtections;
     views: readonly LangWatchQLViewDefinition[];
   }): readonly string[] {
-    const held = heldLwqlGates(protections);
-    const withheld = views.flatMap((view) =>
-      view.columns
-        .filter((column) => this.columnGates({ view, column }).some((gate) => !held.has(gate)))
-        .map((column) => column.name),
-    );
+    return Object.keys(this.gatedColumnGates({ protections, views })).toSorted();
+  }
 
-    return [...new Set(withheld)].toSorted();
+  /**
+   * The validator's `gatedColumnGates` for one caller: each withheld column's name, with the
+   * gates it needs that the caller lacks. A name two views share carries both views' gates,
+   * since the validator withholds a column by name.
+   */
+  gatedColumnGates({
+    protections,
+    views,
+  }: {
+    protections: LangWatchQLProtections;
+    views: readonly LangWatchQLViewDefinition[];
+  }): Readonly<Record<string, readonly LwqlGate[]>> {
+    const held = heldLwqlGates(protections);
+    const missing = new Map<string, Set<LwqlGate>>();
+    for (const view of views) {
+      for (const column of view.columns) {
+        const lacked = this.columnGates({ view, column }).filter((gate) => !held.has(gate));
+        if (lacked.length === 0) continue;
+        const gates = missing.get(column.name) ?? new Set<LwqlGate>();
+        for (const gate of lacked) gates.add(gate);
+        missing.set(column.name, gates);
+      }
+    }
+
+    return Object.fromEntries([...missing].map(([name, gates]) => [name, [...gates].toSorted()]));
   }
 
   /**

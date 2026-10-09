@@ -9,19 +9,26 @@ import type { ChartFrameDashboardContext } from "@langwatch/analytics-contract/c
 import { dashboardWidgetDefinitionSchema } from "@langwatch/analytics-contract/dashboard-widget-definition";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { Box, Text } from "@langwatch/design-system/primitives";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useAnalyticsPeriod } from "../../../../behavior/use-analytics-period.ts";
 import { useFrameDiagnostic } from "../../../../behavior/use-frame-diagnostic.ts";
 import { useWidgetQueryRecords } from "../../../../behavior/use-widget-query-records.ts";
 import { usePublishWidgetCompleteness } from "../../../../behavior/widget-completeness-sink.ts";
+import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { declaredParamDefaults } from "../../../../model/dashboard-widget/params-snapshot.ts";
+import { withheldWords } from "../../../../model/dashboard-widget/widget-access.ts";
 import {
   type WidgetFace,
   widgetFace,
 } from "../../../../model/dashboard-widget/widget-completeness.ts";
 import {
+  type WidgetExport,
+  widgetExportStatus,
+} from "../../../../model/dashboard-widget/widget-export.ts";
+import {
   WidgetFailedFace,
+  WidgetNoAccessFace,
   WidgetNoTrafficFace,
   WidgetSetupFace,
 } from "../../../../ui/elements/widget-state-face.tsx";
@@ -80,11 +87,17 @@ export function DashboardWidgetFrameOverWindow({
   timeWindow,
   granularitySeconds,
   onAskLangyToSetUp,
+  onFaceChange,
+  onExportChange,
 }: DashboardWidgetFrameProps & {
   readonly timeWindow: { start: number; end: number };
   readonly granularitySeconds?: LangWatchQLAcceptedGranularityStep;
   /** Drafts the step that sends a field no trace carries; absent, the setup view has no button. */
   readonly onAskLangyToSetUp?: (missing: { field: string; label: string }) => void;
+  /** Told which face the frame draws, so the card offers only what that face allows. */
+  readonly onFaceChange?: (face: WidgetFace["kind"]) => void;
+  /** Handed what "Export CSV" would write now: the rows the widget's queries last returned. */
+  readonly onExportChange?: (widgetExport: WidgetExport) => void;
 }) {
   const { colorMode } = useColorMode();
   const refreshedAt = useDashboardRefreshedAt();
@@ -101,9 +114,20 @@ export function DashboardWidgetFrameOverWindow({
     definition.queries,
     granularitySeconds === void 0 ? { timeWindow } : { timeWindow, granularitySeconds },
   );
-  const { executeQuery, records, reset } = useWidgetQueryRecords({ executeQuery: runQuery });
+  const { executeQuery, records, results, reset } = useWidgetQueryRecords({
+    executeQuery: runQuery,
+    timeWindow,
+  });
   const face = useMemo(() => widgetFace(records), [records]);
   usePublishWidgetCompleteness(face.kind === "chart" ? face.completeness : null);
+  useEffect(() => onFaceChange?.(face.kind), [onFaceChange, face.kind]);
+
+  const hasQueries = definition.queries.length > 0;
+  const widgetExport = useMemo(
+    () => ({ status: widgetExportStatus({ face: face.kind, hasQueries, results }), results }),
+    [face.kind, hasQueries, results],
+  );
+  useEffect(() => onExportChange?.(widgetExport), [onExportChange, widgetExport]);
 
   // Retry starts the frame over, so every query of the widget runs again.
   const [attempt, setAttempt] = useState(0);
@@ -198,6 +222,8 @@ function faceInPlaceOfChart({
   onAskLangyToSetUp?: (missing: { field: string; label: string }) => void;
 }) {
   switch (face.kind) {
+    case "no_access":
+      return <NoAccessFace missingGates={face.missingGates} />;
     case "failed":
       return <WidgetFailedFace name={name} message={face.error.message} onRetry={onRetry} />;
     case "no_traffic":
@@ -213,4 +239,10 @@ function faceInPlaceOfChart({
     case "chart":
       return null;
   }
+}
+
+/** The no-access state in the words for the project the reader is in. */
+function NoAccessFace({ missingGates }: { missingGates: readonly string[] }) {
+  const projectName = useAnalyticsHost().project()?.name;
+  return <WidgetNoAccessFace {...withheldWords({ missingGates, projectName })} />;
 }

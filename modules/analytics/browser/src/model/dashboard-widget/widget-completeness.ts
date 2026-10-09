@@ -83,6 +83,8 @@ export function combineCompleteness(
 /** What the frame draws in place of the widget's own code, or the code itself. */
 export type WidgetFace =
   | { readonly kind: "chart"; readonly completeness: WidgetCompleteness | null }
+  /** The reader may not see what a query reads: the gates they lack, such as "cost:view". */
+  | { readonly kind: "no_access"; readonly missingGates: readonly string[] }
   | { readonly kind: "failed"; readonly error: ChartQueryError }
   | { readonly kind: "no_traffic"; readonly unit: string }
   | {
@@ -97,12 +99,22 @@ function isFinal(failure: NonNullable<WidgetQueryRecord["failure"]>): boolean {
   return failure.error.retryable !== true || failure.attempts > CHART_QUERY_MAX_RETRIES;
 }
 
+/** Every gate the queries were last refused for, sorted; empty when none was refused for access. */
+function gatesRefused(records: readonly WidgetQueryRecord[]): readonly string[] {
+  const gates = records.flatMap((record) => record.failure?.error.missingGates ?? []);
+  return [...new Set(gates)].toSorted();
+}
+
 /**
- * The widget's face. A query that failed for good before it ever answered fails the widget; one
- * whose refresh failed keeps its rows. Then the combined report decides.
+ * The widget's face. A query refused because the reader may not see what it reads makes the
+ * whole widget "no access", before anything else. A query that failed for good before it ever
+ * answered fails the widget; one whose refresh failed keeps its rows. Then the report decides.
  */
 export function widgetFace(records: WidgetQueryRecords): WidgetFace {
   const all = Object.values(records);
+  const missingGates = gatesRefused(all);
+  if (missingGates.length > 0) return { kind: "no_access", missingGates };
+
   const failed = all.find(
     (record) => !record.hasResult && record.failure !== undefined && isFinal(record.failure),
   );

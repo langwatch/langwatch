@@ -110,8 +110,8 @@ Feature: Dashboards widget flow: the editor with Langy, the widget menu and Undo
   Scenario: Widget menu: the actions follow the prototype's order
     Given Langy is available
     When the member opens a widget's menu
-    Then it offers Edit with Langy, Edit code, Copy widget id, Copy API snippet, Set an alert,
-      Send as a report, Duplicate and Delete, in that order
+    Then it offers Edit with Langy, Edit code, Copy widget id, Copy API snippet, Export CSV,
+      Set an alert, Send as a report, Duplicate and Delete, in that order
 
   @integration
   Scenario: Widget menu: Copy widget id and Copy API snippet copy what an agent needs

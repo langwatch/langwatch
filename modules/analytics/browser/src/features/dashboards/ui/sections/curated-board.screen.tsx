@@ -1,10 +1,10 @@
 /**
  * `/[project]/dashboards/curated/[templateId]`: a From LangWatch board, a template live and
- * read-only. Nothing is stored until "Duplicate to edit" (dashboards-v2.feature).
+ * read-only. Nothing is stored until "Duplicate to edit" in the sidebar menu
+ * (dashboards-v2.feature).
  */
 
 import { UiPageNotFound } from "@langwatch/browser/page-fallbacks";
-import { Button } from "@langwatch/design-system/primitives";
 
 import {
   DashboardRefetchIntervalContext,
@@ -13,7 +13,6 @@ import {
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { DashboardRefreshedAtContext } from "../../../../ui/sections/use-dashboard-auto-refresh.ts";
 import { useBoardPeriod } from "../../behavior/use-board-period.ts";
-import { useDuplicateCurated } from "../../behavior/use-duplicate-curated.ts";
 import { useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
 import { useBoardOnScreen, useLangyAsk } from "../../langy/behavior/use-board-langy.ts";
 import { boardSubject, widgetPromptDraft } from "../../langy/model/board-langy.ts";
@@ -30,7 +29,6 @@ function OpenCuratedBoard({ board }: { board: CuratedBoard }) {
   const host = useAnalyticsHost();
   const projectId = host.project()?.id ?? "";
   const saved = useSavedDashboards();
-  const copy = useDuplicateCurated();
   const { range, grain, period, setRange, setGrain } = useBoardPeriod();
   const autoRefresh = useDashboardAutoRefresh({ live: range === "live" });
   const subject = boardSubject({
@@ -51,18 +49,7 @@ function OpenCuratedBoard({ board }: { board: CuratedBoard }) {
           name={board.name}
           description={board.job}
           isFromLangWatch
-          action={
-            <Button
-              size="sm"
-              colorPalette="teal"
-              borderRadius="lg"
-              fontSize="13px"
-              loading={copy.creatingId === board.templateId}
-              onClick={() => void copy.duplicate(board)}
-            >
-              Duplicate to edit
-            </Button>
-          }
+          action={null}
           periodControl={
             <BoardPeriodControl
               range={range}
@@ -84,6 +71,7 @@ function OpenCuratedBoard({ board }: { board: CuratedBoard }) {
             projectId={projectId}
             projectSlug={saved.projectSlug}
             templateId={board.templateId}
+            boardName={board.name}
             widgets={board.widgets}
             period={period}
             onAskLangy={

@@ -17,6 +17,8 @@ export class UiProcedureRefusal extends Error {
   constructor(
     readonly code: string,
     readonly httpStatus: number,
+    /** The handled error's `meta`, for a refusal whose details the screen reads. */
+    readonly meta: Readonly<Record<string, unknown>> = {},
   ) {
     super(code);
     this.name = "UiProcedureRefusal";
@@ -37,7 +39,7 @@ async function settle(answer: UiProcedureAnswer, call: UiProcedureCall): Promise
           httpStatus: error.httpStatus,
           path: call.path,
           // The handled payload production's error formatter adds, which `readHandledError` reads.
-          error: { code: error.code, httpStatus: error.httpStatus, meta: {} },
+          error: { code: error.code, httpStatus: error.httpStatus, meta: error.meta },
         },
       },
     };

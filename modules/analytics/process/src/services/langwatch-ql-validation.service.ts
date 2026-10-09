@@ -112,6 +112,12 @@ export class LangWatchQLValidationService {
           sortedUnique(columns),
         ]),
       ),
+      gatedColumnGates: new Map(
+        Object.entries(policy.gatedColumnGates ?? {}).map(([column, gates]) => [
+          column.trim().toLowerCase(),
+          sortedUnique(gates),
+        ]),
+      ),
     };
   }
 

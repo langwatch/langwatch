@@ -83,6 +83,11 @@ export interface ChartQueryError {
   readonly message: string;
   /** Set when the same request is expected to succeed shortly; the hook retries it. */
   readonly retryable?: boolean;
+  /**
+   * Set when the query was refused only because the reader may not see what it reads: the gates
+   * they lack, such as "cost:view". The host then shows "no access", not a failure.
+   */
+  readonly missingGates?: readonly string[];
 }
 
 // ---------------------------------------------------------------------------

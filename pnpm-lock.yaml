@@ -4948,6 +4948,9 @@ importers:
       '@langwatch/browser-host':
         specifier: workspace:*
         version: link:../../../packages/browser-host
+      '@langwatch/csv':
+        specifier: workspace:*
+        version: link:../../../packages/csv
       '@langwatch/dashboard-contract':
         specifier: workspace:*
         version: link:../../dashboard/contract
