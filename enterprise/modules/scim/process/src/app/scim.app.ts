@@ -485,6 +485,7 @@ export class ScimModule implements ScimApiContract {
       },
       identify: async ({ request }) => {
         const directory = await this.authenticateDirectory({
+          // oxlint-disable-next-line langwatch/auth-header-read -- this is the SCIM door's own read
           authorization: request.headers.get("authorization"),
           method: request.method,
           path: new URL(request.url).pathname,
