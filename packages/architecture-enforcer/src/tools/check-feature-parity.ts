@@ -145,6 +145,8 @@ const DEFAULT_TEST_ROOTS: string[] = [
   // The fuzz browser runner (@langwatch/fuzz-runner): its vision judge's
   // scenarios are proved by its vitest suite and by nothing else.
   "tools/fuzz/runner/src",
+  // The seed runner's tests bind specs/setup/seedgen-runner.feature.
+  "tools/seedgen/runner/src",
   // The contributor-only backend launcher (tools/dev-runtime): the API and the
   // worker in one local process. Its boot order and its shutdown ordering —
   // drain the worker, then close the API listener — are asserted by its own
