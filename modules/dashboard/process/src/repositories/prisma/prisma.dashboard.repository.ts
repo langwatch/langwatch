@@ -37,14 +37,17 @@ const WORKBENCH_SQL_CHART_KIND = "workbench_sql";
 const starTarget = (star: DashboardStar) =>
   star.kind === "board" ? { dashboardId: star.dashboardId } : { templateId: star.templateId };
 
+/** A live project, as the project module reads one: not archived. */
+const LIVE_PROJECT = { archivedAt: null } satisfies Prisma.ProjectWhereInput;
+
 /**
- * The rows a read reaches: the project's own, and with an organization its shared boards.
- * Always an OR of tenancy predicates, which is the shape the tenancy guard admits.
+ * The rows a read reaches: the project's own, and with an organization the boards its live
+ * projects share. Always an OR of tenancy predicates, which is the shape the tenancy guard admits.
  */
 const reached = ({ projectId, organizationId }: DashboardReach): Prisma.DashboardWhereInput =>
   organizationId === undefined
     ? { projectId }
-    : { OR: [{ projectId }, { organizationId, scope: "ORGANIZATION" }] };
+    : { OR: [{ projectId }, { organizationId, scope: "ORGANIZATION", project: LIVE_PROJECT }] };
 
 /** Every project whose stars this project lists: its own, then the shared boards' owners. */
 const starProjects = ({ projectId, sharedProjectIds = [] }: MemberStars): string[] => [
@@ -263,7 +266,8 @@ export class PrismaDashboardRepository
     });
   }
 
-  async findStarred(input: MemberStars): Promise<StarredDashboard[]> {
+  async findStarred(listed: MemberStars): Promise<StarredDashboard[]> {
+    const input = await this.#withLiveOwners(listed);
     const favourites = await this.prisma.dashboardFavourite.findMany({
       where: memberStars(input),
       orderBy: [{ position: "asc" }, { createdAt: "asc" }],
@@ -289,7 +293,8 @@ export class PrismaDashboardRepository
     });
   }
 
-  async findStarredDashboardIds(input: MemberStars): Promise<string[]> {
+  async findStarredDashboardIds(listed: MemberStars): Promise<string[]> {
+    const input = await this.#withLiveOwners(listed);
     const rows = await this.prisma.dashboardFavourite.findMany({
       where: {
         userId: input.userId,
@@ -300,6 +305,18 @@ export class PrismaDashboardRepository
       select: { dashboardId: true },
     });
     return rows.flatMap((row) => (row.dashboardId === null ? [] : [row.dashboardId]));
+  }
+
+  /** The stars with only the shared owners still live: an archived project lists no board. */
+  async #withLiveOwners(input: MemberStars): Promise<MemberStars> {
+    const shared = [...(input.sharedProjectIds ?? [])];
+    if (shared.length === 0) return input;
+    const live = await this.prisma.dashboard.findMany({
+      where: { projectId: { in: shared }, project: LIVE_PROJECT },
+      distinct: ["projectId"],
+      select: { projectId: true },
+    });
+    return { ...input, sharedProjectIds: live.map((row) => row.projectId) };
   }
 
   async addStar(input: {
@@ -343,7 +360,7 @@ export class PrismaDashboardRepository
   }
 
   async reorderStars(input: MemberStars & { stars: DashboardStar[] }): Promise<void> {
-    const boardProjects = { in: starProjects(input) };
+    const boardProjects = { in: starProjects(await this.#withLiveOwners(input)) };
     await this.transaction(async (transaction) => {
       // Rows are matched by target, so only stars the member holds are moved.
       await Promise.all(

@@ -40,6 +40,11 @@ export class MemoryAutomationStore {
   readonly fires: (TriggerFire & { projectId: string })[] = [];
   readonly suppressions: EmailSuppression[] = [];
   readonly customGraphs: (CustomGraph & { dashboardId: string | null })[] = [];
+  /**
+   * The boards set to Only me. This store holds no board rows, so a test names the ones whose
+   * graphs automation must not reach.
+   */
+  readonly privateDashboardIds = new Set<string>();
   readonly graphTriggerSent: StoredGraphTriggerSent[] = [];
   /** The project names an unsubscribe page renders, by project id. */
   readonly projectNames = new Map<string, string>();

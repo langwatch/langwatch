@@ -30,6 +30,8 @@ type Backend = Readonly<{
   otherProjectId: () => string;
   /** The organization both projects sit in. */
   organizationId: () => string;
+  /** Archives the other project, as the project module does: the row stays, marked. */
+  archiveOtherProject: () => Promise<void>;
 }>;
 
 const LAYOUT = { gridColumn: 0, gridRow: 0, colSpan: 1, rowSpan: 1 };
@@ -390,6 +392,67 @@ function contractCases(backend: Backend): void {
       await expect(
         repository.findDashboards({ ...here(), dashboardIds: [board.id] }),
       ).resolves.toEqual([]);
+    });
+
+    /** @scenario "AC188 Scope: an Organization board of an archived project is listed nowhere" */
+    it("stops reaching it by list, by id and among ids once its project is archived", async () => {
+      const repository = backend.repository();
+      const own = await dashboard("Own", 0);
+      const board = await shared();
+      await backend.archiveOtherProject();
+
+      const listed = await repository.findAllDashboards({ ...here(), graphKinds: BOTH_KINDS });
+
+      expect({
+        listed: listed.map((row) => row.id),
+        opened: await repository.findDashboard({ ...here(), dashboardId: board.id }),
+        among: await repository.findDashboards({ ...here(), dashboardIds: [board.id] }),
+      }).toEqual({ listed: [own.id], opened: undefined, among: [] });
+    });
+
+    /** @scenario "AC188 Scope: an Organization board of an archived project is listed nowhere" */
+    it("still reaches it from the archived project that owns it", async () => {
+      const repository = backend.repository();
+      const board = await shared();
+      await backend.archiveOtherProject();
+      const home = {
+        projectId: backend.otherProjectId(),
+        organizationId: backend.organizationId(),
+      };
+
+      const listed = await repository.findAllDashboards({ ...home, graphKinds: BOTH_KINDS });
+
+      expect({
+        listed: listed.map((row) => row.id),
+        opened: (await repository.findDashboard({ ...home, dashboardId: board.id }))?.id,
+      }).toEqual({ listed: [board.id], opened: board.id });
+    });
+
+    /** @scenario "AC188 Scope: an Organization board of an archived project is listed nowhere" */
+    it("leaves a star on it out of the member's stars, and out of a reorder", async () => {
+      const repository = backend.repository();
+      const own = await dashboard("Own", 0);
+      const board = await shared();
+      const owner = backend.otherProjectId();
+      const stars = [own, board].map((row) => ({ kind: "board" as const, dashboardId: row.id }));
+      const mine = { projectId: backend.projectId(), userId: "u", sharedProjectIds: [owner] };
+      await repository.addStar({ projectId: backend.projectId(), userId: "u", star: stars[0]! });
+      await repository.addStar({
+        projectId: owner,
+        userId: "u",
+        star: stars[1]!,
+        listedInProjectId: backend.projectId(),
+      });
+      await backend.archiveOtherProject();
+
+      await repository.reorderStars({ ...mine, stars: stars.toReversed() });
+
+      const starred = await repository.findStarred(mine);
+      expect({
+        starred: starred.map((row) => (row.kind === "board" ? row.dashboard.id : row.kind)),
+        ids: await repository.findStarredDashboardIds(mine),
+        atHome: await repository.findStarredDashboardIds({ projectId: owner, userId: "u" }),
+      }).toEqual({ starred: [own.id], ids: [own.id], atHome: [board.id] });
     });
 
     /** @scenario "AC173 Scope: an Organization board is read-only outside the project that owns it" */
@@ -1076,9 +1139,11 @@ function contractCases(backend: Backend): void {
 
 describe("given the memory dashboard repository", () => {
   let repository: DashboardRepository;
+  let archivedProjectIds = new Set<string>();
 
   beforeEach(() => {
-    repository = MemoryDashboardRepository.create();
+    archivedProjectIds = new Set();
+    repository = MemoryDashboardRepository.create({ archivedProjectIds });
   });
 
   contractCases({
@@ -1086,6 +1151,7 @@ describe("given the memory dashboard repository", () => {
     projectId: () => "project-1",
     otherProjectId: () => "project-2",
     organizationId: () => "organization-1",
+    archiveOtherProject: async () => void archivedProjectIds.add("project-2"),
   });
 });
 
@@ -1114,8 +1180,12 @@ describe.skipIf(!databaseUrl)("given the Postgres dashboard repository", () => {
   let otherProjectId = "";
   let organizationId = "";
 
-  const clean = () =>
-    cleanupTestRows(database(), [
+  const clean = async () => {
+    await database().project.updateMany({
+      where: { id: { in: [projectId, otherProjectId] } },
+      data: { archivedAt: null },
+    });
+    await cleanupTestRows(database(), [
       ["dashboardFavourite", { projectId }],
       ["dashboardFavourite", { projectId: otherProjectId }],
       ["customGraph", { projectId }],
@@ -1123,6 +1193,7 @@ describe.skipIf(!databaseUrl)("given the Postgres dashboard repository", () => {
       ["dashboard", { projectId }],
       ["dashboard", { projectId: otherProjectId }],
     ]);
+  };
 
   beforeAll(async () => {
     const organization = await database().organization.create({
@@ -1164,6 +1235,12 @@ describe.skipIf(!databaseUrl)("given the Postgres dashboard repository", () => {
     projectId: () => projectId,
     otherProjectId: () => otherProjectId,
     organizationId: () => organizationId,
+    archiveOtherProject: async () => {
+      await database().project.update({
+        where: { id: otherProjectId },
+        data: { archivedAt: new Date() },
+      });
+    },
   });
 });
 import { createLogger } from "@langwatch/observability";

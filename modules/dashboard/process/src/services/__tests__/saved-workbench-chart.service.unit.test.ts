@@ -70,6 +70,8 @@ function dashboardRecord(): DashboardRecord & { graphs: GraphRecord[] } {
     order: 0,
     description: null,
     createdById: null,
+    scope: "PROJECT",
+    organizationId: null,
     createdAt: new Date(0),
     updatedAt: new Date(0),
     graphs: [],

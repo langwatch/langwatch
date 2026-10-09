@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import {
   createDashboardTestAnalytics,
   createDashboardTestProjects,
+  DASHBOARDS_ROLLED_OUT,
 } from "../../app/__tests__/dashboard.fixture.ts";
 import { MemoryDashboardWidgetRepository } from "../../repositories/memory/memory.dashboard-widget.repository.ts";
 import { MemoryDashboardRepository } from "../../repositories/memory/memory.dashboard.repository.ts";
@@ -27,6 +28,7 @@ function setUp() {
     boards: DashboardAccessService.create({
       repository: MemoryDashboardRepository.create(),
       projects: createDashboardTestProjects(),
+      rollout: DASHBOARDS_ROLLED_OUT,
     }),
   });
   return { repository, service };

@@ -134,6 +134,7 @@ export const customGraphRow = {
   projectId: "project-1",
   name: "Errors per minute",
   kind: "builder",
+  dashboardId: null,
   filters: {},
   graph: {
     series: [{ name: "Errors", metric: "metadata.trace_id", aggregation: "cardinality" }],

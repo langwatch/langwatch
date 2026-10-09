@@ -1,7 +1,7 @@
 /**
  * Board scope on the server, through the composed app over memory repositories: what each
  * operation answers for the author, a teammate, another project and a project credential.
- * Spec: dashboards-v2.feature AC170 to AC182.
+ * Spec: dashboards-v2.feature AC170 to AC182 and AC189.
  */
 import {
   MY_DASHBOARD_NAME,
@@ -12,6 +12,7 @@ import { describe, expect, it } from "vitest";
 
 import { MemoryDashboardRepositories } from "../../repositories/memory/memory.dashboard.repositories.ts";
 import {
+  createDashboardTestAnalytics,
   createDashboardTestApp,
   createDashboardTestAuthz,
   createDashboardTestProjects,
@@ -37,22 +38,30 @@ const CHART_ID = "chart-on-board";
 
 type Viewer = { userId: string } | undefined;
 type Target = Readonly<{ dashboardId: string; widgetId: string; graphId: string; chartId: string }>;
+/** A board and an unplaced widget every member of HOME sees, for a move to or from a target. */
+type Open = Readonly<{ dashboardId: string; widgetId: string }>;
+type World = Readonly<{ openProjectIds?: readonly string[]; dashboardsOffIn?: readonly string[] }>;
 
-function appWith(input: Readonly<{ openProjectIds?: readonly string[] }> = {}) {
+/** The app, with the projects where Dashboards is off in a set a test may change. */
+function appWith(input: World = {}) {
   const repositories = MemoryDashboardRepositories.create();
+  const dashboardsOff = new Set(input.dashboardsOffIn);
   const app = createDashboardTestApp({
     repositories,
     dependencies: {
+      analytics: createDashboardTestAnalytics({
+        isDashboardsEnabled: async ({ projectId }) => !dashboardsOff.has(projectId),
+      }),
       projects: createDashboardTestProjects({ organizations: ORGANIZATIONS }),
       authz: createDashboardTestAuthz(input),
     },
   });
-  return { app, repositories };
+  return { app, repositories, dashboardsOff };
 }
 
 /** The author's board in HOME with a widget, a graph and a saved chart on it. */
-async function boardAt(scope: DashboardScope) {
-  const { app, repositories } = appWith();
+async function boardAt(scope: DashboardScope, world: World = {}) {
+  const { app, repositories, dashboardsOff } = appWith(world);
   const board = await app.create({
     projectId: HOME,
     name: "Reports",
@@ -77,8 +86,18 @@ async function boardAt(scope: DashboardScope) {
     graphId: graph.id,
     chartId: CHART_ID,
   };
-  return { app, repositories, board, target };
+  return { app, repositories, dashboardsOff, board, target };
 }
+
+/** A Project board and an unplaced widget in HOME, made by the author after the target. */
+async function openThings(app: DashboardApi): Promise<Open> {
+  const made = { projectId: HOME, viewer: AUTHOR };
+  const board = await app.create({ projectId: HOME, name: "Open", createdById: AUTHOR.userId });
+  const widget = await app.createDashboardWidget({ ...WIDGET, ...made });
+  return { dashboardId: board.id, widgetId: widget.id };
+}
+
+const NOTHING_OPEN: Open = { dashboardId: "no-open-board", widgetId: "no-open-widget" };
 
 const starOf = (dashboardId: string) => ({ kind: "board" as const, dashboardId });
 const MISSING: Target = {
@@ -98,18 +117,28 @@ async function codeOf(call: Promise<unknown>): Promise<unknown> {
   return "<resolved>";
 }
 
+/** Everything a call answers: what it resolved with, or the whole refusal it raised. */
+async function outcomeOf(call: Promise<unknown>): Promise<unknown> {
+  try {
+    return { resolved: (await call) ?? null };
+  } catch (error) {
+    const refusal = error as Error & { serialize?: () => object };
+    return { refused: { name: refusal.name, message: refusal.message, ...refusal.serialize?.() } };
+  }
+}
+
+type Asking = Readonly<{ app: DashboardApi; projectId: string; viewer: Viewer; open?: Open }>;
+
 /** Every operation that names a board, or something on one, by id. */
 function operations({
   app,
   projectId,
   viewer,
-}: {
-  app: DashboardApi;
-  projectId: string;
-  viewer: Viewer;
-}): Record<string, (target: Target) => Promise<unknown>> {
+  open = NOTHING_OPEN,
+}: Asking): Record<string, (target: Target) => Promise<unknown>> {
   const as = { projectId, viewer };
   const member = viewer ?? TEAMMATE;
+  const starring = { projectId, userId: member.userId };
   return {
     open: ({ dashboardId }) => app.getById({ ...as, dashboardId }),
     rename: ({ dashboardId }) => app.rename({ ...as, dashboardId, name: "Taken" }),
@@ -117,8 +146,10 @@ function operations({
       app.updateDashboardDetails({ projectId, dashboardId, viewer: member, description: "Mine" }),
     delete: ({ dashboardId }) => app.delete({ ...as, dashboardId }),
     reorder: ({ dashboardId }) => app.reorder({ ...as, dashboardIds: [dashboardId] }),
-    star: ({ dashboardId }) =>
-      app.star({ projectId, userId: member.userId, star: starOf(dashboardId) }),
+    star: ({ dashboardId }) => app.star({ ...starring, star: starOf(dashboardId) }),
+    unstar: ({ dashboardId }) => app.unstar({ ...starring, star: starOf(dashboardId) }),
+    reorderStars: ({ dashboardId }) =>
+      app.reorderStars({ ...starring, stars: [starOf(dashboardId)] }),
     setScope: ({ dashboardId }) =>
       app.setDashboardScope({ projectId, dashboardId, viewer: member, scope: "PROJECT" }),
     scopeImpact: ({ dashboardId }) =>
@@ -129,15 +160,38 @@ function operations({
     addWidget: ({ dashboardId }) => app.createDashboardWidget({ ...WIDGET, ...as, dashboardId }),
     readWidget: ({ widgetId }) => app.getDashboardWidget({ ...as, id: widgetId }),
     editWidget: ({ widgetId }) => app.updateDashboardWidget({ ...as, id: widgetId, name: "X" }),
+    placeWidget: ({ dashboardId }) =>
+      app.assignDashboardWidgetToDashboard({ ...as, id: open.widgetId, dashboardId }),
+    takeWidget: ({ widgetId }) =>
+      app.assignDashboardWidgetToDashboard({ ...as, id: widgetId, dashboardId: open.dashboardId }),
+    moveWidget: ({ widgetId }) =>
+      app.updateDashboardWidgetLayout({ ...as, graphId: widgetId, layout: LAYOUT }),
+    moveWidgets: ({ widgetId }) =>
+      app.batchUpdateDashboardWidgetLayouts({
+        ...as,
+        layouts: [{ graphId: widgetId, layout: LAYOUT }],
+      }),
     deleteWidget: ({ widgetId }) => app.deleteDashboardWidget({ ...as, id: widgetId }),
+    listBoardGraphs: ({ dashboardId }) => app.listGraphs({ ...as, dashboardId }),
     addGraph: ({ dashboardId }) =>
       app.createGraph({ ...as, dashboardId, name: "Errors", graph: { graphType: "line" } }),
     readGraph: ({ graphId }) => app.getGraph({ ...as, graphId }),
     editGraph: ({ graphId }) => app.updateGraph({ ...as, graphId, name: "X" }),
     moveGraph: ({ graphId }) => app.updateGraphLayout({ ...as, graphId, layout: LAYOUT }),
+    moveGraphs: ({ graphId }) =>
+      app.batchUpdateGraphLayouts({ ...as, layouts: [{ graphId, layout: LAYOUT }] }),
     deleteGraph: ({ graphId }) => app.deleteGraph({ ...as, graphId }),
     readChart: ({ chartId }) => app.getSavedWorkbenchChart({ ...as, chartId }),
     editChart: ({ chartId }) => app.updateSavedWorkbenchChart({ ...as, chartId, name: "X" }),
+    memberEditChart: ({ chartId }) =>
+      app.updateMemberSavedWorkbenchChart({
+        ...as,
+        chartId,
+        actorId: member.userId,
+        name: "X",
+      }),
+    runChart: ({ chartId }) =>
+      app.runSavedWorkbenchChart({ ...as, chartId, actorId: member.userId }),
     placeChart: ({ dashboardId }) =>
       app.placeSavedWorkbenchChart({ ...as, chartId: CHART_ID, dashboardId }),
     unplaceChart: ({ chartId }) => app.unplaceSavedWorkbenchChart({ ...as, chartId }),
@@ -146,16 +200,39 @@ function operations({
 }
 
 /** What each operation answers, one after the other, by name. */
-async function answers(
-  input: { app: DashboardApi; projectId: string; viewer: Viewer },
-  target: Target,
-): Promise<Record<string, unknown>> {
+async function answers(input: Asking, target: Target): Promise<Record<string, unknown>> {
   const result: Record<string, unknown> = {};
   for (const [name, run] of Object.entries(operations(input))) {
     result[name] = await codeOf(run(target));
   }
   return result;
 }
+
+/**
+ * The whole of what each operation answers, its code, status, message and payload, with the ids
+ * the caller named taken out: a hidden board must say no more than a missing one in any of them.
+ */
+async function outcomes(input: Asking, target: Target): Promise<Record<string, unknown>> {
+  const result: Record<string, unknown> = {};
+  for (const [name, run] of Object.entries(operations(input))) {
+    const told = JSON.stringify(await outcomeOf(run(target)));
+    const named = Object.values(target).reduce((text, id) => text.replaceAll(id, "<id>"), told);
+    result[name] = JSON.parse(named);
+  }
+  return result;
+}
+
+/** The operations that accept an id naming nothing: each changes nothing, or lists nothing. */
+const ACCEPTED_FOR_A_MISSING_ID = [
+  "unstar",
+  "reorderStars",
+  "moveWidget",
+  "moveWidgets",
+  "listBoardGraphs",
+];
+
+const acceptedIn = (told: Record<string, unknown>) =>
+  Object.entries(told).flatMap(([name, outcome]) => ("resolved" in Object(outcome) ? [name] : []));
 
 const listedIds = async (app: DashboardApi, projectId: string, viewer: Viewer) =>
   (
@@ -196,45 +273,97 @@ describe("board scope on the server", () => {
     /** @scenario "AC171 Scope: an Only me board exists for its author alone" */
     it("answers a teammate on every operation as a board that does not exist", async () => {
       const { app, target } = await boardAt("PRIVATE");
-      const teammate = { app, projectId: HOME, viewer: TEAMMATE };
-      const missing = await answers(teammate, MISSING);
+      const teammate = { app, projectId: HOME, viewer: TEAMMATE, open: await openThings(app) };
+      const missing = await outcomes(teammate, MISSING);
 
       expect({
-        hidden: await answers(teammate, target),
-        anyAccepted: Object.values(missing).includes("<resolved>"),
-      }).toEqual({ hidden: missing, anyAccepted: false });
+        hidden: await outcomes(teammate, target),
+        accepted: acceptedIn(missing),
+      }).toEqual({ hidden: missing, accepted: ACCEPTED_FOR_A_MISSING_ID });
     });
 
     /** @scenario "AC171 Scope: an Only me board exists for its author alone" */
     it("answers a project credential on every operation as a board that does not exist", async () => {
       const { app, target } = await boardAt("PRIVATE");
-      const credential = { app, projectId: HOME, viewer: void 0 };
-      const missing = await answers(credential, MISSING);
+      const credential = { app, projectId: HOME, viewer: void 0, open: await openThings(app) };
+      const missing = await outcomes(credential, MISSING);
 
       expect({
-        hidden: await answers(credential, target),
-        anyAccepted: Object.values(missing).includes("<resolved>"),
-      }).toEqual({ hidden: missing, anyAccepted: false });
+        hidden: await outcomes(credential, target),
+        accepted: acceptedIn(missing),
+      }).toEqual({ hidden: missing, accepted: ACCEPTED_FOR_A_MISSING_ID });
+    });
+
+    /** @scenario "AC171 Scope: an Only me board exists for its author alone" */
+    it("lists a member's stars and finds their first board as it does once the board is deleted", async () => {
+      const read = async (world: Awaited<ReturnType<typeof boardAt>>, viewer: Viewer) => {
+        const { app, target } = world;
+        const starred = await app.listStarred({
+          projectId: HOME,
+          userId: (viewer ?? TEAMMATE).userId,
+        });
+        const first = await app.getOrCreateFirst({ projectId: HOME, viewer });
+        // `order` counts every board of the project, hidden ones too: a known side channel.
+        const { name, scope, createdById, description, organizationId } = first;
+        const made = { name, scope, createdById, description, organizationId };
+        return { starred, first: made, isTheBoard: first.id === target.dashboardId };
+      };
+      const deleted = async () => {
+        const world = await boardAt("PROJECT");
+        await world.app.delete({
+          projectId: HOME,
+          dashboardId: world.target.dashboardId,
+          viewer: AUTHOR,
+        });
+        return world;
+      };
+
+      expect({
+        teammate: await read(await boardAt("PRIVATE"), TEAMMATE),
+        credential: await read(await boardAt("PRIVATE"), void 0),
+      }).toEqual({
+        teammate: await read(await deleted(), TEAMMATE),
+        credential: await read(await deleted(), void 0),
+      });
     });
 
     /** @scenario "AC171 Scope: an Only me board exists for its author alone" */
     it("leaves the board and everything on it untouched by those attempts", async () => {
       const { app, target } = await boardAt("PRIVATE");
-      await answers({ app, projectId: HOME, viewer: TEAMMATE }, target);
-      await answers({ app, projectId: HOME, viewer: void 0 }, target);
-
+      const open = await openThings(app);
       const read = { projectId: HOME, viewer: AUTHOR };
-      expect({
+      const stored = async () => ({
         board: await app.getById({ ...read, dashboardId: target.dashboardId }),
         widget: await app.getDashboardWidget({ ...read, id: target.widgetId }),
         graph: await app.getGraph({ ...read, graphId: target.graphId }),
         chart: await app.getSavedWorkbenchChart({ ...read, chartId: target.chartId }),
-      }).toMatchObject({
+      });
+      const before = await stored();
+
+      await answers({ app, projectId: HOME, viewer: TEAMMATE, open }, target);
+      await answers({ app, projectId: HOME, viewer: void 0, open }, target);
+
+      expect(await stored()).toEqual(before);
+      expect(before).toMatchObject({
         board: { name: "Reports", description: null, scope: "PRIVATE" },
         widget: { name: "Usage", dashboardId: target.dashboardId },
         graph: { name: "Latency", dashboardId: target.dashboardId },
         chart: { name: "Spend", dashboardId: target.dashboardId },
       });
+    });
+
+    /** @scenario "AC176 Scope: a narrower scope keeps other members' stars" */
+    it("keeps a teammate's star through their unstar of a board they cannot see", async () => {
+      const { app, target } = await boardAt("PRIVATE");
+      const on = { projectId: HOME, dashboardId: target.dashboardId, viewer: AUTHOR };
+      const teammate = { projectId: HOME, userId: TEAMMATE.userId };
+
+      await app.unstar({ ...teammate, star: starOf(target.dashboardId) });
+      await app.setDashboardScope({ ...on, scope: "PROJECT" });
+
+      expect(await app.listStarred(teammate)).toMatchObject([
+        { kind: "board", dashboard: { id: target.dashboardId } },
+      ]);
     });
 
     /** @scenario "AC171 Scope: an Only me board exists for its author alone" */
@@ -595,6 +724,57 @@ describe("board scope on the server", () => {
 
       expect(await app.getDashboardScopeImpact({ ...on, viewer: AUTHOR })).toEqual({
         otherStars: 2,
+      });
+    });
+  });
+
+  describe("given a project where Dashboards is switched off", () => {
+    /** @scenario "AC189 Scope: board scope reaches only a project where Dashboards is switched on" */
+    it("starts a member's My dashboard at Project there, so a teammate lists it", async () => {
+      const { app } = appWith({ dashboardsOffIn: [HOME] });
+
+      const own = await app.create({
+        projectId: HOME,
+        name: MY_DASHBOARD_NAME,
+        createdById: AUTHOR.userId,
+      });
+
+      expect({ scope: own.scope, teammateLists: await listedIds(app, HOME, TEAMMATE) }).toEqual({
+        scope: "PROJECT",
+        teammateLists: [own.id],
+      });
+    });
+
+    /** @scenario "AC189 Scope: board scope reaches only a project where Dashboards is switched on" */
+    it.each([
+      ["a member", TEAMMATE],
+      ["a project credential", void 0],
+    ])(
+      "answers %s for another project's Organization board as for a board that does not exist",
+      async (_who, viewer) => {
+        const { app, target } = await boardAt("ORGANIZATION", { dashboardsOffIn: [SIBLING] });
+        const guest = { app, projectId: SIBLING, viewer };
+
+        expect({
+          listed: await listedIds(app, SIBLING, viewer),
+          board: await outcomes(guest, target),
+        }).toEqual({ listed: [], board: await outcomes(guest, MISSING) });
+      },
+    );
+
+    /** @scenario "AC189 Scope: board scope reaches only a project where Dashboards is switched on" */
+    it("still lists and opens a board in the project that owns it, and where Dashboards is on", async () => {
+      const { app, target, dashboardsOff } = await boardAt("ORGANIZATION");
+      dashboardsOff.add(HOME);
+      const opened = async (projectId: string) =>
+        (await app.getById({ projectId, dashboardId: target.dashboardId, viewer: TEAMMATE })).id;
+
+      expect({
+        home: [await listedIds(app, HOME, TEAMMATE), await opened(HOME)],
+        sibling: [await listedIds(app, SIBLING, TEAMMATE), await opened(SIBLING)],
+      }).toEqual({
+        home: [[target.dashboardId], target.dashboardId],
+        sibling: [[target.dashboardId], target.dashboardId],
       });
     });
   });

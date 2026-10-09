@@ -10,7 +10,10 @@ import {
 } from "@langwatch/dashboard-contract";
 import { describe, expect, it } from "vitest";
 
-import { createDashboardTestProjects } from "../../app/__tests__/dashboard.fixture.ts";
+import {
+  createDashboardTestProjects,
+  DASHBOARDS_ROLLED_OUT,
+} from "../../app/__tests__/dashboard.fixture.ts";
 import { MemoryDashboardRepository } from "../../repositories/memory/memory.dashboard.repository.ts";
 import { DashboardAccessService } from "../dashboard-access.service.ts";
 import { DashboardStarService } from "../dashboard-star.service.ts";
@@ -30,6 +33,7 @@ function serviceWith(workbenchEnabled = true) {
   const access = DashboardAccessService.create({
     repository,
     projects: createDashboardTestProjects(),
+    rollout: DASHBOARDS_ROLLED_OUT,
   });
 
   return {

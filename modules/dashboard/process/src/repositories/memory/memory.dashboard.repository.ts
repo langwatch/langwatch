@@ -64,11 +64,17 @@ export class MemoryDashboardRepository implements DashboardRepository {
   #favourites: StoredFavourite[] = [];
   #clock = 0;
   #favouriteId = 0;
+  #archivedProjectIds: ReadonlySet<string>;
 
-  private constructor() {}
+  private constructor(archivedProjectIds: ReadonlySet<string>) {
+    this.#archivedProjectIds = archivedProjectIds;
+  }
 
-  static create(): MemoryDashboardRepository {
-    return new MemoryDashboardRepository();
+  /** The twin holds no project rows, so a test names the archived ones in a set it keeps. */
+  static create(
+    options: { archivedProjectIds?: ReadonlySet<string> } = {},
+  ): MemoryDashboardRepository {
+    return new MemoryDashboardRepository(options.archivedProjectIds ?? new Set());
   }
 
   async countUsage({
@@ -87,7 +93,7 @@ export class MemoryDashboardRepository implements DashboardRepository {
     input: DashboardReach & { graphKinds: readonly DashboardGraphKind[] },
   ): Promise<DashboardSummaryRecord[]> {
     const ordered = this.#dashboards
-      .filter((dashboard) => reaches(input, dashboard))
+      .filter((dashboard) => this.#reaches(input, dashboard))
       .toSorted((left, right) => left.order - right.order || left.name.localeCompare(right.name));
     const isOwn = (dashboard: DashboardRecord) => dashboard.projectId === input.projectId;
     return [...ordered.filter(isOwn), ...ordered.filter((row) => !isOwn(row))].map((dashboard) => ({
@@ -102,7 +108,7 @@ export class MemoryDashboardRepository implements DashboardRepository {
     input: DashboardReach & { dashboardId: string },
   ): Promise<(DashboardRecord & { graphs: GraphRecord[] }) | undefined> {
     const dashboard = this.#dashboards.find(
-      (row) => row.id === input.dashboardId && reaches(input, row),
+      (row) => row.id === input.dashboardId && this.#reaches(input, row),
     );
     if (!dashboard) return undefined;
 
@@ -118,7 +124,7 @@ export class MemoryDashboardRepository implements DashboardRepository {
     input: DashboardReach & { dashboardIds: string[] },
   ): Promise<DashboardRecord[]> {
     return this.#dashboards.filter(
-      (dashboard) => input.dashboardIds.includes(dashboard.id) && reaches(input, dashboard),
+      (dashboard) => input.dashboardIds.includes(dashboard.id) && this.#reaches(input, dashboard),
     );
   }
 
@@ -244,9 +250,22 @@ export class MemoryDashboardRepository implements DashboardRepository {
     ).length;
   }
 
+  /** Whether a read from this project, and its organization when named, reaches the board. */
+  #reaches(reach: DashboardReach, dashboard: DashboardRecord): boolean {
+    if (dashboard.projectId === reach.projectId) return true;
+    return (
+      reach.organizationId !== undefined &&
+      dashboard.scope === "ORGANIZATION" &&
+      dashboard.organizationId === reach.organizationId &&
+      !this.#archivedProjectIds.has(dashboard.projectId)
+    );
+  }
+
   /** The member's favourites as this project lists them, in position order. */
   #starred(input: MemberStars): StoredFavourite[] {
-    const shared = input.sharedProjectIds ?? [];
+    const shared = (input.sharedProjectIds ?? []).filter(
+      (projectId) => !this.#archivedProjectIds.has(projectId),
+    );
     return this.#favourites
       .filter(
         (row) =>
@@ -512,13 +531,6 @@ export class MemoryDashboardRepository implements DashboardRepository {
     return toDate(Temporal.Instant.fromEpochMilliseconds(this.#clock));
   }
 }
-
-/** Whether a read from this project, and its organization when named, reaches the board. */
-const reaches = (reach: DashboardReach, dashboard: DashboardRecord): boolean =>
-  dashboard.projectId === reach.projectId ||
-  (reach.organizationId !== undefined &&
-    dashboard.scope === "ORGANIZATION" &&
-    dashboard.organizationId === reach.organizationId);
 
 const graphOf = (chart: StoredChart): GraphRecord =>
   graphSchema.parse({

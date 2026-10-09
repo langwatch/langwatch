@@ -1,7 +1,7 @@
 /**
  * Every rule that follows from a board's scope: who sees it from where, who may write it, who
  * may change the scope and what a change costs other people. Pure, so the server refuses with
- * the same rules the browser offers controls with. Spec: dashboards-v2.feature AC170 to AC186.
+ * the same rules the browser offers controls with. Spec: dashboards-v2.feature AC170 to AC189.
  */
 import {
   DEFAULT_DASHBOARD_SCOPE,
@@ -29,17 +29,21 @@ type Reading = Readonly<{ viewer: DashboardViewer | undefined; place: DashboardP
  */
 export type DashboardStanding = "home" | "guest" | "none";
 
-/** The scope a new board starts at: Project, and Only me for a member's own My dashboard. */
+/**
+ * The scope a new board starts at: Project, and Only me for a member's own My dashboard where
+ * Dashboards is switched on. Where it is off nothing offers the scope, so nobody could widen it.
+ */
 export function newDashboardScope({
   name,
   createdById,
+  dashboardsEnabled,
 }: {
   name: string;
   createdById: string | undefined;
+  dashboardsEnabled: boolean;
 }): DashboardScope {
-  return name === MY_DASHBOARD_NAME && createdById !== undefined
-    ? "PRIVATE"
-    : DEFAULT_DASHBOARD_SCOPE;
+  const ownMyDashboard = name === MY_DASHBOARD_NAME && createdById !== undefined;
+  return ownMyDashboard && dashboardsEnabled ? "PRIVATE" : DEFAULT_DASHBOARD_SCOPE;
 }
 
 /** A board with no recorded author has none: a project credential never is one. */

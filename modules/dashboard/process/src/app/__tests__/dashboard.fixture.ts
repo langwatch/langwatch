@@ -67,6 +67,9 @@ export function createDashboardTestAutomation(triggers: Trigger[] = []): Automat
   });
 }
 
+/** Dashboards switched on for every project, for a service built without the analytics peer. */
+export const DASHBOARDS_ROLLED_OUT = { isDashboardsEnabled: async () => true };
+
 export const TEST_TEAM_ID = "team-1";
 export const TEST_ORGANIZATION_ID = "organization-1";
 

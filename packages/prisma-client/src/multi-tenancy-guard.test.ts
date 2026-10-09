@@ -1516,13 +1516,18 @@ describe("guardOrganizationId — organizationId as an operator or a composite k
 
 /** The shapes the dashboard repository reads an Organization board with (dashboards-v2 AC172). */
 describe("guardProjectId — Dashboard scope reads", () => {
-  const reach = [{ projectId: "project_a" }, { organizationId: "org_a", scope: "ORGANIZATION" }];
+  const live = { archivedAt: null };
+  const reach = [
+    { projectId: "project_a" },
+    { organizationId: "org_a", scope: "ORGANIZATION", project: live },
+  ];
 
   describe("when a read reaches the project's boards and its organization's shared ones", () => {
     it.each([
       ["findMany", { OR: reach }],
       ["findFirst", { id: "dashboard_1", OR: reach }],
       ["findMany", { id: { in: ["dashboard_1"] }, OR: reach }],
+      ["findMany", { projectId: { in: ["project_b"] }, project: live }],
     ])("permits Dashboard.%s where %o", async (action, where) => {
       await expect(runGuard({ model: "Dashboard", action, args: { where } })).resolves.toBe("ok");
     });

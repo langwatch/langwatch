@@ -17,6 +17,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   createDashboardTestAnalytics,
   createDashboardTestProjects,
+  DASHBOARDS_ROLLED_OUT,
 } from "../../../app/__tests__/dashboard.fixture.ts";
 import { DashboardAccessService } from "../../../services/dashboard-access.service.ts";
 import type { WorkbenchAccess } from "../../../services/dashboard.service.ts";
@@ -62,7 +63,11 @@ function graphs(): DashboardService {
   return DashboardService.create({
     repository,
     workbenchAccess: new WorkbenchOn(),
-    access: DashboardAccessService.create({ repository, projects: createDashboardTestProjects() }),
+    access: DashboardAccessService.create({
+      repository,
+      projects: createDashboardTestProjects(),
+      rollout: DASHBOARDS_ROLLED_OUT,
+    }),
   });
 }
 

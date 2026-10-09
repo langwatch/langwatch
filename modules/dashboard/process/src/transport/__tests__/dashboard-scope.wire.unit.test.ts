@@ -2,22 +2,33 @@
  * @vitest-environment node
  * Board scope at the doors: the member tRPC procedures and the project-credential REST routes,
  * over the real application and its memory repositories.
- * Spec: dashboards-v2.feature AC171 to AC174.
+ * Spec: dashboards-v2.feature AC171 to AC174 and AC189.
  */
-import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
+import { langWatchQLCallerProtections } from "@langwatch/analytics-contract";
+import { bindRestMiddleware, canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import type { TrpcProcedureFactory } from "@langwatch/api/trpc";
 import type { DashboardApi, DashboardScope } from "@langwatch/dashboard-contract";
 import { describe, expect, it } from "vitest";
 
 import {
+  createDashboardTestAnalytics,
   createDashboardTestApp,
   createDashboardTestProjects,
+  FULLY_PERMITTED,
 } from "../../app/__tests__/dashboard.fixture.ts";
+import { MemoryDashboardRepositories } from "../../repositories/memory/memory.dashboard.repositories.ts";
+import {
+  dashboardWidgetCallerSource,
+  dashboardWidgetRest,
+  dashboardWidgetUrl,
+} from "../dashboard-widget.rest.ts";
 import { dashboardWidgetTrpcTransport } from "../dashboard-widget.trpc.ts";
 import { dashboardRest } from "../dashboard.rest.ts";
 import { dashboardTrpcTransport } from "../dashboard.trpc.ts";
 import { graphRest } from "../graph.rest.ts";
 import { graphTrpcTransport } from "../graph.trpc.ts";
+import { savedWorkbenchChartRest, savedWorkbenchChartUrl } from "../saved-workbench-chart.rest.ts";
+import { savedWorkbenchChartTrpcTransport } from "../saved-workbench-chart.trpc.ts";
 
 type Context = object;
 /** A procedure's input: always in one project, the rest as that procedure takes it. */
@@ -40,6 +51,18 @@ const WIDGET = {
   queries: [{ name: "usage", sql: "SELECT 1" }],
 };
 const GRAPH = { name: "Latency", graph: { graphType: "line" } };
+const CHART_ID = "chart-on-board";
+const BOX = { gridColumn: 0, gridRow: 0, colSpan: 2, rowSpan: 2 };
+const PLATFORM_URL = "https://app.langwatch.test/dashboards";
+
+/** The board and what is on it, by id; or ids that name nothing. */
+type Ids = Readonly<{ boardId: string; widgetId: string; graphId: string; chartId: string }>;
+const MISSING: Ids = {
+  boardId: "no-such-board",
+  widgetId: "no-such-widget",
+  graphId: "no-such-graph",
+  chartId: "no-such-chart",
+};
 
 /** The member doors: every dashboards, widgets and graphs procedure, called as one member. */
 function memberDoors(app: DashboardApi) {
@@ -54,6 +77,7 @@ function memberDoors(app: DashboardApi) {
   dashboardTrpcTransport.router(runtime, () => app);
   dashboardWidgetTrpcTransport.router(runtime, () => app);
   graphTrpcTransport.router(runtime, () => app);
+  savedWorkbenchChartTrpcTransport.router(runtime, () => app);
 
   return async (actorId: string, procedure: string, input: Input) => {
     const handle = handlers.get(procedure);
@@ -68,7 +92,7 @@ function memberDoors(app: DashboardApi) {
   };
 }
 
-/** The credential doors: `/api/dashboards` and `/api/graphs` with one project's API key. */
+/** The credential doors: boards, graphs, widgets and saved charts with one project's API key. */
 function credentialDoors(app: DashboardApi, projectId: string) {
   const caller = {
     actor: { type: "api_key" as const, id: "key-1" },
@@ -77,13 +101,23 @@ function credentialDoors(app: DashboardApi, projectId: string) {
   const runtime = createRestRuntime({
     identity: { authenticate: () => caller, identify: () => caller },
   });
-  const mounted = [dashboardRest, graphRest].map((family) =>
-    runtime.mount(family.router(), { app: () => app, facts: [], onError: canonicalErrorResponse }),
-  );
+  const mount = (family: typeof dashboardRest, facts: unknown[] = []) =>
+    runtime.mount(family.router(), {
+      app: () => app,
+      facts: facts as never,
+      onError: canonicalErrorResponse,
+    });
+  const families = [
+    { under: "/analytics/dashboard-widgets", hono: mount(dashboardWidgetRest, WIDGET_FACTS) },
+    { under: "/analytics/charts", hono: mount(savedWorkbenchChartRest, CHART_FACTS) },
+    { under: "/api/dashboards", hono: mount(dashboardRest) },
+    { under: "/api/graphs", hono: mount(graphRest) },
+  ];
 
   return async (method: string, path: string, body?: unknown) => {
-    const hono = path.startsWith("/api/dashboards") ? mounted[0] : mounted[1];
-    const response = await hono!.fetch(
+    const hono = families.find(({ under }) => path.includes(under))?.hono;
+    if (hono === undefined) throw new Error(`no route family serves ${path}`);
+    const response = await hono.fetch(
       new Request(`http://api.test${path}`, {
         method,
         headers: { "content-type": "application/json" },
@@ -95,10 +129,24 @@ function credentialDoors(app: DashboardApi, projectId: string) {
   };
 }
 
-/** The author's board in HOME, with a widget and a graph, at the scope asked for. */
-async function boardAt(scope: DashboardScope) {
+const WIDGET_FACTS = [
+  bindRestMiddleware(dashboardWidgetUrl, () => PLATFORM_URL),
+  bindRestMiddleware(dashboardWidgetCallerSource, () => ({ kind: "api" as const })),
+];
+const CHART_FACTS = [
+  bindRestMiddleware(langWatchQLCallerProtections, () => FULLY_PERMITTED),
+  bindRestMiddleware(savedWorkbenchChartUrl, () => PLATFORM_URL),
+];
+
+/** The author's board in HOME, with a widget, a graph and a saved chart, at the scope asked for. */
+async function boardAt(scope: DashboardScope, world: { dashboardsOffIn?: string[] } = {}) {
+  const repositories = MemoryDashboardRepositories.create();
   const app = createDashboardTestApp({
+    repositories,
     dependencies: {
+      analytics: createDashboardTestAnalytics({
+        isDashboardsEnabled: async ({ projectId }) => !world.dashboardsOffIn?.includes(projectId),
+      }),
       projects: createDashboardTestProjects({
         organizations: { [HOME]: "organization-1", [SIBLING]: "organization-1" },
       }),
@@ -113,9 +161,106 @@ async function boardAt(scope: DashboardScope) {
     id: string;
   };
   const graph = (await call(AUTHOR, "graphs.create", { ...GRAPH, ...on })) as { id: string };
+  await repositories.dashboards.createSavedWorkbenchChart({
+    id: CHART_ID,
+    projectId: HOME,
+    name: "Spend",
+    definition: { version: 1, sql: "SELECT 1", parameters: {} },
+  });
+  await app.placeSavedWorkbenchChart({ ...on, chartId: CHART_ID, viewer: { userId: AUTHOR } });
+  await call(TEAMMATE, "dashboards.star", { projectId: HOME, star: starOf(board.id) });
   if (scope !== "PROJECT") await call(AUTHOR, "dashboards.setScope", { ...on, scope });
 
-  return { app, call, boardId: board.id, widgetId: widget.id, graphId: graph.id };
+  const ids: Ids = { boardId: board.id, widgetId: widget.id, graphId: graph.id, chartId: CHART_ID };
+  return { app, call, ids, ...ids };
+}
+
+const starOf = (dashboardId: string) => ({ kind: "board" as const, dashboardId });
+
+/** Every member procedure that names a board, or something on one, by id. */
+function memberAsks({ boardId, widgetId, graphId, chartId }: Ids): Record<string, [string, Input]> {
+  const here = { projectId: HOME };
+  const on = { ...here, dashboardId: boardId };
+  const star = starOf(boardId);
+  return {
+    open: ["dashboards.getById", on],
+    rename: ["dashboards.rename", { ...on, name: "Taken" }],
+    describe: ["dashboards.updateDetails", { ...on, description: "Mine" }],
+    reorder: ["dashboards.reorderDashboards", { ...here, dashboardIds: [boardId] }],
+    setScope: ["dashboards.setScope", { ...on, scope: "PROJECT" }],
+    scopeImpact: ["dashboards.scopeImpact", on],
+    scopeProjects: ["dashboards.scopeProjects", on],
+    star: ["dashboards.star", { ...here, star }],
+    unstar: ["dashboards.unstar", { ...here, star }],
+    reorderStars: ["dashboards.reorderStars", { ...here, stars: [star] }],
+    widgets: ["dashboardWidgets.list", on],
+    addWidget: ["dashboardWidgets.create", { ...WIDGET, ...on }],
+    editWidget: ["dashboardWidgets.update", { ...WIDGET, ...here, id: widgetId }],
+    placeWidget: ["dashboardWidgets.assignDashboard", { ...on, id: widgetId }],
+    moveWidget: ["dashboardWidgets.updateLayout", { ...here, graphId: widgetId, ...BOX }],
+    moveWidgets: [
+      "dashboardWidgets.batchUpdateLayouts",
+      { ...here, layouts: [{ graphId: widgetId, ...BOX }] },
+    ],
+    deleteWidget: ["dashboardWidgets.delete", { ...here, id: widgetId }],
+    boardGraphs: ["graphs.getAll", on],
+    addGraph: ["graphs.create", { ...GRAPH, ...on }],
+    readGraph: ["graphs.getById", { ...here, id: graphId }],
+    moveGraphs: ["graphs.batchUpdateLayouts", { ...here, layouts: [{ graphId, ...BOX }] }],
+    deleteGraph: ["graphs.delete", { ...here, id: graphId }],
+    readChart: ["analytics.savedWorkbenchCharts.getById", { ...here, id: chartId }],
+    editChart: ["analytics.savedWorkbenchCharts.update", { ...here, id: chartId, name: "X" }],
+    runChart: ["analytics.savedWorkbenchCharts.run", { ...here, id: chartId }],
+    deleteChart: ["analytics.savedWorkbenchCharts.delete", { ...here, id: chartId }],
+    delete: ["dashboards.delete", on],
+  };
+}
+
+const WIDGETS = `/api/v1/projects/${HOME}/analytics/dashboard-widgets`;
+const CHARTS = `/api/v1/projects/${HOME}/analytics/charts`;
+
+/** Every REST route that names a board, or something on one, by id: method, path and body. */
+function credentialAsks({
+  boardId,
+  widgetId,
+  graphId,
+  chartId,
+}: Ids): Record<string, [string, string, unknown?]> {
+  return {
+    open: ["GET", `/api/dashboards/${boardId}`],
+    rename: ["PATCH", `/api/dashboards/${boardId}`, { name: "Taken" }],
+    reorder: ["PUT", "/api/dashboards/reorder", { dashboardIds: [boardId] }],
+    readGraph: ["GET", `/api/graphs/${graphId}`],
+    addGraph: ["POST", "/api/graphs", { ...GRAPH, dashboardId: boardId }],
+    editGraph: ["PATCH", `/api/graphs/${graphId}`, { name: "X" }],
+    deleteGraph: ["DELETE", `/api/graphs/${graphId}`],
+    readWidget: ["GET", `${WIDGETS}/${widgetId}`],
+    editWidget: ["PATCH", `${WIDGETS}/${widgetId}`, { name: "X" }],
+    placeWidget: ["POST", `${WIDGETS}/${widgetId}/dashboard`, { dashboardId: boardId }],
+    deleteWidget: ["DELETE", `${WIDGETS}/${widgetId}`],
+    readChart: ["GET", `${CHARTS}/${chartId}`],
+    editChart: ["PATCH", `${CHARTS}/${chartId}`, { name: "X" }],
+    placeChart: ["PUT", `${CHARTS}/${chartId}/placement`, { dashboardId: boardId }],
+    unplaceChart: ["DELETE", `${CHARTS}/${chartId}/placement`],
+    deleteChart: ["DELETE", `${CHARTS}/${chartId}`],
+    delete: ["DELETE", `/api/dashboards/${boardId}`],
+  };
+}
+
+/** An answer less the ids the caller named, so a hidden board compares with a missing one. */
+function withoutIds(answer: unknown, ids: Ids): unknown {
+  const told = JSON.stringify(answer);
+  return JSON.parse(Object.values(ids).reduce((text, id) => text.replaceAll(id, "<id>"), told));
+}
+
+/** Everything a call answers: what it resolved with, or the whole refusal it raised. */
+async function outcomeOf(call: Promise<unknown>): Promise<unknown> {
+  try {
+    return { resolved: (await call) ?? null };
+  } catch (error) {
+    const refusal = error as Error & { serialize?: () => object };
+    return { refused: { name: refusal.name, message: refusal.message, ...refusal.serialize?.() } };
+  }
 }
 
 /** The `code` a rejected call carries, or that it resolved. */
@@ -228,6 +373,65 @@ describe("board scope at the doors", () => {
     });
 
     /** @scenario "AC171 Scope: an Only me board exists for its author alone" */
+    it("tells a teammate no more than a missing id does, on any member procedure", async () => {
+      const { call, ids } = await boardAt("PRIVATE");
+      const told = async (named: Ids) => {
+        const result: Record<string, unknown> = {};
+        for (const [name, [procedure, input]] of Object.entries(memberAsks(named))) {
+          result[name] = withoutIds(await outcomeOf(call(TEAMMATE, procedure, input)), named);
+        }
+        return result;
+      };
+      const missing = await told(MISSING);
+
+      expect({
+        hidden: await told(ids),
+        accepted: Object.keys(missing).filter((name) => "resolved" in Object(missing[name])),
+      }).toEqual({
+        hidden: missing,
+        accepted: ["unstar", "reorderStars", "moveWidget", "moveWidgets", "boardGraphs"],
+      });
+    });
+
+    /** @scenario "AC171 Scope: an Only me board exists for its author alone" */
+    it("lists a teammate's stars and finds their first board as it does once the board is deleted", async () => {
+      const read = async ({ call }: Awaited<ReturnType<typeof boardAt>>) => {
+        const starred = await call(TEAMMATE, "dashboards.listStarred", { projectId: HOME });
+        const first = (await call(TEAMMATE, "dashboards.getOrCreateFirst", {
+          projectId: HOME,
+        })) as { name: string; scope: string; createdById: string | null };
+        // `order` counts every board of the project, hidden ones too: a known side channel.
+        return { starred, name: first.name, scope: first.scope, createdById: first.createdById };
+      };
+      const deleted = await boardAt("PROJECT");
+      await deleted.call(AUTHOR, "dashboards.delete", {
+        projectId: HOME,
+        dashboardId: deleted.boardId,
+      });
+
+      expect(await read(await boardAt("PRIVATE"))).toEqual(await read(deleted));
+    });
+
+    /** @scenario "AC171 Scope: an Only me board exists for its author alone" */
+    it("tells a project credential no more than a missing id does, on any REST route", async () => {
+      const { app, ids } = await boardAt("PRIVATE");
+      const send = credentialDoors(app, HOME);
+      const told = async (named: Ids) => {
+        const result: Record<string, { status: number }> = {};
+        for (const [name, [method, path, body]] of Object.entries(credentialAsks(named))) {
+          result[name] = withoutIds(await send(method, path, body), named) as { status: number };
+        }
+        return result;
+      };
+      const missing = await told(MISSING);
+
+      expect({
+        hidden: await told(ids),
+        accepted: Object.keys(missing).filter((name) => missing[name]!.status < 400),
+      }).toEqual({ hidden: missing, accepted: [] });
+    });
+
+    /** @scenario "AC171 Scope: an Only me board exists for its author alone" */
     it("says no more to a project credential than a board that does not exist does", async () => {
       const { app, boardId } = await boardAt("PRIVATE");
       const send = credentialDoors(app, HOME);
@@ -281,6 +485,33 @@ describe("board scope at the doors", () => {
         status: 200,
         id: boardId,
         listed: [],
+      });
+    });
+
+    /** @scenario "AC189 Scope: board scope reaches only a project where Dashboards is switched on" */
+    it("is a board that does not exist for a project where Dashboards is switched off", async () => {
+      const { app, call, ids } = await boardAt("ORGANIZATION", { dashboardsOffIn: [SIBLING] });
+      const send = credentialDoors(app, SIBLING);
+      const opened = async (named: Ids) => ({
+        credential: withoutIds(await send("GET", `/api/dashboards/${named.boardId}`), named),
+        member: withoutIds(
+          await outcomeOf(
+            call(TEAMMATE, "dashboards.getById", {
+              projectId: SIBLING,
+              dashboardId: named.boardId,
+            }),
+          ),
+          named,
+        ),
+      });
+      const listed = await call(TEAMMATE, "dashboards.getAll", {
+        projectId: SIBLING,
+        includeOrganization: true,
+      });
+
+      expect({ listed, opened: await opened(ids) }).toEqual({
+        listed: [],
+        opened: await opened(MISSING),
       });
     });
 

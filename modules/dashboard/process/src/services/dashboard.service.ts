@@ -131,7 +131,7 @@ export class DashboardService {
 
   /**
    * A new board after the last, at the scope Project. A member's own My dashboard alone starts
-   * at Only me and starred, for them.
+   * starred for them, and at Only me where Dashboards is switched on.
    */
   async create(input: {
     projectId: string;
@@ -143,6 +143,9 @@ export class DashboardService {
     const id = generate(DASHBOARD_KSUID_RESOURCE).toString();
 
     const last = await this.#repository.findLastDashboard({ projectId: parsed.projectId });
+    const dashboardsEnabled = await this.#access.isDashboardsEnabled({
+      projectId: parsed.projectId,
+    });
 
     const dashboard = await this.#repository.createDashboard({
       id,
@@ -150,7 +153,7 @@ export class DashboardService {
       name: parsed.name,
       order: (last?.order ?? -1) + 1,
       createdById: createdById ?? null,
-      scope: newDashboardScope({ name: parsed.name, createdById }),
+      scope: newDashboardScope({ name: parsed.name, createdById, dashboardsEnabled }),
     });
     // Stored as an ordinary star, so unstarring it later removes it for good.
     if (createdById !== undefined && parsed.name === MY_DASHBOARD_NAME) {

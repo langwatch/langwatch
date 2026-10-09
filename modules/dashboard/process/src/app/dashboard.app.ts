@@ -52,7 +52,10 @@ import { ProjectApi, type ProjectApi as ProjectApiContract } from "@langwatch/pr
 
 import type { DashboardRepositories } from "../repositories/dashboard.repositories.ts";
 import { dashboardPlatformUrl } from "../rules/dashboard-platform-url.rules.ts";
-import { DashboardAccessService } from "../services/dashboard-access.service.ts";
+import {
+  DashboardAccessService,
+  type DashboardsRollout,
+} from "../services/dashboard-access.service.ts";
 import { DashboardScopeService } from "../services/dashboard-scope.service.ts";
 import { DashboardStarService } from "../services/dashboard-star.service.ts";
 import { DashboardWidgetService } from "../services/dashboard-widget.service.ts";
@@ -85,11 +88,6 @@ interface WorkbenchCaller {
     actorId: string;
     projectId: string;
   }): Promise<Readonly<{ project: LangWatchQLCaller; protections: LangWatchQLProtections }>>;
-}
-
-/** The `release_dashboards` rollout, resolved for one project. */
-interface DashboardsRollout {
-  isDashboardsEnabled(input: { projectId: string }): Promise<boolean>;
 }
 
 /**
@@ -210,7 +208,8 @@ export class DashboardModule implements DashboardApi {
     const workbenchCaller = new AnalyticsWorkbenchCaller(analytics);
     const repository = setup.repositories.dashboards;
     const { projects, authz } = setup.dependencies;
-    const access = DashboardAccessService.create({ repository, projects });
+    const rollout = new AnalyticsDashboardsRollout(analytics);
+    const access = DashboardAccessService.create({ repository, projects, rollout });
 
     return new DashboardModule({
       services: {
@@ -237,7 +236,7 @@ export class DashboardModule implements DashboardApi {
         projects: setup.dependencies.projects,
       },
       workbench: { access: workbenchAccess, caller: workbenchCaller },
-      rollout: new AnalyticsDashboardsRollout(analytics),
+      rollout,
       publicBaseUrl: setup.config.publicBaseUrl,
     });
   }

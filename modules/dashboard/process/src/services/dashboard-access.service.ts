@@ -18,6 +18,11 @@ import type {
   GraphRecord,
 } from "../repositories/dashboard.repository.ts";
 
+/** The `release_dashboards` rollout, resolved for one project. */
+export interface DashboardsRollout {
+  isDashboardsEnabled(input: { projectId: string }): Promise<boolean>;
+}
+
 /** Who is reading, from which project; no viewer is a project credential. */
 export type BoardReading = Readonly<{ projectId: string; viewer?: DashboardViewer }>;
 
@@ -35,22 +40,41 @@ export type ReadableBoard = Readonly<{
 export class DashboardAccessService {
   #repository: DashboardRepository;
   #projects: ProjectApi;
+  #rollout: DashboardsRollout;
 
-  private constructor(repository: DashboardRepository, projects: ProjectApi) {
-    this.#repository = repository;
-    this.#projects = projects;
+  private constructor(options: {
+    repository: DashboardRepository;
+    projects: ProjectApi;
+    rollout: DashboardsRollout;
+  }) {
+    this.#repository = options.repository;
+    this.#projects = options.projects;
+    this.#rollout = options.rollout;
   }
 
   static create(options: {
     repository: DashboardRepository;
     projects: ProjectApi;
+    rollout: DashboardsRollout;
   }): DashboardAccessService {
-    return new DashboardAccessService(options.repository, options.projects);
+    return new DashboardAccessService(options);
   }
 
-  /** The project a read is made from, with the organization whose shared boards it lists. */
+  /** Whether Dashboards is switched on for the project: where it is off, scope offers nothing. */
+  isDashboardsEnabled({ projectId }: { projectId: string }): Promise<boolean> {
+    return this.#rollout.isDashboardsEnabled({ projectId });
+  }
+
+  /**
+   * The project a read is made from, with the organization whose shared boards it lists. A
+   * project with Dashboards off has none, so another project's board is not there for it.
+   */
   async placeOf({ projectId }: { projectId: string }): Promise<DashboardPlace> {
-    return { projectId, organizationId: await this.#projects.findOrganizationId(projectId) };
+    const enabled = await this.isDashboardsEnabled({ projectId });
+    return {
+      projectId,
+      organizationId: enabled ? await this.#projects.findOrganizationId(projectId) : void 0,
+    };
   }
 
   /** The boards the reader's project lists: its own they may see, then the organization's. */
