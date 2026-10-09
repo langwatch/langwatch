@@ -163,6 +163,19 @@ describe("given acme is not on a plan that carries the requirement", () => {
       );
     });
 
+    it("says the plan no longer includes it only while the requirement is still on", () => {
+      renderSurface({ mfaRequired: false, canTurnOn: false, planLocked: true, members: [] });
+      const plain = screen.getByTestId("two-step-requirement-plan-notice").textContent ?? "";
+      expect(plain).toContain("part of the Enterprise plan");
+      expect(plain).not.toContain("no longer includes");
+      cleanup();
+
+      renderSurface({ mfaRequired: true, canTurnOn: false, planLocked: true, members: [] });
+      expect(screen.getByTestId("two-step-requirement-plan-notice").textContent).toContain(
+        "no longer includes",
+      );
+    });
+
     /** @scenario "The requirement is offered on every plan and locked without one" */
     it("still lets ana turn it off once it is on and the plan has lapsed", async () => {
       const { onChange } = renderSurface({
