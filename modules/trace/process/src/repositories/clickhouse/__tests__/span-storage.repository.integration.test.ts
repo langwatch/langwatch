@@ -4,18 +4,32 @@
  * suite confirms normal traces return correct results under the cap. */
 
 import type { ClickHouseClient } from "@clickhouse/client";
+import { ownProof } from "@langwatch/authorization/testing";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { MAX_EVENT_NAMES_PER_TRACE } from "../../span-storage.repository.ts";
+import { AuthorizedTraceReadsRepository } from "../clickhouse.trace-member-client.repository.ts";
 import { SpanStorageClickHouseRepository } from "../span-storage.repository.ts";
 import { recordStoredSpansQueries } from "./fixtures/recording-clickhouse-client.ts";
+import { authorizedReadsOver } from "./support/authorized-reads.support.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
 } from "./support/clickhouse-endpoint.support.ts";
 
 const clickHouseConfigured = testClickHouseConfigured();
+
+/** Writes resolve the client directly; reads go through the proof-checking reader (ADR-175). */
+function repositoryOver(client: ClickHouseClient): SpanStorageClickHouseRepository {
+  return SpanStorageClickHouseRepository.create({
+    resolveClient: async () => client,
+    reads: authorizedReadsOver(client),
+  });
+}
+
+/** A proof sealed now, so a slow container start can never leave it expired. */
+const proofFor = (projectId: string) => ownProof({ projectId, now: Date.now() });
 
 const tenantId = `test-span-fetch-${nanoid()}`;
 const traceId = `trace-${nanoid()}`;
@@ -93,7 +107,7 @@ async function insertRows(rows: ReturnType<typeof makeSpanRow>[]) {
 beforeAll(async () => {
   if (!clickHouseConfigured) return;
   ch = await startMigratedTraceClickHouse();
-  repo = new SpanStorageClickHouseRepository(async () => ch);
+  repo = repositoryOver(ch);
 
   const rows = Array.from({ length: TOTAL_SPANS }, (_, i) => makeSpanRow(i));
   await insertRows(rows);
@@ -176,7 +190,7 @@ describe.skipIf(!clickHouseConfigured)(
     describe("when reading a trace under the per-query memory cap", () => {
       it("returns the earliest `limit` spans ordered by StartTime", async () => {
         const spans = await repo.findNormalizedSpansByTraceId({
-          tenantId,
+          authorization: proofFor(tenantId),
           traceId,
         });
 
@@ -192,7 +206,7 @@ describe.skipIf(!clickHouseConfigured)(
 
       it("returns the latest version of a duplicated span, not the stale one", async () => {
         const spans = await repo.findNormalizedSpansByTraceId({
-          tenantId,
+          authorization: proofFor(tenantId),
           traceId,
         });
 
@@ -205,7 +219,7 @@ describe.skipIf(!clickHouseConfigured)(
 
       it("preserves the full heavy SpanAttributes payload", async () => {
         const spans = await repo.findNormalizedSpansByTraceId({
-          tenantId,
+          authorization: proofFor(tenantId),
           traceId,
         });
 
@@ -252,7 +266,7 @@ describe.skipIf(!clickHouseConfigured)(
 
       it("getTraceEventsByTraceId returns all events incl. exceptions in ASC order, latest span version only", async () => {
         const events = await repo.findTraceEventsByTraceId({
-          tenantId: eventsTenantId,
+          authorization: proofFor(eventsTenantId),
           traceId: eventsTraceId,
         });
 
@@ -268,7 +282,7 @@ describe.skipIf(!clickHouseConfigured)(
 
       it("getEventsByTraceId filters out exception events and orders by event_timestamp DESC, latest span version only", async () => {
         const events = await repo.findEventsByTraceId({
-          tenantId: eventsTenantId,
+          authorization: proofFor(eventsTenantId),
           traceId: eventsTraceId,
         });
 
@@ -399,7 +413,7 @@ describe.skipIf(!clickHouseConfigured)(
       /** @scenario A trace with events shows a badge per event name */
       it("returns one entry per event name for a trace", async () => {
         const rollups = await repo.findTraceEventRollupsByTraceIds({
-          tenantId: rollupTenantId,
+          authorization: proofFor(rollupTenantId),
           traceIds: [feedbackTraceId],
           timeRange,
         });
@@ -421,7 +435,7 @@ describe.skipIf(!clickHouseConfigured)(
       /** @scenario Badges are ordered by when the event first occurred */
       it("collapses repeats by name, ordered by first occurrence, latest span version only", async () => {
         const rollups = await repo.findTraceEventRollupsByTraceIds({
-          tenantId: rollupTenantId,
+          authorization: proofFor(rollupTenantId),
           traceIds: [chattyTraceId],
           timeRange,
         });
@@ -444,7 +458,7 @@ describe.skipIf(!clickHouseConfigured)(
       /** @scenario Events are shown for the traces currently on screen */
       it("answers a whole page in one call, keyed by trace id", async () => {
         const rollups = await repo.findTraceEventRollupsByTraceIds({
-          tenantId: rollupTenantId,
+          authorization: proofFor(rollupTenantId),
           traceIds: [feedbackTraceId, chattyTraceId, quietTraceId],
           timeRange,
         });
@@ -457,7 +471,7 @@ describe.skipIf(!clickHouseConfigured)(
       /** @scenario A trace with no events shows the empty marker */
       it("omits a trace that recorded no events", async () => {
         const rollups = await repo.findTraceEventRollupsByTraceIds({
-          tenantId: rollupTenantId,
+          authorization: proofFor(rollupTenantId),
           traceIds: [quietTraceId],
           timeRange,
         });
@@ -468,7 +482,7 @@ describe.skipIf(!clickHouseConfigured)(
       /** @scenario A trace with a very large number of events stays bounded */
       it("trims to the badge cap while still reporting the true totals", async () => {
         const rollups = await repo.findTraceEventRollupsByTraceIds({
-          tenantId: rollupTenantId,
+          authorization: proofFor(rollupTenantId),
           traceIds: [noisyTraceId],
           timeRange,
         });
@@ -484,7 +498,7 @@ describe.skipIf(!clickHouseConfigured)(
       /** @scenario Only the caller's project is read */
       it("leaves out the neighbour's events on a trace id both tenants used", async () => {
         const rollups = await repo.findTraceEventRollupsByTraceIds({
-          tenantId: rollupTenantId,
+          authorization: proofFor(rollupTenantId),
           traceIds: [otherTenantTraceId],
           timeRange,
         });
@@ -508,7 +522,7 @@ describe.skipIf(!clickHouseConfigured)(
       it("returns nothing when the page's time range excludes the spans", async () => {
         const longAgo = rollupBase.getTime() - 400 * 24 * 60 * 60 * 1000;
         const rollups = await repo.findTraceEventRollupsByTraceIds({
-          tenantId: rollupTenantId,
+          authorization: proofFor(rollupTenantId),
           traceIds: [feedbackTraceId],
           timeRange: { from: longAgo, to: longAgo + 60_000 },
         });
@@ -518,13 +532,18 @@ describe.skipIf(!clickHouseConfigured)(
 
       /** @scenario A page with no traces on it shows no events */
       it("issues no query for an empty page", async () => {
-        const failingRepo = new SpanStorageClickHouseRepository(async () => {
-          throw new Error("resolveClient must not be called");
+        const failingRepo = SpanStorageClickHouseRepository.create({
+          resolveClient: async () => {
+            throw new Error("resolveClient must not be called");
+          },
+          reads: AuthorizedTraceReadsRepository.create({
+            clickhouse: { query: () => Promise.reject(new Error("the reader must not be called")) },
+          }),
         });
 
         await expect(
           failingRepo.findTraceEventRollupsByTraceIds({
-            tenantId: rollupTenantId,
+            authorization: proofFor(rollupTenantId),
             traceIds: [],
             timeRange,
           }),
@@ -593,7 +612,7 @@ describe.skipIf(!clickHouseConfigured)(
       describe("when the trace's occurrence time is recorded in trace_summaries", () => {
         it("resolves the partition window from trace_summaries and still returns the events", async () => {
           const events = await repo.findTraceEventsByTraceId({
-            tenantId: hintlessTenantId,
+            authorization: proofFor(hintlessTenantId),
             traceId: withEventsTraceId,
           });
 
@@ -607,10 +626,10 @@ describe.skipIf(!clickHouseConfigured)(
           // partition-bounded (carry the StartTime predicate / fromMs param).
           const { client: recordingClient, queries: storedSpansQueries } =
             recordStoredSpansQueries(ch);
-          const recordingRepo = new SpanStorageClickHouseRepository(async () => recordingClient);
+          const recordingRepo = repositoryOver(recordingClient);
 
           const events = await recordingRepo.findTraceEventsByTraceId({
-            tenantId: hintlessTenantId,
+            authorization: proofFor(hintlessTenantId),
             traceId: noEventsTraceId,
           });
 
@@ -690,7 +709,7 @@ describe.skipIf(!clickHouseConfigured)(
 
       it("resolves the partition window from trace_summaries and still returns the spans", async () => {
         const spans = await repo.findNormalizedSpansByTraceId({
-          tenantId: hintlessTenantId,
+          authorization: proofFor(hintlessTenantId),
           traceId: withSpansTraceId,
         });
 
@@ -700,10 +719,10 @@ describe.skipIf(!clickHouseConfigured)(
       it("returns no spans for a trace without any, via the bounded-then-unbounded fallback", async () => {
         const { client: recordingClient, queries: storedSpansQueries } =
           recordStoredSpansQueries(ch);
-        const recordingRepo = new SpanStorageClickHouseRepository(async () => recordingClient);
+        const recordingRepo = repositoryOver(recordingClient);
 
         const spans = await recordingRepo.findNormalizedSpansByTraceId({
-          tenantId: hintlessTenantId,
+          authorization: proofFor(hintlessTenantId),
           traceId: emptyTraceId,
         });
 
@@ -720,10 +739,10 @@ describe.skipIf(!clickHouseConfigured)(
       it("returns spans that fall outside the resolved ±2-day window via the unbounded fallback", async () => {
         const { client: recordingClient, queries: storedSpansQueries } =
           recordStoredSpansQueries(ch);
-        const recordingRepo = new SpanStorageClickHouseRepository(async () => recordingClient);
+        const recordingRepo = repositoryOver(recordingClient);
 
         const spans = await recordingRepo.findNormalizedSpansByTraceId({
-          tenantId: hintlessTenantId,
+          authorization: proofFor(hintlessTenantId),
           traceId: outOfWindowTraceId,
         });
 
@@ -741,10 +760,10 @@ describe.skipIf(!clickHouseConfigured)(
         // unbounded rather than guessing a window.
         const { client: recordingClient, queries: storedSpansQueries } =
           recordStoredSpansQueries(ch);
-        const recordingRepo = new SpanStorageClickHouseRepository(async () => recordingClient);
+        const recordingRepo = repositoryOver(recordingClient);
 
         const spans = await recordingRepo.findNormalizedSpansByTraceId({
-          tenantId: hintlessTenantId,
+          authorization: proofFor(hintlessTenantId),
           traceId: orphanTraceId,
         });
 

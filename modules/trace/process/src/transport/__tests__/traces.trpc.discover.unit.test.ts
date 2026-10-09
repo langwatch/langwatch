@@ -84,6 +84,7 @@ describe("given the sidebar's facet read", () => {
         timeRange: TIME_RANGE,
         query: "status:error",
         evalRuns: undefined,
+        actor: { id: "reader-1", type: "user" },
       });
     });
   });

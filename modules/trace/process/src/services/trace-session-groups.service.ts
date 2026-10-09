@@ -1,3 +1,4 @@
+import type { Authorization } from "@langwatch/authorization";
 import { ValidationError } from "@langwatch/handled-error";
 import type { SessionGroupDto, SessionGroupsResult } from "@langwatch/trace-contract";
 import { teaserOf } from "@langwatch/trace-contract";
@@ -27,6 +28,8 @@ const SORT_COLUMNS = Object.keys(SORT_COLUMN_KEYS) as [
 const sessionGroupsCursorSchema = z.object({
   sortValue: z.number().finite(),
   conversationId: z.string().min(1),
+  /** The boundary session's tenant; absent on a cursor minted before it was carried. */
+  tenantId: z.string().min(1).optional(),
   sortColumn: z.enum(SORT_COLUMNS),
   sortDirection: z.enum(["asc", "desc"]),
 });
@@ -74,6 +77,7 @@ function buildKeysetCursor({
   return {
     sortValue: cursor.sortValue,
     conversationId: cursor.conversationId,
+    ...(cursor.tenantId === void 0 ? {} : { tenantId: cursor.tenantId }),
   };
 }
 
@@ -138,7 +142,8 @@ function teasedSession(session: SessionGroupDto): SessionGroupDto {
 }
 
 interface SessionGroupsParams {
-  tenantId: string;
+  /** The route's proof; the rollup reads through it (ADR-175). */
+  authorization: Authorization;
   timeRange: { from: number; to: number; live?: boolean };
   sort?: { columnId: string; direction: "asc" | "desc" };
   pageSize: number;
@@ -171,7 +176,7 @@ export class SessionGroupsService {
     const sortColumn = SORT_COLUMN_MAP[params.sort?.columnId ?? ""] ?? DEFAULT_SORT.column;
     const sortDirection = params.sort?.direction ?? DEFAULT_SORT.direction;
     const page = await this.repository.listSessionGroups({
-      tenantId: params.tenantId,
+      authorization: params.authorization,
       timeRange: params.timeRange,
       sort: { column: sortColumn, direction: sortDirection },
       // One sentinel row past the page so `nextCursor` is exact.
@@ -208,6 +213,7 @@ export class SessionGroupsService {
                 column: sortColumn,
               }),
               conversationId: lastRow.conversationId,
+              tenantId: lastRow.tenantId,
               sortColumn,
               sortDirection,
             })

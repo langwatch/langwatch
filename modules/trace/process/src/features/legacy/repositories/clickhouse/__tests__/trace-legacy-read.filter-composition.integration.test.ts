@@ -6,18 +6,20 @@
  * @see specs/traces/trace-filter-api.feature
  */
 import type { ClickHouseClient } from "@clickhouse/client";
+import { ownProof } from "@langwatch/authorization/testing";
 import { TRACE_FILTER_EXAMPLES, type GetAllTracesForProjectInput } from "@langwatch/trace-contract";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { traceQueryTranslation } from "../../../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
-import { TraceCanonicalisationService } from "../../../../derivation/services/trace-canonicalisation.service.ts";
-import { TraceLegacyReadClickHouseRepository } from "../trace-legacy-read.repository.ts";
 import { openProtections } from "../../../../../repositories/clickhouse/__tests__/open-protections.ts";
+import { authorizedReadsOver } from "../../../../../repositories/clickhouse/__tests__/support/authorized-reads.support.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
 } from "../../../../../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
+import { traceQueryTranslation } from "../../../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
+import { TraceCanonicalisationService } from "../../../../derivation/services/trace-canonicalisation.service.ts";
+import { TraceLegacyReadClickHouseRepository } from "../trace-legacy-read.repository.ts";
 
 const clickHouseConfigured = testClickHouseConfigured();
 
@@ -80,11 +82,17 @@ async function search({
   queryText?: string;
   input?: Partial<GetAllTracesForProjectInput>;
 }): Promise<string[]> {
-  const filterWhere = queryText
+  const compiled = queryText
     ? traceQueryTranslation.translateFilter({
         queryText,
-        tenantId,
         timeRange: { from: window.startDate, to: window.endDate },
+      })
+    : null;
+  // The app fences a compiled filter to the project's own rows before the legacy read runs it.
+  const filterWhere = compiled
+    ? authorizedReadsOver(ch).expandFragment({
+        authorization: ownProof({ projectId: tenantId, now: Date.now() }),
+        filterWhere: compiled,
       })
     : null;
   const results = await repo.listAllTracesForProject(searchInput(input), openProtections, {

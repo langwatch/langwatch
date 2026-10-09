@@ -9,6 +9,8 @@ import {
  * field's paged values with one - registered before `:traceId` so "facets"
  * is never read as a trace id.
  */
+import type { Authorization } from "@langwatch/authorization";
+import { ownProjectIdOf } from "@langwatch/authorization/tenant-fence";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceListRead } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -85,6 +87,11 @@ function mount(
   return { send, readDiscover, readFacetValues };
 }
 
+/** The project the proof a reader was handed fences its read to. */
+function projectFencedBy({ read }: { read: { authorization: Authorization } | undefined }) {
+  return read && ownProjectIdOf({ authorization: read.authorization, reads: "traces" });
+}
+
 describe("GET /api/v1/traces/facets", () => {
   describe("when no field is named", () => {
     /** @scenario "Without a field, the facets endpoint answers the whole discovery payload" */
@@ -95,9 +102,10 @@ describe("GET /api/v1/traces/facets", () => {
 
       expect(response.status).toBe(200);
       expect(readDiscover).toHaveBeenCalledWith({
-        tenantId: "project-1",
+        authorization: expect.anything(),
         timeRange: expect.objectContaining({ from: expect.any(Number), to: expect.any(Number) }),
       });
+      expect(projectFencedBy({ read: readDiscover.mock.lastCall?.[0] })).toBe("project-1");
       await expect(response.json()).resolves.toEqual({ facets: [], pending: false });
     });
   });
@@ -111,8 +119,9 @@ describe("GET /api/v1/traces/facets", () => {
 
       expect(response.status).toBe(200);
       expect(readFacetValues).toHaveBeenCalledWith(
-        expect.objectContaining({ tenantId: "project-1", facetKey: "model", limit: 1, offset: 0 }),
+        expect.objectContaining({ facetKey: "model", limit: 1, offset: 0 }),
       );
+      expect(projectFencedBy({ read: readFacetValues.mock.lastCall?.[0] })).toBe("project-1");
       await expect(response.json()).resolves.toEqual({
         values: [{ value: "gpt-5-mini", count: 3 }],
         total: 1,

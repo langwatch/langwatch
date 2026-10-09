@@ -2,6 +2,7 @@
  * TraceModule's transcript read for one viewer: protections first, then the shared read.
  * @see modules/trace/specs/trace-drawer-coding-agent-reads.feature
  */
+import { ownProjectIdOf } from "@langwatch/authorization/tenant-fence";
 import { describe, expect, it, vi } from "vitest";
 
 import { openProtections } from "../../repositories/clickhouse/__tests__/open-protections.ts";
@@ -32,8 +33,12 @@ describe("TraceModule.readCodingAgentTranscript", () => {
         publiclyShared: false,
       });
       expect(getSpansByTraceId).toHaveBeenCalledWith(
-        expect.objectContaining({ tenantId: PROJECT_ID, visibilityCutoffMs: CUTOFF_MS }),
+        expect.objectContaining({ traceId: TRACE_ID, visibilityCutoffMs: CUTOFF_MS }),
       );
+      const spanRead = getSpansByTraceId.mock.lastCall?.[0];
+      expect(
+        spanRead && ownProjectIdOf({ authorization: spanRead.authorization, reads: "traces" }),
+      ).toBe(PROJECT_ID);
       expect(transcript).toMatchObject({ entries: [] });
     });
   });

@@ -2,6 +2,7 @@ import type { FoldProjectionStore } from "@langwatch/eventing";
 import { TraceCapabilityUnavailableError } from "@langwatch/trace-contract";
 
 import {
+  TraceAuthorizedReads,
   TraceClickHouse,
   type TraceClickHouseClient,
 } from "../clickhouse/clickhouse.trace-member-client.repository.ts";
@@ -62,6 +63,25 @@ class MemoryTraceClickHouseClientsRepository extends TraceClickHouse {
 
   resolve(): Promise<TraceClickHouseClient> {
     return Promise.reject(new TraceCapabilityUnavailableError("memory", "a ClickHouse client"));
+  }
+}
+
+/** No ClickHouse here either: the proof-checking reader is refused by name, never faked. */
+class MemoryTraceAuthorizedReadsRepository extends TraceAuthorizedReads {
+  static create(): MemoryTraceAuthorizedReadsRepository {
+    return new MemoryTraceAuthorizedReadsRepository();
+  }
+
+  private constructor() {
+    super();
+  }
+
+  reader(): TraceClickHouseClient {
+    throw new TraceCapabilityUnavailableError("memory", "an authorized ClickHouse read");
+  }
+
+  expandFragment(): { sql: string; params: Record<string, unknown> } {
+    throw new TraceCapabilityUnavailableError("memory", "an authorized ClickHouse read");
   }
 }
 
@@ -143,6 +163,7 @@ export class MemoryTraceRepositories {
       exportSlots: MemoryTraceExportSlotRepository.create(),
       rateLimits: MemoryTraceRateLimitRepository.create(),
       clickhouseClients: MemoryTraceClickHouseClientsRepository.create(),
+      authorizedReads: MemoryTraceAuthorizedReadsRepository.create(),
     };
   }
 }

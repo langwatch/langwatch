@@ -3,6 +3,8 @@
  * One source of truth — every facet builder consumes these.
  */
 
+import { tenantScope, type TenantScopeTimeColumn } from "@langwatch/authorization/tenant-fence";
+
 import type { FacetQueryContext } from "../../rules/trace-facet-registry.rules.ts";
 
 /**
@@ -22,11 +24,16 @@ export class ClickHouseTraceFacetQueryRepository {
   }
 
   /**
-   * WHERE predicate with tenant filtering and time window, per clickhouse-queries.md.
+   * WHERE predicate pinning a facet query to the tenant fence and the time window, the tenant
+   * marker first per clickhouse-queries.md. The authorized reader expands the marker into the
+   * proof's fence, windowed on this same column (ADR-175).
    */
-  buildTimeWhere(timeColumn: string, ctx?: Pick<FacetQueryContext, "traceScope">): string {
+  buildTimeWhere(
+    timeColumn: TenantScopeTimeColumn,
+    ctx?: Pick<FacetQueryContext, "traceScope">,
+  ): string {
     return [
-      "TenantId = {tenantId:String}",
+      tenantScope(timeColumn),
       `${timeColumn} >= fromUnixTimestamp64Milli({timeFrom:Int64})`,
       `${timeColumn} <= fromUnixTimestamp64Milli({timeTo:Int64})`,
       ...(ctx?.traceScope ? [ctx.traceScope.sql] : []),
@@ -36,12 +43,11 @@ export class ClickHouseTraceFacetQueryRepository {
   /**
    * The bound-parameter tuple every facet query relies on. Helpers that need
    * `prefix` add it on top, since not every builder supports key/value
-   * prefix-filtering.
+   * prefix-filtering. The tenant is not among them: the reader binds it.
    */
   baseParams(ctx: FacetQueryContext): Record<string, unknown> {
     return {
       ...ctx.traceScope?.params,
-      tenantId: ctx.tenantId,
       timeFrom: ctx.timeRange.from,
       timeTo: ctx.timeRange.to,
       limit: ctx.limit,

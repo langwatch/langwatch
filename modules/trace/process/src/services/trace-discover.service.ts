@@ -4,6 +4,7 @@
  * the background, so no viewer waits on the full ClickHouse fan-out.
  */
 
+import { ownProjectIdOf, tenantScopeKey } from "@langwatch/authorization/tenant-fence";
 import { createLogger } from "@langwatch/observability";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import { nowInstant } from "@langwatch/time";
@@ -15,10 +16,15 @@ import type {
   TraceListRead,
 } from "@langwatch/trace-contract";
 
-import type { FacetCatalog, FacetDefinition } from "#features/facet/rules/trace-facet-registry.rules";
+import type {
+  FacetCatalog,
+  FacetDefinition,
+} from "#features/facet/rules/trace-facet-registry.rules";
 
 import { isExpressionCategorical } from "../features/facet/rules/trace-facet-classification.rules.ts";
 import type { FacetFilterResolver } from "../features/facet/rules/trace-facet-filter.rules.ts";
+import { TraceFacetDescriptorService } from "../features/facet/services/trace-facet-descriptor.service.ts";
+import type { TraceTopicNamingService } from "../features/topic/services/trace-topic-naming.service.ts";
 import type { TraceFilterWhere } from "../rules/trace-filter-hidden-origins.rules.ts";
 import {
   discoverCacheKey,
@@ -31,8 +37,6 @@ import {
   type FacetFilters,
   type Outcome,
 } from "./trace-discover-task.service.ts";
-import { TraceFacetDescriptorService } from "../features/facet/services/trace-facet-descriptor.service.ts";
-import type { TraceTopicNamingService } from "../features/topic/services/trace-topic-naming.service.ts";
 import { TraceTtlCacheService } from "./trace-ttl-cache.service.ts";
 
 /**
@@ -218,10 +222,10 @@ export class TraceDiscoverService {
     // content always matches its key.
     const snapped = snapToWindowPreset(params.timeRange);
     const snappedParams: DiscoverParams = {
-      tenantId: params.tenantId,
+      authorization: params.authorization,
       timeRange: { from: snapped.from, to: snapped.to },
     };
-    const cacheKey = discoverCacheKey(params.tenantId, snapped);
+    const cacheKey = discoverCacheKey({ authorization: params.authorization, snapped });
     const lookup = await DISCOVER_CACHE.get(cacheKey);
 
     if (lookup.kind === "hit") {
@@ -289,22 +293,24 @@ export class TraceDiscoverService {
           value: fresh,
           timestamp: nowInstant().epochMilliseconds,
         });
-        // SSE push to any browser subscribed for this tenant; the client refetches via tRPC and
-        // hits the warm cache. Throws are swallowed: the cache write already succeeded.
+        // SSE push to the tabs open on the project the proof was minted for (on an aggregate,
+        // the aggregate itself); the client refetches via tRPC and hits the warm cache. Throws
+        // are swallowed: the cache write already succeeded.
+        const projectId = ownProjectIdOf({ authorization: params.authorization, reads: "traces" });
         try {
           await this.updates.publishProjectEvent({
-            projectId: params.tenantId,
+            projectId,
             channel: "discover_updated",
             event: JSON.stringify({
               event: "discover_updated",
-              tenantId: params.tenantId,
+              tenantId: projectId,
               timestamp: nowInstant().epochMilliseconds,
             }),
           });
         } catch (broadcastErr) {
           discoverLogger.warn(
             {
-              tenantId: params.tenantId,
+              scope: tenantScopeKey({ authorization: params.authorization, reads: "traces" }),
               cacheKey,
               error: broadcastErr instanceof Error ? broadcastErr.message : String(broadcastErr),
             },
@@ -410,7 +416,12 @@ export class TraceDiscoverService {
 
     taskTimings.sort((a, b) => b.durationMs - a.durationMs);
     discoverLogger.info(
-      { tenantId: params.tenantId, totalMs, breakdown: taskTimings.slice(0, 20), taskCount },
+      {
+        scope: tenantScopeKey({ authorization: params.authorization, reads: "traces" }),
+        totalMs,
+        breakdown: taskTimings.slice(0, 20),
+        taskCount,
+      },
       "Discover wall-clock exceeded 1.5s — per-task breakdown",
     );
   }

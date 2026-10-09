@@ -1,3 +1,5 @@
+import type { Authorization } from "@langwatch/authorization";
+import { fenceFor, type TenantFence } from "@langwatch/authorization/tenant-fence";
 import type {
   EvaluationRunData,
   EvaluationSummary,
@@ -9,7 +11,22 @@ import { TraceEvaluationRunsReadRepository } from "../trace-evaluation-runs.repo
 /** A run as a test seeds it, with the tenant that recorded it; already its latest version. */
 type SeededRun = EvaluationRunData & { readonly tenantId: string };
 
-/** Evaluation's shared run rows in memory, seeded by a test; trace writes none. */
+/** Whether the fence reads this run, windowed on `scheduledAt` as the ClickHouse fence is. */
+function fenceAdmits({ fence, run }: { fence: TenantFence; run: SeededRun }): boolean {
+  if (fence.own.includes(run.tenantId)) return true;
+  const atMs = run.scheduledAt ?? 0;
+  return fence.shared.some(
+    (window) =>
+      window.projectId === run.tenantId &&
+      atMs >= window.from &&
+      (window.until === null || atMs < window.until),
+  );
+}
+
+/**
+ * Evaluation's shared run rows in memory, seeded by a test; trace writes none. Read through the
+ * proof's fence (ADR-175), like the ClickHouse twin.
+ */
 export class MemoryTraceEvaluationRunsRepository extends TraceEvaluationRunsReadRepository {
   static create({
     runs = [],
@@ -22,16 +39,16 @@ export class MemoryTraceEvaluationRunsRepository extends TraceEvaluationRunsRead
   }
 
   async findRunsByTraceId(input: {
-    tenantId: string;
+    authorization: Authorization;
     traceId: string;
   }): Promise<EvaluationRunData[]> {
-    return this.runs
-      .filter((run) => run.tenantId === input.tenantId && run.traceId === input.traceId)
+    return this.#fenced(input.authorization)
+      .filter((run) => run.traceId === input.traceId)
       .map(({ tenantId: _tenantId, ...run }) => run);
   }
 
   async findSummariesByTraceIds(input: {
-    tenantId: string;
+    authorization: Authorization;
     traceIds: readonly string[];
     since: number;
   }): Promise<Record<string, EvaluationSummary[]>> {
@@ -55,7 +72,7 @@ export class MemoryTraceEvaluationRunsRepository extends TraceEvaluationRunsRead
   }
 
   async findTraceEvaluations(input: {
-    tenantId: string;
+    authorization: Authorization;
     traceIds: readonly string[];
   }): Promise<Record<string, TraceEvaluationData[]>> {
     const output = Object.fromEntries(
@@ -87,10 +104,15 @@ export class MemoryTraceEvaluationRunsRepository extends TraceEvaluationRunsRead
     return output;
   }
 
-  #within(input: { tenantId: string; traceIds: readonly string[] }): SeededRun[] {
+  #fenced(authorization: Authorization): SeededRun[] {
+    const fence = fenceFor({ authorization, reads: "traces" });
+    return this.runs.filter((run) => fenceAdmits({ fence, run }));
+  }
+
+  #within(input: { authorization: Authorization; traceIds: readonly string[] }): SeededRun[] {
     const wanted = new Set(input.traceIds);
-    return this.runs.filter(
-      (run) => run.tenantId === input.tenantId && run.traceId !== null && wanted.has(run.traceId),
+    return this.#fenced(input.authorization).filter(
+      (run) => run.traceId !== null && wanted.has(run.traceId),
     );
   }
 }

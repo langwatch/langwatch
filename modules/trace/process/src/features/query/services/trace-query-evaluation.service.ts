@@ -67,7 +67,6 @@ export class TraceQueryEvaluationService {
     try {
       compiled = this.#translation.translateFilter({
         queryText,
-        tenantId: "__in_memory__",
         timeRange: { from: 0, to: 0 },
       });
     } catch {

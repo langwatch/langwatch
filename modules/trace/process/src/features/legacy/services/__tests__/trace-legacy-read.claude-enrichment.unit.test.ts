@@ -166,6 +166,7 @@ function makeService(
     logRecordStorage: { getLogsByTraceId },
     // The enrichment join reads no evaluation; a refusing double proves it.
     evaluationRuns: refusingEvaluations(),
+    readProofs: refusingEvaluations(),
   });
 }
 

@@ -2,7 +2,7 @@
  * Sealed ADR-166 proofs for tests that hand one to a store client (ADR-175). Minted through
  * `sealAuthorization`, never assembled by hand, so the client accepts them as it would a door's.
  */
-import { type Authorization, sealAuthorization } from "../../authorization-proof.ts";
+import { type Authorization, sealAuthorization } from "./authorization-proof.ts";
 
 const TEST_ACTOR = { type: "user", id: "test-user" } as const;
 const TEST_ORGANIZATION_ID = "test-organization";

@@ -31,6 +31,7 @@ import type { SpanInsertData } from "@langwatch/trace-contract";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { AuthorizedTraceReadsRepository } from "../clickhouse.trace-member-client.repository.ts";
 import { SpanStorageClickHouseRepository } from "../span-storage.repository.ts";
 
 const PRIVATE_ORGANIZATION = privateRouteOrgId("isolation-private");
@@ -196,7 +197,12 @@ describe("given one organization on a private ClickHouse instance and one on the
     });
 
     const resolveClient = (tenantId: string) => connection.resolve(tenantId);
-    spans = new SpanStorageClickHouseRepository(resolveClient as never);
+    spans = SpanStorageClickHouseRepository.create({
+      resolveClient: resolveClient as never,
+      reads: AuthorizedTraceReadsRepository.create({
+        clickhouse: { query: () => Promise.reject(new Error("this suite only writes spans")) },
+      }),
+    });
     events = EventingClickHouseEventRepository.create({
       resolveClient: resolveClient as never,
       retention: createEventingRetentionConfiguration({ defaultRetentionDays: 30 }),

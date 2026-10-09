@@ -1,14 +1,18 @@
+import { aggregateProof, ownProof } from "@langwatch/authorization/testing";
+import type { QueryRequest, QueryResult } from "@langwatch/clickhouse-client";
 import { createTenantId, SecurityError } from "@langwatch/eventing";
 import type { SpanInsertData } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import { createTestSpan } from "../../../eventing/__tests__/trace-summary-test.fixtures.ts";
 import { SpanStorageStore } from "../../../eventing/span-storage.store.ts";
-import type {
-  TraceClickHouseWriteClient,
-  TraceClickHouseWriteResolver,
+import {
+  AuthorizedTraceReadsRepository,
+  type TraceClickHouseWriteClient,
+  type TraceClickHouseWriteResolver,
 } from "../clickhouse.trace-member-client.repository.ts";
 import { SpanStorageClickHouseRepository } from "../span-storage.repository.ts";
+import { recordingAuthorizedReads } from "./support/authorized-reads.support.ts";
 
 /** TWIN-DRIFT PINS: table name, column set, insert settings and retention
  * stamp are pinned as literals. An insert that omits a column succeeds by
@@ -85,7 +89,10 @@ class RecordingClickHouse {
 
 function repository() {
   const clickhouse = new RecordingClickHouse();
-  const repo = SpanStorageClickHouseRepository.create(clickhouse.resolve);
+  const repo = SpanStorageClickHouseRepository.create({
+    resolveClient: clickhouse.resolve,
+    reads: recordingAuthorizedReads().reads,
+  });
   return { clickhouse, repo };
 }
 
@@ -386,24 +393,26 @@ describe("SpanStorageClickHouseRepository", () => {
  * The read half, harvested at the conversion.
  * Spec: specs/trace-processing/worker-trace-pipeline-conversion.feature
  */
+/** The routed member behind the proof-checking reader: records each expanded statement. */
 class QueryingClickHouse {
-  readonly queries: { query: string; params: Record<string, unknown>; settings?: unknown }[] = [];
+  readonly queries: QueryRequest[] = [];
   rows: Row[] = [];
   refuseWith: Error | null = null;
 
-  readonly resolve: TraceClickHouseWriteResolver = async () => ({
-    query: async (input) => {
-      if (this.refuseWith) throw this.refuseWith;
-      this.queries.push({
-        query: input.query,
-        params: input.query_params ?? {},
-        settings: input.clickhouse_settings,
-      });
-      return { json: async () => this.rows as never[] };
-    },
-    insert: async () => undefined,
-  });
+  readonly query = async <R>(request: QueryRequest): Promise<QueryResult<R>> => {
+    if (this.refuseWith) throw this.refuseWith;
+    this.queries.push(request);
+    return { rows: this.rows as R[] };
+  };
 }
+
+/** Writes are refused here: the read half never resolves a tenant's own client. */
+const refusingResolver: TraceClickHouseWriteResolver = async () => {
+  throw new Error("a read must not resolve a tenant's own client");
+};
+
+const NOW = Date.now();
+const proofFor = (projectId: string) => ownProof({ projectId, now: NOW });
 
 function storedRow(overrides: Record<string, unknown> = {}): Row {
   return {
@@ -433,29 +442,34 @@ function storedRow(overrides: Record<string, unknown> = {}): Row {
 
 function readRepository() {
   const clickhouse = new QueryingClickHouse();
-  const repo = SpanStorageClickHouseRepository.create(clickhouse.resolve);
+  const repo = SpanStorageClickHouseRepository.create({
+    resolveClient: refusingResolver,
+    reads: AuthorizedTraceReadsRepository.create({ clickhouse }),
+  });
   return { clickhouse, repo };
 }
 
 describe("SpanStorageClickHouseRepository.findNormalizedSpanById", () => {
+  const byId = () => ({
+    authorization: proofFor("project-1"),
+    traceId: "trace-1",
+    spanId: "span-1",
+    occurredAtMs: 1_700_000_000_000,
+  });
+
   describe("given a span reference with the span's own start time", () => {
     /** @scenario "The referenced span is read back inside its own partition window" */
     it("bounds the read to a window centred on the hint rather than scanning every partition", async () => {
       const { clickhouse, repo } = readRepository();
       clickhouse.rows = [storedRow()];
 
-      await repo.findNormalizedSpanById({
-        tenantId: "project-1",
-        traceId: "trace-1",
-        spanId: "span-1",
-        occurredAtMs: 1_700_000_000_000,
-      });
+      await repo.findNormalizedSpanById(byId());
 
       expect(clickhouse.queries).toHaveLength(1);
       const [read] = clickhouse.queries;
-      expect(read?.query).toContain("StartTime >= fromUnixTimestamp64Milli({fromMs:Int64})");
-      expect(read?.params.fromMs).toBe(1_700_000_000_000 - 2 * 24 * 60 * 60 * 1000);
-      expect(read?.params.toMs).toBe(1_700_000_000_000 + 2 * 24 * 60 * 60 * 1000);
+      expect(read?.sql).toContain("StartTime >= fromUnixTimestamp64Milli({fromMs:Int64})");
+      expect(read?.params?.fromMs).toBe(1_700_000_000_000 - 2 * 24 * 60 * 60 * 1000);
+      expect(read?.params?.toMs).toBe(1_700_000_000_000 + 2 * 24 * 60 * 60 * 1000);
     });
 
     /** @scenario "The referenced span is read back inside its own partition window" */
@@ -463,19 +477,15 @@ describe("SpanStorageClickHouseRepository.findNormalizedSpanById", () => {
       const { clickhouse, repo } = readRepository();
       clickhouse.rows = [storedRow()];
 
-      await repo.findNormalizedSpanById({
-        tenantId: "project-1",
-        traceId: "trace-1",
-        spanId: "span-1",
-        occurredAtMs: 1_700_000_000_000,
-      });
+      await repo.findNormalizedSpanById(byId());
 
       const read = clickhouse.queries[0];
-      expect(read?.query).toContain("TenantId = {tenantId:String}");
-      expect(read?.query).toContain("TraceId = {traceId:String}");
-      expect(read?.query).toContain("SpanId = {spanId:String}");
+      expect(read?.sql).toContain("TenantId IN ({tenantScope_all:Array(String)})");
+      expect(read?.sql).toContain("TraceId = {traceId:String}");
+      expect(read?.sql).toContain("SpanId = {spanId:String}");
+      expect(read?.tenantId).toBe("project-1");
       expect(read?.params).toMatchObject({
-        tenantId: "project-1",
+        tenantScope_all: ["project-1"],
         traceId: "trace-1",
         spanId: "span-1",
       });
@@ -486,17 +496,12 @@ describe("SpanStorageClickHouseRepository.findNormalizedSpanById", () => {
       const { clickhouse, repo } = readRepository();
       clickhouse.rows = [storedRow()];
 
-      const foundSpan = await repo.findNormalizedSpanById({
-        tenantId: "project-1",
-        traceId: "trace-1",
-        spanId: "span-1",
-        occurredAtMs: 1_700_000_000_000,
-      });
+      const foundSpan = await repo.findNormalizedSpanById(byId());
 
       const read = clickhouse.queries[0];
-      expect(read?.query).not.toContain("Events.");
-      expect(read?.query).not.toContain("Links.");
-      expect(read?.query).toContain("SpanAttributes");
+      expect(read?.sql).not.toContain("Events.");
+      expect(read?.sql).not.toContain("Links.");
+      expect(read?.sql).toContain("SpanAttributes");
       expect(foundSpan?.events).toEqual([]);
       expect(foundSpan?.links).toEqual([]);
     });
@@ -506,18 +511,13 @@ describe("SpanStorageClickHouseRepository.findNormalizedSpanById", () => {
       const { clickhouse, repo } = readRepository();
       clickhouse.rows = [storedRow()];
 
-      await repo.findNormalizedSpanById({
-        tenantId: "project-1",
-        traceId: "trace-1",
-        spanId: "span-1",
-        occurredAtMs: 1_700_000_000_000,
-      });
+      await repo.findNormalizedSpanById(byId());
 
       expect(clickhouse.queries[0]?.settings).toMatchObject({
         query_plan_optimize_lazy_materialization: "1",
       });
-      expect(clickhouse.queries[0]?.query).toContain("ORDER BY UpdatedAt DESC");
-      expect(clickhouse.queries[0]?.query).toContain("LIMIT 1");
+      expect(clickhouse.queries[0]?.sql).toContain("ORDER BY UpdatedAt DESC");
+      expect(clickhouse.queries[0]?.sql).toContain("LIMIT 1");
     });
 
     /** @scenario "The referenced span is read back inside its own partition window" */
@@ -525,12 +525,7 @@ describe("SpanStorageClickHouseRepository.findNormalizedSpanById", () => {
       const { clickhouse, repo } = readRepository();
       clickhouse.rows = [storedRow()];
 
-      const foundSpan = await repo.findNormalizedSpanById({
-        tenantId: "project-1",
-        traceId: "trace-1",
-        spanId: "span-1",
-        occurredAtMs: 1_700_000_000_000,
-      });
+      const foundSpan = await repo.findNormalizedSpanById(byId());
 
       expect(foundSpan).toMatchObject({
         tenantId: "project-1",
@@ -549,34 +544,27 @@ describe("SpanStorageClickHouseRepository.findNormalizedSpanById", () => {
       const { clickhouse, repo } = readRepository();
       clickhouse.rows = [];
 
-      const foundSpan = await repo.findNormalizedSpanById({
-        tenantId: "project-1",
-        traceId: "trace-1",
-        spanId: "span-1",
-        occurredAtMs: 1_700_000_000_000,
-      });
+      const foundSpan = await repo.findNormalizedSpanById(byId());
 
       expect(foundSpan).toBeNull();
       expect(clickhouse.queries).toHaveLength(1);
-      expect(clickhouse.queries[0]?.query).toContain(
+      expect(clickhouse.queries[0]?.sql).toContain(
         "StartTime >= fromUnixTimestamp64Milli({fromMs:Int64})",
       );
     });
   });
 
-  describe("given a read with no tenant", () => {
+  describe("given a read whose proof has expired", () => {
     /** @scenario "A tenantless read is refused before it reaches ClickHouse" */
-    it("refuses before resolving a client", async () => {
+    it("refuses before reaching ClickHouse", async () => {
       const { clickhouse, repo } = readRepository();
 
       await expect(
         repo.findNormalizedSpanById({
-          tenantId: "",
-          traceId: "trace-1",
-          spanId: "span-1",
-          occurredAtMs: 1_700_000_000_000,
+          ...byId(),
+          authorization: ownProof({ projectId: "project-1", now: 0 }),
         }),
-      ).rejects.toThrow(/tenant/i);
+      ).rejects.toMatchObject({ code: "authorization_expired" });
       expect(clickhouse.queries).toHaveLength(0);
     });
   });
@@ -587,14 +575,110 @@ describe("SpanStorageClickHouseRepository.findNormalizedSpanById", () => {
       const { clickhouse, repo } = readRepository();
       clickhouse.refuseWith = new Error("Attempt to read after eof");
 
-      await expect(
-        repo.findNormalizedSpanById({
-          tenantId: "project-1",
-          traceId: "trace-1",
-          spanId: "span-1",
-          occurredAtMs: 1_700_000_000_000,
-        }),
-      ).rejects.toThrow("Attempt to read after eof");
+      await expect(repo.findNormalizedSpanById(byId())).rejects.toThrow(
+        "Attempt to read after eof",
+      );
+    });
+  });
+});
+
+/** ADR-175: every read is fenced by the proof the caller hands it, never by a tenant it names. */
+describe("SpanStorageClickHouseRepository reads through the proof", () => {
+  const authorization = proofFor("project-1");
+  const byTrace = { authorization, traceId: "trace-1", occurredAtMs: 1_700_000_000_000 };
+  const rollupRead = (repo: SpanStorageClickHouseRepository) =>
+    repo.findTraceEventRollupsByTraceIds({
+      authorization,
+      traceIds: ["trace-1"],
+      timeRange: { from: 1_700_000_000_000, to: 1_700_000_060_000 },
+    });
+  const modelSampleRead = (repo: SpanStorageClickHouseRepository) =>
+    repo.findRecentSpansByModels({
+      authorization,
+      models: ["gpt-5-mini"],
+      fromMs: 1_700_000_000_000,
+      perModelLimit: 3,
+      limit: 10,
+    });
+  const reads: Record<string, (repo: SpanStorageClickHouseRepository) => Promise<unknown>> = {
+    findSpansByTraceId: (repo) => repo.findSpansByTraceId(byTrace),
+    findNormalizedSpansByTraceId: (repo) => repo.findNormalizedSpansByTraceId(byTrace),
+    findSpanByIds: (repo) => repo.findSpanByIds({ ...byTrace, spanId: "span-1" }),
+    findTraceEventsByTraceId: (repo) => repo.findTraceEventsByTraceId(byTrace),
+    findTraceEventRollupsByTraceIds: rollupRead,
+    findEventsByTraceId: (repo) => repo.findEventsByTraceId(byTrace),
+    findSpanEvents: (repo) => repo.findSpanEvents({ ...byTrace, spanId: "span-1" }),
+    findSpanSummaryByTraceId: (repo) => repo.findSpanSummaryByTraceId(byTrace),
+    findLangwatchSignalsByTraceId: (repo) => repo.findLangwatchSignalsByTraceId(byTrace),
+    findSpanResourcesByTraceId: (repo) => repo.findSpanResourcesByTraceId(byTrace),
+    listSpansPaginated: (repo) => repo.listSpansPaginated({ ...byTrace, limit: 10, offset: 0 }),
+    findSpansSince: (repo) => repo.findSpansSince({ ...byTrace, sinceStartTimeMs: 0 }),
+    findModelUsageStats: (repo) =>
+      repo.findModelUsageStats({ authorization, fromMs: 1_700_000_000_000, limit: 10 }),
+    findRecentSpansByModels: modelSampleRead,
+    hintlessTraceRead: (repo) =>
+      repo.findSpanSummaryByTraceId({ authorization, traceId: "trace-1" }),
+  };
+
+  describe.each(Object.entries(reads))("given %s", (_name, read) => {
+    it("sends every statement fenced to the proof's tenant and names none of its own", async () => {
+      const { clickhouse, repo } = readRepository();
+
+      await read(repo);
+
+      expect(clickhouse.queries.length).toBeGreaterThan(0);
+      for (const sent of clickhouse.queries) {
+        expect(sent.sql).toContain("TenantId IN ({tenantScope_all:Array(String)})");
+        expect(sent.sql).not.toContain("{tenantId:String}");
+        expect(sent.params).not.toHaveProperty("tenantId");
+        expect(sent.params?.tenantScope_all).toEqual(["project-1"]);
+        expect(sent.tenantId).toBe("project-1");
+      }
+    });
+  });
+
+  describe("given a proof that also reads a member project inside its grant's window", () => {
+    it("sends the statement under both tenants with the member's window bound", async () => {
+      const { clickhouse, repo } = readRepository();
+      const aggregate = aggregateProof({
+        projectId: "aggregate-1",
+        members: [{ projectId: "member-1", from: 1_600_000_000_000 }],
+        now: NOW,
+      });
+
+      await repo.findSpansByTraceId({ ...byTrace, authorization: aggregate });
+
+      const [sent] = clickhouse.queries;
+      expect(sent?.tenantIds).toEqual(["aggregate-1", "member-1"]);
+      expect(sent?.params).toMatchObject({
+        tenantScope_all: ["aggregate-1", "member-1"],
+        tenantScope_ids: ["member-1"],
+        tenantScope_from: [1_600_000_000_000],
+      });
+    });
+  });
+
+  describe("given a page of traces two tenants may share an id across", () => {
+    it("groups, ranks and trims the event rollup per tenant as well as per trace", async () => {
+      const { clickhouse, repo } = readRepository();
+
+      await rollupRead(repo);
+
+      const sql = clickhouse.queries[0]?.sql ?? "";
+      expect(sql).toMatch(/GROUP BY tenantId, traceId, name/);
+      expect(sql).toMatch(/PARTITION BY tenantId, traceId/);
+      expect(sql).toMatch(/LIMIT \{maxNames:UInt32\} BY tenantId, traceId/);
+    });
+  });
+
+  describe("given the model sample read over the trace summaries and the spans", () => {
+    it("fences the candidate traces on their occurrence and the spans on their start", async () => {
+      const { clickhouse, repo } = readRepository();
+
+      await modelSampleRead(repo);
+
+      const sql = clickhouse.queries[0]?.sql ?? "";
+      expect(sql.match(/TenantId IN \(\{tenantScope_all:Array\(String\)\}\)/g)).toHaveLength(2);
     });
   });
 });

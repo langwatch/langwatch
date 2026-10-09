@@ -1,3 +1,4 @@
+import { tenantScope } from "@langwatch/authorization/tenant-fence";
 import {
   FilterFieldUnknownError,
   type DerivedTraceEvent,
@@ -8,12 +9,15 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
+import type {
+  ExpressionCategoricalDef,
+  RangeFacetDef,
+} from "../../features/facet/rules/trace-facet-registry.rules.ts";
 import {
   traceFacetRegistry as FACET_REGISTRY,
   traceQueryEvaluation,
   traceQueryTranslation,
 } from "../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
-import type { ExpressionCategoricalDef, RangeFacetDef } from "../../features/facet/rules/trace-facet-registry.rules.ts";
 
 const evaluateQueryInMemory = (queryText: string, trace: InMemoryTrace) =>
   traceQueryEvaluation.traceMatchesQuery(queryText, trace);
@@ -696,7 +700,6 @@ describe("FieldDef SQL/read parity", () => {
         const literal = def.kind === "range" ? "1" : "x";
         const compiled = traceQueryTranslation.translateFilter({
           queryText: `${key}:${literal}`,
-          tenantId: "tenant-1",
           timeRange: { from: 0, to: 1 },
         });
         expect(compiled?.sql).toContain(def.expression);
@@ -740,7 +743,6 @@ describe("given a filter field that collides with an Object.prototype member", (
       expect(() =>
         traceQueryTranslation.translateFilter({
           queryText: `${field}:x`,
-          tenantId: "tenant-1",
           timeRange: { from: 0, to: 1 },
         }),
       ).toThrow(FilterFieldUnknownError);
@@ -844,7 +846,6 @@ describe("the in-memory free-text narrowing", () => {
     // the asymmetry the spec records.
     const compiled = traceQueryTranslation.translateFilter({
       queryText: "codex",
-      tenantId: "tenant-1",
       timeRange: { from: 0, to: 1 },
     });
     expect(compiled!.sql).toContain("FROM stored_spans");
@@ -878,7 +879,6 @@ describe("free text compiled to ClickHouse", () => {
   function compile(query: string) {
     return traceQueryTranslation.translateFilter({
       queryText: query,
-      tenantId: "tenant-1",
       timeRange: { from: 1000, to: 2000 },
     });
   }
@@ -893,11 +893,11 @@ describe("free text compiled to ClickHouse", () => {
     expect(sql).toContain("ifNull(TraceName, '') ILIKE");
     expect(sql).toContain("FROM stored_spans");
     expect(sql).toContain("SpanName ILIKE");
-    // The span subquery crosses into another table, so its tenant predicate is
+    // The span subquery crosses into another table, so its tenant marker is
     // the one whose regression leaks across tenants rather than just returning
     // the wrong rows. Pin it here even though `boundedSubquery` owns it.
-    expect(sql).toContain("TenantId = {tenantId:String}");
-    expect(compiled!.params).toMatchObject({ tenantId: "tenant-1" });
+    expect(sql).toContain(tenantScope("StartTime"));
+    expect(compiled!.params).not.toHaveProperty("tenantId");
     expect(Object.values(compiled!.params)).toContain("%codex%");
   });
 

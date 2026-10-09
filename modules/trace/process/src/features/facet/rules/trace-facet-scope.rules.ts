@@ -2,16 +2,17 @@
  * A trace filter read as a predicate on a facet's own table. ADR-139.
  */
 
+import { tenantScope } from "@langwatch/authorization/tenant-fence";
 import type { FacetTableName } from "@langwatch/trace-contract";
 
 import type { TraceFilterWhere } from "../../../rules/trace-filter-hidden-origins.rules.ts";
 
 /**
- * The tenant and window predicate of `trace_summaries`, bound to the same
- * parameter names the filter compiler seeds (`tenantId`, `timeFrom`, `timeTo`).
+ * The tenant marker and window predicate of `trace_summaries`. The window is bound to the
+ * parameter names the filter compiler seeds (`timeFrom`, `timeTo`); the tenant is the authorized
+ * reader's to add (ADR-175).
  */
-const TRACE_WINDOW_FROM =
-  "TenantId = {tenantId:String} AND OccurredAt >= fromUnixTimestamp64Milli({timeFrom:Int64})";
+const TRACE_WINDOW_FROM = `${tenantScope("OccurredAt")} AND OccurredAt >= fromUnixTimestamp64Milli({timeFrom:Int64})`;
 
 const TRACE_WINDOW_TO = " AND OccurredAt <= fromUnixTimestamp64Milli({timeTo:Int64})";
 
@@ -25,9 +26,9 @@ function traceWindowWhere(isLiveWindow: boolean): string {
 }
 
 /**
- * On `trace_summaries` the filter itself, placed after the version dedup. On
- * the other facet tables a membership test against the traces it selects, read
- * at their latest version so an older row's values do not count.
+ * On `trace_summaries` the filter itself, after the version dedup. Elsewhere a membership test on
+ * the (tenant, trace id) pair against the traces it selects at their latest version, since a
+ * fence can span tenants sharing a trace id.
  */
 export function scopeTraceFilterToTable({
   table,
@@ -46,8 +47,8 @@ export function scopeTraceFilterToTable({
   const window = traceWindowWhere(isLiveWindow);
 
   return {
-    sql: `TraceId IN (
-      SELECT TraceId
+    sql: `((TenantId, TraceId) IN (
+      SELECT TenantId, TraceId
       FROM trace_summaries
       WHERE ${window}
         AND (TenantId, TraceId, UpdatedAt) IN (
@@ -57,7 +58,7 @@ export function scopeTraceFilterToTable({
           GROUP BY TenantId, TraceId
         )
         AND (${filterWhere.sql})
-    )`,
+    ))`,
     params: filterWhere.params,
   };
 }

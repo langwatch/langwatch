@@ -10,7 +10,7 @@ import {
   sealAuthorization,
   usableAuthorization,
 } from "../index.ts";
-import { aggregateProof, ownProof } from "./support/authorization-proofs.ts";
+import { aggregateProof, ownProof } from "../testing.ts";
 
 /**
  * ADR-166 / ADR-175: the proof is sealed and it expires.

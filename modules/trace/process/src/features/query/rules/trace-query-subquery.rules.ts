@@ -1,5 +1,28 @@
+import { tenantScope, tenantSet } from "@langwatch/authorization/tenant-fence";
+
+/**
+ * The tenant marker a subquery on `table` carries; the authorized reader expands it into the
+ * proof's fence (ADR-175). Trace and span tables are windowed on their own time, so a shared
+ * grant's window applies; a side table takes the set alone, windowed by the outer read.
+ */
+function tenantMarkerFor(table: string): string {
+  switch (table) {
+    case "trace_summaries":
+      return tenantScope("OccurredAt");
+    case "stored_spans":
+      return tenantScope("StartTime");
+    default:
+      return tenantSet();
+  }
+}
+
+/**
+ * A fence can span several tenants and two of them may hold one trace id, so every subquery here
+ * matches the outer row on its (tenant, key) pair, never on the key alone. Each is parenthesised
+ * whole, because ClickHouse reads `NOT (a, b) IN (...)` as `not(a, b) IN (...)`.
+ */
 export function boundedSubquery(table: string, timeCol: string, innerWhere: string): string {
-  return `TraceId IN (SELECT DISTINCT TraceId FROM ${table} WHERE TenantId = {tenantId:String} AND ${timeCol} >= fromUnixTimestamp64Milli({timeFrom:Int64}) AND ${timeCol} <= fromUnixTimestamp64Milli({timeTo:Int64}) AND ${innerWhere})`;
+  return `((TenantId, TraceId) IN (SELECT DISTINCT TenantId, TraceId FROM ${table} WHERE ${tenantMarkerFor(table)} AND ${timeCol} >= fromUnixTimestamp64Milli({timeFrom:Int64}) AND ${timeCol} <= fromUnixTimestamp64Milli({timeTo:Int64}) AND ${innerWhere}))`;
 }
 
 /**
@@ -19,7 +42,7 @@ export function instantEvalJudgmentsSubquery({
   untilParam: string;
 }): string {
   const where =
-    `TenantId = {tenantId:String} AND RunId = {${runParam}:String}` +
+    `${tenantSet()} AND RunId = {${runParam}:String}` +
     ` AND CreatedAt >= fromUnixTimestamp64Milli({${fromParam}:Int64})` +
     ` AND CreatedAt <= fromUnixTimestamp64Milli({${untilParam}:Int64})`;
   // A threads run judges one row per conversation and addresses it by its
@@ -27,14 +50,14 @@ export function instantEvalJudgmentsSubquery({
   // conversation as one turn.
   if (by === "conversation") {
     return (
-      `Attributes['gen_ai.conversation.id'] IN (SELECT argMax(ThreadId, UpdatedAt) AS MatchedThreadId FROM instant_eval_judgments WHERE ${where}` +
-      ` GROUP BY TraceId, SpanId, QuestionId HAVING argMax(Passed, UpdatedAt) = 1 AND MatchedThreadId != '')`
+      `((TenantId, Attributes['gen_ai.conversation.id']) IN (SELECT TenantId, argMax(ThreadId, UpdatedAt) AS MatchedThreadId FROM instant_eval_judgments WHERE ${where}` +
+      ` GROUP BY TenantId, TraceId, SpanId, QuestionId HAVING argMax(Passed, UpdatedAt) = 1 AND MatchedThreadId != ''))`
     );
   }
 
   return (
-    `TraceId IN (SELECT TraceId FROM instant_eval_judgments WHERE ${where}` +
-    ` GROUP BY TraceId, SpanId, QuestionId HAVING argMax(Passed, UpdatedAt) = 1)`
+    `((TenantId, TraceId) IN (SELECT TenantId, TraceId FROM instant_eval_judgments WHERE ${where}` +
+    ` GROUP BY TenantId, TraceId, SpanId, QuestionId HAVING argMax(Passed, UpdatedAt) = 1))`
   );
 }
 
@@ -44,22 +67,22 @@ export function instantEvalJudgmentsSubquery({
  * IN-tuple dedup pattern (no FINAL) and bounds StartedAt for partition pruning.
  */
 export function scenarioRunSubquery(innerWhere: string): string {
-  return `Attributes['scenario.run_id'] IN (
-    SELECT ScenarioRunId
+  return `((TenantId, Attributes['scenario.run_id']) IN (
+    SELECT TenantId, ScenarioRunId
     FROM simulation_runs
-    WHERE TenantId = {tenantId:String}
+    WHERE ${tenantSet()}
       AND StartedAt >= fromUnixTimestamp64Milli({timeFrom:Int64})
       AND StartedAt <= fromUnixTimestamp64Milli({timeTo:Int64})
       AND ${innerWhere}
       AND (TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, UpdatedAt) IN (
         SELECT TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, max(UpdatedAt)
         FROM simulation_runs
-        WHERE TenantId = {tenantId:String}
+        WHERE ${tenantSet()}
           AND StartedAt >= fromUnixTimestamp64Milli({timeFrom:Int64})
           AND StartedAt <= fromUnixTimestamp64Milli({timeTo:Int64})
         GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
       )
-  )`;
+  ))`;
 }
 
 /**
@@ -77,9 +100,9 @@ export function latestEvaluationRunsSubquery({
   scopeWhere: string;
   innerWhere: string;
 }): string {
-  const bounds = `TenantId = {tenantId:String} AND ${timeCol} >= fromUnixTimestamp64Milli({timeFrom:Int64}) AND ${timeCol} <= fromUnixTimestamp64Milli({timeTo:Int64}) AND ${scopeWhere}`;
+  const bounds = `${tenantSet()} AND ${timeCol} >= fromUnixTimestamp64Milli({timeFrom:Int64}) AND ${timeCol} <= fromUnixTimestamp64Milli({timeTo:Int64}) AND ${scopeWhere}`;
   return (
-    `TraceId IN (SELECT DISTINCT TraceId FROM evaluation_runs WHERE ${bounds} AND ${innerWhere}` +
-    ` AND (TenantId, EvaluationId, UpdatedAt) IN (SELECT TenantId, EvaluationId, max(UpdatedAt) FROM evaluation_runs WHERE ${bounds} GROUP BY TenantId, EvaluationId))`
+    `((TenantId, TraceId) IN (SELECT DISTINCT TenantId, TraceId FROM evaluation_runs WHERE ${bounds} AND ${innerWhere}` +
+    ` AND (TenantId, EvaluationId, UpdatedAt) IN (SELECT TenantId, EvaluationId, max(UpdatedAt) FROM evaluation_runs WHERE ${bounds} GROUP BY TenantId, EvaluationId)))`
   );
 }

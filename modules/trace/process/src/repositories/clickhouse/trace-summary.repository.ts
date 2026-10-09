@@ -1,3 +1,5 @@
+import type { Authorization } from "@langwatch/authorization";
+import { tenantScope, tenantScopeKey, tenantSet } from "@langwatch/authorization/tenant-fence";
 import { DEFAULT_PARTITION_WINDOW_MS, queryWindowed } from "@langwatch/clickhouse-client";
 import { EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
@@ -15,8 +17,17 @@ import {
   type TraceSummaryProjectionEntry,
   type TraceSummaryReadWindow,
 } from "../trace-summary-projection.repository.ts";
-import type { FindByTraceIdOptions, TraceSummaryRepository } from "../trace-summary.repository.ts";
-import type { TraceClickHouseWriteResolver } from "./clickhouse.trace-member-client.repository.ts";
+import type {
+  FindByTraceIdOptions,
+  FindByTraceIdParams,
+  TraceSummaryRead,
+  TraceSummaryRepository,
+} from "../trace-summary.repository.ts";
+import type {
+  TraceAuthorizedReads,
+  TraceClickHouseClient,
+  TraceClickHouseWriteResolver,
+} from "./clickhouse.trace-member-client.repository.ts";
 import { chBoolean, chNumber, chString, chStringMap } from "./stored-span-row.mapper.ts";
 import { createTraceSummaryProjectionId } from "./trace-summary-id.mapper.ts";
 
@@ -185,18 +196,448 @@ const occurredAtCountRowsSchema = z.array(
   z.looseObject({ rowCount: chNumber, occurredAtMs: chNumber.nullable() }),
 );
 
-export class TraceSummaryClickHouseRepository implements TraceSummaryRepository {
-  private constructor(
-    private readonly options: {
-      resolveClient: TraceClickHouseWriteResolver;
-    },
-  ) {}
+/**
+ * Where one summary read runs: the client and the tenant predicates it carries. `outer` is the
+ * heavy read's outer scope, `inner` its dedup subquery and the OccurredAt seek.
+ */
+interface SummaryReadScope {
+  client: TraceClickHouseClient;
+  outer: string;
+  inner: string;
+  params: Record<string, unknown>;
+  /** What a log line names the read by: the fence's key, or the fold's tenant. */
+  log: Record<string, unknown>;
+}
 
-  static create(options: {
-    resolveClient: TraceClickHouseWriteResolver;
-  }): TraceSummaryClickHouseRepository {
-    return new TraceSummaryClickHouseRepository(options);
+/**
+ * The proof-fenced scope (ADR-175). The outer scope projects `OccurredAt` as an integer alias,
+ * so a windowed fence there would compare against the alias; it takes the tenant set alone and
+ * the dedup subquery, which reads the stored column, carries the window.
+ */
+function authorizedScope({
+  reads,
+  authorization,
+}: {
+  reads: TraceAuthorizedReads;
+  authorization: Authorization;
+}): SummaryReadScope {
+  const client = reads.reader(authorization);
+  return {
+    client,
+    outer: tenantSet(),
+    inner: tenantScope("OccurredAt"),
+    params: {},
+    log: { scope: tenantScopeKey({ authorization, reads: "traces" }) },
+  };
+}
+
+function logSummaryReadFailure({
+  scope,
+  traceId,
+  error,
+}: {
+  scope: SummaryReadScope;
+  traceId: string;
+  error: unknown;
+}): void {
+  logger.warn(
+    { ...scope.log, traceId, error: error instanceof Error ? error.message : String(error) },
+    "Failed to get trace summary from ClickHouse",
+  );
+}
+
+/**
+ * The single-trace read ladder over one scope. An explicit window (the fold read-back, ADR-066)
+ * applies verbatim with no fallback; otherwise a hinted window, then a resolved OccurredAt.
+ */
+async function findSummary({
+  scope,
+  traceId,
+  options,
+}: {
+  scope: SummaryReadScope;
+  traceId: string;
+  options: FindByTraceIdOptions;
+}): Promise<TraceSummaryRead | null> {
+  if (options.window) {
+    return findInExplicitWindow({ scope, traceId, window: options.window });
   }
+
+  // Two-stage read: hinted window for partition pruning, fallback unbounded.
+  const hasHint = options.occurredAtMs !== undefined;
+
+  try {
+    return await queryWindowed<TraceSummaryRead | null>({
+      table: TABLE_NAME,
+      hintMs: options.occurredAtMs ?? null,
+      fallback: "unbounded",
+      isEmpty: (result) => result === null,
+      run: async (window) => {
+        if (window) {
+          return findFirstSummary({
+            scope,
+            traceId,
+            window: { fromMs: window.fromMs, toMs: window.toMs },
+          });
+        }
+
+        return findByResolvedOccurredAt({ scope, traceId, hasHint, options });
+      },
+    });
+  } catch (error) {
+    logSummaryReadFailure({ scope, traceId, error });
+    throw error;
+  }
+}
+
+/**
+ * Fold read-back path (ADR-066): an explicit window applies verbatim with NO internal
+ * fallback; the fold executor owns the miss retry.
+ */
+async function findInExplicitWindow({
+  scope,
+  traceId,
+  window: { fromMs, toMs },
+}: {
+  scope: SummaryReadScope;
+  traceId: string;
+  window: { fromMs: number; toMs: number };
+}): Promise<TraceSummaryRead | null> {
+  try {
+    return await queryWindowed<TraceSummaryRead | null>({
+      table: TABLE_NAME,
+      hintMs: (fromMs + toMs) / 2,
+      windowMs: (toMs - fromMs) / 2,
+      fallback: "none",
+      isEmpty: (result) => result === null,
+      run: async (window) =>
+        // With a hint and `fallback: "none"` the fragment is always
+        // present; the null arm exists only to satisfy the contract.
+        window
+          ? findFirstSummary({
+              scope,
+              traceId,
+              window: { fromMs: window.fromMs, toMs: window.toMs },
+            })
+          : null,
+    });
+  } catch (error) {
+    logSummaryReadFailure({ scope, traceId, error });
+    throw error;
+  }
+}
+
+/**
+ * The fallback stage: the hint window missed, or there was none. Resolves
+ * OccurredAt from a cheap sort-key seek and bounds the heavy read instead
+ * of scanning every weekly partition. A genuinely absent trace returns null.
+ */
+async function findByResolvedOccurredAt({
+  scope,
+  traceId,
+  hasHint,
+  options,
+}: {
+  scope: SummaryReadScope;
+  traceId: string;
+  hasHint: boolean;
+  options: FindByTraceIdOptions;
+}): Promise<TraceSummaryRead | null> {
+  if (hasHint) {
+    logger.debug(
+      { ...scope.log, traceId, occurredAtMs: options.occurredAtMs },
+      "Trace summary not found in hint window — resolving OccurredAt to bound the retry",
+    );
+  }
+
+  const resolved = await resolveOccurredAtMs({ scope, traceId });
+  if (!resolved.found) return null;
+
+  if (resolved.occurredAtMs === undefined) {
+    logger.debug(
+      { ...scope.log, traceId },
+      "Trace summary resolved with sentinel OccurredAt — falling back to unbounded read",
+    );
+
+    return findFirstSummary({ scope, traceId });
+  }
+
+  return findFirstSummary({
+    scope,
+    traceId,
+    window: {
+      fromMs: resolved.occurredAtMs - DEFAULT_PARTITION_WINDOW_MS,
+      toMs: resolved.occurredAtMs + DEFAULT_PARTITION_WINDOW_MS,
+    },
+  });
+}
+
+/**
+ * Resolves OccurredAt via sort-key seek to enable partition pruning.
+ */
+async function resolveOccurredAtMs({
+  scope,
+  traceId,
+}: {
+  scope: SummaryReadScope;
+  traceId: string;
+}): Promise<{ found: boolean; occurredAtMs?: number }> {
+  const result = await scope.client.query({
+    query: `
+      SELECT
+        count() AS rowCount,
+        toUnixTimestamp64Milli(min(OccurredAt)) AS occurredAtMs
+      FROM ${TABLE_NAME}
+      WHERE ${scope.inner}
+        AND TraceId = {traceId:String}
+    `,
+    query_params: { ...scope.params, traceId },
+    format: "JSONEachRow",
+  });
+  const rows = occurredAtCountRowsSchema.parse(await result.json());
+  const rowCountRaw = rows[0]?.rowCount;
+  const raw = rows[0]?.occurredAtMs;
+  const rowCount = typeof rowCountRaw === "string" ? Number(rowCountRaw) : (rowCountRaw ?? NaN);
+  if (!Number.isFinite(rowCount) || rowCount <= 0) {
+    return { found: false };
+  }
+  if (raw === null || raw === undefined) return { found: true };
+  // A positive OccurredAt can safely bound the read. Historical rows with the
+  // epoch sentinel (0) must fall back to the legacy unbounded lookup because
+  // they do exist but have no usable partition key.
+  const ms = typeof raw === "string" ? Number(raw) : raw;
+  return Number.isFinite(ms) && ms > 0 ? { found: true, occurredAtMs: ms } : { found: true };
+}
+
+/**
+ * The heavy single-trace read, at most one row. Two tenants the scope reads may hold the same
+ * trace id; the read cannot name one, so the winners are ordered by tenant and the first is
+ * returned, the same row on every read.
+ */
+async function findSummaryRows({
+  scope,
+  traceId,
+  window,
+}: {
+  scope: SummaryReadScope;
+  traceId: string;
+  window?: { fromMs: number; toMs: number };
+}): Promise<TraceSummaryRead[]> {
+  const outerTimeFilter = window
+    ? "AND t.OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64}) " +
+      "AND t.OccurredAt <= fromUnixTimestamp64Milli({toMs:Int64})"
+    : "";
+  const innerTimeFilter = window
+    ? "AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64}) " +
+      "AND OccurredAt <= fromUnixTimestamp64Milli({toMs:Int64})"
+    : "";
+
+  // IN-tuple dedup over the ReplacingMergeTree: the inner SELECT scans
+  // only (TenantId, TraceId, UpdatedAt) — small, sparse — to find the
+  // latest version, then the outer SELECT pulls the heavy columns
+  // (ComputedInput, ComputedOutput, Attributes, etc.) for that one row.
+  // See dev/docs/best_practices/clickhouse-queries.md.
+  const result = await scope.client.query({
+    query: `
+      SELECT
+        t.ProjectionId AS ProjectionId,
+        t.TenantId AS TenantId,
+        t.TraceId AS TraceId,
+        t.Version AS Version,
+        t.Attributes AS Attributes,
+        toUnixTimestamp64Milli(t.OccurredAt) AS OccurredAt,
+        t.EarliestSpanStartMs AS EarliestSpanStartMs,
+        toUnixTimestamp64Milli(t.CreatedAt) AS CreatedAt,
+        toUnixTimestamp64Milli(t.UpdatedAt) AS UpdatedAt,
+        t.ComputedIOSchemaVersion AS ComputedIOSchemaVersion,
+        t.ComputedInput AS ComputedInput,
+        t.ComputedOutput AS ComputedOutput,
+        t.TimeToFirstTokenMs AS TimeToFirstTokenMs,
+        t.TimeToLastTokenMs AS TimeToLastTokenMs,
+        t.TotalDurationMs AS TotalDurationMs,
+        t.TokensPerSecond AS TokensPerSecond,
+        t.SpanCount AS SpanCount,
+        t.ContainsErrorStatus AS ContainsErrorStatus,
+        t.ContainsOKStatus AS ContainsOKStatus,
+        t.ErrorMessage AS ErrorMessage,
+        t.Models AS Models,
+        t.TotalCost AS TotalCost,
+        t.NonBilledCost AS NonBilledCost,
+        t.TokensEstimated AS TokensEstimated,
+        t.TotalPromptTokenCount AS TotalPromptTokenCount,
+        t.TotalCompletionTokenCount AS TotalCompletionTokenCount,
+        t.OutputFromRootSpan AS OutputFromRootSpan,
+        t.OutputSpanEndTimeMs AS OutputSpanEndTimeMs,
+        t.BlockedByGuardrail AS BlockedByGuardrail,
+        t.RootSpanType AS RootSpanType,
+        t.ContainsAi AS ContainsAi,
+        t.ContainsPrompt AS ContainsPrompt,
+        t.SelectedPromptId AS SelectedPromptId,
+        t.SelectedPromptSpanId AS SelectedPromptSpanId,
+        t.LastUsedPromptId AS LastUsedPromptId,
+        t.LastUsedPromptVersionNumber AS LastUsedPromptVersionNumber,
+        t.LastUsedPromptVersionId AS LastUsedPromptVersionId,
+        t.LastUsedPromptSpanId AS LastUsedPromptSpanId,
+        t.TopicId AS TopicId,
+        t.SubTopicId AS SubTopicId,
+        t.AnnotationIds AS AnnotationIds,
+        t.HasAnnotation AS HasAnnotation,
+        t.TraceName AS TraceName
+      FROM ${TABLE_NAME} AS t
+      WHERE ${scope.outer}
+        AND t.TraceId = {traceId:String}
+        ${outerTimeFilter}
+        AND (t.TenantId, t.TraceId, t.UpdatedAt) IN (
+          SELECT TenantId, TraceId, max(UpdatedAt)
+          FROM ${TABLE_NAME}
+          WHERE ${scope.inner}
+            AND TraceId = {traceId:String}
+            ${innerTimeFilter}
+          GROUP BY TenantId, TraceId
+        )
+      ORDER BY t.TenantId ASC
+      LIMIT 1
+    `,
+    query_params: window
+      ? { ...scope.params, traceId, fromMs: window.fromMs, toMs: window.toMs }
+      : { ...scope.params, traceId },
+    format: "JSONEachRow",
+  });
+
+  const rows = summaryReadRowsSchema.parse(await result.json());
+  return rows.map((row) => ({ ...fromClickHouseRecord(row), tenantId: row.TenantId }));
+}
+
+/** The one summary {@link findSummaryRows} answers, or null when the trace is absent. */
+async function findFirstSummary(
+  params: Parameters<typeof findSummaryRows>[0],
+): Promise<TraceSummaryRead | null> {
+  const [first] = await findSummaryRows(params);
+  return first ?? null;
+}
+
+function fromClickHouseRecord(record: SummaryReadRow): TraceSummaryData {
+  return {
+    traceId: record.TraceId,
+    spanCount: record.SpanCount,
+    totalDurationMs: Number(record.TotalDurationMs),
+    computedIOSchemaVersion: record.ComputedIOSchemaVersion,
+    computedInput: record.ComputedInput,
+    computedOutput: record.ComputedOutput,
+    timeToFirstTokenMs: record.TimeToFirstTokenMs,
+    timeToLastTokenMs: record.TimeToLastTokenMs,
+    tokensPerSecond: record.TokensPerSecond,
+    containsErrorStatus: !!record.ContainsErrorStatus,
+    containsOKStatus: !!record.ContainsOKStatus,
+    errorMessage: record.ErrorMessage,
+    models: record.Models,
+    totalCost: record.TotalCost,
+    nonBilledCost: record.NonBilledCost ?? null,
+    tokensEstimated: !!record.TokensEstimated,
+    totalPromptTokenCount: record.TotalPromptTokenCount,
+    totalCompletionTokenCount: record.TotalCompletionTokenCount,
+    outputFromRootSpan: !!record.OutputFromRootSpan,
+    outputSpanEndTimeMs: Number(record.OutputSpanEndTimeMs),
+    blockedByGuardrail: !!record.BlockedByGuardrail,
+    rootSpanType: record.RootSpanType,
+    containsAi: !!record.ContainsAi,
+    containsPrompt: !!record.ContainsPrompt,
+    selectedPromptId: record.SelectedPromptId,
+    selectedPromptSpanId: record.SelectedPromptSpanId,
+    // Internal tiebreakers are not persisted; reconstruct as null on read.
+    selectedPromptStartTimeMs: null,
+    lastUsedPromptId: record.LastUsedPromptId,
+    lastUsedPromptVersionNumber: record.LastUsedPromptVersionNumber,
+    lastUsedPromptVersionId: record.LastUsedPromptVersionId,
+    lastUsedPromptSpanId: record.LastUsedPromptSpanId,
+    lastUsedPromptStartTimeMs: null,
+    topicId: record.TopicId,
+    subTopicId: record.SubTopicId,
+    annotationIds: record.AnnotationIds ?? [],
+    traceName: record.TraceName ?? "",
+    attributes: record.Attributes ?? {},
+    // Anchor is frozen; occurrence time from separate column for span baseline.
+    storageAnchorMs: record.OccurredAt,
+    occurredAt: isStorageAnchoredVersion(record.Version)
+      ? Number(record.EarliestSpanStartMs ?? 0)
+      : record.OccurredAt,
+    createdAt: record.CreatedAt,
+    updatedAt: record.UpdatedAt,
+    LastEventOccurredAt: Number(record.LastEventOccurredAt ?? 0),
+  };
+}
+
+function toClickHouseRecord({
+  data,
+  tenantId,
+  projectionId,
+  version,
+  retentionDays,
+}: {
+  data: TraceSummaryData;
+  tenantId: string;
+  projectionId: string;
+  version: string;
+  retentionDays: number;
+}): ClickHouseSummaryWriteRecord {
+  return {
+    ProjectionId: projectionId,
+    TenantId: tenantId,
+    TraceId: data.traceId,
+    Version: version,
+    Attributes: data.attributes,
+    // OccurredAt is the storage / partition / TTL anchor (ADR-087). The span
+    // timing baseline is persisted separately so a late earlier-starting span
+    // cannot move this address.
+    OccurredAt: new Date(storageAnchorForWrite(data)),
+    EarliestSpanStartMs: data.occurredAt,
+    CreatedAt: new Date(data.createdAt),
+    UpdatedAt: new Date(data.updatedAt),
+    LastEventOccurredAt: data.LastEventOccurredAt
+      ? new Date(data.LastEventOccurredAt)
+      : new Date(0),
+    ComputedIOSchemaVersion: data.computedIOSchemaVersion,
+    ComputedInput: data.computedInput,
+    ComputedOutput: data.computedOutput,
+    TimeToFirstTokenMs:
+      data.timeToFirstTokenMs != null ? Math.round(data.timeToFirstTokenMs) : null,
+    TimeToLastTokenMs: data.timeToLastTokenMs != null ? Math.round(data.timeToLastTokenMs) : null,
+    TotalDurationMs: Math.round(data.totalDurationMs),
+    TokensPerSecond: data.tokensPerSecond != null ? Math.round(data.tokensPerSecond) : null,
+    SpanCount: data.spanCount,
+    ContainsErrorStatus: data.containsErrorStatus ? 1 : 0,
+    ContainsOKStatus: data.containsOKStatus ? 1 : 0,
+    ErrorMessage: data.errorMessage,
+    Models: data.models,
+    TotalCost: data.totalCost,
+    NonBilledCost: data.nonBilledCost,
+    TokensEstimated: data.tokensEstimated,
+    TotalPromptTokenCount: data.totalPromptTokenCount,
+    TotalCompletionTokenCount: data.totalCompletionTokenCount,
+    OutputFromRootSpan: data.outputFromRootSpan ? 1 : 0,
+    OutputSpanEndTimeMs: data.outputSpanEndTimeMs,
+    BlockedByGuardrail: data.blockedByGuardrail ? 1 : 0,
+    RootSpanType: data.rootSpanType,
+    ContainsAi: data.containsAi ? 1 : 0,
+    ContainsPrompt: data.containsPrompt ? 1 : 0,
+    SelectedPromptId: data.selectedPromptId,
+    SelectedPromptSpanId: data.selectedPromptSpanId,
+    LastUsedPromptId: data.lastUsedPromptId,
+    LastUsedPromptVersionNumber: data.lastUsedPromptVersionNumber,
+    LastUsedPromptVersionId: data.lastUsedPromptVersionId,
+    LastUsedPromptSpanId: data.lastUsedPromptSpanId,
+    TopicId: data.topicId,
+    SubTopicId: data.subTopicId,
+    AnnotationIds: data.annotationIds,
+    HasAnnotation: data.annotationIds.length > 0 ? 1 : 0,
+    TraceName: data.traceName,
+    _retention_days: retentionDays,
+  };
+}
+
+/** The writes both trace_summaries ports share: each batch resolves its tenant's own client. */
+class TraceSummaryWrites {
+  constructor(private readonly resolveClient: TraceClickHouseWriteResolver) {}
 
   async upsert(data: TraceSummaryData, tenantId: string, retentionDays: number): Promise<void> {
     EventUtils.validateTenantId({ tenantId }, "TraceSummaryClickHouseRepository.upsert");
@@ -208,8 +649,8 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
     });
 
     try {
-      const client = await this.options.resolveClient(tenantId);
-      const record = this.toClickHouseRecord({
+      const client = await this.resolveClient(tenantId);
+      const record = toClickHouseRecord({
         data,
         tenantId,
         projectionId,
@@ -245,14 +686,14 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
     const tenantId = validateBatchTenants(entries, "TraceSummaryClickHouseRepository.upsertBatch");
 
     try {
-      const client = await this.options.resolveClient(tenantId);
+      const client = await this.resolveClient(tenantId);
       const records = entries.map(({ data, tenantId: tid, retentionDays: rd }) => {
         const projectionId = createTraceSummaryProjectionId({
           tenantId: tid,
           traceId: data.traceId,
           occurredAtMs: data.occurredAt,
         });
-        return this.toClickHouseRecord({
+        return toClickHouseRecord({
           data,
           tenantId: tid,
           projectionId,
@@ -276,389 +717,61 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       throw error;
     }
   }
+}
 
-  /**
-   * Fold read-back path (ADR-066): an explicit window applies verbatim with
-   * NO internal fallback — the fold executor owns the miss retry, so a
-   * second recovery ladder here would re-run a seek the executor redoes anyway.
-   */
-  async #findInExplicitWindow({
-    tenantId,
+/**
+ * Writes resolve the tenant's own client by the summary's tenant id, the way the projection
+ * hands it over. Reads never name a tenant: they go through the proof's fence (ADR-175).
+ */
+export class TraceSummaryClickHouseRepository implements TraceSummaryRepository {
+  private constructor(
+    private readonly writes: TraceSummaryWrites,
+    private readonly reads: TraceAuthorizedReads,
+  ) {}
+
+  static create(options: {
+    resolveClient: TraceClickHouseWriteResolver;
+    reads: TraceAuthorizedReads;
+  }): TraceSummaryClickHouseRepository {
+    return new TraceSummaryClickHouseRepository(
+      new TraceSummaryWrites(options.resolveClient),
+      options.reads,
+    );
+  }
+
+  upsert(data: TraceSummaryData, tenantId: string, retentionDays: number): Promise<void> {
+    return this.writes.upsert(data, tenantId, retentionDays);
+  }
+
+  upsertBatch(
+    entries: { data: TraceSummaryData; tenantId: string; retentionDays: number }[],
+  ): Promise<void> {
+    return this.writes.upsertBatch(entries);
+  }
+
+  findByTraceId({
+    authorization,
     traceId,
-    window: { fromMs, toMs },
-  }: {
-    tenantId: string;
-    traceId: string;
-    window: { fromMs: number; toMs: number };
-  }): Promise<TraceSummaryData | null> {
-    try {
-      return await queryWindowed<TraceSummaryData | null>({
-        table: TABLE_NAME,
-        hintMs: (fromMs + toMs) / 2,
-        windowMs: (toMs - fromMs) / 2,
-        fallback: "none",
-        isEmpty: (result) => result === null,
-        run: async (window) =>
-          // With a hint and `fallback: "none"` the fragment is always
-          // present; the null arm exists only to satisfy the contract.
-          window
-            ? this.queryByTraceId(tenantId, traceId, {
-                fromMs: window.fromMs,
-                toMs: window.toMs,
-              })
-            : null,
-      });
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.warn(
-        { tenantId, traceId, error: errorMessage },
-        "Failed to get trace summary from ClickHouse",
-      );
-      throw error;
-    }
-  }
-
-  /**
-   * The fallback stage: the hint window missed, or there was none. Resolves
-   * OccurredAt from a cheap sort-key seek and bounds the heavy read instead
-   * of scanning every weekly partition. A genuinely absent trace returns null.
-   */
-  async #findByResolvedOccurredAt({
-    tenantId,
-    traceId,
-    hasHint,
-    options,
-  }: {
-    tenantId: string;
-    traceId: string;
-    hasHint: boolean;
-    options?: FindByTraceIdOptions;
-  }): Promise<TraceSummaryData | null> {
-    if (hasHint) {
-      logger.debug(
-        { tenantId, traceId, occurredAtMs: options!.occurredAtMs },
-        "Trace summary not found in hint window — resolving OccurredAt to bound the retry",
-      );
-    }
-
-    const resolved = await this.resolveOccurredAtMs({ tenantId, traceId });
-    if (!resolved.found) return null;
-
-    if (resolved.occurredAtMs === undefined) {
-      logger.debug(
-        { tenantId, traceId },
-        "Trace summary resolved with sentinel OccurredAt — falling back to unbounded read",
-      );
-
-      return this.queryByTraceId(tenantId, traceId);
-    }
-
-    return this.queryByTraceId(tenantId, traceId, {
-      fromMs: resolved.occurredAtMs - DEFAULT_PARTITION_WINDOW_MS,
-      toMs: resolved.occurredAtMs + DEFAULT_PARTITION_WINDOW_MS,
+    ...options
+  }: FindByTraceIdParams): Promise<TraceSummaryRead | null> {
+    return findSummary({
+      scope: authorizedScope({ reads: this.reads, authorization }),
+      traceId,
+      options,
     });
-  }
-
-  async findByTraceId(
-    { tenantId, traceId }: { tenantId: string; traceId: string },
-    options?: FindByTraceIdOptions,
-  ): Promise<TraceSummaryData | null> {
-    EventUtils.validateTenantId({ tenantId }, "TraceSummaryClickHouseRepository.findByTraceId");
-
-    // Fold read-back path (ADR-066): an explicit window applies verbatim
-    // with NO internal fallback — the fold executor owns the miss retry, so
-    // a second recovery ladder here would re-run a seek it redoes anyway.
-    if (options?.window) {
-      return this.#findInExplicitWindow({ tenantId, traceId, window: options.window });
-    }
-
-    // Two-stage read: hinted window for partition pruning, fallback unbounded.
-    const hasHint = options?.occurredAtMs !== undefined;
-
-    try {
-      return await queryWindowed<TraceSummaryData | null>({
-        table: TABLE_NAME,
-        hintMs: options?.occurredAtMs ?? null,
-        fallback: "unbounded",
-        isEmpty: (result) => result === null,
-        run: async (window) => {
-          if (window) {
-            return this.queryByTraceId(tenantId, traceId, {
-              fromMs: window.fromMs,
-              toMs: window.toMs,
-            });
-          }
-
-          return this.#findByResolvedOccurredAt({ tenantId, traceId, hasHint, options });
-        },
-      });
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.warn(
-        { tenantId, traceId, error: errorMessage },
-        "Failed to get trace summary from ClickHouse",
-      );
-      throw error;
-    }
-  }
-
-  /**
-   * Resolves OccurredAt via sort-key seek to enable partition pruning.
-   */
-  private async resolveOccurredAtMs({
-    tenantId,
-    traceId,
-  }: {
-    tenantId: string;
-    traceId: string;
-  }): Promise<{ found: boolean; occurredAtMs?: number }> {
-    const client = await this.options.resolveClient(tenantId);
-    const result = await client.query({
-      query: `
-        SELECT
-          count() AS rowCount,
-          toUnixTimestamp64Milli(min(OccurredAt)) AS occurredAtMs
-        FROM ${TABLE_NAME}
-        WHERE TenantId = {tenantId:String}
-          AND TraceId = {traceId:String}
-      `,
-      query_params: { tenantId, traceId },
-      format: "JSONEachRow",
-    });
-    const rows = occurredAtCountRowsSchema.parse(await result.json());
-    const rowCountRaw = rows[0]?.rowCount;
-    const raw = rows[0]?.occurredAtMs;
-    const rowCount = typeof rowCountRaw === "string" ? Number(rowCountRaw) : (rowCountRaw ?? NaN);
-    if (!Number.isFinite(rowCount) || rowCount <= 0) {
-      return { found: false };
-    }
-    if (raw === null || raw === undefined) return { found: true };
-    // A positive OccurredAt can safely bound the read. Historical rows with the
-    // epoch sentinel (0) must fall back to the legacy unbounded lookup because
-    // they do exist but have no usable partition key.
-    const ms = typeof raw === "string" ? Number(raw) : raw;
-    return Number.isFinite(ms) && ms > 0 ? { found: true, occurredAtMs: ms } : { found: true };
-  }
-
-  private async queryByTraceId(
-    tenantId: string,
-    traceId: string,
-    window?: { fromMs: number; toMs: number },
-  ): Promise<TraceSummaryData | null> {
-    const outerTimeFilter = window
-      ? "AND t.OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64}) " +
-        "AND t.OccurredAt <= fromUnixTimestamp64Milli({toMs:Int64})"
-      : "";
-    const innerTimeFilter = window
-      ? "AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64}) " +
-        "AND OccurredAt <= fromUnixTimestamp64Milli({toMs:Int64})"
-      : "";
-
-    const client = await this.options.resolveClient(tenantId);
-    // IN-tuple dedup over the ReplacingMergeTree: the inner SELECT scans
-    // only (TenantId, TraceId, UpdatedAt) — small, sparse — to find the
-    // latest version, then the outer SELECT pulls the heavy columns
-    // (ComputedInput, ComputedOutput, Attributes, etc.) for that one row.
-    // See dev/docs/best_practices/clickhouse-queries.md.
-    const result = await client.query({
-      query: `
-        SELECT
-          t.ProjectionId AS ProjectionId,
-          t.TenantId AS TenantId,
-          t.TraceId AS TraceId,
-          t.Version AS Version,
-          t.Attributes AS Attributes,
-          toUnixTimestamp64Milli(t.OccurredAt) AS OccurredAt,
-          t.EarliestSpanStartMs AS EarliestSpanStartMs,
-          toUnixTimestamp64Milli(t.CreatedAt) AS CreatedAt,
-          toUnixTimestamp64Milli(t.UpdatedAt) AS UpdatedAt,
-          t.ComputedIOSchemaVersion AS ComputedIOSchemaVersion,
-          t.ComputedInput AS ComputedInput,
-          t.ComputedOutput AS ComputedOutput,
-          t.TimeToFirstTokenMs AS TimeToFirstTokenMs,
-          t.TimeToLastTokenMs AS TimeToLastTokenMs,
-          t.TotalDurationMs AS TotalDurationMs,
-          t.TokensPerSecond AS TokensPerSecond,
-          t.SpanCount AS SpanCount,
-          t.ContainsErrorStatus AS ContainsErrorStatus,
-          t.ContainsOKStatus AS ContainsOKStatus,
-          t.ErrorMessage AS ErrorMessage,
-          t.Models AS Models,
-          t.TotalCost AS TotalCost,
-          t.NonBilledCost AS NonBilledCost,
-          t.TokensEstimated AS TokensEstimated,
-          t.TotalPromptTokenCount AS TotalPromptTokenCount,
-          t.TotalCompletionTokenCount AS TotalCompletionTokenCount,
-          t.OutputFromRootSpan AS OutputFromRootSpan,
-          t.OutputSpanEndTimeMs AS OutputSpanEndTimeMs,
-          t.BlockedByGuardrail AS BlockedByGuardrail,
-          t.RootSpanType AS RootSpanType,
-          t.ContainsAi AS ContainsAi,
-          t.ContainsPrompt AS ContainsPrompt,
-          t.SelectedPromptId AS SelectedPromptId,
-          t.SelectedPromptSpanId AS SelectedPromptSpanId,
-          t.LastUsedPromptId AS LastUsedPromptId,
-          t.LastUsedPromptVersionNumber AS LastUsedPromptVersionNumber,
-          t.LastUsedPromptVersionId AS LastUsedPromptVersionId,
-          t.LastUsedPromptSpanId AS LastUsedPromptSpanId,
-          t.TopicId AS TopicId,
-          t.SubTopicId AS SubTopicId,
-          t.AnnotationIds AS AnnotationIds,
-          t.HasAnnotation AS HasAnnotation,
-          t.TraceName AS TraceName
-        FROM ${TABLE_NAME} AS t
-        WHERE t.TenantId = {tenantId:String}
-          AND t.TraceId = {traceId:String}
-          ${outerTimeFilter}
-          AND (t.TenantId, t.TraceId, t.UpdatedAt) IN (
-            SELECT TenantId, TraceId, max(UpdatedAt)
-            FROM ${TABLE_NAME}
-            WHERE TenantId = {tenantId:String}
-              AND TraceId = {traceId:String}
-              ${innerTimeFilter}
-            GROUP BY TenantId, TraceId
-          )
-        LIMIT 1
-      `,
-      query_params: window
-        ? { tenantId, traceId, fromMs: window.fromMs, toMs: window.toMs }
-        : { tenantId, traceId },
-      format: "JSONEachRow",
-    });
-
-    const rows = summaryReadRowsSchema.parse(await result.json());
-    const row = rows[0];
-    if (!row) return null;
-    return this.fromClickHouseRecord(row);
-  }
-
-  private fromClickHouseRecord(record: SummaryReadRow): TraceSummaryData {
-    return {
-      traceId: record.TraceId,
-      spanCount: record.SpanCount,
-      totalDurationMs: Number(record.TotalDurationMs),
-      computedIOSchemaVersion: record.ComputedIOSchemaVersion,
-      computedInput: record.ComputedInput,
-      computedOutput: record.ComputedOutput,
-      timeToFirstTokenMs: record.TimeToFirstTokenMs,
-      timeToLastTokenMs: record.TimeToLastTokenMs,
-      tokensPerSecond: record.TokensPerSecond,
-      containsErrorStatus: !!record.ContainsErrorStatus,
-      containsOKStatus: !!record.ContainsOKStatus,
-      errorMessage: record.ErrorMessage,
-      models: record.Models,
-      totalCost: record.TotalCost,
-      nonBilledCost: record.NonBilledCost ?? null,
-      tokensEstimated: !!record.TokensEstimated,
-      totalPromptTokenCount: record.TotalPromptTokenCount,
-      totalCompletionTokenCount: record.TotalCompletionTokenCount,
-      outputFromRootSpan: !!record.OutputFromRootSpan,
-      outputSpanEndTimeMs: Number(record.OutputSpanEndTimeMs),
-      blockedByGuardrail: !!record.BlockedByGuardrail,
-      rootSpanType: record.RootSpanType,
-      containsAi: !!record.ContainsAi,
-      containsPrompt: !!record.ContainsPrompt,
-      selectedPromptId: record.SelectedPromptId,
-      selectedPromptSpanId: record.SelectedPromptSpanId,
-      // Internal tiebreakers are not persisted; reconstruct as null on read.
-      selectedPromptStartTimeMs: null,
-      lastUsedPromptId: record.LastUsedPromptId,
-      lastUsedPromptVersionNumber: record.LastUsedPromptVersionNumber,
-      lastUsedPromptVersionId: record.LastUsedPromptVersionId,
-      lastUsedPromptSpanId: record.LastUsedPromptSpanId,
-      lastUsedPromptStartTimeMs: null,
-      topicId: record.TopicId,
-      subTopicId: record.SubTopicId,
-      annotationIds: record.AnnotationIds ?? [],
-      traceName: record.TraceName ?? "",
-      attributes: record.Attributes ?? {},
-      // Anchor is frozen; occurrence time from separate column for span baseline.
-      storageAnchorMs: record.OccurredAt,
-      occurredAt: isStorageAnchoredVersion(record.Version)
-        ? Number(record.EarliestSpanStartMs ?? 0)
-        : record.OccurredAt,
-      createdAt: record.CreatedAt,
-      updatedAt: record.UpdatedAt,
-      LastEventOccurredAt: Number(record.LastEventOccurredAt ?? 0),
-    };
-  }
-
-  private toClickHouseRecord({
-    data,
-    tenantId,
-    projectionId,
-    version,
-    retentionDays,
-  }: {
-    data: TraceSummaryData;
-    tenantId: string;
-    projectionId: string;
-    version: string;
-    retentionDays: number;
-  }): ClickHouseSummaryWriteRecord {
-    return {
-      ProjectionId: projectionId,
-      TenantId: tenantId,
-      TraceId: data.traceId,
-      Version: version,
-      Attributes: data.attributes,
-      // OccurredAt is the storage / partition / TTL anchor (ADR-087). The span
-      // timing baseline is persisted separately so a late earlier-starting span
-      // cannot move this address.
-      OccurredAt: new Date(storageAnchorForWrite(data)),
-      EarliestSpanStartMs: data.occurredAt,
-      CreatedAt: new Date(data.createdAt),
-      UpdatedAt: new Date(data.updatedAt),
-      LastEventOccurredAt: data.LastEventOccurredAt
-        ? new Date(data.LastEventOccurredAt)
-        : new Date(0),
-      ComputedIOSchemaVersion: data.computedIOSchemaVersion,
-      ComputedInput: data.computedInput,
-      ComputedOutput: data.computedOutput,
-      TimeToFirstTokenMs:
-        data.timeToFirstTokenMs != null ? Math.round(data.timeToFirstTokenMs) : null,
-      TimeToLastTokenMs: data.timeToLastTokenMs != null ? Math.round(data.timeToLastTokenMs) : null,
-      TotalDurationMs: Math.round(data.totalDurationMs),
-      TokensPerSecond: data.tokensPerSecond != null ? Math.round(data.tokensPerSecond) : null,
-      SpanCount: data.spanCount,
-      ContainsErrorStatus: data.containsErrorStatus ? 1 : 0,
-      ContainsOKStatus: data.containsOKStatus ? 1 : 0,
-      ErrorMessage: data.errorMessage,
-      Models: data.models,
-      TotalCost: data.totalCost,
-      NonBilledCost: data.nonBilledCost,
-      TokensEstimated: data.tokensEstimated,
-      TotalPromptTokenCount: data.totalPromptTokenCount,
-      TotalCompletionTokenCount: data.totalCompletionTokenCount,
-      OutputFromRootSpan: data.outputFromRootSpan ? 1 : 0,
-      OutputSpanEndTimeMs: data.outputSpanEndTimeMs,
-      BlockedByGuardrail: data.blockedByGuardrail ? 1 : 0,
-      RootSpanType: data.rootSpanType,
-      ContainsAi: data.containsAi ? 1 : 0,
-      ContainsPrompt: data.containsPrompt ? 1 : 0,
-      SelectedPromptId: data.selectedPromptId,
-      SelectedPromptSpanId: data.selectedPromptSpanId,
-      LastUsedPromptId: data.lastUsedPromptId,
-      LastUsedPromptVersionNumber: data.lastUsedPromptVersionNumber,
-      LastUsedPromptVersionId: data.lastUsedPromptVersionId,
-      LastUsedPromptSpanId: data.lastUsedPromptSpanId,
-      TopicId: data.topicId,
-      SubTopicId: data.subTopicId,
-      AnnotationIds: data.annotationIds,
-      HasAnnotation: data.annotationIds.length > 0 ? 1 : 0,
-      TraceName: data.traceName,
-      _retention_days: retentionDays,
-    };
   }
 }
 
 /**
- * The trace_summaries projection port over the same ClickHouse repository
- * the read side uses — same table, key triple and partition column. Only
- * the fold's write argument shape differs, reshaped here, not at composition.
+ * The trace_summaries projection port: the fold's write shape and its read-back. The read-back
+ * still names the fold's tenant: ADR-175's fold authorizer has not landed here, and no route
+ * reaches this port.
  */
 export class TraceSummaryProjectionClickHouseRepository extends TraceSummaryProjectionRepository {
-  private constructor(private readonly repository: TraceSummaryClickHouseRepository) {
+  private constructor(
+    private readonly writes: TraceSummaryWrites,
+    private readonly resolveClient: TraceClickHouseWriteResolver,
+  ) {
     super();
   }
 
@@ -666,17 +779,18 @@ export class TraceSummaryProjectionClickHouseRepository extends TraceSummaryProj
     resolveClient: TraceClickHouseWriteResolver;
   }): TraceSummaryProjectionClickHouseRepository {
     return new TraceSummaryProjectionClickHouseRepository(
-      TraceSummaryClickHouseRepository.create(options),
+      new TraceSummaryWrites(options.resolveClient),
+      options.resolveClient,
     );
   }
 
   async upsert(entry: TraceSummaryProjectionEntry): Promise<void> {
-    await this.repository.upsert(entry.data, entry.tenantId, entry.retentionDays);
+    await this.writes.upsert(entry.data, entry.tenantId, entry.retentionDays);
   }
 
   override async upsertBatch(entries: TraceSummaryProjectionEntry[]): Promise<void> {
     if (entries.length === 0) return;
-    await this.repository.upsertBatch(entries);
+    await this.writes.upsertBatch(entries);
   }
 
   async findByTraceId(input: {
@@ -684,9 +798,24 @@ export class TraceSummaryProjectionClickHouseRepository extends TraceSummaryProj
     traceId: string;
     window?: TraceSummaryReadWindow;
   }): Promise<TraceSummaryData | null> {
-    return this.repository.findByTraceId(
-      { tenantId: input.tenantId, traceId: input.traceId },
-      { window: input.window },
+    EventUtils.validateTenantId(
+      { tenantId: input.tenantId },
+      "TraceSummaryProjectionClickHouseRepository.findByTraceId",
     );
+    const scope: SummaryReadScope = {
+      client: await this.resolveClient(input.tenantId),
+      outer: "t.TenantId = {tenantId:String}",
+      inner: "TenantId = {tenantId:String}",
+      params: { tenantId: input.tenantId },
+      log: { tenantId: input.tenantId },
+    };
+    const found = await findSummary({
+      scope,
+      traceId: input.traceId,
+      options: { window: input.window },
+    });
+    if (!found) return null;
+    const { tenantId: _tenantId, ...summary } = found;
+    return summary;
   }
 }

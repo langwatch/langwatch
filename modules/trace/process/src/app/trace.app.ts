@@ -4,7 +4,7 @@ import { ApiKeyApi } from "@langwatch/api-key-contract";
  * Rules: attribution (caller stamped), full resolution on consuming reads,
  * partition-pruning hints, visibility verdicts, sample draw. See ADR for details.
  */
-import type { PrincipalRef } from "@langwatch/authorization";
+import type { Actor, Authorization, PrincipalRef } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
 import {
   type CodingAgentTranscript,
@@ -171,6 +171,7 @@ import {
   traceConfig,
   TraceIdAmbiguousError,
   TraceNotFoundError,
+  type TraceListCursor,
   type TraceListTracesInput,
   type TraceFindTraceInput,
   type TraceReadTracesWithSpansInput,
@@ -361,6 +362,7 @@ import { TracePreconditionSampleService } from "../services/trace-precondition-s
 import { TraceProcessingCommandsService } from "../services/trace-processing-commands.service.ts";
 import type { TraceProcessingCommands } from "../services/trace-processing-commands.service.ts";
 import { TraceProjectMilestonesService } from "../services/trace-project-milestones.service.ts";
+import { TraceReadAuthorizationService } from "../services/trace-read-authorization.service.ts";
 import { TraceRetentionFloorService } from "../services/trace-retention-floor.service.ts";
 import { SessionGroupsService } from "../services/trace-session-groups.service.ts";
 import { TraceUsageCountService } from "../services/trace-usage-count.service.ts";
@@ -446,39 +448,42 @@ export type TraceLogRecordReadRow = Readonly<{
   scopeVersion: string | null;
 }>;
 
-/** The list, facet and discover reads behind the grid and its sidebar. */
+/** A fenced read as its callers name it: the project, and the route's caller where one is. */
+type ProjectRead<T> = Omit<T, "authorization"> & { tenantId: string; actor?: Actor | undefined };
+
+/** The list, facet and discover reads behind the grid and its sidebar, fenced by a proof. */
 type TraceListReadParams = {
-  tenantId: string;
+  authorization: Authorization;
   timeRange: { from: number; to: number };
   sort: { columnId: string; direction: "asc" | "desc" };
   page?: number;
   pageSize: number;
-  cursor?: { sortValue: number; traceId: string };
+  cursor?: TraceListCursor;
   filterWhere?: { sql: string; params: Record<string, unknown> };
   visibilityCutoffMs?: number | null;
 };
 
 type TraceNewCountParams = {
-  tenantId: string;
+  authorization: Authorization;
   timeRange: { from: number; to: number };
   since: number;
   filterWhere?: { sql: string; params: Record<string, unknown> };
 };
 
 type TraceSuggestionsParams = {
-  tenantId: string;
+  authorization: Authorization;
   field: string;
   prefix: string;
   limit?: number;
 };
 
 type TraceDiscoverReadParams = {
-  tenantId: string;
+  authorization: Authorization;
   timeRange: { from: number; to: number; live?: boolean };
 };
 
 type TraceFacetValuesReadParams = {
-  tenantId: string;
+  authorization: Authorization;
   timeRange: { from: number; to: number };
   facetKey: string;
   prefix?: string;
@@ -489,13 +494,13 @@ type TraceFacetValuesReadParams = {
 export type TracesListReader = Readonly<{
   getList(params: TraceListReadParams): Promise<TraceListPage>;
   getFacets(params: {
-    tenantId: string;
+    authorization: Authorization;
     timeRange: { from: number; to: number; live?: boolean };
     filterFor: FacetFilterResolver;
   }): Promise<FacetDescriptor[]>;
   getNewCount(params: TraceNewCountParams): Promise<number>;
   getTraceIds(params: {
-    tenantId: string;
+    authorization: Authorization;
     timeRange: { from: number; to: number };
     filterWhere?: { sql: string; params: Record<string, unknown> };
     limit: number;
@@ -508,7 +513,7 @@ export type TracesListReader = Readonly<{
 
 /** The Sessions lens read. */
 type TraceSessionGroupsReadParams = {
-  tenantId: string;
+  authorization: Authorization;
   timeRange: { from: number; to: number; live?: boolean };
   sort?: { columnId: string; direction: "asc" | "desc" };
   pageSize: number;
@@ -522,7 +527,7 @@ export type TracesSessionGroupsReader = Readonly<{
   getSessionGroups(params: TraceSessionGroupsReadParams): Promise<SessionGroupsResult>;
 }>;
 
-type ByTrace = { tenantId: string; traceId: string; occurredAtMs?: number };
+type ByTrace = { authorization: Authorization; traceId: string; occurredAtMs?: number };
 
 /** Every per-span read the drawer, the waterfall and the share page issue. */
 export type TracesSpanReader = Readonly<{
@@ -547,17 +552,17 @@ export type TracesSpanReader = Readonly<{
   getSpanResourcesByTraceId(params: ByTrace): Promise<SpanResourceInfo[]>;
   getTraceEventsByTraceId(params: ByTrace): Promise<DerivedTraceEvent[]>;
   getTraceEventRollupsByTraceIds(params: {
-    tenantId: string;
+    authorization: Authorization;
     traceIds: string[];
     timeRange: { from: number; to: number };
   }): Promise<Record<string, TraceEventRollup>>;
   getModelUsageStats(params: {
-    tenantId: string;
+    authorization: Authorization;
     fromMs: number;
     limit: number;
   }): Promise<ModelUsageStatsRow[]>;
   getRecentSpansByModels(params: {
-    tenantId: string;
+    authorization: Authorization;
     models: string[];
     fromMs: number;
     perModelLimit: number;
@@ -571,9 +576,9 @@ export type TracesSpanReader = Readonly<{
  */
 export type TraceSummaryReader = Readonly<{
   getByTraceId(
-    tenantId: string,
-    traceId: string,
-    options?: Readonly<{
+    params: Readonly<{
+      authorization: Authorization;
+      traceId: string;
       occurredAtMs?: number;
       visibilityCutoffMs?: number | null;
       full?: boolean;
@@ -687,6 +692,8 @@ export interface TraceAppDependencies {
   spanCostSuggestions: TraceSpanCostSuggestion;
   /** Evaluation's shared runs (R40), which `readEvaluationRuns` answers from. */
   evaluationRuns: Pick<TraceEvaluationRunsReadRepository, "findRunsByTraceId">;
+  /** Mints the proof every fenced read carries (ADR-175); absent, those reads refuse by name. */
+  readAuthorization?: TraceReadAuthorizationService | undefined;
   /** Dates eval chips' runs from instant-eval's shared table; absent, chips stay pending. */
   explorerEvalRuns?: TraceInstantEvalRunService;
   /** The AI search composer's model seam; absent, the three AI operations refuse by name. */
@@ -992,6 +999,10 @@ export class TraceModule implements TraceApi, CollectorApp {
     const logRecords = LogRecordStorageService.create({
       repository: options.repositories.logRecords,
     });
+    const readAuthorization = TraceReadAuthorizationService.create({
+      authz: options.protections.authz,
+      reads: options.repositories.authorizedReads,
+    });
     const read = TraceLegacyReadService.create({
       traceCanonicalisation: options.canonicalisation,
       traceRead: TraceModule.composeLegacyRead({
@@ -1007,6 +1018,7 @@ export class TraceModule implements TraceApi, CollectorApp {
       editOverlay,
       logRecordStorage: logRecords,
       evaluationRuns: options.repositories.evaluationRuns,
+      readProofs: readAuthorization,
     });
     const list = TraceListService.create({
       repository: options.repositories.list,
@@ -1029,7 +1041,10 @@ export class TraceModule implements TraceApi, CollectorApp {
       : TraceModule.composeTree({
           resolveClient: resolve,
           modelProviders: options.modelProviders,
-          queryFieldValues: TraceReadQueryFieldValues.create(list),
+          queryFieldValues: TraceReadQueryFieldValues.create({
+            list,
+            readProofs: readAuthorization,
+          }),
           queryClassification: TraceQueryClassificationService.create({
             evaluation: TraceModule.#composeQuery().evaluation,
           }),
@@ -1109,6 +1124,7 @@ export class TraceModule implements TraceApi, CollectorApp {
         modelProviders: options.modelProviders,
       }),
       evaluationRuns: options.repositories.evaluationRuns,
+      readAuthorization,
       explorerEvalRuns: TraceInstantEvalRunService.create({
         runs: options.repositories.instantEvalRuns,
       }),
@@ -1526,12 +1542,42 @@ export class TraceModule implements TraceApi, CollectorApp {
     await ingest.recordSpan(input);
   }
 
-  findNormalizedSpansByTraceId(input: {
+  /** ADR-175: the route caller's proof where one is named, else the project's own-only proof. */
+  #readProof({
+    projectId,
+    actor,
+    entry,
+  }: {
+    projectId: string;
+    actor?: Actor | undefined;
+    entry: string;
+  }): Promise<Authorization> {
+    const proofs = this.#dependencies.readAuthorization;
+    if (!proofs) {
+      return Promise.reject(
+        new TraceCapabilityUnavailableError("this process", "a fenced trace read"),
+      );
+    }
+    return actor === void 0
+      ? proofs.ownOnly({ projectId, entry })
+      : proofs.forCaller({ actor, projectId, route: entry });
+  }
+
+  async findNormalizedSpansByTraceId({
+    tenantId,
+    ...read
+  }: {
     tenantId: string;
     traceId: string;
     limit?: number;
   }): Promise<NormalizedSpan[]> {
-    return this.#dependencies.traces.spans.getNormalizedSpansByTraceId(input);
+    return this.#dependencies.traces.spans.getNormalizedSpansByTraceId({
+      ...read,
+      authorization: await this.#readProof({
+        projectId: tenantId,
+        entry: "findNormalizedSpansByTraceId",
+      }),
+    });
   }
 
   getEvaluationSpans(
@@ -1553,13 +1599,41 @@ export class TraceModule implements TraceApi, CollectorApp {
       refuseAbove: input.options?.refuseAbove,
     });
 
+    const filterWhere = input.options?.filterWhere;
     return this.#contentReader.listTraces({
       ...input,
       query: {
         ...input.query,
         ...(pageSize === undefined ? {} : { pageSize }),
       },
+      ...(filterWhere === undefined
+        ? {}
+        : {
+            options: {
+              ...input.options,
+              filterWhere: await this.#expandOwnFilter({
+                projectId: input.query.projectId,
+                entry: "listTraces",
+                filterWhere,
+              }),
+            },
+          }),
     });
+  }
+
+  /** A compiled filter's tenant markers fenced to the project alone, for a statement it names. */
+  #expandOwnFilter(input: {
+    projectId: string;
+    entry: string;
+    filterWhere: { sql: string; params: Record<string, unknown> };
+  }): Promise<{ sql: string; params: Record<string, unknown> }> {
+    const proofs = this.#dependencies.readAuthorization;
+    if (!proofs) {
+      return Promise.reject(
+        new TraceCapabilityUnavailableError("this process", "a fenced trace read"),
+      );
+    }
+    return proofs.expandForOwnProject(input);
   }
   /** The tRPC reads refuse above their named plan bound; every other caller clamps. */
   async #boundedPageSize({
@@ -1821,12 +1895,18 @@ export class TraceModule implements TraceApi, CollectorApp {
     timeRange: { from: number; to: number; live?: boolean };
     query?: string | null;
     evalRuns?: Readonly<Record<string, InstantEvalRunReference>>;
+    actor?: Actor | undefined;
   }): Promise<DiscoverResult> {
     if (input.query === null || input.query === undefined) {
-      return this.readDiscover({ tenantId: input.projectId, timeRange: input.timeRange });
+      return this.readDiscover({
+        tenantId: input.projectId,
+        actor: input.actor,
+        timeRange: input.timeRange,
+      });
     }
     return this.readFilteredFacets({
       projectId: input.projectId,
+      actor: input.actor,
       timeRange: input.timeRange,
       query: input.query,
       evalRuns: await this.findExplorerEvalRuns({
@@ -2311,13 +2391,11 @@ export class TraceModule implements TraceApi, CollectorApp {
   /** The trace query language's free-text filter, compiled to a ClickHouse WHERE fragment. */
   translateTraceFilter(input: {
     query: string;
-    tenantId: string;
     timeRange: { from: number; to: number };
     evalRuns?: readonly ResolvedInstantEvalRun[];
   }): { sql: string; params: Record<string, unknown> } | null {
     return this.#queryTranslation.translateFilter({
       queryText: input.query,
-      tenantId: input.tenantId,
       timeRange: input.timeRange,
       ...(input.evalRuns ? { evalRuns: input.evalRuns } : {}),
     });
@@ -2342,7 +2420,6 @@ export class TraceModule implements TraceApi, CollectorApp {
    */
   compileExplorerTraceFilter(input: {
     query: string;
-    tenantId: string;
     timeRange: { from: number; to: number };
     evalRuns?: readonly ResolvedInstantEvalRun[];
     originNamed?: boolean;
@@ -2367,18 +2444,22 @@ export class TraceModule implements TraceApi, CollectorApp {
   }
 
   /** The trace ids a filter selects, newest first and capped. */
-  findTraceIdsForFilter(input: {
+  async findTraceIdsForFilter(input: {
     projectId: string;
     filter: string;
     window: { from: number; to: number };
     limit: number;
+    actor?: Actor | undefined;
   }): Promise<readonly string[]> {
     return this.#dependencies.traces.list.getTraceIds({
-      tenantId: input.projectId,
+      authorization: await this.#readProof({
+        projectId: input.projectId,
+        actor: input.actor,
+        entry: "findTraceIdsForFilter",
+      }),
       timeRange: input.window,
       filterWhere: this.compileExplorerTraceFilter({
         query: input.filter,
-        tenantId: input.projectId,
         timeRange: input.window,
       }),
       limit: input.limit,
@@ -2404,18 +2485,24 @@ export class TraceModule implements TraceApi, CollectorApp {
   // -------------------------------------------------------------------------
 
   /** One page of the trace grid. */
-  readTraceList(params: TraceListReadParams): Promise<TraceListPage> {
-    return this.#dependencies.traces.list.getList(params);
+  async readTraceList({
+    tenantId,
+    actor,
+    ...read
+  }: ProjectRead<TraceListReadParams>): Promise<TraceListPage> {
+    return this.#dependencies.traces.list.getList({
+      ...read,
+      authorization: await this.#readProof({ projectId: tenantId, actor, entry: "readTraceList" }),
+    });
   }
 
   /** One Sessions lens page through the viewer's protections; coding-agent fills `codingAgent`. */
   async readSessionGroups(
-    input: TraceSessionGroupsInput & { protections: Protections },
+    input: TraceSessionGroupsInput & { protections: Protections; actor?: Actor | undefined },
   ): Promise<TracesSessionsPage> {
     const { protections } = input;
     const filterWhere = this.compileExplorerTraceFilter({
       query: input.query ?? "",
-      tenantId: input.projectId,
       timeRange: input.timeRange,
       evalRuns: await this.findExplorerEvalRuns({
         projectId: input.projectId,
@@ -2423,7 +2510,11 @@ export class TraceModule implements TraceApi, CollectorApp {
       }),
     });
     const result = await this.#dependencies.traces.sessionGroups.getSessionGroups({
-      tenantId: input.projectId,
+      authorization: await this.#readProof({
+        projectId: input.projectId,
+        actor: input.actor,
+        entry: "readSessionGroups",
+      }),
       timeRange: input.timeRange,
       sort: input.sort,
       pageSize: input.pageSize,
@@ -2457,13 +2548,13 @@ export class TraceModule implements TraceApi, CollectorApp {
     timeRange: { from: number; to: number; live?: boolean };
     query: string;
     evalRuns?: readonly ResolvedInstantEvalRun[];
+    actor?: Actor | undefined;
   }): Promise<DiscoverResult> {
     const filterFor = createFacetFilterResolver({
       queryText: input.query,
       compile: (text) =>
         this.translateTraceFilter({
           query: text,
-          tenantId: input.projectId,
           timeRange: input.timeRange,
           ...(input.evalRuns ? { evalRuns: input.evalRuns } : {}),
         }) ?? undefined,
@@ -2471,7 +2562,11 @@ export class TraceModule implements TraceApi, CollectorApp {
     });
 
     const facets = await this.#dependencies.traces.list.getFacets({
-      tenantId: input.projectId,
+      authorization: await this.#readProof({
+        projectId: input.projectId,
+        actor: input.actor,
+        entry: "readFilteredFacets",
+      }),
       timeRange: input.timeRange,
       filterFor,
     });
@@ -2480,23 +2575,59 @@ export class TraceModule implements TraceApi, CollectorApp {
   }
 
   /** How many traces have arrived since the grid last painted. */
-  readNewCount(params: TraceNewCountParams): Promise<number> {
-    return this.#dependencies.traces.list.getNewCount(params);
+  async readNewCount({
+    tenantId,
+    actor,
+    ...read
+  }: ProjectRead<TraceNewCountParams>): Promise<number> {
+    return this.#dependencies.traces.list.getNewCount({
+      ...read,
+      authorization: await this.#readProof({ projectId: tenantId, actor, entry: "readNewCount" }),
+    });
   }
 
   /** The typeahead's values for one field. */
-  readSuggestions(params: TraceSuggestionsParams): Promise<string[]> {
-    return this.#dependencies.traces.list.getSuggestions(params);
+  async readSuggestions({
+    tenantId,
+    actor,
+    ...read
+  }: ProjectRead<TraceSuggestionsParams>): Promise<string[]> {
+    return this.#dependencies.traces.list.getSuggestions({
+      ...read,
+      authorization: await this.#readProof({
+        projectId: tenantId,
+        actor,
+        entry: "readSuggestions",
+      }),
+    });
   }
 
   /** The facet payload the sidebar opens with. */
-  readDiscover(params: TraceDiscoverReadParams): Promise<DiscoverResult> {
-    return this.#dependencies.traces.list.getDiscover(params);
+  async readDiscover({
+    tenantId,
+    actor,
+    ...read
+  }: ProjectRead<TraceDiscoverReadParams>): Promise<DiscoverResult> {
+    return this.#dependencies.traces.list.getDiscover({
+      ...read,
+      authorization: await this.#readProof({ projectId: tenantId, actor, entry: "readDiscover" }),
+    });
   }
 
   /** One facet's values, paged. */
-  readFacetValues(params: TraceFacetValuesReadParams): Promise<FacetValuesResult> {
-    return this.#dependencies.traces.list.getFacetValues(params);
+  async readFacetValues({
+    tenantId,
+    actor,
+    ...read
+  }: ProjectRead<TraceFacetValuesReadParams>): Promise<FacetValuesResult> {
+    return this.#dependencies.traces.list.getFacetValues({
+      ...read,
+      authorization: await this.#readProof({
+        projectId: tenantId,
+        actor,
+        entry: "readFacetValues",
+      }),
+    });
   }
 
   // -------------------------------------------------------------------------
@@ -2504,14 +2635,21 @@ export class TraceModule implements TraceApi, CollectorApp {
   // -------------------------------------------------------------------------
 
   /** One trace's summary fold. */
-  readTraceSummary(input: {
+  async readTraceSummary(input: {
     projectId: string;
     traceId: string;
     occurredAtMs?: number;
     visibilityCutoffMs?: number | null;
     full?: boolean;
+    actor?: Actor | undefined;
   }): Promise<TraceSummaryData> {
-    return this.#dependencies.traces.summary.getByTraceId(input.projectId, input.traceId, {
+    return this.#dependencies.traces.summary.getByTraceId({
+      authorization: await this.#readProof({
+        projectId: input.projectId,
+        actor: input.actor,
+        entry: "readTraceSummary",
+      }),
+      traceId: input.traceId,
       ...occurredAtHint(input.occurredAtMs),
       ...(input.visibilityCutoffMs !== undefined
         ? { visibilityCutoffMs: input.visibilityCutoffMs }
@@ -2529,6 +2667,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     projectId: string;
     traceId: string;
     visibilityCutoffMs: number | null | undefined;
+    actor?: Actor | undefined;
   }): Promise<boolean> {
     if (input.visibilityCutoffMs === null || input.visibilityCutoffMs === undefined) {
       return false;
@@ -2537,6 +2676,7 @@ export class TraceModule implements TraceApi, CollectorApp {
       const summary = await this.readTraceSummary({
         projectId: input.projectId,
         traceId: input.traceId,
+        actor: input.actor,
         visibilityCutoffMs: input.visibilityCutoffMs,
         full: false,
       });
@@ -2555,28 +2695,38 @@ export class TraceModule implements TraceApi, CollectorApp {
   // -------------------------------------------------------------------------
 
   /** The light per-span summary rows the waterfall is built from. */
-  readSpanSummaries(input: {
+  async readSpanSummaries(input: {
     projectId: string;
     traceId: string;
     occurredAtMs?: number;
+    actor?: Actor | undefined;
   }): Promise<SpanSummaryRow[]> {
     return this.#dependencies.traces.spans.getSpanSummaryByTraceId({
-      tenantId: input.projectId,
+      authorization: await this.#readProof({
+        projectId: input.projectId,
+        actor: input.actor,
+        entry: "readSpanSummaries",
+      }),
       traceId: input.traceId,
       ...occurredAtHint(input.occurredAtMs),
     });
   }
 
   /** Every stored span of one trace. */
-  readSpans(input: {
+  async readSpans(input: {
     projectId: string;
     traceId: string;
     occurredAtMs?: number;
     visibilityCutoffMs?: number | null;
     limit?: number;
+    actor?: Actor | undefined;
   }): Promise<Span[]> {
     return this.#dependencies.traces.spans.getSpansByTraceId({
-      tenantId: input.projectId,
+      authorization: await this.#readProof({
+        projectId: input.projectId,
+        actor: input.actor,
+        entry: "readSpans",
+      }),
       traceId: input.traceId,
       ...(input.visibilityCutoffMs !== undefined
         ? { visibilityCutoffMs: input.visibilityCutoffMs }
@@ -2587,16 +2737,21 @@ export class TraceModule implements TraceApi, CollectorApp {
   }
 
   /** One page of a trace's spans. */
-  readSpansPage(input: {
+  async readSpansPage(input: {
     projectId: string;
     traceId: string;
     limit: number;
     offset: number;
     occurredAtMs?: number;
     visibilityCutoffMs?: number | null;
+    actor?: Actor | undefined;
   }): Promise<{ spans: Span[]; total: number }> {
     return this.#dependencies.traces.spans.getSpansPaginated({
-      tenantId: input.projectId,
+      authorization: await this.#readProof({
+        projectId: input.projectId,
+        actor: input.actor,
+        entry: "readSpansPage",
+      }),
       traceId: input.traceId,
       limit: input.limit,
       offset: input.offset,
@@ -2608,15 +2763,20 @@ export class TraceModule implements TraceApi, CollectorApp {
   }
 
   /** The spans of a live trace that have moved since the browser last looked. */
-  readSpansSince(input: {
+  async readSpansSince(input: {
     projectId: string;
     traceId: string;
     sinceStartTimeMs: number;
     occurredAtMs?: number;
     visibilityCutoffMs?: number | null;
+    actor?: Actor | undefined;
   }): Promise<Span[]> {
     return this.#dependencies.traces.spans.getSpansSince({
-      tenantId: input.projectId,
+      authorization: await this.#readProof({
+        projectId: input.projectId,
+        actor: input.actor,
+        entry: "readSpansSince",
+      }),
       traceId: input.traceId,
       sinceStartTimeMs: input.sinceStartTimeMs,
       ...(input.visibilityCutoffMs !== undefined
@@ -2627,15 +2787,20 @@ export class TraceModule implements TraceApi, CollectorApp {
   }
 
   /** One span, by id. */
-  findSpan(input: {
+  async findSpan(input: {
     projectId: string;
     traceId: string;
     spanId: string;
     occurredAtMs?: number;
     visibilityCutoffMs?: number | null;
+    actor?: Actor | undefined;
   }): Promise<Span | null> {
     return this.#dependencies.traces.spans.findSpanById({
-      tenantId: input.projectId,
+      authorization: await this.#readProof({
+        projectId: input.projectId,
+        actor: input.actor,
+        entry: "findSpan",
+      }),
       traceId: input.traceId,
       spanId: input.spanId,
       ...(input.visibilityCutoffMs !== undefined
@@ -2646,14 +2811,19 @@ export class TraceModule implements TraceApi, CollectorApp {
   }
 
   /** One span's events. */
-  readSpanEvents(input: {
+  async readSpanEvents(input: {
     projectId: string;
     traceId: string;
     spanId: string;
     occurredAtMs?: number;
+    actor?: Actor | undefined;
   }): Promise<ElasticSearchEvent[]> {
     return this.#dependencies.traces.spans.getSpanEvents({
-      tenantId: input.projectId,
+      authorization: await this.#readProof({
+        projectId: input.projectId,
+        actor: input.actor,
+        entry: "readSpanEvents",
+      }),
       traceId: input.traceId,
       spanId: input.spanId,
       ...occurredAtHint(input.occurredAtMs),
@@ -2661,52 +2831,72 @@ export class TraceModule implements TraceApi, CollectorApp {
   }
 
   /** The per-span LangWatch instrumentation signals the badges render. */
-  readLangwatchSignals(input: {
+  async readLangwatchSignals(input: {
     projectId: string;
     traceId: string;
     occurredAtMs?: number;
+    actor?: Actor | undefined;
   }): Promise<{ spanId: string; signals: SpanLangwatchSignals["signals"] }[]> {
     return this.#dependencies.traces.spans.getLangwatchSignalsByTraceId({
-      tenantId: input.projectId,
+      authorization: await this.#readProof({
+        projectId: input.projectId,
+        actor: input.actor,
+        entry: "readLangwatchSignals",
+      }),
       traceId: input.traceId,
       ...occurredAtHint(input.occurredAtMs),
     });
   }
 
   /** The per-span resource and scope rows the resource pane is built from. */
-  readSpanResources(input: {
+  async readSpanResources(input: {
     projectId: string;
     traceId: string;
     occurredAtMs?: number;
+    actor?: Actor | undefined;
   }): Promise<SpanResourceInfo[]> {
     return this.#dependencies.traces.spans.getSpanResourcesByTraceId({
-      tenantId: input.projectId,
+      authorization: await this.#readProof({
+        projectId: input.projectId,
+        actor: input.actor,
+        entry: "readSpanResources",
+      }),
       traceId: input.traceId,
       ...occurredAtHint(input.occurredAtMs),
     });
   }
 
   /** The trace-level events the drawer timeline renders. */
-  readTraceEvents(input: {
+  async readTraceEvents(input: {
     projectId: string;
     traceId: string;
     occurredAtMs?: number;
+    actor?: Actor | undefined;
   }): Promise<DerivedTraceEvent[]> {
     return this.#dependencies.traces.spans.getTraceEventsByTraceId({
-      tenantId: input.projectId,
+      authorization: await this.#readProof({
+        projectId: input.projectId,
+        actor: input.actor,
+        entry: "readTraceEvents",
+      }),
       traceId: input.traceId,
       ...occurredAtHint(input.occurredAtMs),
     });
   }
 
   /** The events column's rollups for one page of the grid. */
-  readTraceEventRollups(input: {
+  async readTraceEventRollups(input: {
     projectId: string;
     traceIds: string[];
     timeRange: { from: number; to: number };
+    actor?: Actor | undefined;
   }): Promise<Record<string, TraceEventRollup>> {
     return this.#dependencies.traces.spans.getTraceEventRollupsByTraceIds({
-      tenantId: input.projectId,
+      authorization: await this.#readProof({
+        projectId: input.projectId,
+        actor: input.actor,
+        entry: "readTraceEventRollups",
+      }),
       traceIds: input.traceIds,
       timeRange: input.timeRange,
     });
@@ -2766,13 +2956,18 @@ export class TraceModule implements TraceApi, CollectorApp {
     return this.#getTree().findSummary(input);
   }
 
-  readModelUsageStats(input: {
+  async readModelUsageStats(input: {
     projectId: string;
     fromMs: number;
     limit: number;
+    actor?: Actor | undefined;
   }): Promise<ModelUsageStatsRow[]> {
     return this.#dependencies.traces.spans.getModelUsageStats({
-      tenantId: input.projectId,
+      authorization: await this.#readProof({
+        projectId: input.projectId,
+        actor: input.actor,
+        entry: "readModelUsageStats",
+      }),
       fromMs: input.fromMs,
       limit: input.limit,
     });
@@ -3024,15 +3219,20 @@ export class TraceModule implements TraceApi, CollectorApp {
     return this.#usageCount;
   }
 
-  readRecentSpansByModels(input: {
+  async readRecentSpansByModels(input: {
     projectId: string;
     models: string[];
     fromMs: number;
     perModelLimit: number;
     limit: number;
+    actor?: Actor | undefined;
   }): Promise<ModelSpanSampleRow[]> {
     return this.#dependencies.traces.spans.getRecentSpansByModels({
-      tenantId: input.projectId,
+      authorization: await this.#readProof({
+        projectId: input.projectId,
+        actor: input.actor,
+        entry: "readRecentSpansByModels",
+      }),
       models: input.models,
       fromMs: input.fromMs,
       perModelLimit: input.perModelLimit,
@@ -3117,8 +3317,17 @@ export class TraceModule implements TraceApi, CollectorApp {
   // -------------------------------------------------------------------------
 
   /** The evaluation runs recorded against one trace. */
-  readEvaluationRuns(input: EvaluationRunsByTraceQuery): Promise<EvaluationRunData[]> {
-    return this.#dependencies.evaluationRuns.findRunsByTraceId(input);
+  async readEvaluationRuns(
+    input: EvaluationRunsByTraceQuery & { actor?: Actor | undefined },
+  ): Promise<EvaluationRunData[]> {
+    return this.#dependencies.evaluationRuns.findRunsByTraceId({
+      authorization: await this.#readProof({
+        projectId: input.tenantId,
+        actor: input.actor,
+        entry: "readEvaluationRuns",
+      }),
+      traceId: input.traceId,
+    });
   }
 
   /** Port of main's `codingAgentTranscript`: the viewer's protections, then the shared read. */
@@ -3624,20 +3833,34 @@ class FoldedTraceSummaryReader extends TraceSummaryReaderRepository {
 }
 
 class TraceReadQueryFieldValues extends TraceQueryFieldValuesRepository {
-  static create(listReader: TraceListService): TraceReadQueryFieldValues {
-    return new TraceReadQueryFieldValues(listReader);
+  static create({
+    list,
+    readProofs,
+  }: {
+    list: TraceListService;
+    readProofs: Pick<TraceReadAuthorizationService, "ownOnly">;
+  }): TraceReadQueryFieldValues {
+    return new TraceReadQueryFieldValues(list, readProofs);
   }
 
   #listReader: TraceListService;
+  #readProofs: Pick<TraceReadAuthorizationService, "ownOnly">;
 
-  private constructor(listReader: TraceListService) {
+  private constructor(
+    listReader: TraceListService,
+    readProofs: Pick<TraceReadAuthorizationService, "ownOnly">,
+  ) {
     super();
     this.#listReader = listReader;
+    this.#readProofs = readProofs;
   }
 
-  findAll(input: TraceQueryFieldValuesInput): Promise<TraceQueryFieldValuesResult> {
+  async findAll(input: TraceQueryFieldValuesInput): Promise<TraceQueryFieldValuesResult> {
     return this.#listReader.getFacetValues({
-      tenantId: input.projectId,
+      authorization: await this.#readProofs.ownOnly({
+        projectId: input.projectId,
+        entry: "queryFieldValues",
+      }),
       timeRange: input.timeRange,
       facetKey: input.facetKey,
       limit: input.limit,

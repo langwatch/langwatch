@@ -4,11 +4,12 @@
  * span.attribute) to their respective stores.
  */
 
+import { ownProof } from "@langwatch/authorization/testing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { CLICKHOUSE_FACET_CATALOG } from "../../../facet/repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
 import { MemoryNullTraceListRepository } from "../../../../repositories/memory/memory.null-trace-list.repository.ts";
 import { MemoryTraceEvaluationRunsRepository } from "../../../../repositories/memory/memory.trace-evaluation-runs.repository.ts";
+import { CLICKHOUSE_FACET_CATALOG } from "../../../facet/repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
 import { TraceListService } from "../trace-list-read.service.ts";
 
 const emptyResult = { values: [], totalDistinct: 0 };
@@ -33,7 +34,7 @@ function makeService() {
 let seq = 0;
 function params(facetKey: string) {
   return {
-    tenantId: `project_routing_${seq++}`,
+    authorization: ownProof({ projectId: `project_routing_${seq++}`, now: 1 }),
     timeRange: { from: 0, to: 1 },
     facetKey,
     limit: 30,

@@ -5,13 +5,14 @@
  * @see specs/traces-v2/search.feature
  */
 
+import { tenantScope } from "@langwatch/authorization/tenant-fence";
 import { describe, expect, it } from "vitest";
 
 import { scopeTraceFilterToTable } from "../trace-facet-scope.rules.ts";
 
 const FILTER = {
   sql: "Status = {p0:String}",
-  params: { tenantId: "project-1", timeFrom: 1, timeTo: 2, p0: "error" },
+  params: { timeFrom: 1, timeTo: 2, p0: "error" },
 };
 
 describe("scopeTraceFilterToTable", () => {
@@ -56,7 +57,16 @@ describe("scopeTraceFilterToTable", () => {
 
       expect(sql).toContain("OccurredAt >= fromUnixTimestamp64Milli");
       expect(sql).not.toContain("OccurredAt <= fromUnixTimestamp64Milli");
-      expect(sql).toContain("TenantId = {tenantId:String}");
+      expect(sql).toContain(tenantScope("OccurredAt"));
+    });
+  });
+
+  describe("given another table and a fence over several tenants", () => {
+    it("matches on the tenant and trace id together, naming no tenant itself", () => {
+      const { sql } = scopeTraceFilterToTable({ table: "stored_spans", filterWhere: FILTER });
+
+      expect(sql).toMatch(/^\(\(TenantId, TraceId\) IN \(\s*SELECT TenantId, TraceId/);
+      expect(sql).not.toContain("{tenantId:String}");
     });
   });
 });

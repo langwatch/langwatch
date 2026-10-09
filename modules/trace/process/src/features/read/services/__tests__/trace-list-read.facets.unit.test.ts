@@ -4,6 +4,7 @@
  * and facets that share a predicate share one batched scan.
  * @see specs/traces-v2/search.feature
  */
+import { ownProof } from "@langwatch/authorization/testing";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
   explorerHiddenOrigins,
@@ -12,19 +13,19 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  CLICKHOUSE_FACET_CATALOG,
-  FACET_REGISTRY,
-} from "../../../facet/repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
 import { MemoryTraceEvaluationRunsRepository } from "../../../../repositories/memory/memory.trace-evaluation-runs.repository.ts";
-import { createFacetFilterResolver } from "../../../facet/rules/trace-facet-filter.rules.ts";
 import {
   explorerOriginExclusion,
   HIDDEN_ORIGINS_PARAM,
   type TraceFilterWhere,
 } from "../../../../rules/trace-filter-hidden-origins.rules.ts";
-import { TraceListService } from "../trace-list-read.service.ts";
 import { traceQueryTranslation } from "../../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
+import {
+  CLICKHOUSE_FACET_CATALOG,
+  FACET_REGISTRY,
+} from "../../../facet/repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
+import { createFacetFilterResolver } from "../../../facet/rules/trace-facet-filter.rules.ts";
+import { TraceListService } from "../trace-list-read.service.ts";
 
 const TENANT = "tenant-1";
 const timeRange = { from: 1_700_000_000_000, to: 1_700_086_400_000 };
@@ -87,14 +88,13 @@ async function facetsFor({
     topicNames: { findNamesByIds: async () => new Map() },
   });
   const facets = await service.getFacets({
-    tenantId: TENANT,
+    authorization: ownProof({ projectId: TENANT, now: timeRange.to }),
     timeRange: window,
     filterFor: createFacetFilterResolver({
       queryText: query,
       compile: (text) =>
         traceQueryTranslation.translateFilter({
           queryText: text,
-          tenantId: TENANT,
           timeRange: window,
         }) ?? undefined,
       hide: explorerOriginExclusion({ hiddenOrigins: explorerHiddenOrigins(query) }),
@@ -112,8 +112,7 @@ function carrying(calls: readonly BatchCall[], key: string): BatchCall {
 }
 
 const compiled = (query: string) =>
-  traceQueryTranslation.translateFilter({ queryText: query, tenantId: TENANT, timeRange })?.sql ??
-  "";
+  traceQueryTranslation.translateFilter({ queryText: query, timeRange })?.sql ?? "";
 
 describe("the sidebar's facet counts", () => {
   describe("given a query naming two facet fields", () => {

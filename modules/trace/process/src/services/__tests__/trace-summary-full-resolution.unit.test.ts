@@ -18,6 +18,7 @@ vi.mock("langwatch", () => ({
   }),
 }));
 
+import { ownProof } from "@langwatch/authorization/testing";
 import {
   type NormalizedSpan,
   NormalizedSpanKind,
@@ -25,12 +26,12 @@ import {
   EVENTREF_ATTR_PREFIX,
 } from "@langwatch/trace-contract";
 
+import { TraceIOExtractionService } from "../../features/derivation/services/trace-io-extraction.service.ts";
+import { TraceSummaryService } from "../../features/read/services/trace-summary-read.service.ts";
 import {
   NullSpanStorageRepository,
   type SpanStorageRepository,
 } from "../../repositories/span-storage.repository.ts";
-import { TraceIOExtractionService } from "../../features/derivation/services/trace-io-extraction.service.ts";
-import { TraceSummaryService } from "../../features/read/services/trace-summary-read.service.ts";
 import { blobStoreResolving } from "./support/trace-blob-store.support.ts";
 
 // ---------------------------------------------------------------------------
@@ -74,7 +75,10 @@ function makeSpan(
 
 const realIOService = TraceIOExtractionService.create(TraceCanonicalisationService.create());
 
+const authorization = ownProof({ projectId: "proj-1", now: Date.now() });
+
 const makeSummary = () => ({
+  tenantId: "proj-1",
   traceId: "trace-1",
   occurredAt: Date.now(),
   computedInput: "preview-input…",
@@ -105,7 +109,9 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
         } as never,
       });
 
-      const result = await service.getByTraceId("proj-1", "trace-1", {
+      const result = await service.getByTraceId({
+        authorization,
+        traceId: "trace-1",
         full: true,
       });
 
@@ -128,23 +134,61 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
 
     describe("when full is requested", () => {
       it("returns the recomputed full input instead of the stored preview", async () => {
+        const spanRepo = makeSpanRepo([spanWithRef]);
+        const blobStore = blobStoreResolving({ "langwatch.input": fullInput });
         const service = TraceSummaryService.create({
           repository: {
             findByTraceId: vi.fn().mockResolvedValue(makeSummary()),
             upsert: vi.fn(),
           } as never,
           fullResolutionDeps: {
-            spanStorageRepository: makeSpanRepo([spanWithRef]),
-            blobStore: blobStoreResolving({ "langwatch.input": fullInput }),
+            spanStorageRepository: spanRepo,
+            blobStore,
             ioExtractionService: realIOService,
           },
         });
 
-        const result = await service.getByTraceId("proj-1", "trace-1", {
+        const result = await service.getByTraceId({
+          authorization,
+          traceId: "trace-1",
           full: true,
         });
 
         expect(result.computedInput).toBe(fullInput);
+        // The spans are re-read through the same proof; the offloaded bodies
+        // live under the project the summary was read from.
+        expect(spanRepo.findNormalizedSpansByTraceId).toHaveBeenCalledWith(
+          expect.objectContaining({ authorization, traceId: "trace-1" }),
+        );
+        expect(blobStore.getFromEventLog).toHaveBeenCalledWith(
+          expect.objectContaining({ tenantId: "proj-1" }),
+        );
+      });
+    });
+
+    describe("when the fenced span read also returns another member's spans under the id", () => {
+      it("recomputes from the spans of the tenant the summary was read from alone", async () => {
+        const blobStore = blobStoreResolving({ "langwatch.input": fullInput });
+        const service = TraceSummaryService.create({
+          repository: {
+            findByTraceId: vi.fn().mockResolvedValue(makeSummary()),
+            upsert: vi.fn(),
+          } as never,
+          fullResolutionDeps: {
+            spanStorageRepository: makeSpanRepo([{ ...spanWithRef, tenantId: "other-member" }]),
+            blobStore,
+            ioExtractionService: realIOService,
+          },
+        });
+
+        const result = await service.getByTraceId({
+          authorization,
+          traceId: "trace-1",
+          full: true,
+        });
+
+        expect(result.computedInput).toBe("preview-input…");
+        expect(blobStore.getFromEventLog).not.toHaveBeenCalled();
       });
     });
 
@@ -163,7 +207,7 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
           },
         });
 
-        const result = await service.getByTraceId("proj-1", "trace-1");
+        const result = await service.getByTraceId({ authorization, traceId: "trace-1" });
 
         expect(result.computedInput).toBe("preview-input…");
         expect(spanRepo.findNormalizedSpansByTraceId).not.toHaveBeenCalled();
@@ -189,7 +233,9 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
         },
       });
 
-      const result = await service.getByTraceId("proj-1", "trace-1", {
+      const result = await service.getByTraceId({
+        authorization,
+        traceId: "trace-1",
         full: true,
       });
 
@@ -221,7 +267,9 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
         },
       });
 
-      const result = await service.getByTraceId("proj-1", "trace-1", {
+      const result = await service.getByTraceId({
+        authorization,
+        traceId: "trace-1",
         full: true,
       });
 
@@ -247,7 +295,9 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
         },
       });
 
-      const result = await service.getByTraceId("proj-1", "trace-1", {
+      const result = await service.getByTraceId({
+        authorization,
+        traceId: "trace-1",
         full: true,
       });
 

@@ -30,6 +30,13 @@ const BOUND_TENANT_SET =
 
 const PLACEHOLDER_NAME = /\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*:/g;
 
+/**
+ * The authorized reader's fence (ADR-175): `TenantId IN ({tenantScope_all:Array(String)})`. Only
+ * that reserved name is read as a tenant array, and only when it binds exactly the declared set.
+ */
+const FENCED_TENANT_SET =
+  /(?:^|[\s.(])TenantId\s+IN\s*\(\s*\{\s*(tenantScope_all)\s*:\s*Array\(\s*String\s*\)\s*\}\s*\)/i;
+
 /** `TenantId = 'literal'` or `= "literal"`, which is never acceptable. */
 const LITERAL_TENANT_PREDICATE = /(?:^|[\s.(])TenantId\s*=\s*(?:'[^']*'|"[^"]*")/i;
 
@@ -226,6 +233,14 @@ export function checkTenantScope({
   tenantIds?: readonly string[] | undefined;
 }): TenantScopeViolation | null {
   const statement = maskNonCode(sql);
+  if (FENCED_TENANT_SET.test(statement)) {
+    return checkFencedTenantSet({
+      statement,
+      params,
+      tenantId,
+      tenantIds: tenantIds ?? [tenantId],
+    });
+  }
   if (tenantIds !== undefined)
     return checkTenantSetScope({ statement, params, tenantId, tenantIds });
   const bound = BOUND_TENANT_PREDICATE.exec(statement);
@@ -298,6 +313,50 @@ function checkTenantSetScope({
     values.every((value) => typeof value === "string" && declared.has(value)) &&
     new Set(values).size === declared.size;
   return matches ? null : { kind: "tenant-set-mismatch", declared: tenantIds, bound: values };
+}
+
+/**
+ * The reader's fence: every `tenantScope_all` array binds exactly the declared tenants, the
+ * claimed tenant among them, and no `OR` can disjoin it away. The router keeps them in one org.
+ */
+function checkFencedTenantSet({
+  statement,
+  params,
+  tenantId,
+  tenantIds,
+}: {
+  statement: string;
+  params?: Record<string, unknown> | undefined;
+  tenantId: string;
+  tenantIds: readonly string[];
+}): TenantScopeViolation | null {
+  const fences = matchesOf({ pattern: FENCED_TENANT_SET, masked: statement });
+  const [first] = fences;
+  if (first === undefined) return { kind: "missing-predicate" };
+  const param = first[1] ?? "";
+  const bound = params?.[param];
+  if (bound === undefined) return { kind: "missing-param", param };
+
+  const declared = new Set(tenantIds);
+  const values: readonly unknown[] = Array.isArray(bound) ? bound : [bound];
+  const matches =
+    Array.isArray(bound) &&
+    declared.has(tenantId) &&
+    values.every((value) => typeof value === "string" && declared.has(value)) &&
+    new Set(values).size === declared.size;
+  if (!matches) return { kind: "tenant-set-mismatch", declared: tenantIds, bound: values };
+
+  const scopingIndexes = fences.map(tokenIndex);
+  if (
+    hasWeakeningDisjunction({
+      masked: statement,
+      predicateIndex: tokenIndex(first),
+      scopingIndexes,
+    })
+  ) {
+    return { kind: "weakening-disjunction" };
+  }
+  return null;
 }
 
 /**

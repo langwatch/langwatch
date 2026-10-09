@@ -295,7 +295,6 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
       });
       const filterWhere = app.compileExplorerTraceFilter({
         query: input.query ?? "",
-        tenantId: input.projectId,
         timeRange: input.timeRange,
         evalRuns: await app.findExplorerEvalRuns({
           projectId: input.projectId,
@@ -305,6 +304,7 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
       const page = traceListPageSchema.parse(
         await app.readTraceList({
           tenantId: input.projectId,
+          actor,
           timeRange: input.timeRange,
           sort: input.sort,
           page: input.page,
@@ -325,9 +325,10 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
 
     .procedure("listEvents")
     .withPermission("traces:view")
-    .handle(({ app, input }) =>
+    .handle(({ app, input, actor }) =>
       app.readTraceEventRollups({
         projectId: input.projectId,
+        actor,
         traceIds: input.traceIds,
         timeRange: input.timeRange,
       }),
@@ -335,10 +336,9 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
 
     .procedure("newCount")
     .withPermission("traces:view")
-    .handle(async ({ app, input }) => {
+    .handle(async ({ app, input, actor }) => {
       const filterWhere = app.compileExplorerTraceFilter({
         query: input.query ?? "",
-        tenantId: input.projectId,
         timeRange: input.timeRange,
         evalRuns: await app.findExplorerEvalRuns({
           projectId: input.projectId,
@@ -347,6 +347,7 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
       });
       const count = await app.readNewCount({
         tenantId: input.projectId,
+        actor,
         timeRange: input.timeRange,
         since: input.since,
         filterWhere,
@@ -357,9 +358,10 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
 
     .procedure("suggest")
     .withPermission("traces:view")
-    .handle(async ({ app, input }) => {
+    .handle(async ({ app, input, actor }) => {
       const values = await app.readSuggestions({
         tenantId: input.projectId,
+        actor,
         field: input.field,
         prefix: input.prefix,
         limit: input.limit,
@@ -385,10 +387,11 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
 
     .procedure("discover")
     .withPermission("traces:view")
-    .handle(async ({ app, input }) =>
+    .handle(async ({ app, input, actor }) =>
       discoverResultSchema.parse(
         await app.readDiscoverForQuery({
           projectId: input.projectId,
+          actor,
           timeRange: input.timeRange,
           query: input.query,
           evalRuns: input.evalRuns,
@@ -412,10 +415,11 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
 
     .procedure("facets")
     .withPermission("traces:view")
-    .handle(async ({ app, input }) =>
+    .handle(async ({ app, input, actor }) =>
       discoverResultSchema.parse(
         await app.readFilteredFacets({
           projectId: input.projectId,
+          actor,
           timeRange: input.timeRange,
           query: input.query ?? "",
           evalRuns: await app.findExplorerEvalRuns({
@@ -428,10 +432,11 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
 
     .procedure("facetValues")
     .withPermission("traces:view")
-    .handle(async ({ app, input }) =>
+    .handle(async ({ app, input, actor }) =>
       facetValuesResultSchema.parse(
         await app.readFacetValues({
           tenantId: input.projectId,
+          actor,
           timeRange: input.timeRange,
           facetKey: input.facetKey,
           prefix: input.prefix,
@@ -478,6 +483,7 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
       const summary = traceSummaryDataSchema.parse(
         await app.readTraceSummary({
           projectId: input.projectId,
+          actor,
           traceId: input.traceId,
           occurredAtMs: input.occurredAtMs,
           visibilityCutoffMs: protections.visibilityCutoffMs,
@@ -521,9 +527,13 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
 
     .procedure("evals")
     .withPermission("traces:view")
-    .handle(async ({ app, input }) =>
+    .handle(async ({ app, input, actor }) =>
       tracesEvaluationRunsSchema.parse(
-        await app.readEvaluationRuns({ tenantId: input.projectId, traceId: input.traceId }),
+        await app.readEvaluationRuns({
+          tenantId: input.projectId,
+          traceId: input.traceId,
+          actor,
+        }),
       ),
     )
 
@@ -559,6 +569,7 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
       });
       const page = await app.readSpansPage({
         projectId: input.projectId,
+        actor,
         traceId: input.traceId,
         visibilityCutoffMs: protections.visibilityCutoffMs,
         limit: input.limit,
@@ -588,6 +599,7 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
       });
       const sinceSpans = await app.readSpansSince({
         projectId: input.projectId,
+        actor,
         traceId: input.traceId,
         sinceStartTimeMs: input.sinceStartTimeMs,
         visibilityCutoffMs: protections.visibilityCutoffMs,
@@ -644,6 +656,7 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
       });
       const rows = await app.readSpanSummaries({
         projectId: input.projectId,
+        actor,
         traceId: input.traceId,
         occurredAtMs: input.occurredAtMs,
       });
@@ -653,9 +666,10 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
 
     .procedure("spanLangwatchSignals")
     .withPermission("traces:view")
-    .handle(async ({ app, input }) => {
+    .handle(async ({ app, input, actor }) => {
       const rows = await app.readLangwatchSignals({
         projectId: input.projectId,
+        actor,
         traceId: input.traceId,
         occurredAtMs: input.occurredAtMs,
       });
@@ -676,6 +690,7 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
       });
       const storedSpans = await app.readSpans({
         projectId: input.projectId,
+        actor,
         traceId: input.traceId,
         occurredAtMs: input.occurredAtMs,
         visibilityCutoffMs: protections.visibilityCutoffMs,
@@ -718,6 +733,7 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
       });
       const rows = await app.readSpanResources({
         projectId: input.projectId,
+        actor,
         traceId: input.traceId,
         occurredAtMs: input.occurredAtMs,
       });
@@ -753,6 +769,7 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
       });
       const events = await app.readTraceEvents({
         projectId: input.projectId,
+        actor,
         traceId: input.traceId,
         occurredAtMs: input.occurredAtMs,
       });

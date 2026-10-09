@@ -15315,6 +15315,9 @@ importers:
       '@langwatch/api-key-contract':
         specifier: workspace:*
         version: link:../../api-key/contract
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
@@ -15481,9 +15484,6 @@ importers:
       '@clickhouse/client':
         specifier: 'catalog:'
         version: 1.23.0
-      '@langwatch/authorization':
-        specifier: workspace:*
-        version: link:../../../packages/authorization
       '@langwatch/clickhouse-migrations':
         specifier: workspace:*
         version: link:../../../packages/clickhouse-migrations
@@ -16706,6 +16706,9 @@ importers:
       '@clickhouse/client':
         specifier: 'catalog:'
         version: 1.23.0
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../authorization
       '@langwatch/limiter':
         specifier: workspace:*
         version: link:../limiter

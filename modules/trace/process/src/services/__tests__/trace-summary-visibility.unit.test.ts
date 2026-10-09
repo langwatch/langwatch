@@ -1,9 +1,11 @@
+import { ownProof } from "@langwatch/authorization/testing";
 import { TEASER_ELLIPSIS, TEASER_MAX_CHARS } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { TraceSummaryService } from "../../features/read/services/trace-summary-read.service.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const authorization = ownProof({ projectId: "project-1", now: Date.now() });
 
 const makeSummary = (occurredDaysAgo: number) => ({
   traceId: "trace-1",
@@ -28,7 +30,9 @@ describe("given a trace summary read with a visibility gate", () => {
   describe("when the summary is older than the cutoff", () => {
     it("teases computed input, output, and error message", async () => {
       const service = makeService(makeSummary(20));
-      const summary = await service.getByTraceId("project-1", "trace-1", {
+      const summary = await service.getByTraceId({
+        authorization,
+        traceId: "trace-1",
         visibilityCutoffMs: Date.now() - 14 * DAY_MS,
       });
       expect(summary.computedInput).toHaveLength(TEASER_MAX_CHARS + TEASER_ELLIPSIS.length);
@@ -40,7 +44,9 @@ describe("given a trace summary read with a visibility gate", () => {
 
     it("marks the summary as redacted and keeps metadata intact", async () => {
       const service = makeService(makeSummary(20));
-      const summary = await service.getByTraceId("project-1", "trace-1", {
+      const summary = await service.getByTraceId({
+        authorization,
+        traceId: "trace-1",
         visibilityCutoffMs: Date.now() - 14 * DAY_MS,
       });
       expect(summary.redactedByVisibilityWindow).toBe(true);
@@ -53,7 +59,9 @@ describe("given a trace summary read with a visibility gate", () => {
   describe("when the summary is within the window", () => {
     it("returns full content and no flag", async () => {
       const service = makeService(makeSummary(5));
-      const summary = await service.getByTraceId("project-1", "trace-1", {
+      const summary = await service.getByTraceId({
+        authorization,
+        traceId: "trace-1",
         visibilityCutoffMs: Date.now() - 14 * DAY_MS,
       });
       expect(summary.computedInput).toHaveLength(5000);
@@ -64,7 +72,7 @@ describe("given a trace summary read with a visibility gate", () => {
   describe("when no cutoff is passed (internal callers)", () => {
     it("returns the summary untouched", async () => {
       const service = makeService(makeSummary(40));
-      const summary = await service.getByTraceId("project-1", "trace-1");
+      const summary = await service.getByTraceId({ authorization, traceId: "trace-1" });
       expect(summary.computedInput).toHaveLength(5000);
       expect(summary.redactedByVisibilityWindow).toBeUndefined();
     });

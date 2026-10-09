@@ -1,4 +1,5 @@
-import { EventUtils } from "@langwatch/eventing";
+import type { Authorization } from "@langwatch/authorization";
+import { tenantScope, type TenantScopeTimeColumn } from "@langwatch/authorization/tenant-fence";
 import { nowInstant } from "@langwatch/time";
 import {
   isStorageAnchoredVersion,
@@ -18,7 +19,10 @@ import { z } from "zod";
 
 import { scopeTraceFilterToTable } from "../../features/facet/rules/trace-facet-scope.rules.ts";
 import type { TraceFilterWhere } from "../../rules/trace-filter-hidden-origins.rules.ts";
-import type { TraceClickHouseResolver } from "./clickhouse.trace-member-client.repository.ts";
+import type {
+  TraceAuthorizedReads,
+  TraceClickHouseClient,
+} from "./clickhouse.trace-member-client.repository.ts";
 import { chBoolean, chNumber, chString } from "./stored-span-row.mapper.ts";
 
 const TABLE_NAME = "trace_summaries" as const;
@@ -30,7 +34,7 @@ const totalHitsRowsSchema = z.array(z.looseObject({ totalHits: numeric }));
 
 const countRowsSchema = z.array(z.looseObject({ cnt: numeric }));
 
-const traceIdRowsSchema = z.array(z.looseObject({ TraceId: chString }));
+const traceRefRowsSchema = z.array(z.looseObject({ TenantId: chString, TraceId: chString }));
 
 const distinctValueRowsSchema = z.array(z.looseObject({ val: chString }));
 
@@ -147,28 +151,31 @@ function facetFilterFragment(
   return { sql: `AND ${scoped.sql}`, params: scoped.params };
 }
 
+/**
+ * The trace list's reads (ADR-175). None names a tenant: each asks the proof-fenced reader for a
+ * client and writes a `tenantScope` marker where the tenant predicate went, so an aggregate reads
+ * the members its proof shares, each inside its grant's window. It writes nothing.
+ */
 export class TraceListClickHouseRepository implements TraceListRepository {
-  private constructor(private readonly resolveClient: TraceClickHouseResolver) {}
+  private constructor(private readonly reads: TraceAuthorizedReads) {}
 
-  static create(resolveClient: TraceClickHouseResolver): TraceListClickHouseRepository {
-    return new TraceListClickHouseRepository(resolveClient);
+  static create({ reads }: { reads: TraceAuthorizedReads }): TraceListClickHouseRepository {
+    return new TraceListClickHouseRepository(reads);
+  }
+
+  private reader(authorization: Authorization): TraceClickHouseClient {
+    return this.reads.reader(authorization, { reads: "traces" });
   }
 
   async listAll(query: TraceListQuery): Promise<TraceListRepositoryPage> {
-    EventUtils.validateTenantId(
-      { tenantId: query.tenantId },
-      "TraceListClickHouseRepository.findAll",
-    );
-
     const {
       sql: whereClause,
       baseSql: baseWhereClause,
       params,
-    } = TraceListClickHouseRepository.whereClause(
-      query.tenantId,
-      query.timeRange,
-      query.filterWhere,
-    );
+    } = TraceListClickHouseRepository.whereClause({
+      timeRange: query.timeRange,
+      filterWhere: query.filterWhere,
+    });
 
     const rawSortExpression =
       query.sort.column === "TotalTokens"
@@ -183,17 +190,25 @@ export class TraceListClickHouseRepository implements TraceListRepository {
         : `toFloat64(coalesce(${rawSortExpression}, 0))`;
     const sortDir = query.sort.direction === "asc" ? "ASC" : "DESC";
     const cursorComparison = query.sort.direction === "asc" ? ">" : "<";
+    // The tie-break is the (tenant, trace id) pair: an aggregate reads several tenants and two may
+    // hold one trace id, so the id alone would skip or repeat a row across pages (ADR-175). A
+    // cursor minted before it carried its tenant falls back to the id, as a plain project did.
+    const cursorTenantId = query.cursor?.tenantId;
+    const tieBreak =
+      cursorTenantId === void 0
+        ? "TraceId > {cursorTraceId:String}"
+        : "(TenantId, TraceId) > ({cursorTenantId:String}, {cursorTraceId:String})";
     const cursorClause = query.cursor
       ? `AND (
               ${sortExpression} ${cursorComparison} {cursorSortValue:Float64}
               OR (
                 ${sortExpression} = {cursorSortValue:Float64}
-                AND TraceId > {cursorTraceId:String}
+                AND ${tieBreak}
               )
             )`
       : "";
 
-    const client = await this.resolveClient(query.tenantId);
+    const client = this.reader(query.authorization);
 
     // Latest-version dedup, shared by the page's inner stage and the count,
     // decided on base predicates alone. A whole-window aggregate, so state
@@ -334,12 +349,13 @@ export class TraceListClickHouseRepository implements TraceListRepository {
               -- share timestamps, costs, token counts, and durations; without
               -- a unique tie-breaker ClickHouse may return tied rows in a
               -- different order on adjacent requests, causing duplicates and
-              -- omissions between pages.
-              ORDER BY ${sortExpression} ${sortDir}, TraceId ASC
+              -- omissions between pages. The tenant comes before the trace id
+              -- because the id is only unique within a tenant.
+              ORDER BY ${sortExpression} ${sortDir}, TenantId ASC, TraceId ASC
               LIMIT {limit:UInt32}
               OFFSET {offset:UInt32}
             )
-          ORDER BY ${sortExpression} ${sortDir}, TraceId ASC
+          ORDER BY ${sortExpression} ${sortDir}, TenantId ASC, TraceId ASC
           LIMIT {limit:UInt32}
         )
       `,
@@ -350,6 +366,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
           ...(query.cursor
             ? {
                 cursorSortValue: query.cursor.sortValue,
+                ...(cursorTenantId === void 0 ? {} : { cursorTenantId }),
                 cursorTraceId: query.cursor.traceId,
               }
             : {}),
@@ -379,16 +396,11 @@ export class TraceListClickHouseRepository implements TraceListRepository {
   }
 
   async findCount(params: {
-    tenantId: string;
+    authorization: Authorization;
     timeRange: { from: number; to: number };
     since: number;
     filterWhere?: { sql: string; params: Record<string, unknown> };
   }): Promise<number> {
-    EventUtils.validateTenantId(
-      { tenantId: params.tenantId },
-      "TraceListClickHouseRepository.findCount",
-    );
-
     // Live "new traces since `since`" poll. Outer count wants OccurredAt >
     // since, but filterWhere may carry a span-level filter scanning
     // stored_spans over [from, to] — raising the window's lower bound to
@@ -399,13 +411,12 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       sql: whereClause,
       baseSql: baseWhereClause,
       params: queryParams,
-    } = TraceListClickHouseRepository.whereClause(
-      params.tenantId,
-      { ...params.timeRange, from: effectiveFrom },
-      params.filterWhere,
-    );
+    } = TraceListClickHouseRepository.whereClause({
+      timeRange: { ...params.timeRange, from: effectiveFrom },
+      filterWhere: params.filterWhere,
+    });
 
-    const client = await this.resolveClient(params.tenantId);
+    const client = this.reader(params.authorization);
     const result = await client.query({
       query: `
         SELECT count() AS cnt
@@ -429,29 +440,27 @@ export class TraceListClickHouseRepository implements TraceListRepository {
   }
 
   async findTraceIds(params: {
-    tenantId: string;
+    authorization: Authorization;
     timeRange: { from: number; to: number; live?: boolean };
     filterWhere?: { sql: string; params: Record<string, unknown> };
     limit: number;
   }): Promise<string[]> {
-    EventUtils.validateTenantId(
-      { tenantId: params.tenantId },
-      "TraceListClickHouseRepository.findTraceIds",
-    );
     const {
       sql: whereClause,
       baseSql: baseWhereClause,
       params: queryParams,
-    } = TraceListClickHouseRepository.whereClause(
-      params.tenantId,
-      params.timeRange,
-      params.filterWhere,
-    );
+    } = TraceListClickHouseRepository.whereClause({
+      timeRange: params.timeRange,
+      filterWhere: params.filterWhere,
+    });
 
-    const client = await this.resolveClient(params.tenantId);
+    const client = this.reader(params.authorization);
+    // Two unmerged versions can tie on max(UpdatedAt), so the dedup tuple can pass a trace
+    // twice; LIMIT 1 BY keeps one per (tenant, trace). It reads only the two key columns, so
+    // none of the heavy-column cost LIMIT BY carries on a wide select applies here.
     const result = await client.query({
       query: `
-        SELECT TraceId
+        SELECT TenantId, TraceId
         FROM ${TABLE_NAME}
         WHERE ${whereClause}
           AND (TenantId, TraceId, UpdatedAt) IN (
@@ -460,52 +469,49 @@ export class TraceListClickHouseRepository implements TraceListRepository {
             WHERE ${baseWhereClause}
             GROUP BY TenantId, TraceId
           )
-        ORDER BY OccurredAt DESC, TraceId
+        ORDER BY OccurredAt DESC, TenantId, TraceId
+        LIMIT 1 BY TenantId, TraceId
         LIMIT {limit:UInt32}
       `,
       query_params: { ...queryParams, limit: params.limit },
       format: "JSONEachRow",
     });
 
-    return traceIdRowsSchema.parse(await result.json()).map((row) => row.TraceId);
+    // Callers take bare ids, so an id two members share is answered once (ADR-175).
+    const ids = traceRefRowsSchema.parse(await result.json()).map((row) => row.TraceId);
+    return [...new Set(ids)];
   }
 
   async findDistinctValues(params: {
-    tenantId: string;
+    authorization: Authorization;
     column: string;
     prefix: string;
     limit: number;
   }): Promise<string[]> {
-    EventUtils.validateTenantId(
-      { tenantId: params.tenantId },
-      "TraceListClickHouseRepository.findDistinctValues",
-    );
-
     // Bound the scan to the last 30 days so prefix-match suggest doesn't
     // touch cold (S3-tier) partitions. Suggest is interactive, so we trade
     // completeness on stale historical values for sub-second responses.
     const SUGGEST_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
     const fromMs = nowInstant().epochMilliseconds - SUGGEST_WINDOW_MS;
 
-    const client = await this.resolveClient(params.tenantId);
+    const client = this.reader(params.authorization);
     const result = await client.query({
       query: `
         SELECT DISTINCT ${params.column} AS val
         FROM ${TABLE_NAME}
-        WHERE TenantId = {tenantId:String}
+        WHERE ${tenantScope("OccurredAt")}
           AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
           AND ${params.column} LIKE {prefix:String}
           AND (TenantId, TraceId, UpdatedAt) IN (
             SELECT TenantId, TraceId, max(UpdatedAt)
             FROM ${TABLE_NAME}
-            WHERE TenantId = {tenantId:String}
+            WHERE ${tenantScope("OccurredAt")}
               AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
             GROUP BY TenantId, TraceId
           )
         LIMIT {limit:UInt32}
       `,
       query_params: {
-        tenantId: params.tenantId,
         fromMs,
         prefix: `${params.prefix}%`,
         limit: params.limit,
@@ -518,27 +524,21 @@ export class TraceListClickHouseRepository implements TraceListRepository {
   }
 
   async findCategoricalFacet(params: {
-    tenantId: string;
+    authorization: Authorization;
     timeRange: { from: number; to: number; live?: boolean };
     table: FacetTableName;
-    timeColumn: string;
+    timeColumn: TenantScopeTimeColumn;
     facetExpression: string;
     limit: number;
     offset: number;
     prefix?: string;
     filterWhere?: TraceFilterWhere;
   }): Promise<CategoricalFacetResult> {
-    EventUtils.validateTenantId(
-      { tenantId: params.tenantId },
-      "TraceListClickHouseRepository.findCategoricalFacet",
-    );
-
     const { sql: whereClause, params: queryParams } =
-      TraceListClickHouseRepository.whereClauseForTable(
-        params.tenantId,
-        params.timeRange,
-        params.timeColumn,
-      );
+      TraceListClickHouseRepository.whereClauseForTable({
+        timeRange: params.timeRange,
+        timeColumn: params.timeColumn,
+      });
 
     const filter = facetFilterFragment(params.table, params.filterWhere, params.timeRange);
 
@@ -561,7 +561,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
           )`
       : "";
 
-    const client = await this.resolveClient(params.tenantId);
+    const client = this.reader(params.authorization);
     const result = await client.query({
       query: `
         SELECT
@@ -593,25 +593,19 @@ export class TraceListClickHouseRepository implements TraceListRepository {
   }
 
   async findDiscreteValues(params: {
-    tenantId: string;
+    authorization: Authorization;
     timeRange: { from: number; to: number; live?: boolean };
     table: FacetTableName;
-    timeColumn: string;
+    timeColumn: TenantScopeTimeColumn;
     column: string;
     limit: number;
     filterWhere?: TraceFilterWhere;
   }): Promise<DiscreteFacetResult> {
-    EventUtils.validateTenantId(
-      { tenantId: params.tenantId },
-      "TraceListClickHouseRepository.findDiscreteValues",
-    );
-
     const { sql: whereClause, params: queryParams } =
-      TraceListClickHouseRepository.whereClauseForTable(
-        params.tenantId,
-        params.timeRange,
-        params.timeColumn,
-      );
+      TraceListClickHouseRepository.whereClauseForTable({
+        timeRange: params.timeRange,
+        timeColumn: params.timeColumn,
+      });
 
     const filter = facetFilterFragment(params.table, params.filterWhere, params.timeRange);
 
@@ -627,7 +621,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
           )`
       : "";
 
-    const client = await this.resolveClient(params.tenantId);
+    const client = this.reader(params.authorization);
     const result = await client.query({
       query: `
         SELECT
@@ -660,15 +654,10 @@ export class TraceListClickHouseRepository implements TraceListRepository {
   }
 
   async findCategoricalFacetRaw(params: {
-    tenantId: string;
+    authorization: Authorization;
     query: TraceListFacetQuery;
   }): Promise<CategoricalFacetResult> {
-    EventUtils.validateTenantId(
-      { tenantId: params.tenantId },
-      "TraceListClickHouseRepository.findCategoricalFacetRaw",
-    );
-
-    const client = await this.resolveClient(params.tenantId);
+    const client = this.reader(params.authorization);
     const result = await client.query({
       query: params.query.sql,
       query_params: params.query.params,
@@ -683,24 +672,18 @@ export class TraceListClickHouseRepository implements TraceListRepository {
   }
 
   async findRangeStatsForTable(params: {
-    tenantId: string;
+    authorization: Authorization;
     timeRange: { from: number; to: number; live?: boolean };
     table: FacetTableName;
-    timeColumn: string;
+    timeColumn: TenantScopeTimeColumn;
     column: string;
     filterWhere?: TraceFilterWhere;
   }): Promise<{ min: number; max: number }> {
-    EventUtils.validateTenantId(
-      { tenantId: params.tenantId },
-      "TraceListClickHouseRepository.findRangeStatsForTable",
-    );
-
     const { sql: whereClause, params: queryParams } =
-      TraceListClickHouseRepository.whereClauseForTable(
-        params.tenantId,
-        params.timeRange,
-        params.timeColumn,
-      );
+      TraceListClickHouseRepository.whereClauseForTable({
+        timeRange: params.timeRange,
+        timeColumn: params.timeColumn,
+      });
 
     const filter = facetFilterFragment(params.table, params.filterWhere, params.timeRange);
 
@@ -719,7 +702,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
           )`
       : "";
 
-    const client = await this.resolveClient(params.tenantId);
+    const client = this.reader(params.authorization);
     const result = await client.query({
       query: `
         SELECT
@@ -753,7 +736,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     queryParams,
     topN,
   }: {
-    client: Awaited<ReturnType<TraceListClickHouseRepository["resolveClient"]>>;
+    client: TraceClickHouseClient;
     specs: { key: string; expression: string }[];
     table: FacetTableName;
     whereClause: string;
@@ -827,7 +810,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     filterClause,
     queryParams,
   }: {
-    client: Awaited<ReturnType<TraceListClickHouseRepository["resolveClient"]>>;
+    client: TraceClickHouseClient;
     specs: { key: string; expression: string }[];
     table: FacetTableName;
     whereClause: string;
@@ -871,26 +854,20 @@ export class TraceListClickHouseRepository implements TraceListRepository {
   }
 
   async findBatchedFacets(params: {
-    tenantId: string;
+    authorization: Authorization;
     timeRange: { from: number; to: number; live?: boolean };
     table: FacetTableName;
-    timeColumn: string;
+    timeColumn: TenantScopeTimeColumn;
     categoricalSpecs: { key: string; expression: string }[];
     rangeSpecs: { key: string; expression: string }[];
     topN: number;
     filterWhere?: TraceFilterWhere;
   }): Promise<BatchedFacetResult> {
-    EventUtils.validateTenantId(
-      { tenantId: params.tenantId },
-      "TraceListClickHouseRepository.findBatchedFacets",
-    );
-
     const { sql: whereClause, params: baseParams } =
-      TraceListClickHouseRepository.whereClauseForTable(
-        params.tenantId,
-        params.timeRange,
-        params.timeColumn,
-      );
+      TraceListClickHouseRepository.whereClauseForTable({
+        timeRange: params.timeRange,
+        timeColumn: params.timeColumn,
+      });
     const filter = facetFilterFragment(params.table, params.filterWhere, params.timeRange);
     const queryParams = { ...filter.params, ...baseParams };
 
@@ -907,7 +884,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
           )`
       : "";
 
-    const client = await this.resolveClient(params.tenantId);
+    const client = this.reader(params.authorization);
     const shared = {
       client,
       table: params.table,
@@ -948,18 +925,13 @@ export class TraceListClickHouseRepository implements TraceListRepository {
   }
 
   async findAttributeValues(params: {
-    tenantId: string;
+    authorization: Authorization;
     timeRange: { from: number; to: number };
     attributeKey: string;
     prefix?: string;
     limit: number;
     offset: number;
   }): Promise<CategoricalFacetResult> {
-    EventUtils.validateTenantId(
-      { tenantId: params.tenantId },
-      "TraceListClickHouseRepository.findAttributeValues",
-    );
-
     // Attribute values are typically low-cardinality; the picker needs only
     // distinct values, fast, not exact counts. Strategy: scan a bounded
     // prefix of rows with the key set and pull distinct values from that
@@ -979,7 +951,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       FROM (
         SELECT DISTINCT Attributes[{attrKey:String}] AS facet_value
         FROM ${TABLE_NAME}
-        PREWHERE TenantId = {tenantId:String}
+        PREWHERE ${tenantScope("OccurredAt")}
           AND OccurredAt >= fromUnixTimestamp64Milli({timeFrom:Int64})
           AND OccurredAt <= fromUnixTimestamp64Milli({timeTo:Int64})
           AND mapContains(Attributes, {attrKey:String})
@@ -995,11 +967,10 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       LIMIT {limit:UInt32} OFFSET {offset:UInt32}
     `;
 
-    const client = await this.resolveClient(params.tenantId);
+    const client = this.reader(params.authorization);
     const result = await client.query({
       query: sql,
       query_params: {
-        tenantId: params.tenantId,
         timeFrom: params.timeRange.from,
         timeTo: params.timeRange.to,
         attrKey: params.attributeKey,
@@ -1016,18 +987,13 @@ export class TraceListClickHouseRepository implements TraceListRepository {
   }
 
   async findEventAttributeValues(params: {
-    tenantId: string;
+    authorization: Authorization;
     timeRange: { from: number; to: number };
     attributeKey: string;
     prefix?: string;
     limit: number;
     offset: number;
   }): Promise<CategoricalFacetResult> {
-    EventUtils.validateTenantId(
-      { tenantId: params.tenantId },
-      "TraceListClickHouseRepository.findEventAttributeValues",
-    );
-
     // Same bounded-sample strategy as findAttributeValues, against the store
     // the `event.attribute.` filter actually queries: `Events.Attributes` is
     // an Array(Map) parallel to `Events.Name`, so a span contributes one
@@ -1053,7 +1019,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
           )
         ) AS facet_value
         FROM stored_spans
-        PREWHERE TenantId = {tenantId:String}
+        PREWHERE ${tenantScope("StartTime")}
           AND StartTime >= fromUnixTimestamp64Milli({timeFrom:Int64})
           AND StartTime <= fromUnixTimestamp64Milli({timeTo:Int64})
           AND arrayExists(m -> mapContains(m, {attrKey:String}), \`Events.Attributes\`)
@@ -1067,11 +1033,10 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       LIMIT {limit:UInt32} OFFSET {offset:UInt32}
     `;
 
-    const client = await this.resolveClient(params.tenantId);
+    const client = this.reader(params.authorization);
     const result = await client.query({
       query: sql,
       query_params: {
-        tenantId: params.tenantId,
         timeFrom: params.timeRange.from,
         timeTo: params.timeRange.to,
         attrKey: params.attributeKey,
@@ -1088,18 +1053,13 @@ export class TraceListClickHouseRepository implements TraceListRepository {
   }
 
   async findSpanAttributeValues(params: {
-    tenantId: string;
+    authorization: Authorization;
     timeRange: { from: number; to: number };
     attributeKey: string;
     prefix?: string;
     limit: number;
     offset: number;
   }): Promise<CategoricalFacetResult> {
-    EventUtils.validateTenantId(
-      { tenantId: params.tenantId },
-      "TraceListClickHouseRepository.findSpanAttributeValues",
-    );
-
     // Same bounded-sample strategy as findAttributeValues, against
     // `stored_spans.SpanAttributes` — the store the `span.attribute.` filter
     // actually queries.
@@ -1117,7 +1077,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       FROM (
         SELECT DISTINCT SpanAttributes[{attrKey:String}] AS facet_value
         FROM stored_spans
-        PREWHERE TenantId = {tenantId:String}
+        PREWHERE ${tenantScope("StartTime")}
           AND StartTime >= fromUnixTimestamp64Milli({timeFrom:Int64})
           AND StartTime <= fromUnixTimestamp64Milli({timeTo:Int64})
           AND mapContains(SpanAttributes, {attrKey:String})
@@ -1133,11 +1093,10 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       LIMIT {limit:UInt32} OFFSET {offset:UInt32}
     `;
 
-    const client = await this.resolveClient(params.tenantId);
+    const client = this.reader(params.authorization);
     const result = await client.query({
       query: sql,
       query_params: {
-        tenantId: params.tenantId,
         timeFrom: params.timeRange.from,
         timeTo: params.timeRange.to,
         attrKey: params.attributeKey,
@@ -1155,6 +1114,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
 
   private toTraceSummaryData(row: ClickHouseSummaryRow): TraceListSummary {
     return {
+      tenantId: row.TenantId,
       traceId: row.TraceId,
       spanCount: row.SpanCount,
       totalDurationMs: Number(row.TotalDurationMs),
@@ -1217,19 +1177,21 @@ export class TraceListClickHouseRepository implements TraceListRepository {
   }
 
   /**
-   * WHERE split: baseSql for dedup, sql for filter; dedup must ignore user filter.
+   * WHERE split: baseSql for dedup, sql for filter; dedup must ignore user filter. The tenant
+   * marker leads both; the reader expands it into the proof's fence.
    */
-  private static whereClause(
-    tenantId: string,
-    timeRange: { from: number; to: number; live?: boolean },
-    filterWhere?: { sql: string; params: Record<string, unknown> },
-  ): { sql: string; baseSql: string; params: Record<string, unknown> } {
+  private static whereClause({
+    timeRange,
+    filterWhere,
+  }: {
+    timeRange: { from: number; to: number; live?: boolean };
+    filterWhere?: { sql: string; params: Record<string, unknown> };
+  }): { sql: string; baseSql: string; params: Record<string, unknown> } {
     const parts = [
-      "TenantId = {tenantId:String}",
+      tenantScope("OccurredAt"),
       "OccurredAt >= fromUnixTimestamp64Milli({timeFrom:Int64})",
     ];
     const params: Record<string, unknown> = {
-      tenantId,
       timeFrom: timeRange.from,
     };
 
@@ -1248,17 +1210,18 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     return { sql: parts.join(" AND "), baseSql, params };
   }
 
-  private static whereClauseForTable(
-    tenantId: string,
-    timeRange: { from: number; to: number; live?: boolean },
-    timeColumn: string,
-  ): { sql: string; params: Record<string, unknown> } {
+  private static whereClauseForTable({
+    timeRange,
+    timeColumn,
+  }: {
+    timeRange: { from: number; to: number; live?: boolean };
+    timeColumn: TenantScopeTimeColumn;
+  }): { sql: string; params: Record<string, unknown> } {
     const parts = [
-      "TenantId = {tenantId:String}",
+      tenantScope(timeColumn),
       `${timeColumn} >= fromUnixTimestamp64Milli({timeFrom:Int64})`,
     ];
     const params: Record<string, unknown> = {
-      tenantId,
       timeFrom: timeRange.from,
     };
 

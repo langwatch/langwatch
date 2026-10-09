@@ -1,4 +1,4 @@
-import type { PrincipalRef } from "@langwatch/authorization";
+import type { Actor, PrincipalRef } from "@langwatch/authorization";
 import type { InstantEvalRunReference } from "@langwatch/instant-eval-contract";
 import { moduleApi } from "@langwatch/module";
 
@@ -67,6 +67,7 @@ import type {
   FacetValuesResult,
   TraceListPage,
 } from "./features/list/trace-list-view.ts";
+import type { TraceListCursor } from "./features/list/trace-list.queries.ts";
 import type { LangWatchQLTraceFilter } from "./features/query/trace-langwatch-ql-filter.ts";
 import type { TraceQueryEvaluationRun } from "./features/query/trace-query-evaluation.types.ts";
 import type {
@@ -297,6 +298,8 @@ export interface TraceApi extends TraceOtlpIngestApi {
     timeRange: { from: number; to: number; live?: boolean };
     query?: string | null;
     evalRuns?: Readonly<Record<string, InstantEvalRunReference>>;
+    /** The route's caller; absent, the read is fenced to the project's own rows (ADR-175). */
+    actor?: Actor | undefined;
   }): Promise<DiscoverResult>;
   /** Renames a trace after trimming; a name out of bounds refuses with `ValidationError`. */
   renameTrace(
@@ -445,6 +448,8 @@ export interface TraceApi extends TraceOtlpIngestApi {
     projectId: string;
     traceId: string;
     occurredAtMs?: number;
+    /** The route's caller; absent, the read is fenced to the project's own rows (ADR-175). */
+    actor?: Actor | undefined;
   }): Promise<SpanSummaryRow[]>;
   readSpans(input: {
     projectId: string;
@@ -452,6 +457,8 @@ export interface TraceApi extends TraceOtlpIngestApi {
     occurredAtMs?: number;
     visibilityCutoffMs?: number | null;
     limit?: number;
+    /** The route's caller; absent, the read is fenced to the project's own rows (ADR-175). */
+    actor?: Actor | undefined;
   }): Promise<Span[]>;
   readSpansPage(input: {
     projectId: string;
@@ -460,6 +467,8 @@ export interface TraceApi extends TraceOtlpIngestApi {
     offset: number;
     occurredAtMs?: number;
     visibilityCutoffMs?: number | null;
+    /** The route's caller; absent, the read is fenced to the project's own rows (ADR-175). */
+    actor?: Actor | undefined;
   }): Promise<{ spans: Span[]; total: number }>;
   readSpansSince(input: {
     projectId: string;
@@ -467,6 +476,8 @@ export interface TraceApi extends TraceOtlpIngestApi {
     sinceStartTimeMs: number;
     occurredAtMs?: number;
     visibilityCutoffMs?: number | null;
+    /** The route's caller; absent, the read is fenced to the project's own rows (ADR-175). */
+    actor?: Actor | undefined;
   }): Promise<Span[]>;
   findSpan(input: {
     projectId: string;
@@ -474,32 +485,44 @@ export interface TraceApi extends TraceOtlpIngestApi {
     spanId: string;
     occurredAtMs?: number;
     visibilityCutoffMs?: number | null;
+    /** The route's caller; absent, the read is fenced to the project's own rows (ADR-175). */
+    actor?: Actor | undefined;
   }): Promise<Span | null>;
   readSpanEvents(input: {
     projectId: string;
     traceId: string;
     spanId: string;
     occurredAtMs?: number;
+    /** The route's caller; absent, the read is fenced to the project's own rows (ADR-175). */
+    actor?: Actor | undefined;
   }): Promise<ElasticSearchEvent[]>;
   readLangwatchSignals(input: {
     projectId: string;
     traceId: string;
     occurredAtMs?: number;
+    /** The route's caller; absent, the read is fenced to the project's own rows (ADR-175). */
+    actor?: Actor | undefined;
   }): Promise<{ spanId: string; signals: SpanLangwatchSignals["signals"] }[]>;
   readSpanResources(input: {
     projectId: string;
     traceId: string;
     occurredAtMs?: number;
+    /** The route's caller; absent, the read is fenced to the project's own rows (ADR-175). */
+    actor?: Actor | undefined;
   }): Promise<SpanResourceInfo[]>;
   readTraceEvents(input: {
     projectId: string;
     traceId: string;
     occurredAtMs?: number;
+    /** The route's caller; absent, the read is fenced to the project's own rows (ADR-175). */
+    actor?: Actor | undefined;
   }): Promise<DerivedTraceEvent[]>;
   readTraceEventRollups(input: {
     projectId: string;
     traceIds: string[];
     timeRange: { from: number; to: number };
+    /** The route's caller; absent, the read is fenced to the project's own rows (ADR-175). */
+    actor?: Actor | undefined;
   }): Promise<Record<string, TraceEventRollup>>;
   readSpanTreePage(input: SpanTreeInput): Promise<SpanTreePage>;
   readSpanTreeDelta(input: SpanTreeDeltaInput): Promise<SpanTreeNode[]>;
@@ -638,7 +661,6 @@ export interface TraceApi extends TraceOtlpIngestApi {
    */
   translateTraceFilter(input: {
     query: string;
-    tenantId: string;
     timeRange: { from: number; to: number };
     /** The Instant Eval runs registered for the query's `eval` chips. */
     evalRuns?: readonly ResolvedInstantEvalRun[];
@@ -658,7 +680,6 @@ export interface TraceApi extends TraceOtlpIngestApi {
    */
   compileExplorerTraceFilter(input: {
     query: string;
-    tenantId: string;
     timeRange: { from: number; to: number };
     evalRuns?: readonly ResolvedInstantEvalRun[];
     originNamed?: boolean;
@@ -679,6 +700,8 @@ export interface TraceApi extends TraceOtlpIngestApi {
     filter: string;
     window: { from: number; to: number };
     limit: number;
+    /** The route's caller; absent, the read is fenced to the project's own rows (ADR-175). */
+    actor?: Actor | undefined;
   }): Promise<readonly string[]>;
   /** The query's positive bare-word terms, for a content (log-body) search. */
   extractTraceFreeTextTerms(query: string): string[];
@@ -698,16 +721,18 @@ export interface TraceApi extends TraceOtlpIngestApi {
     sort: { columnId: string; direction: "asc" | "desc" };
     page?: number;
     pageSize: number;
-    cursor?: { sortValue: number; traceId: string };
+    cursor?: TraceListCursor;
     filterWhere?: { sql: string; params: Record<string, unknown> };
     visibilityCutoffMs?: number | null;
+    /** The route's caller; absent, the read is fenced to the project's own rows (ADR-175). */
+    actor?: Actor | undefined;
   }): Promise<TraceListPage>;
   /**
    * One page of the Sessions lens through the viewer's protections: content redacted and spend
    * gated, with `codingAgent` left null for coding-agent, which serves the lens, to fill and gate.
    */
   readSessionGroups(
-    input: TraceSessionGroupsInput & { protections: Protections },
+    input: TraceSessionGroupsInput & { protections: Protections; actor?: Actor | undefined },
   ): Promise<TracesSessionsPage>;
   /**
    * The sidebar's facets under the active query: descriptors counted in the
@@ -718,12 +743,16 @@ export interface TraceApi extends TraceOtlpIngestApi {
     timeRange: { from: number; to: number; live?: boolean };
     query: string;
     evalRuns?: readonly ResolvedInstantEvalRun[];
+    /** The route's caller; absent, the read is fenced to the project's own rows (ADR-175). */
+    actor?: Actor | undefined;
   }): Promise<unknown>;
   readNewCount(params: unknown): Promise<number>;
   readSuggestions(params: unknown): Promise<string[]>;
   readDiscover(params: {
     tenantId: string;
     timeRange: { from: number; to: number; live?: boolean };
+    /** The route's caller; absent, the read is fenced to the project's own rows (ADR-175). */
+    actor?: Actor | undefined;
   }): Promise<DiscoverResult>;
   readFacetValues(params: {
     tenantId: string;
@@ -732,6 +761,8 @@ export interface TraceApi extends TraceOtlpIngestApi {
     prefix?: string;
     limit: number;
     offset: number;
+    /** The route's caller; absent, the read is fenced to the project's own rows (ADR-175). */
+    actor?: Actor | undefined;
   }): Promise<FacetValuesResult>;
   readTraceSummary(input: {
     projectId: string;
@@ -739,11 +770,15 @@ export interface TraceApi extends TraceOtlpIngestApi {
     occurredAtMs?: number;
     visibilityCutoffMs?: number | null;
     full?: boolean;
+    /** The route's caller; absent, the read is fenced to the project's own rows (ADR-175). */
+    actor?: Actor | undefined;
   }): Promise<unknown>;
   isTraceWindowRedacted(input: {
     projectId: string;
     traceId: string;
     visibilityCutoffMs: number | null | undefined;
+    /** The route's caller; absent, the read is fenced to the project's own rows (ADR-175). */
+    actor?: Actor | undefined;
   }): Promise<boolean>;
   readTraceLogRecords(input: {
     projectId: string;
@@ -764,7 +799,12 @@ export interface TraceApi extends TraceOtlpIngestApi {
     by: { id: string },
   ): Promise<TraceEditOverlayDto>;
   deleteTraceEditOverlay(input: { projectId: string; traceId: string }): Promise<void>;
-  readEvaluationRuns(input: { tenantId: string; traceId: string }): Promise<unknown>;
+  readEvaluationRuns(input: {
+    tenantId: string;
+    traceId: string;
+    /** The route's caller; absent, the read is fenced to the project's own rows (ADR-175). */
+    actor?: Actor | undefined;
+  }): Promise<unknown>;
   /** The transcript through the viewer's own protections; `codingAgents.transcript` reads it. */
   readCodingAgentTranscript(input: {
     projectId: string;

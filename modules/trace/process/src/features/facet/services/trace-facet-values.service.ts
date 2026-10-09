@@ -5,6 +5,7 @@
  */
 
 import { RequestValidationError } from "@langwatch/api/rest";
+import type { Authorization } from "@langwatch/authorization";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import type {
@@ -18,13 +19,14 @@ import { TraceAttributeValuesWithheldError } from "@langwatch/trace-contract";
 import type { FacetCatalog } from "#features/facet/rules/trace-facet-registry.rules";
 
 import { createAttributeRedactor } from "../../../rules/trace-attribute-redaction.rules.ts";
-import { isExpressionCategorical } from "../rules/trace-facet-classification.rules.ts";
 import {
   facetValuesCacheKey,
   type FacetValuesParams,
 } from "../../../rules/trace-list-cache-key.rules.ts";
-import type { TraceTopicNamingService } from "../../topic/services/trace-topic-naming.service.ts";
 import { TraceTtlCacheService } from "../../../services/trace-ttl-cache.service.ts";
+import type { TraceTopicNamingService } from "../../topic/services/trace-topic-naming.service.ts";
+import { isExpressionCategorical } from "../rules/trace-facet-classification.rules.ts";
+import { mergeTopicLabels, topicProjectsOf } from "../rules/trace-facet-topic-names.rules.ts";
 
 const facetValuesLogger = createLogger("langwatch:app-layer:traces:trace-list-facet-values");
 
@@ -74,7 +76,7 @@ function unknownFacetError(
 /**
  * Stale-while-revalidate cache for facet value results: a hit returns the cached value and starts
  * a background recomputation once it is older than REFRESH_AFTER_MS. The TTL is long because
- * discover queries scan the whole tenant window. Keys include `tenantId`, so tenants are isolated.
+ * discover queries scan the whole window. Keys carry the proof's fence: no two fences share a slot.
  */
 const FACET_VALUES_TTL_MS = 30 * 60 * 1000; // cache lives up to 30 minutes
 const FACET_VALUES_REFRESH_AFTER_MS = 2 * 60 * 1000; // background refresh after 2 min
@@ -270,7 +272,7 @@ export class TraceFacetValuesService {
     let result: CategoricalFacetResult;
     if (isExpressionCategorical(def)) {
       result = await this.repository.findCategoricalFacet({
-        tenantId: params.tenantId,
+        authorization: params.authorization,
         timeRange: params.timeRange,
         table: def.table,
         timeColumn: this.facets.timeColumns[def.table],
@@ -281,30 +283,42 @@ export class TraceFacetValuesService {
       });
     } else {
       const query = def.queryBuilder({
-        tenantId: params.tenantId,
         timeRange: params.timeRange,
         limit: params.limit,
         offset: params.offset,
         prefix: params.prefix,
       });
       result = await this.repository.findCategoricalFacetRaw({
-        tenantId: params.tenantId,
+        authorization: params.authorization,
         query,
       });
     }
 
     if (def.key === "topic" || def.key === "subtopic") {
-      result = await this.topicNaming.enrichTopicNames(params.tenantId, result);
+      result = await this.nameTopics(params.authorization, result);
     }
 
     return result;
+  }
+
+  /** Topic labels across every project the proof reads; one naming read per project. */
+  private async nameTopics(
+    authorization: Authorization,
+    result: CategoricalFacetResult,
+  ): Promise<CategoricalFacetResult> {
+    const named = await Promise.all(
+      topicProjectsOf({ authorization }).map((projectId) =>
+        this.topicNaming.enrichTopicNames(projectId, result),
+      ),
+    );
+    return mergeTopicLabels({ base: result, named });
   }
 
   private async attributeFacetValues(
     params: FacetValuesParams,
     facetPrefix: string,
     find: (p: {
-      tenantId: string;
+      authorization: Authorization;
       timeRange: { from: number; to: number };
       attributeKey: string;
       prefix?: string;
@@ -322,7 +336,7 @@ export class TraceFacetValuesService {
     }
 
     return find({
-      tenantId: params.tenantId,
+      authorization: params.authorization,
       timeRange: params.timeRange,
       attributeKey,
       limit: params.limit,

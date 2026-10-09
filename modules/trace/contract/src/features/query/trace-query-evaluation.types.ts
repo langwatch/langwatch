@@ -17,7 +17,7 @@ export interface TranslationContext {
   paramCounter: number;
   nodeCount: number;
   params: Record<string, unknown>;
-  tenantId: string;
+  /** No tenant: each subquery carries a marker the authorized reader expands (ADR-175). */
   timeRange: { from: number; to: number };
   /**
    * The Instant Eval runs the caller registered for its `eval` chips, already

@@ -29,7 +29,6 @@ export class ReportTraceListService {
   }: ReportTraceListInput): ReturnType<ReportDispatchDeps["listReportTraces"]> {
     const filterWhere = this.traces.translateTraceFilter({
       query,
-      tenantId: projectId,
       timeRange: { from, to },
     });
     const page = await this.traces.readTraceList({

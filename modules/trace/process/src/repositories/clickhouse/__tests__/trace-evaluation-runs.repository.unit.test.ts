@@ -2,13 +2,15 @@
  * Trace's read of evaluation's shared `evaluation_runs`.
  * @see modules/trace/specs/trace-evaluation-runs-read.feature
  */
+import { aggregateProof, ownProof } from "@langwatch/authorization/testing";
+import type { QueryRequest } from "@langwatch/clickhouse-client";
 import { describe, expect, it, vi } from "vitest";
 
+import { AuthorizedTraceReadsRepository } from "../clickhouse.trace-member-client.repository.ts";
 import { ClickHouseTraceEvaluationRunsRepository } from "../trace-evaluation-runs.repository.ts";
 
-type ChQuery = { query: string; query_params?: Record<string, unknown> };
-
 const TENANT = "project-1";
+const authorization = ownProof({ projectId: TENANT, now: Date.now() });
 const SUMMARY_ROW = {
   EvaluationId: "eval-1",
   EvaluatorId: "customeval_tone",
@@ -22,17 +24,27 @@ const SUMMARY_ROW = {
   Label: null,
 };
 
-function client(answer: (request: ChQuery) => unknown[] | Error) {
-  const query = vi.fn(async (request: ChQuery) => {
+/** A recording reader: each request is the statement as the proof's fence expanded it. */
+function client(answer: (request: QueryRequest) => unknown[] | Error) {
+  const query = vi.fn(async (request: QueryRequest): Promise<{ rows: unknown[] }> => {
     const rows = answer(request);
     if (rows instanceof Error) throw rows;
-    return { json: async () => rows };
+    return { rows };
   });
   return { query };
 }
 
 function repositoryOver(ch: ReturnType<typeof client>) {
-  return ClickHouseTraceEvaluationRunsRepository.create({ resolveClient: async () => ch });
+  return ClickHouseTraceEvaluationRunsRepository.create({
+    reads: AuthorizedTraceReadsRepository.create({
+      clickhouse: {
+        query: async <Row>(request: QueryRequest) => {
+          const { rows } = await ch.query(request);
+          return { rows: rows as Row[] };
+        },
+      },
+    }),
+  });
 }
 
 describe("given evaluation has recorded runs against a trace", () => {
@@ -61,15 +73,16 @@ describe("given evaluation has recorded runs against a trace", () => {
       ]);
 
       const runs = await repositoryOver(ch).findRunsByTraceId({
-        tenantId: TENANT,
+        authorization,
         traceId: "trace-1",
       });
 
       const request = ch.query.mock.calls[0]?.[0];
-      expect(request?.query).toContain("FROM evaluation_runs AS runs");
-      expect(request?.query).toContain("ScheduledAt >= now() - INTERVAL 7 DAY");
-      expect(request?.query).toContain("SELECT TenantId, EvaluationId, max(UpdatedAt)");
-      expect(request?.query_params).toEqual({ tenantId: TENANT, traceId: "trace-1" });
+      expect(request?.sql).toContain("FROM evaluation_runs AS runs");
+      expect(request?.sql).toContain("ScheduledAt >= now() - INTERVAL 7 DAY");
+      expect(request?.sql).toContain("SELECT TenantId, EvaluationId, max(UpdatedAt)");
+      expect(request?.tenantId).toBe(TENANT);
+      expect(request?.params).toEqual({ traceId: "trace-1", tenantScope_all: [TENANT] });
       expect(runs).toEqual([
         expect.objectContaining({
           evaluationId: "eval-1",
@@ -81,6 +94,33 @@ describe("given evaluation has recorded runs against a trace", () => {
           startedAt: null,
         }),
       ]);
+    });
+  });
+
+  describe("when an aggregate reads them through a member's windowed grant", () => {
+    it("windows the dedup subquery, never the outer scope that projects ScheduledAt", async () => {
+      const ch = client(() => []);
+      const aggregate = aggregateProof({
+        projectId: "aggregate",
+        members: [{ projectId: "member-a", from: 1_000, until: 2_000 }],
+        now: Date.now(),
+      });
+
+      await repositoryOver(ch).findRunsByTraceId({ authorization: aggregate, traceId: "trace-1" });
+      await repositoryOver(ch).findTraceEvaluations({
+        authorization: aggregate,
+        traceIds: ["trace-1"],
+      });
+
+      for (const [request] of ch.query.mock.calls) {
+        const [outer, subquery] = request.sql.split(
+          "SELECT TenantId, EvaluationId, max(UpdatedAt)",
+        );
+        expect(outer).toContain("TenantId IN ({tenantScope_all:Array(String)})");
+        expect(outer).not.toContain("has({tenantScope_ids");
+        expect(subquery).toContain("has({tenantScope_ids");
+        expect(request.tenantIds).toEqual(["aggregate", "member-a"]);
+      }
     });
   });
 });
@@ -95,17 +135,17 @@ describe("given evaluation has recorded runs against the traces on one list page
       ]);
 
       const summaries = await repositoryOver(ch).findSummariesByTraceIds({
-        tenantId: TENANT,
+        authorization,
         traceIds: ["trace-1", "trace-2"],
         since: 1_000,
       });
 
       const request = ch.query.mock.calls[0]?.[0];
-      expect(request?.query).toContain("ScheduledAt >= fromUnixTimestamp64Milli({since:Int64})");
-      expect(request?.query_params).toEqual({
-        tenantId: TENANT,
+      expect(request?.sql).toContain("ScheduledAt >= fromUnixTimestamp64Milli({since:Int64})");
+      expect(request?.params).toEqual({
         traceIds: ["trace-1", "trace-2"],
         since: 1_000,
+        tenantScope_all: [TENANT],
       });
       expect(Object.keys(summaries)).toEqual(["trace-1", "trace-2"]);
       expect(summaries["trace-2"]?.[0]).toMatchObject({ evaluationId: "eval-2", passed: null });
@@ -118,7 +158,7 @@ describe("given reading a trace's evaluations with their inputs exceeds ClickHou
     /** @scenario "A trace's evaluations retry without their inputs when ClickHouse runs out of memory" */
     it("reads them again without inputs and answers every asked trace", async () => {
       const ch = client((request) =>
-        request.query.includes("Inputs")
+        request.sql.includes("Inputs")
           ? new Error("Code: 241. DB::Exception: Memory limit (total) exceeded")
           : [
               {
@@ -133,7 +173,7 @@ describe("given reading a trace's evaluations with their inputs exceeds ClickHou
       );
 
       const evaluations = await repositoryOver(ch).findTraceEvaluations({
-        tenantId: TENANT,
+        authorization,
         traceIds: ["trace-1", "trace-quiet"],
       });
 
@@ -156,9 +196,9 @@ describe("given no traces", () => {
       const repository = repositoryOver(ch);
 
       expect(
-        await repository.findSummariesByTraceIds({ tenantId: TENANT, traceIds: [], since: 0 }),
+        await repository.findSummariesByTraceIds({ authorization, traceIds: [], since: 0 }),
       ).toEqual({});
-      expect(await repository.findTraceEvaluations({ tenantId: TENANT, traceIds: [] })).toEqual({});
+      expect(await repository.findTraceEvaluations({ authorization, traceIds: [] })).toEqual({});
       expect(ch.query).not.toHaveBeenCalled();
     });
   });

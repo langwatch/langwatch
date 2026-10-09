@@ -81,6 +81,7 @@ function makeService(): TraceLegacyReadService {
     },
     editOverlay: TraceEditOverlayService.create(MemoryTraceEditOverlayRepository.create()),
     evaluationRuns: refusingEvaluations(),
+    readProofs: refusingEvaluations(),
   });
 }
 

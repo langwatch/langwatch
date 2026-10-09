@@ -38,6 +38,8 @@ import {
 } from "@langwatch/trace-contract";
 import type { z } from "zod";
 
+import { unkeyedLegacyFilterViolations } from "#features/legacy/rules/trace-legacy-filter-keys.rules";
+import { compileProjection } from "#features/projection/rules/trace-projection-compile.rules";
 import { enrichTracesWithEvaluations } from "#rules/trace-evaluation-enrichment.rules";
 /**
  * /api/traces: v1 trace reads (search, facets, get-by-id, transcript, metadata
@@ -45,9 +47,7 @@ import { enrichTracesWithEvaluations } from "#rules/trace-evaluation-enrichment.
  * literal /facets, before the bare :traceId.
  */
 import { formatTraceSummaryDigest } from "#rules/trace-formatting.rules";
-import { unkeyedLegacyFilterViolations } from "#features/legacy/rules/trace-legacy-filter-keys.rules";
 import { tracePath } from "#rules/trace-platform-url.rules";
-import { compileProjection } from "#features/projection/rules/trace-projection-compile.rules";
 
 const logger = createLogger("langwatch:api:traces");
 
@@ -253,7 +253,6 @@ async function searchTraces({
   const endEpoch = coerceToEpochOrThrow(endDate, "endDate");
   const filterWhere = app.compileExplorerTraceFilter({
     query: filter ?? "",
-    tenantId: scope.id,
     timeRange: { from: startEpoch, to: endEpoch },
     originNamed: namesOriginFilter(searchFields.filters),
     dateField,

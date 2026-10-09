@@ -1,4 +1,5 @@
-import { EventUtils } from "@langwatch/eventing";
+import type { Authorization } from "@langwatch/authorization";
+import { tenantScope, tenantSet } from "@langwatch/authorization/tenant-fence";
 import { z } from "zod";
 
 import type {
@@ -8,7 +9,7 @@ import type {
   SessionGroupsQuery,
   SessionGroupsRepository,
 } from "../session-groups.repository.ts";
-import type { TraceClickHouseResolver as ClickHouseClientResolver } from "./clickhouse.trace-member-client.repository.ts";
+import type { TraceAuthorizedReads } from "./clickhouse.trace-member-client.repository.ts";
 import { chString } from "./stored-span-row.mapper.ts";
 
 const TABLE_NAME = "trace_summaries" as const;
@@ -48,6 +49,7 @@ const SORT_EXPRESSIONS: Record<SessionGroupSortColumn, string> = {
 const numeric = z.union([z.number(), z.string()]);
 
 const sessionGroupRowSchema = z.looseObject({
+  TenantId: chString,
   ConversationId: chString,
   TraceCount: numeric,
   SessionCost: numeric,
@@ -64,6 +66,7 @@ const sessionGroupRowSchema = z.looseObject({
   SessionErrorCount: numeric,
   SessionWarningCount: numeric,
   SessionSpans: numeric,
+  /** The session's latest trace, in the session's own tenant (`TenantId`, a grouping key). */
   LastTraceId: chString,
 });
 
@@ -76,6 +79,7 @@ const totalHitsRowSchema = z.looseObject({ totalHits: numeric });
 const totalHitsRowsSchema = z.array(totalHitsRowSchema);
 
 const previewRowSchema = z.looseObject({
+  TenantId: chString,
   TraceId: chString,
   ComputedInput: chString.nullable(),
   ComputedOutput: chString.nullable(),
@@ -83,20 +87,24 @@ const previewRowSchema = z.looseObject({
 
 const previewRowsSchema = z.array(previewRowSchema);
 
+/** A preview's map key: the trace id alone is not unique across the tenants an aggregate reads. */
+function previewKey({ TenantId, TraceId }: { TenantId: string; TraceId: string }): string {
+  return `${TenantId}:${TraceId}`;
+}
+
 function isLiveUpperBound(timeRange: { to: number; live?: boolean }): boolean {
   return timeRange.live === true;
 }
 
-function buildBaseWhere(
-  tenantId: string,
-  timeRange: { from: number; to: number; live?: boolean },
-): { sql: string; params: Record<string, unknown> } {
+function buildBaseWhere(timeRange: { from: number; to: number; live?: boolean }): {
+  sql: string;
+  params: Record<string, unknown>;
+} {
   const parts = [
-    "TenantId = {tenantId:String}",
+    tenantScope("OccurredAt"),
     "OccurredAt >= fromUnixTimestamp64Milli({timeFrom:Int64})",
   ];
   const params: Record<string, unknown> = {
-    tenantId,
     timeFrom: timeRange.from,
   };
   if (!isLiveUpperBound(timeRange)) {
@@ -106,20 +114,16 @@ function buildBaseWhere(
   return { sql: parts.join(" AND "), params };
 }
 
+/** Read-only: every statement goes through the proof's fence (ADR-175) and names no tenant. */
 export class SessionGroupsClickHouseRepository implements SessionGroupsRepository {
-  static create(resolveClient: ClickHouseClientResolver): SessionGroupsClickHouseRepository {
-    return new SessionGroupsClickHouseRepository(resolveClient);
+  static create({ reads }: { reads: TraceAuthorizedReads }): SessionGroupsClickHouseRepository {
+    return new SessionGroupsClickHouseRepository(reads);
   }
 
-  constructor(private readonly resolveClient: ClickHouseClientResolver) {}
+  private constructor(private readonly reads: TraceAuthorizedReads) {}
 
   async listSessionGroups(query: SessionGroupsQuery): Promise<SessionGroupsPage> {
-    EventUtils.validateTenantId(
-      { tenantId: query.tenantId },
-      "SessionGroupsClickHouseRepository.findSessionGroups",
-    );
-
-    const { sql: baseWhere, params } = buildBaseWhere(query.tenantId, query.timeRange);
+    const { sql: baseWhere, params } = buildBaseWhere(query.timeRange);
 
     // Latest-version dedup, the rollup must sum each logical trace exactly
     // once even while ReplacingMergeTree merges lag. Same IN-tuple shape as
@@ -142,24 +146,32 @@ export class SessionGroupsClickHouseRepository implements SessionGroupsRepositor
     const sortDir = query.sort.direction === "asc" ? "ASC" : "DESC";
     const cursorComparison = query.sort.direction === "asc" ? ">" : "<";
     // Keyset over the GROUP BY output lives in HAVING: the sort value is an
-    // aggregate, so it does not exist before grouping. ConversationId ASC is
-    // the unique tie-breaker regardless of sort direction, matching the trace
-    // list's TraceId tie-break convention.
+    // aggregate, so it does not exist before grouping. (ConversationId,
+    // TenantId) ASC is the unique tie-breaker regardless of sort direction; a
+    // cursor minted before the tenant was carried pages on the id alone. The OR sits a bracket
+    // below the fence's own depth, so the tenant guard can see it cannot disjoin the fence away.
+    const tieBreak =
+      query.cursor?.tenantId !== undefined
+        ? "(ConversationId, TenantId) > ({cursorConversationId:String}, {cursorTenantId:String})"
+        : "ConversationId > {cursorConversationId:String}";
     const havingClause = query.cursor
-      ? `HAVING (
+      ? `HAVING ((
               ${sortExpression} ${cursorComparison} {cursorSortValue:Float64}
               OR (
                 ${sortExpression} = {cursorSortValue:Float64}
-                AND ConversationId > {cursorConversationId:String}
+                AND ${tieBreak}
               )
-            )`
+            ))`
       : "";
     if (query.cursor) {
       params.cursorSortValue = query.cursor.sortValue;
       params.cursorConversationId = query.cursor.conversationId;
+      if (query.cursor.tenantId !== undefined) {
+        params.cursorTenantId = query.cursor.tenantId;
+      }
     }
 
-    const client = await this.resolveClient(query.tenantId);
+    const client = this.reads.reader(query.authorization);
 
     // Phase 1: the rollup itself, light columns only. Heavy previews
     // (ComputedInput/ComputedOutput) are read in phase 2 for the page's
@@ -168,6 +180,7 @@ export class SessionGroupsClickHouseRepository implements SessionGroupsRepositor
       client.query({
         query: `
         SELECT
+          TenantId,
           ${CONVERSATION_ID_EXPR} AS ConversationId,
           count() AS TraceCount,
           ${SORT_EXPRESSIONS.cost} AS SessionCost,
@@ -190,9 +203,9 @@ export class SessionGroupsClickHouseRepository implements SessionGroupsRepositor
           AND ${CONVERSATION_ID_EXPR} != ''
           AND ${dedupFilter}
           ${sessionMatchClause}
-        GROUP BY ConversationId
+        GROUP BY TenantId, ConversationId
         ${havingClause}
-        ORDER BY ${sortExpression} ${sortDir}, ConversationId ASC
+        ORDER BY ${sortExpression} ${sortDir}, ConversationId ASC, TenantId ASC
         LIMIT {limit:UInt32}
       `,
         query_params: { ...params, limit: query.limit },
@@ -200,7 +213,7 @@ export class SessionGroupsClickHouseRepository implements SessionGroupsRepositor
       }),
       client.query({
         query: `
-        SELECT uniqExact(${CONVERSATION_ID_EXPR}) AS totalHits
+        SELECT uniqExact(TenantId, ${CONVERSATION_ID_EXPR}) AS totalHits
         FROM ${TABLE_NAME}
         WHERE ${baseWhere}
           AND ${CONVERSATION_ID_EXPR} != ''
@@ -217,7 +230,7 @@ export class SessionGroupsClickHouseRepository implements SessionGroupsRepositor
     const totalHits = countRows.length > 0 ? Number(countRows[0]!.totalHits) : 0;
 
     const previews = await this.findPreviewsByTraceIds({
-      tenantId: query.tenantId,
+      authorization: query.authorization,
       timeRange: query.timeRange,
       traceIds: rows.map((row) => row.LastTraceId).filter(Boolean),
     });
@@ -246,7 +259,7 @@ export class SessionGroupsClickHouseRepository implements SessionGroupsRepositor
       // filter and drags its session into the page, even when the current
       // version no longer matches.
       branches.push(`
-            SELECT DISTINCT ${CONVERSATION_ID_EXPR} AS SessionId
+            SELECT DISTINCT TenantId, ${CONVERSATION_ID_EXPR} AS SessionId
             FROM ${TABLE_NAME}
             WHERE ${baseWhere}
               AND ${CONVERSATION_ID_EXPR} != ''
@@ -277,9 +290,9 @@ export class SessionGroupsClickHouseRepository implements SessionGroupsRepositor
         params.logTimeTo = query.timeRange.to + LOG_WINDOW_BUFFER_MS;
       }
       branches.push(`
-            SELECT DISTINCT ProviderSessionId AS SessionId
+            SELECT DISTINCT TenantId, ProviderSessionId AS SessionId
             FROM log_records
-            WHERE TenantId = {tenantId:String}
+            WHERE ${tenantSet()}
               AND TimeUnixMs >= fromUnixTimestamp64Milli({logTimeFrom:Int64})
               ${upperBound}
               AND ProviderSessionId != ''
@@ -289,7 +302,7 @@ export class SessionGroupsClickHouseRepository implements SessionGroupsRepositor
     if (branches.length === 0) return { sql: "", params };
 
     return {
-      sql: `AND ${CONVERSATION_ID_EXPR} IN (${branches.join("\n            UNION DISTINCT\n")}
+      sql: `AND (TenantId, ${CONVERSATION_ID_EXPR}) IN (${branches.join("\n            UNION DISTINCT\n")}
           )`,
       params,
     };
@@ -301,19 +314,20 @@ export class SessionGroupsClickHouseRepository implements SessionGroupsRepositor
    * ride through the rollup scan.
    */
   private async findPreviewsByTraceIds(args: {
-    tenantId: string;
+    authorization: Authorization;
     timeRange: { from: number; to: number; live?: boolean };
     traceIds: string[];
   }): Promise<Map<string, { input: string | null; output: string | null }>> {
+    // Keyed by tenant and trace id: two tenants the proof fences may hold the same id.
     const previews = new Map<string, { input: string | null; output: string | null }>();
     if (args.traceIds.length === 0) return previews;
 
-    const { sql: baseWhere, params } = buildBaseWhere(args.tenantId, args.timeRange);
+    const { sql: baseWhere, params } = buildBaseWhere(args.timeRange);
 
-    const client = await this.resolveClient(args.tenantId);
+    const client = this.reads.reader(args.authorization);
     const result = await client.query({
       query: `
-        SELECT TraceId, ComputedInput, ComputedOutput
+        SELECT TenantId, TraceId, ComputedInput, ComputedOutput
         FROM ${TABLE_NAME}
         WHERE ${baseWhere}
           AND TraceId IN {previewTraceIds:Array(String)}
@@ -331,7 +345,7 @@ export class SessionGroupsClickHouseRepository implements SessionGroupsRepositor
 
     const rows = previewRowsSchema.parse(await result.json());
     for (const row of rows) {
-      previews.set(row.TraceId, {
+      previews.set(previewKey(row), {
         input: row.ComputedInput ?? null,
         output: row.ComputedOutput ?? null,
       });
@@ -345,9 +359,10 @@ export class SessionGroupsClickHouseRepository implements SessionGroupsRepositor
   ): SessionGroupRow {
     const contextSize = Number(row.MaxContextSizeTokens);
     const services = row.SessionServices ?? [];
-    const preview = previews.get(row.LastTraceId);
+    const preview = previews.get(previewKey({ TenantId: row.TenantId, TraceId: row.LastTraceId }));
     return {
       conversationId: row.ConversationId,
+      tenantId: row.TenantId,
       traceCount: Number(row.TraceCount),
       totalCost: Number(row.SessionCost),
       totalTokens: Number(row.SessionTokens),

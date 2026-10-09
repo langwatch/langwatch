@@ -20,12 +20,12 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import type * as projectionCompileRules from "#features/projection/rules/trace-projection-compile.rules";
+import { compileProjection } from "#features/projection/rules/trace-projection-compile.rules";
 import {
   andFilterConditions,
   findHiddenOriginConditions,
 } from "#rules/trace-filter-hidden-origins.rules";
-import type * as projectionCompileRules from "#features/projection/rules/trace-projection-compile.rules";
-import { compileProjection } from "#features/projection/rules/trace-projection-compile.rules";
 
 import { traceQueryTranslation } from "../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
 import { tracesRestCredential, tracesRest } from "../traces.rest.ts";
@@ -42,14 +42,12 @@ vi.mock("#features/projection/rules/trace-projection-compile.rules", async (impo
  */
 function compileExplorerTraceFilter(input: {
   query: string;
-  tenantId: string;
   timeRange: { from: number; to: number };
   originNamed?: boolean;
   dateField?: "occurred" | "updated";
 }): { sql: string; params: Record<string, unknown> } {
   const compiled = traceQueryTranslation.translateFilter({
     queryText: input.query,
-    tenantId: input.tenantId,
     timeRange: input.timeRange,
   });
 
@@ -576,7 +574,8 @@ describe("POST /search with a trace filter", () => {
       await send({ startDate: 1000, endDate: 5000, filter: "status:error" });
       const filterWhere = filterWhereOf(listTraces);
       expect(filterWhere?.sql).toContain("ContainsErrorStatus");
-      expect(filterWhere?.params.tenantId).toBe("project-123");
+      // The store client fences the statement (ADR-175); the compiled filter names no tenant.
+      expect(filterWhere?.params).not.toHaveProperty("tenantId");
     });
 
     it("bounds the translation to the window the search asked for", async () => {

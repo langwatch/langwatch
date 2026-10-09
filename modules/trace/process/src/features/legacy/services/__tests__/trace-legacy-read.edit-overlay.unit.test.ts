@@ -86,6 +86,7 @@ function makeService(): TraceLegacyReadService {
     },
     editOverlay,
     evaluationRuns: refusingEvaluations(),
+    readProofs: refusingEvaluations(),
   });
 }
 

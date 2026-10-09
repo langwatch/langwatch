@@ -33,6 +33,7 @@
     "@langwatch/annotation-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/api-key-contract": "workspace:*",
+    "@langwatch/authorization": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/coding-agent-contract": "workspace:*",
@@ -90,7 +91,6 @@
   },
   "devDependencies": {
     "@clickhouse/client": "catalog:",
-    "@langwatch/authorization": "workspace:*",
     "@langwatch/clickhouse-migrations": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@types/papaparse": "catalog:",

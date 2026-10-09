@@ -5,10 +5,13 @@
  * @see https://github.com/langwatch/tasks/issues/918
  */
 import type { ClickHouseClient } from "@clickhouse/client";
+import { tenantScope } from "@langwatch/authorization/tenant-fence";
+import { ownProof } from "@langwatch/authorization/testing";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { traceQueryTranslation } from "../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
+import { authorizedReadsOver } from "./support/authorized-reads.support.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -104,21 +107,21 @@ function evaluationRow({
 
 let ch: ClickHouseClient;
 
-/** The trace ids a compiled filter selects, sorted. */
+/** The trace ids a compiled filter selects, sorted, read through the proof-fenced reader. */
 async function matching(filter: string, tenant = tenantId): Promise<string[]> {
   const compiled = traceQueryTranslation.translateFilter({
     queryText: filter,
-    tenantId: tenant,
     timeRange: WINDOW,
   });
   if (!compiled) throw new Error(`compiled to nothing: ${filter}`);
-  const result = await ch.query({
-    query: `SELECT DISTINCT TraceId FROM trace_summaries ts WHERE TenantId = {tenantId:String} AND ${compiled.sql}`,
+  const reader = authorizedReadsOver(ch).reader(ownProof({ projectId: tenant, now: Date.now() }));
+  const result = await reader.query({
+    query: `SELECT DISTINCT TraceId FROM trace_summaries ts WHERE ${tenantScope("OccurredAt")} AND ${compiled.sql}`,
     query_params: compiled.params,
     format: "JSONEachRow",
   });
-  const rows = await result.json<{ TraceId: string }>();
-  return rows.map((row) => row.TraceId).toSorted();
+  const rows = (await result.json()) as { TraceId: string }[];
+  return rows.map((row) => row.TraceId).toSorted((a, b) => a.localeCompare(b));
 }
 
 beforeAll(async () => {

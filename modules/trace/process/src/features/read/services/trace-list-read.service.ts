@@ -1,3 +1,4 @@
+import type { Authorization } from "@langwatch/authorization";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import {
   TRACE_ORIGIN_CLICKHOUSE_EXPRESSION,
@@ -13,26 +14,30 @@ import type {
   TraceListItem,
   TraceListPage,
   TraceListRead,
+  TraceListSummary,
   Protections,
 } from "@langwatch/trace-contract";
 
 import type { FacetCatalog } from "#features/facet/rules/trace-facet-registry.rules";
 
 import type { TraceEvaluationRunsReadRepository } from "../../../repositories/trace-evaluation-runs.repository.ts";
-import type { TraceTopicNamesReadRepository } from "../../topic/repositories/trace-topic-names.repository.ts";
-import type { FacetFilterResolver } from "../../facet/rules/trace-facet-filter.rules.ts";
-import type { DiscoverParams, FacetValuesParams } from "../../../rules/trace-list-cache-key.rules.ts";
+import type {
+  DiscoverParams,
+  FacetValuesParams,
+} from "../../../rules/trace-list-cache-key.rules.ts";
 import {
   cursorForTraceRow,
   mapToTraceListItem,
   SORT_COLUMN_MAP,
 } from "../../../rules/trace-list-row.rules.ts";
 import { TraceDiscoverService } from "../../../services/trace-discover.service.ts";
+import type { FacetFilterResolver } from "../../facet/rules/trace-facet-filter.rules.ts";
 import { TraceFacetValuesService } from "../../facet/services/trace-facet-values.service.ts";
+import type { TraceTopicNamesReadRepository } from "../../topic/repositories/trace-topic-names.repository.ts";
 import { TraceTopicNamingService } from "../../topic/services/trace-topic-naming.service.ts";
 
 interface ListParams {
-  tenantId: string;
+  authorization: Authorization;
   timeRange: { from: number; to: number };
   sort: { columnId: string; direction: "asc" | "desc" };
   /** 1-based offset compatibility for non-cursor callers. */
@@ -48,7 +53,7 @@ interface ListParams {
 }
 
 interface FacetParams {
-  tenantId: string;
+  authorization: Authorization;
   /** The exact window the list reads, never snapped. */
   timeRange: { from: number; to: number; live?: boolean };
   /** The predicate each facet is counted under. */
@@ -56,21 +61,21 @@ interface FacetParams {
 }
 
 interface NewCountParams {
-  tenantId: string;
+  authorization: Authorization;
   timeRange: { from: number; to: number };
   since: number;
   filterWhere?: { sql: string; params: Record<string, unknown> };
 }
 
 interface TraceIdsParams {
-  tenantId: string;
+  authorization: Authorization;
   timeRange: { from: number; to: number };
   filterWhere?: { sql: string; params: Record<string, unknown> };
   limit: number;
 }
 
 interface SuggestParams {
-  tenantId: string;
+  authorization: Authorization;
   field: string;
   prefix: string;
   limit?: number;
@@ -177,6 +182,15 @@ export class TraceListService {
     );
   }
 
+  /** The keyset cursor after a row, carrying its tenant for the (tenant, trace id) tie-break. */
+  static #cursorAfter(
+    row: TraceListSummary,
+    sortColumn: Parameters<typeof cursorForTraceRow>[1],
+  ): TraceListCursor {
+    const cursor = cursorForTraceRow(row, sortColumn);
+    return row.tenantId === void 0 ? cursor : { ...cursor, tenantId: row.tenantId };
+  }
+
   static #teaseItem(item: TraceListItem): TraceListItem {
     return {
       ...item,
@@ -199,7 +213,7 @@ export class TraceListService {
     }
 
     const result = await this.repository.listAll({
-      tenantId: params.tenantId,
+      authorization: params.authorization,
       timeRange: params.timeRange,
       sort: { column: sortColumn, direction: params.sort.direction },
       // Read one sentinel row so `nextCursor` is exact without guessing from
@@ -215,9 +229,10 @@ export class TraceListService {
     const items = visibleRows.map((row) => mapToTraceListItem(row));
     const traceIds = items.map((item) => item.traceId);
 
+    // An aggregate's page can hold one trace id from two members; ask for each id once.
     const evaluations = await this.evaluationRuns.findSummariesByTraceIds({
-      tenantId: params.tenantId,
-      traceIds,
+      authorization: params.authorization,
+      traceIds: [...new Set(traceIds)],
       since: params.timeRange.from,
     });
 
@@ -229,7 +244,7 @@ export class TraceListService {
       evaluations,
       nextCursor:
         hasMore && visibleRows.length > 0
-          ? cursorForTraceRow(visibleRows[visibleRows.length - 1]!, sortColumn)
+          ? TraceListService.#cursorAfter(visibleRows[visibleRows.length - 1]!, sortColumn)
           : null,
     };
   }
@@ -241,14 +256,14 @@ export class TraceListService {
    */
   getFacets(params: FacetParams): Promise<FacetDescriptor[]> {
     return this.discover.getFilteredFacets({
-      params: { tenantId: params.tenantId, timeRange: params.timeRange },
+      params: { authorization: params.authorization, timeRange: params.timeRange },
       filterFor: params.filterFor,
     });
   }
 
   async getNewCount(params: NewCountParams): Promise<number> {
     return this.repository.findCount({
-      tenantId: params.tenantId,
+      authorization: params.authorization,
       timeRange: params.timeRange,
       since: params.since,
       filterWhere: params.filterWhere,
@@ -262,7 +277,7 @@ export class TraceListService {
    */
   async getTraceIds(params: TraceIdsParams): Promise<string[]> {
     return this.repository.findTraceIds({
-      tenantId: params.tenantId,
+      authorization: params.authorization,
       timeRange: params.timeRange,
       ...(params.filterWhere ? { filterWhere: params.filterWhere } : {}),
       limit: params.limit,
@@ -276,7 +291,7 @@ export class TraceListService {
     }
 
     return this.repository.findDistinctValues({
-      tenantId: params.tenantId,
+      authorization: params.authorization,
       column,
       prefix: params.prefix,
       limit: params.limit ?? 20,

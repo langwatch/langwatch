@@ -7,6 +7,7 @@
  * @see specs/traces-v2/instant-eval-search.feature
  */
 import type { ClickHouseClient } from "@clickhouse/client";
+import { ownProof } from "@langwatch/authorization/testing";
 import {
   explorerHiddenOrigins,
   LANGY_TRACE_ORIGIN,
@@ -15,7 +16,12 @@ import {
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import {
+  CLICKHOUSE_FACET_CATALOG,
+  FACET_REGISTRY,
+} from "../../../features/facet/repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
 import { createFacetFilterResolver } from "../../../features/facet/rules/trace-facet-filter.rules.ts";
+import { TraceListService } from "../../../features/read/services/trace-list-read.service.ts";
 import {
   andFilterConditions,
   explorerOriginExclusion,
@@ -23,13 +29,9 @@ import {
   type TraceFilterWhere,
 } from "../../../rules/trace-filter-hidden-origins.rules.ts";
 import { traceQueryTranslation } from "../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
-import { TraceListService } from "../../../features/read/services/trace-list-read.service.ts";
 import { MemoryTraceEvaluationRunsRepository } from "../../memory/memory.trace-evaluation-runs.repository.ts";
-import {
-  CLICKHOUSE_FACET_CATALOG,
-  FACET_REGISTRY,
-} from "../../../features/facet/repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
 import { TraceListClickHouseRepository } from "../trace-list.repository.ts";
+import { authorizedReadsOver } from "./support/authorized-reads.support.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -42,6 +44,9 @@ let repo: TraceListClickHouseRepository;
 
 const base = Date.now() - 60 * 60 * 1000;
 const timeRange = { from: base - 60_000, to: base + 60_000 };
+
+/** The proof a route mints for the seeded project; the reader fences on it. */
+const proof = (tenantId: string) => ownProof({ projectId: tenantId, now: Date.now() });
 
 function traceRow({
   tenantId,
@@ -95,17 +100,14 @@ function facetExpression(key: string): string {
 }
 
 function compiled({
-  tenantId,
   queryText,
   evalRuns,
 }: {
-  tenantId: string;
   queryText: string;
   evalRuns?: ResolvedInstantEvalRun[];
 }): TraceFilterWhere {
   const filter = traceQueryTranslation.translateFilter({
     queryText,
-    tenantId,
     timeRange,
     ...(evalRuns ? { evalRuns } : {}),
   });
@@ -114,22 +116,16 @@ function compiled({
 }
 
 /** The Explorer's filter: the query's own conditions and the origins it hides. */
-function explorerFilter({
-  tenantId,
-  query,
-}: {
-  tenantId: string;
-  query: string;
-}): TraceFilterWhere {
+function explorerFilter({ query }: { query: string }): TraceFilterWhere {
   return andFilterConditions([
-    ...(query ? [compiled({ tenantId, queryText: query })] : []),
+    ...(query ? [compiled({ queryText: query })] : []),
     ...findHiddenOriginConditions({ hiddenOrigins: explorerHiddenOrigins(query) }),
   ]);
 }
 
 function listWith({ tenantId, filterWhere }: { tenantId: string; filterWhere: TraceFilterWhere }) {
   return repo.listAll({
-    tenantId,
+    authorization: proof(tenantId),
     timeRange,
     sort: { column: "OccurredAt", direction: "desc" },
     limit: 50,
@@ -148,7 +144,7 @@ async function categoricalCounts({
   filterWhere?: TraceFilterWhere;
 }): Promise<Record<string, number>> {
   const batch = await repo.findBatchedFacets({
-    tenantId,
+    authorization: proof(tenantId),
     timeRange,
     table: "trace_summaries",
     timeColumn: "OccurredAt",
@@ -165,7 +161,7 @@ async function categoricalCounts({
 beforeAll(async () => {
   if (!clickHouseConfigured) return;
   ch = await startMigratedTraceClickHouse();
-  repo = TraceListClickHouseRepository.create(async () => ch);
+  repo = TraceListClickHouseRepository.create({ reads: authorizedReadsOver(ch) });
 }, 120_000);
 
 describe.skipIf(!clickHouseConfigured)("the Explorer's hidden origins on the trace list", () => {
@@ -198,7 +194,7 @@ describe.skipIf(!clickHouseConfigured)("the Explorer's hidden origins on the tra
     it("lists only the customer trace with the default hidden origins", async () => {
       const page = await listWith({
         tenantId,
-        filterWhere: explorerFilter({ tenantId, query: "" }),
+        filterWhere: explorerFilter({ query: "" }),
       });
 
       expect(page.rows.map((row) => row.traceId)).toEqual([customerTraceId]);
@@ -209,7 +205,7 @@ describe.skipIf(!clickHouseConfigured)("the Explorer's hidden origins on the tra
     it("lists only Langy's turn once the query asks for that origin", async () => {
       const page = await listWith({
         tenantId,
-        filterWhere: explorerFilter({ tenantId, query: "origin:langy" }),
+        filterWhere: explorerFilter({ query: "origin:langy" }),
       });
 
       expect(page.rows.map((row) => row.traceId)).toEqual([langyTraceId]);
@@ -220,7 +216,7 @@ describe.skipIf(!clickHouseConfigured)("the Explorer's hidden origins on the tra
     it("keeps a filter of its own and still hides the turn", async () => {
       const page = await listWith({
         tenantId,
-        filterWhere: explorerFilter({ tenantId, query: "status:ok" }),
+        filterWhere: explorerFilter({ query: "status:ok" }),
       });
 
       expect(page.rows.map((row) => row.traceId)).toEqual([customerTraceId]);
@@ -229,10 +225,10 @@ describe.skipIf(!clickHouseConfigured)("the Explorer's hidden origins on the tra
     /** @scenario "The list leaves out Langy's turns by default" */
     it("counts only the customer trace as new", async () => {
       const count = await repo.findCount({
-        tenantId,
+        authorization: proof(tenantId),
         timeRange,
         since: base - 1,
-        filterWhere: explorerFilter({ tenantId, query: "" }),
+        filterWhere: explorerFilter({ query: "" }),
       });
 
       expect(count).toBe(1);
@@ -269,7 +265,7 @@ describe.skipIf(!clickHouseConfigured)("an eval chip on the trace list", () => {
   });
 
   const chipFilter = ({ query, run }: { query: string; run: string }) =>
-    compiled({ tenantId, queryText: query, evalRuns: [runOf(run)] });
+    compiled({ queryText: query, evalRuns: [runOf(run)] });
 
   function judgment({
     tenant,
@@ -393,13 +389,12 @@ async function sidebarCounts({
     topicNames: { findNamesByIds: async () => new Map() },
   });
   const facets = await service.getFacets({
-    tenantId,
+    authorization: proof(tenantId),
     timeRange,
     filterFor: createFacetFilterResolver({
       queryText: query,
       compile: (text) =>
-        traceQueryTranslation.translateFilter({ queryText: text, tenantId, timeRange }) ??
-        undefined,
+        traceQueryTranslation.translateFilter({ queryText: text, timeRange }) ?? undefined,
       hide: explorerOriginExclusion({ hiddenOrigins: explorerHiddenOrigins(query) }),
     }),
   });
@@ -451,7 +446,7 @@ describe.skipIf(!clickHouseConfigured)("the sidebar's counts against the table",
 
       const page = await listWith({
         tenantId,
-        filterWhere: explorerFilter({ tenantId, query: "status:error AND service:api" }),
+        filterWhere: explorerFilter({ query: "status:error AND service:api" }),
       });
 
       expect(page.totalHits).toBe(apiCount);
@@ -465,7 +460,7 @@ describe.skipIf(!clickHouseConfigured)("the sidebar's counts against the table",
       expect(everything.get("status")).toEqual({ error: 3, ok: 1 });
 
       const query = "service:nobody";
-      const page = await listWith({ tenantId, filterWhere: explorerFilter({ tenantId, query }) });
+      const page = await listWith({ tenantId, filterWhere: explorerFilter({ query }) });
       expect(page.totalHits).toBe(0);
 
       const counts = await sidebarCounts({ tenantId, query });

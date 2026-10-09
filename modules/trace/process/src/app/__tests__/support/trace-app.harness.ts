@@ -1,8 +1,27 @@
+import { ownProof } from "@langwatch/authorization/testing";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
+import { TraceReadAuthorizationService } from "../../../services/trace-read-authorization.service.ts";
 import { TraceModule, type TraceAppDependencies } from "../../trace.app.ts";
 
 type TraceReaders = TraceAppDependencies["traces"];
+
+/** The proofs a plain project's reads carry: authz mints its one own grant, nothing shared. */
+export function ownProjectReadAuthorization(): TraceReadAuthorizationService {
+  return TraceReadAuthorizationService.create({
+    authz: createApiFixture<Pick<AuthzApi, "mintAuthorization" | "mintInternalAuthorization">>(
+      {
+        mintAuthorization: async ({ scope }) =>
+          ownProof({ projectId: scope.projectId, now: Date.now() }),
+        mintInternalAuthorization: async ({ projectId }) =>
+          ownProof({ projectId, now: Date.now() }),
+      },
+      "authz",
+    ),
+    reads: createApiFixture({}, "authorized reads"),
+  });
+}
 
 /**
  * A real `TraceModule` over doubles for everything a test does not configure: each unconfigured
@@ -26,6 +45,7 @@ export function createTraceAppHarness({
     projects: createApiFixture<TraceAppDependencies["projects"]>({}, "projects"),
     requestBounds: createApiFixture<TraceAppDependencies["requestBounds"]>({}, "requestBounds"),
     exportBounds: null,
+    readAuthorization: ownProjectReadAuthorization(),
     ...dependencies,
     traces: createApiFixture<TraceReaders>(traces, "traces"),
   });

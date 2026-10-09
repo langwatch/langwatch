@@ -1,7 +1,10 @@
 /**
  * Evaluation's `evaluation_runs`, shared with trace for reading (R40, EF-5): each
  * read collapses a run to its latest version, as evaluation's own reads collapse it.
+ * Every read goes through the proof's fence (ADR-175) and names no tenant.
  */
+import type { Authorization } from "@langwatch/authorization";
+import { tenantScope, tenantScopeKey, tenantSet } from "@langwatch/authorization/tenant-fence";
 import {
   evaluationRunDataSchema,
   evaluationSummarySchema,
@@ -10,12 +13,11 @@ import {
   type EvaluationSummary,
   type TraceEvaluationData,
 } from "@langwatch/evaluation-contract";
-import { EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 
 import { TraceEvaluationRunsReadRepository } from "../trace-evaluation-runs.repository.ts";
-import type { TraceClickHouseResolver } from "./clickhouse.trace-member-client.repository.ts";
+import type { TraceAuthorizedReads } from "./clickhouse.trace-member-client.repository.ts";
 import { chNumber, chString } from "./stored-span-row.mapper.ts";
 
 const EVALUATION_RUNS_TABLE = "evaluation_runs" as const;
@@ -119,24 +121,31 @@ function summaryFields(row: SummaryRow) {
   };
 }
 
+/** What a log line names a fenced read by: the fence's key, never a tenant of its own. */
+function scopeOf(authorization: Authorization): string {
+  return tenantScopeKey({ authorization, reads: "traces" });
+}
+
+/**
+ * Where a statement projects `ScheduledAt` as an integer alias, a bare `ScheduledAt` in its outer
+ * scope is that alias, so the windowed fence goes in the dedup subquery, which reads the stored
+ * column; the outer scope takes the tenant set alone.
+ */
 export class ClickHouseTraceEvaluationRunsRepository extends TraceEvaluationRunsReadRepository {
-  static create(options: {
-    resolveClient: TraceClickHouseResolver;
-  }): ClickHouseTraceEvaluationRunsRepository {
-    return new ClickHouseTraceEvaluationRunsRepository(options.resolveClient);
+  static create(options: { reads: TraceAuthorizedReads }): ClickHouseTraceEvaluationRunsRepository {
+    return new ClickHouseTraceEvaluationRunsRepository(options.reads);
   }
 
-  private constructor(private readonly resolveClient: TraceClickHouseResolver) {
+  private constructor(private readonly reads: TraceAuthorizedReads) {
     super();
   }
 
   async findRunsByTraceId(input: {
-    tenantId: string;
+    authorization: Authorization;
     traceId: string;
   }): Promise<EvaluationRunData[]> {
-    EventUtils.validateTenantId(input, "ClickHouseTraceEvaluationRunsRepository.findRunsByTraceId");
     try {
-      const client = await this.resolveClient(input.tenantId);
+      const client = this.reads.reader(input.authorization);
       const result = await client.query({
         query: `
           SELECT EvaluationId, EvaluatorId, EvaluatorType, EvaluatorName, TraceId,
@@ -149,20 +158,20 @@ export class ClickHouseTraceEvaluationRunsRepository extends TraceEvaluationRuns
             toUnixTimestamp64Milli(${RUNS}.CompletedAt) AS CompletedAt, CostId,
             toUnixTimestamp64Milli(${RUNS}.LastEventOccurredAt) AS LastEventOccurredAt
           FROM ${EVALUATION_RUNS_TABLE} AS ${RUNS}
-          WHERE ${RUNS}.TenantId = {tenantId:String}
+          WHERE ${tenantSet()}
             AND ${RUNS}.ScheduledAt >= now() - INTERVAL 7 DAY
             AND ${RUNS}.TraceId = {traceId:String}
             AND (${RUNS}.TenantId, ${RUNS}.EvaluationId, ${RUNS}.UpdatedAt) IN (
               SELECT TenantId, EvaluationId, max(UpdatedAt)
               FROM ${EVALUATION_RUNS_TABLE}
-              WHERE TenantId = {tenantId:String}
+              WHERE ${tenantScope("ScheduledAt")}
                 AND ScheduledAt >= now() - INTERVAL 7 DAY
                 AND TraceId = {traceId:String}
               GROUP BY TenantId, EvaluationId
             )
           ORDER BY ${RUNS}.UpdatedAt DESC
         `,
-        query_params: { tenantId: input.tenantId, traceId: input.traceId },
+        query_params: { traceId: input.traceId },
         format: "JSONEachRow",
       });
       return runRowsSchema.parse(await result.json()).map((row) =>
@@ -184,37 +193,37 @@ export class ClickHouseTraceEvaluationRunsRepository extends TraceEvaluationRuns
       );
     } catch (error) {
       logger.warn(
-        { tenantId: input.tenantId, traceId: input.traceId, error },
+        { scope: scopeOf(input.authorization), traceId: input.traceId, error },
         "Failed to find evaluation runs by trace ID in ClickHouse",
       );
       throw error;
     }
   }
 
+  /**
+   * Nothing here projects a column under a raw one's name, so the windowed fence goes in both
+   * scopes, on `ScheduledAt`, the evaluation's own time the list's `since` bounds too.
+   */
   async findSummariesByTraceIds(input: {
-    tenantId: string;
+    authorization: Authorization;
     traceIds: readonly string[];
     since: number;
   }): Promise<Record<string, EvaluationSummary[]>> {
     if (input.traceIds.length === 0) return {};
-    EventUtils.validateTenantId(
-      input,
-      "ClickHouseTraceEvaluationRunsRepository.findSummariesByTraceIds",
-    );
     try {
-      const client = await this.resolveClient(input.tenantId);
+      const client = this.reads.reader(input.authorization);
       const result = await client.query({
         query: `
           SELECT EvaluationId, EvaluatorId, EvaluatorType, EvaluatorName,
             TraceId, IsGuardrail, Status, Score, Passed, Label
           FROM ${EVALUATION_RUNS_TABLE}
-          WHERE TenantId = {tenantId:String}
+          WHERE ${tenantScope("ScheduledAt")}
             AND ScheduledAt >= fromUnixTimestamp64Milli({since:Int64})
             AND TraceId IN ({traceIds:Array(String)})
             AND (TenantId, EvaluationId, UpdatedAt) IN (
               SELECT TenantId, EvaluationId, max(UpdatedAt)
               FROM ${EVALUATION_RUNS_TABLE}
-              WHERE TenantId = {tenantId:String}
+              WHERE ${tenantScope("ScheduledAt")}
                 AND ScheduledAt >= fromUnixTimestamp64Milli({since:Int64})
                 AND TraceId IN ({traceIds:Array(String)})
               GROUP BY TenantId, EvaluationId
@@ -222,7 +231,6 @@ export class ClickHouseTraceEvaluationRunsRepository extends TraceEvaluationRuns
           ORDER BY UpdatedAt DESC
         `,
         query_params: {
-          tenantId: input.tenantId,
           traceIds: [...input.traceIds],
           since: input.since,
         },
@@ -236,7 +244,7 @@ export class ClickHouseTraceEvaluationRunsRepository extends TraceEvaluationRuns
       return output;
     } catch (error) {
       logger.warn(
-        { tenantId: input.tenantId, traceIdCount: input.traceIds.length, error },
+        { scope: scopeOf(input.authorization), traceIdCount: input.traceIds.length, error },
         "Failed to find evaluation summaries by trace IDs in ClickHouse",
       );
       throw error;
@@ -244,29 +252,26 @@ export class ClickHouseTraceEvaluationRunsRepository extends TraceEvaluationRuns
   }
 
   async findTraceEvaluations(input: {
-    tenantId: string;
+    authorization: Authorization;
     traceIds: readonly string[];
   }): Promise<Record<string, TraceEvaluationData[]>> {
     if (input.traceIds.length === 0) return {};
-    EventUtils.validateTenantId(
-      input,
-      "ClickHouseTraceEvaluationRunsRepository.findTraceEvaluations",
-    );
     try {
       return await this.queryTraceEvaluations({
         ...input,
         columns: TRACE_EVALUATION_COLUMNS_WITH_INPUTS,
       });
     } catch (error) {
+      const scope = scopeOf(input.authorization);
       if (!isMemoryLimitError(error)) {
         logger.error(
-          { tenantId: input.tenantId, traceIdCount: input.traceIds.length, error },
+          { scope, traceIdCount: input.traceIds.length, error },
           "Failed to fetch trace evaluations from ClickHouse",
         );
         throw error;
       }
       logger.warn(
-        { tenantId: input.tenantId, traceIdCount: input.traceIds.length },
+        { scope, traceIdCount: input.traceIds.length },
         "Trace evaluation read hit the ClickHouse memory limit; retrying without inputs",
       );
       return this.queryTraceEvaluations({ ...input, columns: TRACE_EVALUATION_COLUMNS_LIGHT });
@@ -274,26 +279,26 @@ export class ClickHouseTraceEvaluationRunsRepository extends TraceEvaluationRuns
   }
 
   private async queryTraceEvaluations(input: {
-    tenantId: string;
+    authorization: Authorization;
     traceIds: readonly string[];
     columns: string;
   }): Promise<Record<string, TraceEvaluationData[]>> {
-    const client = await this.resolveClient(input.tenantId);
+    const client = this.reads.reader(input.authorization);
     const result = await client.query({
       query: `
         SELECT ${input.columns}
         FROM ${EVALUATION_RUNS_TABLE} AS ${RUNS}
-        WHERE ${RUNS}.TenantId = {tenantId:String}
+        WHERE ${tenantSet()}
           AND ${RUNS}.TraceId IN ({traceIds:Array(String)})
           AND (${RUNS}.TenantId, ${RUNS}.EvaluationId, ${RUNS}.UpdatedAt) IN (
             SELECT TenantId, EvaluationId, max(UpdatedAt)
             FROM ${EVALUATION_RUNS_TABLE}
-            WHERE TenantId = {tenantId:String}
+            WHERE ${tenantScope("ScheduledAt")}
               AND TraceId IN ({traceIds:Array(String)})
             GROUP BY TenantId, EvaluationId
           )
       `,
-      query_params: { tenantId: input.tenantId, traceIds: [...input.traceIds] },
+      query_params: { traceIds: [...input.traceIds] },
       format: "JSONEachRow",
     });
     const output = Object.fromEntries(

@@ -26,6 +26,8 @@ vi.mock("@langwatch/observability", async (importOriginal) => ({
   }),
 }));
 
+import { type Authorization, narrowAuthorization } from "@langwatch/authorization";
+import { aggregateProof, ownProof } from "@langwatch/authorization/testing";
 import {
   EVENTREF_ATTR_PREFIX,
   type NormalizedSpan,
@@ -33,11 +35,15 @@ import {
   NormalizedStatusCode,
 } from "@langwatch/trace-contract";
 
+import { TraceIOExtractionService } from "../../../features/derivation/services/trace-io-extraction.service.ts";
+import { BlobNotFoundError } from "../../../features/media/services/trace-blob-store.service.ts";
+import { SpanStorageService } from "../../../features/read/services/trace-span-storage-read.service.ts";
 import type { SpanStorageRepository } from "../../../repositories/span-storage.repository.ts";
 import { NullSpanStorageRepository } from "../../../repositories/span-storage.repository.ts";
-import { blobStoreResolving } from "../../__tests__/support/trace-blob-store.support.ts";
-import { TraceIOExtractionService } from "../../../features/derivation/services/trace-io-extraction.service.ts";
-import { SpanStorageService } from "../../../features/read/services/trace-span-storage-read.service.ts";
+import {
+  blobStoreReading,
+  blobStoreResolving,
+} from "../../__tests__/support/trace-blob-store.support.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -45,6 +51,10 @@ import { SpanStorageService } from "../../../features/read/services/trace-span-s
 
 const FULL_OUTPUT = "The full 50 KB output that was offloaded to event_log";
 const PREVIEW_OUTPUT = "The full 50 KB output that was offloaded…";
+
+const proofFor = (projectId: string): Authorization => ownProof({ projectId, now: Date.now() });
+
+const ioExtraction = () => TraceIOExtractionService.create(TraceCanonicalisationService.create());
 
 function makeNormalizedSpan(
   overrides: Partial<NormalizedSpan> & {
@@ -129,7 +139,7 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
 
       it("returns spans with the full output value, not the preview", async () => {
         const spans = await service.getSpansByTraceId({
-          tenantId: "proj-1",
+          authorization: proofFor("proj-1"),
           traceId: "trace-1",
         });
 
@@ -147,7 +157,7 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
 
       it("does not surface the reserved eventref key in the serialized params", async () => {
         const spans = await service.getSpansByTraceId({
-          tenantId: "proj-1",
+          authorization: proofFor("proj-1"),
           traceId: "trace-1",
         });
 
@@ -178,7 +188,7 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
 
       it("returns the span with the full output value, not the preview", async () => {
         const span = await service.findSpanById({
-          tenantId: "proj-1",
+          authorization: proofFor("proj-1"),
           traceId: "trace-1",
           spanId: "span-1",
         });
@@ -194,7 +204,7 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
 
       it("returns null when the spanId is not found in the trace", async () => {
         const span = await service.findSpanById({
-          tenantId: "proj-1",
+          authorization: proofFor("proj-1"),
           traceId: "trace-1",
           spanId: "non-existent-span",
         });
@@ -229,7 +239,7 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
         });
 
         const spans = await service.getSpansByTraceId({
-          tenantId: "proj-1",
+          authorization: proofFor("proj-1"),
           traceId: "trace-2",
         });
 
@@ -264,7 +274,7 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
         const service = SpanStorageService.create({ repository: repo });
 
         const spans = await service.getSpansByTraceId({
-          tenantId: "proj-1",
+          authorization: proofFor("proj-1"),
           traceId: "trace-legacy",
         });
 
@@ -307,13 +317,13 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
 
         await expect(
           service.getSpansByTraceId({
-            tenantId: "proj-1",
+            authorization: proofFor("proj-1"),
             traceId: "trace-stale",
           }),
         ).resolves.not.toThrow();
 
         const spans = await service.getSpansByTraceId({
-          tenantId: "proj-1",
+          authorization: proofFor("proj-1"),
           traceId: "trace-stale",
         });
         const outputValue = spans[0]?.output;
@@ -321,6 +331,102 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
           outputValue?.type === "text" ? outputValue.value : JSON.stringify(outputValue);
         // Falls back to preview value when event_log row is missing.
         expect(outputStr).toBe(PREVIEW_OUTPUT);
+      });
+    });
+  });
+
+  describe("given a member's offloaded span read through an aggregate", () => {
+    const AGGREGATE = "proj-aggregate";
+    const MEMBER = "proj-member";
+    const memberSpan = makeNormalizedSpan({
+      spanId: "span-member",
+      traceId: "trace-member",
+      tenantId: MEMBER,
+      spanAttributes: {
+        "langwatch.output": PREVIEW_OUTPUT,
+        [`${EVENTREF_ATTR_PREFIX}langwatch.output`]: JSON.stringify({
+          field: "langwatch.output",
+          eventId: "evt-member",
+        }),
+      },
+    });
+    const aggregateReadsMember = () =>
+      aggregateProof({
+        projectId: AGGREGATE,
+        members: [{ projectId: MEMBER, from: 0 }],
+        now: Date.now(),
+      });
+    /** A blob store that holds the full body under the member only. */
+    const memberBlobStore = () =>
+      blobStoreReading(async ({ eventId, field, tenantId }) => {
+        if (tenantId === MEMBER) return FULL_OUTPUT;
+        throw new BlobNotFoundError(eventId, field, tenantId);
+      });
+    const outputOf = (span: { output?: unknown } | null | undefined) => {
+      const output = span?.output as { type: string; value: unknown } | null | undefined;
+      return output?.type === "text" ? output.value : JSON.stringify(output);
+    };
+
+    describe("when the proof is narrowed to the member", () => {
+      const narrowedToMember = (): Authorization => {
+        const narrowed = narrowAuthorization({
+          authorization: aggregateReadsMember(),
+          projectId: MEMBER,
+        });
+        if (narrowed === null) throw new Error("the aggregate's proof names the member");
+        return narrowed;
+      };
+
+      it("resolves the body under the member for the trace's spans", async () => {
+        const blobStore = memberBlobStore();
+        const service = SpanStorageService.create({
+          repository: makeStubRepository([memberSpan]),
+          blobResolutionDeps: { blobStore, ioExtractionService: ioExtraction() },
+        });
+
+        const spans = await service.getSpansByTraceId({
+          authorization: narrowedToMember(),
+          traceId: "trace-member",
+        });
+
+        expect(outputOf(spans[0])).toBe(FULL_OUTPUT);
+        expect(blobStore.getFromEventLog).toHaveBeenCalledWith(
+          expect.objectContaining({ tenantId: MEMBER }),
+        );
+      });
+
+      it("resolves the body under the member for one span", async () => {
+        const service = SpanStorageService.create({
+          repository: makeStubRepository([memberSpan]),
+          blobResolutionDeps: { blobStore: memberBlobStore(), ioExtractionService: ioExtraction() },
+        });
+
+        const span = await service.findSpanById({
+          authorization: narrowedToMember(),
+          traceId: "trace-member",
+          spanId: "span-member",
+        });
+
+        expect(outputOf(span)).toBe(FULL_OUTPUT);
+      });
+    });
+
+    describe("when the proof still spans the aggregate and its member", () => {
+      it("keeps the preview, reads no body and hides the reserved pointer", async () => {
+        const blobStore = memberBlobStore();
+        const service = SpanStorageService.create({
+          repository: makeStubRepository([memberSpan]),
+          blobResolutionDeps: { blobStore, ioExtractionService: ioExtraction() },
+        });
+
+        const spans = await service.getSpansByTraceId({
+          authorization: aggregateReadsMember(),
+          traceId: "trace-member",
+        });
+
+        expect(outputOf(spans[0])).toBe(PREVIEW_OUTPUT);
+        expect(blobStore.getFromEventLog).not.toHaveBeenCalled();
+        expect(JSON.stringify(spans[0]?.params ?? {})).not.toContain(EVENTREF_ATTR_PREFIX);
       });
     });
   });

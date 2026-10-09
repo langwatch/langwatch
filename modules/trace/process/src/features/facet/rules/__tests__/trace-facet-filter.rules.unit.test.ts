@@ -7,8 +7,8 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-import { createFacetFilterResolver } from "../trace-facet-filter.rules.ts";
 import type { TraceFilterWhere } from "../../../../rules/trace-filter-hidden-origins.rules.ts";
+import { createFacetFilterResolver } from "../trace-facet-filter.rules.ts";
 
 const HIDDEN: TraceFilterWhere = {
   sql: "origin NOT IN ({hiddenOrigins:Array(String)})",

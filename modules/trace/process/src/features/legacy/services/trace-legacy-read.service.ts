@@ -21,12 +21,13 @@ import { getLangWatchTracer } from "langwatch";
 import type { TraceIOExtractionService } from "#features/derivation/services/trace-io-extraction.service";
 
 import type { TraceEvaluationRunsReadRepository } from "../../../repositories/trace-evaluation-runs.repository.ts";
-import type { TraceLegacyReadRepository } from "../repositories/trace-legacy-read.repository.ts";
-import { type TraceLogRecordReader } from "../../claude-code/rules/claude-code-log-enrichment.rules.ts";
 import { mapTraceEvaluationsToLegacyEvaluations } from "../../../rules/trace-evaluation-mapping.rules.ts";
-import type { TraceBlobStoreService } from "../../media/services/trace-blob-store.service.ts";
+import type { TraceReadAuthorizationService } from "../../../services/trace-read-authorization.service.ts";
+import { type TraceLogRecordReader } from "../../claude-code/rules/claude-code-log-enrichment.rules.ts";
 import type { TraceEditOverlayService } from "../../edit-overlay/services/trace-edit-overlay.service.ts";
+import type { TraceBlobStoreService } from "../../media/services/trace-blob-store.service.ts";
 import { TraceReadEnrichmentService } from "../../read/services/trace-read-enrichment.service.ts";
+import type { TraceLegacyReadRepository } from "../repositories/trace-legacy-read.repository.ts";
 
 /**
  * Minimum prefix length we will attempt to resolve. Shorter strings fall through to "not found" —
@@ -106,10 +107,10 @@ export class TraceLegacyReadService {
     private readonly clickHouseService: TraceLegacyReadRepository,
     // Required, so it comes before the optional tail: every single-trace read
     // resolves the evaluations behind it.
-    private readonly evaluationRuns: Pick<
-      TraceEvaluationRunsReadRepository,
-      "findTraceEvaluations"
-    >,
+    private readonly findEvaluations: (input: {
+      projectId: string;
+      traceIds: readonly string[];
+    }) => ReturnType<TraceEvaluationRunsReadRepository["findTraceEvaluations"]>,
   ) {}
 
   static create({
@@ -118,6 +119,7 @@ export class TraceLegacyReadService {
     editOverlay,
     logRecordStorage,
     evaluationRuns,
+    readProofs,
   }: {
     traceCanonicalisation: TraceCanonicalisationService;
     /** The composed trace store; the composition root picks the implementation. */
@@ -127,11 +129,17 @@ export class TraceLegacyReadService {
     logRecordStorage?: TraceLogRecordReader;
     /** Evaluation's shared runs (R40); every single-trace read resolves its evaluations. */
     evaluationRuns: Pick<TraceEvaluationRunsReadRepository, "findTraceEvaluations">;
+    /** The legacy reads serve one project, so their evaluations read under its own-only proof. */
+    readProofs: Pick<TraceReadAuthorizationService, "ownOnly">;
   }): TraceLegacyReadService {
     return new TraceLegacyReadService(
       TraceReadEnrichmentService.create({ traceCanonicalisation, editOverlay, logRecordStorage }),
       traceRead,
-      evaluationRuns,
+      async ({ projectId, traceIds }) =>
+        evaluationRuns.findTraceEvaluations({
+          authorization: await readProofs.ownOnly({ projectId, entry: "legacy.evaluations" }),
+          traceIds,
+        }),
     );
   }
 
@@ -337,10 +345,7 @@ export class TraceLegacyReadService {
         attributes: { "tenant.id": projectId, "trace.count": traceIds.length },
       },
       async () => {
-        const result = await this.evaluationRuns.findTraceEvaluations({
-          tenantId: projectId,
-          traceIds,
-        });
+        const result = await this.findEvaluations({ projectId, traceIds });
 
         return mapTraceEvaluationsToLegacyEvaluations(result);
       },

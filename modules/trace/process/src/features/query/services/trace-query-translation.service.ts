@@ -28,17 +28,16 @@ export class TraceQueryTranslationService {
   }
 
   /**
-   * Translates a liqe query into a parameterized WHERE fragment or null.
-   * `evalRuns` carries the runs registered for the query's `eval` chips.
+   * A liqe query as a parameterized WHERE fragment, or null; `evalRuns` backs its `eval` chips.
+   * It names no tenant: each subquery carries a marker the authorized reader expands into the
+   * proof's fence (ADR-175), so the statement it lands in decides who is in scope.
    */
   translateFilter({
     queryText,
-    tenantId,
     timeRange,
     evalRuns,
   }: {
     queryText: string;
-    tenantId: string;
     timeRange: { from: number; to: number };
     evalRuns?: readonly ResolvedInstantEvalRun[];
   }): { sql: string; params: Record<string, unknown> } | null {
@@ -46,11 +45,9 @@ export class TraceQueryTranslationService {
       paramCounter: 0,
       nodeCount: 0,
       params: {
-        tenantId,
         timeFrom: timeRange.from,
         timeTo: timeRange.to,
       },
-      tenantId,
       timeRange,
       ...(evalRuns ? { evalRuns } : {}),
     };

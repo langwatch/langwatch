@@ -4,6 +4,7 @@
  * apart from the discovery run so the fan-out stays about scheduling, not shaping.
  */
 
+import type { Authorization } from "@langwatch/authorization";
 import type {
   BatchedFacetResult,
   CategoricalFacetDescriptor,
@@ -22,11 +23,12 @@ import type {
   RangeFacetDef,
 } from "#features/facet/rules/trace-facet-registry.rules";
 
-import { isExpressionCategorical } from "../rules/trace-facet-classification.rules.ts";
-import { scopeTraceFilterToTable } from "../rules/trace-facet-scope.rules.ts";
 import type { TraceFilterWhere } from "../../../rules/trace-filter-hidden-origins.rules.ts";
 import type { DiscoverParams } from "../../../rules/trace-list-cache-key.rules.ts";
 import type { TraceTopicNamingService } from "../../topic/services/trace-topic-naming.service.ts";
+import { isExpressionCategorical } from "../rules/trace-facet-classification.rules.ts";
+import { scopeTraceFilterToTable } from "../rules/trace-facet-scope.rules.ts";
+import { mergeTopicLabels, topicProjectsOf } from "../rules/trace-facet-topic-names.rules.ts";
 
 export class TraceFacetDescriptorService {
   private constructor(
@@ -45,6 +47,19 @@ export class TraceFacetDescriptorService {
     facets: FacetCatalog;
   }): TraceFacetDescriptorService {
     return new TraceFacetDescriptorService(repository, topicNaming, facets);
+  }
+
+  /** Topic labels across every project the proof reads; one naming read per project. */
+  private async nameTopics(
+    authorization: Authorization,
+    result: CategoricalFacetResult,
+  ): Promise<CategoricalFacetResult> {
+    const named = await Promise.all(
+      topicProjectsOf({ authorization }).map((projectId) =>
+        this.topicNaming.enrichTopicNames(projectId, result),
+      ),
+    );
+    return mergeTopicLabels({ base: result, named });
   }
 
   async buildDescriptor({
@@ -94,9 +109,7 @@ export class TraceFacetDescriptorService {
     }
 
     const namesTopics = def.key === "topic" || def.key === "subtopic";
-    const enriched = namesTopics
-      ? await this.topicNaming.enrichTopicNames(params.tenantId, raw)
-      : raw;
+    const enriched = namesTopics ? await this.nameTopics(params.authorization, raw) : raw;
 
     return {
       key: def.key,
@@ -152,7 +165,7 @@ export class TraceFacetDescriptorService {
 
     if (isExpressionCategorical(def)) {
       result = await this.repository.findCategoricalFacet({
-        tenantId: params.tenantId,
+        authorization: params.authorization,
         timeRange: params.timeRange,
         table: def.table,
         timeColumn: this.facets.timeColumns[def.table],
@@ -163,7 +176,6 @@ export class TraceFacetDescriptorService {
       });
     } else {
       const query = def.queryBuilder({
-        tenantId: params.tenantId,
         timeRange: params.timeRange,
         limit,
         offset: 0,
@@ -178,13 +190,13 @@ export class TraceFacetDescriptorService {
           : {}),
       });
       result = await this.repository.findCategoricalFacetRaw({
-        tenantId: params.tenantId,
+        authorization: params.authorization,
         query,
       });
     }
 
     if (def.key === "topic" || def.key === "subtopic") {
-      result = await this.topicNaming.enrichTopicNames(params.tenantId, result);
+      result = await this.nameTopics(params.authorization, result);
     }
 
     return {
@@ -207,7 +219,7 @@ export class TraceFacetDescriptorService {
     filterWhere?: TraceFilterWhere;
   }): Promise<RangeFacetDescriptor> {
     const result = await this.repository.findRangeStatsForTable({
-      tenantId: params.tenantId,
+      authorization: params.authorization,
       timeRange: params.timeRange,
       table: def.table,
       timeColumn: this.facets.timeColumns[def.table],
@@ -235,13 +247,12 @@ export class TraceFacetDescriptorService {
     limit: number;
   }): Promise<DynamicKeysFacetDescriptor> {
     const query = def.queryBuilder({
-      tenantId: params.tenantId,
       timeRange: params.timeRange,
       limit,
       offset: 0,
     });
     const result = await this.repository.findCategoricalFacetRaw({
-      tenantId: params.tenantId,
+      authorization: params.authorization,
       query,
     });
 

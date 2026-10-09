@@ -1,3 +1,5 @@
+import type { Authorization } from "@langwatch/authorization";
+import type { TenantScopeTimeColumn } from "@langwatch/authorization/tenant-fence";
 import { z } from "zod";
 
 /**
@@ -6,6 +8,8 @@ import { z } from "zod";
  * and never exposes Prisma or raw ClickHouse rows.
  */
 export interface TraceListSummary {
+  /** The tenant the row was read from; on an aggregate, the member that holds it. */
+  tenantId?: string;
   traceId: string;
   spanCount: number;
   totalDurationMs: number;
@@ -77,19 +81,24 @@ export interface TraceListSort {
 }
 
 /**
- * Keyset cursor for the trace list. The sort value is normalized to a finite
- * number by the repository; TraceId is the unique tie-breaker that turns every
- * supported sort into a total order.
+ * Keyset cursor for the trace list; the repository normalizes the sort value to a finite number.
+ * Tenant and trace id together break ties, since two members of an aggregate may hold one trace
+ * id (ADR-175); a cursor minted before it carried its tenant breaks ties on the trace id alone.
  */
 export const traceListCursorSchema = z.object({
   sortValue: z.number(),
+  tenantId: z.string().optional(),
   traceId: z.string(),
 });
 
 export type TraceListCursor = z.infer<typeof traceListCursorSchema>;
 
+/** The partition column a facet table is windowed on; a shared grant's window applies to it. */
+export type FacetTimeColumn = Exclude<TenantScopeTimeColumn, "Timestamp">;
+
 export interface TraceListQuery {
-  tenantId: string;
+  /** The sealed proof the read is fenced by; the reader applies its tenant set. */
+  authorization: Authorization;
   timeRange: { from: number; to: number; live?: boolean };
   sort: TraceListSort;
   limit: number;
@@ -173,11 +182,15 @@ export interface BatchedFacetResult {
   ranges: Record<string, { min: number; max: number }>;
 }
 
+/**
+ * Every read is fenced by a sealed `authorization` proof (ADR-175): it never names a tenant, and
+ * on an aggregate project it reads the members the proof shares, each inside its grant's window.
+ */
 export interface TraceListRead {
   listAll(query: TraceListQuery): Promise<TraceListRepositoryPage>;
 
   findCount(params: {
-    tenantId: string;
+    authorization: Authorization;
     timeRange: { from: number; to: number; live?: boolean };
     since: number;
     filterWhere?: { sql: string; params: Record<string, unknown> };
@@ -185,17 +198,18 @@ export interface TraceListRead {
 
   /**
    * The trace ids matching the filter, newest first and capped. Deduped the
-   * IN-tuple way so a re-written trace is counted once.
+   * IN-tuple way so a re-written trace is counted once; an id two members
+   * share is answered once.
    */
   findTraceIds(params: {
-    tenantId: string;
+    authorization: Authorization;
     timeRange: { from: number; to: number; live?: boolean };
     filterWhere?: { sql: string; params: Record<string, unknown> };
     limit: number;
   }): Promise<string[]>;
 
   findDistinctValues(params: {
-    tenantId: string;
+    authorization: Authorization;
     column: string;
     prefix: string;
     limit: number;
@@ -207,10 +221,10 @@ export interface TraceListRead {
    * Absent for the unfiltered discover read.
    */
   findCategoricalFacet(params: {
-    tenantId: string;
+    authorization: Authorization;
     timeRange: { from: number; to: number; live?: boolean };
     table: FacetTableName;
-    timeColumn: string;
+    timeColumn: FacetTimeColumn;
     facetExpression: string;
     limit: number;
     offset: number;
@@ -219,15 +233,15 @@ export interface TraceListRead {
   }): Promise<CategoricalFacetResult>;
 
   findCategoricalFacetRaw(params: {
-    tenantId: string;
+    authorization: Authorization;
     query: TraceListFacetQuery;
   }): Promise<CategoricalFacetResult>;
 
   findRangeStatsForTable(params: {
-    tenantId: string;
+    authorization: Authorization;
     timeRange: { from: number; to: number; live?: boolean };
     table: FacetTableName;
-    timeColumn: string;
+    timeColumn: FacetTimeColumn;
     column: string;
     filterWhere?: { sql: string; params: Record<string, unknown> };
   }): Promise<{ min: number; max: number }>;
@@ -237,10 +251,10 @@ export interface TraceListRead {
    * true` on its `RangeFacetDef`), ascending, capped at `limit`.
    */
   findDiscreteValues(params: {
-    tenantId: string;
+    authorization: Authorization;
     timeRange: { from: number; to: number; live?: boolean };
     table: FacetTableName;
-    timeColumn: string;
+    timeColumn: FacetTimeColumn;
     column: string;
     limit: number;
     filterWhere?: { sql: string; params: Record<string, unknown> };
@@ -252,10 +266,10 @@ export interface TraceListRead {
    * Used by `discover` to collapse ~25 parallel queries into ~2 per table.
    */
   findBatchedFacets(params: {
-    tenantId: string;
+    authorization: Authorization;
     timeRange: { from: number; to: number; live?: boolean };
     table: FacetTableName;
-    timeColumn: string;
+    timeColumn: FacetTimeColumn;
     categoricalSpecs: { key: string; expression: string }[];
     rangeSpecs: { key: string; expression: string }[];
     topN: number;
@@ -268,7 +282,7 @@ export interface TraceListRead {
    * the repo trusts it.
    */
   findAttributeValues(params: {
-    tenantId: string;
+    authorization: Authorization;
     timeRange: { from: number; to: number; live?: boolean };
     attributeKey: string;
     prefix?: string;
@@ -282,7 +296,7 @@ export interface TraceListRead {
    * queries.
    */
   findEventAttributeValues(params: {
-    tenantId: string;
+    authorization: Authorization;
     timeRange: { from: number; to: number; live?: boolean };
     attributeKey: string;
     prefix?: string;
@@ -296,7 +310,7 @@ export interface TraceListRead {
    * injection-safety contract as {@link findAttributeValues}.
    */
   findSpanAttributeValues(params: {
-    tenantId: string;
+    authorization: Authorization;
     timeRange: { from: number; to: number; live?: boolean };
     attributeKey: string;
     prefix?: string;

@@ -152,6 +152,23 @@ export {
   TenantGuard,
   TenantScopeError,
 } from "./tenantGuard.ts";
+/** ADR-175: reads fenced by a sealed `Authorization` proof instead of a hand-named tenant. */
+export {
+  AuthorizedClickHouse,
+  expandFragment,
+  expandStatement,
+  fenceExpression,
+  HAND_WRITTEN_TENANT_PREDICATE,
+  StatementScopeError,
+  TENANT_SCOPE_PARAM_PREFIX,
+  TENANT_SCOPE_SET_PARAM,
+  TenantScopedReader,
+} from "./authorized-reads.ts";
+export type {
+  StatementScopeViolation,
+  TenantScopedQuery,
+  TenantScopedStatementClient,
+} from "./authorized-reads.ts";
 export type { QueryErrorDescriptor, QueryOutcome, Span, TraceOptions, Tracer } from "./tracing.ts";
 export { describeQueryError, QueryTracer, SPAN_ATTRIBUTES } from "./tracing.ts";
 export type {

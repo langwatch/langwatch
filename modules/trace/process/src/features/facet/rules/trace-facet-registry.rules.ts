@@ -1,10 +1,10 @@
-import type { CategoricalRead, RangeRead } from "@langwatch/trace-contract";
+import type { CategoricalRead, FacetTimeColumn, RangeRead } from "@langwatch/trace-contract";
 
 export type FacetTable = "trace_summaries" | "evaluation_runs" | "stored_spans";
 type FacetGroup = "trace" | "evaluation" | "span" | "metadata" | "prompt";
 
+/** No tenant: a builder writes the tenant marker and the reader binds the proof's fence. */
 export interface FacetQueryContext {
-  tenantId: string;
   timeRange: { from: number; to: number; live?: boolean };
   limit: number;
   offset: number;
@@ -72,5 +72,5 @@ export type FacetDefinition = CategoricalFacetDef | RangeFacetDef | DynamicKeysD
 /** The facets a backend offers, and the time column each of its tables is windowed on. */
 export interface FacetCatalog {
   registry: readonly FacetDefinition[];
-  timeColumns: Readonly<Record<FacetTable, string>>;
+  timeColumns: Readonly<Record<FacetTable, FacetTimeColumn>>;
 }

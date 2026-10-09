@@ -4,13 +4,16 @@
  * for its span, and two viewers of the same window share one cache slot.
  */
 
+import type { Authorization } from "@langwatch/authorization";
+import { tenantScopeKey } from "@langwatch/authorization/tenant-fence";
+
 export interface DiscoverParams {
-  tenantId: string;
+  authorization: Authorization;
   timeRange: { from: number; to: number; live?: boolean };
 }
 
 export interface FacetValuesParams {
-  tenantId: string;
+  authorization: Authorization;
   timeRange: { from: number; to: number };
   facetKey: string;
   prefix?: string;
@@ -80,7 +83,7 @@ export function facetValuesCacheKey(params: FacetValuesParams): string {
   // "Live" time ranges roll forward by milliseconds each request — bucket to the
   // minute so identical user intent hits the same cache slot.
   return [
-    params.tenantId,
+    tenantScopeKey({ authorization: params.authorization, reads: "traces" }),
     params.facetKey,
     bucketTime(params.timeRange.from),
     bucketTime(params.timeRange.to),
@@ -90,13 +93,25 @@ export function facetValuesCacheKey(params: FacetValuesParams): string {
   ].join("|");
 }
 
-export function discoverCacheKey(
-  tenantId: string,
-  snapped: ReturnType<typeof snapToWindowPreset>,
-): string {
+/**
+ * The slot is keyed on the proof's fence, not a project id: an aggregate and its members, or two
+ * aggregates with different grant windows, read different rows and must not share one (ADR-175).
+ */
+export function discoverCacheKey({
+  authorization,
+  snapped,
+}: {
+  authorization: Authorization;
+  snapped: ReturnType<typeof snapToWindowPreset>;
+}): string {
   // Include the snapped `from` alongside `to` so two requests with different actual
   // spans that happen to land in the same preset label (e.g. 15-minute and 1-hour
   // windows both classify as "1h") don't collide on one cache slot — without `from`
   // the second viewer's facets would be served for a window they aren't looking at.
-  return [tenantId, snapped.label, snapped.from, snapped.to].join("|");
+  return [
+    tenantScopeKey({ authorization, reads: "traces" }),
+    snapped.label,
+    snapped.from,
+    snapped.to,
+  ].join("|");
 }

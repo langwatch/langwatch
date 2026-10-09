@@ -1,4 +1,12 @@
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { type Authorization, usableAuthorization } from "@langwatch/authorization";
+import { fenceFor, type ReadResource } from "@langwatch/authorization/tenant-fence";
+import {
+  AuthorizedClickHouse,
+  type ClickHouseQueryClient,
+  expandFragment,
+  type TenantScopedReader,
+  type TenantScopedStatementClient,
+} from "@langwatch/clickhouse-client";
 
 /** Minimal ClickHouse client primitive; rows arrive unknown and each caller parses its own. */
 export interface TraceClickHouseClient {
@@ -101,6 +109,88 @@ export class ClickHouseTraceClientsRepository extends TraceClickHouse {
     return Promise.resolve(
       MemberTraceClickHouseClientRepository.create({ clickhouse: this.clickhouse, tenantId }),
     );
+  }
+}
+
+/**
+ * ADR-175: the reads a repository makes through a sealed proof. A converted read never names a
+ * tenant: it asks for a reader bound to the proof and writes a `tenantScope` marker instead.
+ */
+export abstract class TraceAuthorizedReads {
+  abstract reader(
+    authorization: Authorization,
+    options?: { reads?: ReadResource },
+  ): TraceClickHouseClient;
+
+  /**
+   * A compiled filter's markers expanded into the proof's trace fence, for a read that assembles
+   * its own statement (the legacy search). The fragment checks still refuse a tenant it names.
+   */
+  abstract expandFragment(input: {
+    authorization: Authorization;
+    filterWhere: { sql: string; params: Record<string, unknown> };
+  }): { sql: string; params: Record<string, unknown> };
+}
+
+/** The fenced reader in the low-level shape Trace's repositories already query through. */
+class ScopedTraceClickHouseClient implements TraceClickHouseClient {
+  constructor(private readonly reader: TenantScopedReader) {}
+
+  async query(input: {
+    query: string;
+    query_params?: Record<string, unknown>;
+    format: "JSONEachRow";
+    clickhouse_settings?: Record<string, string>;
+  }): Promise<{ json(): Promise<unknown[]> }> {
+    const result = await this.reader.query<unknown>({
+      sql: input.query,
+      params: input.query_params ?? {},
+      ...(input.clickhouse_settings ? { settings: input.clickhouse_settings } : {}),
+    });
+    return { json: async () => result.rows };
+  }
+}
+
+/** The routed member behind the proof-checking client: every converted read goes through here. */
+export class AuthorizedTraceReadsRepository extends TraceAuthorizedReads {
+  static create(input: {
+    clickhouse: TenantScopedStatementClient;
+    now?: () => number;
+  }): AuthorizedTraceReadsRepository {
+    const now = input.now ?? Date.now;
+    return new AuthorizedTraceReadsRepository(
+      AuthorizedClickHouse.create({ clickhouse: input.clickhouse, now }),
+      now,
+    );
+  }
+
+  private constructor(
+    private readonly clickhouse: AuthorizedClickHouse,
+    private readonly now: () => number,
+  ) {
+    super();
+  }
+
+  reader(
+    authorization: Authorization,
+    { reads = "traces" }: { reads?: ReadResource } = {},
+  ): TraceClickHouseClient {
+    return new ScopedTraceClickHouseClient(this.clickhouse.as(authorization, { reads }));
+  }
+
+  expandFragment({
+    authorization,
+    filterWhere,
+  }: {
+    authorization: Authorization;
+    filterWhere: { sql: string; params: Record<string, unknown> };
+  }): { sql: string; params: Record<string, unknown> } {
+    const proof = usableAuthorization({ authorization, now: this.now() });
+    return expandFragment({
+      fragment: filterWhere.sql,
+      queryParams: filterWhere.params,
+      fence: fenceFor({ authorization: proof, reads: "traces" }),
+    });
   }
 }
 

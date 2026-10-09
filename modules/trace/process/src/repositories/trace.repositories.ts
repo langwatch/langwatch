@@ -6,7 +6,10 @@ import type { TraceIngestSourceBillingRepository } from "../features/ingestion/r
 import type { TraceRateLimitRepository } from "../features/ingestion/repositories/trace-rate-limit.repository.ts";
 import type { TraceClusteringSampleRepository } from "../features/topic/repositories/trace-clustering-sample.repository.ts";
 import type { TraceTopicNamesReadRepository } from "../features/topic/repositories/trace-topic-names.repository.ts";
-import type { TraceClickHouse } from "./clickhouse/clickhouse.trace-member-client.repository.ts";
+import type {
+  TraceAuthorizedReads,
+  TraceClickHouse,
+} from "./clickhouse/clickhouse.trace-member-client.repository.ts";
 import type { LogRecordStorageRepository } from "./log-record-storage.repository.ts";
 import type { SessionGroupsRepository } from "./session-groups.repository.ts";
 import type { SpanStorageRepository } from "./span-storage.repository.ts";
@@ -79,4 +82,6 @@ export interface TraceRepositories {
   readonly rateLimits: TraceRateLimitRepository;
   /** A raw tenant client, for the reads not yet behind a named repository. */
   readonly clickhouseClients: TraceClickHouse;
+  /** ADR-175: the proof-checking reader every converted read goes through. */
+  readonly authorizedReads: TraceAuthorizedReads;
 }

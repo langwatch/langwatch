@@ -1,3 +1,4 @@
+import { ownProjectIdOf } from "@langwatch/authorization/tenant-fence";
 import { PresenceApi } from "@langwatch/presence-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { ShareApi } from "@langwatch/share-contract";
@@ -17,8 +18,8 @@ import type {
 } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { MemoryTraceEvaluationRunsRepository } from "../../repositories/memory/memory.trace-evaluation-runs.repository.ts";
 import type { TraceSpanCostSuggestion } from "../../features/span/services/span-cost-suggestion.service.ts";
+import { MemoryTraceEvaluationRunsRepository } from "../../repositories/memory/memory.trace-evaluation-runs.repository.ts";
 import type { TraceLegacyRead } from "../../services/trace-viewer.service.ts";
 import type { TraceService as TraceTreeService } from "../../services/trace.service.ts";
 import {
@@ -29,6 +30,7 @@ import {
   type TracesSessionGroupsReader,
   type TracesSpanReader,
 } from "../trace.app.ts";
+import { ownProjectReadAuthorization } from "./support/trace-app.harness.ts";
 import { createTraceTestRequestBounds } from "./trace-bounds.fixture.ts";
 
 const PROTECTIONS = { canSeeCosts: true };
@@ -147,6 +149,7 @@ function harness(
     } as ProjectApi,
     requestBounds: createTraceTestRequestBounds(),
     exportBounds: null,
+    readAuthorization: ownProjectReadAuthorization(),
   });
 
   return {
@@ -326,9 +329,11 @@ describe("TraceModule", () => {
           }),
         ).resolves.toBe(true);
         expect(getByTraceId).toHaveBeenCalledWith(
+          expect.objectContaining({ traceId: "trace-1", visibilityCutoffMs: 1_000, full: false }),
+        );
+        const read = getByTraceId.mock.lastCall?.[0];
+        expect(read && ownProjectIdOf({ authorization: read.authorization, reads: "traces" })).toBe(
           "project-1",
-          "trace-1",
-          expect.objectContaining({ visibilityCutoffMs: 1_000, full: false }),
         );
       });
     });

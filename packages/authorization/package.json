@@ -20,6 +20,14 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
+    },
+    "./tenant-fence": {
+      "types": "./dist/tenant-fence.d.ts",
+      "default": "./src/tenant-fence.ts"
+    },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "default": "./src/testing.ts"
     }
   },
   "scripts": {

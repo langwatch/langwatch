@@ -1,6 +1,7 @@
 /** The ClickHouse side of the facet registry: each facet's table, time column and SQL. */
 import {
   deriveTraceOrigin,
+  type FacetTimeColumn,
   TRACE_ORIGIN_CLICKHOUSE_EXPRESSION,
   deriveTraceStatus,
   TRACE_STATUS_CLICKHOUSE_EXPRESSION,
@@ -27,7 +28,7 @@ import { ClickHouseTraceFacetSpanStatusRepository } from "./clickhouse.trace-fac
 const spanNameFacetRepository = ClickHouseTraceFacetSpanNameRepository.create();
 const spanStatusFacetRepository = ClickHouseTraceFacetSpanStatusRepository.create();
 
-export const TABLE_TIME_COLUMNS: Record<FacetTable, string> = {
+export const TABLE_TIME_COLUMNS: Record<FacetTable, FacetTimeColumn> = {
   trace_summaries: "OccurredAt",
   evaluation_runs: "ScheduledAt",
   stored_spans: "StartTime",

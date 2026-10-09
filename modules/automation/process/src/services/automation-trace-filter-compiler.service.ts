@@ -26,7 +26,6 @@ export class AutomationTraceFilterCompilerService implements AutomationTraceFilt
     try {
       this.traces.translateTraceFilter({
         query,
-        tenantId: projectId,
         timeRange: { from: 0, to: 0 },
       });
     } catch (error) {

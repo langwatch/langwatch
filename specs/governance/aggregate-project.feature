@@ -86,7 +86,7 @@ Feature: An aggregate project reads its member projects
     And a new proof is minted for ana
     Then the new proof lists no shared grant for that member
 
-  @unit @unimplemented
+  @unit
   Scenario: The proof travels as a named parameter
     When a service or repository that reads traces is called without the authorization parameter
     Then the call fails to type-check
@@ -95,21 +95,21 @@ Feature: An aggregate project reads its member projects
 
   # ── C. The store client applies the proof ────────────────────────────────
 
-  @integration @unimplemented
+  @integration
   Scenario: The client adds the tenant set from the proof
     Given a proof with own grant on the aggregate and shared grants on members A and B
     When the trace list repository queries through the client with that proof
     Then the query is restricted to tenants aggregate, A and B
     And rows from A and B are restricted to the window of their grant
 
-  @integration @unimplemented
+  @integration
   Scenario: A project outside the proof contributes nothing
     Given an aggregate project with one member
     And another project in the organisation that is not a member and holds traces
     When ana reads the aggregate's trace list, trace summary, spans and analytics
     Then no row from the non-member appears in any of them
 
-  @integration @unimplemented
+  @integration
   Scenario: A trace written before the grant's from date is not shared
     Given a member whose grant starts today
     And a trace in that member written yesterday
@@ -117,7 +117,7 @@ Feature: An aggregate project reads its member projects
     Then yesterday's trace is absent
     And a trace written today is present
 
-  @unit @unimplemented
+  @unit
   Scenario: Trace repositories write no tenant of their own
     When the trace list, summary, span and analytics repositories are checked
     Then none of their query text filters on the tenant column
@@ -125,13 +125,13 @@ Feature: An aggregate project reads its member projects
     # Naming the column as a projected value or a dedup tuple member is
     # fine; only a predicate picks tenants, and only the client writes one.
 
-  @integration @unimplemented
+  @integration
   Scenario: A plain project reads the same rows as before
     Given an ordinary project with traces
     When its trace list is read through the proof path
     Then the rows match the rows read before the change
 
-  @unit @unimplemented
+  @unit
   Scenario: A proof declared for one resource is refused for another
     Given a proof minted for traces view
     When the client is asked to read a resource the proof does not cover
