@@ -11,6 +11,7 @@ import {
   CreateTeamDrawerToken,
   EditProjectDrawerToken,
   InviteMemberDrawerToken,
+  JoinInsteadToken,
   JoinOfferToken,
   PendingJoinRequestsToken,
   PersonDrawerToken,
@@ -102,6 +103,10 @@ export const organizationWeb = defineBrowserModule("organization")
   /** The join offer onboarding's welcome and the shell's dashboard body draw. */
   .lends(JoinOfferToken, {
     load: () => import("./features/join-offer/ui/sections/join-your-team-takeover.tsx"),
+  })
+  /** The organization form's quiet way back to the team, once the offer was declined. */
+  .lends(JoinInsteadToken, {
+    load: () => import("./features/join-offer/ui/blocks/join-instead-action.tsx"),
   })
   /** People waiting at the door, lent to project's home for those who can answer (§10.1). */
   .lends(PendingJoinRequestsToken, {

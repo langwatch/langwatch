@@ -17,3 +17,6 @@ export function shellContentMaxWidth({
   const inset = Number.parseInt(menuWidth, 10) + (railWidth ? Number.parseInt(railWidth, 10) : 0);
   return `calc(100vw - ${inset}px)`;
 }
+
+/** The content card makes room for the docked assistant on the dock's own slide. */
+export const LANGY_DOCK_TRANSITION = "240ms cubic-bezier(0.32, 0.72, 0, 1)";
