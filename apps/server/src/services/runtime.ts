@@ -19,7 +19,6 @@ import { startLangwatchWorkers } from "./langwatch-workers.ts";
 import { startLangwatch } from "./langwatch.ts";
 import { ensureLangyCli } from "./langy-cli.ts";
 import { monobinarySupportsLangyagent, startLangyagent } from "./langyagent.ts";
-import { runMigrations } from "./migrate.ts";
 import { startNlpgo } from "./nlpgo.ts";
 import { ensureLangwatchDeps } from "./node-deps.ts";
 import { ensureTiktokenEncodings } from "./offline-defaults.ts";
@@ -88,16 +87,6 @@ const runtimeImpl: RuntimeApi = {
       startClickhouse(ctx, bus),
     ]);
     handles.push(pg, redis, ch);
-
-    // Phase 2: migrations (Prisma + ClickHouse goose). Both shell out to
-    // the langwatch app's existing pnpm scripts so we stay in lockstep with
-    // helm/docker.
-    try {
-      await runMigrations(ctx, bus, envFromFile);
-    } catch (err) {
-      await stopHandles(handles);
-      throw err;
-    }
 
     // Phase 3: app-tier services in parallel. The langwatch app receives
     // userEnv overlay so the user's provider keys (OPENAI_API_KEY etc.)

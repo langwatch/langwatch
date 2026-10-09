@@ -68,7 +68,6 @@ vi.mock("../../src/services/node-deps.ts", () => ({
 const { startLangwatch } = await import("../../src/services/langwatch.ts");
 const { startLangwatchWorkers } = await import("../../src/services/langwatch-workers.ts");
 const { startLangevals } = await import("../../src/services/langevals.ts");
-const { runMigrations } = await import("../../src/services/migrate.ts");
 const { ensureTiktokenEncodings, ensureLangevalsTiktokenCache } =
   await import("../../src/services/offline-defaults.ts");
 
@@ -128,14 +127,9 @@ describe("outbound defaults in the service env", () => {
     it("turns off Prisma's version check in each", async () => {
       await startLangwatch(ctx(), bus, {});
       await startLangwatchWorkers(ctx(), bus, {});
-      await runMigrations(ctx(), bus, {});
 
       expect(spawnedEnvs.langwatch?.CHECKPOINT_DISABLE).toBe("1");
       expect(spawnedEnvs.workers?.CHECKPOINT_DISABLE).toBe("1");
-      for (const call of execCalls) {
-        expect(call.env?.CHECKPOINT_DISABLE).toBe("1");
-      }
-      expect(execCalls).toHaveLength(2);
     });
 
     /** @scenario The app and the workers read tokenizer files from disk */
@@ -174,7 +168,6 @@ describe("outbound defaults in the service env", () => {
       await startLangwatch(ctx(), bus, userEnv);
       await startLangwatchWorkers(ctx(), bus, userEnv);
       await startLangevals(ctx(), bus, userEnv);
-      await runMigrations(ctx(), bus, userEnv);
 
       expect(spawnedEnvs.langwatch?.TIKTOKENS_PATH).toBe("/srv/tiktoken");
       expect(spawnedEnvs.workers?.TIKTOKENS_PATH).toBe("/srv/tiktoken");
@@ -186,13 +179,9 @@ describe("outbound defaults in the service env", () => {
       const userEnv = { CHECKPOINT_DISABLE: "0" };
       await startLangwatch(ctx(), bus, userEnv);
       await startLangwatchWorkers(ctx(), bus, userEnv);
-      await runMigrations(ctx(), bus, userEnv);
 
       expect(spawnedEnvs.langwatch?.CHECKPOINT_DISABLE).toBe("1");
       expect(spawnedEnvs.workers?.CHECKPOINT_DISABLE).toBe("1");
-      for (const call of execCalls) {
-        expect(call.env?.CHECKPOINT_DISABLE).toBe("1");
-      }
     });
   });
 });

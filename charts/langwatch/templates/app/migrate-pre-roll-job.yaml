@@ -1,44 +1,26 @@
 {{/*
   The pre-roll upgrade (ADR-155; specs/upgrade/entry-points.feature).
 
-  Why. A migration is never breaking: it is applied to the live database while
-  the PREVIOUS image is still serving, and the new image must work on the old
-  schema until its own migration has run. The api and the workers never
-  migrate: at boot they read the upgrade ledger and refuse by name, naming the
-  outstanding steps and `pnpm task upgrade`, when a blocking step of their
-  image is not done. Something has to run the upgrade before they roll, once,
-  and this Job is that something.
+  By default nothing runs ahead of the roll: the new worker pods run
+  `pnpm task upgrade` under the runner's lease, and the new api pods report
+  not ready until the ledger is current, so the old pods keep serving
+  (UIW-4).
 
-  What this does. One Job, on the NEW image, running only the upgrade (the
-  api's `start:prepare:db`: `pnpm task upgrade` alone, with no system-migrations
-  pass), before helm applies any Deployment. It is fail-closed: an upgrade that
-  fails stops the helm upgrade with the new image never rolled and the old one
-  still serving the old schema, which is the state an operator can reason
-  about. `upgrade` takes its own lease, so a second runner waits, then exits
-  naming the holder.
+  This Job renders only with `app.storedObjects.localFilesystem.serializeUpgrades`
+  active (UIW-11): those hooks hold the workers at 0 until the app has rolled,
+  so no worker could run the upgrade. Here the Job runs the api's one
+  preparation script (`start:prepare:db`: `pnpm task upgrade` alone) on the NEW
+  image before any Deployment rolls, under the same lease. It is fail-closed:
+  a failed upgrade stops the helm upgrade with the old image still serving.
 
-  Scope. pre-upgrade only, deliberately:
-    - not pre-install: helm applies hook resources before the rest of the
-      manifests, so on a first install the Secrets this Job reads do not exist
-      yet. On a first install the api's first boot finds an empty ledger on an
-      empty schema and runs the upgrade once itself (Q10); the workers refuse
-      and restart until it is done.
-    - not pre-rollback: a rollback must never run migrations. Rolling back to
-      the previous image on the migrated schema is precisely what the
-      expand/contract rules guarantee, and a "down" migration is not how the
-      way back works here.
-
-  ArgoCD and Flux map pre-upgrade to PreSync and will run this on every sync,
-  including the first. `upgrade` is idempotent, so a redundant run is a no-op
-  that exits 0.
-
-  Opt out with `app.migrations.preRoll: false`, for an operator who runs the
-  upgrade as a separate pipeline step. Nothing else runs it on an upgrade then:
-  until the operator runs `pnpm task upgrade` from the new image, the new pods
-  refuse to start, by name.
+  pre-upgrade only: never pre-install (the Secrets it reads do not exist yet;
+  the first install's worker runs the upgrade) and never pre-rollback (a
+  rollback never migrates; expand/contract makes the old image safe).
+  ArgoCD and Flux map pre-upgrade to PreSync; `upgrade` is idempotent, so a
+  redundant run exits 0. `app.migrations.preRoll: false` turns it off.
 */}}
 {{- $preRoll := dig "migrations" "preRoll" true .Values.app }}
-{{- if $preRoll }}
+{{- if and $preRoll (eq (include "langwatch.storedObjects.serializeUpgradesActive" .) "true") }}
 {{- $name := printf "%s-migrate-pre-roll" .Release.Name }}
 {{/* The upgrade can legitimately take a long time on a large installation,
      and a deadline shorter than the work turns a slow migration into a failed

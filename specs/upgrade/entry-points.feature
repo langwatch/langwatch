@@ -39,21 +39,21 @@ Feature: The worker runs the upgrade from every entry point; the api never migra
     Then no pre-roll Job is rendered
     And the new api pods report not ready until the ledger is current, so old pods keep serving
 
-  @unimplemented
+  @unit
   Scenario: The Helm pre-roll Job renders only when upgrades are serialised
     Given the chart with `app.storedObjects.localFilesystem.serializeUpgrades` on
     When a release is upgraded
     Then the pre-roll Job runs the preparation script before any Deployment rolls
     And it is never a pre-install or pre-rollback hook
 
-  @unimplemented
+  @unit
   Scenario: The compose stack has no migrate service; the app and workers wait only for their stores
     Given the self-hosted compose file
     When the stack comes up
     Then no service runs the preparation script
     And the app and the workers depend only on their stores
 
-  @unimplemented
+  @unit
   Scenario: The npx server starts its services with no migration phase
     Given the npx server's launcher
     When it starts
