@@ -84,8 +84,17 @@ function readerMayOpenThePage({
 
 const MEASURED_OPS_PAGES = [...instanceGroup().items, ...cloudAdminGroup().items];
 
-/** Form pages read at main's Profile measure; tables and lists keep the wider one. */
-const FORM_PAGES = ["/settings", "/settings/profile", "/settings/security", "/settings/checkup"];
+/** Sparse pages (forms, a few rows, an empty state) read narrow; tables keep the wider measure. */
+const FORM_PAGES = [
+  "/settings",
+  "/settings/profile",
+  "/settings/security",
+  "/settings/checkup",
+  "/settings/data-privacy",
+  "/settings/license",
+  "/settings/connect",
+  "/settings/integrations",
+];
 const FORM_MEASURE = "820px";
 /** Your own account pages sit at the left, as on main, behind a fixed margin. */
 const LEFT_ALIGNED_PAGES = ["/settings/profile", "/settings/security"];
