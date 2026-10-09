@@ -42,10 +42,15 @@ type recordedStep struct {
 	Verb    string           `json:"verb"`
 	URL     string           `json:"url,omitempty"`
 	Locator *recordedLocator `json:"locator,omitempty"`
-	Text    string           `json:"text,omitempty"`
-	Key     string           `json:"key,omitempty"`
-	Native  bool             `json:"native,omitempty"`
-	Expect  struct {
+	Target  *recordedLocator `json:"target,omitempty"`
+	By      *struct {
+		DX int `json:"dx"`
+		DY int `json:"dy"`
+	} `json:"by,omitempty"`
+	Text   string `json:"text,omitempty"`
+	Key    string `json:"key,omitempty"`
+	Native bool   `json:"native,omitempty"`
+	Expect struct {
 		URL     string `json:"url"`
 		Queries []struct {
 			Method string `json:"method"`
@@ -191,6 +196,10 @@ func (step recordedStep) ts() string {
 		return fmt.Sprintf("  await page.goto(%s);\n", q(step.URL))
 	case "click":
 		return fmt.Sprintf("  await %s.click();\n", loc)
+	case "hover":
+		return fmt.Sprintf("  await %s.hover();\n", loc)
+	case "drag":
+		return step.dragTS(loc)
 	case "fill":
 		return fmt.Sprintf("  await %s.fill(%s);\n", loc, q(step.Text))
 	case "select":
@@ -204,4 +213,19 @@ func (step recordedStep) ts() string {
 		return fmt.Sprintf("  await page.keyboard.press(%s);\n", q(step.Key))
 	}
 	return ""
+}
+
+// dragTS drags with real mouse moves: React Flow and sortable lists ignore a jump from down to up.
+func (step recordedStep) dragTS(loc string) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "  {\n    const from = (await %s.boundingBox())!;\n", loc)
+	b.WriteString("    await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);\n    await page.mouse.down();\n")
+	if step.Target != nil {
+		fmt.Fprintf(&b, "    const to = (await %s.boundingBox())!;\n", step.Target.ts())
+		b.WriteString("    await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 12 });\n")
+	} else if step.By != nil {
+		fmt.Fprintf(&b, "    await page.mouse.move(from.x + from.width / 2 + %d, from.y + from.height / 2 + %d, { steps: 12 });\n", step.By.DX, step.By.DY)
+	}
+	b.WriteString("    await page.mouse.up();\n  }\n")
+	return b.String()
 }

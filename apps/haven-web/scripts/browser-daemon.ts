@@ -33,6 +33,7 @@ import {
   type Script,
   type Step,
 } from "./browser-record.ts";
+import { filterSnapshot } from "./browser-snapshot.ts";
 
 const env = (name: string) => {
   const value = process.env[name];
@@ -46,7 +47,9 @@ const APP = new URL(env("HAVEN_BROWSER_APP"));
 const HAVEN = env("HAVEN_BROWSER_HAVEN");
 const APP_LOG = process.env.HAVEN_BROWSER_APP_LOG ?? "";
 const IDLE_MS = Number(process.env.HAVEN_BROWSER_IDLE_MS ?? 5 * 60_000);
-const MAX_LANES = Number(process.env.HAVEN_BROWSER_MAX_LANES ?? 8);
+const LANE_IDLE_MS = Number(process.env.HAVEN_BROWSER_LANE_IDLE_MS ?? 10 * 60_000);
+const MAX_LANES = Number(process.env.HAVEN_BROWSER_MAX_LANES ?? 16);
+const MAX_RSS_MB = Number(process.env.HAVEN_BROWSER_MAX_RSS_MB ?? 3072);
 const MAX_BUSY = Number(process.env.HAVEN_BROWSER_MAX_PAGES ?? 4);
 const READY_LINE = '"msg":"backend ready"';
 const RECYCLING_LINE = '"msg":"backend recycling"';
@@ -83,6 +86,29 @@ type Lane = {
   recording?: Script;
 };
 const lanes = new Map<string, Lane>();
+/** Lanes closed for idling, told once on their next command. */
+const idled = new Set<string>();
+
+/** Resident memory of this daemon and every browser process under it, in MB. */
+async function treeRssMb(): Promise<number> {
+  const { stdout } = await runHaven("ps", ["-A", "-o", "pid=,ppid=,rss="]);
+  const rows = stdout
+    .trim()
+    .split("\n")
+    .map((row) => row.trim().split(/\s+/).map(Number));
+  const inTree = new Set([process.pid]);
+  let kb = 0;
+  for (let grown = true; grown;) {
+    grown = false;
+    for (const [pid = 0, ppid = 0] of rows) {
+      if (inTree.has(pid) || !inTree.has(ppid)) continue;
+      inTree.add(pid);
+      grown = true;
+    }
+  }
+  for (const [pid = 0, , rss = 0] of rows) if (inTree.has(pid)) kb += rss;
+  return kb / 1024;
+}
 
 /** The backend-reload gate: closed by a recycling line or a 50x, opened by the ready line. */
 let backendReady: Promise<void> = Promise.resolve();
@@ -230,6 +256,12 @@ async function laneFor({
       `the browser already holds ${MAX_LANES} lanes; close one (haven browser close --lane <name>)`,
     );
   }
+  const rss = await treeRssMb();
+  if (rss > MAX_RSS_MB) {
+    throw new Error(
+      `the browser uses ${Math.round(rss)} MB (ceiling ${MAX_RSS_MB} MB): refusing a new lane; close one (haven browser close --lane <name>)`,
+    );
+  }
   // A lane keeps its session across daemons: the stack allows 30 sign-ins per 15 minutes.
   const saved = sessionFile({ lane: name, as });
   let storageState = stateFile;
@@ -266,7 +298,11 @@ function scheduleExit() {
 function touch({ lane }: { lane: Lane }) {
   clearTimeout(exitTimer);
   clearTimeout(lane.idle);
-  lane.idle = setTimeout(() => void closeLane({ name: lane.name }), IDLE_MS);
+  lane.idle = setTimeout(() => {
+    idled.add(lane.name);
+    console.error(`lane ${lane.name} closed after idling ${LANE_IDLE_MS} ms`);
+    void closeLane({ name: lane.name });
+  }, LANE_IDLE_MS);
 }
 
 /** The app shell mounted (precedent: apps/ui/scripts/smoke-boot.mjs), then the network settles. */
@@ -340,6 +376,12 @@ type Request = {
   file?: string;
   locator?: LocatorSpec;
   script?: Script;
+  targetRef?: string;
+  target?: LocatorSpec;
+  by?: { dx: number; dy: number };
+  grep?: string;
+  depth?: number;
+  maxChars?: number;
 };
 
 type Act = (args: { page: Page; body: Request; timeout: number }) => Promise<unknown>;
@@ -349,10 +391,15 @@ const actions: Record<string, Act> = {
   open: async ({ page }) => ({ url: page.url(), title: await page.title() }),
   goto: async ({ page }) => ({ url: page.url(), title: await page.title() }),
   "state-load": async ({ page }) => ({ url: page.url(), title: await page.title() }),
-  snapshot: async ({ page, timeout }) => ({
+  snapshot: async ({ page, body, timeout }) => ({
     url: page.url(),
     title: await page.title(),
-    snapshot: await page.ariaSnapshot({ mode: "ai", timeout }),
+    snapshot: filterSnapshot({
+      text: await page.ariaSnapshot({ mode: "ai", timeout }),
+      grep: body.grep,
+      depth: body.depth,
+      maxChars: body.maxChars,
+    }),
   }),
   screenshot: async ({ page, body, timeout }) => {
     const file = body.out ?? join(DIR, `${body.lane}.png`);
@@ -362,6 +409,14 @@ const actions: Record<string, Act> = {
   },
   click: async ({ page, body, timeout }) => {
     await targetOf({ page, body }).click({ timeout });
+    return afterInput({ page, timeout });
+  },
+  hover: async ({ page, body, timeout }) => {
+    await targetOf({ page, body }).hover({ timeout });
+    return afterInput({ page, timeout });
+  },
+  drag: async ({ page, body, timeout }) => {
+    await dragBetween({ page, body, timeout });
     return afterInput({ page, timeout });
   },
   fill: async ({ page, body, timeout }) => {
@@ -405,6 +460,41 @@ function targetOf({ page, body }: { page: Page; body: Request }) {
     : locatorFor({ page, ref: body.ref ?? "" });
 }
 
+/** The drop element of a drag: a recorded locator, else the caller's second ref or selector. */
+function dropTargetOf({ page, body }: { page: Page; body: Request }) {
+  if (body.target) return locatorOf({ page, spec: body.target });
+  return body.targetRef ? locatorFor({ page, ref: body.targetRef }) : undefined;
+}
+
+/** Real mouse moves in steps, since React Flow and sortable lists ignore a jump from down to up. */
+async function dragBetween({
+  page,
+  body,
+  timeout,
+}: {
+  page: Page;
+  body: Request;
+  timeout: number;
+}) {
+  const source = targetOf({ page, body });
+  const drop = dropTargetOf({ page, body });
+  if (!drop && !body.by) throw new Error("drag needs a target ref or --by dx,dy");
+  await source.scrollIntoViewIfNeeded({ timeout });
+  const from = await source.boundingBox({ timeout });
+  if (!from) throw new Error("the drag source has no box on the page");
+  const start = { x: from.x + from.width / 2, y: from.y + from.height / 2 };
+  const to = drop ? await drop.boundingBox({ timeout }) : undefined;
+  if (drop && !to) throw new Error("the drag target has no box on the page");
+  const end = to
+    ? { x: to.x + to.width / 2, y: to.y + to.height / 2 }
+    : { x: start.x + (body.by?.dx ?? 0), y: start.y + (body.by?.dy ?? 0) };
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await page.mouse.move(start.x + 5, start.y + 5, { steps: 3 });
+  await page.mouse.move(end.x, end.y, { steps: 12 });
+  await page.mouse.up();
+}
+
 const pathOf = (url: string) => new URL(url).pathname;
 
 /** The step a recorded verb stands for, described before the action changes the page. */
@@ -431,9 +521,28 @@ async function describeStep({
       .catch(() => undefined);
     return { verb: "type", text: focus?.secret ? REDACTED : body.text };
   }
-  if (verb === "click" || verb === "fill" || verb === "select")
+  if (verb === "drag") return describeDrag({ page, body });
+  if (["click", "hover", "fill", "select"].includes(verb))
     return describeTarget({ page, verb, body });
   return undefined;
+}
+
+async function describeDrag({
+  page,
+  body,
+}: {
+  page: Page;
+  body: Request;
+}): Promise<Omit<Step, "expect">> {
+  const { spec } = await recordLocator({ page, target: targetOf({ page, body }) });
+  const drop = dropTargetOf({ page, body });
+  const target = drop && (await recordLocator({ page, target: drop })).spec;
+  return {
+    verb: "drag",
+    locator: spec,
+    ...(target && { target }),
+    ...(body.by && { by: body.by }),
+  };
 }
 
 async function describeTarget({
@@ -442,14 +551,14 @@ async function describeTarget({
   body,
 }: {
   page: Page;
-  verb: "click" | "fill" | "select";
+  verb: "click" | "hover" | "fill" | "select";
   body: Request;
 }): Promise<Omit<Step, "expect">> {
   const { spec, described } = await recordLocator({ page, target: targetOf({ page, body }) });
   return {
     verb,
     locator: spec,
-    ...(verb !== "click" && { text: described.secret ? REDACTED : body.text }),
+    ...(verb !== "click" && verb !== "hover" && { text: described.secret ? REDACTED : body.text }),
     ...(verb === "select" && { native: described.tag === "select" }),
   };
 }
@@ -587,11 +696,14 @@ async function handle({ verb, body }: { verb: string; body: Request }): Promise<
   if (!/^[\w-]+$/.test(name)) throw new Error("--lane must be letters, digits, - or _");
   if (!/^[\w.+@-]*$/.test(body.as ?? "")) throw new Error("--as must be admin or an email");
   if (verb === "close") {
+    idled.delete(name);
     await closeLane({ name });
     return { closed: name };
   }
   if (!actions[verb] && !["record-start", "record-stop", "replay"].includes(verb))
     throw new Error(`unknown verb ${verb}`);
+  if (idled.delete(name) && verb !== "open" && !lanes.has(name))
+    throw new Error(`lane ${name} was closed after idling; reopen with open`);
   const timeout = body.timeoutMs ?? 30_000;
   const stateFile = verb === "state-load" ? body.file : undefined;
   const lane = await laneFor({ name, as: body.as ?? "", timeout, stateFile });

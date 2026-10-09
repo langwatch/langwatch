@@ -18,9 +18,12 @@ export type LocatorSpec = {
 export type Query = { method: string; path: string; status: number };
 
 export type Step = {
-  verb: "goto" | "click" | "fill" | "select" | "type" | "press";
+  verb: "goto" | "click" | "hover" | "drag" | "fill" | "select" | "type" | "press";
   url?: string;
   locator?: LocatorSpec;
+  /** drag: the element dropped on, or the pixel offset when there is none. */
+  target?: LocatorSpec;
+  by?: { dx: number; dy: number };
   text?: string;
   key?: string;
   native?: boolean;

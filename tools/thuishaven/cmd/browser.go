@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -27,7 +28,7 @@ import (
 // re-signs a lane in when its page lands on sign-in and exits once no lane
 // is left; every command waits on page events, never a fixed sleep.
 
-const browserUsage = "usage: haven browser <open|goto|snapshot|click|fill|select|type|press|screenshot|eval|state-load|record|replay|close|status|stop> [args] --lane <name> [--as admin|email]"
+const browserUsage = "usage: haven browser <open|goto|snapshot|click|hover|drag|fill|select|type|press|screenshot|eval|state-load|record|replay|close|status|stop> [args] --lane <name> [--as admin|email]"
 
 // browserStartTimeout bounds the daemon's first line: a cold browser on a loaded machine.
 const browserStartTimeout = 90 * time.Second
@@ -35,7 +36,7 @@ const browserStartTimeout = 90 * time.Second
 func browserSpec() commandSpec {
 	return commandSpec{
 		name:    "browser",
-		summary: "one shared headless browser per stack, a signed-in context per --lane, playwright-cli's verbs: open | goto | snapshot | click | fill | select | type | press | screenshot | eval | state-load | record | replay | close | status | stop",
+		summary: "one shared headless browser per stack, a signed-in context per --lane, playwright-cli's verbs: open | goto | snapshot | click | hover | drag | fill | select | type | press | screenshot | eval | state-load | record | replay | close | status | stop",
 		args:    "<verb> [ref|selector|url|text|key|expression|file] [text]",
 		maxArgs: 3,
 		flags: []flagSpec{
@@ -44,6 +45,10 @@ func browserSpec() commandSpec {
 			{long: "--wait-for", takesValue: true, value: "<selector>", summary: "also wait for this CSS or text= selector before answering"},
 			{long: "--out", takesValue: true, value: "<file>", summary: "screenshot: where to write the PNG; record stop: where to write the script"},
 			{long: "--playwright", takesValue: true, value: "<file>", summary: "record export: where to write the Playwright test"},
+			{long: "--by", takesValue: true, value: "<dx,dy>", summary: "drag: move the element by this many pixels instead of onto a target"},
+			{long: "--grep", takesValue: true, value: "<text>", summary: "snapshot: only nodes whose role or name contain text, plus their ancestors"},
+			{long: "--depth", takesValue: true, value: "<n>", summary: "snapshot: only the first n levels of the tree"},
+			{long: "--max-chars", takesValue: true, value: "<n>", summary: "snapshot: cut after n characters with a truncated footer"},
 			{long: "--timeout", takesValue: true, value: "<dur>", summary: "how long a command may wait on the page (default 30s)"},
 			{long: "--json", summary: "machine-readable"},
 			{long: "--stack", takesValue: true, value: "<slug>", summary: "another worktree's stack by slug"},
@@ -146,6 +151,9 @@ func browserRequest(verb string, inv invocation) (map[string]any, error) {
 	if len(given) > len(fields) {
 		return nil, fmt.Errorf("haven browser %s takes %d argument(s)", verb, len(fields))
 	}
+	if err := browserExtras(verb, inv, req); err != nil {
+		return nil, err
+	}
 	for _, field := range []string{"file", "out"} {
 		if raw, ok := req[field].(string); ok {
 			abs, err := filepath.Abs(raw)
@@ -173,10 +181,39 @@ func browserRequest(verb string, inv invocation) (map[string]any, error) {
 	return req, nil
 }
 
+// browserExtras maps drag's --by and snapshot's filters onto the request.
+func browserExtras(verb string, inv invocation, req map[string]any) error {
+	if by := inv.value("--by"); by != "" {
+		var dx, dy int
+		if _, err := fmt.Sscanf(by, "%d,%d", &dx, &dy); err != nil {
+			return fmt.Errorf("--by %q is not dx,dy (for example 120,-40)", by)
+		}
+		req["by"] = map[string]any{"dx": dx, "dy": dy}
+	}
+	if verb == "drag" && req["targetRef"] == nil && req["by"] == nil {
+		return errors.New("haven browser drag needs <targetRef> or --by dx,dy")
+	}
+	if grep := inv.value("--grep"); grep != "" {
+		req["grep"] = grep
+	}
+	for flag, field := range map[string]string{"--depth": "depth", "--max-chars": "maxChars"} {
+		raw := inv.value(flag)
+		if raw == "" {
+			continue
+		}
+		n, err := strconv.Atoi(raw)
+		if err != nil || n < 1 {
+			return fmt.Errorf("%s %q is not a positive number", flag, raw)
+		}
+		req[field] = n
+	}
+	return nil
+}
+
 // browserVerbArgs names each verb's positionals, as playwright-cli spells them; "?" is optional.
 var browserVerbArgs = map[string][]string{
 	"open": {"url?"}, "goto": {"url"}, "snapshot": nil, "screenshot": nil, "close": nil,
-	"click": {"ref"}, "fill": {"ref", "text"}, "select": {"ref", "text"}, "type": {"text"}, "press": {"key"},
+	"click": {"ref"}, "hover": {"ref"}, "drag": {"ref", "targetRef?"}, "fill": {"ref", "text"}, "select": {"ref", "text"}, "type": {"text"}, "press": {"key"},
 	"eval": {"expression"}, "state-load": {"file"},
 	"record-start": nil, "record-stop": nil, "replay": {"file"},
 }

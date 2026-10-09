@@ -180,6 +180,11 @@ haven browser fill e14 "t1 name" --lane qa-1 --as admin    # also: select <ref> 
 haven browser eval "document.title" --lane qa-1 --as admin
 haven browser open /settings --lane qa-1 --as admin --wait-for 'text=Members'
 haven browser select e12 "Team" --lane qa-1 --as admin   # native <select> or combobox: opens it, picks the option by its text; target is a snapshot ref or CSS selector
+haven browser hover e12 --lane qa-1 --as admin             # moves the mouse over a ref or CSS selector (menus, hover cards, toast stacks)
+haven browser drag e12 e30 --lane qa-1 --as admin          # real mouse moves from one element's centre to another's (React Flow handles, sortable lists)
+haven browser drag e12 --by 120,-40 --lane qa-1 --as admin # or move it by dx,dy pixels (a node on a canvas)
+haven browser snapshot --grep Save --lane qa-1 --as admin  # only nodes whose role/name contain "Save", plus their ancestors
+haven browser snapshot --depth 3 --max-chars 4000 --lane qa-1 --as admin  # first 3 levels; cut at 4000 chars with a "truncated, narrow with --grep" footer
 haven browser close --lane qa-1                            # status | stop for the whole browser
 haven auth admin --out state.json                          # just the Playwright storage state (mode 600)
 ```
@@ -190,12 +195,14 @@ haven auth admin --out state.json                          # just the Playwright
 - The stack allows 30 sign-ins per 15 minutes; a lane reuses its saved session, so keep lane names stable.
 - Use one plain `haven browser` command per shell call. Multi-line commands, or a command chained into `grep` or `sed`, get refused by the agent safety check. A refused command is not rephrased: mark the step blocked and move on.
 - Never write a key, token or password to a file, even scratch. The safety check refuses it as credential materialisation. Let haven hold the credential.
+- A traces-table snapshot is about 50 KB: prefer `snapshot --grep <text>` (add `--depth N` or `--max-chars N`) over a full one. Without those flags the snapshot is unchanged.
+- A browser holds up to 16 lanes. A lane idle for 10 minutes is closed; its next command says `lane X was closed after idling; reopen with open`, and `open` brings it back. A new lane is refused (not crashed) when the browser's memory passes 3 GB.
 - One shared browser costs about 230 MB, plus about 0.7 GB per signed-in dev page (about 0.4 GB with `--ui=built`). Close your lane when done.
 
 **Record and replay** (build e2e tests from a manual walk):
 
 ```bash
-haven browser record start --lane qa-1 --as admin           # then drive the lane as usual
+haven browser record start --lane qa-1 --as admin           # then drive the lane as usual (click, hover, drag, fill, select, type, press, goto)
 haven browser record stop --lane qa-1 --out flow.json       # JSON script; prints its path
 haven browser replay flow.json --lane qa-1 --as admin [--json]  # exits non-zero at the first divergence
 haven browser record export flow.json --playwright flow.spec.ts  # a test for dev/tests/agentic-e2e

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -75,5 +76,53 @@ func TestPrintReplayFailsOnADivergence(t *testing.T) {
 	err := printReplay(map[string]any{"ok": false, "divergence": div}, true)
 	if err == nil || !strings.Contains(err.Error(), "step 2") || !strings.Contains(err.Error(), "url /b") {
 		t.Errorf("err = %v", err)
+	}
+}
+
+// @scenario "A browser lane's actions are recorded as a script and replayed"
+func TestBrowserHoverDragAndSnapshotFlags(t *testing.T) {
+	inv, _ := parse(browserSpec(), []string{"drag", "e1", "e2", "--lane", "a"})
+	req, err := browserRequest("drag", inv)
+	if err != nil || req["targetRef"] != "e2" {
+		t.Fatalf("drag req = %v (%v)", req, err)
+	}
+	inv, _ = parse(browserSpec(), []string{"drag", "e1", "--by", "120,-40", "--lane", "a"})
+	req, err = browserRequest("drag", inv)
+	if by, _ := req["by"].(map[string]any); err != nil || by["dx"] != 120 || by["dy"] != -40 {
+		t.Errorf("drag --by req = %v (%v)", req, err)
+	}
+	inv, _ = parse(browserSpec(), []string{"drag", "e1", "--lane", "a"})
+	if _, err := browserRequest("drag", inv); err == nil {
+		t.Error("drag with neither target nor --by was accepted")
+	}
+	inv, _ = parse(browserSpec(), []string{"hover", "e1", "--lane", "a"})
+	if _, err := browserRequest("hover", inv); err != nil {
+		t.Error(err)
+	}
+	inv, _ = parse(browserSpec(), []string{"snapshot", "--grep", "Save", "--depth", "3", "--max-chars", "2000", "--lane", "a"})
+	req, err = browserRequest("snapshot", inv)
+	if err != nil || req["grep"] != "Save" || req["depth"] != 3 || req["maxChars"] != 2000 {
+		t.Errorf("snapshot req = %v (%v)", req, err)
+	}
+	inv, _ = parse(browserSpec(), []string{"snapshot", "--depth", "x", "--lane", "a"})
+	if _, err := browserRequest("snapshot", inv); err == nil {
+		t.Error("--depth x was accepted")
+	}
+}
+
+func TestExportScriptHoverAndDrag(t *testing.T) {
+	var script recordedScript
+	body := `{"version":1,"steps":[
+	 {"verb":"hover","locator":{"by":"text","value":"Toast"},"expect":{"url":"/p","queries":[]}},
+	 {"verb":"drag","locator":{"by":"css","value":".h1"},"target":{"by":"css","value":".h2"},"expect":{"url":"/p","queries":[]}},
+	 {"verb":"drag","locator":{"by":"css","value":".h1"},"by":{"dx":10,"dy":-5},"expect":{"url":"/p","queries":[]}}]}`
+	if err := json.Unmarshal([]byte(body), &script); err != nil {
+		t.Fatal(err)
+	}
+	got := playwrightTest(script)
+	for _, want := range []string{`.hover();`, `page.locator(".h2").boundingBox()`, `from.x + from.width / 2 + 10, from.y + from.height / 2 + -5`} {
+		if !strings.Contains(got, want) {
+			t.Errorf("export lacks %s:\n%s", want, got)
+		}
 	}
 }
