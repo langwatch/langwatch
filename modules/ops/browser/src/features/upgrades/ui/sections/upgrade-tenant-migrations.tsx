@@ -13,6 +13,7 @@ import {
   Stack,
   Table,
   Text,
+  Wrap,
 } from "@langwatch/design-system/primitives";
 import { HandledErrorAlert } from "@langwatch/error-views";
 import { readableDate } from "@langwatch/time";
@@ -126,37 +127,27 @@ export function UpgradeTenantMigrations() {
 
   const isSaaS = enrollmentsQuery.data?.isSaaS ?? false;
   const enrollments = enrollmentsQuery.data?.enrollments ?? [];
+  const migrations = query.data ?? [];
 
   return (
-    <Stack gap={8}>
-      <HStack alignItems="flex-start">
-        <Stack gap={2} maxWidth="720px">
-          <Text fontSize="sm" color="fg.muted">
-            One-time data migrations the system performs on itself, organization by organization, at
-            worker boot. They run as an ordered pipeline: each step starts only after the previous
-            steps finalized for that organization. Held organizations finished the work but failed
-            the parity proof - they stay on their legacy path, behaving exactly as before, until the
-            disagreement in their report is resolved and a later pass re-verifies them. Parked
-            organizations hit an error and are retried automatically.
+    <Stack gap={6}>
+      <HStack alignItems="flex-start" gap={3}>
+        <Stack gap={1} flex={1} minWidth={0}>
+          <Text textStyle="sm" color="fg.muted">
+            Per-organization data migrations, run in order at worker boot. Held organizations failed
+            the parity proof and stay on the legacy path; parked ones hit an error and retry.
           </Text>
           {enrollmentsQuery.data && !isSaaS && (
-            <Text fontSize="sm" color="fg.muted">
-              This installation runs released migrations automatically for every organization, so
-              there is nothing to enroll.
+            <Text textStyle="sm" color="fg.muted">
+              Released migrations run for every organization here, so nothing needs enrolling.
             </Text>
           )}
           {enrollmentsQuery.error && !enrollmentsQuery.data && (
-            // The enrollment actions hide themselves when this read fails,
-            // which is the safe direction but an unexplained one: without
-            // this line a cloud operator sees a page that looks like a
-            // self-hosted installation.
-            <Text fontSize="sm" color="fg.muted">
-              Enrollment could not be read just now, so the enrollment actions are hidden. The page
-              retries every 30 seconds.
+            <Text textStyle="sm" color="fg.muted">
+              Enrollment could not be read, so its actions are hidden. Retrying every 30 seconds.
             </Text>
           )}
         </Stack>
-        <Spacer />
         <Button
           size="sm"
           disabled={!canManage}
@@ -167,12 +158,34 @@ export function UpgradeTenantMigrations() {
         </Button>
       </HStack>
 
-      {(query.data ?? []).map((migration, index) => (
-        <MigrationSection
+      <ListTable data-testid="upgrade-tenant-migrations-table">
+        <Table.Header>
+          <Table.Row>
+            <Table.ColumnHeader>Step</Table.ColumnHeader>
+            <Table.ColumnHeader textAlign="end">Finalized</Table.ColumnHeader>
+            <Table.ColumnHeader textAlign="end">Held</Table.ColumnHeader>
+            <Table.ColumnHeader textAlign="end">Parked</Table.ColumnHeader>
+            {isSaaS && <Table.ColumnHeader textAlign="end">Enrolled</Table.ColumnHeader>}
+            {canManage && <Table.ColumnHeader>Actions</Table.ColumnHeader>}
+          </Table.Row>
+        </Table.Header>
+        <Table.Body>
+          {migrations.map((migration, index) => (
+            <MigrationRow
+              key={migration.name}
+              migration={migration}
+              previousMigrationTitle={migrations[index - 1]?.title}
+              isSaaS={isSaaS}
+              canManage={canManage}
+            />
+          ))}
+        </Table.Body>
+      </ListTable>
+
+      {migrations.map((migration) => (
+        <MigrationDetail
           key={migration.name}
-          step={index + 1}
           migration={migration}
-          previousMigrationTitle={query.data?.[index - 1]?.title}
           enrollments={enrollments.filter(
             (enrollment) => enrollment.migrationName === migration.name,
           )}
@@ -184,135 +197,138 @@ export function UpgradeTenantMigrations() {
   );
 }
 
-/**
- * One status figure. A zero is fine and stays gray and quiet; a non-zero
- * count takes its palette, so the eye lands only on what moved.
- */
-function CountBadge({ label, count, palette }: { label: string; count: number; palette: string }) {
+/** A zero is a quiet number; a non-zero count takes its palette as a badge. */
+function CountCell({ count, palette }: { count: number; palette?: string }) {
+  if (count === 0 || !palette) {
+    return (
+      <Text as="span" textStyle="sm" color={count === 0 ? "fg.subtle" : void 0}>
+        {count}
+      </Text>
+    );
+  }
   return (
-    <Badge colorPalette={count === 0 ? "gray" : palette} variant={count === 0 ? "subtle" : "solid"}>
-      {label} {count}
+    <Badge size="sm" variant="subtle" colorPalette={palette}>
+      {count}
     </Badge>
   );
 }
 
-/** Space proportional to trouble: a zero reads as one quiet gray chip,
- *  a non-zero Held or Parked is the loud one. */
-function MigrationStatusBadges({ migration }: { migration: MigrationListing }) {
+function MigrationRow({
+  migration,
+  previousMigrationTitle,
+  isSaaS,
+  canManage,
+}: {
+  migration: MigrationListing;
+  previousMigrationTitle?: string;
+  isSaaS: boolean;
+  canManage: boolean;
+}) {
+  const requiresConfirmation = migration.requiresOperatorConfirmation;
+  const actionable = canManage && migration.availableOnThisInstallation;
   return (
-    <HStack marginBottom={4} flexWrap="wrap" gap={2}>
-      <CountBadge label="Finalized" count={migration.counts.finalized} palette="green" />
-      <CountBadge label="Held" count={migration.counts.migrated} palette="orange" />
-      <CountBadge label="Parked" count={migration.counts.parked} palette="red" />
-      {migration.counts.rolled_back > 0 && (
-        <CountBadge label="Rolled back" count={migration.counts.rolled_back} palette="gray" />
+    <Table.Row data-testid={`upgrade-tenant-migration-${migration.name}`}>
+      <Table.Cell maxWidth="420px">
+        <Stack gap={0}>
+          <Text textStyle="sm" truncate title={migration.title}>
+            {migration.title}
+          </Text>
+          <Text textStyle="xs" color="fg.muted" fontFamily="mono" truncate title={migration.name}>
+            {migration.name}
+          </Text>
+          {!migration.availableOnThisInstallation && (
+            <Text textStyle="xs" color="fg.muted">
+              Not yet available for self-hosted installations.
+            </Text>
+          )}
+        </Stack>
+      </Table.Cell>
+      <Table.Cell textAlign="end">
+        <CountCell count={migration.counts.finalized} />
+      </Table.Cell>
+      <Table.Cell textAlign="end">
+        <CountCell count={migration.counts.migrated} palette="orange" />
+      </Table.Cell>
+      <Table.Cell textAlign="end">
+        <CountCell count={migration.counts.parked} palette="red" />
+      </Table.Cell>
+      {isSaaS && (
+        <Table.Cell textAlign="end">
+          <CountCell count={migration.enrollment?.enrolledCount ?? 0} />
+        </Table.Cell>
       )}
-      {migration.enrollment && (
-        <>
-          <CountBadge label="Enrolled" count={migration.enrollment.enrolledCount} palette="blue" />
-          <Badge colorPalette="gray" variant="subtle">
-            Not enrolled {migration.enrollment.notEnrolledCount}
-          </Badge>
-        </>
+      {canManage && (
+        <Table.Cell>
+          {actionable && (
+            <Wrap gap={1}>
+              {isSaaS && !migration.enrolledAutomatically && (
+                <>
+                  <EnrollAction
+                    migrationName={migration.name}
+                    migrationTitle={migration.title}
+                    requiresConfirmation={requiresConfirmation}
+                  />
+                  <EnrollCohortAction
+                    migrationName={migration.name}
+                    migrationTitle={migration.title}
+                    previousMigrationTitle={previousMigrationTitle}
+                    requiresConfirmation={requiresConfirmation}
+                  />
+                </>
+              )}
+              <RunForOrganizationAction
+                migrationName={migration.name}
+                migrationTitle={migration.title}
+                requiresConfirmation={requiresConfirmation}
+              />
+              <RollBackAction migrationName={migration.name} migrationTitle={migration.title} />
+            </Wrap>
+          )}
+        </Table.Cell>
       )}
-    </HStack>
+    </Table.Row>
   );
 }
 
-function MigrationSection({
-  step,
+/** Enrolments and organizations needing attention for one step; nothing renders when quiet. */
+function MigrationDetail({
   migration,
-  previousMigrationTitle,
   enrollments,
   isSaaS,
   canManage,
 }: {
-  step: number;
   migration: MigrationListing;
-  previousMigrationTitle?: string;
   enrollments: EnrollmentRecord[];
   isSaaS: boolean;
   canManage: boolean;
 }) {
-  // Which steps take a typed confirmation is the server's call, declared by
-  // the migration itself - the page asks for it exactly where the server
-  // requires it rather than recognising a step by its name.
-  const requiresConfirmation = migration.requiresOperatorConfirmation;
+  const showEnrollments = isSaaS && migration.availableOnThisInstallation;
+  if (!migration.availableOnThisInstallation) return null;
+  if (!showEnrollments && migration.attention.length === 0) return null;
   return (
-    <Box borderWidth="1px" borderColor="border.emphasized" borderRadius="lg" padding={5}>
-      <HStack marginBottom={1} flexWrap="wrap" gap={3}>
-        <Heading size="md">
-          Step {step} · {migration.title}
-        </Heading>
-        <Text fontFamily="mono" fontSize="xs" color="fg.muted">
-          {migration.name}
-        </Text>
-        <Spacer />
-        {canManage && migration.availableOnThisInstallation && (
-          <HStack>
-            {isSaaS && !migration.enrolledAutomatically && (
-              <>
-                <EnrollAction
-                  migrationName={migration.name}
-                  migrationTitle={migration.title}
-                  requiresConfirmation={requiresConfirmation}
-                />
-                <EnrollCohortAction
-                  migrationName={migration.name}
-                  migrationTitle={migration.title}
-                  previousMigrationTitle={previousMigrationTitle}
-                  requiresConfirmation={requiresConfirmation}
-                />
-              </>
-            )}
-            <RunForOrganizationAction
-              migrationName={migration.name}
-              migrationTitle={migration.title}
-              requiresConfirmation={requiresConfirmation}
-            />
-            <RollBackAction migrationName={migration.name} migrationTitle={migration.title} />
-          </HStack>
-        )}
-      </HStack>
-      <Text fontSize="sm" color="fg.muted" maxWidth="720px" marginBottom={3}>
-        {migration.description}
-      </Text>
-      <MigrationStatusBadges migration={migration} />
-      {!migration.availableOnThisInstallation ? (
-        <Text fontSize="sm" color="fg.muted">
-          Not yet available for self-hosted installations. It will run automatically, for every
-          organization, in a later release - nothing to do until then.
-        </Text>
-      ) : (
-        <Stack gap={4}>
-          {isSaaS && <EnrollmentTable enrollments={enrollments} canManage={canManage} />}
-          {migration.attention.length === 0 ? (
-            <Text fontSize="sm" color="fg.muted">
-              No organizations need attention.
-            </Text>
-          ) : (
-            <ListTable size="sm">
-              <Table.Header>
-                <Table.Row>
-                  <Table.ColumnHeader>Organization</Table.ColumnHeader>
-                  <Table.ColumnHeader>Status</Table.ColumnHeader>
-                  <Table.ColumnHeader>Last movement</Table.ColumnHeader>
-                  <Table.ColumnHeader>Report</Table.ColumnHeader>
-                </Table.Row>
-              </Table.Header>
-              <Table.Body>
-                {migration.attention.map((record) => (
-                  <AttentionRow
-                    key={`${record.migrationName}:${record.tenantId}`}
-                    record={record}
-                  />
-                ))}
-              </Table.Body>
-            </ListTable>
-          )}
-        </Stack>
+    <Stack gap={3}>
+      <Heading size="sm" truncate title={migration.title}>
+        {migration.title}
+      </Heading>
+      {showEnrollments && <EnrollmentTable enrollments={enrollments} canManage={canManage} />}
+      {migration.attention.length > 0 && (
+        <ListTable size="sm">
+          <Table.Header>
+            <Table.Row>
+              <Table.ColumnHeader>Organization needing attention</Table.ColumnHeader>
+              <Table.ColumnHeader>Status</Table.ColumnHeader>
+              <Table.ColumnHeader>Last movement</Table.ColumnHeader>
+              <Table.ColumnHeader>Report</Table.ColumnHeader>
+            </Table.Row>
+          </Table.Header>
+          <Table.Body>
+            {migration.attention.map((record) => (
+              <AttentionRow key={`${record.migrationName}:${record.tenantId}`} record={record} />
+            ))}
+          </Table.Body>
+        </ListTable>
       )}
-    </Box>
+    </Stack>
   );
 }
 
