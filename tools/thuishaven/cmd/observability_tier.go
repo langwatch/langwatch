@@ -28,9 +28,11 @@ func observabilityStack(rt *colima.Runtime, ram uint64, cpus int) app.Observabil
 	endpoints := observabilityEndpoints()
 	endpoints.PyroscopePort = 0
 	tempo, _ := domain.TempoNativeArtifactFor(runtime.GOOS, runtime.GOARCH)
+	alloy, _ := domain.AlloyNativeArtifactFor(runtime.GOOS, runtime.GOARCH)
 	return otelnative.New(otelnative.Options{
 		Home: havenHome(), Endpoints: endpoints, Limits: observabilityLimits(ram, cpus),
 		TempoBin: devEnv("HAVEN_OBS_TEMPO_BIN"), TempoArtifact: tempo,
+		AlloyBin: devEnv("HAVEN_OBS_ALLOY_BIN"), AlloyArtifact: alloy,
 	})
 }
 

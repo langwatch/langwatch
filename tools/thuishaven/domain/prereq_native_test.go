@@ -9,14 +9,17 @@ import (
 func TestNativePinnedBinariesOnMacOS(t *testing.T) {
 	home := string(filepath.Separator) + "h"
 	bins := NativePinnedBinaries(home, "darwin", "arm64")
-	if len(bins) != 2 || bins[0].Name != "clickhouse" || bins[1].Name != "tempo" {
-		t.Fatalf("got %+v, want clickhouse then tempo", bins)
+	if len(bins) != 3 || bins[0].Name != "clickhouse" || bins[1].Name != "tempo" || bins[2].Name != "alloy" {
+		t.Fatalf("got %+v, want clickhouse, tempo then alloy", bins)
 	}
 	if want := filepath.Join(home, ClickHouseNativeDir, "bin", ClickHouseNativeVersion, "clickhouse"); bins[0].Dest != want {
 		t.Errorf("clickhouse dest %q, want %q", bins[0].Dest, want)
 	}
 	if bins[1].Artifact.SHA256 == "" || bins[1].Artifact.Member != "tempo" {
 		t.Errorf("tempo artifact not pinned: %+v", bins[1].Artifact)
+	}
+	if bins[2].Artifact.SHA256 == "" || bins[2].Artifact.Member != "alloy-darwin-arm64" {
+		t.Errorf("alloy artifact not pinned: %+v", bins[2].Artifact)
 	}
 }
 
@@ -33,12 +36,12 @@ func TestMissingPinnedBinariesSkipsWhatIsOnDisk(t *testing.T) {
 	bins := NativePinnedBinaries(home, "darwin", "arm64")
 	onDisk := map[string]bool{bins[0].Dest: true}
 	missing := MissingPinnedBinaries(bins, func(p string) bool { return onDisk[p] })
-	if len(missing) != 1 || missing[0].Name != "tempo" {
-		t.Fatalf("got %+v, want only tempo", missing)
+	if len(missing) != 2 || missing[0].Name != "tempo" || missing[1].Name != "alloy" {
+		t.Fatalf("got %+v, want only tempo and alloy", missing)
 	}
 	all := MissingPinnedBinaries(bins, func(string) bool { return true })
 	if len(all) != 0 {
-		t.Fatalf("got %+v, want nothing once both are on disk", all)
+		t.Fatalf("got %+v, want nothing once all are on disk", all)
 	}
 }
 
@@ -64,7 +67,7 @@ func TestNativeTierPrereqsOnMacOS(t *testing.T) {
 		}
 	}
 	c, _ := LookupCandidate(got["observability"].Prereq, "observability")
-	if cmd, _ := c.InstallOn("darwin"); cmd != "brew install grafana prometheus loki grafana/grafana/alloy" {
+	if cmd, _ := c.InstallOn("darwin"); cmd != "brew install grafana prometheus loki" {
 		t.Errorf("observability installs with %q", cmd)
 	}
 }

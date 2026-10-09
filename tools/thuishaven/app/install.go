@@ -163,7 +163,7 @@ func (o *Orchestrator) probeSomaxconn(ctx context.Context) domain.Found {
 	return domain.Found{Present: n >= domain.SomaxconnFloor, Detail: "kern.ipc.somaxconn=" + out}
 }
 
-// nativeBinaries is the pinned ClickHouse and Tempo for this machine, at the
+// nativeBinaries is the pinned ClickHouse, Tempo and Alloy for this machine, at the
 // paths `haven up` looks for them.
 func (o *Orchestrator) nativeBinaries() []domain.NativePinnedBinary {
 	return domain.NativePinnedBinaries(o.cfg.Home, o.platform(), runtime.GOARCH)
@@ -301,10 +301,10 @@ func (o *Orchestrator) installGolangciLint(ctx context.Context) error {
 }
 
 // InstallPrereqs installs the chosen prerequisites in dependency order,
-// narrating each one. It stops at the first failure: the entries depend on
-// each other (brew installs the formulae, node provides the npm), so
-// continuing past a failure produces a second, more confusing error about a
-// cause that is already known.
+// narrating each one. A failed REQUIRED entry stops the run: the rest are
+// installed through it (brew, node). A failed recommended or optional entry
+// is logged and the run carries on; the failures are summed up at the end
+// and do not fail the run.
 //
 // A manual entry prints its command rather than running it. If it is also
 // REQUIRED and anything is ordered after it, the run ends there: the rest are
@@ -320,10 +320,20 @@ func (o *Orchestrator) installPrereqsTo(ctx context.Context, w io.Writer, chosen
 		fmt.Fprintln(w, "nothing selected; nothing installed.")
 		return nil
 	}
+	var failed []string
 	for i, pick := range ordered {
-		if err := o.installPick(ctx, w, prereqPick{chosen: pick, hasMore: i < len(ordered)-1}); err != nil {
+		err := o.installPick(ctx, w, prereqPick{chosen: pick, hasMore: i < len(ordered)-1})
+		if err == nil {
+			continue
+		}
+		if p, ok := domain.LookupPrereq(pick.Key); !ok || p.Requirement == domain.PrereqRequired {
 			return err
 		}
+		fmt.Fprintf(w, "✗ %v\n", err)
+		failed = append(failed, pick.Key)
+	}
+	if len(failed) > 0 {
+		fmt.Fprintf(w, "\nnot installed (not required, haven up still runs): %s\n", strings.Join(failed, ", "))
 	}
 	return nil
 }

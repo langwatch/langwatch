@@ -110,9 +110,10 @@ See `specs/ops/local-observability-stack.feature` (the "console stays quiet" and
 The stack stays on by default, because it is what makes agent debugging work,
 but on macOS it no longer holds a colima VM open. haven's `otelnative` adapter
 starts the same components the `grafana/otel-lgtm` bundle carries as host
-processes: Grafana, Prometheus and Loki from Homebrew core, Grafana Alloy (the
-Grafana OpenTelemetry Collector distribution, `grafana/grafana/alloy`) as the
-OTLP collector, and Tempo 3.1.0 from its official darwin release tarball (Tempo
+processes: Grafana, Prometheus and Loki from Homebrew core, Grafana Alloy 1.20.1
+(the Grafana OpenTelemetry Collector distribution) as the OTLP collector from its
+official darwin release zip (the `grafana/grafana/alloy` tap builds from source and
+needs current Command Line Tools; `HAVEN_OBS_ALLOY_BIN` overrides), and Tempo 3.1.0 from its official darwin release tarball (Tempo
 has no Homebrew formula). haven fetches that tarball itself with the same pinned,
 sha256-checked downloader as the native ClickHouse binary (`adapters/pinnedrelease`;
 digests from GitHub's recorded release-asset digests) and keeps it under

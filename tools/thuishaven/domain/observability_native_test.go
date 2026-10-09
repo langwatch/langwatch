@@ -219,6 +219,31 @@ func hasArg(list []string, want string) bool {
 	return false
 }
 
+// @scenario "Haven fetches a pinned, checksummed Alloy instead of building it"
+func TestAlloyIsPinnedPerMacArchitecture(t *testing.T) {
+	for _, arch := range []string{"arm64", "amd64"} {
+		a, ok := AlloyNativeArtifactFor("darwin", arch)
+		if !ok {
+			t.Fatalf("no alloy pinned for darwin/%s", arch)
+		}
+		wantURL := "https://github.com/grafana/alloy/releases/download/v" + AlloyNativeVersion + "/alloy-darwin-" + arch + ".zip"
+		if a.URL != wantURL || len(a.SHA256) != 64 || a.Member != "alloy-darwin-"+arch {
+			t.Errorf("darwin/%s artifact = %+v, want %s with a sha256 and member alloy-darwin-%s", arch, a, wantURL, arch)
+		}
+	}
+	arm, _ := AlloyNativeArtifactFor("darwin", "arm64")
+	amd, _ := AlloyNativeArtifactFor("darwin", "amd64")
+	if arm.SHA256 == amd.SHA256 {
+		t.Error("both architectures carry the same digest")
+	}
+	if _, ok := AlloyNativeArtifactFor("linux", "amd64"); ok {
+		t.Error("linux has no darwin zip to pin")
+	}
+	if got := nativePlan().AlloyBinary(); strings.HasPrefix(got, nativePlan().DataDir()) {
+		t.Errorf("alloy binary %s sits under DataDir, which `down` discards", got)
+	}
+}
+
 // @scenario "Haven fetches a pinned, checksummed Tempo"
 func TestTempoIsPinnedPerMacArchitecture(t *testing.T) {
 	for _, arch := range []string{"arm64", "amd64"} {

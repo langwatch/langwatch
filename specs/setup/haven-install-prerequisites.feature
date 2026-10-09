@@ -205,23 +205,36 @@ Feature: haven install checks the machine's prerequisites
 
     Scenario: One failed install does not silently skip the rest
       Given three prerequisites were chosen
-      When the second one fails to install
+      When the second one, a required one, fails to install
       Then the failure is reported naming the prerequisite
       And the run stops rather than reporting a success it did not get
+
+    Scenario: A failed recommended install does not stop the run
+      Given a recommended prerequisite and a later one were chosen
+      When the recommended one fails to install
+      Then the failure is logged naming the prerequisite
+      And the later one is still installed
+      And the summary lists the failure and the run does not fail
 
   Rule: On macOS the install brings the native tier, and a container runtime is optional
 
     Scenario: macOS install fetches the native tier and colima stays optional
       Given a Mac with Homebrew and no observability tools or pinned binaries
       When the developer runs "haven install --yes"
-      Then grafana, prometheus, loki and grafana/grafana/alloy are installed through Homebrew
-      And the pinned ClickHouse and Tempo releases are downloaded and their sha256 verified
+      Then grafana, prometheus and loki are installed through Homebrew
+      And the pinned ClickHouse, Tempo and Alloy releases are downloaded and their sha256 verified
       And the container runtime is reported optional, never required
 
     Scenario: A second install run fetches nothing
-      Given the pinned ClickHouse and Tempo binaries are already on disk
+      Given the pinned ClickHouse, Tempo and Alloy binaries are already on disk
       When the developer runs "haven install" again
-      Then nothing is downloaded and the row reads as installed with both versions
+      Then nothing is downloaded and the row reads as installed with every version
+
+    Scenario: Haven fetches a pinned, checksummed Alloy instead of building it
+      Given a Mac whose Command Line Tools are too old to build Alloy from source
+      When the developer runs "haven install"
+      Then haven downloads the pinned Alloy darwin zip for its architecture into its home
+      And unpacks the alloy binary only when the zip matches its pinned sha256
 
     Scenario: Linux install keeps today's catalogue
       Given a Linux machine

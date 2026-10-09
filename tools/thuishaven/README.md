@@ -81,8 +81,8 @@ portless if missing, trusts its CA, starts the proxy — every step idempotent.
 `make haven install` (optional) go-installs the binary so plain `haven ...`
 works everywhere, and then runs `haven install`, which checks the machine for
 everything else haven drives — node, pnpm, go, the brew formulae behind the
-shared Postgres and Redis, on macOS the native tier (Grafana, Prometheus, Loki
-and Alloy from Homebrew, the pinned ClickHouse and Tempo downloads), and an
+shared Postgres and Redis, on macOS the native tier (Grafana, Prometheus and
+Loki from Homebrew, the pinned ClickHouse, Tempo and Alloy downloads), and an
 optional container runtime (colima only backs the container fallback, `haven
 play` and sandboxed langy) — and offers to install what is missing. With no
 terminal (`make haven install` from an agent) it runs `--yes`: no prompts, one
@@ -401,10 +401,12 @@ loudly instead of paging the machine. `haven status` shows each service's
 current memory use, and the hub + dashboard show each stack's RAM footprint.
 
 **Observability tier.** The observability stack is on by default. On macOS it
-runs as host processes, no VM: `brew install grafana prometheus loki
-grafana/grafana/alloy`; haven fetches Tempo 3.1.0 itself (the official darwin
-tarball, pinned and sha256-checked like the native ClickHouse binary, into
-`<haven home>/observability/bin`; `HAVEN_OBS_TEMPO_BIN` overrides it). Same ports (OTLP 4317/4318, Grafana 3000) and
+runs as host processes, no VM: `brew install grafana prometheus loki`; haven
+fetches Tempo 3.1.0 and Alloy 1.20.1 itself (the official darwin release assets,
+pinned and sha256-checked like the native ClickHouse binary, into
+`<haven home>/observability/bin`; `HAVEN_OBS_TEMPO_BIN` and `HAVEN_OBS_ALLOY_BIN`
+override them). A failed recommended or optional `haven install` row is logged
+and the run carries on; only a failed required row fails it. Same ports (OTLP 4317/4318, Grafana 3000) and
 datasource uids as the container; files under `<haven home>/observability`;
 `haven logs obs` tails its per-process logs. A missing binary prints its
 install line and never fails `up`. `LANGWATCH_HAVEN_OBS_TIER=container` runs

@@ -107,6 +107,36 @@ func TempoNativeArtifactFor(goos, goarch string) (PinnedArtifact, bool) {
 	return PinnedArtifact{URL: url, SHA256: sum, Member: "tempo"}, true
 }
 
+// AlloyBinary is where haven installs the pinned Alloy, beside Tempo.
+func (p NativeObservabilityPlan) AlloyBinary() string {
+	return filepath.Join(p.Dir, "bin", "alloy", AlloyNativeVersion, "alloy")
+}
+
+// AlloyNativeVersion is the Alloy release haven fetches on macOS. Grafana's
+// Homebrew tap builds Alloy from source, which refuses on outdated Command
+// Line Tools; the release zip needs nothing but a download.
+const AlloyNativeVersion = "1.20.1"
+
+// alloyNativeDigests are GitHub's recorded sha256 of each darwin zip
+// (`gh api repos/grafana/alloy/releases/tags/v1.20.1`, field assets[].digest).
+var alloyNativeDigests = map[string]string{
+	"darwin/arm64": "9709de08e15ef4307ce52dd5c306edf0d115db02119a712c39c00a04e013e88d",
+	"darwin/amd64": "8ae0c7f56e4658093d15e5dea8ca5cfa4ed382bd99fca059418cf3d647ea956e",
+}
+
+// AlloyNativeArtifactFor returns the pinned Alloy zip for a machine, or false
+// where haven pins none (then alloy is looked up on PATH). The zip holds one
+// binary named after the asset.
+func AlloyNativeArtifactFor(goos, goarch string) (PinnedArtifact, bool) {
+	sum, ok := alloyNativeDigests[goos+"/"+goarch]
+	if !ok {
+		return PinnedArtifact{}, false
+	}
+	asset := fmt.Sprintf("alloy-%s-%s", goos, goarch)
+	url := fmt.Sprintf("https://github.com/grafana/alloy/releases/download/v%s/%s.zip", AlloyNativeVersion, asset)
+	return PinnedArtifact{URL: url, SHA256: sum, Member: asset}, true
+}
+
 // NativeComponent is one host process of the native stack.
 type NativeComponent struct {
 	Name     string
@@ -167,7 +197,8 @@ func NativeObservabilityComponents(p NativeObservabilityPlan, grafanaHome string
 			ReadyURL: loopback(p.Ports.TempoHTTP) + "/ready",
 		},
 		{
-			Name: "alloy", Binary: "alloy", Install: "brew install grafana/grafana/alloy", Required: true,
+			Name: "alloy", Binary: "alloy", Required: true,
+			Install: "haven fetches Alloy " + AlloyNativeVersion + " on macOS; elsewhere put alloy on PATH or set HAVEN_OBS_ALLOY_BIN",
 			Args: []string{
 				"run", fmt.Sprintf("--server.http.listen-addr=127.0.0.1:%d", p.Ports.CollectorHTTP),
 				"--storage.path=" + filepath.Join(data, "alloy"), "--disable-reporting",

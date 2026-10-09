@@ -16,7 +16,8 @@ const ClickHouseNativeVersion = "25.8.33.6"
 const ClickHouseNativeDir = "clickhouse-native"
 
 // PinnedArtifact is one pinned release download and the sha256 it must match.
-// Member names the binary inside a tar.gz asset; empty means the asset is it.
+// Member names the binary inside a tar.gz or .zip asset; empty means the
+// asset is it.
 type PinnedArtifact struct {
 	URL    string
 	SHA256 string

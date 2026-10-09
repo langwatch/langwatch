@@ -1,11 +1,12 @@
 // Package pinnedrelease installs a pinned release asset into haven's home: it
 // downloads the asset, checks its sha256 and only then puts the binary in
 // place, so a binary that exists is a verified one. The one downloader every
-// native host process (ClickHouse, Tempo) uses.
+// native host process (ClickHouse, Tempo, Alloy) uses.
 package pinnedrelease
 
 import (
 	"archive/tar"
+	"archive/zip"
 	"compress/gzip"
 	"context"
 	"crypto/sha256"
@@ -16,12 +17,13 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
 // Ensure returns dest, downloading and verifying the artifact first when dest
-// does not exist yet. A tar.gz artifact names the Member it unpacks.
+// does not exist yet. A tar.gz or .zip artifact names the Member it unpacks.
 func Ensure(ctx context.Context, a domain.PinnedArtifact, dest string) (string, error) {
 	if _, err := os.Stat(dest); err == nil {
 		return dest, nil
@@ -41,7 +43,11 @@ func Ensure(ctx context.Context, a domain.PinnedArtifact, dest string) (string, 
 	defer func() { _ = os.Remove(asset) }()
 	bin := asset
 	if a.Member != "" {
-		if bin, err = unpack(asset, a.Member, dir); err != nil {
+		extract := unpack
+		if strings.HasSuffix(a.URL, ".zip") {
+			extract = unzip
+		}
+		if bin, err = extract(asset, a.Member, dir); err != nil {
 			return "", fmt.Errorf("unpack %s from %s: %w", a.Member, a.URL, err)
 		}
 		defer func() { _ = os.Remove(bin) }() // a no-op once renamed into place
@@ -112,6 +118,33 @@ func unpack(archive, member, dir string) (path string, err error) {
 			return copyMember(tr, hdr.Size, dir)
 		}
 	}
+}
+
+// unzip copies the regular file named member (at any depth) out of a
+// verified zip into a temp file in dir.
+func unzip(archive, member, dir string) (path string, err error) {
+	zr, err := zip.OpenReader(archive)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = zr.Close() }()
+	for _, f := range zr.File {
+		if !f.Mode().IsRegular() || filepath.Base(f.Name) != member {
+			continue
+		}
+		return copyZipMember(f, dir)
+	}
+	return "", errors.New("not in the archive")
+}
+
+// copyZipMember unpacks one zip entry; the loop returns on the first match.
+func copyZipMember(f *zip.File, dir string) (string, error) {
+	rc, err := f.Open()
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = rc.Close() }()
+	return copyMember(rc, int64(f.UncompressedSize64), dir) // #nosec G115 -- a size the zip declares, bounded by CopyN
 }
 
 func copyMember(r io.Reader, size int64, dir string) (path string, err error) {

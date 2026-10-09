@@ -23,9 +23,16 @@ import (
 
 // Stack is the host-process implementation of app.Observability.
 type Stack struct {
-	plan          domain.NativeObservabilityPlan
-	tempoBin      string                // HAVEN_OBS_TEMPO_BIN; wins over the pinned download
-	tempoArtifact domain.PinnedArtifact // empty where none is pinned: tempo comes from PATH
+	plan   domain.NativeObservabilityPlan
+	pinned map[string]pinnedComponent // by component name: tempo and alloy
+}
+
+// pinnedComponent is a component haven can fetch itself. override is the
+// HAVEN_OBS_*_BIN path and wins; an empty artifact means PATH.
+type pinnedComponent struct {
+	override string
+	artifact domain.PinnedArtifact
+	dest     string
 }
 
 // Options are what New builds a Stack from.
@@ -35,20 +42,22 @@ type Options struct {
 	Limits        domain.ObservabilityLimits
 	TempoBin      string
 	TempoArtifact domain.PinnedArtifact
+	AlloyBin      string
+	AlloyArtifact domain.PinnedArtifact
 }
 
 // New builds a Stack whose files live under home/observability.
 func New(o Options) *Stack {
-	return &Stack{
-		plan: domain.NativeObservabilityPlan{
-			Dir:       filepath.Join(o.Home, "observability"),
-			Endpoints: o.Endpoints,
-			Ports:     domain.DefaultNativeObservabilityPorts(),
-			Limits:    o.Limits,
-		},
-		tempoBin:      o.TempoBin,
-		tempoArtifact: o.TempoArtifact,
+	plan := domain.NativeObservabilityPlan{
+		Dir:       filepath.Join(o.Home, "observability"),
+		Endpoints: o.Endpoints,
+		Ports:     domain.DefaultNativeObservabilityPorts(),
+		Limits:    o.Limits,
 	}
+	return &Stack{plan: plan, pinned: map[string]pinnedComponent{
+		"tempo": {override: o.TempoBin, artifact: o.TempoArtifact, dest: plan.TempoBinary()},
+		"alloy": {override: o.AlloyBin, artifact: o.AlloyArtifact, dest: plan.AlloyBinary()},
+	}}
 }
 
 // Endpoints reports the stack's ports without touching anything.
@@ -102,21 +111,23 @@ func (s *Stack) resolve(ctx context.Context) (runnable, missing []domain.NativeC
 	return runnable, missing
 }
 
-// binary finds a component's executable. Tempo is HAVEN_OBS_TEMPO_BIN when
-// set, else the pinned release haven fetches, else whatever PATH holds.
+// binary finds a component's executable. Tempo and Alloy are their
+// HAVEN_OBS_*_BIN when set, else the pinned release haven fetches, else
+// whatever PATH holds; the rest come from PATH.
 func (s *Stack) binary(ctx context.Context, c domain.NativeComponent) (string, error) {
-	if c.Name != "tempo" {
+	p, ok := s.pinned[c.Name]
+	if !ok {
 		return exec.LookPath(c.Binary)
 	}
-	if s.tempoBin != "" {
-		return exec.LookPath(s.tempoBin)
+	if p.override != "" {
+		return exec.LookPath(p.override)
 	}
-	if s.tempoArtifact.URL == "" {
+	if p.artifact.URL == "" {
 		return exec.LookPath(c.Binary)
 	}
-	bin, err := pinnedrelease.Ensure(ctx, s.tempoArtifact, s.plan.TempoBinary())
+	bin, err := pinnedrelease.Ensure(ctx, p.artifact, p.dest)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "haven: observability: fetching tempo: %v\n", err)
+		fmt.Fprintf(os.Stderr, "haven: observability: fetching %s: %v\n", c.Name, err)
 	}
 	return bin, err
 }

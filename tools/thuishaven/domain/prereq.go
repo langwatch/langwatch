@@ -331,34 +331,34 @@ var Prereqs = []Prereq{{
 }, {
 	Key:         "observability",
 	Name:        "Observability tools",
-	Summary:     "Grafana, Prometheus, Loki and Alloy for the native telemetry tier",
+	Summary:     "Grafana, Prometheus and Loki for the native telemetry tier",
 	Requirement: PrereqRecommended,
 	After:       []string{"brew"},
 	DarwinOnly:  true,
 	Detail: "On macOS haven runs the telemetry stack as host processes, not a\n" +
 		"    container. Without these `haven up` still serves the app, with no local\n" +
-		"    Grafana, metrics or logs. The alloy formula comes from Grafana's tap.",
+		"    Grafana, metrics or logs. Alloy is a pinned download (native-binaries).",
 	Candidates: []Candidate{{
 		Key:      "observability",
-		Label:    "grafana + prometheus + loki + alloy",
-		Binaries: []string{"grafana", "prometheus", "loki", "alloy"},
-		Install:  "brew install grafana prometheus loki grafana/grafana/alloy",
+		Label:    "grafana + prometheus + loki",
+		Binaries: []string{"grafana", "prometheus", "loki"},
+		Install:  "brew install grafana prometheus loki",
 	}},
 }, {
 	// Not a brew formula: haven pins and checksums these releases itself
 	// (adapters/pinnedrelease); fetching here keeps the first `up` fast.
 	Key:         "native-binaries",
-	Name:        "ClickHouse and Tempo",
-	Summary:     "the pinned ClickHouse server and Tempo the native tier runs",
+	Name:        "ClickHouse, Tempo and Alloy",
+	Summary:     "the pinned ClickHouse server, Tempo and Alloy the native tier runs",
 	Requirement: PrereqRecommended,
 	DarwinOnly:  true,
-	Detail: "`haven up` downloads both on first use, which stalls that first run\n" +
+	Detail: "`haven up` downloads them on first use, which stalls that first run\n" +
 		"    for a few hundred MB. Fetching them here verifies each sha256 and\n" +
 		"    leaves nothing for `up` to wait on.",
 	Candidates: []Candidate{{
 		Key:     "native-binaries",
-		Label:   "pinned ClickHouse " + ClickHouseNativeVersion + " + Tempo " + TempoNativeVersion,
-		Install: "download the pinned ClickHouse and Tempo releases",
+		Label:   "pinned ClickHouse " + ClickHouseNativeVersion + " + Tempo " + TempoNativeVersion + " + Alloy " + AlloyNativeVersion,
+		Install: "download the pinned ClickHouse, Tempo and Alloy releases",
 	}},
 }, {
 	Key:         "runtime",

@@ -95,7 +95,7 @@ Feature: The observability stack runs natively on macOS
     Scenario: Without a collector the stack boots unobserved
       Given Grafana Alloy is not installed
       When the stack comes up
-      Then haven prints the brew install line for Alloy
+      Then haven prints how to get Alloy
       And the stack comes up without observability
 
   Rule: The stack is shared, capped and disposable, exactly as the container was

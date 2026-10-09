@@ -236,13 +236,14 @@ var envHelpText = `Environment variables.
                                  capped; one that already exists is never resized.
     LANGWATCH_HAVEN_OBS=0        Skip starting the observability stack on "up".
                                  On by default. On macOS it runs natively (brew
-                                 grafana, prometheus, loki, grafana/grafana/alloy
-                                 plus Tempo 3.1.0, which haven fetches and
+                                 grafana, prometheus, loki plus Tempo 3.1.0 and
+                                 Alloy 1.20.1, which haven fetches and
                                  sha256-checks into its home); no VM.
     LANGWATCH_HAVEN_OBS_TIER=x   native | container. Default native on macOS,
                                  container (the LGTM image on colima) elsewhere.
     HAVEN_OBS_TEMPO_BIN=<path>   Tempo binary for the native tier, instead of the
                                  pinned download (PATH when none is pinned).
+    HAVEN_OBS_ALLOY_BIN=<path>   Alloy binary for the native tier, likewise.
     HAVEN_OBS_IMAGE=<image>      Override the pinned LGTM bundle image.
     LW_OBS_GRAFANA_PORT=3000     Grafana port (also LW_OBS_OTLP_HTTP_PORT=4318,
                                  LW_OBS_OTLP_GRPC_PORT=4317).
