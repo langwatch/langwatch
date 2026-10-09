@@ -32,6 +32,7 @@
     "@langwatch/browser": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/design-system": "workspace:*",
+    "@langwatch/error-views": "workspace:*",
     "@langwatch/evaluator-client": "workspace:*",
     "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/experiment-contract": "workspace:*",

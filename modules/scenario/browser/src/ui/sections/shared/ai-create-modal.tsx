@@ -14,10 +14,7 @@ import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { AlertCircle, ArrowRight, PencilLine, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
-// Deep import on purpose: `ErrorActions` is deliberately absent from the
-// `~/features/errors` barrel, which would put it in an import cycle with the
-// toaster. `components/ui/toaster.tsx` reaches for it the same way.
-import { ErrorActions } from "../../../behavior/errors.tsx";
+import { ErrorRetryRow } from "../../../behavior/errors.tsx";
 import { classifyGenerationError } from "../../../behavior/scenarios/classify-generation-error.ts";
 import { useAiGeneration } from "../../../behavior/use-ai-generation.ts";
 import { CARD } from "../../../model/langy/asaplangy-tokens.ts";
@@ -530,7 +527,7 @@ function ErrorState({ error }: ErrorStateProps) {
             customer (ADR-045) — it is the handle support can act on, where the
             raw failure text that used to sit here was neither readable nor
             ours to show. */}
-        <ErrorActions traceId={classified.traceId} />
+        <ErrorRetryRow traceId={classified.traceId} />
       </VStack>
     </VStack>
   );

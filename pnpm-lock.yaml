@@ -13404,6 +13404,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
+      '@langwatch/error-views':
+        specifier: workspace:*
+        version: link:../../../packages/error-views
       '@langwatch/evaluator-client':
         specifier: workspace:*
         version: link:../../evaluator/client

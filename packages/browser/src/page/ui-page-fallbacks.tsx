@@ -13,9 +13,8 @@ import {
   Stack,
   Text,
 } from "@langwatch/design-system/primitives";
+import { ErrorActions } from "@langwatch/error-views";
 import { Lock } from "lucide-react";
-
-import { UiErrorActions } from "../ui-error-actions.tsx";
 
 /** While the flags a page is behind have not answered. */
 export function UiPageLoading() {
@@ -96,7 +95,7 @@ export function UiPageFailure({
             Try again
           </Button>
         )}
-        <UiErrorActions
+        <ErrorActions
           {...(copy.docsUrl ? { docsUrl: copy.docsUrl } : {})}
           {...(copy.traceId ? { traceId: copy.traceId } : {})}
         />
