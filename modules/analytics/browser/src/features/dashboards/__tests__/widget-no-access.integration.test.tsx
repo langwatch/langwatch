@@ -107,6 +107,7 @@ function storedCard({
         projectId="proj-1"
         projectSlug="checkout"
         dashboardId="board-1"
+        boardName="Weekly review"
         period={PERIOD}
         isWriting={false}
         langy={langy}
@@ -207,6 +208,7 @@ describe("given a stored board's widget whose query reads cost", () => {
         "Edit code",
         "Copy widget id",
         "Copy API snippet",
+        "Export CSV Still loading",
         "Set an alert",
         "Send as a report",
         "Duplicate",
@@ -231,6 +233,7 @@ describe("given a From LangWatch board's widget whose query reads cost", () => {
               layout: { gridColumn: 0, gridRow: 0, colSpan: 4, rowSpan: 4 },
             }}
             frameId="costs-cost"
+            boardName="Running costs"
             projectId="proj-1"
             projectSlug="test-project"
             rowSpan={4}

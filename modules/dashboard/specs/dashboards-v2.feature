@@ -982,8 +982,8 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Given Langy is on for the project and the member may start a conversation
     When the member opens a saved board or a read-only From LangWatch board
     Then every widget card on it has an "Ask Langy" button, shown while the card is hovered or focused
-    And on a From LangWatch board it is the card's only control, and clicking it drafts that
-      widget's prompt with the board as context, as on a saved board
+    And on a From LangWatch board it sits beside a menu that holds only Export CSV, and
+      clicking it drafts that widget's prompt with the board as context, as on a saved board
     And when Langy is off or the member may not start a conversation, no card shows it
 
   @unit @integration
@@ -1136,8 +1136,8 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   @integration
   Scenario: AC143b Widget menu: without Langy the menu offers no alert or report
     Given Langy is off or the member may not start a conversation
-    Then a widget's menu offers Edit code, Copy widget id, Copy API snippet, Duplicate and Delete
-      only, with no Edit with Langy, Set an alert or Send as a report
+    Then a widget's menu offers Edit code, Copy widget id, Copy API snippet, Export CSV,
+      Duplicate and Delete only, with no Edit with Langy, Set an alert or Send as a report
 
   @integration
   Scenario: AC144 Template card: the primary button reads Add to this project

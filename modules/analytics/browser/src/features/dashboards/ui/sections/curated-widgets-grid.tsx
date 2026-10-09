@@ -1,6 +1,7 @@
 /**
- * A From LangWatch board's widgets on the board grid, read-only: no drag, resize or menu,
- * only Ask Langy, which changes nothing. Each widget runs its own queries over the board's period.
+ * A From LangWatch board's widgets on the board grid, read-only: no drag or resize, only Ask
+ * Langy and Export CSV, which change nothing. Each widget runs its own queries over the
+ * board's period.
  */
 
 import { useMemo } from "react";
@@ -19,6 +20,7 @@ export function CuratedWidgetsGrid({
   projectId,
   projectSlug,
   templateId,
+  boardName,
   widgets,
   period,
   onAskLangy,
@@ -26,6 +28,7 @@ export function CuratedWidgetsGrid({
   projectId: string;
   projectSlug: string;
   templateId: string;
+  boardName: string;
   widgets: readonly BoardTemplateWidget[];
   period: BoardPeriod;
   /** Drafts a prompt about the widget in Langy; absent when Langy is not available. */
@@ -53,6 +56,7 @@ export function CuratedWidgetsGrid({
           <CuratedWidgetCard
             widget={widget}
             frameId={`${templateId}-${graphId}`}
+            boardName={boardName}
             projectId={projectId}
             projectSlug={projectSlug}
             rowSpan={rowSpan}

@@ -84,6 +84,7 @@ function OpenCuratedBoard({ board }: { board: CuratedBoard }) {
             projectId={projectId}
             projectSlug={saved.projectSlug}
             templateId={board.templateId}
+            boardName={board.name}
             widgets={board.widgets}
             period={period}
             onAskLangy={

@@ -13,6 +13,7 @@ import type { WidgetFace } from "../../../../model/dashboard-widget/widget-compl
 import { CHART_GRID_DRAG_HANDLE_CLASS } from "../../../../ui/sections/chart-grid.tsx";
 import { DashboardWidgetFrameOverWindow } from "../../../dashboard-widget/ui/sections/dashboard-widget-frame.tsx";
 import { useWidgetClipboard } from "../../behavior/use-widget-clipboard.ts";
+import { useWidgetCsvExport } from "../../behavior/use-widget-csv-export.ts";
 import type { WidgetSetup } from "../../langy/model/board-langy.ts";
 import type { BoardPeriod } from "../../model/board-period.ts";
 import type { BoardWidget } from "../../model/board-widgets.ts";
@@ -36,6 +37,7 @@ export function BoardWidgetCard({
   projectId,
   projectSlug,
   dashboardId,
+  boardName,
   period,
   isWriting,
   langy,
@@ -47,6 +49,8 @@ export function BoardWidgetCard({
   projectId: string;
   projectSlug: string;
   dashboardId: string;
+  /** The board's name, which an exported file is named for. */
+  boardName: string;
   period: BoardPeriod;
   isWriting: boolean;
   langy?: WidgetCardLangy;
@@ -57,6 +61,7 @@ export function BoardWidgetCard({
 }) {
   const host = useAnalyticsHost();
   const clipboard = useWidgetClipboard({ dashboardId });
+  const csvExport = useWidgetCsvExport({ board: boardName, widget: widget.name });
   const [face, setFace] = useState<WidgetFace["kind"]>("chart");
   // A widget the reader may not see offers nothing that reads its data: no Langy, alert or report.
   const langyOnData = face === "no_access" ? undefined : langy;
@@ -95,6 +100,7 @@ export function BoardWidgetCard({
             onEditCode={canEditCode ? () => onEdit({ withLangy: false }) : undefined}
             onCopyId={() => clipboard.copyId(widget.id)}
             onCopyApiSnippet={() => clipboard.copyApiSnippet(widget.id)}
+            exportCsv={csvExport.item}
             onSetAlert={langyOnData && (() => langyOnData.setUp("alert"))}
             onSendReport={langyOnData && (() => langyOnData.setUp("report"))}
             onDuplicate={onDuplicate}
@@ -114,6 +120,7 @@ export function BoardWidgetCard({
         timeWindow={timeWindow}
         granularitySeconds={granularitySeconds}
         onFaceChange={setFace}
+        onExportChange={csvExport.onExportChange}
         {...(langy ? { onAskLangyToSetUp: langy.setUpMissing } : {})}
       />
     </WidgetCardShell>

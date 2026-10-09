@@ -15,6 +15,7 @@ export function BoardWidgetsGrid({
   projectId,
   projectSlug,
   dashboardId,
+  boardName,
   widgets,
   period,
   isWriting,
@@ -27,6 +28,7 @@ export function BoardWidgetsGrid({
   projectId: string;
   projectSlug: string;
   dashboardId: string;
+  boardName: string;
   widgets: readonly BoardWidget[];
   period: BoardPeriod;
   isWriting: boolean;
@@ -54,6 +56,7 @@ export function BoardWidgetsGrid({
             projectId={projectId}
             projectSlug={projectSlug}
             dashboardId={dashboardId}
+            boardName={boardName}
             period={period}
             isWriting={isWriting}
             {...(langyFor ? { langy: langyFor(widget) } : {})}

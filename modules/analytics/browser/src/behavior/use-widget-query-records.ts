@@ -1,6 +1,7 @@
 /**
- * Watches the queries a widget frame runs, so the host knows each one's completeness report
- * and whether it failed for good. Wraps the executor the frame calls; changes nothing it sends.
+ * Watches the queries a widget frame runs, so the host knows each one's completeness report,
+ * whether it failed for good, and the rows it last returned, which "Export CSV" writes. Wraps
+ * the executor the frame calls; changes nothing it sends.
  */
 
 import { useCallback, useState } from "react";
@@ -10,10 +11,23 @@ import {
   recordQueryResult,
   type WidgetQueryRecords,
 } from "../model/dashboard-widget/widget-completeness.ts";
+import {
+  recordQueryExport,
+  type WidgetExportPeriod,
+  type WidgetQueryResults,
+} from "../model/dashboard-widget/widget-export.ts";
 import { type ChartFrameExecuteQuery, toChartQueryErrorPayload } from "./frame-bridge.ts";
 
-export function useWidgetQueryRecords({ executeQuery }: { executeQuery: ChartFrameExecuteQuery }) {
+export function useWidgetQueryRecords({
+  executeQuery,
+  timeWindow,
+}: {
+  executeQuery: ChartFrameExecuteQuery;
+  /** The period `executeQuery` runs over, which a kept result is stamped with. */
+  timeWindow: WidgetExportPeriod;
+}) {
   const [records, setRecords] = useState<WidgetQueryRecords>({});
+  const [results, setResults] = useState<WidgetQueryResults>({});
 
   const watchedExecuteQuery: ChartFrameExecuteQuery = useCallback(
     async (args) => {
@@ -24,6 +38,14 @@ export function useWidgetQueryRecords({ executeQuery }: { executeQuery: ChartFra
             records: previous,
             queryName: args.queryName,
             completeness: result.completeness,
+          }),
+        );
+        setResults((previous) =>
+          recordQueryExport({
+            results: previous,
+            queryName: args.queryName,
+            result,
+            period: timeWindow,
           }),
         );
         return result;
@@ -41,11 +63,14 @@ export function useWidgetQueryRecords({ executeQuery }: { executeQuery: ChartFra
         throw error;
       }
     },
-    [executeQuery],
+    [executeQuery, timeWindow],
   );
 
   /** Forgets every answer, for a Retry that starts the widget over. */
-  const reset = useCallback(() => setRecords({}), []);
+  const reset = useCallback(() => {
+    setRecords({});
+    setResults({});
+  }, []);
 
-  return { executeQuery: watchedExecuteQuery, records, reset };
+  return { executeQuery: watchedExecuteQuery, records, results, reset };
 }

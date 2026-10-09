@@ -414,6 +414,7 @@ describe("the widget menu", () => {
         "Edit code",
         "Copy widget id",
         "Copy API snippet",
+        "Export CSV Still loading",
         "Set an alert",
         "Send as a report",
         "Duplicate",

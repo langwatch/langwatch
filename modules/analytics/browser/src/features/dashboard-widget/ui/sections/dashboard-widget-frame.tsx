@@ -23,6 +23,10 @@ import {
   widgetFace,
 } from "../../../../model/dashboard-widget/widget-completeness.ts";
 import {
+  type WidgetExport,
+  widgetExportStatus,
+} from "../../../../model/dashboard-widget/widget-export.ts";
+import {
   WidgetFailedFace,
   WidgetNoAccessFace,
   WidgetNoTrafficFace,
@@ -84,6 +88,7 @@ export function DashboardWidgetFrameOverWindow({
   granularitySeconds,
   onAskLangyToSetUp,
   onFaceChange,
+  onExportChange,
 }: DashboardWidgetFrameProps & {
   readonly timeWindow: { start: number; end: number };
   readonly granularitySeconds?: LangWatchQLAcceptedGranularityStep;
@@ -91,6 +96,8 @@ export function DashboardWidgetFrameOverWindow({
   readonly onAskLangyToSetUp?: (missing: { field: string; label: string }) => void;
   /** Told which face the frame draws, so the card offers only what that face allows. */
   readonly onFaceChange?: (face: WidgetFace["kind"]) => void;
+  /** Handed what "Export CSV" would write now: the rows the widget's queries last returned. */
+  readonly onExportChange?: (widgetExport: WidgetExport) => void;
 }) {
   const { colorMode } = useColorMode();
   const refreshedAt = useDashboardRefreshedAt();
@@ -107,10 +114,20 @@ export function DashboardWidgetFrameOverWindow({
     definition.queries,
     granularitySeconds === void 0 ? { timeWindow } : { timeWindow, granularitySeconds },
   );
-  const { executeQuery, records, reset } = useWidgetQueryRecords({ executeQuery: runQuery });
+  const { executeQuery, records, results, reset } = useWidgetQueryRecords({
+    executeQuery: runQuery,
+    timeWindow,
+  });
   const face = useMemo(() => widgetFace(records), [records]);
   usePublishWidgetCompleteness(face.kind === "chart" ? face.completeness : null);
   useEffect(() => onFaceChange?.(face.kind), [onFaceChange, face.kind]);
+
+  const hasQueries = definition.queries.length > 0;
+  const widgetExport = useMemo(
+    () => ({ status: widgetExportStatus({ face: face.kind, hasQueries, results }), results }),
+    [face.kind, hasQueries, results],
+  );
+  useEffect(() => onExportChange?.(widgetExport), [onExportChange, widgetExport]);
 
   // Retry starts the frame over, so every query of the widget runs again.
   const [attempt, setAttempt] = useState(0);
