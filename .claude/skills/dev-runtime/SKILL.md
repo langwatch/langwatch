@@ -92,6 +92,19 @@ waiting for a change`: the old one is drained and the next change retries. Fix t
 - Memory growing over many generations: note `rssMiB` per `backend ready` line; a restart
   is the guardrail. Report it, since it is an ADR-168 risk.
 
+## Profiling the host
+
+- Inspector: `kill -USR1 $(pgrep -f "src/app.entrypoint.ts" | grep -v sh)` opens `127.0.0.1:9229`. Do it again after every restart, because the pid changes.
+- Drive it over CDP from a script: `Profiler` for CPU, `HeapProfiler.startSampling` for allocations, `Debugger.enable` (its `scriptParsed` events give each loaded script's url and length), and `HeapProfiler.takeHeapSnapshot` for a full dump.
+- A snapshot of this heap is gigabytes: summarise it with a streaming parser or memlab, never `JSON.parse`. Scratch files go in `.claude/tmp/prof/`.
+- What it showed (2026-10-10, dev UI in-process):
+  - RSS is about 2.7 GB, of which about 1.5 GB is JS heap (500 MB of it large objects). A boot takes about 40 s (`readyMs`).
+  - At rest the process is about 90% idle, so the boot is the CPU cost.
+  - Most of the heap is loaded code. The module runner keeps each backend module's transformed code with an inline base64 source map, Vite's module graph keeps the map as well, and V8 holds its own copy.
+  - `modules/analytics/contract/src/visualization/vega-lite-schema-validator.generated.js` is 8 MB on disk and evaluates as a 41M-char script.
+  - The other big ones: sass, the prisma client, `@clickhouse/parser`, `model-catalog.json` and `lwql-prisma-manifest.generated.json`.
+- `haven up --ui=built` takes the UI's Vite server out of the process altogether.
+
 ## Where to read next
 
 `dev/docs/LOCAL_STACK.md` (processes, one process section), `specs/setup/dev-process-topology.feature`

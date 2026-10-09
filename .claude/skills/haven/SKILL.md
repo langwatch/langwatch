@@ -86,6 +86,19 @@ haven up --ui=built -f            # serve a production build of apps/ui from the
 haven reload ui                   # --ui=built: rebuild the bundle and swap it in; returns once swapped
 ```
 
+What `--ui=built` changes, measured on /governance with a signed-in headless page, dev vs built:
+
+| | dev | built |
+|---|---|---|
+| Page memory | 708 MB | 396 MB |
+| JS heap | 242 MB | 69 MB |
+| Requests | 2289 | 563 |
+
+- The app's own process sheds the UI's Vite server too.
+- There is no orb (so no `haven feedback`) and no HMR, and the app runs its production code paths.
+- Old assets pile up in `apps/ui/dist/client/assets`; `rm -rf apps/ui/dist` clears them.
+- A build peaks at about 4.8 GB.
+
 ## The stack's own traces and logs
 
 This is the stack's OTel telemetry (Tempo, Loki), not product traces. Every read is
@@ -169,6 +182,9 @@ haven auth admin --out state.json                          # just the Playwright
 - A lane that lands on sign-in is signed back in and returned to its page; a backend reload is waited out on its ready line.
 - Commands wait on page events (shell mounted, network idle, `--wait-for`), never sleeps; `--timeout` bounds them (default 30s).
 - The stack allows 30 sign-ins per 15 minutes; a lane reuses its saved session, so keep lane names stable.
+- Use one plain `haven browser` command per shell call. Multi-line commands, or a command chained into `grep` or `sed`, get refused by the agent safety check. A refused command is not rephrased: mark the step blocked and move on.
+- Never write a key, token or password to a file, even scratch. The safety check refuses it as credential materialisation. Let haven hold the credential.
+- One shared browser costs about 230 MB, plus about 0.7 GB per signed-in dev page (about 0.4 GB with `--ui=built`). Close your lane when done.
 
 ## Other commands you will want
 
@@ -219,6 +235,7 @@ that is only Vite re-optimising, and signing in for a browser check.
 
 ## Do not
 
-- Run `haven up` or `haven down` on a checkout another session is using without asking.
+- Run `haven up` or `haven down` on a checkout another session is using without asking. As an agent, a `haven up -f` or `make haven install` on a stack that testers are driving is refused by the safety check: hand the command to the user.
+- Search the repo with `git grep`, never `rg -uu` from the root: it walks `node_modules` and `.worktrees` at about 3 cores for minutes.
 - Name an app port in a URL you report. Name the hostname.
 - Call a stack healthy because `haven up` returned. Check `haven status`, then the URL.
