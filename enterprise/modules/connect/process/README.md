@@ -100,11 +100,13 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `connect_contract_budget` (aggregate `global`)
 
-Declared at `src/eventing/connect-contract-budget.pipeline.ts:30`.
+Declared at `src/eventing/connect-contract-budget.pipeline.ts:36`.
 
-| Kind            | Name                                | Handles                                                                           | Declared at                                           |
-| --------------- | ----------------------------------- | --------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| peer subscriber | `connectContractBudgetTermsChanged` | `lw.licensing.contract_terms_changed` from [licensing](../../licensing/README.md) | `src/eventing/connect-contract-budget.pipeline.ts:36` |
+| Kind            | Name                                     | Handles                                                                           | Declared at                                           |
+| --------------- | ---------------------------------------- | --------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| peer subscriber | `connectContractBudgetTermsChanged`      | `lw.licensing.contract_terms_changed` from [licensing](../../licensing/README.md) | `src/eventing/connect-contract-budget.pipeline.ts:42` |
+| peer subscriber | `connectContractBudgetCustomerOnboarded` | `lw.billing.connected_customer_onboarded` from [billing](../../billing/README.md) | `src/eventing/connect-contract-budget.pipeline.ts:48` |
+| peer subscriber | `connectContractBudgetTermRenewed`       | `lw.billing.connected_term_renewed` from [billing](../../billing/README.md)       | `src/eventing/connect-contract-budget.pipeline.ts:54` |
 
 ## Configuration
 

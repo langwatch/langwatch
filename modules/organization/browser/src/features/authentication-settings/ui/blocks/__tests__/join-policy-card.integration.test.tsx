@@ -88,6 +88,20 @@ describe("given the who-can-join policy", () => {
       expect(screen.getByRole("link", { name: "See plans" })).toBeInTheDocument();
     });
 
+    it("gives the plain plan message when the control was never changed from its default", () => {
+      renderCard({ planLocked: true, domainJoin: "request" });
+
+      const notice = screen.getByTestId("join-policy-notice").textContent ?? "";
+      expect(notice).toContain("part of the Enterprise plan");
+      expect(notice).not.toContain("no longer includes");
+    });
+
+    it("says the plan no longer includes it only while an opened setting is still in force", () => {
+      renderCard({ planLocked: true, domainJoin: "auto", joinDomains: ["acme.com"] });
+
+      expect(screen.getByTestId("join-policy-notice").textContent).toContain("no longer includes");
+    });
+
     /** @scenario "Closing the door is never refused for the plan" */
     it("never greys Invite only, so the door can always be shut", () => {
       renderCard({ planLocked: true, domainJoin: "auto", joinDomains: ["acme.com"] });

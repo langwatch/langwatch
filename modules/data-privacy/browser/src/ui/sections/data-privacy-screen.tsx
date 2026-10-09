@@ -27,7 +27,7 @@ import {
   scopeFilterAddressWrite,
   scopeFilterFromAddress,
 } from "@langwatch/design-system/scope-filter";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 import { dataPrivacyApi } from "../../behavior/data-privacy-api.ts";
 import {
@@ -46,6 +46,7 @@ import { EffectiveSummary } from "../blocks/effective-summary.tsx";
 import { NoPrivacyRules } from "../blocks/no-privacy-rules.tsx";
 import { PrivacyRuleDrawer, type PrivacyScopeEntry } from "../blocks/privacy-rule-drawer.tsx";
 import { PrivacyRulesTable } from "../blocks/privacy-rules-table.tsx";
+import { RemoveRuleConfirmDialog } from "../blocks/remove-rule-confirm-dialog.tsx";
 
 export default function DataPrivacyScreen() {
   const host = useDataPrivacyHost();
@@ -98,6 +99,7 @@ function DataPrivacyPage({ host, projectId }: { host: DataPrivacyHostApi; projec
   const invalidate = () => utils.dataPrivacy.getSnapshot.invalidate({ projectId });
 
   const removeForScope = dataPrivacyApi.dataPrivacy.removeForScope.useMutation();
+  const [ruleToRemove, setRuleToRemove] = useState<DataPrivacyRule | null>(null);
 
   const ruleAddress = query[PRIVACY_RULE_QUERY_KEY];
   const setRuleAddress = (next: string | undefined) =>
@@ -123,6 +125,7 @@ function DataPrivacyPage({ host, projectId }: { host: DataPrivacyHostApi; projec
         personalOnly: rule.personalOnly,
       });
       void invalidate();
+      setRuleToRemove(null);
       host.succeeded({ title: "Privacy rule removed" });
     } catch (error) {
       host.failed({ error, fallbackTitle: "Couldn't remove this rule" });
@@ -163,9 +166,15 @@ function DataPrivacyPage({ host, projectId }: { host: DataPrivacyHostApi; projec
             rules={filteredRules}
             canWrite={canWrite}
             onEdit={openEdit}
-            onRemove={(rule) => void removeRule(rule)}
+            onRemove={setRuleToRemove}
           />
         )}
+        <RemoveRuleConfirmDialog
+          rule={ruleToRemove}
+          isRemoving={removeForScope.isPending}
+          onCancel={() => setRuleToRemove(null)}
+          onConfirm={() => (ruleToRemove ? removeRule(ruleToRemove) : undefined)}
+        />
 
         {snapshot && (
           <EffectiveSummary

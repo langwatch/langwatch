@@ -1,8 +1,17 @@
 /**
  * @vitest-environment node
- * Connect syncs a customer's contract budget from licensing's contract_terms_changed fact.
+ * Connect syncs a customer's contract budget from licensing's contract_terms_changed fact, and
+ * resets then syncs it from billing's renewal fact.
  * @see enterprise/modules/connect/specs/connect.feature
  */
+import {
+  CONNECTED_BILLING_AGGREGATE_TYPE,
+  CONNECTED_BILLING_EVENT_VERSION,
+  CONNECTED_CUSTOMER_ONBOARDED_EVENT_TYPE,
+  CONNECTED_TERM_RENEWED_EVENT_TYPE,
+  connectedCustomerOnboardedEventDataSchema,
+  connectedTermRenewedEventDataSchema,
+} from "@langwatch/enterprise-billing-contract";
 import {
   CONTRACT_TERMS_CHANGED_EVENT_TYPE,
   type ContractTermsChangedEventData,
@@ -56,9 +65,31 @@ function licensingStandIn() {
     .build();
 }
 
+/** Billing's connected_billing pipeline as its contract names the onboarding and renewal facts. */
+function billingStandIn() {
+  return definePipeline({
+    name: "connected_billing_stand_in",
+    aggregate: defineAggregate({ type: CONNECTED_BILLING_AGGREGATE_TYPE }),
+  })
+    .withEvents([
+      z.object({
+        ...EventSchema.shape,
+        type: z.literal(CONNECTED_CUSTOMER_ONBOARDED_EVENT_TYPE),
+        data: connectedCustomerOnboardedEventDataSchema,
+      }),
+      z.object({
+        ...EventSchema.shape,
+        type: z.literal(CONNECTED_TERM_RENEWED_EVENT_TYPE),
+        data: connectedTermRenewedEventDataSchema,
+      }),
+    ])
+    .build();
+}
+
 /** The gateway's budget table in memory: one contract budget per organization. */
 class MemoryBudgets implements ContractBudgetStore {
   readonly created: number[] = [];
+  readonly steps: string[] = [];
   budget: ContractBudget | null = null;
 
   async findForOrganization(): Promise<ContractBudget | null> {
@@ -67,11 +98,16 @@ class MemoryBudgets implements ContractBudgetStore {
 
   async create({ limitUsdCents }: { limitUsdCents: number }): Promise<void> {
     this.created.push(limitUsdCents);
-    this.budget = { id: "budget-1", limitUsdCents, capSetByCustomer: false };
+    this.budget = { id: "budget-1", limitUsdCents, capSetByCustomer: false, lastResetAt: null };
   }
 
   async setLimit({ limitUsdCents }: { limitUsdCents: number }): Promise<void> {
+    this.steps.push("sync");
     if (this.budget) this.budget = { ...this.budget, limitUsdCents };
+  }
+
+  async reset(): Promise<void> {
+    this.steps.push("reset");
   }
 }
 
@@ -90,7 +126,33 @@ function harness() {
     processStore: InMemoryProcessStore.createForTesting(),
   });
   const licensing = eventing.register(licensingStandIn());
-  eventing.register(buildConnectContractBudgetPipeline({ contractBudgets: { sync } }));
+  const billing = eventing.register(billingStandIn());
+  eventing.register(
+    buildConnectContractBudgetPipeline({
+      contractBudgets: { sync, reset: (input) => contractBudgets.reset(input) },
+    }),
+  );
+  const billed = (
+    type: typeof CONNECTED_CUSTOMER_ONBOARDED_EVENT_TYPE | typeof CONNECTED_TERM_RENEWED_EVENT_TYPE,
+    id: string,
+  ) =>
+    billing.service.storeEvents(
+      [
+        {
+          id,
+          aggregateId: fact.organizationId,
+          aggregateType: CONNECTED_BILLING_AGGREGATE_TYPE,
+          tenantId: createTenantId(fact.tenantId),
+          type,
+          version: CONNECTED_BILLING_EVENT_VERSION,
+          createdAt: fact.occurredAt,
+          occurredAt: fact.occurredAt,
+          idempotencyKey: id,
+          data: fact,
+        },
+      ],
+      { tenantId: createTenantId(fact.tenantId) },
+    );
   const changed = (fact: ContractTermsChangedEventData, id: string) =>
     licensing.service.storeEvents(
       [
@@ -109,7 +171,7 @@ function harness() {
       ],
       { tenantId: createTenantId(fact.tenantId) },
     );
-  return { changed, store, sync };
+  return { changed, billed, store, sync };
 }
 
 const fact: ContractTermsChangedEventData = {
@@ -145,6 +207,42 @@ describe("given licensing records a customer's contract terms as changed", () =>
 
       expect(store.created).toEqual([100_000]);
       expect(store.budget?.limitUsdCents).toBe(100_000);
+    });
+  });
+});
+
+describe("given billing records a connected customer's renewal", () => {
+  describe("when connect's subscriber receives the fact", () => {
+    /** @scenario "A renewal fact resets then syncs the contract budget" */
+    it("starts the budget's new window first, then brings it in line with the terms", async () => {
+      const { billed, store, sync } = harness();
+      store.budget = {
+        id: "budget-1",
+        limitUsdCents: 50_000,
+        capSetByCustomer: false,
+        lastResetAt: null,
+      };
+
+      await billed(CONNECTED_TERM_RENEWED_EVENT_TYPE, "renewed-1");
+
+      await vi.waitFor(() => expect(store.steps).toEqual(["reset", "sync"]));
+      expect(sync).toHaveBeenCalledWith({ organizationId: "org-acme", operatorId: "operator-1" });
+      expect(store.budget?.limitUsdCents).toBe(100_000);
+    });
+  });
+});
+
+describe("given billing records a connected customer's onboarding", () => {
+  describe("when connect's subscriber receives the fact", () => {
+    /** @scenario "An onboarding fact syncs the contract budget" */
+    it("brings the organization's contract budget in line with its current terms", async () => {
+      const { billed, store, sync } = harness();
+
+      await billed(CONNECTED_CUSTOMER_ONBOARDED_EVENT_TYPE, "onboarded-1");
+
+      await vi.waitFor(() => expect(store.created).toEqual([100_000]));
+      expect(sync).toHaveBeenCalledWith({ organizationId: "org-acme", operatorId: "operator-1" });
+      expect(store.steps).toEqual([]);
     });
   });
 });

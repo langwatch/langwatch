@@ -167,6 +167,7 @@ describe("given the retention policies page", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     snapshotRef.current.canConfigureRetention = true;
+    snapshotRef.current.effective = { traces: 49, scenarios: 49, experiments: 49 };
     snapshotRef.current.rules = [
       {
         scopeType: "TEAM",
@@ -205,6 +206,14 @@ describe("given the retention policies page", () => {
       renderScreen(new TestRetentionHost());
 
       expect(screen.getByText(/override the platform default of/)).toHaveTextContent("49 days");
+    });
+
+    it("names the deployment's own default, not a fixed constant", () => {
+      snapshotRef.current.rules = [];
+      snapshotRef.current.effective = { traces: 7, scenarios: 7, experiments: 7 };
+      renderScreen(new TestRetentionHost());
+
+      expect(screen.getByText(/override the platform default of/)).toHaveTextContent("7 days");
     });
   });
 

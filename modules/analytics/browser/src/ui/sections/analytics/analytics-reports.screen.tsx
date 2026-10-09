@@ -39,13 +39,13 @@ import { ReportGrid } from "../report-grid.tsx";
 import { DashboardRefreshedAtContext } from "../use-dashboard-auto-refresh.ts";
 
 function ReportsContent() {
-  const { project, organization, hasPermission } = useOrganizationTeamProject();
-  // Each write is refused where the server refuses it: on an aggregate (ADR-177) and without
-  // the grant.
-  const canAddChart = hasPermission("analytics:create");
-  const canRenameDashboard = hasPermission("analytics:update");
-  const { showFilters } = useFilterToggle();
+  const { project, organization } = useOrganizationTeamProject();
   const host = useAnalyticsHost();
+  // Each write is refused where the server refuses it: on an aggregate (ADR-177) and without
+  // the grant. Grants come from the analytics host; the scope reading carries none.
+  const canAddChart = host.hasPermission("analytics:create");
+  const canRenameDashboard = host.hasPermission("analytics:update");
+  const { showFilters } = useFilterToggle();
   const showErrorToast = useShowErrorToast();
   const projectId = project?.id ?? "";
 

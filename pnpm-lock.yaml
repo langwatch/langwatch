@@ -2980,6 +2980,9 @@ importers:
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../../../modules/authz/contract
+      '@langwatch/enterprise-billing-contract':
+        specifier: workspace:*
+        version: link:../../billing/contract
       '@langwatch/enterprise-connect-contract':
         specifier: workspace:*
         version: link:../contract
@@ -11019,6 +11022,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
+      '@langwatch/trace-contract':
+        specifier: workspace:*
+        version: link:../../trace/contract
       '@langwatch/upgrade':
         specifier: workspace:*
         version: link:../../../packages/upgrade
@@ -18164,6 +18170,12 @@ importers:
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../observability
+      '@vitejs/plugin-react':
+        specifier: 'catalog:'
+        version: 6.1.1(babel-plugin-react-compiler@1.0.0)(oxc-transform-react@0.145.0)(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+      oxc-transform-react:
+        specifier: 'catalog:'
+        version: 0.145.0
     devDependencies:
       '@types/node':
         specifier: ^26.0.1

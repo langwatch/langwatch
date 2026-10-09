@@ -228,10 +228,6 @@ export interface LicensingApi {
     byUsdCents: number;
     operatorId: string;
   }): Promise<IssuedLicenseView>;
-  /** Re-derives the contract budget's cap from the license terms. */
-  syncContractBudget(input: { organizationId: string; operatorId: string }): Promise<void>;
-  /** Starts a new budget window: spend so far no longer counts. */
-  resetContractBudget(input: { organizationId: string; operatorId: string }): Promise<void>;
   /**
    * The hosted services the active license behind one managed key is entitled
    * to, empty when no active license names that key. The gateway resolves a

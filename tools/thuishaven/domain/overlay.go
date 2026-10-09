@@ -300,8 +300,8 @@ func (s Stack) observabilityEnv() []string {
 	env := []string{
 		"OTEL_EXPORTER_OTLP_ENDPOINT=" + otlp,   // official name — TS app AND Go services (their own telemetry)
 		"OTEL_DEBUG_COLLECTOR_ENDPOINT=" + otlp, // Go OTLP logs ride this; span/metric export dedupes when equal to the official endpoint
-		"PINO_OTEL_ENABLED=true",
-		"OTEL_METRICS_ENABLED=true",
+		"OTEL_LOGS_EXPORTER=otlp",
+		"OTEL_METRICS_EXPORTER=otlp",
 		"LOG_OTEL_LEVEL=debug",
 		"OTEL_RESOURCE_ATTRIBUTES=" + ObservabilityWorktreeAttr + "=" + s.Slug,
 		// Browser telemetry (ADR-058). Tied to the collector rather than flagged

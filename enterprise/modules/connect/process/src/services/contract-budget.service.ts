@@ -10,6 +10,7 @@ import {
   type LicensingApi,
 } from "@langwatch/enterprise-licensing-contract";
 import { ValidationError } from "@langwatch/handled-error";
+import type { Instant } from "@langwatch/time";
 
 const CENTS = 100;
 
@@ -64,6 +65,26 @@ export class ContractBudgetService {
     });
   }
 
+  /**
+   * Starts a new window at a renewal, so the new term's credit is spent against a cap that counts
+   * nothing from the term before. No budget is a no-op: the sync after it creates one. A window
+   * already restarted at or after the renewal is left alone, so a redelivered fact resets once.
+   */
+  async reset({
+    organizationId,
+    operatorId,
+    renewedAtMs,
+  }: {
+    organizationId: string;
+    operatorId: string;
+    renewedAtMs: number;
+  }): Promise<void> {
+    const existing = await this.collaborators.store.findForOrganization(organizationId);
+    if (!existing) return;
+    if (existing.lastResetAt && existing.lastResetAt.epochMilliseconds >= renewedAtMs) return;
+    await this.collaborators.store.reset({ organizationId, id: existing.id, actorId: operatorId });
+  }
+
   /** The customer sets its own cap. It may be below what is already spent. */
   async setCap({
     organizationId,
@@ -101,6 +122,7 @@ export interface ContractBudget {
   limitUsdCents: number;
   /** Whether the customer chose this cap, as opposed to it following the commit. */
   capSetByCustomer: boolean;
+  lastResetAt: Instant | null;
 }
 
 /** Where the contract budget is kept: the gateway's own budget table, reached through its Api. */
@@ -118,4 +140,6 @@ export interface ContractBudgetStore {
     capSetByCustomer: boolean;
     actorId: string;
   }): Promise<void>;
+  /** Starts a new window: spend so far no longer counts against the cap. */
+  reset(params: { organizationId: string; id: string; actorId: string }): Promise<void>;
 }

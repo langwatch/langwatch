@@ -91,12 +91,38 @@ Feature: The hosted end of Connect
 
     Licensing says the terms moved; connect brings the budget in line with the terms licensing
     answers now and writes it only through the gateway's operations. Connect owns no table.
+    Billing's renewal and onboarding facts reset and sync it the same way.
 
     @unit
     Scenario: A contract_terms_changed fact syncs the contract budget
       Given licensing records a contract_terms_changed fact for an organization
       When connect's subscriber receives it
       Then the organization's contract budget is brought in line with its current terms
+
+    @unit
+    Scenario: A renewal fact resets then syncs the contract budget
+      Given billing records a connected_term_renewed fact for an organization with a contract budget
+      When connect's subscriber receives it
+      Then the budget starts a new window first
+      And it is then brought in line with the organization's current terms
+
+    @unit
+    Scenario: An onboarding fact syncs the contract budget
+      Given billing records a connected_customer_onboarded fact for an organization
+      When connect's subscriber receives it
+      Then the organization's contract budget is brought in line with its current terms
+
+    @unit
+    Scenario: A reset with no contract budget does nothing
+      Given an organization with no contract budget
+      When connect starts a new budget window for it
+      Then the gateway is asked for nothing
+
+    @unit
+    Scenario: A redelivered renewal fact starts the window once
+      Given a contract budget whose window already restarted at or after a renewal
+      When the same renewal fact arrives again
+      Then the window is left alone, so spend since the reset still counts
 
     @unit
     Scenario: A redelivered fact syncs to the same cap

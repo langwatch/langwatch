@@ -21,6 +21,7 @@ import type { AnyTRPCRouter } from "@trpc/server";
 import { TRPCError } from "@trpc/server";
 
 import type { Authorize, Entitlements, PlatformDecision } from "../access/access.ts";
+import { retryAfterOf } from "../errors.ts";
 import type { TrpcAuditSink, TrpcSessionVersions } from "../hosting/api-door.ts";
 import type { SessionCaller, SessionReader } from "../hosting/session-reader.ts";
 import type {
@@ -255,6 +256,15 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
     const query = this.#queries.get(input.path);
 
     return query ? { [SCHEMA_HASH_HEADER]: schemaHashOf(query) } : {};
+  }
+
+  /** A failed call's `Retry-After`, from its handled cause's wait as on REST; none otherwise. */
+  retryAfterHeaders(input: {
+    errors: readonly { cause?: unknown }[];
+  }): Readonly<Record<string, string>> {
+    const retryAfter = input.errors.map(({ cause }) => retryAfterOf(cause)).find(Boolean);
+
+    return retryAfter ? { "Retry-After": retryAfter } : {};
   }
 
   /** The caller's session version header; none for an anonymous caller or an unreadable store. */

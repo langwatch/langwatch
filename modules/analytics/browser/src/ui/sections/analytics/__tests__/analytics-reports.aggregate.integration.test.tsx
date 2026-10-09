@@ -20,7 +20,6 @@ vi.mock("@langwatch/browser-host/use-organization-team-project", async (importOr
   useOrganizationTeamProject: () => ({
     project: projectRef.current,
     organization: { id: "org-1" },
-    hasPermission: (permission: string) => !deniedRef.current.has(permission),
   }),
 }));
 
@@ -82,7 +81,15 @@ import { ReportsContent } from "../analytics-reports.screen.tsx";
 
 const renderReports = () =>
   render(
-    <AnalyticsTestHarness host={new StubAnalyticsHost()}>
+    <AnalyticsTestHarness
+      host={
+        new StubAnalyticsHost({
+          permissions: ["analytics:view", "analytics:create", "analytics:update"].filter(
+            (permission) => !deniedRef.current.has(permission),
+          ),
+        })
+      }
+    >
       <ReportsContent />
     </AnalyticsTestHarness>,
   );

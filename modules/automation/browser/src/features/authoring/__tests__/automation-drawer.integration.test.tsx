@@ -79,6 +79,9 @@ vi.mock("../../../behavior/automation-api.ts", () => ({
       getTriggerById: {
         useQuery: () => mockGetTriggerByIdQuery(),
       },
+      previewTriggerEmail: {
+        useQuery: () => ({ data: undefined }),
+      },
       testFireTemplate: {
         useMutation: () => ({ mutate: vi.fn(), isLoading: false }),
       },

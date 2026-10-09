@@ -466,6 +466,7 @@ function trpcLanes(trpc: TrpcHost): Hono {
       router: trpc.router,
       createContext,
       allowBatching: false,
+      responseMeta: ({ errors }) => ({ headers: trpc.retryAfterHeaders({ errors }) }),
     });
     for (const [name, value] of Object.entries(versionHeaders)) response.headers.set(name, value);
 

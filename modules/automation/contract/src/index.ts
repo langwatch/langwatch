@@ -38,8 +38,6 @@ export * from "./templating/block-kit-allowlist.ts";
 export * from "./templating/defaults.ts";
 export * from "./templating/engine.ts";
 export * from "./templating/example-context.ts";
-export * from "./templating/markdown.ts";
-export * from "./templating/render-email.ts";
 export type {
   SlackPayload,
   SlackRenderDefaults,

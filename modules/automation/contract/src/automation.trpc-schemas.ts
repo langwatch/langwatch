@@ -241,6 +241,25 @@ export const automationApiTestFireInputSchema = z.object({
 });
 export type AutomationApiTestFireInput = z.infer<typeof automationApiTestFireInputSchema>;
 
+/** The email the drawer previews: the test-fire's example context, with no delivery. */
+export const automationApiPreviewEmailInputSchema = automationApiTestFireInputSchema.pick({
+  projectId: true,
+  trigger: true,
+  draft: true,
+  graphAlert: true,
+  report: true,
+});
+export type AutomationApiPreviewEmailInput = z.infer<typeof automationApiPreviewEmailInputSchema>;
+
+export const automationEmailPreviewSchema = z.object({
+  subject: z.string(),
+  html: z.string(),
+  usedDefault: z.boolean(),
+  missingVariables: z.array(z.string()),
+  errors: z.array(z.string()),
+});
+export type AutomationEmailPreview = z.infer<typeof automationEmailPreviewSchema>;
+
 export const automationApiUpsertInputSchema = z.object({
   projectId: z.string(),
   triggerId: z.string().optional(),

@@ -30,13 +30,13 @@ function fakeReader(overrides: {
   tenantIdsSeen: string[];
 }): ModelCostPreviewSpanReader {
   return {
-    async getModelUsageStats(input) {
+    async readModelUsageStats(input) {
       overrides.tenantIdsSeen.push(
         ...input.authorization.grants.map((grant) => grant.projectId ?? ""),
       );
       return overrides.stats ?? [];
     },
-    async getRecentSpansByModels(input) {
+    async readRecentSpansByModels(input) {
       overrides.tenantIdsSeen.push(
         ...input.authorization.grants.map((grant) => grant.projectId ?? ""),
       );

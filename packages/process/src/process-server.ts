@@ -127,6 +127,7 @@ export class ProcessServer implements ProcessBoot {
     if (!this.config.stores)
       throw new Error("The stores config owner must be installed before boot.");
     const config = this.config.stores as StoresConfig;
+    if (role === "api") this.server.expectApplication();
     await this.server.openLiveness();
     const secrets = this.resolver.scopeTo(storesOwner.name, Object.values(storesOwner.secrets));
     let members: ProcessMemberSource | undefined;

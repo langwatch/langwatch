@@ -27,6 +27,7 @@ import {
   type AutomationPersistCapCount,
   type AutomationPersistCapDecision,
   type AutomationUsageCount,
+  type AutomationEmailPreview,
 } from "@langwatch/automation-contract";
 import { type Instant } from "@langwatch/time";
 import type { WebhookApi } from "@langwatch/webhook-contract";
@@ -47,7 +48,7 @@ import type { UnsubscribeTokenVerifier } from "../services/unsubscribe-token.ser
 import { ActiveTriggerCacheService } from "./active-trigger-cache.service.ts";
 import { AutomationEmailSuppressionService } from "./automation-email-suppression.service.ts";
 import { AutomationFireHistoryService } from "./automation-fire-history.service.ts";
-import type { AutomationTemplateService } from "./automation-template.service.ts";
+import type { AutomationTemplateService, TemplatePreviewInput } from "./automation-template.service.ts";
 
 /** The webhook module's log of this module's webhook attempts (ADR-167). */
 type WebhookDeliveryLog = Pick<WebhookApi, "findDeliveriesBySource">;
@@ -134,6 +135,10 @@ export class AutomationService {
 
   validateTemplateDraft(input: TestFireTemplateDraft): void {
     this.templates.validate(input);
+  }
+
+  previewEmail(input: TemplatePreviewInput): Promise<AutomationEmailPreview> {
+    return this.templates.previewEmail(input);
   }
 
   testFire(input: TestFireInput): Promise<TestFireResult> {

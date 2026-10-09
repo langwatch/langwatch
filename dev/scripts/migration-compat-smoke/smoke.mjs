@@ -44,11 +44,11 @@ async function answerOf({ what, response }) {
 }
 
 /** The old image's wire: tRPC with superjson envelopes, REST with a project key. */
-export function createWire({ appBase, fetchImpl = fetch }) {
+export function createWire({ appBase, origin = appBase, fetchImpl = fetch }) {
   const state = { cookie: null };
   const headers = () => ({
     "Content-Type": "application/json",
-    Origin: appBase,
+    Origin: origin,
     ...(state.cookie ? { Cookie: state.cookie } : {}),
   });
   return {

@@ -90,6 +90,30 @@ void describe("an in-process child that crashes after booting", () => {
   });
 });
 
+void describe("a split lane's child that exits non-zero after booting", () => {
+  /** @scenario "An in-process api lane that crashes after booting is started again" */
+  void it("is started again when it outlived the boot window, and waits when it did not", async () => {
+    const booted = startSupervised({
+      bootMs: 400,
+      env: { LANGWATCH_DEV_READY_PATTERN: "", LANGWATCH_DEV_BOOT_SETTLE_MS: "300" },
+    });
+    fs.writeFileSync(path.join(booted.dir, "crash-after"), "");
+    await until(() => booted.stderr().includes("after booting; starting it again"), 8000);
+    fs.rmSync(path.join(booted.dir, "crash-after"));
+    await until(() => booted.events().filter((event) => event === "START").length >= 2);
+    await booted.stop();
+
+    const early = startSupervised({
+      bootMs: 50,
+      env: { LANGWATCH_DEV_READY_PATTERN: "", LANGWATCH_DEV_BOOT_SETTLE_MS: "5000" },
+    });
+    fs.writeFileSync(path.join(early.dir, "crash"), "");
+    await until(() => early.stderr().includes("waiting for the next change"));
+    assert.equal(early.stderr().includes("after booting"), false);
+    await early.stop();
+  });
+});
+
 void describe("a watched child that crashes", () => {
   /** @scenario "A crashed boot waits for the next change instead of ending the lane" */
   void it("stays supervised, says so once, and boots again on the next change", async () => {

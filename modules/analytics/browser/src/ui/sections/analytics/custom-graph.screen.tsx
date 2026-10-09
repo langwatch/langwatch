@@ -336,7 +336,8 @@ function AnalyticsCustomGraphContent({
   } = useAnalyticsPeriod();
   const { showFilters } = useFilterToggle();
 
-  const formData = JSON.stringify(form.watch() ?? {});
+  // The React Compiler memoises `form.watch()` on the stable form; useWatch subscribes.
+  const formData = JSON.stringify(useWatch({ control: form.control }) ?? {});
   const [debouncedCustomGraphInput, setDebouncedCustomGraphInput] = useDebounceValue<
     CustomGraphInput | undefined
   >(undefined, 400);

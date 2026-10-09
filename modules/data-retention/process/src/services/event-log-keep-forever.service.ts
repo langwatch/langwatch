@@ -55,6 +55,12 @@ export class EventLogKeepForeverService {
       if (signal.aborted) break;
       const [latest] = await this.retroactive.findKeepForeverRewrites(target);
       const running = latest !== undefined && !latest.isDone;
+      // A finished, unfailed rewrite already holds the target: nothing to start or wait for.
+      if (latest?.isDone && !latest.latestFailReason) {
+        done.push(name);
+        if (!dryRun) await onTargetDone({ done, wouldStart });
+        continue;
+      }
       if (dryRun) {
         if (!running) wouldStart.push(name);
         continue;

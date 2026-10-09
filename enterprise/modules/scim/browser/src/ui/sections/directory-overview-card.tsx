@@ -45,11 +45,7 @@ export function DirectoryOverviewCard({
   if (reconciliation.isError) {
     return (
       <OverviewCard title="Directory" data-testid="directory-card">
-        {isEnterpriseGateError(reconciliation.error) ? (
-          <DirectoryEnterpriseGate />
-        ) : (
-          <DirectoryReadFailure />
-        )}
+        <DirectoryReadFailure error={reconciliation.error} />
       </OverviewCard>
     );
   }
@@ -92,20 +88,17 @@ export function DirectoryOverviewCard({
 export default DirectoryOverviewCard;
 
 /** The read failed: said on the card, never drawn as an empty directory. */
-function DirectoryReadFailure() {
+function DirectoryReadFailure({ error }: { error: unknown }) {
+  if (isEnterpriseGateError(error)) {
+    return (
+      <Text fontSize="13px" color="fg.muted" data-testid="directory-card-enterprise-gate">
+        Directory sync is an Enterprise feature. Contact sales to upgrade.
+      </Text>
+    );
+  }
   return (
     <Text fontSize="13px" color="fg.muted" data-testid="directory-card-failure">
       Couldn&apos;t read your directory. Try again in a moment.
-    </Text>
-  );
-}
-
-/** A plan state, not a failure: retrying would not change it, so the card says what would. */
-function DirectoryEnterpriseGate() {
-  return (
-    <Text fontSize="13px" color="fg.muted" data-testid="directory-card-enterprise-gate">
-      Directory sync is an Enterprise feature. Once your plan includes it, connect your identity
-      provider and members, groups and sync times fill themselves in.
     </Text>
   );
 }

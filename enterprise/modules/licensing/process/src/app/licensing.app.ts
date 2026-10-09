@@ -98,9 +98,8 @@ import {
 import { ConnectCredentialService } from "../services/connect-credential.service.ts";
 import { ConnectInstallService } from "../services/connect-install.service.ts";
 import type { ConnectUpstreamSlot } from "../services/connect-install.service.ts";
-import { ContractBudgetStoreService } from "../services/contract-budget-store.service.ts";
 import { ContractBudgetService } from "../services/contract-budget.service.ts";
-import type { ContractBudgets, ContractBudgetStore } from "../services/contract-budget.service.ts";
+import type { ContractBudgets } from "../services/contract-budget.service.ts";
 import { DomainClaimAuthorityService } from "../services/domain-claim-authority.service.ts";
 import { HostedServicesService } from "../services/hosted-services.service.ts";
 import { HostedUsageReaderService } from "../services/hosted-usage-reader.service.ts";
@@ -710,14 +709,6 @@ export class LicensingModule implements LicensingApiContract {
     return this.#registry.raiseCommit(input);
   }
 
-  syncContractBudget(input: { organizationId: string; operatorId: string }): Promise<void> {
-    return this.#customerFacts.contractTermsChanged(input);
-  }
-
-  resetContractBudget(input: { organizationId: string; operatorId: string }): Promise<void> {
-    return this.#contractBudgets.reset(input);
-  }
-
   findConnectServicesForManagedKey(input: {
     virtualKeyId: string;
     organizationId: string;
@@ -799,7 +790,6 @@ function licenseRegistryParts({
 }): LicenseRegistryParts {
   const now = () => nowInstant();
   const contractBudgets = ContractBudgetService.create({
-    store: hosted.budgets,
     licensesOf: (organizationId) => infrastructure.repository.findAllByOrganization(organizationId),
     now,
   });
@@ -925,8 +915,8 @@ function licenseRegistryOver({
 }
 
 /**
- * The contract budget and the hosted usage billing reads, over the gateway's budgets and authz's
- * scopes. The hosted routes, their judge and their spend are the connect module's.
+ * The hosted usage billing reads, over the gateway's budgets and authz's scopes. The hosted routes,
+ * their judge, their spend and the contract budget's writes are the connect module's.
  */
 function hostedServicesOverPeers({
   gateway,
@@ -934,12 +924,11 @@ function hostedServicesOverPeers({
 }: {
   gateway: Pick<
     GatewayApi,
-    "listBudgetsWithHealth" | "resetBudget" | "findVirtualKeyById" | "resolveApplicableBudgets"
+    "listBudgetsWithHealth" | "findVirtualKeyById" | "resolveApplicableBudgets"
   >;
   scopes: Pick<AuthzApi, "getScope">;
 }): HostedServicesInfrastructure {
   return {
-    budgets: ContractBudgetStoreService.create({ gateway }),
     usage: HostedUsageReaderService.create({ gateway, scopes }),
   };
 }
@@ -1094,9 +1083,8 @@ function connectInstallParts({
   };
 }
 
-/** The contract budget and the hosted usage licensing still answers, on every deployment. */
+/** The hosted usage licensing still answers billing, on every deployment. */
 type HostedServicesInfrastructure = Readonly<{
-  budgets: ContractBudgetStore;
   usage: HostedUsageReader;
 }>;
 

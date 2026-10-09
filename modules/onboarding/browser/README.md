@@ -16,7 +16,6 @@ Installed by ui, from the app's generated module list (`pnpm generate:modules`).
 | `pages/onboarding/welcome`        | `/onboarding/welcome`           | –      | –     | –              | –     |
 | `pages/onboarding/product/index`  | `/onboarding/product`           | –      | –     | –              | –     |
 | `pages/onboarding/[team]/project` | `/onboarding/:team/project`     | –      | –     | –              | –     |
-| `pages/[project]/setup`           | `/:project/setup` (route table) | –      | –     | `project:view` | –     |
 
 A URL marked (route table) is joined from `apps/ui/src/shell/ui-route-table.ts`; the screen declares no `path`.
 

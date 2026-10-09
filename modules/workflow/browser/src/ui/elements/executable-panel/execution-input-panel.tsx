@@ -9,7 +9,7 @@ import {
 } from "@langwatch/design-system/primitives";
 import { useCallback, useEffect, useMemo } from "react";
 import { Play } from "react-feather";
-import { type FieldErrors, useForm } from "react-hook-form";
+import { Controller, type FieldErrors, useForm } from "react-hook-form";
 
 // Create a simplified field type that matches what we need
 export type InputField = {
@@ -74,10 +74,9 @@ export const ExecutionInputPanel = ({
     },
   });
 
-  const formValues = form.watch();
-
   useEffect(() => {
-    const formIsStale = JSON.stringify(formValues) !== JSON.stringify(defaultValues);
+    // Read live: the React Compiler memoises a `form.watch()` made in render.
+    const formIsStale = JSON.stringify(form.getValues()) !== JSON.stringify(defaultValues);
     if (formIsStale) {
       form.reset(defaultValues as Record<string, string>);
     }
@@ -115,9 +114,13 @@ export const ExecutionInputPanel = ({
               helper={""}
               invalid={!!form.formState.errors[input.identifier]}
             >
-              <Textarea
-                {...form.register(input.identifier)}
-                placeholder={inputPlaceholder(input.type)}
+              {/* Controller, not `register`: the compiler memoises its ref past a reset. */}
+              <Controller
+                control={form.control}
+                name={input.identifier}
+                render={({ field }) => (
+                  <Textarea {...field} placeholder={inputPlaceholder(input.type)} />
+                )}
               />
               <Field.ErrorText>{form.formState.errors[input.identifier]?.message}</Field.ErrorText>
             </HorizontalFormControl>

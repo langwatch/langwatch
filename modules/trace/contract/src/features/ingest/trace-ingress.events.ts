@@ -23,11 +23,12 @@ const traceIngressEventEnvelopeSchema = z.object({
   idempotencyKey: z.string().optional(),
 });
 
+/** Ids optional: the event log keeps only the traceparent, so an event read back carries none. */
 export const spanReceivedEventMetadataSchema = z
   .object({
     processingTraceparent: z.string().optional(),
-    spanId: z.string(),
-    traceId: z.string(),
+    spanId: z.string().optional(),
+    traceId: z.string().optional(),
   })
   .passthrough();
 
@@ -42,7 +43,7 @@ export const spanReceivedEventSchema = z.object({
   ...traceIngressEventEnvelopeSchema.shape,
   type: z.literal(SPAN_RECEIVED_EVENT_TYPE),
   data: spanReceivedEventDataSchema,
-  metadata: spanReceivedEventMetadataSchema,
+  metadata: spanReceivedEventMetadataSchema.optional(),
 });
 
 /** What a metering consumer reads of span_received: its trace and when the span started. */

@@ -90,14 +90,6 @@ Feature: Organization authentication settings
       When she opens the authentication page
       Then the counts she may not read say so rather than reading zero
 
-    @integration
-    Scenario: A plan without directory sync says so on the directory card
-      Given "acme"'s plan does not include directory sync
-      When "ana" opens the authentication page
-      Then the directory card says directory sync is an Enterprise feature
-      And it does not ask her to try again in a moment
-      But a read that failed for another reason still says it could not be read
-
     @unit
     Scenario: One source that stopped is never summarised as working
       Given one source is syncing and another needs attention
