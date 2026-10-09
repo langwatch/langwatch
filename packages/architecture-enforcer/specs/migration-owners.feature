@@ -59,3 +59,45 @@ Feature: Each SQL migration belongs to one owner
     Given the repository's migrations
     When the tree's two-owner migrations are counted
     Then there are none
+
+  # A blocking upgrade step never touches a sign-in table (Alex, 2026-10-09, UPGRADE-IN-WORKER,
+  # UIW-9): the api serves sign-in while the worker upgrades. Sign-in tables: every table auth,
+  # user, organization, authz and identity (SSO config) claim. Policy `upgrade-sign-in-tables`
+  # reuses this policy's touch parsing; a change to them ships as a background step.
+
+  @unimplemented
+  Scenario: A blocking step whose SQL touches a sign-in table is refused, naming the step and the table
+    Given a blocking data step whose frozen SQL updates a table the user module claims
+    When the upgrade-sign-in-tables policy runs
+    Then it reports the step, naming its id, the table and user as the owner
+    And the fix says to ship the change as a background step
+
+  @unimplemented
+  Scenario: A background step touching a sign-in table passes
+    Given a background step whose SQL updates a table the organization module claims
+    When the upgrade-sign-in-tables policy runs
+    Then it reports nothing for that step
+
+  @unimplemented
+  Scenario: A blocking step touching only other owners' tables passes
+    Given a blocking data step whose frozen SQL updates a table the dataset module claims
+    When the upgrade-sign-in-tables policy runs
+    Then it reports nothing for that step
+
+  @unimplemented
+  Scenario: A Postgres schema migration on a sign-in table passes
+    Given a Prisma migration that adds a column to a table the auth module claims
+    When the upgrade-sign-in-tables policy runs
+    Then it reports nothing, because the api holds through the schema phase
+
+  @unimplemented
+  Scenario: The sign-in owners are read from ownership claims
+    Given the repository's modules and their Prisma claims
+    When the policy resolves the sign-in tables
+    Then they are exactly the tables auth, user, organization, authz and identity claim
+
+  @unimplemented
+  Scenario: The tree has no blocking step touching a sign-in table
+    Given the repository's blocking steps
+    When the steps touching a sign-in table are counted
+    Then there are none

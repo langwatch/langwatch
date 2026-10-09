@@ -10,7 +10,7 @@
   and this Job is that something.
 
   What this does. One Job, on the NEW image, running only the upgrade (the
-  api's `start:prepare:db`: `pnpm task upgrade`, then the system-migrations
+  api's `start:prepare:db`: `pnpm task upgrade` alone, with no system-migrations
   pass), before helm applies any Deployment. It is fail-closed: an upgrade that
   fails stops the helm upgrade with the new image never rolled and the old one
   still serving the old schema, which is the state an operator can reason
