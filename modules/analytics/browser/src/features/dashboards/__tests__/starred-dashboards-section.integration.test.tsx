@@ -65,6 +65,37 @@ describe("the starred dashboards group", () => {
     });
   });
 
+  describe("given the member starred more than 7 boards", () => {
+    const starsOf = (count: number) =>
+      Array.from({ length: count }, (_, index) => ({
+        kind: "board",
+        dashboard: { ...LATENCY, id: `board-${index}`, name: `Board ${index}` },
+      }));
+
+    /** @scenario "Starred dashboards in other products' sidebars stop at 7" */
+    it("lists 7 and an All starred (N) row that opens Dashboards", async () => {
+      const user = userEvent.setup();
+      const { host } = renderStarred({ stars: starsOf(9) });
+
+      const group = within(await screen.findByRole("region", { name: "Starred dashboards" }));
+      expect(group.getAllByRole("link").map((link) => link.textContent)).toEqual([
+        ...[0, 1, 2, 3, 4, 5, 6].map((index) => `Board ${index}`),
+        "All starred (9)",
+      ]);
+      await user.click(group.getByRole("link", { name: "All starred (9)" }));
+      expect(host.navigations).toEqual(["/test-project/dashboards"]);
+    });
+
+    /** @scenario "Starred dashboards in other products' sidebars stop at 7" */
+    it("adds no All starred row at 7 or fewer", async () => {
+      renderStarred({ stars: starsOf(7) });
+
+      const group = within(await screen.findByRole("region", { name: "Starred dashboards" }));
+      expect(group.getAllByRole("link")).toHaveLength(7);
+      expect(group.queryByText(/^All starred/)).toBeNull();
+    });
+  });
+
   describe("given the member starred nothing, or the stars cannot be read", () => {
     /** @scenario "Starred dashboards show in the other products' sidebars" */
     it("draws nothing", async () => {

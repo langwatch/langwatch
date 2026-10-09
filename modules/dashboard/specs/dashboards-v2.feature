@@ -877,6 +877,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     When the member opens /[project]/dashboards/curated/<template id>
     Then the template's widgets run over the project's data, badged "From LangWatch"
     And nothing can be moved, edited or added, and nothing is stored
+    And its header has no "Duplicate to edit" button
     And an unknown template id shows the not-found page
 
   @unit @integration
@@ -887,9 +888,10 @@ Feature: Dashboards v2 polish and bring-your-own-AI
 
   @integration
   Scenario: From LangWatch: Duplicate to edit makes an own board named after the template
-    When the member presses "Duplicate to edit"
+    When the member presses "Duplicate to edit" in the board's sidebar menu
     Then a board named "<name> (copy)" is made for the project with the template's built widgets
     And it opens, with the template's report prompt drafted in Langy, unsent
+    # The board's header has no such button: the sidebar menu is the only place
 
   @unit @integration
   Scenario: From LangWatch: a template board asks Langy with the board as context
@@ -1099,6 +1101,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
       has not set up yet: the data its widgets need (such as cost, user id or evaluator
       results) and integrations not connected
     And it names the pieces the template's widgets need that the member can send or turn on
+    And it lists each widget that waits for such data, as "<widget>" needs <data>
     And it asks Langy to say what is missing and offer to help set up each piece
     # Owner list, 2026-10-08. Plain traces and what LangWatch has still to build are not named.
 

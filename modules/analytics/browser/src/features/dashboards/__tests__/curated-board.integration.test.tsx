@@ -48,12 +48,12 @@ afterEach(cleanup);
 
 describe("given a member opens a From LangWatch board", () => {
   /** @scenario "From LangWatch: a template board is live and read-only" */
-  it("shows the template badged, offering Duplicate to edit and no way to change it", async () => {
+  it("shows the template badged, with no Duplicate to edit in the header and no way to change it", async () => {
     const { server } = openCurated("release");
 
     expect(await screen.findByRole("heading", { name: "Release check" })).toBeInTheDocument();
     expect(screen.getByText("From LangWatch")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Duplicate to edit" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Duplicate to edit" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Add a widget" })).toBeNull();
     expect(screen.queryByRole("button", { name: /^Actions for / })).toBeNull();
     expect(server.calls.filter(({ path }) => WRITES.test(path))).toEqual([]);
