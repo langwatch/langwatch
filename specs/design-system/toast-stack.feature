@@ -13,8 +13,16 @@ Feature: Toasts stack in place
   Scenario: Reaching for the stack fans it out and holds every timer
     Given a collapsed stack of toasts
     When the pointer enters the stack
-    Then every card spreads out to be read
+    Then the cards spread a little, still overlapping
     And every timer holds until the pointer leaves
+
+  @integration
+  Scenario: Clicking the stack opens it into the full list
+    Given a collapsed stack of toasts
+    When the pointer enters the stack
+    And the stack is clicked
+    Then every card shows in the full list
+    And the stack collapses again when the pointer leaves or a click lands outside it
 
   @integration
   Scenario: A stack says how many toasts wait behind it
