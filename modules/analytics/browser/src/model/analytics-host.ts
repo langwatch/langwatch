@@ -76,6 +76,9 @@ export type AnalyticsLangyAskRequest = {
   context: readonly AnalyticsLangyContext[];
 };
 
+/** The release flags an Analytics screen reads; the mount answers each one. */
+export type AnalyticsReleaseFlag = "release_dashboards" | "release_langy_enabled";
+
 export abstract class AnalyticsHostApi {
   /** The project in scope, or undefined before one resolves. */
   abstract project(): AnalyticsHostProject | undefined;
@@ -95,7 +98,7 @@ export abstract class AnalyticsHostApi {
   abstract isSettled(): boolean;
 
   /** On, off, or `undefined` while the flag has not answered yet. */
-  abstract featureFlag(flag: string): boolean | undefined;
+  abstract featureFlag(flag: AnalyticsReleaseFlag): boolean | undefined;
 
   abstract route(): AnalyticsRouteReading;
 
