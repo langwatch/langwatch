@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/cmd/viewer/sources"
-	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
 // The top row is fixed. Before this the tabs were whatever capture files
@@ -112,10 +111,8 @@ type Sources struct {
 	Traces   sources.Traces
 	Metrics  sources.Metrics
 	Profiles sources.Profiles
-	// ObservabilityTier is the tier the stack runs on; the native tier has no profiler.
-	ObservabilityTier domain.ObservabilityTier
-	Stores            sources.Stores
-	Jobs              sources.Jobs
+	Stores   sources.Stores
+	Jobs     sources.Jobs
 	// Render turns one captured line into the reader form the log tab shows.
 	Render func(line sources.LogLine) string
 	// Open sends a URL to the browser, for `o`.
@@ -154,10 +151,4 @@ func New(src Sources) []Tab {
 // doing nothing" when it means "nothing was asked".
 func stackDownBody() []Row {
 	return textRows([]string{" " + dim(sources.ErrStackDown.Error()+" - start it with `"+sources.StartObservabilityCommand+"`")})
-}
-
-// profilesNativeBody is the profiles empty state on the native tier, where no
-// profiler runs and the stack being up is not the question.
-func profilesNativeBody() []Row {
-	return textRows([]string{" " + dim("Profiles need the container tier ("+domain.ObservabilityTierEnvVar+"="+string(domain.ObservabilityTierContainer)+")")})
 }

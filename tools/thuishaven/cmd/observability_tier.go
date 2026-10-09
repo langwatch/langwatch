@@ -14,7 +14,6 @@ import (
 
 // observabilityStack picks the observability tier: native host processes on
 // macOS, the LGTM container elsewhere or when LANGWATCH_HAVEN_OBS_TIER pins it.
-// The native tier drops Pyroscope, so its endpoints publish no profiler port.
 func observabilityStack(rt *colima.Runtime, ram uint64, cpus int) app.Observability {
 	tier, pinned, ok := selectedObservabilityTier()
 	if !ok {
@@ -26,14 +25,14 @@ func observabilityStack(rt *colima.Runtime, ram uint64, cpus int) app.Observabil
 	if tier == domain.ObservabilityTierContainer {
 		return container
 	}
-	endpoints := observabilityEndpoints()
-	endpoints.PyroscopePort = 0
 	tempo, _ := domain.TempoNativeArtifactFor(runtime.GOOS, runtime.GOARCH)
 	alloy, _ := domain.AlloyNativeArtifactFor(runtime.GOOS, runtime.GOARCH)
+	pyroscope, _ := domain.PyroscopeNativeArtifactFor(runtime.GOOS, runtime.GOARCH)
 	return otelnative.New(otelnative.Options{
-		Home: havenHome(), Endpoints: endpoints, Limits: observabilityLimits(ram, cpus),
+		Home: havenHome(), Endpoints: observabilityEndpoints(), Limits: observabilityLimits(ram, cpus),
 		TempoBin: devEnv("HAVEN_OBS_TEMPO_BIN"), TempoArtifact: tempo,
 		AlloyBin: devEnv("HAVEN_OBS_ALLOY_BIN"), AlloyArtifact: alloy,
+		PyroscopeBin: devEnv("HAVEN_OBS_PYROSCOPE_BIN"), PyroscopeArtifact: pyroscope,
 		Container: container, // stopped when running: it publishes the same ports
 	})
 }

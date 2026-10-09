@@ -48,6 +48,10 @@ type NativeObservabilityPorts struct {
 	TempoOTLPHTTP  int // where the collector forwards spans, as the bundle did (4418)
 	TempoGossip    int // memberlist; moved off 7946 and pinned to loopback
 	CollectorHTTP  int // Alloy's own UI and readiness endpoint
+	// Pyroscope's HTTP port is Endpoints.PyroscopePort; its gRPC (which the
+	// bundle puts on 9097, now Tempo's) and memberlist move beside Tempo's.
+	PyroscopeGRPC   int
+	PyroscopeGossip int
 }
 
 // DefaultNativeObservabilityPorts mirrors the bundle's internal layout.
@@ -55,7 +59,7 @@ func DefaultNativeObservabilityPorts() NativeObservabilityPorts {
 	return NativeObservabilityPorts{
 		PrometheusHTTP: 9090, LokiHTTP: 3100, LokiGRPC: 9096,
 		TempoHTTP: 3200, TempoGRPC: 9097, TempoOTLPHTTP: 4418, TempoGossip: 7947,
-		CollectorHTTP: 12345,
+		CollectorHTTP: 12345, PyroscopeGRPC: 9098, PyroscopeGossip: 7948,
 	}
 }
 
@@ -137,6 +141,35 @@ func AlloyNativeArtifactFor(goos, goarch string) (PinnedArtifact, bool) {
 	return PinnedArtifact{URL: url, SHA256: sum, Member: asset}, true
 }
 
+// PyroscopeBinary is where haven installs the pinned Pyroscope, beside Tempo.
+func (p NativeObservabilityPlan) PyroscopeBinary() string {
+	return filepath.Join(p.Dir, "bin", "pyroscope", PyroscopeNativeVersion, "pyroscope")
+}
+
+// PyroscopeNativeVersion is the Pyroscope release haven fetches on macOS: the
+// newest of the 2.x line the bundle runs (v2.0.2 in otel-lgtm 0.28.0), whose
+// v2 storage config RenderNativePyroscopeConfig mirrors.
+const PyroscopeNativeVersion = "2.3.2"
+
+// pyroscopeNativeDigests are GitHub's recorded sha256 of each darwin tarball
+// (`gh api repos/grafana/pyroscope/releases/tags/v2.3.2`, field assets[].digest).
+var pyroscopeNativeDigests = map[string]string{
+	"darwin/arm64": "2560e2fdd172dfeec0ceed7714959cb17cda452c481ed150269cb81b82977d38",
+	"darwin/amd64": "a3877d18c0ce7554985f6baef9b6762ae161b8d30d08ce7fe6aeeb890dfd4914",
+}
+
+// PyroscopeNativeArtifactFor returns the pinned Pyroscope tarball for a
+// machine, or false where haven pins none (then pyroscope is looked up on PATH).
+func PyroscopeNativeArtifactFor(goos, goarch string) (PinnedArtifact, bool) {
+	sum, ok := pyroscopeNativeDigests[goos+"/"+goarch]
+	if !ok {
+		return PinnedArtifact{}, false
+	}
+	url := fmt.Sprintf("https://github.com/grafana/pyroscope/releases/download/v%s/pyroscope_%s_%s_%s.tar.gz",
+		PyroscopeNativeVersion, PyroscopeNativeVersion, goos, goarch)
+	return PinnedArtifact{URL: url, SHA256: sum, Member: "pyroscope"}, true
+}
+
 // NativeComponent is one host process of the native stack.
 type NativeComponent struct {
 	Name     string
@@ -176,7 +209,7 @@ func NativeObservabilityComponents(p NativeObservabilityPlan, grafanaHome string
 		fmt.Sprintf("--web.listen-address=127.0.0.1:%d", p.Ports.PrometheusHTTP),
 		"--web.enable-otlp-receiver",
 	}, strings.Fields(p.Limits.PrometheusExtraArgs())...)
-	return []NativeComponent{
+	stores := []NativeComponent{
 		{
 			Name: "prometheus", Binary: "prometheus", Install: "brew install prometheus",
 			Args:     prometheusArgs,
@@ -196,6 +229,17 @@ func NativeObservabilityComponents(p NativeObservabilityPlan, grafanaHome string
 			Files:    map[string]string{"tempo.yaml": RenderNativeTempoConfig(p)},
 			ReadyURL: loopback(p.Ports.TempoHTTP) + "/ready",
 		},
+	}
+	if p.Endpoints.PyroscopePort != 0 {
+		stores = append(stores, NativeComponent{
+			Name: "pyroscope", Binary: "pyroscope",
+			Install:  "haven fetches Pyroscope " + PyroscopeNativeVersion + " on macOS; elsewhere put pyroscope on PATH or set HAVEN_OBS_PYROSCOPE_BIN",
+			Args:     []string{"-config.file=" + filepath.Join(cfg, "pyroscope.yaml")},
+			Files:    map[string]string{"pyroscope.yaml": RenderNativePyroscopeConfig(p)},
+			ReadyURL: loopback(p.Endpoints.PyroscopePort) + "/ready",
+		})
+	}
+	return append(stores, []NativeComponent{
 		{
 			Name: "alloy", Binary: "alloy", Required: true,
 			Install: "haven fetches Alloy " + AlloyNativeVersion + " on macOS; elsewhere put alloy on PATH or set HAVEN_OBS_ALLOY_BIN",
@@ -204,8 +248,9 @@ func NativeObservabilityComponents(p NativeObservabilityPlan, grafanaHome string
 				"--storage.path=" + filepath.Join(data, "alloy"), "--disable-reporting",
 				filepath.Join(cfg, "collector.alloy"),
 			},
-			Files:    map[string]string{"collector.alloy": RenderNativeCollectorConfig(p)},
-			ReadyURL: loopback(p.Ports.CollectorHTTP) + "/-/ready",
+			Files: map[string]string{"collector.alloy": RenderNativeCollectorConfig(p)},
+			// The adapter also checks the OTLP ports: a failed receiver still answers 200.
+			ReadyURL: loopback(p.Ports.CollectorHTTP) + "/-/healthy",
 		},
 		{
 			Name: "grafana", Binary: "grafana", Install: "brew install grafana", Required: true,
@@ -216,7 +261,49 @@ func NativeObservabilityComponents(p NativeObservabilityPlan, grafanaHome string
 			},
 			ReadyURL: p.Endpoints.GrafanaURL() + "/api/health",
 		},
-	}
+	}...)
+}
+
+// RenderNativePyroscopeConfig is the bundle's single-process v2-storage
+// Pyroscope on local disk, its gRPC and memberlist moved off Tempo's ports and
+// everything bound to loopback.
+func RenderNativePyroscopeConfig(p NativeObservabilityPlan) string {
+	dir := filepath.Join(p.DataDir(), "pyroscope")
+	grpc := fmt.Sprintf("127.0.0.1:%d", p.Ports.PyroscopeGRPC)
+	return fmt.Sprintf(`server:
+  http_listen_address: 127.0.0.1
+  http_listen_port: %d
+  grpc_listen_address: 127.0.0.1
+  grpc_listen_port: %d
+  log_level: warn
+memberlist:
+  bind_addr: [127.0.0.1]
+  bind_port: %d
+metastore:
+  address: %s
+  min_ready_duration: 1s
+  data_dir: %s/metastore/data
+  raft:
+    dir: %s/metastore/raft
+    snapshots_dir: %s/metastore/raft
+architecture_storage: v2
+limits:
+  write_path: segment-writer
+storage:
+  backend: filesystem
+  filesystem:
+    dir: %s/shared
+distributor:
+  ring:
+    kvstore:
+      store: inmemory
+segment_writer:
+  lifecycler:
+    min_ready_duration: 1s
+query_backend:
+  address: %s
+`, p.Endpoints.PyroscopePort, p.Ports.PyroscopeGRPC, p.Ports.PyroscopeGossip,
+		grpc, dir, dir, dir, dir, grpc)
 }
 
 // RenderNativePrometheusConfig is the bundle's OTLP setup plus the worktree
@@ -413,8 +500,18 @@ level = warn
 }
 
 // RenderNativeGrafanaDatasources provisions the bundle's datasource uids
-// (loki, prometheus, tempo): haven's viewer and agents' queries proxy by uid.
+// (loki, prometheus, tempo, pyroscope while its port is set): haven's viewer
+// and agents' queries proxy by uid.
 func RenderNativeGrafanaDatasources(p NativeObservabilityPlan) string {
+	pyroscope := ""
+	if p.Endpoints.PyroscopePort != 0 {
+		pyroscope = fmt.Sprintf(`  - name: Pyroscope
+    type: grafana-pyroscope-datasource
+    uid: pyroscope
+    access: proxy
+    url: http://127.0.0.1:%d
+`, p.Endpoints.PyroscopePort)
+	}
 	return fmt.Sprintf(`apiVersion: 1
 datasources:
   - name: Prometheus
@@ -443,5 +540,5 @@ datasources:
         filterByTraceID: true
       serviceMap:
         datasourceUid: prometheus
-`, p.Ports.PrometheusHTTP, p.Ports.LokiHTTP, p.Ports.TempoHTTP)
+`, p.Ports.PrometheusHTTP, p.Ports.LokiHTTP, p.Ports.TempoHTTP) + pyroscope
 }

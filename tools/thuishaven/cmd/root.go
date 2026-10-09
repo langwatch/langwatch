@@ -173,6 +173,7 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 		envInt("HAVEN_REDIS_MAXMEMORY_MB", domain.DefaultRedisMaxMemoryMB),
 	)
 	obs := observabilityStack(rt, ram, cpus)
+	obsTier, _, _ := selectedObservabilityTier()
 
 	// The console floor haven imposes while the observability stack is up: default
 	// warn, because the full info/debug stream is in Grafana and the terminal only
@@ -221,6 +222,8 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 		// and a default-on stop would yank it out from under them.
 		ShouldStopClickHouseIdle: devEnv("LANGWATCH_HAVEN_CH_STOP_IDLE") == "1",
 		ClickHousePostgresHost:   chRuntime.PostgresHost(),
+		ClickHouseRuntime:        chRuntime,
+		ObservabilityTier:        obsTier,
 		ShouldManagePostgres:     devEnv("LANGWATCH_HAVEN_PG") != "0",
 		ShouldManageRedis:        devEnv("LANGWATCH_HAVEN_REDIS") != "0",
 		RedisDBOverride:          app.RedisDBOverrideFromEnv(devEnv("LANGWATCH_HAVEN_REDIS_DB")),

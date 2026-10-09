@@ -9,8 +9,8 @@ import (
 func TestNativePinnedBinariesOnMacOS(t *testing.T) {
 	home := string(filepath.Separator) + "h"
 	bins := NativePinnedBinaries(home, "darwin", "arm64")
-	if len(bins) != 3 || bins[0].Name != "clickhouse" || bins[1].Name != "tempo" || bins[2].Name != "alloy" {
-		t.Fatalf("got %+v, want clickhouse, tempo then alloy", bins)
+	if len(bins) != 4 || bins[0].Name != "clickhouse" || bins[1].Name != "tempo" || bins[2].Name != "alloy" || bins[3].Name != "pyroscope" {
+		t.Fatalf("got %+v, want clickhouse, tempo, alloy then pyroscope", bins)
 	}
 	if want := filepath.Join(home, ClickHouseNativeDir, "bin", ClickHouseNativeVersion, "clickhouse"); bins[0].Dest != want {
 		t.Errorf("clickhouse dest %q, want %q", bins[0].Dest, want)
@@ -20,6 +20,9 @@ func TestNativePinnedBinariesOnMacOS(t *testing.T) {
 	}
 	if bins[2].Artifact.SHA256 == "" || bins[2].Artifact.Member != "alloy-darwin-arm64" {
 		t.Errorf("alloy artifact not pinned: %+v", bins[2].Artifact)
+	}
+	if bins[3].Artifact.SHA256 == "" || bins[3].Artifact.Member != "pyroscope" {
+		t.Errorf("pyroscope artifact not pinned: %+v", bins[3].Artifact)
 	}
 }
 
@@ -36,8 +39,8 @@ func TestMissingPinnedBinariesSkipsWhatIsOnDisk(t *testing.T) {
 	bins := NativePinnedBinaries(home, "darwin", "arm64")
 	onDisk := map[string]bool{bins[0].Dest: true}
 	missing := MissingPinnedBinaries(bins, func(p string) bool { return onDisk[p] })
-	if len(missing) != 2 || missing[0].Name != "tempo" || missing[1].Name != "alloy" {
-		t.Fatalf("got %+v, want only tempo and alloy", missing)
+	if len(missing) != 3 || missing[0].Name != "tempo" || missing[1].Name != "alloy" || missing[2].Name != "pyroscope" {
+		t.Fatalf("got %+v, want only tempo, alloy and pyroscope", missing)
 	}
 	all := MissingPinnedBinaries(bins, func(string) bool { return true })
 	if len(all) != 0 {

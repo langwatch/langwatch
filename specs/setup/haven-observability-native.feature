@@ -4,9 +4,10 @@ Feature: The observability stack runs natively on macOS
   worktree reads its own logs, traces and metrics in Grafana. What changes is
   where it runs. On macOS it no longer needs a colima VM: haven starts the
   same stack the grafana/otel-lgtm bundle carries, as host processes from
-  Homebrew and a pinned Tempo release haven fetches itself: Grafana over Loki, Prometheus and Tempo,
+  Homebrew and pinned Tempo, Alloy and Pyroscope releases haven fetches itself:
+  Grafana over Loki, Prometheus, Tempo and Pyroscope,
   with Grafana Alloy (Grafana's OpenTelemetry Collector distribution)
-  receiving OTLP and fanning it out. Pyroscope is dropped.
+  receiving OTLP and fanning it out.
 
   It presents the same endpoints on the same ports, with the same datasource
   ids, so nothing upstream of it changes: not the overlay, not the app, not
@@ -44,6 +45,30 @@ Feature: The observability stack runs natively on macOS
       When LANGWATCH_HAVEN_OBS is "0"
       Then no tier is started and nothing is linked unless a stack already answers
 
+  Rule: The colima VM is needed only by a container-only feature
+
+    # domain/container_need.go decides; app/report.go reports it.
+
+    Scenario: A default Mac needs no colima VM
+      Given a Mac with native ClickHouse and the native observability tier
+      And no stack runs langy in a container
+      Then haven needs no colima VM
+
+    Scenario: Each container-only selection names why the VM is needed
+      When ClickHouse runs as a container, the LGTM tier is pinned or a stack runs sandboxed langy
+      Then haven needs the colima VM and names each of those reasons
+
+    Scenario: Status reports an unneeded VM without probing it
+      Given haven needs no colima VM
+      When I run haven status
+      Then colima is reported as not needed
+      And colima is never asked whether the VM is running
+
+    Scenario: Status probes the VM only when a feature needs it
+      Given a stack runs sandboxed langy
+      When I run haven status
+      Then colima reports whether its profile is running, without starting it
+
   Rule: The native tier presents the same endpoints as the container
 
     Scenario: One OTLP endpoint, on the same port
@@ -53,19 +78,30 @@ Feature: The observability stack runs natively on macOS
 
     Scenario: Grafana can query every store under the same datasource ids
       Given the native tier is planned
-      Then Grafana is provisioned with the loki, prometheus and tempo datasources
-      And none is named pyroscope
+      Then Grafana is provisioned with the loki, prometheus, tempo and pyroscope datasources
 
-    Scenario: Profiling is off, not broken
+    Scenario: Profiles land on the container tier's port
       Given the native tier is planned
-      Then no Pyroscope endpoint is published
-      And the overlay names none, so nothing profiles into a void
+      Then Pyroscope listens on loopback on the container tier's profiling port, 4040
+      And its gRPC and memberlist ports stay clear of Tempo's
+      And it runs the bundle's v2-storage config with every path under the data directory
 
     Scenario: Metrics carry the worktree label
       Given the native tier is planned
       Then Prometheus promotes langwatch.worktree to a metric label
 
-  Rule: Tempo comes from a pinned release, not from Homebrew
+    Scenario: Every signal reaches its store
+      Given the native tier is planned
+      Then the collector sends metrics to Prometheus's OTLP receiver
+      And logs to Loki's OTLP endpoint and traces to Tempo's OTLP receiver
+      And each store listens where the collector sends
+
+    Scenario: A collector whose receiver did not start is down
+      Given the collector runs but its OTLP receiver could not bind its port
+      When haven probes the collector
+      Then the collector counts as down, not ready
+
+  Rule: Tempo and Pyroscope come from pinned releases, not from Homebrew
 
     Scenario: Haven fetches a pinned, checksummed Tempo
       Given a Mac with no HAVEN_OBS_TEMPO_BIN set
@@ -79,6 +115,20 @@ Feature: The observability stack runs natively on macOS
     @unimplemented
     Scenario: HAVEN_OBS_TEMPO_BIN overrides the download
       Given HAVEN_OBS_TEMPO_BIN names a tempo binary
+      When the native stack comes up
+      Then haven runs that binary and downloads nothing
+
+    Scenario: Haven fetches a pinned, checksummed Pyroscope
+      Given a Mac with no HAVEN_OBS_PYROSCOPE_BIN set
+      When the native stack first comes up
+      Then haven downloads the pinned Pyroscope 2.x darwin tarball for its architecture into its home
+      And installs the pyroscope binary only when the tarball matches its pinned sha256
+      And a later "haven observability down" keeps the binary
+
+    # Unbound: the override is adapter behaviour, proven live.
+    @unimplemented
+    Scenario: HAVEN_OBS_PYROSCOPE_BIN overrides the download
+      Given HAVEN_OBS_PYROSCOPE_BIN names a pyroscope binary
       When the native stack comes up
       Then haven runs that binary and downloads nothing
 

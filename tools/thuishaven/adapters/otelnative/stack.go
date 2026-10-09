@@ -1,6 +1,6 @@
 // Package otelnative implements app.Observability as host processes: the
 // grafana/otel-lgtm stack (Alloy fronting Loki, Prometheus and Tempo, Grafana
-// over all three) run from Homebrew binaries with no VM. Spec:
+// over all three, plus Pyroscope) run as host processes with no VM. Spec:
 // specs/setup/haven-observability-native.feature. Configs are rendered by
 // domain.NativeObservabilityComponents.
 package otelnative
@@ -25,7 +25,7 @@ import (
 // Stack is the host-process implementation of app.Observability.
 type Stack struct {
 	plan      domain.NativeObservabilityPlan
-	pinned    map[string]pinnedComponent // by component name: tempo and alloy
+	pinned    map[string]pinnedComponent // by component name: tempo, alloy and pyroscope
 	container ContainerStack
 }
 
@@ -45,14 +45,16 @@ type pinnedComponent struct {
 
 // Options are what New builds a Stack from.
 type Options struct {
-	Home          string // haven's home; the stack lives under home/observability
-	Endpoints     domain.ObservabilityEndpoints
-	Limits        domain.ObservabilityLimits
-	TempoBin      string
-	TempoArtifact domain.PinnedArtifact
-	AlloyBin      string
-	AlloyArtifact domain.PinnedArtifact
-	Container     ContainerStack // nil when no container runtime is configured
+	Home              string // haven's home; the stack lives under home/observability
+	Endpoints         domain.ObservabilityEndpoints
+	Limits            domain.ObservabilityLimits
+	TempoBin          string
+	TempoArtifact     domain.PinnedArtifact
+	AlloyBin          string
+	AlloyArtifact     domain.PinnedArtifact
+	PyroscopeBin      string
+	PyroscopeArtifact domain.PinnedArtifact
+	Container         ContainerStack // nil when no container runtime is configured
 }
 
 // New builds a Stack whose files live under home/observability.
@@ -64,8 +66,9 @@ func New(o Options) *Stack {
 		Limits:    o.Limits,
 	}
 	return &Stack{plan: plan, container: o.Container, pinned: map[string]pinnedComponent{
-		"tempo": {override: o.TempoBin, artifact: o.TempoArtifact, dest: plan.TempoBinary()},
-		"alloy": {override: o.AlloyBin, artifact: o.AlloyArtifact, dest: plan.AlloyBinary()},
+		"tempo":     {override: o.TempoBin, artifact: o.TempoArtifact, dest: plan.TempoBinary()},
+		"alloy":     {override: o.AlloyBin, artifact: o.AlloyArtifact, dest: plan.AlloyBinary()},
+		"pyroscope": {override: o.PyroscopeBin, artifact: o.PyroscopeArtifact, dest: plan.PyroscopeBinary()},
 	}}
 }
 
@@ -90,7 +93,7 @@ func (s *Stack) Ensure(ctx context.Context) (domain.ObservabilityEndpoints, erro
 	s.retireContainer(ctx)
 	limitMB := domain.NativeMemoryLimitMB(s.plan.Limits, len(components))
 	for _, c := range components {
-		if ready(ctx, c.ReadyURL) {
+		if s.serving(ctx, c) {
 			continue // another worktree's stack, or still up from the last run
 		}
 		if conflict := s.portConflict(ctx, c); conflict != "" {
@@ -108,7 +111,8 @@ func (s *Stack) Ensure(ctx context.Context) (domain.ObservabilityEndpoints, erro
 }
 
 // retireContainer stops haven's own LGTM container when it runs, then waits
-// for colima's forward of the Grafana port to close, so native can bind it.
+// for colima's forwards of Grafana and both OTLP ports to close, so native can
+// bind them: Alloy losing that race left a collector receiving nothing.
 func (s *Stack) retireContainer(ctx context.Context) {
 	if s.container == nil {
 		return
@@ -123,10 +127,34 @@ func (s *Stack) retireContainer(ctx context.Context) {
 	}
 	fmt.Fprintf(os.Stderr, "haven: observability: stopped the %s container; native observability uses its ports now\n", domain.ObservabilityContainer)
 	for deadline := time.Now().Add(15 * time.Second); time.Now().Before(deadline); time.Sleep(500 * time.Millisecond) {
-		if _, held := listener(ctx, s.plan.Endpoints.GrafanaPort); !held {
+		if !s.anyPublicPortHeld(ctx) {
 			return
 		}
 	}
+}
+
+// serving is c answering its probe with every port it owns held: Alloy answers
+// 200 on /-/healthy even after its OTLP receiver failed to bind.
+func (s *Stack) serving(ctx context.Context, c domain.NativeComponent) bool {
+	if !ready(ctx, c.ReadyURL) {
+		return false
+	}
+	for _, port := range domain.NativeComponentPorts(s.plan, c.Name) {
+		if _, held := listener(ctx, port); port != 0 && !held {
+			return false
+		}
+	}
+	return true
+}
+
+func (s *Stack) anyPublicPortHeld(ctx context.Context) bool {
+	e := s.plan.Endpoints
+	for _, port := range []int{e.GrafanaPort, e.OTLPGRPCPort, e.OTLPHTTPPort} {
+		if _, held := listener(ctx, port); held {
+			return true
+		}
+	}
+	return false
 }
 
 // portConflict names the first of c's ports another process listens on ("" if none).
@@ -168,7 +196,7 @@ func (s *Stack) resolve(ctx context.Context) (runnable, missing []domain.NativeC
 	return runnable, missing
 }
 
-// binary finds a component's executable. Tempo and Alloy are their
+// binary finds a component's executable. Tempo, Alloy and Pyroscope are their
 // HAVEN_OBS_*_BIN when set, else the pinned release haven fetches, else
 // whatever PATH holds; the rest come from PATH.
 func (s *Stack) binary(ctx context.Context, c domain.NativeComponent) (string, error) {
@@ -271,7 +299,7 @@ func (s *Stack) Health(ctx context.Context) (bool, string) {
 	var down []string
 	grafanaUp := false
 	for _, c := range domain.NativeObservabilityComponents(s.plan, "") {
-		up := ready(ctx, c.ReadyURL)
+		up := s.serving(ctx, c)
 		if up && c.Name != "grafana" {
 			continue
 		}

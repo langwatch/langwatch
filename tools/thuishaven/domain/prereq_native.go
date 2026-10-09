@@ -18,7 +18,7 @@ func ClickHouseNativeBinary(dir string) string {
 }
 
 // NativePinnedBinaries lists the pinned downloads for a machine: ClickHouse,
-// Tempo and Alloy on macOS, nothing where haven pins none.
+// Tempo, Alloy and Pyroscope on macOS, nothing where haven pins none.
 func NativePinnedBinaries(havenHome, goos, goarch string) []NativePinnedBinary {
 	var out []NativePinnedBinary
 	if a, ok := ClickHouseNativeArtifactFor(goos, goarch); ok {
@@ -33,6 +33,9 @@ func NativePinnedBinaries(havenHome, goos, goarch string) []NativePinnedBinary {
 	}
 	if a, ok := AlloyNativeArtifactFor(goos, goarch); ok {
 		out = append(out, NativePinnedBinary{Name: "alloy", Version: AlloyNativeVersion, Artifact: a, Dest: plan.AlloyBinary()})
+	}
+	if a, ok := PyroscopeNativeArtifactFor(goos, goarch); ok {
+		out = append(out, NativePinnedBinary{Name: "pyroscope", Version: PyroscopeNativeVersion, Artifact: a, Dest: plan.PyroscopeBinary()})
 	}
 	return out
 }

@@ -50,8 +50,12 @@ type Config struct {
 	// ClickHousePostgresHost is how the managed ClickHouse reaches host Postgres
 	// (domain.ClickHouseRuntime.PostgresHost), recorded on each stack it serves.
 	ClickHousePostgresHost string
-	ShouldManagePostgres   bool // haven ensures a shared brew-services Postgres + per-slug DBs
-	ShouldManageRedis      bool // haven ensures a shared brew-services Redis is running
+	// ClickHouseRuntime and ObservabilityTier are the resolved selections
+	// domain.ContainerNeeds reads, so status never probes a VM nothing needs.
+	ClickHouseRuntime    domain.ClickHouseRuntime
+	ObservabilityTier    domain.ObservabilityTier
+	ShouldManagePostgres bool // haven ensures a shared brew-services Postgres + per-slug DBs
+	ShouldManageRedis    bool // haven ensures a shared brew-services Redis is running
 	// RedisDBOverride pins this worktree's Redis DB index
 	// (LANGWATCH_HAVEN_REDIS_DB). nil = unset, so a Config built without the
 	// field never pins database 0 by accident — which a plain int sentinel does

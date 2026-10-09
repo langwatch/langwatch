@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/cmd/viewer/sources"
-	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
 // @scenario "Stores shows each server against its limit"
@@ -170,18 +169,5 @@ func TestBracketsMoveBetweenProfiledServices(t *testing.T) {
 	}
 	if !strings.Contains(tab.Footer(), "[ ] moves between services") {
 		t.Errorf("footer = %q, want it to name the bracket keys", tab.Footer())
-	}
-}
-
-// @scenario "Profiles on the native tier says a profiler needs the container tier"
-func TestProfilesOnNativeTierSaysContainerTierNeeded(t *testing.T) {
-	tab := NewProfilesTab(Sources{ObservabilityTier: domain.ObservabilityTierNative})
-	tab.down = true
-	body := strings.Join(texts(tab.Body(Frame{Width: 140, Height: 20})), "\n")
-	if !strings.Contains(body, "Profiles need the container tier (LANGWATCH_HAVEN_OBS_TIER=container)") {
-		t.Fatalf("body = %q, want the container-tier message", body)
-	}
-	if strings.Contains(body, "stack down") {
-		t.Fatalf("body = %q, must not claim the stack is down", body)
 	}
 }

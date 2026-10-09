@@ -402,16 +402,16 @@ current memory use, and the hub + dashboard show each stack's RAM footprint.
 
 **Observability tier.** The observability stack is on by default. On macOS it
 runs as host processes, no VM: `brew install grafana prometheus loki`; haven
-fetches Tempo 3.1.0 and Alloy 1.20.1 itself (the official darwin release assets,
+fetches Tempo 3.1.0, Alloy 1.20.1 and Pyroscope 2.3.2 itself (the official darwin release assets,
 pinned and sha256-checked like the native ClickHouse binary, into
-`<haven home>/observability/bin`; `HAVEN_OBS_TEMPO_BIN` and `HAVEN_OBS_ALLOY_BIN`
-override them). A failed recommended or optional `haven install` row is logged
+`<haven home>/observability/bin`; `HAVEN_OBS_TEMPO_BIN`, `HAVEN_OBS_ALLOY_BIN` and
+`HAVEN_OBS_PYROSCOPE_BIN` override them). A failed recommended or optional `haven install` row is logged
 and the run carries on; only a failed required row fails it. Same ports (OTLP 4317/4318, Grafana 3000) and
 datasource uids as the container; files under `<haven home>/observability`;
 `haven logs obs` tails its per-process logs. A missing binary prints its
 install line and never fails `up`. `LANGWATCH_HAVEN_OBS_TIER=container` runs
 the `grafana/otel-lgtm` container on colima instead (the default off macOS).
-Pyroscope is container-tier only. See ADR-042.
+Both tiers serve profiles on Pyroscope's port 4040. See ADR-042.
 
 **Machine limits.** `haven limits` prints the ClickHouse, observability and
 Redis memory caps, the colima VM's CPUs and memory, and the unit test worker

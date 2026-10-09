@@ -466,6 +466,8 @@ type ContainerRuntime interface {
 	// resolved from before the stack is built — "can a container tier run here?"
 	// — which Ensure can only answer by doing the work.
 	Available(ctx context.Context) bool
+	// IsRunning reports whether the VM is up, without starting it.
+	IsRunning(ctx context.Context) bool
 }
 
 // ContainerJanitor sweeps containers a testcontainers run left behind in the

@@ -349,7 +349,7 @@ var Prereqs = []Prereq{{
 	// (adapters/pinnedrelease); fetching here keeps the first `up` fast.
 	Key:         "native-binaries",
 	Name:        "ClickHouse, Tempo and Alloy",
-	Summary:     "the pinned ClickHouse server, Tempo and Alloy the native tier runs",
+	Summary:     "the pinned ClickHouse server, Tempo, Alloy and Pyroscope the native tier runs",
 	Requirement: PrereqRecommended,
 	DarwinOnly:  true,
 	Detail: "`haven up` downloads them on first use, which stalls that first run\n" +
@@ -357,8 +357,8 @@ var Prereqs = []Prereq{{
 		"    leaves nothing for `up` to wait on.",
 	Candidates: []Candidate{{
 		Key:     "native-binaries",
-		Label:   "pinned ClickHouse " + ClickHouseNativeVersion + " + Tempo " + TempoNativeVersion + " + Alloy " + AlloyNativeVersion,
-		Install: "download the pinned ClickHouse, Tempo and Alloy releases",
+		Label:   "pinned ClickHouse " + ClickHouseNativeVersion + " + Tempo " + TempoNativeVersion + " + Alloy " + AlloyNativeVersion + " + Pyroscope " + PyroscopeNativeVersion,
+		Install: "download the pinned ClickHouse, Tempo, Alloy and Pyroscope releases",
 	}},
 }, {
 	Key:         "runtime",

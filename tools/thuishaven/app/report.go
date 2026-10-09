@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
@@ -104,7 +105,38 @@ func (o *Orchestrator) serverHealth(ctx context.Context) map[string]health {
 			servers[p.name] = health{OK: ok, Detail: detail}
 		}
 	}
+	if o.container != nil {
+		servers["colima"] = o.colimaHealth(ctx)
+	}
 	return servers
+}
+
+// colimaHealth reports the VM as not needed, without probing it, unless a
+// selected feature runs in a container. Probing never starts the VM.
+func (o *Orchestrator) colimaHealth(ctx context.Context) health {
+	needs := domain.ContainerNeeds(o.containerNeedInputs())
+	if len(needs) == 0 {
+		return health{OK: true, Detail: "not needed (ClickHouse and observability run natively)"}
+	}
+	state := "stopped"
+	isRunning := o.container.IsRunning(ctx)
+	if isRunning {
+		state = "running"
+	}
+	return health{OK: isRunning, Detail: fmt.Sprintf("profile %s %s; needed by %s",
+		o.container.Profile(), state, strings.Join(needs, ", "))}
+}
+
+// containerNeedInputs is what this machine has selected that could need the VM.
+func (o *Orchestrator) containerNeedInputs() domain.ContainerNeedInputs {
+	in := domain.ContainerNeedInputs{Stacks: o.store.Stacks()}
+	if o.cfg.ShouldManageClickHouse {
+		in.ClickHouse = o.cfg.ClickHouseRuntime
+	}
+	if o.cfg.ShouldStartObservability {
+		in.Observability = o.cfg.ObservabilityTier
+	}
+	return in
 }
 
 // printStacks is one line per stack, with its RAM, and a dot per service that
@@ -140,7 +172,7 @@ func statusMark(b bool) string {
 func (o *Orchestrator) printShared(r statusReport) {
 	fmt.Printf("%s portless proxy (%s)\n", statusMark(r.proxy.OK), r.proxy.Detail)
 	fmt.Printf("%s haven daemon (%s) -> %s\n", statusMark(r.daemon.OK), r.daemon.Detail, r.shared(o.cfg.Naming.Project))
-	for _, name := range []string{"observability", "clickhouse", "postgres", "redis"} {
+	for _, name := range []string{"observability", "clickhouse", "postgres", "redis", "colima"} {
 		h, managed := r.servers[name]
 		if !managed {
 			continue

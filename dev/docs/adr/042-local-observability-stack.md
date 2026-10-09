@@ -120,11 +120,13 @@ digests from GitHub's recorded release-asset digests) and keeps it under
 `observability/bin`; `HAVEN_OBS_TEMPO_BIN` overrides it. 3.1.0 is pinned because no
 later 2.x release ships darwin builds and 2.7.2's assets carry no digest; its
 config is the 3.x monolithic schema (`backend_worker.compaction`, `live_store`).
-Pyroscope is dropped.
+Pyroscope 2.3.2 comes the same way, from its darwin release tarball
+(`HAVEN_OBS_PYROSCOPE_BIN` overrides), running the bundle's v2-storage config
+on the container's profiling port 4040.
 
 - **Same surface.** OTLP on `:4317`/`:4318`, Grafana on `:3000` behind
-  `observability.langwatch.localhost`, datasource uids `prometheus`, `loki` and
-  `tempo`, `langwatch.worktree` promoted to a metric label. Everything binds
+  `observability.langwatch.localhost`, datasource uids `prometheus`, `loki`,
+  `tempo` and `pyroscope`, `langwatch.worktree` promoted to a metric label. Everything binds
   loopback only, as before, because anonymous Grafana access is Admin.
 - **Bounded.** Configs, data and logs live under haven's home
   (`observability/{config,data,logs}`); the same retention window and Loki

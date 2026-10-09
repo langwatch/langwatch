@@ -225,14 +225,12 @@ func (m *viewerModel) install(src viewer.Sources) {
 func (m *viewerModel) sources(combined, capDir string) viewer.Sources {
 	obs := observabilityEndpoints()
 	loki := sources.NewLoki(obs.GrafanaPort, m.slug, time.Now())
-	tier, _, _ := selectedObservabilityTier()
 	return viewer.Sources{
-		ObservabilityTier: tier,
-		Files:             sources.NewFileLogs(capDir, time.Now()),
-		Loki:              loki,
-		LokiUp:            loki.Up,
-		Traces:            sources.NewTempo(obs.GrafanaPort, m.slug),
-		Metrics:           sources.NewPrometheus(obs.GrafanaPort, m.slug),
+		Files:   sources.NewFileLogs(capDir, time.Now()),
+		Loki:    loki,
+		LokiUp:  loki.Up,
+		Traces:  sources.NewTempo(obs.GrafanaPort, m.slug),
+		Metrics: sources.NewPrometheus(obs.GrafanaPort, m.slug),
 		Profiles: sources.NewPyroscope(sources.PyroscopeConfig{
 			PyroscopePort: obs.PyroscopePort, GrafanaPort: obs.GrafanaPort,
 			Worktree: m.slug, Services: profiledServices(),

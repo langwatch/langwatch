@@ -25,6 +25,7 @@ func (c *tierContainer) Ensure(context.Context) (string, error) {
 }
 func (c *tierContainer) Profile() string                { return "tier" }
 func (c *tierContainer) Available(context.Context) bool { return c.available }
+func (c *tierContainer) IsRunning(context.Context) bool { return false }
 
 func tierOrch(container ContainerRuntime) *Orchestrator {
 	return &Orchestrator{container: container, log: zap.NewNop()}

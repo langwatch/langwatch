@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/cmd/viewer/sources"
-	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
 // ProfilesTab answers the question traces and metrics cannot: which function
@@ -45,9 +44,6 @@ func (t *ProfilesTab) Poll() {
 
 // Body renders the selected service's two top-ten lists side by side.
 func (t *ProfilesTab) Body(f Frame) []Row {
-	if t.src.ObservabilityTier == domain.ObservabilityTierNative {
-		return profilesNativeBody()
-	}
 	if t.down {
 		return stackDownBody()
 	}

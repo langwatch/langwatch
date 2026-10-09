@@ -24,6 +24,8 @@ func NativeComponentPorts(p NativeObservabilityPlan, name string) []int {
 		return []int{p.Ports.LokiHTTP, p.Ports.LokiGRPC}
 	case "tempo":
 		return []int{p.Ports.TempoHTTP, p.Ports.TempoGRPC, p.Ports.TempoOTLPHTTP}
+	case "pyroscope":
+		return []int{p.Endpoints.PyroscopePort, p.Ports.PyroscopeGRPC}
 	case "alloy":
 		return []int{p.Endpoints.OTLPGRPCPort, p.Endpoints.OTLPHTTPPort, p.Ports.CollectorHTTP}
 	case "grafana":
