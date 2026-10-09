@@ -137,3 +137,32 @@ export function planUpgrade({
   }
   return { outcome: "planned", fresh: false, releases, notNeeded: [] };
 }
+
+/**
+ * Before a release whose schema holds a contract step, every unfinished background step shipped in
+ * an earlier release runs inline, forced and blocking (Alex, 2026-10-09, UPGRADE-FIXES), so a
+ * contract never drops what a background step still reads. Per planned release, the ids to run.
+ */
+export function inlineBeforeContracts({
+  releases,
+  contracts,
+  background,
+  settled,
+}: {
+  releases: readonly Pick<PlannedRelease, "release" | "schema">[];
+  contracts: ReadonlySet<string>;
+  background: readonly { id: string; release: string | null }[];
+  settled: ReadonlySet<string>;
+}): string[][] {
+  const earlier = (left: string | null, right: string | null) =>
+    left !== null && (right === null || compareReleases({ left, right }) < 0);
+  const inlined = new Set<string>();
+  return releases.map(({ release, schema }) => {
+    if (!schema.some((id) => contracts.has(id))) return [];
+    const due = background.filter(
+      (step) => !settled.has(step.id) && !inlined.has(step.id) && earlier(step.release, release),
+    );
+    for (const step of due) inlined.add(step.id);
+    return due.map((step) => step.id);
+  });
+}

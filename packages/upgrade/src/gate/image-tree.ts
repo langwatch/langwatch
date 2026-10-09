@@ -1,8 +1,15 @@
-import { readdirSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import type { ManifestStep } from "../manifest/manifest.ts";
-import { type ReleaseTreeSteps, stampRelease, treeStepIds } from "../manifest/stamp.ts";
+import {
+  gooseStepId,
+  prismaStepId,
+  type ReleaseTreeSteps,
+  stampRelease,
+  treeStepIds,
+} from "../manifest/stamp.ts";
 
 /** Where this image ships its Postgres and ClickHouse migrations, beside this package. */
 export const IMAGE_MIGRATION_DIRECTORIES = {
@@ -66,4 +73,27 @@ export function imageSteps({
     shipped: new Set(),
     ownerOf: () => null,
   }).steps;
+}
+
+/** The note the migration-safety rules require above every destructive statement. */
+const CONTRACT_NOTE = /--[ \t]*contract:[ \t]*retired in[ \t]+\S+/i;
+
+/** The schema steps whose SQL carries `-- contract: retired in <release>`: the destructive ones. */
+export function imageContractSteps({
+  directories = IMAGE_MIGRATION_DIRECTORIES,
+  tree = readImageTree({ directories }),
+}: {
+  directories?: { prisma: string; goose: string };
+  tree?: ReleaseTreeSteps;
+} = {}): Set<string> {
+  const contract = (path: string) =>
+    existsSync(path) && CONTRACT_NOTE.test(readFileSync(path, "utf8"));
+  return new Set([
+    ...tree.prismaFolders
+      .filter((folder) => contract(join(directories.prisma, folder, "migration.sql")))
+      .map((folder) => prismaStepId({ folder })),
+    ...tree.gooseFiles
+      .filter((file) => contract(join(directories.goose, file)))
+      .flatMap((file) => gooseStepId({ file }) ?? []),
+  ]);
 }

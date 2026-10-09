@@ -756,4 +756,95 @@ describe.skipIf(!DB_URL)("the upgrade runner", () => {
       expect(warnings.filter((message) => message.includes("read hint"))).toHaveLength(9);
     });
   });
+
+  describe("when a later release drops what an earlier release's background step reads", () => {
+    const manifests: ReleaseManifest[] = [
+      ...MANIFESTS.slice(0, 2),
+      {
+        release: "3.22.0",
+        previous: "3.21.0",
+        cutAt: "2026-10-04T09:00:00+02:00",
+        steps: [step("prisma:20261003000000_drop_old", "postgres-schema")],
+      },
+    ];
+    const upTo = (release: string | null) =>
+      manifests
+        .filter((m) => release === null || m.release <= release)
+        .flatMap((m) => m.steps.map((s) => s.id));
+    const recording = (order: string[]): UpgradeSchemaApplier => ({
+      async apply({ release }) {
+        order.push(`schema ${release}`);
+        for (const id of upTo(release).filter((each) => each.startsWith("prisma:"))) {
+          await scratch.postgres.query(
+            `INSERT INTO "_prisma_migrations" ("migration_name", "finished_at")
+             SELECT $1::text, now() WHERE NOT EXISTS (SELECT 1 FROM "_prisma_migrations" WHERE "migration_name" = $1::text)`,
+            [id.slice("prisma:".length)],
+          );
+        }
+        const goose = new Set(upTo(release).filter((each) => each.startsWith("clickhouse:")));
+        return [
+          { engine: "postgres", target: "postgres", ok: true, error: null },
+          { engine: "clickhouse", target: "shared", ok: true, error: null, applied: goose },
+        ];
+      },
+    });
+    const upgradeTo = ({ release, order }: { release: string; order: string[] }) =>
+      run(
+        runnerFor({
+          release,
+          applier: recording(order),
+          image: {
+            release,
+            steps: manifests.filter((m) => m.release <= release).flatMap((m) => m.steps),
+          },
+          releases: { manifests, floor: FLOOR },
+          contracts: new Set(["prisma:20261003000000_drop_old"]),
+          codeSteps: [
+            defineMigrationStep({
+              id: "dataset:copy-keys",
+              kind: "data",
+              mode: "blocking",
+              description: "copies the keys",
+              run: async () => ({}),
+            }),
+            defineMigrationStep({
+              id: "identity:backfill",
+              kind: "tenant",
+              mode: "background",
+              description: "backfills identifiers",
+              needsOldWritersGone: true,
+              run: async () => {
+                order.push("step identity:backfill");
+                return {};
+              },
+            }),
+          ],
+        }),
+      );
+
+    /** @scenario "A jump runs the earlier release's unfinished background step before the contract release's schema" */
+    it("runs the background step between the two releases' schema", async () => {
+      await run(runnerFor({ release: "3.20.1", applier: fakeApplier({ release: "3.20.1" }) }));
+      const order: string[] = [];
+      const outcome = await upgradeTo({ release: "3.22.0", order });
+      expect(outcome.code).toBe("done");
+      expect(order).toEqual(["schema 3.21.0", "step identity:backfill", "schema 3.22.0"]);
+      expect(await statusOf("identity:backfill")).toBe("done");
+    });
+
+    /** @scenario "A background step the worker finished is not run again before the contract release's schema" */
+    it("does not run the step the worker already finished", async () => {
+      await run(runnerFor({ release: "3.20.1", applier: fakeApplier({ release: "3.20.1" }) }));
+      await upgradeTo({ release: "3.21.0", order: [] });
+      await UpgradeRunnerRepository.create({ postgres: scratch.postgres }).setStatus({
+        ids: ["identity:backfill"],
+        status: "done",
+        runId: "background:worker-1",
+      });
+      const order: string[] = [];
+      const outcome = await upgradeTo({ release: "3.22.0", order });
+      expect(outcome.code).toBe("done");
+      expect(order).toEqual(["schema 3.22.0"]);
+    });
+  });
 });

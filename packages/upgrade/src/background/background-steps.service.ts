@@ -117,6 +117,17 @@ export class BackgroundStepsService {
     return { paused: false, ...sweep, retrying };
   }
 
+  /**
+   * Runs one step now, as `upgrade` does before a contract step (Alex, 2026-10-09): forced, so
+   * neither serving nor the serving roster is asked. A step not pending or running is skipped.
+   */
+  async runNow({ id, signal }: { id: string; signal: AbortSignal }): Promise<StepOutcome> {
+    const step = this.options.steps.find((each) => each.id === id);
+    const row = (await this.options.ledger.findSteps()).find((each) => each.id === id);
+    if (!step || !row || !RUNNABLE.has(row.status)) return "skipped";
+    return this.runLeased({ step, resumeFrom: row.report ?? null, signal });
+  }
+
   private now(): number {
     return (this.options.now ?? performance.now.bind(performance))();
   }

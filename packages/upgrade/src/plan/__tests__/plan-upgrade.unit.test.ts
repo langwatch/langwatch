@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ManifestStep, ReleaseManifest } from "../../manifest/manifest.ts";
-import { planUpgrade } from "../plan-upgrade.ts";
+import { inlineBeforeContracts, planUpgrade } from "../plan-upgrade.ts";
 
 function step(
   id: string,
@@ -206,6 +206,78 @@ describe("planUpgrade()", () => {
           },
         ],
       });
+    });
+  });
+});
+
+describe("inlineBeforeContracts()", () => {
+  const contracts = new Set(["prisma:20270101000000_drop_legacy_key"]);
+  const background = [
+    { id: "dataset:content-to-object-storage", release: "3.21.0" },
+    { id: "identity:identifier-backfill", release: "3.22.0" },
+  ];
+  const planned = () => {
+    const plan = planUpgrade({
+      installed: "3.20.1",
+      image: { release: "3.23.0", steps: imageSteps },
+      floor: { release: "3.19.0", namedAt: "2026-10-06" },
+      manifests,
+      ledger: noLedger,
+    });
+    if (plan.outcome !== "planned") throw new Error(`expected a plan, got ${plan.outcome}`);
+    return plan.releases;
+  };
+
+  describe("when 3.23.0 drops a column and both earlier background steps are unfinished", () => {
+    /** @scenario "An unfinished background step of an earlier release runs inline before a contract release" */
+    it("runs both before 3.23.0's schema and none before 3.21.0's or 3.22.0's", () => {
+      expect(
+        inlineBeforeContracts({ releases: planned(), contracts, background, settled: new Set() }),
+      ).toEqual([[], [], ["dataset:content-to-object-storage", "identity:identifier-backfill"]]);
+    });
+  });
+
+  describe("when the 3.21.0 background step is already done", () => {
+    /** @scenario "A finished background step is not run again before a contract release" */
+    it("runs only the unfinished one", () => {
+      const settled = new Set(["dataset:content-to-object-storage"]);
+      expect(
+        inlineBeforeContracts({ releases: planned(), contracts, background, settled }),
+      ).toEqual([[], [], ["identity:identifier-backfill"]]);
+    });
+  });
+
+  describe("when no planned release holds a contract step", () => {
+    /** @scenario "A release without a contract step waits for no background step" */
+    it("runs nothing inline", () => {
+      expect(
+        inlineBeforeContracts({
+          releases: planned(),
+          contracts: new Set(),
+          background,
+          settled: new Set(),
+        }),
+      ).toEqual([[], [], []]);
+    });
+  });
+
+  describe("when a background step ships with the contract or is not released yet", () => {
+    /** @scenario "A background step runs before a contract only when an earlier release shipped it" */
+    it("runs only the released one, and only before the unreleased contract", () => {
+      expect(
+        inlineBeforeContracts({
+          releases: [
+            { release: "3.21.0", schema: ["prisma:20261101000000_drop_a"] },
+            { release: null, schema: ["prisma:20261201000000_drop_b"] },
+          ],
+          contracts: new Set(["prisma:20261101000000_drop_a", "prisma:20261201000000_drop_b"]),
+          background: [
+            { id: "dataset:same-release", release: "3.21.0" },
+            { id: "trace:unreleased", release: null },
+          ],
+          settled: new Set(),
+        }),
+      ).toEqual([[], ["dataset:same-release"]]);
     });
   });
 });
