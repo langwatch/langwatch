@@ -65,6 +65,15 @@ type SpanShape struct {
 	Attrs      []Attr
 	// Error, when set, ends the span with an error status and an exception event.
 	Error string
+	// Events are extra span events, offset from the span's start.
+	Events []EventShape
+}
+
+// EventShape is one span event of a SpanShape.
+type EventShape struct {
+	Name     string
+	OffsetMs int64
+	Attrs    []Attr
 }
 
 // LogShape is one record of a logs preset.
@@ -164,6 +173,8 @@ var presets = append([]Preset{
 		{Name: "telemetrysim.request.duration", Unit: "ms", Kind: MetricHistogram, Base: 120, Attrs: []Attr{{"http.route", "/api/chat"}}},
 	}},
 }, backfillPresets...)
+
+func init() { presets = append(presets, markedPresets...) }
 
 // PresetNames lists the presets in order.
 func PresetNames() []string {
@@ -344,10 +355,14 @@ func (b *batch) traces(p Preset, res *resourcepb.Resource) *colltracepb.ExportTr
 		if shape.Parent > 0 {
 			spans[i].ParentSpanId = ids[shape.Parent-1]
 		}
+		for _, ev := range shape.Events {
+			spans[i].Events = append(spans[i].Events, &tracepb.Span_Event{Name: ev.Name,
+				TimeUnixNano: nanos(start.Add(ms(ev.OffsetMs))), Attributes: b.attributes(ev.Attrs)})
+		}
 		if shape.Error != "" {
 			spans[i].Status = &tracepb.Status{Code: tracepb.Status_STATUS_CODE_ERROR, Message: shape.Error}
-			spans[i].Events = []*tracepb.Span_Event{{Name: "exception", TimeUnixNano: spans[i].EndTimeUnixNano,
-				Attributes: b.attributes([]Attr{{"exception.message", shape.Error}})}}
+			spans[i].Events = append(spans[i].Events, &tracepb.Span_Event{Name: "exception", TimeUnixNano: spans[i].EndTimeUnixNano,
+				Attributes: b.attributes([]Attr{{"exception.message", shape.Error}})})
 		}
 	}
 	return &colltracepb.ExportTraceServiceRequest{ResourceSpans: []*tracepb.ResourceSpans{{
