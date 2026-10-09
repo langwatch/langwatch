@@ -1,6 +1,6 @@
 import { Alert } from "@chakra-ui/react";
 import { Link } from "~/components/ui/link";
-import { describeError } from "~/features/errors";
+import { describeError, OUT_OF_CREDIT_ADVICE } from "~/features/errors";
 import type { ParsedLLMError } from "~/utils/formatLLMError";
 
 interface ErrorMessageProps {
@@ -63,6 +63,8 @@ function describeLLMError(type: Exclude<ParsedLLMError["type"], "unknown">) {
       return "The model provider doesn't have the model this prompt asks for.";
     case "rate_limit":
       return "The model provider is rate-limiting this project, or the account behind it has no allowance left.";
+    case "out_of_credit":
+      return `The account behind this model has no credit or budget left. ${OUT_OF_CREDIT_ADVICE}`;
     case "bad_request":
       return "The model provider rejected the request — usually a parameter this model doesn't support, or a conversation past its context limit.";
     case "connection":

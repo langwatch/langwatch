@@ -27,6 +27,13 @@ const (
 	// (openai-compat) provider with DeepSeek's public endpoint as the
 	// default base URL.
 	ProviderDeepSeek ProviderID = "deepseek"
+	// ProviderDoubleword hosts open-weight models behind an OpenAI-compatible API
+	// and is not in Bifrost's ModelProvider enum either. It takes the same
+	// vLLM (openai-compat) route as DeepSeek, defaulting to Doubleword's
+	// public endpoint. Its model ids carry the vendor's own slash
+	// ("deepseek-ai/DeepSeek-V4.1-Flash"), so only the first segment of
+	// "doubleword/<model>" is the provider.
+	ProviderDoubleword ProviderID = "doubleword"
 	// Voyage is direct-API only. Bifrost has no Voyage ModelProvider
 	// enum; the gateway proxies Voyage embeddings via a thin direct
 	// HTTP path. Voyage's wire format is OpenAI-compatible so no body
@@ -126,6 +133,7 @@ var knownProviderFamilies = map[string]struct{}{
 	"groq":                  {},
 	"cerebras":              {},
 	"deepseek":              {},
+	"doubleword":            {},
 	"voyage":                {},
 	"custom":                {},
 	"elevenlabs":            {},

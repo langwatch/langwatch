@@ -23,12 +23,45 @@ import { versionMetadataToNodeFormat } from "~/prompts/schemas/version-metadata-
 import type { PromptConfigFormValues } from "~/prompts/types";
 import { buildLLMConfig } from "~/server/prompt-config/llmConfigBuilder";
 import type { ChatMessage } from "~/server/tracer/types";
-import { parseLLMError } from "~/utils/formatLLMError";
+import {
+  llmErrorTypeFromStatus,
+  type ParsedLLMError,
+  parseLLMError,
+} from "~/utils/formatLLMError";
 import { generateOtelTraceId } from "~/utils/trace";
 import { studioBackendPostEvent } from "../../workflows/post_event/post-event";
 import { extractStreamableOutput, type OutputConfig } from "./output-formatter";
 
 const logger = createLogger("PromptStudioAdapter");
+
+/** A node failure that carries the HTTP status the model provider answered with. */
+class UpstreamLLMError extends Error {
+  constructor(
+    message: string,
+    readonly upstreamStatus: number | undefined,
+  ) {
+    super(message);
+    this.name = "UpstreamLLMError";
+  }
+}
+
+/**
+ * Parses a node failure for the chat, naming the error from the provider's
+ * HTTP status when the message alone does not say what went wrong.
+ */
+function parseNodeError(err: unknown): ParsedLLMError {
+  const failure = err as { message?: unknown; upstreamStatus?: unknown };
+  const parsed = parseLLMError(
+    typeof failure?.message === "string" ? failure.message : "Unexpected error",
+  );
+  if (
+    parsed.type === "unknown" &&
+    typeof failure?.upstreamStatus === "number"
+  ) {
+    parsed.type = llmErrorTypeFromStatus(failure.upstreamStatus);
+  }
+  return parsed;
+}
 
 // Matches a `{{ input }}` Liquid placeholder (whitespace tolerated).
 // Used to detect whether a saved-prompt template message will absorb
@@ -273,14 +306,13 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
 
       /**
        * Sends an error message to the client and finishes the stream.
-       * @param message - Error message to display
+       * @param parsed - Parsed error to display
        */
-      const sendError = (message: string) => {
+      const sendError = (parsed: ParsedLLMError) => {
         if (!started) {
           started = true;
           eventStream$.sendTextMessageStart({ messageId });
         }
-        const parsed = parseLLMError(message);
         // Escape backticks to prevent code blocks in chat
         parsed.message = parsed.message.replace(/`/g, "'");
         eventStream$.sendTextMessageContent({
@@ -339,7 +371,7 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
 
               // Propagate errors to outer catch
               if (state.error) {
-                throw new Error(state.error);
+                throw new UpstreamLLMError(state.error, state.upstream_status);
               }
             } else if (serverEvent.type === "error") {
               logger.error({ serverEvent }, "error");
@@ -354,7 +386,7 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
       } catch (err: any) {
         // Centralized error handling: log and stream to client
         logger.error({ err }, "error");
-        sendError(err?.message ?? "Unexpected error");
+        sendError(parseNodeError(err));
       } finally {
         eventStream$.complete();
       }

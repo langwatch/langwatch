@@ -230,6 +230,24 @@ export const modelProviderRegistry: ModelProviderRegistry = [
     },
   },
   {
+    key: "doubleword",
+    backendModelProviderKey: "doubleword",
+    label: "Doubleword",
+    defaultBaseUrl: "https://api.doubleword.ai/v1",
+    icon: themedIcon(
+      "/images/external-icons/doubleword-lighttheme.svg",
+      "/images/external-icons/doubleword-darktheme.svg",
+      "Doubleword",
+    ),
+    externalDocsUrl: "https://docs.doubleword.ai/",
+    fieldMetadata: {
+      DOUBLEWORD_API_KEY: {
+        label: "API Key",
+        description: "Your Doubleword API key from app.doubleword.ai",
+      },
+    },
+  },
+  {
     key: "custom",
     backendModelProviderKey: "custom",
     label: "Custom, OpenAI-compatible",

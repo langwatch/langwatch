@@ -5172,6 +5172,14 @@ function listLabels(labels: string[]): string {
 }
 
 /**
+ * What to do about an HTTP 402. The status comes from a provider whose account
+ * ran out of credit and also from the AI gateway when an organization budget is
+ * spent, so the advice names both. Shared so every surface says the same thing.
+ */
+export const OUT_OF_CREDIT_ADVICE =
+  "Check the provider's billing and your gateway budget, then try again.";
+
+/**
  * Body copy for a node failure that carries the upstream's HTTP status.
  *
  * `meta.upstreamStatus` is attached by `nodeErrorDomain.ts` for every node
@@ -5198,6 +5206,9 @@ function describeUpstreamStatus({
   const status = error.meta.upstreamStatus;
   if (typeof status !== "number") return whenAbsent;
   if (status === 401 || status === 403) return whenRejected;
+  if (status === 402) {
+    return `Its account has no credit or budget left. ${OUT_OF_CREDIT_ADVICE}`;
+  }
   if (status === 429) return "It's rate limiting us. Try again shortly.";
   if (status >= 500) return "It's having trouble. Try again in a moment.";
   return whenOther;

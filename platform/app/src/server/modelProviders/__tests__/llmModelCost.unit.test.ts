@@ -5,6 +5,7 @@ import {
   resolveAudioOutputRate,
   resolveCacheWrite1hRate,
 } from "../llmModelCost";
+import { llmModels } from "../loadModelCatalog";
 
 describe("getStaticModelCosts", () => {
   const costs = getStaticModelCosts();
@@ -205,9 +206,14 @@ describe("hour-long cache write rate", () => {
 
     /** @scenario "An hour-long cache write rate is derived for Anthropic models" */
     it("leaves models from other providers without one", () => {
+      // A provider whose own catalog entry states an hour-long price (such
+      // as Doubleword) carries that price; no other provider gets a derived one.
+      const catalogStates1h = (modelId: string) =>
+        llmModels.models[modelId]?.pricing?.inputCacheWrite1hPerToken != null;
       const others = costs.filter(
         (c) =>
           !/^~?anthropic\//.test(c.model) &&
+          !catalogStates1h(c.model) &&
           c.cacheCreation1hCostPerToken !== undefined,
       );
       expect(others).toEqual([]);
@@ -450,6 +456,27 @@ describe("the ElevenLabs conversational entry", () => {
           "elevenlabs/scribe_v1",
         );
       });
+    });
+  });
+});
+
+describe("Doubleword catalog pricing", () => {
+  const costs = getStaticModelCosts();
+
+  describe("when a span names a Doubleword model with its vendor slash", () => {
+    /** @scenario A Doubleword call is priced from the catalog */
+    it("prices it at Doubleword's realtime rate for that model", () => {
+      const modelId = "doubleword/deepseek-ai/DeepSeek-V4.1-Flash";
+      const catalogPricing = llmModels.models[modelId]?.pricing;
+      expect(catalogPricing?.inputCostPerToken).toBeGreaterThan(0);
+
+      const match = matchModelCostWithFallbacks(modelId, costs);
+
+      expect(match?.model).toBe(modelId);
+      expect(match?.inputCostPerToken).toBe(catalogPricing?.inputCostPerToken);
+      expect(match?.outputCostPerToken).toBe(
+        catalogPricing?.outputCostPerToken,
+      );
     });
   });
 });

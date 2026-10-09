@@ -1125,7 +1125,7 @@ Manage them at **Settings > Model Providers**. The table lists each configuratio
 | Azure OpenAI | API key and endpoint, optional API version. **Use API Gateway** switches to an API gateway base URL and version |
 | Bedrock | AWS access key id, secret access key and region |
 | Vertex AI | Service account JSON, project and location |
-| DeepSeek, xAI, Cerebras, Groq, Voyage AI | API key |
+| DeepSeek, Doubleword, xAI, Cerebras, Groq, Voyage AI | API key |
 | ElevenLabs | API key, optional webhook secret. See [Voice Agents](/agent-testing/voice-agents#before-you-start) for the key permissions it needs |
 | Azure Safety | Content Safety endpoint and key, for the Azure safety evaluators |
 | Custom (OpenAI-compatible) | Base URL and optional API key, for a LiteLLM proxy, vLLM or any endpoint that serves `/chat/completions` |
@@ -7212,7 +7212,7 @@ The prefix is removed before the request leaves. A provider never receives `open
 
 ## Provider families
 
-`openai`, `anthropic`, `azure`, `bedrock`, `vertex`, `gemini`, `xai`, `groq`, `cerebras`, `deepseek`, `voyage`, `elevenlabs`, `cloudflare`, `custom`, `openai_codex`.
+`openai`, `anthropic`, `azure`, `bedrock`, `vertex`, `gemini`, `xai`, `groq`, `cerebras`, `deepseek`, `doubleword`, `voyage`, `elevenlabs`, `cloudflare`, `custom`, `openai_codex`.
 
 The alternative spellings that SDKs emit are accepted too: `azure_openai`, `aws_bedrock`, `vertex_ai`, `google_vertex`, `google_gemini`. The family is case-insensitive, so `OpenAI/gpt-5-mini` works.
 
@@ -7621,7 +7621,7 @@ The gateway translates between wire formats where the provider differs. For exam
 
 <CardGroup cols={2}>
   <Card title="Providers" icon="plug" href="/ai-gateway/providers/overview">
-    OpenAI, Anthropic, Azure OpenAI, AWS Bedrock, Vertex AI, Gemini, xAI, Groq, Cerebras, DeepSeek, Voyage AI, ElevenLabs, custom endpoints.
+    OpenAI, Anthropic, Azure OpenAI, AWS Bedrock, Vertex AI, Gemini, xAI, Groq, Cerebras, DeepSeek, Doubleword, Voyage AI, ElevenLabs, custom endpoints.
   </Card>
   <Card title="Coding Agents" icon="terminal" href="/coding-agents/overview">
     Claude Code, Codex, Gemini CLI, OpenCode, Cursor and Aider through the gateway.
@@ -8267,6 +8267,62 @@ curl https://gateway.langwatch.ai/v1/chat/completions \
 
 ---
 
+# FILE: ./ai-gateway/providers/doubleword.mdx
+
+---
+title: Doubleword
+description: Add a Doubleword API key under Settings, Model Providers and call Doubleword's hosted open-weight models through the LangWatch AI Gateway.
+sidebarTitle: Doubleword
+---
+
+## Add the credential
+
+Open **Settings > Model Providers**, click **Add Model Provider** and select **Doubleword**. Give the row a name, pick the organization, team or project it belongs to, and fill in:
+
+| Field | Value |
+|---|---|
+| `DOUBLEWORD_API_KEY` | A Doubleword API key from [app.doubleword.ai/api-keys](https://app.doubleword.ai/api-keys). |
+
+Create the key for inference (the "realtime" purpose). Doubleword refuses model calls made with a key whose purpose is "platform", with HTTP 403.
+
+Save the row. Every virtual key whose scope can see the row can now dispatch to it, unless the key restricts its providers. See [Virtual keys](/ai-gateway/virtual-keys#create-a-virtual-key).
+
+The gateway calls `https://api.doubleword.ai` as an OpenAI-compatible endpoint.
+
+## Model names
+
+Write `doubleword/<model>`. Doubleword model ids keep the vendor slash and casing Doubleword uses, for example `doubleword/deepseek-ai/DeepSeek-V4.1-Flash`, `doubleword/Qwen/Qwen3-Embedding-8B` or `doubleword/openai/gpt-oss-120b`. Only the first segment names the provider, and the rest is sent to Doubleword as is.
+
+Always keep the `doubleword/` prefix. A bare `openai/gpt-oss-120b` names the OpenAI provider, not Doubleword.
+
+## Send a request
+
+```bash
+curl https://gateway.langwatch.ai/v1/chat/completions \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "doubleword/deepseek-ai/DeepSeek-V4.1-Flash",
+    "messages": [{"role": "user", "content": "Say hi in one word"}]
+  }'
+```
+
+## Endpoints
+
+| Endpoint | Served |
+|---|---|
+| `POST /v1/chat/completions` | Yes |
+| `POST /v1/messages` | Yes, translated |
+| `POST /v1/embeddings` | Yes, with a Doubleword embeddings model such as `doubleword/Qwen/Qwen3-Embedding-8B` |
+| `POST /v1/images/generations`, `POST /v1/images/edits` | No, rejected with HTTP 400. Image traffic needs a direct OpenAI, Azure OpenAI, Gemini, Vertex AI or Bedrock credential. See [Images](/ai-gateway/api/images) |
+| `GET /v1/models` | Yes, from the Doubleword catalog |
+
+## Cost
+
+LangWatch prices Doubleword calls at Doubleword's realtime rates. Batch and async rates are not used, because the gateway sends realtime requests.
+
+---
+
 # FILE: ./ai-gateway/providers/elevenlabs.mdx
 
 ---
@@ -8683,6 +8739,7 @@ Model names are `provider/model`. The provider segment is the id in the first co
 | [Groq](/ai-gateway/providers/groq) | `groq` | API key | Chat, Messages, models |
 | [Cerebras](/ai-gateway/providers/cerebras) | `cerebras` | API key | Chat, Messages, models |
 | [DeepSeek](/ai-gateway/providers/deepseek) | `deepseek` | API key | Chat, Messages, models |
+| [Doubleword](/ai-gateway/providers/doubleword) | `doubleword` | API key | Chat, Messages, embeddings, models |
 | [Voyage AI](/ai-gateway/providers/voyage) | `voyage` | API key | Embeddings only |
 | [ElevenLabs](/ai-gateway/providers/elevenlabs) | `elevenlabs` | API key, optional base URL and webhook secret | Speech, transcription, ElevenLabs native |
 | [OpenAI account](/ai-gateway/providers/openai-account) | `openai_codex` | Sign in with a ChatGPT account | Responses, Messages |
@@ -59088,6 +59145,7 @@ Langy runs on the model providers your project has enabled. Every provider excep
 | Amazon Bedrock | API key or credentials | |
 | Google Vertex | API key or credentials | |
 | DeepSeek | API key | |
+| Doubleword | API key | Open-weight models such as DeepSeek, Qwen, GLM and gpt-oss. |
 | xAI | API key | |
 | Cerebras | API key | |
 | Groq | API key | |

@@ -536,6 +536,73 @@ describe("PromptStudioAdapter", () => {
     });
   });
 
+  describe("when the model provider refuses the call with an HTTP status", () => {
+    const additionalParams = JSON.stringify({
+      formValues: {
+        version: {
+          configData: {
+            llm: { model: "doubleword/deepseek-ai/DeepSeek-V4.1-Flash" },
+            messages: [{ role: "user", content: "{{input}}" }],
+            inputs: [{ identifier: "input", type: "str" }],
+            outputs: [{ identifier: "output", type: "str" }],
+          },
+        },
+      },
+      variables: [],
+    });
+
+    async function streamedErrorFor(upstreamStatus: number) {
+      vi.mocked(addEnvs).mockImplementation(async (event: any) => event);
+      vi.mocked(loadDatasets).mockImplementation(async (event: any) => event);
+      vi.mocked(studioBackendPostEvent).mockReset();
+      vi.mocked(studioBackendPostEvent).mockImplementation(
+        async ({ onEvent }: any) => {
+          onEvent({
+            type: "component_state_change",
+            payload: {
+              component_id: "prompt_node",
+              execution_state: {
+                status: "error",
+                error: `gateway returned non-2xx status ${upstreamStatus}`,
+                error_type: "llm_error",
+                upstream_status: upstreamStatus,
+              },
+            },
+          });
+        },
+      );
+      const { eventSource, collect } = createMockEventSource();
+      await runProcess(adapter, {
+        eventSource,
+        messages: [{ role: "user", content: "Say hi" }] as any,
+        actions: [],
+        threadId: "thread-upstream-status",
+        forwardedParameters: {
+          model: additionalParams,
+        } as CopilotRuntimeChatCompletionRequest["forwardedParameters"],
+      } as RequestForProcess);
+      const events = await collect();
+      const content = events.find((e) => e.type === "TextMessageContent");
+      if (content?.type !== "TextMessageContent") {
+        throw new Error("no error content was streamed");
+      }
+      return JSON.parse(content.content.replace("[ERROR]", ""));
+    }
+
+    /** @scenario A provider account with no credit left is named in the playground */
+    it("names an out-of-credit account for a 402", async () => {
+      expect((await streamedErrorFor(402)).type).toBe("out_of_credit");
+    });
+
+    it("names rejected credentials for a 401", async () => {
+      expect((await streamedErrorFor(401)).type).toBe("auth");
+    });
+
+    it("names a rate limit for a 429", async () => {
+      expect((await streamedErrorFor(429)).type).toBe("rate_limit");
+    });
+  });
+
   describe("when forwardedParameters.model contains malformed JSON", () => {
     it("streams a Configuration Error message", async () => {
       const { eventSource, collect } = createMockEventSource();
