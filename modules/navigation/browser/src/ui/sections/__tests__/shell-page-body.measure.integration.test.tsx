@@ -22,7 +22,7 @@ vi.mock("../../../behavior/navigation-api.ts", () => ({
 
 afterEach(() => cleanup());
 
-function measureAt({ pathname }: { pathname: string }): string {
+function frameAt({ pathname }: { pathname: string }): DOMStringMap {
   renderWithDesignSystem(
     <WithStubNavigationHost readings={{ pathname, currentUserId: "user_1", isLoading: true }}>
       <ShellPageBody>
@@ -30,7 +30,11 @@ function measureAt({ pathname }: { pathname: string }): string {
       </ShellPageBody>
     </WithStubNavigationHost>,
   );
-  return screen.getByText("Page content").parentElement?.dataset.pageMeasure ?? "";
+  return screen.getByText("Page content").parentElement?.dataset ?? {};
+}
+
+function measureAt({ pathname }: { pathname: string }): string {
+  return frameAt({ pathname }).pageMeasure ?? "";
 }
 
 describe("given a settings page", () => {
@@ -41,6 +45,16 @@ describe("given a settings page", () => {
         expect(measureAt({ pathname })).toBe("820px");
       },
     );
+  });
+
+  describe("when it is your own account page", () => {
+    it.each(["/settings/profile", "/settings/security"])("aligns %s to the left", (pathname) => {
+      expect(frameAt({ pathname }).pageAlign).toBe("start");
+    });
+
+    it("centres the organization's settings", () => {
+      expect(frameAt({ pathname: "/settings" }).pageAlign).toBe("center");
+    });
   });
 
   describe("when it is a list or table page", () => {

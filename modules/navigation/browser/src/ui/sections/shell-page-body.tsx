@@ -87,6 +87,8 @@ const MEASURED_OPS_PAGES = [...instanceGroup().items, ...cloudAdminGroup().items
 /** Form pages read at main's Profile measure; tables and lists keep the wider one. */
 const FORM_PAGES = ["/settings", "/settings/profile", "/settings/security", "/settings/checkup"];
 const FORM_MEASURE = "820px";
+/** Your own account pages sit at the left, as on main, behind a fixed margin. */
+const LEFT_ALIGNED_PAGES = ["/settings/profile", "/settings/security"];
 const TABLE_MEASURE = "1280px";
 
 /** Authentication's section rail takes the full width; forms read narrow, tables wide. */
@@ -107,9 +109,14 @@ function PageMeasure({ pathname, children }: { pathname: string; children: React
     MEASURED_OPS_PAGES.some((item) => isPathUnder({ pathname, base: item.href }));
   if (!isMeasured) return <>{children}</>;
   const measure = measureOf(pathname);
+  const isLeftAligned = LEFT_ALIGNED_PAGES.includes(pathname);
+  const inset = isLeftAligned
+    ? "var(--chakra-spacing-8)"
+    : `max(var(--chakra-spacing-6), calc((100% - ${measure}) / 2))`;
   return (
     <Box
       data-page-measure={measure}
+      data-page-align={isLeftAligned ? "start" : "center"}
       flex={1}
       minHeight={0}
       overflowY="auto"
@@ -118,7 +125,7 @@ function PageMeasure({ pathname, children }: { pathname: string; children: React
       // under it sit in one column of the measure, centred in the card.
       // Buttons are skipped: the assistant's floating launcher is a fixed sibling.
       css={{
-        "--page-inset": `max(var(--chakra-spacing-6), calc((100% - ${measure}) / 2))`,
+        "--page-inset": inset,
         "& [data-page-header]": { paddingInline: "var(--page-inset)" },
         "& [data-page-header] ~ :not(button), &:not(:has([data-page-header])) > :not(button)": {
           width: "calc(100% - 2 * var(--page-inset))",
