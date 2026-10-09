@@ -1655,6 +1655,11 @@ containers:
            with. app.extraEnvs reaches it too; workers.extraEnvs renders
            after and so wins a duplicate. */}}
     {{- include "langwatch.processEnv" . | nindent 4 }}
+    {{- if and (not .Values.workers.enabled) .Values.app.telemetry.metrics.enabled }}
+    # Sidecar: the api in this pod holds 9464, so the worker scrapes on 9465 (SIDECAR-METRICS-9465).
+    - name: OTEL_EXPORTER_PROMETHEUS_PORT
+      value: "9465"
+    {{- end }}
     {{- with .Values.app.extraEnvs}}
     {{- toYaml . | nindent 4 }}
     {{- end }}
