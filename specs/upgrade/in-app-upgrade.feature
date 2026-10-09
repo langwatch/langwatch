@@ -115,7 +115,6 @@ Feature: The new image's worker runs its blocking upgrade while the api holds, t
     Then the upgrading frame names the phase and "2 of 5"
     And it names no tenant, error, hostname or version
 
-  @unimplemented
   Scenario: The holding page offers sign-in to follow the upgrade
     Given the api is in upgrading mode
     When a browser requests a page that is not served

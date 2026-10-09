@@ -10,6 +10,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import type { ServerRole } from "../feature-installer.ts";
 import {
   UPGRADE_CONSOLE_TOKEN_TTL_MS,
+  UPGRADING_PHASE,
   type UpgradeConsole,
   type UpgradeHolding,
 } from "../lifecycle/liveness-thread.ts";
@@ -64,8 +65,6 @@ const LEDGER = "the upgrade ledger (DATABASE_URL)";
 const LEDGER_UNREADABLE_NEXT =
   "check DATABASE_URL reaches Postgres and `pnpm task upgrade status` answers, then start this process again";
 const REFUSED_NEXT = "do what the refusal names, then start this process again";
-/** The api's phase once the schema steps are done: it boots and serves declared routes (UIW-1). */
-export const UPGRADING_PHASE = "upgrading";
 /** How often a holding or upgrading api asks the ledger again (UPGRADE-IN-WORKER). */
 const RE_ASK_MS = 10_000;
 

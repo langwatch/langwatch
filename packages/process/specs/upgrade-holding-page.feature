@@ -46,6 +46,13 @@ Feature: The liveness door holds browsers on a static page while an upgrade runs
     And the main thread never sees the connection
 
   @unit
+  Scenario: The upgrading holding page offers sign-in to follow the upgrade
+    Given the api serves in upgrading mode
+    When the holding page is rendered
+    Then it links to sign-in with a callback to the Upgrades page
+    And the holding page of the schema phase carries no link
+
+  @unit
   Scenario: The holding page names only the phase when no step is outstanding
     Given an upgrade with no outstanding step ids
     When the holding page is rendered

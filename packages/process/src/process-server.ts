@@ -14,9 +14,9 @@ import type { SecretsResolver } from "@langwatch/secrets";
 import { z } from "zod";
 
 import { bootInstalledProcess } from "./boot-installed-process.ts";
+import { UPGRADING_PHASE } from "./lifecycle/liveness-thread.ts";
 import { processShutdownDeadlineMs } from "./lifecycle/shutdown-deadline.ts";
 import {
-  UPGRADING_PHASE,
   type UpgradeGate,
   upgradeGateComponent,
   type UpgradeGatedRole,
