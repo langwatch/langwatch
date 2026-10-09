@@ -11,8 +11,8 @@
 #   pnpm dev, haven     the stack's prepare step, once, before the lanes
 #   dev compose         the api service runs `upgrade` before its dev command
 #
-# The one preparation script is apps/api's `start:prepare:db`: `upgrade`, then the
-# system-migrations pass, two processes chained with `&&` so a refusal stops the chain.
+# The one preparation script is apps/api's `start:prepare:db`: `upgrade` alone. The
+# system-migrations pass is not part of api start (Alex, 2026-10-09).
 
 Feature: Every entry point runs the upgrade once; serving processes never migrate
   As an operator starting or upgrading LangWatch
@@ -27,10 +27,10 @@ Feature: Every entry point runs the upgrade once; serving processes never migrat
     And neither names a migration task
 
   @unit
-  Scenario: The one preparation script runs the upgrade, then the system-migrations pass
+  Scenario: The one preparation script runs the upgrade and nothing else
     Given the api's preparation script
     When an entry point runs it
-    Then it runs `pnpm task upgrade` and only on success the system-migrations pass
+    Then it runs `pnpm task upgrade` and no system-migrations pass
 
   @unit
   Scenario: The Helm pre-roll Job runs the upgrade on the new image

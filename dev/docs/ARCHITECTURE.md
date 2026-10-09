@@ -1347,8 +1347,10 @@ repositories whose tier nobody stated refuses boot by name (Alex, 2026-10-05). P
 live stores; a test or dev harness hands `memoryStores()` directly and never touches env.
 
 **Migrations are not the api's job.** They run through `pnpm task upgrade` (apps/api
-`start:prepare:db`: upgrade, then the system-migrations pass), before serve, from every entry
-point (ADR-173). Prisma migrations
+`start:prepare:db`: upgrade alone; the system-migrations pass is not part of api start), before serve, from every entry
+point (ADR-173). On a self-hosted install the new image's api runs that same `upgrade` itself,
+under the runner's lease, whenever the ledger is behind it, behind the holding page; the worker
+never does (Alex, 2026-10-09, UPGRADE-FIXES). Prisma migrations
 live with the schema; ClickHouse migrations are goose SQL files. A serving
 process holding DDL locks is how deploys die. Because they run before any module boots, apps/tasks'
 migration-runner files (`src/*migrat*.ts`) may name process packages (Alex, 2026-09-27), and

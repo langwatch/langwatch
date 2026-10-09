@@ -103,6 +103,46 @@ describe.skipIf(!DB_URL)("servingUpgradeGate over a ledger", () => {
     });
   });
 
+  describe("given a blocking step of this image still pending, for the api", () => {
+    /** @scenario "The api on an installation behind its image runs the upgrade once, then serves" */
+    it("runs the upgrade once for the api and admits it after", async () => {
+      await recordSteps({ [PRISMA]: "done", [GOOSE]: "pending" });
+      let runs = 0;
+      const gate = gateFor({
+        role: "api",
+        firstInstall: async () => {
+          runs += 1;
+          await scratch.postgres.query(
+            `UPDATE "_langwatch_upgrade_step" SET "status" = 'done' WHERE "id" = $1`,
+            [GOOSE],
+          );
+          return 0;
+        },
+      });
+
+      await expect(gate.admit()).resolves.toMatchObject({ admitted: true });
+      expect(runs).toBe(1);
+      await gate.release();
+    });
+
+    /** @scenario "The worker never runs the upgrade when its installation is behind" */
+    it("refuses the worker by name and runs nothing", async () => {
+      await recordSteps({ [PRISMA]: "done", [GOOSE]: "pending" });
+      let runs = 0;
+      const verdict = await gateFor({
+        role: "worker",
+        firstInstall: async () => {
+          runs += 1;
+          return 0;
+        },
+      }).admit();
+
+      expect(verdict).toMatchObject({ admitted: false, outcome: "behind" });
+      expect(verdict.admitted ? "" : verdict.refusal).toContain(UPGRADE_COMMAND);
+      expect(runs).toBe(0);
+    });
+  });
+
   describe("given every blocking step done", () => {
     /** @scenario "A serving process is admitted once the upgrade has run" */
     it("admits the api and records its roster entry until release", async () => {

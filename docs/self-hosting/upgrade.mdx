@@ -149,8 +149,10 @@ helm repo update
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
   -f values-production.yaml \
-  --wait --timeout 10m
+  --wait --timeout 45m
 ```
+
+The pre-upgrade Job can run for up to 35 minutes on a large installation. Helm's default hook timeout is 5 minutes, and a shorter `--timeout` fails the release part-way through a migration.
 
 ### Pin a Specific Version
 
@@ -195,7 +197,7 @@ To run it yourself, from the new image with the app's environment (`DATABASE_URL
 cd /app/apps/api && pnpm --silent run start:prepare:db
 ```
 
-That runs `pnpm task upgrade` (Postgres, ClickHouse and LangWatchQL, under one lease, so a second run waits for the first) and then the system-migrations pass. It is safe to run again: on a current installation it applies no step and leaves the schema as it is. To see what it would do first, run `cd /app/apps/tasks && pnpm task upgrade plan`; `pnpm task upgrade status` shows the ledger. Both take `--json`.
+That runs `pnpm task upgrade` (Postgres, ClickHouse and LangWatchQL, under one lease, so a second run waits for the first). It is safe to run again: on a current installation it applies no step and leaves the schema as it is. To see what it would do first, run `cd /app/apps/tasks && pnpm task upgrade plan`; `pnpm task upgrade status` shows the ledger. Both take `--json`.
 
 ### Exit codes and what to do
 

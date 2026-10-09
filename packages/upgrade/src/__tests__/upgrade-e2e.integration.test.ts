@@ -516,8 +516,8 @@ describe.skipIf(!DB_URL || !CH_URL)("the upgrade, end to end over live stores", 
       expect(tables.rows[0]?.present).toBe("public_upgrade_ledger._langwatch_upgrade_run");
     });
 
-    /** @scenario "A lapsed roster entry stops serving and the next good write serves again" */
-    it("stops serving once its roster writes fail past the stale bound, and serves after a good one", async () => {
+    /** @scenario "A roster outage never takes an admitted process out of service" */
+    it("keeps serving through a roster outage past the stale bound, and after it", async () => {
       const repository = ledger();
       const roster = createServingRoster({
         ledger: repository,
@@ -538,7 +538,7 @@ describe.skipIf(!DB_URL || !CH_URL)("the upgrade, end to end over live stores", 
         'ALTER TABLE "public_upgrade_ledger"."_langwatch_serving_roster" RENAME TO "_roster_away"',
       );
       await sleep(1_200);
-      expect(gate.serving()).toBe(false);
+      expect(gate.serving()).toBe(true);
       await scratch.postgres.query(
         'ALTER TABLE "public_upgrade_ledger"."_roster_away" RENAME TO "_langwatch_serving_roster"',
       );

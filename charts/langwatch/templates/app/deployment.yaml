@@ -192,9 +192,8 @@ spec:
             {{- toYaml .Values.app.resources | nindent 12 }}
           # 40 minutes (15s x 160). The app never migrates: serving starts only
           # once its upgrade gate admits it, which on a first install means
-          # running `pnpm task upgrade` once, and the system-migrations pass
-          # behind it is designed to take up to ~27 minutes (25 passes, each
-          # waiting up to 60s for its queue work to settle, 5s between them). A
+          # running `pnpm task upgrade` once, which can take up to 35 minutes
+          # (the pre-roll Job's deadline). A
           # shorter budget turns a slow first install into CrashLoopBackOff,
           # which hides the error the gate would otherwise report by name.
           startupProbe:

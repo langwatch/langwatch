@@ -22,8 +22,8 @@ import { imageGateSteps, readImageTree } from "./image-tree.ts";
 import { type ServingRole, type ServingVerdict, UPGRADE_COMMAND } from "./serving-gate.ts";
 import { createUpgradeGate, type UpgradeGate } from "./upgrade-gate.service.ts";
 
-/** Roster refresh and stale bound (held question "cloud presence timings", default taken). */
-export const SERVING_ROSTER_TIMING = { staleAfterMs: 60_000, refreshEveryMs: 15_000 } as const;
+/** Generous stale bound: a database blip must never take a process out of service (2026-10-09). */
+export const SERVING_ROSTER_TIMING = { staleAfterMs: 10 * 60_000, refreshEveryMs: 15_000 } as const;
 
 /** Roster entries dead this long are deleted when a process records its own (plan F-10). */
 export const SERVING_ROSTER_PRUNE_AFTER_MS = 7 * 24 * 60 * 60_000;
@@ -105,14 +105,6 @@ export function upgradeGateOver({
     onRefreshError: (error) =>
       warn("roster refresh failed", { processId, error: messageOf(error) }),
     onPruneError: (error) => warn("roster prune failed", { processId, error: messageOf(error) }),
-    onLapseChange: (lapsed) =>
-      warn(
-        lapsed
-          ? `roster entry lapsed past ${SERVING_ROSTER_TIMING.staleAfterMs} ms: ${processId} stops serving; ` +
-              "readiness answers 503 until a roster write succeeds (check DATABASE_URL reaches Postgres)"
-          : `roster entry written again: ${processId} serves again`,
-        { processId },
-      ),
   });
   const gate = createUpgradeGate({
     role,
@@ -135,7 +127,10 @@ export function upgradeGateOver({
   return {
     async admit(): Promise<ServingVerdict> {
       try {
-        const verdict = await admitAfterFirstInstall({ gate, firstInstall, warn });
+        const verdict =
+          role === "api"
+            ? await admitAfterFirstInstall({ gate, firstInstall, warn })
+            : await gate.admit();
         if (!verdict.admitted) await closeOnce();
         return verdict;
       } catch (error) {
@@ -166,7 +161,11 @@ export function upgradeGateOver({
   };
 }
 
-/** The api's first install runs `upgrade` once and asks again (Q10), saying so first. */
+/**
+ * The api runs `upgrade` once and asks again, saying so first: on a first install (Q10) and on
+ * any installation behind this image, behind the holding page (UPGRADE-FIXES, 2026-10-09).
+ * Spec: specs/upgrade/in-app-upgrade.feature.
+ */
 export async function admitAfterFirstInstall({
   gate,
   firstInstall,
@@ -177,16 +176,16 @@ export async function admitAfterFirstInstall({
   warn: ServingGateWarn;
 }): Promise<ServingVerdict> {
   const verdict = await gate.admit();
-  if (verdict.outcome !== "first-install") return verdict;
-  warn(
-    `first install: the ledger and the schema are empty, so this api runs \`${UPGRADE_COMMAND}\` ` +
-      "once before it serves; its lines follow",
-    {
-      phase: "first-install",
-      waitingOn: `\`${UPGRADE_COMMAND}\``,
-      next: "nothing to do: the api serves when the upgrade finishes",
-    },
-  );
+  if (verdict.outcome !== "first-install" && verdict.outcome !== "behind") return verdict;
+  const why =
+    verdict.outcome === "first-install"
+      ? "first install: the ledger and the schema are empty"
+      : `behind this image: blocking steps not done: ${verdict.outstanding.join(", ")}`;
+  warn(`${why}, so this api runs \`${UPGRADE_COMMAND}\` once before it serves; its lines follow`, {
+    phase: verdict.outcome,
+    waitingOn: `\`${UPGRADE_COMMAND}\``,
+    next: "nothing to do: the api serves when the upgrade finishes",
+  });
   const exitCode = await firstInstall();
   if (exitCode === 0) return gate.admit();
   return { ...verdict, refusal: `${verdict.refusal} The api ran it; it exited ${exitCode}.` };

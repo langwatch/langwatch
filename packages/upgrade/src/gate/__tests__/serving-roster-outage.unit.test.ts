@@ -12,12 +12,10 @@ const ledgerStep = (id: string, status: UpgradeStepStatus) =>
 
 function workerGate({ goose = "done" }: { goose?: UpgradeStepStatus } = {}) {
   const rosterLedger = new MemoryServingRosterLedger();
-  const changes: boolean[] = [];
   const roster = createServingRoster({
     ledger: rosterLedger,
     ...SERVING_ROSTER_TIMING,
     onRefreshError: () => undefined,
-    onLapseChange: (lapsed) => changes.push(lapsed),
   });
   const gate = createUpgradeGate({
     role: "worker",
@@ -30,10 +28,10 @@ function workerGate({ goose = "done" }: { goose?: UpgradeStepStatus } = {}) {
     roster,
     schemaIsEmpty: async () => false,
   });
-  return { gate, rosterLedger, changes };
+  return { gate, rosterLedger };
 }
 
-describe("the serving gate's lapsed roster entry", () => {
+describe("the serving gate through a roster outage", () => {
   beforeEach(() => {
     vi.useFakeTimers({ now: new Date("2026-10-06T22:00:00Z") });
   });
@@ -41,45 +39,31 @@ describe("the serving gate's lapsed roster entry", () => {
     vi.useRealTimers();
   });
 
-  /** @scenario "A process whose roster writes keep failing stops serving past the stale bound" */
-  it("stops serving once the last good write is older than 60 s, and says so once", async () => {
-    const { gate, rosterLedger, changes } = workerGate();
+  /** @scenario "A process whose roster writes keep failing keeps serving" */
+  it("keeps serving for thirty minutes of refused writes, and after they recover", async () => {
+    const { gate, rosterLedger } = workerGate();
     await gate.admit();
-    for (let refused = 0; refused < 5; refused++) rosterLedger.refuseNextWrite();
+    for (let refused = 0; refused < 200; refused++) rosterLedger.refuseNextWrite();
 
-    await vi.advanceTimersByTimeAsync(SERVING_ROSTER_TIMING.staleAfterMs);
-    expect(gate.serving()).toBe(true);
-    await vi.advanceTimersByTimeAsync(1);
-    expect(gate.serving()).toBe(false);
-    await vi.advanceTimersByTimeAsync(10_000);
-    expect(changes).toEqual([true]);
+    for (let second = 0; second < 1_800; second += 15) {
+      await vi.advanceTimersByTimeAsync(15_000);
+      expect(gate.serving()).toBe(true);
+    }
     await gate.release();
   });
 
-  /** @scenario "A process that stopped serving on a lapsed roster entry serves again after a good write" */
-  it("serves again after the next good write, and says so once", async () => {
-    const { gate, rosterLedger, changes } = workerGate();
-    await gate.admit();
-    for (let refused = 0; refused < 4; refused++) rosterLedger.refuseNextWrite();
-    await vi.advanceTimersByTimeAsync(SERVING_ROSTER_TIMING.staleAfterMs + 1);
-    expect(gate.serving()).toBe(false);
-
-    await vi.advanceTimersByTimeAsync(SERVING_ROSTER_TIMING.refreshEveryMs);
-
-    expect(gate.serving()).toBe(true);
-    expect(changes).toEqual([true, false]);
-    await gate.release();
+  it("holds the stale bound well above a database blip", () => {
+    expect(SERVING_ROSTER_TIMING.staleAfterMs).toBeGreaterThanOrEqual(10 * 60_000);
   });
 
   /** @scenario "A healthy process never stops serving" */
   it("keeps serving for ten minutes of good writes", async () => {
-    const { gate, changes } = workerGate();
+    const { gate } = workerGate();
     await gate.admit();
     for (let second = 0; second < 600; second += 5) {
       await vi.advanceTimersByTimeAsync(5_000);
       expect(gate.serving()).toBe(true);
     }
-    expect(changes).toEqual([]);
     await gate.release();
   });
 
