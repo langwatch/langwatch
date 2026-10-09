@@ -79,8 +79,7 @@ func ParseCredentialFromHeaders(h http.Header) (domain.Credential, error) {
 		Extra:      make(map[string]string),
 	}
 
-	// Only the provider shapes that ship credentials inline today are mapped;
-	// others (e.g. ProviderVoyage) fall through with an empty Extra.
+	// Only the provider shapes that ship credentials inline today are mapped.
 	switch provider {
 	case domain.ProviderOpenAI, domain.ProviderAnthropic, domain.ProviderGemini,
 		domain.ProviderXAI, domain.ProviderGroq, domain.ProviderCerebras,
@@ -155,6 +154,9 @@ func ParseCredentialFromHeaders(h http.Header) (domain.Credential, error) {
 		if v := h.Get(headerVertexLocation); v != "" {
 			cred.Extra["vertex_location"] = v
 		}
+	case domain.ProviderVoyage, domain.ProviderCustom, domain.ProviderElevenLabs,
+		domain.ProviderLangWatch, domain.ProviderOpenAICodex:
+		// No inline credential shape: Extra stays empty.
 	}
 
 	// Populate the Azure / Bedrock / Vertex deployment map from the requested
