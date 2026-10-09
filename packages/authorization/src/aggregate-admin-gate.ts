@@ -27,7 +27,7 @@ export function applyAggregateAdminGate<
   if (!decision.permitted || decision.organizationRole === "ADMIN") return decision;
   if (!isAggregateProjectKind(kind)) return decision;
 
-  return { ...decision, permitted: false, denialReason: "no-binding" };
+  return { ...decision, permitted: false, denialReason: "no-grant" };
 }
 
 /**
