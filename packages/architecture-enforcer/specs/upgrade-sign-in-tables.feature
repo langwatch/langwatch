@@ -6,7 +6,10 @@ Feature: A blocking upgrade step never touches a sign-in or ingest table
   Ingest tables: every table api-key, project, evaluation, evaluator,
   model-provider, monitor, experiment and governance claim (key resolution,
   evaluator and guardrail calls, batch result logs, governance sources). The policy reuses migration-owners' touch parsing; a
-  change to them ships as a background step.
+  change to them ships as a background step. Generalised (Alex, 2026-10-09): a
+  blocking data step may touch only tables created in its own release, that is
+  by a Prisma migration newer than the newest released one (the floor tag's, or
+  a later one a release manifest names); otherwise it ships as a background step.
 
   @unit @architecture
   Scenario: A blocking step whose SQL touches a sign-in table is refused, naming the step and the table
@@ -38,6 +41,21 @@ Feature: A blocking upgrade step never touches a sign-in or ingest table
     Given the repository's modules and their Prisma claims
     When the policy resolves the sign-in tables
     Then they are exactly the tables the sign-in and ingest owners claim
+
+  @unit @architecture
+  Scenario: A blocking step touching a table an earlier release created is refused, naming it
+    Given a Prisma migration at or before the newest released one creates the Dataset table
+    And a blocking data step whose frozen SQL updates Dataset
+    When the upgrade-sign-in-tables policy runs
+    Then it reports the step, naming its id and Dataset as created before this release
+    And the fix says to ship it as a background step ordered with after
+
+  @unit @architecture
+  Scenario: A blocking step touching only tables created in its own release passes
+    Given a Prisma migration newer than every released one creates the Dataset table
+    And a blocking data step whose frozen SQL updates Dataset
+    When the upgrade-sign-in-tables policy runs
+    Then it reports nothing for that step
 
   @unit @architecture
   Scenario: The tree has no blocking step touching a sign-in table
