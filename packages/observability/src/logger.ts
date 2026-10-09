@@ -1,3 +1,4 @@
+import { nowInstant } from "@langwatch/time";
 import pino, {
   type DestinationStream,
   type LoggerOptions,
@@ -344,10 +345,13 @@ function buildTransport(configuration: ResolvedLoggerConfiguration): Destination
   ]);
 }
 
+const TRANSPORT_RETRY_MS = 30_000;
+
 /**
- * One target's worker; when it fails, one stderr line, then its lines go to
- * `fallback`. `emit` carries pino's config message, which a target such as the
- * OTel transport waits for before it takes a single line.
+ * One target's worker; on failure one stderr line, then lines go to `fallback`.
+ * After 30s the next line tries a fresh worker, with no second warning. `emit`
+ * carries pino's config message, which the OTel target waits for.
+ * @see specs/observability/logger-transport-resilience.feature
  */
 function transportOrStdout({
   target,
@@ -356,16 +360,44 @@ function transportOrStdout({
   target: pino.TransportTargetOptions;
   fallback: DestinationStream | null;
 }): DestinationStream & { emit(event: string, ...args: unknown[]): boolean } {
-  const transport = pino.transport({ targets: [target] });
-  let failed = false;
-  transport.on("error", (error: unknown) => {
-    if (failed) return;
-    failed = true;
-    const next = fallback ? "writing its lines to stdout" : "dropping its lines";
-    console.error(`pino transport ${target.target} failed, ${next}:`, error);
-  });
+  let warned = false;
+  let failedAt: number | undefined;
+  let transport = start();
+
+  function start() {
+    const next = pino.transport({ targets: [target] });
+    next.on("error", (error: unknown) => {
+      failedAt = nowInstant().epochMilliseconds;
+      if (warned) return;
+      warned = true;
+      const lines = fallback ? "writing its lines to stdout" : "dropping its lines";
+      console.error(`pino transport ${target.target} failed, ${lines}:`, error);
+    });
+    return next;
+  }
+
+  function retryIfDue() {
+    if (failedAt === undefined || nowInstant().epochMilliseconds - failedAt < TRANSPORT_RETRY_MS)
+      return;
+    failedAt = undefined;
+    try {
+      transport = start();
+    } catch {
+      failedAt = nowInstant().epochMilliseconds;
+    }
+  }
+
   return {
-    write: (line) => (failed ? fallback?.write(line) : transport.write(line)),
+    write: (line) => {
+      retryIfDue();
+      if (failedAt !== undefined) return fallback?.write(line);
+      try {
+        return transport.write(line);
+      } catch {
+        failedAt = nowInstant().epochMilliseconds;
+        return fallback?.write(line);
+      }
+    },
     emit: (event, ...args) => transport.emit(event, ...args),
   };
 }
