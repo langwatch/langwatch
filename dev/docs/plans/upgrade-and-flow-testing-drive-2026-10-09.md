@@ -28,7 +28,10 @@ Shapes: self-hosted · cloud · cloud hybrid (tenants on their own ClickHouse an
 | Monitor evaluations | Dated at the evaluated trace's end; alerts judge staleness by processing time |
 | Seed | Q1 optional in-process trace backdate · Q2 span time for monitor evaluations · Q3 fixed-id private orgs before boot · Q4 per-org plan and a higher haven default · Q5 branch then main · Q6 tracking issue if one exists, else summary · Q7 every kind on `haven up` |
 | Secrets | 1Password is best effort: one probe, parallel reads, skip with a warning |
-| Stripe | Local and CI billing run against paymentsim |
+| Stripe | Local and CI billing run against paymentsim. A failed renewal (`past_due`) cancels the plan at once, as on main; kept for now |
+| Keys from main | Legacy project keys and ownerless keys keep the full project access they had on main; new projects no longer get a legacy project key |
+| Retention loop | Gateway and Instant Eval get tenant retention by cutting licensing's calls into them over to events (no peer cycle) |
+| SaaS image | Migration is the upgrade system's (the worker upgrades under its lease); the image lane's other defaults stand in the draft SaaS PR |
 
 ## 3. Landed (pushed)
 
@@ -38,6 +41,11 @@ Shapes: self-hosted · cloud · cloud hybrid (tenants on their own ClickHouse an
 | Authorization | Every authorize member required; REST mounts need an authorization port; `authz-members-required` lint rule |
 | Retention | Opt-out classes; worker classifies event rows on write again (as on main); ruled classes; per-pipeline tenant policy; classifier required at worker boot |
 | Billing | Five billing scenarios pass against paymentsim |
+| Fixes from UP-01 | UPG-001 gate tolerates a missing ledger; UPG-002 empty chunked datasets read; UPG-004 trace events without metadata parse |
+| Retention (8 more) | Tenant policy on eight more pipelines' event rows |
+| Image | One image boots as api, worker or task; draft langwatch-saas#1295 |
+| Seed SG5 | Memory guard, executors, preflight, resume |
+| Ledger | 41 area comments, 2,100+ rows after deep audits of 24 areas |
 | Upgrade cell UP-01 | Cloud, small, with overlap: 9 of 16 invariants; findings UPG-001..005 on #8553 |
 | Evaluations | Monitor evaluations dated by span end; alert staleness by processing time; peer subscribers get `createdAt` |
 | Seed | Plan core, protocol, checkpoint, CLI (SG1) · runner and `seed:apply` (SG3) · static coverage, 612 gaps (SG11) · telemetry backfill and chunker (SG2) · local identity grants through commands (SG4) · `haven seed` and auto-seed (SG12) |
@@ -51,11 +59,9 @@ Shapes: self-hosted · cloud · cloud hybrid (tenants on their own ClickHouse an
 | --- | --- |
 | Tested-flow ledger | Missing area files, fold in the code sweep (3,103 rows), assemble the #8553 body; coordinator publishes |
 | Upgrade e2e harness | First proven cell (cloud, no hybrid, small) with overlap; verdicts per invariant into #8553 |
-| UPG-001..004 fixes | Gate tolerates a missing upgrade ledger; main-layout datasets read; main API keys keep trace reads; main-queued jobs (UPG-004 first decides local-only or real) |
-| Upgrade cells 2 | Hybrid small (UP-04), self-hosted small (UP-06), drills: retry a step, worker restart mid-upgrade, api before worker |
-| Retention pipelines | `.withRetention` on the 10 pipelines without it; real classifier in the api-live fixture |
-| Image + SaaS | One image booting as api/server or worker; draft PR in the SaaS repo (no deploy) |
-| SG5 | Memory guard, executors, preflight, resume; measured drain rate |
+| UPG-003 | Legacy and ownerless main keys keep main's access; no legacy key for new projects |
+| Retention loop | Cut licensing → gateway / Instant Eval edges; wire their retention |
+| Upgrade cells 2 | Hybrid small (UP-04), self-hosted small (UP-06), drills |
 
 ## 5. Next, in order
 
