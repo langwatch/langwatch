@@ -93,6 +93,15 @@ export const opsUpgradeStepProgressSchema = z.object({
   total: z.number().int().positive(),
 });
 
+/** A live serving process a step waits on: its image does not know the step (STEP-WAITINGON). */
+export const opsUpgradeWaitingWriterSchema = z.object({
+  role: z.string(),
+  image: z.string(),
+  release: z.string().nullable(),
+  lastSeenAt: isoInstant.nullable(),
+});
+export type OpsUpgradeWaitingWriter = z.infer<typeof opsUpgradeWaitingWriterSchema>;
+
 export const opsUpgradeStepSchema = z.object({
   id: z.string(),
   kind: z.string(),
@@ -108,6 +117,7 @@ export const opsUpgradeStepSchema = z.object({
   lastError: z.string().nullable(),
   report: reportSchema,
   progress: opsUpgradeStepProgressSchema.nullable(),
+  waitingOn: z.array(opsUpgradeWaitingWriterSchema),
   runId: z.string().nullable(),
   startedAt: isoInstant.nullable(),
   finishedAt: isoInstant.nullable(),

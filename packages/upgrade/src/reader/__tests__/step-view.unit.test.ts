@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { progressOf } from "../step-view.ts";
+import { progressOf, waitingOnOf } from "../step-view.ts";
 
 describe("progressOf", () => {
   describe("when the report carries done and total", () => {
@@ -19,5 +19,32 @@ describe("progressOf", () => {
         expect(progressOf({ report })).toBeNull();
       },
     );
+  });
+});
+
+describe("waitingOnOf", () => {
+  const roster = [
+    { role: "api", image: "3.21.0", release: "3.21.0", steps: ["ops:fill"], heartbeat_at: "t1" },
+    { role: "worker", image: "3.20.1", release: "3.20.1", steps: [], heartbeat_at: "t2" },
+  ];
+  const declared = { id: "ops:fill", kind: "data", mode: "background", needsOldWritersGone: true };
+
+  describe("when an unsettled step needs old writers gone", () => {
+    it("lists the live processes whose image does not know the step", () => {
+      expect(waitingOnOf({ id: "ops:fill", status: "pending", declared, roster })).toEqual([
+        { role: "worker", image: "3.20.1", release: "3.20.1", lastSeenAt: "t2" },
+      ]);
+    });
+  });
+
+  describe("when the step does not wait or has settled", () => {
+    it.each([
+      { status: "pending", declared: { ...declared, needsOldWritersGone: false } },
+      { status: "pending", declared: undefined },
+      { status: "done", declared },
+      { status: "not-needed", declared },
+    ])("waits on nothing for %o", ({ status, declared: step }) => {
+      expect(waitingOnOf({ id: "ops:fill", status, declared: step, roster })).toEqual([]);
+    });
   });
 });

@@ -82,6 +82,7 @@ function stepOf(step: UpgradeStepView): OpsUpgradeStep {
     lastError: step.lastError,
     report: step.report,
     progress: step.progress,
+    waitingOn: step.waitingOn.map((writer) => ({ ...writer })),
     runId: step.runId,
     startedAt: step.startedAt,
     finishedAt: step.finishedAt,

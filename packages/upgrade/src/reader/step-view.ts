@@ -1,11 +1,12 @@
 import { describeStepStatus } from "./labels.ts";
-import type { LedgerStepRow } from "./reader.repository.ts";
+import type { LedgerRosterRow, LedgerStepRow } from "./reader.repository.ts";
 import {
   type ListStepsFilter,
   type UpgradeImage,
   type UpgradeImageStep,
   type UpgradeStepProgress,
   type UpgradeStepView,
+  type UpgradeWaitingWriter,
   upgradeStepProgressSchema,
 } from "./reader.schema.ts";
 import { compareReleasesNewestFirst } from "./release.ts";
@@ -20,12 +21,42 @@ export function progressOf({
   return parsed.success ? parsed.data : null;
 }
 
+const SETTLED = new Set(["done", "not-needed"]);
+
+/**
+ * The live serving processes an unsettled step waits on: those whose image does not declare it,
+ * when the step needs old writers gone (STEP-WAITINGON, Alex 2026-10-09).
+ */
+export function waitingOnOf({
+  id,
+  status,
+  declared,
+  roster,
+}: {
+  id: string;
+  status: string;
+  declared: UpgradeImageStep | undefined;
+  roster: readonly LedgerRosterRow[];
+}): UpgradeWaitingWriter[] {
+  if (!declared?.needsOldWritersGone || SETTLED.has(status)) return [];
+  return roster
+    .filter((entry) => !entry.steps.includes(id))
+    .map((entry) => ({
+      role: entry.role,
+      image: entry.image,
+      release: entry.release,
+      lastSeenAt: entry.heartbeat_at,
+    }));
+}
+
 function viewRecorded({
   row,
   declared,
+  roster,
 }: {
   row: LedgerStepRow;
   declared: UpgradeImageStep | undefined;
+  roster: readonly LedgerRosterRow[];
 }): UpgradeStepView {
   return {
     id: row.id,
@@ -42,6 +73,7 @@ function viewRecorded({
     lastError: row.last_error,
     report: row.report,
     progress: progressOf({ report: row.report }),
+    waitingOn: waitingOnOf({ id: row.id, status: row.status, declared, roster }),
     runId: row.run_id,
     startedAt: row.started_at,
     finishedAt: row.finished_at,
@@ -52,9 +84,11 @@ function viewRecorded({
 function viewDeclared({
   step,
   imageRelease,
+  roster,
 }: {
   step: UpgradeImageStep;
   imageRelease: string;
+  roster: readonly LedgerRosterRow[];
 }): UpgradeStepView {
   return {
     id: step.id,
@@ -71,6 +105,7 @@ function viewDeclared({
     lastError: null,
     report: null,
     progress: null,
+    waitingOn: waitingOnOf({ id: step.id, status: "pending", declared: step, roster }),
     runId: null,
     startedAt: null,
     finishedAt: null,
@@ -82,17 +117,19 @@ function viewDeclared({
 export function mergeSteps({
   rows,
   image,
+  roster,
 }: {
   rows: readonly LedgerStepRow[];
   image: UpgradeImage;
+  roster: readonly LedgerRosterRow[];
 }): UpgradeStepView[] {
   const declaredById = new Map(image.steps.map((step) => [step.id, step]));
   const recorded = new Set(rows.map((row) => row.id));
   const views = [
-    ...rows.map((row) => viewRecorded({ row, declared: declaredById.get(row.id) })),
+    ...rows.map((row) => viewRecorded({ row, declared: declaredById.get(row.id), roster })),
     ...image.steps
       .filter((step) => !recorded.has(step.id))
-      .map((step) => viewDeclared({ step, imageRelease: image.release })),
+      .map((step) => viewDeclared({ step, imageRelease: image.release, roster })),
   ];
   return views.toSorted((left, right) => {
     const byRelease = compareReleasesNewestFirst({ left: left.release, right: right.release });

@@ -1,11 +1,13 @@
 import { HandledError } from "@langwatch/handled-error";
 import { z } from "zod";
 
+import { SERVING_ROSTER_TIMING } from "../gate/serving-upgrade-gate.ts";
 import type { UpgradePostgres } from "../ports.ts";
 import { computeInstallationState, describeInstallationState } from "./installation-state.ts";
 import { preflightFrom, type UpgradePreflightRow } from "./preflight.ts";
 import {
   type LedgerLeaseRow,
+  type LedgerRosterRow,
   type LedgerRunRow,
   type LedgerStepRow,
   type LedgerStepFact,
@@ -129,14 +131,16 @@ function pickStepView({
   declared,
   imageRelease,
   id,
+  roster,
 }: {
   row: LedgerStepRow | undefined;
   declared: UpgradeImageStep | undefined;
   imageRelease: string;
   id: string;
+  roster: readonly LedgerRosterRow[];
 }): UpgradeStepView {
-  if (row) return viewRecordedStep({ row, declared });
-  if (declared) return viewDeclaredStep({ step: declared, imageRelease });
+  if (row) return viewRecordedStep({ row, declared, roster });
+  if (declared) return viewDeclaredStep({ step: declared, imageRelease, roster });
   throw new UpgradeReadError("upgrade_not_found", `No upgrade step "${id}" in the ledger.`);
 }
 
@@ -191,6 +195,8 @@ export function createUpgradeReader({
 }) {
   const repository = UpgradeReaderRepository.create({ postgres });
   const declaredById = new Map(image.steps.map((step) => [step.id, step]));
+  const findRoster = ({ tables }: { tables: LedgerTables }) =>
+    repository.findLiveRoster({ tables, staleAfterMs: SERVING_ROSTER_TIMING.staleAfterMs });
 
   async function readStatusFacts({ tables }: { tables: LedgerTables }) {
     const [stepFacts, latestRun, succeededRun, floors, leases, unfinishedRun, anyRun, failed] =
@@ -249,7 +255,11 @@ export function createUpgradeReader({
   }
 
   async function listAllSteps({ tables }: { tables: LedgerTables }): Promise<UpgradeStepView[]> {
-    return mergeSteps({ rows: await repository.findSteps({ tables }), image });
+    const [rows, roster] = await Promise.all([
+      repository.findSteps({ tables }),
+      findRoster({ tables }),
+    ]);
+    return mergeSteps({ rows, image, roster });
   }
 
   async function listSteps(filter: ListStepsFilter = {}): Promise<UpgradeStepPage> {
@@ -269,9 +279,12 @@ export function createUpgradeReader({
 
   async function getStep({ id }: { id: string }): Promise<UpgradeStepDetail> {
     const tables = await repository.findTables();
-    const [row] = await repository.findStepById({ tables, id });
+    const [[row], roster] = await Promise.all([
+      repository.findStepById({ tables, id }),
+      findRoster({ tables }),
+    ]);
     const declared = declaredById.get(id);
-    const view = pickStepView({ row, declared, imageRelease: image.release, id });
+    const view = pickStepView({ row, declared, imageRelease: image.release, id, roster });
     const targets = await repository.findTargets({ tables, stepId: id });
     return {
       ...view,
@@ -302,13 +315,18 @@ export function createUpgradeReader({
     if (!run) {
       throw new UpgradeReadError("upgrade_not_found", `No upgrade run "${id}" in the ledger.`);
     }
-    const rows = await repository.findSteps({ tables, runId: id });
+    const [rows, roster] = await Promise.all([
+      repository.findSteps({ tables, runId: id }),
+      findRoster({ tables }),
+    ]);
     return {
       ...summariseRun(run),
       plan: run.plan,
       report: run.report,
       phases: parseRunPhases({ report: run.report }),
-      steps: rows.map((row) => viewRecordedStep({ row, declared: declaredById.get(row.id) })),
+      steps: rows.map((row) =>
+        viewRecordedStep({ row, declared: declaredById.get(row.id), roster }),
+      ),
     };
   }
 

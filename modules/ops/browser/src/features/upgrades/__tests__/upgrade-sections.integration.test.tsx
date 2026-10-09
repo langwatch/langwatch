@@ -59,6 +59,7 @@ function stepWith(overrides: Partial<UpgradeStepView>): UpgradeStepView {
     lastError: null,
     report: null,
     progress: null,
+    waitingOn: [],
     runId: null,
     startedAt: "2026-10-06T10:00:00.000Z",
     finishedAt: "2026-10-06T10:00:02.000Z",
@@ -249,6 +250,20 @@ describe("UpgradesOverview", () => {
 
       const row = screen.getByTestId("upgrade-background-step-ops:backfill-names");
       expect(row).toHaveTextContent("63%");
+    });
+
+    it("names the old serving processes a step waits on", () => {
+      const waiting = {
+        ...running,
+        waitingOn: [
+          { role: "worker", image: "img-3.20.1", release: "3.20.1", lastSeenAt: null },
+          { role: "api", image: "img-dev", release: null, lastSeenAt: null },
+        ],
+      };
+      renderOverview({ status: finishing, backgroundSteps: [failed, waiting] });
+
+      const row = screen.getByTestId("upgrade-background-step-ops:backfill-names");
+      expect(row).toHaveTextContent("worker (3.20.1), api (img-dev)");
     });
 
     it("shows a skeleton while the background steps load", () => {

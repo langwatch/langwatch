@@ -18,6 +18,7 @@ export function stepOf(
     lastError: null,
     report: null,
     progress: null,
+    waitingOn: [],
     runId: null,
     startedAt: null,
     finishedAt: null,

@@ -252,6 +252,7 @@ function BackgroundSteps({
           <Table.ColumnHeader>Step</Table.ColumnHeader>
           <Table.ColumnHeader>Status</Table.ColumnHeader>
           <Table.ColumnHeader>Progress</Table.ColumnHeader>
+          <Table.ColumnHeader>Waiting on</Table.ColumnHeader>
           <Table.ColumnHeader>Release</Table.ColumnHeader>
           <Table.ColumnHeader>Last error</Table.ColumnHeader>
           <Table.ColumnHeader />
@@ -273,6 +274,11 @@ function BackgroundSteps({
             </Table.Cell>
             <Table.Cell>
               {step.progress && `${Math.floor((step.progress.done / step.progress.total) * 100)}%`}
+            </Table.Cell>
+            <Table.Cell>
+              {step.waitingOn
+                .map((writer) => `${writer.role} (${writer.release ?? writer.image})`)
+                .join(", ")}
             </Table.Cell>
             <Table.Cell fontFamily="mono">{step.release ?? "Unreleased"}</Table.Cell>
             <Table.Cell>{step.lastError}</Table.Cell>

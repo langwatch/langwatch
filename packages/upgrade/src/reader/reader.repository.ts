@@ -89,11 +89,21 @@ const leaseRowSchema = z.object({
 });
 export type LedgerLeaseRow = z.infer<typeof leaseRowSchema>;
 
+const rosterRowSchema = z.object({
+  role: z.string(),
+  image: z.string(),
+  release: nullable(z.string()),
+  steps: z.array(z.string()),
+  heartbeat_at: instant,
+});
+export type LedgerRosterRow = z.infer<typeof rosterRowSchema>;
+
 export interface LedgerTables {
   step: boolean;
   run: boolean;
   lease: boolean;
   target: boolean;
+  roster: boolean;
 }
 
 const jsonRows = z.array(z.object({ row: z.unknown() }));
@@ -131,7 +141,8 @@ export class UpgradeReaderRepository {
       (t) => `SELECT to_regclass('${t.step}') IS NOT NULL AS "step",
               to_regclass('${t.run}') IS NOT NULL AS "run",
               to_regclass('${t.lease}') IS NOT NULL AS "lease",
-              to_regclass('${t.target}') IS NOT NULL AS "target"`,
+              to_regclass('${t.target}') IS NOT NULL AS "target",
+              to_regclass('${t.roster}') IS NOT NULL AS "roster"`,
     );
     const row = rows[0];
     return {
@@ -139,6 +150,7 @@ export class UpgradeReaderRepository {
       run: row?.run ?? false,
       lease: row?.lease ?? false,
       target: row?.target ?? false,
+      roster: row?.roster ?? false,
     };
   }
 
@@ -214,6 +226,25 @@ export class UpgradeReaderRepository {
                      AS "row" FROM ${t.lease} lease`,
     });
     return rows.map((row) => leaseRowSchema.parse(row));
+  }
+
+  /** Serving processes that heartbeated within `staleAfterMs` of the database clock. */
+  async findLiveRoster({
+    tables,
+    staleAfterMs,
+  }: {
+    tables: LedgerTables;
+    staleAfterMs: number;
+  }): Promise<LedgerRosterRow[]> {
+    if (!tables.roster) return [];
+    const rows = await this.queryRows({
+      text: (t) => `SELECT to_jsonb(entry) AS "row" FROM ${t.roster} entry
+              WHERE entry."heartbeat_at" >= (now() AT TIME ZONE 'UTC')
+                    - ($1::double precision * interval '1 millisecond')
+              ORDER BY entry."process_id"`,
+      values: [staleAfterMs],
+    });
+    return rows.map((row) => rosterRowSchema.parse(row));
   }
 
   async findLatestRun({ tables }: { tables: LedgerTables }): Promise<LedgerRunRow | null> {
