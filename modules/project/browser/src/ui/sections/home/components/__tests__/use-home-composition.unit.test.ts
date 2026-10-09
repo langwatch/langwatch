@@ -35,7 +35,7 @@ describe("resolveHomeComposition", () => {
   });
 
   describe("when the signal-focused rollout is off", () => {
-    /** @scenario The Langy home renders when the signal-focused home is off */
+    /** @scenario The Langy home renders for a reader with Langy */
     it("gives the Langy home to a reader with Langy — no second rollout", () => {
       expect(
         resolveHomeComposition({
