@@ -240,3 +240,9 @@ Feature: haven install checks the machine's prerequisites
       Given a Linux machine
       When the developer runs "haven install"
       Then the observability tools and the pinned binaries are reported not applicable
+
+    Scenario: Two concurrent installs of a pinned binary download it once
+      Given a pinned artifact that is not yet in haven's home
+      When two haven runs ensure it at the same time
+      Then one downloads it and the other waits for the lock
+      And the waiting run finds the binary in place and downloads nothing

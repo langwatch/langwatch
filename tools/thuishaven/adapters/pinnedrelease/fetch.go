@@ -18,6 +18,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
+	"time"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
@@ -34,6 +36,14 @@ func Ensure(ctx context.Context, a domain.PinnedArtifact, dest string) (string, 
 	dir := filepath.Dir(dest)
 	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return "", err
+	}
+	unlock, err := lock(ctx, dest+".lock")
+	if err != nil {
+		return "", err
+	}
+	defer unlock()
+	if _, err := os.Stat(dest); err == nil { // another run finished while we waited
+		return dest, nil
 	}
 	fmt.Printf("downloading %s (first run only) ...\n", a.URL)
 	asset, err := download(ctx, a, dir)
@@ -56,6 +66,35 @@ func Ensure(ctx context.Context, a domain.PinnedArtifact, dest string) (string, 
 		return "", err
 	}
 	return dest, os.Rename(bin, dest)
+}
+
+// lock takes an exclusive flock on path, polling so ctx can end the wait. The
+// file is dest's own, never another package's lock: a second flock on one file
+// from one process would deadlock.
+func lock(ctx context.Context, path string) (func(), error) {
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600) // #nosec G304 -- dest plus ".lock"
+	if err != nil {
+		return nil, err
+	}
+	for {
+		err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
+		if err == nil {
+			return func() {
+				_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
+				_ = f.Close()
+			}, nil
+		}
+		if !errors.Is(err, syscall.EWOULDBLOCK) {
+			_ = f.Close()
+			return nil, err
+		}
+		select {
+		case <-ctx.Done():
+			_ = f.Close()
+			return nil, ctx.Err()
+		case <-time.After(50 * time.Millisecond):
+		}
+	}
 }
 
 // download writes the asset to a temp file in dir, hashing while it writes,
