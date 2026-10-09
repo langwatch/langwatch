@@ -6,9 +6,10 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+const currentProject = { slug: "my-project", kind: "application" };
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
-    project: { slug: "my-project" },
+    project: currentProject,
     hasPermission: () => true,
   }),
 }));
@@ -25,7 +26,7 @@ vi.mock("~/components/analytics/CustomGraph", () => ({
     input,
   }: {
     emptyState?: React.ReactNode;
-    input?: { graphType?: string };
+    input?: { graphType?: string; excludeOrigins?: string[] };
   }) => (
     <div
       data-testid={
@@ -33,6 +34,7 @@ vi.mock("~/components/analytics/CustomGraph", () => ({
           ? "traces-overview-trend"
           : "traces-overview-graph"
       }
+      data-exclude-origins={(input?.excludeOrigins ?? []).join(",")}
     >
       {emptyState}
     </div>
@@ -53,6 +55,17 @@ function renderWithProviders(ui: React.ReactElement) {
 
 describe("<TracesOverview />", () => {
   afterEach(cleanup);
+
+  /** @scenario "The home figures leave out Langy's own turns" */
+  it("leaves Langy's own turns out of the figures", () => {
+    renderWithProviders(<TracesOverview />);
+
+    expect(
+      screen
+        .getByTestId("traces-overview-graph")
+        .getAttribute("data-exclude-origins"),
+    ).toBe("langy");
+  });
 
   it("renders the figures", () => {
     renderWithProviders(<TracesOverview />);

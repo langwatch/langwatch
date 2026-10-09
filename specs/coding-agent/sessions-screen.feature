@@ -325,3 +325,39 @@ Rule: A session can be replayed from wherever it is listed
     When the user chooses it
     Then they are told the session stored none of its turns
     And no replay opens
+
+Rule: A helper thread the agent ran for itself is not a session
+
+  Codex generates a thread title, and a recap, on a hidden thread of its own
+  with its own thread id, through the same telemetry exporter as the session
+  it serves. Every one of those turns used to list as an untitled session
+  beside the real one, with a withheld prompt as its only content. The fold
+  marks such a session auxiliary; the row is kept and priced on its own
+  trace, and the list never shows it.
+
+  @integration
+  Scenario: An auxiliary session is not listed
+    Given a codex session and the auxiliary helper session its title came from
+    When the sessions list is read
+    Then the helper session is not in the list
+    And the codex session is
+
+  @integration
+  Scenario: A second session started seconds later is listed on its own
+    Given two codex sessions the user started seconds apart, neither auxiliary
+    When the sessions list is read
+    Then both sessions are listed
+
+  @integration
+  Scenario: A run of helper threads does not shorten the list
+    Given more auxiliary helper sessions than a page holds, all started after
+      the user's own sessions
+    When a page of the sessions list is read
+    Then the page holds as many user sessions as it asked for
+
+  @integration
+  Scenario: A session marked auxiliary after it was first stored drops out of the list
+    Given a session whose first stored version was not yet marked auxiliary
+    When a later version marks it auxiliary
+    And the sessions list is read
+    Then the session is not in the list

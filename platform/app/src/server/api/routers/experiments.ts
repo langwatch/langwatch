@@ -338,6 +338,10 @@ export const experimentsRouter = createTRPCRouter({
         ...(workbench.actorLabel !== undefined
           ? { actorLabel: workbench.actorLabel }
           : {}),
+        // The run that wrote it, when a run did. A tab coming back from the
+        // background adopts a version its own run wrote instead of standing
+        // down over a write it already holds every cell of.
+        ...(workbench.runId !== undefined ? { runId: workbench.runId } : {}),
       };
     }),
 
@@ -1109,6 +1113,16 @@ const copyEvaluationsV3Experiment = async ({
   // Clear execution results (don't copy them to new project)
   delete workbenchState.results;
 
+  // The copy is its own experiment: carrying the original's id/slug would make
+  // the editor autosave the copy's edits onto the original.
+  delete workbenchState.experimentId;
+  delete workbenchState.experimentSlug;
+
+  const experimentName = `${experiment.name ?? experiment.slug} (copy)`;
+  if (typeof workbenchState.name === "string") {
+    workbenchState.name = experimentName;
+  }
+
   // Process datasets if copyDatasets is enabled
   if (copyDatasets && Array.isArray(workbenchState.datasets)) {
     const datasetService = DatasetService.create(ctx.prisma);
@@ -1152,7 +1166,6 @@ const copyEvaluationsV3Experiment = async ({
   }
 
   // Generate unique slug for the new experiment
-  const experimentName = experiment.name ?? experiment.slug;
   const experiments = experimentService();
   const initialSlug = await experiments.generateUniqueSlug({
     baseSlug: slugify(experimentName),

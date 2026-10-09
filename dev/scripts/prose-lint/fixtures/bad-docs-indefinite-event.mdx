@@ -1,0 +1,8 @@
+---
+title: Connect your agent
+description: Send your agent's traces to LangWatch through a tunnel from your laptop.
+---
+
+## How the connection works
+
+A developer connects the agent to LangWatch once, and the connection stays open while the agent runs. A tunnel URL is public, so anyone holding it can send traces into the project. A request carrying an expired token is refused with a 401 and the reason in the body.

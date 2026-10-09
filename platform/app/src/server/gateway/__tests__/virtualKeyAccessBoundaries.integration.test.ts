@@ -27,6 +27,7 @@ import {
   getTestClickHouseClient,
   startTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
 import {
   clearClickHouseTestApp,
   installClickHouseTestApp,
@@ -117,14 +118,12 @@ describe("virtual key access boundaries (real PG)", () => {
     });
     // OrgUser.role=ADMIN alone grants nothing beyond the MEMBER floor;
     // admin power flows from an ORGANIZATION-scoped RoleBinding.
-    await prisma.roleBinding.create({
-      data: {
-        organizationId: ORG_ID,
-        userId: ADMIN_ID,
-        role: "ADMIN",
-        scopeType: "ORGANIZATION",
-        scopeId: ORG_ID,
-      },
+    await seedRoleBinding(prisma, {
+      organizationId: ORG_ID,
+      userId: ADMIN_ID,
+      role: "ADMIN",
+      scopeType: "ORGANIZATION",
+      scopeId: ORG_ID,
     });
     await prisma.organizationUser.create({
       data: { userId: TRACE_ADMIN_ID, organizationId: ORG_ID, role: "MEMBER" },
@@ -136,6 +135,13 @@ describe("virtual key access boundaries (real PG)", () => {
     // the landing project, nothing anywhere else.
     await prisma.teamUser.create({
       data: { userId: TRACE_ADMIN_ID, teamId: TEAM_OWNER_ID, role: "ADMIN" },
+    });
+    await seedRoleBinding(prisma, {
+      organizationId: ORG_ID,
+      userId: TRACE_ADMIN_ID,
+      role: "ADMIN",
+      scopeType: "TEAM",
+      scopeId: TEAM_OWNER_ID,
     });
   }, 120_000);
 
@@ -149,6 +155,7 @@ describe("virtual key access boundaries (real PG)", () => {
     });
     await prisma.auditLog.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.virtualKey.deleteMany({ where: { organizationId: ORG_ID } });
+    await prisma.grant.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.roleBinding.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.teamUser.deleteMany({
       where: { teamId: { in: [TEAM_OWNER_ID, TEAM_OTHER_ID] } },

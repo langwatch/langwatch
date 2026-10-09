@@ -56,10 +56,7 @@ export type {
   TeamBindingWrite,
 } from "./authz-migration.repository";
 export { AuthzService } from "./authz.service";
-export type {
-  AuthzEpochReader,
-  AuthzServiceOptions,
-} from "./authz.service";
+export type { AuthzEpochReader, AuthzServiceOptions } from "./authz.service";
 export { DuplicateGrantError, GrantValidationError } from "./grant-validation";
 export { GrantsService } from "./grants.service";
 export type {
@@ -76,7 +73,9 @@ export {
   grantFactToCompatBinding,
   grantFactToCompatShareLink,
   grantFactToRow,
+  grantConditionFromDb,
   grantRowToFact,
+  isBindingGrant,
   PRINCIPAL_TO_DB,
   RESOURCE_KIND_TO_DB,
   roleFactToRow,
@@ -91,6 +90,7 @@ export type {
   CompatShareLinkRowShape,
   GrantPrincipalTypeDb,
   GrantResourceKindDb,
+  GrantRowRead,
   GrantRowShape,
   GrantScopeTypeDb,
   RoleRowShape,
@@ -104,8 +104,7 @@ export type {
   BindingIdentityInput,
   BindingIdentityPrincipal,
 } from "./ledger/grant-identity";
-export {
-} from "./ledger/facts";
+export {} from "./ledger/facts";
 export { GRANT_EVENT_SOURCES } from "./ledger/facts";
 export type {
   GrantEventSource,

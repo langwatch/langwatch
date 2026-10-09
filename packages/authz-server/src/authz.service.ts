@@ -106,10 +106,9 @@ export class AuthzService {
     grants: CollectedGrants;
   }> {
     const organizationId = scopeOrganizationId(scope);
-    const [grants, resourceGrants, ownerGrants] = await Promise.all([
-      this.collectCached({ principal, organizationId }),
+    const [{ grants, ownerGrants }, resourceGrants] = await Promise.all([
+      this.collectWithCeiling({ principal, organizationId }),
       this.resourceGrantsFor(scope),
-      this.ownerGrantsFor({ principal, organizationId }),
     ]);
     const decision = this.engine.decideWithCeiling({
       keyGrants: grants,
@@ -143,10 +142,9 @@ export class AuthzService {
     scope: AuthzScopeRef;
   }): Promise<AuthzPermission[]> {
     const organizationId = scopeOrganizationId(scope);
-    const [grants, resourceGrants, ownerGrants] = await Promise.all([
-      this.collectCached({ principal, organizationId }),
+    const [{ grants, ownerGrants }, resourceGrants] = await Promise.all([
+      this.collectWithCeiling({ principal, organizationId }),
       this.resourceGrantsFor(scope),
-      this.ownerGrantsFor({ principal, organizationId }),
     ]);
     const demo = this.demoProjectId();
     return ALL_PERMISSIONS.filter(
@@ -193,17 +191,11 @@ export class AuthzService {
     if (!scope) return { allowed: false, organizationRole: null };
 
     const scopeOrg = scopeOrganizationId(scope);
-    const pass = this.collector.beginPass();
-    const [grants, ownerGrants] = await Promise.all([
-      this.collector.collectGrants({
-        principal,
-        organizationId: scopeOrg,
-        reader: pass,
-      }),
-      ceiling
-        ? this.ownerGrantsFor({ principal, organizationId: scopeOrg, reader: pass })
-        : Promise.resolve(null),
-    ]);
+    const { grants, ownerGrants } = await this.collectWithCeiling({
+      principal,
+      organizationId: scopeOrg,
+      ceiling,
+    });
     const decision = this.engine.decideWithCeiling({
       keyGrants: grants,
       ownerGrants,
@@ -248,15 +240,10 @@ export class AuthzService {
     // decide — so this is a no-op for the user callers this has today and
     // closes the hole before an api-key caller reaches it.
     const scopeOrg = scopeOrganizationId(scope);
-    const pass = this.collector.beginPass();
-    const [grants, ownerGrants] = await Promise.all([
-      this.collector.collectGrants({
-        principal,
-        organizationId: scopeOrg,
-        reader: pass,
-      }),
-      this.ownerGrantsFor({ principal, organizationId: scopeOrg, reader: pass }),
-    ]);
+    const { grants, ownerGrants } = await this.collectWithCeiling({
+      principal,
+      organizationId: scopeOrg,
+    });
     const demoProjectId = this.demoProjectId();
     const matched = permissions.find(
       (permission) =>
@@ -305,20 +292,68 @@ export class AuthzService {
     projects: Map<string, boolean>;
     organizationRole: OrganizationRoleOrNull;
   }> {
-    // The api-key owner ceiling, off the same snapshot as the key's grants —
-    // see `canAnyByIds`. Null for a user principal, so a no-op for the callers
-    // this has today.
-    const pass = this.collector.beginPass();
-    const [grants, ownerGrants] = await Promise.all([
-      this.collector.collectGrants({
+    const { byPermission, organizationRole } =
+      await this.canBatchPermissionsByIds({
         principal,
+        permissions: [permission],
         organizationId,
-        reader: pass,
-      }),
-      this.ownerGrantsFor({ principal, organizationId, reader: pass }),
-    ]);
+        teams,
+        projects,
+      });
+    const decision = byPermission.get(permission) ?? {
+      teams: new Map<string, boolean>(),
+      projects: new Map<string, boolean>(),
+    };
+    return { ...decision, organizationRole };
+  }
+
+  /**
+   * MANY permissions across many scopes in one organization — and still ONE
+   * collection. `canBatchByIds` above is this with a single permission; this
+   * exists because the api-key project ceiling asks two permissions of every
+   * project, and two single-permission batches would collect the same
+   * snapshot twice. Deciding is pure, so permissions × scopes costs no
+   * further queries; each project's scope is resolved once, not once per
+   * permission, and only when the caller does not already know its team.
+   */
+  async canBatchPermissionsByIds({
+    principal,
+    permissions,
+    organizationId,
+    teams,
+    projects,
+  }: {
+    principal: AuthzPrincipalRef;
+    permissions: readonly AuthzPermission[];
+    organizationId: string;
+    teams: ReadonlyArray<{ teamId: string }>;
+    projects: ReadonlyArray<{ projectId: string; teamId?: string | undefined }>;
+  }): Promise<{
+    byPermission: Map<
+      AuthzPermission,
+      { teams: Map<string, boolean>; projects: Map<string, boolean> }
+    >;
+    organizationRole: OrganizationRoleOrNull;
+    /**
+     * For an api-key principal, the owner's organisation role, read from the
+     * snapshot the ceiling already collected; null for a user principal and
+     * for a service key with no owner. A rule that only an organisation admin
+     * may pass asks this, since the key itself holds no role.
+     */
+    ownerOrganizationRole: OrganizationRoleOrNull;
+  }> {
+    // The api-key owner ceiling, collected with the key's grants as check()
+    // collects it — see `canAnyByIds`. Null for a user or service-key
+    // principal, and `decideWithCeiling` with a null ceiling is a plain decide.
+    const { grants, ownerGrants } = await this.collectWithCeiling({
+      principal,
+      organizationId,
+    });
     const demoProjectId = this.demoProjectId();
-    const allowedAt = (scope: AuthzScopeRef | null): boolean =>
+    const allowedAt = (
+      permission: AuthzPermission,
+      scope: AuthzScopeRef | null,
+    ): boolean =>
       scope
         ? this.engine.decideWithCeiling({
             keyGrants: grants,
@@ -329,26 +364,46 @@ export class AuthzService {
           }).allowed
         : false;
 
-    const resolvedProjects = await Promise.all(
-      projects.map(async ({ projectId, teamId }): Promise<[string, boolean]> => [
-        projectId,
-        allowedAt(
+    const projectScopes = await Promise.all(
+      projects.map(
+        async ({
+          projectId,
+          teamId,
+        }): Promise<[string, AuthzScopeRef | null]> => [
+          projectId,
           teamId
             ? { type: "project", id: projectId, teamId, organizationId }
             : await this.collector.resolveScopeRef({ projectId }),
-        ),
-      ]),
+        ],
+      ),
     );
 
     return {
-      teams: new Map(
-        teams.map(({ teamId }) => [
-          teamId,
-          allowedAt({ type: "team", id: teamId, organizationId }),
+      byPermission: new Map(
+        permissions.map((permission) => [
+          permission,
+          {
+            teams: new Map(
+              teams.map(({ teamId }) => [
+                teamId,
+                allowedAt(permission, {
+                  type: "team",
+                  id: teamId,
+                  organizationId,
+                }),
+              ]),
+            ),
+            projects: new Map(
+              projectScopes.map(([projectId, scope]) => [
+                projectId,
+                allowedAt(permission, scope),
+              ]),
+            ),
+          },
         ]),
       ),
-      projects: new Map(resolvedProjects),
       organizationRole: grants.organizationRole,
+      ownerOrganizationRole: ownerGrants?.organizationRole ?? null,
     };
   }
 
@@ -392,14 +447,12 @@ export class AuthzService {
   private async ownerGrantsFor({
     principal,
     organizationId,
+    epoch,
     reader,
   }: {
     principal: AuthzPrincipalRef;
     organizationId: string;
-    /** Present when the ceiling must come off the same snapshot as the key's
-     *  own grants. Intersecting two heads would let a gate expiry between the
-     *  two collections cap a ledger binding list with a legacy one. Passing a
-     *  reader also means not using the cache, which is the point. */
+    epoch: number | null;
     reader?: AuthzReadRepository;
   }): Promise<CollectedGrants | null> {
     if (principal.type !== "apiKey") return null;
@@ -411,13 +464,44 @@ export class AuthzService {
       type: "user",
       id: owner.userId,
     };
-    return reader
-      ? this.collector.collectGrants({
-          principal: ownerPrincipal,
-          organizationId,
-          reader,
-        })
-      : this.collectCached({ principal: ownerPrincipal, organizationId });
+    return this.collectAtEpoch({
+      principal: ownerPrincipal,
+      organizationId,
+      epoch,
+      reader,
+    });
+  }
+
+  /**
+   * A principal's grants and its §9 owner ceiling, as one pair. With an epoch
+   * both come off the cache under that one epoch; without one both come off
+   * ONE pass, so a cutover between the two collects cannot cap a key with an
+   * owner snapshot read from the other head (`beginPass` on the port).
+   */
+  private async collectWithCeiling({
+    principal,
+    organizationId,
+    ceiling = true,
+  }: {
+    principal: AuthzPrincipalRef;
+    organizationId: string;
+    ceiling?: boolean;
+  }): Promise<{
+    grants: CollectedGrants;
+    ownerGrants: CollectedGrants | null;
+  }> {
+    const epoch = await this.epochFor({ principal, organizationId });
+    const reader =
+      epoch === null && principal.type !== "anonymous"
+        ? this.collector.beginPass()
+        : undefined;
+    const [grants, ownerGrants] = await Promise.all([
+      this.collectAtEpoch({ principal, organizationId, epoch, reader }),
+      ceiling
+        ? this.ownerGrantsFor({ principal, organizationId, epoch, reader })
+        : Promise.resolve(null),
+    ]);
+    return { grants, ownerGrants };
   }
 
   private async resourceGrantsFor(
@@ -447,18 +531,49 @@ export class AuthzService {
     principal: AuthzPrincipalRef;
     organizationId: string;
   }): Promise<CollectedGrants> {
+    const epoch = await this.epochFor({ principal, organizationId });
+    return this.collectAtEpoch({ principal, organizationId, epoch });
+  }
+
+  /** The organization's grant epoch, or null when nothing may be cached: the
+   *  flag is off, the store is unreachable, or the caller is anonymous. */
+  private async epochFor({
+    principal,
+    organizationId,
+  }: {
+    principal: AuthzPrincipalRef;
+    organizationId: string;
+  }): Promise<number | null> {
     const { epochReader } = this.options;
     if (
       !this.cacheEnabled() ||
       !epochReader ||
       principal.type === "anonymous"
     ) {
-      return this.collector.collectGrants({ principal, organizationId });
+      return null;
     }
+    return epochReader({ organizationId });
+  }
 
-    const epoch = await epochReader({ organizationId });
-    if (epoch === null) {
-      return this.collector.collectGrants({ principal, organizationId });
+  /** A cached snapshot at `epoch`, or a fresh collect (on `reader`, when the
+   *  caller holds a pass) when there is no epoch to cache under. */
+  private async collectAtEpoch({
+    principal,
+    organizationId,
+    epoch,
+    reader,
+  }: {
+    principal: AuthzPrincipalRef;
+    organizationId: string;
+    epoch: number | null;
+    reader?: AuthzReadRepository;
+  }): Promise<CollectedGrants> {
+    if (epoch === null || principal.type === "anonymous") {
+      return this.collector.collectGrants({
+        principal,
+        organizationId,
+        reader,
+      });
     }
 
     const maxAgeMs = this.options.cacheMaxAgeMs ?? DEFAULT_CACHE_MAX_AGE_MS;

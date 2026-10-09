@@ -15,6 +15,14 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
+// An ordinary project: the bar's tips depend on whether it can save lenses.
+vi.mock("~/hooks/useOrganizationTeamProject", () => ({
+  useOrganizationTeamProject: () => ({
+    project: { id: "proj-1", kind: "application" },
+    hasPermission: () => true,
+  }),
+}));
+
 vi.mock("@paper-design/shaders-react", () => ({
   MeshGradient: () => null,
 }));
@@ -32,7 +40,7 @@ vi.mock("../../ai/useAiTraceAction", () => ({
 
 import { explainAnyError } from "~/features/errors";
 import type { AiActionError } from "~/server/app-layer/traces/ai-query";
-import { useFilterStore } from "../../../stores/filterStore";
+import { useExplorerStore } from "../../../stores/explorerStore";
 import { FloatingAiBar } from "../FloatingAiBar";
 
 /** A handled failure in the shape tRPC delivers it. */
@@ -51,11 +59,11 @@ function registryTitle(cause: unknown): string {
 
 afterEach(() => {
   cleanup();
-  useFilterStore.getState().setAiError(null);
+  useExplorerStore.getState().setAiError(null);
 });
 
 beforeEach(() => {
-  useFilterStore.getState().setAiError(null);
+  useExplorerStore.getState().setAiError(null);
 });
 
 const RECT = { top: 100, left: 100, width: 600 };
@@ -98,7 +106,7 @@ describe("<FloatingAiBar /> error row", () => {
     function renderWithProviderError() {
       const result = renderBar();
       act(() => {
-        useFilterStore.getState().setAiError(providerError);
+        useExplorerStore.getState().setAiError(providerError);
       });
       return result;
     }
@@ -138,7 +146,7 @@ describe("<FloatingAiBar /> error row", () => {
       renderWithProviderError();
       await user.click(screen.getByRole("button", { name: /dismiss error/i }));
       expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-      expect(useFilterStore.getState().aiError).toBeNull();
+      expect(useExplorerStore.getState().aiError).toBeNull();
     });
 
     it("keeps the strip outside the pill click-transparent", () => {
@@ -159,7 +167,7 @@ describe("<FloatingAiBar /> error row", () => {
       const cause = new Error("socket hang up");
       renderBar();
       act(() => {
-        useFilterStore.getState().setAiError({ code: "unknown", cause });
+        useExplorerStore.getState().setAiError({ code: "unknown", cause });
       });
       const alert = screen.getByRole("alert");
       expect(alert).toHaveTextContent(registryTitle(cause));

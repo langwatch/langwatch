@@ -444,15 +444,15 @@ describe("runUnifiedLoginFlow", () => {
 				);
 
 				const cfg = baseCfg({
-					control_plane_url: "http://localhost:5580",
+					control_plane_url: "https://langwatch.acme.test",
 				});
 
 				vi.spyOn(deviceFlow, "startDeviceCode").mockResolvedValue({
 					device_code: "dc",
 					user_code: "USER-CODE",
-					verification_uri: "http://localhost:5580/device",
+					verification_uri: "https://langwatch.acme.test/device",
 					verification_uri_complete:
-						"http://localhost:5580/device?code=USER-CODE",
+						"https://langwatch.acme.test/device?code=USER-CODE",
 					expires_in: 300,
 					interval: 5,
 				});
@@ -477,7 +477,7 @@ describe("runUnifiedLoginFlow", () => {
 							secret: "freshsecret000000000000000000000",
 						}),
 						prefix: "ik-lw-newi",
-						endpoint: "http://localhost:5580/api/otel",
+						endpoint: "https://langwatch.acme.test/api/otel",
 					},
 				);
 				(cliApi.getCliBootstrap as ReturnType<typeof vi.fn>).mockResolvedValue(
@@ -492,7 +492,7 @@ describe("runUnifiedLoginFlow", () => {
 					fs.readFileSync(appSettingsTargetFor("claude")!.path, "utf8"),
 				) as { env: Record<string, string> };
 				expect(written.env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(
-					"http://localhost:5580/api/otel",
+					"https://langwatch.acme.test/api/otel",
 				);
 				expect(written.env.OTEL_EXPORTER_OTLP_HEADERS).toContain(
 					"newinstance00000",

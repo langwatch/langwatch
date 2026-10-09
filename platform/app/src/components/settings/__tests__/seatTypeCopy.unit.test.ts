@@ -2,12 +2,12 @@
  * See specs/licensing/seat-type-explained.feature.
  *
  * The seat copy is a billing promise, so it is pinned to the permission set it
- * describes. If `EXTERNAL_MEMBER_PERMISSIONS` gains or loses a resource, the
+ * describes. If the canonical `lite-member` role gains or loses a resource, the
  * sentence an admin reads before paying for a seat has to move with it.
  */
 
+import { builtinRolePermissions } from "@langwatch/authz";
 import { describe, expect, it } from "vitest";
-import { EXTERNAL_MEMBER_PERMISSIONS } from "../../../server/api/rbac";
 import {
   LITE_MEMBER_EXPLANATION,
   LITE_MEMBER_SHORT_DESCRIPTION,
@@ -23,6 +23,7 @@ const NAMED_IN_COPY: Record<string, string> = {
   prompts: "prompts",
   experiments: "experiments",
 };
+const LITE_MEMBER_PERMISSIONS = [...builtinRolePermissions("lite-member")];
 
 describe("lite member seat copy", () => {
   describe("when an admin reads it before choosing a seat type", () => {
@@ -56,7 +57,7 @@ describe("lite member seat copy", () => {
 
   describe("when the underlying permission set is the source of truth", () => {
     it("names every resource a lite member can read", () => {
-      const readable = EXTERNAL_MEMBER_PERMISSIONS.filter((permission) =>
+      const readable = LITE_MEMBER_PERMISSIONS.filter((permission) =>
         permission.endsWith(":view"),
       ).map((permission) => permission.split(":")[0]!);
 
@@ -69,7 +70,7 @@ describe("lite member seat copy", () => {
     });
 
     it("promises annotations as the one thing a lite member can change", () => {
-      const writable = EXTERNAL_MEMBER_PERMISSIONS.filter(
+      const writable = LITE_MEMBER_PERMISSIONS.filter(
         (permission) => !permission.endsWith(":view"),
       ).map((permission) => permission.split(":")[0]!);
 
@@ -78,7 +79,7 @@ describe("lite member seat copy", () => {
     });
 
     it("does not promise a resource the permission set withholds", () => {
-      const readable = EXTERNAL_MEMBER_PERMISSIONS.map(
+      const readable = LITE_MEMBER_PERMISSIONS.map(
         (permission) => permission.split(":")[0]!,
       );
 

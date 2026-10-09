@@ -1,9 +1,8 @@
 import {
-  IDENTIFIER_DEAD_ENDED_EVENT_TYPE,
-  type IdentityFact,
   IdentityEmailInUseError,
   IdentityVerificationExpiredError,
   IdentityVerificationInvalidError,
+  IdentityVerificationNotSettledError,
 } from "@langwatch/identity";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
@@ -21,15 +20,6 @@ import type { IdentityVerificationWrites } from "./identity-writes";
 const logger = createLogger("langwatch:identity:verification-ceremony");
 
 export const IDENTITY_VERIFICATION_TTL_MS = 15 * 60 * 1000;
-
-/** The emission that means the address went to somebody else mid-ceremony. */
-function lostTheUniquenessRace(facts: readonly IdentityFact[]): boolean {
-  return facts.some(
-    (fact) =>
-      fact.type === IDENTIFIER_DEAD_ENDED_EVENT_TYPE &&
-      fact.data.reason === "uniqueness_race_lost",
-  );
-}
 
 export interface MintedEmailVerification {
   verificationId: string;
@@ -173,7 +163,7 @@ export class VerificationCeremonyService {
     // Dispatch BEFORE consuming: if persistence rejects, the record survives
     // and the same valid link retries. The command is idempotent, so a
     // concurrent identical completion cannot double-verify.
-    const facts = await this.identity.verifyIdentifier({
+    await this.identity.verifyIdentifier({
       tenantId: userId,
       userId,
       commandId: newIdentityCommandId(),
@@ -184,7 +174,25 @@ export class VerificationCeremonyService {
       actor: { type: "user", id: userId },
     });
 
-    if (lostTheUniquenessRace(facts)) {
+    // What this person is told is what was RECORDED, never what this thread
+    // decided (ADR-135).
+    //
+    // This used to read the returned facts for a dead-end event. Those facts
+    // are the guard's decision on THIS thread; the same guard runs again on
+    // the queue, and only the second run's events are stored. Both directions
+    // of that divergence lie to somebody, and this is the sentence they read:
+    // decide "lost" here while the queue verifies, and a person is told their
+    // own address belongs to a stranger; decide "won" here while the queue
+    // dead-ends, and they are told an address is theirs when it is not — the
+    // exact harm the branch below was written to prevent.
+    //
+    // So the identifier is read back and the answer comes from its recorded
+    // state. `uniqueness_race_lost` is the only reason anything is ever
+    // dead-ended (`guards.ts`), which is what makes the state alone conclusive
+    // rather than needing the event's reason.
+    const recorded = await this.heads.findIdentifier({ userId, identifierId });
+
+    if (recorded?.state === "DEAD_END") {
       // The guard resolved a cross-user race by DEAD-ENDING this identifier
       // rather than refusing (D01: on the losing side of a concurrent verify
       // there is no caller to refuse). There is a caller here, so the caller
@@ -200,6 +208,20 @@ export class VerificationCeremonyService {
       throw new IdentityEmailInUseError(
         "complete_email_verification: another user's verified identifier holds this address",
       );
+    }
+
+    if (recorded?.state !== "VERIFIED" && recorded?.state !== "PRIMARY") {
+      // Neither outcome is recorded yet: the write is queued and the ledger's
+      // read-your-writes window was already spent. Claiming either would be a
+      // guess, and both guesses are the harms above, so this says the true
+      // thing instead. The record is deliberately NOT consumed — the same link
+      // works, and clicking it again once the fold lands is the whole
+      // remediation.
+      logger.warn(
+        { userId, identifierId, verificationId, state: recorded?.state ?? null },
+        "verification completion could not be confirmed: the identifier projection has not caught up, so neither success nor a uniqueness loss is claimed",
+      );
+      throw new IdentityVerificationNotSettledError();
     }
 
     const consumed = await this.store.consume({ identifierId, verificationId });

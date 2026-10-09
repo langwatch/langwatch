@@ -17,6 +17,9 @@ import {
   OrganizationUserRole,
   RoleBindingScopeType,
 } from "~/generated/prisma/client";
+import { resetAuthzGrantsCommandsForTests } from "~/server/app-layer/authz/ledger";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import { UNLIMITED_PLAN } from "../../../../../ee/licensing/constants";
 import { cleanupTestRows } from "../../../../test-utils/cleanupTestRows";
 import { getApp, globalForApp, resetApp } from "../../../app-layer/app";
@@ -100,21 +103,21 @@ describe("organization.setMemberDisabled", () => {
 
     // role=ADMIN on its own is not enough for `organization:manage`; the
     // permission check reads the binding.
-    await prisma.roleBinding.create({
-      data: {
-        id: `rb-${nanoid(8)}`,
-        organizationId,
-        userId: adminUserId,
-        role: OrganizationUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: organizationId,
-      },
+    await seedRoleBinding(prisma, {
+      id: `rb-${nanoid(8)}`,
+      organizationId,
+      userId: adminUserId,
+      role: OrganizationUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: organizationId,
     });
 
     repo = new PrismaOrganizationRepository(prisma);
     seats = new LicenseEnforcementRepository(prisma);
 
+    resetAuthzGrantsCommandsForTests();
     globalForApp.__langwatch_app = createTestApp({
+      _eventSourcing: createAuthzTestEventSourcing(prisma),
       organizations: traced(
         new OrganizationService(repo, new PromptTagRepository(prisma)),
         "OrganizationService",
@@ -143,7 +146,9 @@ describe("organization.setMemberDisabled", () => {
 
   afterAll(async () => {
     await resetApp();
+    resetAuthzGrantsCommandsForTests();
     await cleanupTestRows(prisma, [
+      ["grant", { organizationId }],
       ["roleBinding", { organizationId }],
       ["organizationUser", { organizationId }],
       ["department", { organizationId }],

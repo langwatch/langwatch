@@ -37,6 +37,7 @@ interface CreateNextContextOptions {
 }
 
 import { auditLog } from "@ee/audit-log/auditLog";
+import type { Authorization } from "@langwatch/actor";
 import type {
   AuthzPermission,
   DeclarationError,
@@ -57,6 +58,10 @@ import { getLogLevelFromStatusCode } from "@langwatch/observability/request";
 import superjson from "superjson";
 import type { OrganizationUserRole } from "~/generated/prisma/client";
 import { type App, getApp } from "~/server/app-layer/app";
+import type {
+  OpsScope,
+  PermissionMiddleware,
+} from "~/server/app-layer/authz/permission-adapters";
 import type { Session } from "~/server/auth";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
@@ -73,7 +78,12 @@ import {
   declaredNoPermission,
   declaredServiceAuthorization,
 } from "../app-layer/authz/trpc-middleware";
-import type { OpsScope, PermissionMiddleware } from "./rbac";
+import {
+  newPrivacyPolicyRequestMemo,
+  type PrivacyPolicyRequestMemo,
+} from "../data-privacy/privacyPolicyRequestMemo";
+import { rateLimit } from "../rateLimit";
+import { isAuditLogExempt } from "./auditLogExemptions";
 
 const logger = createLogger("langwatch:trpc");
 
@@ -96,9 +106,44 @@ interface CreateContextOptions {
    * singleton.
    */
   app?: App;
+  /**
+   * The two-step verification gate's dependencies, for a test that is not
+   * about the gate.
+   *
+   * The gate sits in the permission middleware, so it runs on the way to
+   * EVERY scoped procedure and reads the scope's owner from Prisma to do it.
+   * A router test that mocks `~/server/db` with the two models its own router
+   * touches then fails inside the pipeline rather than in the code it is
+   * testing — and, worse, only on a deployment where the gate is switched on,
+   * so the suite's colour depends on an environment variable.
+   *
+   * Passing `{ offered: () => false }` says "this suite is not about the
+   * second factor" once, at the seam the middleware already offers, instead
+   * of every Prisma double chasing whatever the pipeline reads next.
+   */
+  mfaGate?: {
+    offered?: () => boolean;
+    scopes?: unknown;
+    organizationMfa?: unknown;
+  };
   permissionChecked?: boolean;
+  /**
+   * ADR-144 block B: the sealed proof a `.permission()` check on a
+   * proof-bearing permission minted for this request. A trace route hands
+   * it by name to the service and on to the store client, which applies
+   * it as the tenant fence. Absent on every other procedure.
+   */
+  authorization?: Authorization;
   publiclyShared?: boolean;
   organizationRole?: OrganizationUserRole | null;
+  /**
+   * ADR-144 decision 9: the privacy policies this request has already
+   * folded, so the protections asked for several times with one proof fold
+   * once. Only a factory whose context lives for one HTTP request passes
+   * one; a long-lived context (an SSE subscription) leaves it unset and
+   * resolves every time, so a rule change still reaches it.
+   */
+  privacyPolicyMemo?: PrivacyPolicyRequestMemo;
   opsScope?: OpsScope;
   /**
    * Aborts when the client goes away. Long-lived subscriptions must pass this
@@ -127,9 +172,12 @@ export const createInnerTRPCContext = (opts: CreateContextOptions) => {
     res: opts.res,
     prisma,
     app: opts.app,
+    mfaGate: opts.mfaGate,
     permissionChecked: opts.permissionChecked ?? false,
+    authorization: opts.authorization,
     publiclyShared: opts.publiclyShared ?? false,
     organizationRole: opts.organizationRole ?? undefined,
+    privacyPolicyMemo: opts.privacyPolicyMemo,
     opsScope: opts.opsScope,
     signal: opts.signal,
   };
@@ -154,6 +202,7 @@ export const createTRPCContext = async (opts: CreateNextContextOptions) => {
     app: getApp(),
     permissionChecked: false,
     publiclyShared: false,
+    privacyPolicyMemo: newPrivacyPolicyRequestMemo(),
   });
 };
 
@@ -453,6 +502,53 @@ const enforcePermissionCheck = t.middleware(({ ctx, next }) => {
   return next();
 });
 
+/**
+ * How many refused calls one caller may write to the audit trail in a window.
+ *
+ * The middleware below records a row for any refusal a signed-in caller
+ * provokes, which is the right instinct — a refused act is worth keeping —
+ * and also a write anybody with a session can repeat. A validation error is
+ * free to cause on purpose, so without a bound one account can grow the table
+ * at the speed it can issue requests.
+ *
+ * An hour, because a person clicking around a broken screen produces refusals
+ * in tens and a script produces them in thousands, and the trail only needs
+ * enough of them to show that it happened. Spending the budget never changes
+ * what the caller is told: the refusal they get is the one the procedure
+ * already decided.
+ */
+const REFUSAL_AUDIT_WINDOW_SECONDS = 60 * 60;
+const REFUSAL_AUDIT_BUDGET = 200;
+
+/**
+ * Whether this refusal still fits in the caller's budget.
+ *
+ * Fails OPEN, like the limiter underneath it: if the budget cannot be read we
+ * would rather write an extra audit row than lose one. A refusal is never
+ * failed over the bookkeeping that records it.
+ */
+async function refusalAuditBudget(userId: string): Promise<boolean> {
+  try {
+    const { allowed, remaining } = await rateLimit({
+      key: `trpc-refusal-audit:${userId}`,
+      windowSeconds: REFUSAL_AUDIT_WINDOW_SECONDS,
+      max: REFUSAL_AUDIT_BUDGET,
+    });
+    if (!allowed && remaining === 0) {
+      // Said once as the budget runs out rather than per dropped row: the
+      // flood stays visible in the logs, which is where an unbounded stream
+      // belongs, without the trail carrying it.
+      logger.warn(
+        { userId },
+        "refusal audit budget spent; further refused calls by this caller are logged but not recorded in the audit trail",
+      );
+    }
+    return allowed;
+  } catch {
+    return true;
+  }
+}
+
 const auditLogTRPCErrors = t.middleware(
   async ({ ctx, next, path, type, input }) => {
     const result = await next();
@@ -461,7 +557,8 @@ const auditLogTRPCErrors = t.middleware(
       !result.ok &&
       result.error instanceof TRPCError &&
       result.error.code !== "INTERNAL_SERVER_ERROR" &&
-      ctx.session?.user.id
+      ctx.session?.user.id &&
+      (await refusalAuditBudget(ctx.session.user.id))
     ) {
       await auditLog({
         userId: ctx.session.user.id,
@@ -476,10 +573,12 @@ const auditLogTRPCErrors = t.middleware(
         error: result.error,
         req: ctx.req,
         // When an admin is impersonating, `session.user.id` reflects the
-        // impersonated user (correct for RBAC attribution). We stamp the
-        // real admin's identity in metadata so security forensics can
-        // filter on `metadata.impersonatorId` to find actions that were
-        // actually performed by an admin.
+        // impersonated user (correct for RBAC attribution) and this is the
+        // human who actually did it. A COLUMN rather than only metadata:
+        // "what did this operator do" is the question an incident asks, and
+        // answering it by scanning JSON is how it stops being asked.
+        // `metadata.impersonatorId` stays for readers written against it.
+        actorUserId: ctx.session.user.impersonator?.id ?? null,
         metadata: ctx.session.user.impersonator
           ? { impersonatorId: ctx.session.user.impersonator.id }
           : undefined,
@@ -585,25 +684,8 @@ function findFirstId(value: unknown): string | undefined {
   return undefined;
 }
 
-/**
- * Mutations that fire on a heartbeat / per-tab cadence and aren't worth
- * recording in the audit log. `presence.*` runs every ~15s per open tab
- * (heartbeat + cursor broadcasts + leave on pagehide); auditing them
- * buries every genuine action — project edits, deletions, role changes —
- * under a wall of `presence.update` rows. They're already silenced from
- * the request log via SILENCED_LOG_PATH_PREFIXES; this is the audit-log
- * equivalent.
- *
- * Add new entries here when a router's mutations exist purely for
- * ephemeral session state that doesn't need a permanent forensic record.
- */
-const AUDIT_LOG_EXEMPT_PATHS = new Set(["user.updateLastLogin"]);
-const AUDIT_LOG_EXEMPT_PATH_PREFIXES = ["presence."] as const;
-
-function isAuditLogExempt(path: string): boolean {
-  if (AUDIT_LOG_EXEMPT_PATHS.has(path)) return true;
-  return AUDIT_LOG_EXEMPT_PATH_PREFIXES.some((p) => path.startsWith(p));
-}
+// The exemption list lives in `auditLogExemptions.ts` so a test can ask
+// whether an action is audited without importing this module's whole graph.
 
 /**
  * Fields on a model-provider write whose values are secrets. All three ride
@@ -612,6 +694,16 @@ function isAuditLogExempt(path: string): boolean {
  * `extraHeaders` is precisely where an `Authorization: Bearer …` is entered.
  */
 const CREDENTIAL_OBJECT_FIELDS = ["customKeys", "providerConfig"] as const;
+
+/**
+ * String fields whose value is a credential on every action that carries them.
+ *
+ * A license key is one: a connected install derives the token it presents to
+ * LangWatch-hosted services from it (ADR-141), so an audit row holding the key
+ * would hold the means to mint that token. Unlike `parameters`, the name means
+ * one thing everywhere, so the rule is bound to the name.
+ */
+const CREDENTIAL_STRING_FIELDS = ["licenseKey"] as const;
 
 /**
  * Action paths whose input carries values a person typed for one run, keyed by
@@ -681,6 +773,13 @@ function redactHeaderValues(headers: readonly unknown[]): unknown[] {
   });
 }
 
+function credentialStringFieldsIn(record: Record<string, unknown>): string[] {
+  return CREDENTIAL_STRING_FIELDS.filter((field) => {
+    const value = record[field];
+    return typeof value === "string" && value !== "";
+  });
+}
+
 /**
  * Strips credential values out of what the audit trail persists.
  *
@@ -721,6 +820,10 @@ export function redactAuditArgs({
     replace("extraHeaders", redactHeaderValues(record.extraHeaders));
   }
 
+  for (const field of credentialStringFieldsIn(record)) {
+    replace(field, "[redacted]");
+  }
+
   return redacted ?? input;
 }
 
@@ -744,9 +847,10 @@ const auditLogMutations = t.middleware(
       req: ctx.req,
       targetKind: target.targetKind,
       targetId: target.targetId,
-      // Stamp the real admin id when the action is happening during
-      // impersonation. `userId` above is the impersonated target (the
-      // RBAC actor); metadata.impersonatorId is the human performing it.
+      // The real admin when the action happens under an impersonation.
+      // `userId` above is the impersonated target (the RBAC actor); this is
+      // the human performing it, in a column an incident can filter on.
+      actorUserId: ctx.session.user.impersonator?.id ?? null,
       metadata: ctx.session.user.impersonator
         ? { impersonatorId: ctx.session.user.impersonator.id }
         : undefined,
@@ -1343,6 +1447,25 @@ interface PendingPermissionProcedureBuilder<
     TCaller
   >;
   /**
+   * A project credential or similarly sensitive project value may conceal a
+   * project outside the caller's organization while preserving the ordinary
+   * denial for a member who merely lacks the permission. The standard
+   * permission decision, audit record and MFA gate still run.
+   */
+  permission<P extends AuthzPermission>(
+    permission: P & ValidateDeclaredPermission<P, TInputOut>,
+    options: { nondisclosure: "not-found-outside-organization" },
+  ): ProcedureBuilder<
+    TContext,
+    TMeta,
+    TContextOverrides,
+    TInputIn,
+    TInputOut,
+    TOutputIn,
+    TOutputOut,
+    TCaller
+  >;
+  /**
    * Any one of the permissions is enough, checked at the input's project
    * scope. List the primary surface's permission first — the denial names
    * it, so granting it resolves the refusal whichever feature the caller
@@ -1430,7 +1553,7 @@ type PermissionAnyArgs<
       ];
 
 type DeclaredNoPermissionOptions<I> = UnsetMarker extends I
-  ? { reason: string; allow?: undefined }
+  ? { reason: string; allow?: undefined; mfaRecovery?: never }
   : NoPermissionOptions<I>;
 
 const permissionProcedureBuilder = <
@@ -1504,10 +1627,17 @@ const permissionProcedureBuilder = <
     use: (middleware) => withPermissionCheck(middleware),
     permission: ((
       permission: AuthzPermission,
-      options?: { via?: ScopeTierField },
+      options?: {
+        via?: ScopeTierField;
+        nondisclosure?: "not-found-outside-organization";
+      },
     ) =>
       withPermissionCheck(
-        checkDeclaredPermission({ permission, via: options?.via }),
+        checkDeclaredPermission({
+          permission,
+          via: options?.via,
+          nondisclosure: options?.nondisclosure,
+        }),
       )) as Pending["permission"],
     permissionAny: ((...permissions: [AuthzPermission, ...AuthzPermission[]]) =>
       withPermissionCheck(
@@ -1516,6 +1646,7 @@ const permissionProcedureBuilder = <
     noPermission: ((options: {
       reason: string;
       allow?: Record<string, string>;
+      mfaRecovery?: { reason: string };
     }) =>
       withPermissionCheck(
         declaredNoPermission(options),

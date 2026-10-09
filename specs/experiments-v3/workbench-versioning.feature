@@ -191,13 +191,22 @@ Feature: Versioned workbench saves
       When the caller restores that row
       Then the version the restore writes reads "Restored from the autosave"
 
-  Rule: A run with no browser writes its cells into the saved state
+  Rule: Every run writes its cells into the saved state
 
     A run started over REST, from the command line or by the assistant has no
     page to stream its cells to, so the workbench state knew nothing about them
     and the table read "No output yet" after the run finished. The runner
-    writes the cells back through the same seam every other write uses, and the
-    update signal lets an open page pick them up.
+    writes the cells back through the same route every other write uses, and
+    the update signal lets an open page pick them up.
+
+    A run started from an open page has the same result for a different reason.
+    The page holds the cells and saves them itself, so a tab the browser puts
+    to sleep, or a connection that drops before the last frame, leaves the run
+    complete in its own record while the board still reads "No output yet".
+    The streaming route writes the cells back the same way the runner does, so
+    the board no longer depends on the tab. A page that started the run reads
+    the version it wrote as its own and takes it, which the adopt rule below
+    covers.
 
     @regression @integration
     Scenario: A completed backend run fills the cells the workbench shows
@@ -249,6 +258,40 @@ Feature: Versioned workbench saves
       Given a backend run that fails before any cell runs
       When the run completes
       Then no cell is marked, because the run's own status carries the failure
+
+    @regression @integration
+    Scenario: A run started from the open page writes its cells too
+      Given a run started from an open workbench page
+      When the run completes
+      Then the server writes the run's cells into the saved state
+      And the version it writes names the run
+
+    @regression @integration
+    Scenario: A stopped run started from the open page keeps the cells it produced
+      Given a run started from an open workbench page that filled some cells
+      When the run is stopped
+      Then the server writes the cells it produced into the saved state
+
+    @regression @integration
+    Scenario: A run started from the open page with its own rows is not written back
+      Given a run started from an open workbench page with rows sent in the request
+      When the run completes
+      Then the server writes nothing into the saved state
+
+    @regression @integration
+    Scenario: A run started from a page with no saved experiment is not written back
+      Given a run started from an open workbench page that names no experiment
+      When the run completes
+      Then the server writes nothing into the saved state
+
+    # The frame that names the run is the first one. A stream that ends before
+    # it arrives carries no cells either, so there is nothing to write and no
+    # run to attribute the write to.
+    @regression @unit
+    Scenario: A run that ends before it names itself writes nothing
+      Given a stream that ends without naming its run
+      When the run ends
+      Then nothing is written into the saved state
 
   Rule: The same seam is reachable over REST
 
@@ -461,3 +504,47 @@ Feature: Versioned workbench saves
       Given an open workbench whose save failed for any other reason
       When the reader looks at the save status
       Then it reads that the save failed
+
+  Rule: A page adopts a version its own run wrote
+
+    A run writes its cells into the workbench state, which advances the counter.
+    The page that started that run holds every cell the run produced already,
+    because it streamed them. Reading its own run's bump as somebody else's
+    write stands autosave down and asks the reader to reload over edits the run
+    had nothing to do with.
+
+    Taking the version is the part that matters. A page that only skipped the
+    warning would keep sending the version it had, and the next save would be
+    refused for the same reason one save later.
+
+    @regression @integration
+    Scenario: A version a run wrote names that run
+      Given a run that writes its cells into the workbench state
+      When the version rows are listed
+      Then the version the run wrote names the run
+
+    @regression @integration
+    Scenario: A refusal names the run that wrote the newer version
+      Given a run wrote its cells after a client read the workbench
+      When that client saves naming the version it read
+      Then the refusal names the run that wrote the newer version
+
+    @integration
+    Scenario: A page takes a version its own run wrote
+      Given a page that started a run and has unsaved edits
+      When a version that run wrote arrives
+      Then the page takes that version
+      And it does not ask the reader to reload
+
+    @integration
+    Scenario: A page still stands down for a version somebody else wrote
+      Given a page that started a run and has unsaved edits
+      When a version somebody else wrote arrives
+      Then the page asks the reader to reload
+
+    @integration
+    Scenario: A refused save whose newer version came from this page's own run is sent again
+      Given a page that started a run and has unsaved edits
+      When its save is refused for the version that run wrote
+      Then the page takes that version and sends its edits again
+      And it does not stand autosave down

@@ -28,7 +28,7 @@ describe("buildEnv", () => {
 			// The gateway process reads the same name to mean the opposite direction
 			// and gets its value from services/aigateway.ts, not from here.
 			expect(env).toContain("LW_GATEWAY_BASE_URL=http://localhost:5563");
-			expect(env).toContain("OPENCODE_AGENT_URL=http://localhost:5564");
+			expect(env).toContain("LANGY_AGENT_URL=http://localhost:5564");
 		});
 
 		it("populates every secret with a fresh random value", () => {
@@ -87,6 +87,14 @@ describe("buildEnv", () => {
 			expect(env).toContain("LANGWATCH_NLP_SERVICE=http://localhost:5561");
 		});
 
+		it("generates LANGWATCH_NLP_INTERNAL_SECRET so both ends share one value", () => {
+			const value = env
+				.split("\n")
+				.find((line) => line.startsWith("LANGWATCH_NLP_INTERNAL_SECRET="))
+				?.split("=")[1];
+			expect(value).toMatch(/^[a-f0-9]{64}$/);
+		});
+
 		it("does not force the removed Go-engine feature flag (routing is unconditional)", () => {
 			expect(env).not.toContain("release_nlp_go_engine_enabled");
 			expect(env).not.toContain("LANGWATCH_NPX_NLP");
@@ -119,7 +127,7 @@ describe("reconcileEnvFile", () => {
 				"DATABASE_URL=postgresql://langwatch@localhost:6580",
 			);
 			expect(body).toContain("BASE_HOST=http://localhost:5580");
-			expect(body).toContain("OPENCODE_AGENT_URL=http://localhost:5584");
+			expect(body).toContain("LANGY_AGENT_URL=http://localhost:5584");
 			expect(body).toContain("PORT=5580");
 		});
 

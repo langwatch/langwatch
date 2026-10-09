@@ -98,3 +98,13 @@ export function isPreciseResourceHref(url: string): boolean {
   const segments = parsed.pathname.split("/").filter(Boolean);
   return segments.length > 2 || parsed.search.length > 0;
 }
+
+/**
+ * Whether `href` is a path inside this app. A protocol-relative `//host` and an
+ * absolute url both leave the app, so neither counts.
+ */
+export function isAppPath(href: unknown): href is string {
+  return (
+    typeof href === "string" && href.startsWith("/") && !href.startsWith("//")
+  );
+}

@@ -1,3 +1,4 @@
+import type { TenantSource } from "./tenant-source";
 import type { TenantMigrationOutcome, TenantMigrationRecord } from "./types";
 
 /**
@@ -7,6 +8,27 @@ import type { TenantMigrationOutcome, TenantMigrationRecord } from "./types";
  * drives them.
  */
 export interface SystemMigration {
+  /** Whether a held outcome must prevent startup. Defaults to finite. */
+  readonly startupSettlement?: "finite" | "recurring";
+
+  /**
+   * The tenants this migration could possibly concern, narrower than the
+   * pass's own source. Omitted, the pass drives it over every tenant the
+   * pass enumerates, which is the right default for work that must reach
+   * everyone once and then finalize.
+   *
+   * A `recurring` migration is the case this exists for. It never finalizes
+   * a tenant, so the runner never stops re-proving one, and every tenant the
+   * pass hands it costs a claim, a state read and a state write on EVERY
+   * pass — including the two the boot preflight must complete before a
+   * process may serve. Declaring the narrower set here is what keeps that
+   * cost proportional to the work actually outstanding rather than to the
+   * size of the installation.
+   *
+   * It narrows and never widens: a tenant outside the pass's own cohort is
+   * still out, because the cohort is checked per tenant regardless.
+   */
+  readonly candidateTenants?: TenantSource;
   /**
    * Stable identifier - the state table's key. Renaming it orphans every
    * stored record, so never do that; what operators read is `title`.

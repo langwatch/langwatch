@@ -1,5 +1,99 @@
 import { describe, expect, it } from "vitest";
-import { getSuggestionState } from "../getSuggestionState";
+import {
+  getSuggestionState,
+  PARAMETER_LINE_GRAMMAR,
+  SEARCH_GRAMMAR,
+} from "../getSuggestionState";
+
+describe("getSuggestionState with the parameter line grammar", () => {
+  const read = ({ text, cursor }: { text: string; cursor: number }) =>
+    getSuggestionState(text, cursor, PARAMETER_LINE_GRAMMAR);
+
+  describe("given a line with one pair and a second name in progress", () => {
+    describe("when the cursor sits on the name after the comma", () => {
+      /** @scenario "The equals sign and the comma separate the tokens of a parameter line" */
+      it("opens key mode on that token, spaces skipped", () => {
+        expect(read({ text: "model=gpt-5, loc", cursor: 16 })).toEqual({
+          open: true,
+          mode: "field",
+          query: "loc",
+          tokenStart: 13,
+        });
+      });
+    });
+
+    describe("when the cursor sits after the equals sign of the first pair", () => {
+      it("opens value mode for the name before that equals sign", () => {
+        expect(read({ text: "model=gpt-5, loc", cursor: 6 })).toEqual({
+          open: true,
+          mode: "value",
+          field: "model",
+          query: "",
+          tokenStart: 0,
+        });
+        expect(read({ text: "model=gpt-5, loc", cursor: 11 })).toMatchObject({
+          mode: "value",
+          field: "model",
+          query: "gpt-5",
+        });
+      });
+    });
+
+    describe("when the value holds a colon or a space", () => {
+      it("keeps the whole value in value mode", () => {
+        expect(
+          read({ text: "greeting=hello there", cursor: 20 }),
+        ).toMatchObject({
+          mode: "value",
+          field: "greeting",
+          query: "hello there",
+        });
+        expect(read({ text: "url=http://a", cursor: 12 })).toMatchObject({
+          mode: "value",
+          field: "url",
+          query: "http://a",
+        });
+      });
+    });
+  });
+
+  describe("given the cursor right after a comma", () => {
+    it("opens key mode with an empty query, so the list shows at once", () => {
+      expect(read({ text: "model=gpt-5,", cursor: 12 })).toEqual({
+        open: true,
+        mode: "field",
+        query: "",
+        tokenStart: 12,
+      });
+      expect(read({ text: "model=gpt-5, ", cursor: 13 })).toEqual({
+        open: true,
+        mode: "field",
+        query: "",
+        tokenStart: 13,
+      });
+    });
+  });
+
+  describe("given a name that starts with an underscore", () => {
+    it("opens key mode, since the parameter grammar allows it", () => {
+      expect(read({ text: "_region", cursor: 7 })).toMatchObject({
+        mode: "field",
+        query: "_region",
+      });
+    });
+  });
+
+  describe("given the traces search grammar", () => {
+    it("keeps the colon as its separator and stays closed on an empty token", () => {
+      expect(getSuggestionState("model=gpt", 9, SEARCH_GRAMMAR)).toEqual({
+        open: false,
+      });
+      expect(getSuggestionState("status:error ", 13, SEARCH_GRAMMAR)).toEqual({
+        open: false,
+      });
+    });
+  });
+});
 
 describe("getSuggestionState", () => {
   describe("given an empty editor", () => {
@@ -202,15 +296,53 @@ describe("getSuggestionState", () => {
     });
 
     describe("when the cursor sits inside a quoted value after a space inside the quotes", () => {
-      it("opens passive field-mode for the post-space identifier (the active token is no longer the quoted value)", () => {
-        // The space terminates the value-mode token, leaving "po" as the new
-        // active word. Identifier-shape, so passive autocomplete opens —
-        // dropdown is invisible if no fields prefix-match.
+      /** @scenario "A space belongs to the question being typed" */
+      it("returns closed because everything inside the quotes is one value", () => {
+        // A word after a space inside the quotes is still part of the value.
+        // Reading it as a new token opened the field list halfway through a
+        // multi-word value, where Enter accepts a field rather than searching.
         expect(getSuggestionState('@status:"refund po', 18)).toEqual({
+          open: false,
+        });
+      });
+    });
+
+    describe("when the cursor sits after the closing quote", () => {
+      it("opens field-mode again, because the value ended", () => {
+        expect(getSuggestionState('status:"refund policy" mo', 25)).toEqual({
           open: true,
           mode: "field",
-          query: "po",
-          tokenStart: 16,
+          query: "mo",
+          tokenStart: 23,
+        });
+      });
+    });
+  });
+
+  describe("given the clauses are separated by a non-breaking space", () => {
+    describe("when a second field name is being typed", () => {
+      /** @scenario "The field list opens for every clause, not only the first" */
+      it("opens field mode on it, because U+00A0 ends a token as a space does", () => {
+        // The editor writes U+00A0 between clauses, and the browser turns a
+        // trailing typed space into one. Read as an ordinary character it
+        // glued the next clause onto the previous value, and the field list
+        // stopped opening after the first chip.
+        expect(getSuggestionState("status:error ser", 16)).toEqual({
+          open: true,
+          mode: "field",
+          query: "ser",
+          tokenStart: 13,
+        });
+      });
+
+      /** @scenario "The field list opens for every clause, not only the first" */
+      it("opens value mode on the second clause's own value", () => {
+        expect(getSuggestionState("status:error service:ap", 24)).toEqual({
+          open: true,
+          mode: "value",
+          field: "service",
+          query: "ap",
+          tokenStart: 13,
         });
       });
     });

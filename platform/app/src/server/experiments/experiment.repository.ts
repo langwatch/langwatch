@@ -458,6 +458,8 @@ export class ExperimentRepository {
       commitMessage: string | null;
       authorId: string | null;
       authorLabel: string;
+      /** The run that wrote this version, when a run wrote it. */
+      runId: string | null;
       createdAt: Date;
       updatedAt: Date;
     }>
@@ -478,6 +480,7 @@ export class ExperimentRepository {
         commitMessage: true,
         authorId: true,
         authorLabel: true,
+        runId: true,
         createdAt: true,
         updatedAt: true,
       },

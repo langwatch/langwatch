@@ -1,6 +1,5 @@
 import { useEffect, useRef } from "react";
-import { useFilterStore } from "../stores/filterStore";
-import { useViewStore } from "../stores/viewStore";
+import { useExplorerStore } from "../stores/explorerStore";
 
 /**
  * Bridge: subscribe to `filterStore.queryText` and forward changes into
@@ -13,8 +12,8 @@ import { useViewStore } from "../stores/viewStore";
  * the draft entry rather than carrying a no-op marker.
  */
 export function useLensFilterDirtySync(): void {
-  const queryText = useFilterStore((s) => s.queryText);
-  const setFilterDraft = useViewStore((s) => s.setFilterDraft);
+  const queryText = useExplorerStore((s) => s.queryText);
+  const setFilterDraft = useExplorerStore((s) => s.setFilterDraft);
   const firstRunRef = useRef(true);
 
   useEffect(() => {

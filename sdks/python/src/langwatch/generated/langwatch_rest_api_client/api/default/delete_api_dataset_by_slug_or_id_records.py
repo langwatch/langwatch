@@ -6,13 +6,13 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.delete_api_dataset_by_slug_or_id_records_body import DeleteApiDatasetBySlugOrIdRecordsBody
-from ...types import UNSET, Response, Unset, safe_http_status
+from ...types import Response, safe_http_status
 
 
 def _get_kwargs(
     slug_or_id: str,
     *,
-    body: DeleteApiDatasetBySlugOrIdRecordsBody | Unset = UNSET,
+    body: DeleteApiDatasetBySlugOrIdRecordsBody,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -23,8 +23,7 @@ def _get_kwargs(
         ),
     }
 
-    if not isinstance(body, Unset):
-        _kwargs["json"] = body.to_dict()
+    _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -54,14 +53,14 @@ def _build_response(*, client: AuthenticatedClient | Client, response: httpx.Res
 def sync_detailed(
     slug_or_id: str,
     *,
-    client: AuthenticatedClient | Client,
-    body: DeleteApiDatasetBySlugOrIdRecordsBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: DeleteApiDatasetBySlugOrIdRecordsBody,
 ) -> Response[Any]:
     """Delete records from a dataset by IDs
 
     Args:
         slug_or_id (str):
-        body (DeleteApiDatasetBySlugOrIdRecordsBody | Unset):
+        body (DeleteApiDatasetBySlugOrIdRecordsBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -86,14 +85,14 @@ def sync_detailed(
 async def asyncio_detailed(
     slug_or_id: str,
     *,
-    client: AuthenticatedClient | Client,
-    body: DeleteApiDatasetBySlugOrIdRecordsBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: DeleteApiDatasetBySlugOrIdRecordsBody,
 ) -> Response[Any]:
     """Delete records from a dataset by IDs
 
     Args:
         slug_or_id (str):
-        body (DeleteApiDatasetBySlugOrIdRecordsBody | Unset):
+        body (DeleteApiDatasetBySlugOrIdRecordsBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

@@ -11,13 +11,13 @@ from ...models.patch_api_gateway_v1_cache_rules_by_id_response_400 import PatchA
 from ...models.patch_api_gateway_v1_cache_rules_by_id_response_401 import PatchApiGatewayV1CacheRulesByIdResponse401
 from ...models.patch_api_gateway_v1_cache_rules_by_id_response_403 import PatchApiGatewayV1CacheRulesByIdResponse403
 from ...models.patch_api_gateway_v1_cache_rules_by_id_response_500 import PatchApiGatewayV1CacheRulesByIdResponse500
-from ...types import UNSET, Response, Unset, safe_http_status
+from ...types import Response, safe_http_status
 
 
 def _get_kwargs(
     id: str,
     *,
-    body: PatchApiGatewayV1CacheRulesByIdBody | Unset = UNSET,
+    body: PatchApiGatewayV1CacheRulesByIdBody,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -28,8 +28,7 @@ def _get_kwargs(
         ),
     }
 
-    if not isinstance(body, Unset):
-        _kwargs["json"] = body.to_dict()
+    _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -101,8 +100,8 @@ def _build_response(
 def sync_detailed(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
-    body: PatchApiGatewayV1CacheRulesByIdBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PatchApiGatewayV1CacheRulesByIdBody,
 ) -> Response[
     PatchApiGatewayV1CacheRulesByIdResponse200
     | PatchApiGatewayV1CacheRulesByIdResponse400
@@ -117,7 +116,7 @@ def sync_detailed(
 
     Args:
         id (str):
-        body (PatchApiGatewayV1CacheRulesByIdBody | Unset):
+        body (PatchApiGatewayV1CacheRulesByIdBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -142,8 +141,8 @@ def sync_detailed(
 def sync(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
-    body: PatchApiGatewayV1CacheRulesByIdBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PatchApiGatewayV1CacheRulesByIdBody,
 ) -> (
     PatchApiGatewayV1CacheRulesByIdResponse200
     | PatchApiGatewayV1CacheRulesByIdResponse400
@@ -159,7 +158,7 @@ def sync(
 
     Args:
         id (str):
-        body (PatchApiGatewayV1CacheRulesByIdBody | Unset):
+        body (PatchApiGatewayV1CacheRulesByIdBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -179,8 +178,8 @@ def sync(
 async def asyncio_detailed(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
-    body: PatchApiGatewayV1CacheRulesByIdBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PatchApiGatewayV1CacheRulesByIdBody,
 ) -> Response[
     PatchApiGatewayV1CacheRulesByIdResponse200
     | PatchApiGatewayV1CacheRulesByIdResponse400
@@ -195,7 +194,7 @@ async def asyncio_detailed(
 
     Args:
         id (str):
-        body (PatchApiGatewayV1CacheRulesByIdBody | Unset):
+        body (PatchApiGatewayV1CacheRulesByIdBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -218,8 +217,8 @@ async def asyncio_detailed(
 async def asyncio(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
-    body: PatchApiGatewayV1CacheRulesByIdBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PatchApiGatewayV1CacheRulesByIdBody,
 ) -> (
     PatchApiGatewayV1CacheRulesByIdResponse200
     | PatchApiGatewayV1CacheRulesByIdResponse400
@@ -235,7 +234,7 @@ async def asyncio(
 
     Args:
         id (str):
-        body (PatchApiGatewayV1CacheRulesByIdBody | Unset):
+        body (PatchApiGatewayV1CacheRulesByIdBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

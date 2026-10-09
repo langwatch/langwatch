@@ -1,26 +1,20 @@
 import { Button } from "@chakra-ui/react";
-import { Clock, Edit, Grid, MoreVertical, Trash2 } from "lucide-react";
+import {
+  Clock,
+  Edit,
+  LayoutDashboard,
+  MoreVertical,
+  Trash2,
+} from "lucide-react";
 import { Menu } from "~/components/ui/menu";
+import { toaster } from "~/components/ui/toaster";
 import { LWQL_WIDGET_DEFAULT_GRANULARITY_SECONDS } from "~/features/analytics-query/components/LangWatchQLDashboardWidget";
 import {
   describeLangWatchQLGranularityStep,
   LWQL_GRANULARITY_STEPS,
 } from "~/server/analytics/lwql/timeWindow";
+import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
-
-type SizeOption = "1x1" | "2x1" | "1x2" | "2x2";
-
-const sizeOptions: {
-  value: SizeOption;
-  label: string;
-  colSpan: number;
-  rowSpan: number;
-}[] = [
-  { value: "1x1", label: "Small (1x1)", colSpan: 1, rowSpan: 1 },
-  { value: "2x1", label: "Wide (2x1)", colSpan: 2, rowSpan: 1 },
-  { value: "1x2", label: "Tall (1x2)", colSpan: 1, rowSpan: 2 },
-  { value: "2x2", label: "Large (2x2)", colSpan: 2, rowSpan: 2 },
-];
 
 /**
  * How each offered datapoint step is named in the menu: the noun form, because
@@ -30,28 +24,102 @@ const sizeOptions: {
 const granularityLabel = (seconds: number): string =>
   describeLangWatchQLGranularityStep(seconds, "noun");
 
-const getCurrentSize = (colSpan: number, rowSpan: number): SizeOption => {
-  if (colSpan === 2 && rowSpan === 2) return "2x2";
-  if (colSpan === 2 && rowSpan === 1) return "2x1";
-  if (colSpan === 1 && rowSpan === 2) return "1x2";
-  return "1x1";
-};
+interface AddToDashboardHandlerProps {
+  projectId: string;
+  graphId: string;
+  dashboardId?: string;
+  showAddToDashboard: boolean;
+  isDashboardWidget: boolean;
+}
+
+// Resolves the "every project has exactly one dashboard" lookup lazily
+// (only when the menu item can actually be shown) and wraps the pin
+// mutation with its already-pinned / success / error toasts.
+function useAddToDashboardHandler({
+  projectId,
+  graphId,
+  dashboardId,
+  showAddToDashboard,
+  isDashboardWidget,
+}: AddToDashboardHandlerProps) {
+  const utils = api.useUtils();
+  const dashboard = api.dashboards.getOrCreateFirst.useQuery(
+    { projectId },
+    { enabled: showAddToDashboard && isDashboardWidget },
+  );
+  const assignDashboard = api.dashboardWidgets.assignDashboard.useMutation();
+  const alreadyOnDashboard =
+    !!dashboard.data && dashboardId === dashboard.data.id;
+
+  const handleAddToDashboard = () => {
+    if (!dashboard.data) return;
+    if (alreadyOnDashboard) {
+      toaster.create({
+        title: "Already on the dashboard",
+        type: "info",
+        duration: 3000,
+      });
+      return;
+    }
+    assignDashboard.mutate(
+      { projectId, id: graphId, dashboardId: dashboard.data.id },
+      {
+        onSuccess: () => {
+          toaster.create({
+            title: `Added to ${dashboard.data!.name}`,
+            type: "success",
+            duration: 3000,
+          });
+          void utils.dashboardWidgets.list.invalidate({ projectId });
+          void utils.graphs.getAll.invalidate();
+        },
+        onError: () => {
+          toaster.create({
+            title: "Error adding to dashboard",
+            type: "error",
+            duration: 3000,
+          });
+        },
+      },
+    );
+  };
+
+  return {
+    hasDashboard: !!dashboard.data,
+    isAssigning: assignDashboard.isPending,
+    handleAddToDashboard,
+  };
+}
 
 interface GraphCardMenuProps {
   graphId: string;
+  projectId: string;
   projectSlug: string;
   dashboardId?: string;
-  colSpan: number;
-  rowSpan: number;
   /**
    * Whether this card is a saved LangWatchQL chart. Decides where Edit goes and
    * whether the datapoint-step picker is offered at all — a builder graph has
    * no granularity contract to pick against.
    */
   isWorkbenchChart?: boolean;
+  /**
+   * Whether this card is a dashboard widget. Its Edit item runs `onEdit`,
+   * which opens the widget's edit drawer in place on the grid.
+   */
+  isDashboardWidget?: boolean;
+  /**
+   * Offers "Add to dashboard", which pins a dashboard widget straight to
+   * the project's single dashboard (no picker — there's only ever one).
+   * Only meaningful alongside `isDashboardWidget`.
+   */
+  showAddToDashboard?: boolean;
   /** The step this workbench card runs at, when it has one stored. */
   granularitySeconds?: number;
-  onSizeChange: (size: SizeOption) => void;
+  /**
+   * When present, Edit runs this instead of navigating to a chart editor
+   * route. A dashboard widget always edits in place, so its card passes this.
+   */
+  onEdit?: () => void;
   onGranularityChange?: (granularitySeconds: number) => void;
   onDelete: () => void;
   isDeleting: boolean;
@@ -59,31 +127,33 @@ interface GraphCardMenuProps {
 
 export function GraphCardMenu({
   graphId,
+  projectId,
   projectSlug,
   dashboardId,
-  colSpan,
-  rowSpan,
   isWorkbenchChart = false,
+  isDashboardWidget = false,
+  showAddToDashboard = false,
   granularitySeconds,
-  onSizeChange,
+  onEdit,
   onGranularityChange,
   onDelete,
   isDeleting,
 }: GraphCardMenuProps) {
   const router = useRouter();
-  const currentSize = getCurrentSize(colSpan, rowSpan);
+  const { hasDashboard, isAssigning, handleAddToDashboard } =
+    useAddToDashboardHandler({
+      projectId,
+      graphId,
+      dashboardId,
+      showAddToDashboard,
+      isDashboardWidget,
+    });
 
-  // A workbench chart is edited in the workbench that wrote it, not in the
-  // builder — the builder cannot read a saved statement.
-  //
-  // The workbench opens charts through its own toolbar and has no deep-link
-  // parameter, so this lands on the surface rather than on the chart. Passing a
-  // `?chart=` it does not read would be worse than not passing one: the member
-  // would arrive at an empty workbench with a URL claiming otherwise. Opening
-  // the named chart directly waits on the workbench accepting a chart id.
-  const editUrl = isWorkbenchChart
-    ? `/${projectSlug}/analytics/query`
-    : `/${projectSlug}/analytics/custom/${graphId}${dashboardId ? `?dashboard=${dashboardId}` : ""}`;
+  // Only a builder graph navigates away to edit. A dashboard widget edits in
+  // place through `onEdit` (the builder can't read its sandboxed author-code
+  // payload), and a saved LangWatchQL chart (isWorkbenchChart) has no editor
+  // surface at all anymore and never reaches this; see the Edit item below.
+  const builderEditUrl = `/${projectSlug}/analytics/custom/${graphId}${dashboardId ? `?dashboard=${dashboardId}` : ""}`;
 
   return (
     <Menu.Root>
@@ -93,32 +163,27 @@ export function GraphCardMenu({
         </Button>
       </Menu.Trigger>
       <Menu.Content>
-        <Menu.Item
-          value="edit"
-          onClick={() => {
-            void router.push(editUrl);
-          }}
-        >
-          <Edit /> {isWorkbenchChart ? "Open in workbench" : "Edit Graph"}
-        </Menu.Item>
-
-        <Menu.Root positioning={{ placement: "right-start", gutter: 2 }}>
-          <Menu.TriggerItem value="size">
-            <Grid /> Size ({currentSize})
-          </Menu.TriggerItem>
-          <Menu.Content>
-            {sizeOptions.map((option) => (
-              <Menu.Item
-                key={option.value}
-                value={option.value}
-                onClick={() => onSizeChange(option.value)}
-              >
-                {option.label}
-                {option.value === currentSize && " ✓"}
-              </Menu.Item>
-            ))}
-          </Menu.Content>
-        </Menu.Root>
+        {/* A saved LangWatchQL chart placed on a dashboard has no editor
+            surface anymore (the workbench page was removed) — it stays
+            read-only here, rendered via `getById`/`run` same as before. */}
+        {/* A dashboard widget whose payload failed schema parsing arrives with
+            no `onEdit` (the builder can't edit a sandbox widget's author code),
+            so it stays read-only rather than falling through to the builder
+            route. */}
+        {!isWorkbenchChart && (!isDashboardWidget || onEdit) && (
+          <Menu.Item
+            value="edit"
+            onClick={() => {
+              if (onEdit) {
+                onEdit();
+                return;
+              }
+              void router.push(builderEditUrl);
+            }}
+          >
+            <Edit /> {onEdit || isDashboardWidget ? "Edit" : "Edit Graph"}
+          </Menu.Item>
+        )}
 
         {isWorkbenchChart && onGranularityChange && (
           <Menu.Root positioning={{ placement: "right-start", gutter: 2 }}>
@@ -146,6 +211,16 @@ export function GraphCardMenu({
           </Menu.Root>
         )}
 
+        {isDashboardWidget && showAddToDashboard && (
+          <Menu.Item
+            value="add-to-dashboard"
+            onClick={handleAddToDashboard}
+            disabled={!hasDashboard || isAssigning}
+          >
+            <LayoutDashboard /> Add to dashboard
+          </Menu.Item>
+        )}
+
         <Menu.Item value="delete" color="red.600" onClick={onDelete}>
           <Trash2 /> Delete Graph
         </Menu.Item>
@@ -153,6 +228,3 @@ export function GraphCardMenu({
     </Menu.Root>
   );
 }
-
-export type { SizeOption };
-export { getCurrentSize, sizeOptions };

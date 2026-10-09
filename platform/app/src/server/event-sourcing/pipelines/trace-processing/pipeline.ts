@@ -193,9 +193,11 @@ export function createTraceProcessingPipeline(
       }),
     )
     // Deferred origin resolution for pure OTEL traces: reject pre-enqueue as
-    // soon as the committed fold shows a resolved origin.
+    // soon as the committed fold shows a resolved origin. Span arrivals only —
+    // see needsOriginResolution for why enrichment events must not open it.
     .withSubscriber("originGate", {
       fold: "traceSummary",
+      events: [SPAN_RECEIVED_EVENT_TYPE],
       when: (event, context) =>
         needsOriginResolution({ event, foldState: context.state }),
       delay: ORIGIN_GATE_DELAY_MS,
@@ -407,6 +409,10 @@ export function createTraceProcessingPipeline(
   // A literal per registration, not one shared object: `recordSpanOptions`
   // above is mutated after construction, so an options object here would invite
   // the same treatment and silently apply one command's change to the other.
+  //
+  // The three annotation commands edit one trace's annotation set, so they
+  // share the trace's lane. On separate per-command groups a delete could be
+  // applied before the add it undoes, leaving the deleted id searchable.
   return recordSpanBuilder
     .withCommand("assignTopic", AssignTopicCommand)
     .withCommand("recordLogContribution", RecordLogContributionCommand, {
@@ -416,9 +422,15 @@ export function createTraceProcessingPipeline(
       coalesceMaxBatch: TRACE_CORRELATION_COALESCE_MAX_BATCH,
     })
     .withCommand("resolveOrigin", ResolveOriginCommand)
-    .withCommand("addAnnotation", AddAnnotationCommand)
-    .withCommand("removeAnnotation", RemoveAnnotationCommand)
-    .withCommand("bulkSyncAnnotations", BulkSyncAnnotationsCommand)
+    .withCommand("addAnnotation", AddAnnotationCommand, {
+      serializeByAggregate: true,
+    })
+    .withCommand("removeAnnotation", RemoveAnnotationCommand, {
+      serializeByAggregate: true,
+    })
+    .withCommand("bulkSyncAnnotations", BulkSyncAnnotationsCommand, {
+      serializeByAggregate: true,
+    })
     .withCommand("changeTraceName", ChangeTraceNameCommand)
     .build();
 }

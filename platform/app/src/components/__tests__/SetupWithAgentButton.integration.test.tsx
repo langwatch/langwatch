@@ -10,6 +10,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { SETUP_SKILL_IDS } from "../../../scripts/generate-setup-skill-bodies";
 import {
   SETUP_SURFACES,
   type SetupSurface,
@@ -57,16 +58,16 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-const KNOWN_SKILLS = [
-  "tracing",
-  "experiments",
-  "online-evaluations",
-  "scenarios",
-  "prompts",
-  "datasets",
-];
+/**
+ * Read from the generator rather than copied: this list used to be a second
+ * copy of the same names, and a new surface that offered a real skill failed
+ * here for having drifted from the copy rather than for anything it did.
+ */
+const KNOWN_SKILLS: readonly string[] = SETUP_SKILL_IDS;
 
+/** The surfaces whose prompt asks Langy to open the repository first. */
 const REPO_CONNECTED: SetupSurface[] = [
+  "connectedAgents",
   "traces",
   "experiments",
   "simulations",
@@ -159,7 +160,7 @@ describe("SetupWithAgentButton", () => {
         "Copy a prompt for your coding agent",
       );
       const langy = screen.getByText("Ask Langy to set it up");
-      screen.getByText(/read the simulations documentation/i);
+      screen.getByText(/read the agent testing documentation/i);
 
       // Copy comes first, Langy second.
       expect(

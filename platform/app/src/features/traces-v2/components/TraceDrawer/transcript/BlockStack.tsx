@@ -7,13 +7,21 @@ import {
   LuWrench,
 } from "react-icons/lu";
 import { TraceMediaPart } from "~/components/traces/TraceMediaPart";
+import {
+  asMarkdownBody,
+  parseContentBlocks,
+  withBlockKeys,
+} from "~/shared/traces/transcript/parsing";
+import type {
+  ChatMessage,
+  ContentBlock,
+  KeyedContentBlock,
+} from "~/shared/traces/transcript/types";
 import { splitLeadingContextBlocks } from "../../../utils/leadingContext";
 import { RenderedMarkdown } from "../markdownView";
 import { CommentableBlock } from "./messageComments";
-import { asMarkdownBody, parseContentBlocks, withBlockKeys } from "./parsing";
 import { ReasoningBlock } from "./ReasoningBlock";
 import { OpenAIToolCallCard, ToolPairCard } from "./ToolBlocks";
-import type { ChatMessage, ContentBlock, KeyedContentBlock } from "./types";
 
 /**
  * Re-run parsing on a text block if it visibly looks like a serialized

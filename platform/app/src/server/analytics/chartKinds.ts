@@ -14,7 +14,7 @@
  * directions rather than only in the newer one.
  *
  * @see prisma/schema.prisma — the `CustomGraph.kind` column
- * @see specs/analytics/lwql-saved-charts.feature
+ * @see specs/lwql/saved-charts.feature
  */
 
 /**
@@ -28,3 +28,12 @@ export const BUILDER_CHART_KIND = "builder";
 
 /** The kind a saved LangWatchQL workbench chart carries. */
 export const WORKBENCH_SQL_CHART_KIND = "workbench_sql";
+
+/**
+ * The kind a persisted dashboard widget carries. Its `graph`
+ * column holds `{ srcdocHtml, sql }`: the author HTML rendered in a sandboxed
+ * frame and the LangWatchQL statement the parent executes on the frame's
+ * behalf. Filtered on by the playground's own reads, so a dashboard widget is
+ * never interpreted as a builder or workbench definition.
+ */
+export const DASHBOARD_SRCDOC_CHART_KIND = "dashboard_srcdoc";

@@ -380,3 +380,41 @@ export class ModelProviderRoutingHandleTakenError extends HandledError {
     this.name = "ModelProviderRoutingHandleTakenError";
   }
 }
+
+/**
+ * A line of the "models allowed to skip Langy permission checks" list is not a
+ * regular expression the engine accepts.
+ *
+ * The list gates whether Langy may run commands on a developer's machine
+ * without asking (ADR-129), so a line that never compiles would match nothing
+ * while the operator believed the model was trusted. The whole save is refused
+ * instead of storing a list that reads as narrower than it looks.
+ *
+ * `meta.fieldErrors` names the field so the drawer shows the refusal on the
+ * textarea rather than in a toast, and `meta.line` is the one-based line the
+ * operator has to correct.
+ */
+export class ModelProviderSkipPermissionsPatternInvalidError extends HandledError {
+  declare readonly code: "model_provider_skip_permissions_pattern_invalid";
+
+  constructor({ line, pattern }: { line: number; pattern: string }) {
+    super(
+      "model_provider_skip_permissions_pattern_invalid",
+      `Line ${line} of the allowed models list is not a valid pattern.`,
+      {
+        meta: {
+          line,
+          pattern,
+          fieldErrors: {
+            langySkipPermissionsModels: [
+              `Line ${line} is not a valid pattern.`,
+            ],
+          },
+        },
+        httpStatus: 400,
+        fault: "customer",
+      },
+    );
+    this.name = "ModelProviderSkipPermissionsPatternInvalidError";
+  }
+}

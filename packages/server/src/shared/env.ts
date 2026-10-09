@@ -38,6 +38,9 @@ const PERSISTENT_SECRET_KEYS = [
 	// The app and the Langy agent authenticate to each other with this; a
 	// regenerated value on one side and not the other makes every turn 401.
 	"LANGY_INTERNAL_SECRET",
+	// Same deal for the app -> nlpgo hop: both processes read this one file, so
+	// a rotation that only reaches one of them makes every studio run 401.
+	"LANGWATCH_NLP_INTERNAL_SECRET",
 ] as const;
 
 const hex = (bytes: number) => randomBytes(bytes).toString("hex");
@@ -97,7 +100,7 @@ export function portBoundEnv(ports: PortAllocation) {
 			expected: `http://localhost:${ports.aigateway}`,
 			scaffoldShape: LOCALHOST_URL_SHAPE,
 		},
-		OPENCODE_AGENT_URL: {
+		LANGY_AGENT_URL: {
 			expected: `http://localhost:${ports.langyagent}`,
 			scaffoldShape: LOCALHOST_URL_SHAPE,
 		},
@@ -147,6 +150,10 @@ export function buildEnv({
 
 	sectionBreak("LANGWATCH INTERNAL SERVICES");
 	set("LANGWATCH_NLP_SERVICE", portBound.LANGWATCH_NLP_SERVICE.expected);
+	// The app sends this as X-LangWatch-NLP-Secret and nlpgo requires it on every
+	// /go/* route. Both read this same file (services/nlpgo.ts passes it through),
+	// so one generated value covers both ends.
+	set("LANGWATCH_NLP_INTERNAL_SECRET", hex(32));
 	set("LANGEVALS_ENDPOINT", portBound.LANGEVALS_ENDPOINT.expected);
 	// The engine reads `LANGWATCH_ENDPOINT` to decide where to POST evaluator
 	// runs and dataset uploads. The default is https://app.langwatch.ai
@@ -172,7 +179,7 @@ export function buildEnv({
 	sectionBreak("LANGY ASSISTANT");
 	// Shared bearer between the app and the agent; see PERSISTENT_SECRET_KEYS.
 	set("LANGY_INTERNAL_SECRET", hex(32));
-	set("OPENCODE_AGENT_URL", portBound.OPENCODE_AGENT_URL.expected);
+	set("LANGY_AGENT_URL", portBound.LANGY_AGENT_URL.expected);
 	// Langy's rollout flag is SYSTEM-scoped and defaults off so the hosted
 	// product can open it one cohort at a time. A laptop install is a cohort of
 	// one, and it just installed the assistant on purpose.
@@ -338,7 +345,6 @@ const PASSTHROUGH_ENV_KEYS = [
 	"VERTEXAI_PROJECT",
 	"VERTEXAI_LOCATION",
 	"SENDGRID_API_KEY",
-	"SENTRY_DSN",
 ] as const;
 
 /**

@@ -12,7 +12,7 @@ import type { ScenarioFormData } from "./ScenarioForm";
 
 type ScenarioEditorSidebarProps = {
   form?: UseFormReturn<ScenarioFormData> | null;
-  /** Agent Testing calls the thing being written a test case, not a scenario. */
+  /** Agent Testing calls the thing being written a scenario, not a scenario. */
   variant?: "agent-testing";
 };
 
@@ -33,7 +33,7 @@ export function ScenarioEditorSidebar({
           <VStack align="stretch" gap={3}>
             <Text fontWeight="semibold" fontSize="sm">
               {isAgentTesting
-                ? "Writing great test cases"
+                ? "Writing great scenarios"
                 : "Writing Great Scenarios"}
             </Text>
 
@@ -113,7 +113,7 @@ export function ScenarioEditorSidebar({
                   <Check size={14} />
                 </List.Indicator>
                 {isAgentTesting
-                  ? "Start with small test cases to validate quickly"
+                  ? "Start with small scenarios to validate quickly"
                   : "Start with small simulations to validate quickly"}
               </List.Item>
               <List.Item fontSize="xs" color="fg.muted">

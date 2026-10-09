@@ -184,6 +184,14 @@ Feature: Customer.io nurturing integration
     When the first trace is processed
     Then the Customer.io calls are made immediately without delay
 
+  # Langy's own turns trace into the project with origin "langy"; they are
+  # not the customer's traces and never reach the CRM as one.
+  @unit
+  Scenario: Langy's own turn does not reach Customer.io as a first trace
+    Given a project that has never received a trace
+    When one of Langy's own turns is processed
+    Then no Customer.io identify or track call is made
+
   @integration
   Scenario: Subsequent traces update count and timestamp with debouncing
     Given a project that already has traces
@@ -306,6 +314,19 @@ Feature: Customer.io nurturing integration
     When the auth session callback fires
     Then the user session is established successfully
     And the Customer.io error is captured for observability
+
+  @unit
+  Scenario: Activity tracking fires an app_active event with the same debounce
+    Given a user refreshes their session multiple times within one hour
+    When the auth session callback fires each time
+    Then exactly one "app_active" event is tracked in Customer.io for that user
+
+  @unit
+  Scenario: A failed app_active event does not affect the last_active_at identify
+    Given the Customer.io track call fails
+    When the auth session callback fires
+    Then the user is still identified with last_active_at
+    And the error is captured without resetting the debounce
 
   # ===========================================================================
   # Iteration 2 — Journey Alignment (R10–R13)

@@ -75,6 +75,20 @@ export interface LangyConversationRepository {
   }): Promise<string | null>;
 
   /**
+   * True when this user has sent a turn on this conversation: a turn receipt
+   * (`LangyTurnRequest`) exists for the triple. The receipt is written in the
+   * admission transaction at send time, before any event is folded, so it is
+   * the one piece of evidence that a conversation is being created while its
+   * projection row has not landed yet. The projection row, and the handoff
+   * fields on it, are folded from events and cannot arrive earlier.
+   */
+  hasAdmittedTurn(params: {
+    projectId: string;
+    conversationId: string;
+    userId: string;
+  }): Promise<boolean>;
+
+  /**
    * True when a turn projection row exists for this exact
    * (projectId, conversationId, turnId) triple — i.e. the turn was really
    * accepted under this conversation in this project. The durable
@@ -115,6 +129,10 @@ export class NullLangyConversationRepository
 
   async findRunToken(): Promise<null> {
     return null;
+  }
+
+  async hasAdmittedTurn(): Promise<boolean> {
+    return false;
   }
 
   async turnExists(): Promise<boolean> {

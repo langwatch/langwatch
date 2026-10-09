@@ -106,16 +106,11 @@ async function proveNothingResolves({
     principal: { type: "user", id: userId },
     organizationId,
   });
-  if (
-    grants.isOrgMember ||
-    grants.bindings.length > 0 ||
-    grants.legacyTeamMemberships.length > 0
-  ) {
+  if (grants.isOrgMember || grants.bindings.length > 0) {
     throw new OffboardIncompleteError({
       userId,
       organizationId,
       remainingBindings: grants.bindings.length,
-      remainingLegacyRows: grants.legacyTeamMemberships.length,
       stillOrgMember: grants.isOrgMember,
     });
   }

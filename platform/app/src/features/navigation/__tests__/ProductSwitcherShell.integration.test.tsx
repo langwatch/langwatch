@@ -23,6 +23,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 let mockPathname = "/[project]";
 let mockGovernanceFlagEnabled = true;
+let mockOrganizationRole = "ADMIN";
 const pushMock = vi.fn().mockResolvedValue(true);
 
 const teamA = {
@@ -182,7 +183,7 @@ vi.mock("~/hooks/useOrganizationTeamProject", async (importOriginal) => ({
     organizations: mockOrganizations,
     team: mockAmbientTeam,
     project: mockAmbientTeam.projects[0],
-    organizationRole: "ADMIN",
+    organizationRole: mockOrganizationRole,
     hasPermission: () => true,
   }),
 }));
@@ -270,6 +271,45 @@ vi.mock("~/utils/api", () => ({
     user: {
       getSsoStatus: { useQuery: () => ({ data: undefined }) },
       isAdmin: { useQuery: () => ({ data: { isAdmin: false } }) },
+      // The dashboard shell mounts the secure-account nudge and the
+      // organization's second-factor gate on every page, so a mock that
+      // names neither takes the whole shell down.
+      secureAccountNudge: { useQuery: () => ({ data: undefined }) },
+      dismissSecureAccountNudge: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
+    },
+    twoStepVerification: {
+      standing: { useQuery: () => ({ data: undefined }) },
+    },
+    // The shell also mounts the join-your-team notice.
+    joinRequests: {
+      offer: { useQuery: () => ({ data: undefined }) },
+      mine: { useQuery: () => ({ data: undefined }) },
+      request: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
+      dismissOffer: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
+      admitAutomatically: { useMutation: () => ({ mutate: vi.fn() }) },
+    },
+    invite: {
+      pendingForMe: { useQuery: () => ({ data: [], isPending: false }) },
+      acceptInvite: { useMutation: () => ({ mutate: vi.fn() }) },
+    },
+    useUtils: () => ({
+      user: { secureAccountNudge: { invalidate: vi.fn() } },
+      joinRequests: {
+        mine: { invalidate: vi.fn() },
+        offer: { invalidate: vi.fn() },
+      },
+    }),
+    auth: {
+      myAddressConfirmation: { useQuery: () => ({ data: undefined }) },
+      sendMyAddressConfirmation: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
     },
     governance: {
       recordWorkspaceView: {
@@ -373,12 +413,14 @@ async function openProductSwitcher() {
 beforeEach(() => {
   mockPathname = "/[project]";
   mockGovernanceFlagEnabled = true;
+  mockOrganizationRole = "ADMIN";
   mockOrganizations = [orgA];
   mockAmbientTeam = teamA;
   pushMock.mockClear();
   trackEventMock.mockReset();
   commandBarOpenMock.mockReset();
   localStorage.clear();
+  localStorage.setItem("langwatch:navigation-mode:v1", "product-switcher");
   useNavigationModeStore.setState({ storedMode: "product-switcher" });
 });
 
@@ -415,6 +457,21 @@ describe("the product-switcher top bar", () => {
       expect(
         screen.queryByText("Every AI tool, license, agent and dollar"),
       ).not.toBeInTheDocument();
+    });
+
+    /** @scenario A Developer is offered the Me product and nothing organisation-wide */
+    it("offers a Developer the Me product and no organization-wide one, whatever the flags and permissions say", async () => {
+      mockOrganizationRole = "DEVELOPER";
+      mockPathname = "/me";
+      mockAmbientTeam = personalTeam;
+      renderShell({ personalScope: true });
+      await openProductSwitcher();
+
+      expect(
+        screen.getByText("Track your coding assistants"),
+      ).toBeInTheDocument();
+      expect(screen.queryByText("Gateway")).not.toBeInTheDocument();
+      expect(screen.queryByText("Governance")).not.toBeInTheDocument();
     });
 
     /** @scenario Switching product opens that product's home */
@@ -709,14 +766,42 @@ describe("the product-switcher top bar", () => {
 
   describe("when on a Gateway page", () => {
     /** @scenario Gateway and Governance carry no scope control */
-    it("shows no project chip and no personal badge", () => {
+    it("shows no project chip", () => {
+      // The ambient team from the outer beforeEach holds projects and renders
+      // the chip on `/[project]`, so the only thing withholding it here is the
+      // page. Without a team that has projects this would assert the absence
+      // of something nothing was going to draw.
       mockPathname = "/gateway/virtual-keys";
       renderShell();
 
       expect(
         screen.queryByRole("button", { name: "Switch project" }),
       ).not.toBeInTheDocument();
+    });
+
+    /** @scenario Gateway and Governance carry no scope control */
+    it("shows no personal badge even when the scope resolved is a personal workspace", () => {
+      // Both drivers of the badge are switched ON deliberately: the personal
+      // workspace is the ambient scope and `personalScope` is set. Rendered
+      // without them — as this case used to be — the badge could not appear
+      // whatever the code did, and deleting the suppression left it green.
+      // The control below is what proves these inputs draw a badge at all.
+      mockPathname = "/gateway/virtual-keys";
+      mockAmbientTeam = personalTeam;
+      renderShell();
+
       expect(screen.queryByText("Personal")).not.toBeInTheDocument();
+    });
+
+    it("draws that badge on a page that does carry a scope control, on the same inputs", () => {
+      // The positive control for the case above, and the only reason its
+      // `not.toBeInTheDocument()` means anything. If this one ever goes red,
+      // the guard beside it has stopped guarding rather than started passing.
+      mockPathname = "/[project]";
+      mockAmbientTeam = personalTeam;
+      renderShell();
+
+      expect(screen.getByText("Personal")).toBeInTheDocument();
     });
   });
 

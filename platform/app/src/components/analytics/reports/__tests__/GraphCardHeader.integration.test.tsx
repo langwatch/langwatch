@@ -35,6 +35,25 @@ vi.mock("~/utils/compat/next-router", () => {
   };
 });
 
+// The header's menu reads tRPC hooks at render ("Add to dashboard"); none of
+// these scenarios exercise them, so the client is stubbed rather than provided.
+vi.mock("~/utils/api", () => ({
+  api: {
+    useUtils: () => ({
+      dashboardWidgets: { list: { invalidate: vi.fn() } },
+      graphs: { getAll: { invalidate: vi.fn() } },
+    }),
+    dashboards: {
+      getOrCreateFirst: { useQuery: () => ({ data: undefined }) },
+    },
+    dashboardWidgets: {
+      assignDashboard: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
+    },
+  },
+}));
+
 import { GraphCardHeader } from "../GraphCardHeader";
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
@@ -59,17 +78,10 @@ function renderHeader({ trigger = null }: RenderOptions = {}) {
         includePrevious: false,
         timeScale: "full",
       }}
+      projectId="project_test"
       projectSlug="proj"
-      colSpan={1}
-      rowSpan={1}
       filters={{}}
       trigger={trigger}
-      isDragging={false}
-      dragAttributes={
-        {} as unknown as Parameters<typeof GraphCardHeader>[0]["dragAttributes"]
-      }
-      dragListeners={undefined}
-      onSizeChange={vi.fn()}
       onDelete={vi.fn()}
       isDeleting={false}
     />,
@@ -87,12 +99,12 @@ describe("GraphCardHeader", () => {
   });
 
   describe("given no trigger is configured", () => {
-    describe("when the Add alert button is clicked", () => {
+    describe("when the Add automation button is clicked", () => {
       it("opens the automations drawer pre-filled with this graph and its first series", async () => {
         renderHeader();
 
         await userEvent.click(
-          screen.getByRole("button", { name: /add alert/i }),
+          screen.getByRole("button", { name: /add automation/i }),
         );
 
         expect(openDrawerMock).toHaveBeenCalledTimes(1);
@@ -112,7 +124,7 @@ describe("GraphCardHeader", () => {
         });
 
         await userEvent.click(
-          screen.getByRole("button", { name: "Edit alert" }),
+          screen.getByRole("button", { name: "Edit automation" }),
         );
 
         expect(openDrawerMock).toHaveBeenCalledTimes(1);

@@ -10,9 +10,15 @@ function isTextInputTarget(target: EventTarget | null): boolean {
 }
 
 // `⌘I` / `Ctrl+I` enters AI mode globally. `⌘K` is reserved for the
-// project-wide command bar.
-export function useGlobalAiShortcut(onTrigger: () => void): void {
+// project-wide command bar. With Langy available the same key toggles the
+// Langy panel on every page (`useGlobalLangyShortcut`), so the caller turns
+// this listener off and the key keeps one meaning.
+export function useGlobalAiShortcut(
+  onTrigger: () => void,
+  { enabled = true }: { enabled?: boolean } = {},
+): void {
   useEffect(() => {
+    if (!enabled) return;
     const handler = (event: KeyboardEvent) => {
       const isAccel = event.metaKey || event.ctrlKey;
       if (!isAccel) return;
@@ -28,5 +34,5 @@ export function useGlobalAiShortcut(onTrigger: () => void): void {
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [onTrigger]);
+  }, [onTrigger, enabled]);
 }

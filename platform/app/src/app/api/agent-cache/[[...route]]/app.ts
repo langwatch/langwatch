@@ -41,6 +41,12 @@ const cacheEntryWrittenSchema = z.object({
   ttl_seconds: z.number(),
 });
 
+const cacheEntryClaimedSchema = z.object({
+  name: z.string(),
+  claimed: z.boolean(),
+  ttl_seconds: z.number(),
+});
+
 const cacheEntryDeletedSchema = z.object({
   name: z.string(),
   deleted: z.boolean(),
@@ -156,6 +162,45 @@ secured.access(requires("agentCache:manage")).put(
       ttlSeconds: body.ttl_seconds,
     });
     return c.json(written);
+  },
+);
+
+secured.access(requires("agentCache:manage")).post(
+  "/:name/claim",
+  describeRoute({
+    description: [
+      "Store a value under a name only if the project does not hold that name yet.",
+      "The answer says whether this caller is the one that took it: `claimed` is true when the value was written, and false when the name was already held, which leaves the held value alone.",
+      "Losing is an ordinary answer and not a refusal, so a caller branches on `claimed` rather than on an error.",
+      "This is what one row of a run uses to do work the rows beside it then reuse, instead of every row doing it at once.",
+      `The value is encrypted at rest and expires by itself after ttl_seconds, which defaults to ${DEFAULT_TTL_SECONDS} seconds.`,
+    ].join(" "),
+    responses: {
+      ...canonicalBaseResponses,
+      200: {
+        description: "Claim resolved, taken or not",
+        content: {
+          "application/json": {
+            schema: resolver(cacheEntryClaimedSchema),
+          },
+        },
+      },
+    },
+  }),
+  zValidator("param", nameParamSchema),
+  zValidator("json", putEntrySchema),
+  async (c) => {
+    const project = c.get("project");
+    const { name } = c.req.valid("param");
+    const body = c.req.valid("json");
+
+    const outcome = await agentCacheService.claim({
+      projectId: project.id,
+      name,
+      value: body.value,
+      ttlSeconds: body.ttl_seconds,
+    });
+    return c.json(outcome);
   },
 );
 

@@ -26,7 +26,7 @@ import {
 } from "~/features/traces-v2/stores/annotationQueueSessionStore";
 import { legacyTraceToTurn } from "~/features/traces-v2/utils/legacyTraceToTurn";
 import { openTraceEditorFromConversation } from "~/features/traces-v2/utils/traceEditMode";
-import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
+import { useAnnotationQueueWalk } from "~/hooks/useAnnotationQueueWalk";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
@@ -34,8 +34,9 @@ import { useRouter } from "~/utils/compat/next-router";
 import { DashboardLayout } from "../../../components/DashboardLayout";
 import { TasksDone } from "../../../components/icons/TasksDone";
 
-type AssignedQueueItem =
-  RouterOutputs["annotation"]["getOptimizedAnnotationQueues"]["assignedQueueItems"][number];
+type AssignedQueueItem = NonNullable<
+  RouterOutputs["annotation"]["getQueueWalkStep"]["item"]
+>;
 
 /** How long the queue bar waits after a route change before it reads settled. */
 export const ROUTE_SETTLE_MS = 100;
@@ -211,51 +212,31 @@ function useHandoffOutcome({
 export default function TraceAnnotations() {
   const router = useRouter();
   const { "queue-item": queueItem } = router.query;
-  // Only what is still waiting: this read resolves the trace behind every item
-  // it returns, so widening it to a whole review history is a page load the
-  // reviewer pays for on every visit.
-  const { assignedQueueItems, queuesLoading } = useAnnotationQueues({
-    showQueueAndUser: true,
-    allQueueItems: true,
+  // One step at a time. The page reads one conversation, and the walk resolves
+  // one item to match: the item on screen carries its whole trace, and the rest
+  // of the queue is a rank, a count, and the two ids either side. Reading the
+  // whole queue to render one of it is what stopped working once queues grew.
+  const {
+    item: currentQueueItem,
+    position,
+    total,
+    previousItemId,
+    nextItemId,
+    queueFinished: nothingLeftToReview,
+    queueLoading: queuesLoading,
+    stepIsStale,
+  } = useAnnotationQueueWalk({
+    queueItemId: typeof queueItem === "string" ? queueItem : undefined,
   });
   const { project, hasPermission } = useOrganizationTeamProject();
   const queryClient = api.useUtils();
   const { openDrawer, drawerOpen } = useDrawer();
 
-  const pendingQueueItems = useMemo(
-    () => (assignedQueueItems ?? []).filter((item) => !item.doneAt),
-    [assignedQueueItems],
-  );
-
-  // An item whose trace no longer resolves carries nothing to read, annotate or
-  // finish. It stays walkable so the reviewer can clear it, but it is not work:
-  // what is left to review is what decides whether the queue is finished, so one
-  // unreadable item cannot hold the end of the queue hostage forever.
-  const resolvablePendingItems = useMemo(
-    () => pendingQueueItems.filter((item) => !!item.trace),
-    [pendingQueueItems],
-  );
-
-  // Force re-render when items change by creating a key
-  const queueItemsKey = useMemo(() => {
-    return pendingQueueItems
-      .map((item) => `${item.id}-${item.doneAt}`)
-      .join(",");
-  }, [pendingQueueItems]);
-
-  let currentQueueItem = pendingQueueItems.find(
-    (item) => item.id === queueItem,
-  );
-
-  if (!currentQueueItem) {
-    currentQueueItem = pendingQueueItems[0];
-  }
-
   const refetchQueueItems = useCallback(async () => {
     // Four independent reads, so they go together: one queue action should not
     // cost four sequential round trips.
     await Promise.all([
-      queryClient.annotation.getOptimizedAnnotationQueues.invalidate(),
+      queryClient.annotation.getQueueWalkStep.invalidate(),
       queryClient.annotation.getPendingItemsCount.invalidate(),
       queryClient.annotation.getAssignedItemsCount.invalidate(),
       queryClient.annotation.getQueueItemsCounts.invalidate(),
@@ -346,7 +327,10 @@ export default function TraceAnnotations() {
 
   useEffect(() => () => setSessionActive(false), [setSessionActive]);
 
-  const queueFinished = !queuesLoading && resolvablePendingItems.length === 0;
+  // What is left to review is what ends the queue: an item whose trace no
+  // longer resolves is walkable, so the reviewer can clear it, but it is not
+  // work, and one of those cannot hold the end of the queue hostage.
+  const queueFinished = !queuesLoading && nothingLeftToReview;
 
   useEffect(() => {
     if (!queueFinished) setSessionActive(true);
@@ -369,23 +353,20 @@ export default function TraceAnnotations() {
   // Where "Skip" and a removal land: the next item still waiting, or the bare
   // queue when there is nothing after this one.
   const currentQueueItemId = currentQueueItem?.id;
-  const nextPendingItemId = useMemo(() => {
-    if (!currentQueueItemId) return undefined;
-    const index = pendingQueueItems.findIndex(
-      (item) => item.id === currentQueueItemId,
-    );
-    return pendingQueueItems[index + 1]?.id;
-  }, [pendingQueueItems, currentQueueItemId]);
+  const nextPendingItemId = nextItemId ?? undefined;
 
   const projectId = project?.id;
   const projectSlug = project?.slug;
-  const advanceToNextItem = useCallback(
-    () =>
-      router.push(
-        queueItemHref({ projectSlug, queueItemId: nextPendingItemId }),
-      ),
-    [router, projectSlug, nextPendingItemId],
-  );
+  // Which item comes next is read from the step in hand, so while that step is
+  // still the one the reviewer stepped away from, moving on would carry them
+  // past the item they actually asked for. The hold lives here rather than on
+  // each button because this is where all of them end up.
+  const advanceToNextItem = useCallback(() => {
+    if (stepIsStale) return;
+    return router.push(
+      queueItemHref({ projectSlug, queueItemId: nextPendingItemId }),
+    );
+  }, [router, projectSlug, nextPendingItemId, stepIsStale]);
 
   // Finishing an item lives here rather than on the bar, because the last item
   // is finished off long after the button was pressed: only once the hand-off
@@ -429,6 +410,9 @@ export default function TraceAnnotations() {
   const deleteQueueItems = api.annotation.deleteQueueItems.useMutation();
   const removeQueueItems = deleteQueueItems.mutate;
   const removeCurrentItemFromQueue = useCallback(() => {
+    // The card offering this button is still drawn from the item left behind,
+    // so acting on it would take away what the reviewer has stepped off.
+    if (stepIsStale) return;
     if (!projectId || !currentQueueItemId) return;
     removeQueueItems(
       { projectId, queueItemIds: [currentQueueItemId] },
@@ -450,6 +434,7 @@ export default function TraceAnnotations() {
     removeQueueItems,
     advanceToNextItem,
     refetchQueueItems,
+    stepIsStale,
   ]);
 
   if (queuesLoading) {
@@ -497,12 +482,45 @@ export default function TraceAnnotations() {
               canRemove={hasPermission("annotations:update")}
               canSkip={!!nextPendingItemId}
               isRemoving={deleteQueueItems.isPending}
+              isStale={stepIsStale}
               onRemove={removeCurrentItemFromQueue}
               onSkip={() => void advanceToNextItem()}
             />
           ) : (
             <CodeBlock.AdapterProvider value={shikiAdapter}>
-              <Box flex="1" minHeight={0} display="flex" flexDirection="column">
+              {/*
+                While the step in hand is the item the reviewer has left, the
+                controls inside the thread — annotate, suggest, the per-turn
+                dataset tick, Edit trace, opening a turn — would act on that
+                item rather than the one asked for, and annotating writes. The
+                hold sits on the subtree rather than on each control: the
+                controls belong to ConversationView, which the trace drawer
+                renders too, so gating them one at a time leaves whatever is
+                added there next ungated.
+
+                Held the way the table holds a subtree over stale rows
+                (TraceTableLayout): dimmed, pointer-inert, and announced as
+                busy. Scrolling goes with it, as it does there. `inert` is what
+                covers the keyboard, which pointer-events does not; React 19
+                reads it as a boolean, so the empty string other call sites
+                pass is read as false.
+              */}
+              <Box
+                flex="1"
+                minHeight={0}
+                display="flex"
+                flexDirection="column"
+                opacity={stepIsStale ? 0.6 : 1}
+                transition="opacity 150ms ease-out"
+                pointerEvents={stepIsStale ? "none" : "auto"}
+                // Driven by staleness alone, never by navigation: the two
+                // states look alike from the bar, and only this one means the
+                // thread on screen belongs to another item.
+                aria-busy={stepIsStale ? true : undefined}
+                {...({ inert: stepIsStale || undefined } as {
+                  inert?: boolean;
+                })}
+              >
                 <IsolatedErrorBoundary
                   scope="Couldn't render this conversation"
                   resetKeys={[currentQueueItem?.trace?.trace_id ?? ""]}
@@ -542,11 +560,19 @@ export default function TraceAnnotations() {
             zIndex={10}
           >
             <AnnotationQueuePicker
-              key={queueItemsKey}
-              queueItems={pendingQueueItems}
+              // A fresh bar per item: the one it was on has been left behind,
+              // and with it the beat it was waiting out before releasing its
+              // controls. Without this the reviewer arrives at the next item
+              // with the bar still held from the step that brought them here.
+              key={currentQueueItem.id}
               currentQueueItem={currentQueueItem}
+              position={position}
+              total={total}
+              previousItemId={previousItemId}
+              nextItemId={nextItemId}
               isTraceAvailable={!!currentQueueItem.trace}
               isFinishing={markQueueItemDone.isPending}
+              stepIsStale={stepIsStale}
               sessionCount={sessionIds.length}
               handoffWanted={handoffWanted}
               onHandoffWantedChange={setHandoffWanted}
@@ -631,12 +657,19 @@ const UnavailableTraceCard = ({
   canRemove,
   canSkip,
   isRemoving,
+  isStale,
   onRemove,
   onSkip,
 }: {
   canRemove: boolean;
   canSkip: boolean;
   isRemoving: boolean;
+  /**
+   * Whether the item this card was drawn from is the one the reviewer has
+   * left. The bar holds its own buttons by disabling them; this card is a
+   * separate surface, so it is told and holds its own.
+   */
+  isStale: boolean;
   onRemove: () => void;
   onSkip: () => void;
 }) => (
@@ -650,11 +683,19 @@ const UnavailableTraceCard = ({
     </Text>
     <HStack gap={3}>
       {canRemove && (
-        <Button variant="outline" disabled={isRemoving} onClick={onRemove}>
+        <Button
+          variant="outline"
+          disabled={isRemoving || isStale}
+          onClick={onRemove}
+        >
           Remove from queue
         </Button>
       )}
-      <Button colorPalette="blue" disabled={!canSkip} onClick={onSkip}>
+      <Button
+        colorPalette="blue"
+        disabled={!canSkip || isStale}
+        onClick={onSkip}
+      >
         Skip
       </Button>
     </HStack>
@@ -662,18 +703,31 @@ const UnavailableTraceCard = ({
 );
 
 const AnnotationQueuePicker = ({
-  queueItems,
   currentQueueItem,
+  position,
+  total,
+  previousItemId,
+  nextItemId,
   isTraceAvailable,
   isFinishing,
+  stepIsStale,
   sessionCount,
   handoffWanted,
   onHandoffWantedChange,
   onFinishItem,
   onFinishQueue,
 }: {
-  queueItems: AssignedQueueItem[];
   currentQueueItem: AssignedQueueItem;
+  /**
+   * Where this item sits in the queue and how many are waiting. A rank and a
+   * count rather than the queue itself: the bar never listed it, it only ever
+   * said which one of how many this is.
+   */
+  position: number;
+  total: number;
+  /** The items either side, as ids: all the walk needs to step. */
+  previousItemId: string | null;
+  nextItemId: string | null;
   /**
    * Whether the item's trace resolved. When it did not, the bar keeps its
    * navigation and drops everything that acts on the trace: there is nothing to
@@ -682,6 +736,16 @@ const AnnotationQueuePicker = ({
   isTraceAvailable: boolean;
   /** Whether an item is being recorded as done right now. */
   isFinishing: boolean;
+  /**
+   * Whether the item above is the one the reviewer has left, with the one they
+   * asked for still being read.
+   *
+   * Everything that acts on the item waits for this to clear. Releasing on a
+   * timer instead let the bar act on the item behind: pressing the primary
+   * action finished the item the reviewer had already stepped away from, and
+   * "Edit trace" opened the trace they had left.
+   */
+  stepIsStale: boolean;
   /** How many traces the sitting counts right now. */
   sessionCount: number;
   handoffWanted: boolean;
@@ -696,10 +760,6 @@ const AnnotationQueuePicker = ({
   const canEditTrace = hasPermission("annotations:update");
   const { openDrawer } = useDrawer();
   const [isNavigating, setIsNavigating] = useState(false);
-
-  const currentQueueItemIndex = queueItems.findIndex(
-    (item) => item.id === currentQueueItem.id,
-  );
 
   // The navigating state is released a beat after the route resolves, so the
   // bar does not flicker back before the new item renders. The timer is held
@@ -728,17 +788,14 @@ const AnnotationQueuePicker = ({
     releaseNavigatingWhenSettled();
   };
 
-  const previousItem = queueItems[currentQueueItemIndex - 1];
-  const nextItem = queueItems[currentQueueItemIndex + 1];
-
   // One way forward: the primary action finishes this item and moves on, and
   // on the last item it ends the walk instead.
   const finishAndMoveOn = () => {
-    if (!nextItem) {
+    if (!nextItemId) {
       onFinishQueue();
       return;
     }
-    onFinishItem(() => navigateToQueue(nextItem.id));
+    onFinishItem(() => navigateToQueue(nextItemId));
   };
 
   const editTrace = () => {
@@ -766,7 +823,7 @@ const AnnotationQueuePicker = ({
       width="full"
       position="relative"
     >
-      {isNavigating && (
+      {(isNavigating || stepIsStale) && (
         <Box
           position="absolute"
           top={0}
@@ -785,15 +842,15 @@ const AnnotationQueuePicker = ({
       <HStack gap={4} width="full">
         <Button
           variant="outline"
-          disabled={!previousItem || isNavigating}
+          disabled={!previousItemId || isNavigating || stepIsStale}
           onClick={() => {
-            if (previousItem) void navigateToQueue(previousItem.id);
+            if (previousItemId) void navigateToQueue(previousItemId);
           }}
         >
           <ChevronLeft /> Previous
         </Button>
         <Text whiteSpace="nowrap">
-          {currentQueueItemIndex + 1} of {queueItems.length}
+          {position} of {total}
         </Text>
         <Spacer />
         {isTraceAvailable ? (
@@ -812,7 +869,7 @@ const AnnotationQueuePicker = ({
             {canEditTrace && (
               <Button
                 variant="outline"
-                disabled={isNavigating}
+                disabled={isNavigating || stepIsStale}
                 onClick={editTrace}
               >
                 <LuPencil /> Edit trace
@@ -821,11 +878,14 @@ const AnnotationQueuePicker = ({
             <Button
               colorPalette="blue"
               disabled={
-                currentQueueItem.doneAt !== null || isFinishing || isNavigating
+                currentQueueItem.doneAt !== null ||
+                isFinishing ||
+                isNavigating ||
+                stepIsStale
               }
               onClick={finishAndMoveOn}
             >
-              {nextItem ? (
+              {nextItemId ? (
                 <>
                   Next <ChevronRight />
                 </>
@@ -841,9 +901,10 @@ const AnnotationQueuePicker = ({
           // good for, the same way the card behind the bar offers Skip.
           <Button
             variant="outline"
-            disabled={!nextItem || isNavigating}
+            disabled={!nextItemId || isNavigating || stepIsStale}
             onClick={() => {
-              if (nextItem) void navigateToQueue(nextItem.id);
+              if (stepIsStale || !nextItemId) return;
+              void navigateToQueue(nextItemId);
             }}
           >
             Next <ChevronRight />

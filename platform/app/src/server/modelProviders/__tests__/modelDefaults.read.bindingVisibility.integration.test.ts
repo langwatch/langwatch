@@ -22,9 +22,13 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import {
+  batchScopePermissions,
+  hasProjectPermission,
+} from "~/server/app-layer/authz/permission-adapters";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
-import { batchScopePermissions, hasProjectPermission } from "../../api/rbac";
 import { prisma } from "../../db";
 import { getDefaultModelsSnapshot } from "../modelDefaults.read";
 import { ModelDefaultsRepository } from "../modelDefaults.repository";
@@ -94,24 +98,24 @@ describe("Default Models visibility for role-binding-only members (real DB)", ()
         role: OrganizationUserRole.MEMBER,
       },
     });
-    await prisma.roleBinding.createMany({
-      data: [
-        {
-          organizationId,
-          userId: member.id,
-          role: TeamUserRole.MEMBER,
-          scopeType: RoleBindingScopeType.ORGANIZATION,
-          scopeId: organizationId,
-        },
-        {
-          organizationId,
-          userId: member.id,
-          role: TeamUserRole.MEMBER,
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: teamId,
-        },
-      ],
-    });
+    for (const binding of [
+      {
+        organizationId,
+        userId: member.id,
+        role: TeamUserRole.MEMBER,
+        scopeType: RoleBindingScopeType.ORGANIZATION,
+        scopeId: organizationId,
+      },
+      {
+        organizationId,
+        userId: member.id,
+        role: TeamUserRole.MEMBER,
+        scopeType: RoleBindingScopeType.TEAM,
+        scopeId: teamId,
+      },
+    ]) {
+      await seedRoleBinding(prisma, binding);
+    }
 
     // One PROJECT-scoped default-models config per team project —
     // mirrors the customer data (all configs project-scoped, none at
@@ -130,6 +134,7 @@ describe("Default Models visibility for role-binding-only members (real DB)", ()
   afterAll(async () => {
     await cleanupTestRows(prisma, [
       ["modelDefaultConfig", { id: { in: configIds } }],
+      ["grant", { organizationId }],
       ["roleBinding", { organizationId }],
       ["organizationUser", { organizationId }],
       ["user", { id: bindingMemberUserId }],

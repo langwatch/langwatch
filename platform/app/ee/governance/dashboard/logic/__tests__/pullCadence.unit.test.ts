@@ -18,6 +18,7 @@ import {
   partsFromPullCron,
   pullCadenceCronError,
   recommendedPullSchedule,
+  shortPullCadence,
   summarizePullCadence,
 } from "../pullCadence";
 
@@ -64,12 +65,19 @@ describe("given the pull-cadence cron mapping", () => {
      * a source that looks configured, reports no error, and returns nothing.
      */
     it("recommends a schedule for every pull-mode source the catalog offers", () => {
-      const missing = SOURCE_TYPE_OPTIONS.filter(
-        (option) =>
-          option.mode === "pull" &&
-          !option.deprecated &&
-          recommendedPullSchedule(option.value) === null,
-      ).map((option) => option.value);
+      const pullOptions = SOURCE_TYPE_OPTIONS.filter(
+        (option) => option.mode === "pull" && !option.deprecated,
+      );
+      // The candidate set has to be proven non-empty first, the same way the
+      // round-trip test above proves it. Folding the selection and the check
+      // into one filter makes an empty result mean either "every pull source
+      // has a schedule" or "nothing is a pull source any more", and the
+      // assertion cannot tell those apart.
+      expect(pullOptions.length).toBeGreaterThan(0);
+
+      const missing = pullOptions
+        .filter((option) => recommendedPullSchedule(option.value) === null)
+        .map((option) => option.value);
       expect(missing).toEqual([]);
     });
   });
@@ -246,6 +254,22 @@ describe("given the pull-cadence cron mapping", () => {
           dayOfWeek: 1,
         }),
       ).toBe("Checks for new activity every Monday at 09:00 UTC");
+    });
+  });
+
+  describe("when a table cell needs the cadence in a few words", () => {
+    /** @scenario "The sources table shows delivery as a column" */
+    it("says each shape briefly, names a custom cron as such, and stays quiet without one", () => {
+      expect(shortPullCadence("*/15 * * * *")).toBe("Every 15 minutes");
+      expect(shortPullCadence("0 * * * *")).toBe("Hourly");
+      expect(shortPullCadence("30 * * * *")).toBe("Hourly at 30 minutes past");
+      expect(shortPullCadence("0 9 * * *")).toBe("Daily at 09:00 UTC");
+      expect(shortPullCadence("0 9 * * 1")).toBe(
+        "Weekly on Monday at 09:00 UTC",
+      );
+      expect(shortPullCadence("0 9 1 * *")).toBe("Custom schedule");
+      expect(shortPullCadence(null)).toBeNull();
+      expect(shortPullCadence("")).toBeNull();
     });
   });
 });

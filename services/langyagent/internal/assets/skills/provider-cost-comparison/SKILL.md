@@ -1,0 +1,85 @@
+---
+name: provider-cost-comparison
+user-prompt: "Would another provider be cheaper for my usage?"
+description: Prices your real LangWatch usage mix against other model providers. Exports your actual token mix per model, including the cache read and write split, fetches current price cards, and reprices the same month of usage under each candidate, with the cache sensitivity stated. Use when someone asks whether a cheaper provider or model would actually save money on your workload.
+license: MIT
+compatibility: Works with Claude Code and similar AI assistants. The `langwatch` CLI is the only interface.
+---
+
+# Price Your Real Usage Mix Against Other Providers
+
+Price-card comparisons lie by omission: a provider that halves the per-token price and lacks cache discounts can cost more on a cache-heavy coding workload. This skill prices the user's own month of usage, with its real input/output/cache mix, under each candidate. It is read-only on the platform. Locally it writes a trace export while it works and deletes it again, and leaves one report file behind.
+
+## Step 1: Set up the LangWatch CLI
+
+Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it once with `npm install -g langwatch`, then run the `langwatch` binary directly; an unpinned `npx langwatch` re-resolves the package from the registry on every run.
+
+Personal coding-agent usage needs `langwatch login --device`; a team or application project needs `--project <slug>` on the read commands.
+
+## Step 2: Export the Real Mix
+
+Settle two things before running anything, and hold both for the whole analysis.
+
+**The window.** `analytics query` and `trace export` both default to the last 7 days, so a report about a month has to state the window itself. Compute one start date and one end date, 30 days back to now unless the user names another window, and pass the same pair to every command.
+
+**The scope.** `analytics query` covers the whole project and has no origin filter, while `trace export` takes `--origin`. Mixing them silently compares application traffic in the totals against coding-agent traffic in the breakdown. When the question is about coding-agent usage, scope the export with `--origin coding_agent` and build every priced number from that export. Use the analytics calls only as a project-wide cross-check, and label them that way in the report. When the question is about the whole project, drop `--origin` and the two agree by construction.
+
+```bash
+langwatch analytics query --metric total-tokens --group-by metadata.model --format json \
+  --start-date <start> --end-date <end>
+langwatch analytics query --metric total-cost --group-by metadata.model --format json \
+  --start-date <start> --end-date <end>
+langwatch trace export --format jsonl --origin coding_agent --limit 20000 \
+  --start-date <start> --end-date <end> -o traces.jsonl
+```
+
+`--limit` caps the whole export, not one page, so a window with more matches than the limit gives a partial file. The command reports both counts when it truncates, for example `Exported 20000 traces (48213 total)`. Raise `--limit` until the two agree, or say in the report that the numbers come from a sample of N of M traces. Never present a truncated export as the window's total.
+
+Delete `traces.jsonl` once the analysis is done.
+
+Collect the distinct `metadata.thread_id` values from the export and pull the per-call rows, because the cache split lives there:
+
+```bash
+langwatch session events <sessionId> --format json
+```
+
+Compute, per model: input tokens, output tokens, cache-read tokens, cache-creation tokens, and the totals over the window you exported. The cache-read share is the single most important number of the whole analysis; on coding agents it is often the large majority of all input.
+
+## Step 3: Fetch Current Prices
+
+Fetch the candidates' price pages at analysis time and cite them; never price from memory, the numbers churn monthly. For each candidate record: input price, output price, cache-read price, cache-write price (some providers price a write above fresh input, some price it the same, some offer no caching at all), the cache-storage price and its unit if the candidate bills cache residency by time, the default cache lifetime, and the context window.
+
+Cache pricing has three shapes and they do not reprice the same way: a write premium and no storage charge, a storage charge by token-hour with a cheap or free write, or no cache at all. Record which shape each candidate uses, because Step 4 needs it.
+
+Candidates come from the user; when they name none, take the current obvious ones for the workload's model class and say why those.
+
+## Step 4: Reprice and Compare
+
+For each candidate, reprice the same mix:
+
+1. **Direct repricing**: the same tokens at the candidate's rates, cache split preserved where the candidate has caching. A candidate that bills cache residency by time needs a storage line as well, because tokens alone do not price it: estimate the residency of each session from its own call timestamps, from the first call that writes the cache to the last call that reads it, cap each stretch at the candidate's cache lifetime, and multiply the cached token count by the elapsed time and the storage rate. State the residency assumption next to the number. When the exported rows carry no usable timestamps, do not publish a direct row that silently omits a real charge: fall back to the no-cache row for that candidate and label it as an upper bound.
+2. **No-cache degradation**: for a candidate without caching, cache reads and cache writes both rebill as fresh input, because the candidate is sent the same context in full on every call. Add the two together, do not price the writes at a write rate the candidate does not have, and state this row separately; it is the row a sticker-price comparison leaves out.
+3. **Sensitivity**: recompute at the observed cache-hit share, at half of it, and at zero, so the conclusion survives a workload change.
+4. **The non-price caveats, named not judged**: a different model is a different model. State window differences and any capability constraint the user's workload obviously depends on (tool calling, long context), and leave the quality judgment to the user; this is a cost analysis.
+
+## Step 5: Report
+
+Write a single self-contained `provider-cost-report.html` in the project root (inline CSS, no external assets) with:
+
+- **The answer first**: "your usage from `<start>` to `<end>` cost $X; under the candidate the same usage prices at $Y" with the exported window and the cache assumption named in the same sentence
+- The mix table: tokens per model per kind (input, output, cache read, cache write)
+- The comparison table: one row per candidate, direct and no-cache columns, with the price-page links and their fetch date
+- The sensitivity chart or table across cache-hit shares
+- A short "what would have to be true" closing: the conditions under which switching saves the claimed amount
+
+State the headline numbers directly in the conversation too.
+
+## Common Mistakes
+
+- Do NOT compare on input and output prices alone; on coding agents the cache columns decide the answer.
+- Do NOT use remembered prices; fetch the price page and cite it with a date.
+- Do NOT present the repriced number as the migration outcome; it prices the same usage, and a different model changes the usage. Say so once, clearly.
+- Do NOT ignore cache-write pricing; providers that bill writes above fresh input make rebuild-heavy workloads more expensive, not less.
+- Do NOT price a cache on token rates alone when the candidate charges for residency by time. A storage charge does not appear in the token mix, so leaving it out makes that candidate look cheaper than it is.
+- Do NOT mix application traffic and coding-agent traffic in one mix when the question is about one of them. The export scopes with `--origin`; the analytics totals cannot, so never take a priced number from an analytics call while the export is scoped.
+- If the CLI returns an error, report the user-facing consequence, not the raw error text.

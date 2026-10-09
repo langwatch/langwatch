@@ -105,7 +105,7 @@ export async function listDatasets(): Promise<
 export async function listAgents(): Promise<
   Array<{ id: string; name: string }>
 > {
-  return toArray(await lwGet("/api/agents"));
+  return toArray(await lwGet("/api/v1/agents"));
 }
 
 export async function listEvaluators(): Promise<

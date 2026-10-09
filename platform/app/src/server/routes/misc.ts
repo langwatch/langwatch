@@ -15,6 +15,8 @@
  */
 
 import { randomUUID } from "node:crypto";
+import { slackActionParamsSchema } from "@langwatch/automations/providers/slack";
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import crypto from "crypto";
@@ -39,7 +41,6 @@ import {
   timeseriesSeriesInput,
 } from "~/server/analytics/registry";
 import { sharedFiltersInputSchema } from "~/server/analytics/types";
-import { isDemoProject } from "~/server/api/rbac";
 import {
   createServiceApp,
   handlerManagedAuth,
@@ -51,7 +52,10 @@ import {
   requireApiKeyPermission,
   type UnifiedAuthVariables,
 } from "~/server/api-key/auth-middleware";
+import { AggregateProjectHasNoCredentialError } from "~/server/api-key/errors";
 import { getApp, tryGetApp } from "~/server/app-layer/app";
+import { isDemoProject } from "~/server/app-layer/authz/permission-adapters";
+import { createSlackIntegrationService } from "~/server/app-layer/automations/slack-integration/slack-integration.wiring";
 import type { DspyStepData } from "~/server/app-layer/dspy-steps/types";
 import {
   predefinedEventsSchemas,
@@ -63,6 +67,10 @@ import {
 } from "~/server/app-layer/events/track-event.service";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { ProjectService } from "~/server/app-layer/projects/project.service";
+import {
+  isAggregateProjectKind,
+  NON_DESTINATION_PROJECT_KINDS,
+} from "~/server/app-layer/projects/project-kinds";
 import { PrismaProjectRepository } from "~/server/app-layer/projects/repositories/project.prisma.repository";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
@@ -79,8 +87,6 @@ import {
   getLLMModelCosts,
   type MaybeStoredLLMModelCost,
 } from "~/server/modelProviders/llmModelCost";
-import { getPostHogInstance } from "~/server/posthog";
-import { rateLimit } from "~/server/rateLimit";
 import {
   estimateCost,
   matchModelCostWithFallbacks,
@@ -91,11 +97,14 @@ import {
 } from "~/server/tracer/types";
 import { runWorkflow as runWorkflowFn } from "~/server/workflows/runWorkflow";
 import { encrypt } from "~/utils/encryption";
-import { getClientIpFromHonoContext } from "~/utils/getClientIp";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 import { zodErrorMessage } from "~/utils/zodErrorMessage";
 import { bodyLimit } from "./_lib/body-limit";
+import {
+  handleTrackUsage,
+  TRACK_USAGE_MAX_BODY_BYTES,
+} from "./_lib/track-usage";
 import {
   experimentInitBadRequestSchema,
   experimentInitForbiddenSchema,
@@ -930,6 +939,27 @@ secured
       return noAccessResponse();
     }
 
+    // The code carries the project's base key, so a project that holds no
+    // credential gets none (ADR-144 decision 7). The aggregate is refused
+    // with its registered code, still in the OAuth wire format above; the
+    // hidden governance project reads as not reachable, as everywhere else.
+    if (NON_DESTINATION_PROJECT_KINDS.includes(project.kind)) {
+      if (!isAggregateProjectKind(project.kind)) return noAccessResponse();
+      const refusal = new AggregateProjectHasNoCredentialError();
+      return c.json(
+        {
+          error: "access_denied",
+          error_description: refusal.message,
+          code: refusal.code,
+          redirect: errorRedirect({
+            error: "access_denied",
+            description: refusal.message,
+          }),
+        },
+        403,
+      );
+    }
+
     const code = randomUUID();
 
     const redis = tryGetApp()?.redis ?? null;
@@ -1175,159 +1205,16 @@ secured.access(tracesCreateAuth).post(
 // =============================================
 // POST /api/track_usage
 // =============================================
-// Self-hosted instances report anonymous daily usage counts here with no
-// credential to present (see usageStatsWorker.ts), so the route stays public.
-// What it accepts is bounded instead:
-//   - `.strict()` schema matching exactly the one report `collectUsageStats`
-//     produces, so a spoofed event can't also smuggle arbitrary properties
-//     into PostHog even once it gets the event name right
-//   - a capped payload size
-//   - a global rate limit — the actual bound. `ip` and `instance_id` are both
-//     values the caller supplies, so an abuser rotates either one and lands
-//     in a fresh bucket every request (mirrors the reasoning in
-//     rum-ingest.service.ts). Checked first, on a fixed key, so a flood the
-//     global bucket is already refusing doesn't also mint a fresh per-caller
-//     Redis key on every request.
-//   - per-IP and per-instance limits on top, for fairness once under the cap
-const TRACK_USAGE_EVENT = "daily_usage_stats";
-// Every stat field is `.optional()`, not required: this receiver is a stable
-// contract that self-hosted instances at ANY historical version hit (see
-// usageStatsWorker.ts's docstring), so an older sender predating a field
-// collectUsageStats.ts later added (or a newer one with a field this receiver
-// doesn't know about yet) must still be accepted rather than 400'd — a
-// self-hosted operator gets zero feedback on a rejected send (the worker logs
-// success unconditionally once `fetch` resolves, without checking `.ok`), so
-// a strict shape mismatch here would silently and permanently drop that
-// instance's telemetry. `.strict()` still closes the actual security gap by
-// rejecting keys outside this known set — the two constraints don't conflict.
-const trackUsageBodySchema = z
-  .object({
-    event: z.literal(TRACK_USAGE_EVENT),
-    instance_id: z.string().min(1).max(200),
-    install_method: z.string().max(100).optional(),
-    hostname: z.string().max(255).optional(),
-    environment: z.string().max(50).optional(),
-    totalTraces: z.number().optional(),
-    totalScenarioEvents: z.number().optional(),
-    annotations: z.number().optional(),
-    annotationQueues: z.number().optional(),
-    annotationQueueItems: z.number().optional(),
-    annotationScores: z.number().optional(),
-    batchEvaluations: z.number().optional(),
-    customGraphs: z.number().optional(),
-    datasets: z.number().optional(),
-    datasetRecords: z.number().optional(),
-    experiments: z.number().optional(),
-    triggers: z.number().optional(),
-    workflows: z.number().optional(),
-    timestamp: z.string().optional(),
-  })
-  .strict();
-
-// A self-hosted instance sends this once per organization per day
-// (usageStatsWorker.ts), so these ceilings stay generous for legitimate
-// traffic while bounding abuse.
-const TRACK_USAGE_GLOBAL_PER_MINUTE = 500;
-const TRACK_USAGE_PER_IP_PER_MINUTE = 10;
-const TRACK_USAGE_PER_INSTANCE_PER_HOUR = 5;
-
-interface TrackUsageRateLimitVerdict {
-  allowed: boolean;
-  retryAfterSeconds: number;
-}
-
-function toVerdict(result: {
-  allowed: boolean;
-  resetAt: number;
-}): TrackUsageRateLimitVerdict {
-  return {
-    allowed: result.allowed,
-    retryAfterSeconds: Math.max(
-      1,
-      Math.ceil((result.resetAt - Date.now()) / 1000),
-    ),
-  };
-}
-
-/**
- * Checked before the body is even parsed, on keys no request-body field can
- * influence, so a flood of malformed JSON is capped exactly like valid
- * traffic — an attacker can't dodge the limiter just by sending garbage.
- */
-async function enforceGlobalAndIpRateLimit(
-  ip: string,
-): Promise<TrackUsageRateLimitVerdict> {
-  const global = await rateLimit({
-    key: "track_usage:global",
-    windowSeconds: 60,
-    max: TRACK_USAGE_GLOBAL_PER_MINUTE,
-  });
-  if (!global.allowed) return toVerdict(global);
-
-  const perIp = await rateLimit({
-    key: `track_usage:ip:${ip}`,
-    windowSeconds: 60,
-    max: TRACK_USAGE_PER_IP_PER_MINUTE,
-  });
-  return toVerdict(perIp);
-}
-
-async function enforceInstanceRateLimit(
-  instanceId: string,
-): Promise<TrackUsageRateLimitVerdict> {
-  const perInstance = await rateLimit({
-    key: `track_usage:instance:${instanceId}`,
-    windowSeconds: 3600,
-    max: TRACK_USAGE_PER_INSTANCE_PER_HOUR,
-  });
-  return toVerdict(perInstance);
-}
-
+// The handler, the schema and the limits live in `_lib/track-usage.ts`,
+// because `POST /api/connect/v1/stats` is the same report arriving at the
+// connect host and has to be handled identically (ADR-141, section 6).
 secured
   .access(publicEndpoint("anonymous product telemetry, no credential"))
-  .post("/track_usage", bodyLimit({ maxSize: 10 * 1024 }), async (c) => {
-    const ip = getClientIpFromHonoContext(c) ?? "unknown";
-
-    const ipLimit = await enforceGlobalAndIpRateLimit(ip);
-    if (!ipLimit.allowed) {
-      c.header("Retry-After", String(ipLimit.retryAfterSeconds));
-      return c.json({ message: "Too many requests" }, 429);
-    }
-
-    let rawBody: unknown;
-    try {
-      rawBody = await c.req.json();
-    } catch {
-      return c.json({ message: "Bad request" }, 400);
-    }
-
-    const parsed = trackUsageBodySchema.safeParse(rawBody);
-    if (!parsed.success) {
-      return c.json({ message: "Bad request" }, 400);
-    }
-    const { event, instance_id, ...properties } = parsed.data;
-
-    const instanceLimit = await enforceInstanceRateLimit(instance_id);
-    if (!instanceLimit.allowed) {
-      c.header("Retry-After", String(instanceLimit.retryAfterSeconds));
-      return c.json({ message: "Too many requests" }, 429);
-    }
-
-    const posthog = getPostHogInstance();
-    if (posthog) {
-      try {
-        posthog.capture({
-          distinctId: instance_id,
-          event,
-          properties,
-        });
-      } catch (error) {
-        captureException(toError(error));
-      }
-    }
-
-    return c.json({ message: "Event captured" });
-  });
+  .post(
+    "/track_usage",
+    bodyLimit({ maxSize: TRACK_USAGE_MAX_BODY_BYTES }),
+    handleTrackUsage,
+  );
 
 // =============================================
 // POST /api/trigger/slack
@@ -1343,28 +1230,62 @@ const filterSchema = z
   )
   .default({});
 
-const slackTriggerBodySchema = z.object({
-  slack_webhook: z
-    .string()
-    .url()
-    .describe("Incoming webhook URL the alert is posted to"),
-  name: z.string().describe("How the trigger is listed in the app"),
-  message: z
-    .string()
-    .optional()
-    .describe("Extra line included with each alert"),
-  filters: filterSchema.describe(
-    "Which traces the trigger fires on. An empty object fires on all of them.",
-  ),
-  alert_type: z.nativeEnum(AlertType),
-});
+const slackTriggerBodySchema = z
+  .object({
+    slack_webhook: z
+      .string()
+      .url()
+      .optional()
+      .describe(
+        "Incoming webhook URL the alert is posted to. It is stored as a Slack " +
+          "connection this project can use (an existing one holding the same " +
+          "URL, else a new project connection). Send this or " +
+          "`slack_connection_id`, not both.",
+      ),
+    slack_connection_id: z
+      .string()
+      .min(1)
+      .optional()
+      .describe(
+        "The Slack connection the alert posts through: an organization " +
+          "connection or one of this project's, as `GET /api/slack-connections` " +
+          "and `langwatch slack-connection list` list them. Send this or " +
+          "`slack_webhook`, not both.",
+      ),
+    slack_channel_id: z
+      .string()
+      .min(1)
+      .optional()
+      .describe(
+        "The channel a bot connection posts in; required with one. Invite " +
+          "the LangWatch app to it first.",
+      ),
+    name: z.string().describe("How the trigger is listed in the app"),
+    message: z
+      .string()
+      .optional()
+      .describe("Extra line included with each alert"),
+    filters: filterSchema.describe(
+      "Which traces the trigger fires on. An empty object fires on all of them.",
+    ),
+    alert_type: z.nativeEnum(AlertType),
+  })
+  .refine(
+    (body) =>
+      (body.slack_webhook === undefined) !==
+      (body.slack_connection_id === undefined),
+    {
+      message: "Send exactly one of slack_webhook or slack_connection_id.",
+      path: ["slack_connection_id"],
+    },
+  );
 
 secured.access(triggersManageAuth).post(
   "/trigger/slack",
   describeRoute({
     summary: "Create a Slack alert trigger",
     description:
-      "Create a trigger that posts to a Slack incoming webhook when traces match its filters. The `/api/triggers` family supersedes this narrower form, which stays for callers written against it.",
+      "Create a trigger that posts to Slack when traces match its filters, through a Slack connection (`slack_connection_id`, plus `slack_channel_id` for a bot) or an incoming webhook URL (`slack_webhook`), which is stored as a connection. The trigger stores no secret of its own. The `/api/triggers` family supersedes this narrower form, which stays for callers written against it.",
     tags: ["Triggers"],
     requestBody: {
       required: true,
@@ -1413,6 +1334,15 @@ secured.access(triggersManageAuth).post(
           },
         },
       },
+      422: {
+        description:
+          "The connection is not one this project can use (`slack_integration_missing`), or a bot connection was named without `slack_channel_id` (`invalid_action_params`)",
+        content: {
+          "application/json": {
+            schema: resolver(handledErrorEnvelopeSchema),
+          },
+        },
+      },
     },
   }),
   authMiddleware,
@@ -1429,6 +1359,23 @@ secured.access(triggersManageAuth).post(
 
     try {
       const validatedData = slackTriggerBodySchema.parse(body);
+      // ADR-093 §5a: a named connection must be usable by the project; a URL
+      // is stored once, as a connection. Either way the automation keeps only
+      // its id. The actor follows the governance API's fallback.
+      const keyUser = c.get("apiKeyUserId");
+      const actionParams = await createSlackIntegrationService({
+        prisma,
+      }).connectActionParams({
+        projectId: project.id,
+        actorId: typeof keyUser === "string" ? keyUser : `svc_${project.id}`,
+        actionParams: validatedData.slack_connection_id
+          ? {
+              slackIntegrationId: validatedData.slack_connection_id,
+              slackChannelId: validatedData.slack_channel_id,
+            }
+          : { slackWebhook: validatedData.slack_webhook },
+      });
+      const storedParams = slackActionParamsSchema.parse(actionParams);
 
       await prisma.trigger.create({
         data: {
@@ -1437,7 +1384,7 @@ secured.access(triggersManageAuth).post(
           name: validatedData.name,
           message: validatedData.message,
           filters: JSON.stringify(validatedData.filters),
-          actionParams: { slackWebhook: validatedData.slack_webhook },
+          actionParams: storedParams,
           alertType: validatedData.alert_type,
         },
       });
@@ -1450,6 +1397,9 @@ secured.access(triggersManageAuth).post(
           400,
         );
       }
+      // A refusal the save path names (an unusable connection, a bot
+      // connection with no channel) reaches the app's error handler as is.
+      if (error instanceof HandledError) throw error;
 
       logger.error({ error }, "Error creating trigger");
       return c.json({ message: "Error creating trigger" }, 500);

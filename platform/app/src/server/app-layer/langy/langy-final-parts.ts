@@ -8,6 +8,7 @@ import {
   splitLangyCardFences,
 } from "@langwatch/langy";
 import { getLangyBlocksCounter } from "~/server/metrics";
+import { partsShownOnce } from "~/shared/langy/shownOnce";
 import { LangyCliEnvelopeService } from "./execution/langy-cli-envelope.service";
 import type { LangyTurnSegment } from "./streaming/langyTurnOrder";
 
@@ -27,6 +28,11 @@ export interface LangyFinalToolCall {
   isError?: boolean;
   digest?: CliResultDigest;
   result?: CliToolResult;
+  /**
+   * The call ran in the folder the developer shared from their own machine
+   * (ADR-129) rather than in the sandbox. Absent means the sandbox.
+   */
+  local?: boolean;
 }
 
 /** The one envelope both finalize paths re-type their tool calls through. */
@@ -95,16 +101,25 @@ export function buildFinalAssistantParts({
       ...(call.input !== undefined ? { input: call.input } : {}),
       ...(call.digest !== undefined ? { digest: call.digest } : {}),
       ...(call.result !== undefined ? { result: call.result } : {}),
+      ...(call.local === true ? { local: true } : {}),
       ...(call.isError
         ? { errorText: call.output ?? "Tool call failed" }
         : { output: call.output ?? "" }),
     });
   };
 
+  // A line is shown once (shownOnce.ts): reply text that repeats a line said
+  // with `say` loses that line, and a `say` that only voices a question card's
+  // own question is dropped. The rule is applied here, on the record both
+  // finalize paths write, so every reader of the turn agrees about what the
+  // turn said rather than each renderer deduplicating on its own.
   if (!order?.length) {
-    return [...toolCalls.map(toolPartOf), ...assistantTextParts(text)];
+    return partsShownOnce([
+      ...toolCalls.map(toolPartOf),
+      ...assistantTextParts(text),
+    ]);
   }
-  return orderedParts({ text, toolCalls, order, toolPartOf });
+  return partsShownOnce(orderedParts({ text, toolCalls, order, toolPartOf }));
 }
 
 /**

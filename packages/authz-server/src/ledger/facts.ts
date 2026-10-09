@@ -1,3 +1,4 @@
+import type { GrantCondition } from "@langwatch/actor";
 /**
  * The authorization domain's facts: what a grant IS, what a role IS, and the
  * vocabulary they are written in.
@@ -36,6 +37,10 @@ export type LedgerScopeType = StoredScopeTier;
  * `join-request` is the opposite case, and deliberately so: somebody asked
  * to join and the request was approved, which is a live change a customer
  * should see. It stays auditable.
+ *
+ * `aggregate-reconciler` (ADR-144) materialises an aggregate project's scope
+ * rule into one shared project-reader grant per member project, and revokes
+ * them when the rule or the membership changes. Live changes, so auditable.
  */
 export const GRANT_EVENT_SOURCES = [
   "grants-service",
@@ -44,6 +49,7 @@ export const GRANT_EVENT_SOURCES = [
   "join-request",
   "read-through-mint",
   "migration",
+  "aggregate-reconciler",
 ] as const;
 
 export type GrantEventSource = (typeof GRANT_EVENT_SOURCES)[number];
@@ -94,6 +100,8 @@ export interface GrantFact {
   roleKey: string | null;
   scope: LedgerScope;
   resource?: ResourceGrantTerms;
+  /** Present only on a shared grant (ADR-144); absent on every own grant. */
+  condition?: GrantCondition;
   /**
    * The `role` column an IMPORTED binding carried before the ledger owned it.
    * Set only where `roleKey` is `custom:<id>` and the fact came from a legacy
@@ -110,6 +118,8 @@ export interface GrantFact {
    */
   legacyRole?: LegacyBindingRole;
   source: GrantEventSource;
+  /** Current USER membership lifetime; absent for non-user/resource facts. */
+  membershipStamp?: string;
   /** Business time (backfilled facts carry the legacy row's createdAt). */
   occurredAtMs: number;
 }

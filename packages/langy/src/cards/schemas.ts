@@ -186,6 +186,12 @@ export const choicesCardFields = {
         id: z.string().min(1),
         label: z.string().min(1),
         description: z.string().optional(),
+        /**
+         * A quiet option is the way out, not the way forward: it renders as
+         * an underlined link under the bordered rows and answers like any
+         * other option ("I'd rather describe it", "Chat about this").
+         */
+        quiet: z.boolean().optional(),
         ref: z
           .object({
             type: z.string().min(1),
@@ -197,6 +203,12 @@ export const choicesCardFields = {
     .min(1),
   multiSelect: z.boolean().optional(),
   allowOther: z.boolean().optional(),
+  /**
+   * The question is drawn as ordinary reply prose above the options, not as
+   * a title: the ask is the whole of what Langy says, so its words live here
+   * and the card carries them in the reply's own typography.
+   */
+  bare: z.boolean().optional(),
 } as const;
 
 /**

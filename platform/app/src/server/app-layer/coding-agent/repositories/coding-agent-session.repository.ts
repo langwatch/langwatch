@@ -1,4 +1,5 @@
 import type { CodingAgentSessionRow } from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
+import type { SessionContextUsage } from "~/server/event-sourcing/pipelines/coding-agent-processing/services/coding-agent-session.types";
 
 /**
  * One session as the pull-request rollup reads it: the numbers it adds up, the
@@ -37,6 +38,12 @@ export interface CodingAgentBranchSessionRow {
    * read both through `branchesOf` rather than either one alone.
    */
   gitBranches: string[];
+  /**
+   * What the session spent under each working context it declared, first
+   * seen first: the split's ledger. Empty for a row folded before the column
+   * existed, whose usage then all reads as spent before any declaration.
+   */
+  usageByContext: SessionContextUsage[];
   /** The generated conversation title, empty when the agent never made one. */
   title: string;
 }
@@ -137,6 +144,18 @@ export interface CodingAgentSessionRepository {
     branches: string[];
     startedAtFromMs: number;
   }): Promise<CodingAgentBranchSessionRow[]>;
+
+  /**
+   * The same rows as `listByRepositoryBranch`, fetched by session id instead
+   * of by repository: the read behind fact-stamp discovery, where a session's
+   * stamped rows name a repository its own row has since moved away from.
+   * `startedAtFromMs` is required for the same partition-pruning reason.
+   */
+  listBySessionIds(params: {
+    tenantIds: string[];
+    sessionIds: string[];
+    startedAtFromMs: number;
+  }): Promise<CodingAgentBranchSessionRow[]>;
 }
 
 /** No-op store for deployments without ClickHouse. */
@@ -163,6 +182,10 @@ export class NullCodingAgentSessionRepository
   }
 
   async listByRepositoryBranch(): Promise<CodingAgentBranchSessionRow[]> {
+    return [];
+  }
+
+  async listBySessionIds(): Promise<CodingAgentBranchSessionRow[]> {
     return [];
   }
 }

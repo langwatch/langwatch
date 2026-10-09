@@ -3,7 +3,10 @@ import type { TriggerContext } from "../../../pipeline/processManagerDefinition"
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
 import type { ResolveOriginCommandData } from "../schemas/commands";
 import { STALE_TRACE_THRESHOLD_MS } from "../schemas/constants";
-import type { TraceProcessingEvent } from "../schemas/events";
+import {
+  isSpanReceivedEvent,
+  type TraceProcessingEvent,
+} from "../schemas/events";
 
 const logger = createLogger("langwatch:trace-processing:origin-gate");
 
@@ -27,6 +30,14 @@ export interface OriginGateSubscriberDeps {
  * Pure relevance guard, shared by `when` (pre-enqueue, sees the committed
  * fold state) and the handler (fail-open path): skip stale resync traces and
  * traces whose origin is already resolved.
+ *
+ * Only a span arrival can open the deferred path. Enrichment events such as
+ * topic_assigned are re-emitted for a whole backlog by a scheduled clustering
+ * pass, stamped with the current time, so the stale check above does not
+ * catch them. A trace older than the fold's read window folds such an event
+ * from an empty state, and the missing origin is an artefact of that empty
+ * state, not an unresolved trace. Resolving it anyway labelled a whole
+ * backlog of old traces "application" and dispatched monitors on each.
  */
 export function needsOriginResolution({
   event,
@@ -35,6 +46,7 @@ export function needsOriginResolution({
   event: TraceProcessingEvent;
   foldState: TraceSummaryData;
 }): boolean {
+  if (!isSpanReceivedEvent(event)) return false;
   if (event.occurredAt < Date.now() - STALE_TRACE_THRESHOLD_MS) return false;
   return !foldState.attributes?.["langwatch.origin"];
 }
@@ -42,7 +54,7 @@ export function needsOriginResolution({
 /**
  * Ensures every trace gets an origin resolved.
  *
- * Fires on every trace event (via traceSummary fold). If origin is already
+ * Fires on span arrivals (via traceSummary fold). If origin is already
  * set (explicit, legacy markers, or SDK heuristic), this is a no-op.
  * If absent (pure OTEL traces), schedules a 5-minute deferred origin
  * resolution job.

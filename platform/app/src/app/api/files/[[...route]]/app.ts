@@ -13,6 +13,10 @@ import {
   sanitizeFilenameSegment,
 } from "~/server/stored-objects/media-response";
 import {
+  FILE_VIEW_PERMISSIONS,
+  requiredPermissionForPurpose,
+} from "~/server/stored-objects/purpose-permission";
+import {
   resolveStoredObjectOwner,
   StoredObjectOwnerLookupUnavailableError,
 } from "~/server/stored-objects/stored-objects-cross-tenant-lookup";
@@ -40,24 +44,11 @@ const secured = createServiceApp<{ Variables: DualAuthVariables }>({
 const FILES_RATE_LIMIT_WINDOW_SECONDS = 60;
 const FILES_RATE_LIMIT_MAX = 120;
 
-/**
- * Stored objects are shared by several features, and which permission guards
- * a read depends on what the object IS: trace media requires `traces:view`,
- * scenario media requires `scenarios:view` — the two are separate permission
- * categories and a custom role can hold one without the other.
- */
-const FILE_VIEW_PERMISSIONS = ["traces:view", "scenarios:view"] as const;
-
-export function requiredPermissionForPurpose(
-  purpose: string,
-): (typeof FILE_VIEW_PERMISSIONS)[number] {
-  return purpose === "trace_content" ? "traces:view" : "scenarios:view";
-}
-
 /** The codes `requireProjectPermission` raises when it refuses the caller. */
 const DENIAL_CODES: ReadonlySet<string> = new Set([
   "project_permission_denied",
   "lite_member_restricted",
+  "developer_seat_restricted",
   // The ADR-092 engine's denial. A route that has migrated to
   // `authz.authorize()` throws this instead of the legacy pair, and without
   // it here the engine's 403 would surface as a 500.
@@ -124,8 +115,9 @@ async function authorizeFileRead({
 
 /**
  * Purpose-specific authorization, applied once the row (and so its purpose)
- * is known: `trace_content` objects require `traces:view`, everything else
- * (the scenario purposes) requires `scenarios:view`. API-key callers are
+ * is known: `trace_content` objects require `traces:view`, a dataset
+ * attachment requires `datasets:view`, and everything else (the scenario
+ * purposes) requires `scenarios:view`. API-key callers are
  * project-scoped full readers on this legacy-key surface and were already
  * pinned to the owning project in `authorizeFileRead`.
  */
@@ -157,8 +149,9 @@ async function authorizeFilePurpose({
  * security headers. For HEAD requests the stream is drained and the body is
  * omitted; for GET the stream is forwarded.
  *
- * `requestedFilename` is the caller-supplied display name (the `filename`
- * query param the attachment chip appends). Stored objects are
+ * `requestedFilename` is the caller-supplied display name: the last path
+ * segment of `/:projectId/:id/:filename`, or the `filename` query param the
+ * attachment chip appends. Stored objects are
  * content-addressed, so the row itself has no filename; passing the
  * message-level one through gives downloads from the browser viewer a
  * human name instead of the object id. It runs through the same
@@ -200,6 +193,16 @@ function streamFileResponse({
     status: 200,
     headers,
   });
+}
+
+/**
+ * The display name the caller asked for: the last segment of the named route,
+ * or the `filename` query param the attachment chip appends.
+ */
+function requestedFilenameOf(
+  c: Parameters<MiddlewareHandler<{ Variables: DualAuthVariables }>>[0],
+): string | undefined {
+  return c.req.param("filename") ?? c.req.query("filename");
 }
 
 /**
@@ -352,9 +355,24 @@ async function handleFileRead(
     stream: result.stream,
     method: options.method,
     mediaType: result.row.media_type,
-    requestedFilename: c.req.query("filename"),
+    requestedFilename: requestedFilenameOf(c),
   });
 }
+
+// Named routes. The file name is the last segment of a dataset attachment
+// reference, so the browser downloads the file under its own name instead of
+// the object id. The name only sets `Content-Disposition`; the bytes served
+// are the same as on the two-segment route below.
+secured
+  .access(anyAuthenticated())
+  .get("/:projectId/:id/:filename", (c) =>
+    handleFileRead(c, { method: "GET" }),
+  );
+secured
+  .access(anyAuthenticated())
+  .head("/:projectId/:id/:filename", (c) =>
+    handleFileRead(c, { method: "HEAD" }),
+  );
 
 // Project-scoped routes (issue #4947) — registered before the legacy
 // id-only routes. Hono matches by path-segment count, so a two-segment

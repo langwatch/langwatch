@@ -19,7 +19,7 @@
  * result arrives as an ordinary measured card. The model never authors a
  * URL, an action, or a component.
  */
-import { Box, Button, Grid, Table, Text } from "@chakra-ui/react";
+import { Box, Grid, Table, Text } from "@chakra-ui/react";
 import type {
   LangyCardHint,
   LangyChoiceSelection,
@@ -36,6 +36,7 @@ import {
   buildTraceExplorerHref,
   readTraceSearchQuery,
 } from "../../logic/traceExplorerLink";
+import { LangyCardActionChip } from "../capabilities/LangyCardActionChip";
 import { TimeseriesPlot } from "../capabilities/LangyTimeseriesCard";
 import { LangySpaAnchor } from "../LangySpaAnchor";
 import { StreamingStatCard } from "../StreamingStatCard";
@@ -344,14 +345,12 @@ function bindHints({
     // can actually route the request (live conversation, not time travel).
     if (onVerify) {
       chips.push(
-        <Button
+        <LangyCardActionChip
           key="verify"
-          size="xs"
-          variant="outline"
+          label="Verify with a real query"
+          icon={<BadgeCheck size={12} />}
           onClick={() => onVerify({ card })}
-        >
-          <BadgeCheck size={12} /> Verify with a real query
-        </Button>,
+        />,
       );
     }
   }

@@ -12,6 +12,7 @@ import { StaleWorkbenchStateError } from "~/server/experiments/errors";
 import type { ExperimentService } from "~/server/experiments/experiment.service";
 import { startPollingRun } from "~/server/experiments-v3/execution/experimentRunner";
 import {
+  planSavedRunCarryOver,
   planSavedRunSeeding,
   prepareSavedStateExecution,
 } from "~/server/experiments-v3/execution/savedStateExecution";
@@ -20,6 +21,10 @@ import {
   LangyUiExperimentRequiredError,
   LangyUiHandlerFailedError,
 } from "./errors";
+import {
+  executeExplorerBackendAction,
+  isExplorerActionKindOnBackend,
+} from "./explorerBackendExecutor";
 import type { PageActionDefinition } from "./pageManifests";
 
 const logger = createLogger("langwatch:langy:ui-actions:backend");
@@ -52,6 +57,16 @@ export async function executeBackendAction({
   definition: PageActionDefinition;
   payload: unknown;
 }): Promise<unknown> {
+  // The Explorer has no saved document to edit, so its away form is a link
+  // rather than a write, and it needs no experiment named.
+  if (isExplorerActionKindOnBackend(kind)) {
+    return executeExplorerBackendAction({
+      projectSlug: context.projectSlug,
+      kind,
+      payload,
+    });
+  }
+
   const slug = context.experimentSlug;
   if (!slug) throw new LangyUiExperimentRequiredError(kind);
 
@@ -216,6 +231,8 @@ async function startSavedStateRun({
 
   const scope = scopeFromRunPayload(parsed);
   const seedTargetOutputs = planSavedRunSeeding({ prepared, scope });
+  // The board the run carries in, so a scoped run still holds every column.
+  const carriedOverCells = planSavedRunCarryOver({ prepared, scope });
   const { runId, total } = await startPollingRun({
     projectId: context.projectId,
     projectSlug: context.projectSlug,
@@ -232,6 +249,9 @@ async function startSavedStateRun({
     // The saved cells the run reuses rather than recomputes. A comparison
     // judging this column against another one reads the other one from here.
     ...(seedTargetOutputs ? { seedTargetOutputs } : {}),
+    // Every cell the run does not cover, copied from the saved board, so
+    // opening the run shows the board rather than one column.
+    ...(carriedOverCells.length > 0 ? { carriedOverCells } : {}),
     // The run evaluates the saved dataset, so its cells belong in the saved
     // state: without this the page the assistant is working for still reads
     // "No output yet" after the run finishes.

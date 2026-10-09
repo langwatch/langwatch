@@ -105,9 +105,16 @@ export class StaleWorkbenchStateError extends HandledError {
   constructor({
     currentVersion,
     actorLabel,
+    runId,
   }: {
     currentVersion: number;
     actorLabel?: string;
+    /**
+     * The run that wrote the newer version, when a run wrote it. A page that
+     * started that run adopts the version instead of standing down, so its own
+     * run's write does not cost the reader their unsaved edits.
+     */
+    runId?: string;
   }) {
     super(
       "experiment_stale_workbench_state",
@@ -118,6 +125,7 @@ export class StaleWorkbenchStateError extends HandledError {
         meta: {
           currentVersion,
           ...(actorLabel !== undefined ? { actorLabel } : {}),
+          ...(runId !== undefined ? { runId } : {}),
         },
       },
     );

@@ -25,7 +25,7 @@
  * - gen_ai.system_instructions (extracted from first system message)
  */
 
-import { ATTR_KEYS } from "./_constants";
+import { ATTR_KEYS, METADATA_SUBKEY_PREFIXES } from "./_constants";
 import { ALLOWED_SPAN_TYPES } from "./_extraction";
 import { isRecord } from "./_guards";
 import {
@@ -252,10 +252,6 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
     // subkeys and normalize to metadata.{bareKey}.
     // Uses setAttr (not setAttrIfAbsent) so subkeys override blob fields.
     // ─────────────────────────────────────────────────────────────────────────
-    const METADATA_SUBKEY_PREFIXES = [
-      "langwatch.metadata.",
-      "langwatch.trace.",
-    ] as const;
     for (const prefix of METADATA_SUBKEY_PREFIXES) {
       for (const { key, value } of attrs.takeByPrefix(prefix)) {
         const bareKey = key.slice(prefix.length);

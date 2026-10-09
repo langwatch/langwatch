@@ -54,6 +54,10 @@ class HeadsOf implements IdentityHeadsRepository {
     return "key_material";
   }
 
+  async hasFolded() {
+    return true;
+  }
+
   async findHeads() {
     return this.heads;
   }
@@ -186,6 +190,7 @@ describe("identity event aggregate type", () => {
         identityGuards: {} as never,
         mfaProjectionStore: {} as never,
         mfaGuards: {} as never,
+        linkProposalGuards: {} as never,
       }).metadata.aggregateType;
       const events = await handler.handle(command(data) as never);
 

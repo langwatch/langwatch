@@ -111,7 +111,7 @@ vi.mock("~/components/sidebar/ThemeToggle", () => ({
   ThemeToggle: () => null,
 }));
 
-import { MainMenu } from "../MainMenu";
+import { MainMenuSections } from "../MainMenu";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -131,7 +131,7 @@ const projectWith = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-describe("<MainMenu /> coding-agent destinations", () => {
+describe("<MainMenuSections showExpanded /> coding-agent destinations", () => {
   beforeEach(() => {
     state.project = projectWith();
     state.flagEnabled = true;
@@ -151,20 +151,20 @@ describe("<MainMenu /> coding-agent destinations", () => {
 
     /** @scenario "A project that records coding-agent sessions offers the Sessions destination" */
     it("shows the Sessions destination", () => {
-      render(<MainMenu />, { wrapper: Wrapper });
+      render(<MainMenuSections showExpanded />, { wrapper: Wrapper });
 
       expect(linkNamed("Sessions")).toHaveAttribute("href", "/demo/sessions");
     });
 
     /** @scenario "Each destination is grown by its own signal" */
     it("leaves the Pull requests destination out until a pull request is linked", () => {
-      render(<MainMenu />, { wrapper: Wrapper });
+      render(<MainMenuSections showExpanded />, { wrapper: Wrapper });
 
       expect(linkNamed("Pull requests")).toBeNull();
     });
 
     it("puts the destination after Online Evals in the Observe section", () => {
-      render(<MainMenu />, { wrapper: Wrapper });
+      render(<MainMenuSections showExpanded />, { wrapper: Wrapper });
 
       const labels = screen
         .getAllByRole("link")
@@ -182,7 +182,7 @@ describe("<MainMenu /> coding-agent destinations", () => {
 
     /** @scenario "A project that stopped recording coding-agent sessions loses the destination" */
     it("hides the Sessions destination", () => {
-      render(<MainMenu />, { wrapper: Wrapper });
+      render(<MainMenuSections showExpanded />, { wrapper: Wrapper });
 
       expect(linkNamed("Sessions")).toBeNull();
     });
@@ -197,7 +197,7 @@ describe("<MainMenu /> coding-agent destinations", () => {
 
     /** @scenario "A project whose work reaches pull requests offers the Pull requests destination" */
     it("shows the Pull requests destination", () => {
-      render(<MainMenu />, { wrapper: Wrapper });
+      render(<MainMenuSections showExpanded />, { wrapper: Wrapper });
 
       expect(linkNamed("Pull requests")).toHaveAttribute(
         "href",
@@ -207,7 +207,7 @@ describe("<MainMenu /> coding-agent destinations", () => {
 
     /** @scenario "Each destination is grown by its own signal" */
     it("leaves the Sessions destination out when only pull requests were recorded", () => {
-      render(<MainMenu />, { wrapper: Wrapper });
+      render(<MainMenuSections showExpanded />, { wrapper: Wrapper });
 
       expect(linkNamed("Sessions")).toBeNull();
     });
@@ -226,7 +226,7 @@ describe("<MainMenu /> coding-agent destinations", () => {
       it("marks Sessions as the open destination and leaves Pull requests unmarked", () => {
         state.path = "/demo/sessions";
 
-        render(<MainMenu />, { wrapper: Wrapper });
+        render(<MainMenuSections showExpanded />, { wrapper: Wrapper });
 
         expect(linkNamed("Sessions")).toHaveAttribute("aria-current", "page");
         expect(linkNamed("Pull requests")).not.toHaveAttribute("aria-current");
@@ -238,7 +238,7 @@ describe("<MainMenu /> coding-agent destinations", () => {
       it("marks Pull requests as the open destination and leaves Sessions unmarked", () => {
         state.path = "/demo/pull-requests";
 
-        render(<MainMenu />, { wrapper: Wrapper });
+        render(<MainMenuSections showExpanded />, { wrapper: Wrapper });
 
         expect(linkNamed("Pull requests")).toHaveAttribute(
           "aria-current",
@@ -252,7 +252,7 @@ describe("<MainMenu /> coding-agent destinations", () => {
   describe("given the project recorded nothing from a coding agent", () => {
     /** @scenario "A project with no coding-agent activity carries neither destination" */
     it("shows neither destination", () => {
-      render(<MainMenu />, { wrapper: Wrapper });
+      render(<MainMenuSections showExpanded />, { wrapper: Wrapper });
 
       expect(linkNamed("Sessions")).toBeNull();
       expect(linkNamed("Pull requests")).toBeNull();
@@ -270,7 +270,7 @@ describe("<MainMenu /> coding-agent destinations", () => {
 
     /** @scenario "Recent activity alone does not open the destinations" */
     it("shows neither destination", () => {
-      render(<MainMenu />, { wrapper: Wrapper });
+      render(<MainMenuSections showExpanded />, { wrapper: Wrapper });
 
       expect(linkNamed("Sessions")).toBeNull();
       expect(linkNamed("Pull requests")).toBeNull();
@@ -288,7 +288,7 @@ describe("<MainMenu /> coding-agent destinations", () => {
 
     /** @scenario "Recent activity alone does not open the destinations" */
     it("shows neither destination", () => {
-      render(<MainMenu />, { wrapper: Wrapper });
+      render(<MainMenuSections showExpanded />, { wrapper: Wrapper });
 
       expect(linkNamed("Sessions")).toBeNull();
       expect(linkNamed("Pull requests")).toBeNull();

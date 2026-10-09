@@ -55,6 +55,13 @@ const AutomationDrawer = lazyDefault({
   factory: () => import("~/features/automations/AutomationDrawer"),
   key: "AutomationDrawer",
 });
+const SlackConnectionDrawer = lazyDefault({
+  factory: () =>
+    import(
+      "~/features/automations/components/slack-connection/SlackConnectionDrawer"
+    ),
+  key: "SlackConnectionDrawer",
+});
 const ViewAutomationDrawer = lazyDefault({
   factory: () => import("~/features/automations/ViewAutomationDrawer"),
   key: "ViewAutomationDrawer",
@@ -79,6 +86,14 @@ const AgentWorkflowTargetEditorDrawer = lazyDefault({
   factory: () => import("./agents/AgentWorkflowTargetEditorDrawer"),
   key: "AgentWorkflowTargetEditorDrawer",
 });
+const ConnectedAgentDrawer = lazyDefault({
+  factory: () => import("./agents/connected/ConnectedAgentDrawer"),
+  key: "ConnectedAgentDrawer",
+});
+const ConnectFromCodeDrawer = lazyDefault({
+  factory: () => import("./agents/connected/ConnectFromCodeDrawer"),
+  key: "ConnectFromCodeDrawer",
+});
 const AgentCodeEditorDrawerFromUrl = lazyDefault({
   factory: () => import("./agents/drawerFromUrl"),
   key: "AgentCodeEditorDrawerFromUrl",
@@ -86,6 +101,10 @@ const AgentCodeEditorDrawerFromUrl = lazyDefault({
 const AgentHttpEditorDrawerFromUrl = lazyDefault({
   factory: () => import("./agents/drawerFromUrl"),
   key: "AgentHttpEditorDrawerFromUrl",
+});
+const AgentVoiceEditorDrawerFromUrl = lazyDefault({
+  factory: () => import("./agents/drawerFromUrl"),
+  key: "AgentVoiceEditorDrawerFromUrl",
 });
 const WorkflowSelectorDrawerFromUrl = lazyDefault({
   factory: () => import("./agents/drawerFromUrl"),
@@ -211,6 +230,10 @@ const InviteMemberDrawer = lazyDefault({
   factory: () => import("./settings/InviteMemberDrawer"),
   key: "InviteMemberDrawer",
 });
+const PersonDrawer = lazyDefault({
+  factory: () => import("./access/PersonDrawer"),
+  key: "PersonDrawer",
+});
 const DataPrivacyRuleDrawer = lazyDefault({
   factory: () => import("./settings/DataPrivacyRuleDrawer"),
   key: "DataPrivacyRuleDrawer",
@@ -219,6 +242,14 @@ const RoutingPolicyDrawer = lazyDefault({
   factory: () =>
     import("./settings/governance/routingPolicies/RoutingPolicyDrawer"),
   key: "RoutingPolicyDrawer",
+});
+const AddDepartmentDrawer = lazyDefault({
+  factory: () => import("./governance/people/AddDepartmentDrawer"),
+  key: "AddDepartmentDrawer",
+});
+const RegisterAgentDrawer = lazyDefault({
+  factory: () => import("./governance/agents/RegisterAgentDrawer"),
+  key: "RegisterAgentDrawer",
 });
 const DefaultModelOverrideDrawer = lazyDefault({
   factory: () => import("./settings/DefaultModelOverrideDrawer"),
@@ -240,9 +271,13 @@ const SuiteFormDrawer = lazyDefault({
   factory: () => import("./suites/SuiteFormDrawer"),
   key: "SuiteFormDrawer",
 });
-const AgentTestingPlanModal = lazyDefault({
-  factory: () => import("./agent-testing/plan/PlanModal"),
-  key: "PlanModal",
+const AgentTestingSuiteEditorDrawer = lazyDefault({
+  factory: () => import("./agent-testing/suite/SuiteEditorDrawer"),
+  key: "SuiteEditorDrawer",
+});
+const AgentTestingCaseEditorDrawer = lazyDefault({
+  factory: () => import("./agent-testing/cases/AgentTestingCaseEditorDrawer"),
+  key: "AgentTestingCaseEditorDrawer",
 });
 const TargetTypeSelectorDrawer = lazyDefault({
   factory: () => import("./targets/TargetTypeSelectorDrawer"),
@@ -277,6 +312,9 @@ export const drawers = {
   traceV2Details: TraceV2DrawerNoop,
   automation: AutomationDrawer,
   viewAutomation: ViewAutomationDrawer,
+  // One named Slack connection (ADR-093 §5a), from settings or from the
+  // automation's Slack step, which returns with it selected.
+  slackConnection: SlackConnectionDrawer,
   editModelProvider: EditModelProviderDrawer,
   defaultModelOverride: DefaultModelOverrideDrawer,
   addOrEditAnnotationScore: AddOrEditAnnotationScoreDrawer,
@@ -304,6 +342,9 @@ export const drawers = {
   agentTypeSelector: AgentTypeSelectorDrawer,
   agentCodeEditor: AgentCodeEditorDrawerFromUrl,
   agentHttpEditor: AgentHttpEditorDrawerFromUrl,
+  agentVoiceEditor: AgentVoiceEditorDrawerFromUrl,
+  agentConnectedDetail: ConnectedAgentDrawer,
+  agentConnectFromCode: ConnectFromCodeDrawer,
   agentWorkflowEditor: AgentWorkflowEditorDrawer,
   agentWorkflowTargetEditor: AgentWorkflowTargetEditorDrawer,
   workflowSelector: WorkflowSelectorDrawerFromUrl,
@@ -323,17 +364,28 @@ export const drawers = {
   scenarioVersionHistory: ScenarioVersionHistoryDrawer,
   // Suites
   suiteEditor: SuiteFormDrawer,
-  // Agent Testing v2 draws the same run plan in a dialog of its own.
-  agentTestingPlanEditor: AgentTestingPlanModal,
+  // Agent Testing v2 draws the same run plan in a right-side drawer.
+  // Agent Testing v2 case editor, opened from the cases table, the run rows
+  // and the run drawer.
+  agentTestingCaseEditor: AgentTestingCaseEditorDrawer,
+  // Agent Testing v2 suite editor: the name, the fields and the evaluators
+  // of a test suite.
+  agentTestingSuiteEditor: AgentTestingSuiteEditorDrawer,
   // Data privacy
   dataPrivacyRule: DataPrivacyRuleDrawer,
   // AI governance
   routingPolicy: RoutingPolicyDrawer,
+  addDepartment: AddDepartmentDrawer,
+  // Instructions rather than a form: an agent registers itself from the
+  // process that runs it (ADR-128), so this drawer shows the snippet that
+  // does it and collects nothing.
+  addAgent: RegisterAgentDrawer,
   // Project management
   createProject: CreateProjectDrawer,
   editProject: EditProjectDrawer,
   createTeam: CreateTeamDrawer,
   inviteMember: InviteMemberDrawer,
+  person: PersonDrawer,
   // Online Evaluations (Monitors)
   onlineEvaluation: OnlineEvaluationDrawer,
   guardrails: GuardrailsDrawer,

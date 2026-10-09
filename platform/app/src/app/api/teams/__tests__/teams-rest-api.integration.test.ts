@@ -1,4 +1,3 @@
-import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
@@ -9,9 +8,9 @@ import {
 } from "~/generated/prisma/client";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { prisma } from "~/server/db";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
-import { KSUID_RESOURCES } from "~/utils/constants";
 import { app } from "../[[...route]]/app";
 
 wireDefaultTestApp();
@@ -55,15 +54,12 @@ async function createPersonalWorkspaceFixture({
     },
   });
 
-  await prisma.roleBinding.create({
-    data: {
-      id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-      organizationId,
-      userId: ownerUserId,
-      role: TeamUserRole.ADMIN,
-      scopeType: RoleBindingScopeType.TEAM,
-      scopeId: personalTeam.id,
-    },
+  await seedRoleBinding(prisma, {
+    organizationId,
+    userId: ownerUserId,
+    role: TeamUserRole.ADMIN,
+    scopeType: RoleBindingScopeType.TEAM,
+    scopeId: personalTeam.id,
   });
 
   return { personalTeamId: personalTeam.id, colleagueUserId: colleague.id };
@@ -151,15 +147,12 @@ describe("Feature: Teams REST API", () => {
       },
     });
 
-    await prisma.roleBinding.create({
-      data: {
-        id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-        organizationId: testOrganization.id,
-        userId,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: testOrganization.id,
-      },
+    await seedRoleBinding(prisma, {
+      organizationId: testOrganization.id,
+      userId,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: testOrganization.id,
     });
 
     const apiKeyService = ApiKeyService.create(prisma);
@@ -189,6 +182,13 @@ describe("Feature: Teams REST API", () => {
       })
       .catch(() => {});
     await prisma.roleBinding
+      .deleteMany({
+        where: {
+          organizationId: { in: [testOrganization.id, otherOrganization.id] },
+        },
+      })
+      .catch(() => {});
+    await prisma.grant
       .deleteMany({
         where: {
           organizationId: { in: [testOrganization.id, otherOrganization.id] },
@@ -342,6 +342,34 @@ describe("Feature: Teams REST API", () => {
 
       const res = await api.get(`/api/teams/${otherTeam.id}`);
       expect(res.status).toBe(404);
+    });
+  });
+
+  describe("GET /api/teams/:id/members", () => {
+    it("lists members from canonical team grants", async () => {
+      const createRes = await api.post("/api/teams", {
+        name: `Members Test ${nanoid(6)}`,
+      });
+      const team = await createRes.json();
+
+      const addRes = await api.post(`/api/teams/${team.id}/members`, {
+        userId,
+        role: TeamUserRole.ADMIN,
+      });
+      expect(addRes.status).toBe(201);
+
+      const res = await api.get(`/api/teams/${team.id}/members`);
+      expect(res.status).toBe(200);
+      expect(await res.json()).toMatchObject({
+        data: [
+          {
+            userId,
+            name: "Teams Test User",
+            email: `test-${ns}@example.com`,
+            role: TeamUserRole.ADMIN,
+          },
+        ],
+      });
     });
   });
 

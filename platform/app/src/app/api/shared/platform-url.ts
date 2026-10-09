@@ -20,3 +20,16 @@ export function platformUrl({
   const cleanPath = path.startsWith("/") ? path : `/${path}`;
   return `${base}/${projectSlug}${cleanPath}`;
 }
+
+/**
+ * Builds a full platform URL for a page of the organization, which sits at
+ * the top level beside the project pages rather than under a project slug:
+ * the governance and gateway pages.
+ *
+ * Example: "https://app.langwatch.ai/governance/inventory?tab=sources"
+ */
+export function organizationPlatformUrl({ path }: { path: string }): string {
+  const base = (env.BASE_HOST ?? "").replace(/\/+$/, "");
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+  return `${base}${cleanPath}`;
+}

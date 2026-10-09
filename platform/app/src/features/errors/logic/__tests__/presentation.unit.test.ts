@@ -10,6 +10,7 @@ import { APP_ERROR_CODES } from "../codes";
 import {
   explainHandledError,
   explainSerializedError,
+  PROVIDER_CONFIG_PROBLEMS,
   UNKNOWN_ERROR_PRESENTATION,
 } from "../presentation";
 import type { HandledErrorShape } from "../readHandledError";
@@ -94,16 +95,16 @@ describe("explainHandledError", () => {
       const { description } = explainHandledError(
         shape({
           code: "lwql_reserved_parameter_supplied",
-          meta: { parameters: ["period_granularity_seconds"] },
+          meta: { parameters: ["dashboard_context_granularity_seconds"] },
         }),
       );
 
-      expect(description).toContain("period_granularity_seconds");
+      expect(description).toContain("dashboard_context_granularity_seconds");
       // The bug this pins: the copy named the window pair unconditionally, so
       // a caller that sent only the step was told to remove two parameters it
       // had never sent.
-      expect(description).not.toContain("period_start");
-      expect(description).not.toContain("period_end");
+      expect(description).not.toContain("dashboard_context_period_start");
+      expect(description).not.toContain("dashboard_context_period_end");
     });
 
     /** @scenario "The refusal names the reserved parameter the caller actually supplied" */
@@ -111,11 +112,18 @@ describe("explainHandledError", () => {
       const { description } = explainHandledError(
         shape({
           code: "lwql_reserved_parameter_supplied",
-          meta: { parameters: ["period_start", "period_end"] },
+          meta: {
+            parameters: [
+              "dashboard_context_period_start",
+              "dashboard_context_period_end",
+            ],
+          },
         }),
       );
 
-      expect(description).toContain("period_start and period_end");
+      expect(description).toContain(
+        "dashboard_context_period_start and dashboard_context_period_end",
+      );
       expect(description).toContain("come from");
       expect(description).toContain("Remove them");
     });
@@ -200,6 +208,33 @@ describe("explainHandledError", () => {
       );
 
       expect(description).toContain("full member seats");
+    });
+
+    /** @scenario The refusal copy names the cap and keeps existing items */
+    it("names the cloud Free creation cap and keeps what was already created", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "resource_limit_exceeded",
+          httpStatus: 403,
+          meta: { limitType: "evaluators", current: 3, max: 3 },
+        }),
+      );
+
+      expect(description).toBe(
+        "Your plan includes 3 custom evaluators. Upgrade to create more. Everything you already have keeps working.",
+      );
+    });
+
+    it("names simulations for a scenario set refusal", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "resource_limit_exceeded",
+          httpStatus: 403,
+          meta: { limitType: "scenarioSets", current: 3, max: 3 },
+        }),
+      );
+
+      expect(description).toContain("3 simulations");
     });
 
     it("keeps the generic plan-limit line for every other allowance", () => {
@@ -304,6 +339,40 @@ describe("explainHandledError", () => {
     });
   });
 
+  describe("given a permission card that was already answered", () => {
+    /** @scenario "A card that was already answered says which answer closed it" */
+    it("names the answer that closed it, and never says Langy gave up", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "langy_wait_expired",
+          httpStatus: 410,
+          meta: {
+            waitId: "lwait_1",
+            outcome: "answered",
+            decision: "allow_pattern",
+          },
+        }),
+      );
+
+      expect(description).toContain("allowed this pattern for the session");
+      expect(description).not.toContain("stopped waiting");
+    });
+
+    describe("when nobody answered in time", () => {
+      it("still says Langy stopped waiting", () => {
+        const { description } = explainHandledError(
+          shape({
+            code: "langy_wait_expired",
+            httpStatus: 410,
+            meta: { waitId: "lwait_1", outcome: "expired" },
+          }),
+        );
+
+        expect(description).toContain("stopped waiting");
+      });
+    });
+  });
+
   describe("given a code the registry has never seen", () => {
     /**
      * The fallback used to be `FAULT_TITLES[fault]`, which is a guess dressed
@@ -390,6 +459,49 @@ describe("explainHandledError", () => {
       expect(description).toContain("key or its permissions");
     });
 
+    /** @scenario "A provider's own access code reads as a refused credential" */
+    it.each([
+      "access_denied",
+      "permission_denied_error",
+      "authentication_error",
+      "permission_error",
+      "invalid_api_key",
+      "AccessDeniedException",
+      "InvalidSignatureException",
+      "UnrecognizedClientException",
+      "ExpiredTokenException",
+      "InvalidClientTokenId",
+      "SignatureDoesNotMatch",
+      "UNAUTHENTICATED",
+      "PERMISSION_DENIED",
+    ])("explains the provider's own %s code as a refused credential", (code) => {
+      const { title, description } = explainHandledError(
+        shape({ code: "llm_upstream_error", reasons: [reason(code)] }),
+      );
+
+      expect(title).toBe("This provider rejected the API key");
+
+      expect(description).toBe(
+        "The model provider refused this key or its permissions for this model. Check the credential configured for it and that it has access to the model, or pick a different model.",
+      );
+    });
+
+    /** @scenario "A provider that does not know the model gets its own remediation copy" */
+    it.each([
+      "upstream_not_found",
+      "model_not_found",
+      "not_found_error",
+      "ResourceNotFoundException",
+    ])("explains a %s reason as a model the provider does not serve", (code) => {
+      const { description } = explainHandledError(
+        shape({ code: "llm_upstream_error", reasons: [reason(code)] }),
+      );
+
+      expect(description).toBe(
+        "The model provider does not serve this model to this key. Check the model name, or pick a different model.",
+      );
+    });
+
     /** @scenario "A provider rate limit gets its own remediation copy" */
     it("explains an upstream_rate_limited reason as a wait-and-retry", () => {
       const { description } = explainHandledError(
@@ -400,6 +512,20 @@ describe("explainHandledError", () => {
       );
 
       expect(description).toContain("rate-limiting");
+    });
+
+    /** @scenario "A provider rate limit gets its own remediation copy" */
+    it.each([
+      "rate_limit_exceeded",
+      "rate_limit_error",
+      "RESOURCE_EXHAUSTED",
+    ])("explains the provider's own %s code as the same wait-and-retry", (code) => {
+      const { description } = explainHandledError(
+        shape({ code: "llm_upstream_error", reasons: [reason(code)] }),
+      );
+
+      expect(description).toContain("rate-limiting");
+      expect(description).toContain("pick a model with more room");
     });
 
     /** @scenario "A provider outage gets its own remediation copy" */
@@ -651,6 +777,12 @@ describe("explainHandledError", () => {
        * the list is once again only our own words.
        */
       const ALLOWED_PER_CODE: Record<string, Set<string>> = {
+        // `reason` is the sentence parameter-spec.ts wrote for this exact
+        // declaration ("it is a turn field the platform sends on every
+        // call"), authored here and never relayed from the SDK. The shape
+        // check picks its sentence from the rule that failed rather than
+        // repeating the schema's own message, which names the parameter.
+        agent_parameter_invalid: new Set(["reason"]),
         // The provider's own reason for rejecting delivery is the entire
         // value of this error — "invite the bot with /invite @LangWatch".
         // Authored server-side by `explainSlackPostError`, never relayed.
@@ -660,6 +792,16 @@ describe("explainHandledError", () => {
         // recipients to test-fire to."), and it names WHICH piece is missing.
         // Authored in `trigger-template.service.ts`, never relayed.
         test_fire_unavailable: new Set(["reason"]),
+        // Same shape: `reason` is the sentence naming WHICH piece of the alert
+        // is missing ("State the severity this alert fires at."), which the
+        // generic line cannot do. Authored in the automations app layer, never
+        // relayed.
+        graph_alert_incomplete: new Set(["reason"]),
+        // `reason` is the sentence the agent test prefetch or the type check
+        // wrote for this exact agent ("Only HTTP, code, workflow and connected
+        // agents can be tested"). Authored in `agent-test-run.ts` and
+        // `agent-test-prefetch.ts`, never relayed from an SDK or a customer.
+        agent_test_refused: new Set(["reason"]),
       };
 
       /**
@@ -727,6 +869,183 @@ describe("explainHandledError", () => {
         expect(title[0], `${code} title`).toBe(title[0]?.toUpperCase());
         expect(title.endsWith("."), `${code} title`).toBe(false);
       }
+    });
+  });
+});
+
+describe("provider_config_invalid", () => {
+  const explain = (meta: Record<string, unknown>) =>
+    explainHandledError(shape({ code: "provider_config_invalid", meta }))
+      .description;
+  const headline = (meta: Record<string, unknown>) =>
+    explainHandledError(shape({ code: "provider_config_invalid", meta })).title;
+
+  /** @scenario "Each provider setup gap gets its own instruction" */
+  it("gives each gap a headline that names the same gap as its body", () => {
+    expect(headline({ problem: "api_key_missing" })).toBe(
+      "This provider has no API key saved",
+    );
+    expect(headline({ problem: "endpoint_missing" })).toBe(
+      "This provider has no endpoint URL saved",
+    );
+    expect(headline({ problem: "deployment_missing" })).toBe(
+      "This provider has no deployment for that model",
+    );
+    expect(headline({ problem: "operation_unsupported" })).toBe(
+      "This provider does not support this kind of request",
+    );
+  });
+
+  it("keeps the model headline when no gap is named or the model is not served", () => {
+    expect(headline({})).toBe(
+      "This provider is not set up to serve that model",
+    );
+    expect(headline({ problem: "model_not_served" })).toBe(
+      "This provider is not set up to serve that model",
+    );
+    expect(headline({ problem: "sk-not-a-problem" })).toBe(
+      "This provider is not set up to serve that model",
+    );
+  });
+
+  /** @scenario "Each provider setup gap gets its own instruction" */
+  it("tells a provider with no API key to add the key", () => {
+    expect(
+      explain({ problem: "api_key_missing", model: "gpt-5.6-terra" }),
+    ).toBe(
+      "This model provider is enabled with no API key saved, so the request never reached it. Add the API key in Settings → Model Providers.",
+    );
+  });
+
+  /** @scenario "Each provider setup gap gets its own instruction" */
+  it("tells a provider with no endpoint to add the endpoint", () => {
+    expect(explain({ problem: "endpoint_missing" })).toBe(
+      "This model provider has no endpoint URL saved, so there was nowhere to send the request. Add the endpoint in Settings → Model Providers.",
+    );
+  });
+
+  /** @scenario "Each provider setup gap gets its own instruction" */
+  it("names the model that has no deployment", () => {
+    expect(
+      explain({ problem: "deployment_missing", model: "gpt-5.6-terra" }),
+    ).toBe(
+      "This model provider has no deployment mapped for gpt-5.6-terra. Add the deployment mapping in Settings → Model Providers.",
+    );
+  });
+
+  /** @scenario "Each provider setup gap gets its own instruction" */
+  it("says when the provider has no API for the request", () => {
+    expect(explain({ problem: "operation_unsupported" })).toBe(
+      "This model provider does not support this kind of request. Pick a model from a provider that does.",
+    );
+  });
+
+  /** @scenario "Each provider setup gap gets its own instruction" */
+  it("keeps the model sentence for the remainder and for an unknown problem", () => {
+    const remainder =
+      "No provider on this project is configured for gpt-5.6-terra. Add it to one in Settings → Model Providers.";
+
+    expect(
+      explain({ problem: "model_not_served", model: "gpt-5.6-terra" }),
+    ).toBe(remainder);
+    expect(explain({ problem: "something_new", model: "gpt-5.6-terra" })).toBe(
+      remainder,
+    );
+    expect(explain({ model: "gpt-5.6-terra" })).toBe(remainder);
+  });
+
+  it("lists every problem the gateway can name", () => {
+    expect([...PROVIDER_CONFIG_PROBLEMS].sort()).toEqual([
+      "api_key_missing",
+      "deployment_missing",
+      "endpoint_missing",
+      "model_not_served",
+      "operation_unsupported",
+    ]);
+  });
+});
+
+describe("agent_payload_too_large", () => {
+  describe("when the session is what broke the cap", () => {
+    /** @scenario "A session above the cap is refused with a typed error" */
+    it("tells the reader to return a small session value", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "agent_payload_too_large",
+          httpStatus: 413,
+          meta: { what: "session", sizeBytes: 70002, limitBytes: 65536 },
+        }),
+      );
+
+      expect(description).toContain("session");
+      expect(description).toContain("conversation id");
+      expect(description).not.toContain("attachments");
+    });
+  });
+
+  describe("when the result is what broke the cap", () => {
+    it("names the result and keeps the trimming advice", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "agent_payload_too_large",
+          httpStatus: 413,
+          meta: { what: "result" },
+        }),
+      );
+
+      expect(description).toContain("The result is above the size limit");
+    });
+  });
+});
+
+describe("instant_eval_opt_in_not_offered", () => {
+  describe("when a self-hosted install is refused the switch", () => {
+    it("says the license, or the operator of an install with its own judge key, is what adds Instant Evals", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "instant_eval_opt_in_not_offered",
+          httpStatus: 403,
+          meta: { deployment: "self_hosted" },
+        }),
+      );
+
+      expect(description).toBe(
+        "A self-hosted install gets Instant Evals from its license, or from whoever runs it when it has its own judge key, never from this switch. Contact us to add them to your license.",
+      );
+    });
+  });
+
+  describe("when an enterprise organization is refused the switch", () => {
+    it("says LangWatch switches them on for the plan", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "instant_eval_opt_in_not_offered",
+          httpStatus: 403,
+          meta: { deployment: "enterprise" },
+        }),
+      );
+
+      expect(description).toBe(
+        "LangWatch switches Instant Evals on for an enterprise plan. Contact us to get them.",
+      );
+    });
+  });
+});
+
+describe("agent_test_refused", () => {
+  describe("when the reason is longer than a sentence", () => {
+    /** @scenario "Technical detail stops at the trace id" */
+    it("clamps it, the way every server-supplied sentence here is clamped", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "agent_test_refused",
+          httpStatus: 400,
+          meta: { reason: "a".repeat(400) },
+        }),
+      );
+
+      expect(description).toContain("\u2026");
+      expect(description.length).toBeLessThan(300);
     });
   });
 });

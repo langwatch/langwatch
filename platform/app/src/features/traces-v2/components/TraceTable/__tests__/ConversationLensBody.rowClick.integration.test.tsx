@@ -14,7 +14,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
 import { useDrawerStore } from "../../../stores/drawerStore";
-import type { LensConfig } from "../../../stores/viewStore";
+import { useExplorerStore } from "../../../stores/explorerStore";
+import type { LensConfig } from "../../../stores/viewSlice";
 import {
   mapSessionGroupToConversationGroup,
   type SessionGroupPayloadItem,
@@ -27,6 +28,13 @@ const { openDrawerMock } = vi.hoisted(() => ({ openDrawerMock: vi.fn() }));
 
 vi.mock("~/hooks/useDrawer", () => ({
   useDrawer: () => ({ openDrawer: openDrawerMock }),
+}));
+
+/** The project the page is on: a plain project, or an aggregate. */
+const page = vi.hoisted(() => ({ projectId: "project-plain" }));
+
+vi.mock("~/hooks/useOrganizationTeamProject", () => ({
+  useOrganizationTeamProject: () => ({ project: { id: page.projectId } }),
 }));
 
 // The expanded row's turns come from their own conversation-scoped query;
@@ -42,6 +50,7 @@ function conversationRow(
 ): ConversationGroup {
   return mapSessionGroupToConversationGroup({
     conversationId: "conv-1",
+    projectId: "project-plain",
     traceCount: 4,
     totalCost: 1.5,
     totalTokens: 90_000,
@@ -96,7 +105,10 @@ const expandToggle = () =>
 
 beforeEach(() => {
   openDrawerMock.mockClear();
+  page.projectId = "project-plain";
   useDrawerStore.getState().closeDrawer();
+  // The open rows are page state in the store, so each case starts closed.
+  useExplorerStore.getState().setExpandedRows([]);
   // The virtualizer windows rows to the scroll element's height, and jsdom
   // measures every element as zero, which windows the table down to no rows
   // at all and leaves every assertion below passing vacuously. Publishing a
@@ -134,6 +146,23 @@ describe("given the conversations lens is showing grouped rows", () => {
     });
   });
 
+  describe("when the reader clicks a session row on an aggregate project", () => {
+    it("opens the drawer on the member the session belongs to, and names it in the link", async () => {
+      page.projectId = "project-aggregate";
+      const user = userEvent.setup();
+      renderBody([conversationRow({ projectId: "project-member" })]);
+
+      await user.click(firstRow());
+
+      expect(openDrawerMock).toHaveBeenCalledWith("traceV2Details", {
+        traceId: "trace-latest",
+        t: String(LAST_ACTIVITY_MS),
+        tenantId: "project-member",
+      });
+      expect(useDrawerStore.getState().tenantId).toBe("project-member");
+    });
+  });
+
   describe("when the reader clicks the row's expand chevron", () => {
     /** @scenario The chevron alone expands a conversation inline */
     it("expands the conversation and leaves the drawer closed", async () => {
@@ -159,6 +188,23 @@ describe("given the conversations lens is showing grouped rows", () => {
 
       expect(openDrawerMock).not.toHaveBeenCalled();
       expect(expandToggle()).toHaveAccessibleName("Collapse turns");
+    });
+  });
+
+  describe("when the table unmounts with a conversation open", () => {
+    /** @scenario "Open rows leave the component and survive a remount" */
+    it("shows the same conversation open when it mounts again", async () => {
+      const user = userEvent.setup();
+      const first = renderBody([conversationRow()]);
+      await user.click(expandToggle());
+      first.unmount();
+
+      renderBody([conversationRow()]);
+
+      expect(expandToggle()).toHaveAccessibleName("Collapse turns");
+      expect(Array.from(useExplorerStore.getState().expandedRows)).toEqual([
+        "conv-1",
+      ]);
     });
   });
 });

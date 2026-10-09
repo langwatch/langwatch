@@ -1,6 +1,6 @@
 /**
  * `langwatch scenario version list|get`: reading the saved versions of a test
- * case from the command line.
+ * scenario from the command line.
  *
  * The command line also WRITES history; that half is in
  * cli-scenarios-service.unit.test.ts.

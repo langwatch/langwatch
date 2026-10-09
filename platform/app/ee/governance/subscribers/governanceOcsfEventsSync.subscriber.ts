@@ -15,6 +15,7 @@ import {
   GOVERNANCE_ATTR,
   isGovernanceOriginTrace,
 } from "../services/governanceAttributeKeys";
+import { ocsfActorFields } from "../services/pullers/ocsfPullEventMapping";
 
 const logger = createLogger(
   "langwatch:trace-processing:governance-ocsf-events-sync",
@@ -74,8 +75,25 @@ function buildOcsfEventRow({
 }): GovernanceOcsfEventInput {
   const sourceType =
     foldState.attributes[ATTR_INGESTION_SOURCE_TYPE] ?? "unknown";
-  const actorUserId = foldState.attributes[ATTR_USER_ID] ?? "";
-  const actorEmail = foldState.attributes[ATTR_USER_EMAIL] ?? "";
+  // The email attribute is placed by what it IS, not by what it is named.
+  // Nothing upstream constrains `user.email` to an address — an SDK writes
+  // whatever it has for a person — and the SIEM export ships `ActorEmail` to a
+  // customer's own tooling, which reads it as an address. So a value that
+  // fails the address test goes to the user id column instead, the field OCSF
+  // reserves for the provider's own identifier, and only when the user id
+  // attribute is not already there to claim it. Anything else would be a
+  // second identifier overwriting the one the trace actually named.
+  //
+  // The address test is `ocsfActorFields`, the same placement the pulled
+  // sources use, so the two paths cannot drift into disagreeing about which
+  // column a string belongs in. A trace carrying both a user id and a real
+  // address keeps both, exactly as before.
+  const placedEmail = ocsfActorFields(
+    foldState.attributes[ATTR_USER_EMAIL] ?? "",
+  );
+  const actorUserId =
+    (foldState.attributes[ATTR_USER_ID] ?? "") || placedEmail.actorUserId;
+  const actorEmail = placedEmail.actorEmail;
   const actorEnduserId = foldState.attributes[ATTR_ENDUSER_ID] ?? "";
   const actionName = foldState.attributes[ATTR_TOOL_NAME] ?? "trace.recorded";
   const targetName =

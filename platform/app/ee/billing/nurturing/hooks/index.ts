@@ -8,6 +8,13 @@ export {
   fireTeamMemberInvitedNurturing,
   fireWorkflowCreatedNurturing,
 } from "./featureAdoption";
+export {
+  fireGuidedOnboardingPathsNurturing,
+  fireGuidedOnboardingProgressNurturing,
+  GUIDED_PATH_CAMPAIGN_EVENT,
+  guidedOnboardingOrgTraits,
+  guidedOnboardingPersonTraits,
+} from "./guidedOnboarding";
 export { fireInviteAcceptedNurturingCalls } from "./inviteAcceptance";
 export type { IntegrationMethodValue } from "./productInterest";
 export {

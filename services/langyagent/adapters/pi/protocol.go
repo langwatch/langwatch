@@ -1,8 +1,8 @@
 // Package pi drives a langy-worker subprocess, the TypeScript wrapper
 // embedding the pi coding agent, over the stdio JSONL protocol documented in
-// services/langyworker/PROTOCOL.md. It is the sibling of adapters/opencode:
-// the pool provisions + spawns through it, and the app drives each turn
-// through the app.CodingAgent port it implements.
+// services/langyworker/PROTOCOL.md. The pool provisions and spawns through it,
+// and the app drives each turn through the app.CodingAgent port it
+// implements.
 package pi
 
 import "encoding/json"
@@ -49,6 +49,10 @@ type wireEvent struct {
 	Input   json.RawMessage `json:"input"`
 	Output  string          `json:"output"`
 	IsError bool            `json:"isError"`
+	// tool_end: the call ran in the developer's shared folder through the
+	// local control path (a local_* tool, or bash while a folder is
+	// connected). Absent, so false, when it ran in the sandbox.
+	Local bool `json:"local"`
 	// plan
 	Items []planItem `json:"items"`
 	// turn_done
@@ -56,21 +60,42 @@ type wireEvent struct {
 	ErrorMessage string `json:"errorMessage"`
 	// handoff
 	Seed string `json:"seed"`
+	// guided_turn: the wrapper's guided turn end guard reporting what it did
+	// (continued the turn, or gave up on a second bare end), which segment of
+	// the turn it read (1, plus one per card answered inside the turn) and
+	// what the turn owed, in the guard's own words.
+	Event   string   `json:"event"`
+	Segment int      `json:"segment"`
+	Missing []string `json:"missing"`
+	// retrying: a model call failed for a transient reason and is made again
+	// after DelayMs; Attempt counts retries from 1 up to MaxAttempts.
+	Attempt     int   `json:"attempt"`
+	MaxAttempts int   `json:"maxAttempts"`
+	DelayMs     int64 `json:"delayMs"`
 }
 
 // Event type discriminants (wrapper -> manager).
 const (
-	eventReady       = "ready"
-	eventPong        = "pong"
-	eventTurnStarted = "turn_started"
-	eventDelta       = "delta"
-	eventReasoning   = "reasoning"
-	eventToolStart   = "tool_start"
-	eventToolUpdate  = "tool_update"
-	eventToolEnd     = "tool_end"
-	eventPlan        = "plan"
-	eventTurnDone    = "turn_done"
-	eventHandoff     = "handoff"
+	eventReady        = "ready"
+	eventPong         = "pong"
+	eventTurnStarted  = "turn_started"
+	eventDelta        = "delta"
+	eventReasoning    = "reasoning"
+	eventToolStart    = "tool_start"
+	eventToolUpdate   = "tool_update"
+	eventToolEnd      = "tool_end"
+	eventPlan         = "plan"
+	eventGuidedTurn   = "guided_turn"
+	eventRetrying     = "retrying"
+	eventRetrySettled = "retry_settled"
+	eventTurnDone     = "turn_done"
+	eventHandoff      = "handoff"
+)
+
+// guided_turn event kinds, logged under these names so a log grep finds them.
+const (
+	guidedTurnContinued = "guided_turn_continued"
+	guidedTurnBareEnd   = "guided_turn_bare_end"
 )
 
 // turn_done outcomes.

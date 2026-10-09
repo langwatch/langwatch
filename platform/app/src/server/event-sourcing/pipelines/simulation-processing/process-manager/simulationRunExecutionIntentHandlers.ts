@@ -1,12 +1,15 @@
 import { createLogger } from "@langwatch/observability";
-
+import type { EvaluatorWithFields } from "~/server/evaluators/evaluator.service";
 import type { IntentExecutor } from "~/server/event-sourcing/pipeline/processManagerDefinition";
+import { toScenarioEvaluationResult } from "~/server/scenarios/evaluations/runScenarioEvaluations";
 import type { ExecutionJobData } from "~/server/scenarios/execution/execution-pool";
+import type { ScenarioEvaluationResult } from "~/server/scenarios/schemas/event-schemas";
 
 import type {
   CancelExecutionIntent,
   ExecuteRunIntent,
   FinishRunIntent,
+  RecordEvaluationsIntent,
 } from "./simulationRunExecutionProcess.types";
 
 const logger = createLogger(
@@ -22,7 +25,10 @@ export interface SimulationRunExecutionPoolPort {
   submit(job: ExecutionJobData): void;
 }
 
-/** The pipeline commands the finish intent reports its outcome through. */
+/**
+ * The pipeline commands the finish and record evaluations intents report
+ * their outcome through.
+ */
 export interface SimulationRunExecutionCommands {
   finishRun(data: {
     tenantId: string;
@@ -31,9 +37,23 @@ export interface SimulationRunExecutionCommands {
     error?: string;
     occurredAt: number;
   }): Promise<void>;
+  recordEvaluations(data: {
+    tenantId: string;
+    scenarioRunId: string;
+    evaluations: ScenarioEvaluationResult[];
+    occurredAt: number;
+  }): Promise<void>;
 }
 
 export interface SimulationRunExecutionDispatchDeps {
+  /**
+   * The saved evaluators behind a run's attachments, by id, so a lost-job
+   * result carries the evaluator's name the way a graded one does.
+   */
+  getAttachedEvaluators: (params: {
+    projectId: string;
+    attachments: readonly { evaluatorId: string }[];
+  }) => Promise<Map<string, Pick<EvaluatorWithFields, "name">>>;
   /**
    * This pod's execution pool, or null when the pod is not a worker (e.g. a
    * web-only replica). Deferred because the pool is wired after the pipeline
@@ -131,5 +151,51 @@ export function createFinishRunHandler(
       ...(payload.error !== undefined ? { error: payload.error } : {}),
       occurredAt: Date.now(),
     });
+  };
+}
+
+/**
+ * The `record_evaluations` intent executor: record one errored result per
+ * evaluator the run still owes, through the pipeline's own record evaluations
+ * command, so the fold applies the same gate a graded run gets. The results
+ * carry the evaluator's name when it still exists and its id otherwise, the
+ * way the evaluation job records an evaluator it cannot find.
+ */
+export function createRecordEvaluationsHandler(
+  deps: SimulationRunExecutionDispatchDeps,
+): IntentExecutor<RecordEvaluationsIntent> {
+  return async (payload) => {
+    const evaluatorsById = await deps.getAttachedEvaluators({
+      projectId: payload.projectId,
+      attachments: payload.evaluators,
+    });
+    const evaluations = payload.evaluators.map((attachment) =>
+      toScenarioEvaluationResult({
+        attachment,
+        name:
+          evaluatorsById.get(attachment.evaluatorId)?.name ??
+          attachment.evaluatorId,
+        result: {
+          status: "error",
+          error_type: "INTERNAL_ERROR",
+          details: payload.details,
+          traceback: [],
+        },
+        inputs: {},
+      }),
+    );
+    await deps.commands().recordEvaluations({
+      tenantId: payload.projectId,
+      scenarioRunId: payload.scenarioRunId,
+      evaluations,
+      occurredAt: Date.now(),
+    });
+    logger.warn(
+      {
+        scenarioRunId: payload.scenarioRunId,
+        evaluatorCount: evaluations.length,
+      },
+      "Scenario run evaluations recorded as errored, the grading job was lost",
+    );
   };
 }

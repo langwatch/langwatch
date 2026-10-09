@@ -1,4 +1,4 @@
-import scenario from "@langwatch/scenario";
+import scenario, { assertSkillWasRead } from "@langwatch/scenario";
 import fs from "fs";
 import { describe, it, expect } from "vitest";
 import dotenv from "dotenv";
@@ -9,8 +9,6 @@ import { openai } from "@ai-sdk/openai";
 import {
   copyFixtureToWorkDir,
   createClaudeCodeAgent,
-  toolCallFix,
-  assertSkillWasRead,
   installSkillToWorkDir,
   SKILL_TESTS_SET_ID,
 } from "./helpers/claude-code-adapter";
@@ -64,7 +62,6 @@ describe("Tracing Skill", () => {
           ),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
             assertSkillWasRead(state, "tracing");
             const resultFile = fs.readFileSync(
               `${tempFolder}/main.py`,
@@ -117,7 +114,6 @@ describe("Tracing Skill", () => {
           ),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
             assertSkillWasRead(state, "tracing");
             const resultFile = fs.readFileSync(
               `${tempFolder}/index.ts`,
@@ -169,7 +165,6 @@ describe("Tracing Skill", () => {
           ),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
             assertSkillWasRead(state, "tracing");
             const resultFile = fs.readFileSync(
               `${tempFolder}/main.py`,
@@ -221,7 +216,6 @@ describe("Tracing Skill", () => {
           ),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
             assertSkillWasRead(state, "tracing");
             const resultFile = fs.readFileSync(
               `${tempFolder}/index.ts`,
@@ -273,7 +267,6 @@ describe("Tracing Skill", () => {
           ),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
             assertSkillWasRead(state, "tracing");
             const resultFile = fs.readFileSync(
               `${tempFolder}/main.py`,
@@ -334,7 +327,6 @@ describe("Tracing Skill", () => {
           ),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
             assertSkillWasRead(state, "tracing");
             const mainPy = fs.readFileSync(
               `${tempFolder}/main.py`,
@@ -392,7 +384,6 @@ describe("Tracing Skill", () => {
           ),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
             assertSkillWasRead(state, "tracing");
             const mainPy = fs.readFileSync(`${tempFolder}/main.py`, "utf8");
             expect(mainPy).toContain("langwatch");
@@ -450,7 +441,6 @@ describe("Tracing Skill", () => {
           ),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
             assertSkillWasRead(state, "tracing");
             const mainPy = fs.readFileSync(`${tempFolder}/main.py`, "utf8");
             expect(mainPy).toContain("langwatch");

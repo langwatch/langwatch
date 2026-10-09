@@ -2,6 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import type {
   EventHandler,
+  IntentContext,
   IntentSpec,
   WakeHandler,
 } from "~/server/event-sourcing/pipeline/processManagerDefinition";
@@ -35,6 +36,10 @@ export const JOIN_REQUEST_REMINDER_MS = 7 * 24 * 60 * 60 * 1000;
 export const remindAdminsIntentSchema = z.object({
   joinRequestId: z.string().min(1),
   organizationId: z.string().min(1),
+  // Old queued reminders predate the identity fields; their executor fills
+  // them from the authoritative JoinRequest projection.
+  requesterUserId: z.string().min(1).optional(),
+  domain: z.string().min(1).optional(),
   scheduledFor: z.number().int(),
 });
 
@@ -44,6 +49,72 @@ export const expireRequestIntentSchema = z.object({
   /** The slot the wake was scheduled for — business time for the command, so
    *  a lagged worker expires the request at the deadline it promised. */
   scheduledFor: z.number().int(),
+});
+
+export const JOIN_REQUEST_NOTIFICATION_KINDS = [
+  "requestArrived",
+  "requestStillWaiting",
+  "requestApproved",
+  "requestRejected",
+  "requestExpired",
+  "joinedAutomatically",
+] as const;
+
+export const joinRequestNotificationIntentSchema = z.object({
+  kind: z.enum(JOIN_REQUEST_NOTIFICATION_KINDS),
+  notificationId: z.string().min(1),
+  joinRequestId: z.string().min(1),
+  organizationId: z.string().min(1),
+  // Old queued reminders and terminal notices do not carry these fields.
+  requesterUserId: z.string().min(1).optional(),
+  domain: z.string().min(1).optional(),
+  admissionId: z.string().min(1).optional(),
+});
+
+const joinRequestNotificationContentSchema = z.object({
+  to: z.string().min(1),
+  subject: z.string().min(1),
+  html: z.string().min(1),
+  from: z.string().min(1),
+  idempotencyKey: z.string().min(1),
+});
+
+export const joinRequestNotificationFanoutSchema = z.object({
+  notificationId: z.string().min(1),
+  kind: z.enum(JOIN_REQUEST_NOTIFICATION_KINDS),
+  joinRequestId: z.string().min(1),
+  organizationId: z.string().min(1),
+  requesterUserId: z.string().min(1),
+  admissionId: z.string().min(1).optional(),
+  messages: z.array(
+    z.object({
+      recipientUserId: z.string().min(1),
+      isAdmin: z.boolean(),
+      content: joinRequestNotificationContentSchema,
+    }),
+  ),
+});
+
+export const joinRequestNotificationDeliverySchema = z.object({
+  kind: z.enum(JOIN_REQUEST_NOTIFICATION_KINDS),
+  joinRequestId: z.string().min(1),
+  organizationId: z.string().min(1),
+  requesterUserId: z.string().min(1),
+  admissionId: z.string().min(1).optional(),
+  recipientUserId: z.string().min(1),
+  isAdmin: z.boolean(),
+  content: joinRequestNotificationContentSchema,
+});
+
+export const attachMembershipGrantIntentSchema = z.object({
+  joinRequestId: z.string().min(1),
+  organizationId: z.string().min(1),
+  userId: z.string().min(1),
+  bindingId: z.string().min(1),
+  commandId: z.string().min(1),
+  occurredAtMs: z.number().int().nonnegative(),
+  membershipStamp: z.string().min(1),
+  approvedByUserId: z.string().min(1).nullable(),
 });
 
 /**
@@ -58,17 +129,29 @@ export interface JoinRequestLifecycleState {
   remindAtMs: number | null;
   expiresAtMs: number | null;
   remindedAt: number | null;
+  joinRequestId: string | null;
+  organizationId: string | null;
+  requesterUserId: string | null;
+  domain: string | null;
 }
 
 export const JOIN_REQUEST_LIFECYCLE_INITIAL_STATE: JoinRequestLifecycleState = {
   remindAtMs: null,
   expiresAtMs: null,
   remindedAt: null,
+  joinRequestId: null,
+  organizationId: null,
+  requesterUserId: null,
+  domain: null,
 };
 
 export type JoinRequestLifecycleIntents = {
+  attachMembershipGrant: IntentSpec<typeof attachMembershipGrantIntentSchema>;
   remindAdmins: IntentSpec<typeof remindAdminsIntentSchema>;
   expireRequest: IntentSpec<typeof expireRequestIntentSchema>;
+  prepareNotification: IntentSpec<typeof joinRequestNotificationIntentSchema>;
+  fanoutNotification: IntentSpec<typeof joinRequestNotificationFanoutSchema>;
+  sendNotification: IntentSpec<typeof joinRequestNotificationDeliverySchema>;
 };
 
 /**
@@ -77,15 +160,25 @@ export type JoinRequestLifecycleIntents = {
  * re-reads the folded deadline, so a wake that fires early expires nothing.
  */
 export interface JoinRequestLifecyclePort {
-  remindAdmins(args: {
-    joinRequestId: string;
-    organizationId: string;
-  }): Promise<void>;
+  attachMembershipGrant(
+    payload: z.infer<typeof attachMembershipGrantIntentSchema>,
+  ): Promise<void>;
   expireRequest(args: {
     joinRequestId: string;
     organizationId: string;
     occurredAtMs: number;
   }): Promise<void>;
+  prepareNotification(args: {
+    payload: z.infer<typeof joinRequestNotificationIntentSchema>;
+    context: IntentContext;
+  }): Promise<void>;
+  fanoutNotification(args: {
+    payload: z.infer<typeof joinRequestNotificationFanoutSchema>;
+    context: IntentContext;
+  }): Promise<void>;
+  sendNotification(
+    payload: z.infer<typeof joinRequestNotificationDeliverySchema>,
+  ): Promise<void>;
 }
 
 /**
@@ -101,7 +194,14 @@ export interface JoinRequestLifecyclePort {
  */
 export const onJoinRequested: EventHandler<
   JoinRequestLifecycleState,
-  { expiresAtMs: number },
+  {
+    joinRequestId: string;
+    organizationId: string;
+    userId: string;
+    domain: string;
+    expiresAtMs: number;
+    notifyAdmins: boolean;
+  },
   JoinRequestLifecycleIntents
 > = (_state, data, ctx) => {
   const remindAtMs = ctx.at + JOIN_REQUEST_REMINDER_MS;
@@ -111,10 +211,118 @@ export const onJoinRequested: EventHandler<
   // after the thing had lapsed.
   const nextWakeAt = remindAtMs < expiresAtMs ? remindAtMs : expiresAtMs;
   return {
-    state: { remindAtMs, expiresAtMs, remindedAt: null },
+    state: {
+      remindAtMs,
+      expiresAtMs,
+      remindedAt: null,
+      joinRequestId: data.joinRequestId,
+      organizationId: data.organizationId,
+      requesterUserId: data.userId,
+      domain: data.domain,
+    },
     nextWakeAt,
+    ...(data.notifyAdmins
+      ? {
+          intents: [
+            ctx.intents.prepareNotification(
+              `join-notification:${data.joinRequestId}:requestArrived`,
+              {
+                kind: "requestArrived",
+                notificationId: `join:${data.joinRequestId}:requestArrived`,
+                joinRequestId: data.joinRequestId,
+                organizationId: data.organizationId,
+                requesterUserId: data.userId,
+                domain: data.domain,
+              },
+            ),
+          ],
+        }
+      : {}),
   };
 };
+
+export const onJoinApproved: EventHandler<
+  JoinRequestLifecycleState,
+  { resolvedBy: { type: "user" | "policy" | "invite"; id: string } },
+  JoinRequestLifecycleIntents
+> = (state, data, ctx) => {
+  const joinRequestId = state.joinRequestId ?? ctx.key;
+  const organizationId = state.organizationId ?? ctx.projectId;
+  const kind =
+    data.resolvedBy.type === "policy"
+      ? "joinedAutomatically"
+      : data.resolvedBy.type === "user"
+        ? "requestApproved"
+        : null;
+  if (kind === null) {
+    return { state: JOIN_REQUEST_LIFECYCLE_INITIAL_STATE, nextWakeAt: null };
+  }
+  return {
+    state: JOIN_REQUEST_LIFECYCLE_INITIAL_STATE,
+    nextWakeAt: null,
+    intents: [
+      ctx.intents.prepareNotification(
+        `join-notification:${joinRequestId}:${kind}`,
+        {
+          kind,
+          notificationId: `join:${joinRequestId}:${kind}`,
+          joinRequestId,
+          organizationId,
+          ...(state.requesterUserId
+            ? { requesterUserId: state.requesterUserId }
+            : {}),
+          ...(state.domain ? { domain: state.domain } : {}),
+        },
+      ),
+    ],
+  };
+};
+
+export const onJoinRejected: EventHandler<
+  JoinRequestLifecycleState,
+  unknown,
+  JoinRequestLifecycleIntents
+> = (state, _data, ctx) => resolvedNotification(state, "requestRejected", ctx);
+
+export const onJoinExpired: EventHandler<
+  JoinRequestLifecycleState,
+  unknown,
+  JoinRequestLifecycleIntents
+> = (state, _data, ctx) => resolvedNotification(state, "requestExpired", ctx);
+
+function resolvedNotification(
+  state: JoinRequestLifecycleState,
+  kind: "requestRejected" | "requestExpired",
+  ctx: Parameters<
+    EventHandler<
+      JoinRequestLifecycleState,
+      unknown,
+      JoinRequestLifecycleIntents
+    >
+  >[2],
+) {
+  const joinRequestId = state.joinRequestId ?? ctx.key;
+  const organizationId = state.organizationId ?? ctx.projectId;
+  return {
+    state: JOIN_REQUEST_LIFECYCLE_INITIAL_STATE,
+    nextWakeAt: null,
+    intents: [
+      ctx.intents.prepareNotification(
+        `join-notification:${joinRequestId}:${kind}`,
+        {
+          kind,
+          notificationId: `join:${joinRequestId}:${kind}`,
+          joinRequestId,
+          organizationId,
+          ...(state.requesterUserId
+            ? { requesterUserId: state.requesterUserId }
+            : {}),
+          ...(state.domain ? { domain: state.domain } : {}),
+        },
+      ),
+    ],
+  };
+}
 
 /**
  * Disarm. Every ending is terminal, so a request that reached one has nothing
@@ -155,7 +363,10 @@ export const joinRequestLifecycleWake: WakeHandler<
 
   if (dueToExpire) {
     return {
-      state: JOIN_REQUEST_LIFECYCLE_INITIAL_STATE,
+      // Keep the request facts until the expiry event is folded. The event
+      // handler owns terminal cleanup and needs them to enqueue the requester
+      // notice; clearing them here would make expiry silently unnotified.
+      state,
       nextWakeAt: null,
       intents: [
         ctx.intents.expireRequest(`join-expire:${expiresAtMs}`, {
@@ -178,6 +389,10 @@ export const joinRequestLifecycleWake: WakeHandler<
       ctx.intents.remindAdmins(`join-remind:${state.remindAtMs ?? ctx.at}`, {
         joinRequestId: ctx.key,
         organizationId: ctx.projectId,
+        ...(state.requesterUserId
+          ? { requesterUserId: state.requesterUserId }
+          : {}),
+        ...(state.domain ? { domain: state.domain } : {}),
         scheduledFor: ctx.at,
       }),
     ],
@@ -187,15 +402,33 @@ export const joinRequestLifecycleWake: WakeHandler<
 export function runRemindAdmins(deps: { port: JoinRequestLifecyclePort }) {
   return async (
     payload: z.infer<typeof remindAdminsIntentSchema>,
+    context: IntentContext,
   ): Promise<void> => {
-    await deps.port.remindAdmins({
-      joinRequestId: payload.joinRequestId,
-      organizationId: payload.organizationId,
+    await deps.port.prepareNotification({
+      payload: {
+        kind: "requestStillWaiting",
+        notificationId: `join:${payload.joinRequestId}:requestStillWaiting`,
+        joinRequestId: payload.joinRequestId,
+        organizationId: payload.organizationId,
+        requesterUserId: payload.requesterUserId,
+        domain: payload.domain,
+      },
+      context,
     });
     logger.info(
       { joinRequestId: payload.joinRequestId },
       "join request still unanswered at the halfway mark; admins reminded",
     );
+  };
+}
+
+export function runAttachMembershipGrant(deps: {
+  port: JoinRequestLifecyclePort;
+}) {
+  return async (
+    payload: z.infer<typeof attachMembershipGrantIntentSchema>,
+  ): Promise<void> => {
+    await deps.port.attachMembershipGrant(payload);
   };
 }
 
@@ -212,5 +445,35 @@ export function runExpireRequest(deps: { port: JoinRequestLifecyclePort }) {
       { joinRequestId: payload.joinRequestId },
       "join request window elapsed; expiry command dispatched",
     );
+  };
+}
+
+export function runPrepareNotification(deps: {
+  port: JoinRequestLifecyclePort;
+}) {
+  return async (
+    payload: z.infer<typeof joinRequestNotificationIntentSchema>,
+    context: IntentContext,
+  ): Promise<void> => {
+    await deps.port.prepareNotification({ payload, context });
+  };
+}
+
+export function runSendNotification(deps: { port: JoinRequestLifecyclePort }) {
+  return async (
+    payload: z.infer<typeof joinRequestNotificationDeliverySchema>,
+  ): Promise<void> => {
+    await deps.port.sendNotification(payload);
+  };
+}
+
+export function runFanoutNotification(deps: {
+  port: JoinRequestLifecyclePort;
+}) {
+  return async (
+    payload: z.infer<typeof joinRequestNotificationFanoutSchema>,
+    context: IntentContext,
+  ): Promise<void> => {
+    await deps.port.fanoutNotification({ payload, context });
   };
 }

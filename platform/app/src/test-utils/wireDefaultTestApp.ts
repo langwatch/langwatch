@@ -1,6 +1,12 @@
 import { afterAll, beforeAll, beforeEach } from "vitest";
-import { globalForApp } from "~/server/app-layer/app";
-import { createTestApp } from "~/server/app-layer/presets";
+import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { resetAuthzGrantsCommandsForTests } from "~/server/app-layer/authz/ledger";
+import {
+  createTestApp,
+  type TestAppOverrides,
+} from "~/server/app-layer/presets";
+import { prisma } from "~/server/db";
+import { createAuthzTestEventSourcing } from "./authz-test-event-sourcing";
 
 /**
  * Wire the App singleton for an integration test file.
@@ -31,10 +37,21 @@ import { createTestApp } from "~/server/app-layer/presets";
  * createTestApp({...})` in a `beforeAll`, the #3240 pattern) does not need
  * this; its later assignment would win anyway, since this helper only fills
  * an empty slot.
+ *
+ * `overrides` replaces App services for the whole file, e.g. a Prisma-backed
+ * `projects` for a suite that drives the REST project routes.
  */
-export function wireDefaultTestApp(): void {
+export function wireDefaultTestApp(
+  overrides: () => TestAppOverrides = () => ({}),
+): void {
   const fill = () => {
-    globalForApp.__langwatch_app ??= createTestApp();
+    if (globalForApp.__langwatch_app) return;
+    const eventSourcing = createAuthzTestEventSourcing(prisma);
+    resetAuthzGrantsCommandsForTests();
+    globalForApp.__langwatch_app = createTestApp({
+      ...overrides(),
+      _eventSourcing: eventSourcing,
+    });
   };
   // Both hooks, deliberately. beforeAll covers a file whose own beforeAll
   // already needs the App (it runs first, registered at the top level).
@@ -44,7 +61,8 @@ export function wireDefaultTestApp(): void {
   // work, and a slot another hook already filled is left alone.
   beforeAll(fill);
   beforeEach(fill);
-  afterAll(() => {
-    globalForApp.__langwatch_app = null;
+  afterAll(async () => {
+    await resetApp();
+    resetAuthzGrantsCommandsForTests();
   });
 }

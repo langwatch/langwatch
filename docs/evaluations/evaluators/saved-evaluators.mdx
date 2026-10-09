@@ -22,7 +22,7 @@ Saved evaluators are pre-configured evaluation setups that you create on the Lan
 
 ### Via the Platform UI
 
-1. Go to **Evaluations** in your LangWatch project
+1. Go to **Evaluators** in your LangWatch project
 2. Click **New Evaluator**
 3. Select the evaluator type (e.g., LLM Boolean, PII Detection)
 4. Configure the settings (model, prompt, thresholds, etc.)
@@ -32,7 +32,30 @@ Saved evaluators are pre-configured evaluation setups that you create on the Lan
 
 ### Via the Evaluators Page
 
+<Frame>
+<img src="/images/evaluations/evaluators-list.png" alt="The Evaluators page with three saved evaluators and the New Evaluator button" />
+</Frame>
+
 You can also manage saved evaluators from the dedicated Evaluators page at `/{project}/evaluators`.
+
+## Custom (Code) evaluators
+
+A code evaluator is a saved evaluator whose logic is your own Python. Create one on the Evaluators page with **New Evaluator → Custom (Code)**: declare its inputs (for example `output` and `expected_output`) and write a `Code` class whose `__call__` takes those inputs and returns a dictionary with any of `passed`, `score`, `label` and `details`.
+
+```python
+class Code:
+    def __call__(self, output: str, expected_output: str):
+        passed = expected_output.lower() in output.lower()
+        return {"passed": passed, "score": 1.0 if passed else 0.0}
+```
+
+From code you can:
+
+- **Run it** like any saved evaluator: `POST /api/evaluations/evaluators/{slug}/evaluate`, with `data` holding one value per declared input.
+- **Find it**: `GET /api/evaluators` lists it with `type: "code"`, and `GET /api/evaluators/{idOrSlug}` returns its code and inputs in `config`.
+- **Monitor with it**: run it on incoming traces with `POST /api/monitors`, sending the evaluator's id as `evaluatorId` and `code/<evaluatorId>` as `checkType`, plus `mappings` from trace fields to its inputs.
+
+Creating a code evaluator and editing its code are done on the Evaluators page: `POST /api/evaluators` only creates built-in evaluator types.
 
 ## Using Saved Evaluators
 
@@ -50,7 +73,7 @@ Saved evaluators are referenced using the `evaluators/{slug}` format, where `{sl
 ```python Python
 import langwatch
 
-df = langwatch.datasets.get_dataset("my-dataset").to_pandas()
+df = langwatch.dataset.get_dataset("my-dataset").to_pandas()
 
 experiment = langwatch.experiment.init("my-experiment")
 

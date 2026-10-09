@@ -23,6 +23,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1", slug: "proj-1" },
+    hasPermission: () => true,
   }),
 }));
 

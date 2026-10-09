@@ -68,6 +68,7 @@ import {
   isGoldenFieldSatisfied,
   LEGACY_PAIRWISE_EVALUATOR_TYPE,
 } from "../types";
+import { connectedTargetFields } from "../utils/connectedAgentTarget";
 import { convertInlineToRowRecords } from "../utils/datasetConversion";
 import { isRowEmpty } from "../utils/emptyRowDetection";
 import { createEvaluatorEditorCallbacks } from "../utils/evaluatorEditorCallbacks";
@@ -265,9 +266,9 @@ export function EvaluationsV3Table({
       activeDatasetId: state.activeDatasetId,
       evaluators: state.evaluators,
       targets: state.targets,
-      // Hydration signal for the comparison-reload effect: loadState sets this
-      // atomically with targets/datasets, so a truthy value means getState() is
-      // safe to read.
+      // Hydration signal for the comparison-reload effect: the loader sets this
+      // (setExperimentId) and calls loadState in the same synchronous pass, so a
+      // truthy value means getState() is safe to read.
       experimentId: state.experimentId,
       results: state.results,
       // Only subscribe to specific UI properties we need (not the entire ui object)
@@ -437,6 +438,24 @@ export function EvaluationsV3Table({
   const handleSelectSavedAgent = useCallback(
     (savedAgent: AgentWithFields) => {
       const config = savedAgent.config as Record<string, unknown>;
+
+      // A connected agent runs in the customer's own process, so the column
+      // reads the turn to send and the parameters the function declares
+      // rather than the fields of a node.
+      if (savedAgent.type === "connected") {
+        const { inputs, outputs } = connectedTargetFields(savedAgent.config);
+        addOrReplaceTarget({
+          id: newTargetId(),
+          type: "agent",
+          agentType: "connected",
+          dbAgentId: savedAgent.id,
+          inputs,
+          outputs,
+          mappings: {},
+        });
+        closeDrawer();
+        return;
+      }
 
       // Check if this is an HTTP agent by looking at savedAgent.type or config structure
       const isHttpAgent =
@@ -1039,10 +1058,10 @@ export function EvaluationsV3Table({
       evaluatorType === COMPARISON_EVALUATOR_TYPE ||
       evaluatorType === LEGACY_PAIRWISE_EVALUATOR_TYPE;
     if (!isComparisonType) return;
-    // Wait for the workbench store to finish hydrating (loadState sets
-    // experimentId atomically with targets/datasets); reading getState() before
-    // then would snapshot an empty picker and lock it in (the guard below blocks
-    // a later refresh).
+    // Wait for the workbench store to finish hydrating (the loader sets
+    // experimentId, then calls loadState in the same synchronous pass);
+    // reading getState() before then would snapshot an empty picker and
+    // lock it in (the guard below blocks a later refresh).
     if (!experimentId) return;
     // Flow context already present → a live Add/edit flow (or an earlier run of
     // this effect) wired it up. Also the loop guard.

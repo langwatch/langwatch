@@ -29,7 +29,6 @@ export function recordingExecutor(
       return {
         columns: [{ name: "value", type: "UInt64" }],
         rows: [{ value: 1 }],
-        truncated: false,
         statistics: {
           elapsedMs: 3,
           rowsRead: 10,

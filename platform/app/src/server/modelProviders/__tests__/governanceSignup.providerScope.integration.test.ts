@@ -25,6 +25,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { PersonalWorkspaceService } from "../../../../ee/governance/services/personalWorkspace.service";
 import { selectAmbientTeam } from "../../../hooks/useOrganizationTeamProject";
@@ -105,14 +106,12 @@ describe("AGENT_GOVERNANCE signup then adding a model provider (real DB)", () =>
         role: OrganizationUserRole.ADMIN,
       },
     });
-    await prisma.roleBinding.create({
-      data: {
-        organizationId,
-        userId,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: organizationId,
-      },
+    await seedRoleBinding(prisma, {
+      organizationId,
+      userId,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: organizationId,
     });
 
     await new PersonalWorkspaceService(prisma).ensure({
@@ -126,6 +125,7 @@ describe("AGENT_GOVERNANCE signup then adding a model provider (real DB)", () =>
   afterAll(async () => {
     await cleanupTestRows(prisma, [
       ["modelProvider", { organizationId }],
+      ["grant", { organizationId }],
       ["roleBinding", { organizationId }],
       ["teamUser", { team: { organizationId } }],
       ["project", { team: { organizationId } }],
@@ -247,10 +247,22 @@ describe("AGENT_GOVERNANCE signup then adding a model provider (real DB)", () =>
     });
 
     it("still creates no shared project as a side effect", async () => {
+      // The population first, in the same query minus the predicate under
+      // test: the organization does hold a project, and it is the personal
+      // one. A count of zero from an organization holding no projects at all
+      // would pass the assertion below with the filter doing no work.
+      const allProjects = await prisma.project.count({
+        where: { team: { organizationId } },
+      });
+      const personalProjects = await prisma.project.count({
+        where: { team: { organizationId }, isPersonal: true },
+      });
       const sharedProjects = await prisma.project.count({
         where: { team: { organizationId }, isPersonal: false },
       });
 
+      expect(allProjects).toBe(1);
+      expect(personalProjects).toBe(1);
       expect(sharedProjects).toBe(0);
     });
   });

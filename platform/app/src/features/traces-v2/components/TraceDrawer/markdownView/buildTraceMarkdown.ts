@@ -4,7 +4,8 @@ import type {
   TraceHeader,
 } from "~/server/api/routers/tracesV2.schemas";
 import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
-import { formatCost, formatDuration } from "../../../utils/formatters";
+import { formatDuration } from "~/shared/format/time";
+import { formatCost } from "../../../utils/formatters";
 import type { MarkdownConfig } from "./types";
 
 const AI_SPAN_TYPES = new Set(["llm", "agent", "rag", "tool", "evaluation"]);

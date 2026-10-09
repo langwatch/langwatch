@@ -60,7 +60,12 @@ import {
  * decoration — the store refuses a write whose event is older than the row.
  */
 export type GrantProjectionWrite =
-  | { kind: "grant.upsert"; row: GrantRowShape }
+  | {
+      kind: "grant.upsert";
+      row: GrantRowShape;
+      membershipStamp?: string;
+      membershipBootstrap?: boolean;
+    }
   | {
       kind: "grant.setRole";
       grantId: string;
@@ -93,6 +98,16 @@ const authzGrantsEvents = [
   roleDeletedEventSchema,
 ] as const;
 
+/**
+ * The row's `condition`, present only when the event carried one, so a row
+ * without a condition has no such key at all rather than an undefined one.
+ */
+function conditionField(
+  condition: GrantAttachedEvent["data"]["condition"],
+): { condition: NonNullable<typeof condition> } | Record<string, never> {
+  return condition !== undefined ? { condition } : {};
+}
+
 export const AUTHZ_GRANTS_WRITE_PROJECTION_NAME = "authzGrantsWrite" as const;
 
 export class AuthzGrantsWriteProjection
@@ -113,6 +128,12 @@ export class AuthzGrantsWriteProjection
     const { data } = event;
     return {
       kind: "grant.upsert",
+      ...(data.membershipStamp
+        ? { membershipStamp: data.membershipStamp }
+        : {}),
+      ...(data.membershipBootstrap
+        ? { membershipBootstrap: data.membershipBootstrap }
+        : {}),
       row: {
         id: data.grantId,
         // The organization is the event's TENANT (ADR-110): the aggregate is
@@ -136,6 +157,7 @@ export class AuthzGrantsWriteProjection
           ? new Date(data.resource.expiresAtMs)
           : null,
         maxViews: data.resource?.maxViews ?? null,
+        ...conditionField(data.condition),
         occurredAt: new Date(event.occurredAt),
       },
     };

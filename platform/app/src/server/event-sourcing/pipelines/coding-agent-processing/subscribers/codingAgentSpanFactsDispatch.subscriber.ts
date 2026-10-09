@@ -1,5 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
+import { codexAuxiliarySessionFacts } from "~/server/app-layer/traces/codex-auxiliary-thread";
 import { SpanNormalizationPipelineService } from "~/server/app-layer/traces/span-normalization.service";
 import type { EventSubscriberDefinition } from "../../../subscribers/eventSubscriber.types";
 import { SPAN_RECEIVED_EVENT_TYPE } from "../../trace-processing/schemas/constants";
@@ -82,6 +83,8 @@ export function createCodingAgentSpanFactsDispatchSubscriber(deps: {
   contributeSpanFacts: (data: ContributeSpanFactsCommandData) => Promise<void>;
   getNormalizedSpanById: (params: {
     tenantId: string;
+    /** The reference event the read is made for; the proof names it. */
+    eventId: string;
     traceId: string;
     spanId: string;
     /** Required: the store read has no unbounded fallback to widen into. */
@@ -383,6 +386,7 @@ async function resolveClaimCheck(
   deps: {
     getNormalizedSpanById: (params: {
       tenantId: string;
+      eventId: string;
       traceId: string;
       spanId: string;
       occurredAtMs: number;
@@ -391,6 +395,7 @@ async function resolveClaimCheck(
 ): Promise<ContributeSpanFactsCommandData> {
   const span = await deps.getNormalizedSpanById({
     tenantId: ref.tenantId,
+    eventId: ref.id,
     traceId: ref.data.traceId,
     spanId: ref.data.spanId,
     // Center the store's partition window on the span's OWN start (the stored
@@ -454,7 +459,15 @@ function liftContribution({
     name: span.name,
     attrs: span.spanAttributes,
   });
-  const facts = liftSpanFacts(span.spanAttributes);
+  const facts = {
+    ...liftSpanFacts(span.spanAttributes),
+    // A codex helper thread's request span says so through its request id;
+    // the fold reads the derived fact, never the vendor literal.
+    ...codexAuxiliarySessionFacts({
+      scopeName: span.instrumentationScope.name,
+      attributes: span.spanAttributes,
+    }),
+  };
   const serviceVersion = span.resourceAttributes["service.version"];
   if (typeof serviceVersion === "string" && serviceVersion.length > 0) {
     facts["service.version"] = serviceVersion;

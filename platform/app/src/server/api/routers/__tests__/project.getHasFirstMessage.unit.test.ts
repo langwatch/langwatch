@@ -28,28 +28,34 @@ vi.mock("nanoid", () => ({
   ),
 }));
 
-vi.mock("../../rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../rbac")>();
-  return {
-    ...actual,
-    hasProjectPermission: vi.fn(() => Promise.resolve(true)),
-    resolveProjectPermission: vi
-      .fn()
-      .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
-    hasOrganizationPermission: vi.fn().mockResolvedValue(true),
-    resolveTeamPermission: vi
-      .fn()
-      .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
-    skipPermissionCheck: ({ ctx, next }: any) => {
-      ctx.permissionChecked = true;
-      return next();
-    },
-    skipPermissionCheckProjectCreation: ({ ctx, next }: any) => {
-      ctx.permissionChecked = true;
-      return next();
-    },
-  };
-});
+vi.mock(
+  "~/server/app-layer/authz/permission-adapters",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("~/server/app-layer/authz/permission-adapters")
+      >();
+    return {
+      ...actual,
+      hasProjectPermission: vi.fn(() => Promise.resolve(true)),
+      resolveProjectPermission: vi
+        .fn()
+        .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
+      hasOrganizationPermission: vi.fn().mockResolvedValue(true),
+      resolveTeamPermission: vi
+        .fn()
+        .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
+      skipPermissionCheck: ({ ctx, next }: any) => {
+        ctx.permissionChecked = true;
+        return next();
+      },
+      skipPermissionCheckProjectCreation: ({ ctx, next }: any) => {
+        ctx.permissionChecked = true;
+        return next();
+      },
+    };
+  },
+);
 
 vi.mock("@ee/audit-log/auditLog", () => ({
   auditLog: vi.fn(() => Promise.resolve()),
@@ -100,6 +106,22 @@ describe("project.getHasFirstMessage", () => {
       });
 
       expect(result).toEqual({ firstMessage: false });
+    });
+  });
+
+  describe("when the project is an aggregate that was never sent a trace", () => {
+    /** @scenario "Aggregate Trace Explorer shows member rows without onboarding" */
+    it("returns firstMessage as true, since it reads its members' traces", async () => {
+      mockGetById.mockResolvedValueOnce({
+        kind: "aggregate",
+        firstMessage: false,
+      });
+
+      const result = await caller.getHasFirstMessage({
+        projectId: "project_aggregate",
+      });
+
+      expect(result).toEqual({ firstMessage: true });
     });
   });
 

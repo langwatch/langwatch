@@ -1,5 +1,8 @@
 import { createLogger } from "@langwatch/observability";
 import type { ProjectService } from "~/server/app-layer/projects/project.service";
+import { LANGY_TRACE_ORIGIN } from "~/server/app-layer/traces/derive-trace-origin";
+import { onboardingExperimentProperties } from "~/server/onboarding/guided-onboarding.experiment";
+import type { ProjectActiveDayTracker } from "~/server/onboarding/project-active-day";
 import { trackServerEvent } from "~/server/posthog";
 import type { TriggerContext } from "../../../pipeline/processManagerDefinition";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
@@ -29,6 +32,12 @@ export interface ProjectMetadataSubscriberDeps {
    * per claim window.
    */
   bootstrapTopicClustering?: (projectId: string) => Promise<void>;
+  /**
+   * Marks the project active for the day of this trace, once a day. Runs
+   * before any Postgres read here: it is one Redis read per real ingest once
+   * the day is marked.
+   */
+  trackActiveDay?: ProjectActiveDayTracker;
 }
 
 /**
@@ -61,9 +70,17 @@ export function projectMetadataGroupKey(event: { tenantId: string }): string {
  * `firstMessage` / `integrated` on them would prematurely dismiss the
  * empty-state onboarding card even though the user hasn't connected their own
  * app yet. Skip entirely — a real trace will trigger this subscriber again.
+ *
+ * Langy's own turns are the same case: the assistant's model calls trace into
+ * the customer's project (ADR-061), so on a fresh guided project the first
+ * trace to arrive is Langy's kickoff, not anything the customer sent. Every
+ * first-trace signal reads the flag this subscriber flips (the home offer,
+ * the onboarding checks, the explorer's empty state, the milestone), so the
+ * exclusion lives here once rather than at each reader.
  */
 export function isRealFirstIngest(foldState: TraceSummaryData): boolean {
-  return foldState.attributes?.["langwatch.origin"] !== "sample";
+  const origin = foldState.attributes?.["langwatch.origin"];
+  return origin !== "sample" && origin !== LANGY_TRACE_ORIGIN;
 }
 
 /**
@@ -80,7 +97,8 @@ async function trackFirstTraceIntegrated({
   tenantId: string;
   attrs: Record<string, string>;
 }): Promise<void> {
-  const { userId } = await projects.resolveOrgAdmin(tenantId);
+  const { userId, onboardingVariant } =
+    await projects.resolveOrgAdmin(tenantId);
   if (!userId) return;
 
   trackServerEvent({
@@ -89,6 +107,8 @@ async function trackFirstTraceIntegrated({
     properties: {
       sdk_language: attrs["sdk.language"] ?? "unknown",
       sdk_framework: attrs["langwatch.sdk.framework"] ?? "unknown",
+      ...(onboardingVariant ? { onboarding_variant: onboardingVariant } : {}),
+      ...onboardingExperimentProperties(onboardingVariant),
     },
     projectId: tenantId,
   });
@@ -112,10 +132,16 @@ export function createProjectMetadataHandler(
   event: TraceProcessingEvent,
   context: TriggerContext<TraceSummaryData>,
 ) => Promise<void> {
-  return async (_event, context) => {
+  return async (event, context) => {
     const { tenantId, state: foldState } = context;
 
     if (!isRealFirstIngest(foldState)) return;
+
+    await deps.trackActiveDay?.({
+      projectId: tenantId,
+      source: "trace",
+      occurredAt: event.occurredAt,
+    });
 
     try {
       await syncProjectMetadata(deps, tenantId, foldState);

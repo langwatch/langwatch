@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { BindingMissingError } from "../../authz-grants.repository";
+import { type GrantFact } from "../facts";
 import {
-  type GrantFact,
-} from "../facts";
-import {
+  grantConditionFromDb,
   grantFactToCompatBinding,
   grantFactToCompatShareLink,
   grantFactToRow,
@@ -137,8 +137,8 @@ describe("compat binding mapping", () => {
           grant: fact({ roleKey }),
           organizationId: ORG,
         });
-        expect(row?.role).toBe(role);
-        expect(row?.customRoleId).toBeNull();
+        expect(row.role).toBe(role);
+        expect(row.customRoleId).toBeNull();
       }
     });
 
@@ -147,9 +147,9 @@ describe("compat binding mapping", () => {
         grant: fact(),
         organizationId: ORG,
       });
-      expect(row?.id).toBe("grant_abc");
-      expect(row?.userId).toBe("user_alice");
-      expect(row?.scopeType).toBe("TEAM");
+      expect(row.id).toBe("grant_abc");
+      expect(row.userId).toBe("user_alice");
+      expect(row.scopeType).toBe("TEAM");
     });
 
     it("splits custom role keys into CUSTOM plus the role id", () => {
@@ -157,10 +157,9 @@ describe("compat binding mapping", () => {
         grant: fact({ roleKey: "custom:role_sre" }),
         organizationId: ORG,
       });
-      expect(row?.role).toBe("CUSTOM");
-      expect(row?.customRoleId).toBe("role_sre");
+      expect(row.role).toBe("CUSTOM");
+      expect(row.customRoleId).toBe("role_sre");
     });
-
 
     it("writes an imported custom binding's own role, not CUSTOM", () => {
       // The legacy resolver falls back to this column whenever the custom
@@ -171,8 +170,8 @@ describe("compat binding mapping", () => {
         grant: fact({ roleKey: "custom:role_sre", legacyRole: "ADMIN" }),
         organizationId: ORG,
       });
-      expect(row?.role).toBe("ADMIN");
-      expect(row?.customRoleId).toBe("role_sre");
+      expect(row.role).toBe("ADMIN");
+      expect(row.customRoleId).toBe("role_sre");
     });
 
     it("sets exactly one principal column per principal type", () => {
@@ -180,30 +179,30 @@ describe("compat binding mapping", () => {
         grant: fact({ principal: { type: "group", id: "grp_1" } }),
         organizationId: ORG,
       });
-      expect(group?.groupId).toBe("grp_1");
-      expect(group?.userId).toBeNull();
-      expect(group?.apiKeyId).toBeNull();
+      expect(group.groupId).toBe("grp_1");
+      expect(group.userId).toBeNull();
+      expect(group.apiKeyId).toBeNull();
       const key = grantFactToCompatBinding({
         grant: fact({ principal: { type: "apiKey", id: "key_1" } }),
         organizationId: ORG,
       });
-      expect(key?.apiKeyId).toBe("key_1");
-      expect(key?.groupId).toBeNull();
-      expect(key?.userId).toBeNull();
+      expect(key.apiKeyId).toBe("key_1");
+      expect(key.groupId).toBeNull();
+      expect(key.userId).toBeNull();
       // The default fixture is a user grant - the third case, and the one
       // that proves "exactly one" rather than "at least the expected one".
       const user = grantFactToCompatBinding({
         grant: fact(),
         organizationId: ORG,
       });
-      expect(user?.userId).toBe("user_alice");
-      expect(user?.groupId).toBeNull();
-      expect(user?.apiKeyId).toBeNull();
+      expect(user.userId).toBe("user_alice");
+      expect(user.groupId).toBeNull();
+      expect(user.apiKeyId).toBeNull();
     });
   });
 
   describe("when the grant is beyond the legacy tables' vocabulary", () => {
-    it("returns null for resource and platform scopes, collectives, and lite-member", () => {
+    it("throws for resource and platform scopes, collectives, and lite-member", () => {
       const beyond: Array<Partial<GrantFact>> = [
         {
           scope: { type: "RESOURCE", id: "trace_t1" },
@@ -214,14 +213,17 @@ describe("compat binding mapping", () => {
         { principal: { type: "organization", id: ORG } },
         { principal: { type: "team", id: "team_client_a" } },
         { roleKey: "lite-member" },
+        { roleKey: null },
+        { roleKey: "custom:" },
+        { principal: { type: "user", id: null } },
       ];
       for (const overrides of beyond) {
-        expect(
+        expect(() =>
           grantFactToCompatBinding({
             grant: fact(overrides),
             organizationId: ORG,
           }),
-        ).toBeNull();
+        ).toThrow(BindingMissingError);
       }
     });
   });
@@ -321,6 +323,60 @@ describe("compat share link mapping", () => {
       expect(
         grantFactToCompatShareLink({ grant: termless, organizationId: ORG }),
       ).toBeNull();
+    });
+  });
+});
+
+describe("shared grant condition (ADR-144)", () => {
+  const sharedFact = (): GrantFact =>
+    fact({
+      grantId: "grant_shared_1",
+      principal: { type: "project", id: "proj_aggregate" },
+      roleKey: "project-reader",
+      scope: { type: "PROJECT", id: "proj_member" },
+      source: "grants-service",
+      condition: { type: "trace", from: "2026-10-01T00:00:00.000Z" },
+    });
+
+  describe("when a shared fact is projected and read back", () => {
+    it("carries the condition through the row unchanged", () => {
+      const row = grantFactToRow({ grant: sharedFact(), organizationId: ORG });
+      expect(row.condition).toEqual({
+        type: "trace",
+        from: "2026-10-01T00:00:00.000Z",
+      });
+      expect(grantRowToFact(row)).toEqual(sharedFact());
+    });
+  });
+
+  describe("when an own fact is projected", () => {
+    it("leaves the condition absent and reads back without one", () => {
+      const row = grantFactToRow({ grant: fact(), organizationId: ORG });
+      expect(row).not.toHaveProperty("condition");
+      expect(grantRowToFact(row)).not.toHaveProperty("condition");
+    });
+  });
+
+  describe("when the stored column does not parse as a condition", () => {
+    it("treats it as no condition rather than widening the window", () => {
+      for (const stored of [
+        null,
+        "trace",
+        [],
+        { type: "metric" },
+        { type: "trace", from: 42 },
+        { type: "trace", where: { eq: 1 } },
+        // Strings the event wire would refuse: not ISO instants.
+        { type: "trace", from: "yesterday" },
+        { type: "trace", until: "2026-13-45" },
+        { type: "trace", from: "1760000000000" },
+      ]) {
+        expect(grantConditionFromDb(stored)).toBeUndefined();
+      }
+      expect(grantConditionFromDb({ type: "span", until: "2026-12-31T00:00:00Z" })).toEqual({
+        type: "span",
+        until: "2026-12-31T00:00:00Z",
+      });
     });
   });
 });

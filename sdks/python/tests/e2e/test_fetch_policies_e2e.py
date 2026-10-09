@@ -43,12 +43,17 @@ def working_directory(path):
 
 CLI_EXECUTABLE = ["npx", "langwatch@latest"]
 
+# The first npx call downloads the CLI package, which on a cold runner cache
+# takes longer than any of the commands themselves.
+CLI_INSTALL_TIMEOUT_SECONDS = 300
+CLI_TIMEOUT_SECONDS = 120
 
-def run_cli(command, cwd=None):
+
+def run_cli(command, cwd=None, timeout=CLI_TIMEOUT_SECONDS):
     """Run a CLI command and return the result."""
     try:
         result = subprocess.run(
-            command, cwd=cwd, capture_output=True, text=True, check=True, timeout=30
+            command, cwd=cwd, capture_output=True, text=True, check=True, timeout=timeout
         )
         return result.stdout
     except subprocess.CalledProcessError as e:
@@ -56,6 +61,12 @@ def run_cli(command, cwd=None):
         print(f"stdout: {e.stdout}")
         print(f"stderr: {e.stderr}")
         raise
+
+
+@pytest.fixture(scope="module", autouse=True)
+def cli_installed():
+    """Download the CLI once so the per-command timeouts cover the command only."""
+    run_cli([*CLI_EXECUTABLE, "--version"], timeout=CLI_INSTALL_TIMEOUT_SECONDS)
 
 
 @pytest.fixture

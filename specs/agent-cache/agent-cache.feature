@@ -39,6 +39,11 @@ Feature: The agent cache
   # authors to pick collision-resistant entry names when a project runs
   # several distinct agents concurrently.
   #
+  # A caller that needs one row rather than all of them to do the work takes
+  # the name with a claim, which writes only when the name is free. That is
+  # the answer to rows that start together, and it stays opt-in: the plain
+  # write is still last-write-wins.
+  #
   # ACCEPTED: a legacy sk-lw- project key reaches these routes, as it reaches
   # the rest of the project surface. Such a key already holds full project
   # access, and the cache holds only state an agent wrote, so the passthrough
@@ -133,12 +138,75 @@ Feature: The agent cache
       When the caller stores an entry and reads it back
       Then the request succeeds
 
-  Rule: A run reaches the cache with a key minted for that run
+  Rule: A caller can take a name only if the project does not hold it
 
-    # The key belongs to no user, is bound to one project, holds the manage
-    # grain and nothing else, and expires after twelve hours. It is never the
-    # project key. A run that cannot mint one still runs: every row does its
-    # own work, which is what a run without the cache does anyway.
+    # Rows that start together all read an empty cache and all do the work
+    # the entry was meant to save. A claim is how one of them takes the name
+    # first: the write happens only if the name is free, and the answer says
+    # whether this caller is the one that took it. Losing is not a refusal,
+    # so agent code reads a boolean rather than catching an exception.
+
+    @integration
+    Scenario: A claim on a free name is taken
+      Given the project holds no entry named ACME_SESSION
+      When the caller claims ACME_SESSION
+      Then the response says the name was taken
+      And a read answers the claimed value
+
+    @integration
+    Scenario: A claim on a held name leaves the held value alone
+      Given the project holds an entry named ACME_SESSION
+      When the caller claims ACME_SESSION with a different value
+      Then the response says the name was not taken
+      And a read still answers the value that was already there
+
+    @integration
+    Scenario: A name is free again once its lifetime passes
+      Given the caller claims ACME_SESSION with a lifetime of five seconds
+      When the caller claims ACME_SESSION after that lifetime has passed
+      Then the response says the name was taken
+
+    @integration
+    Scenario: Only one of several claims sent at once takes the name
+      Given the project holds no entry named ACME_SESSION
+      When several callers claim ACME_SESSION at the same moment
+      Then exactly one response says the name was taken
+      And a read answers the value that caller sent
+
+    # A read and a write degrade to a per-process answer when the store
+    # cannot answer, and the worst that costs is a stale read. A claim that
+    # degraded the same way would name one winner per process, which is the
+    # one outcome it exists to prevent.
+    @unit
+    Scenario: A claim the store cannot answer raises rather than naming a winner
+      Given a store that cannot answer
+      When the caller claims a name
+      Then the call is refused
+      And the caller is never told it took the name
+
+    @unit
+    Scenario: The SDK answers a lost claim with false
+      Given the project already holds an entry named ACME_SESSION
+      When the agent claims ACME_SESSION
+      Then the agent is given false, and no exception is raised
+
+  Rule: A run reaches the cache with a key the project's runs share
+
+    # The key is bound to one project, holds the manage grain and nothing
+    # else, and expires after twelve hours. It is never the project key. In a
+    # shared project it belongs to no user. A personal workspace admits no
+    # principal but its owner, so there the key is the owner's own, which is
+    # the owner acting programmatically. A run that cannot get one still
+    # runs: every row does its own work, which is what a run without the
+    # cache does anyway.
+    #
+    # Every run of a project holds the same authority over the same cache, so
+    # the runs share one key rather than minting one each: a project that runs
+    # all day mints a few keys, one that runs nothing mints none. The shared
+    # token is held encrypted for eight of the key's twelve hours, so a run
+    # that picks it up late still holds a key with hours to live, and the key
+    # stays short-lived because the plaintext is never written anywhere
+    # durable.
     #
     # The manage grain alone, because it is what all three routes ask for.
     # Adding agentCache:view would reach no route today, and would hand every
@@ -146,19 +214,46 @@ Feature: The agent cache
 
     @integration
     Scenario: The sandbox key reaches the agent cache
-      Given a key minted for one run of this project
+      Given a key minted for the runs of this project
       When the run stores an entry and reads it back
       Then the request succeeds
 
     @integration
     Scenario: The sandbox key reaches nothing else
-      Given a key minted for one run of this project
+      Given a key minted for the runs of this project
       When the run calls another route in the same project
       Then the request is refused as forbidden
 
+    @integration
+    Scenario: A later run in the same project reuses the key
+      Given a run of this project got a key
+      When a later run of the same project asks for one
+      Then it is given the same key
+      And no second key is minted
+      And the key still reaches the agent cache
+
+    @unit
+    Scenario: A shared key the platform can no longer read is replaced
+      Given the held token cannot be read
+      When a run asks for a key
+      Then a new key is minted and shared from then on
+
+    @integration
+    Scenario: A run in a personal workspace gets a key its owner holds
+      Given a project in a personal workspace
+      When a run of that project mints its key
+      Then the key belongs to the workspace owner
+      And the key reaches the agent cache of that project
+
+    @unit
+    Scenario: A run in a shared project gets a key no user holds
+      Given a project in a shared team
+      When a run of that project mints its key
+      Then the key belongs to no user
+
     @unit
     Scenario: A run whose key could not be minted still runs
-      Given the platform cannot mint a sandbox key
+      Given the platform holds no shared key and cannot mint one
       When the run starts
       Then the run executes with no cache credential
       And the failure is warned about, not raised
@@ -195,3 +290,48 @@ Feature: The agent cache
       When the agent reads the exception
       Then nothing in it quotes the value the agent sent
       # A run shows what it printed, and an exception text is printed often.
+
+    # The route stores text. A session is a dict more often than not, and an
+    # agent that hands one over should not have to know that: the SDK stores
+    # it as JSON and reads it back parsed. What JSON carries is what comes
+    # back, so a tuple reads back as a list and a key that is not a string
+    # reads back as one.
+    @unit
+    Scenario: The SDK stores a dict or list as JSON and reads it back parsed
+      When the agent stores a dict under ACME_SESSION
+      Then the write carries the dict as JSON text
+      And reading ACME_SESSION gives the agent the dict back
+
+    # An entry holds text and nothing else, so text that is itself a JSON
+    # object or array cannot be told apart from a dict the SDK stored. Type
+    # metadata would tell them apart, but only for the entries this SDK
+    # wrote; the route, the REST callers and the other SDKs read plain text.
+    @unit
+    Scenario: JSON text an older writer stored reads back parsed
+      Given an entry written over REST holds the text of a JSON object
+      When the agent reads the entry
+      Then it gets the object parsed
+
+    @unit
+    Scenario: The SDK refuses a value it cannot store before calling the platform
+      When the agent stores a number
+      Then the agent is told which types a value can be
+      And no call reaches the platform
+
+    # A customer report: every write refused with "400 (validation_error)" and
+    # nothing more, because the message stopped at the code. The platform
+    # names the rejected field and what it expected, and that is what the
+    # caller needs. The platform's wording never quotes a value.
+    @unit
+    Scenario: A refused write names the field the platform rejected
+      Given the platform refuses a write because the value is not text
+      When the agent reads the exception
+      Then it names the field and what was expected of it
+
+    # The platform gives the same refusal in more than one form. Every form
+    # must reach the caller with the reason, not with the bare code.
+    @unit
+    Scenario: A write refused for a bad time to live names that field too
+      Given the platform refuses a write because the time to live is too small
+      When the agent reads the exception
+      Then it names the field and what was expected of it

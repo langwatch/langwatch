@@ -26,6 +26,14 @@ import {
   LangyConversationStartedEventSchema,
   type LangyConversationTitleGeneratedEvent,
   LangyConversationTitleGeneratedEventSchema,
+  type LangyLocalControlRequestedEvent,
+  LangyLocalControlRequestedEventSchema,
+  type LangyLocalPolicyChangedEvent,
+  LangyLocalPolicyChangedEventSchema,
+  type LangyLocalWorkspaceConnectedEvent,
+  LangyLocalWorkspaceConnectedEventSchema,
+  type LangyLocalWorkspaceDisconnectedEvent,
+  LangyLocalWorkspaceDisconnectedEventSchema,
   type LangyMessageImportedEvent,
   LangyMessageImportedEventSchema,
   type LangyMessageRecordedEvent,
@@ -38,7 +46,29 @@ import {
   LangyToolCallInitiatedEventSchema,
   type LangyToolCallSucceededEvent,
   LangyToolCallSucceededEventSchema,
+  type LangyUserWaitEndedEvent,
+  LangyUserWaitEndedEventSchema,
+  type LangyUserWaitStartedEvent,
+  LangyUserWaitStartedEventSchema,
 } from "../schemas/events";
+
+/**
+ * How the event ended, for the analytics column. Only the three events that
+ * carry an outcome answer; everything else has none, which is not the same as
+ * a failure.
+ */
+function outcomeOf(event: LangyConversationProcessingEvent): string | null {
+  if (event.type === LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED) {
+    return event.data.outcome;
+  }
+  if (event.type === LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONSE_FAILED) {
+    return "failed";
+  }
+  if (event.type === LANGY_CONVERSATION_EVENT_TYPES.USER_WAIT_ENDED) {
+    return event.data.outcome;
+  }
+  return null;
+}
 
 export interface LangyAnalyticsEventProjectionRecord {
   eventId: string;
@@ -73,6 +103,12 @@ const analyticsEvents = [
   LangyConversationHandoffPendingEventSchema,
   LangyConversationHandoffConsumedEventSchema,
   LangyConversationTitleGeneratedEventSchema,
+  LangyLocalControlRequestedEventSchema,
+  LangyLocalWorkspaceConnectedEventSchema,
+  LangyLocalWorkspaceDisconnectedEventSchema,
+  LangyLocalPolicyChangedEventSchema,
+  LangyUserWaitStartedEventSchema,
+  LangyUserWaitEndedEventSchema,
 ] as const;
 
 /**
@@ -179,6 +215,36 @@ export class LangyAnalyticsEventMapProjection
     return this.record(event);
   }
 
+  mapLangyConversationLocalControlRequested(
+    event: LangyLocalControlRequestedEvent,
+  ) {
+    return this.record(event);
+  }
+
+  mapLangyConversationLocalWorkspaceConnected(
+    event: LangyLocalWorkspaceConnectedEvent,
+  ) {
+    return this.record(event);
+  }
+
+  mapLangyConversationLocalWorkspaceDisconnected(
+    event: LangyLocalWorkspaceDisconnectedEvent,
+  ) {
+    return this.record(event);
+  }
+
+  mapLangyConversationLocalPolicyChanged(event: LangyLocalPolicyChangedEvent) {
+    return this.record(event);
+  }
+
+  mapLangyConversationUserWaitStarted(event: LangyUserWaitStartedEvent) {
+    return this.record(event);
+  }
+
+  mapLangyConversationUserWaitEnded(event: LangyUserWaitEndedEvent) {
+    return this.record(event);
+  }
+
   private record(
     event: LangyConversationProcessingEvent,
   ): LangyAnalyticsEventProjectionRecord {
@@ -189,15 +255,10 @@ export class LangyAnalyticsEventMapProjection
       eventVersion: event.version,
       aggregateId: event.aggregateId,
       turnId: "turnId" in data ? (data.turnId ?? null) : null,
-      userId: "userId" in data ? data.userId : null,
+      userId: "userId" in data ? (data.userId ?? null) : null,
       role: "role" in data ? data.role : null,
       toolName: "toolName" in data ? data.toolName : null,
-      outcome:
-        event.type === LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED
-          ? event.data.outcome
-          : event.type === LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONSE_FAILED
-            ? "failed"
-            : null,
+      outcome: outcomeOf(event),
       model:
         event.type === LANGY_CONVERSATION_EVENT_TYPES.TITLE_GENERATED
           ? event.data.model

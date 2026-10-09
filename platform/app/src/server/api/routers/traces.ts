@@ -5,6 +5,7 @@ import shuffle from "lodash-es/shuffle";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
+import { EvaluationNotFoundError } from "~/server/app-layer/evaluations/errors";
 import { formatSpansDigest } from "~/server/tracer/spanToReadableSpan";
 import { TraceService } from "~/server/traces/trace.service";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
@@ -15,8 +16,18 @@ import {
   evaluatePreconditions,
 } from "../../evaluations/preconditions";
 import { checkPreconditionSchema } from "../../evaluations/types";
+import {
+  namedTenantAuthorization,
+  traceDetailAuthorization,
+  traceTenantShape,
+} from "../trace-detail-authorization";
 import { getUserProtectionsForProject } from "../utils";
-import { getAllForProjectInput, tracesFilterInput } from "./traces.schemas";
+import {
+  getAllForDownloadInput,
+  getAllForProjectInput,
+  MAX_TRACE_DOWNLOAD_PAGE_SIZE,
+  tracesFilterInput,
+} from "./traces.schemas";
 
 export { getAllForProjectInput };
 
@@ -76,22 +87,31 @@ export const tracesRouter = createTRPCRouter({
       return trace;
     }),
 
+  /**
+   * The evaluations panel of the trace drawer. Read through the detail proof
+   * (ADR-144 block F): on an aggregate the proof is narrowed to the member
+   * that holds the trace, the one the list row or the header named, so the
+   * panel shows that member's evaluations next to its spans.
+   */
   getEvaluations: protectedProcedure
-    .input(z.object({ projectId: z.string(), traceId: z.string() }))
+    .input(
+      z.object({
+        projectId: z.string(),
+        traceId: z.string(),
+        ...traceTenantShape,
+      }),
+    )
     .permission("traces:view")
     .query(async ({ input, ctx }) => {
-      const protections = await getUserProtectionsForProject(ctx, {
-        projectId: input.projectId,
+      const authorization = await traceDetailAuthorization({ ctx, input });
+      return TraceService.create(ctx.prisma).getEvaluationsForTrace({
+        authorization,
+        traceId: input.traceId,
+        protections: await getUserProtectionsForProject(ctx, {
+          projectId: input.projectId,
+          authorization,
+        }),
       });
-
-      const traceService = TraceService.create(ctx.prisma);
-      const evaluations = await traceService.getEvaluationsMultiple(
-        input.projectId,
-        [input.traceId],
-        protections,
-      );
-
-      return evaluations[input.traceId];
     }),
 
   // Protected (not public-share): the read is keyed by evaluationId, which is
@@ -99,21 +119,31 @@ export const tracesRouter = createTRPCRouter({
   // public-share token is scoped to a single trace and could otherwise be used
   // to read any evaluation's inputs in the project by supplying another
   // evaluationId. Public-shared trace drawers already get inputs eagerly from
-  // the public `getEvaluations`; this lazy fallback stays project-gated.
+  // the public `getEvaluations`; this lazy fallback stays project-gated. On an
+  // aggregate the drawer names the member, and the proof is narrowed to it.
   getEvaluationInputs: protectedProcedure
     .input(
       z.object({
         projectId: z.string(),
         evaluationId: z.string(),
+        ...traceTenantShape,
       }),
     )
     .permission("traces:view")
     .query(async ({ input, ctx }) => {
-      const traceService = TraceService.create(ctx.prisma);
-      return traceService.getEvaluationInputs(
-        input.projectId,
-        input.evaluationId,
-      );
+      const authorization = namedTenantAuthorization({
+        ctx,
+        tenantId: input.tenantId,
+        notFound: () => new EvaluationNotFoundError(input.evaluationId),
+      });
+      return TraceService.create(ctx.prisma).getEvaluationInputs({
+        authorization,
+        evaluationId: input.evaluationId,
+        protections: await getUserProtectionsForProject(ctx, {
+          projectId: input.projectId,
+          authorization,
+        }),
+      });
     }),
 
   getEvaluationsMultiple: protectedProcedure
@@ -480,11 +510,7 @@ export const tracesRouter = createTRPCRouter({
     }),
 
   getAllForDownload: protectedProcedure
-    .input(
-      getAllForProjectInput.extend({
-        includeSpans: z.boolean(),
-      }),
-    )
+    .input(getAllForDownloadInput)
     .permission("traces:view")
     .mutation(async ({ ctx, input }) => {
       const protections = await getUserProtectionsForProject(ctx, {
@@ -504,7 +530,7 @@ export const tracesRouter = createTRPCRouter({
       return traceService.getAllTracesForProject(
         {
           ...input,
-          pageSize: input.pageSize ?? 10_000,
+          pageSize: input.pageSize ?? MAX_TRACE_DOWNLOAD_PAGE_SIZE,
         },
         protections,
         {

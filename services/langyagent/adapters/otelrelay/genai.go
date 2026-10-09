@@ -20,21 +20,18 @@ import (
 	"github.com/langwatch/langwatch/pkg/contexts"
 	"github.com/langwatch/langwatch/pkg/customertracebridge"
 	"github.com/langwatch/langwatch/pkg/otelsetup"
-	"github.com/langwatch/langwatch/services/langyagent/domain"
 )
 
-// The pi harness exports no OTLP: the wrapper is a thin stdio process and pi
+// The worker exports no OTLP: the wrapper is a thin stdio process and pi
 // itself ships no exporter. Every one of its LLM calls still crosses THIS
 // proxy, so the relay retells each call as one gen_ai span into the customer's
 // trace, model from the manager-held config, token usage read from the
-// response as it streams through untouched, parent = the turn span. Gated on
-// WorkerInfo.Harness == pi: opencode workers keep exporting their own spans
-// and would double-report if the relay synthesized more.
+// response as it streams through untouched, parent = the turn span.
 //
 // The gateway's own gen_ai span (joined via the injected traceparent) remains
-// the authoritative METER for tokens and cost, exactly as on the opencode
-// path, so the synthesized span carries the skip-token-accumulation stamp and
-// its usage attributes are descriptive, never double-counted.
+// the authoritative METER for tokens and cost, so the synthesized span carries
+// the skip-token-accumulation stamp and its usage attributes are descriptive,
+// never double-counted.
 
 // maxGenAIJSONBodyBytes caps how much of a non-streaming response body the
 // usage scanner accumulates. Usage rides a small trailing object; a body past
@@ -123,10 +120,10 @@ type genAICall struct {
 }
 
 // newGenAICall returns the observer for one call, or nil when no span should
-// be synthesized: a non-pi worker, an invalid turn context (nothing to parent
-// under), or a non-generation request (only POSTs carry model calls).
+// be synthesized: an invalid turn context (nothing to parent under), or a
+// non-generation request (only POSTs carry model calls).
 func newGenAICall(r *Relay, entry *workerEntry, req *http.Request) *genAICall {
-	if entry.info.Harness != domain.HarnessPi || req.Method != http.MethodPost {
+	if req.Method != http.MethodPost {
 		return nil
 	}
 	turn := entry.turnContext()

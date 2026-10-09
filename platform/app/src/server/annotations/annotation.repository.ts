@@ -1,5 +1,6 @@
 import type { JsonValue } from "@prisma/client/runtime/client";
 import type { Annotation, PrismaClient } from "~/generated/prisma/client";
+import { isRecordNotFoundError } from "~/server/utils/prismaErrors";
 import {
   type AnnotationAnchorKind,
   type AnnotationAnchorScope,
@@ -10,7 +11,10 @@ export type CreateAnnotationInput = {
   id: string;
   projectId: string;
   traceId: string;
-  userId: string;
+  /** Null for an annotation made over the REST API, which names no user. */
+  userId: string | null;
+  /** The author's email, which the REST API takes in place of a user. */
+  email?: string | null;
   comment: string;
   isThumbsUp: boolean | null;
   scoreOptions: JsonValue;
@@ -80,6 +84,7 @@ export class AnnotationRepository {
         projectId: input.projectId,
         traceId: input.traceId,
         userId: input.userId,
+        email: input.email ?? null,
         comment: input.comment,
         isThumbsUp: input.isThumbsUp,
         scoreOptions: input.scoreOptions ?? {},
@@ -148,15 +153,21 @@ export class AnnotationRepository {
   }
 
   /**
-   * Deletes an annotation by id within a project.
+   * Deletes an annotation by id within a project. Null when no annotation
+   * with that id exists in the project.
    */
-  async delete(input: DeleteAnnotationInput): Promise<Annotation> {
-    return await this.prisma.annotation.delete({
-      where: {
-        id: input.id,
-        projectId: input.projectId,
-      },
-    });
+  async delete(input: DeleteAnnotationInput): Promise<Annotation | null> {
+    try {
+      return await this.prisma.annotation.delete({
+        where: {
+          id: input.id,
+          projectId: input.projectId,
+        },
+      });
+    } catch (error) {
+      if (isRecordNotFoundError(error)) return null;
+      throw error;
+    }
   }
 
   /**

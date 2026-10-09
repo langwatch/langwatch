@@ -25,7 +25,8 @@ interface OnboardingContainerProps extends React.PropsWithChildren {
   title: string;
   subTitle?: string;
   compressedHeader?: boolean;
-  widthVariant?: "narrow" | "full";
+  /** `guided` is the width of the guided variant's cards, wide enough that a company name never truncates. */
+  widthVariant?: "narrow" | "guided" | "full";
   showBackButton?: boolean;
   onBack?: () => void;
   skipHref?: string;
@@ -217,7 +218,10 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
         maxW={
           isFullWidth
             ? { base: "100%", "2xl": "1440px" }
-            : { base: "100%", md: "540px" }
+            : {
+                base: "100%",
+                md: widthVariant === "guided" ? "560px" : "540px",
+              }
         }
         px={isFullWidth ? { base: 5, md: 10 } : { base: 4, md: 0 }}
         {...(isFullWidth ? { fluid: true } : {})}

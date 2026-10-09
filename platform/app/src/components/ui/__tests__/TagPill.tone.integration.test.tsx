@@ -12,7 +12,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import type React from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import { TagList } from "../TagList";
-import { pastelPaletteForLabel, TagPill } from "../TagPill";
+import { pastelHueForLabel, TagPill } from "../TagPill";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -62,16 +62,35 @@ describe("<TagPill/> tone", () => {
       expect(pillFor("billing").className).not.toBe(neutral);
     });
 
+    it("draws the label in the monospace face", () => {
+      render(<TagPill label="billing" tone="pastel" />, { wrapper: Wrapper });
+
+      const rules = Array.from(document.styleSheets)
+        .flatMap((sheet) => {
+          try {
+            return Array.from(sheet.cssRules).map((rule) => rule.cssText);
+          } catch {
+            return [];
+          }
+        })
+        .filter((text) =>
+          Array.from(pillFor("billing").classList).some((className) =>
+            text.includes(className),
+          ),
+        )
+        .join("\n");
+
+      expect(rules).toMatch(/font-family:\s*var\(--chakra-fonts-mono\)/);
+    });
+
     it("gives the same label the same colour every time", () => {
-      expect(pastelPaletteForLabel("billing")).toBe(
-        pastelPaletteForLabel("billing"),
-      );
+      expect(pastelHueForLabel("billing")).toBe(pastelHueForLabel("billing"));
     });
 
     it("tells labels apart", () => {
       const palettes = new Set(
         ["billing", "refunds", "onboarding", "escalation"].map(
-          pastelPaletteForLabel,
+          pastelHueForLabel,
         ),
       );
 

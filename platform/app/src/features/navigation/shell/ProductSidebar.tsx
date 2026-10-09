@@ -117,7 +117,7 @@ function SidebarBottomBlock({
           showLabel={showExpanded}
         />
       )}
-      <SupportMenu showLabel={showExpanded} chatPlacement="in-menu" />
+      <SupportMenu showLabel={showExpanded} />
       <ThemeToggle showLabel={showExpanded} />
     </VStack>
   );
@@ -216,6 +216,8 @@ function SettingsMenuBody({ showExpanded }: { showExpanded: boolean }) {
 /**
  * The Gateway and Governance sidebar bodies: the same registry data the
  * legacy section rails render, promoted to first-class sidebar entries.
+ * Ungrouped entries list flat first; each `group` then lists under its own
+ * collapsible label, in the order the groups first appear in the data.
  */
 function SectionItemsNav({
   items,
@@ -226,21 +228,42 @@ function SectionItemsNav({
 }) {
   const pathname = usePathname();
   const visibleItems = useVisibleSectionNavItems(items);
+  const ungrouped = visibleItems.filter((item) => item.group === undefined);
+  const groups = new Map<string, SectionNavItemData[]>();
+  for (const item of visibleItems) {
+    if (item.group === undefined) continue;
+    groups.set(item.group, [...(groups.get(item.group) ?? []), item]);
+  }
+  const renderLink = (item: SectionNavItemData) => (
+    <SideMenuLink
+      key={item.href}
+      icon={item.icon}
+      label={item.label}
+      href={item.href}
+      tourId={item.tourId}
+      isActive={
+        item.includePath
+          ? isPathUnder({ pathname, base: item.includePath })
+          : pathname === item.href
+      }
+      showLabel={showExpanded}
+    />
+  );
   return (
     <>
-      {visibleItems.map((item) => (
-        <SideMenuLink
-          key={item.href}
-          icon={item.icon}
-          label={item.label}
-          href={item.href}
-          isActive={
-            item.includePath
-              ? isPathUnder({ pathname, base: item.includePath })
-              : pathname === item.href
-          }
-          showLabel={showExpanded}
-        />
+      {ungrouped.map(renderLink)}
+      {/* The groups sit at the foot of the column, above the bottom block,
+          so the product's own pages stay in one place at the top. */}
+      {groups.size > 0 && <Box flex={1} width="full" />}
+      {[...groups.entries()].map(([group, groupItems]) => (
+        <SidebarSection
+          key={group}
+          id={group.toLowerCase()}
+          label={group}
+          showExpanded={showExpanded}
+        >
+          {groupItems.map(renderLink)}
+        </SidebarSection>
       ))}
     </>
   );
@@ -257,12 +280,7 @@ function ProductSidebarBody({
     return <SettingsMenuBody showExpanded={showExpanded} />;
   }
   if (surface === "me") {
-    return (
-      <PersonalSidebarLinks
-        showExpanded={showExpanded}
-        shouldIncludeGovernSection={false}
-      />
-    );
+    return <PersonalSidebarLinks showExpanded={showExpanded} />;
   }
   if (surface === "gateway") {
     return (
@@ -274,13 +292,7 @@ function ProductSidebarBody({
       <SectionItemsNav items={governanceNavItems} showExpanded={showExpanded} />
     );
   }
-  return (
-    <MainMenuSections
-      showExpanded={showExpanded}
-      shouldIncludeGovernSection={false}
-      shouldIncludeOpsSection={false}
-    />
-  );
+  return <MainMenuSections showExpanded={showExpanded} />;
 }
 
 /**
@@ -333,6 +345,7 @@ export function SidebarContent({
       <VStack
         ref={scrollRegionRef}
         data-testid="sidebar-scroll-region"
+        data-tour="sidebar"
         width="full"
         paddingX={3}
         paddingTop={surface === "settings" ? 1.5 : 0}

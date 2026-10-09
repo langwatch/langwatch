@@ -4,7 +4,7 @@
  * Opened from the workbench settings menu ("Run in CI/CD"). Targets the
  * experiment run endpoint via the SDK (`langwatch.experiment.run` /
  * `experiments.runWithResults` / `POST /api/experiments/{slug}/run`). Offers a
- * language picker (Python, TypeScript, Shell) and a data-source picker (attached
+ * language picker (Python, TypeScript, Go, Shell) and a data-source picker (attached
  * dataset, inline data, dataset id), and always shows how to read the per-row
  * results back.
  *

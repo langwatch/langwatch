@@ -23,6 +23,8 @@ If the user's request is **specific** ("version this prompt", "create a new prom
 - Create or update the managed prompt
 - Update the relevant code to use `langwatch.prompts.get()`
 
+In Langy, do not print the code change for the user to apply by hand: call `code_access` and follow the `code-changes` skill to make it on their machine or through GitHub.
+
 ## Plan Limits
 
 LangWatch's free plan has limits on prompts, scenarios, evaluators, experiments, and datasets. When you hit a limit, the API returns `"Free plan limit of N reached..."` with an upgrade link.

@@ -31,6 +31,7 @@ import {
 } from "@langwatch/langy";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { digestOfToolCall } from "../../logic/langyCapabilityDigest";
+import { LangyAutomationCard } from "../automations/LangyAutomationCard";
 import { LangyCardBoundary } from "../LangyCardBoundary";
 import {
   type CapabilityCardInput,
@@ -240,6 +241,10 @@ function CapabilityCard({
   projectSlug: string | null;
 }) {
   const props = { descriptor, input, output, digest, projectSlug };
+  // An automation is drawn by what it is, whichever verb touched it.
+  if (descriptor.command.resource === "trigger") {
+    return <LangyAutomationCard {...props} />;
+  }
   switch (descriptor.render) {
     // `traces` is a trace SEARCH — the sample card, matched traces plus a way
     // through to the Trace Explorer. `trace` is a single `get`.

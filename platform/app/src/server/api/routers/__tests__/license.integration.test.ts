@@ -20,21 +20,10 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
-import {
-  ENTERPRISE_TEMPLATE,
-  LicenseHandler,
-  parseLicenseKey,
-  verifySignature,
-} from "../../../../../ee/licensing";
-import {
-  canonicalPemKey,
-  mangledPemPastes,
-} from "../../../../../ee/licensing/__tests__/fixtures/mangledPemPastes";
-import {
-  TEST_PRIVATE_KEY,
-  TEST_PUBLIC_KEY,
-} from "../../../../../ee/licensing/__tests__/fixtures/testKeys";
+import { LicenseHandler } from "../../../../../ee/licensing";
+import { TEST_PUBLIC_KEY } from "../../../../../ee/licensing/__tests__/fixtures/testKeys";
 import {
   BASE_LICENSE,
   ENTERPRISE_LICENSE,
@@ -50,6 +39,35 @@ import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 
 wireDefaultTestApp();
+
+/**
+ * The connect host, stood in for: activation is tested against a real host in
+ * `connect.license-activate.integration.test.ts`, and what matters here is that
+ * whatever comes back goes through the same validation and storage as a license
+ * a customer pasted.
+ */
+const activation = vi.hoisted(() => ({ license: "", calls: 0 }));
+vi.mock("@ee/licensing/connect/install/connectLicenseClient", () => ({
+  getConnectLicenseClient: () => ({
+    activate: async () => {
+      activation.calls += 1;
+      return {
+        license: activation.license,
+        planType: "ENTERPRISE",
+        maxMembers: 25,
+        expiresAt: new Date().toISOString(),
+        services: [],
+      };
+    },
+  }),
+  resetConnectLicenseClient: async () => undefined,
+}));
+vi.mock("@ee/licensing/connect/install/instanceIdentity", async (original) => ({
+  ...(await original<
+    typeof import("@ee/licensing/connect/install/instanceIdentity")
+  >()),
+  installInstanceId: async () => "instance-license-router-test",
+}));
 
 // Mock getLicenseHandler to use test public key
 vi.mock("../../../subscriptionHandler", async (importOriginal) => {
@@ -116,17 +134,19 @@ describe("License Router Integration", () => {
 
     // Grant admin user an org-scoped ADMIN RoleBinding so permission checks pass
     await cleanupTestRows(prisma, [
+      [
+        "grant",
+        { organizationId, principalType: "USER", principalId: adminUser.id },
+      ],
       ["roleBinding", { organizationId, userId: adminUser.id }],
     ]);
-    await prisma.roleBinding.create({
-      data: {
-        id: `rb-lic-admin-${nanoid(8)}`,
-        organizationId,
-        userId: adminUser.id,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: organizationId,
-      },
+    await seedRoleBinding(prisma, {
+      id: `rb-lic-admin-${nanoid(8)}`,
+      organizationId,
+      userId: adminUser.id,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: organizationId,
     });
 
     // Create member user
@@ -157,17 +177,19 @@ describe("License Router Integration", () => {
 
     // Grant member an org-scoped MEMBER RoleBinding so organization:view checks pass
     await cleanupTestRows(prisma, [
+      [
+        "grant",
+        { organizationId, principalType: "USER", principalId: memberUser.id },
+      ],
       ["roleBinding", { organizationId, userId: memberUser.id }],
     ]);
-    await prisma.roleBinding.create({
-      data: {
-        id: `rb-lic-member-${nanoid(8)}`,
-        organizationId,
-        userId: memberUser.id,
-        role: TeamUserRole.MEMBER,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: organizationId,
-      },
+    await seedRoleBinding(prisma, {
+      id: `rb-lic-member-${nanoid(8)}`,
+      organizationId,
+      userId: memberUser.id,
+      role: TeamUserRole.MEMBER,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: organizationId,
     });
 
     // Create admin caller
@@ -192,6 +214,7 @@ describe("License Router Integration", () => {
   afterAll(async () => {
     // Cleanup
     await cleanupTestRows(prisma, [
+      ["grant", { organizationId }],
       ["roleBinding", { organizationId }],
       ["organizationUser", { organizationId }],
       ["organization", { slug: testOrgSlug }],
@@ -271,6 +294,55 @@ describe("License Router Integration", () => {
       await expect(
         adminCaller.license.getStatus({ organizationId: "" }),
       ).rejects.toThrow();
+    });
+  });
+
+  // ==========================================================================
+  // activate Tests
+  // ==========================================================================
+
+  describe("activate", () => {
+    /** @scenario "The install stores what the code minted exactly as a pasted license" */
+    it("stores the license the code minted the way it stores a pasted one", async () => {
+      activation.license = ENTERPRISE_LICENSE_KEY;
+      activation.calls = 0;
+
+      const result = await adminCaller.license.activate({
+        organizationId,
+        code: "LW-A1B2-C3D4-E5F6-G7H8",
+      });
+
+      expect(result.success).toBe(true);
+      expect(activation.calls).toBe(1);
+
+      const status = await adminCaller.license.getStatus({ organizationId });
+      expect(status.hasLicense).toBe(true);
+      expect(status.valid).toBe(true);
+    });
+
+    it("refuses a license the connect host answered with that does not verify", async () => {
+      activation.license = GARBAGE_DATA;
+
+      await expect(
+        adminCaller.license.activate({
+          organizationId,
+          code: "LW-A1B2-C3D4-E5F6-G7H8",
+        }),
+      ).rejects.toThrow();
+
+      const status = await adminCaller.license.getStatus({ organizationId });
+      expect(status.hasLicense).toBe(false);
+    });
+
+    it("refuses a member, because activating a license is an organization change", async () => {
+      activation.license = ENTERPRISE_LICENSE_KEY;
+
+      await expect(
+        memberCaller.license.activate({
+          organizationId,
+          code: "LW-A1B2-C3D4-E5F6-G7H8",
+        }),
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
   });
 
@@ -394,209 +466,6 @@ describe("License Router Integration", () => {
       // User is not a member of non-existent org, so permission check fails before NOT_FOUND can be thrown
       await expect(
         adminCaller.license.remove({ organizationId: "non-existent-org-id" }),
-      ).rejects.toMatchObject({ code: "FORBIDDEN" });
-    });
-  });
-
-  // ==========================================================================
-  // generate Tests
-  // ==========================================================================
-
-  describe("generate", () => {
-    const futureDate = new Date("2030-12-31T23:59:59Z");
-
-    const getValidInput = () => ({
-      organizationId,
-      privateKey: TEST_PRIVATE_KEY,
-      organizationName: "Test Corp",
-      email: "admin@test.corp",
-      expiresAt: futureDate,
-      planType: "PRO" as const,
-      plan: {
-        maxMembers: 10,
-        maxMembersLite: 5,
-        maxMessagesPerMonth: 100000,
-        canPublish: true,
-        usageUnit: "traces" as const,
-      },
-    });
-
-    it("generates valid license key for valid input", async () => {
-      const result = await adminCaller.license.generate(getValidInput());
-
-      expect(result.licenseKey).toBeDefined();
-      expect(typeof result.licenseKey).toBe("string");
-      expect(result.licenseKey.length).toBeGreaterThan(0);
-    });
-
-    it("generates license that can be parsed and verified", async () => {
-      const result = await adminCaller.license.generate(getValidInput());
-
-      const parsedLicense = parseLicenseKey(result.licenseKey);
-      expect(parsedLicense).not.toBeNull();
-      if (parsedLicense) {
-        const isValid = verifySignature(parsedLicense, TEST_PUBLIC_KEY);
-        expect(isValid).toBe(true);
-      }
-    });
-
-    it("includes correct organization name and email in license", async () => {
-      const result = await adminCaller.license.generate(getValidInput());
-
-      const parsedLicense = parseLicenseKey(result.licenseKey);
-      expect(parsedLicense?.data.organizationName).toBe("Test Corp");
-      expect(parsedLicense?.data.email).toBe("admin@test.corp");
-    });
-
-    it("includes correct plan limits in license", async () => {
-      const result = await adminCaller.license.generate(getValidInput());
-
-      const parsedLicense = parseLicenseKey(result.licenseKey);
-      expect(parsedLicense?.data.plan.maxMembers).toBe(10);
-      expect(parsedLicense?.data.plan.maxMembersLite).toBe(5);
-      expect(parsedLicense?.data.plan.maxMessagesPerMonth).toBe(100000);
-    });
-
-    it("generates unique license IDs for each call", async () => {
-      const result1 = await adminCaller.license.generate(getValidInput());
-      const result2 = await adminCaller.license.generate(getValidInput());
-
-      const license1 = parseLicenseKey(result1.licenseKey);
-      const license2 = parseLicenseKey(result2.licenseKey);
-
-      expect(license1?.data.licenseId).not.toBe(license2?.data.licenseId);
-    });
-
-    it("uses PRO template defaults when planType is PRO", async () => {
-      const result = await adminCaller.license.generate({
-        ...getValidInput(),
-        planType: "PRO",
-      });
-
-      const parsedLicense = parseLicenseKey(result.licenseKey);
-      expect(parsedLicense?.data.plan.type).toBe("PRO");
-      expect(parsedLicense?.data.plan.name).toBe("Pro");
-    });
-
-    it("uses ENTERPRISE template defaults when planType is ENTERPRISE", async () => {
-      const result = await adminCaller.license.generate({
-        ...getValidInput(),
-        planType: "ENTERPRISE",
-        plan: {
-          maxMembers: ENTERPRISE_TEMPLATE.maxMembers,
-          maxMembersLite: ENTERPRISE_TEMPLATE.maxMembersLite ?? 50,
-          maxMessagesPerMonth: ENTERPRISE_TEMPLATE.maxMessagesPerMonth,
-          canPublish: true,
-          usageUnit: "traces" as const,
-        },
-      });
-
-      const parsedLicense = parseLicenseKey(result.licenseKey);
-      expect(parsedLicense?.data.plan.type).toBe("ENTERPRISE");
-      expect(parsedLicense?.data.plan.name).toBe("Enterprise");
-    });
-
-    describe("when the pasted private key carries stray whitespace", () => {
-      const pastes = mangledPemPastes(canonicalPemKey(TEST_PRIVATE_KEY));
-
-      for (const [description, privateKey] of Object.entries(pastes)) {
-        it(`generates a verifiable license from a key with ${description}`, async () => {
-          const result = await adminCaller.license.generate({
-            ...getValidInput(),
-            privateKey,
-          });
-
-          const parsedLicense = parseLicenseKey(result.licenseKey);
-          expect(parsedLicense).not.toBeNull();
-          expect(verifySignature(parsedLicense!, TEST_PUBLIC_KEY)).toBe(true);
-        });
-      }
-
-      it("generates a verifiable license from a public+private PEM bundle", async () => {
-        const result = await adminCaller.license.generate({
-          ...getValidInput(),
-          privateKey: `${TEST_PUBLIC_KEY}${TEST_PRIVATE_KEY}`,
-        });
-
-        const parsedLicense = parseLicenseKey(result.licenseKey);
-        expect(parsedLicense).not.toBeNull();
-        expect(verifySignature(parsedLicense!, TEST_PUBLIC_KEY)).toBe(true);
-      });
-    });
-
-    it("throws BAD_REQUEST with a keyable code when the private key is not a PEM key", async () => {
-      await expect(
-        adminCaller.license.generate({
-          ...getValidInput(),
-          privateKey: "not-a-private-key",
-        }),
-      ).rejects.toMatchObject({
-        code: "BAD_REQUEST",
-        cause: { code: "license_signing_key_not_pem" },
-      });
-    });
-
-    it("throws BAD_REQUEST for past expiration date", async () => {
-      await expect(
-        adminCaller.license.generate({
-          ...getValidInput(),
-          expiresAt: new Date("2020-01-01"),
-        }),
-      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
-    });
-
-    it("throws BAD_REQUEST for missing organization name", async () => {
-      await expect(
-        adminCaller.license.generate({
-          ...getValidInput(),
-          organizationName: "",
-        }),
-      ).rejects.toThrow();
-    });
-
-    it("throws BAD_REQUEST for invalid email format", async () => {
-      await expect(
-        adminCaller.license.generate({
-          ...getValidInput(),
-          email: "not-an-email",
-        }),
-      ).rejects.toThrow();
-    });
-
-    it("throws BAD_REQUEST for negative plan limits", async () => {
-      await expect(
-        adminCaller.license.generate({
-          ...getValidInput(),
-          plan: {
-            ...getValidInput().plan,
-            maxMembers: -5,
-          },
-        }),
-      ).rejects.toThrow();
-    });
-
-    it("includes usageUnit in generated license", async () => {
-      const result = await adminCaller.license.generate(getValidInput());
-
-      const parsedLicense = parseLicenseKey(result.licenseKey);
-      expect(parsedLicense?.data.plan.usageUnit).toBe("traces");
-    });
-
-    it("generates license with events usageUnit", async () => {
-      const input = {
-        ...getValidInput(),
-        plan: { ...getValidInput().plan, usageUnit: "events" as const },
-      };
-
-      const result = await adminCaller.license.generate(input);
-
-      const parsedLicense = parseLicenseKey(result.licenseKey);
-      expect(parsedLicense?.data.plan.usageUnit).toBe("events");
-    });
-
-    it("throws UNAUTHORIZED when member tries to generate", async () => {
-      await expect(
-        memberCaller.license.generate(getValidInput()),
       ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
   });

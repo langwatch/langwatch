@@ -1,7 +1,10 @@
 import { Button, Combobox, Text } from "@chakra-ui/react";
 import { ChevronsUpDown } from "lucide-react";
 import { useState } from "react";
-import { ProjectAvatar } from "~/components/ProjectAvatar";
+import {
+  AggregateProjectAvatar,
+  ProjectAvatar,
+} from "~/components/ProjectAvatar";
 import { useRouter } from "~/utils/compat/next-router";
 import { ProjectComboboxPopup } from "./ProjectSwitcherComboboxPopup";
 import {
@@ -23,12 +26,14 @@ export function ProjectSwitcherCombobox({
   groups,
   currentProjectId,
   currentProjectName,
+  currentProjectIsAggregate = false,
   showTeamHeaders,
   onCreateProjectForTeam,
 }: {
   groups: ProjectPickGroup[];
   currentProjectId: string;
   currentProjectName: string;
+  currentProjectIsAggregate?: boolean;
   showTeamHeaders: boolean;
   onCreateProjectForTeam:
     | (({ teamId, orgId }: { teamId: string; orgId: string }) => void)
@@ -55,7 +60,14 @@ export function ProjectSwitcherCombobox({
   return (
     <Combobox.Root
       collection={collection}
-      value={[currentProjectId]}
+      // Deliberately uncontrolled. Holding the current project as the
+      // combobox's selected value makes the machine drag the highlight back
+      // onto it whenever the collection changes — and once a search has
+      // filtered that project out, the highlight lands on an option that is
+      // no longer rendered, so Enter resolves to the project the reader is
+      // already on and opens nothing. The current project is marked by the
+      // Check in ProjectItemRow, which reads `currentProjectId` directly, so
+      // nothing needs the selection here.
       openOnClick
       selectionBehavior="clear"
       // Typing highlights the top result, so a reader can search and press
@@ -74,7 +86,10 @@ export function ProjectSwitcherCombobox({
       positioning={{ placement: "bottom-start", gutter: 4 }}
       width="auto"
     >
-      <ProjectComboboxTrigger currentProjectName={currentProjectName} />
+      <ProjectComboboxTrigger
+        currentProjectName={currentProjectName}
+        currentProjectIsAggregate={currentProjectIsAggregate}
+      />
       <ProjectComboboxPopup
         visibleGroups={visibleGroups}
         showTeamHeaders={showTeamHeaders}
@@ -87,8 +102,10 @@ export function ProjectSwitcherCombobox({
 /** The chip that opens the popup, styled the same as the plain menu's. */
 function ProjectComboboxTrigger({
   currentProjectName,
+  currentProjectIsAggregate,
 }: {
   currentProjectName: string;
+  currentProjectIsAggregate: boolean;
 }) {
   return (
     // Ark positions the listbox against the CONTROL, so the trigger
@@ -98,6 +115,7 @@ function ProjectComboboxTrigger({
         <Button
           variant="ghost"
           aria-label="Switch project"
+          data-tour="project-switcher"
           fontSize="13px"
           fontWeight="normal"
           paddingX={2}
@@ -106,7 +124,11 @@ function ProjectComboboxTrigger({
           gap={2}
           _hover={{ backgroundColor: "bg.muted" }}
         >
-          <ProjectAvatar name={currentProjectName} />
+          {currentProjectIsAggregate ? (
+            <AggregateProjectAvatar name={currentProjectName} />
+          ) : (
+            <ProjectAvatar name={currentProjectName} />
+          )}
           <Text whiteSpace="nowrap">{currentProjectName}</Text>
           <ChevronsUpDown size={12} color="var(--chakra-colors-fg-muted)" />
         </Button>

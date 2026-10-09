@@ -835,7 +835,7 @@ describe("Langy via HTTP wrapper", () => {
       expect(newOnes.length).toBeGreaterThan(0);
     });
 
-    // `POST /api/agents` gates on `project:update`, and the project family is
+    // `POST /api/v1/agents` gates on `project:update`, and the project family is
     // read-only for Langy by policy: project writes are the credential surface
     // (`project:update` stores model-provider keys). Agents have no permission
     // family of their own, so there is no narrower grain the route could ask

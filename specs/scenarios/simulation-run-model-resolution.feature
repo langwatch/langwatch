@@ -151,6 +151,67 @@ Feature: Simulation run model resolution per target type
     And the failure names that node's model
 
   # ============================================================================
+  # Latest-alias expansion at the execution boundary
+  # ============================================================================
+
+  # A scenario or run plan can store a virtual alias like "openai/latest" or
+  # "anthropic/latest-mini" as its simulator or judge model. Providers do not
+  # understand these aliases, so the chain that resolves the run models expands
+  # every answer to the concrete registry flagship. One expansion serves both
+  # readers of that chain: the prefetch prepares litellm params with a concrete
+  # model, and the queue path stamps the same concrete model on the run.
+  # Storage keeps the alias verbatim so the pick keeps tracking upstream
+  # releases.
+
+  @unit
+  Scenario: A latest alias expands where the run models resolve
+    Given a run plan whose simulator model is "openai/latest"
+    When the models of the run are resolved
+    Then the simulator model is the concrete model the alias resolves to
+    And it is never the literal alias
+
+  @unit
+  Scenario: A latest alias on the scenario simulator model expands to a concrete model at run time
+    Given a scenario whose simulator model is "openai/latest"
+    When the run data is prefetched
+    Then the prepared simulator params carry the concrete model the alias resolves to
+    And they never carry the literal alias
+
+  @unit
+  Scenario: A latest alias on the scenario judge model expands to a concrete model at run time
+    Given a scenario whose judge model is "anthropic/latest-mini"
+    When the run data is prefetched
+    Then the prepared judge params carry the concrete model the alias resolves to
+    And they never carry the literal alias
+
+  @unit
+  Scenario: A latest alias on the run plan simulator model expands to a concrete model at run time
+    Given a run plan whose simulator model is "openai/latest-mini"
+    When a scenario in that plan is prefetched
+    Then the prepared simulator params carry the concrete model the alias resolves to
+    And they never carry the literal alias
+
+  @unit
+  Scenario: A latest alias on the run plan judge model expands to a concrete model at run time
+    Given a run plan whose judge model is "gemini/latest"
+    When a scenario in that plan is prefetched
+    Then the prepared judge params carry the concrete model the alias resolves to
+    And they never carry the literal alias
+
+  @integration
+  Scenario: A latest alias is stored verbatim on the scenario and the run plan
+    Given a scenario updated with simulator model "openai/latest"
+    And a run plan saved with judge model "anthropic/latest-mini"
+    When the records are read back
+    Then both still hold the alias string, not a concrete model
+
+  @unit
+  Scenario: A model override that is not a provider-prefixed id is rejected at save time
+    Given a scenario update whose simulator model is "latest"
+    When the input is validated
+    Then the update is rejected with a message asking for a provider/model id
+
+  # ============================================================================
   # Rollout: the child-process job payload
   # ============================================================================
 
@@ -186,3 +247,23 @@ Feature: Simulation run model resolution per target type
     When the child process parses the job payload
     Then parsing succeeds
     And the simulator and judge fall back to the adapter-role model params
+
+  # Bedrock and Vertex authenticate with their own credential fields
+  # (aws_access_key_id / vertex_credentials) and carry no api_key, so a job
+  # payload that requires api_key fails to parse before the first message.
+
+  @unit
+  Scenario: A job payload whose models run on Bedrock or Vertex parses without an api_key
+    Given the simulator and judge models run on Bedrock with AWS access keys
+    And the adapter model runs on Vertex with service account credentials
+    When the child process parses the job payload
+    Then parsing succeeds
+    And the provider credential fields reach the model params unchanged
+
+  # The run showed "Failed to parse job data: [": a ZodError's message is its
+  # issues as pretty-printed JSON, and the reason shows its first line only.
+  @unit
+  Scenario: A job payload that fails to parse names the rejected fields on one line
+    Given a job payload whose simulator model params carry no model
+    When the child process fails to parse it
+    Then the failure names the rejected field and the reason on one line

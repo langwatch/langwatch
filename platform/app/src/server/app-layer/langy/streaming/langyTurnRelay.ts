@@ -185,12 +185,15 @@ export interface LangyRelayBuffer {
     isError?: boolean;
     digest?: CliResultDigest;
     result?: CliToolResult;
+    /** The call ran in the developer's shared folder, not in the sandbox. */
+    local?: boolean;
   }): Promise<void>;
   markEnd(a: {
     conversationId: string;
     turnId: string;
     backstopSilentTurn?: boolean;
-  }): Promise<{ backstopped: boolean }>;
+    /** The line the backstop wrote, when it wrote one. */
+  }): Promise<{ backstopped: boolean; text?: string }>;
   markError(a: {
     conversationId: string;
     turnId: string;
@@ -633,11 +636,14 @@ export class LangyTurnRelay {
         // deltas, so this is the one place that sees both. Whether the backstop
         // fired decides both, or the fallback would show live and the turn
         // would render blank again the moment history reloads.
-        const { backstopped } = await this.deps.buffer.markEnd({
-          ...at,
-          backstopSilentTurn: (frame.text ?? "").trim() === "",
-        });
-        const text = backstopped ? LANGY_EMPTY_TURN_FALLBACK : frame.text;
+        const { backstopped, text: backstopText } =
+          await this.deps.buffer.markEnd({
+            ...at,
+            backstopSilentTurn: (frame.text ?? "").trim() === "",
+          });
+        const text = backstopped
+          ? (backstopText ?? LANGY_EMPTY_TURN_FALLBACK)
+          : frame.text;
         // markEnd first: it flushes the last tokens, so the turn's own account
         // of what happened when is complete on the stream before the ingest
         // reads it back to record the parts in that order.
@@ -718,6 +724,7 @@ export class LangyTurnRelay {
         ...(frame.output !== undefined ? { output: frame.output } : {}),
         ...(frame.isError !== undefined ? { isError: frame.isError } : {}),
         ...(frame.result !== undefined ? { result: frame.result } : {}),
+        ...(frame.local !== undefined ? { local: frame.local } : {}),
       },
     });
 
@@ -755,6 +762,7 @@ export class LangyTurnRelay {
       ...(call.isError !== undefined ? { isError: call.isError } : {}),
       ...(call.digest !== undefined ? { digest: call.digest } : {}),
       ...(call.result !== undefined ? { result: call.result } : {}),
+      ...(call.local !== undefined ? { local: call.local } : {}),
     });
     // A capability's present-continuous sub-status ("Searching traces…") for the
     // live status line — emitted AFTER the tool frame so the cold-start clear (it

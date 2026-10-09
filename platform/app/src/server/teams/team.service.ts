@@ -3,6 +3,7 @@ import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
 import {
+  OrganizationUserRole,
   Prisma,
   type PrismaClient,
   RoleBindingScopeType,
@@ -14,11 +15,16 @@ import {
   type GrantsLedgerWriter,
   grantsLedgerWriter,
 } from "~/server/app-layer/authz/ledger";
-import { CutoverAwareAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.cutover.repository";
+import { GrantsAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.grants.repository";
 import {
   ACCESS_LISTING_USER_SELECT,
   type AccessListingRepository,
 } from "~/server/app-layer/authz/repositories/access-listing.repository";
+import { liveRoles } from "~/server/app-layer/authz/repositories/live-rows";
+import {
+  projectKindsHiddenFrom,
+  withoutAggregateCredentials,
+} from "~/server/app-layer/projects/project-kinds";
 import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
 import type {
   RoleBindingRepository,
@@ -232,7 +238,7 @@ export class TeamService {
     prisma,
     roleBindingRepo = new PrismaRoleBindingRepository(prisma),
     writer = grantsLedgerWriter(),
-    accessListing = new CutoverAwareAccessListingRepository(prisma),
+    accessListing = new GrantsAccessListingRepository(prisma),
   }: {
     prisma: PrismaClient;
     roleBindingRepo?: RoleBindingRepository;
@@ -303,9 +309,12 @@ export class TeamService {
   async getTeamWithMembers({
     slug,
     organizationId,
+    callerOrganizationRole,
   }: {
     slug: string;
     organizationId: string;
+    /** Decides whether the team's aggregate projects are listed (ADR-144). */
+    callerOrganizationRole: string | null;
   }) {
     const team = await this.prisma.team.findFirst({
       where: { slug, organizationId },
@@ -313,7 +322,7 @@ export class TeamService {
         projects: {
           where: {
             archivedAt: null,
-            kind: { not: "internal_governance" },
+            kind: { notIn: projectKindsHiddenFrom(callerOrganizationRole) },
           },
         },
       },
@@ -329,6 +338,7 @@ export class TeamService {
 
     return {
       ...team,
+      projects: team.projects.map(withoutAggregateCredentials),
       members: this.shapeTeamMembers(byTeam.get(team.id) ?? [], team.id),
     };
   }
@@ -343,10 +353,13 @@ export class TeamService {
     organizationId,
     callerId,
     callerHasManage,
+    callerOrganizationRole,
   }: {
     organizationId: string;
     callerId: string;
     callerHasManage: boolean;
+    /** Decides whether aggregate projects are listed (ADR-144). */
+    callerOrganizationRole: string | null;
   }) {
     const teams = await this.prisma.team.findMany({
       where: {
@@ -365,7 +378,7 @@ export class TeamService {
         projects: {
           where: {
             archivedAt: null,
-            kind: { not: "internal_governance" },
+            kind: { notIn: projectKindsHiddenFrom(callerOrganizationRole) },
           },
         },
       },
@@ -380,6 +393,7 @@ export class TeamService {
 
     return teams.map((team) => ({
       ...team,
+      projects: team.projects.map(withoutAggregateCredentials),
       members: this.shapeTeamMembers(byTeam.get(team.id) ?? [], team.id),
     }));
   }
@@ -419,13 +433,26 @@ export class TeamService {
 
   async getTeamsWithRoleBindings({
     organizationId,
+    callerOrganizationRole,
   }: {
     organizationId: string;
+    /**
+     * Decides whether aggregate projects are listed (ADR-144). The route asks
+     * organization:manage, which a custom role can grant to someone who is
+     * not an organisation admin.
+     */
+    callerOrganizationRole: string | null;
   }) {
     const teams = await this.prisma.team.findMany({
       where: { organizationId, archivedAt: null },
       include: {
-        projects: { where: { archivedAt: null }, orderBy: { name: "asc" } },
+        projects: {
+          where: {
+            archivedAt: null,
+            kind: { notIn: projectKindsHiddenFrom(callerOrganizationRole) },
+          },
+          orderBy: { name: "asc" },
+        },
       },
       orderBy: { name: "asc" },
     });
@@ -467,7 +494,18 @@ export class TeamService {
                 where: {
                   groupId: { in: allGroupIds },
                   group: { organizationId },
-                  user: { orgMemberships: { some: { organizationId } } },
+                  // A Developer seat gets nothing through a group (ADR-143),
+                  // so one sitting in a team-bound group is not a member the
+                  // listing should show, the same rule the admin fan-out
+                  // applies in effective-team-admins.
+                  user: {
+                    orgMemberships: {
+                      some: {
+                        organizationId,
+                        role: { not: OrganizationUserRole.DEVELOPER },
+                      },
+                    },
+                  },
                 },
                 include: { user: { select: ACCESS_LISTING_USER_SELECT } },
               })
@@ -683,7 +721,7 @@ export class TeamService {
           id: team.id,
           name: team.name,
           slug: team.slug,
-          projects: team.projects,
+          projects: team.projects.map(withoutAggregateCredentials),
           directMembers,
           projectOnlyAccess: [...projectOnlyMap.values()],
           projectAccess,
@@ -818,14 +856,15 @@ export class TeamService {
   }): Promise<MembershipPlan> {
     return await this.prisma.$transaction(
       async (tx) => {
-        const currentBindings = await tx.roleBinding.findMany({
+        const currentBindings = await new GrantsAccessListingRepository(
+          tx,
+        ).findBindingRows({
+          organizationId,
           where: {
-            organizationId,
+            principalType: "USER",
             scopeType: RoleBindingScopeType.TEAM,
             scopeId: teamId,
-            userId: { not: null },
           },
-          select: { id: true, userId: true, role: true, customRoleId: true },
         });
 
         const plan = diffMembership({ currentBindings, members });
@@ -1079,8 +1118,8 @@ export class TeamService {
         throw new CustomRoleIdRequiredError();
       }
       const customRoleId = member.customRoleId;
-      const customRole = await this.prisma.customRole.findUnique({
-        where: { id: customRoleId },
+      const customRole = await liveRoles(this.prisma).findFirst({
+        where: { id: customRoleId, kind: "custom" },
         select: { organizationId: true, kind: true },
       });
       if (customRole?.kind !== "custom") {
@@ -1139,14 +1178,16 @@ export class TeamService {
         }
 
         // Check if the target user is currently a direct member of the team
-        const targetBinding = await tx.roleBinding.findFirst({
+        const [targetBinding] = await new GrantsAccessListingRepository(
+          tx,
+        ).findBindingRows({
+          organizationId: team.organizationId,
           where: {
-            organizationId: team.organizationId,
+            principalType: "USER",
+            principalId: userId,
             scopeType: RoleBindingScopeType.TEAM,
             scopeId: teamId,
-            userId,
           },
-          select: { role: true },
         });
 
         if (!targetBinding) {
@@ -1179,14 +1220,16 @@ export class TeamService {
         // read and revoked as a command once this commits. There is no
         // post-removal re-read of the admin set — `projectedAdminUserIds`
         // above IS that post-state, computed for exactly this removal.
-        const grantIds = await tx.roleBinding.findMany({
+        const grantIds = await new GrantsAccessListingRepository(
+          tx,
+        ).findBindingRows({
+          organizationId: team.organizationId,
           where: {
-            organizationId: team.organizationId,
-            userId,
+            principalType: "USER",
+            principalId: userId,
             scopeType: RoleBindingScopeType.TEAM,
             scopeId: teamId,
           },
-          select: { id: true },
         });
         await tx.teamUser.deleteMany({ where: { userId, teamId } });
 

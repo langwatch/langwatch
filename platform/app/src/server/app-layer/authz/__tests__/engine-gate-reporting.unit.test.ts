@@ -38,7 +38,6 @@ describe("the installed engine-gate failure reporter", () => {
   });
 
   describe("when a migration-state read fails after installation", () => {
-    /** @scenario "A failed migration-state read is reported" */
     it("logs the reopened window and increments the read-failure counter", async () => {
       installAuthzEngineGateReporting();
       const error = new Error("pg is down");

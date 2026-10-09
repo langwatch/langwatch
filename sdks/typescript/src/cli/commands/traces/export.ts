@@ -10,6 +10,7 @@ import { cliAuthHeaders } from "../../utils/authHeaders";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import { parseOriginOption } from "./origin-filter";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 /** Rows are serialised in chunks so the progress bar moves as the file is built. */
 const PROGRESS_CHUNK = 25;
@@ -122,7 +123,7 @@ export const exportTracesCommand = async (options: {
         options.includeSpans ? SPANS_PAGE_CAP : SERVER_PAGE_CAP,
       );
 
-      const response = await fetch(`${endpoint}/api/traces/search`, {
+      const response = await langwatchFetch(`${endpoint}/api/traces/search`, {
         method: "POST",
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
         headers: {

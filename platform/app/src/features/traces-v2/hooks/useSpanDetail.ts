@@ -16,13 +16,13 @@ import { useTraceQueryArgs } from "./useTraceQueryArgs";
  */
 export function useSpanDetailCanonical() {
   const shared = useSharedTrace();
-  const { isReady, queryArgs } = useTraceQueryArgs();
+  const { isReady, hintReady, queryArgs } = useTraceQueryArgs();
   const spanId = useDrawerStore((s) => s.selectedSpanId);
 
   const query = api.tracesV2.spanDetail.useQuery(
     { ...queryArgs, spanId: spanId ?? "" },
     {
-      enabled: isReady && !!spanId && !shared,
+      enabled: isReady && hintReady && !!spanId && !shared,
       staleTime: 300_000,
     },
   );

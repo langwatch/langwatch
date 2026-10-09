@@ -18,6 +18,7 @@ export const ORIGIN_DISPLAY = {
   sample: { label: "Sample", colorPalette: "gray" },
   coding_agent: { label: "Coding Agent", colorPalette: "orange" },
   ai_tool: { label: "AI Tool", colorPalette: "yellow" },
+  langy: { label: "Langy", colorPalette: "orange" },
 } as const satisfies Record<string, { label: string; colorPalette: string }>;
 
 export type KnownOrigin = keyof typeof ORIGIN_DISPLAY;

@@ -6,7 +6,7 @@
 
 **Relates to:** [ADR-081](./081-lwql-table-function-and-ssrf-policy.md) (why the caller can never write `postgresql()` themselves), [ADR-082](./082-lwql-analytics-views-invoker-column-grants-final-dedup.md) (the invoker-view and column-grant model this extends across a second residence).
 
-Behavioural contract: [specs/analytics/lwql-api.feature](../../../specs/analytics/lwql-api.feature).
+Behavioural contract: [specs/lwql/api.feature](../../../specs/lwql/api.feature).
 
 ## Context
 
@@ -183,6 +183,6 @@ proving it cannot be probed.
 
 - Issue: [#6480](https://github.com/langwatch/langwatch/issues/6480)
 - `platform/app/src/server/analytics/lwql/catalog/postgresViews.ts` — the six entries
-- `platform/app/src/server/analytics/lwql/views.ts` — `postgresTenantPredicate`
-- `platform/app/src/server/analytics/lwql/provisioning.ts` — approved views, engine tables, reader role
+- `platform/app/src/server/analytics/lwql/provisioning/catalogStatements.ts` — `postgresTenantPredicate`
+- `platform/app/src/server/analytics/lwql/provisioning/accessModel.ts` — approved views, engine tables, reader role
 - `platform/app/src/server/analytics/lwql/__tests__/postgresEngineIsolation.integration.test.ts` — the proof and the measurements

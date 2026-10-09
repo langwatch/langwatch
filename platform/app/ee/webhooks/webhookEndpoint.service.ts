@@ -6,6 +6,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type {
+  Prisma,
   PrismaClient,
   WebhookDeliveryOutcome,
   WebhookEndpoint,
@@ -588,6 +589,42 @@ function newSecret(): string {
   return `whsec_${randomBytes(32).toString("base64url")}`;
 }
 
+/**
+ * Flips an ACTIVE endpoint to DISABLED with the automatic reason, and answers
+ * whether this call is the one that flipped it.
+ *
+ * A compare-and-set on status, so of any concurrent failing attempts exactly
+ * one is told yes, and only that one notifies. Stated as SQL rather than
+ * through `updateMany`, which does not hold under concurrency: Prisma puts
+ * the condition in a subquery, and a statement that waited on the row lock
+ * re-checks only the outer id predicate against the committed row while the
+ * subquery still runs on its own older snapshot, so both attempts would be
+ * told yes and the auto-disable notification would go out twice.
+ */
+export async function disableEndpointForFailureStreak({
+  prisma,
+  organizationId,
+  endpointId,
+  now,
+}: {
+  prisma: PrismaClient | Prisma.TransactionClient;
+  organizationId: string;
+  endpointId: string;
+  now: Date;
+}): Promise<boolean> {
+  const flipped = await prisma.$executeRaw`
+    UPDATE "WebhookEndpoint"
+       SET "status" = 'DISABLED',
+           "disabledReason" = ${WEBHOOK_DISABLED_REASON_AUTO},
+           "disabledAt" = ${now},
+           "updatedAt" = now()
+     WHERE "id" = ${endpointId}
+       AND "organizationId" = ${organizationId}
+       AND "status" = 'ACTIVE'
+  `;
+  return flipped === 1;
+}
+
 export interface WebhookEndpointDeps {
   prisma: PrismaClient;
   /**
@@ -1130,19 +1167,13 @@ export class WebhookEndpointService {
     ) {
       return;
     }
-    const flipped = await this.deps.prisma.webhookEndpoint.updateMany({
-      where: {
-        id: endpoint.id,
-        organizationId,
-        status: "ACTIVE",
-      },
-      data: {
-        status: "DISABLED",
-        disabledReason: WEBHOOK_DISABLED_REASON_AUTO,
-        disabledAt: now,
-      },
+    const flipped = await disableEndpointForFailureStreak({
+      prisma: this.deps.prisma,
+      organizationId,
+      endpointId: endpoint.id,
+      now,
     });
-    if (flipped.count !== 1) return;
+    if (!flipped) return;
 
     logger.warn(
       {

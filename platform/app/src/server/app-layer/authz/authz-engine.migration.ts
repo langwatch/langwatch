@@ -323,11 +323,18 @@ export class AuthzEngineMigration implements SystemMigration {
   }
 
   private async readInventory(organizationId: string) {
+    // Read membership lifetimes first. Offboarding removes the retained
+    // legacy USER bindings in the same transaction; therefore a later binding
+    // read sees either no old row or a row paired with the old stamp, which
+    // the projection fence rejects. Promise.all here would allow a new
+    // membership read to pair with a retained pre-offboard binding.
+    const members = await this.deps.store.findOrganizationMembers({
+      organizationId,
+    });
     const [
       organizationCreatedAtMs,
       roleRows,
       bindingRows,
-      members,
       teamRows,
       shareLinkRows,
       externalMembers,
@@ -337,7 +344,6 @@ export class AuthzEngineMigration implements SystemMigration {
       this.deps.store.findOrganizationCreatedAtMs({ organizationId }),
       this.deps.store.findLegacyRoleRows({ organizationId }),
       this.deps.store.findLegacyBindingRows({ organizationId }),
-      this.deps.store.findOrganizationMembers({ organizationId }),
       this.deps.store.findLegacyTeamRows({ organizationId }),
       this.deps.store.findShareLinkRows({ organizationId }),
       this.deps.store.findExternalMemberFacts({ organizationId }),

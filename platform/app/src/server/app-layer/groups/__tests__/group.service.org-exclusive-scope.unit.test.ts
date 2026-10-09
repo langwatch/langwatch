@@ -43,7 +43,7 @@ function buildService(role: { id: string; permissions: string[] }) {
   } as unknown as GroupRepository;
 
   const prisma = {
-    customRole: {
+    role: {
       findMany: vi.fn().mockResolvedValue([role]),
     },
   };

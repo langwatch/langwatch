@@ -28,6 +28,9 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import { resetAuthzGrantsCommandsForTests } from "~/server/app-layer/authz/ledger";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import { cleanupTestRows } from "../../../../test-utils/cleanupTestRows";
 import { globalForApp, resetApp } from "../../../app-layer/app";
 import { OrganizationService } from "../../../app-layer/organizations/organization.service";
@@ -80,15 +83,13 @@ describe("organization.getAll — admin-via-binding promotion of legacy role", (
         role: OrganizationUserRole.MEMBER,
       },
     });
-    await prisma.roleBinding.create({
-      data: {
-        id: `rb-admin-${nanoid(8)}`,
-        organizationId,
-        userId: adminUserId,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: organizationId,
-      },
+    await seedRoleBinding(prisma, {
+      id: `rb-admin-${nanoid(8)}`,
+      organizationId,
+      userId: adminUserId,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: organizationId,
     });
 
     // Control case: a user with no binding promotion — legacy MEMBER stays MEMBER.
@@ -100,7 +101,9 @@ describe("organization.getAll — admin-via-binding promotion of legacy role", (
       },
     });
 
+    resetAuthzGrantsCommandsForTests();
     globalForApp.__langwatch_app = createTestApp({
+      _eventSourcing: createAuthzTestEventSourcing(prisma),
       organizations: traced(
         new OrganizationService(
           new PrismaOrganizationRepository(prisma),
@@ -124,7 +127,9 @@ describe("organization.getAll — admin-via-binding promotion of legacy role", (
 
   afterAll(async () => {
     await resetApp();
+    resetAuthzGrantsCommandsForTests();
     await cleanupTestRows(prisma, [
+      ["grant", { organizationId }],
       ["roleBinding", { organizationId }],
       ["organizationUser", { organizationId }],
       ["organization", { id: organizationId }],

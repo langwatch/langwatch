@@ -1,16 +1,20 @@
 import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { buildGuidedKickoffParts } from "~/features/guided-onboarding/kickoff";
+import { AggregateProjectIsReadOnlyError } from "~/server/app-layer/projects/errors";
 import { featureFlagService } from "~/server/featureFlag";
 import {
   LangyAgentUnavailableError,
   LangyConversationNotOwnedError,
   LangyModelNotAllowedError,
   LangyModelNotConfiguredError,
+  LangySkillNotAvailableError,
   LangyTurnInProgressError,
   LangyTurnNotStoppableError,
 } from "../errors";
 import {
   __resetLangyTurnOverrideCacheForTests,
+  composeLangyTurnPrompt,
   LangyTurnService,
   type LangyTurnServiceDeps,
   langyTurnIdentity,
@@ -97,6 +101,7 @@ function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
       conversations as unknown as LangyTurnServiceDeps["conversations"],
     credentials: credentials as unknown as LangyTurnServiceDeps["credentials"],
     resolveModel: vi.fn(async () => ({ modelId: "openai/gpt-5-mini" })),
+    projectKinds: { kindOf: vi.fn(async () => "application") },
     worker: { probe, dispatch },
     reservePermit,
     releasePermit,
@@ -170,6 +175,106 @@ describe("LangyTurnService.startConversationTurn", () => {
     ({ deps, mocks } = makeDeps());
   });
 
+  describe("given a guided onboarding kickoff composed before the tour's key was recorded", () => {
+    const kickoff = buildGuidedKickoffParts({
+      input: {
+        path: "gateway",
+        paths: ["gateway"],
+        orgName: "ACME",
+        tourStatus: "completed",
+        gatewayUrl: "https://gateway.acme.example/v1",
+      },
+    });
+
+    /** @scenario "The brief's state lines are settled on the server from the stored guided state" */
+    it("records and asks the model the brief settled from the stored state, not the panel's snapshot", async () => {
+      const guidedKickoffFacts = vi.fn(async () => ({
+        paths: ["gateway" as const],
+        provider: undefined,
+        providerModel: undefined,
+        gatewayUrl: "https://gateway.acme.example/v1",
+        virtualKeyName: "production-app",
+        virtualKeyPreview: "vk-lw-01M1X40",
+        virtualKeyRevealId: "rvl_late",
+      }));
+      ({ deps, mocks } = makeDeps({ guidedKickoffFacts }));
+
+      await LangyTurnService.create(deps).startConversationTurn(
+        input({ messages: [{ role: "user", parts: kickoff }] }),
+      );
+
+      expect(guidedKickoffFacts).toHaveBeenCalledWith({
+        organizationId: "org-1",
+      });
+      const accepted = mocks.acceptTurn.mock.calls[0]?.[0] as unknown as {
+        questionParts: Array<{ text?: string }>;
+        userMessage: { parts: Array<Record<string, unknown>> };
+      };
+      const settledLine =
+        "Virtual key: production-app is live (preview vk-lw-01M1X40, reveal id rvl_late). Show it with secret_snippet using this reveal id. Do not list, ask or create keys.";
+      expect(accepted.questionParts[1]?.text).toContain(settledLine);
+      expect(accepted.userMessage.parts[1]?.text).toContain(settledLine);
+      expect(accepted.userMessage.parts[0]).toMatchObject({
+        virtualKeyRevealId: "rvl_late",
+      });
+      expect(JSON.stringify(accepted)).not.toContain("none minted by the tour");
+    });
+
+    /** @scenario "The prompt the model reads is the settled brief, not the panel's snapshot" */
+    it("hands the worker the settled brief as the prompt, not the panel's snapshot", async () => {
+      const guidedKickoffFacts = vi.fn(async () => ({
+        paths: ["gateway" as const],
+        provider: undefined,
+        providerModel: undefined,
+        gatewayUrl: "https://gateway.acme.example/v1",
+        virtualKeyName: "production-app",
+        virtualKeyPreview: "vk-lw-01M1X40",
+        virtualKeyRevealId: "rvl_late",
+      }));
+      ({ deps, mocks } = makeDeps({ guidedKickoffFacts }));
+
+      await LangyTurnService.create(deps).startConversationTurn(
+        input({ messages: [{ role: "user", parts: kickoff }] }),
+      );
+
+      const [[stashed]] = mocks.stash.mock.calls as unknown as [
+        [{ prompt: string }],
+      ];
+      expect(stashed.prompt).toContain(
+        "Virtual key: production-app is live (preview vk-lw-01M1X40, reveal id rvl_late). Show it with secret_snippet using this reveal id. Do not list, ask or create keys.",
+      );
+      expect(stashed.prompt).not.toContain("none minted by the tour");
+      expect(stashed.prompt.startsWith("Guided onboarding kickoff.")).toBe(
+        true,
+      );
+    });
+
+    it("records the kickoff as sent when nothing reads the state", async () => {
+      await LangyTurnService.create(deps).startConversationTurn(
+        input({ messages: [{ role: "user", parts: kickoff }] }),
+      );
+      const accepted = mocks.acceptTurn.mock.calls[0]?.[0] as unknown as {
+        userMessage: { parts: unknown[] };
+      };
+      expect(accepted.userMessage.parts).toEqual(kickoff);
+    });
+
+    it("never reads the state for a message that is not a kickoff", async () => {
+      const guidedKickoffFacts = vi.fn(async () => {
+        throw new Error("not to be read");
+      });
+      ({ deps, mocks } = makeDeps({ guidedKickoffFacts }));
+      await LangyTurnService.create(deps).startConversationTurn(input());
+      expect(guidedKickoffFacts).not.toHaveBeenCalled();
+      expect(mocks.acceptTurn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          questionParts: [{ type: "text", text: "hi" }],
+        }),
+      );
+    });
+  });
+
+  /** @scenario "A message and its activity bump are one command, not two writes" */
   it("commits one atomic message + acceptance command and fast-dispatches it", async () => {
     const result = await LangyTurnService.create(deps).startConversationTurn(
       input(),
@@ -202,6 +307,7 @@ describe("LangyTurnService.startConversationTurn", () => {
     );
   });
 
+  /** @scenario "Sending the first message creates the conversation from its events" */
   it("atomically prefixes a new conversation with its owner and run token", async () => {
     mocks.ensureConversation.mockResolvedValue({ id: "conv-1", isNew: true });
 
@@ -276,6 +382,30 @@ describe("LangyTurnService.startConversationTurn", () => {
     expect(mocks.dispatch).toHaveBeenCalledWith(
       expect.objectContaining({ intent: "continue" }),
     );
+  });
+
+  /** @scenario The warm and the turn's probe carry the same disabled skills */
+  it("probes for a worker with the same disabled skills the dispatch sends", async () => {
+    // Flag off => `dashboard-widgets` is gated off for every turn.
+    const flags = vi
+      .spyOn(featureFlagService, "isEnabled")
+      .mockResolvedValue(false);
+    try {
+      await LangyTurnService.create(deps).startConversationTurn(input());
+
+      const probeArgs = mocks.probe.mock.calls[0]![0] as {
+        disabledSkillIds?: string[];
+      };
+      const dispatched = (mocks.dispatch.mock.calls[0] as unknown[])[0] as {
+        credentials: { disabledSkillIds?: string[] };
+      };
+      expect(probeArgs.disabledSkillIds).toContain("dashboard-widgets");
+      expect(probeArgs.disabledSkillIds).toEqual(
+        dispatched.credentials.disabledSkillIds,
+      );
+    } finally {
+      flags.mockRestore();
+    }
   });
 
   it("finalizes the GitHub permit before probing the worker signature", async () => {
@@ -442,6 +572,36 @@ describe("LangyTurnService.startConversationTurn", () => {
     ).rejects.toBeInstanceOf(LangyModelNotConfiguredError);
 
     expect(mocks.claim).not.toHaveBeenCalled();
+  });
+
+  describe("when the project is an aggregate", () => {
+    /** @scenario "Langy refuses to start on an aggregate with the read-only refusal" */
+    it("refuses as read only before resolving a model or a key, or writing a conversation", async () => {
+      // An aggregate has no Langy model or key, so either lookup would fail
+      // first and answer with a conflict; the kind check comes before both.
+      (deps.projectKinds.kindOf as ReturnType<typeof vi.fn>).mockResolvedValue(
+        "aggregate",
+      );
+      (deps.resolveModel as ReturnType<typeof vi.fn>).mockRejectedValue(
+        new Error("no model"),
+      );
+
+      const refusal = await LangyTurnService.create(deps)
+        .startConversationTurn(input())
+        .then(() => null)
+        .catch((error: unknown) => error);
+
+      expect(refusal).toBeInstanceOf(AggregateProjectIsReadOnlyError);
+      expect(refusal).toMatchObject({
+        code: "aggregate_project_is_read_only",
+        httpStatus: 403,
+      });
+      expect(deps.resolveModel).not.toHaveBeenCalled();
+      expect(deps.credentials.getOrProvision).not.toHaveBeenCalled();
+      expect(mocks.ensureConversation).not.toHaveBeenCalled();
+      expect(mocks.claim).not.toHaveBeenCalled();
+      expect(mocks.mintSessionKey).not.toHaveBeenCalled();
+    });
   });
 
   it("revokes the key, releases the permit, and aborts when acceptance fails", async () => {
@@ -939,6 +1099,7 @@ describe("LangyTurnService.stopTurn", () => {
       } as unknown as LangyTurnServiceDeps["conversations"],
       credentials: {} as unknown as LangyTurnServiceDeps["credentials"],
       resolveModel: vi.fn(),
+      projectKinds: { kindOf: vi.fn(async () => "application") },
       worker: { cancel } as unknown as LangyTurnServiceDeps["worker"],
       tokenBuffer: over.noBuffer
         ? null
@@ -1254,38 +1415,31 @@ describe("when no prompt project is configured", () => {
   });
 });
 
-describe("when the harness flag resolves for the turn", () => {
-  it("rides the harness on the probe, the handoff stash and the dispatch", async () => {
-    const { deps, mocks } = makeDeps({
-      resolveHarness: vi.fn(async () => "pi" as const),
-    });
-
-    await LangyTurnService.create(deps).startConversationTurn(input());
-
-    expect(mocks.probe).toHaveBeenCalledWith(
-      expect.objectContaining({ harness: "pi" }),
-    );
-    expect(mocks.stash).toHaveBeenCalledWith(
-      expect.objectContaining({
-        credentials: expect.objectContaining({ harness: "pi" }),
-      }),
-    );
-    expect(mocks.dispatch).toHaveBeenCalledWith(
-      expect.objectContaining({
-        credentials: expect.objectContaining({ harness: "pi" }),
-      }),
-    );
+describe("when a turn requests a skill gated off for the caller", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
-  it("leaves the harness unset when no resolver is composed", async () => {
+  it("rejects with LangySkillNotAvailableError and never dispatches the turn", async () => {
+    // Flag off => the `dashboard-widgets` skill (its `featureFlag`) is gated
+    // off; a turn that explicitly asks for it is refused.
+    vi.spyOn(featureFlagService, "isEnabled").mockResolvedValue(false);
     const { deps, mocks } = makeDeps();
 
-    await LangyTurnService.create(deps).startConversationTurn(input());
+    await expect(
+      LangyTurnService.create(deps).startConversationTurn(
+        input({
+          turnContext: {
+            pageContext: undefined,
+            skills: [{ id: "dashboard-widgets" }],
+          } as StartConversationTurnInput["turnContext"],
+        }),
+      ),
+    ).rejects.toBeInstanceOf(LangySkillNotAvailableError);
 
-    const probeArgs = mocks.probe.mock.calls[0]![0] as unknown as {
-      harness?: string;
-    };
-    expect(probeArgs.harness).toBeUndefined();
+    // The rejected turn is classified once — as `rejected` in the outer catch,
+    // never also as an `error` — and it must not reach dispatch.
+    expect(mocks.dispatch).not.toHaveBeenCalled();
   });
 });
 
@@ -1314,5 +1468,33 @@ describe("when the first message adopts a warmed conversation id", () => {
     expect(mocks.dispatch).toHaveBeenCalledWith(
       expect.objectContaining({ conversationId: "conv-warmed" }),
     );
+  });
+});
+
+describe("composeLangyTurnPrompt", () => {
+  describe("when the viewer has an email", () => {
+    it('names the viewer so "email me" needs no question', () => {
+      const { prompt } = composeLangyTurnPrompt({
+        viewer: { id: "u1", name: "Ada", email: "ada@example.com" },
+        contextBlock: null,
+        capNote: "",
+        userText: "email me on thumbs-down",
+      });
+      expect(prompt).toContain("You are talking to Ada <ada@example.com>.");
+      expect(prompt.endsWith("email me on thumbs-down")).toBe(true);
+    });
+  });
+
+  describe("when the viewer has no email", () => {
+    it("leaves the prompt as the bare user text", () => {
+      expect(
+        composeLangyTurnPrompt({
+          viewer: { id: "u1" },
+          contextBlock: null,
+          capNote: "",
+          userText: "hi",
+        }),
+      ).toEqual({ prompt: "hi", labelled: false });
+    });
   });
 });

@@ -8,11 +8,13 @@ import { app as webhooksApp } from "@ee/scim/webhooks";
 import { Hono } from "hono";
 import { app as adminApp } from "../../ee/admin/routes/admin";
 import { app as agentCacheApp } from "../app/api/agent-cache/[[...route]]/app";
+import { app as agentsAliasApp } from "../app/api/agents/[[...route]]/alias";
 import { app as agentsApp } from "../app/api/agents/[[...route]]/app";
 import { app as analyticsApp } from "../app/api/analytics/[...route]/app";
 import { app as analyticsSqlApp } from "../app/api/analytics-sql/[[...route]]/app";
 import { app as apiKeysApp } from "../app/api/api-keys/[[...route]]/app";
 import { app as codingAgentApp } from "../app/api/coding-agent/[[...route]]/app";
+import { app as codingAgentV1App } from "../app/api/coding-agent/[[...route]]/app.v1";
 import { app as copilotKitApp } from "../app/api/copilotkit/[[...route]]/app";
 import { app as dashboardsApp } from "../app/api/dashboards/[[...route]]/app";
 import { app as datasetApp } from "../app/api/dataset/[[...route]]/app";
@@ -27,26 +29,34 @@ import { app as gatewaySpendApp } from "../app/api/gateway-spend/[[...route]]/ap
 import { app as governanceApp } from "../app/api/governance/[[...route]]/app";
 import { app as graphsApp } from "../app/api/graphs/[[...route]]/app";
 import { app as groupsApp } from "../app/api/groups/[[...route]]/app";
+import { app as instantEvalsApp } from "../app/api/instant-evals/[[...route]]/app";
+import { app as langyControlApp } from "../app/api/langy-control/[[...route]]/app";
 import { app as meApp } from "../app/api/me/[[...route]]/app";
 import { app as modelDefaultsApp } from "../app/api/model-defaults/[[...route]]/app";
 import { app as modelProvidersApp } from "../app/api/model-providers/[[...route]]/app";
 import { app as monitorsApp } from "../app/api/monitors/[[...route]]/app";
+import { app as onboardingApp } from "../app/api/onboarding/[[...route]]/app";
 import { app as organizationApp } from "../app/api/organization/[[...route]]/app";
 import { app as organizationsApp } from "../app/api/organizations/[[...route]]/app";
 import { app as projectsApp } from "../app/api/projects/[[...route]]/app";
 import { app as promptsApp } from "../app/api/prompts/[[...route]]/app";
+import { app as queryApp } from "../app/api/query/[[...route]]/app";
 import { app as roleBindingsApp } from "../app/api/role-bindings/[[...route]]/app";
 import { app as rolesApp } from "../app/api/roles/[[...route]]/app";
+import { app as runPlansApp } from "../app/api/run-plans/[[...route]]/app";
 import { app as scenarioEventsApp } from "../app/api/scenario-events/[[...route]]/app";
 import { app as scenariosApp } from "../app/api/scenarios/[[...route]]/app";
 import { app as scimTokensApp } from "../app/api/scim-tokens/[[...route]]/app";
 import { app as secretsApp } from "../app/api/secrets/[[...route]]/app";
 import { app as simulationRunsApp } from "../app/api/simulation-runs/[[...route]]/app";
+import { app as slackConnectionsApp } from "../app/api/slack-connections/[[...route]]/app";
 import { app as suitesApp } from "../app/api/suites/[[...route]]/app";
 import { app as teamsApp } from "../app/api/teams/[[...route]]/app";
+import { app as testSuitesApp } from "../app/api/test-suites/[[...route]]/app";
 import { app as tracesApp } from "../app/api/traces/[[...route]]/app";
 import { app as triggersApp } from "../app/api/triggers/[[...route]]/app";
 import { app as userAvatarApp } from "../app/api/user-avatar/[[...route]]/app";
+import { app as voiceSessionApp } from "../app/api/voice/[[...route]]/app";
 import { app as webhookPlatformApp } from "../app/api/webhooks/[[...route]]/app";
 import { app as workflowsCrudApp } from "../app/api/workflows/[[...route]]/app";
 import { app as annotationsApp } from "./routes/annotations";
@@ -54,7 +64,9 @@ import { app as apiDiscoveryApp } from "./routes/api-discovery";
 import { app as authApp } from "./routes/auth";
 import { app as authCliApp } from "./routes/auth-cli";
 import { app as bugReportsApp } from "./routes/bug-reports";
+import { app as checkupApp } from "./routes/checkup";
 import { app as collectorApp } from "./routes/collector";
+import { app as connectApp } from "./routes/connect";
 import { app as cronApp } from "./routes/cron";
 import { app as datasetGenerateApp } from "./routes/dataset-generate";
 import { app as elevenLabsApp } from "./routes/elevenlabs";
@@ -71,6 +83,7 @@ import { app as healthChecksApp } from "./routes/health-checks";
 import { app as ingestionRoutesApp } from "./routes/ingest/ingestionRoutes";
 import { app as langyApiApp } from "./routes/langy-api";
 import { app as langyInternalApp } from "./routes/langy-internal";
+import { app as langyLocalApp } from "./routes/langy-local";
 import { app as langyRelayApp } from "./routes/langy-relay";
 import { app as langyUiActionsApp } from "./routes/langy-ui-actions";
 import { app as miscApp } from "./routes/misc";
@@ -80,6 +93,7 @@ import { app as otelPathAliasApp } from "./routes/otel-path-aliases";
 import { app as playgroundApp } from "./routes/playground";
 import { app as rootDiscoveryApp } from "./routes/root-discovery";
 import { app as rumApp } from "./routes/rum";
+import { app as scenarioExecuteSyncApp } from "./routes/scenario-execute-sync";
 import { app as scenarioGenerateApp } from "./routes/scenario-generate";
 import { app as sseApp } from "./routes/sse";
 import { app as tracesLegacyApp } from "./routes/traces-legacy";
@@ -111,12 +125,17 @@ export function createApiRouter() {
   api.route("/", datasetGenerateApp); // /api/dataset/generate (before datasetApp's /:slugOrId)
   api.route("/", workflowsApp); // /api/workflows/code-completion, /post_event
   api.route("/", healthChecksApp); // /api/health/collector, /evaluations, etc.
+  api.route("/", checkupApp); // /api/checkup, /api/checkup/run
 
-  api.route("/", agentsApp);
+  api.route("/", agentsApp); // /api/v1/agents, connect and call included
+  api.route("/", agentsAliasApp); // deprecated alias: /api/agents
   api.route("/", analyticsApp);
-  api.route("/", analyticsSqlApp); // /api/v1/projects/:projectId/analytics/* — governed SQL
+  api.route("/", analyticsSqlApp); // /api/v1/projects/:projectId/analytics/charts/* — saved workbench charts only; the raw-LWQL routes this app used to serve were removed (issue #7565)
+  api.route("/", queryApp); // /api/v1/query — LWQL query domain, REST; the only HTTP door for raw LangWatchQL
+  api.route("/", instantEvalsApp); // /api/v1/instant-evals: one LWQL statement, judged as a job
   api.route("/", copilotKitApp);
   api.route("/", codingAgentApp);
+  api.route("/", codingAgentV1App); // /api/v1/coding-agent/* — organization-key door
   api.route("/", dashboardsApp);
   api.route("/", datasetApp);
   api.route("/", evaluatorsApp);
@@ -168,30 +187,39 @@ export function createApiRouter() {
   api.route("/", scimTokensApp);
   api.route("/", promptsApp);
   api.route("/", scenarioEventsApp);
+  api.route("/", voiceSessionApp); // /api/voice/session mint + finish + audio proxy
   api.route("/", scenariosApp);
   api.route("/", secretsApp);
   api.route("/", agentCacheApp);
   api.route("/", simulationRunsApp);
-  api.route("/", suitesApp);
+  api.route("/", suitesApp); // deprecated alias of the two families below
+  api.route("/", runPlansApp); // /api/v1/run-plans
+  api.route("/", testSuitesApp); // /api/v1/test-suites
   api.route("/", teamsApp);
   api.route("/", webhookPlatformApp);
   api.route("/", gatewaySpendApp);
   api.route("/", tracesApp);
   api.route("/", triggersApp);
+  api.route("/", slackConnectionsApp);
   api.route("/", userAvatarApp); // /api/user-avatar/:projectId/:id — user avatars
   api.route("/", workflowsCrudApp); // CRUD — complements workflowsApp (code-completion, post_event)
 
   api.route("/", gatewayInternalApp);
+  api.route("/", connectApp); // /api/connect/v1, what a connected self-hosted install calls
   api.route("/", otelApp);
   api.route("/", rumApp); // /api/rum/v1/traces — browser telemetry proxy
   api.route("/", playgroundApp);
   api.route("/", langyApiApp); // /api/langy/conversations — key-authed turns
   api.route("/", langyUiActionsApp); // /api/langy/ui/actions — agent-to-page dispatch
+  api.route("/", langyLocalApp); // /api/langy/local, /api/langy/waits — the worker's door onto the developer's folder
+  api.route("/", langyControlApp); // /api/v1/langy/control — control requests and the long-poll transport
+  api.route("/", onboardingApp); // /api/v1/onboarding/guided: the guided onboarding state through a project key
   api.route("/", langyInternalApp);
   api.route("/", langyRelayApp);
   api.route("/", elevenLabsApp); // /api/elevenlabs/webhook/:modelProviderId
   api.route("/", githubApp);
   api.route("/", scenarioGenerateApp);
+  api.route("/", scenarioExecuteSyncApp); // /api/scenario/execute-sync (internal: scenario child -> this project's engine)
   api.route("/", scimApp);
   api.route("/", webhooksApp);
 

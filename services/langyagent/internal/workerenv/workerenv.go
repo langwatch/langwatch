@@ -1,8 +1,8 @@
 // Package workerenv holds the parts of a worker subprocess environment that
-// are identical for every harness: the inherited-variable allowlist and the
-// NO_PROXY host list. Both adapters (opencode and pi) spawn the same kind of
+// are identical for every worker: the inherited-variable allowlist and the
+// NO_PROXY host list. The adapter spawns the same kind of
 // process into the same cluster, so one copy per adapter would let a key added
-// on one side change what only one harness leaks into a worker.
+// on one side change what leaks into a worker.
 package workerenv
 
 import (
@@ -30,6 +30,13 @@ var InheritedEnvKeys = []string{
 	"FORCE_COLOR",
 	"SSL_CERT_FILE",
 	"SSL_CERT_DIR",
+	// The image sets DO_NOT_TRACK=1 so the Bun-compiled `langwatch` CLI never
+	// auto-uploads a crash report. A Bun crash report reprints the process
+	// argv, and argv for `langwatch ui call` carries the customer's own
+	// payload. The CLI runs inside the WORKER, not in the manager, so without
+	// this entry the image setting stops at the allowlist and never reaches
+	// the process it is meant to cover.
+	"DO_NOT_TRACK",
 }
 
 // BaseEnv returns the allowlisted manager variables that are set, as KEY=value

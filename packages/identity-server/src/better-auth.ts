@@ -27,20 +27,9 @@ export {
   type AccountWhere,
   IdentityUnsupportedStorageQueryError,
   issuerForProviderId,
+  nativeSocialIssuerFor,
   parseAccountQuery,
 } from "./better-auth/account-queries";
-export {
-  anyBornInThisRequest,
-  birthAwareGate,
-  currentIdentityBirth,
-  IdentityEngineUnavailableError,
-  type IdentityBirthPort,
-  type IdentityBirthScope,
-  type IdentityNewborn,
-  recordIdentityBirth,
-  runWithIdentityBirth,
-  wasBornInThisRequest,
-} from "./better-auth/identity-birth";
 export {
   bridgeAccountCeremonies,
   IdentityCeremonies,
@@ -48,11 +37,23 @@ export {
 export {
   createIdentityStorageAdapter,
   type IdentityStorageAdapterDeps,
+  type PasskeyRemovalOutcome,
+  type PasskeyRemovalPort,
 } from "./better-auth/identity-storage-adapter";
+export {
+  IdentityAccountWriter,
+  type IdentityAccountWriterDeps,
+} from "./better-auth/identity-account-writer";
 export type {
   IdentityAccountRow,
   IdentityAccountSecrets,
   IdentityAccountsPort,
+  IdentityConnectionIssuersPort,
+  IdentityIssuerResolution,
   IdentityResolution,
   IdentityResolutionPort,
 } from "./better-auth/storage-ports";
+export {
+  MfaCeremonies,
+  type MfaCeremoniesDeps,
+} from "./better-auth/mfa-ceremonies";

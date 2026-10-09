@@ -18,13 +18,16 @@
  */
 import { Box, Grid, Text, VStack } from "@chakra-ui/react";
 import { type CliResultDigest, parseCardResult } from "@langwatch/langy";
-import { extractPlatformUrl } from "~/utils/platformHref";
+import { Play } from "lucide-react";
+import { extractPlatformUrl, isAppPath } from "~/utils/platformHref";
 import {
   type CapabilityData,
   useCapabilityData,
 } from "../../hooks/useCapabilityData";
 import type { LangyTurnMetric } from "../../hooks/useLangyTurnSignals";
+import { type LangySend, useLangySend } from "../LangySendContext";
 import { StreamingStatCard } from "../StreamingStatCard";
+import type { CapabilityFact } from "./capabilityCatalog";
 import {
   buildResourceHref,
   buildSurfaceHref,
@@ -42,6 +45,7 @@ import {
   CapabilityRowSkeletons,
   LangyCapabilityCard,
 } from "./LangyCapabilityCard";
+import { LangyCardActionChip } from "./LangyCardActionChip";
 import { isPlottable, TimeseriesPlot } from "./LangyTimeseriesCard";
 
 const MAX_ROWS = 5;
@@ -158,6 +162,42 @@ function factsOf(
   for (const key of FACT_PRIORITY) push(key);
   for (const key of Object.keys(record)) push(key);
   return facts;
+}
+
+/**
+ * The facts a catalog row named, in its order and its words, and nothing the
+ * document carries beyond them.
+ */
+function namedFactsOf(
+  document: unknown,
+  specs: readonly CapabilityFact[],
+  { omitValue }: { omitValue?: string | null } = {},
+): { label: string; value: string }[] {
+  if (!document || typeof document !== "object" || Array.isArray(document)) {
+    return [];
+  }
+  const record = document as Record<string, unknown>;
+  const facts: { label: string; value: string }[] = [];
+  for (const spec of specs) {
+    const raw = record[spec.key];
+    const value = spec.values?.[String(raw)] ?? displayValue(raw);
+    if (value === null || value === undefined || value === omitValue) continue;
+    facts.push({ label: spec.label, value });
+  }
+  return facts;
+}
+
+/** A row's status, in the catalog's words when the resource names them. */
+function rowStatusOf(
+  descriptor: CapabilityDescriptor,
+  row: unknown,
+): string | null {
+  const raw = firstString(row, ["status", "state", "description"]);
+  if (raw === null) return null;
+  const spec = descriptor.facts?.find(
+    (fact) => fact.key === "status" || fact.key === "state",
+  );
+  return spec?.values?.[raw] ?? raw;
 }
 
 /** The labelled figures a document reports: its own numbers, or its row count. */
@@ -306,7 +346,7 @@ function RowsBody({
         const primary =
           name ?? id ?? `${capitalize(descriptor.noun.singular)} ${index + 1}`;
         const secondary =
-          firstString(row, ["status", "state", "description"]) ??
+          rowStatusOf(descriptor, row) ??
           (name && id && id !== name ? id : null);
         return (
           <CapabilityRow
@@ -351,9 +391,10 @@ function FactsBody({
   }
 
   // The card's title already shows the resource's name — don't repeat it.
-  const facts = factsOf(document, {
-    omitValue: firstString(document, NAME_KEYS),
-  });
+  const omitValue = firstString(document, NAME_KEYS);
+  const facts = descriptor.facts
+    ? namedFactsOf(document, descriptor.facts, { omitValue })
+    : factsOf(document, { omitValue });
   if (facts.length === 0) {
     return <UnreadableBody descriptor={descriptor} projectSlug={projectSlug} />;
   }
@@ -467,6 +508,41 @@ function DiffBody({
   );
 }
 
+/**
+ * The offer a freshly created scenario carries: its first run. It is worded,
+ * not scheduled. The message goes through the composer, so Langy resolves the
+ * target (the connected agent when one is online) and asks what it has to
+ * ask, the way the scenarios skill does for a typed request. Nothing is
+ * offered where no request can be routed (a replayed turn) or when the card
+ * has no name to put in the sentence.
+ */
+function createdScenarioRunOffer({
+  descriptor,
+  name,
+  send,
+}: {
+  descriptor: CapabilityDescriptor;
+  name: string | null;
+  send: LangySend | null;
+}) {
+  const createdScenario =
+    descriptor.tone === "created" &&
+    descriptor.command.resource === "scenario" &&
+    descriptor.command.verb === "create";
+  if (!createdScenario || !send || !name) return undefined;
+  return (
+    <LangyCardActionChip
+      label="Run against my agent"
+      icon={<Play size={12} />}
+      disabled={send.isTurnInFlight}
+      onClick={() =>
+        send.send(`Run scenario "${name}" against my connected agent`)
+      }
+      testId="langy-card-run-scenario"
+    />
+  );
+}
+
 /** The settled-write sentence, by tone. */
 function writeSentence(tone: CapabilityDescriptor["tone"]): string {
   switch (tone) {
@@ -496,6 +572,7 @@ export function LangyDeclarativeCard({
 }: CapabilityCardInput) {
   const projectSlug = rawProjectSlug ?? null;
   const { tone, body, noun } = descriptor;
+  const send = useLangySend();
 
   // Hydration is for COLLECTION reads: fresh names and links for the entities
   // the result referenced. Facts/stats/diff keep the stored structure (the
@@ -542,6 +619,7 @@ export function LangyDeclarativeCard({
         resourceId={removed ? null : id}
         platformUrl={removed ? null : extractPlatformUrl(output)}
         icon={descriptor.icon}
+        actions={createdScenarioRunOffer({ descriptor, name, send })}
       >
         <BodyLine>{writeSentence(tone)}</BodyLine>
       </LangyCapabilityCard>
@@ -559,6 +637,7 @@ export function LangyDeclarativeCard({
       projectSlug={projectSlug}
       resourceId={tone === "removed" ? null : id}
       platformUrl={tone === "removed" ? null : extractPlatformUrl(output)}
+      {...dispatchedActionLink(document)}
       icon={descriptor.icon}
     >
       {parsed.ok ? (
@@ -807,4 +886,28 @@ function dispatchedActionTitle(document: unknown): string | null {
   if (typeof kind !== "string" || kind.trim() === "") return null;
   const action = kind.slice(kind.lastIndexOf(".") + 1);
   return action === "" ? null : capitalize(labelize(action));
+}
+
+/**
+ * The link a page action answered with. An action that ran with no page open
+ * cannot change a screen, so it answers where its effect can be seen
+ * (`explorer.setFilter` answers the Trace Explorer on that filter). The card
+ * links there instead of to the surface the action family belongs to. A link
+ * that leaves the app is dropped together with its label.
+ */
+function dispatchedActionLink(document: unknown): {
+  deepLinkHref?: string;
+  deepLinkLabel?: string;
+} {
+  if (!document || typeof document !== "object") return {};
+  const record = document as Record<string, unknown>;
+  if (typeof record.executedVia !== "string") return {};
+  const result = record.result;
+  if (!result || typeof result !== "object") return {};
+  const { href, label } = result as Record<string, unknown>;
+  if (!isAppPath(href)) return {};
+  return {
+    deepLinkHref: href,
+    deepLinkLabel: typeof label === "string" ? label : undefined,
+  };
 }

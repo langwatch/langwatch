@@ -41,6 +41,16 @@ export type WorkbenchActorLabel = "user" | "langy" | "api";
 export interface WorkbenchActor {
   userId?: string;
   label: WorkbenchActorLabel;
+  /**
+   * The run this write belongs to, when a run is writing its cells back.
+   *
+   * A run's write advances the counter, and the page that started that run
+   * would otherwise read its own bump as somebody else's: its next save is
+   * refused and the reader is asked to reload over unsaved edits the run had
+   * nothing to do with. Named here, the refusal and the update signal both
+   * carry the run id, and the page adopts the version instead.
+   */
+  runId?: string;
 }
 
 /** What a caller reads before it edits. `version` is what it saves back. */
@@ -57,6 +67,12 @@ export interface WorkbenchStateView {
    * this field says nothing rather than guessing.
    */
   actorLabel?: WorkbenchActorLabel;
+  /**
+   * The run that wrote this version, when a run wrote it. A page that started
+   * that run adopts the version rather than reading its own run's write as a
+   * stranger's, which is what a tab coming back from the background does.
+   */
+  runId?: string;
 }
 
 export interface WorkbenchSaveResult {
@@ -534,7 +550,7 @@ export class ExperimentService {
       throw new ExperimentTypeMismatchError();
     }
 
-    const actorLabel = await this.authorOfVersion({
+    const author = await this.authorOfVersion({
       projectId,
       experimentId: row.id,
       counterVersion: row.workbenchVersion,
@@ -547,7 +563,8 @@ export class ExperimentService {
       state: repairWorkbenchState(row.workbenchState),
       version: row.workbenchVersion,
       updatedAt: row.updatedAt,
-      ...(actorLabel ? { actorLabel } : {}),
+      ...(author ? { actorLabel: author.label } : {}),
+      ...(author?.runId ? { runId: author.runId } : {}),
     };
   }
 
@@ -579,13 +596,16 @@ export class ExperimentService {
     // reads on that connection rather than borrowing a second one from the pool
     // while the first is held open.
     options?: { tx?: Prisma.TransactionClient },
-  ): Promise<WorkbenchActorLabel | undefined> {
+  ): Promise<{ label: WorkbenchActorLabel; runId?: string } | undefined> {
     const [latest] = await this.repository.findVersions(
       { projectId, experimentId, take: 1 },
       options,
     );
     if (!latest || latest.counterVersion !== counterVersion) return undefined;
-    return latest.authorLabel as WorkbenchActorLabel;
+    return {
+      label: latest.authorLabel as WorkbenchActorLabel,
+      ...(latest.runId ? { runId: latest.runId } : {}),
+    };
   }
 
   /**
@@ -659,6 +679,7 @@ export class ExperimentService {
       projectId,
       ...saved,
       actorLabel: actor.label,
+      ...(actor.runId ? { runId: actor.runId } : {}),
     });
 
     return saved;
@@ -708,7 +729,7 @@ export class ExperimentService {
         { tx },
       );
       if (!current) throw new ExperimentNotFoundError(row.id);
-      const actorLabel = await this.authorOfVersion(
+      const author = await this.authorOfVersion(
         {
           projectId,
           experimentId: current.id,
@@ -718,7 +739,8 @@ export class ExperimentService {
       );
       throw new StaleWorkbenchStateError({
         currentVersion: current.workbenchVersion,
-        ...(actorLabel ? { actorLabel } : {}),
+        ...(author ? { actorLabel: author.label } : {}),
+        ...(author?.runId ? { runId: author.runId } : {}),
       });
     };
 
@@ -1172,6 +1194,7 @@ export class ExperimentService {
             state: snapshot,
             authorId: actor.userId ?? null,
             authorLabel: actor.label,
+            runId: actor.runId ?? null,
             commitMessage: null,
             schemaVersion: WORKBENCH_SCHEMA_VERSION,
           },
@@ -1209,6 +1232,7 @@ export class ExperimentService {
           commitMessage: commitMessage ?? null,
           authorId: actor.userId ?? null,
           authorLabel: actor.label,
+          runId: actor.runId ?? null,
           state: snapshot,
           schemaVersion: WORKBENCH_SCHEMA_VERSION,
         },
@@ -1231,12 +1255,14 @@ export class ExperimentService {
     slug,
     version,
     actorLabel,
+    runId,
   }: {
     projectId: string;
     experimentId: string;
     slug: string;
     version: number;
     actorLabel: WorkbenchActorLabel;
+    runId?: string;
   }): Promise<void> {
     const broadcaster = this.options.broadcaster;
     if (!broadcaster) return;
@@ -1250,6 +1276,7 @@ export class ExperimentService {
           slug,
           version,
           actorLabel,
+          ...(runId ? { runId } : {}),
         }),
         "experiment_updated",
       );

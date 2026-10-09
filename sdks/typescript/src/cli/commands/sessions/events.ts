@@ -11,6 +11,7 @@ import {
 } from "../../utils/output";
 import { createCommandEvents } from "../../telemetry/events";
 import { cliAuthHeaders } from "../../utils/authHeaders";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 /** Bound each page request so a quiet socket cannot hold the CLI open forever. */
 const REQUEST_TIMEOUT_MS = 60_000;
@@ -124,7 +125,7 @@ const fetchAllSessionEvents = async ({
     if (toMs !== undefined) params.set("to", String(toMs));
     if (cursor) params.set("cursor", cursor);
 
-    const response = await fetch(
+    const response = await langwatchFetch(
       `${endpoint}/api/coding-agent/sessions/${encodeURIComponent(sessionId)}/events?${params}`,
       {
         headers: cliAuthHeaders({ apiKey }),

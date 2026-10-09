@@ -197,6 +197,73 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       Then the entry is evicted from the cache
       And the next request with that VK calls /resolve-key fresh and is rejected
 
+  Rule: A change-feed eviction keeps the last known config as an outage fallback
+    Every debit emits BUDGET_UPDATED, so a busy project's keys are evicted by
+    the change feed every few minutes and the next request pays a cold config
+    fetch. When that fetch times out or the control plane answers 5xx, the key
+    it was serving a minute ago must not start answering auth_upstream_unavailable.
+    The evicted entry is kept aside and served again, for at most one hour after
+    its config was last confirmed by the control plane. A definitive answer about
+    the key itself (revoked, disabled, rotated, invalid, expired) never gets this
+    fallback.
+
+    @unit @regression
+    Scenario: a key evicted by a budget change keeps serving when the refetch times out
+      Given the cache holds a key with known-good credentials
+      And the change feed reports a budget update for its project
+      And the config fetch then times out
+      When I send a request with that VK
+      Then the last known credentials are served
+      And a warning names the key and the failed refresh
+      And the next request is served from the cache without waiting on the control plane
+      And the next refresh asks for the config outright rather than revalidating it
+
+    @unit
+    Scenario: the fallback recovers as soon as the control plane answers
+      Given a key is being served from its last known config after a failed refetch
+      When the control plane answers the next refresh
+      Then the fresh config replaces the last known one
+
+    @unit
+    Scenario: a not-modified answer counts as a confirmation of the last known config
+      Given the cache holds a key whose config was last downloaded more than one hour ago
+      And the control plane has since answered a revalidation with 304 Not Modified
+      When the change feed evicts the key and the refetch times out
+      Then the last known config is served
+      And it may be served for up to one hour after that 304
+
+    @unit
+    Scenario: the last known config expires one hour after it was last confirmed
+      Given the cache evicted a key whose config was last confirmed more than one hour ago
+      And the config fetch fails with a transport error
+      When I send a request with that VK
+      Then the request is rejected with error.type "auth_upstream_unavailable" (503, retryable)
+      And an entry that crosses the one hour mark while the refetch is running is not served either
+
+    @unit
+    Scenario: the fallback never outlives the key's own expiration date
+      Given the cache evicted a key after a budget update
+      And resolve-key answers with a token carrying the key's expiration date
+      But the config fetch times out
+      When I send a request with that VK
+      Then the last known config is served under the fresh token
+      And it stops being served at the key's expiration date
+      And a key whose date has already passed is refused with virtual_key_expired
+
+    @unit
+    Scenario: revoking, disabling or rotating a key leaves no fallback behind
+      Given the cache holds a key with known-good credentials
+      When the change feed reports that key revoked, disabled or rotated
+      And the control plane is then unreachable
+      Then the request is rejected rather than served from the last known config
+
+    @unit
+    Scenario: a definitive rejection from the control plane is never overridden by the fallback
+      Given the cache evicted a key after a budget update
+      When the control plane answers the refetch that the key is invalid, or the config fetch finds it deleted (404)
+      Then the request is rejected with that answer
+      And the last known config is discarded
+
   Rule: Short-lived JWT is refreshed before expiry
 
     @unit @unimplemented
@@ -497,6 +564,80 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       And an explicit null is a key that never expires
       And a missing field says nothing about expiry, so the caller keeps what it holds
 
+  Rule: A budget period that ends invalidates the spend the gateway is holding
+
+    # The bundle carries each budget's spend for the period it was read in, and
+    # the config version token is built from the key's revision and its
+    # provider set. Neither of those moves when a period ends, so a conditional
+    # revalidation confirms figures that describe a period that is over.
+    #
+    # For a budget that reached its limit, that leaves the key rejecting on
+    # money it did not spend this period. What clears it is a BUDGET_UPDATED
+    # event, and the only one that arrives without an admin touching something
+    # is emitted by a debit — by a request that got through. The blocked key
+    # cannot produce one itself.
+    #
+    # Eviction on that event is project-wide (org-wide when the event carries
+    # no project), so a sibling key with traffic in the same project clears the
+    # block for everyone within a poll cycle. The keys that stay stuck are the
+    # ones whose project has no other traffic — a CI key, a scheduled job, a
+    # single-key project — and they stay stuck until an admin edits something
+    # or the gateway restarts. That is the case this Rule closes; it is not
+    # closed by the change feed, which is why the boundary has to be a schedule
+    # the gateway keeps on its own.
+
+    @unit
+    Scenario: a bundle knows when its spend figures stop describing the current period
+      Given a config response carrying budgets that reset at different instants
+      When the gateway decodes it
+      Then the bundle is valid until the earliest of those instants
+      And a budget with no limit does not shorten that, because it can never block
+      And a budget the control plane sent no boundary for does not shorten it either
+
+    @unit
+    Scenario: the refresh at a period boundary asks for the config instead of confirming it
+      Given a cached key whose budget period ended after its config was read
+      When the next request arrives
+      Then the config refresh carries no version token
+      And the new period's spend replaces the old period's
+
+    @unit
+    Scenario: a period still running is revalidated the ordinary way
+      Given a cached key whose budget is exhausted inside its own period
+      And a config read within the staleness TTL
+      When the next request arrives
+      Then no config refresh is triggered
+      And the request is judged against the spend the gateway holds
+
+    @unit
+    Scenario: a boundary that is already behind the gateway is asked about once
+      Given a cached key carrying a budget boundary that never moves
+      When request after request arrives
+      Then only the first triggers a config re-read
+      And the rest fall back to the ordinary staleness clock
+
+    @unit
+    Scenario: a refresh the control plane never answered leaves the period unresolved
+      Given a cached key whose budget period ended after its config was read
+      And a config refresh that fails to reach the control plane
+      When a later request arrives
+      Then the entry still holds the ended period's spend
+      And the next refresh is unconditional too, so it cannot be confirmed as unchanged
+      And the period counts as resolved only once an answer arrives
+
+    @unit
+    Scenario: a confirmation taken before the boundary does not count as reading past it
+      Given a cached key whose config was confirmed unchanged inside its budget period
+      When that period ends and the next request arrives
+      Then the boundary still forces an unconditional re-read
+      And the new period's spend replaces the old
+
+    @unit
+    Scenario: a bundle with no budgets keeps the ordinary staleness clock
+      Given a cached key with no budgets
+      When its config passes the staleness TTL
+      Then the refresh revalidates against the version token as before
+
   Rule: Bootstrap-pull enables gateway to serve when control plane is cold
 
     # The flag is named the way contract.md §6 and §9 name it. Nothing reads
@@ -520,3 +661,19 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       When I inspect the cache keyset
       Then the key is the 64-char hex SHA-256 of the raw VK
       And the raw VK value is not stored anywhere in the cache entries
+
+  Rule: A provider change reaches every key of its organization
+
+    # A new provider, or one enabled or granted a wider scope, is in no cached
+    # bundle yet, so matching the event on the provider id alone evicts nothing.
+    # A key resolved before the change would keep answering
+    # model_provider_not_bound for the new provider (for example Langy's
+    # managed key after OpenAI is added next to Bedrock) until revalidation.
+
+    @unit
+    Scenario: A provider added to the organization reaches keys already cached
+      Given a key of organization "acme" cached while it had only a Bedrock provider
+      And a key of another organization is cached
+      When the change feed reports a new model provider for "acme"
+      Then the "acme" key is evicted so its next request sees the new provider
+      And the other organization's key stays cached

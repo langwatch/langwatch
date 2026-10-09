@@ -2,13 +2,14 @@ import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import { resolveCredentials } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
+import { failSpinnerFromResponse } from "../../utils/failFromResponse";
 import { formatTable } from "../../utils/formatting";
 import { failSpinner } from "../../utils/spinnerError";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import type { CommandResult } from "../../utils/output";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 /**
  * Returns the listing rather than printing it: the output port renders it in
@@ -25,13 +26,12 @@ export const listSecretsCommand = async (): Promise<CommandResult | void> => {
   const spinner = createSpinner("Fetching secrets...").start();
 
   try {
-    const response = await fetch(`${endpoint}/api/secrets`, {
+    const response = await langwatchFetch(`${endpoint}/api/secrets`, {
       headers: buildAuthHeaders({ apiKey }),
     });
 
     if (!response.ok) {
-      const message = await formatFetchError(response);
-      failSpinner({ spinner, error: new Error(message), action: "fetch secrets" });
+      await failSpinnerFromResponse({ spinner, response, action: "fetch secrets" });
       process.exit(1);
     }
 

@@ -43,8 +43,8 @@ describe("withNote()", () => {
 
   describe("when the note is a plain line of text", () => {
     it("stores it under the top-level note key", () => {
-      expect(withNote("switched judge to the stricter rubric")).toEqual({
-        note: "switched judge to the stricter rubric",
+      expect(withNote("switched judge to the stricter criterion")).toEqual({
+        note: "switched judge to the stricter criterion",
       });
     });
   });

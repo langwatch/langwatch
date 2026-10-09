@@ -48,19 +48,21 @@ import { z } from "zod";
 const COST_USD_PATTERN = /^[+-]?\d*(?:\.\d*)?(?:[eE][+-]?\d+)?$/;
 
 /** Validates and stringifies a cost_usd value at the Zod boundary. */
-const costUsdSchema = z
-  .union([z.string(), z.number()])
-  .transform((v) => {
-    const s = String(v).trim();
-    if (s === "" || s === "0" || s === "0.0") return "0";
-    if (!COST_USD_PATTERN.test(s)) return "0";
-    // Reject negative costs — adapters currently only produce non-negative.
-    // If credits/refunds are needed, this guard should be removed explicitly.
-    const n = Number(s);
-    if (!Number.isFinite(n) || n < 0) return "0";
-    return s;
-  })
-  .default("0");
+const costUsdSchema = z.union([z.string(), z.number()]).transform((v) => {
+  const s = String(v).trim();
+  if (s === "" || s === "0" || s === "0.0") return "0";
+  if (!COST_USD_PATTERN.test(s)) return "0";
+  // Finite, and nothing more. A negative figure is REAL money: a provider
+  // that refunds a day serves the credit in the same field a charge arrives
+  // in, and clamping it to zero would leave the charge it reverses standing
+  // on its own — the customer reads as having spent money they got back.
+  // The pattern above already permits the sign; this only rejects values
+  // that are not numbers at all, including the lone "-" and anything that
+  // overflows.
+  const n = Number(s);
+  if (!Number.isFinite(n)) return "0";
+  return s;
+});
 
 /**
  * Canonical event shape produced by every adapter. Downstream code
@@ -80,10 +82,32 @@ export const normalizedPullEventSchema = z.object({
   action: z.string(),
   /** Target of the action (e.g. model name, tool name, document id). */
   target: z.string(),
-  /** USD cost as a decimal string ("0" if the source doesn't expose it).
+  /** Cost as a decimal string ("0" if the source doesn't expose it).
    *  Kept as a string so sub-cent amounts survive without float rounding.
-   *  Validated against DECIMAL_PATTERN and nonnegative at the parse boundary. */
-  cost_usd: costUsdSchema,
+   *  SIGNED: a provider that credits a period reports it here as a negative
+   *  figure, and it is carried rather than clamped. Validated against
+   *  DECIMAL_PATTERN and checked finite at the parse boundary.
+   *
+   *  Named `_usd` for the sources that predate currencies, so it may only ever
+   *  hold DOLLARS. OPTIONAL, and absent is the honest answer for a day billed
+   *  in another currency that nobody converted: a "0" there would assert both
+   *  that the provider published a dollar figure and that the figure was
+   *  nothing, and it would land in a total as a real, wrong zero. There was a
+   *  `.default("0")` here that re-filled exactly that zero on any re-parse,
+   *  which is why absence had to be made real at the schema and not only at
+   *  the emitter. The amount in its own currency travels beside this, in
+   *  `cost_amount` / `cost_currency`. */
+  cost_usd: costUsdSchema.optional(),
+  /**
+   * The amount as the provider billed it, in the currency named beside it.
+   *
+   * Added because `cost_usd` can only honestly hold dollars, and a euro day
+   * still has to leave. Both fields travel together or neither does: an amount
+   * with no currency is the same guess this pair exists to remove.
+   */
+  cost_amount: z.string().optional(),
+  /** ISO 4217 code for `cost_amount`. Meaningless without it. */
+  cost_currency: z.string().optional(),
   /** Input tokens (0 if unknown). */
   tokens_input: z.number().nonnegative().int().default(0),
   /** Output tokens (0 if unknown). */
@@ -103,6 +127,38 @@ export const normalizedPullEventSchema = z.object({
 });
 
 export type NormalizedPullEvent = z.infer<typeof normalizedPullEventSchema>;
+
+/**
+ * An adapter could not obtain the bearer its provider calls need.
+ *
+ * A subclass rather than a plain `Error` because two callers now read the same
+ * failure and want different things from it. The run path wants the message,
+ * unchanged, in the log and on the source. A caller listing entities on demand
+ * wants to tell an admin WHICH failure it was, and the three cases below are
+ * three different next actions: fill the credential in, fix the one that is
+ * there, or try again later.
+ *
+ * `message` stays customer-safe. It names the status at most, never the
+ * provider's reply body, which may echo the request back with the secret in it.
+ */
+export class ProviderSignInError extends Error {
+  readonly reason: "not_configured" | "refused" | "malformed_response";
+  /** The sign-in endpoint's status, when the failure had one. */
+  readonly status: number | null;
+
+  constructor(
+    message: string,
+    params: {
+      reason: "not_configured" | "refused" | "malformed_response";
+      status?: number;
+    },
+  ) {
+    super(message);
+    this.name = "ProviderSignInError";
+    this.reason = params.reason;
+    this.status = params.status ?? null;
+  }
+}
 
 /**
  * Result of a single `runOnce` invocation. Drained when `cursor === null`.
@@ -139,6 +195,60 @@ export interface PullResult {
    * with an unchanged cursor it fails the run.
    */
   errorCount: number;
+  /**
+   * Whether this run reached the end of what it set out to read.
+   *
+   * `"truncated"` means the run stopped at a limit — a page budget, a file
+   * count, a deadline — with more waiting. It is NOT a failure: the money and
+   * the events already gathered are kept, and `cursor` still advances over
+   * them. It exists because a run that stopped early and a run that drained
+   * the source currently leave through the same exit, so a source stuck
+   * half-read is indistinguishable from a source that is simply quiet.
+   *
+   * Optional: an adapter that says nothing is read as `"complete"`, which is
+   * what every adapter meant before the field existed.
+   */
+  completeness?: "complete" | "truncated";
+  /**
+   * Set when this run's `errorCount` includes a page it could not read AT ALL.
+   *
+   * The contract above has two shapes for a nonzero `errorCount`, and this is
+   * the third thing that can happen: an adapter that could not read a page but
+   * HAD already read earlier ones may bank them — return the advanced cursor,
+   * the events it has, and this flag — rather than throw the lot away. The
+   * events are written and the position is persisted, exactly like skipped
+   * input, but the source must NOT read as working: without this flag a source
+   * refused part-way through every run holds a failure count of zero forever
+   * and never turns red. Say so here and the fold counts the failure while
+   * keeping the progress.
+   *
+   * Only for a page nobody could read. Input an adapter deliberately steps
+   * over belongs in `errorCount` alone.
+   */
+  unreadPage?: true;
+  /**
+   * The instant this run is known to have read up to, ISO 8601.
+   *
+   * Distinct from the instant the run finished, and that distinction is the
+   * whole point: the run clock advances on every attempt, so a source stuck
+   * re-reading the same half would look like progress. This value does not
+   * move until the read does.
+   */
+  readThroughAt?: string;
+  /**
+   * Stable codes for things the run continued through rather than failed on.
+   *
+   * A degradation a reader of the source needs to know about — "the money is
+   * here but nobody is attributed to it" — has to survive as data. A log line
+   * cannot be shown to someone looking at the source.
+   *
+   * Today nothing carries it that far: `runPuller` (pullerWorker) returns
+   * `nextCursor`, `eventCount`, `errorCount`, `completeness` and
+   * `readThroughAt` and drops `notices` on the floor, so no screen and no
+   * person sees a code set here. The tests assert on them; nothing else reads
+   * them yet.
+   */
+  notices?: string[];
 }
 
 /**

@@ -8,26 +8,35 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
+import { useState } from "react";
+import { withAggregateAnalyticsGate } from "~/components/analytics/AggregateAnalyticsGate";
+import { DashboardAutoRefreshMenu } from "~/components/analytics/DashboardAutoRefreshMenu";
+import {
+  DashboardRefreshedAtContext,
+  useDashboardAutoRefresh,
+} from "~/components/analytics/useDashboardAutoRefresh";
 import { FilterSidebar } from "~/components/filters/FilterSidebar";
 import { useFilterToggle } from "~/components/filters/FilterToggle";
 import GraphsLayout from "~/components/GraphsLayout";
 import { toaster } from "~/components/ui/toaster";
 import { useWidgetGranularity } from "~/features/analytics-query/hooks/useWidgetGranularity";
+import { CreateDashboardWidgetDrawer } from "~/features/custom-chart-playground/CreateDashboardWidgetDrawer";
+import { useFeatureFlag } from "~/hooks/useFeatureFlag";
+import type { ChartGridPlacement } from "~/server/analytics/chartGrid";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
-import {
-  calculateGridPositions,
-  type GridLayout,
-  ReportGrid,
-  type SizeOption,
-  sizeOptions,
-} from "../../../components/analytics/reports";
+import { ReportGrid } from "../../../components/analytics/reports";
 import { Link } from "../../../components/ui/link";
 import { withPermissionGuard } from "../../../components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 
-function ReportsContent() {
-  const { project } = useOrganizationTeamProject();
+/** Exported for the test that renders the body past the aggregate gate. */
+export function ReportsContent() {
+  const { project, organization, hasPermission } = useOrganizationTeamProject();
+  // The writes this page offers, each refused where the server refuses it:
+  // on an aggregate project (ADR-144) and for a member without the grant.
+  const canAddChart = hasPermission("analytics:create");
+  const canRenameDashboard = hasPermission("analytics:update");
   const { showFilters } = useFilterToggle();
   const router = useRouter();
   const projectId = project?.id ?? "";
@@ -42,6 +51,33 @@ function ReportsContent() {
   );
 
   const activeDashboardId = urlDashboardId ?? getOrCreateFirst.data?.id;
+
+  const [isAddChartOpen, setIsAddChartOpen] = useState(false);
+
+  // Gates the new dashboard-widget "Add chart" flow client-side to match the
+  // server-side enforcement in the dashboardWidgets tRPC router
+  // (enforceCustomChartPlaygroundEnabled) — without this, a user with the
+  // flag off would get a drawer whose Save always fails. `enabled` defaults
+  // to false while the query is loading, so the button starts as the legacy
+  // link and (for flagged-in accounts) swaps to the drawer once resolved,
+  // rather than flashing the drawer open state first.
+  const { enabled: customChartPlaygroundEnabled } = useFeatureFlag(
+    "release_custom_chart_playground",
+    {
+      projectId: project?.id,
+      organizationId: organization?.id,
+      enabled: !!project?.id && !!organization?.id,
+    },
+  );
+
+  // Scheduled refresh: widgets follow refreshedAt through their dashboard
+  // context; builder graphs and placed charts re-fetch through tRPC.
+  const utils = api.useUtils();
+  const autoRefresh = useDashboardAutoRefresh({
+    onTick: () => {
+      void utils.analytics.invalidate();
+    },
+  });
 
   // Fetch all dashboards to get current dashboard name
   const dashboardsQuery = api.dashboards.getAll.useQuery(
@@ -60,8 +96,8 @@ function ReportsContent() {
     { enabled: !!projectId && !!activeDashboardId },
   );
 
+  const queryClient = api.useUtils();
   const deleteGraph = api.graphs.delete.useMutation();
-  const updateLayout = api.graphs.updateLayout.useMutation();
   const batchUpdateLayouts = api.graphs.batchUpdateLayouts.useMutation();
   const renameDashboard = api.dashboards.rename.useMutation();
 
@@ -90,7 +126,11 @@ function ReportsContent() {
       { projectId, id: graphId },
       {
         onSuccess: () => {
-          void graphsQuery.refetch();
+          // Invalidate EVERY graphs.getAll key, not just this dashboard's.
+          // The automation composer reads the list keyed by {projectId}
+          // alone, so refetching only the {projectId, dashboardId} query left
+          // a deleted graph on offer there until a full page reload.
+          void queryClient.graphs.getAll.invalidate();
         },
         onError: () => {
           toaster.create({
@@ -103,69 +143,16 @@ function ReportsContent() {
     );
   };
 
-  const handleGraphSizeChange = (graphId: string, size: SizeOption) => {
-    const sizeConfig = sizeOptions.find((s) => s.value === size);
-    if (!sizeConfig) return;
-
-    const graph = graphsQuery.data?.find((g) => g.id === graphId);
-    if (!graph) return;
-
-    // Update this graph's size
-    updateLayout.mutate(
-      {
-        projectId,
-        graphId,
-        gridColumn: graph.gridColumn,
-        gridRow: graph.gridRow,
-        colSpan: sizeConfig.colSpan,
-        rowSpan: sizeConfig.rowSpan,
-      },
-      {
-        onSuccess: () => {
-          // Recalculate all positions after size change
-          const updatedGraphs = graphsQuery.data?.map((g) =>
-            g.id === graphId
-              ? {
-                  ...g,
-                  colSpan: sizeConfig.colSpan,
-                  rowSpan: sizeConfig.rowSpan,
-                }
-              : g,
-          );
-
-          if (updatedGraphs) {
-            const newLayouts = calculateGridPositions(updatedGraphs);
-            batchUpdateLayouts.mutate(
-              { projectId, layouts: newLayouts },
-              {
-                onSuccess: () => {
-                  void graphsQuery.refetch();
-                },
-              },
-            );
-          }
-        },
-        onError: () => {
-          toaster.create({
-            title: "Error updating graph size",
-            type: "error",
-            duration: 3000,
-          });
-        },
-      },
-    );
-  };
-
-  const handleGraphsReorder = (layouts: GridLayout[]) => {
+  const handleGraphsPlacementChange = (placements: ChartGridPlacement[]) => {
     batchUpdateLayouts.mutate(
-      { projectId, layouts },
+      { projectId, layouts: placements },
       {
         onSuccess: () => {
           void graphsQuery.refetch();
         },
         onError: () => {
           toaster.create({
-            title: "Error reordering graphs",
+            title: "Error saving the dashboard layout",
             type: "error",
             duration: 3000,
           });
@@ -203,7 +190,8 @@ function ReportsContent() {
   });
   const hasNoGraphs = graphs.length === 0 && !graphsQuery.isLoading;
 
-  // Build add chart URL with current dashboard
+  // Legacy builder route — used when the playground flag is off (or still
+  // loading), matching main's Add-chart handler.
   const addChartUrl = activeDashboardId
     ? `/${project?.slug}/analytics/custom?dashboard=${activeDashboardId}`
     : `/${project?.slug}/analytics/custom`;
@@ -212,20 +200,53 @@ function ReportsContent() {
     <GraphsLayout
       title={dashboardTitle}
       analyticsHeaderProps={{
-        isEditable: true,
+        isEditable: canRenameDashboard,
         onTitleSave: handleTitleSave,
       }}
       extraHeaderButtons={
-        project ? (
-          <Link href={addChartUrl} asChild>
-            <Button colorPalette="orange" size="sm">
-              <Plus /> Add chart
-            </Button>
-          </Link>
-        ) : null
+        <>
+          <DashboardAutoRefreshMenu
+            option={autoRefresh.option}
+            onChange={autoRefresh.setOption}
+          />
+          {project && canAddChart ? (
+            customChartPlaygroundEnabled ? (
+              <Button
+                colorPalette="orange"
+                size="sm"
+                onClick={() => setIsAddChartOpen(true)}
+              >
+                <Plus /> Add chart
+              </Button>
+            ) : (
+              <Link href={addChartUrl} asChild>
+                <Button colorPalette="orange" size="sm">
+                  <Plus /> Add chart
+                </Button>
+              </Link>
+            )
+          ) : null}
+        </>
       }
     >
-      {/* Empty state */}
+      {/* The workbench builder's own save path is disabled while the
+          custom-chart-playground is enabled (see DashboardWidgetService /
+          saved_workbench_charts_disabled_for_playground) — a member landing
+          there would hit a Save button that always fails. This drawer is
+          the one "create a new chart" path that still works, and it lands
+          the new widget on this dashboard directly. */}
+      {project && canAddChart && customChartPlaygroundEnabled && (
+        <CreateDashboardWidgetDrawer
+          open={isAddChartOpen}
+          onClose={() => setIsAddChartOpen(false)}
+          projectId={projectId}
+          projectSlug={project.slug}
+          dashboardId={activeDashboardId ?? undefined}
+        />
+      )}
+
+      {/* Empty state: shown to every member, inviting only those who can
+          add a chart to click the button they can see. */}
       {hasNoGraphs && (
         <Alert.Root
           status="info"
@@ -235,11 +256,16 @@ function ReportsContent() {
         >
           <Alert.Indicator alignSelf="start" />
           <VStack align="start">
-            <Alert.Title>Add your custom graphs here</Alert.Title>
+            <Alert.Title>
+              {canAddChart
+                ? "Add your custom graphs here"
+                : "No custom graphs yet"}
+            </Alert.Title>
             <Alert.Description>
               <Text as="span">
-                You haven{"'"}t set up any custom graphs yet. Click + Add chart
-                to get started.
+                {canAddChart
+                  ? "You haven't set up any custom graphs yet. Click + Add chart to get started."
+                  : "Nobody has added a custom graph to this dashboard yet."}
               </Text>
             </Alert.Description>
           </VStack>
@@ -247,32 +273,35 @@ function ReportsContent() {
       )}
 
       {/* Main content */}
-      <HStack align="start" gap={6} width="full">
-        <Box flex={1}>
-          {graphsQuery.isLoading ? (
-            <Skeleton height="300px" />
-          ) : (
-            <ReportGrid
-              graphs={graphs}
-              projectSlug={project?.slug ?? ""}
-              projectId={projectId}
-              dashboardId={activeDashboardId ?? undefined}
-              onGraphDelete={handleGraphDelete}
-              onGraphSizeChange={handleGraphSizeChange}
-              onGraphGranularityChange={handleGraphGranularityChange}
-              onGraphsReorder={handleGraphsReorder}
-              deletingGraphId={
-                deleteGraph.isPending
-                  ? (deleteGraph.variables?.id ?? null)
-                  : null
-              }
-            />
-          )}
-        </Box>
-        {showFilters ? <FilterSidebar /> : null}
-      </HStack>
+      <DashboardRefreshedAtContext.Provider value={autoRefresh.refreshedAt}>
+        <HStack align="start" gap={6} width="full">
+          <Box flex={1}>
+            {graphsQuery.isLoading ? (
+              <Skeleton height="300px" />
+            ) : (
+              <ReportGrid
+                graphs={graphs}
+                projectSlug={project?.slug ?? ""}
+                projectId={projectId}
+                dashboardId={activeDashboardId ?? undefined}
+                onGraphDelete={handleGraphDelete}
+                onGraphGranularityChange={handleGraphGranularityChange}
+                onGraphsPlacementChange={handleGraphsPlacementChange}
+                deletingGraphId={
+                  deleteGraph.isPending
+                    ? (deleteGraph.variables?.id ?? null)
+                    : null
+                }
+              />
+            )}
+          </Box>
+          {showFilters ? <FilterSidebar /> : null}
+        </HStack>
+      </DashboardRefreshedAtContext.Provider>
     </GraphsLayout>
   );
 }
 
-export default withPermissionGuard("analytics:view")(ReportsContent);
+export default withPermissionGuard("analytics:view")(
+  withAggregateAnalyticsGate("Reports", ReportsContent),
+);

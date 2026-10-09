@@ -2,6 +2,7 @@
  * One run of the plan in the runs rail, read from the rows the run produced.
  *
  * @see specs/features/agent-testing/results-tabs.feature
+ * @see specs/features/agent-testing/comparison-mode.feature
  */
 
 import {
@@ -10,12 +11,16 @@ import {
 } from "~/components/suites/run-history-transforms";
 import { useNow } from "~/hooks/useNow";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
-import { RunsSidebarEntry } from "./RunsSidebarEntry";
-import { batchNote, type RunPlan } from "./run-plans";
+import { RunsSidebarEntry, type SidebarTargetRate } from "./RunsSidebarEntry";
+import { batchNote } from "./run-plans";
 import { runTitle } from "./run-titles";
+import {
+  isComparison,
+  summaryOfTarget,
+  useBatchTargets,
+} from "./useBatchTargets";
 
 export type RunsSidebarBatchEntryProps = {
-  plan: RunPlan;
   batch: BatchRun;
   /** Where the run sits in the window, which gives it its number. */
   index: number;
@@ -26,7 +31,6 @@ export type RunsSidebarBatchEntryProps = {
 };
 
 export function RunsSidebarBatchEntry({
-  plan,
   batch,
   index,
   totalBatchCount,
@@ -37,12 +41,21 @@ export function RunsSidebarBatchEntry({
   const now = useNow();
   const summary = computeBatchRunSummary({ batchRun: batch });
   const isRunning = summary.inProgressCount + summary.queuedCount > 0;
+  const targets = useBatchTargets(batch.scenarioRuns);
+
+  const targetRates: SidebarTargetRate[] | undefined = isComparison(targets)
+    ? targets.map((target) => ({
+        key: target.key,
+        color: target.color,
+        label: target.label,
+        passRate: summaryOfTarget({ scenarioRuns: batch.scenarioRuns, target })
+          .passRate,
+      }))
+    : undefined;
 
   return (
     <RunsSidebarEntry
       title={runTitle({
-        plan,
-        batch,
         index,
         totalCount: totalBatchCount,
         loadedCount,
@@ -51,6 +64,7 @@ export function RunsSidebarBatchEntry({
       timeAgo={formatTimeAgoCompact(batch.timestamp, now)}
       passRate={summary.passRate}
       passedCount={summary.passedCount}
+      targetRates={targetRates}
       isRunning={isRunning}
       judgedCount={summary.completedCount}
       totalCount={summary.totalCount}

@@ -25,7 +25,10 @@ import { useLangyStore } from "../stores/langyStore";
 const MID_TURN_PLACEHOLDER = "Langy is working. You can send when it stops.";
 const IDLE_PLACEHOLDER = "Ask Langy or describe what you want…";
 
-function renderComposer(onSend: (input: string) => void) {
+function renderComposer(
+  onSend: (input: string) => void,
+  over: { awaitingAnswer?: boolean; terminalConnected?: boolean } = {},
+) {
   return render(
     <ChakraProvider value={defaultSystem}>
       <Composer
@@ -35,6 +38,7 @@ function renderComposer(onSend: (input: string) => void) {
         onSend={onSend}
         onStop={() => {}}
         disabled={false}
+        {...over}
       />
     </ChakraProvider>,
   );
@@ -49,6 +53,22 @@ beforeEach(() => {
 });
 
 afterEach(cleanup);
+
+describe("given the turn has ended", () => {
+  /** @scenario "A card left from a finished turn does not lock the message field" */
+  it("reads the idle placeholder even while a card entry still reads pending", () => {
+    useLangyStore.setState({ turnPhase: "idle" });
+    renderComposer(() => {}, { awaitingAnswer: true, terminalConnected: true });
+
+    expect(screen.getByPlaceholderText(IDLE_PLACEHOLDER)).toBeTruthy();
+    expect(
+      screen.queryByPlaceholderText(
+        "Answer on the card above or in the terminal.",
+      ),
+    ).toBeNull();
+    expect(screen.queryByPlaceholderText(MID_TURN_PLACEHOLDER)).toBeNull();
+  });
+});
 
 describe("given a Langy turn is in flight", () => {
   describe("when the user reads the composer", () => {
@@ -67,6 +87,35 @@ describe("given a Langy turn is in flight", () => {
       renderComposer(() => {});
 
       expect(screen.getByPlaceholderText(MID_TURN_PLACEHOLDER)).toBeTruthy();
+    });
+
+    /** @scenario "The message field points at the card while one is waiting" */
+    it("points at the card while one is waiting, and stops blaming Langy", () => {
+      useLangyStore.setState({ turnPhase: "active" });
+      renderComposer(() => {}, { awaitingAnswer: true });
+
+      expect(
+        screen.getByPlaceholderText("Answer the card above to keep going."),
+      ).toBeTruthy();
+      expect(screen.queryByPlaceholderText(MID_TURN_PLACEHOLDER)).toBeNull();
+    });
+
+    /** @scenario "The panel names the terminal while the ask is open there too" */
+    it("names the terminal as well when a folder is shared from one", () => {
+      useLangyStore.setState({ turnPhase: "active" });
+      renderComposer(() => {}, {
+        awaitingAnswer: true,
+        terminalConnected: true,
+      });
+
+      expect(
+        screen.getByPlaceholderText(
+          "Answer on the card above or in the terminal.",
+        ),
+      ).toBeTruthy();
+      expect(
+        screen.queryByPlaceholderText("Answer the card above to keep going."),
+      ).toBeNull();
     });
   });
 

@@ -86,6 +86,37 @@ export class AgentCacheService {
     return { name, ttl_seconds: lifetimeSeconds };
   }
 
+  /**
+   * Take a name, but only if the project does not hold it yet.
+   *
+   * This is what one row uses to do work the other rows then reuse. Losing is
+   * an ordinary answer rather than a refusal: the caller reads `claimed` and
+   * either does the work or reads back what the winner stored, so agent code
+   * branches on a boolean instead of catching an exception.
+   */
+  async claim({
+    projectId,
+    name,
+    value,
+    ttlSeconds,
+  }: {
+    projectId: string;
+    name: string;
+    value: string;
+    ttlSeconds?: number;
+  }): Promise<{ name: string; claimed: boolean; ttl_seconds: number }> {
+    const lifetimeSeconds = ttlSeconds ?? DEFAULT_TTL_SECONDS;
+
+    const claimed = await this.repository.claim({
+      projectId,
+      name,
+      encryptedValue: encrypt(value),
+      ttlMs: lifetimeSeconds * 1000,
+    });
+
+    return { name, claimed, ttl_seconds: lifetimeSeconds };
+  }
+
   /** Idempotent: a name the project does not hold deletes nothing and is not
    * an error, so a caller can clear an entry without reading it first. */
   async delete({

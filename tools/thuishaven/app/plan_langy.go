@@ -14,7 +14,7 @@ import (
 // container tiers. Local-only (never pushed/pulled), built from infra/docker/Dockerfile.langyagent.
 const langyImage = "langyagent:dev"
 
-// Langy is intentionally constrained in local development. OpenCode workers are
+// Langy is intentionally constrained in local development. Workers are
 // heavyweight processes (roughly 600-650 MiB each in normal use), and an uncapped
 // manager can otherwise consume the entire small Colima VM before the ten-minute
 // production-shaped idle timeout has a chance to help. These are local launcher
@@ -115,21 +115,21 @@ func (o *Orchestrator) langyChild(st domain.Stack, opts PlanOptions, base []stri
 	// PORT, not SERVER_ADDR (see services/langyagent/config.go) — PORT always wins.
 	// Its sessions/workspace roots default to the in-container /workspace, which is
 	// read-only on a dev host; point them at writable per-slug dirs under haven's
-	// home and create them so the manager boots (session spawn still needs an
-	// `opencode` binary on PATH, but the service itself comes up). The UID sandbox
+	// home and create them so the manager boots (session spawn still needs the
+	// built `langy-worker` binary, but the service itself comes up). The UID sandbox
 	// is disabled — on the host the worker runs as the developer's own unprivileged
 	// user, where the setuid + chown the sandbox needs would fail with EPERM.
 	laRoot := filepath.Join(o.cfg.Home, "langyagent", st.Slug)
 	_ = os.MkdirAll(filepath.Join(laRoot, "sessions"), 0o755)
 	_ = os.MkdirAll(filepath.Join(laRoot, "workspace"), 0o755)
 	piWorkerPath := filepath.Join(opts.RepoRoot, "services", "langyworker", "out", "langy-worker")
-	// A missing wrapper binary fails every pi spawn with exec-not-found, which
-	// reads as a harness bug rather than a setup gap. Say so at startup, once,
+	// A missing wrapper binary fails every worker spawn with exec-not-found,
+	// which reads as a bug rather than a setup gap. Say so at startup, once,
 	// while the operator is still looking at the terminal.
 	if !isExecutableFile(piWorkerPath) {
 		fmt.Printf(
-			"  warning: the pi worker binary is not built at %s.\n"+
-				"  Every pi-harness worker spawn will fail until you run\n"+
+			"  warning: the langy worker binary is not built at %s.\n"+
+				"  Every worker spawn will fail until you run\n"+
 				"  `pnpm --filter @langwatch/langyworker build:binary`.\n",
 			piWorkerPath,
 		)
@@ -145,12 +145,11 @@ func (o *Orchestrator) langyChild(st domain.Stack, opts PlanOptions, base []stri
 			fmt.Sprintf("LANGY_WORKER_IDLE_MS=%d", langyWorkerIdleMS(localLangyWorkerIdleHostMS)),
 			fmt.Sprintf("LANGY_REAPER_INTERVAL_MS=%d", localLangyReaperIntervalMS),
 			"LANGY_UNSAFE_DEV_DISABLE_ISOLATION=true",
-			// The pi harness spawns this worktree's own built wrapper binary
+			// The manager spawns this worktree's own built wrapper binary
 			// (`pnpm --filter @langwatch/langyworker build:binary`). Without an
-			// explicit path the manager falls back to bare `langy-worker` on
-			// PATH, which no dev machine has: every pi spawn then fails with
-			// exec-not-found while opencode keeps working, which reads as a
-			// harness bug instead of a setup gap.
+			// explicit path it falls back to bare `langy-worker` on PATH, which
+			// no dev machine has: every spawn then fails with exec-not-found,
+			// which reads as a bug instead of a setup gap.
 			"LANGY_PI_WORKER_BINARY_PATH="+piWorkerPath,
 		),
 	}

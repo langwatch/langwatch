@@ -7,12 +7,7 @@
  * deterministic 409 (`role_binding_already_exists`), and a custom role that
  * carries an organization-exclusive permission is refused at team or project
  * scope at write time rather than silently never granting (ADR-021).
- *
- * A create for a user whose access until now came only from legacy team
- * membership reports `hasLegacyAccessNotice: true`: their first explicit binding
- * switches the team-derived fallback off, which is worth telling the operator
- * even though the write itself is exactly what they asked for.
- *
+
  * Every write here is a grants-ledger command (ADR-092 §13), so the audit
  * trail is the pipeline's insert-only subscriber (decision 17): these
  * handlers never emit `management.roleBinding.*` rows of their own — that
@@ -64,14 +59,7 @@ const bindingSchema = z.object({
   createdAt: z.date(),
 });
 
-const createdBindingSchema = bindingSchema.extend({
-  /**
-   * Present (true) only when this is the user's first explicit binding and
-   * their access so far derived from legacy team membership, which this
-   * write switches off. Informative, never blocking.
-   */
-  hasLegacyAccessNotice: z.boolean().optional(),
-});
+const createdBindingSchema = bindingSchema;
 
 const listQuerySchema = z.object({
   userId: z.string().min(1).optional(),
@@ -203,13 +191,6 @@ const createBindingHandler = async (
   },
 ) => {
   const organization = organizationOf(c);
-  const hasLegacyAccessNotice = input.userId
-    ? await app.roleBindings.wouldFirstBindingDisableLegacyAccess({
-        organizationId: organization.id,
-        userId: input.userId,
-      })
-    : false;
-
   const created = await app.roleBindings.create({
     organizationId: organization.id,
     ...input,
@@ -239,10 +220,7 @@ const createBindingHandler = async (
       scopeType: input.scopeType,
       scopeId: input.scopeId,
     });
-  return {
-    ...binding,
-    ...(hasLegacyAccessNotice ? { hasLegacyAccessNotice: true } : {}),
-  };
+  return binding;
 };
 
 const updateBindingHandler = async (

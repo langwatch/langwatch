@@ -1,21 +1,35 @@
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
-import type { Organization, Project, Team } from "~/generated/prisma/client";
+import type {
+  Organization,
+  Prisma,
+  Project,
+  Team,
+} from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
+import { raceOnOneRow } from "~/test-utils/rowLockInterleaving";
 import { DatasetRepository } from "../dataset.repository";
 
 /**
- * Integration coverage for `DatasetRepository.deletePendingUpload` against a
- * real Postgres. This is the FIRST hard-delete of a `Dataset` in the codebase
- * (every other removal soft-archives), so the unit/service tests — which mock
- * the repo — can't prove the actual `deleteMany` succeeds under
+ * Integration coverage for the `Dataset` writes that only a real Postgres can
+ * prove, against one.
+ *
+ * `deletePendingUpload` is the FIRST hard-delete of a `Dataset` in the
+ * codebase (every other removal soft-archives), so the unit/service tests,
+ * which mock the repo, can't prove the actual `deleteMany` succeeds under
  * `relationMode="prisma"` (where `DatasetRecord`/`BatchEvaluation` default to
  * `onDelete: Restrict`). These exercise the real Prisma path: a childless
  * placeholder deletes cleanly, the `status='uploading'` guard protects a row a
  * finalize raced to `processing`, and the predicate is tenancy-scoped.
+ *
+ * `claimForProcessing` is proved exclusive by interleaving two claims on one
+ * row: the first is held open until the second is parked on its row lock,
+ * which is the overlap under which a guard in a subquery admits both.
+ *
+ * @see specs/datasets/large-dataset-storage.feature
  */
-describe("DatasetRepository.deletePendingUpload (integration)", () => {
+describe("DatasetRepository (integration)", () => {
   let repository: DatasetRepository;
   let organization: Organization;
   let team: Team;
@@ -120,6 +134,35 @@ describe("DatasetRepository.deletePendingUpload (integration)", () => {
           }),
         ).not.toBeNull();
       });
+    });
+  });
+
+  describe("given an uploading row two finalize calls claim at the same moment", () => {
+    /** @scenario "Two finalize calls for one upload start one preparation" */
+    it("admits the first claim and refuses the second, which waited on the row", async () => {
+      const row = await createUploadingRow("uploading");
+      const claim = (tx: Prisma.TransactionClient) =>
+        new DatasetRepository(tx).claimForProcessing({
+          id: row.id,
+          projectId: project.id,
+        });
+
+      const claims = await raceOnOneRow({
+        prisma,
+        table: "Dataset",
+        first: claim,
+        second: claim,
+      });
+
+      expect(claims.first).toBe(1);
+      expect(claims.second).toBe(0);
+      expect(
+        (
+          await prisma.dataset.findFirstOrThrow({
+            where: { id: row.id, projectId: project.id },
+          })
+        ).status,
+      ).toBe("processing");
     });
   });
 });

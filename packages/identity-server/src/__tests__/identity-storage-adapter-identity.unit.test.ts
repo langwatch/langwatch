@@ -18,7 +18,8 @@
  * branch and for the `Account` rows the bridge mirror writes.
  */
 import { IDENTIFIER_ATTACHED_EVENT_TYPE } from "@langwatch/identity";
-import { beforeEach, describe, expect, it } from "vitest";
+import { handleOAuthUserInfo } from "better-auth/oauth2";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { IdentityUnsupportedStorageQueryError } from "../better-auth/account-queries";
 import type { IdentityStack } from "./support/storage-adapter-stack";
 import {
@@ -82,8 +83,10 @@ function seedBridgeRow(stack: Stack, accountId: string): void {
     id: accountId,
     userId: userIdOf(stack),
     providerId: "credential",
-    issuer: CREDENTIAL_ISSUER,
     accountId: userIdOf(stack),
+    // 1.7 keys the local credential account by this issuer; the real bridge
+    // rows carry it in their non-nullable `issuer` column.
+    issuer: CREDENTIAL_ISSUER,
     createdAt: new Date(),
     updatedAt: new Date(),
   });
@@ -391,6 +394,37 @@ describe("better-auth over the identity storage adapter", () => {
         ).toContain("lw.identity.attach_identifier");
       });
 
+      /** @scenario "A real-issuer callback resolves its account rather than refusing" */
+      it("answers the callback key better-auth builds from a provider's own issuer", async () => {
+        await signUp(stack.auth, EMAIL);
+        const userId = userIdOf(stack);
+        const context = await stack.auth.$context;
+        await context.internalAdapter.linkAccount({
+          userId,
+          providerId: "google",
+          issuer: GOOGLE_ISSUER,
+          accountId: "sub-google-1",
+        });
+        // Nothing in the legacy table, so a refusal cannot hide behind a
+        // legacy answer: either the identity branch resolves this or the
+        // sign-in fails.
+        stack.db.account = [];
+
+        // The EXACT call better-auth 1.7 makes on an OAuth callback: two
+        // fields, no providerId and no userId. Naming no user is what makes
+        // it take the fleet-wide gate, so a refusal here fails the sign-in
+        // of every user on the deployment and not just this one.
+        const owner = await context.internalAdapter.findAccountOwnerByKey({
+          issuer: GOOGLE_ISSUER,
+          accountId: "sub-google-1",
+        });
+
+        // "owned" and not "orphaned": the point is that the callback finds
+        // the PERSON, which is what lets the sign-in continue.
+        expect(owner?.kind).toBe("owned");
+        expect(owner?.kind === "owned" ? owner.user.id : null).toBe(userId);
+      });
+
       /** @scenario "A stored issuer is served in preference to a derived one" */
       it("serves the stored issuer back to better-auth, not the synthetic form", async () => {
         await signUp(stack.auth, EMAIL);
@@ -614,6 +648,136 @@ describe("better-auth over the identity storage adapter", () => {
         expect(
           stack.storage.credentials.get(google?.id as string)?.secrets,
         ).toMatchObject({ accessToken: "at-2", refreshToken: "rt-2" });
+      });
+    });
+
+    describe("when the sign-in token refresh restates the account's own provider", () => {
+      /** @scenario "A sign-in that echoes the account's own provider back is served, not refused" */
+      it("writes the tokens instead of refusing the echo", async () => {
+        await signUp(stack.auth, EMAIL);
+        const userId = userIdOf(stack);
+        const context = await stack.auth.$context;
+        await context.internalAdapter.linkAccount({
+          userId,
+          providerId: "google",
+          issuer: oauthIssuer("google"),
+          accountId: "sub-google-1",
+        });
+        const google = (await context.internalAdapter.findAccounts(userId)).find(
+          (row) => row.providerId === "google",
+        );
+        const statedBefore = stack.commands.length;
+
+        // better-auth 1.7's `oauth2/link-account` sends `providerId` in the
+        // same payload as the rotated tokens, echoing back the value it just
+        // read. 1.6 did not, and refusing the echo failed every OAuth
+        // sign-in for a latched user.
+        await context.adapter.update({
+          model: "account",
+          where: [{ field: "id", value: google?.id as string }],
+          update: {
+            providerId: "google",
+            accessToken: "at-2",
+            refreshToken: "rt-2",
+          },
+        });
+
+        expect(
+          stack.storage.credentials.get(google?.id as string)?.secrets,
+        ).toMatchObject({ accessToken: "at-2", refreshToken: "rt-2" });
+        // The restated provider wrote nothing: linkage is still the fold's,
+        // so no command was stated for it.
+        expect(stack.commands).toHaveLength(statedBefore);
+      });
+
+      /** @scenario "A sign-in that changes the account's provider is still refused" */
+      it("still refuses a provider that differs from the row it names", async () => {
+        await signUp(stack.auth, EMAIL);
+        const userId = userIdOf(stack);
+        const context = await stack.auth.$context;
+        await context.internalAdapter.linkAccount({
+          userId,
+          providerId: "google",
+          issuer: oauthIssuer("google"),
+          accountId: "sub-google-1",
+        });
+        const google = (await context.internalAdapter.findAccounts(userId)).find(
+          (row) => row.providerId === "google",
+        );
+
+        // Equality is the whole safety argument: an echo writes nothing, but
+        // a DIFFERENT provider is a real linkage rewrite and would repoint
+        // the row at another IdP.
+        await expect(
+          context.adapter.update({
+            model: "account",
+            where: [{ field: "id", value: google?.id as string }],
+            update: { providerId: "github", accessToken: "at-2" },
+          }),
+        ).rejects.toMatchObject({
+          body: { code: "identity_unsupported_storage_query" },
+        });
+
+        expect(
+          (await context.internalAdapter.findAccounts(userId)).find(
+            (row) => row.id === google?.id,
+          )?.providerId,
+        ).toBe("google");
+      });
+    });
+
+    describe("when better-auth's own sign-in path refreshes an OAuth account", () => {
+      /** @scenario "A sign-in that echoes the account's own provider back is served, not refused" */
+      it("completes the sign-in better-auth 1.7 actually issues", async () => {
+        await signUp(stack.auth, EMAIL);
+        const userId = userIdOf(stack);
+        const context = await stack.auth.$context;
+        await context.internalAdapter.linkAccount({
+          userId,
+          providerId: "google",
+          issuer: oauthIssuer("google"),
+          accountId: "sub-google-1",
+        });
+        const google = (await context.internalAdapter.findAccounts(userId)).find(
+          (row) => row.providerId === "google",
+        );
+
+        // better-auth's OWN payload, not one this test hand-builds: 1.7's
+        // `handleOAuthUserInfo` is where the sign-in token refresh is
+        // constructed, and it is what added `providerId` beside the tokens.
+        // Driving it here is the difference between pinning the fix and
+        // pinning this test's guess about the fix.
+        const result = await handleOAuthUserInfo(
+          { context } as unknown as Parameters<typeof handleOAuthUserInfo>[0],
+          {
+            userInfo: {
+              id: "sub-google-1",
+              email: EMAIL,
+              emailVerified: true,
+              name: "Sam",
+              image: null,
+            },
+            account: {
+              providerId: "google",
+              issuer: oauthIssuer("google"),
+              accountId: "sub-google-1",
+              accessToken: "at-rotated",
+              refreshToken: "rt-rotated",
+            },
+          },
+        );
+
+        // A refusal reaches here as a throw, so arriving at all is half the
+        // claim; the session is the other half — this is a completed
+        // sign-in, not merely an update that did not explode.
+        expect(result.error).toBeFalsy();
+        expect(result.data?.session).toBeDefined();
+        expect(
+          stack.storage.credentials.get(google?.id as string)?.secrets,
+        ).toMatchObject({
+          accessToken: "at-rotated",
+          refreshToken: "rt-rotated",
+        });
       });
     });
 
@@ -1125,6 +1289,86 @@ describe("better-auth over the identity storage adapter", () => {
         expect(fromOkta?.userId).toBe(olgaId);
       });
     });
+  });
+});
+
+describe("the atomic passkey-delete adapter boundary", () => {
+  it("routes the plugin's exact id delete through the passkey-removal port", async () => {
+    const remove = vi.fn(async () => "deleted" as const);
+    const stack = identityStack({
+      passkeyRemoval: { deleteIfAnotherWayInRemains: remove },
+    });
+    const context = await stack.auth.$context;
+
+    await context.adapter.delete({
+      model: "passkey",
+      where: [{ field: "id", value: "passkey-1" }],
+    });
+
+    expect(remove).toHaveBeenCalledOnce();
+    expect(remove).toHaveBeenCalledWith({ passkeyId: "passkey-1" });
+  });
+
+  it("surfaces the serialization loser in better-auth's last-way-in vocabulary", async () => {
+    const stack = identityStack({
+      passkeyRemoval: {
+        deleteIfAnotherWayInRemains: async () => "would_strand_user",
+      },
+    });
+    const context = await stack.auth.$context;
+
+    await expect(
+      context.adapter.delete({
+        model: "passkey",
+        where: [{ field: "id", value: "passkey-last" }],
+      }),
+    ).rejects.toMatchObject({ body: { code: "LAST_WAY_IN" } });
+  });
+
+  it("fails closed when a single passkey delete is not one exact id equality", async () => {
+    const remove = vi.fn(async () => "deleted" as const);
+    const stack = identityStack({
+      passkeyRemoval: { deleteIfAnotherWayInRemains: remove },
+    });
+    stack.db.passkey?.push({ id: "passkey-1", userId: "user-1" });
+    const context = await stack.auth.$context;
+
+    await expect(
+      context.adapter.delete({
+        model: "passkey",
+        where: [
+          { field: "id", value: "passkey-1" },
+          { field: "userId", value: "user-1" },
+        ],
+      }),
+    ).rejects.toMatchObject({
+      body: { code: "identity_unsupported_storage_query" },
+    });
+    expect(stack.db.passkey).toEqual([
+      { id: "passkey-1", userId: "user-1" },
+    ]);
+    expect(remove).not.toHaveBeenCalled();
+  });
+
+  it("leaves passkey deleteMany on the legacy path used by user erasure", async () => {
+    const remove = vi.fn(async () => "deleted" as const);
+    const stack = identityStack({
+      passkeyRemoval: { deleteIfAnotherWayInRemains: remove },
+    });
+    stack.db.passkey?.push(
+      { id: "passkey-1", userId: "user-1" },
+      { id: "passkey-2", userId: "user-1" },
+    );
+    const context = await stack.auth.$context;
+
+    const deleted = await context.adapter.deleteMany({
+      model: "passkey",
+      where: [{ field: "userId", value: "user-1" }],
+    });
+
+    expect(deleted).toBe(2);
+    expect(stack.db.passkey).toHaveLength(0);
+    expect(remove).not.toHaveBeenCalled();
   });
 });
 

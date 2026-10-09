@@ -4,16 +4,31 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ...models.annotation import Annotation
 from ...models.error import Error
-from ...types import Response, safe_http_status
+from ...models.get_api_annotations_anchor import GetApiAnnotationsAnchor
+from ...models.get_api_annotations_response_200 import GetApiAnnotationsResponse200
+from ...types import UNSET, Response, Unset, safe_http_status
 
 
-def _get_kwargs() -> dict[str, Any]:
+def _get_kwargs(
+    *,
+    anchor: GetApiAnnotationsAnchor | Unset = UNSET,
+) -> dict[str, Any]:
+
+    params: dict[str, Any] = {}
+
+    json_anchor: str | Unset = UNSET
+    if not isinstance(anchor, Unset):
+        json_anchor = anchor.value
+
+    params["anchor"] = json_anchor
+
+    params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
     _kwargs: dict[str, Any] = {
         "method": "get",
         "url": "/api/annotations",
+        "params": params,
     }
 
     return _kwargs
@@ -21,14 +36,9 @@ def _get_kwargs() -> dict[str, Any]:
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Error | list[Annotation] | None:
+) -> Error | GetApiAnnotationsResponse200 | None:
     if response.status_code == 200:
-        response_200 = []
-        _response_200 = response.json()
-        for response_200_item_data in _response_200:
-            response_200_item = Annotation.from_dict(response_200_item_data)
-
-            response_200.append(response_200_item)
+        response_200 = GetApiAnnotationsResponse200.from_dict(response.json())
 
         return response_200
 
@@ -45,7 +55,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[Error | list[Annotation]]:
+) -> Response[Error | GetApiAnnotationsResponse200]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -60,18 +70,24 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient | Client,
-) -> Response[Error | list[Annotation]]:
+    anchor: GetApiAnnotationsAnchor | Unset = UNSET,
+) -> Response[Error | GetApiAnnotationsResponse200]:
     """Returns all annotations for project
+
+    Args:
+        anchor (GetApiAnnotationsAnchor | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Error | list[Annotation]]
+        Response[Error | GetApiAnnotationsResponse200]
     """
 
-    kwargs = _get_kwargs()
+    kwargs = _get_kwargs(
+        anchor=anchor,
+    )
 
     response = client.get_httpx_client().request(
         **kwargs,
@@ -83,37 +99,48 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient | Client,
-) -> Error | list[Annotation] | None:
+    anchor: GetApiAnnotationsAnchor | Unset = UNSET,
+) -> Error | GetApiAnnotationsResponse200 | None:
     """Returns all annotations for project
+
+    Args:
+        anchor (GetApiAnnotationsAnchor | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Error | list[Annotation]
+        Error | GetApiAnnotationsResponse200
     """
 
     return sync_detailed(
         client=client,
+        anchor=anchor,
     ).parsed
 
 
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient | Client,
-) -> Response[Error | list[Annotation]]:
+    anchor: GetApiAnnotationsAnchor | Unset = UNSET,
+) -> Response[Error | GetApiAnnotationsResponse200]:
     """Returns all annotations for project
+
+    Args:
+        anchor (GetApiAnnotationsAnchor | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Error | list[Annotation]]
+        Response[Error | GetApiAnnotationsResponse200]
     """
 
-    kwargs = _get_kwargs()
+    kwargs = _get_kwargs(
+        anchor=anchor,
+    )
 
     response = await client.get_async_httpx_client().request(**kwargs)
 
@@ -123,19 +150,24 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient | Client,
-) -> Error | list[Annotation] | None:
+    anchor: GetApiAnnotationsAnchor | Unset = UNSET,
+) -> Error | GetApiAnnotationsResponse200 | None:
     """Returns all annotations for project
+
+    Args:
+        anchor (GetApiAnnotationsAnchor | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Error | list[Annotation]
+        Error | GetApiAnnotationsResponse200
     """
 
     return (
         await asyncio_detailed(
             client=client,
+            anchor=anchor,
         )
     ).parsed

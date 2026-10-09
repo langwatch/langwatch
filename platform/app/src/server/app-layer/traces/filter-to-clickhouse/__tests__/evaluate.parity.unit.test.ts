@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { tenantScope } from "~/server/app-layer/clients/clickhouse/authorized-reads";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
 import { FilterFieldUnknownError } from "../../errors";
@@ -637,7 +638,7 @@ const cases: Case[] = [
   },
   {
     name: "over-complex query (exceeds the node cap) fails closed",
-    // 11 tags → 21 AST nodes, over MAX_NODE_COUNT (20); each would match, so a
+    // 11 tags → 21 AST nodes, over MAX_FILTER_NODE_COUNT (20); each would match, so a
     // `false` result proves the cap forced fail-closed rather than a miss.
     query: Array.from({ length: 11 }, () => "origin:app").join(" AND "),
     trace: makeTrace({ attributes: { "langwatch.origin": "app" } }),
@@ -712,11 +713,10 @@ describe("FieldDef SQL/read parity", () => {
       autoDerived.map((d) => [d.key, d] as const),
     )("[%s] compiles against its registry expression", (key, def) => {
       const literal = def.kind === "range" ? "1" : "x";
-      const compiled = translateFilterToClickHouse(
-        `${key}:${literal}`,
-        "tenant-1",
-        { from: 0, to: 1 },
-      );
+      const compiled = translateFilterToClickHouse(`${key}:${literal}`, {
+        from: 0,
+        to: 1,
+      });
       expect(compiled?.sql).toContain(def.expression);
     });
   });
@@ -771,7 +771,7 @@ describe("given a filter field that collides with an Object.prototype member", (
       PROTOTYPE_FIELDS,
     )("[%s] is rejected as an unknown field", (field) => {
       expect(() =>
-        translateFilterToClickHouse(`${field}:x`, "tenant-1", {
+        translateFilterToClickHouse(`${field}:x`, {
           from: 0,
           to: 1,
         }),
@@ -880,7 +880,7 @@ describe("the in-memory free-text narrowing", () => {
 
     // The same filter compiled for ClickHouse does reach span names, which is
     // the asymmetry the spec records.
-    const compiled = translateFilterToClickHouse("codex", "tenant-1", {
+    const compiled = translateFilterToClickHouse("codex", {
       from: 0,
       to: 1,
     });
@@ -913,7 +913,7 @@ describe("the in-memory free-text narrowing", () => {
 
 describe("free text compiled to ClickHouse", () => {
   function compile(query: string) {
-    return translateFilterToClickHouse(query, "tenant-1", {
+    return translateFilterToClickHouse(query, {
       from: 1000,
       to: 2000,
     });
@@ -929,11 +929,11 @@ describe("free text compiled to ClickHouse", () => {
     expect(sql).toContain("ifNull(TraceName, '') ILIKE");
     expect(sql).toContain("FROM stored_spans");
     expect(sql).toContain("SpanName ILIKE");
-    // The span subquery crosses into another table, so its tenant predicate is
+    // The span subquery crosses into another table, so its tenant marker is
     // the one whose regression leaks across tenants rather than just returning
     // the wrong rows. Pin it here even though `boundedSubquery` owns it.
-    expect(sql).toContain("TenantId = {tenantId:String}");
-    expect(compiled!.params).toMatchObject({ tenantId: "tenant-1" });
+    expect(sql).toContain(tenantScope("StartTime"));
+    expect(compiled!.params).not.toHaveProperty("tenantId");
     expect(Object.values(compiled!.params)).toContain("%codex%");
   });
 

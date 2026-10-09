@@ -17,16 +17,20 @@ class PostApiSuitesByIdDuplicateResponse404:
     Attributes:
         error (str):
         message (str | Unset):
+        code (str | Unset): The domain error code, when the refusal names one.
     """
 
     error: str
     message: str | Unset = UNSET
+    code: str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         error = self.error
 
         message = self.message
+
+        code = self.code
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -37,6 +41,8 @@ class PostApiSuitesByIdDuplicateResponse404:
         )
         if message is not UNSET:
             field_dict["message"] = message
+        if code is not UNSET:
+            field_dict["code"] = code
 
         return field_dict
 
@@ -47,9 +53,12 @@ class PostApiSuitesByIdDuplicateResponse404:
 
         message = d.pop("message", UNSET)
 
+        code = d.pop("code", UNSET)
+
         post_api_suites_by_id_duplicate_response_404 = cls(
             error=error,
             message=message,
+            code=code,
         )
 
         post_api_suites_by_id_duplicate_response_404.additional_properties = d

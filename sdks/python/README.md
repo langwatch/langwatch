@@ -18,6 +18,11 @@ Ensure you have the SDK installed:
 pip install langwatch
 ```
 
+The SDK supports Python 3.10 through 3.14. On an interpreter outside that
+range pip does not fail, it installs the newest release that accepts it, so
+check the installed version with `pip show langwatch` if `langwatch.setup` is
+missing.
+
 ## Getting Started
 
 Initialize LangWatch early in your application, typically where you configure services:

@@ -21,9 +21,17 @@ export class InMemoryHeads implements IdentityHeadsRepository {
   hashKeys = new Map<string, string>();
   heads = new Map<string, IdentityHeads>();
   activeByValue = new Map<string, { userId: string; identifierId: string }>();
+  /** Users whose projection has never folded: their heads, if any, are the
+   *  ledger's provisional rows. Everyone else counts as folded, which is what
+   *  `fold` below produces. */
+  newborns = new Set<string>();
 
   async findUserHashKey({ userId }: { userId: string }) {
     return this.hashKeys.get(userId) ?? null;
+  }
+
+  async hasFolded({ userId }: { userId: string }): Promise<boolean> {
+    return !this.newborns.has(userId);
   }
 
   async findHeads({ userId }: { userId: string }): Promise<IdentityHeads> {

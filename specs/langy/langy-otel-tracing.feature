@@ -161,6 +161,13 @@ Feature: Langy agent activity is traced into the user's project
     Then the customer's trace is complete
     And nothing about the turn reaches the prod Langy project
 
+  @unit
+  Scenario: An install with no mirror sends model calls without the mirror's markers
+    Given an install with no mirror project configured
+    When the gateway records a Langy turn's model call
+    Then the customer's project receives the call with its content
+    And the call carries none of the mirror's internal markers
+
   @unimplemented
   Scenario: A turn in the prod Langy project never mirrors into itself
     Given a conversation whose own project is the prod Langy project
@@ -273,6 +280,16 @@ Feature: Langy agent activity is traced into the user's project
     Then the turn appears as a single trace in my project
     And the model call the gateway served for the turn appears inside that trace
     And no separate gateway-origin trace duplicates the turn's model call
+
+  # The gateway's span is the first piece of a turn to reach the project: the
+  # worker spans and the langy.turn root land when the turn ends. A trace
+  # that folds as the gateway's first marks a fresh project as integrated
+  # before the root can rank it as Langy's.
+  @unit
+  Scenario: A Langy turn's model call is Langy's from its first span
+    When the gateway serves a model call for a Langy turn
+    Then the span it records in my project names Langy as its origin
+    And the trace reads as Langy's before the turn's other spans arrive
 
   @unit
   Scenario: Gateway traffic outside a Langy turn keeps its own trace

@@ -20,6 +20,9 @@ interface LicenseDetailsCardProps {
   status: Extract<LicenseStatus, { hasLicense: true }>;
   onRemove: () => void;
   isRemoving: boolean;
+  /** Syncs the license with LangWatch now. Offered on a connected license only. */
+  onRefresh?: () => void;
+  isRefreshing?: boolean;
 }
 
 /**
@@ -89,10 +92,16 @@ export function LicenseDetailsCard({
   status,
   onRemove,
   isRemoving,
+  onRefresh,
+  isRefreshing = false,
 }: LicenseDetailsCardProps) {
   const isCorrupted = isCorruptedLicense(status);
   const isValid = status.valid;
   const isExpired = isLicenseExpired(status);
+  // A connected license is kept current by LangWatch: a seat change or a
+  // renewal reaches this install over sync, and refresh runs that sync now.
+  const canRefresh =
+    status.valid && status.connected && onRefresh !== undefined;
 
   if (isCorrupted) {
     return (
@@ -200,6 +209,18 @@ export function LicenseDetailsCard({
         {!isValid && !isExpired && <InvalidLicenseNotice />}
 
         <HStack>
+          {canRefresh ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onRefresh}
+              loading={isRefreshing}
+              disabled={isRefreshing}
+              data-testid="refresh-license"
+            >
+              Refresh license
+            </Button>
+          ) : null}
           <Button
             variant="outline"
             size="sm"

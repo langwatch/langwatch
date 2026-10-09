@@ -1,0 +1,92 @@
+---
+title: Coding Agent Sessions and Terminal Replay
+sidebarTitle: Sessions
+description: Every coding-agent session on one list, with the context it carried, what it cost, the pull requests it drove, and a terminal replay of the whole conversation.
+keywords:
+  - coding agent sessions
+  - claude code session history
+  - claude code context window
+  - claude code compaction
+  - cache rebuild
+  - terminal replay
+---
+
+A session is one run of a coding agent: everything between starting Claude Code, Codex or another assistant and closing it, shown as one row. Open **Sessions** on your personal page at [/me/sessions](https://app.langwatch.ai/me/sessions), or in the sidebar of any project that receives coding-agent telemetry.
+
+<Frame caption="The sessions list. The Context and Compactions columns show which sessions ran heavy; the Pull requests column shows what each session shipped, and a dash means the branch has no pull request yet.">
+  ![Sessions list](/images/coding-agents/sessions-list.png)
+</Frame>
+
+## The sessions list
+
+One row per session, over the last 90 days. Every column sorts; a third click on the same column resets the sort.
+
+| Column | What it shows |
+| --- | --- |
+| **Session** | The session's title, lifted from the agent's own generated conversation title. |
+| **Agent** | Which assistant ran it: Claude Code, Codex, Copilot, Gemini CLI, OpenCode. |
+| **Last update** | When the session last did anything. |
+| **Context** | Peak context: the most tokens the session carried into a single model call. |
+| **Compactions** | How many times the agent compacted its conversation to fit the context window, and under it, how many times it rebuilt the prompt cache. |
+| **Active and waiting** | How long the agent worked, next to how long it sat waiting for you. |
+| **Token cost** | What the session cost, cache-aware: tokens read from cache are priced as cache reads, not as fresh input. |
+| **Pull requests** | The pull requests the session's branches map to. |
+
+Search matches session titles. The period selector starts unset and reads **All time**, which means the whole 90-day window above rather than every session you ever ran. Pick a range when you look for a specific day.
+
+## Session detail
+
+Click a row to open the session. The **Usage** tab opens on the totals: cost, model calls, tools run and files touched. Under them sit the signals worth knowing before you read any number, for example that the conversation was compacted, that an action was declined, or that the approval mode changed part way through.
+
+The **Cache health** section is where the money goes:
+
+| Stat | What it tells you |
+| --- | --- |
+| **Peak context** | The largest context the session carried, as a share of the model's window, banded against the current reliability guidance for long-context sessions. |
+| **Cache misses** | Model calls that re-created most of the context instead of reading it from cache. A cache write costs more per token than a read, so each miss pays twice for the same tokens. |
+| **Context reused** | Tokens served from the prompt cache across the session. These bill at a fraction of fresh input. |
+| **Context rebuilt** | Tokens spent writing the cache again, summed across the session. |
+
+The detail also shows the biggest single rebuild: how many tokens one model call re-sent instead of reusing from cache.
+
+<Frame caption="Session detail with the Cache health section. This session compacted twice, missed its cache three times, and re-sent 393k tokens on its biggest rebuild.">
+  ![Session detail](/images/coding-agents/session-detail.png)
+</Frame>
+
+Below Cache health, **Where the tokens went** plots one bar per model call, split into the part served from cache and the part paid fresh. A session that caches well shows a thin dark band on each bar after the first. A tall dark band part way through the run marks the call where the cache was rebuilt, and the bar number tells you which call to look at in the replay.
+
+The same tab also lists the tools the session used, in order, the time split between thinking, running tools and waiting for you, and the result in lines changed and edits accepted.
+
+<Frame caption="The token composition of one session. Call 1 pays for the whole context; every call after it reads most of the context back from cache.">
+  ![Session token usage](/images/coding-agents/session-usage.png)
+</Frame>
+
+To turn these numbers into a decision, run the [context sweet spot investigation](/coding-agents/find-your-context-sweet-spot) on your own sessions.
+
+## Terminal replay
+
+The **Terminal** tab replays the session moment by moment, the way it looked in the terminal: your prompts, the agent's replies, every tool run with its output, and file changes as syntax-highlighted diffs.
+
+<Frame caption="The terminal replay. Each tool run carries the time it took, and a file edit renders as the diff the agent applied.">
+  ![Terminal replay](/images/coding-agents/terminal-replay.png)
+</Frame>
+
+Two details keep the replay faithful:
+
+- A notification injected into the session by tooling renders as a note, never as something you said.
+- A tool call the agent was denied stays in the replay, marked as denied.
+
+LangWatch puts the view you choose in the address bar, so a link you share opens on the same view for the reader, subject to their [content permissions](/coding-agents/privacy).
+
+## Read sessions from outside the UI
+
+The same data answers over the command line and the API:
+
+```bash
+langwatch session events <sessionId>   # model calls, compactions, rate limits, tool runs, in time order
+langwatch trace transcript <traceId>   # the conversation of one trace
+```
+
+For programs, `GET /api/coding-agent/sessions/{sessionId}/events` returns the per-call rows. See the [coding agents API reference](/api-reference/coding-agents/overview).
+
+**Also check:** [Usage analytics](/coding-agents/usage-analytics) for the rollups across sessions, and [Privacy](/coding-agents/privacy) for who can open a session's content.

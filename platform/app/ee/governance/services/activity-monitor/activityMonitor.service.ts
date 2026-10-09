@@ -31,6 +31,11 @@
  *   - specs/ai-gateway/governance/architecture-invariants.feature
  *     (single trace store, reserved namespaces)
  */
+import {
+  deriveSourceHealth,
+  isDayCoveredByPull,
+  type SourceHealth,
+} from "@ee/governance/services/pullers/sourceHealth";
 import { z } from "zod";
 import type { PrismaClient } from "~/generated/prisma/client";
 
@@ -42,12 +47,15 @@ import {
   resolveTraceDepartmentId,
   UNASSIGNED_DEPARTMENT,
 } from "../department/departmentAttribution";
-import { PROJECT_KIND } from "../governanceProject.service";
+import { resolveGovProjectId } from "../govProject";
 import type { ActivityMonitorClickHouseRepository } from "./activityMonitor.clickhouse.repository";
 import type {
   PulledEventChRow,
   PushedEventChRow,
   SortDir,
+  SpendByDepartmentChRow,
+  SpendByTeamSourceChRow,
+  SpendOverTimeChRow,
   SpendOverTimeGroupBy,
   SpendSortField,
   WindowCountChRow,
@@ -201,6 +209,25 @@ export interface SourceHealthMetrics {
   events7d: number;
   events30d: number;
   lastSuccessIso: string | null;
+}
+
+/** One UTC day, and whether a successful pull ever reached into it. */
+export interface SourceCoverageDay {
+  dayStartIso: string;
+  /**
+   * False means unknown, and unknown carries no number on purpose: the whole
+   * defect this shape exists to prevent is an unpulled day being rendered as
+   * zero dollars.
+   */
+  covered: boolean;
+}
+
+export interface SourceDataCoverage {
+  health: SourceHealth;
+  consecutiveFailures: number;
+  lastSuccessfulPullIso: string | null;
+  /** Oldest first, one entry per UTC day in the requested window. */
+  days: SourceCoverageDay[];
 }
 
 // ---------------------------------------------------------------------------
@@ -420,15 +447,7 @@ export class ActivityMonitorService {
   private async resolveGovProjectId(
     organizationId: string,
   ): Promise<string | null> {
-    const project = await this.prisma.project.findFirst({
-      where: {
-        kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
-        team: { organizationId },
-        archivedAt: null,
-      },
-      select: { id: true },
-    });
-    return project?.id ?? null;
+    return await resolveGovProjectId({ prisma: this.prisma, organizationId });
   }
 
   // -----------------------------------------------------------------------
@@ -464,6 +483,7 @@ export class ActivityMonitorService {
       tenantId: govProjectId,
       thisStart: thisWindowStart,
       prevStart: previousWindowStart,
+      windowEnd: now,
     });
 
     return {
@@ -519,6 +539,7 @@ export class ActivityMonitorService {
     const rows = await this.repository.findSpendByUser({
       tenantId: govProjectId,
       windowStart: now - windowMs,
+      windowEnd: now,
       sortBy: input.sortBy ?? "spend",
       sortDir: input.sortDir ?? "desc",
       limit: input.limit ?? 50,
@@ -593,61 +614,16 @@ export class ActivityMonitorService {
     const rows = await this.repository.findSpendByDepartment({
       tenantIds,
       windowStart,
+      windowEnd: now,
     });
 
-    const acc = new Map<
-      string,
-      { spendNanoUsd: bigint; requestCount: number; lastActivityMs: number }
-    >();
-    for (const r of rows) {
-      const hasPrincipalUser = r.actor !== "";
-      const departmentId = resolveTraceDepartmentId({
-        hasPrincipalUser,
-        userDepartmentId: userDepartmentByEmail.get(r.actor),
-        userTeamDepartmentId: userTeamDepartmentByEmail.get(r.actor),
-        projectDepartmentId: projectDepartmentById.get(r.projectId) ?? null,
-      });
-      // An archived or otherwise-unknown department rolls up as Unassigned
-      // without a backfill: it is simply absent from the active name map.
-      const key =
-        departmentId !== UNASSIGNED_DEPARTMENT &&
-        activeDepartmentNames.has(departmentId)
-          ? departmentId
-          : UNASSIGNED_DEPARTMENT;
-      const prior = acc.get(key) ?? {
-        spendNanoUsd: 0n,
-        requestCount: 0,
-        lastActivityMs: 0,
-      };
-      acc.set(key, {
-        spendNanoUsd: prior.spendNanoUsd + usdToNanoUsd(r.spendUsdStr),
-        requestCount: prior.requestCount + Number(r.requests),
-        lastActivityMs: Math.max(
-          prior.lastActivityMs,
-          Number(r.lastActivityMs),
-        ),
-      });
-    }
-
-    return [...acc.entries()]
-      .map(([key, v]) => ({
-        departmentId: key === UNASSIGNED_DEPARTMENT ? null : key,
-        departmentName:
-          key === UNASSIGNED_DEPARTMENT
-            ? "Unassigned"
-            : activeDepartmentNames.get(key)!,
-        spendUsd: nanoUsdToDecimalString(v.spendNanoUsd),
-        requestCount: v.requestCount,
-        lastActivityIso:
-          v.lastActivityMs > 0
-            ? new Date(v.lastActivityMs).toISOString()
-            : null,
-      }))
-      .sort((a, b) => {
-        const aNano = usdToNanoUsd(a.spendUsd);
-        const bNano = usdToNanoUsd(b.spendUsd);
-        return bNano > aNano ? 1 : bNano < aNano ? -1 : 0;
-      });
+    return assembleDepartmentRows({
+      rows,
+      projectDepartmentById,
+      userDepartmentByEmail,
+      userTeamDepartmentByEmail,
+      activeDepartmentNames,
+    });
   }
 
   private async activeDepartmentNames(
@@ -756,6 +732,7 @@ export class ActivityMonitorService {
       tenantId: govProjectId,
       thisStart: now - windowMs,
       prevStart: previousWindowStart,
+      windowEnd: now,
     });
     if (sourceRows.length === 0) return [];
 
@@ -772,73 +749,8 @@ export class ActivityMonitorService {
     });
     const teamBySource = new Map(sources.map((s) => [s.id, s.team] as const));
 
-    const ORG_WIDE_KEY = "__org_wide__";
-    const byTeam = new Map<
-      string,
-      {
-        teamId: string | null;
-        teamName: string;
-        thisSpendNano: bigint;
-        prevSpendNano: bigint;
-        requestCount: number;
-        lastActivityMs: number;
-        sourceCount: number;
-      }
-    >();
-    for (const row of sourceRows) {
-      const team = teamBySource.get(row.sourceId) ?? null;
-      const key = team ? team.id : ORG_WIDE_KEY;
-      const teamId = team?.id ?? null;
-      const teamName = team?.name ?? "Org-wide";
-      const thisSpendNano = usdToNanoUsd(row.thisSpendStr);
-      const prevSpendNano = usdToNanoUsd(row.prevSpendStr);
-      const requestCount = Number(row.thisRequests);
-      const lastActivityMs = Number(row.lastActivityMs);
-      const existing = byTeam.get(key);
-      if (existing) {
-        existing.thisSpendNano += thisSpendNano;
-        existing.prevSpendNano += prevSpendNano;
-        existing.requestCount += requestCount;
-        existing.sourceCount += 1;
-        existing.lastActivityMs = Math.max(
-          existing.lastActivityMs,
-          lastActivityMs,
-        );
-      } else {
-        byTeam.set(key, {
-          teamId,
-          teamName,
-          thisSpendNano,
-          prevSpendNano,
-          requestCount,
-          lastActivityMs,
-          sourceCount: 1,
-        });
-      }
-    }
-
-    const sortKey = TEAM_ROW_SORT_KEYS[sortBy];
-    const sign = sortDir === "asc" ? 1 : -1;
-    return [...byTeam.values()]
-      .filter((t) => t.thisSpendNano > 0n || t.requestCount > 0)
-      .sort((a, b) => sign * (sortKey(a) - sortKey(b)))
-      .slice(offset, offset + limit)
-      .map((t) => ({
-        teamId: t.teamId,
-        teamName: t.teamName,
-        spendUsd: nanoUsdToDecimalString(t.thisSpendNano),
-        requestCount: t.requestCount,
-        deltaPctVsPriorWindow: pctChange(
-          Number(t.thisSpendNano),
-          Number(t.prevSpendNano),
-        ),
-        hasPriorBaseline: t.prevSpendNano > 0n,
-        lastActivityIso:
-          t.lastActivityMs > 0
-            ? new Date(t.lastActivityMs).toISOString()
-            : null,
-        sourceCount: t.sourceCount,
-      }));
+    const byTeam = rollUpSourcesByTeam({ sourceRows, teamBySource });
+    return formatTeamRows({ byTeam, sortBy, sortDir, offset, limit });
   }
 
   // -----------------------------------------------------------------------
@@ -846,7 +758,7 @@ export class ActivityMonitorService {
   // -----------------------------------------------------------------------
 
   /**
-   * Time-series spend rollup for the bird's-eye `<SpendOverTimeChart>`.
+   * Time-series spend rollup for the bird's-eye spend chart.
    * Bucketed daily, grouped by team / user / model. The wire shape is
    * bucket-major (one entry per day with all non-zero groups inside)
    * which round-trips exactly the cross-product the chart legend
@@ -891,108 +803,24 @@ export class ActivityMonitorService {
     const rows = await this.repository.findSpendOverTime({
       tenantId: govProjectId,
       windowStart,
+      windowEnd: now,
       groupBy: input.groupBy,
     });
 
-    let labelByKey: Map<string, { key: string; label: string }>;
-    let rolledRows: Array<{
-      bucketMs: number;
-      key: string;
-      spendNanoUsd: bigint;
-    }>;
-
-    if (input.groupBy === "team") {
-      const sourceIds = Array.from(
-        new Set(
-          rows
-            .map((r) => r.groupKey)
-            .filter((s): s is string => typeof s === "string" && s !== ""),
-        ),
-      );
-      const sources = sourceIds.length
-        ? await this.prisma.ingestionSource.findMany({
-            where: {
-              id: { in: sourceIds },
-              organizationId: input.organizationId,
-            },
-            select: {
-              id: true,
-              team: { select: { id: true, name: true } },
-            },
+    const { labelByKey, rolledRows } =
+      input.groupBy === "team"
+        ? await this.resolveTeamSpendOverTimeRows({
+            rows,
+            organizationId: input.organizationId,
           })
-        : [];
-      const teamBySource = new Map(sources.map((s) => [s.id, s.team] as const));
-      const ORG_WIDE_KEY = "__org_wide__";
-      labelByKey = new Map();
-      rolledRows = [];
-      for (const row of rows) {
-        const sourceId = row.groupKey ?? "";
-        if (!sourceId) continue;
-        const team = teamBySource.get(sourceId) ?? null;
-        const key = team?.id ?? ORG_WIDE_KEY;
-        const label = team?.name ?? "Org-wide";
-        labelByKey.set(key, { key, label });
-        rolledRows.push({
-          bucketMs: Number(row.bucketMs),
-          key,
-          spendNanoUsd: usdToNanoUsd(row.spendUsdStr),
-        });
-      }
-    } else {
-      labelByKey = new Map();
-      rolledRows = [];
-      for (const row of rows) {
-        const key = row.groupKey ?? "";
-        if (!key) continue;
-        labelByKey.set(key, { key, label: key });
-        rolledRows.push({
-          bucketMs: Number(row.bucketMs),
-          key,
-          spendNanoUsd: usdToNanoUsd(row.spendUsdStr),
-        });
-      }
-    }
+        : resolveDirectSpendOverTimeRows({ rows });
 
-    // Roll up (bucket, key) duplicates that come out of the team-side
-    // sourceId → teamId remapping (multiple sources can share one team).
-    const aggregated = new Map<string, bigint>();
-    for (const r of rolledRows) {
-      const k = `${r.bucketMs}::${r.key}`;
-      aggregated.set(k, (aggregated.get(k) ?? 0n) + r.spendNanoUsd);
-    }
-
-    const buckets = emptyDenseBuckets(windowStart, windowDays);
-    const bucketIndexByMs = new Map(
-      buckets.map((b, i) => [Date.parse(b.bucketIso), i] as const),
-    );
-    for (const [composite, spendNanoUsd] of aggregated.entries()) {
-      const sep = composite.indexOf("::");
-      const bucketMs = Number(composite.slice(0, sep));
-      const key = composite.slice(sep + 2);
-      const idx = bucketIndexByMs.get(bucketMs);
-      if (idx === undefined) continue;
-      const meta = labelByKey.get(key);
-      if (!meta) continue;
-      if (spendNanoUsd <= 0n) continue;
-      buckets[idx]!.points.push({
-        key: meta.key,
-        label: meta.label,
-        spendUsd: nanoUsdToDecimalString(spendNanoUsd),
-      });
-    }
-
-    // Stable per-bucket ordering - descending spend so the largest
-    // contributor renders at the bottom of the stacked area (Recharts
-    // stacks in array order; bottom-up = largest-first).
-    for (const bucket of buckets) {
-      bucket.points.sort((a, b) => {
-        const aN = usdToNanoUsd(a.spendUsd);
-        const bN = usdToNanoUsd(b.spendUsd);
-        return bN > aN ? 1 : bN < aN ? -1 : 0;
-      });
-    }
-
-    return { buckets };
+    return fillSpendOverTimeBuckets({
+      rolledRows,
+      labelByKey,
+      windowStart,
+      windowDays,
+    });
   }
 
   // -----------------------------------------------------------------------
@@ -1192,4 +1020,318 @@ export class ActivityMonitorService {
       lastSuccessIso: lastMs > 0 ? new Date(lastMs).toISOString() : null,
     };
   }
+
+  /**
+   * Puller health, and which days of the window a successful pull reached.
+   *
+   * Prisma only: both inputs live on the source row, mirrored there by the
+   * ingestionPullRunStatus projection. That matters beyond speed -- a
+   * deployment without ClickHouse still has to be able to say a puller is
+   * broken, and the health question is not a spend question.
+   *
+   * Spec: specs/governance/ingestion-source-health.feature
+   */
+  async sourceDataCoverage(input: {
+    organizationId: string;
+    sourceId: string;
+    windowDays: number;
+  }): Promise<SourceDataCoverage> {
+    const windowDays = Math.max(1, Math.floor(input.windowDays));
+    const dayMs = 24 * 60 * 60 * 1000;
+    const windowStart = startOfUtcDay(Date.now()) - (windowDays - 1) * dayMs;
+
+    const source = await this.prisma.ingestionSource.findFirst({
+      where: { id: input.sourceId, organizationId: input.organizationId },
+      select: {
+        errorCount: true,
+        lastSuccessAt: true,
+        // How far the run actually READ. A day the run never reached is not
+        // a day it collected, and reasoning from the run clock instead marks
+        // the whole window covered the moment any run finishes.
+        lastReadThroughAt: true,
+      },
+    });
+    const consecutiveFailures = source?.errorCount ?? 0;
+    const lastSuccessfulPullMs = source?.lastSuccessAt?.getTime() ?? null;
+    const readThroughMs = source?.lastReadThroughAt?.getTime() ?? null;
+
+    return {
+      health: deriveSourceHealth({ consecutiveFailures }),
+      consecutiveFailures,
+      lastSuccessfulPullIso: source?.lastSuccessAt?.toISOString() ?? null,
+      days: Array.from({ length: windowDays }, (_, i) => {
+        const dayStartMs = windowStart + i * dayMs;
+        return {
+          dayStartIso: new Date(dayStartMs).toISOString(),
+          covered: isDayCoveredByPull({
+            dayStartMs,
+            lastSuccessfulPullMs,
+            readThroughMs,
+          }),
+        };
+      }),
+    };
+  }
+
+  private async resolveTeamSpendOverTimeRows({
+    rows,
+    organizationId,
+  }: {
+    rows: SpendOverTimeChRow[];
+    organizationId: string;
+  }): Promise<SpendOverTimeRolled> {
+    const sourceIds = Array.from(
+      new Set(
+        rows
+          .map((r) => r.groupKey)
+          .filter((s): s is string => typeof s === "string" && s !== ""),
+      ),
+    );
+    const sources = sourceIds.length
+      ? await this.prisma.ingestionSource.findMany({
+          where: { id: { in: sourceIds }, organizationId },
+          select: { id: true, team: { select: { id: true, name: true } } },
+        })
+      : [];
+    const teamBySource = new Map(sources.map((s) => [s.id, s.team] as const));
+    const ORG_WIDE_KEY = "__org_wide__";
+    const labelByKey = new Map<string, { key: string; label: string }>();
+    const rolledRows: RolledSpendRow[] = [];
+    for (const row of rows) {
+      const sourceId = row.groupKey ?? "";
+      if (!sourceId) continue;
+      const team = teamBySource.get(sourceId) ?? null;
+      const key = team?.id ?? ORG_WIDE_KEY;
+      const label = team?.name ?? "Org-wide";
+      labelByKey.set(key, { key, label });
+      rolledRows.push({
+        bucketMs: Number(row.bucketMs),
+        key,
+        spendNanoUsd: usdToNanoUsd(row.spendUsdStr),
+      });
+    }
+    return { labelByKey, rolledRows };
+  }
+}
+
+interface RolledSpendRow {
+  bucketMs: number;
+  key: string;
+  spendNanoUsd: bigint;
+}
+
+interface SpendOverTimeRolled {
+  labelByKey: Map<string, { key: string; label: string }>;
+  rolledRows: RolledSpendRow[];
+}
+
+function assembleDepartmentRows({
+  rows,
+  projectDepartmentById,
+  userDepartmentByEmail,
+  userTeamDepartmentByEmail,
+  activeDepartmentNames,
+}: {
+  rows: SpendByDepartmentChRow[];
+  projectDepartmentById: ReadonlyMap<string, string | null>;
+  userDepartmentByEmail: ReadonlyMap<string, string | null>;
+  userTeamDepartmentByEmail: ReadonlyMap<string, string | null>;
+  activeDepartmentNames: ReadonlyMap<string, string>;
+}): SpendByDepartmentRow[] {
+  const acc = new Map<
+    string,
+    { spendNanoUsd: bigint; requestCount: number; lastActivityMs: number }
+  >();
+  for (const r of rows) {
+    const hasPrincipalUser = r.actor !== "";
+    const departmentId = resolveTraceDepartmentId({
+      hasPrincipalUser,
+      userDepartmentId: userDepartmentByEmail.get(r.actor),
+      userTeamDepartmentId: userTeamDepartmentByEmail.get(r.actor),
+      projectDepartmentId: projectDepartmentById.get(r.projectId) ?? null,
+    });
+    const key =
+      departmentId !== UNASSIGNED_DEPARTMENT &&
+      activeDepartmentNames.has(departmentId)
+        ? departmentId
+        : UNASSIGNED_DEPARTMENT;
+    const prior = acc.get(key) ?? {
+      spendNanoUsd: 0n,
+      requestCount: 0,
+      lastActivityMs: 0,
+    };
+    acc.set(key, {
+      spendNanoUsd: prior.spendNanoUsd + usdToNanoUsd(r.spendUsdStr),
+      requestCount: prior.requestCount + Number(r.requests),
+      lastActivityMs: Math.max(prior.lastActivityMs, Number(r.lastActivityMs)),
+    });
+  }
+
+  return [...acc.entries()]
+    .map(([key, v]) => ({
+      departmentId: key === UNASSIGNED_DEPARTMENT ? null : key,
+      departmentName:
+        key === UNASSIGNED_DEPARTMENT
+          ? "Unassigned"
+          : activeDepartmentNames.get(key)!,
+      spendUsd: nanoUsdToDecimalString(v.spendNanoUsd),
+      requestCount: v.requestCount,
+      lastActivityIso:
+        v.lastActivityMs > 0 ? new Date(v.lastActivityMs).toISOString() : null,
+    }))
+    .sort((a, b) => {
+      const aNano = usdToNanoUsd(a.spendUsd);
+      const bNano = usdToNanoUsd(b.spendUsd);
+      return bNano > aNano ? 1 : bNano < aNano ? -1 : 0;
+    });
+}
+
+function rollUpSourcesByTeam({
+  sourceRows,
+  teamBySource,
+}: {
+  sourceRows: SpendByTeamSourceChRow[];
+  teamBySource: Map<string, { id: string; name: string } | null>;
+}): Map<string, TeamAccumulator> {
+  const ORG_WIDE_KEY = "__org_wide__";
+  const byTeam = new Map<string, TeamAccumulator>();
+  for (const row of sourceRows) {
+    const team = teamBySource.get(row.sourceId) ?? null;
+    const key = team ? team.id : ORG_WIDE_KEY;
+    const existing = byTeam.get(key);
+    if (existing) {
+      existing.thisSpendNano += usdToNanoUsd(row.thisSpendStr);
+      existing.prevSpendNano += usdToNanoUsd(row.prevSpendStr);
+      existing.requestCount += Number(row.thisRequests);
+      existing.sourceCount += 1;
+      existing.lastActivityMs = Math.max(
+        existing.lastActivityMs,
+        Number(row.lastActivityMs),
+      );
+    } else {
+      byTeam.set(key, {
+        teamId: team?.id ?? null,
+        teamName: team?.name ?? "Org-wide",
+        thisSpendNano: usdToNanoUsd(row.thisSpendStr),
+        prevSpendNano: usdToNanoUsd(row.prevSpendStr),
+        requestCount: Number(row.thisRequests),
+        lastActivityMs: Number(row.lastActivityMs),
+        sourceCount: 1,
+      });
+    }
+  }
+  return byTeam;
+}
+
+interface TeamAccumulator {
+  teamId: string | null;
+  teamName: string;
+  thisSpendNano: bigint;
+  prevSpendNano: bigint;
+  requestCount: number;
+  lastActivityMs: number;
+  sourceCount: number;
+}
+
+function formatTeamRows({
+  byTeam,
+  sortBy,
+  sortDir,
+  offset,
+  limit,
+}: {
+  byTeam: Map<string, TeamAccumulator>;
+  sortBy: SpendSortField;
+  sortDir: SortDir;
+  offset: number;
+  limit: number;
+}): SpendByTeamRow[] {
+  const sortKey = TEAM_ROW_SORT_KEYS[sortBy];
+  const sign = sortDir === "asc" ? 1 : -1;
+  return [...byTeam.values()]
+    .filter((t) => t.thisSpendNano > 0n || t.requestCount > 0)
+    .sort((a, b) => sign * (sortKey(a) - sortKey(b)))
+    .slice(offset, offset + limit)
+    .map((t) => ({
+      teamId: t.teamId,
+      teamName: t.teamName,
+      spendUsd: nanoUsdToDecimalString(t.thisSpendNano),
+      requestCount: t.requestCount,
+      deltaPctVsPriorWindow: pctChange(
+        Number(t.thisSpendNano),
+        Number(t.prevSpendNano),
+      ),
+      hasPriorBaseline: t.prevSpendNano > 0n,
+      lastActivityIso:
+        t.lastActivityMs > 0 ? new Date(t.lastActivityMs).toISOString() : null,
+      sourceCount: t.sourceCount,
+    }));
+}
+
+function resolveDirectSpendOverTimeRows({
+  rows,
+}: {
+  rows: SpendOverTimeChRow[];
+}): SpendOverTimeRolled {
+  const labelByKey = new Map<string, { key: string; label: string }>();
+  const rolledRows: RolledSpendRow[] = [];
+  for (const row of rows) {
+    const key = row.groupKey ?? "";
+    if (!key) continue;
+    labelByKey.set(key, { key, label: key });
+    rolledRows.push({
+      bucketMs: Number(row.bucketMs),
+      key,
+      spendNanoUsd: usdToNanoUsd(row.spendUsdStr),
+    });
+  }
+  return { labelByKey, rolledRows };
+}
+
+function fillSpendOverTimeBuckets({
+  rolledRows,
+  labelByKey,
+  windowStart,
+  windowDays,
+}: {
+  rolledRows: RolledSpendRow[];
+  labelByKey: Map<string, { key: string; label: string }>;
+  windowStart: number;
+  windowDays: number;
+}): SpendOverTimeResult {
+  const aggregated = new Map<string, bigint>();
+  for (const r of rolledRows) {
+    const k = `${r.bucketMs}::${r.key}`;
+    aggregated.set(k, (aggregated.get(k) ?? 0n) + r.spendNanoUsd);
+  }
+
+  const buckets = emptyDenseBuckets(windowStart, windowDays);
+  const bucketIndexByMs = new Map(
+    buckets.map((b, i) => [Date.parse(b.bucketIso), i] as const),
+  );
+  for (const [composite, spendNanoUsd] of aggregated.entries()) {
+    const sep = composite.indexOf("::");
+    const bucketMs = Number(composite.slice(0, sep));
+    const key = composite.slice(sep + 2);
+    const idx = bucketIndexByMs.get(bucketMs);
+    if (idx === undefined) continue;
+    const meta = labelByKey.get(key);
+    if (!meta) continue;
+    if (spendNanoUsd <= 0n) continue;
+    buckets[idx]!.points.push({
+      key: meta.key,
+      label: meta.label,
+      spendUsd: nanoUsdToDecimalString(spendNanoUsd),
+    });
+  }
+
+  for (const bucket of buckets) {
+    bucket.points.sort((a, b) => {
+      const aN = usdToNanoUsd(a.spendUsd);
+      const bN = usdToNanoUsd(b.spendUsd);
+      return bN > aN ? 1 : bN < aN ? -1 : 0;
+    });
+  }
+
+  return { buckets };
 }

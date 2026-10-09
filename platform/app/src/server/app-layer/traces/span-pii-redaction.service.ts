@@ -13,12 +13,18 @@ import {
   redactStringNative,
 } from "~/server/data-privacy/redaction/applyContentRedaction";
 import { ESSENTIAL_PII_ENTITIES } from "~/server/data-privacy/redaction/essentialPii";
+import {
+  isHeldOutIdentifierAttribute,
+  reservesModelOrToolName,
+} from "~/server/data-privacy/redaction/identifierHoldout";
 import type { TenantId } from "~/server/event-sourcing/domain/tenantId";
 import {
   batchPresidioClearPII as defaultBatchPresidioClearPII,
   googleDLPClearPII,
+  NAME_AND_PLACE_ENTITIES,
   type PIICheckOptions,
   PRESIDIO_STRICT_ENTITIES,
+  presidioDefaultEntities,
 } from "~/server/tracer/collector/piiCheck";
 
 /**
@@ -58,6 +64,8 @@ export const DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH = 250_000;
 export type BatchClearPIIFunction = (
   texts: string[],
   options: PIICheckOptions,
+  /** Per text: a model, provider or tool name, spared name/place findings. */
+  spareNamesAndPlaces?: readonly boolean[],
 ) => Promise<(string | null)[]>;
 
 /**
@@ -93,44 +101,49 @@ export interface OtlpSpanPiiRedactionServiceDependencies {
 /**
  * Default batch PII clearing: uses Presidio batch API, falls back to individual Google DLP calls.
  */
-const runGoogleDlpBatch = (
-  texts: string[],
-  piiRedactionLevel: PIIRedactionLevel,
-  exceptPatterns?: readonly string[],
-): Promise<(string | null)[]> =>
+const runGoogleDlpBatch: BatchClearPIIFunction = (
+  texts,
+  { piiRedactionLevel, exceptPatterns },
+  spareNamesAndPlaces,
+) =>
   Promise.all(
-    texts.map(async (text) => {
+    texts.map(async (text, i) => {
       const wrapper = { value: text };
       await googleDLPClearPII({
         currentObject: wrapper,
         lastKey: "value",
         piiRedactionLevel,
         exceptPatterns,
+        spareNamesAndPlaces: spareNamesAndPlaces?.[i] ?? false,
       });
       return wrapper.value !== text ? wrapper.value : null;
     }),
   );
 
-const defaultBatchClearPII: BatchClearPIIFunction = async (texts, options) => {
-  const { piiRedactionLevel, mainMethod, entities, exceptPatterns } = options;
+const defaultBatchClearPII: BatchClearPIIFunction = async (
+  texts,
+  options,
+  spareNamesAndPlaces,
+) => {
+  const { piiRedactionLevel, mainMethod, entities } = options;
 
   if (mainMethod === "google_dlp") {
-    return runGoogleDlpBatch(texts, piiRedactionLevel, exceptPatterns);
+    return runGoogleDlpBatch(texts, options, spareNamesAndPlaces);
   }
 
   try {
-    return await defaultBatchPresidioClearPII(
-      texts,
-      piiRedactionLevel,
+    return await defaultBatchPresidioClearPII(texts, piiRedactionLevel, {
       entities,
-    );
+      spareNamesAndPlaces,
+    });
   } catch {
     // The DLP fallback redacts by level, not by the custom entity subset; the
     // native pass already handled the pattern-based selections, so this only
     // ever widens the analysis-service entities on a presidio outage. The
     // policy's do-not-redact exceptions do carry over, so the fallback cannot
-    // re-redact a value an exception kept.
-    return await runGoogleDlpBatch(texts, piiRedactionLevel, exceptPatterns);
+    // re-redact a value an exception kept, and so does the model/tool name
+    // flag, so the fallback never masks one as a name or place.
+    return await runGoogleDlpBatch(texts, options, spareNamesAndPlaces);
   }
 };
 
@@ -180,7 +193,12 @@ type StringEntry = {
   field: "stringValue" | "message";
   /** The original text value */
   text: string;
+  /** A model, provider or tool name: its name/place findings are dropped */
+  isNameExempt: boolean;
 };
+
+/** One text to analyse, and whether its name/place findings are dropped. */
+type AnalysisItem = { text: string; isNameExempt: boolean };
 
 /**
  * Accumulator used by the record-shaped redaction paths (logs, metrics).
@@ -188,9 +206,14 @@ type StringEntry = {
  * length budget enforced by `tryPush`.
  */
 type RedactionBatch = {
-  texts: string[];
+  items: AnalysisItem[];
   refs: { obj: Record<string, string>; key: string }[];
-  tryPush: (obj: Record<string, string>, key: string, value: string) => void;
+  tryPush: (entry: {
+    obj: Record<string, string>;
+    key: string;
+    value: string;
+    isNameExempt: boolean;
+  }) => void;
 };
 
 /**
@@ -291,8 +314,8 @@ export class OtlpSpanPiiRedactionService {
    * to the identifiers only the analysis service can detect (names, locations):
    * the native floor already ran every pattern-based recognizer WITH the
    * exceptions applied, and re-scanning those entities out-of-process would
-   * re-redact the very values an exception kept (the service returns anonymized
-   * text, so vetoes cannot be applied to its findings).
+   * re-redact the very values an exception kept (vetoes are not applied to the
+   * service's findings; see PIICheckOptions.exceptPatterns in piiCheck.ts).
    *
    * Narrowing to name/location entities shrinks the blast radius, it does not
    * close the gap: `exceptPatterns` still rides along on the returned options
@@ -594,6 +617,7 @@ export class OtlpSpanPiiRedactionService {
           owner: span.status,
           field: "message",
           text: span.status.message,
+          isNameExempt: false,
         });
         totalLength += span.status.message.length;
         anyRedacted = true;
@@ -629,16 +653,7 @@ export class OtlpSpanPiiRedactionService {
       return true;
     }
 
-    const results = await this.deps.batchClearPII(
-      entries.map((e) => e.text),
-      options,
-    );
-
-    if (results.length !== entries.length) {
-      throw new Error(
-        `Incomplete PII batch: got ${results.length} results for ${entries.length} inputs`,
-      );
-    }
+    const results = await this.analyseBatch(entries, options);
 
     for (let i = 0; i < entries.length; i++) {
       const redacted = results[i];
@@ -691,6 +706,7 @@ export class OtlpSpanPiiRedactionService {
       body: string;
       attributes: Record<string, string>;
       resourceAttributes: Record<string, string>;
+      attributeNames?: Record<string, string>;
     },
     piiRedactionLevel: PIIRedactionLevel,
     lambda?: {
@@ -706,10 +722,18 @@ export class OtlpSpanPiiRedactionService {
     if (!options) return;
 
     const batch = this.createRedactionBatch();
+    // The body is free text, not an attribute value, so no hold-out applies:
+    // an identifier written in a sentence sits next to content that may well
+    // hold personal data.
     if (log.body) {
-      batch.tryPush(log as unknown as Record<string, string>, "body", log.body);
+      batch.tryPush({
+        obj: log as unknown as Record<string, string>,
+        key: "body",
+        value: log.body,
+        isNameExempt: false,
+      });
     }
-    this.collectRecordEntries(batch, log.attributes);
+    this.collectRecordEntries(batch, log.attributes, log.attributeNames);
     this.collectRecordEntries(batch, log.resourceAttributes);
 
     await this.applyRedactionBatch(batch, options);
@@ -761,6 +785,7 @@ export class OtlpSpanPiiRedactionService {
     metric: {
       attributes: Record<string, string>;
       resourceAttributes: Record<string, string>;
+      attributeNames?: Record<string, string>;
     },
     piiRedactionLevel: PIIRedactionLevel,
     lambda?: {
@@ -776,7 +801,7 @@ export class OtlpSpanPiiRedactionService {
     if (!options) return;
 
     const batch = this.createRedactionBatch();
-    this.collectRecordEntries(batch, metric.attributes);
+    this.collectRecordEntries(batch, metric.attributes, metric.attributeNames);
     this.collectRecordEntries(batch, metric.resourceAttributes);
 
     await this.applyRedactionBatch(batch, options);
@@ -828,16 +853,16 @@ export class OtlpSpanPiiRedactionService {
   }
 
   private createRedactionBatch(): RedactionBatch {
-    const texts: string[] = [];
+    const items: AnalysisItem[] = [];
     const refs: { obj: Record<string, string>; key: string }[] = [];
     const maxLen = this.deps.piiRedactionMaxAttributeLength;
     const logger = this.logger;
     const state = { totalLength: 0 };
 
     return {
-      texts,
+      items,
       refs,
-      tryPush(obj, key, value) {
+      tryPush({ obj, key, value, isNameExempt }) {
         if (state.totalLength + value.length > maxLen) {
           logger.warn(
             {
@@ -850,21 +875,45 @@ export class OtlpSpanPiiRedactionService {
           );
           return;
         }
-        texts.push(value);
+        items.push({ text: value, isNameExempt });
         refs.push({ obj, key });
         state.totalLength += value.length;
       },
     };
   }
 
+  /**
+   * The log and metric counterpart of {@link collectStringEntries}: the same
+   * identifier hold-out, over a flattened record rather than an OTLP list.
+   *
+   * `attributeNames` restores the real attribute name where the record is keyed
+   * by an addressing path instead, because the reserved-name half of the
+   * hold-out reads the name and a path would never match one.
+   *
+   * It is passed for `attributes` and deliberately not for `resourceAttributes`
+   * at every call site. The map belongs to the attribute record: it is keyed by
+   * that record's keys, so handing it to the resource record would resolve a
+   * resource key against an unrelated attribute path wherever the two collide.
+   * Resource attributes are keyed by their own names already and need no map.
+   * If one is ever needed, it has to be a SEPARATE field — reusing this one is
+   * the bug this note exists to prevent.
+   */
   private collectRecordEntries(
     batch: RedactionBatch,
     record: Record<string, string>,
+    attributeNames?: Record<string, string>,
   ): void {
     for (const key of Object.keys(record)) {
-      if (record[key]) {
-        batch.tryPush(record, key, record[key]!);
-      }
+      const value = record[key];
+      if (!value) continue;
+      const name = attributeNames?.[key] ?? key;
+      if (isHeldOutIdentifierAttribute({ key: name, value })) continue;
+      batch.tryPush({
+        obj: record,
+        key,
+        value,
+        isNameExempt: reservesModelOrToolName({ key: name, value }),
+      });
     }
   }
 
@@ -872,15 +921,9 @@ export class OtlpSpanPiiRedactionService {
     batch: RedactionBatch,
     options: PIICheckOptions,
   ): Promise<void> {
-    if (batch.texts.length === 0) return;
+    if (batch.items.length === 0) return;
 
-    const results = await this.deps.batchClearPII(batch.texts, options);
-
-    if (results.length !== batch.refs.length) {
-      throw new Error(
-        `Incomplete PII batch: got ${results.length} results for ${batch.refs.length} inputs`,
-      );
-    }
+    const results = await this.analyseBatch(batch.items, options);
 
     for (let i = 0; i < batch.refs.length; i++) {
       const redacted = results[i];
@@ -888,6 +931,50 @@ export class OtlpSpanPiiRedactionService {
         batch.refs[i]!.obj[batch.refs[i]!.key] = redacted;
       }
     }
+  }
+
+  /**
+   * Runs the analysis batch and returns one result per item, in order.
+   *
+   * Everything goes in one call. Model, provider and tool names are flagged,
+   * and the analysis step drops only the name and place findings on those
+   * (see batchPresidioClearPII), so they are still redacted for every other
+   * entity the call looks for, on every path and at every level. When the
+   * call looks for nothing but names and places (a custom level that selected
+   * only those), a flagged value is left out and stays as the native pass left
+   * it.
+   */
+  private async analyseBatch(
+    items: readonly AnalysisItem[],
+    options: PIICheckOptions,
+  ): Promise<(string | null)[]> {
+    const results: (string | null)[] = items.map(() => null);
+    // A spared value has nothing to be scanned for when the call looks only
+    // for names and places, so it stays out of the request altogether.
+    const onlyNamesAndPlaces =
+      items.some((item) => item.isNameExempt) &&
+      (
+        options.entities ?? presidioDefaultEntities(options.piiRedactionLevel)
+      ).every((entity) => NAME_AND_PLACE_ENTITIES.has(entity));
+    const indexes = items.flatMap((item, i) =>
+      item.isNameExempt && onlyNamesAndPlaces ? [] : [i],
+    );
+    if (indexes.length === 0) return results;
+
+    const batchResults = await this.deps.batchClearPII(
+      indexes.map((i) => items[i]!.text),
+      options,
+      indexes.map((i) => items[i]!.isNameExempt),
+    );
+    if (batchResults.length !== indexes.length) {
+      throw new Error(
+        `Incomplete PII batch: got ${batchResults.length} results for ${indexes.length} inputs`,
+      );
+    }
+    indexes.forEach((itemIndex, j) => {
+      results[itemIndex] = batchResults[j] ?? null;
+    });
+    return results;
   }
 
   private collectAllAttributeSets(span: OtlpSpan): OtlpKeyValue[][] {
@@ -902,6 +989,12 @@ export class OtlpSpanPiiRedactionService {
    * Collects string attribute values into the entries array.
    * Enforces a cumulative character budget — once adding a value would
    * exceed piiRedactionMaxAttributeLength the value is skipped.
+   *
+   * Machine identifiers never leave the process (see
+   * {@link isHeldOutIdentifierAttribute}). Holding one back is NOT a skip: a
+   * skip means "this value may still hold personal data we did not scan for",
+   * which is what marks the span as partially redacted, and an opaque address
+   * holds none. So a held-out attribute sets neither flag.
    */
   private collectStringEntries(
     attributes: OtlpKeyValue[],
@@ -918,6 +1011,14 @@ export class OtlpSpanPiiRedactionService {
         attr.value.stringValue !== null &&
         attr.value.stringValue.length > 0
       ) {
+        if (
+          isHeldOutIdentifierAttribute({
+            key: attr.key,
+            value: attr.value.stringValue,
+          })
+        ) {
+          continue;
+        }
         if (
           totalLength + attr.value.stringValue.length >
           this.deps.piiRedactionMaxAttributeLength
@@ -938,6 +1039,10 @@ export class OtlpSpanPiiRedactionService {
           owner: attr.value,
           field: "stringValue",
           text: attr.value.stringValue,
+          isNameExempt: reservesModelOrToolName({
+            key: attr.key,
+            value: attr.value.stringValue,
+          }),
         });
         totalLength += attr.value.stringValue.length;
         collected = true;

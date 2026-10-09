@@ -95,6 +95,7 @@ function createModelProvider(
     rateLimitRpd: null,
     rotationPolicy: "MANUAL",
     providerConfig: null,
+    langySkipPermissionsModels: null,
     fallbackPriorityGlobal: null,
     healthStatus: "UNKNOWN",
     circuitOpenedAt: null,

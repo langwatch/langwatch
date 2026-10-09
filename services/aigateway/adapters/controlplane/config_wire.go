@@ -264,6 +264,7 @@ func (w *configWire) toDomain() domain.BundleConfig {
 	}
 
 	cfg.Budget.Scopes = toBudgetScopes(w.Budgets)
+	cfg.Budget.ValidUntil = budgetsValidUntil(w.Budgets)
 	cfg.PolicyRules = buildPolicyRules(w.PolicyRules)
 	cfg.CacheRules = buildCacheRules(w.CacheRules)
 
@@ -448,6 +449,32 @@ func toBudgetScopes(ws []budgetWire) []domain.BudgetScope {
 	return scopes
 }
 
+// budgetsValidUntil is the earliest boundary any enforceable budget on this
+// bundle is heading for: the instant its spend figures stop describing the
+// current period. See domain.BudgetConfig.ValidUntil for what the cache does
+// with it.
+//
+// Scopes without a limit are skipped because the checker skips them too, so
+// their boundary would shorten the config's life for a budget that can never
+// block. A non-positive resets_at is skipped as no answer rather than read as
+// 1970: TOTAL and MANUAL windows ship a far-future sentinel, and a control
+// plane older than the field ships nothing at all, neither of which is a
+// period that has ended.
+func budgetsValidUntil(ws []budgetWire) time.Time {
+	var earliest time.Time
+	for i := range ws {
+		b := &ws[i]
+		if b.LimitMicroUSD <= 0 || b.ResetsAt <= 0 {
+			continue
+		}
+		at := time.Unix(b.ResetsAt, 0)
+		if earliest.IsZero() || at.Before(earliest) {
+			earliest = at
+		}
+	}
+	return earliest
+}
+
 // toExcludedProviders maps the {id, type} exclusion wire entries onto domain
 // rows, normalizing the provider type the same way credentials are so the
 // gateway matches a resolved request's provider kind consistently.
@@ -521,6 +548,12 @@ func providerSlotToCredential(p providerSlotWire) domain.Credential {
 			"account_id":      getString("account_id"),
 			"provider_row_id": getString("provider_row_id"),
 		}
+	case domain.ProviderLangWatch:
+		// The license token is the bearer and the instance id rides a header,
+		// because the registry binds a license to one install and refuses the
+		// token presented from anywhere else (ADR-139 section 4).
+		cred.APIKey = getString("api_key")
+		cred.Extra = map[string]string{"instance_id": getString("instance_id")}
 	case domain.ProviderGemini:
 		// Gemini's second door: a credential carrying project_id + region
 		// is an Agent Platform key, and mapProvider routes it to

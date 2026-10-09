@@ -95,10 +95,13 @@ const SPAN_ID_HEX = /^[0-9a-fA-F]{16}$/;
  *
  * Returns `undefined` when the parent trace doesn't have OTel-standard
  * IDs (legacy `trace_<nanoid>` shape, missing root span) — in that
- * case nlpgo falls back to body-supplied req.TraceID and emits without
- * a parent linkage. Callers should NOT default-emit a synthesized
- * parent: a synth parent_span_id would render under a non-existent
- * span in the waterfall, which is worse UX than a separate trace.
+ * case the dispatchers ask nlpgo not to emit spans at all
+ * (`do_not_trace`), because without a parent link nlpgo would mint a
+ * fresh trace id and the evaluator's spans would form a separate
+ * evaluation-origin trace that flows back through the trace pipeline.
+ * Callers should NOT default-emit a synthesized parent: a synth
+ * parent_span_id would render under a non-existent span in the
+ * waterfall.
  */
 export function extractParentTraceForNlpgo(
   trace: Trace | undefined,

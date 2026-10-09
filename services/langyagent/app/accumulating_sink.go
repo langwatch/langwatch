@@ -156,6 +156,7 @@ func (s *frameSink) result() (text string, toolCalls []FinalToolCall) {
 			Input:   t.Input,
 			Output:  t.Output,
 			IsError: t.IsError,
+			Local:   t.Local,
 		})
 	}
 	return text, toolCalls

@@ -13,13 +13,22 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useTraceDetailsDrawer } from "~/hooks/useTraceDetailsDrawer";
 import { api } from "~/utils/api";
 
-function SeparatorLine() {
+/**
+ * The line reads solid where it meets the label at the centre and fades to
+ * nothing at the outer edge, so a wall of turns reads as one column of labels
+ * instead of a ladder of rules.
+ */
+function SeparatorLine({ side }: { side: "left" | "right" }) {
+  const fadeTo =
+    side === "left"
+      ? "linear-gradient(to left, var(--turn-line-color, var(--chakra-colors-border-muted)), transparent)"
+      : "linear-gradient(to right, var(--turn-line-color, var(--chakra-colors-border-muted)), transparent)";
   return (
     <Box
       className="turn-line"
       height="1px"
       flex={1}
-      bg="border.muted"
+      bgImage={fadeTo}
       transition="background 0.12s ease"
     />
   );
@@ -110,7 +119,7 @@ export function RunTurnSeparator({
       _hover={
         hasTrace
           ? {
-              "& .turn-line": { bg: "border.emphasized" },
+              "--turn-line-color": "var(--chakra-colors-border-emphasized)",
               "& .turn-view-trace": { color: "fg.muted" },
             }
           : undefined
@@ -122,15 +131,15 @@ export function RunTurnSeparator({
               outlineColor: "border.emphasized",
               outlineOffset: "2px",
               borderRadius: "sm",
-              "& .turn-line": { bg: "border.emphasized" },
+              "--turn-line-color": "var(--chakra-colors-border-emphasized)",
               "& .turn-view-trace": { color: "fg.muted" },
             }
           : undefined
       }
     >
-      <SeparatorLine />
+      <SeparatorLine side="left" />
       <SeparatorLabel index={index} hasTrace={hasTrace} />
-      <SeparatorLine />
+      <SeparatorLine side="right" />
     </Flex>
   );
 

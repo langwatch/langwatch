@@ -115,8 +115,8 @@ describe("given the governance section navigation data", () => {
   });
 
   describe("when the governance layout renders with the billed-cost flag off", () => {
-    /** @scenario With the billed-cost flag off, Costs and Billed do not exist */
-    it("renders the pinned item list without Costs and Billed", () => {
+    /** @scenario "With the billed-cost flag off, Costs does not exist" */
+    it("renders the pinned item list without Costs", () => {
       render(<GovernanceLayout>x</GovernanceLayout>);
 
       expect(
@@ -124,15 +124,28 @@ describe("given the governance section navigation data", () => {
       ).toEqual([
         { label: "Overview", href: "/governance" },
         { label: "Inventory", href: "/governance/inventory" },
-        { label: "Anomaly Rules", href: "/governance/anomaly-rules" },
+        { label: "Agents", href: "/governance/agents" },
         { label: "People", href: "/governance/people" },
       ]);
+    });
+
+    /** @scenario "Anomaly Rules and Billed are no longer rail entries" */
+    it("lists neither Anomaly Rules nor Billed under any flag state", () => {
+      for (const flags of [[], ["release_ui_governance_billed_cost_enabled"]]) {
+        harness.enabledFlags = flags;
+        render(<GovernanceLayout>x</GovernanceLayout>);
+
+        expect(capturedItems.map((item) => item.label)).not.toContain(
+          "Anomaly Rules",
+        );
+        expect(capturedItems.map((item) => item.label)).not.toContain("Billed");
+      }
     });
   });
 
   describe("when the governance layout renders with the billed-cost flag on", () => {
-    /** @scenario With the billed-cost flag on, Costs and Billed appear as placeholders */
-    it("lists Costs and Billed between Overview and Inventory", () => {
+    /** @scenario With the billed-cost flag on, Costs appears without the unfinished Billed destination */
+    it("lists Costs without Billed and keeps the Platform entries after People", () => {
       harness.enabledFlags = ["release_ui_governance_billed_cost_enabled"];
       render(<GovernanceLayout>x</GovernanceLayout>);
 
@@ -141,10 +154,14 @@ describe("given the governance section navigation data", () => {
       ).toEqual([
         { label: "Overview", href: "/governance" },
         { label: "Costs", href: "/governance/costs" },
-        { label: "Billed", href: "/governance/billed" },
         { label: "Inventory", href: "/governance/inventory" },
-        { label: "Anomaly Rules", href: "/governance/anomaly-rules" },
+        { label: "Agents", href: "/governance/agents" },
         { label: "People", href: "/governance/people" },
+        // The legacy rail has no grouping affordance, so the Platform
+        // entries list flat here; the v2 sidebar groups them.
+        { label: "Insights", href: "/governance/insights" },
+        { label: "Analytics", href: "/governance/analytics" },
+        { label: "Signals & Alerts", href: "/governance/signals" },
       ]);
 
       // The flag must resolve in organization context, gated on the org

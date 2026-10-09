@@ -1,4 +1,5 @@
 import { claudeCacheWritesLongLived } from "~/server/app-layer/traces/canonicalisation/extractors/claudeCode";
+import { AUXILIARY_SESSION_FACT } from "~/server/app-layer/traces/codex-auxiliary-thread";
 import { computeSpanCost } from "~/server/app-layer/traces/model-cost-matching";
 import {
   CODING_AGENT_REGISTRY,
@@ -15,12 +16,19 @@ import {
   SESSION_TITLE_FACT_KEY,
   SESSION_TITLE_FALLBACK_FACT_KEY,
 } from "./coding-agent-normalization";
-import type {
-  CodingAgentSessionData,
-  MetricSeriesFact,
-  SessionStep,
-  SessionTitleSource,
+import {
+  type CodingAgentSessionData,
+  contextUsageKey,
+  MAX_USAGE_CONTEXTS,
+  type MetricSeriesFact,
+  type SessionStep,
+  type SessionTitleSource,
 } from "./coding-agent-session.types";
+import {
+  SESSION_CONTEXT_ATTR,
+  SESSION_CONTEXT_EVENT,
+  type SessionWorkingContext,
+} from "./session-context-memo";
 
 /**
  * Derive a coding-agent SESSION from its contributions (ADR-056,
@@ -126,6 +134,12 @@ const CLAUDE = {
 const CODEX = {
   SPAN: {
     TURN: "session_task.turn",
+    /**
+     * The app-server request span of a helper thread codex ran for itself,
+     * stamped with the helper's thread id at ingestion. Its one fact is the
+     * auxiliary mark; it counts nothing.
+     */
+    HELPER_REQUEST: "turn/start",
   },
   EVENT: {
     TURN_TTFT: "turn_ttft",
@@ -140,6 +154,17 @@ const CODEX = {
 } as const;
 
 /**
+ * The spans whose tokens the fold counts as a model call, across every
+ * span-bearing agent. The contribute command stamps exactly these with the
+ * session's declared working context, so the fold can charge their tokens
+ * to it; every other span charges nothing anywhere and rides unstamped.
+ */
+export const MODEL_CALL_SPAN_NAMES: ReadonlySet<string> = new Set([
+  CLAUDE.SPAN.LLM_REQUEST,
+  CODEX.SPAN.TURN,
+]);
+
+/**
  * The LangWatch vocabulary, the sibling of the {@link CLAUDE} adapter for the
  * facts no vendor emits: the companion event carrying the session's git
  * identity, and the keys it and the derived title ride on. Agent-generic by
@@ -148,14 +173,10 @@ const CODEX = {
  */
 const LANGWATCH = {
   EVENT: {
-    SESSION_CONTEXT: "session_context",
+    SESSION_CONTEXT: SESSION_CONTEXT_EVENT,
   },
   ATTR: {
-    REPOSITORY_HOST: "vcs.repository.host",
-    REPOSITORY_OWNER: "vcs.repository.owner",
-    REPOSITORY_NAME: "vcs.repository.name",
-    BRANCH: "vcs.ref.head.name",
-    WORKTREE: "vcs.worktree.name",
+    ...SESSION_CONTEXT_ATTR,
     TITLE: SESSION_TITLE_FACT_KEY,
     TITLE_FALLBACK: SESSION_TITLE_FALLBACK_FACT_KEY,
     NAME: SESSION_NAME_FACT_KEY,
@@ -289,6 +310,7 @@ export function createInitCodingAgentSession(): CodingAgentSessionData {
     userId: null,
     parentSessionId: null,
     isFork: false,
+    auxiliary: false,
     repositoryHost: null,
     repositoryOwner: null,
     repositoryName: null,
@@ -323,6 +345,7 @@ export function createInitCodingAgentSession(): CodingAgentSessionData {
     cacheCreationTokens: 0,
     costUsd: 0,
     agentReportedCostUsd: 0,
+    usageByContext: {},
 
     modelCallMs: 0,
     toolMs: 0,
@@ -553,6 +576,11 @@ function withIdentity(
     // session": the two are indistinguishable from here.
     parentSessionId: state.parentSessionId ?? str(attrs.parent_session_id),
     isFork: state.isFork || scalarStr(attrs.is_fork) === "true",
+    // The fact a helper thread's request span contributes (codex's title
+    // generator, its recap). Sticky: the thread's other signals fold in
+    // whatever order their export batches land, and none may unmark.
+    auxiliary:
+      state.auxiliary || scalarStr(attrs[AUXILIARY_SESSION_FACT]) === "true",
   };
 }
 
@@ -648,6 +676,76 @@ function pricedFromTokens(facts: Record<string, unknown>): number {
 }
 
 /**
+ * Charge what one model call added to the session's counters to the working
+ * context the call was stamped with. The delta is read off the counters
+ * themselves, before and after the fold, so whatever a carrier counts as the
+ * call's tokens and cost is exactly what lands on its context and the record
+ * can never drift from the totals it partitions.
+ *
+ * Keyed on the contribution's own stamp, never on the state's current
+ * branch: the fold folds a late event in place (`refoldOnOutOfOrder` is off),
+ * and a sum keyed on the event commutes where one keyed on arrival order
+ * would not. An unstamped call charges nothing; the read side prices the gap
+ * between the counters and this record as the session's undeclared usage.
+ *
+ * The record is bounded like every other map on the session: a context past
+ * `MAX_USAGE_CONTEXTS` is not opened, and its calls stay in the counters
+ * alone. A record that reached the bound is therefore one whose gap no longer
+ * means "before the first declaration", and the read recognises that size and
+ * charges the gap to no pull request rather than to the first branch.
+ */
+function chargeContextUsage({
+  before,
+  after,
+  context,
+}: {
+  before: CodingAgentSessionData;
+  after: CodingAgentSessionData;
+  context: SessionWorkingContext | null;
+}): CodingAgentSessionData {
+  if (context === null) return after;
+  const key = contextUsageKey(context);
+  const existing = after.usageByContext[key];
+  if (
+    existing === undefined &&
+    Object.keys(after.usageByContext).length >= MAX_USAGE_CONTEXTS
+  ) {
+    return after;
+  }
+  const charged = existing ?? {
+    repositoryHost: context.repositoryHost,
+    repositoryOwner: context.repositoryOwner,
+    repositoryName: context.repositoryName,
+    branch: context.branch,
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheReadTokens: 0,
+    cacheCreationTokens: 0,
+    costUsd: 0,
+  };
+  return {
+    ...after,
+    usageByContext: {
+      ...after.usageByContext,
+      [key]: {
+        ...charged,
+        inputTokens:
+          charged.inputTokens + (after.inputTokens - before.inputTokens),
+        outputTokens:
+          charged.outputTokens + (after.outputTokens - before.outputTokens),
+        cacheReadTokens:
+          charged.cacheReadTokens +
+          (after.cacheReadTokens - before.cacheReadTokens),
+        cacheCreationTokens:
+          charged.cacheCreationTokens +
+          (after.cacheCreationTokens - before.cacheCreationTokens),
+        costUsd: charged.costUsd + (after.costUsd - before.costUsd),
+      },
+    },
+  };
+}
+
+/**
  * A Claude Code call's tokens, respelled into the gen_ai keys
  * {@link computeSpanCost} reads. The llm_request span carries the CLI's bare
  * spellings, whose `input_tokens` is already the disjoint non-cached bucket,
@@ -715,6 +813,7 @@ export function applySpanToCodingAgentSession({
   state,
   span,
   agent,
+  context = null,
 }: {
   state: CodingAgentSessionData;
   span: SpanFactsView;
@@ -729,6 +828,12 @@ export function applySpanToCodingAgentSession({
    * gate has to be enforced on both sides, not just declared.
    */
   agent?: string;
+  /**
+   * The working context the contribution was stamped with, or null when it
+   * carries none. A model call's tokens and cost are charged to it
+   * (`chargeContextUsage`); nothing else reads it.
+   */
+  context?: SessionWorkingContext | null;
 }): CodingAgentSessionData {
   const attrs = span.attrs;
   const durationMs = Math.max(0, span.endTimeUnixMs - span.startTimeUnixMs);
@@ -737,15 +842,20 @@ export function applySpanToCodingAgentSession({
   if (span.name === CLAUDE.SPAN.LLM_REQUEST) {
     // Identity still rides the span; only the counted facts are the log's.
     if (isLogsOnly) return withIdentity(state, attrs);
-    const folded = foldModelCall(withIdentity(state, attrs), attrs, durationMs);
+    const before = withIdentity(state, attrs);
+    const folded = foldModelCall(before, attrs, durationMs);
     // Priced from the span's tokens with the same formula and the same
     // cache-write lifetime the trace pipeline applies to the identical span,
     // so the session and its traces state one figure. The cost the agent
     // reports about itself lands on agentReportedCostUsd instead.
-    return {
-      ...folded,
-      costUsd: folded.costUsd + pricedFromTokens(claudeCallTokenFacts(attrs)),
-    };
+    return chargeContextUsage({
+      before,
+      after: {
+        ...folded,
+        costUsd: folded.costUsd + pricedFromTokens(claudeCallTokenFacts(attrs)),
+      },
+      context,
+    });
   }
 
   if (span.name === CODEX.SPAN.TURN) {
@@ -756,8 +866,17 @@ export function applySpanToCodingAgentSession({
     const facts = codexTurnTokenFacts(attrs);
     // Fallback duration 0, not the span's: the turn's wall time includes the
     // tools that ran inside it, and zero reads honestly as "not measured".
-    const folded = foldModelCall(withIdentity(state, attrs), facts, 0);
-    return { ...folded, costUsd: folded.costUsd + pricedFromTokens(facts) };
+    const before = withIdentity(state, attrs);
+    const folded = foldModelCall(before, facts, 0);
+    return chargeContextUsage({
+      before,
+      after: { ...folded, costUsd: folded.costUsd + pricedFromTokens(facts) },
+      context,
+    });
+  }
+
+  if (span.name === CODEX.SPAN.HELPER_REQUEST) {
+    return withIdentity(state, attrs);
   }
 
   if (span.name === CLAUDE.SPAN.SUBAGENT_SPAWN) {
@@ -909,6 +1028,7 @@ export function applyLogToCodingAgentSession({
   attributes,
   agent,
   occurredAtMs,
+  context = null,
 }: {
   state: CodingAgentSessionData;
   /** The contribution's lifted scalar facts — raw wire keys. */
@@ -921,6 +1041,12 @@ export function applyLogToCodingAgentSession({
   agent?: string;
   /** The record's own time, for step placement on logs-only folds. */
   occurredAtMs?: number;
+  /**
+   * The working context the contribution was stamped with, or null. A
+   * logs-only agent's `api_request` IS its model call, so that is where the
+   * tokens and cost are charged to it; no other record charges anything.
+   */
+  context?: SessionWorkingContext | null;
 }): CodingAgentSessionData {
   const attrs = attributes;
   // Membership rides the registry (`logsOnly` on the definition), so adding
@@ -980,11 +1106,15 @@ export function applyLogToCodingAgentSession({
       // and with no token-bearing span to compute from, the reported figure
       // is also the session's cost.
       return isLogsOnly
-        ? foldModelCall(
-            { ...withReported, costUsd: withReported.costUsd + reported },
-            attrs,
-            0,
-          )
+        ? chargeContextUsage({
+            before: withReported,
+            after: foldModelCall(
+              { ...withReported, costUsd: withReported.costUsd + reported },
+              attrs,
+              0,
+            ),
+            context,
+          })
         : withReported;
     }
 
@@ -1001,12 +1131,14 @@ export function applyLogToCodingAgentSession({
       });
 
     case LANGWATCH.EVENT.SESSION_CONTEXT: {
-      // Repository identity and worktree are once-set: a session is one
-      // checkout, so the first answer stands. The branch is the exception:
-      // it moves during a session, and the branch a session ENDS on is the
-      // one its pull request comes from. Every branch it passed through joins
-      // the set as well, because a session that moves on has still driven the
-      // branch it left, and the pull request it opened there.
+      // Everything here is present tense, last write wins: a resumed session
+      // moves between branches, worktrees and even repositories, and the row
+      // answers where it is NOW. Per-branch history lives on the fact rows
+      // (the contribute command stamps each one with the context active when
+      // it happened), so nothing is lost by letting the scalars move. Every
+      // branch the session passed through also joins the set, because a
+      // session that moves on has still driven the branch it left, and the
+      // pull request it opened there.
       const branch = str(attrs[LANGWATCH.ATTR.BRANCH]);
       // Two titles can ride the record. The context title is the codex
       // harvest's prompt-derived name (codex withholds prompt text from its
@@ -1026,12 +1158,12 @@ export function applyLogToCodingAgentSession({
       return {
         ...named,
         repositoryHost:
-          base.repositoryHost ?? str(attrs[LANGWATCH.ATTR.REPOSITORY_HOST]),
+          str(attrs[LANGWATCH.ATTR.REPOSITORY_HOST]) ?? base.repositoryHost,
         repositoryOwner:
-          base.repositoryOwner ?? str(attrs[LANGWATCH.ATTR.REPOSITORY_OWNER]),
+          str(attrs[LANGWATCH.ATTR.REPOSITORY_OWNER]) ?? base.repositoryOwner,
         repositoryName:
-          base.repositoryName ?? str(attrs[LANGWATCH.ATTR.REPOSITORY_NAME]),
-        gitWorktree: base.gitWorktree ?? str(attrs[LANGWATCH.ATTR.WORKTREE]),
+          str(attrs[LANGWATCH.ATTR.REPOSITORY_NAME]) ?? base.repositoryName,
+        gitWorktree: str(attrs[LANGWATCH.ATTR.WORKTREE]) ?? base.gitWorktree,
         gitBranch: branch ?? base.gitBranch,
         gitBranches:
           branch !== null

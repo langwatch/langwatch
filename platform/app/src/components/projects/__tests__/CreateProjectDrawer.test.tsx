@@ -41,12 +41,16 @@ const MOCK_TEAMS = [
   { id: "team-2", name: "Data Science", projects: [] },
 ];
 
-vi.mock("../../../hooks/useOrganizationTeamProject", () => ({
-  useOrganizationTeamProject: vi.fn(() => ({
-    organization: { id: CURRENT_ORG_ID, name: CURRENT_ORG_NAME },
-    project: null,
-  })),
-}));
+vi.mock(
+  "../../../hooks/useOrganizationTeamProject",
+  async (importOriginal) => ({
+    ...(await importOriginal<Record<string, unknown>>()),
+    useOrganizationTeamProject: vi.fn(() => ({
+      organization: { id: CURRENT_ORG_ID, name: CURRENT_ORG_NAME },
+      project: null,
+    })),
+  }),
+);
 
 vi.mock("../../../hooks/useLicenseEnforcement", () => ({
   useLicenseEnforcement: vi.fn(() => ({
@@ -150,6 +154,9 @@ describe("<CreateProjectDrawer/>", () => {
       });
 
       // Fill in the project name
+      await waitFor(() => {
+        expect(screen.getByRole("dialog")).toHaveFocus();
+      });
       const projectNameInput = screen.getByPlaceholderText("AI Project");
       await user.type(projectNameInput, "My New Project");
 
@@ -175,6 +182,9 @@ describe("<CreateProjectDrawer/>", () => {
       render(<CreateProjectDrawer />, { wrapper: Wrapper });
 
       // Fill in the project name
+      await waitFor(() => {
+        expect(screen.getByRole("dialog")).toHaveFocus();
+      });
       const projectNameInput = screen.getByPlaceholderText("AI Project");
       await user.type(projectNameInput, "My New Project");
 

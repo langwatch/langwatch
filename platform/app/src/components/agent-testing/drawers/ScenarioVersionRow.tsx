@@ -1,5 +1,5 @@
 /**
- * One version in the history of a test case: who saved it, when, what changed,
+ * One version in the history of a scenario: who saved it, when, what changed,
  * and what it held.
  *
  * @see specs/features/agent-testing/case-version-history.feature

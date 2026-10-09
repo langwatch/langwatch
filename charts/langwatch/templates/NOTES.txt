@@ -1,4 +1,6 @@
 LangWatch {{ .Chart.AppVersion }} has been deployed to namespace {{ .Release.Namespace }}.
+{{- $appHost := "" }}
+{{- if .Values.ingress.enabled }}{{ with .Values.ingress.hosts }}{{ $appHost = (first .).host | default "" }}{{ end }}{{ end }}
 
 ──────────────────────────────────────────────────────────────────────
 1. Reach the UI
@@ -6,7 +8,7 @@ LangWatch {{ .Chart.AppVersion }} has been deployed to namespace {{ .Release.Nam
 {{- if .Values.ingress.enabled }}
 Once DNS is pointing at your ingress, your team reaches LangWatch at:
 
-  https://{{ .Values.ingress.host | default "<your-ingress-host>" }}
+  https://{{ $appHost | default "<your-ingress-host>" }}
 
 {{- else }}
 Ingress is disabled. Port-forward to reach the UI from your laptop:
@@ -55,7 +57,7 @@ in that state.
 ──────────────────────────────────────────────────────────────────────
 Once steps 1-3 are done, share the install command with your team:
 
-  npx langwatch@latest login --device --url https://{{ .Values.ingress.host | default "<your-host>" }}
+  npx langwatch@latest login --device --url https://{{ $appHost | default "<your-host>" }}
 
 Then in any terminal:
 
@@ -75,6 +77,21 @@ dev's Personal Workspace at https://<your-host>/me .
       kubectl -n {{ .Release.Namespace }} get pods -l app.kubernetes.io/name={{ .Release.Name }}-gateway
   • Healthcheck (in-cluster):
       curl http://{{ .Release.Name }}-gateway/healthz
+{{- $gwHost := ((.Values.ingress | default dict).gateway | default dict).host }}
+{{- if and .Values.ingress.enabled $gwHost }}
+  • AI Gateway public route: Ingress {{ .Release.Name }}-gateway-ingress for {{ $gwHost }}, paths /v1 and /health.
+{{- else if .Values.gateway.publicUrl }}
+  • AI Gateway public URL: {{ .Values.gateway.publicUrl }} (no Ingress
+    rendered; your own route must send /v1 and /health to Service
+    {{ .Release.Name }}-gateway port 80).
+{{- else }}
+  • The AI Gateway has no public route. LLM clients and the CLI need one.
+    Either set ingress.gateway.host on the app Ingress, or route
+    /v1 and /health on your gateway hostname to Service
+    {{ .Release.Name }}-gateway port 80 (Gateway API HTTPRoute, a load
+    balancer) and set gateway.publicUrl. Routes, timeouts and body size:
+      https://docs.langwatch.ai/self-hosting/deployment/routing
+{{- end }}
 {{- end }}
 {{- if (index .Values "langyagent").chartManaged }}
   • Langy, the in-product assistant:
@@ -203,6 +220,11 @@ backend for you:
         the pre-upgrade Job fails, the upgrade stops and the workers stay
         at 0: read the Job logs, then run the upgrade again to bring them
         back.
+      • A sync that re-applies the running release (Argo CD runs these
+        Jobs as PreSync and PostSync on every sync) leaves the workers
+        up: the Jobs skip when the release fingerprint on
+        {{ .Release.Name }}-workers is unchanged and both Deployments
+        have finished rolling out.
       • Both Jobs run on `helm rollback` too. They cannot cover a
         rollback to a chart version from before they existed, because
         helm runs the TARGET revision's hooks: scale
@@ -245,9 +267,8 @@ backend for you:
 ──────────────────────────────────────────────────────────────────────
 Each chart bump may introduce new required keys on the umbrella's app
 Secret. When upgrading, verify these are present in the Secret the app
-+ gateway pods mount, otherwise the pods crashloop at boot with a
-CreateContainerConfigError that hides the missing key behind a generic
-message.
++ gateway pods mount, otherwise the pods stay in
+CreateContainerConfigError; `kubectl describe pod` names the missing key.
 
   {{ include "langwatch.appSecretName" . }} keys (always required):
     - credentialsEncryptionKey
@@ -255,9 +276,22 @@ message.
     - nextAuthSecret
     - virtualKeyPepper
 {{- if and .Values.gateway .Values.gateway.chartManaged }}
-    - LW_GATEWAY_INTERNAL_SECRET      (gateway.chartManaged=true)
-    - LW_GATEWAY_JWT_SECRET           (gateway.chartManaged=true)
+    - {{ include "langwatch.gatewayInternalSecretKey" . }}      (gateway.chartManaged=true)
+    - {{ include "langwatch.gatewayJwtSecretKey" . }}           (gateway.chartManaged=true)
 {{- end }}
+{{- if .Values.lwql.enabled }}
+    - {{ include "langwatch.lwql.clickhousePasswordKey" . }}         (lwql.enabled=true; app-Secret keys ONLY
+    - {{ include "langwatch.lwql.postgresReaderPasswordKey" . }}     when you own this Secret — existingSecret
+                                        or autogen off. With autogen the chart
+                                        generates them into its own
+                                        {{ include "langwatch.lwql.passwordSecretName" . }} Secret
+                                        instead. Optional either way — if absent,
+                                        LangWatchQL simply stays unprovisioned
+                                        instead of failing. See Section 8.)
+{{- end }}
+    - {{ include "langwatch.nlpInternalSecretKey" . }}   (optional: without it the NLP
+                                        service accepts unauthenticated requests
+                                        from inside the cluster)
 {{- $langy := (index .Values "langyagent") }}
 {{- $langySecrets := $langy.secrets | default dict }}
 {{- $langyKey := $langySecrets.internalSecretKey | default "LANGY_INTERNAL_SECRET" }}
@@ -276,9 +310,10 @@ message.
   When autogen.enabled=true the chart materialises this Secret on
   first install via per-key lookup-or-rand and heals missing keys
   on subsequent renders. When autogen.enabled=false the operator
-  pre-creates the Secret out-of-band and the preflight Job validates
-  the required keys are present before pods roll. The
-  operator-provided path is the only one that works cleanly under
+  pre-creates the Secret out-of-band. Plain helm checks that it holds
+  the Langy key at render time; Argo CD renders without cluster
+  access, so there a missing key shows up only as the pod error
+  above. The operator-provided path is the only one that works cleanly under
   GitOps controllers whose render step has no cluster access (ArgoCD
   repo-server, etc.) because the chart never renders the Secret for
   the controller to reconcile against. See
@@ -292,11 +327,23 @@ message.
       --from-literal=nextAuthSecret="$(openssl rand -hex 32)" \
       --from-literal=virtualKeyPepper="$(openssl rand -hex 32)" \
 {{- if and .Values.gateway .Values.gateway.chartManaged }}
-      --from-literal=LW_GATEWAY_INTERNAL_SECRET="$(openssl rand -hex 32)" \
-      --from-literal=LW_GATEWAY_JWT_SECRET="$(openssl rand -hex 32)"{{ if and $langy.chartManaged (not $langyOwnSecret) }} \{{ end }}
+      --from-literal={{ include "langwatch.gatewayInternalSecretKey" . }}="$(openssl rand -hex 32)" \
+      --from-literal={{ include "langwatch.gatewayJwtSecretKey" . }}="$(openssl rand -hex 32)" \
+{{- end }}
+{{- if .Values.lwql.enabled }}
+      --from-literal={{ include "langwatch.lwql.clickhousePasswordKey" . }}="$(openssl rand -hex 32)" \
+      --from-literal={{ include "langwatch.lwql.postgresReaderPasswordKey" . }}="$(openssl rand -hex 32)" \
 {{- end }}
 {{- if and $langy.chartManaged (not $langyOwnSecret) }}
-      --from-literal={{ $langyKey }}="$(openssl rand -hex 32)"
+      --from-literal={{ $langyKey }}="$(openssl rand -hex 32)" \
+{{- end }}
+      --from-literal={{ include "langwatch.nlpInternalSecretKey" . }}="$(openssl rand -hex 32)"
+{{- if .Values.lwql.enabled }}
+
+  (The two LWQL_*_PASSWORD lines above apply only to this operator-provided path.
+  With autogen the chart generates them into its own
+  {{ include "langwatch.lwql.passwordSecretName" . }} Secret — do not add them to
+  the app Secret in that case.)
 {{- end }}
 {{- if and $langy.chartManaged $langyOwnSecret }}
 
@@ -305,4 +352,89 @@ message.
 
     kubectl -n {{ .Release.Namespace }} create secret generic {{ $langySecretName }} \
       --from-literal={{ $langyKey }}="$(openssl rand -hex 32)"
+{{- end }}
+{{- if and .Values.clickhouse.chartManaged (not .Values.autogen.enabled) }}
+{{- $chSecret := include "langwatch.clickhouse.secretName" . }}
+
+  {{ $chSecret }} keys (chart-managed ClickHouse, autogen.enabled=false):
+  With autogen off, templates/clickhouse/url-secret.yaml does NOT render, so
+  the chart never creates the ClickHouse credentials Secret — you must
+  pre-create it. The app composes CLICKHOUSE_URL from `password`, and a
+  replicated cluster shares `clusterSecret` for inter-node/Keeper auth;
+  NOTES never documented these keys before.
+    - password         (ClickHouse `default` user password)
+    - clusterSecret    (inter-node/Keeper auth for replicated clusters)
+
+  Pre-create command:
+
+    kubectl -n {{ .Release.Namespace }} create secret generic {{ $chSecret }} \
+      --from-literal=password="$(openssl rand -hex 32)" \
+      --from-literal=clusterSecret="$(openssl rand -hex 32)"
+{{- end }}
+
+──────────────────────────────────────────────────────────────────────
+8. LangWatchQL (LWQL) — governed analytics SQL
+──────────────────────────────────────────────────────────────────────
+{{- if .Values.lwql.enabled }}
+The `release_lwql_workbench` feature flag still gates the HTTP endpoint —
+until it is on for a project, queries are refused with `lwql_not_enabled`
+while the backend objects sit ready.
+
+The application owns the LangWatchQL access model in code. How it reaches
+ClickHouse depends on the posture:
+{{- if .Values.clickhouse.chartManaged }}
+
+  Chart-managed ClickHouse (this release): RENDERED delivery. A deploy-time
+  Job ({{ .Release.Name }}-lwql-access-render-<spec hash>) runs the app image,
+  renders the access model, and writes it into the Secret
+  {{ .Release.Name }}-lwql-clickhouse-access. Every ClickHouse pod mounts it at
+  users.d/lwql-access.yaml and config.d/lwql-named-collection.yaml, so the
+  restricted identity, its profile, grants, row policies and the `lwql_postgres`
+  named collection land on EVERY replica — not just the one behind the Service.
+  No access SQL DDL runs, and the restricted langwatch_lwql identity holds no
+  ACCESS MANAGEMENT. (The image still grants the `default` admin user
+  access_management; rendered delivery never uses it — only `sql` mode does.)
+  On upgrade, the ClickHouse pods roll (carrying the LWQL catalog annotation) so
+  each re-mounts the freshly rendered Secret.
+
+  Install/upgrade with `--wait-for-jobs`: `helm --wait` does not wait for Jobs,
+  and the ClickHouse mount of that Secret is REQUIRED, so if the render Job fails
+  the ClickHouse pods stay ContainerCreating instead of coming up accessless.
+  With `--wait-for-jobs` the release fails on a bad render; otherwise confirm the
+  {{ .Release.Name }}-lwql-access-render-<spec hash> Job reached Complete yourself.
+
+  Missing passwords do not block ClickHouse. When
+  {{ include "langwatch.lwql.passwordSecret" . }} has no {{ include "langwatch.lwql.clickhousePasswordKey" . }} or
+  {{ include "langwatch.lwql.postgresReaderPasswordKey" . }} key, the Job logs which one is missing and
+  writes an empty access model, so ClickHouse starts and LangWatchQL stays off.
+  To turn it on later: add both keys to that Secret, delete the
+  {{ .Release.Name }}-lwql-access-render-<spec hash> Job (helm upgrade or the Argo CD
+  sync runs it again). Once it is Complete, restart ClickHouse so it mounts
+  the new access model, and the app and workers so they read the passwords:
+  kubectl -n {{ .Release.Namespace }} rollout restart statefulset {{ include "langwatch.clickhouse.serviceName" . }}
+  kubectl -n {{ .Release.Namespace }} rollout restart deployment {{ .Release.Name }}-app{{ if .Values.workers.enabled }} {{ .Release.Name }}-workers{{ end }}
+{{- else }}
+
+  External / bring-your-own ClickHouse: SQL DDL (`sql` mode). The chart cannot
+  write your server's config files, so the app self-provisions the model with
+  SQL DDL at boot, deriving the target from CLICKHOUSE_URL. This needs the admin
+  user allowed access-management DDL (`access_management`,
+  `named_collection_control`), the server to declare the `custom_` settings
+  prefix, and
+  `access_control_improvements.settings_constraints_replace_previous=true`. Set
+  LWQL_ACCESS_MODEL_MODE=sql (see examples/overlays/clickhouse-external.yaml). In
+  `sql` mode on a multi-host cluster without replicated access storage the app
+  refuses (AC9); acknowledge a single node with
+  LWQL_ACCESS_MODEL_SQL_SINGLE_NODE=true.
+{{- end }}
+
+Either way, Section 7 lists the two passwords (LWQL_CLICKHOUSE_PASSWORD,
+LWQL_POSTGRES_READER_PASSWORD) the chart hands the app. The `lwql_postgres`
+bridge dials the PostgreSQL that DATABASE_URL points at, converging a read-only
+`lwql_ro` role; that role's owner must be allowed to CREATE/ALTER ROLE or the
+convergence logs and LangWatchQL stays refused (fail-closed). If provisioning
+cannot complete, LangWatchQL stays unavailable — nothing else breaks.
+{{- else }}
+Disabled (lwql.enabled=false). No LangWatchQL objects are provisioned
+and the endpoints refuse every query.
 {{- end }}

@@ -28,6 +28,8 @@ const definition = buildProcessDefinition(
     name: INGESTION_PULL_PROCESS_NAME,
     applier: ingestionPullPM({
       runPort: { run: () => Promise.reject(new Error("unused")) },
+      agentListingPort: { list: () => Promise.reject(new Error("unused")) },
+      peopleListingPort: { list: () => Promise.reject(new Error("unused")) },
       commands: () => {
         throw new Error("unused in evolve tests");
       },

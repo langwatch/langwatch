@@ -33,6 +33,21 @@ type RouterDeps struct {
 	// in-process aigateway dispatcher. nil → /go/proxy/v1/* returns the
 	// 501 stub (used by tests that don't exercise the playground path).
 	PlaygroundProxy PlaygroundProxy
+	// StreamHeartbeat is the is_alive_response cadence for
+	// /go/studio/execute, from the operator's
+	// NLPGO_ENGINE_STREAM_HEARTBEAT_SECONDS. Zero → DefaultStreamHeartbeat.
+	StreamHeartbeat time.Duration
+	// StreamIdleTimeout closes /go/studio/execute when the engine
+	// stream emits nothing for this long, from the operator's
+	// NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_SECONDS. Zero →
+	// DefaultStreamIdleTimeout.
+	StreamIdleTimeout time.Duration
+	// InternalSecret is the secret shared with the LangWatch app, from the
+	// operator's LANGWATCH_NLP_INTERNAL_SECRET. Every /go/* route requires
+	// it in the X-LangWatch-NLP-Secret header. Empty leaves those routes
+	// open, which is what lets an install configured before this variable
+	// existed keep serving; see RequireInternalSecret.
+	InternalSecret string
 	// OTel is the OpenTelemetry provider whose `ForceFlush` is called
 	// after each /go/studio/* request, so spans for the just-finished
 	// workflow ship to the collector before the Lambda runtime freezes
@@ -63,14 +78,18 @@ func NewRouter(deps RouterDeps) http.Handler {
 		r.Get("/startupz", deps.Health.Startup)
 	}
 
+	// The health routes above stay open: Kubernetes probes and the compose
+	// healthcheck call them, and they report liveness only. Everything the
+	// app actually drives lives under /go and is guarded.
 	r.Route("/go", func(g chi.Router) {
+		g.Use(RequireInternalSecret(deps.InternalSecret))
 		g.Get("/version", versionHandler(deps.Version))
 		g.Route("/studio", func(s chi.Router) {
 			if deps.OTel != nil {
 				s.Use(forceFlushMiddleware(deps.OTel))
 			}
 			s.Post("/execute_sync", executeSyncHandler(deps.App))
-			s.Post("/execute", executeStreamHandler(deps.App))
+			s.Post("/execute", executeStreamHandler(deps.App, deps.StreamHeartbeat, deps.StreamIdleTimeout))
 		})
 		g.HandleFunc("/proxy/v1/*", proxyPassthroughHandler(deps.PlaygroundProxy))
 		g.HandleFunc("/proxy/v1beta/*", proxyPassthroughHandler(deps.PlaygroundProxy))

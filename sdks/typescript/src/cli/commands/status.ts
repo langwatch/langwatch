@@ -14,6 +14,7 @@ import { buildCatalog, renderStatusSummary } from "../utils/commandCatalog";
 import { TracesApiService } from "@/client-sdk/services/traces/traces-api.service";
 import { ExperimentsApiService } from "@/client-sdk/services/experiments/experiments-api.service";
 import { GatewayBudgetsApiService } from "@/client-sdk/services/gateway-budgets/gateway-budgets-api.service";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** Budgets at or above this utilization are worth a human's attention. */
@@ -164,7 +165,7 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
   };
 
   async function fetchCount(url: string): Promise<{ data: unknown; error?: unknown; status?: number }> {
-    const response = await fetch(`${endpoint}${url}`, {
+    const response = await langwatchFetch(`${endpoint}${url}`, {
       headers: buildAuthHeaders({ apiKey }),
     });
     if (!response.ok) {
@@ -411,7 +412,7 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
     { key: "scenarios", fn: () => apiClient.GET("/api/scenarios") },
     { key: "suites", fn: () => fetchCount("/api/suites") },
     { key: "datasets", fn: () => apiClient.GET("/api/dataset") },
-    { key: "agents", fn: () => apiClient.GET("/api/agents") },
+    { key: "agents", fn: () => apiClient.GET("/api/v1/agents") },
     { key: "workflows", fn: () => apiClient.GET("/api/workflows") },
     { key: "dashboards", fn: () => apiClient.GET("/api/dashboards") },
     { key: "triggers", fn: () => fetchCount("/api/triggers") },

@@ -165,6 +165,27 @@ describe("pickAnalyticsTable (ADR-034 Phase 3 read router)", () => {
     });
   });
 
+  describe("given a query that leaves out trace origins", () => {
+    // The rollup is keyed by bucket, so it has no origin to leave out; slim
+    // keeps the origin on every trace row.
+    /** @scenario Leaving out an origin stays accurate on optimized analytics storage */
+    it("routes a trace-source query to the slim table", () => {
+      const table = pickAnalyticsTable({
+        series: [series("performance.total_cost", "sum")],
+        excludeOrigins: ["langy"],
+      });
+      expect(table).toBe("trace_analytics");
+    });
+
+    it("still routes to the rollup when the exclusion is empty", () => {
+      const table = pickAnalyticsTable({
+        series: [series("performance.total_cost", "sum")],
+        excludeOrigins: [],
+      });
+      expect(table).toBe("trace_analytics_rollup");
+    });
+  });
+
   describe("given a query scoped to explicit trace ids", () => {
     // The fast-path builders do not implement the TraceId narrowing — the
     // result would silently cover ALL traces instead of the requested set.
@@ -263,6 +284,35 @@ describe("pickAnalyticsTable (ADR-034 Phase 3 read router)", () => {
         filters: { "metadata.key": ["gen_ai.prompt"] },
       });
       expect(table).toBe("trace_summaries");
+    });
+  });
+
+  describe("given a metadata.key filter on a blocklisted key sent with · for .", () => {
+    it("falls back to trace_summaries (the builders read the dotted key)", () => {
+      const table = pickAnalyticsTable({
+        series: [series("performance.total_cost", "sum")],
+        filters: { "metadata.key": ["input·value"] },
+      });
+      expect(table).toBe("trace_summaries");
+    });
+  });
+
+  describe("given an evaluation metric filtered by custom metadata", () => {
+    // The eval slim row carries only the evaluation events' metadata, never
+    // the trace's, so it would count nothing (langwatch/tasks#919).
+    it.each([
+      { "metadata.key": ["outcome"] },
+      { "metadata.value": { outcome: ["ok"] } },
+    ])("routes %j to evaluation_runs", (filters) => {
+      // Grouped by label so the unfiltered series lands on the eval slim.
+      const query = {
+        series: [series("evaluations.evaluation_runs", "cardinality")],
+        groupBy: "evaluations.evaluation_label",
+      };
+      const unfiltered = pickAnalyticsTable(query);
+      const filtered = pickAnalyticsTable({ ...query, filters });
+      expect(unfiltered).toBe("evaluation_analytics");
+      expect(filtered).toBe("evaluation_runs");
     });
   });
 

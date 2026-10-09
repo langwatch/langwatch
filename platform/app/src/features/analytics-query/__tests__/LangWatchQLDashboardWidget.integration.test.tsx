@@ -26,7 +26,7 @@
  * one, so that a mutation's resolution can be held open and released out of
  * order — which is the whole shape of the race being pinned.
  *
- * @see specs/analytics/lwql-saved-charts.feature
+ * @see specs/lwql/saved-charts.feature
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

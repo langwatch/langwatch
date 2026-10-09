@@ -26,6 +26,7 @@ let mockIsEnterprise = true;
 let mockIsLiteMember = false;
 let mockHasOpsAccess = false;
 let mockIsAdmin = false;
+let mockHasPermission = true;
 const pushMock = vi.fn().mockResolvedValue(true);
 
 const team = {
@@ -95,7 +96,7 @@ vi.mock("~/hooks/useOrganizationTeamProject", async (importOriginal) => ({
     team,
     project: team.projects[0],
     organizationRole: "ADMIN",
-    hasPermission: () => true,
+    hasPermission: () => mockHasPermission,
   }),
 }));
 
@@ -126,7 +127,9 @@ vi.mock("~/components/LoadingScreen", () => ({
 
 // Legacy mode renders through DashboardLayout, which mounts the nudge. This
 // suite asserts on settings navigation, not on the nudge's own contract.
-vi.mock("~/components/me/PasskeyNudge", () => ({ PasskeyNudge: () => null }));
+vi.mock("~/components/me/SecureAccountNudge", () => ({
+  SecureAccountNudge: () => null,
+}));
 
 vi.mock("~/hooks/usePublicEnv", () => ({
   usePublicEnv: () => ({
@@ -182,9 +185,30 @@ vi.mock("~/utils/api", () => ({
       getUsage: { useQuery: () => ({ data: undefined }) },
     },
     user: {
+      secureAccountNudge: { useQuery: () => ({ data: undefined }) },
       getSsoStatus: { useQuery: () => ({ data: undefined }) },
       isAdmin: { useQuery: () => ({ data: { isAdmin: mockIsAdmin } }) },
     },
+    twoStepVerification: {
+      standing: { useQuery: () => ({ data: undefined, refetch: vi.fn() }) },
+    },
+    joinRequests: {
+      offer: { useQuery: () => ({ data: undefined, isPending: false }) },
+      mine: { useQuery: () => ({ data: undefined, isPending: false }) },
+      dismissOffer: { useMutation: () => ({ mutate: vi.fn() }) },
+      request: { useMutation: () => ({ mutate: vi.fn() }) },
+      admitAutomatically: { useMutation: () => ({ mutate: vi.fn() }) },
+    },
+    invite: {
+      pendingForMe: { useQuery: () => ({ data: [], isPending: false }) },
+      acceptInvite: { useMutation: () => ({ mutate: vi.fn() }) },
+    },
+    useUtils: () => ({
+      joinRequests: {
+        offer: { invalidate: vi.fn() },
+        mine: { invalidate: vi.fn() },
+      },
+    }),
     governance: {
       recordWorkspaceView: {
         useMutation: () => ({ mutate: vi.fn(), isPending: false }),
@@ -277,9 +301,11 @@ beforeEach(() => {
   mockIsLiteMember = false;
   mockHasOpsAccess = false;
   mockIsAdmin = false;
+  mockHasPermission = true;
   pushMock.mockClear();
   localStorage.clear();
   sessionStorage.clear();
+  localStorage.setItem("langwatch:navigation-mode:v1", "product-switcher");
   useNavigationModeStore.setState({ storedMode: "product-switcher" });
 });
 
@@ -311,23 +337,81 @@ describe("the settings shell in a new navigation mode", () => {
       renderSettings();
 
       expect(screen.getByText("Organization")).toBeInTheDocument();
-      expect(screen.getByText("Access")).toBeInTheDocument();
+      expect(screen.getByText("People & access")).toBeInTheDocument();
       expect(screen.getByRole("link", { name: "General" })).toHaveAttribute(
         "href",
         "/settings",
       );
-      expect(screen.getByRole("link", { name: "Members" })).toHaveAttribute(
+      expect(screen.getByRole("link", { name: "Directory" })).toHaveAttribute(
         "href",
-        "/settings/members",
+        "/settings/directory",
       );
       expect(screen.getByTestId("settings-page-content")).toBeInTheDocument();
+    });
+
+    /** @scenario The You section comes first and is about the reader */
+    it("puts the reader's Profile and Security pages first", () => {
+      renderSettings();
+
+      const links = within(screen.getByTestId("sidebar-scroll-region"))
+        .getAllByRole("link")
+        .map((link) => link.textContent?.trim());
+      const groupButtons = screen
+        .getAllByRole("button", { name: /^Collapse / })
+        .map((button) => button.textContent?.trim());
+
+      expect(groupButtons[0]).toBe("You");
+      expect(links.slice(0, 2)).toEqual(["Profile", "Security"]);
+      expect(groupButtons.indexOf("You")).toBeLessThan(
+        groupButtons.indexOf("Organization"),
+      );
+    });
+
+    /** @scenario The personal pages ask for no organization permission */
+    it("keeps Profile and Security when organization permissions are denied", () => {
+      mockHasPermission = false;
+      renderSettings();
+
+      expect(screen.getByRole("link", { name: "Profile" })).toBeInTheDocument();
+      expect(
+        screen.getByRole("link", { name: "Security" }),
+      ).toBeInTheDocument();
+    });
+
+    /** @scenario The access group is named for people and holds the organization's pages */
+    it("keeps authentication with the organization and consolidates people access", () => {
+      renderSettings();
+
+      const organizationGroup = screen.getByRole("button", {
+        name: "Collapse Organization",
+      }).parentElement;
+      const peopleGroup = screen.getByRole("button", {
+        name: "Collapse People & access",
+      }).parentElement;
+
+      expect(organizationGroup).not.toBeNull();
+      expect(peopleGroup).not.toBeNull();
+      expect(
+        within(organizationGroup!).getByRole("link", {
+          name: "Authentication",
+        }),
+      ).toHaveAttribute("href", "/settings/authentication");
+      expect(
+        within(peopleGroup!).getByRole("link", { name: "Directory" }),
+      ).toHaveAttribute("href", "/settings/directory");
+      expect(
+        within(peopleGroup!).getByRole("link", { name: "Roles" }),
+      ).toHaveAttribute("href", "/settings/roles");
+      for (const name of ["Members", "Groups", "Access", "Role Bindings"]) {
+        expect(screen.queryByRole("link", { name })).not.toBeInTheDocument();
+      }
     });
 
     /** @scenario "Enterprise entries carry a quiet grey pill" */
     it("marks the enterprise entries with a grey pill in a hairline border", () => {
       renderSettings();
 
-      expect(screen.getByRole("link", { name: "Groups" })).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Roles" })).toBeInTheDocument();
       const pills = screen.getAllByText("ENT");
       expect(pills.length).toBeGreaterThanOrEqual(1);
       // The hairline border is pinned on the shared chip style itself:
@@ -347,12 +431,16 @@ describe("the settings shell in a new navigation mode", () => {
       expect(
         screen.getAllByRole("button", { name: /^Collapse / }).length,
       ).toBeGreaterThan(1);
-      expect(screen.getByRole("link", { name: "Members" })).toBeInTheDocument();
+      expect(
+        screen.getByRole("link", { name: "Directory" }),
+      ).toBeInTheDocument();
 
-      await user.click(screen.getByRole("button", { name: "Collapse Access" }));
+      await user.click(
+        screen.getByRole("button", { name: "Collapse People & access" }),
+      );
 
       expect(
-        screen.queryByRole("link", { name: "Members" }),
+        screen.queryByRole("link", { name: "Directory" }),
       ).not.toBeInTheDocument();
       expect(
         screen.getByRole("button", { name: "Collapse Organization" }),
@@ -363,10 +451,10 @@ describe("the settings shell in a new navigation mode", () => {
       renderSettings();
 
       expect(
-        screen.getByRole("button", { name: "Expand Access" }),
+        screen.getByRole("button", { name: "Expand People & access" }),
       ).toHaveAttribute("aria-expanded", "false");
       expect(
-        screen.queryByRole("link", { name: "Members" }),
+        screen.queryByRole("link", { name: "Directory" }),
       ).not.toBeInTheDocument();
       expect(screen.getByRole("link", { name: "General" })).toBeInTheDocument();
     });
@@ -391,7 +479,7 @@ describe("the settings shell in a new navigation mode", () => {
       );
       // The pages themselves are what scrolls, so they stay inside it.
       expect(scrollRegion).toContainElement(
-        screen.getByRole("link", { name: "Members" }),
+        screen.getByRole("link", { name: "Directory" }),
       );
     });
 
@@ -424,9 +512,9 @@ describe("the settings shell in a new navigation mode", () => {
       // an index lookup on its own would read as the move having worked.
       expect(entries.filter((entry) => entry === "API Keys")).toHaveLength(1);
       expect(entries.indexOf("API Keys")).toBe(entries.indexOf("General") + 1);
-      // Members opens ACCESS, so an entry before it is in ORGANIZATION.
+      // Directory opens PEOPLE & ACCESS, so an entry before it is ORGANIZATION.
       expect(entries.indexOf("API Keys")).toBeLessThan(
-        entries.indexOf("Members"),
+        entries.indexOf("Directory"),
       );
     });
 
@@ -483,21 +571,6 @@ describe("the settings shell in a new navigation mode", () => {
     });
   });
 
-  describe("when the device is in legacy mode", () => {
-    /** @scenario Legacy mode keeps the current settings chrome */
-    it("keeps the current settings navigation", () => {
-      useNavigationModeStore.setState({ storedMode: "legacy" });
-      renderSettings();
-
-      expect(
-        screen.getByRole("link", { name: "General Settings" }),
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByRole("button", { name: "Quick Search" }),
-      ).not.toBeInTheDocument();
-    });
-  });
-
   describe("when the reader has ops access and is an admin", () => {
     /** @scenario The settings menu holds the ops groups at the bottom */
     it("puts OPS and BACKOFFICE last", () => {
@@ -515,12 +588,9 @@ describe("the settings shell in a new navigation mode", () => {
     });
   });
 
-  describe("when the pin flag and the environment variable are both off", () => {
-    /** @scenario The settings menu shows ops without the pin flag or the environment variable */
-    it("still shows the OPS group away from an ops page", () => {
-      // `usePublicEnv` names no SHOW_OPS_IN_MAIN_SIDEBAR and the address
-      // is a settings page, so the two conditions the legacy sidebar
-      // needs are both absent here.
+  describe("when the reader has ops access", () => {
+    /** @scenario The settings menu holds the ops groups at the bottom */
+    it("shows the OPS group away from an ops page", () => {
       mockHasOpsAccess = true;
       renderSettings();
 

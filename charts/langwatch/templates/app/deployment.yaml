@@ -148,6 +148,11 @@ spec:
             - name: OTEL_SERVICE_NAME
               value: {{ .Values.app.otel.serviceName | default "langwatch-app" | quote }}
 
+            {{- with .Values.app.trustedProxyAddresses }}
+            - name: TRUSTED_PROXY_ADDRESSES
+              value: {{ . | quote }}
+            {{- end }}
+
             {{/* NEXTAUTH_URL comes from langwatch.sharedEnv: every process
                  needs the same answer for what this installation is called. */}}
             - name: NEXTAUTH_URL_INTERNAL
@@ -226,19 +231,19 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: {{ include "langwatch.appSecretName" . }}
-                  key: LW_GATEWAY_INTERNAL_SECRET
+                  key: {{ include "langwatch.gatewayInternalSecretKey" . }}
             - name: LW_GATEWAY_JWT_SECRET
               valueFrom:
                 secretKeyRef:
                   name: {{ include "langwatch.appSecretName" . }}
-                  key: LW_GATEWAY_JWT_SECRET
+                  key: {{ include "langwatch.gatewayJwtSecretKey" . }}
             {{- end }}
 
             {{- if (index .Values "langyagent").chartManaged }}
-            # Langy agent pod. The app POSTs chats to OPENCODE_AGENT_URL with
+            # Langy agent pod. The app POSTs chats to LANGY_AGENT_URL with
             # LANGY_INTERNAL_SECRET as the Bearer token; the agent verifies it
             # against the same Secret. Subchart values key read via index (aliased subchart).
-            - name: OPENCODE_AGENT_URL
+            - name: LANGY_AGENT_URL
               value: {{ (index .Values "langyagent").controlPlane.agentUrl | default (printf "http://%s-langyagent:80" .Release.Name) | quote }}
             - name: LANGY_INTERNAL_SECRET
               valueFrom:
@@ -274,16 +279,15 @@ spec:
             # cursor) at login. Without it the CLI falls back to
             # http://localhost:5563, which a developer laptop can't reach
             # against a remote cluster. Prefer the explicit gateway.publicUrl
-            # knob; otherwise derive it from an operator-set gateway ingress
-            # host (the SaaS default host is skipped so a self-host install
-            # never silently points at gateway.langwatch.ai).
+            # knob; otherwise derive it from ingress.gateway.host when the
+            # app Ingress publishes the gateway.
             {{- $gwPublic := .Values.gateway.publicUrl | default "" }}
             {{- if not $gwPublic }}
-            {{- $gwIngress := .Values.gateway.ingress | default dict }}
-            {{- $gwHost := $gwIngress.host | default "" }}
-            {{- if and $gwIngress.enabled $gwHost (ne $gwHost "gateway.langwatch.ai") }}
+            {{- $gwRoute := (.Values.ingress | default dict).gateway | default dict }}
+            {{- $gwHost := $gwRoute.host | default "" }}
+            {{- if and .Values.ingress.enabled $gwHost }}
             {{- $scheme := "http" }}
-            {{- if and $gwIngress.tls $gwIngress.tls.enabled }}{{- $scheme = "https" }}{{- end }}
+            {{- if ($gwRoute.tls | default dict).secretName }}{{- $scheme = "https" }}{{- end }}
             {{- $gwPublic = printf "%s://%s" $scheme $gwHost }}
             {{- end }}
             {{- end }}
@@ -302,10 +306,37 @@ spec:
                    error naming this variable. */}}
             {{- include "langwatch.gatewayBaseUrlEnv" . | nindent 12 }}
 
-            # NextAuth configuration (NEXTAUTH_SECRET lives in sharedEnv —
-            # every app-image consumer needs it, see _helpers.tpl)
-            - name: NEXTAUTH_PROVIDER
+            # Auth configuration (NEXTAUTH_SECRET lives in sharedEnv —
+            # every app-image consumer needs it, see _helpers.tpl).
+            # AUTH_PROVIDER is the app's supported name for this setting;
+            # the values key keeps its NextAuth-era path for compatibility.
+            # An operator who selects the provider in app.extraEnvs, under
+            # either name, owns the setting: rendering AUTH_PROVIDER from the
+            # values key would outrank a NEXTAUTH_PROVIDER there and silently
+            # put an SSO install into email mode.
+            {{- $providerFromExtraEnvs := false }}
+            {{- range .Values.app.extraEnvs }}
+            {{- if has (toString .name) (list "AUTH_PROVIDER" "NEXTAUTH_PROVIDER") }}
+            {{- $providerFromExtraEnvs = true }}
+            {{- end }}
+            {{- end }}
+            {{- if not $providerFromExtraEnvs }}
+            - name: AUTH_PROVIDER
               value: {{ .Values.app.nextAuth.provider | quote }}
+            {{- end }}
+
+            # Self sign-up restrictions. Rendered only when set away from the
+            # default, so an upgrade that changes no value adds no variable.
+            {{- with .Values.app.signUp }}
+            {{- if and .mode (ne (toString .mode) "open") }}
+            - name: SIGN_UP_MODE
+              value: {{ .mode | quote }}
+            {{- end }}
+            {{- if .allowedDomains }}
+            - name: SIGN_UP_ALLOWED_DOMAINS
+              value: {{ join "," .allowedDomains | quote }}
+            {{- end }}
+            {{- end }}
 
             # NextAuth - SSO OAuth providers (auth0, azureAd, cognito, github,
             # gitlab, google, okta, onelogin, oidc).
@@ -332,13 +363,11 @@ spec:
             {{- end }}
 
             {{- with .Values.app.extraEnvs}}
+            {{- include "langwatch.assertNoReservedTimeoutEnvs" (dict "envs" . "path" "app.extraEnvs") }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
 
-          {{- with .Values.app.extraEnvFrom}}
-          envFrom:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
+          {{- include "langwatch.envFromWithOfflineDefaults" (dict "root" $ "extraEnvFrom" .Values.app.extraEnvFrom) | nindent 10 }}
 
           {{- if .Values.app.extraLifecycle}}
           lifecycle:
@@ -348,12 +377,19 @@ spec:
           {{- end }}
           resources:
             {{- toYaml .Values.app.resources | nindent 12 }}
+          # 40 minutes (15s x 160). Serving starts only after the database
+          # migrations and the system-migration preflight finish, and that
+          # preflight is designed to take up to ~27 minutes before it gives up
+          # (25 passes, each waiting up to 60s for its queue work to settle,
+          # 5s between them). A budget shorter than the design turns a slow or
+          # non-converging preflight into CrashLoopBackOff, which hides the
+          # error the preflight would otherwise report by name.
           startupProbe:
             httpGet:
               path: /api/health
               port: http
-            failureThreshold: 30
-            periodSeconds: 10
+            failureThreshold: 160
+            periodSeconds: 15
           readinessProbe:
             httpGet:
               path: /api/health

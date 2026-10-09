@@ -3,7 +3,7 @@ import { X } from "lucide-react";
 import { useMemo } from "react";
 import { Tooltip } from "~/components/ui/tooltip";
 import { walkAST } from "~/server/app-layer/traces/query-language/walk";
-import { useFilterStore } from "../../stores/filterStore";
+import { useExplorerStore } from "../../stores/explorerStore";
 
 /**
  * Empty-state companion that breaks the active query down into removable
@@ -38,10 +38,10 @@ interface BreakdownEntry {
 }
 
 export function QueryBreakdownChips() {
-  const ast = useFilterStore((s) => s.ast);
-  const removeFacet = useFilterStore((s) => s.removeFacet);
-  const removeField = useFilterStore((s) => s.removeField);
-  const removeFreeText = useFilterStore((s) => s.removeFreeText);
+  const ast = useExplorerStore((s) => s.ast);
+  const removeFacet = useExplorerStore((s) => s.removeFacet);
+  const removeField = useExplorerStore((s) => s.removeField);
+  const removeFreeText = useExplorerStore((s) => s.removeFreeText);
 
   const entries = useMemo<BreakdownEntry[]>(() => {
     const out: BreakdownEntry[] = [];

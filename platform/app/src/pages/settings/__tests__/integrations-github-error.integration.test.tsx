@@ -57,12 +57,29 @@ vi.mock("~/utils/api", () => ({
         useMutation: () => ({ mutate: vi.fn(), isPending: false }),
       },
     },
+    langy: {
+      getCodeAccessPreference: {
+        useQuery: () => ({ data: { preference: null }, refetch: vi.fn() }),
+      },
+      setCodeAccessPreference: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
+    },
+    slackIntegration: {
+      list: { useQuery: () => ({ data: undefined, error: null }) },
+    },
   },
+}));
+
+vi.mock("~/hooks/useDrawer", () => ({
+  useDrawer: () => ({ openDrawer: vi.fn() }),
 }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
     organization: { id: "org-1", name: "Acme Corp" },
+    // With no session project the Slack section issues no list query.
+    hasPermission: () => true,
   }),
 }));
 

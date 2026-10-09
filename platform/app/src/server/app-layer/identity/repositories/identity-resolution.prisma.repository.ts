@@ -1,10 +1,14 @@
 import { LIVE_IDENTIFIER_STATES } from "@langwatch/identity";
 import type {
+  IdentityIssuerResolution,
   IdentityResolution,
   IdentityResolutionPort,
 } from "@langwatch/identity-server/better-auth";
+import { createLogger } from "@langwatch/observability";
 import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../migration-name";
+
+const logger = createLogger("langwatch:identity:resolution");
 
 /** Only a proven address signs anyone in. An ATTACHED identifier is one the
  *  user has claimed and not yet verified, and D01's collision guard lets it
@@ -12,8 +16,13 @@ import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../migration-name";
 const RESOLVABLE_STATES = ["VERIFIED", "PRIMARY"] as const;
 
 interface ResolutionRow {
+  identifierId: string;
   userId: string;
   status: string | null;
+}
+
+interface IssuerResolutionRow extends ResolutionRow {
+  providerId: string | null;
 }
 
 /**
@@ -69,6 +78,51 @@ export class PrismaIdentityResolutionRepository
     );
   }
 
+  /**
+   * The callback of a provider that asserts its OWN issuer.
+   *
+   * Google, GitHub, GitLab and Azure AD are keyed by better-auth on the
+   * issuer the provider states rather than on one we mint, and the attach
+   * ceremony stores that verbatim - so this matches the pair the row carries
+   * and `@@index([issuer, providerAccountId])` serves it.
+   *
+   * It returns the row's `providerId` as well, because the account read
+   * underneath is keyed by it and the caller asked by issuer. Deriving it
+   * from the issuer instead would be a guess, and a provider subject is
+   * unique only WITHIN an issuer: a wrong guess answers with another IdP's
+   * user. A row whose `providerId` is null backs no protocol account, so it
+   * resolves nobody here.
+   */
+  async resolveByIssuerSubject({
+    issuer,
+    providerAccountId,
+  }: {
+    issuer: string;
+    providerAccountId: string;
+  }): Promise<IdentityIssuerResolution | null> {
+    const rows = await this.prisma.$queryRaw<IssuerResolutionRow[]>`
+      SELECT i."id" AS "identifierId", i."userId" AS "userId",
+             i."providerId" AS "providerId", s."status" AS "status"
+      FROM "Identifier" i
+      LEFT JOIN "SystemMigrationTenantState" s
+        ON s."tenantId" = i."userId"
+       AND s."migrationName" = ${IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME}
+      WHERE i."issuer" = ${issuer}
+        AND i."providerAccountId" = ${providerAccountId}
+        AND i."state" IN (${Prisma.join([...LIVE_IDENTIFIER_STATES])})
+      ORDER BY i."attachedAt" ASC, i."id" ASC
+      LIMIT 1
+    `;
+    const row = rows[0];
+    if (row === undefined || row.providerId === null) return null;
+    this.touchLastUsed(row.identifierId);
+    return {
+      userId: row.userId,
+      finalized: row.status === "finalized",
+      providerId: row.providerId,
+    };
+  }
+
   private async resolve(match: Prisma.Sql): Promise<IdentityResolution | null> {
     // `ORDER BY` fixes which row answers when more than one matches, so a
     // resolution can never pick differently between two reads - that would
@@ -84,7 +138,7 @@ export class PrismaIdentityResolutionRepository
     // the same address through several providers), and there the ordering
     // is the whole answer.
     const rows = await this.prisma.$queryRaw<ResolutionRow[]>`
-      SELECT i."userId" AS "userId", s."status" AS "status"
+      SELECT i."id" AS "identifierId", i."userId" AS "userId", s."status" AS "status"
       FROM "Identifier" i
       LEFT JOIN "SystemMigrationTenantState" s
         ON s."tenantId" = i."userId"
@@ -95,10 +149,39 @@ export class PrismaIdentityResolutionRepository
     `;
     const row = rows[0];
     if (row === undefined) return null;
+    this.touchLastUsed(row.identifierId);
     // `finalized` and nothing else, the same predicate the write gate uses:
     // `migrated` is HELD — the rows exist but the parity proof found them
     // behind or disagreeing — so the legacy branch stays this user's truth
     // until the next backfill pass heals them.
     return { userId: row.userId, finalized: row.status === "finalized" };
+  }
+
+  /**
+   * Records that this identifier answered — `Identifier.lastUsedAt`, the one
+   * column on this table the fold does not own.
+   *
+   * Fire-and-forget on purpose, and not awaited: this runs on the sign-in
+   * path, and a timestamp is never worth failing a sign-in for or making one
+   * wait on a second round trip. The catch is the whole point — an unwritable
+   * column must cost the timestamp and nothing else.
+   *
+   * It records a RESOLUTION, which is not an authentication: the password,
+   * passkey or IdP answer is checked after this returns, so a wrong password
+   * moves this timestamp too. The column's comment carries the same warning,
+   * because the name alone invites the stronger reading.
+   */
+  private touchLastUsed(identifierId: string): void {
+    void this.prisma.identifier
+      .update({
+        where: { id: identifierId },
+        data: { lastUsedAt: new Date() },
+      })
+      .catch((error: unknown) => {
+        logger.warn(
+          { identifierId, error },
+          "could not record identifier last-used; sign-in is unaffected",
+        );
+      });
   }
 }

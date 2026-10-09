@@ -8,7 +8,12 @@ vi.mock("~/server/app-layer/app", () => ({
   tryGetApp: () => ({ redis: null }),
 }));
 
-function createMockPrisma() {
+/**
+ * The delegates the service touches, kept as the typed `vi.fn()`s they are so
+ * a test reaches `.mockResolvedValue` without a cast. `createMockPrisma` is
+ * the same object worn as the client.
+ */
+function createMockDelegates() {
   return {
     user: {
       findUnique: vi.fn(),
@@ -21,16 +26,62 @@ function createMockPrisma() {
       findMany: vi.fn().mockResolvedValue([]),
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
-  } as unknown as Parameters<typeof UserService.create>[0];
+    organization: {
+      // Backs the default PrismaLegacySsoOrganizationRepository getSsoStatus()
+      // reads through.
+      findUnique: vi.fn().mockResolvedValue(null),
+    },
+    account: {
+      findMany: vi.fn().mockResolvedValue([]),
+    },
+  };
+}
+
+function createMockPrisma(
+  delegates: ReturnType<typeof createMockDelegates>,
+): Parameters<typeof UserService.create>[0] {
+  return delegates as unknown as Parameters<typeof UserService.create>[0];
 }
 
 describe("UserService", () => {
+  let delegates: ReturnType<typeof createMockDelegates>;
   let prisma: ReturnType<typeof createMockPrisma>;
   let service: UserService;
 
   beforeEach(() => {
-    prisma = createMockPrisma();
+    delegates = createMockDelegates();
+    prisma = createMockPrisma(delegates);
     service = UserService.create(prisma);
+  });
+
+  describe("create()", () => {
+    it("persists an explicitly inactive account inactive from the first write", async () => {
+      await service.create({
+        name: "Inactive person",
+        email: "inactive@example.com",
+        active: false,
+      });
+
+      expect(prisma.user.create).toHaveBeenCalledWith({
+        data: {
+          name: "Inactive person",
+          email: "inactive@example.com",
+          deactivatedAt: expect.any(Date),
+        },
+      });
+      expect(prisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it("preserves active creation when no status is supplied", async () => {
+      await service.create({
+        name: "Active person",
+        email: "active@example.com",
+      });
+
+      expect(prisma.user.create).toHaveBeenCalledWith({
+        data: { name: "Active person", email: "active@example.com" },
+      });
+    });
   });
 
   describe("deactivate()", () => {
@@ -101,6 +152,128 @@ describe("UserService", () => {
     });
   });
 
+  describe("getSsoStatus()", () => {
+    const pendingUser = { pendingSsoSetup: true, email: "andrei@acme.com" };
+    const acmeWithPin = (ssoProvider: string | null) => ({
+      id: "org_1",
+      name: "Acme",
+      ssoProvider,
+    });
+
+    describe("given the flag is not set", () => {
+      it("reports not pending without reading accounts", async () => {
+        delegates.user.findUnique.mockResolvedValue({
+          pendingSsoSetup: false,
+          email: "andrei@acme.com",
+        });
+
+        const result = await service.getSsoStatus({ id: "user-1" });
+
+        expect(result).toEqual({ pendingSsoSetup: false });
+        expect(delegates.account.findMany).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("given the flag is set and the user holds no sign-in matching the organization's single sign-on", () => {
+      it("reports pending", async () => {
+        delegates.user.findUnique.mockResolvedValue(pendingUser);
+        delegates.organization.findUnique.mockResolvedValue(
+          acmeWithPin("auth0"),
+        );
+        delegates.account.findMany.mockResolvedValue([
+          { provider: "credential", providerAccountId: "user-1" },
+        ]);
+
+        const result = await service.getSsoStatus({ id: "user-1" });
+
+        expect(result).toEqual({ pendingSsoSetup: true });
+      });
+    });
+
+    describe("given the flag is set and the user already holds a matching sign-in (pin is a provider name)", () => {
+      it("reports not pending", async () => {
+        delegates.user.findUnique.mockResolvedValue(pendingUser);
+        delegates.organization.findUnique.mockResolvedValue(
+          acmeWithPin("auth0"),
+        );
+        delegates.account.findMany.mockResolvedValue([
+          { provider: "auth0", providerAccountId: "sub-1" },
+        ]);
+
+        const result = await service.getSsoStatus({ id: "user-1" });
+
+        expect(result).toEqual({ pendingSsoSetup: false });
+      });
+    });
+
+    describe("given the flag is set and the pin is a providerAccountId prefix that the user's account id starts with", () => {
+      // The trap: comparing the pin to the account by equality would miss
+      // this — the pin is only a PREFIX of the account's id.
+      it("reports not pending", async () => {
+        delegates.user.findUnique.mockResolvedValue(pendingUser);
+        delegates.organization.findUnique.mockResolvedValue(
+          acmeWithPin("waad|acme-conn"),
+        );
+        delegates.account.findMany.mockResolvedValue([
+          { provider: "auth0", providerAccountId: "waad|acme-conn|user-123" },
+        ]);
+
+        const result = await service.getSsoStatus({ id: "user-1" });
+
+        expect(result).toEqual({ pendingSsoSetup: false });
+      });
+    });
+
+    describe("given the user holds several accounts and only the second matches", () => {
+      it("reports not pending with exactly one organization lookup", async () => {
+        delegates.user.findUnique.mockResolvedValue(pendingUser);
+        delegates.organization.findUnique.mockResolvedValue(
+          acmeWithPin("auth0"),
+        );
+        delegates.account.findMany.mockResolvedValue([
+          { provider: "credential", providerAccountId: "user-1" },
+          { provider: "auth0", providerAccountId: "sub-1" },
+        ]);
+
+        const result = await service.getSsoStatus({ id: "user-1" });
+
+        expect(result).toEqual({ pendingSsoSetup: false });
+        expect(delegates.organization.findUnique).toHaveBeenCalledOnce();
+      });
+    });
+
+    describe("given the flag is set but the organization has since dropped its single sign-on pin", () => {
+      // The stored flag is only ever cleared by a sign-in, so without this a
+      // member would be asked to link a provider nobody names any more.
+      /** @scenario "A member is not asked to link a sign-in method their organization no longer requires" */
+      it("reports not pending, since there is nothing left to link", async () => {
+        delegates.user.findUnique.mockResolvedValue(pendingUser);
+        delegates.organization.findUnique.mockResolvedValue(acmeWithPin(null));
+        delegates.account.findMany.mockResolvedValue([
+          { provider: "credential", providerAccountId: "user-1" },
+        ]);
+
+        const result = await service.getSsoStatus({ id: "user-1" });
+
+        expect(result).toEqual({ pendingSsoSetup: false });
+      });
+    });
+
+    describe("given the flag is set but no organization claims the user's domain any more", () => {
+      it("reports not pending", async () => {
+        delegates.user.findUnique.mockResolvedValue(pendingUser);
+        delegates.organization.findUnique.mockResolvedValue(null);
+        delegates.account.findMany.mockResolvedValue([
+          { provider: "credential", providerAccountId: "user-1" },
+        ]);
+
+        const result = await service.getSsoStatus({ id: "user-1" });
+
+        expect(result).toEqual({ pendingSsoSetup: false });
+      });
+    });
+  });
+
   describe("updateProfile()", () => {
     describe("when only the name changes", () => {
       it("updates the user but does NOT revoke sessions", async () => {
@@ -120,7 +293,7 @@ describe("UserService", () => {
           data: { name: "Alice New" },
         });
         // Name-only change: no session revocation
-        expect((prisma as any).session.deleteMany).not.toHaveBeenCalled();
+        expect(delegates.session.deleteMany).not.toHaveBeenCalled();
       });
     });
 
@@ -140,7 +313,7 @@ describe("UserService", () => {
           email: "alice@acme.com",
         });
 
-        expect((prisma as any).session.deleteMany).not.toHaveBeenCalled();
+        expect(delegates.session.deleteMany).not.toHaveBeenCalled();
       });
     });
 
@@ -172,7 +345,7 @@ describe("UserService", () => {
           data: { email: "alice@acme.com" },
         });
         // No revocation because it's a case-only change
-        expect((prisma as any).session.deleteMany).not.toHaveBeenCalled();
+        expect(delegates.session.deleteMany).not.toHaveBeenCalled();
       });
     });
 
@@ -197,7 +370,7 @@ describe("UserService", () => {
           email: "alice-new@acme.com",
         });
 
-        expect((prisma as any).session.deleteMany).toHaveBeenCalledWith({
+        expect(delegates.session.deleteMany).toHaveBeenCalledWith({
           where: { userId: "user-1" },
         });
       });
@@ -210,7 +383,7 @@ describe("UserService", () => {
         ).rejects.toThrow(/blank/i);
         // No write, no revocation.
         expect(prisma.user.update).not.toHaveBeenCalled();
-        expect((prisma as any).session.deleteMany).not.toHaveBeenCalled();
+        expect(delegates.session.deleteMany).not.toHaveBeenCalled();
       });
 
       it("also rejects an empty string", async () => {

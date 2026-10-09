@@ -1,4 +1,7 @@
-import type { MetricSequencePoint } from "~/server/event-sourcing/pipelines/metric-processing/rollup/sequence";
+import type {
+  MetricRollupSourcePoint,
+  MetricSequencePoint,
+} from "~/server/event-sourcing/pipelines/metric-processing/rollup/sequence";
 import type {
   AggregationTemporality,
   CanonicalMetricDataPoint,
@@ -69,22 +72,6 @@ export interface RawMetricRow {
   OccurredAt: string | number;
   AcceptedAt: string | number;
 }
-
-export const RAW_SELECT = `
-  TenantId, PointId, SeriesId,
-  ResourceSchemaUrl, ResourceAttributesJson, ResourceAttributeKeys,
-  ScopeSchemaUrl, ScopeName, ScopeVersion, ScopeAttributesJson, ScopeAttributeKeys,
-  MetricName, MetricDescription, MetricUnit, MetricKind,
-  AggregationTemporality, IsMonotonic,
-  PointAttributesJson, PointAttributeKeys,
-  StartTimeUnixNano, TimeUnixNano, toUnixTimestamp64Milli(TimeUnixMs) AS TimeUnixMs,
-  Flags, ValueType, ValueInt, ValueDouble, Count, Sum, Min, Max,
-  ExplicitBounds, BucketCounts, ExponentialScale, ExponentialZeroThreshold, ZeroCount,
-  PositiveOffset, PositiveBucketCounts, NegativeOffset, NegativeBucketCounts,
-  SummaryQuantilesJson, CanonicalPayload, _size_bytes,
-  toUnixTimestamp64Milli(OccurredAt) AS OccurredAt,
-  toUnixTimestamp64Milli(AcceptedAt) AS AcceptedAt
-`;
 
 export function rawRow({
   point,
@@ -240,7 +227,8 @@ export function rollupRow({
  * One of the three `Array(UInt64)` count columns, refusing to decode a row that
  * does not carry it.
  *
- * These are the only fields `fromRaw` dereferences without a null check, so a
+ * These are the only fields `fromRollupRow` dereferences without a null check,
+ * so a
  * row arriving without them used to surface as a bare
  * `Cannot read properties of undefined (reading 'map')` — no column, no series,
  * no query, and a stack the queue drops in favour of the message alone. Naming
@@ -277,16 +265,98 @@ function countsColumn({
 }
 
 /**
- * The columns the rollup fold actually reads. Identical to {@link RAW_SELECT}
- * minus CanonicalPayload: the fold never touches the payload, and it is the
- * one megabyte-scale column, so fetching it through `FINAL` was what pushed
- * the folded seek queries past the server's per-query memory cap
- * (MEMORY_LIMIT_EXCEEDED while executing ReplacingSorted).
+ * The columns the rollup fold actually reads — {@link MetricRollupSourcePoint},
+ * spelled as SQL.
+ *
+ * Dropping the payload column was not enough. `FINAL` materialises every
+ * selected column for every row a seek's granules cover, not for the rows it
+ * returns, and the authoritative bucket read returns on the order of a hundred
+ * rows out of millions scanned. So each of the columns left out here — the two
+ * attribute JSON blobs, the resource and scope identity, the description,
+ * flags, the quantile JSON, the size and acceptance bookkeeping — was being
+ * decompressed for every scanned row and thrown away. That is the allocation
+ * the server ran out of memory inside: `Code: 241 ... (while reading column
+ * PointAttributesJson)`.
+ *
+ * None of them is a rollup input: a rollup carries identity, kind, temporality
+ * and aggregatable values, and quantiles are explicitly not aggregatable (see
+ * `buildSummaryRow`). The type is what enforces that — adding a column here
+ * without adding it to {@link MetricRollupSourcePoint} gains nothing, and
+ * reading one in a builder without adding it here will not compile.
  */
-export const AUTHORITATIVE_SELECT = RAW_SELECT.replace(
-  "SummaryQuantilesJson, CanonicalPayload, _size_bytes,",
-  "SummaryQuantilesJson, _size_bytes,",
-);
+export const ROLLUP_SELECT = `
+  TenantId, PointId, SeriesId,
+  MetricName, MetricUnit, MetricKind, AggregationTemporality, IsMonotonic,
+  StartTimeUnixNano, TimeUnixNano, toUnixTimestamp64Milli(TimeUnixMs) AS TimeUnixMs,
+  ValueType, ValueInt, ValueDouble, Count, Sum, Min, Max,
+  ExplicitBounds, BucketCounts,
+  ExponentialScale, ExponentialZeroThreshold, ZeroCount,
+  PositiveOffset, PositiveBucketCounts, NegativeOffset, NegativeBucketCounts
+`;
+
+/** A row of {@link ROLLUP_SELECT}, which is a strict subset of the raw row. */
+export type RollupSourceRow = Pick<
+  RawMetricRow,
+  | "TenantId"
+  | "PointId"
+  | "SeriesId"
+  | "MetricName"
+  | "MetricUnit"
+  | "MetricKind"
+  | "AggregationTemporality"
+  | "IsMonotonic"
+  | "StartTimeUnixNano"
+  | "TimeUnixNano"
+  | "TimeUnixMs"
+  | "ValueType"
+  | "ValueInt"
+  | "ValueDouble"
+  | "Count"
+  | "Sum"
+  | "Min"
+  | "Max"
+  | "ExplicitBounds"
+  | "BucketCounts"
+  | "ExponentialScale"
+  | "ExponentialZeroThreshold"
+  | "ZeroCount"
+  | "PositiveOffset"
+  | "PositiveBucketCounts"
+  | "NegativeOffset"
+  | "NegativeBucketCounts"
+>;
+
+export function fromRollupRow(row: RollupSourceRow): MetricRollupSourcePoint {
+  return {
+    tenantId: row.TenantId,
+    pointId: row.PointId,
+    seriesId: row.SeriesId,
+    metricName: row.MetricName,
+    metricUnit: row.MetricUnit,
+    metricKind: row.MetricKind,
+    aggregationTemporality: row.AggregationTemporality,
+    isMonotonic: row.IsMonotonic === null ? null : Boolean(row.IsMonotonic),
+    startTimeUnixNano: String(row.StartTimeUnixNano),
+    timeUnixNano: String(row.TimeUnixNano),
+    timeUnixMs: Number(row.TimeUnixMs),
+    valueType: row.ValueType,
+    valueInt: row.ValueInt === null ? null : String(row.ValueInt),
+    valueDouble: row.ValueDouble,
+    count: row.Count === null ? null : String(row.Count),
+    sum: row.Sum,
+    min: row.Min,
+    max: row.Max,
+    explicitBounds: row.ExplicitBounds,
+    bucketCounts: countsColumn({ row, column: "BucketCounts" }),
+    exponentialScale: row.ExponentialScale,
+    exponentialZeroThreshold: row.ExponentialZeroThreshold,
+    zeroCount: row.ZeroCount === null ? null : String(row.ZeroCount),
+    positiveOffset: row.PositiveOffset,
+    positiveBucketCounts: countsColumn({ row, column: "PositiveBucketCounts" }),
+    negativeOffset: row.NegativeOffset,
+    negativeBucketCounts: countsColumn({ row, column: "NegativeBucketCounts" }),
+  };
+}
 
 /**
  * The columns a successor seek needs: just enough to order points
@@ -318,67 +388,6 @@ export function fromSeekRow(row: SeekMetricRow): MetricSequencePoint {
     timeUnixNano: String(row.TimeUnixNano),
     metricKind: row.MetricKind,
     aggregationTemporality: row.AggregationTemporality,
-  };
-}
-
-export function fromRaw({
-  row,
-  organizationId,
-}: {
-  // CanonicalPayload is optional on purpose: the authoritative bucket reads
-  // deliberately do not select it (see AUTHORITATIVE_SELECT), and the fold
-  // never reads the decoded field.
-  row: Omit<RawMetricRow, "CanonicalPayload"> & { CanonicalPayload?: string };
-  organizationId: string;
-}): CanonicalMetricDataPoint {
-  return {
-    tenantId: row.TenantId,
-    // Organization identity is deliberately absent from authoritative metric
-    // storage. It is carried only long enough to write the shadow ledger.
-    organizationId,
-    pointId: row.PointId,
-    seriesId: row.SeriesId,
-    resourceSchemaUrl: row.ResourceSchemaUrl,
-    resourceAttributesJson: row.ResourceAttributesJson,
-    resourceAttributeKeys: row.ResourceAttributeKeys,
-    scopeSchemaUrl: row.ScopeSchemaUrl,
-    scopeName: row.ScopeName,
-    scopeVersion: row.ScopeVersion,
-    scopeAttributesJson: row.ScopeAttributesJson,
-    scopeAttributeKeys: row.ScopeAttributeKeys,
-    metricName: row.MetricName,
-    metricDescription: row.MetricDescription,
-    metricUnit: row.MetricUnit,
-    metricKind: row.MetricKind,
-    aggregationTemporality: row.AggregationTemporality,
-    isMonotonic: row.IsMonotonic === null ? null : Boolean(row.IsMonotonic),
-    pointAttributesJson: row.PointAttributesJson,
-    pointAttributeKeys: row.PointAttributeKeys,
-    startTimeUnixNano: String(row.StartTimeUnixNano),
-    timeUnixNano: String(row.TimeUnixNano),
-    timeUnixMs: Number(row.TimeUnixMs),
-    flags: row.Flags,
-    valueType: row.ValueType,
-    valueInt: row.ValueInt === null ? null : String(row.ValueInt),
-    valueDouble: row.ValueDouble,
-    count: row.Count === null ? null : String(row.Count),
-    sum: row.Sum,
-    min: row.Min,
-    max: row.Max,
-    explicitBounds: row.ExplicitBounds,
-    bucketCounts: countsColumn({ row, column: "BucketCounts" }),
-    exponentialScale: row.ExponentialScale,
-    exponentialZeroThreshold: row.ExponentialZeroThreshold,
-    zeroCount: row.ZeroCount === null ? null : String(row.ZeroCount),
-    positiveOffset: row.PositiveOffset,
-    positiveBucketCounts: countsColumn({ row, column: "PositiveBucketCounts" }),
-    negativeOffset: row.NegativeOffset,
-    negativeBucketCounts: countsColumn({ row, column: "NegativeBucketCounts" }),
-    summaryQuantilesJson: row.SummaryQuantilesJson,
-    canonicalPayload: row.CanonicalPayload ?? "",
-    canonicalSizeBytes: Number(row._size_bytes),
-    occurredAt: Number(row.OccurredAt),
-    acceptedAt: Number(row.AcceptedAt),
   };
 }
 

@@ -1,0 +1,145 @@
+{
+  "input": "../../../../.claude/tmp/video/raw/traces-v4/traces-v4.webm",
+  "output": "../../../../.claude/tmp/video/hero/beat1.webm",
+  "fps": 30,
+  "page": {
+    "width": 1440,
+    "height": 900
+  },
+  "size": {
+    "width": 1664,
+    "height": 1040
+  },
+  "frame": {
+    "background": "backgrounds/default.webp",
+    "fit": "native"
+  },
+  "quality": {
+    "crf": 36,
+    "cpuUsed": 2
+  },
+  "cut": {
+    "speed": 2,
+    "segments": [
+      [
+        25.41,
+        32.31
+      ],
+      [
+        34.85,
+        39.25
+      ],
+      [
+        40.92,
+        46.68
+      ],
+      [
+        47.43,
+        49.33
+      ],
+      [
+        49.35,
+        54.35
+      ]
+    ]
+  },
+  "cursor": {
+    "start": {
+      "x": 700,
+      "y": 500
+    }
+  },
+  "beats": [
+    {
+      "tRaw": 26.91,
+      "x": 900,
+      "y": 300,
+      "zoom": 1,
+      "click": false,
+      "arc": 0,
+      "note": "every conversation the agent had, with its origin, latency, cost and tokens, and the photo the customer attached"
+    },
+    {
+      "tRaw": 28.92,
+      "x": 404,
+      "y": 410,
+      "zoom": 1.65,
+      "zoomAt": {
+        "x": 700,
+        "y": 410
+      },
+      "hold": 0.2,
+      "note": "the camera goes in on the row as the cursor lands, so the click is the thing being watched"
+    },
+    {
+      "tRaw": 30.91,
+      "zoom": 1,
+      "cursor": false,
+      "click": false,
+      "note": "and straight back out to 1x, holding on the whole drawer the click opened"
+    },
+    {
+      "tRaw": 37.35,
+      "x": 745,
+      "y": 66,
+      "zoom": 1.9,
+      "zoomAt": {
+        "x": 810,
+        "y": 175
+      },
+      "hold": 0.1,
+      "click": false,
+      "arc": 0,
+      "note": "only then in again, on the cost of the conversation"
+    },
+    {
+      "tRaw": 38.65,
+      "x": 880,
+      "y": 66,
+      "zoom": 1.9,
+      "zoomAt": {
+        "x": 810,
+        "y": 175
+      },
+      "hold": 0.8,
+      "click": false,
+      "arc": 0,
+      "note": "and the tokens it spent, in and out"
+    },
+    {
+      "tRaw": 41.56,
+      "x": 657,
+      "y": 161,
+      "zoom": 1,
+      "note": "the Trace tab, then the waterfall finishes painting and the shot sits on it"
+    },
+    {
+      "tRaw": 48.18,
+      "x": 892,
+      "y": 199,
+      "zoom": 1.6,
+      "zoomAt": {
+        "x": 800,
+        "y": 290
+      },
+      "hold": 0.2,
+      "pause": {
+        "before": 0.5
+      },
+      "note": "the sequence diagram"
+    },
+    {
+      "tRaw": 51.35,
+      "x": 700,
+      "y": 500,
+      "zoom": 1,
+      "click": false,
+      "arc": 0,
+      "note": "a supervisor hands the case to a refunds specialist, which calls the model, a tool, then the model again"
+    },
+    {
+      "tRaw": 53.85,
+      "hide": true
+    }
+  ]
+}

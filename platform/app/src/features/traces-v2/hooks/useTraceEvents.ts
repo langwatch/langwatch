@@ -17,10 +17,10 @@ export interface TraceEventsResult {
  */
 export function useTraceEvents(): TraceEventsResult {
   const shared = useSharedTrace();
-  const { isReady, queryArgs } = useTraceQueryArgs();
+  const { isReady, hintReady, queryArgs } = useTraceQueryArgs();
 
   const query = api.tracesV2.traceEvents.useQuery(queryArgs, {
-    enabled: isReady && !shared,
+    enabled: isReady && hintReady && !shared,
     staleTime: 30_000,
     refetchOnWindowFocus: false,
     trpc: { context: { skipBatch: true } },

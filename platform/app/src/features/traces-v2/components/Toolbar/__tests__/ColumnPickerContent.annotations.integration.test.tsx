@@ -29,8 +29,8 @@ vi.mock("../../../hooks/useEvaluatorOptions", () => ({
   useEvaluatorOptions: () => ({ options: [], nameByKey: new Map() }),
 }));
 
-vi.mock("../../../stores/viewStore", () => ({
-  useViewStore: (selector: (s: unknown) => unknown) =>
+vi.mock("../../../stores/explorerStore", () => ({
+  useExplorerStore: (selector: (s: unknown) => unknown) =>
     selector({
       columnOrder: ["time", "trace"],
       grouping: "flat",

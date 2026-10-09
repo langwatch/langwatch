@@ -59,12 +59,10 @@
  */
 export const FRONTEND_FEATURE_FLAGS = [
   "release_ui_ai_gateway_menu_enabled",
-  // Product-scoped navigation shells (product-switcher / icon-rail) plus
-  // the avatar-menu mode picker. The flag unlocks the picker; the
-  // per-device mode in localStorage decides which shell renders. Flag off
-  // or mode legacy = the current chrome, unchanged. See
-  // specs/navigation/navigation-modes.feature and useNavigationMode.
-  "release_ui_navigation_v2_enabled",
+  // Voice agents: register an ElevenLabs agent, talk to it, call it from a
+  // run, and run scenarios with a simulated caller. Off by default.
+  // See useVoiceAgentsEnabled and specs/features/agents/voice-agents-v1.feature.
+  "release_voice_agents_enabled",
   // Governance: gates the personal-keys / admin oversight /
   // RoutingPolicy / IngestionSource UI surfaces. On by default
   // (ADR-038 Decision 7); SaaS rollout and per-org kill switches are
@@ -72,14 +70,19 @@ export const FRONTEND_FEATURE_FLAGS = [
   // because the gateway product ships on its own flag.
   // Force off in dev: `RELEASE_UI_AI_GOVERNANCE_ENABLED=0`.
   "release_ui_ai_governance_enabled",
-  // The Costs and Billed placeholder pages + their governance nav items.
-  // Composed ON TOP of `release_ui_ai_governance_enabled` (never instead
-  // of it): the section flag off still hides everything. Off by default —
-  // the pages are empty shells shipped ahead of the spend views. See
-  // specs/ai-gateway/governance/governance-home-routing.feature.
+  // Costs and the Platform preview pages + their governance nav items. Composed ON
+  // TOP of `release_ui_ai_governance_enabled` (never instead of it): the
+  // section flag off still hides everything. Off by default. Costs renders
+  // the real cost lanes (ADR-128); the unfinished Billed address stays
+  // unavailable even when enabled. See
+  // specs/ai-gateway/governance/governance-home-routing.feature and
+  // specs/governance/governance-cost-screen.feature.
   "release_ui_governance_billed_cost_enabled",
   "release_langy_enabled",
   "release_langy_promo_enabled",
+  // Gates the custom-chart-playground page outside local development; the
+  // page falls back to NODE_ENV === "development" so dev stays unaffected.
+  "release_custom_chart_playground",
   // Gates the Optimize this prompt menu item alongside the UI-action channel
   // it hands off to; the server-side dispatch checks the same flag.
   "release_langy_ui_actions",
@@ -97,7 +100,8 @@ export const FRONTEND_FEATURE_FLAGS = [
   // launcher orb. Swaps only the CLOSED-state affordance; opening, the
   // panel and Cmd/Ctrl+I are identical either way.
   "release_ui_langy_peek_dock_enabled",
-  "release_webhook_automations",
+  // NOTE: `release_webhook_automations` (ADR-040) was retired — the webhook
+  // delivery channel is offered to every project, so the frontend never asks.
   // Pins the Ops section into the main sidebar for a user who already has ops
   // access, so it shows on every route instead of only under /ops. Deliberately
   // NOT registered — it resolves false server-side (unknown flag) and is
@@ -111,20 +115,21 @@ export const FRONTEND_FEATURE_FLAGS = [
   // (issue #5103, specs/experiments/comparison-leaderboard.feature). Off by
   // default — power-user surface, additive to the existing win-rate chart.
   "release_ui_comparison_leaderboard_enabled",
-  // The Agent Testing v2 interface: one page with Test cases and Results
-  // tabs, test suites as folders, run notes, test case versions, and the
-  // wide run drawer (specs/features/agent-testing/). Off by default and
-  // purely additive: the current Simulations pages and menu group are
-  // untouched while it is off, and the backend it calls is unflagged.
+  // The Agent Testing v2 interface: one page with Scenarios and Results
+  // tabs, test suites as folders, run notes, scenario versions, and the
+  // wide run drawer (specs/features/agent-testing/). On by default; a rule
+  // keeps a project on the Simulations pages, which are untouched while it
+  // is off. The backend it calls is unflagged.
   "release_ui_agent_testing_v2_enabled",
-  // The identifier-first front door: the sign-in, sign-up and invitation
-  // screens (D13, ADR-117). Deliberately NOT a PostHog flag — every screen it
-  // governs is reached SIGNED OUT, and `featureFlag.isEnabled` is a protected
-  // procedure that answers 401 rather than false to a visitor with no session.
-  // It resolves from this browser's own override, set by `?ff_<flag>=on` and
-  // remembered locally, and falls back to the deployment's `IDENTITY_ROUTER_V2`
-  // when no override is set. See useIdentityFrontDoor.
-  "release_ui_identity_front_door_enabled",
+  // Gates the `eval:"..."` chip on the Trace Explorer search bar. Off, the
+  // bar shows a contact-us popover instead of starting a run. See
+  // specs/traces-v2/instant-eval-search.feature.
+  "release_instant_evals",
+  // The guided onboarding variant (spec:
+  // specs/features/onboarding/guided-onboarding-variant.feature). Read on the
+  // welcome flow with the user's id, which is what the percentage rollout
+  // rule buckets on, so the same user lands in the same variant every time.
+  "experiment_onboarding_langy_guided",
 ] as const;
 
 /**

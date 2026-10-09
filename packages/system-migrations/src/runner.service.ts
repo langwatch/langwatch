@@ -80,6 +80,7 @@ export class SystemMigrationRunnerService {
       tenantsSeen: 0,
       finalized: 0,
       held: 0,
+      finiteHeld: 0,
       parked: 0,
       skipped: 0,
       alreadyFinalized: 0,
@@ -305,8 +306,12 @@ export class SystemMigrationRunnerService {
       // previous record is a transition - pending is a state.
       if (existing?.status !== outcome.status) summary.advanced += 1;
       if (outcome.status === "finalized") summary.finalized += 1;
-      else if (outcome.status === "migrated") summary.held += 1;
-      else summary.parked += 1;
+      else if (outcome.status === "migrated") {
+        summary.held += 1;
+        if (migration.startupSettlement !== "recurring") {
+          summary.finiteHeld = (summary.finiteHeld ?? 0) + 1;
+        }
+      } else summary.parked += 1;
       logger.info(
         { migration: migration.name, tenantId, status: outcome.status },
         "tenant migration outcome",

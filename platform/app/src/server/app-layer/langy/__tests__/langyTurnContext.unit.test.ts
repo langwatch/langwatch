@@ -283,6 +283,25 @@ describe("renderLangyTurnContext — the live UI-action line", () => {
     });
   });
 
+  describe("given the Trace Explorer's view chip", () => {
+    /** @scenario "The traces page chips advertise live UI actions" */
+    it("tells the agent the Explorer can be driven live", () => {
+      const block = renderLangyTurnContext({
+        context: {
+          pageContext: [
+            {
+              kind: "filter",
+              ref: "data source: traces; time range: Last 30 days",
+              label: "Traces · All · Last 30 days",
+            },
+          ],
+        },
+        isUiActionSurfaceOpen: true,
+      })!;
+      expect(block).toContain("langwatch ui actions");
+    });
+  });
+
   describe("given a page with no UI-action manifest", () => {
     it("stays silent even with the surface open", () => {
       const block = renderLangyTurnContext({

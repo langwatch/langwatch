@@ -12,13 +12,13 @@ from ...models.patch_api_triggers_by_id_response_401 import PatchApiTriggersById
 from ...models.patch_api_triggers_by_id_response_404 import PatchApiTriggersByIdResponse404
 from ...models.patch_api_triggers_by_id_response_422 import PatchApiTriggersByIdResponse422
 from ...models.patch_api_triggers_by_id_response_500 import PatchApiTriggersByIdResponse500
-from ...types import UNSET, Response, Unset, safe_http_status
+from ...types import Response, safe_http_status
 
 
 def _get_kwargs(
     id: str,
     *,
-    body: PatchApiTriggersByIdBody | Unset = UNSET,
+    body: PatchApiTriggersByIdBody,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -29,8 +29,7 @@ def _get_kwargs(
         ),
     }
 
-    if not isinstance(body, Unset):
-        _kwargs["json"] = body.to_dict()
+    _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -109,8 +108,8 @@ def _build_response(
 def sync_detailed(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
-    body: PatchApiTriggersByIdBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PatchApiTriggersByIdBody,
 ) -> Response[
     PatchApiTriggersByIdResponse200
     | PatchApiTriggersByIdResponse400
@@ -119,11 +118,13 @@ def sync_detailed(
     | PatchApiTriggersByIdResponse422
     | PatchApiTriggersByIdResponse500
 ]:
-    """Update a trigger (name, active state, message, filters)
+    """Update an automation. Every field is optional and what is left out is left alone, except
+    `actionParams`, which replaces the delivery configuration as a whole. The delivery channel and an
+    alert's graph cannot be changed.
 
     Args:
         id (str):
-        body (PatchApiTriggersByIdBody | Unset):
+        body (PatchApiTriggersByIdBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -148,8 +149,8 @@ def sync_detailed(
 def sync(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
-    body: PatchApiTriggersByIdBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PatchApiTriggersByIdBody,
 ) -> (
     PatchApiTriggersByIdResponse200
     | PatchApiTriggersByIdResponse400
@@ -159,11 +160,13 @@ def sync(
     | PatchApiTriggersByIdResponse500
     | None
 ):
-    """Update a trigger (name, active state, message, filters)
+    """Update an automation. Every field is optional and what is left out is left alone, except
+    `actionParams`, which replaces the delivery configuration as a whole. The delivery channel and an
+    alert's graph cannot be changed.
 
     Args:
         id (str):
-        body (PatchApiTriggersByIdBody | Unset):
+        body (PatchApiTriggersByIdBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -183,8 +186,8 @@ def sync(
 async def asyncio_detailed(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
-    body: PatchApiTriggersByIdBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PatchApiTriggersByIdBody,
 ) -> Response[
     PatchApiTriggersByIdResponse200
     | PatchApiTriggersByIdResponse400
@@ -193,11 +196,13 @@ async def asyncio_detailed(
     | PatchApiTriggersByIdResponse422
     | PatchApiTriggersByIdResponse500
 ]:
-    """Update a trigger (name, active state, message, filters)
+    """Update an automation. Every field is optional and what is left out is left alone, except
+    `actionParams`, which replaces the delivery configuration as a whole. The delivery channel and an
+    alert's graph cannot be changed.
 
     Args:
         id (str):
-        body (PatchApiTriggersByIdBody | Unset):
+        body (PatchApiTriggersByIdBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -220,8 +225,8 @@ async def asyncio_detailed(
 async def asyncio(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
-    body: PatchApiTriggersByIdBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PatchApiTriggersByIdBody,
 ) -> (
     PatchApiTriggersByIdResponse200
     | PatchApiTriggersByIdResponse400
@@ -231,11 +236,13 @@ async def asyncio(
     | PatchApiTriggersByIdResponse500
     | None
 ):
-    """Update a trigger (name, active state, message, filters)
+    """Update an automation. Every field is optional and what is left out is left alone, except
+    `actionParams`, which replaces the delivery configuration as a whole. The delivery channel and an
+    alert's graph cannot be changed.
 
     Args:
         id (str):
-        body (PatchApiTriggersByIdBody | Unset):
+        body (PatchApiTriggersByIdBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

@@ -6,6 +6,7 @@
  * another organization's role.
  */
 
+import { grantFactToRow } from "@langwatch/authz-server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { RoleService } from "../role.service";
@@ -26,19 +27,15 @@ vi.mock("~/server/app-layer/authz/ledger", () => ({
 
 function buildMockPrisma() {
   return {
-    // deleteIfUnused reads the cross-organization RoleBinding count in raw
+    // deleteIfUnused reads the cross-organization binding count in raw
     // SQL (the tenancy guard refuses the model client for that question).
     $queryRaw: vi.fn().mockResolvedValue([{ count: 0n }]),
-    customRole: {
+    role: {
       findMany: vi.fn(),
       findFirst: vi.fn(),
-      findUnique: vi.fn(),
     },
-    roleBinding: {
-      count: vi.fn(),
-    },
-    teamUser: {
-      count: vi.fn(),
+    grant: {
+      findMany: vi.fn().mockResolvedValue([]),
     },
     team: {
       findUnique: vi.fn(),
@@ -53,8 +50,25 @@ const storedRole = {
   description: null,
   kind: "custom",
   permissions: ["traces:view"],
-  assignedUsers: [],
 };
+
+function customRoleGrant(id: string) {
+  return {
+    ...grantFactToRow({
+      organizationId: "org_1",
+      grant: {
+        grantId: id,
+        principal: { type: "user", id: "user_1" },
+        roleKey: "custom:cr_1",
+        legacyRole: "MEMBER",
+        scope: { type: "TEAM", id: "team_1" },
+        source: "grants-service",
+        occurredAtMs: 0,
+      },
+    }),
+    updatedAt: new Date(0),
+  };
+}
 
 describe("RoleService org-scoped variants", () => {
   let prisma: ReturnType<typeof buildMockPrisma>;
@@ -70,21 +84,26 @@ describe("RoleService org-scoped variants", () => {
 
   describe("when reading a role by organization", () => {
     it("scopes the lookup to the organization and the custom kind", async () => {
-      prisma.customRole.findFirst.mockResolvedValue(storedRole);
+      prisma.role.findFirst.mockResolvedValue(storedRole);
 
       const role = await service.getRoleForOrg({
         roleId: "cr_1",
         organizationId: "org_1",
       });
 
-      expect(prisma.customRole.findFirst).toHaveBeenCalledWith({
-        where: { id: "cr_1", organizationId: "org_1", kind: "custom" },
+      expect(prisma.role.findFirst).toHaveBeenCalledWith({
+        where: {
+          id: "cr_1",
+          organizationId: "org_1",
+          kind: "custom",
+          deletedAt: null,
+        },
       });
       expect(role.permissions).toEqual(["traces:view"]);
     });
 
     it("answers not found for another organization's role", async () => {
-      prisma.customRole.findFirst.mockResolvedValue(null);
+      prisma.role.findFirst.mockResolvedValue(null);
 
       await expect(
         service.getRoleForOrg({ roleId: "cr_1", organizationId: "org_2" }),
@@ -94,7 +113,7 @@ describe("RoleService org-scoped variants", () => {
 
   describe("when updating a role by organization", () => {
     it("answers not found before writing when the role is foreign", async () => {
-      prisma.customRole.findFirst.mockResolvedValue(null);
+      prisma.role.findFirst.mockResolvedValue(null);
 
       await expect(
         service.updateRoleForOrg({
@@ -109,8 +128,9 @@ describe("RoleService org-scoped variants", () => {
     });
 
     it("refuses a rename onto an existing role name", async () => {
-      prisma.customRole.findFirst.mockResolvedValue(storedRole);
-      prisma.customRole.findUnique.mockResolvedValue({ id: "cr_other" });
+      prisma.role.findFirst
+        .mockResolvedValueOnce(storedRole)
+        .mockResolvedValueOnce({ id: "cr_other" });
 
       await expect(
         service.updateRoleForOrg({
@@ -136,13 +156,12 @@ describe("RoleService org-scoped variants", () => {
     });
 
     it("updates a role of its own organization", async () => {
-      prisma.customRole.findFirst.mockResolvedValue(storedRole);
       // The natural-key check asks by (organizationId, name) and finds it
       // free; the redefine asks by id and finds the role it rewrites.
-      prisma.customRole.findUnique.mockImplementation(
-        async ({ where }: { where: Record<string, unknown> }) =>
-          where.organizationId_name ? null : storedRole,
-      );
+      prisma.role.findFirst
+        .mockResolvedValueOnce(storedRole)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(storedRole);
 
       const updated = await service.updateRoleForOrg({
         roleId: "cr_1",
@@ -157,7 +176,7 @@ describe("RoleService org-scoped variants", () => {
 
   describe("when deleting a role by organization", () => {
     it("answers not found for another organization's role", async () => {
-      prisma.customRole.findFirst.mockResolvedValue(null);
+      prisma.role.findFirst.mockResolvedValue(null);
 
       await expect(
         service.deleteRoleForOrg({
@@ -170,9 +189,12 @@ describe("RoleService org-scoped variants", () => {
       expect(ledger.deleteRole).not.toHaveBeenCalled();
     });
 
-    it("refuses to delete a role that role bindings still reference", async () => {
-      prisma.customRole.findFirst.mockResolvedValue(storedRole);
-      prisma.roleBinding.count.mockResolvedValue(2);
+    it("refuses to delete a role that grants still reference", async () => {
+      prisma.role.findFirst.mockResolvedValue(storedRole);
+      prisma.grant.findMany.mockResolvedValue([
+        customRoleGrant("grant_1"),
+        customRoleGrant("grant_2"),
+      ]);
 
       await expect(
         service.deleteRoleForOrg({
@@ -189,9 +211,7 @@ describe("RoleService org-scoped variants", () => {
     });
 
     it("deletes an unreferenced role", async () => {
-      prisma.customRole.findFirst.mockResolvedValue(storedRole);
-      prisma.roleBinding.count.mockResolvedValue(0);
-      prisma.teamUser.count.mockResolvedValue(0);
+      prisma.role.findFirst.mockResolvedValue(storedRole);
 
       const result = await service.deleteRoleForOrg({
         roleId: "cr_1",
@@ -207,12 +227,13 @@ describe("RoleService org-scoped variants", () => {
 
     describe("when a binding is written between the check and the delete", () => {
       it("leaves the role standing and refuses with the fresh counts", async () => {
-        prisma.customRole.findFirst.mockResolvedValue(storedRole);
+        prisma.role.findFirst.mockResolvedValue(storedRole);
         // The pre-check sees nothing; the cross-org read inside the delete
         // and the re-read after it find the binding that arrived in between.
-        prisma.roleBinding.count.mockResolvedValueOnce(0).mockResolvedValue(1);
+        prisma.grant.findMany
+          .mockResolvedValueOnce([])
+          .mockResolvedValue([customRoleGrant("grant_1")]);
         prisma.$queryRaw.mockResolvedValue([{ count: 1n }]);
-        prisma.teamUser.count.mockResolvedValue(0);
 
         await expect(
           service.deleteRoleForOrg({
@@ -233,11 +254,9 @@ describe("RoleService org-scoped variants", () => {
         // finds it gone, which is what says another caller removed it in
         // between. A 409 here would list zero users and zero bindings for a
         // role that no longer exists.
-        prisma.customRole.findFirst
+        prisma.role.findFirst
           .mockResolvedValueOnce(storedRole)
           .mockResolvedValueOnce(null);
-        prisma.roleBinding.count.mockResolvedValue(0);
-        prisma.teamUser.count.mockResolvedValue(0);
 
         await expect(
           service.deleteRoleForOrg({

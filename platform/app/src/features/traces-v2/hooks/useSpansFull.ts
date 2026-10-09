@@ -18,10 +18,10 @@ import { useTraceQueryArgs } from "./useTraceQueryArgs";
 /** Every span's detail exactly as captured, before any correction. */
 export function useSpansFullCanonical(enabled: boolean) {
   const shared = useSharedTrace();
-  const { isReady, queryArgs } = useTraceQueryArgs();
+  const { isReady, hintReady, queryArgs } = useTraceQueryArgs();
 
   const query = api.tracesV2.spansFull.useQuery(queryArgs, {
-    enabled: enabled && isReady && !shared,
+    enabled: enabled && isReady && hintReady && !shared,
     staleTime: 300_000,
     // Hold the span tree in cache for 30 min after the last observer
     // unmounts. Lets users flip between recently-viewed traces in the

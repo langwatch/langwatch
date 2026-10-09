@@ -21,6 +21,40 @@ Feature: Scenario API
     And no scenario is created
 
   # ============================================================================
+  # Model overrides and turn limits over REST
+  # ============================================================================
+
+  # The UI already edits simulatorModel, judgeModel, maxTurns and minTurns
+  # through tRPC. The public REST API must expose the same fields, or a
+  # scenario managed as code silently loses them.
+
+  @integration
+  Scenario: Create over REST accepts model overrides and turn limits
+    Given I am authenticated with a project API key
+    When I POST a scenario with simulatorModel "openai/gpt-5-mini", judgeModel "openai/gpt-5-mini", maxTurns 8 and minTurns 2
+    Then the response carries those values back
+    And GET on the scenario returns the same values
+
+  @integration
+  Scenario: Update over REST clears a model override with null
+    Given a scenario with a simulator model override
+    When I PUT the scenario with simulatorModel null
+    Then the stored override is cleared
+    And GET on the scenario returns simulatorModel null
+
+  @integration
+  Scenario: PATCH updates a scenario the same way PUT does
+    Given a scenario exists
+    When I PATCH the scenario with a new name
+    Then the response is 200 and carries the new name
+
+  @integration
+  Scenario: REST rejects a model override with no provider prefix
+    Given I am authenticated with a project API key
+    When I POST a scenario with simulatorModel "latest"
+    Then the response is a validation error
+
+  # ============================================================================
   # Read
   # ============================================================================
 

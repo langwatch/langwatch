@@ -3,16 +3,23 @@ import { handledErrorFrom } from "@/internal/api/errors";
 import { resolveCredentials } from "../../utils/apiKey";
 import { reportCommandError } from "../../utils/errorOutput";
 import type { CommandResult } from "../../utils/output";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 /**
  * Bound the request so a wedged control plane cannot hold the whole turn.
  *
  * This call blocks by design: the server keeps it open for the claim window
- * (3s) plus the action's execute budget, which the platform caps at 30s. 60s
- * clears that ceiling with room to spare, so a slow page still answers here
- * while a half-open socket fails instead of hanging the agent worker.
+ * plus the action's execute budget, and caps the two together at 15s
+ * (UI_ACTION_MAX_BUDGET_MS). It also runs inside an agent worker whose harness
+ * stops any command at 30 seconds. At 60s this deadline could never fire
+ * there: the harness always killed the command first, so the MAY_HAVE_APPLIED
+ * warning below was unreachable in the one case it was written for.
+ *
+ * 20s clears the server ceiling by 5 seconds and sits 10 seconds under the
+ * harness, so a slow page still answers here and a page that never answers is
+ * reported by this command rather than by a kill the caller cannot read.
  */
-const REQUEST_TIMEOUT_MS = 60_000;
+export const REQUEST_TIMEOUT_MS = 20_000;
 
 /**
  * True of EVERY failed dispatch, whichever way it failed.
@@ -130,8 +137,9 @@ export const uiCallCommand = async (
   }
 
   let response: Response;
+  let text: string;
   try {
-    response = await fetch(`${endpoint}/api/langy/ui/actions`, {
+    response = await langwatchFetch(`${endpoint}/api/langy/ui/actions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -147,11 +155,16 @@ export const uiCallCommand = async (
       }),
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
+    // The deadline covers the body too: a socket that goes quiet after the
+    // headers aborts this read, not the send.
+    text = await response.text();
   } catch (error) {
     // A tripped deadline rejects with a bare TimeoutError, which reads as a
     // crash rather than as the limit this command set. Name it. Every other
-    // failure is left to the caller's error path.
-    if ((error as { name?: string } | null)?.name !== "TimeoutError") throw error;
+    // failure is left to the caller's error path. An aborted body read arrives
+    // as an AbortError instead.
+    const name = (error as { name?: string } | null)?.name;
+    if (name !== "TimeoutError" && name !== "AbortError") throw error;
     process.stderr.write(
       `${endpoint} did not answer "${kind}" within ${REQUEST_TIMEOUT_MS / 1000}s. ` +
         `${MAY_HAVE_APPLIED}\n`,
@@ -160,7 +173,6 @@ export const uiCallCommand = async (
     return;
   }
 
-  const text = await response.text();
   if (!response.ok) {
     // Through the shared reporter, not straight to stderr. The body is the
     // platform's REST envelope (`{error: {...}}`), and the reader on the other

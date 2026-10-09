@@ -30,8 +30,8 @@
  *      the line that names it. Widening therefore requires first re-classifying
  *      the kind as presentation, which is a one-word claim a reviewer can see
  *      and disbelieve, rather than an omission nobody notices.
- *   3. AT THE SCHEMA MAP. {@link DERIVED_SCHEMA_BY_KIND} is
- *      `Record<DerivedSafeCardKind, …>`, so a kind added to the list does not
+ *   3. AT THE SCHEMA MAP. `DERIVED_SCHEMA_BY_KIND` is
+ *      `Record<RenderedCardKind, …>`, so a kind added to the list does not
  *      build until someone AUTHORS a strict schema for it. This module never
  *      reads `SCHEMA_BY_CARD_KIND`: the measured acceptance schemas are
  *      deliberately permissive (a card must not break when the CLI grows a
@@ -89,20 +89,37 @@ export type PresentationCardKind = {
 }[CardKind];
 
 /**
- * Every kind a model-emitted card may claim. Closed by construction, and a
- * strict subset of `CARD_KINDS`.
+ * Every kind a MODEL-EMITTED card may claim — what a ```langy-card fence is
+ * allowed to say. Closed by construction, and a strict subset of `CARD_KINDS`.
  *
  * Deliberately NOT here: every resource-shaped kind (`traces`, `evalRun`,
  * `resourceCreated`, …). Adding one is a type error — see the header.
+ *
+ * `choices` is not here either, and that is not a shape judgement: the model
+ * asks through its `question` tool, and the panel builds the choices card from
+ * that tool call. A choices fence therefore fails validation like any kind the
+ * channel does not know, which is what keeps one asking path.
  */
 export const DERIVED_SAFE_CARD_KINDS = [
   "timeseries",
   "table",
   "stats",
-  "choices",
 ] as const satisfies readonly PresentationCardKind[];
 
 export type DerivedSafeCardKind = (typeof DERIVED_SAFE_CARD_KINDS)[number];
+
+/**
+ * Every kind a stamped `langy-card` PART may carry: the model-emittable kinds
+ * plus `choices`, which the panel stamps for itself from a `question` tool
+ * call. Wider than the fence allowlist on purpose — the part channel has two
+ * producers and the fence has one.
+ */
+export const RENDERED_CARD_KINDS = [
+  ...DERIVED_SAFE_CARD_KINDS,
+  "choices",
+] as const satisfies readonly PresentationCardKind[];
+
+export type RenderedCardKind = (typeof RENDERED_CARD_KINDS)[number];
 
 /**
  * Affordance HINTS (ADR-060 §5) — requests from a closed vocabulary. A hint
@@ -184,7 +201,8 @@ export const langyDerivedStatsCardSchema = z.object({
 export type LangyDerivedStatsCard = z.infer<typeof langyDerivedStatsCardSchema>;
 
 /**
- * `choices` — the one sanctioned way to offer options (ADR-060 §6).
+ * `choices` — the one sanctioned way to offer options (ADR-060 §6). The panel
+ * stamps it from a `question` tool call; the model never writes it as a fence.
  *
  * Option ids must be unique: the selection binds by `{blockId, optionId}`, and
  * a duplicated id would make the recorded answer ambiguous — that is a failed
@@ -220,12 +238,12 @@ export const langyDerivedChoicesCardSchema =
 export type LangyDerivedChoicesCard = z.infer<typeof choicesCardObjectSchema>;
 
 /**
- * The strict schema per derived-safe kind — gate 3.
+ * The strict schema per rendered kind — gate 3.
  *
- * `Record<DerivedSafeCardKind, …>` is what forces a newly allowlisted kind to
- * arrive WITH a schema someone wrote on purpose. The union below is assembled
- * from this map rather than from a second hand-written list, so the two cannot
- * drift apart.
+ * `Record<RenderedCardKind, …>` is what forces a newly allowlisted kind to
+ * arrive WITH a schema someone wrote on purpose. Both unions below are
+ * assembled from this map rather than from a second hand-written list, so they
+ * cannot drift apart.
  *
  * The members are bare ZodObjects because a discriminated union needs them to
  * be; `choices`' uniqueness refinement is therefore re-applied at the union
@@ -236,12 +254,24 @@ const DERIVED_SCHEMA_BY_KIND = {
   table: langyDerivedTableCardSchema,
   stats: langyDerivedStatsCardSchema,
   choices: choicesCardObjectSchema,
-} as const satisfies Record<DerivedSafeCardKind, z.ZodObject>;
+} as const satisfies Record<RenderedCardKind, z.ZodObject>;
 
 /**
- * The whole channel: a derived card is exactly one of the allowlisted kinds.
- * A resource-shaped `kind` fails the discriminator and becomes a failed card —
- * the allowlist IS the schema, not a filter in front of it.
+ * The FENCE channel: a model-emitted card is exactly one of the allowlisted
+ * kinds. A resource-shaped `kind` fails the discriminator and becomes a failed
+ * card — the allowlist IS the schema, not a filter in front of it. A `choices`
+ * fence fails here too, because the `question` tool is the way to ask.
+ */
+export const langyModelEmittedCardSchema = z.discriminatedUnion("kind", [
+  DERIVED_SCHEMA_BY_KIND.timeseries,
+  DERIVED_SCHEMA_BY_KIND.table,
+  DERIVED_SCHEMA_BY_KIND.stats,
+]);
+export type LangyModelEmittedCard = z.infer<typeof langyModelEmittedCardSchema>;
+
+/**
+ * The PART channel: every kind a stamped card part may carry, so the panel's
+ * own `choices` card validates through the same module the relay stamps with.
  */
 export const langyDerivedCardSchema = z
   .discriminatedUnion("kind", [

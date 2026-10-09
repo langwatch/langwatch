@@ -3,9 +3,9 @@
  * saved state becomes a snapshot, and how two states diff into the changed
  * field list a history entry shows.
  *
- * The snapshot holds the editable content and nothing else. Folder
+ * The snapshot holds the editable content and nothing else. Test suite
  * membership, archive state and run history live beside the content, so a
- * restore brings the text back without moving the case or touching what ran.
+ * restore brings the text back without moving the scenario or touching what ran.
  *
  * @see specs/scenarios/scenario-versioning.feature
  * @see specs/scenarios/scenario-version-restore.feature
@@ -15,8 +15,14 @@ import { z } from "zod";
 import type { Prisma, Scenario } from "~/generated/prisma/client";
 import type { UpdateScenarioInput } from "./scenario.repository";
 
-/** Schema version written into every snapshot envelope and version row. */
-export const SCENARIO_SNAPSHOT_SCHEMA_VERSION = 1;
+/**
+ * Schema version written into every snapshot envelope and version row.
+ *
+ * Version 2 added `fields`, the values a scenario carries for the fields its
+ * test suite declares. A version 1 snapshot has no such key and reads as
+ * null, the same as a scenario that carries no values.
+ */
+export const SCENARIO_SNAPSHOT_SCHEMA_VERSION = 2;
 
 /** Who a version row names as its writer. */
 export const SCENARIO_AUTHOR_LABELS = ["user", "api", "cli", "langy"] as const;
@@ -30,7 +36,7 @@ export type ScenarioActor = {
 
 /**
  * The fields a version snapshots. An update that names none of these (a
- * folder move, an author stamp) is not a save of the case's content and
+ * test suite move, an author stamp) is not a save of the scenario's content and
  * writes no version.
  */
 export const SCENARIO_VERSIONED_FIELDS = [
@@ -43,6 +49,7 @@ export const SCENARIO_VERSIONED_FIELDS = [
   "judgeModel",
   "maxTurns",
   "minTurns",
+  "fields",
 ] as const;
 export type ScenarioVersionedField = (typeof SCENARIO_VERSIONED_FIELDS)[number];
 
@@ -57,6 +64,8 @@ export type ScenarioSnapshotFields = {
   judgeModel: string | null;
   maxTurns: number | null;
   minTurns: number | null;
+  /** The values per suite field, as stored. Read with `parseScenarioFieldValues`. */
+  fields: Prisma.JsonValue | null;
 };
 
 const snapshotFieldsSchema = z.object({
@@ -69,6 +78,8 @@ const snapshotFieldsSchema = z.object({
   judgeModel: z.string().nullable(),
   maxTurns: z.number().nullable(),
   minTurns: z.number().nullable(),
+  // Absent on a version 1 snapshot, which predates suite fields.
+  fields: z.unknown().nullable().optional(),
 });
 
 const snapshotEnvelopeSchema = z.object({
@@ -93,7 +104,21 @@ export function snapshotFieldsOf(
     judgeModel: scenario.judgeModel,
     maxTurns: scenario.maxTurns,
     minTurns: scenario.minTurns,
+    fields: fieldValuesOrNull(scenario.fields),
   };
+}
+
+/**
+ * A scenario with no field values stores either null (never given any) or an
+ * empty record (cleared); the snapshot keeps one spelling so the two never
+ * diff as a change.
+ */
+function fieldValuesOrNull(
+  fields: Prisma.JsonValue | null,
+): Prisma.JsonValue | null {
+  if (fields === null || typeof fields !== "object" || Array.isArray(fields))
+    return fields;
+  return Object.keys(fields).length === 0 ? null : fields;
 }
 
 /**
@@ -142,5 +167,9 @@ export function buildSnapshotEnvelope({
 export function parseSnapshotEnvelope(
   snapshot: Prisma.JsonValue,
 ): ScenarioSnapshotEnvelope {
-  return snapshotEnvelopeSchema.parse(snapshot);
+  const envelope = snapshotEnvelopeSchema.parse(snapshot);
+  return {
+    ...envelope,
+    fields: { ...envelope.fields, fields: envelope.fields.fields ?? null },
+  };
 }

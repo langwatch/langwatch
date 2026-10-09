@@ -5,6 +5,8 @@ import { DashboardLayout } from "~/components/DashboardLayout";
 import { DatasetEditorTable } from "~/components/datasets/editor/DatasetEditorTable";
 import { retryDatasetNormalize } from "~/components/datasets/services/directUpload";
 import { showErrorToast } from "~/features/errors";
+import { useRegisterLangyPageContext } from "~/features/langy/LangyContext";
+import { datasetContextChip } from "~/features/langy/logic/langyContextChips";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
@@ -29,6 +31,15 @@ export default function Dataset() {
           ? 3000
           : false,
     },
+  );
+
+  // "This dataset" in a Langy conversation: the id the route already offers,
+  // with the name only this page knows.
+  const datasetName = datasetQuery.data?.name;
+  useRegisterLangyPageContext(
+    datasetId && datasetName
+      ? [datasetContextChip({ datasetId, name: datasetName })]
+      : [],
   );
 
   const status = datasetQuery.data?.status;

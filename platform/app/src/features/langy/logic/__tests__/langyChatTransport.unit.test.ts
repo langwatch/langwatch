@@ -321,6 +321,31 @@ describe("createLangyChatTransport", () => {
       ]);
     });
 
+    /** @scenario "The retry line shows on a turn that picks up after an answered card" */
+    it("marks only the first pre-output status as readiness, so a retry line before output stays real", async () => {
+      // The manager's "Thinking…" is the one placeholder. A retry line the
+      // worker sends before its first output is not one: on a turn that already
+      // shows a card, the panel hides readiness statuses, and the retry line
+      // would vanish with it.
+      const onSignal = vi.fn();
+      const { transport } = makeTransport(
+        { conversationId: null },
+        { onSignal },
+      );
+      await transport.sendMessages(options());
+      const { onData } = streamHandlers();
+
+      onData({ type: "status", status: "Thinking…" });
+      onData({ type: "status", status: "Retrying (1 of 5)" });
+      onData({ type: "status", status: "" });
+
+      expect(onSignal.mock.calls.map(([s]) => s)).toEqual([
+        { type: "status", status: "Thinking…", readiness: true },
+        { type: "status", status: "Retrying (1 of 5)", readiness: false },
+        { type: "status", status: "", readiness: false },
+      ]);
+    });
+
     it("shows a mid-turn sub-status between outputs (not wiped by the cold-start clear)", async () => {
       const onSignal = vi.fn();
       const { transport } = makeTransport(
@@ -502,9 +527,16 @@ describe("createLangyChatTransport", () => {
       return opts;
     }
 
+    /** A chunk as these tests read it back. */
+    type CollectedChunk = {
+      type: string;
+      id?: string;
+      providerMetadata?: Record<string, Record<string, unknown>>;
+    };
+
     /** Read every chunk the transport enqueues, until the stream closes. */
-    function collect(stream: ReadableStream<{ type: string; id?: string }>) {
-      const chunks: Array<{ type: string; id?: string }> = [];
+    function collect(stream: ReadableStream<CollectedChunk>) {
+      const chunks: CollectedChunk[] = [];
       const reader = stream.getReader();
       const done = (async () => {
         for (;;) {
@@ -610,6 +642,38 @@ describe("createLangyChatTransport", () => {
         "text-end",
         "finish",
       ]);
+    });
+
+    it("marks a settled call that ran in the developer's shared folder", async () => {
+      const { transport } = makeTransport({ conversationId: null });
+      const stream = (await transport.sendMessages(
+        options(),
+      )) as unknown as ReadableStream<CollectedChunk>;
+      const { chunks, done } = collect(stream);
+      const { onData } = streamHandlers();
+
+      onData({
+        type: "tool",
+        id: "t1",
+        name: "bash",
+        phase: "start",
+        input: {},
+      });
+      onData({
+        type: "tool",
+        id: "t1",
+        name: "bash",
+        phase: "end",
+        output: "ok",
+        local: true,
+      });
+      onData({ type: "end" });
+      await done;
+
+      const settled = chunks.find(
+        (chunk) => chunk.type === "tool-output-available",
+      );
+      expect(settled?.providerMetadata).toEqual({ langwatch: { local: true } });
     });
 
     it("opens no paragraph at all for a turn that only ran tools", async () => {

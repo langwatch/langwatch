@@ -364,6 +364,7 @@ const ROLLUP_EVAL_GROUP_BY_KEYS: ReadonlySet<string> = new Set([
  * `metadata.span_type` requires a stored_spans join (not on slim).
  */
 const SLIM_TRACE_GROUP_BY_KEYS: ReadonlySet<string> = new Set([
+  "error.has_error",
   "topics.topics",
   "traces.trace_name",
   "metadata.user_id",
@@ -412,11 +413,14 @@ const SLIM_TRACE_FILTER_FIELDS: ReadonlySet<FilterField> = new Set<FilterField>(
   ],
 );
 
-/** Slim-eval filter fields — typed columns on the slim row. */
-const SLIM_EVAL_FILTER_FIELDS: ReadonlySet<FilterField> = new Set<FilterField>([
-  "metadata.key",
-  "metadata.value",
-]);
+/**
+ * Slim-eval filter fields (none). The slim eval row's Attributes carry only
+ * the evaluation events' own metadata, never the trace's custom metadata, so
+ * `metadata.key` / `metadata.value` must read `trace_summaries` on the
+ * legacy path. See https://github.com/langwatch/tasks/issues/919
+ */
+const SLIM_EVAL_FILTER_FIELDS: ReadonlySet<FilterField> =
+  new Set<FilterField>();
 
 /**
  * Aggregations the trace rollup can compute CORRECTLY from its columns. The
@@ -476,6 +480,8 @@ export interface PickAnalyticsTableInput {
   traceIds?: string[];
   /** Invert the user's filter selection (toolbar toggle). Legacy-builder-only. */
   negateFilters?: boolean;
+  /** Trace origins left out of the count. The rollup has no origin column. */
+  excludeOrigins?: string[];
 }
 
 /**
@@ -540,9 +546,15 @@ export function pickAnalyticsTable(
   // Attributes map and only survive on the legacy table.
   if (filtersHitBlocklist(input.filters)) return legacyFallbackFor(source);
 
+  // The rollup is keyed by bucket, not by trace, so it has no origin to leave
+  // out: an origin exclusion reads the per-trace tables.
+  const excludesOrigins =
+    input.excludeOrigins !== undefined && input.excludeOrigins.length > 0;
+
   // ---------- Rollup eligibility ----------
   const rollupOk =
     !hasPipeline &&
+    !excludesOrigins &&
     rollupHandlesAllSeries(input.series, source, input.groupBy) &&
     rollupHandlesGroupBy(input.groupBy, source) &&
     rollupHandlesFilters(input.filters, source);
@@ -719,7 +731,10 @@ function filtersHitBlocklist(
   return false;
 }
 
-function isBlocklisted(key: string): boolean {
+function isBlocklisted(rawKey: string): boolean {
+  // Filter keys arrive with `·` standing in for `.`; the builders read the
+  // dotted key, so check that one.
+  const key = rawKey.replaceAll("·", ".");
   if (PAYLOAD_BLOCKLIST_EXACT.has(key)) return true;
   for (const prefix of PAYLOAD_BLOCKLIST_PREFIXES) {
     if (key.startsWith(prefix)) return true;

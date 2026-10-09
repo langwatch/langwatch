@@ -85,6 +85,14 @@ const routes: RouteObject[] = [
     ...page(() => import("./pages/auth/verify-email")),
   },
   { path: "/auth/error", ...page(() => import("./pages/auth/error")) },
+  // Lands sign-ins whose destination better-auth's callbackURL check refuses.
+  { path: "/auth/resume", ...page(() => import("./pages/auth/resume")) },
+  // Where a single sign-on test lands: the tester holds a session the
+  // connection has not admitted, so the orgless bootstrap is the wrong answer.
+  {
+    path: "/auth/sso-test-complete",
+    ...page(() => import("./pages/auth/sso-test-complete")),
+  },
   // Join before create (ADR-117 §6): a new account passes through here on its
   // way to making an organization. Renders nothing until D12 fills it.
   { path: "/auth/join", ...page(() => import("./pages/auth/join")) },
@@ -122,6 +130,10 @@ const routes: RouteObject[] = [
     children: [
       { path: "/settings", ...page(() => import("./pages/settings")) },
       {
+        // Role Bindings became a tab of Roles. The address keeps resolving so
+        // old bookmarks and links do not dead-end; the page it loads renders
+        // <Navigate>, not a `loader` redirect, because loaders do not run on a
+        // cold load of the SPA — which is exactly how a stale link arrives.
         path: "/settings/role-bindings",
         ...page(() => import("./pages/settings/role-bindings")),
       },
@@ -146,16 +158,31 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/settings/audit-log")),
       },
       {
-        path: "/settings/authentication",
-        ...page(() => import("./pages/settings/authentication")),
+        path: "/settings/profile",
+        ...page(() => import("./pages/settings/profile")),
       },
       {
+        path: "/settings/security",
+        ...page(() => import("./pages/settings/security")),
+      },
+      {
+        // Groups became the second tab of Directory. Same shape as
+        // role-bindings above: the address keeps resolving, and the page it
+        // loads renders <Navigate> rather than a `loader` redirect.
         path: "/settings/groups",
         ...page(() => import("./pages/settings/groups")),
       },
       {
         path: "/settings/license",
         ...page(() => import("./pages/settings/license")),
+      },
+      {
+        path: "/settings/connect",
+        ...page(() => import("./pages/settings/connect")),
+      },
+      {
+        path: "/settings/checkup",
+        ...page(() => import("./pages/settings/checkup")),
       },
       {
         path: "/settings/members",
@@ -182,12 +209,37 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/settings/api-keys")),
       },
       {
+        path: "/settings/directory",
+        ...page(() => import("./pages/settings/directory")),
+      },
+      {
+        // The old protocol-named address, forwarding onto the page it became.
         path: "/settings/scim",
         ...page(() => import("./pages/settings/scim")),
       },
       {
         path: "/settings/secrets",
         ...page(() => import("./pages/settings/secrets")),
+      },
+      {
+        path: "/settings/access",
+        ...page(() => import("./pages/settings/access")),
+      },
+      {
+        // The identity provider's own journey and the connectors that
+        // provision people are routes rather than modes of the overview —
+        // see `AuthenticationLayout`. Registered before the index so the
+        // more specific path is matched first.
+        path: "/settings/authentication/provider",
+        ...page(() => import("./pages/settings/authentication/provider")),
+      },
+      {
+        path: "/settings/authentication/connectors",
+        ...page(() => import("./pages/settings/authentication/connectors")),
+      },
+      {
+        path: "/settings/authentication",
+        ...page(() => import("./pages/settings/authentication")),
       },
       {
         path: "/settings/subscription",
@@ -235,12 +287,16 @@ const routes: RouteObject[] = [
         ),
       },
       {
-        path: "/governance/anomaly-rules",
-        ...page(() => import("@ee/governance/dashboard/pages/anomaly-rules")),
-      },
-      {
+        // Anomaly rules moved into the inventory as a tab; the retired
+        // /governance/anomaly-rules address redirects via legacyRedirectRoutes.
         path: "/governance/people",
         ...page(() => import("./pages/governance/people")),
+      },
+      {
+        // The agents detected across the organization, as one list. `?view`
+        // picks the layout and `?add=1` asks for the register drawer.
+        path: "/governance/agents",
+        ...page(() => import("./pages/governance/agents")),
       },
       {
         // Behind release_ui_governance_billed_cost_enabled (the pages
@@ -251,6 +307,21 @@ const routes: RouteObject[] = [
       {
         path: "/governance/billed",
         ...page(() => import("./pages/governance/billed")),
+      },
+      {
+        // The Platform placeholders, behind the same flag as costs/billed
+        // (each page carries its own guard; see
+        // specs/governance/governance-platform-placeholders.feature).
+        path: "/governance/insights",
+        ...page(() => import("./pages/governance/insights")),
+      },
+      {
+        path: "/governance/analytics",
+        ...page(() => import("./pages/governance/analytics")),
+      },
+      {
+        path: "/governance/signals",
+        ...page(() => import("./pages/governance/signals")),
       },
       {
         // The people page has been cost centers and then departments; old
@@ -282,11 +353,8 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/governance/teams/[id]")),
       },
       {
-        // View-all users listing - bird's-eye `View all users →` lands here.
-        path: "/governance/users",
-        ...page(() => import("./pages/governance/users")),
-      },
-      {
+        // The bare users listing folded into the People page (?tab=people);
+        // /governance/users redirects there via legacyRedirectRoutes.
         // Per-user detail - single-row scoped view keyed off the
         // URL-encoded actor id (email / sub claim).
         path: "/governance/users/:id",
@@ -326,12 +394,6 @@ const routes: RouteObject[] = [
         // budget-exceeded → request flow Ariana caught in dogfood.
         path: "/me/budget/request",
         ...page(() => import("./pages/me/budget/request")),
-      },
-
-      // CLI device-flow approval (RFC 8628 user-facing screen)
-      {
-        path: "/cli/auth",
-        ...page(() => import("./pages/cli/auth")),
       },
 
       // AI Gateway: org-scoped admin pages live under /gateway/** at the top
@@ -387,6 +449,14 @@ const routes: RouteObject[] = [
       },
       ...legacyRedirectRoutes,
     ],
+  },
+
+  // CLI device-flow approval (RFC 8628 user-facing screen). Top level, like
+  // /onboarding: it is a confirm-a-code screen, not a page of the app, and
+  // the Langy panel must not mount on it.
+  {
+    path: "/cli/auth",
+    ...page(() => import("./pages/cli/auth")),
   },
 
   // Project routes — wrapped in a layout route that mounts Langy ONCE per
@@ -581,10 +651,6 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/[project]/analytics/users")),
       },
       {
-        path: "/:project/analytics/query",
-        ...page(() => import("./pages/[project]/analytics/query")),
-      },
-      {
         path: "/:project/analytics/custom",
         ...page(() => import("./pages/[project]/analytics/custom/index")),
       },
@@ -711,6 +777,22 @@ const routes: RouteObject[] = [
   {
     path: "/ops/backoffice/sso-connections",
     ...page(() => import("./pages/ops/backoffice/sso-connections")),
+  },
+  {
+    path: "/ops/backoffice/licenses",
+    ...page(() => import("./pages/ops/backoffice/licenses")),
+  },
+  {
+    path: "/ops/backoffice/self-hosted-instances",
+    ...page(() => import("./pages/ops/backoffice/self-hosted-instances")),
+  },
+  {
+    path: "/ops/backoffice/identity-lookup",
+    ...page(() => import("./pages/ops/backoffice/identity-lookup")),
+  },
+  {
+    path: "/ops/backoffice/directory-sync",
+    ...page(() => import("./pages/ops/backoffice/directory-sync")),
   },
 
   // @project redirect - Next.js parallel route that redirects /@project/path to /:project/path

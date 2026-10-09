@@ -1,5 +1,5 @@
 /**
- * What one saved version of a test case says about itself.
+ * What one saved version of a scenario says about itself.
  *
  * @see specs/features/agent-testing/case-version-history.feature
  * @see specs/scenarios/scenario-versioning.feature

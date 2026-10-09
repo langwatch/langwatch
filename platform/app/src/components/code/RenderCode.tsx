@@ -21,6 +21,7 @@ export const RenderCode = ({
   language,
   style: propsStyle = {},
   colorMode = "dark",
+  wrap = true,
 }: {
   code: string;
   language: string;
@@ -31,6 +32,11 @@ export const RenderCode = ({
    * follow it instead.
    */
   colorMode?: "light" | "dark";
+  /**
+   * Whether long lines wrap. When false they keep their width and the block
+   * scrolls horizontally instead, so a snippet is copied exactly as shown.
+   */
+  wrap?: boolean;
 }) => {
   const handleCopy = () => {
     navigator.clipboard
@@ -75,6 +81,10 @@ export const RenderCode = ({
       ? highlighted.html
       : null;
 
+  const preStyle = wrap
+    ? { whiteSpace: "pre-wrap" as const }
+    : { whiteSpace: "pre" as const, overflowX: "auto" as const };
+
   return (
     <Box position="relative" className="group" style={propsStyle}>
       <IconButton
@@ -96,12 +106,12 @@ export const RenderCode = ({
         // Shiki's own <pre> is what callers' surrounding CSS sees.
         <Box
           display="contents"
-          css={{ "& pre": { margin: 0, whiteSpace: "pre-wrap" } }}
+          css={{ "& pre": { margin: 0, ...preStyle } }}
           dangerouslySetInnerHTML={{ __html: html }}
         />
       ) : (
         // Fallback until the highlight for THIS code resolves — plain text.
-        <Box as="pre" margin={0} whiteSpace="pre-wrap">
+        <Box as="pre" margin={0} style={preStyle}>
           {code}
         </Box>
       )}

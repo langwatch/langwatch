@@ -10,6 +10,7 @@ import { app as analyticsApp } from "../app/api/analytics/[...route]/app";
 import { app as analyticsSqlApp } from "../app/api/analytics-sql/[[...route]]/app";
 import { app as apiKeysApp } from "../app/api/api-keys/[[...route]]/app";
 import { app as codingAgentApp } from "../app/api/coding-agent/[[...route]]/app";
+import { app as codingAgentV1App } from "../app/api/coding-agent/[[...route]]/app.v1";
 import { app as dashboardsApp } from "../app/api/dashboards/[[...route]]/app";
 import { app as datasetApp } from "../app/api/dataset/[[...route]]/app";
 import { app as evaluatorsApp } from "../app/api/evaluators/[[...route]]/app";
@@ -20,6 +21,8 @@ import { app as gatewaySpendApp } from "../app/api/gateway-spend/[[...route]]/ap
 import { app as governanceApp } from "../app/api/governance/[[...route]]/app";
 import { app as graphsApp } from "../app/api/graphs/[[...route]]/app";
 import { app as groupsApp } from "../app/api/groups/[[...route]]/app";
+import { app as instantEvalsApp } from "../app/api/instant-evals/[[...route]]/app";
+import { app as langyControlApp } from "../app/api/langy-control/[[...route]]/app";
 import { app as meApp } from "../app/api/me/[[...route]]/app";
 import { app as modelDefaultsApp } from "../app/api/model-defaults/[[...route]]/app";
 import { app as modelProvidersApp } from "../app/api/model-providers/[[...route]]/app";
@@ -29,9 +32,12 @@ import { app as organizationApp } from "../app/api/organization/[[...route]]/app
 import { app as organizationsApp } from "../app/api/organizations/[[...route]]/app";
 import { ORGANIZATIONS_SPEC_OPTIONS } from "../app/api/organizations/[[...route]]/openapi";
 import { app as projectsApp } from "../app/api/projects/[[...route]]/app";
+import { app as queryApp } from "../app/api/query/[[...route]]/app";
 import { app as roleBindingsApp } from "../app/api/role-bindings/[[...route]]/app";
 import { app as rolesApp } from "../app/api/roles/[[...route]]/app";
+import { app as runPlansApp } from "../app/api/run-plans/[[...route]]/app";
 import { app as scimTokensApp } from "../app/api/scim-tokens/[[...route]]/app";
+import { normalizeExclusiveBounds } from "../server/api/openapi-exclusive-bounds";
 import { requireDefaultedResponseFields } from "../server/api/openapi-response-required";
 import {
   allRegisteredRoutes,
@@ -45,6 +51,7 @@ import {
 // so the unannotated siblings sharing these files (the stripe webhook, the demo
 // bot, the MCP authorize step) cannot reach a public document merely by living
 // next to something that is published.
+import { app as checkupApp } from "../server/routes/checkup";
 import { app as evaluationsLegacyApp } from "../server/routes/evaluations-legacy";
 import { app as experimentsV3App } from "../server/routes/experiments-v3";
 import { app as miscApp } from "../server/routes/misc";
@@ -73,11 +80,21 @@ const generateSpecs: typeof generateSpecsUnpinned = async (hono, options, c) =>
 // the merge union forever.
 const APP_DERIVED_PREFIXES = [
   "/api/agent-cache",
+  "/api/checkup",
   "/api/agents",
+  "/api/v1/agents",
   "/api/api-keys",
   "/api/analytics",
   "/api/coding-agent",
+  "/api/v1/coding-agent",
+  "/api/v1/langy/control",
   "/api/v1/projects",
+  "/api/v1/query",
+  // The query domain's former prefix, kept listed so the two paths it used to
+  // publish are pruned from the committed spec rather than riding the merge
+  // union forever. Nothing serves it any more; remove this entry once a
+  // regenerated spec no longer contains `/api/query/v1`.
+  "/api/query/v1",
   "/api/dashboards",
   "/api/evaluators",
   "/api/events",
@@ -117,8 +134,12 @@ const APP_DERIVED_PREFIXES = [
   "/api/scenario-events",
   "/api/scenarios",
   "/api/secrets",
+  "/api/slack-connections",
   "/api/simulation-runs",
   "/api/suites",
+  "/api/v1/instant-evals",
+  "/api/v1/run-plans",
+  "/api/v1/test-suites",
   "/api/teams",
   "/api/traces",
   "/api/triggers",
@@ -155,8 +176,10 @@ import { app as scenarioEventsApp } from "../app/api/scenario-events/[[...route]
 import { app as scenariosApp } from "../app/api/scenarios/[[...route]]/app";
 import { app as secretsApp } from "../app/api/secrets/[[...route]]/app";
 import { app as simulationRunsApp } from "../app/api/simulation-runs/[[...route]]/app";
+import { app as slackConnectionsApp } from "../app/api/slack-connections/[[...route]]/app";
 import { app as suitesApp } from "../app/api/suites/[[...route]]/app";
 import { app as teamsApp } from "../app/api/teams/[[...route]]/app";
+import { app as testSuitesApp } from "../app/api/test-suites/[[...route]]/app";
 import { app as tracesApp } from "../app/api/traces/[[...route]]/app";
 import { app as triggersApp } from "../app/api/triggers/[[...route]]/app";
 import { app as webhooksApp } from "../app/api/webhooks/[[...route]]/app";
@@ -193,8 +216,12 @@ export default async function execute() {
   const analyticsSpec = await generateSpecs(analyticsApp);
   console.log("Building governed analytics SQL spec...");
   const analyticsSqlSpec = await generateSpecs(analyticsSqlApp);
+  console.log("Building query domain spec...");
+  const querySpec = await generateSpecs(queryApp);
   console.log("Building coding agent spec...");
   const codingAgentSpec = await generateSpecs(codingAgentApp);
+  console.log("Building coding agent v1 spec...");
+  const codingAgentV1Spec = await generateSpecs(codingAgentV1App);
   console.log("Building dashboards spec...");
   const dashboardsSpec = await generateSpecs(dashboardsApp);
   console.log("Building dataset spec...");
@@ -211,12 +238,16 @@ export default async function execute() {
   const experimentsV3Spec = await generateSpecs(experimentsV3App);
   console.log("Building experiment init spec...");
   const miscSpec = await generateSpecs(miscApp);
+  console.log("Building checkup spec...");
+  const checkupSpec = await generateSpecs(checkupApp);
   console.log("Building gateway-platform spec...");
   const gatewayPlatformSpec = await generateSpecs(gatewayPlatformApp);
   console.log("Building governance spec...");
   const governanceSpec = await generateSpecs(governanceApp);
   console.log("Building graphs spec...");
   const graphsSpec = await generateSpecs(graphsApp);
+  console.log("Building langy control spec...");
+  const langyControlSpec = await generateSpecs(langyControlApp);
   console.log("Building me spec...");
   const meSpec = await generateSpecs(meApp);
   console.log("Building llm configs spec...");
@@ -258,6 +289,12 @@ export default async function execute() {
   const simulationRunsSpec = await generateSpecs(simulationRunsApp);
   console.log("Building suites spec...");
   const suitesSpec = await generateSpecs(suitesApp);
+  console.log("Building instant evals spec...");
+  const instantEvalsSpec = await generateSpecs(instantEvalsApp);
+  console.log("Building run plans spec...");
+  const runPlansSpec = await generateSpecs(runPlansApp);
+  console.log("Building test suites spec...");
+  const testSuitesSpec = await generateSpecs(testSuitesApp);
   console.log("Building teams spec...");
   const teamsSpec = await generateSpecs(teamsApp);
   console.log("Building groups spec...");
@@ -266,6 +303,8 @@ export default async function execute() {
   const tracesSpec = await generateSpecs(tracesApp);
   console.log("Building triggers spec...");
   const triggersSpec = await generateSpecs(triggersApp);
+  console.log("Building Slack connections spec...");
+  const slackConnectionsSpec = await generateSpecs(slackConnectionsApp);
   console.log("Building workflows spec...");
   const workflowsSpec = await generateSpecs(workflowsApp);
   const webhooksSpec = await generateSpecs(webhooksApp);
@@ -280,7 +319,9 @@ export default async function execute() {
       apiKeysSpec,
       analyticsSpec,
       analyticsSqlSpec,
+      querySpec,
       codingAgentSpec,
+      codingAgentV1Spec,
       dashboardsSpec,
       datasetSpec,
       evaluatorsSpec,
@@ -289,9 +330,11 @@ export default async function execute() {
       evaluationsLegacySpec,
       experimentsV3Spec,
       miscSpec,
+      checkupSpec,
       gatewayPlatformSpec,
       governanceSpec,
       graphsSpec,
+      langyControlSpec,
       meSpec,
       llmConfigsSpec,
       modelDefaultsSpec,
@@ -309,10 +352,14 @@ export default async function execute() {
       secretsSpec,
       simulationRunsSpec,
       suitesSpec,
+      instantEvalsSpec,
+      runPlansSpec,
+      testSuitesSpec,
       teamsSpec,
       groupsSpec,
       tracesSpec,
       triggersSpec,
+      slackConnectionsSpec,
       webhooksSpec,
       gatewaySpendSpec,
       workflowsSpec,
@@ -335,6 +382,7 @@ export default async function execute() {
 
   console.log("Stamping per-operation security...");
   stampSecurityFromRegistry(mergedSpec as SpecShape);
+  normalizeExclusiveBounds(mergedSpec);
 
   fs.writeFileSync(
     path.join(__dirname, "../app/api/openapiLangWatch.json"),

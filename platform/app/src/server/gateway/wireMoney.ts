@@ -116,6 +116,24 @@ export function nanoUsdToDecimalString(nano: bigint | number): string {
 }
 
 /**
+ * A nano-MINOR integer as the same decimal string, for a currency that is not
+ * US dollars.
+ *
+ * `AmountNanoMinor` is nano of the currency's MAJOR unit — nano-euros for a
+ * subscription billed in euros — so the scale is identical to nano-USD and the
+ * only thing that has to go is the name. Kept as a separate export rather than
+ * renaming the USD one: every existing caller is publishing dollars and says
+ * so at the call site, which is worth more than one fewer function.
+ *
+ * The currency code is deliberately NOT taken and NOT rendered. This returns
+ * digits; which currency they are is the caller's to say, and a symbol chosen
+ * here would be one this module has no way to be right about.
+ */
+export function nanoMinorToDecimalString(nano: bigint | number): string {
+  return nanoUsdToDecimalString(nano);
+}
+
+/**
  * The display string for any amount this surface holds, whatever it holds it
  * as: a Prisma `Decimal`, a ClickHouse `Float64` already stringified, or a
  * decimal string that was passed through untouched.

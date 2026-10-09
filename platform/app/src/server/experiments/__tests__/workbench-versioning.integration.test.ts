@@ -230,6 +230,81 @@ describe("workbench versioning", () => {
           });
         }
       });
+
+      /** @scenario "A refusal names the run that wrote the newer version" */
+      it("names the run when a run wrote the newer version", async () => {
+        // The page that started this run holds every cell it produced already.
+        // Named here, the refusal lets that page take the version and carry on
+        // saving instead of standing down over its own run's write.
+        const { experimentId, version } = await createEvaluation();
+        await service.saveWorkbenchState({
+          projectId: project.id,
+          id: experimentId,
+          state: stateNamed("Results from the run"),
+          expectedVersion: version,
+          actor: { label: "user", runId: "bold-jolly-bee" },
+        });
+
+        try {
+          await service.saveWorkbenchState({
+            projectId: project.id,
+            id: experimentId,
+            state: stateNamed("The reader's own edit"),
+            expectedVersion: version,
+            actor: { label: "user" },
+          });
+          expect.unreachable("the save should have been refused");
+        } catch (error) {
+          const meta = HandledError.isHandled(error) ? error.meta : {};
+          expect(meta).toEqual({
+            currentVersion: version + 1,
+            actorLabel: "user",
+            runId: "bold-jolly-bee",
+          });
+        }
+      });
+
+      /** @scenario "A version a run wrote names that run" */
+      it("records the run on the version row it wrote", async () => {
+        const { experimentId, version } = await createEvaluation();
+        await service.saveWorkbenchState({
+          projectId: project.id,
+          id: experimentId,
+          state: stateNamed("Results from the run"),
+          expectedVersion: version,
+          actor: { label: "user", runId: "bold-jolly-bee" },
+        });
+
+        const row = await prisma.experimentVersion.findFirstOrThrow({
+          where: {
+            experimentId,
+            projectId: project.id,
+            counterVersion: version + 1,
+          },
+        });
+        expect(row.runId).toBe("bold-jolly-bee");
+      });
+
+      /** @scenario "A version a run wrote names that run" */
+      it("leaves the run empty on a version a person wrote", async () => {
+        const { experimentId, version } = await createEvaluation();
+        await service.saveWorkbenchState({
+          projectId: project.id,
+          id: experimentId,
+          state: stateNamed("Typed by the reader"),
+          expectedVersion: version,
+          actor: { label: "user" },
+        });
+
+        const row = await prisma.experimentVersion.findFirstOrThrow({
+          where: {
+            experimentId,
+            projectId: project.id,
+            counterVersion: version + 1,
+          },
+        });
+        expect(row.runId).toBeNull();
+      });
     });
   });
 

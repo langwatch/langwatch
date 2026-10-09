@@ -11,7 +11,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { Redis } from "ioredis";
 import { nanoid } from "nanoid";
-
+import { grantOrganizationAdmin } from "~/server/api/routers/__tests__/helpers/roleBindings";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
@@ -174,6 +174,12 @@ export async function seedBudgetOverviewFixture(): Promise<void> {
   // differential caller read gatewayBudgets.get.
   await prisma.teamUser.create({
     data: { teamId: TEAM_ID, userId: USER_ID, role: "ADMIN" },
+  });
+  await grantOrganizationAdmin({
+    prisma,
+    organizationId: ORG_ID,
+    userId: USER_ID,
+    teamId: TEAM_ID,
   });
 
   // Personal workspace, the same shape PersonalWorkspaceService.ensure

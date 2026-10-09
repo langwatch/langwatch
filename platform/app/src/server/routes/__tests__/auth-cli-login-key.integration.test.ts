@@ -39,6 +39,8 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import {
   clearClickHouseTestApp,
   installClickHouseTestApp,
@@ -65,6 +67,8 @@ const PROJECT_B_ID = `proj-clikey-b-${suffix}`;
 const MEMBER_PPROJECT_ID = `proj-clikey-personal-${suffix}`;
 
 let redisConnection: Redis | null = null;
+let eventSourcing: ReturnType<typeof createAuthzTestEventSourcing> | null =
+  null;
 
 type IdentityUser = { id: string; email: string; name: string };
 
@@ -95,7 +99,11 @@ interface ExchangeSuccess {
   refresh_token: string;
   personal_project?: { id: string; api_key: string };
   cli_api_key?: string;
-  cli_api_key_scope?: { kind: string; project_ids: string[] };
+  cli_api_key_scope?: {
+    kind: string;
+    project_ids: string[];
+    permissions?: string[];
+  };
 }
 
 async function mintDeviceCode(): Promise<{
@@ -232,9 +240,11 @@ async function keyPermissions(apiKeyId: string): Promise<string[]> {
 beforeAll(async () => {
   await startTestContainers();
   redisConnection = getTestRedisConnection();
+  eventSourcing = createAuthzTestEventSourcing(prisma);
   installClickHouseTestApp({
     resolveClient: async () => getTestClickHouseClient(),
     redis: redisConnection,
+    eventSourcing: eventSourcing ?? undefined,
   });
 
   await prisma.organization.create({
@@ -323,46 +333,47 @@ beforeAll(async () => {
   // team-scope ADMIN for the member (shared team + their personal team, the
   // latter seeded directly so the default-selection path is deterministic
   // rather than racing the personal-workspace grant projection).
-  await prisma.roleBinding.createMany({
-    data: [
-      {
-        id: `rb-clikey-admin-${suffix}`,
-        organizationId: ORG_ID,
-        userId: ADMIN_ID,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: ORG_ID,
-      },
-      {
-        id: `rb-clikey-ceiling-${suffix}`,
-        organizationId: ORG_ID,
-        userId: CEILING_ID,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: ORG_ID,
-      },
-      {
-        id: `rb-clikey-member-shared-${suffix}`,
-        organizationId: ORG_ID,
-        userId: MEMBER_ID,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.TEAM,
-        scopeId: TEAM_SHARED_ID,
-      },
-      {
-        id: `rb-clikey-member-personal-${suffix}`,
-        organizationId: ORG_ID,
-        userId: MEMBER_ID,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.TEAM,
-        scopeId: MEMBER_PTEAM_ID,
-      },
-    ],
-  });
+  for (const data of [
+    {
+      id: `rb-clikey-admin-${suffix}`,
+      organizationId: ORG_ID,
+      userId: ADMIN_ID,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: ORG_ID,
+    },
+    {
+      id: `rb-clikey-ceiling-${suffix}`,
+      organizationId: ORG_ID,
+      userId: CEILING_ID,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: ORG_ID,
+    },
+    {
+      id: `rb-clikey-member-shared-${suffix}`,
+      organizationId: ORG_ID,
+      userId: MEMBER_ID,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.TEAM,
+      scopeId: TEAM_SHARED_ID,
+    },
+    {
+      id: `rb-clikey-member-personal-${suffix}`,
+      organizationId: ORG_ID,
+      userId: MEMBER_ID,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.TEAM,
+      scopeId: MEMBER_PTEAM_ID,
+    },
+  ]) {
+    await seedRoleBinding(prisma, data);
+  }
 }, 120_000);
 
 afterAll(async () => {
   await clearClickHouseTestApp();
+  await prisma.grant.deleteMany({ where: { organizationId: ORG_ID } });
   await prisma.roleBinding.deleteMany({ where: { organizationId: ORG_ID } });
   await prisma.apiKey.deleteMany({ where: { organizationId: ORG_ID } });
   await prisma.customRole.deleteMany({ where: { organizationId: ORG_ID } });
@@ -424,7 +435,18 @@ describe("CLI login user-scoped key, given a device-session flow", () => {
       expect(result.cli_api_key_scope).toEqual({
         kind: "organization",
         project_ids: [],
+        permissions: [...defaultCliKeyPermissions()].sort(),
       });
+    });
+
+    /** @scenario "the exchange reports the permissions the key was minted with" */
+    it("reports the minted permissions so whoami can print the grain", async () => {
+      const key = await mintedKeyFor({
+        userId: ADMIN_ID,
+        deviceLabel: HOSTNAME,
+      });
+      const permissions = await keyPermissions(key!.id);
+      expect(result.cli_api_key_scope!.permissions).toEqual(permissions);
     });
 
     /** @scenario "the organization-management permissions are off by default" */
@@ -504,6 +526,7 @@ describe("CLI login user-scoped key, given a device-session flow", () => {
       expect(result.cli_api_key_scope).toEqual({
         kind: "projects",
         project_ids: [PROJECT_A_ID],
+        permissions: ["traces:view"],
       });
     });
   });
@@ -735,11 +758,25 @@ describe("CLI login user-scoped key, given a device-session flow", () => {
       const removedBindings = await prisma.roleBinding.findMany({
         where: { organizationId: ORG_ID, userId: MEMBER_ID },
       });
+      const removedGrants = await prisma.grant.findMany({
+        where: {
+          organizationId: ORG_ID,
+          principalType: "USER",
+          principalId: MEMBER_ID,
+        },
+      });
       const removedMemberships = await prisma.organizationUser.findMany({
         where: { organizationId: ORG_ID, userId: MEMBER_ID },
       });
       await prisma.roleBinding.deleteMany({
         where: { organizationId: ORG_ID, userId: MEMBER_ID },
+      });
+      await prisma.grant.deleteMany({
+        where: {
+          organizationId: ORG_ID,
+          principalType: "USER",
+          principalId: MEMBER_ID,
+        },
       });
       await prisma.organizationUser.deleteMany({
         where: { organizationId: ORG_ID, userId: MEMBER_ID },
@@ -766,6 +803,10 @@ describe("CLI login user-scoped key, given a device-session flow", () => {
         });
         await prisma.roleBinding.createMany({
           data: removedBindings,
+          skipDuplicates: true,
+        });
+        await prisma.grant.createMany({
+          data: removedGrants.map(({ condition: _condition, ...row }) => row),
           skipDuplicates: true,
         });
       }
@@ -799,11 +840,25 @@ describe("CLI login user-scoped key, given a device-session flow", () => {
       const removedBindings = await prisma.roleBinding.findMany({
         where: { organizationId: ORG_ID, userId: MEMBER_ID },
       });
+      const removedGrants = await prisma.grant.findMany({
+        where: {
+          organizationId: ORG_ID,
+          principalType: "USER",
+          principalId: MEMBER_ID,
+        },
+      });
       const removedMemberships = await prisma.organizationUser.findMany({
         where: { organizationId: ORG_ID, userId: MEMBER_ID },
       });
       await prisma.roleBinding.deleteMany({
         where: { organizationId: ORG_ID, userId: MEMBER_ID },
+      });
+      await prisma.grant.deleteMany({
+        where: {
+          organizationId: ORG_ID,
+          principalType: "USER",
+          principalId: MEMBER_ID,
+        },
       });
       await prisma.organizationUser.deleteMany({
         where: { organizationId: ORG_ID, userId: MEMBER_ID },
@@ -841,6 +896,10 @@ describe("CLI login user-scoped key, given a device-session flow", () => {
           data: removedBindings,
           skipDuplicates: true,
         });
+        await prisma.grant.createMany({
+          data: removedGrants.map(({ condition: _condition, ...row }) => row),
+          skipDuplicates: true,
+        });
       }
     });
   });
@@ -862,6 +921,13 @@ describe("CLI login user-scoped key, given a device-session flow", () => {
       // Demote: the owner keeps org membership but loses the org-wide role.
       await prisma.roleBinding.deleteMany({
         where: { organizationId: ORG_ID, userId: CEILING_ID },
+      });
+      await prisma.grant.deleteMany({
+        where: {
+          organizationId: ORG_ID,
+          principalType: "USER",
+          principalId: CEILING_ID,
+        },
       });
       await prisma.organizationUser.updateMany({
         where: { userId: CEILING_ID, organizationId: ORG_ID },

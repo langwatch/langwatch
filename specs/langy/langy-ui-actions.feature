@@ -44,6 +44,22 @@ Feature: Langy drives the open page through typed UI actions
     When the action entry reaches it
     Then the page does not claim, leaving the server free to fall back
 
+  @unit
+  Scenario: An action that arrives while its page is still mounting is held for that page
+    Given the browser is on the page that owns the dispatched kind
+    And the page has not registered its handlers yet
+    When the action entry reaches it
+    Then the page claims the action at once, so the server does not fall back to saved state
+    And the handler runs as soon as the page registers it
+    And the completion reports what the live page did
+
+  @unit
+  Scenario: A page that never finishes mounting reports it instead of leaving the agent waiting
+    Given the browser is on the page that owns the dispatched kind
+    And the page never registers a handler for it
+    When the hold runs out
+    Then the action completes as failed with the code "langy_ui_page_not_ready"
+
   @integration
   Scenario: With page control rolled back, the open page ignores dispatched actions
     Given agent-driven page control is switched off for my project
@@ -112,6 +128,26 @@ Feature: Langy drives the open page through typed UI actions
     When the dispatch fails, whichever way it failed
     Then the agent is told to read the state again before it retries
     And it never retries a change that already landed
+
+  # `langwatch ui call` runs inside an agent worker whose harness stops any
+  # command at 30 seconds. The server ceiling was 30 seconds too and the CLI
+  # deadline was 60, so a slow action was always ended by the harness: the CLI
+  # never printed its own failure, and the agent never read the warning that
+  # the action may already have applied.
+  @unit
+  Scenario: The server gives up before the harness kills the command
+    Given an action whose declared budget is above the platform ceiling
+    When the page claims it and never answers
+    Then the dispatch gives up inside the platform ceiling
+    And the ceiling is under the deadline the CLI sets for itself
+    And that deadline is under the time the agent harness allows a command
+
+  @unit
+  Scenario: The CLI reports the missing answer itself
+    Given the page never answers the dispatch
+    When the CLI's own request deadline runs out
+    Then the CLI names the endpoint, the action and the deadline
+    And it tells the agent the action may still have applied
 
   @unit
   Scenario: A browser handler failure reaches the agent as langy_ui_handler_failed and the user as a toast
@@ -183,7 +219,7 @@ Feature: Langy drives the open page through typed UI actions
 
   @unit
   Scenario: The worker env carries the conversation id for the UI channel
-    Given a worker is spawned for a conversation on either harness
+    Given a worker is spawned for a conversation
     Then its environment names that conversation for the CLI's ui call
 
   @unit

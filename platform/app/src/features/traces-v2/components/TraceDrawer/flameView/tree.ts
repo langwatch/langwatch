@@ -1,5 +1,5 @@
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
-import { formatDuration } from "../../../utils/formatters";
+import { formatDuration } from "~/shared/format/time";
 import type { BuiltTree, FlameNode, SpanContext, Viewport } from "./types";
 
 export function buildTree(spans: SpanTreeNode[]): BuiltTree {

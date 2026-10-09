@@ -20,24 +20,53 @@
 
 import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
 import type { AgentInput } from "@langwatch/scenario";
-import { AgentAdapter, AgentRole } from "@langwatch/scenario";
+import { AgentRole } from "@langwatch/scenario";
 import { randomBytes } from "crypto";
+import {
+  resolveFloorFetchTimeoutMs,
+  resolveMaxFetchTimeoutMs,
+} from "../../../nlpgo/timeouts";
 import type { RunParameterValues } from "../../parameters";
 import { resolveFieldMappings } from "../resolve-field-mappings";
 import type { WorkflowAgentData } from "../types";
+import type {
+  ExecuteSyncResponse,
+  ExecuteSyncTransport,
+} from "./execute-sync-transport";
+import { SerializedAgentAdapter } from "./serialized-agent.adapter";
 
-/** Timeout for NLP service requests (2 minutes) — matches code adapter. */
-const NLP_FETCH_TIMEOUT_MS = 120_000;
+/**
+ * How long to wait on the NLP service for one turn.
+ *
+ * This adapter has no per-agent `timeoutMs` budget to add headroom above
+ * (unlike the code adapter's `CodeAgentData`, `WorkflowAgentData` carries
+ * none) — so the deadline is simply the floor, bounded by the platform's
+ * operator-configurable maximum. See `../../../nlpgo/timeouts.ts` for what
+ * the floor derives from and why: it used to be this file's own hardcoded
+ * `NLP_FETCH_TIMEOUT_MS = 120_000`, entirely independent of the code
+ * adapter's copy and with no env override, which is exactly the drift that
+ * caused a live production timeout when the engine's own ceiling was
+ * raised and this one wasn't told.
+ */
+function fetchTimeoutMs(): number {
+  return Math.min(resolveMaxFetchTimeoutMs(), resolveFloorFetchTimeoutMs());
+}
 
 /**
  * Serialized workflow agent adapter that uses pre-fetched workflow DSL.
  * Sends execute_flow events to the NLP service. No database access required.
  */
-export class SerializedWorkflowAgentAdapter extends AgentAdapter {
+export class SerializedWorkflowAgentAdapter extends SerializedAgentAdapter {
   role = AgentRole.AGENT;
 
   private readonly config: WorkflowAgentData;
-  private readonly nlpServiceUrl: string;
+  /**
+   * How one turn reaches nlpgo. Self-hosted that is the engine itself; on
+   * SaaS it is the control plane, which invokes this project's own engine
+   * with a credential the child must not hold. See
+   * `./execute-sync-transport.ts`.
+   */
+  private readonly transport: ExecuteSyncTransport;
   /**
    * The LangWatch platform API key (project.apiKey), sent as
    * workflow.api_key. nlpgo forwards it verbatim as the X-Auth-Token header
@@ -57,18 +86,18 @@ export class SerializedWorkflowAgentAdapter extends AgentAdapter {
 
   constructor({
     config,
-    nlpServiceUrl,
+    transport,
     projectApiKey,
     parameters,
   }: {
     config: WorkflowAgentData;
-    nlpServiceUrl: string;
+    transport: ExecuteSyncTransport;
     projectApiKey: string;
     parameters?: RunParameterValues;
   }) {
     super();
     this.config = config;
-    this.nlpServiceUrl = nlpServiceUrl;
+    this.transport = transport;
     this.projectApiKey = projectApiKey;
     this.parameters = parameters ?? {};
     this.name = "SerializedWorkflowAgentAdapter";
@@ -206,32 +235,15 @@ export class SerializedWorkflowAgentAdapter extends AgentAdapter {
     };
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), NLP_FETCH_TIMEOUT_MS);
+    const timeoutMs = fetchTimeoutMs();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
-      let response: Response;
-      try {
-        response = await fetch(`${this.nlpServiceUrl}/go/studio/execute_sync`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(event),
-          signal: controller.signal,
-        });
-      } catch (fetchError) {
-        const cause =
-          fetchError instanceof Error && "cause" in fetchError
-            ? ` (cause: ${String(
-                (fetchError as Error & { cause?: unknown }).cause,
-              )})`
-            : "";
-        throw new Error(
-          `Workflow execution failed: fetch to ${this.nlpServiceUrl}/go/studio/execute_sync failed - ${
-            fetchError instanceof Error
-              ? fetchError.message
-              : String(fetchError)
-          }${cause}`,
-        );
-      }
+      const response = await this.postExecuteSync({
+        event,
+        signal: controller.signal,
+        timeoutMs,
+      });
 
       if (!response.ok) {
         let errorMessage = "";
@@ -253,7 +265,7 @@ export class SerializedWorkflowAgentAdapter extends AgentAdapter {
         );
       }
 
-      const result = (await response.json()) as {
+      const result = JSON.parse(await response.text()) as {
         trace_id: string;
         status: string;
         result: Record<string, unknown> | null;
@@ -261,6 +273,32 @@ export class SerializedWorkflowAgentAdapter extends AgentAdapter {
       return result.result;
     } finally {
       clearTimeout(timeout);
+    }
+  }
+
+  private async postExecuteSync({
+    event,
+    signal,
+    timeoutMs,
+  }: {
+    event: unknown;
+    signal: AbortSignal;
+    timeoutMs: number;
+  }): Promise<ExecuteSyncResponse> {
+    try {
+      return await this.transport.post({ event, signal, timeoutMs });
+    } catch (fetchError) {
+      const cause =
+        fetchError instanceof Error && "cause" in fetchError
+          ? ` (cause: ${String(
+              (fetchError as Error & { cause?: unknown }).cause,
+            )})`
+          : "";
+      throw new Error(
+        `Workflow execution failed: fetch to ${this.transport.endpoint} failed - ${
+          fetchError instanceof Error ? fetchError.message : String(fetchError)
+        }${cause}`,
+      );
     }
   }
 

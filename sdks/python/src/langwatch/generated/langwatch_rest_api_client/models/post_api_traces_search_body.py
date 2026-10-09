@@ -28,8 +28,11 @@ class PostApiTracesSearchBody:
         filters (PostApiTracesSearchBodyFilters | Unset):
         trace_ids (list[str] | Unset):
         negate_filters (bool | Unset):
-        page_offset (float | Unset):
-        page_size (float | Unset):
+        exclude_origins (list[str] | Unset):
+        page_offset (float | Unset): Removed. Offset pagination is no longer supported and any value other than 0 is
+            rejected. Page with the scrollId returned by the previous response instead. The field remains on the schema so
+            that sending it produces an explanatory error rather than being silently discarded.
+        page_size (int | Unset):
         group_by (str | Unset):
         sort_by (str | Unset):
         sort_direction (str | Unset):
@@ -40,6 +43,12 @@ class PostApiTracesSearchBody:
         include_spans (bool | Unset): When true, fetches full span data for each trace. Useful for bulk export. Default
             false.
         llm_mode (bool | Unset):
+        filter_ (str | Unset): A trace filter string in the same language the Trace Explorer's search bar speaks —
+            `status:error AND model:gpt-*`, `trace.attribute.langwatch.user_id:alice`, `evaluatorVerdict:fail`, a quoted
+            phrase for free text. It is combined with `filters`, `query` and `traceIds` rather than replacing any of them,
+            so every condition you send must hold. `GET /api/v1/query/reference` lists every field and the syntax; `GET
+            /api/traces/facets` says what values a field actually holds. A malformed filter, or one naming a field the
+            language does not have, is a 422 that names the field.
         date_field (PostApiTracesSearchBodyDateField | Unset): Which timestamp the startDate/endDate window filters on.
             'occurred' (default) selects traces by when they happened. 'updated' selects traces by when they were last
             modified — use this for incremental ETL ('give me everything changed since my last pull'), since a trace can
@@ -60,8 +69,9 @@ class PostApiTracesSearchBody:
     filters: PostApiTracesSearchBodyFilters | Unset = UNSET
     trace_ids: list[str] | Unset = UNSET
     negate_filters: bool | Unset = UNSET
+    exclude_origins: list[str] | Unset = UNSET
     page_offset: float | Unset = UNSET
-    page_size: float | Unset = UNSET
+    page_size: int | Unset = UNSET
     group_by: str | Unset = UNSET
     sort_by: str | Unset = UNSET
     sort_direction: str | Unset = UNSET
@@ -70,6 +80,7 @@ class PostApiTracesSearchBody:
     format_: PostApiTracesSearchBodyFormat | Unset = UNSET
     include_spans: bool | Unset = UNSET
     llm_mode: bool | Unset = UNSET
+    filter_: str | Unset = UNSET
     date_field: PostApiTracesSearchBodyDateField | Unset = PostApiTracesSearchBodyDateField.OCCURRED
     from_: PostApiTracesSearchBodyFrom | Unset = PostApiTracesSearchBodyFrom.TRACES
     select: list[str] | Unset = UNSET
@@ -93,6 +104,10 @@ class PostApiTracesSearchBody:
             trace_ids = self.trace_ids
 
         negate_filters = self.negate_filters
+
+        exclude_origins: list[str] | Unset = UNSET
+        if not isinstance(self.exclude_origins, Unset):
+            exclude_origins = self.exclude_origins
 
         page_offset = self.page_offset
 
@@ -119,6 +134,8 @@ class PostApiTracesSearchBody:
         include_spans = self.include_spans
 
         llm_mode = self.llm_mode
+
+        filter_ = self.filter_
 
         date_field: str | Unset = UNSET
         if not isinstance(self.date_field, Unset):
@@ -148,6 +165,8 @@ class PostApiTracesSearchBody:
             field_dict["traceIds"] = trace_ids
         if negate_filters is not UNSET:
             field_dict["negateFilters"] = negate_filters
+        if exclude_origins is not UNSET:
+            field_dict["excludeOrigins"] = exclude_origins
         if page_offset is not UNSET:
             field_dict["pageOffset"] = page_offset
         if page_size is not UNSET:
@@ -168,6 +187,8 @@ class PostApiTracesSearchBody:
             field_dict["includeSpans"] = include_spans
         if llm_mode is not UNSET:
             field_dict["llmMode"] = llm_mode
+        if filter_ is not UNSET:
+            field_dict["filter"] = filter_
         if date_field is not UNSET:
             field_dict["dateField"] = date_field
         if from_ is not UNSET:
@@ -206,6 +227,8 @@ class PostApiTracesSearchBody:
 
         negate_filters = d.pop("negateFilters", UNSET)
 
+        exclude_origins = cast(list[str], d.pop("excludeOrigins", UNSET))
+
         page_offset = d.pop("pageOffset", UNSET)
 
         page_size = d.pop("pageSize", UNSET)
@@ -238,6 +261,8 @@ class PostApiTracesSearchBody:
 
         llm_mode = d.pop("llmMode", UNSET)
 
+        filter_ = d.pop("filter", UNSET)
+
         _date_field = d.pop("dateField", UNSET)
         date_field: PostApiTracesSearchBodyDateField | Unset
         if isinstance(_date_field, Unset):
@@ -261,6 +286,7 @@ class PostApiTracesSearchBody:
             filters=filters,
             trace_ids=trace_ids,
             negate_filters=negate_filters,
+            exclude_origins=exclude_origins,
             page_offset=page_offset,
             page_size=page_size,
             group_by=group_by,
@@ -271,6 +297,7 @@ class PostApiTracesSearchBody:
             format_=format_,
             include_spans=include_spans,
             llm_mode=llm_mode,
+            filter_=filter_,
             date_field=date_field,
             from_=from_,
             select=select,

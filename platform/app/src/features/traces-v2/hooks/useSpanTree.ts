@@ -29,7 +29,7 @@ import { useTraceQueryArgs } from "./useTraceQueryArgs";
  */
 export function useSpanTreeCanonical() {
   const shared = useSharedTrace();
-  const { isLive, isReady, queryArgs } = useTraceQueryArgs();
+  const { isLive, isReady, hintReady, queryArgs } = useTraceQueryArgs();
   // SSE health decides the delta poll's CADENCE, not whether it runs at all.
   // While SSE is up, `useTraceFreshness` invalidates the delta on each
   // `span.stored` event and the merge happens push-style, so a timer would be
@@ -53,8 +53,9 @@ export function useSpanTreeCanonical() {
     // with hand-crafted span data; firing a real request would just
     // return empty and clobber the seed. A shared trace carries its
     // spans in the share payload, so there is nothing to walk and no
-    // authenticated endpoint to walk it with.
-    enabled: isReady && !shared,
+    // authenticated endpoint to walk it with. The partition hint is waited
+    // for as well: on a deep link the header read backfills it.
+    enabled: isReady && hintReady && !shared,
     staleTime: 300_000,
     gcTime: 1_800_000,
     placeholderData: keepPreviousData,

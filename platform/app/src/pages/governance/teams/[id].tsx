@@ -15,6 +15,7 @@ import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { HandledErrorAlert } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { landingProjectOf } from "~/server/app-layer/projects/project-kinds";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { getHexColorForString } from "~/utils/rotatingColors";
@@ -47,6 +48,11 @@ const fmtRelative = (date: Date | string | null): string => {
  * deep-link. Detail-data depth (per-day spend, per-user breakdown,
  * model mix) defers to a follow-up; this page exists today to honor
  * the bird's-eye click-through invariant.
+ *
+ * Every control on the page is a link that navigates; the copy names only
+ * what the page shows today and marks the rest as not available yet.
+ *
+ * Spec: specs/ai-governance/dashboard/team-detail-page.feature
  */
 function GovernanceTeamDetailPage() {
   const router = useRouter();
@@ -57,16 +63,19 @@ function GovernanceTeamDetailPage() {
     });
   const orgId = organization?.id ?? "";
   const canReadActivity = hasAnyPermission("activityMonitor:view");
-  // Resolve the team's first project slug for the bird's-eye drill-in
-  // link. Teams typically have a primary project (or a small set);
-  // navigating to /[projectSlug]/traces lands the admin on the team's
-  // workspace via the existing project-shell + auto-switches to
-  // PersonalSidebar via the v2 chrome retention discriminator (admin's
-  // not a TeamUser → AdminViewingAsBanner fires from DashboardLayout).
-  const teamProjectSlug =
+  // Resolve the team's landing project slug for the bird's-eye drill-in
+  // link: its first project that is not an aggregate, the same rule the app
+  // lands on (ADR-144 block F), since an aggregate reads other projects and
+  // is opened on purpose. Navigating to /[projectSlug]/traces lands the admin
+  // on the team's workspace via the existing project-shell. No "viewing as
+  // admin" banner comes with it: that banner keys off a PERSONAL workspace
+  // owned by somebody else (see DashboardPageBody), and an org team is not
+  // one, so a team drill-through is silent and unlogged.
+  const teamProjects =
     organizations
       ?.flatMap((org) => org.teams ?? [])
-      .find((t) => t.id === teamId)?.projects?.[0]?.slug ?? null;
+      .find((t) => t.id === teamId)?.projects ?? [];
+  const teamProjectSlug = landingProjectOf(teamProjects)?.slug ?? null;
 
   const teamsQuery = api.activityMonitor.spendByTeam.useQuery(
     { organizationId: orgId, windowDays: 30, limit: 500 },
@@ -96,8 +105,11 @@ function GovernanceTeamDetailPage() {
               width="14px"
               height="14px"
               borderRadius="full"
+              // A swatch with no team behind it is an empty surface, not text,
+              // so it takes a surface token. `fg.muted` here painted a 14px
+              // circle in reading ink.
               backgroundColor={
-                team ? getHexColorForString(team.teamName) : "fg.muted"
+                team ? getHexColorForString(team.teamName) : "bg.emphasized"
               }
             />
             <Heading size="md">{team?.teamName ?? "Team not found"}</Heading>
@@ -156,8 +168,8 @@ function GovernanceTeamDetailPage() {
                 Detail metrics
               </Text>
               <Text fontSize="xs" color="fg.muted" marginBottom={3}>
-                Per-day spend, per-user breakdown, and model mix for this team
-                will land here in a follow-up.
+                Per-day spend, per-user breakdown and model mix for this team
+                are not available yet.
               </Text>
               {teamProjectSlug && (
                 <>
@@ -175,9 +187,7 @@ function GovernanceTeamDetailPage() {
                     marginTop={1}
                     marginBottom={3}
                   >
-                    The trace explorer opens with the team's data. A 'Viewing as
-                    admin' banner stays present + the access is logged to
-                    /settings/audit-log.
+                    The trace explorer opens with this team's data.
                   </Text>
                 </>
               )}
@@ -190,8 +200,8 @@ function GovernanceTeamDetailPage() {
                 See this team in the bird's-eye chart →
               </Link>
               <Text fontSize="xs" color="fg.subtle" marginTop={1}>
-                The chart's {`'By Team'`} toggle exercises the same data through
-                one orthogonal lens until the dedicated drilldown ships.
+                The chart's {`'By team'`} view shows this team's spend next to
+                every other team's.
               </Text>
             </Box>
           </>

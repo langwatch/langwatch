@@ -37,11 +37,15 @@
 export {
   computeIdentifierHash,
   deriveIdentifierId,
-  deriveNewbornUserId,
 } from "./crypto/identifier-identity";
-export { s256Challenge } from "./crypto/pkce";
+export {
+  mintVerificationToken,
+  safeEqual,
+  s256Challenge,
+  sha256Hex,
+} from "./crypto/pkce";
 export { mintUserHashKey } from "./crypto/user-hash-key";
-export { IdentityGuards } from "./guards";
+export { detachStrandsUser, IdentityGuards } from "./guards";
 export {
   type BackfillAccountRow,
   type BackfillUserRow,
@@ -84,11 +88,27 @@ export type {
   IdentityVerificationRepository,
 } from "./identity-verification.repository";
 export { IdentityService } from "./identity.service";
+export { LinkProposalGuards } from "./link-proposal-guards";
+export type {
+  LinkProposalDecision,
+  LinkProposalReadsRepository,
+  LinkProposalRecord,
+} from "./link-proposal.repository";
+export {
+  type LinkProposalDirectoryPort,
+  LinkProposalService,
+  type LinkProposalServiceDeps,
+} from "./link-proposal.service";
 export type { MfaEnrollmentRepository } from "./mfa-enrollment.repository";
 export { MfaGuards } from "./mfa-guards";
+export { mfaCeremonyCommandId, newMfaEnrollmentId } from "./mfa-id";
+export type { MfaLedger } from "./mfa-ledger";
+export { MfaService } from "./mfa.service";
 export {
+  type SignInAccountLookupPort,
   type SignInBreakGlassLimiter,
   type SignInDomainRoutingPort,
+  type SignInDomainRoutingSources,
   type SignInMethodPolicyPort,
   type SignInRouteRequest,
   SignInRouterService,
@@ -111,6 +131,7 @@ export {
   type CallbackAuditRecord,
   type CallbackLinkOutcome,
   type CallbackUserMatch,
+  linkRefusalFor,
   type SignInCallbackAudit,
   type SignInCallbackDirectoryPort,
   SignInCallbackLinkingService,
@@ -122,7 +143,6 @@ export {
 } from "./join-request-guards";
 export {
   approveJoinCommandId,
-  expireJoinCommandId,
   newJoinRequestCommandId,
   newJoinRequestId,
 } from "./join-request-id";
@@ -133,45 +153,10 @@ export type {
 } from "./join-request.repository";
 export { JoinRequestService } from "./join-request.service";
 export {
-  SCIM_APPLY_MAX_ATTEMPTS,
-  ScimSyncGuards,
-} from "./scim-sync-guards";
-export { newScimSyncCommandId } from "./scim-sync-id";
-export type { ScimSyncLedger } from "./scim-sync-ledger";
-export type { ScimSyncReadRepository } from "./scim-sync.repository";
-export {
-  type LegacySsoOrganizationRepository,
-  type SsoConnectionGrandfatherDeps,
-  type SsoConnectionGrandfatherOutcome,
-  SsoConnectionGrandfatherService,
-} from "./sso-connection-grandfather.service";
-export {
-  SsoConnectionGuards,
-  type SsoConnectionGuardsDeps,
-} from "./sso-connection-guards";
-export {
-  grandfatherCommandId,
-  grandfatheredSsoConnectionId,
-  newSsoConnectionCommandId,
-  newSsoConnectionId,
-} from "./sso-connection-id";
-export type { SsoConnectionLedger } from "./sso-connection-ledger";
-export {
-  ShadowComparingDomainRoutingRepository,
-  type SsoConnectionRoutingShadowDeps,
-  type SsoConnectionRoutingShadowRecord,
-  type SsoConnectionRoutingShadowRecorder,
-} from "./sso-connection-routing-shadow";
-export type {
-  SsoBreakGlassBindingRepository,
-  SsoConnectionReadRepository,
-  SsoConnectionStrandingRepository,
-  SsoPlatformOperatorRepository,
-} from "./sso-connection.repository";
-export { SsoConnectionService } from "./sso-connection.service";
-export {
   IDENTITY_VERIFICATION_TTL_MS,
   type MintedEmailVerification,
   VerificationCeremonyService,
   type VerificationCeremonyDeps,
 } from "./verification-ceremony.service";
+
+export { withoutTrailingSlashes } from "./trailing-slash";

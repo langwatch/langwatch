@@ -20,6 +20,8 @@ import {
   langyToolCallFailedEventDataSchema,
   langyToolCallInitiatedEventDataSchema,
   langyToolCallSucceededEventDataSchema,
+  langyUserWaitEndedEventDataSchema,
+  langyUserWaitStartedEventDataSchema,
 } from "./events";
 
 /** The `type` strings the turn fold consumes (routing/subscription filters). */
@@ -31,6 +33,8 @@ export const LANGY_CONVERSATION_TURN_EVENT_TYPES = [
   LANGY_CONVERSATION_EVENT_TYPES.PLAN_UPDATED,
   LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONSE_FAILED,
   LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED,
+  LANGY_CONVERSATION_EVENT_TYPES.USER_WAIT_STARTED,
+  LANGY_CONVERSATION_EVENT_TYPES.USER_WAIT_ENDED,
 ] as const;
 
 const turnWireEnvelope = {
@@ -74,6 +78,16 @@ export const langyConversationTurnEventSchema = z.discriminatedUnion("type", [
     ...turnWireEnvelope,
     type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED),
     data: langyAgentRespondedEventDataSchema,
+  }),
+  z.object({
+    ...turnWireEnvelope,
+    type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.USER_WAIT_STARTED),
+    data: langyUserWaitStartedEventDataSchema,
+  }),
+  z.object({
+    ...turnWireEnvelope,
+    type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.USER_WAIT_ENDED),
+    data: langyUserWaitEndedEventDataSchema,
   }),
 ]);
 export type LangyConversationTurnWireEvent = z.infer<

@@ -79,7 +79,7 @@ func TestAgentsTemplate_FitsSizeBudget(t *testing.T) {
 }
 
 // MaterializeSkills writes the embedded skills tree to disk (a subprocess cannot
-// read embed.FS), preserving the <name>/SKILL.md layout opencode discovers.
+// read embed.FS), preserving the <name>/SKILL.md layout the worker discovers.
 func TestMaterializeSkills_WritesTreeToDisk(t *testing.T) {
 	dest := t.TempDir()
 	if err := MaterializeSkills(dest); err != nil {
@@ -93,5 +93,93 @@ func TestMaterializeSkills_WritesTreeToDisk(t *testing.T) {
 	}
 	if info.IsDir() || info.Size() == 0 {
 		t.Errorf("%s is not a non-empty file", skill)
+	}
+}
+
+// The guided onboarding kickoff arrives as an ordinary user message; the
+// routing table is what sends it to the native-only skill instead of the
+// generic reply rules.
+//
+// @scenario "The agent prompt routes the kickoff to the skill"
+func TestAgentsTemplate_RoutesGuidedKickoffToTheSkill(t *testing.T) {
+	tmpl, err := AgentsTemplate()
+	if err != nil {
+		t.Fatalf("AgentsTemplate: %v", err)
+	}
+	var row string
+	for _, line := range strings.Split(tmpl, "\n") {
+		if strings.HasPrefix(line, "|") && strings.Contains(line, "Guided onboarding kickoff") {
+			row = line
+		}
+	}
+	if row == "" {
+		t.Fatal("AGENTS.md has no routing row for the guided onboarding kickoff")
+	}
+	for _, want := range []string{"`guided-onboarding`", "Let's set up", "`skill` tool"} {
+		if !strings.Contains(row, want) {
+			t.Errorf("the kickoff routing row lacks %q: %s", want, row)
+		}
+	}
+	// The row sends the model to the skill and names no command of its own:
+	// a command listed here gets run straight from the row, before the script
+	// is ever read.
+	if strings.Contains(row, "complete-path") {
+		t.Errorf("the kickoff routing row names a command the model then runs instead of loading the skill: %s", row)
+	}
+}
+
+// Alert, automation and Slack delivery requests used to fall to a "direct CLI"
+// row, so the model never loaded the rules that keep Slack secrets out of the
+// conversation. The row now names the automations skill, which ships embedded.
+//
+// @scenario "The prompt routes alert and Slack requests to the automations skill"
+func TestAgentsTemplate_RoutesAlertsToTheAutomationsSkill(t *testing.T) {
+	tmpl, err := AgentsTemplate()
+	if err != nil {
+		t.Fatalf("AgentsTemplate: %v", err)
+	}
+	var row string
+	for _, line := range strings.Split(tmpl, "\n") {
+		if strings.HasPrefix(line, "|") && strings.Contains(line, "alert me") {
+			row = line
+		}
+	}
+	if row == "" {
+		t.Fatal("AGENTS.md has no routing row for alert requests")
+	}
+	for _, want := range []string{"`automations`", "Slack", "email", "langwatch trigger"} {
+		if !strings.Contains(row, want) {
+			t.Errorf("the alert routing row lacks %q: %s", want, row)
+		}
+	}
+	dest := t.TempDir()
+	if err := MaterializeSkills(dest); err != nil {
+		t.Fatalf("MaterializeSkills: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dest, "automations", "SKILL.md")); err != nil {
+		t.Errorf("the automations skill the row names is not embedded: %v", err)
+	}
+}
+
+// @scenario "The automations skill never asks for a Slack secret"
+func TestAutomationsSkill_NeverTakesASlackSecret(t *testing.T) {
+	dest := t.TempDir()
+	if err := MaterializeSkills(dest); err != nil {
+		t.Fatalf("MaterializeSkills: %v", err)
+	}
+	body, err := os.ReadFile(filepath.Join(dest, "automations", "SKILL.md"))
+	if err != nil {
+		t.Fatalf("read automations skill: %v", err)
+	}
+	skill := string(body)
+	for _, want := range []string{
+		"Never ask for one, never accept one pasted into the conversation",
+		"never pass `--slack-webhook`",
+		"--slack-connection",
+		"Automations page",
+	} {
+		if !strings.Contains(skill, want) {
+			t.Errorf("the automations skill lacks %q", want)
+		}
 	}
 }

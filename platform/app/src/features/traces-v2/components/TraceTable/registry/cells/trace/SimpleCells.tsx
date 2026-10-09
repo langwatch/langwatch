@@ -1,5 +1,5 @@
 import { Badge, Text } from "@chakra-ui/react";
-import { useFilterStore } from "~/features/traces-v2/stores/filterStore";
+import { useExplorerStore } from "~/features/traces-v2/stores/explorerStore";
 import type { TraceListItem } from "../../../../../types/trace";
 import { formatTokens } from "../../../../../utils/formatters";
 import {
@@ -37,7 +37,7 @@ function renderOrigin(row: TraceListItem, size: "sm" | "xs") {
   return (
     <FilterChip
       onFilter={() =>
-        useFilterStore.getState().toggleFacet("origin", row.origin)
+        useExplorerStore.getState().toggleFacet("origin", row.origin)
       }
       filterLabel={`Filter by origin "${label}"`}
     >

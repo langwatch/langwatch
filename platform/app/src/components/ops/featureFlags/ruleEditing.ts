@@ -1,0 +1,266 @@
+import type {
+  FeatureFlagRuleMatch,
+  FeatureFlagRules,
+} from "~/server/featureFlag";
+import { emailDomainsOf } from "~/server/featureFlag/rules";
+
+/**
+ * The editing model behind the targeting-rules dialog.
+ *
+ * Stored rules are a `match` object with optional keys; the dialog shows one
+ * scope picker and one field. Translating between the two shapes is the only
+ * thing in here, kept free of React so the ordering decisions — which are
+ * where first-match-wins bites — can be read and tested on their own.
+ *
+ * @see specs/ops/internal-feature-flags.feature
+ */
+
+export type ScopeKind =
+  | "EVERYONE"
+  | "ORGANIZATION"
+  | "PROJECT"
+  /** Organizations created on or after a date — shown as "New users". */
+  | "NEW_USERS"
+  /** A stable share of users, in percent, shown as "Percentage of users". */
+  | "PERCENTAGE"
+  /** Signed-in users at one or more email domains, shown as "Email domain". */
+  | "EMAIL_DOMAIN";
+
+export interface UIRule {
+  /**
+   * Identity for React and for drag-reordering. Rules carry no id of their
+   * own and two rules can be identical while the operator fills them in, so
+   * the list index cannot serve: reordering by index makes the wrong row
+   * animate and re-mounts inputs mid-edit.
+   */
+  id: string;
+  scopeKind: ScopeKind;
+  /**
+   * An organization or project id, a date for `NEW_USERS`, a number of
+   * percent for `PERCENTAGE`, or comma-separated domains for `EMAIL_DOMAIN`.
+   */
+  target: string;
+  enabled: boolean;
+  /**
+   * Conditions the stored rule carries that this one-field editor has no
+   * control for. A `match` is a conjunction, so a rule naming both an
+   * organization and an age would come back from the dialog as the
+   * organization alone — silently widening the rollout to that organization's
+   * whole history. Carrying them through means the dialog can only change
+   * what it can show.
+   */
+  otherConditions: FeatureFlagRuleMatch;
+}
+
+let nextRuleId = 0;
+
+export function newRuleId(): string {
+  nextRuleId += 1;
+  return `rule-${nextRuleId}`;
+}
+
+export function newRule(): UIRule {
+  return {
+    id: newRuleId(),
+    scopeKind: "ORGANIZATION",
+    target: "",
+    enabled: true,
+    otherConditions: {},
+  };
+}
+
+export function rulesToUI(rules: FeatureFlagRules): UIRule[] {
+  // Empty input → seed the dialog with one org-scoped rule so operators
+  // see the shape they're about to fill in instead of an empty pane.
+  if (rules.length === 0) return [newRule()];
+  return rules.map((rule) => {
+    const base = { id: newRuleId(), enabled: rule.enabled };
+    if (rule.match.organizationId) {
+      return {
+        ...base,
+        scopeKind: "ORGANIZATION" as const,
+        target: rule.match.organizationId,
+        otherConditions: without({ match: rule.match, key: "organizationId" }),
+      };
+    }
+    if (rule.match.projectId) {
+      return {
+        ...base,
+        scopeKind: "PROJECT" as const,
+        target: rule.match.projectId,
+        otherConditions: without({ match: rule.match, key: "projectId" }),
+      };
+    }
+    if (rule.match.organizationCreatedAfter) {
+      return {
+        ...base,
+        scopeKind: "NEW_USERS" as const,
+        target: toDateInputValue(rule.match.organizationCreatedAfter),
+        otherConditions: without({
+          match: rule.match,
+          key: "organizationCreatedAfter",
+        }),
+      };
+    }
+    if (rule.match.percentageRollout !== undefined) {
+      return {
+        ...base,
+        scopeKind: "PERCENTAGE" as const,
+        target: String(rule.match.percentageRollout),
+        otherConditions: without({
+          match: rule.match,
+          key: "percentageRollout",
+        }),
+      };
+    }
+    if (rule.match.emailDomain !== undefined) {
+      return {
+        ...base,
+        scopeKind: "EMAIL_DOMAIN" as const,
+        target: emailDomainsOf(rule.match.emailDomain).join(", "),
+        otherConditions: without({ match: rule.match, key: "emailDomain" }),
+      };
+    }
+    return {
+      ...base,
+      scopeKind: "EVERYONE" as const,
+      target: "",
+      otherConditions: {},
+    };
+  });
+}
+
+export function uiToRules(rules: UIRule[]): FeatureFlagRules {
+  return rules.map((rule) => {
+    const target = rule.target.trim();
+    // Conditions the editor cannot show ride along, except under "Everyone":
+    // choosing it is the operator saying the rule matches every context, and
+    // a leftover condition would quietly make that untrue.
+    const rest = rule.scopeKind === "EVERYONE" ? {} : rule.otherConditions;
+    return {
+      match: { ...rest, ...OWNED_CONDITION[rule.scopeKind](target) },
+      enabled: rule.enabled,
+    };
+  });
+}
+
+/** The one condition each scope owns, from the field beside the picker. */
+const OWNED_CONDITION: Record<
+  ScopeKind,
+  (target: string) => FeatureFlagRuleMatch
+> = {
+  EVERYONE: () => ({}),
+  ORGANIZATION: (target) => ({ organizationId: target }),
+  PROJECT: (target) => ({ projectId: target }),
+  NEW_USERS: (target) => ({ organizationCreatedAfter: target }),
+  PERCENTAGE: (target) => ({ percentageRollout: Number(target) }),
+  EMAIL_DOMAIN: (target) => ({
+    emailDomain: singleOrList(parseEmailDomains(target)),
+  }),
+};
+
+/**
+ * The domains typed into the email domain field, in their stored form:
+ * split on commas, lowercased, without padding or a leading `@`, empties
+ * dropped. An operator pastes "@Acme.com, acme.io" and the rule stores
+ * `["acme.com", "acme.io"]`.
+ */
+export function parseEmailDomains(target: string): string[] {
+  return target
+    .split(",")
+    .map((domain) => domain.trim().toLowerCase().replace(/^@/, ""))
+    .filter((domain) => domain !== "");
+}
+
+/** One domain is stored as a string, several as a list. */
+function singleOrList(domains: string[]): string | string[] {
+  const [only] = domains;
+  return domains.length === 1 && only !== undefined ? only : domains;
+}
+
+/** The rule's other conditions: its match without the one the scope owns. */
+function without({
+  match,
+  key,
+}: {
+  match: FeatureFlagRuleMatch;
+  key: keyof FeatureFlagRuleMatch;
+}): FeatureFlagRuleMatch {
+  const { [key]: _owned, ...rest } = match;
+  return rest;
+}
+
+/**
+ * Where an added rule goes.
+ *
+ * Rules are first-match-wins, and an "Everyone" rule matches every context,
+ * so anything below one can never fire. Appending to a list that ends in
+ * Everyone therefore hands the operator a rule that reads as live and is
+ * dead — the new rule goes directly above it instead. With no trailing
+ * Everyone rule, an added rule is the lowest-priority one, which is what
+ * appending already means.
+ */
+export function insertionIndexForNewRule(rules: UIRule[]): number {
+  const last = rules[rules.length - 1];
+  return last?.scopeKind === "EVERYONE" ? rules.length - 1 : rules.length;
+}
+
+export function withRuleAdded(rules: UIRule[], rule: UIRule): UIRule[] {
+  const index = insertionIndexForNewRule(rules);
+  return [...rules.slice(0, index), rule, ...rules.slice(index)];
+}
+
+/** Moves the rule with `fromId` to the position currently held by `toId`. */
+export function withRuleMoved(
+  rules: UIRule[],
+  { fromId, toId }: { fromId: string; toId: string },
+): UIRule[] {
+  const from = rules.findIndex((rule) => rule.id === fromId);
+  const to = rules.findIndex((rule) => rule.id === toId);
+  if (from < 0 || to < 0 || from === to) return rules;
+  const moved = [...rules];
+  const [rule] = moved.splice(from, 1);
+  if (!rule) return rules;
+  moved.splice(to, 0, rule);
+  return moved;
+}
+
+/**
+ * The rule this operator has left unfillable, or undefined when every rule
+ * can match something. A scoped rule with no target, a new-users rule with
+ * no date and a domain rule with an `@` in it are all rules the operator
+ * believes are live.
+ */
+export function findUnfillableRule(rules: UIRule[]): UIRule | undefined {
+  return rules.find((rule) => {
+    if (rule.scopeKind === "EVERYONE") return false;
+    const target = rule.target.trim();
+    if (target === "") return true;
+    if (rule.scopeKind === "PERCENTAGE") return !isPercentage(target);
+    if (rule.scopeKind === "EMAIL_DOMAIN") return !areEmailDomains(target);
+    return false;
+  });
+}
+
+function isPercentage(target: string): boolean {
+  const percentage = Number(target);
+  return Number.isFinite(percentage) && percentage >= 0 && percentage <= 100;
+}
+
+function areEmailDomains(target: string): boolean {
+  const domains = parseEmailDomains(target);
+  return domains.length > 0 && domains.every((d) => !/[@\s]/.test(d));
+}
+
+/**
+ * Renders a stored `organizationCreatedAfter` for an `<input type="date">`,
+ * which only accepts `YYYY-MM-DD`. Rows written by this dialog already carry
+ * that shape; a full ISO instant written by hand or by a future writer is
+ * narrowed to its day rather than silently emptying the field.
+ */
+function toDateInputValue(stored: string): string {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(stored)) return stored;
+  const parsed = Date.parse(stored);
+  if (Number.isNaN(parsed)) return "";
+  return new Date(parsed).toISOString().slice(0, 10);
+}

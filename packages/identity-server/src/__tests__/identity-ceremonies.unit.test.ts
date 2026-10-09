@@ -35,9 +35,10 @@ function harness(options?: {
       .mockResolvedValue(
         options?.email === undefined ? "sam@acme.com" : options.email,
       ),
-    // The ceremonies never ask it — the collision guard does, one layer
-    // down — but the double is the whole port.
+    // The ceremonies never ask these — the collision guard and the join
+    // door do, one layer down — but the double is the whole port.
     findUserIdByEmail: vi.fn().mockResolvedValue(null),
+    findVerifiedLegacyEmail: vi.fn().mockResolvedValue(null),
   };
   const identity = {
     attachIdentifier: vi.fn(options?.attach ?? (async () => [])),
@@ -70,7 +71,9 @@ describe("the identity ceremonies", () => {
     it("emits nothing and leaves the row write untouched", async () => {
       const { ceremonies, identity } = harness({ latched: false });
 
-      expect(await ceremonies.beforeAccountCreate(accountRow())).toBeUndefined();
+      expect(
+        await ceremonies.beforeAccountCreate(accountRow()),
+      ).toBeUndefined();
       await ceremonies.beforeAccountDelete(accountRow());
       await ceremonies.beforeUserDelete({ id: USER });
 
@@ -150,7 +153,9 @@ describe("the identity ceremonies", () => {
     it("attaches nothing when the user carries no email value", async () => {
       const { ceremonies, identity } = harness({ email: null });
 
-      expect(await ceremonies.beforeAccountCreate(accountRow())).toBeUndefined();
+      expect(
+        await ceremonies.beforeAccountCreate(accountRow()),
+      ).toBeUndefined();
       expect(identity.attachIdentifier).not.toHaveBeenCalled();
     });
 
@@ -193,6 +198,7 @@ describe("the identity ceremonies", () => {
 
   describe("when a latched user is about to be deleted", () => {
     /** @scenario "Deleting a latched user runs the erase ceremony before the row delete" */
+    /** @scenario Tenant retention never enrolls durable security projections */
     it("erases the user before the row goes", async () => {
       const { ceremonies, identity } = harness();
 

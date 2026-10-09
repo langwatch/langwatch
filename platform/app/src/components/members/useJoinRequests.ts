@@ -1,8 +1,9 @@
-import type { DomainJoinSetting } from "@langwatch/identity";
+import type { DomainJoinSetting, JoinerRole } from "@langwatch/identity";
 import { useCallback, useMemo, useState } from "react";
 import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
 import { toaster } from "../ui/toaster";
+import type { AutomaticJoin } from "./AutomaticJoinsNotice";
 import type { PendingJoinRequest } from "./JoinRequestsTable";
 
 /**
@@ -24,7 +25,42 @@ export function useJoinRequests(scope: {
 }) {
   const answers = usePendingJoinRequests(scope);
   const joining = useDomainJoinSetting(scope);
-  return { ...answers, ...joining };
+  const automatic = useAutomaticJoins(scope);
+  return { ...answers, ...joining, ...automatic };
+}
+
+/**
+ * Who walked in without anybody approving, lately.
+ *
+ * The in-product half of telling the admins after the fact: the mail goes out
+ * the moment it happens, and this is what an admin who was not reading their
+ * inbox sees. An organization that never turned automatic joining on gets an
+ * empty list and the notice does not render.
+ */
+function useAutomaticJoins({
+  organizationId,
+  canManage,
+}: {
+  organizationId: string;
+  canManage: boolean;
+}) {
+  const automaticJoins = api.joinRequests.automaticJoins.useQuery(
+    { organizationId },
+    { enabled: !!organizationId && canManage },
+  );
+
+  const joins: AutomaticJoin[] = useMemo(
+    () =>
+      (automaticJoins.data ?? []).map((join) => ({
+        joinRequestId: join.joinRequestId,
+        name: join.name,
+        domain: join.domain,
+        joinedAt: join.joinedAt,
+      })),
+    [automaticJoins.data],
+  );
+
+  return { automaticJoins: joins };
 }
 
 /**
@@ -80,6 +116,30 @@ function useAnswerJoinRequest({ organizationId }: { organizationId: string }) {
 }
 
 /** What is waiting, and the two answers. */
+/**
+ * How many people are waiting, and nothing else.
+ *
+ * For the settings menu, which wants the NUMBER without the approve and
+ * reject machinery `useJoinRequests` builds around it — a sidebar rendered on
+ * every settings page must not mount two mutations to draw a badge.
+ *
+ * Undefined until the answer is in, so a caller can tell "nobody is waiting"
+ * from "we have not asked yet" and draw neither a wrong zero nor a flicker.
+ */
+export function usePendingJoinRequestCount({
+  organizationId,
+  canManage,
+}: {
+  organizationId: string | undefined;
+  canManage: boolean;
+}): number | undefined {
+  const pending = api.joinRequests.pending.useQuery(
+    { organizationId: organizationId ?? "" },
+    { enabled: !!organizationId && canManage },
+  );
+  return pending.data?.length;
+}
+
 function usePendingJoinRequests({
   organizationId,
   canManage,
@@ -107,6 +167,7 @@ function usePendingJoinRequests({
         domain: request.domain,
         requestedAt: request.requestedAt,
         expiresAt: request.expiresAt,
+        seat: request.seat,
       })),
     [pending.data],
   );
@@ -117,8 +178,7 @@ function usePendingJoinRequests({
         joinRequestId,
         run: approveMutation,
         title: "Request approved",
-        description:
-          "They are a member now, with your organization's default role.",
+        description: "They are a member now, in the seat their request showed.",
       }),
     [answer, approveMutation],
   );
@@ -155,7 +215,12 @@ function useDomainJoinSetting({
   const setJoiningMutation = api.joinRequests.setJoining.useMutation();
 
   const setJoining = useCallback(
-    (next: { domainJoin: DomainJoinSetting; domains: string[] }) => {
+    (next: {
+      domainJoin: DomainJoinSetting;
+      domains: string[];
+      /** Left out when the card hid the seat; the server keeps the one in force. */
+      joinerRole?: JoinerRole;
+    }) => {
       setJoiningMutation.mutate(
         { organizationId, ...next },
         {
@@ -186,6 +251,7 @@ function useDomainJoinSetting({
     joining: joining.data ?? {
       domainJoin: "request" as const,
       joinDomains: [],
+      joinerRole: "MEMBER" as const,
     },
     savingJoining: setJoiningMutation.isPending,
     setJoining,

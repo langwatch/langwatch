@@ -216,6 +216,23 @@ describe("customerIoTraceSync subscriber", () => {
     });
   });
 
+  describe("given a project whose first trace is one of Langy's own turns", () => {
+    /** @scenario "Langy's own turn does not reach Customer.io as a first trace" */
+    it("makes no nurturing call at all", async () => {
+      const deps = createDeps();
+      const subscriber = createCustomerIoTraceSyncSubscriber(deps);
+      const state = createFoldState({
+        attributes: { "langwatch.origin": "langy" },
+      });
+
+      await subscriber.handler(createEvent(), createContext(state));
+
+      expect(deps.projects.resolveOrgAdmin).not.toHaveBeenCalled();
+      expect(deps.nurturing.identifyUser).not.toHaveBeenCalled();
+      expect(deps.nurturing.trackEvent).not.toHaveBeenCalled();
+    });
+  });
+
   describe("given a project that already has traces", () => {
     describe("when a new trace is processed", () => {
       /** @scenario 'Subsequent traces update count and timestamp with debouncing' */

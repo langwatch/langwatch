@@ -29,6 +29,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import { seedCustomRole, seedRoleBinding } from "~/test-utils/authz-seeds";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { prisma } from "../../../db";
 import {
@@ -80,14 +81,12 @@ describe("virtualKeys.update — guardrail attach", () => {
     });
     // ORG-scoped ADMIN RoleBinding grants virtualKeys:manage (org) +
     // cascades gatewayGuardrails:attach to every project in the org.
-    await prisma.roleBinding.create({
-      data: {
-        organizationId: ORG_ID,
-        userId: USER_ID,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: ORG_ID,
-      },
+    await seedRoleBinding(prisma, {
+      organizationId: ORG_ID,
+      userId: USER_ID,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: ORG_ID,
     });
     await prisma.team.create({
       data: {
@@ -182,23 +181,19 @@ describe("virtualKeys.update — guardrail attach", () => {
         role: OrganizationUserRole.MEMBER,
       },
     });
-    await prisma.customRole.create({
-      data: {
-        id: NOATTACH_ROLE_ID,
-        organizationId: ORG_ID,
-        name: `manage-no-attach-${ns}`,
-        permissions: ["virtualKeys:manage", "gatewayGuardrails:view"],
-      },
+    await seedCustomRole(prisma, {
+      id: NOATTACH_ROLE_ID,
+      organizationId: ORG_ID,
+      name: `manage-no-attach-${ns}`,
+      permissions: ["virtualKeys:manage", "gatewayGuardrails:view"],
     });
-    await prisma.roleBinding.create({
-      data: {
-        organizationId: ORG_ID,
-        userId: NOATTACH_USER_ID,
-        role: TeamUserRole.CUSTOM,
-        customRoleId: NOATTACH_ROLE_ID,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: ORG_ID,
-      },
+    await seedRoleBinding(prisma, {
+      organizationId: ORG_ID,
+      userId: NOATTACH_USER_ID,
+      role: TeamUserRole.CUSTOM,
+      customRoleId: NOATTACH_ROLE_ID,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: ORG_ID,
     });
 
     noAttachCaller = appRouter.createCaller(
@@ -227,8 +222,10 @@ describe("virtualKeys.update — guardrail attach", () => {
     await prisma.evaluator.deleteMany({
       where: { projectId: { in: [DEMO_PROJECT_ID, OTHER_PROJECT_ID] } },
     });
+    await prisma.grant.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.roleBinding.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.customRole.deleteMany({ where: { organizationId: ORG_ID } });
+    await prisma.role.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.teamUser.deleteMany({
       where: { team: { organizationId: ORG_ID } },
     });

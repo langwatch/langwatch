@@ -1,6 +1,10 @@
 import type { SerializedHandledError } from "@langwatch/handled-error";
 import { useCallback, useState } from "react";
-import { describeError, explainSerializedError } from "../features/errors";
+import {
+  describeError,
+  explainSerializedError,
+  readHandledError,
+} from "../features/errors";
 import { api } from "../utils/api";
 
 /**
@@ -43,6 +47,11 @@ export function useModelProviderApiKeyValidation(
 ) {
   const [isValidating, setIsValidating] = useState(false);
   const [validationError, setValidationError] = useState<string | undefined>();
+  // The stable code behind `validationError`, for the analytics that count
+  // refusals by cause without carrying the copy (or the key).
+  const [validationErrorCode, setValidationErrorCode] = useState<
+    string | undefined
+  >();
   const utils = api.useUtils();
   // A mutation, so the key travels in a request body rather than encoded into
   // a URL. See the procedure for why that matters.
@@ -60,6 +69,7 @@ export function useModelProviderApiKeyValidation(
 
     setIsValidating(true);
     setValidationError(undefined);
+    setValidationErrorCode(undefined);
 
     try {
       const result = await validateApiKey({
@@ -72,6 +82,7 @@ export function useModelProviderApiKeyValidation(
 
       if (!result.valid) {
         setValidationError(describeRefusal(result.domainError));
+        setValidationErrorCode(result.domainError.code);
         return false;
       }
 
@@ -85,6 +96,7 @@ export function useModelProviderApiKeyValidation(
       setValidationError(
         describeError({ error, fallbackTitle: "Couldn't check this API key" }),
       );
+      setValidationErrorCode(readHandledError(error)?.code ?? "unknown");
       return false;
     } finally {
       setIsValidating(false);
@@ -137,11 +149,13 @@ export function useModelProviderApiKeyValidation(
 
   const clearError = useCallback(() => {
     setValidationError(undefined);
+    setValidationErrorCode(undefined);
   }, []);
 
   return {
     isValidating,
     validationError,
+    validationErrorCode,
     validate,
     validateWithCustomUrl,
     clearError,

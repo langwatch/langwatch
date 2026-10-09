@@ -136,24 +136,36 @@ describe("PresenceMenuItem", () => {
     });
   });
 
-  describe("given the avatar dropdown in DashboardLayout", () => {
+  describe("given the avatar dropdown in the navigation shell", () => {
     /** @scenario Avatar menu omits the presence toggle off the traces page */
     it("gates the PresenceMenuItem render on the /[project]/traces pathname", () => {
-      const layoutSrc = readFileSync(
-        resolve(__dirname, "../../DashboardLayout.tsx"),
+      const shellStateSrc = readFileSync(
+        resolve(
+          __dirname,
+          "../../../features/navigation/shell/useNavigationV2ShellState.ts",
+        ),
         "utf8",
       );
       // The gating expression is the source of truth: the menu item is
       // only rendered when this flag is true, so the route check
       // staying in place is what enforces the off-traces behavior.
-      expect(layoutSrc).toMatch(
-        /showPresenceMenuItem\s*=\s*router\.pathname\.startsWith\("\/\[project\]\/traces"\)/,
+      expect(shellStateSrc).toMatch(
+        /showPresenceMenuItem:\s*pathname\.startsWith\("\/\[project\]\/traces"\)/,
       );
-      expect(layoutSrc).toMatch(
-        /showPresenceMenuItem=\{showPresenceMenuItem\}/,
+      // Both header surfaces in the shell pass the gate through to the
+      // avatar menu.
+      const topBarSrc = readFileSync(
+        resolve(
+          __dirname,
+          "../../../features/navigation/shell/ShellTopBar.tsx",
+        ),
+        "utf8",
       );
-      // The avatar menu was extracted to AppHeaderUserMenu; it renders
-      // the entry only when the gate is passed in true.
+      expect(topBarSrc).toMatch(
+        /showPresenceMenuItem=\{state\.showPresenceMenuItem\}/,
+      );
+      // The avatar menu renders the entry only when the gate is passed
+      // in true.
       const menuSrc = readFileSync(
         resolve(__dirname, "../../AppHeaderUserMenu.tsx"),
         "utf8",

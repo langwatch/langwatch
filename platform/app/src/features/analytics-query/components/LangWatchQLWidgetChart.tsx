@@ -16,7 +16,7 @@
  * result is a refusal on that one card rather than a crash taking the grid.
  *
  * @see ./LazyLangWatchQLWidgetChart — the boundary to mount instead
- * @see specs/analytics/lwql-saved-charts.feature
+ * @see specs/lwql/saved-charts.feature
  */
 
 import { Box } from "@chakra-ui/react";

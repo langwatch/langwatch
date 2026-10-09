@@ -7,7 +7,12 @@ import { useOnboardingStore } from "../../store/onboardingStore";
 
 let isTourDismissed = false;
 let isTourPreferenceResolved = true;
+let isGuidedPathActive = false;
 const mockPersistDismissal = vi.fn();
+
+vi.mock("~/features/guided-onboarding/guidedPathActive", () => ({
+  useGuidedPathActive: () => isGuidedPathActive,
+}));
 
 vi.mock("../useTraceExplorerTourPreference", () => ({
   useTraceExplorerTourPreference: () => ({
@@ -24,6 +29,7 @@ describe("useFirstTraceSpotlightTrigger", () => {
     vi.useFakeTimers();
     isTourDismissed = false;
     isTourPreferenceResolved = true;
+    isGuidedPathActive = false;
     mockPersistDismissal.mockReset();
     useOnboardingStore.setState({
       firstTraceSpotlightFired: false,
@@ -56,6 +62,37 @@ describe("useFirstTraceSpotlightTrigger", () => {
         expect(useOnboardingStore.getState().spotlightsActive).toBe(false);
         expect(useOnboardingStore.getState().firstTraceSpotlightFired).toBe(
           false,
+        );
+      });
+    });
+  });
+
+  describe("given a guided onboarding path is being set up", () => {
+    describe("when traces arrive in the project", () => {
+      /** @scenario "no other coach mark starts while a guided path is active" */
+      it("starts no coach mark, and starts it once the path is done", () => {
+        isGuidedPathActive = true;
+
+        const { rerender } = renderHook(() =>
+          useFirstTraceSpotlightTrigger({
+            projectId: "current-project",
+            hasAnyTraces: true,
+          }),
+        );
+        act(() => vi.advanceTimersByTime(2_000));
+
+        expect(useOnboardingStore.getState().spotlightsActive).toBe(false);
+        expect(useOnboardingStore.getState().firstTraceSpotlightFired).toBe(
+          false,
+        );
+
+        isGuidedPathActive = false;
+        rerender();
+        act(() => vi.advanceTimersByTime(2_000));
+
+        expect(useOnboardingStore.getState().spotlightsActive).toBe(true);
+        expect(useOnboardingStore.getState().firstTraceSpotlightFired).toBe(
+          true,
         );
       });
     });

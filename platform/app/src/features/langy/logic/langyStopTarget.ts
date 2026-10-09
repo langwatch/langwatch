@@ -20,6 +20,11 @@
  * newer than any projection, so it cannot be the stale one. Once this tab has
  * no unsettled turn of its own, the durable id is the only truth left.
  *
+ * A send this tab has made but the server has not answered yet is newer still,
+ * and its turn has no id here. The durable id may then be a turn that has
+ * already ended (the projection lags both ways), so it is not offered: the
+ * caller keeps the stop and sends it when the ids land (`stopPending`).
+ *
  * PURE — `(ids) → target`, no store and no React — so the honesty rule is
  * testable directly: `dispatch` is the ONLY outcome the caller may show a
  * "stopping" state for.
@@ -36,11 +41,10 @@ export type LangyStopTarget =
       kind: "unavailable";
       /**
        * `no-conversation` — nothing is open to stop (a stale click).
-       * `turn-not-identified` — a turn is in flight but neither this tab nor
-       * the durable record can name it yet. That is the real window between a
-       * message being sent and the turn being accepted on the record: a tab
-       * that did not send it genuinely does not know what to stop, and must say
-       * so rather than pretend.
+       * `turn-not-identified` — a turn is in flight but no id names it yet.
+       * That is the window between a message being sent and the server
+       * answering with the ids. Nothing can be dispatched, so the caller keeps
+       * the user's stop and dispatches it when an id arrives.
        */
       reason: "no-conversation" | "turn-not-identified";
     };
@@ -50,6 +54,7 @@ export function resolveLangyStopTarget({
   conversationId,
   localTurnId,
   localSettledTurnId,
+  localSendPending = false,
   durableTurnId,
 }: {
   projectId: string | null | undefined;
@@ -58,6 +63,8 @@ export function resolveLangyStopTarget({
   localTurnId: string | null;
   /** The turn a genuine end-of-turn frame settled (`settledTurnId`). */
   localSettledTurnId: string | null;
+  /** Whether this tab sent a message the server has not answered with ids yet. */
+  localSendPending?: boolean;
   /** The turn the durable record has in flight, or null if it names none. */
   durableTurnId: string | null;
 }): LangyStopTarget {
@@ -66,7 +73,11 @@ export function resolveLangyStopTarget({
   }
   const ownsLiveTurn =
     localTurnId !== null && localTurnId !== localSettledTurnId;
-  const turnId = ownsLiveTurn ? localTurnId : durableTurnId;
+  const turnId = ownsLiveTurn
+    ? localTurnId
+    : localSendPending
+      ? null
+      : durableTurnId;
   if (!turnId) {
     return { kind: "unavailable", reason: "turn-not-identified" };
   }

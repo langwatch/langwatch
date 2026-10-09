@@ -7,6 +7,7 @@ import { safeTruncate } from "~/utils/truncate";
 
 export const auditLog = async ({
   userId,
+  actorUserId,
   organizationId,
   projectId,
   action,
@@ -17,7 +18,18 @@ export const auditLog = async ({
   targetKind,
   targetId,
 }: {
+  /** WHOSE access was used — the subject. Under an impersonation this is the
+   *  customer, which is what the session's `user.id` already resolves to. */
   userId: string;
+  /**
+   * Who really did it, when that is not `userId`.
+   *
+   * Omitted on an ordinary request, where the two are the same person.
+   * Supplied under an impersonation, so the one durable record of the act
+   * names the operator rather than filing it against the customer whose
+   * access they borrowed.
+   */
+  actorUserId?: string | null;
   organizationId?: string;
   projectId?: string;
   action: string;
@@ -34,6 +46,8 @@ export const auditLog = async ({
   await prisma.auditLog.create({
     data: {
       userId,
+      // Only when it says something `userId` does not.
+      actorUserId: actorUserId && actorUserId !== userId ? actorUserId : null,
       organizationId,
       projectId,
       action,

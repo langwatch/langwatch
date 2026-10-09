@@ -1,8 +1,8 @@
 # langwatch-langyagent helm chart
 
-Deploys the **Langy agent pod** — the OpenCode "manager" (Go, `services/langyagent/`) that
+Deploys the **Langy agent pod** — the worker manager (Go, `services/langyagent/`) that
 backs the in-product Langy assistant. The manager spawns one isolated
-OpenCode subprocess per conversation and injects that request's credentials
+worker subprocess per conversation and injects that request's credentials
 into the subprocess env at spawn time, so sessions never share credentials.
 
 This is an **internal-only** service: it has no Ingress and a default-deny
@@ -63,15 +63,15 @@ kubectl -n <namespace> get deploy <release>-langyagent \
 
 Everything else in the install keeps running either way.
 
-Unsandboxed, you keep per-worker UID isolation, the per-worker opencode
-password, and the NetworkPolicy; you give up the pod-to-host sandbox. A
+Unsandboxed, you keep per-worker UID isolation, workers that bind no
+listener, and the NetworkPolicy; you give up the pod-to-host sandbox. A
 single-tenant install whose users are colleagues carries a much smaller
 worker-versus-worker risk than a multi-tenant one; read the trade that way,
 not as a formality.
 
 ### Standalone
 
-You bring your own control plane, set `OPENCODE_AGENT_URL` on it manually, and
+You bring your own control plane, set `LANGY_AGENT_URL` on it manually, and
 create the shared Secret yourself so both sides hold the same value:
 
 ```bash
@@ -96,12 +96,12 @@ Override the Secret/key names via `secrets.existingSecretName` and
 | `environment`                 | Deployment environment reported as `ENVIRONMENT` (empty → inherits `global.env` → `production`). Security-load-bearing: prod pods must report a production environment so the manager refuses `LANGY_UNSAFE_DEV_DISABLE_ISOLATION` |
 | `image.tag`                   | Image tag override (defaults to `Chart.AppVersion`)                     |
 | `replicaCount`                | **Keep at 1** — see Scaling below                                       |
-| `manager.maxWorkers`          | Max concurrent OpenCode subprocesses before the pod returns 503         |
+| `manager.maxWorkers`          | Max concurrent worker subprocesses before the pod returns 503           |
 | `manager.workerIdleMs`        | Idle worker reap timeout (default 10 min)                               |
 | `secrets.existingSecretName`  | Name of the Secret created above                                        |
 | `resources`                   | Pod CPU/memory requests + limits                                        |
 | `networkPolicy.ingressFrom`   | Which pods may call the agent (default: `app.kubernetes.io/name: langwatch`) |
-| `networkPolicy.allowExternalHttps` | Allow egress :443 to anywhere (OpenCode update/telemetry); tighten once pinned |
+| `networkPolicy.allowExternalHttps` | Allow egress :443 to anywhere (git/gh/npm); tighten once pinned |
 | `networkPolicy.privateExcept` / `privateExceptV6` | Private/link-local/CGNAT CIDRs carved out of the `:443`-to-anywhere rule so a worker cannot pivot to internal services. Includes `100.64.0.0/10` (EKS CGNAT). Append your cluster's CIDR if it lives outside RFC1918 |
 | `egress.fqdnFloor` / `requireTls` / `enforceFloor` / `sniCrossCheck` / `egress.cilium.enabled` | ADR-076 per-worker L7 egress adapter: operator FQDN floor + enforcement toggles. Stock posture is monitor-only for destination decisions; `egress.cilium.enabled` ships a bypass-proof datapath `toFQDNs` policy |
 | `nodeSelector` / `affinity` / `tolerations` | Node placement. Opt-in **public-subnet** pinning is a defence-in-depth wall (a node with no route to private RDS/ElastiCache). Needs a Terraform-side node group; see Network policy below |
@@ -121,7 +121,7 @@ Both probes hit the manager's HTTP listener (port `8080`, named `http`):
 without first adding conversation-sticky routing.** The manager keeps
 per-conversation workers in memory keyed by `conversationId`. With a second
 replica, a follow-up turn that lands on the other pod cold-starts a fresh
-worker (it still works, but loses the warm session and its OpenCode session
+worker (it still works, but loses the warm session and its agent session
 id). Scale **vertically** instead — raise `resources` and
 `manager.maxWorkers`.
 

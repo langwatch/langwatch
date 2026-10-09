@@ -1,269 +1,50 @@
-import { describeRoute } from "hono-openapi";
-import { nanoid } from "nanoid";
-import { ZodError, z } from "zod";
-import { createProjectApp, requires } from "~/server/api/security";
-import { validator as zValidator } from "~/server/api/validation";
-import {
-  type AgentComponentConfig,
-  agentTypeSchema,
-} from "../../../../server/agents/agent.repository";
-import { patchZodOpenapi } from "../../../../utils/extend-zod-openapi";
-import {
-  type AgentServiceMiddlewareVariables,
-  agentServiceMiddleware,
-} from "../../middleware/agent-service";
-import { NotFoundError, UnprocessableEntityError } from "../../shared/errors";
-import { agentPlatformUrl } from "../agent-platform-url";
-import { handleAgentError } from "./error-handler";
-
-patchZodOpenapi();
-
-// -- Validation schemas --
-
-const paginationQuerySchema = z.object({
-  page: z.coerce.number().int().positive().optional().default(1),
-  limit: z.coerce.number().int().positive().max(1000).optional().default(50),
-});
-
-const createAgentSchema = z.object({
-  name: z.string().min(1, "name is required").max(255),
-  type: agentTypeSchema,
-  config: z.record(z.unknown()),
-  workflowId: z.string().optional(),
-});
-
-const updateAgentSchema = z.object({
-  name: z.string().min(1).max(255).optional(),
-  type: agentTypeSchema.optional(),
-  config: z.record(z.unknown()).optional(),
-  workflowId: z.string().nullable().optional(),
-});
-
 /**
- * Maps AgentNotFoundError from the service layer to the HTTP NotFoundError.
+ * The agents REST family on the versioned API framework, `/api/v1/agents`.
+ *
+ * It holds the agents themselves (list, create, read, update, archive), the
+ * one-off test run, the relay call of a connected agent, and the HTTP
+ * long-poll transport of the connect protocol under `/connect`. The
+ * WebSocket upgrade `GET /api/v1/agents/connect` is served by the connect
+ * gateway on the same listener, not by this app.
+ *
+ * `/api/agents` is the deprecated alias of the endpoints that predate this
+ * family; it lives in `alias.ts`.
  */
-function mapAgentNotFoundError(error: unknown): never {
-  if (error instanceof Error && error.name === "AgentNotFoundError") {
-    throw new NotFoundError("Agent not found");
-  }
-  throw error;
+
+import { AgentService } from "~/server/agents/agent.service";
+import { createProjectService } from "~/server/api/v1/project-service";
+import { V1_API_VERSION } from "~/server/api/v1/version";
+import { getLongPollTransport } from "~/server/connected-agents/long-poll.process";
+import type { LongPollTransport } from "~/server/connected-agents/long-poll.transport";
+import { prisma } from "~/server/db";
+import { registerAgentEndpoints, registerAgentTestEndpoint } from "./agents.v1";
+import { registerCallEndpoint } from "./call.v1";
+import { registerConnectEndpoints } from "./connect.v1";
+
+/** Builds the family over one long-poll transport; tests pass their own. */
+export function createAgentsApp({
+  transport,
+}: {
+  transport: () => LongPollTransport;
+}) {
+  const { service, guard } = createProjectService({
+    name: "agents",
+    basePath: "/api/v1/agents",
+  });
+
+  return service
+    .provide({
+      agents: () => AgentService.create(prisma),
+    })
+    .version(V1_API_VERSION, (v) => {
+      // The static /connect paths go first: a `/:id` verb registered before
+      // them would answer for the segment "connect".
+      registerConnectEndpoints({ v, transport });
+      registerAgentEndpoints({ v, guard, docs: "published" });
+      registerAgentTestEndpoint({ v, guard });
+      registerCallEndpoint({ v, guard });
+    })
+    .build();
 }
 
-/**
- * Maps ZodError from config validation to a 422 UnprocessableEntityError.
- * Config is validated against the agent type's DSL schema in the repository layer.
- */
-function mapConfigValidationError(error: unknown): never {
-  if (error instanceof ZodError) {
-    const issue = error.issues[0];
-    throw new UnprocessableEntityError(
-      issue?.message ?? "Invalid agent config",
-    );
-  }
-  throw error;
-}
-
-const secured = createProjectApp<AgentServiceMiddlewareVariables>({
-  basePath: "/api/agents",
-});
-
-secured.hono.onError(handleAgentError);
-
-// ── List Agents (paginated) ──────────────────────────────────
-secured.access(requires("project:view")).get(
-  "/",
-  agentServiceMiddleware,
-  describeRoute({
-    description: "List all non-archived agents for the project (paginated)",
-  }),
-  zValidator("query", paginationQuerySchema),
-  async (c) => {
-    const project = c.get("project");
-    const { page, limit } = c.req.valid("query");
-    const service = c.get("agentService");
-
-    const result = await service.listAgents({
-      projectId: project.id,
-      page,
-      limit,
-    });
-
-    return c.json({
-      ...result,
-      data: result.data.map((a: { id: string; type: string }) => ({
-        ...a,
-        platformUrl: agentPlatformUrl({
-          projectSlug: project.slug,
-          agentId: a.id,
-          agentType: a.type,
-        }),
-      })),
-    });
-  },
-);
-
-// ── Create Agent ─────────────────────────────────────────────
-secured.access(requires("project:update")).post(
-  "/",
-  agentServiceMiddleware,
-  describeRoute({
-    description: "Create a new agent",
-  }),
-  zValidator("json", createAgentSchema),
-  async (c) => {
-    const project = c.get("project");
-    const { name, type, config, workflowId } = c.req.valid("json");
-    const service = c.get("agentService");
-
-    let agent;
-    try {
-      agent = await service.create({
-        id: `agent_${nanoid()}`,
-        projectId: project.id,
-        name,
-        type,
-        config: config as AgentComponentConfig,
-        workflowId,
-      });
-    } catch (error) {
-      return mapConfigValidationError(error);
-    }
-
-    return c.json(
-      {
-        id: agent.id,
-        name: agent.name,
-        type: agent.type,
-        config: agent.config,
-        createdAt: agent.createdAt,
-        updatedAt: agent.updatedAt,
-        platformUrl: agentPlatformUrl({
-          projectSlug: project.slug,
-          agentId: agent.id,
-          agentType: agent.type,
-        }),
-      },
-      201,
-    );
-  },
-);
-
-// ── Get Single Agent ─────────────────────────────────────────
-secured.access(requires("project:view")).get(
-  "/:id",
-  agentServiceMiddleware,
-  describeRoute({
-    description: "Get an agent by its id",
-  }),
-  async (c) => {
-    const { id } = c.req.param();
-    const project = c.get("project");
-    const service = c.get("agentService");
-
-    let agent;
-    try {
-      agent = await service.getByIdOrThrow({
-        id,
-        projectId: project.id,
-      });
-    } catch (error) {
-      return mapAgentNotFoundError(error);
-    }
-
-    return c.json({
-      id: agent.id,
-      name: agent.name,
-      type: agent.type,
-      config: agent.config,
-      createdAt: agent.createdAt,
-      updatedAt: agent.updatedAt,
-      platformUrl: agentPlatformUrl({
-        projectSlug: project.slug,
-        agentId: agent.id,
-        agentType: agent.type,
-      }),
-    });
-  },
-);
-
-// ── Update Agent ─────────────────────────────────────────────
-secured.access(requires("project:update")).patch(
-  "/:id",
-  agentServiceMiddleware,
-  describeRoute({
-    description: "Update an agent by its id",
-  }),
-  zValidator("json", updateAgentSchema),
-  async (c) => {
-    const { id } = c.req.param();
-    const project = c.get("project");
-    const body = c.req.valid("json");
-    const service = c.get("agentService");
-
-    let agent;
-    try {
-      agent = await service.updateOrThrow({
-        id,
-        projectId: project.id,
-        data: {
-          ...(body.name && { name: body.name }),
-          ...(body.type && { type: body.type }),
-          ...(body.config && { config: body.config as AgentComponentConfig }),
-          ...(body.workflowId !== undefined && {
-            workflowId: body.workflowId,
-          }),
-        },
-      });
-    } catch (error) {
-      if (error instanceof Error && error.name === "AgentNotFoundError") {
-        throw new NotFoundError("Agent not found");
-      }
-      return mapConfigValidationError(error);
-    }
-
-    return c.json({
-      id: agent.id,
-      name: agent.name,
-      type: agent.type,
-      config: agent.config,
-      createdAt: agent.createdAt,
-      updatedAt: agent.updatedAt,
-      platformUrl: agentPlatformUrl({
-        projectSlug: project.slug,
-        agentId: agent.id,
-        agentType: agent.type,
-      }),
-    });
-  },
-);
-
-// ── Delete (Archive) Agent ───────────────────────────────────
-secured.access(requires("project:delete")).delete(
-  "/:id",
-  agentServiceMiddleware,
-  describeRoute({
-    description: "Archive an agent (soft-delete)",
-  }),
-  async (c) => {
-    const { id } = c.req.param();
-    const project = c.get("project");
-    const service = c.get("agentService");
-
-    try {
-      const agent = await service.archiveAgent({
-        id,
-        projectId: project.id,
-      });
-      return c.json({
-        id: agent.id,
-        name: agent.name,
-        type: agent.type,
-        archivedAt: agent.archivedAt,
-      });
-    } catch (error) {
-      return mapAgentNotFoundError(error);
-    }
-  },
-);
-
-export const app = secured.hono;
+export const app = createAgentsApp({ transport: getLongPollTransport });

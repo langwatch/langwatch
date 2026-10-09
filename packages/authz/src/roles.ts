@@ -1,11 +1,6 @@
 /**
- * ADR-092 §1 — built-in roles declared as differences, not duplicate lists.
- * viewer is the base; member = viewer + additions; admin = member +
- * additions. The computed sets are parity-tested cell-for-cell against the
- * legacy bags in `server/api/rbac.ts` (roles-parity.unit.test.ts) — that
- * suite is the safety net the whole ADR-092 migration stands on.
- *
- * Client-safe: no Prisma, no env.
+ * Built-in roles share a viewer base. The complete permission matrix is
+ * checked against an independent compatibility fixture in roles-parity.unit.test.ts.
  */
 import { type AuthzPermission, permissionSatisfiedBy } from "./registry";
 
@@ -16,7 +11,23 @@ export type BuiltinRoleKey =
   | "lite-member"
   | "demo-viewer"
   | "org-admin"
-  | "org-member";
+  | "org-member"
+  | typeof PROJECT_READER_ROLE_KEY;
+
+/** ADR-144: the role key a shared project-to-project grant carries. */
+export const PROJECT_READER_ROLE_KEY = "project-reader" as const;
+
+/**
+ * ADR-144: everything a project-reader grant may do, and nothing else. An
+ * aggregate project reads its members' traces and analytics; it never
+ * manages, shares, annotates or sees prompts, datasets or secrets. The list
+ * is closed on purpose - the matcher test proves every other permission is
+ * denied through this role.
+ */
+export const PROJECT_READER_PERMISSIONS: readonly AuthzPermission[] = [
+  "traces:view",
+  "analytics:view",
+];
 
 const VIEWER: readonly AuthzPermission[] = [
   "project:view",
@@ -164,6 +175,17 @@ const ORG_ADMIN: readonly AuthzPermission[] = [
   "webhookEndpoints:manage",
   "gatewaySpend:view",
   "gatewaySpend:manage",
+  // The organization's cost screen. Attached to ADMIN by default for the
+  // same reason the rest of the governance family is: an admin has to be
+  // able to open the screen before they can delegate it to anyone else.
+  "governanceCost:view",
+  // The organization administrator IS the IT administrator on self-hosted:
+  // there is nobody else to hold single sign-on and directory sync, and a
+  // fresh install has no custom-role authoring surface to mint one. The
+  // license gates whether the capability exists; this only says who may use
+  // it where it does (D05, ADR-122).
+  "sso:view",
+  "sso:manage",
 ];
 
 const ORG_MEMBER: readonly AuthzPermission[] = [
@@ -179,6 +201,7 @@ const ROLE_PERMISSION_SETS: Record<BuiltinRoleKey, ReadonlySet<string>> = {
   "demo-viewer": new Set(DEMO_VIEWER),
   "org-admin": new Set(ORG_ADMIN),
   "org-member": new Set(ORG_MEMBER),
+  "project-reader": new Set(PROJECT_READER_PERMISSIONS),
 };
 
 export function builtinRolePermissions(

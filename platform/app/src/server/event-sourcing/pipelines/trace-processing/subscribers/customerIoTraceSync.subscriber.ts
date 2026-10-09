@@ -11,6 +11,7 @@ import type {
 } from "../../../pipeline/processManagerDefinition";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
 import type { TraceProcessingEvent } from "../schemas/events";
+import { isRealFirstIngest } from "./projectMetadata.subscriber";
 
 const logger = createLogger(
   "langwatch:trace-processing:customer-io-trace-sync",
@@ -59,6 +60,11 @@ export function createCustomerIoTraceSyncSubscriber(
       context: TriggerContext<TraceSummaryData>,
     ): Promise<void> {
       const { tenantId: projectId, state: foldState } = context;
+
+      // Seeded samples and Langy's own turns are not the customer's traces:
+      // the same rule that keeps them from flipping Project.firstMessage
+      // keeps them out of the CRM milestones.
+      if (!isRealFirstIngest(foldState)) return;
 
       try {
         const { userId, firstMessage } =

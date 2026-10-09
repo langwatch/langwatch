@@ -72,6 +72,19 @@ func TestToolEnd_CarriesFlagInputAndOutput(t *testing.T) {
 	}
 }
 
+// The marker of a call that ran in the developer's folder rides the end frame
+// and only that frame: a sandbox end carries no local field at all.
+func TestToolEndLocal_MarksTheFrame(t *testing.T) {
+	local := asMap(t, mk(ToolEndLocal("tc-3", "bash", json.RawMessage(`{"command":"git push"}`), false, "pushed", 0)))
+	if local["local"] != true {
+		t.Fatalf("a local tool end must carry local=true, got %v", local)
+	}
+	sandbox := asMap(t, mk(ToolEnd("tc-4", "bash", json.RawMessage(`{"command":"git push"}`), false, "pushed", 0)))
+	if _, present := sandbox["local"]; present {
+		t.Fatalf("a sandbox tool end must carry no local field, got %v", sandbox)
+	}
+}
+
 func TestFinal_CarriesTextAndToolCalls(t *testing.T) {
 	out := "result"
 	f, err := Final("the answer", []ToolCall{{ID: "t", Name: "bash", Output: &out}})

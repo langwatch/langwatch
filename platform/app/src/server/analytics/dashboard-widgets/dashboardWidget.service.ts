@@ -1,0 +1,384 @@
+/**
+ * Dashboard widgets — the write path the REST surface uses.
+ *
+ * A lean twin of {@link SavedWorkbenchChartService} for the playground's own
+ * rows: `CustomGraph` records of kind {@link DASHBOARD_SRCDOC_CHART_KIND},
+ * whose `graph` column holds a {@link DashboardWidgetDefinition}
+ * (`{ version, code, queries }`). Every read and write filters by that kind
+ * alongside `projectId`, so a dashboard widget is never read, updated or
+ * deleted through the builder or workbench paths — the same invariant the
+ * `dashboardWidgets` tRPC router keeps for the UI.
+ *
+ * Deliberately thin: unlike the workbench chart service there is no LangWatchQL
+ * or Vega-Lite governor to call, because a widget's queries are validated at
+ * run time by `LW.query` inside the sandbox (see
+ * {@link validateDashboardWidgetQueryParams}), not at save. The persistence shape is
+ * the one the tRPC router already writes; this module exists so the REST route
+ * that backs the `langwatch dashboard-widget` CLI has a single, kind-scoped
+ * write path instead of reaching into Prisma from the handler.
+ *
+ * @see ../dashboardWidgetDefinition — the `graph` column's versioned shape
+ * @see ../../api/routers/dashboardWidgets.ts — the UI's tRPC twin
+ */
+
+import { HandledError } from "@langwatch/handled-error";
+import { nanoid } from "nanoid";
+
+import type {
+  CustomGraph,
+  Prisma,
+  PrismaClient,
+} from "~/generated/prisma/client";
+import {
+  CHART_GRID_DEFAULT_COL_SPAN,
+  CHART_GRID_DEFAULT_ROW_SPAN,
+  chartGridBottomRow,
+} from "~/server/analytics/chartGrid";
+import { DASHBOARD_SRCDOC_CHART_KIND } from "~/server/analytics/chartKinds";
+import { dashboardBelongsToProject } from "~/server/analytics/dashboardBelongsToProject";
+import {
+  DASHBOARD_WIDGET_DEFINITION_VERSION,
+  type DashboardWidgetDefinition,
+  type DashboardWidgetQuery,
+  dashboardWidgetDefinitionSchema,
+} from "~/server/analytics/dashboardWidgetDefinition";
+
+/**
+ * No dashboard widget with that id in this project.
+ *
+ * A widget belonging to another project earns this too, and that is the point:
+ * the answer must not let a caller tell "not yours" from "never existed" — the
+ * same reasoning as {@link SavedWorkbenchChartNotFoundError}, applied to the
+ * dashboard widget's id space.
+ */
+export class DashboardWidgetNotFoundError extends HandledError {
+  declare readonly code: "dashboard_widget_not_found";
+
+  constructor() {
+    super("dashboard_widget_not_found", "Dashboard widget not found.", {
+      httpStatus: 404,
+      fault: "customer",
+    });
+    this.name = "DashboardWidgetNotFoundError";
+  }
+}
+
+/**
+ * A stored definition does not match the versioned schema.
+ *
+ * `platform` fault and a 5xx on purpose: every write goes through a schema, so
+ * a row that cannot be read back is something this application got wrong — a
+ * hand-edited row, or a version skew a build shipped. Charging it to the
+ * customer would file a real defect as routine noise.
+ */
+export class DashboardWidgetDefinitionInvalidError extends HandledError {
+  declare readonly code: "dashboard_widget_definition_invalid";
+
+  constructor(widgetId: string, options: { reasons?: readonly Error[] } = {}) {
+    super(
+      "dashboard_widget_definition_invalid",
+      "This dashboard widget's definition could not be read.",
+      {
+        httpStatus: 500,
+        fault: "platform",
+        meta: { widgetId },
+        ...options,
+      },
+    );
+    this.name = "DashboardWidgetDefinitionInvalidError";
+  }
+}
+
+/** A dashboard widget as every caller above this layer sees it. */
+export interface DashboardWidget {
+  readonly id: string;
+  readonly projectId: string;
+  readonly name: string;
+  /** Already parsed against the versioned schema — never raw `Json`. */
+  readonly definition: DashboardWidgetDefinition;
+  readonly createdAt: Date;
+  readonly updatedAt: Date;
+  /** `null` when the widget is not on a dashboard — the playground page is not one. */
+  readonly dashboardId: string | null;
+  readonly gridColumn: number;
+  readonly gridRow: number;
+  readonly colSpan: number;
+  readonly rowSpan: number;
+}
+
+/** The definition fields a create or update supplies. */
+export interface DashboardWidgetDefinitionInput {
+  readonly code: string;
+  readonly queries: readonly DashboardWidgetQuery[];
+}
+
+const graphOf = (
+  input: DashboardWidgetDefinitionInput,
+): Prisma.InputJsonValue => ({
+  version: DASHBOARD_WIDGET_DEFINITION_VERSION,
+  code: input.code,
+  queries: input.queries as DashboardWidgetQuery[],
+});
+
+/**
+ * Dashboard widgets — the only way the REST surface writes one.
+ *
+ * Constructed with a Prisma client rather than injected repositories: the
+ * write path is direct and kind-scoped, and the prototype has no unit suite to
+ * drive against an in-memory store. Mirror {@link SavedWorkbenchChartService}
+ * if that changes.
+ */
+export class DashboardWidgetService {
+  private constructor(private readonly prisma: PrismaClient) {}
+
+  /** Builds the service with its production dependencies. */
+  static create(prisma: PrismaClient): DashboardWidgetService {
+    return new DashboardWidgetService(prisma);
+  }
+
+  /** Every dashboard widget in a project, ordered as the page shows them. */
+  async getAll({
+    projectId,
+  }: {
+    projectId: string;
+  }): Promise<DashboardWidget[]> {
+    const rows = await this.prisma.customGraph.findMany({
+      where: { projectId, kind: DASHBOARD_SRCDOC_CHART_KIND },
+      orderBy: [{ gridRow: "asc" }, { gridColumn: "asc" }],
+    });
+    return rows.map((row) => this.present(row));
+  }
+
+  /**
+   * One dashboard widget.
+   *
+   * @throws {DashboardWidgetNotFoundError} when no widget of this kind has
+   *   that id in this project — including when it has that id in another one.
+   */
+  async getById({
+    id,
+    projectId,
+  }: {
+    id: string;
+    projectId: string;
+  }): Promise<DashboardWidget> {
+    const row = await this.prisma.customGraph.findFirst({
+      where: { id, projectId, kind: DASHBOARD_SRCDOC_CHART_KIND },
+    });
+    if (!row) throw new DashboardWidgetNotFoundError();
+    return this.present(row);
+  }
+
+  /**
+   * Saves a new widget below the lowest row it would collide with.
+   *
+   * Row computation and write share one interactive transaction so two
+   * concurrent creates cannot read the same maximum row and then both write
+   * it — the placement is atomic, not last-writer-wins.
+   *
+   * @throws {DashboardWidgetNotFoundError} when `dashboardId` is given but
+   *   names no dashboard in this project — including one in another project,
+   *   which must not be distinguishable from a missing one (IDOR).
+   */
+  async createWidget({
+    projectId,
+    dashboardId,
+    input,
+  }: {
+    projectId: string;
+    /** When placing on a dashboard; absent for the unplaced authoring grid. */
+    dashboardId?: string;
+    input: { name: string } & DashboardWidgetDefinitionInput;
+  }): Promise<DashboardWidget> {
+    const row = await this.prisma.$transaction(async (tx) => {
+      if (
+        dashboardId !== undefined &&
+        !(await dashboardBelongsToProject(tx, dashboardId, projectId))
+      ) {
+        throw new DashboardWidgetNotFoundError();
+      }
+
+      // Scoped to the placement target: a card on another dashboard must not
+      // push this one down. Unplaced widgets share the kind-scoped authoring
+      // grid; a placed one shares the whole target dashboard's grid.
+      const existing = await tx.customGraph.findMany({
+        where:
+          dashboardId === undefined
+            ? { projectId, kind: DASHBOARD_SRCDOC_CHART_KIND }
+            : { projectId, dashboardId },
+        select: { gridRow: true, rowSpan: true },
+      });
+
+      return await tx.customGraph.create({
+        data: {
+          id: nanoid(),
+          projectId,
+          name: input.name,
+          kind: DASHBOARD_SRCDOC_CHART_KIND,
+          graph: graphOf(input),
+          ...(dashboardId === undefined ? {} : { dashboardId }),
+          gridColumn: 0,
+          gridRow: chartGridBottomRow(existing),
+          colSpan: CHART_GRID_DEFAULT_COL_SPAN,
+          rowSpan: CHART_GRID_DEFAULT_ROW_SPAN,
+        },
+      });
+    });
+    return this.present(row);
+  }
+
+  /**
+   * Updates a widget's name, its definition, or both, then returns it.
+   *
+   * @throws {DashboardWidgetNotFoundError} when the update touches no row —
+   *   a missing id, or one in another project.
+   */
+  async updateWidget({
+    id,
+    projectId,
+    input,
+  }: {
+    id: string;
+    projectId: string;
+    input: { name?: string } & Partial<DashboardWidgetDefinitionInput>;
+  }): Promise<DashboardWidget> {
+    await this.prisma.$transaction(async (tx) => {
+      const data: Prisma.CustomGraphUpdateManyMutationInput = {};
+      if (input.name !== undefined) data.name = input.name;
+
+      if (input.code !== undefined || input.queries !== undefined) {
+        data.graph = await this.mergeDefinitionUpdate({
+          tx,
+          id,
+          projectId,
+          input,
+        });
+      }
+
+      const result = await tx.customGraph.updateMany({
+        where: { id, projectId, kind: DASHBOARD_SRCDOC_CHART_KIND },
+        data,
+      });
+      if (result.count === 0) throw new DashboardWidgetNotFoundError();
+    });
+    return this.getById({ id, projectId });
+  }
+
+  /**
+   * Reads back the stored definition and re-merges it with a partial update.
+   *
+   * A partial definition update keeps the untouched half: `code` alone must
+   * not blank the stored queries, nor `queries` alone the stored code. The
+   * `graph` column is one JSON blob, so the surviving side is read back and
+   * re-merged inside the caller's transaction rather than overwritten.
+   *
+   * @throws {DashboardWidgetNotFoundError} when the widget is not in this
+   *   transaction's project scope.
+   */
+  private async mergeDefinitionUpdate({
+    tx,
+    id,
+    projectId,
+    input,
+  }: {
+    tx: Prisma.TransactionClient;
+    id: string;
+    projectId: string;
+    input: Partial<DashboardWidgetDefinitionInput>;
+  }): Promise<Prisma.CustomGraphUpdateManyMutationInput["graph"]> {
+    const current = await tx.customGraph.findFirst({
+      where: { id, projectId, kind: DASHBOARD_SRCDOC_CHART_KIND },
+    });
+    if (!current) throw new DashboardWidgetNotFoundError();
+    const { definition } = this.present(current);
+    return graphOf({
+      code: input.code ?? definition.code,
+      queries: input.queries ?? definition.queries,
+    });
+  }
+
+  /**
+   * Deletes a widget.
+   *
+   * @throws {DashboardWidgetNotFoundError} when nothing was deleted, so a
+   *   caller cannot tell a foreign id from a gone one by the status.
+   */
+  async deleteWidget({
+    id,
+    projectId,
+  }: {
+    id: string;
+    projectId: string;
+  }): Promise<void> {
+    const result = await this.prisma.customGraph.deleteMany({
+      where: { id, projectId, kind: DASHBOARD_SRCDOC_CHART_KIND },
+    });
+    if (result.count === 0) throw new DashboardWidgetNotFoundError();
+  }
+
+  /**
+   * Adds a widget to a dashboard at the next free row, keeping its size.
+   *
+   * Row computation and write share one interactive transaction so two
+   * concurrent assignments cannot both read the same maximum row and overlap.
+   *
+   * @throws {DashboardWidgetNotFoundError} when the target dashboard is not in
+   *   this project (including one in another project, indistinguishable from
+   *   missing — IDOR), or when the update touches no widget row.
+   */
+  async assignToDashboard({
+    id,
+    projectId,
+    dashboardId,
+  }: {
+    id: string;
+    projectId: string;
+    dashboardId: string;
+  }): Promise<DashboardWidget> {
+    await this.prisma.$transaction(async (tx) => {
+      if (!(await dashboardBelongsToProject(tx, dashboardId, projectId))) {
+        throw new DashboardWidgetNotFoundError();
+      }
+      // Next free row on the TARGET dashboard across every kind (gridRow is shared
+      // between the widget-authoring grid and dashboard grid — accepted prototype coupling).
+      const onDashboard = await tx.customGraph.findMany({
+        where: { projectId, dashboardId },
+        select: { gridRow: true, rowSpan: true },
+      });
+      const result = await tx.customGraph.updateMany({
+        where: { id, projectId, kind: DASHBOARD_SRCDOC_CHART_KIND },
+        data: {
+          dashboardId,
+          gridColumn: 0,
+          gridRow: chartGridBottomRow(onDashboard),
+          // colSpan/rowSpan intentionally untouched — keep the widget's size.
+        },
+      });
+      if (result.count === 0) throw new DashboardWidgetNotFoundError();
+    });
+    return this.getById({ id, projectId });
+  }
+
+  /** Parses a row's `graph` against the versioned schema, loud on a bad row. */
+  private present(row: CustomGraph): DashboardWidget {
+    const parsed = dashboardWidgetDefinitionSchema.safeParse(row.graph);
+    if (!parsed.success) {
+      throw new DashboardWidgetDefinitionInvalidError(row.id, {
+        reasons: [parsed.error],
+      });
+    }
+    return {
+      id: row.id,
+      projectId: row.projectId,
+      name: row.name,
+      definition: parsed.data,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      dashboardId: row.dashboardId,
+      gridColumn: row.gridColumn,
+      gridRow: row.gridRow,
+      colSpan: row.colSpan,
+      rowSpan: row.rowSpan,
+    };
+  }
+}

@@ -1,3 +1,4 @@
+import type { AuthzPermission as Permission } from "@langwatch/authz";
 import {
   type AuthzPermission,
   type DeclaredScopeId,
@@ -6,13 +7,14 @@ import {
   type TierOfScopeArg,
 } from "@langwatch/authz";
 import { type Authorized, mintWitness } from "@langwatch/authz/witness";
-import type { Permission } from "~/server/api/rbac";
 import type {
   ApiKeyPermissionCheck,
+  ApiKeyProjectDecisionsQuery,
   CredentialDecisionRepository,
   ProjectScope,
 } from "./credential-decision.repository";
 import {
+  DeveloperSeatRestrictedError,
   LiteMemberRestrictedError,
   ProjectPermissionDeniedError,
 } from "./errors";
@@ -60,7 +62,9 @@ export class PermissionsService {
    * Asserts that a user holds the given permission on a project.
    *
    * Throws {@link LiteMemberRestrictedError} when the denial is caused by the
-   * user being a Lite Member (EXTERNAL org role), and
+   * user being a Lite Member (EXTERNAL org role),
+   * {@link DeveloperSeatRestrictedError} when it is caused by a Developer seat
+   * (ADR-143) reaching outside its own project, and
    * {@link ProjectPermissionDeniedError} for every other denial (not a member,
    * or a member whose role does not carry the permission). Both are handled
    * errors carrying a code — callers must never tell them apart by message.
@@ -88,6 +92,11 @@ export class PermissionsService {
     if (!permitted) {
       if (organizationRole === "EXTERNAL") {
         throw new LiteMemberRestrictedError(
+          permission.split(":")[0] ?? "unknown",
+        );
+      }
+      if (organizationRole === "DEVELOPER") {
+        throw new DeveloperSeatRestrictedError(
           permission.split(":")[0] ?? "unknown",
         );
       }
@@ -159,6 +168,11 @@ export class PermissionsService {
         check.permission.split(":")[0] ?? "unknown",
       );
     }
+    if (organizationRole === "DEVELOPER") {
+      throw new DeveloperSeatRestrictedError(
+        check.permission.split(":")[0] ?? "unknown",
+      );
+    }
     throw new PermissionDeniedError({
       permission: check.permission,
       scope: { type: scope.tier, id: scope.id },
@@ -210,6 +224,23 @@ export class PermissionsService {
    */
   async hasApiKeyPermission(check: ApiKeyPermissionCheck): Promise<boolean> {
     return await this.credentials.findApiKeyDecision(check);
+  }
+
+  /**
+   * {@link hasApiKeyPermission} across a set of project scopes and
+   * permissions in one organization — the same `key ∩ owner` decision per
+   * (project, permission), answered from grant snapshots collected ONCE.
+   *
+   * The batch is the contract, not an optimization a caller may skip: asking
+   * per project fans one collector pass of several queries out per project
+   * per permission, and across a large organization that demands the whole
+   * connection pool at once (the v1 pull-request usage rollup answered a
+   * 10-second P2024 500 exactly this way).
+   */
+  async apiKeyProjectCuts(
+    query: ApiKeyProjectDecisionsQuery,
+  ): Promise<Map<Permission, Map<string, boolean>>> {
+    return await this.credentials.findApiKeyProjectDecisions(query);
   }
 
   /**

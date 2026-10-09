@@ -7,6 +7,7 @@ import { UserNotInOrganizationError } from "~/server/role-bindings/errors";
 import { slugify } from "~/utils/slugify";
 import type {
   PaginatedResult,
+  TeamProjectListing,
   TeamRepository,
 } from "./repositories/team.repository";
 
@@ -195,6 +196,31 @@ export class LiteMemberViewerOnlyError extends HandledError {
   }
 }
 
+/**
+ * A role on a shared team, project or the organisation was asked for
+ * somebody on a Developer seat (ADR-143).
+ *
+ * The seat holds the person's own personal team and nothing shared, so there
+ * is no team role that would be allowed: the way forward is a different seat,
+ * and the message says so.
+ */
+export class DeveloperSeatNoSharedAccessError extends HandledError {
+  declare readonly code: "developer_seat_no_shared_access";
+
+  constructor(scopeName?: string | null) {
+    super(
+      "developer_seat_no_shared_access",
+      "A Developer seat holds no role outside its own personal project.",
+      {
+        meta: scopeName ? { scopeName } : {},
+        httpStatus: 409,
+        fault: "customer",
+      },
+    );
+    this.name = "DeveloperSeatNoSharedAccessError";
+  }
+}
+
 export class TeamRestService {
   constructor(readonly repo: TeamRepository) {}
 
@@ -218,6 +244,35 @@ export class TeamRestService {
     limit: number;
   }): Promise<PaginatedResult<Team>> {
     return this.repo.findAllByOrganization(params);
+  }
+
+  /**
+   * The team's projects, minus the organization's hidden governance home.
+   *
+   * The caller has already established that the team belongs to its
+   * organization; this only widens from team to projects.
+   */
+  async listProjects({
+    teamId,
+    callerOrganizationRole,
+  }: {
+    teamId: string;
+    /** Decides whether aggregate projects are listed (ADR-144 decision 5). */
+    callerOrganizationRole: string | null;
+  }): Promise<TeamProjectListing[]> {
+    return this.repo.findProjectsInTeam({ teamId, callerOrganizationRole });
+  }
+
+  async listMembers({
+    id,
+    organizationId,
+  }: {
+    id: string;
+    organizationId: string;
+  }) {
+    const team = await this.getById({ id, organizationId });
+    if (!team) throw new TeamNotFoundError(id);
+    return this.repo.listMembers({ organizationId, teamId: id });
   }
 
   async create({

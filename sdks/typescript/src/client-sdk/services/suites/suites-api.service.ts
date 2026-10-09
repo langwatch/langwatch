@@ -8,6 +8,7 @@ import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
+import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 
 export type SuiteResponse = NonNullable<
   paths["/api/suites"]["get"]["responses"]["200"]["content"]["application/json"]
@@ -68,6 +69,9 @@ export class SuitesApiError extends Error {
   }
 }
 
+/**
+ * @deprecated Use runPlans and testSuites; /api/suites is a frozen alias.
+ */
 export class SuitesApiService {
   private readonly apiClient: LangwatchApiClient;
 
@@ -79,6 +83,7 @@ export class SuitesApiService {
     const message = formatApiErrorForOperation({ operation: operation, error: error, options: {
       status: extractStatusFromResponse(error),
     } });
+    throwIfHandledError({ operation, error, message });
     throw new SuitesApiError(message, operation, error);
   }
 

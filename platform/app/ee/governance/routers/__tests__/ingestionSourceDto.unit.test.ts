@@ -34,6 +34,69 @@ const row = (overrides: Record<string, unknown> = {}) =>
     ...overrides,
   }) as Parameters<typeof toIngestionSourceDto>[0]["row"];
 
+describe("a source's latest pull result", () => {
+  it("distinguishes provider rate limits from a busy local database", () => {
+    const dto = toIngestionSourceDto({
+      row: row(),
+      liveTraceProjectIds: new Set(),
+      pullRun: {
+        LastRunAt: 1,
+        LastRunOutcome: "failed",
+        LastRunError: "Anthropic rate limit exceeded (HTTP 429).",
+        LastRunErrorCode: "pull_failed",
+      },
+    });
+    expect(dto.pullStatus.error).toBe(
+      "The provider's request limit was reached.",
+    );
+  });
+  it("shows a safe failure reason and saved billing progress without exposing provider tokens or error payloads", () => {
+    const dto = toIngestionSourceDto({
+      row: row({
+        sourceType: "anthropic_admin",
+        pollerCursor: JSON.stringify({
+          startingAt: "2026-01-01T00:00:00Z",
+          watermark: "2026-02-01T00:00:00Z",
+          page: "private-page-token",
+        }),
+      }),
+      liveTraceProjectIds: new Set(),
+      pullRun: {
+        LastRunAt: Date.parse("2026-02-02T12:00:00Z"),
+        LastRunOutcome: "failed",
+        LastRunError: "Too many simultaneous queries; private upstream payload",
+        LastRunErrorCode: "pull_failed",
+      },
+    });
+    expect(dto.pullStatus).toEqual({
+      lastRunAt: "2026-02-02T12:00:00.000Z",
+      outcome: "failed",
+      error: "The database is busy.",
+      backfillThrough: "2026-02-01T00:00:00.000Z",
+      hasMore: true,
+    });
+    expect(JSON.stringify(dto)).not.toContain("private");
+  });
+
+  it("does not present an unstarted or unreadable cursor as completed history", () => {
+    for (const pollerCursor of [
+      null,
+      "not-json",
+      JSON.stringify({
+        startingAt: "2026-01-01T00:00:00Z",
+        page: "private",
+        watermark: null,
+      }),
+    ]) {
+      const dto = toIngestionSourceDto({
+        row: row({ sourceType: "openai_admin", pollerCursor }),
+        liveTraceProjectIds: new Set(),
+      });
+      expect(dto.pullStatus?.backfillThrough).toBeNull();
+    }
+  });
+});
+
 describe("given an ingestion source with a trace destination", () => {
   describe("when the destination is still a live project of this org", () => {
     it("reports it as not archived", () => {

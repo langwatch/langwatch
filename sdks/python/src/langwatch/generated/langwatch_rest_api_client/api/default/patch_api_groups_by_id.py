@@ -6,13 +6,13 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.patch_api_groups_by_id_body import PatchApiGroupsByIdBody
-from ...types import UNSET, Response, Unset, safe_http_status
+from ...types import Response, safe_http_status
 
 
 def _get_kwargs(
     id: str,
     *,
-    body: PatchApiGroupsByIdBody | Unset = UNSET,
+    body: PatchApiGroupsByIdBody,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -23,8 +23,7 @@ def _get_kwargs(
         ),
     }
 
-    if not isinstance(body, Unset):
-        _kwargs["json"] = body.to_dict()
+    _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -54,14 +53,14 @@ def _build_response(*, client: AuthenticatedClient | Client, response: httpx.Res
 def sync_detailed(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
-    body: PatchApiGroupsByIdBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PatchApiGroupsByIdBody,
 ) -> Response[Any]:
     """Rename a group
 
     Args:
         id (str):
-        body (PatchApiGroupsByIdBody | Unset):
+        body (PatchApiGroupsByIdBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -86,14 +85,14 @@ def sync_detailed(
 async def asyncio_detailed(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
-    body: PatchApiGroupsByIdBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PatchApiGroupsByIdBody,
 ) -> Response[Any]:
     """Rename a group
 
     Args:
         id (str):
-        body (PatchApiGroupsByIdBody | Unset):
+        body (PatchApiGroupsByIdBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

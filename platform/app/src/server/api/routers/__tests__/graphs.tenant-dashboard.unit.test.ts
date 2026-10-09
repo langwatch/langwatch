@@ -21,15 +21,21 @@ vi.mock("../../../license-enforcement", async (importOriginal) => {
   return { ...actual, enforceLicenseLimit: vi.fn() };
 });
 
-vi.mock("../../rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../rbac")>();
-  return {
-    ...actual,
-    resolveProjectPermission: vi
-      .fn()
-      .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
-  };
-});
+vi.mock(
+  "~/server/app-layer/authz/permission-adapters",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("~/server/app-layer/authz/permission-adapters")
+      >();
+    return {
+      ...actual,
+      resolveProjectPermission: vi
+        .fn()
+        .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
+    };
+  },
+);
 
 const dashboardFindFirst = vi.fn();
 const graphCreate = vi.fn();
@@ -66,6 +72,24 @@ describe("graph dashboard references", () => {
       where: { id: "dashboard_2", projectId: "project_1" },
       select: { id: true },
     });
+    expect(graphCreate).not.toHaveBeenCalled();
+  });
+});
+
+describe("given a create input whose column and span overflow the grid", () => {
+  it("refuses the placement instead of persisting an off-grid card", async () => {
+    await expect(
+      createCaller().create({
+        projectId: "project_1",
+        name: "Graph",
+        graph: "{}",
+        // Each passes its own bound (column < 8, span <= 8) yet 7 + 2 = 9
+        // overruns the grid's right edge — the same rule `layoutSchema` refuses.
+        gridColumn: 7,
+        colSpan: 2,
+      }),
+    ).rejects.toThrow();
+
     expect(graphCreate).not.toHaveBeenCalled();
   });
 });

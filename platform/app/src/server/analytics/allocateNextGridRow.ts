@@ -1,7 +1,22 @@
-import type { PrismaClient } from "~/generated/prisma/client";
+import type { Prisma, PrismaClient } from "~/generated/prisma/client";
+import { chartGridBottomRow } from "./chartGrid";
 
 /**
- * The next free grid row on a dashboard, counting every chart already on it.
+ * The Prisma surface this needs: a `customGraph.findMany`. Widened from
+ * `PrismaClient` so the same allocator runs inside an interactive
+ * transaction (a {@link Prisma.TransactionClient}) — the read and the write it
+ * feeds must share one transaction, or two concurrent placements can read the
+ * same free row and overlap.
+ */
+type GridRowReader = Pick<
+  PrismaClient | Prisma.TransactionClient,
+  "customGraph"
+>;
+
+/**
+ * The next free grid row on a dashboard, counting every chart already on it:
+ * the row just below the lowest card's bottom edge, so a new card never lands
+ * on top of a tall one.
  *
  * One shared decision rather than two writers guessing: a builder graph
  * created with no explicit row and a saved workbench chart placed with no
@@ -15,13 +30,12 @@ import type { PrismaClient } from "~/generated/prisma/client";
  *   workbench's writer
  */
 export async function allocateNextGridRow(
-  prisma: PrismaClient,
+  prisma: GridRowReader,
   { dashboardId, projectId }: { dashboardId: string; projectId: string },
 ): Promise<number> {
-  const lastGraph = await prisma.customGraph.findFirst({
+  const cards = await prisma.customGraph.findMany({
     where: { dashboardId, projectId },
-    orderBy: { gridRow: "desc" },
-    select: { gridRow: true },
+    select: { gridRow: true, rowSpan: true },
   });
-  return (lastGraph?.gridRow ?? -1) + 1;
+  return chartGridBottomRow(cards);
 }

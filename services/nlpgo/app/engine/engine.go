@@ -23,6 +23,7 @@ import (
 	"github.com/langwatch/langwatch/sdks/go/prompts"
 	"github.com/langwatch/langwatch/services/nlpgo/app"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/agentblock"
+	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/blocktimeout"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/codeblock"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/dataset"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/evaluatorblock"
@@ -596,6 +597,7 @@ func (e *Engine) runCode(ctx context.Context, node *dsl.Node, run nodeRun) (map[
 		Secrets:         run.secrets,
 		Params:          run.params,
 		SandboxAPIKey:   run.sandboxAPIKey,
+		Timeout:         nodeTimeout(node.Data.Parameters),
 	})
 	if err != nil {
 		return nil, run.storeError(&NodeError{Type: "code_runner_error", Message: err.Error()})
@@ -605,6 +607,15 @@ func (e *Engine) runCode(ctx context.Context, node *dsl.Node, run nodeRun) (map[
 		return nil, run.storeError(nodeErrorFromCodeBlock(res.Error))
 	}
 	return res.Outputs, nil
+}
+
+// nodeTimeout reads the node's `timeout_ms` parameter — the same identifier
+// and units the HTTP block uses — as a duration. Missing, zero, negative and
+// values too large to convert all yield 0, which the executors read as "use
+// the configured default". The value is a request for a SHORTER budget only;
+// the code executor clamps it to the operator's ceiling.
+func nodeTimeout(params []dsl.Field) time.Duration {
+	return blocktimeout.FromMillis(paramInt(params, "timeout_ms"))
 }
 
 func (e *Engine) runHTTP(ctx context.Context, node *dsl.Node, inputs map[string]any, ns *NodeState, secrets map[string]string) (map[string]any, *NodeError) {
@@ -698,13 +709,13 @@ func (e *Engine) runSignature(ctx context.Context, node *dsl.Node, inputs map[st
 	// "(unsaved edits)".
 	emitPromptSpans(ctx, node, inputs)
 
-	// Resolve image-typed inputs that carry a remote URL into inline images
-	// before templating. An image-typed field is an explicit attachment, so a
-	// URL it holds that cannot be fetched as an image aborts the run with a
-	// clear error rather than being left as text for the model to guess from.
+	// Resolve image-typed and file-typed inputs that carry a remote URL into
+	// inline attachments before templating. Such a field is an explicit
+	// attachment, so a URL it holds that cannot be fetched aborts the run with
+	// a clear error rather than being left as text for the model to guess from.
 	msgInputs := inputs
 	if e.attachments != nil {
-		inlined, aerr := e.attachments.inlineImageInputs(ctx, node, inputs)
+		inlined, aerr := e.attachments.inlineAttachmentInputs(ctx, node, inputs)
 		if aerr != nil {
 			aerr.NodeID = node.ID
 			return nil, aerr
@@ -712,9 +723,10 @@ func (e *Engine) runSignature(ctx context.Context, node *dsl.Node, inputs map[st
 		msgInputs = inlined
 	}
 
-	// Re-shape any template-interpolated image data URLs into multimodal
-	// content parts so the model receives actual images, not base64 text.
-	messages := splitMessagesWithImages(buildMessages(node, msgInputs))
+	// Re-shape any template-interpolated attachment data URLs into multimodal
+	// content parts so the model receives real pictures, recordings and
+	// documents, not base64 text.
+	messages := splitMessagesWithAttachments(buildMessages(node, msgInputs))
 	// Fetch any remote attachment URLs (http/https) referenced in the messages
 	// and deliver them as content the model can open. A failed fetch aborts the
 	// run with a clear, user-facing error instead of a broken provider request.
@@ -777,10 +789,7 @@ func (e *Engine) runSignature(ctx context.Context, node *dsl.Node, inputs map[st
 	// Use the provider/model form (matching the cost table keys + the LLM span
 	// name) so the consumer's model-cost lookup hits the right entry.
 	if u := resp.Usage; u.TotalTokens > 0 || u.PromptTokens > 0 || u.CompletionTokens > 0 {
-		metricsModel := model
-		if provider != "" && model != "" {
-			metricsModel = provider + "/" + model
-		}
+		metricsModel := modelID(model, provider)
 		ns.Metrics = &NodeMetrics{
 			PromptTokens:     u.PromptTokens,
 			CompletionTokens: u.CompletionTokens,

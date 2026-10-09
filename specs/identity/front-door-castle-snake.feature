@@ -1,4 +1,4 @@
-Feature: The castle Snake - a way to waste a minute at our front door
+Feature: The castle Snake - a way to waste a minute at our auth screens
   As somebody who noticed the castle and poked it twice
   I need a small game that runs on the ground already behind the sign-in card
   So that finding it is a reward, and never finding it costs nothing at all
@@ -8,7 +8,7 @@ Feature: The castle Snake - a way to waste a minute at our front door
   # nothing stored. It exists to be found.
   #
   # The board is the ground's own signal grid - the 72px lattice
-  # `lw-front-door-signal-grid` already draws - and the snake runs along the
+  # `lw-auth-signal-grid` already draws - and the snake runs along the
   # LINES of it rather than through the cells. It eats tokens. A small and
   # visibly unwell molecule gives chase, one step for every three of the
   # snake's, which is the whole difficulty curve.
@@ -19,7 +19,7 @@ Feature: The castle Snake - a way to waste a minute at our front door
   # moment it stops.
 
   Background:
-    Given a hosted deployment with the front door enabled
+    Given a hosted deployment with the auth screens enabled
 
   # Nothing on the page hints at this, which is the point: an easter egg that
   # announces itself is a feature nobody asked for. A double-tap is deliberate

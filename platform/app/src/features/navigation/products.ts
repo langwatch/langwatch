@@ -1,3 +1,4 @@
+import type { AuthzPermission as Permission } from "@langwatch/authz";
 import {
   Boxes,
   Building2,
@@ -5,7 +6,7 @@ import {
   UserRound,
   Waypoints,
 } from "lucide-react";
-import type { Permission } from "~/server/api/rbac";
+import type { OrganizationUserRole } from "~/generated/prisma/client";
 import type { FrontendFeatureFlag } from "~/server/featureFlag/frontendFeatureFlags";
 
 /**
@@ -89,10 +90,57 @@ export const PRODUCTS: readonly ProductDefinition[] = [
   },
 ];
 
+/**
+ * Whether a seat may open a product at all, before any flag or permission
+ * is asked. A Developer (ADR-143) owns a personal project and nothing
+ * shared, and an organization-wide product is shared by definition:
+ * Gateway lists the organization's keys and Governance its people. The
+ * permission gates alone do not keep a Developer out, because the
+ * permissions are evaluated on the project in view, and inside their own
+ * project a Developer holds everything a member holds. So the seat is a
+ * gate of its own, read off the registry's scope, and every surface that
+ * offers or opens a product asks it: the switcher, the rail, the landing
+ * resolver and the page guard.
+ *
+ * Spec: specs/members/developer-seat.feature
+ */
+export function seatReachesProduct({
+  product,
+  organizationRole,
+}: {
+  product: Pick<ProductDefinition, "scopeKind">;
+  organizationRole: OrganizationUserRole | null | undefined;
+}): boolean {
+  if (organizationRole !== "DEVELOPER") return true;
+  return product.scopeKind !== "organization";
+}
+
 export function productById(id: ProductId): ProductDefinition {
   const product = PRODUCTS.find((candidate) => candidate.id === id);
   if (!product) throw new Error(`Unknown product id "${id}"`);
   return product;
+}
+
+/**
+ * Whether a product is an organization-wide surface, read off the registry
+ * rather than from a list of product names. The scope of a product is a
+ * fact the registry owns; the shell route resolver used to type out
+ * "gateway" and "governance" by hand in two separate places, so a fifth
+ * org-wide product meant remembering to edit both. Now it is one entry
+ * here.
+ *
+ * Takes a nullable id because the callers work from the address: there is
+ * no active product on the settings detour, and `productFromPathname`
+ * returns null for every non-product page. A missing product is not
+ * organization-wide, so this looks the id up without `productById`, which
+ * throws on anything unknown.
+ */
+export function isOrganizationScopedProduct(id: ProductId | null): boolean {
+  if (!id) return false;
+  return (
+    PRODUCTS.find((candidate) => candidate.id === id)?.scopeKind ===
+    "organization"
+  );
 }
 
 /**

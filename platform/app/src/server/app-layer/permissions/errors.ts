@@ -17,6 +17,25 @@ export class LiteMemberRestrictedError extends HandledError {
 }
 
 /**
+ * A Developer seat (ADR-143) asked for something outside its personal
+ * project. The seat is the reason, not a missing binding: a Developer can
+ * never be given access to a shared project, so the way forward is a
+ * different seat, and the message says so rather than pointing at an admin
+ * for a role that cannot be granted.
+ */
+export class DeveloperSeatRestrictedError extends HandledError {
+  declare readonly code: "developer_seat_restricted";
+
+  constructor(resource: string) {
+    super("developer_seat_restricted", "This is outside your Developer seat", {
+      meta: { resource },
+      httpStatus: 401,
+    });
+    this.name = "DeveloperSeatRestrictedError";
+  }
+}
+
+/**
  * The caller is signed in and the project exists, but their role does not carry
  * the permission this operation requires.
  *

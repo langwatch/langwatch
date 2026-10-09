@@ -1,5 +1,5 @@
 /**
- * Evaluation-run capability card (`platform_run_experiment`, `platform_run_suite`,
+ * Evaluation-run capability card (`platform_run_experiment`, `platform_run_plan`,
  * `platform_experiment_results`, `platform_experiment_status`).
  *
  * Surfaces the outcome of a run — a status line plus any pass-rate / score the
@@ -28,9 +28,17 @@ import { LangyCapabilityCard } from "./LangyCapabilityCard";
  * A document that reports a run is read structurally: the status is a field or
  * there is no badge, and the lines are counted rather than sliced. Anything
  * else (an MCP tool's prose) keeps the text reading it was written for.
+ *
+ * The CLI's run commands (`scenario run`, `test-suite run`, `run-plan run`)
+ * answer one document: an `outcome` and, once waited for, `tallies` over the
+ * batch and the per-run `results`. The run's state is the batch's, read off
+ * those two fields; a row's verdict under `results` is never the badge. The
+ * suite row once wore the first row's "FAILED" beside a page reading two of
+ * three passed.
  */
 function readRun(output: unknown): {
   status: string | null;
+  tone: BadgeTone | null;
   passRate: string | null;
   lines: string[];
 } {
@@ -43,20 +51,121 @@ function readRun(output: unknown): {
     const passRate = text.match(/([\d.]+\s*%)\s*(?:pass|passed|pass rate)?/i);
     return {
       status: status ? status[1]! : null,
+      tone: null,
       passRate: passRate ? passRate[1]!.replace(/\s+/g, "") : null,
       lines: summaryLines(output, 2),
     };
   }
 
+  const batch = batchRunOf(document);
+  if (batch) return batch;
+
   return {
     status: typeof document.status === "string" ? document.status : null,
+    tone: null,
     passRate: reportedPassRate(document),
     lines: runLines(document),
   };
 }
 
 /** Fields any run document reports about itself, whatever command printed it. */
-const RUN_FIELDS = ["runId", "status", "progress", "total", "passed", "failed"];
+const RUN_FIELDS = [
+  "runId",
+  "status",
+  "progress",
+  "total",
+  "passed",
+  "failed",
+  "outcome",
+  "tallies",
+];
+
+type BadgeTone = "green" | "red" | "orange";
+
+/** The batch's tallies, as the CLI reports them once it waited for the run. */
+type BatchTallies = {
+  total: number;
+  completed: number;
+  passed: number;
+  failed: number;
+};
+
+function talliesOf(value: unknown): BatchTallies | null {
+  if (!value || typeof value !== "object") return null;
+  const { total, completed, passed, failed } = value as Record<string, unknown>;
+  if (
+    typeof total !== "number" ||
+    typeof passed !== "number" ||
+    typeof failed !== "number"
+  ) {
+    return null;
+  }
+  return {
+    total,
+    completed: typeof completed === "number" ? completed : passed + failed,
+    passed,
+    failed,
+  };
+}
+
+type BatchRun = {
+  status: string;
+  tone: BadgeTone;
+  passRate: string | null;
+  lines: string[];
+};
+
+/**
+ * The CLI's batch run document, read as the page reads the run: the state is
+ * whether the batch answered, the rate and the counts come from the tallies.
+ * A run that failed is a finding, not an error, so the badge turns orange,
+ * never red, and the counts say how many.
+ */
+function batchRunOf(document: Record<string, unknown>): BatchRun | null {
+  const outcome = document.outcome;
+  if (typeof outcome !== "string") return null;
+  const tallies = talliesOf(document.tallies);
+  if (!tallies) return unansweredBatch(outcome, document.jobCount);
+  return talliedBatch(outcome, tallies);
+}
+
+/** A batch the CLI did not wait for, or could not read: no tallies, only the jobs it scheduled. */
+function unansweredBatch(outcome: string, jobs: unknown): BatchRun {
+  return {
+    status: outcome === "scheduled" ? "scheduled" : outcome.replace("_", " "),
+    tone: "orange",
+    passRate: null,
+    lines:
+      typeof jobs === "number"
+        ? [`${jobs} ${jobs === 1 ? "run" : "runs"} scheduled`]
+        : [],
+  };
+}
+
+/** The states a wait can end in short of the batch answering. */
+const WAIT_STATES: Record<string, string> = {
+  timeout: "timed out",
+  poll_failure: "unknown",
+};
+
+function talliedBatch(outcome: string, tallies: BatchTallies): BatchRun {
+  const answered = tallies.completed >= tallies.total;
+  const status = WAIT_STATES[outcome] ?? (answered ? "completed" : "running");
+  const clean = status === "completed" && tallies.failed === 0;
+  const settled = tallies.passed + tallies.failed;
+  return {
+    status,
+    tone: clean ? "green" : "orange",
+    passRate:
+      settled > 0 ? `${Math.round((tallies.passed / settled) * 100)}%` : null,
+    lines: [talliesLine(tallies)],
+  };
+}
+
+function talliesLine(tallies: BatchTallies): string {
+  const passed = `${tallies.passed} of ${tallies.total} passed`;
+  return tallies.failed > 0 ? `${passed}, ${tallies.failed} failed` : passed;
+}
 
 function runDocument(output: unknown): Record<string, unknown> | null {
   const value = typeof output === "string" ? parseJson(output) : output;
@@ -104,7 +213,7 @@ function runLines(document: Record<string, unknown>): string[] {
 }
 
 /** A finished run reads as finished; only a real failure reads as red. */
-function statusTone(status: string): "green" | "red" | "orange" {
+function statusTone(status: string): BadgeTone {
   const word = status.toLowerCase();
   if (word === "failed" || word === "error") return "red";
   if (["completed", "finished", "success", "passed"].includes(word)) {
@@ -121,7 +230,7 @@ export function LangyEvalRunCard({
   projectSlug,
 }: CapabilityCardInput) {
   const id = digest?.primaryId ?? extractPrimaryId(input, output);
-  const { status, passRate, lines } = readRun(output);
+  const { status, tone, passRate, lines } = readRun(output);
 
   // Opportunistic: when the run references an experiment the viewer can read,
   // title the card by the experiment's CURRENT name. Anything else (no
@@ -142,7 +251,11 @@ export function LangyEvalRunCard({
               (id ? `Run ${id.slice(0, 10)}` : "Run")}
           </Text>
           {status ? (
-            <Badge size="sm" variant="subtle" colorPalette={statusTone(status)}>
+            <Badge
+              size="sm"
+              variant="subtle"
+              colorPalette={tone ?? statusTone(status)}
+            >
               {status}
             </Badge>
           ) : null}

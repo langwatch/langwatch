@@ -37,8 +37,26 @@ import { findPageAction } from "./pageManifests";
 export const UI_ACTION_CLAIM_WINDOW_MS = 3_000;
 /** Execute budget when the action's manifest declares none. */
 export const UI_ACTION_DEFAULT_BUDGET_MS = 10_000;
-/** Hard ceiling on any execute budget, under the ingress idle timeout. */
-export const UI_ACTION_MAX_BUDGET_MS = 30_000;
+/**
+ * Hard ceiling on any execute budget.
+ *
+ * The dispatch blocks a `langwatch ui call`, and that command runs inside an
+ * agent worker whose harness stops any command at 30 seconds. A ceiling at 30
+ * seconds was therefore a race the CLI always lost: the harness killed it at
+ * the same instant the server gave up, so the caller never read the CLI's
+ * "the action may still have applied" warning, which is written for exactly
+ * that case.
+ *
+ * The ceiling is the WHOLE server wait, claim window included: the dispatch
+ * waits the claim window first, then the rest of the budget, so a 15s ceiling
+ * is 3s of claim plus at most 12s of execute.
+ *
+ * The order that has to hold is: this ceiling (15s) < the CLI's own request
+ * deadline (20s, sdks/typescript/src/cli/commands/ui/call.ts) < the harness
+ * stop (30s), so the failure is always reported by the layer that owns it.
+ * This still clears the ingress idle timeout.
+ */
+export const UI_ACTION_MAX_BUDGET_MS = 15_000;
 /** Pending records outlive the longest possible dispatch, then self-clean. */
 const PENDING_TTL_SECONDS = 60;
 const CLAIM_TTL_SECONDS = 60;
@@ -233,20 +251,39 @@ export class LangyUiActionService {
     definition,
     payload,
     experimentSlug,
+    remainingMs,
   }: {
     actionId: string;
     kind: string;
     definition: NonNullable<ReturnType<typeof findPageAction>>;
     payload: unknown;
     experimentSlug?: string;
+    /** What is left of the ceiling once the claim window is spent. */
+    remainingMs: number;
   }): Promise<UiActionOutcome> {
     if (!this.backendRunner) throw new LangyUiNoBrowserError(kind);
-    const result = await this.backendRunner({
-      kind,
-      definition,
-      payload,
-      experimentSlug,
+    // The backend answers under the same ceiling the page does. Without this
+    // the runner is awaited unbounded, so a slow action runs past the ceiling
+    // and the CLI's deadline reports the failure instead of this layer.
+    //
+    // The action is not cancelled, only stopped being waited on: it may still
+    // apply, which is exactly what the caller is told.
+    let timer: NodeJS.Timeout | undefined;
+    const deadline = new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () => reject(new LangyUiTimeoutError(kind)),
+        remainingMs,
+      );
     });
+    let result: unknown;
+    try {
+      result = await Promise.race([
+        this.backendRunner({ kind, definition, payload, experimentSlug }),
+        deadline,
+      ]);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
     return {
       status: "done",
       executedVia: "backend",
@@ -279,6 +316,14 @@ export class LangyUiActionService {
     experimentSlug?: string;
   }): Promise<UiActionOutcome> {
     const blocking = this.redis.duplicate();
+    // What is left of the ceiling once the claim window is spent. Both the
+    // page and the backend answer inside it, so the whole server wait stays
+    // under the CLI's own deadline whichever side runs the action.
+    const budgetMs = Math.min(
+      definition.executeBudgetMs ?? UI_ACTION_DEFAULT_BUDGET_MS,
+      UI_ACTION_MAX_BUDGET_MS,
+    );
+    const remainingMs = Math.max(1_000, budgetMs - UI_ACTION_CLAIM_WINDOW_MS);
     try {
       const claimWindowSeconds = Math.ceil(UI_ACTION_CLAIM_WINDOW_MS / 1000);
       const first = await blocking.blpop(
@@ -319,17 +364,11 @@ export class LangyUiActionService {
           definition,
           payload,
           experimentSlug,
+          remainingMs,
         });
       }
 
-      const budgetMs = Math.min(
-        definition.executeBudgetMs ?? UI_ACTION_DEFAULT_BUDGET_MS,
-        UI_ACTION_MAX_BUDGET_MS,
-      );
-      const remainingSeconds = Math.max(
-        1,
-        Math.ceil((budgetMs - UI_ACTION_CLAIM_WINDOW_MS) / 1000),
-      );
+      const remainingSeconds = Math.max(1, Math.ceil(remainingMs / 1000));
       const second = await blocking.blpop(
         uiActionKeys.result(actionId),
         remainingSeconds,

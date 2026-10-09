@@ -345,10 +345,13 @@ describe("the writes a claim holder makes", () => {
    * A prisma that records what it was asked to write and reports how many rows
    * each write matched. `matchedRows: 0` is a claim that was taken over while
    * this request's handler was still running.
+   *
+   * The fenced writes are SQL, so what is recorded for them is the bound
+   * values in the order the statement names them.
    */
   function recordingPrisma({ matchedRows }: { matchedRows: number }) {
     const created: PrismaCall[] = [];
-    const updated: PrismaCall[] = [];
+    const updated: unknown[][] = [];
     const deleted: PrismaCall[] = [];
 
     const prisma = {
@@ -357,14 +360,14 @@ describe("the writes a claim holder makes", () => {
           created.push(args);
           return Promise.resolve({ id: RECEIPT_ID });
         },
-        updateMany: (args: PrismaCall) => {
-          updated.push(args);
-          return Promise.resolve({ count: matchedRows });
-        },
         deleteMany: (args: PrismaCall) => {
           deleted.push(args);
           return Promise.resolve({ count: matchedRows });
         },
+      },
+      $executeRaw: (_sql: TemplateStringsArray, ...values: unknown[]) => {
+        updated.push(values);
+        return Promise.resolve(matchedRows);
       },
     } as unknown as PrismaClient;
 
@@ -393,9 +396,10 @@ describe("the writes a claim holder makes", () => {
       const claimId = created[0]?.data?.claimId;
       expect(typeof claimId).toBe("string");
       // The fence, spelled on the write itself rather than checked before it,
-      // so no gap exists between reading the claim and writing under it.
+      // so no gap exists between reading the claim and writing under it. The
+      // statement binds the status, the body, then the receipt and the claim.
       expect(updated).toHaveLength(1);
-      expect(updated[0]?.where).toEqual({ id: RECEIPT_ID, claimId });
+      expect(updated[0]?.slice(2)).toEqual([RECEIPT_ID, claimId]);
       expect(logSpy.error).not.toHaveBeenCalled();
     });
   });

@@ -19,11 +19,14 @@
  * both returns the tenant to its legacy path (no consumer reads it as
  * finalized) and pins it there until a human moves it again.
  */
-export type TenantMigrationStatus =
-  | "migrated"
-  | "finalized"
-  | "parked"
-  | "rolled_back";
+export const TENANT_MIGRATION_STATUSES = [
+  "migrated",
+  "finalized",
+  "parked",
+  "rolled_back",
+] as const;
+
+export type TenantMigrationStatus = (typeof TENANT_MIGRATION_STATUSES)[number];
 
 /**
  * The two terminal states the runner never re-runs: `finalized` is the
@@ -36,6 +39,16 @@ export function isTerminalTenantStatus(
 ): boolean {
   return status === "finalized" || status === "rolled_back";
 }
+
+/**
+ * The same two statuses as a LIST, for the callers that must ask the question
+ * somewhere a predicate cannot go - a tenant source narrowing its enumeration
+ * with `status = ANY(...)` in SQL. Derived from `isTerminalTenantStatus` over
+ * every declared status rather than written out a second time, so a third
+ * terminal state would reach those queries along with the runner.
+ */
+export const TERMINAL_TENANT_STATUSES: readonly TenantMigrationStatus[] =
+  TENANT_MIGRATION_STATUSES.filter(isTerminalTenantStatus);
 
 export type TenantMigrationRecord = {
   migrationName: string;
@@ -65,6 +78,8 @@ export type MigrationPassSummary = {
   tenantsSeen: number;
   finalized: number;
   held: number;
+  /** Held outcomes from migrations that must settle before startup. */
+  finiteHeld?: number;
   parked: number;
   /** Outside the cohort, or an operator's mid-pass pin discarded the
    *  outcome. Never "already done" - that is `alreadyFinalized` /

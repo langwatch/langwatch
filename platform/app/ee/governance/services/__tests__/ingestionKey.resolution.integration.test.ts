@@ -7,11 +7,10 @@
  * integration tests, because they only bite at query time / on the OTLP
  * receiver path):
  *
- *   1. ensureForProject -> ApiKeyRepository.findIngestKey queried ApiKey
- *      WITHOUT organizationId, so the org-tenancy guard
- *      (dbOrganizationIdProtection) rejected every mint/rotate at runtime.
- *      The mints below exercise that path; a missing organizationId predicate
- *      throws before a token is ever returned.
+ *   1. The mint's ApiKey reads once ran WITHOUT organizationId, so the
+ *      org-tenancy guard (dbOrganizationIdProtection) rejected every mint at
+ *      runtime. The mints below exercise that path; a missing organizationId
+ *      predicate throws before a token is ever returned.
  *
  *   2. TokenResolver.resolveApiKey required an externally-supplied projectId.
  *      An ingestion key is self-scoping: the OTLP exporter inside a wrapped
@@ -23,9 +22,8 @@
  *      two-or-more-project keys stay ambiguous and require an explicit
  *      projectId.
  *
- * It also pins the create-only sibling, issueForProject: two machines each
- * hold a live key for one (project, sourceType), where ensureForProject would
- * have revoked the first.
+ * It also pins that issueForProject is create-only: two machines each hold a
+ * live key for one (project, sourceType), and neither mint revokes the other.
  *
  * Spec: specs/ai-gateway/governance/ingest-api-key-lifecycle.feature
  */
@@ -34,8 +32,12 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { TokenResolver } from "~/server/api-key/token-resolver";
 import { prisma } from "~/server/db";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 
 import { IngestionKeyService } from "../ingestionKey.service";
+
+wireDefaultTestApp();
 
 const suffix = nanoid(8);
 const ORG_ID = `org-ik-${suffix}`;
@@ -61,14 +63,12 @@ describe("IngestionKey issuance + self-scoping resolution", () => {
     });
     // Org-scoped ADMIN RoleBinding so the user-owned-key ceiling check
     // (assertBindingsWithinCeiling) lets the caller grant traces:create.
-    await prisma.roleBinding.create({
-      data: {
-        organizationId: ORG_ID,
-        userId: USER_ID,
-        role: "ADMIN",
-        scopeType: "ORGANIZATION",
-        scopeId: ORG_ID,
-      },
+    await seedRoleBinding(prisma, {
+      organizationId: ORG_ID,
+      userId: USER_ID,
+      role: "ADMIN",
+      scopeType: "ORGANIZATION",
+      scopeId: ORG_ID,
     });
     await prisma.team.create({
       data: {
@@ -114,6 +114,9 @@ describe("IngestionKey issuance + self-scoping resolution", () => {
     await prisma.roleBinding
       .deleteMany({ where: { organizationId: ORG_ID } })
       .catch(() => undefined);
+    await prisma.grant
+      .deleteMany({ where: { organizationId: ORG_ID } })
+      .catch(() => undefined);
     await prisma.apiKey
       .deleteMany({ where: { organizationId: ORG_ID } })
       .catch(() => undefined);
@@ -139,7 +142,7 @@ describe("IngestionKey issuance + self-scoping resolution", () => {
 
   describe("when an ingest key is issued for a project", () => {
     it("mints through the org-tenancy guard and self-scopes on resolution with no projectId", async () => {
-      const issued = await ingestKeys.ensureForProject({
+      const issued = await ingestKeys.issueForProject({
         callerUserId: USER_ID,
         ownerUserId: USER_ID,
         organizationId: ORG_ID,
@@ -164,7 +167,7 @@ describe("IngestionKey issuance + self-scoping resolution", () => {
     });
 
     it("persists the minting device label for the API-keys settings page", async () => {
-      const issued = await ingestKeys.ensureForProject({
+      const issued = await ingestKeys.issueForProject({
         callerUserId: USER_ID,
         ownerUserId: USER_ID,
         organizationId: ORG_ID,
@@ -298,58 +301,30 @@ describe("IngestionKey issuance + self-scoping resolution", () => {
       expect(row.name).toBe("Ingestion key (claude_cowork)");
     });
 
-    it("does not revoke a key the rotating path issued for the same pair", async () => {
-      const rotating = await ingestKeys.ensureForProject({
-        callerUserId: USER_ID,
-        ownerUserId: USER_ID,
-        organizationId: ORG_ID,
-        projectId: PROJECT_ID,
-        sourceType: "claude_desktop",
-      });
-      await ingestKeys.issueForProject({
-        callerUserId: USER_ID,
-        ownerUserId: null,
-        organizationId: ORG_ID,
-        projectId: PROJECT_ID,
-        sourceType: "claude_desktop",
-      });
-
-      const stillLive = await resolver.resolve({
-        token: rotating.token,
-        projectId: null,
-      });
-      expect(stillLive?.type).toBe("apiKey");
-    });
-  });
-
-  describe("when an ingest key is rotated in place", () => {
-    it("revokes the previous token so it stops resolving", async () => {
-      const first = await ingestKeys.ensureForProject({
+    /** @scenario "Two machines each keep a live key for the same project and tool" */
+    it("leaves a key another machine issued for the same pair live", async () => {
+      const first = await ingestKeys.issueForProject({
         callerUserId: USER_ID,
         ownerUserId: USER_ID,
         organizationId: ORG_ID,
         projectId: OTHER_PROJECT_ID,
         sourceType: "codex",
       });
-      const second = await ingestKeys.ensureForProject({
+      const second = await ingestKeys.issueForProject({
         callerUserId: USER_ID,
-        ownerUserId: USER_ID,
+        ownerUserId: null,
         organizationId: ORG_ID,
         projectId: OTHER_PROJECT_ID,
         sourceType: "codex",
       });
       expect(second.token).not.toBe(first.token);
 
-      expect(
-        await resolver.resolve({ token: first.token, projectId: null }),
-      ).toBeNull();
-      const live = await resolver.resolve({
-        token: second.token,
-        projectId: null,
-      });
-      expect(live?.type).toBe("apiKey");
-      if (live?.type === "apiKey") {
-        expect(live.project.id).toBe(OTHER_PROJECT_ID);
+      for (const token of [first.token, second.token]) {
+        const live = await resolver.resolve({ token, projectId: null });
+        expect(live?.type).toBe("apiKey");
+        if (live?.type === "apiKey") {
+          expect(live.project.id).toBe(OTHER_PROJECT_ID);
+        }
       }
     });
   });

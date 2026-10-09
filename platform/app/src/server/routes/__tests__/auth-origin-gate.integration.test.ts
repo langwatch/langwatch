@@ -12,6 +12,9 @@
  * rejects it. Before the fix the second half of that sequence wins and the
  * request comes back 403 INVALID_ORIGIN.
  */
+
+import { IncomingMessage } from "node:http";
+import { Socket } from "node:net";
 import dotenv from "dotenv";
 import { mkdtempSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
@@ -90,6 +93,7 @@ const post = async (
 
 describe("given a dev checkout running on a non-default port", () => {
   let app: HonoTestApp;
+  let trpc: typeof import("~/server/routes/trpc").app;
   let env: { NEXTAUTH_URL: string; BASE_HOST: string };
   let prisma: typeof import("~/server/db").prisma;
   let userId: string;
@@ -101,6 +105,7 @@ describe("given a dev checkout running on a non-default port", () => {
     vi.resetModules();
     ({ env } = await import("~/env.mjs"));
     ({ app } = await import("~/server/routes/auth"));
+    ({ app: trpc } = await import("~/server/routes/trpc"));
     ({ prisma } = await import("~/server/db"));
 
     const { hash } = await import("bcrypt");
@@ -163,18 +168,43 @@ describe("given a dev checkout running on a non-default port", () => {
       const response = await post(app, `http://localhost:${APP_PORT}`);
 
       expect(response.status).toBe(401);
+      // The refusal reaches the wire as the handled-error envelope, whose
+      // `error` is the stable code. Better than the raw better-auth string it
+      // replaced: one shape for every refusal, and the words a customer reads
+      // come from the presentation registry keyed by this code, not from here.
       expect(await response.json()).toMatchObject({
-        code: "INVALID_EMAIL_OR_PASSWORD",
+        error: "identity_sign_in_refused",
+        fault: "customer",
       });
     });
   });
 
   describe("when the post comes from somewhere else entirely", () => {
+    /** @scenario A cross-site sign-in post reaches no further than the refusal */
     it("is still refused, so the gate has not been weakened", async () => {
       const response = await post(app, "http://evil.example.com");
 
       expect(response.status).toBe(403);
       expect(await response.json()).toMatchObject({ code: "INVALID_ORIGIN" });
+    });
+
+    it("lets an IdP POST reach BetterAuth only at the exact SAML ACS path", async () => {
+      const response = await app.request(
+        "/api/auth/sso/saml2/sp/acs/unknown-provider",
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/x-www-form-urlencoded",
+            origin: "https://idp.example.com",
+          },
+          body: new URLSearchParams({ SAMLResponse: "not-a-saml-response" }),
+        },
+      );
+
+      expect(response.status).toBe(404);
+      expect(await response.json()).not.toMatchObject({
+        code: "INVALID_ORIGIN",
+      });
     });
 
     /** @scenario The refused address is recorded for whoever runs the installation */
@@ -191,6 +221,91 @@ describe("given a dev checkout running on a non-default port", () => {
         expect.stringContaining("origin"),
       );
       warn.mockRestore();
+    });
+  });
+
+  describe("when the sign-up screen creates an account from somewhere else", () => {
+    const SIGNUP_EMAIL = `origin-gate-signup-${Date.now()}@example.com`;
+
+    const register = async (origin: string) => {
+      // The Node adapter supplies `incoming`; `app.request()` does not, so it
+      // is handed one the way the server would.
+      return trpc.request(
+        "/api/trpc/user.register",
+        {
+          method: "POST",
+          headers: { "content-type": "application/json", origin },
+          body: JSON.stringify({
+            json: {
+              email: SIGNUP_EMAIL,
+              password: "correct horse battery staple",
+              addressProof: "a-proof-nobody-issued",
+            },
+          }),
+        },
+        { incoming: new IncomingMessage(new Socket()) },
+      );
+    };
+
+    /** @scenario "A sign-up on a web address the installation is not set up for writes no account" */
+    it("is refused with the invalid origin code and writes no account", async () => {
+      const response = await register("http://localhost:18560");
+
+      expect(response.status).toBe(403);
+      expect(JSON.stringify(await response.json())).toContain(
+        "auth_invalid_origin",
+      );
+      expect(
+        await prisma.user.findUnique({ where: { email: SIGNUP_EMAIL } }),
+      ).toBeNull();
+    });
+
+    it("lets the same call from the configured address past the gate", async () => {
+      const response = await register(`http://localhost:${APP_PORT}`);
+
+      expect(JSON.stringify(await response.json())).not.toContain(
+        "auth_invalid_origin",
+      );
+    });
+  });
+
+  describe("when a signed-in user calls the plugin's native registration route", () => {
+    it("refuses before provider persistence or discovery traffic", async () => {
+      const signIn = await post(app, `http://localhost:${APP_PORT}`, PASSWORD);
+      const cookie = signIn.headers.get("set-cookie");
+      expect(cookie).not.toBeNull();
+
+      const before = await prisma.ssoProvider.count({
+        where: { providerId: "native-registration-must-not-write" },
+      });
+      const fetchSpy = vi.spyOn(globalThis, "fetch");
+
+      const response = await app.request("/api/auth/sso/register", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: cookie?.split(";")[0] ?? "",
+          origin: `http://localhost:${APP_PORT}`,
+        },
+        body: JSON.stringify({
+          providerId: "native-registration-must-not-write",
+          issuer: "https://attacker.example.com",
+          domain: "example.com",
+          oidcConfig: { clientId: "client" },
+        }),
+      });
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toMatchObject({
+        message: "SSO provider registration is disabled",
+      });
+      expect(
+        await prisma.ssoProvider.count({
+          where: { providerId: "native-registration-must-not-write" },
+        }),
+      ).toBe(before);
+      expect(fetchSpy).not.toHaveBeenCalled();
+      fetchSpy.mockRestore();
     });
   });
 });

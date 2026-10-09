@@ -7,11 +7,6 @@ export const projectRoutes = {
     path: "/[project]/analytics",
     title: "Analytics",
   },
-  analytics_custom_query: {
-    path: "/[project]/analytics/query",
-    title: "Custom query",
-    parent: "analytics",
-  },
   workflows: {
     path: "/[project]/workflows",
     title: "Workflows",
@@ -144,14 +139,17 @@ export const projectRoutes = {
     title: "Automations",
     parent: "automations",
   },
+  // The alerts path is a preserved alias: automations and alerts are one list
+  // now (ADR-093 §1), so it resolves to the automations table and its
+  // breadcrumb and document title have to say so.
   automations_alerts: {
     path: "/[project]/automations/alerts",
-    title: "Alerts",
+    title: "Automations",
     parent: "automations",
   },
   automations_schedules: {
     path: "/[project]/automations/schedules",
-    title: "Schedules",
+    title: "Reports",
     parent: "automations",
   },
   automations_activity: {

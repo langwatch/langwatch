@@ -41,7 +41,6 @@ const {
     selectedOrganizationId: "",
     selectedTeamId: "",
     selectedProjectSlug: "",
-    lastVisitedHomeKind: "",
   } as Record<string, string>,
 }));
 
@@ -49,6 +48,7 @@ vi.mock("~/utils/api", () => ({
   api: {
     organization: { getAll: { useQuery: mockOrganizationsQuery } },
     sharedTrace: { get: { useQuery: idleQuery } },
+    identity: { myTestArrival: { useQuery: idleQuery } },
     publicEnv: { useQuery: idleQuery },
     modelProvider: {
       getAllForProject: { useQuery: idleQuery },
@@ -60,6 +60,15 @@ vi.mock("~/utils/api", () => ({
       // these tests are about.
       testConnection: {
         useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+      },
+    },
+    authz: {
+      effectivePermissions: {
+        useQuery: () => ({
+          data: { permissions: ["project:manage"] },
+          isLoading: false,
+          isFetched: true,
+        }),
       },
     },
     useUtils: () => ({

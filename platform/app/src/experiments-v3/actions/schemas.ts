@@ -291,6 +291,13 @@ export const addEvaluatorPayloadSchema = evaluatorConfigSchema
       .describe(
         "Id for the new evaluator. Generated as evaluator_<nanoid> when omitted.",
       ),
+    name: z
+      .string()
+      .trim()
+      .min(1)
+      .describe(
+        "What this evaluator is called on every chip, header and export. Required, and it has to tell this evaluator apart from its siblings: one board often carries several evaluators of ONE type, so the type name alone leaves a reader with three identical chips. Name what this one checks, for example `l1 exact match` beside `l2 exact match`.",
+      ),
     inputs: z
       .array(fieldSchema)
       .default([])
@@ -339,6 +346,7 @@ export const addEvaluatorPayloadSchema = evaluatorConfigSchema
   })
   .describe(
     "Add an evaluator to the workbench. " +
+      "`name` is required and is what every chip reads, so give each evaluator a name that says what it checks. " +
       "Leave `comparison` out and the evaluator attaches to EVERY target column as a score, one chip per cell, which is what grading candidates asks for. " +
       `Set \`comparison\` and the evaluator becomes a column of its own that judges the columns it names against each other. Only the Comparison judge (${COMPARISON_EVALUATOR_TYPE}) may do that, and any other type given a comparison config is refused. ` +
       "Run `langwatch evaluator types` to list the types this workbench accepts.",

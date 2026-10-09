@@ -14,8 +14,12 @@ import type { PlannedUser } from "./subscription-types";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type TRPCRefetchFn = { refetch: () => any };
 
-function memberTypeToRole(memberType: MemberType): "MEMBER" | "EXTERNAL" {
-  return memberType === "FullMember" ? "MEMBER" : "EXTERNAL";
+function memberTypeToRole(
+  memberType: MemberType,
+): "MEMBER" | "EXTERNAL" | "DEVELOPER" {
+  if (memberType === "FullMember") return "MEMBER";
+  if (memberType === "Developer") return "DEVELOPER";
+  return "EXTERNAL";
 }
 
 export function useSubscriptionActions({

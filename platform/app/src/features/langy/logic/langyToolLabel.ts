@@ -7,7 +7,7 @@ import { resolveCapabilityProgress } from "../components/capabilities/capability
  * What a tool call is DOING, in human words.
  *
  * ── THE BUG THIS EXISTS TO KILL ────────────────────────────────────────────
- * The cards used to be labelled from the tool's TYPE. So a call to opencode's
+ * The cards used to be labelled from the tool's TYPE. So a call to the worker's
  * `skill` tool rendered a card that said "SKILL / Skill", and a `bash` call
  * running `langwatch trace search` rendered "BASH / Coding…". Both are the same
  * mistake twice: the name of the mechanism where the name of the ACT belongs.
@@ -36,7 +36,7 @@ const SHELL_TOOLS = new Set(["bash", "shell", "execute"]);
 /** Keys a shell tool may pass its command under. */
 const COMMAND_KEYS = ["command", "cmd", "script"] as const;
 
-/** Keys opencode's `skill` tool may name the skill under. */
+/** Keys the `skill` tool may name the skill under. */
 const SKILL_KEYS = ["name", "skill", "id", "skill_name"] as const;
 
 function readString(
@@ -83,10 +83,14 @@ export function commandOf(input: unknown): string | undefined {
  * else keeps its own name.
  */
 export function effectiveToolName(name: string, input: unknown): string {
-  const command = shellCommandOf(name, input);
+  // A stored `langwatch.*` name is re-read from its command, so a turn named
+  // before a parser fix (a `--help` stamped as a create) replays correctly.
+  const stored = name.startsWith("langwatch.");
+  const command = stored ? commandOf(input) : shellCommandOf(name, input);
   if (!command) return name;
   const parsed = parseLangwatchCommand(command);
-  return parsed ? `langwatch.${parsed.resource}.${parsed.verb}` : name;
+  if (parsed) return `langwatch.${parsed.resource}.${parsed.verb}`;
+  return stored ? "bash" : name;
 }
 
 export interface LangyToolLabel {
@@ -140,6 +144,23 @@ const GITHUB_STAGE_TITLE: Record<string, string> = {
   pushed: "Pushing the branch",
   opening_pr: "Opening the pull request",
   opened: "Opening the pull request",
+};
+
+/**
+ * The tools that run on the developer's own machine, in the folder they shared
+ * (ADR-129). The act reads the same as its sandbox twin; what the row has to
+ * add is WHERE it ran, because that is the whole difference and the reader
+ * cannot see it anywhere else.
+ */
+const LOCAL_TOOLS: Record<string, string> = {
+  local_read: "Reading a file",
+  local_write: "Writing a file",
+  local_edit: "Editing a file",
+  local_bash: "Running a command",
+  local_grep: "Searching the code",
+  local_find: "Looking through files",
+  local_ls: "Looking through files",
+  local_langwatch_env: "Writing LangWatch credentials",
 };
 
 /** Generic (non-LangWatch, non-GitHub) tools, by what they do. */
@@ -218,6 +239,20 @@ export function describeToolCall({
   input: unknown;
 }): LangyToolLabel {
   const lower = name.toLowerCase();
+
+  // ── A call that runs on the developer's own machine, not in the sandbox.
+  const local = LOCAL_TOOLS[lower];
+  if (local) {
+    const path = readString(input, ["path", "file_path", "filePath"]);
+    const command = readString(input, COMMAND_KEYS);
+    const query = readString(input, ["pattern", "query"]);
+    const detail = command ?? (path ? basename(path) : undefined) ?? query;
+    return {
+      title: `${local} on your machine`,
+      detail: detail ? truncate(detail) : undefined,
+      key: "local",
+    };
+  }
 
   // ── The skill tool. THE point of the card is which skill, and what it does.
   if (lower === "skill" || lower === "use_skill") {

@@ -7,7 +7,10 @@ import { useGlobalSlashFocus } from "./useGlobalSlashFocus";
 
 interface ActiveSearchEditorProps {
   queryText: string;
+  /** Applies an edit of an existing chip (X widget, AND/OR swap) at once. */
   applyQueryText: (text: string) => void;
+  /** Enter with no highlighted suggestion; the only path for typed text. */
+  submitQueryText: (text: string) => void;
   /** Focus the editor as soon as it mounts. */
   autoFocus: boolean;
   /** Bubble up `hasContent` so the parent can swap the Clear/Kbd affordance. */
@@ -22,32 +25,28 @@ interface ActiveSearchEditorProps {
     location: { start: number; end: number };
   }) => void;
   /**
-   * Fired on ⌘+⏎ / Ctrl+⏎. Carries the editor's current plain-text
-   * content so the parent can punt it into AI mode as the seed prompt.
-   */
-  onAiShortcut?: (currentText: string) => void;
-  /**
    * Bubbles up whether the autocomplete dropdown is currently open. The
-   * SearchBar uses this to hide the inline "Press ⏎ to search…" hint
-   * while the user is mid-autocomplete (the hint would otherwise sit
-   * behind / next to the dropdown).
+   * SearchBar uses this to hide the inline "Enter to search" hint while
+   * the user is mid-autocomplete (the hint would otherwise sit behind /
+   * next to the dropdown).
    */
   onSuggestionOpenChange?: (open: boolean) => void;
   /**
    * Bubbles up the cursor's pixel offset from the editor's left edge.
-   * The SearchBar renders an inline "Press ⏎ to search…" hint pinned
-   * to this offset so the hint floats just after whatever the user
-   * has typed, no matter how long it is.
+   * The SearchBar renders an inline "Enter to search" hint pinned to this
+   * offset so the hint floats just after whatever the user has typed, no
+   * matter how long it is.
    */
   onCursorAnchorChange?: (anchorX: number) => void;
   /** Mirrors the editor's focus state so the parent can gate chrome. */
   onFocusChange?: (focused: boolean) => void;
   /**
-   * Placeholder shown while the editor is empty. Defaults to the Ask AI
-   * wording; the SearchBar passes the Ask Langy variant when Langy owns
-   * the ask affordance.
+   * Bumped by the parent's Clear button. Clear keeps the caret in the bar,
+   * and text that was never submitted is not in the store, so neither focus
+   * nor the applied query can carry the instruction down here. A rising
+   * value empties the editor.
    */
-  placeholder?: string;
+  clearNonce?: number;
 }
 
 /**
@@ -58,31 +57,31 @@ interface ActiveSearchEditorProps {
 export const ActiveSearchEditor: React.FC<ActiveSearchEditorProps> = ({
   queryText,
   applyQueryText,
+  submitQueryText,
   autoFocus,
   onHasContentChange,
   valueResolver,
   onTokenClick,
-  onAiShortcut,
   onSuggestionOpenChange,
   onCursorAnchorChange,
   onFocusChange,
-  placeholder,
+  clearNonce = 0,
 }) => {
   const {
     editor,
     suggestion,
     acceptSuggestion,
+    reset,
     cursorAnchorX,
     endAnchorX,
     isFocused,
   } = useFilterEditor({
     queryText,
     applyQueryText,
+    submitQueryText,
     onHasContentChange,
     valueResolver,
     onTokenClick,
-    onAiShortcut,
-    placeholder,
   });
 
   useGlobalSlashFocus(editor);
@@ -115,6 +114,14 @@ export const ActiveSearchEditor: React.FC<ActiveSearchEditorProps> = ({
   useEffect(() => {
     onFocusChange?.(isFocused);
   }, [isFocused, onFocusChange]);
+
+  // The mount value is the parent's starting count, not a clear.
+  const lastClearNonceRef = useRef(clearNonce);
+  useEffect(() => {
+    if (clearNonce === lastClearNonceRef.current) return;
+    lastClearNonceRef.current = clearNonce;
+    reset();
+  }, [clearNonce, reset]);
 
   return (
     <>

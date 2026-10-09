@@ -4,6 +4,7 @@ user-prompt: "Build a chart from a question and put it on my dashboard"
 description: Author a saved analytics chart from a plain question and place it on a dashboard. Discovers the LangWatchQL analytics schema, writes and test-runs the SQL, saves it as a chart with a Vega-Lite specification, and places it where the team already looks. Use when asked to build, save, run, or dashboard a metric or chart.
 license: MIT
 compatibility: Requires the `langwatch` CLI with a valid `LANGWATCH_API_KEY`, and a project with LangWatchQL analytics enabled. Works with Claude Code and similar coding agents.
+exclude-when-flag: release_custom_chart_playground
 metadata:
   category: recipe
 ---
@@ -30,20 +31,20 @@ Read the datasets, their grain, their time column, and which columns are `availa
 
 A chart that should follow the dashboard's period selector declares the reserved bound parameters instead of hardcoding dates:
 
-- `{period_start:DateTime}` / `{period_end:DateTime}` — the surface's period, half-open `[start, end)`
-- `{period_granularity_seconds:UInt32}` — the surface's datapoint step, in seconds
+- `{dashboard_context_period_start:DateTime}` / `{dashboard_context_period_end:DateTime}` — the surface's period, half-open `[start, end)`
+- `{dashboard_context_granularity_seconds:UInt32}` — the surface's datapoint step, in seconds
 
 ```sql
 SELECT
-  toStartOfInterval(OccurredAt, INTERVAL {period_granularity_seconds:UInt32} SECOND) AS bucket,
+  toStartOfInterval(OccurredAt, INTERVAL {dashboard_context_granularity_seconds:UInt32} SECOND) AS bucket,
   count() AS traces
 FROM analytics.traces
-WHERE OccurredAt >= {period_start:DateTime} AND OccurredAt < {period_end:DateTime}
+WHERE OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime}
 GROUP BY bucket
 ORDER BY bucket
 ```
 
-Your own parameters (`{since:DateTime}`, `{model:String}`, …) get their values from `--param`; never pass a value for the reserved `period_*` names.
+Your own parameters (`{since:DateTime}`, `{model:String}`, …) get their values from `--param`; never pass a value for the reserved `dashboard_context_*` names.
 
 ## Step 3: Save the chart, then prove it runs
 
@@ -88,6 +89,7 @@ langwatch chart delete <chart-id>
 ## Failure modes worth knowing
 
 - `lwql_not_enabled` — the project's LangWatchQL switch is off; stop and say so.
+- `saved_workbench_charts_disabled_for_playground` — the custom-chart-playground is enabled for this project, which turns `chart` commands off; do not retry any `chart` command. Use the `dashboard-widgets` skill / `langwatch dashboard-widget` commands instead.
 - A save that succeeds but a run that fails naming a column — the SQL names one that does not exist; re-read the schema (Step 1) and fix the column, then update the chart.
 - `saved_workbench_chart_specification_refused` — the Vega-Lite specification breaks the chart policy; simplify it (one `query_result` data source, fields matching the SQL columns).
 - `saved_workbench_chart_dashboard_not_found` — the dashboard id is not in this project; list dashboards again.

@@ -28,8 +28,8 @@
  * @see ~/app/api/shared/canonical-error — the mapping every refusal here goes
  *   through, including the 5xx redaction one case below turns on
  *
- * @see specs/analytics/lwql-saved-charts.feature
- * @see specs/analytics/lwql-langy-authoring.feature — the placement routes
+ * @see specs/lwql/saved-charts.feature
+ * @see specs/lwql/langy-authoring.feature — the placement routes
  * @see ~/server/analytics/saved-workbench-charts — the service under test
  */
 
@@ -65,7 +65,9 @@ import {
 } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
 import { getFeatureFlagStore } from "~/server/featureFlag";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
+import { app as queryApp } from "../../query/[[...route]]/app";
 import { app } from "../[[...route]]/app";
 
 /** Names a LangWatchQL dataset every deployment publishes, and reads nothing gated. */
@@ -113,6 +115,7 @@ describe("given the saved workbench chart REST endpoints", () => {
   let otherProject: Project;
   /** A scoped key holding `analytics:view` on this organization and nothing else. */
   let viewOnlyToken: string;
+  let eventSourcing: ReturnType<typeof createAuthzTestEventSourcing>;
 
   const chartsPath = (project: Project) =>
     `/api/v1/projects/${project.id}/analytics/charts`;
@@ -175,8 +178,16 @@ describe("given the saved workbench chart REST endpoints", () => {
     method?: string;
     body?: unknown;
     auth: Record<string, string>;
+    /**
+     * The Hono instance to route through. Defaults to this family's own app.
+     *
+     * Structural rather than `typeof app`: a call site also passes
+     * `queryApp`, whose route generic differs, and `.request()` is the only
+     * member used below regardless of which app is routed through.
+     */
+    app?: Pick<typeof app, "request">;
   }) =>
-    app.request(options.path, {
+    (options.app ?? app).request(options.path, {
       method: options.method ?? "GET",
       headers: { "Content-Type": "application/json", ...options.auth },
       ...(options.body === undefined
@@ -246,7 +257,9 @@ describe("given the saved workbench chart REST endpoints", () => {
     process.env.RELEASE_LWQL_WORKBENCH = "1";
 
     await resetApp();
+    eventSourcing = createAuthzTestEventSourcing(prisma);
     globalForApp.__langwatch_app = createTestApp({
+      _eventSourcing: eventSourcing,
       planProvider: PlanProviderService.create({
         getActivePlan: vi
           .fn()
@@ -359,6 +372,9 @@ describe("given the saved workbench chart REST endpoints", () => {
     }
     if (team) {
       await prisma.dataPrivacyPolicy.deleteMany({
+        where: { organizationId: organization.id },
+      });
+      await prisma.grant.deleteMany({
         where: { organizationId: organization.id },
       });
       await prisma.roleBinding.deleteMany({
@@ -484,14 +500,15 @@ describe("given the saved workbench chart REST endpoints", () => {
       });
 
       const running = await refused({
-        path: `/api/v1/projects/${gatedProject.id}/analytics/query/clickhouse`,
+        app: queryApp,
+        path: "/api/v1/query",
         method: "POST",
         auth: asProject(gatedProject),
         body: { sql: GATED_SQL },
       });
 
       expect(saving.error.code).toBe("lwql_not_permitted");
-      expect(saving.error.code).toBe(running.error.code);
+      expect(running.error.code).toBe(saving.error.code);
       expect(await listedIds(gatedProject)).toEqual([]);
 
       // The control: the same statement, a key whose protections do not
@@ -1154,7 +1171,8 @@ describe("given the saved workbench chart REST endpoints", () => {
 
         // REST directly: the governed query door with the same statement.
         const viaRest = await refused({
-          path: `/api/v1/projects/${gatedProject.id}/analytics/query/clickhouse`,
+          app: queryApp,
+          path: "/api/v1/query",
           method: "POST",
           auth: asProject(gatedProject),
           body: { sql: GATED_SQL },

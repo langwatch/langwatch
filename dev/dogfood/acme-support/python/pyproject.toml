@@ -1,0 +1,34 @@
+[project]
+name = "acme-support"
+version = "0.1.0"
+description = "ACME shop support agent, the demo application for LangWatch dogfooding"
+requires-python = ">=3.10,<3.14"
+dependencies = [
+    "fastapi>=0.115",
+    "langwatch",
+    "openai>=1.99",
+    "python-dotenv>=1.0",
+    "uvicorn>=0.30",
+]
+
+[dependency-groups]
+dev = [
+    "langwatch-scenario>=1.4.0",
+    "pytest>=8.0",
+    "pytest-asyncio>=0.26",
+]
+
+# The demo always runs the SDK of this checkout, never a released one.
+[tool.uv.sources]
+langwatch = { path = "../../../../sdks/python", editable = true }
+
+[tool.pytest.ini_options]
+asyncio_mode = "strict"
+testpaths = ["tests"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]

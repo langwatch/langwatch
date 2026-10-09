@@ -115,6 +115,36 @@ Feature: Langy recognises its own CLI behind a shell tool call
       And the card offers the next step the platform recommends
       And the card never shows an internal permission name as its headline
 
+    # The sandbox's `gh` has no login when the GitHub App is not installed, and
+    # it says so in its own words: "To get started with GitHub CLI, please run:
+    # gh auth login". That is a shell the customer cannot reach. The manager's
+    # gate names the same condition, but it reads settled frames, so this card
+    # is already on screen by the time the turn stops.
+    @unit
+    Scenario: The sandbox's own gh never tells the customer to log in
+      When Langy's sandbox tool call fails because gh has no login
+      Then the card says the LangWatch GitHub App is not installed
+      And the card carries the code for a missing GitHub App
+      And the card points at Settings, under Integrations
+      And the card never repeats the instruction to run gh auth login
+
+    @unit
+    Scenario: The developer's own gh keeps its own instruction
+      When a tool call in the shared local folder fails because gh has no login
+      Then the card shows what gh said
+      And the card does not claim the LangWatch GitHub App is missing
+
+    # The shell that delegates a command to the shared folder is registered as
+    # `bash`, the same name the sandbox shell answers to, so the name alone
+    # cannot say where a command ran. The settled call carries a marker that
+    # can, and that marker is what decides the card.
+    @unit
+    Scenario: A shell command that ran in the shared folder keeps gh's own instruction
+      When a shell call marked as run in the shared folder fails because gh has no login
+      Then the card shows what gh said
+      And the card does not claim the LangWatch GitHub App is missing
+      And an unmarked shell call with the same failure still says the GitHub App is missing
+
     # The card draws its conclusions from what the failure IS, never from
     # matching the English it happens to be phrased in — that pins user copy to
     # a pattern and hides whoever dropped the structure.

@@ -14,6 +14,8 @@ type SidebarSectionProps = {
   showExpanded: boolean;
   defaultExpanded?: boolean;
   projectId?: string;
+  /** The `data-tour` target the guided tour spotlights: the label and the items together. */
+  tourId?: string;
 };
 
 export const SidebarSection = ({
@@ -23,6 +25,7 @@ export const SidebarSection = ({
   showExpanded,
   defaultExpanded = true,
   projectId,
+  tourId,
 }: SidebarSectionProps) => {
   const { isExpanded, toggleSection } = useSidebarSectionState({
     id,
@@ -32,7 +35,7 @@ export const SidebarSection = ({
   });
 
   return (
-    <VStack width="full" gap={0.5} align="start">
+    <VStack width="full" gap={0.5} align="start" data-tour={tourId}>
       <SidebarSectionToggle
         isExpanded={isExpanded}
         label={label}

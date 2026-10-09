@@ -9,11 +9,6 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import { StaleWorkbenchStateError } from "~/server/experiments/errors";
-import type {
-  ExperimentService,
-  WorkbenchActor,
-} from "~/server/experiments/experiment.service";
 import { generateHumanReadableId } from "~/utils/humanReadableId";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import {
@@ -22,14 +17,11 @@ import {
   runOrchestrator,
 } from "./orchestrator";
 import { mapThrownErrorEvent } from "./resultMapper";
+import { applyRunEvent, emptyRunResultsDraft } from "./runResults";
 import {
-  applyRunEvent,
-  emptyRunResultsDraft,
-  mergeRunResults,
-  planRunMerge,
-  type RunResultsDraft,
-  runResultsAreEmpty,
-} from "./runResults";
+  persistRunResults,
+  type RunResultsPersistence,
+} from "./runResultsWriter";
 import { runStateManager } from "./runStateManager";
 import { getRunUrl } from "./runUrl";
 import {
@@ -40,21 +32,6 @@ import {
 } from "./types";
 
 const logger = createLogger("langwatch:experiments-v3:runner");
-
-/**
- * Where a completed run writes its cells so an open page can show them.
- *
- * The workbench state is the canonical home of a run's cells: a browser run
- * autosaves them there, and a page that opens later reads them back. A backend
- * run has no page to stream to, so it writes them itself through the same
- * server-owned seam, which validates the state, advances the version and tells
- * the tenant the experiment moved.
- */
-export interface RunResultsPersistence {
-  experiments: ExperimentService;
-  /** Who the workbench write is attributed to in the version history. */
-  actor: WorkbenchActor;
-}
 
 export type StartPollingRunInput = Omit<
   OrchestratorInput,
@@ -71,89 +48,6 @@ export type StartPollingRunInput = Omit<
    * shows, so it leaves the saved state alone.
    */
   persistResults?: RunResultsPersistence;
-};
-
-/**
- * Writes a completed run's cells into the saved workbench state.
- *
- * Never throws: the cells are already stored, so a workbench that could not be
- * updated costs the open page a refresh, not the run. One retry covers the
- * concurrent write (a person typing in the same experiment), which is the same
- * answer the assistant's backend edits give a stale read.
- */
-const persistRunResults = async ({
-  persistence,
-  projectId,
-  experimentId,
-  runId,
-  scope,
-  draft,
-  isRetry = false,
-}: {
-  persistence: RunResultsPersistence;
-  projectId: string;
-  experimentId: string;
-  runId: string;
-  scope: ExecutionScope;
-  draft: RunResultsDraft;
-  isRetry?: boolean;
-}): Promise<void> => {
-  if (runResultsAreEmpty(draft)) {
-    logger.info(
-      { runId, experimentId },
-      "Run produced no cells to write into the workbench state",
-    );
-    return;
-  }
-
-  const plan = planRunMerge(scope);
-
-  try {
-    const saved = await persistence.experiments.applyWorkbenchTransform({
-      projectId,
-      id: experimentId,
-      actor: persistence.actor,
-      commitMessage: `Results from run ${runId}`,
-      transform: (state) => ({
-        ...state,
-        results: mergeRunResults({ existing: state.results, draft, plan }),
-      }),
-    });
-    logger.info(
-      {
-        runId,
-        experimentId,
-        version: saved.version,
-        targets: Object.keys(draft.targetOutputs).length,
-      },
-      "Wrote the run results into the workbench state",
-    );
-  } catch (error) {
-    if (error instanceof StaleWorkbenchStateError && !isRetry) {
-      logger.info(
-        { runId, experimentId },
-        "Workbench moved while the run was writing its results, retrying once",
-      );
-      await persistRunResults({
-        persistence,
-        projectId,
-        experimentId,
-        runId,
-        scope,
-        draft,
-        isRetry: true,
-      });
-      return;
-    }
-
-    logger.error(
-      { error, runId, experimentId, projectId },
-      "Failed to write the run results into the workbench state",
-    );
-    captureException(toError(error), {
-      extra: { runId, experimentId, projectId },
-    });
-  }
 };
 
 /** Everything the orchestrator itself takes, minus what the runner decides. */

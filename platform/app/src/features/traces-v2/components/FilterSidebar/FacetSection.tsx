@@ -80,9 +80,10 @@ interface FacetSectionProps {
    * than as a full-width row beneath — is why the contract is an object
    * rather than a single node.
    *
-   * FacetSection owns the `expandedInactiveRows` Set so the state is
-   * automatically reset whenever the section unmounts or the sidebar
-   * is closed — no external persistence needed.
+   * FacetSection decides `isExpanded` itself: a row that carries a filter
+   * is expanded, and the chevron records a short-lived override on top of
+   * that. Nothing to persist externally, and nothing survives the section
+   * unmounting or the sidebar closing.
    */
   renderInactiveRowExtras?: (
     item: FacetItem,
@@ -118,20 +119,44 @@ const FacetSectionInner: React.FC<FacetSectionProps> = ({
   modeToggleProps,
   serverValueSearch,
 }) => {
-  const [expandedInactiveRows, setExpandedInactiveRows] = useState<Set<string>>(
-    () => new Set(),
+  // A row's drilldown is OPEN whenever that row contributes a filter —
+  // included or excluded alike. Deriving it (rather than latching a Set on
+  // click) is what keeps the inactive row and the pinned row consistent: the
+  // pinned path renders extras unconditionally for any non-neutral row, so a
+  // stored flag could only ever drift out of sync with it. It also means a
+  // filter dropped from ANYWHERE — the query bar, the pinned row's own
+  // toggle, a saved-view switch — closes the drilldown, instead of leaving
+  // sub-options open for a filter the row no longer carries.
+  //
+  // The trailing chevron is the one way to disagree with that default, so it
+  // records an override AGAINST the state it was pressed on. The moment that
+  // row's filter state changes the override stops matching and silently
+  // expires — no effect, no cleanup pass, no stale flag surviving a filter
+  // the user already cleared.
+  const [expandOverrides, setExpandOverrides] = useState<
+    Map<string, { open: boolean; against: FacetValueState }>
+  >(() => new Map());
+  const isRowExpanded = useCallback(
+    (value: string) => {
+      const state = getValueState(value);
+      const override = expandOverrides.get(value);
+      if (override && override.against === state) return override.open;
+      return state !== "neutral";
+    },
+    [expandOverrides, getValueState],
   );
-  const toggleInactiveExpand = useCallback((value: string) => {
-    setExpandedInactiveRows((prev) => {
-      const next = new Set(prev);
-      if (next.has(value)) {
-        next.delete(value);
-      } else {
-        next.add(value);
-      }
-      return next;
-    });
-  }, []);
+  const toggleInactiveExpand = useCallback(
+    (value: string) => {
+      const state = getValueState(value);
+      const open = isRowExpanded(value);
+      setExpandOverrides((prev) => {
+        const next = new Map(prev);
+        next.set(value, { open: !open, against: state });
+        return next;
+      });
+    },
+    [getValueState, isRowExpanded],
+  );
   const lensOverride = useFacetLensStore((s) => s.lens.sectionOpen[field]);
   const setSectionOpen = useFacetLensStore((s) => s.setSectionOpen);
   const [showMore, setShowMore] = useState(false);
@@ -154,6 +179,15 @@ const FacetSectionInner: React.FC<FacetSectionProps> = ({
     if (!searchOpen) setSearchQuery("");
   }, [searchOpen]);
 
+  // Clicking a row that carries a drilldown ALSO opens it — see
+  // `isRowExpanded`, which derives that from the row's filter state so no
+  // bookkeeping is needed here. Without it the sub-options are reachable only
+  // through the trailing chevron, which reads as decoration: operators clicked
+  // the evaluator, got a filter, and never learned that pass/fail (or an
+  // event's metric values) were one level down. The layout freeze keeps the
+  // clicked row where it was clicked, so the drilldown opens in place instead
+  // of appearing in the pinned block after the pointer leaves — the reason the
+  // click looked inert.
   const handleToggle = useCallback(
     (value: string) => onToggle(field, value),
     [onToggle, field],
@@ -392,7 +426,7 @@ const FacetSectionInner: React.FC<FacetSectionProps> = ({
           {layout.facetWindow.visible.map((item) => {
             const inactiveExtras = renderInactiveRowExtras?.(
               item,
-              expandedInactiveRows.has(item.value),
+              isRowExpanded(item.value),
               () => toggleInactiveExpand(item.value),
             );
             const row = (

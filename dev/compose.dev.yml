@@ -243,7 +243,7 @@ services:
       RELEASE_UI_SIMULATIONS_MENU_ENABLED: "1"
       RELEASE_UI_SUITES_ENABLED: "1"
       # Use email login for dev (no Auth0 dependency)
-      NEXTAUTH_PROVIDER: "email"
+      AUTH_PROVIDER: "email"
     env_file:
       - platform/app/.env
       - path: platform/app/.env.dev-up
@@ -296,7 +296,7 @@ services:
       - root_modules:/node_modules
       - app_modules:/platform/app/node_modules
       - goose_bin:/opt/goose-bin:ro
-    command: sh -c "export PATH=/opt/goose-bin:$$PATH && corepack enable && while true; do pnpm exec tsx src/workers.ts; sleep 1; done"
+    command: sh -c "export PATH=/opt/goose-bin:$$PATH && corepack enable && while true; do pnpm run start:workers:dev; sleep 1; done"
     environment:
       <<: *common-env
       # Override BASE_HOST for Docker networking - scenario child processes post events here

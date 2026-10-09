@@ -12,12 +12,12 @@
  * so a definition written by a build that disagreed with this one is refused by
  * name instead of being half-understood.
  *
- * @see specs/analytics/lwql-saved-charts.feature
+ * @see specs/lwql/saved-charts.feature
  */
 
 import { z } from "zod";
 
-import { MAX_LWQL_LENGTH } from "../lwql/sqlText";
+import { MAX_LWQL_LENGTH } from "../lwql/limits";
 
 /**
  * The version this build writes, and the only one it reads.

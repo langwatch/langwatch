@@ -1,4 +1,5 @@
 import chalk from "chalk";
+import type { paths } from "@/internal/generated/openapi/api-client";
 import { createSpinner } from "../../utils/spinner";
 import { AnalyticsApiService } from "@/client-sdk/services/analytics/analytics-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
@@ -27,8 +28,57 @@ const METRIC_ALIASES: Record<string, keyof typeof METRIC_PRESETS> = {
   cost: "total-cost",
   traces: "trace-count",
   "trace-counts": "trace-count",
+  "trace_count": "trace-count",
+  "traces.count": "trace-count",
+  "trace.count": "trace-count",
   "pass-rate": "eval-pass-rate",
 };
+
+/** The origin Langy's own turns carry. */
+const LANGY_ORIGIN = "langy";
+
+/** One metric path, as the timeseries endpoint's own schema declares them. */
+type AnalyticsMetric =
+  paths["/api/analytics/timeseries"]["post"]["requestBody"]["content"]["application/json"]["series"][number]["metric"];
+
+// The metric paths the platform accepts, checked here so a mistyped path is
+// refused with the list in hand, before a request is made. `satisfies` pins
+// the list to the generated schema: a metric the platform renames or drops
+// stops compiling here rather than reaching the API as a rejected body.
+const KNOWN_METRICS: readonly string[] = [
+  "metadata.trace_id",
+  "metadata.user_id",
+  "metadata.thread_id",
+  "metadata.span_type",
+  "sentiment.thumbs_up_down",
+  "performance.completion_time",
+  "performance.first_token",
+  "performance.total_cost",
+  "performance.cost_billed",
+  "performance.cost_non_billed",
+  "performance.prompt_tokens",
+  "performance.completion_tokens",
+  "performance.cache_read_tokens",
+  "performance.cache_write_tokens",
+  "performance.reasoning_tokens",
+  "performance.total_processed_tokens",
+  "performance.total_tokens",
+  "performance.tokens_per_second",
+  "events.event_type",
+  "events.event_score",
+  "events.event_details",
+  "evaluations.evaluation_score",
+  "evaluations.evaluation_pass_rate",
+  "evaluations.evaluation_runs",
+  "threads.average_duration_per_thread",
+] satisfies readonly AnalyticsMetric[];
+
+/** The presets and metric paths a `--metric` value can name, for an error. */
+const metricChoices = (): string =>
+  [
+    `Presets: ${Object.keys(METRIC_PRESETS).join(", ")}`,
+    `Metrics: ${KNOWN_METRICS.join(", ")}`,
+  ].join("\n");
 
 /**
  * Returns the timeseries rather than printing it: the output port renders it
@@ -44,6 +94,7 @@ export const queryAnalyticsCommand = async (options: {
   endDate?: string;
   groupBy?: string;
   timeScale?: string;
+  shouldIncludeLangy?: boolean;
 }): Promise<CommandResult | void> => {
   await resolveCredentials();
 
@@ -65,6 +116,16 @@ export const queryAnalyticsCommand = async (options: {
   } else {
     metric = options.metric ?? "metadata.trace_id";
     aggregation = options.aggregation ?? "cardinality";
+  }
+
+  if (!KNOWN_METRICS.includes(metric)) {
+    console.error(
+      chalk.red(
+        `Error: "${options.metric}" is not a metric preset or a metric path.`,
+      ),
+    );
+    console.error(chalk.gray(metricChoices()));
+    process.exit(1);
   }
 
   const now = Date.now();
@@ -92,6 +153,8 @@ export const queryAnalyticsCommand = async (options: {
       groupBy: options.groupBy as "metadata.model" | undefined,
       timeScale: options.timeScale === "full" ? "full" : options.timeScale ? Number(options.timeScale) : undefined,
       timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      // Langy's own turns stay out unless asked for, as in the Trace Explorer.
+      ...(options.shouldIncludeLangy ? {} : { excludeOrigins: [LANGY_ORIGIN] }),
     });
 
     spinner.succeed("Analytics query complete");
@@ -109,6 +172,7 @@ export const queryAnalyticsCommand = async (options: {
           currentPeriod: result.currentPeriod,
           previousPeriod: result.previousPeriod,
           metric,
+          aggregation,
         }) ?? {}),
       },
       table: () => {

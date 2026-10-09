@@ -44,6 +44,22 @@ Feature: CLI error handling
     Then the CLI output includes the word "network" or "ECONNREFUSED" or "unreachable"
     And the CLI exits with status 1
 
+  # A missing dataset used to be reported as a network error at status 0,
+  # with "Check your network connection" as the advice for a wrong slug.
+  @unit
+  Scenario: A missing dataset is reported as not found, not as a network error
+    Given a dataset command is given a slug that does not exist
+    When the command reports its failure
+    Then the error document carries the code "not_found" and status 404
+    And the suggestions speak of the slug, not of the network
+
+  @unit
+  Scenario: A dataset plan limit is reported with its own code
+    Given a dataset command runs into the plan limit
+    When the command reports its failure
+    Then the error document carries the code "plan_limit_reached" and status 403
+    And the limit type and the usage stand in the meta
+
   @integration @unimplemented
   Scenario Outline: Common error conditions map to actionable messages for every CLI command
     Given the API responds with status <status> for command "<command>"
@@ -59,3 +75,71 @@ Feature: CLI error handling
       | langwatch dataset get missing  |    404 |
       | langwatch monitor create m     |    422 |
       | langwatch secret create FOO    |    409 |
+
+  Rule: a fault in the CLI's own code is not reported as a network failure
+
+    A failure with no HTTP status was read as `network_error`, which is right
+    for a request that never landed and wrong for a crash while rendering a
+    response that already arrived. `langwatch chart schema` crashed on a
+    payload shape it did not expect and the user was told to check their
+    network connection, for a bug they could not fix.
+
+    @unit
+    Scenario: a TypeError with no status is an internal error, not a network one
+      Given a TypeError is thrown while a command renders a response
+      When the failure is read into the CLI's error structure
+      Then the code is internal_error
+      And it is not network_error
+      And it is still marked as a failure the platform did not name
+
+    @unit
+    Scenario: a request that never landed is still a network failure
+      Given a plain Error is thrown with no HTTP status
+      When the failure is read into the CLI's error structure
+      Then the code is network_error
+
+    @unit
+    Scenario: a TLS failure is a network failure, not a code the platform chose
+      Given fetch fails with an expired certificate, which carries no errno
+        or syscall the way a refused socket does
+      When the failure is read into the CLI's error structure
+      Then the code is network_error
+      And the certificate code is not presented as the platform's own
+
+    @unit
+    Scenario: fetch failed with nothing behind it is a fault in our code
+      Given a TypeError says "fetch failed" and carries no system error, no
+        errno and no transport code as its cause
+      When the failure is read into the CLI's error structure
+      Then the code is internal_error
+      And the sentence alone was not read as evidence of a transport
+
+    @unit
+    Scenario: a transport failure the SDK wrapped is still a transport failure
+      Given the SDK wrapped an expired-certificate failure as originalError,
+        which carries a code but no errno
+      When the failure is read into the CLI's error structure
+      Then the code is network_error
+      And the certificate code is not claimed as one the platform chose
+
+    @unit
+    Scenario: a Node error code is not a transport code
+      Given a TypeError carries Node's own ERR_INVALID_URL, thrown while
+        building a URL from a scheme-less endpoint
+      When the failure is read into the CLI's error structure
+      Then the code is internal_error
+      And the shape of the code was not read as the transport speaking
+
+    @unit
+    Scenario: a body that would not parse stays a network failure
+      Given a proxy answered with an HTML page and reading it as JSON threw
+      When the failure is read into the CLI's error structure
+      Then the code is network_error
+
+    @unit
+    Scenario: chart schema names a payload it does not recognise
+      Given the analytics schema comes back without its list of views
+      When the user runs `langwatch chart schema`
+      Then the command exits non-zero with a validation error
+      And the message says to update the CLI
+      And no TypeError reaches the user

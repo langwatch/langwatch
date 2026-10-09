@@ -95,28 +95,60 @@ type SocialProviderEnv = Pick<
   | "AZURE_AD_CLIENT_ID"
   | "AZURE_AD_CLIENT_SECRET"
   | "AZURE_AD_TENANT_ID"
+  | "NEXTAUTH_URL"
 >;
 
 /**
+ * What the social providers call out to while a sign-in is in flight.
+ */
+export interface SocialProviderDeps {
+  /**
+   * Called with the Microsoft id token claims before better-auth
+   * looks the account up, so an account stored under its pre-3.17 key can be
+   * moved onto the one the lookup asks for (`microsoft-account-rekey.ts`).
+   * A throw stops the sign-in: the callback fails and the user retries,
+   * rather than better-auth looking up an account still on its old key.
+   */
+  onMicrosoftProfile?: (profile: Record<string, unknown>) => Promise<void>;
+}
+
+/**
  * Builds BetterAuth's `socialProviders` map from environment configuration.
- * Mirrors the original NextAuth "exactly one provider" behavior: only the
- * provider named by `NEXTAUTH_PROVIDER` is configured, and only when its
- * client credentials are present.
+ * On a deployment that names ANY federated provider, a social provider
+ * mounts when its client credentials are present — the credentials ARE the
+ * operator's intent, since they exist for no other reason. The named
+ * provider still selects the generic-OAuth branch (auth0, okta, oidc) and
+ * still leads the sign-in rail, so a single-provider deployment reads
+ * exactly as it always did.
+ *
+ * This retired the NextAuth-era "exactly one provider" rule on purpose
+ * (D09): migrating off the Auth0 broker means the native providers mount
+ * BESIDE it during grace, and a rule that could mount only the broker made
+ * that impossible. `sso-gate.ts#authProviderIsMounted` answers for the named
+ * provider specifically, so the typo protection did not widen with this.
+ *
+ * EMAIL MODE STAYS AUTHORITATIVE. A deployment that chose email mode mounts
+ * no social provider whatever credentials linger in its environment: email
+ * mode is exactly what ADR-027 means by DENY, and the federation request
+ * hook stands down entirely in email mode
+ * (`deploymentIsFederationCapable`), so a provider mounted here would be a
+ * live, license-ungated sign-in endpoint nothing offered and nothing
+ * refuses.
  *
  * Exported for unit testing — lets us exercise google/github/gitlab/azure
  * selection directly, without re-initializing the module under a different
- * `NEXTAUTH_PROVIDER`.
+ * environment.
  */
 export const buildSocialProviders = (
   e: SocialProviderEnv,
+  deps: SocialProviderDeps = {},
 ): NonNullable<BetterAuthOptions["socialProviders"]> => {
   const socialProviders: NonNullable<BetterAuthOptions["socialProviders"]> = {};
+  if (!e.NEXTAUTH_PROVIDER || e.NEXTAUTH_PROVIDER === "email") {
+    return socialProviders;
+  }
 
-  if (
-    e.NEXTAUTH_PROVIDER === "google" &&
-    e.GOOGLE_CLIENT_ID &&
-    e.GOOGLE_CLIENT_SECRET
-  ) {
+  if (e.GOOGLE_CLIENT_ID && e.GOOGLE_CLIENT_SECRET) {
     socialProviders.google = {
       clientId: e.GOOGLE_CLIENT_ID,
       clientSecret: e.GOOGLE_CLIENT_SECRET,
@@ -128,11 +160,7 @@ export const buildSocialProviders = (
     };
   }
 
-  if (
-    e.NEXTAUTH_PROVIDER === "github" &&
-    e.GITHUB_CLIENT_ID &&
-    e.GITHUB_CLIENT_SECRET
-  ) {
+  if (e.GITHUB_CLIENT_ID && e.GITHUB_CLIENT_SECRET) {
     socialProviders.github = {
       clientId: e.GITHUB_CLIENT_ID,
       clientSecret: e.GITHUB_CLIENT_SECRET,
@@ -144,11 +172,7 @@ export const buildSocialProviders = (
     };
   }
 
-  if (
-    e.NEXTAUTH_PROVIDER === "gitlab" &&
-    e.GITLAB_CLIENT_ID &&
-    e.GITLAB_CLIENT_SECRET
-  ) {
+  if (e.GITLAB_CLIENT_ID && e.GITLAB_CLIENT_SECRET) {
     socialProviders.gitlab = {
       clientId: e.GITLAB_CLIENT_ID,
       clientSecret: e.GITLAB_CLIENT_SECRET,
@@ -161,7 +185,6 @@ export const buildSocialProviders = (
   }
 
   if (
-    e.NEXTAUTH_PROVIDER === "azure-ad" &&
     e.AZURE_AD_CLIENT_ID &&
     e.AZURE_AD_CLIENT_SECRET &&
     e.AZURE_AD_TENANT_ID
@@ -170,24 +193,91 @@ export const buildSocialProviders = (
       clientId: e.AZURE_AD_CLIENT_ID,
       clientSecret: e.AZURE_AD_CLIENT_SECRET,
       tenantId: e.AZURE_AD_TENANT_ID,
-      mapProfileToUser: (profile) => ({
-        name: fallbackName(profile as Record<string, any>),
-        email:
-          (
-            profile as {
-              email?: string;
-              mail?: string;
-              userPrincipalName?: string;
-            }
-          ).email ??
-          (profile as { mail?: string }).mail ??
-          (profile as { userPrincipalName?: string }).userPrincipalName,
-      }),
+      ...microsoftRedirect(e.NEXTAUTH_URL),
+      mapProfileToUser: async (profile) => {
+        await deps.onMicrosoftProfile?.(profile as Record<string, unknown>);
+        return {
+          name: fallbackName(profile as Record<string, any>),
+          email:
+            (
+              profile as {
+                email?: string;
+                mail?: string;
+                userPrincipalName?: string;
+              }
+            ).email ??
+            (profile as { mail?: string }).mail ??
+            (profile as { userPrincipalName?: string }).userPrincipalName,
+        };
+      },
     };
   }
 
   return socialProviders;
 };
+
+/**
+ * The social providers, in the order a sign-in rail draws them, as a map from
+ * the key BetterAuth mounts them under to the id the product dials.
+ *
+ * The two differ for exactly one provider: BetterAuth calls it `microsoft`,
+ * and everything outside better-auth — `NEXTAUTH_PROVIDER`, the `Account`
+ * rows, the callback path customers registered with Azure, the method labels
+ * — has always called it `azure-ad`. `auth-client` maps one to the other at
+ * the moment of the dial; this table is the same pairing, read the other way,
+ * so a method offered by the door carries the id the door knows how to dial.
+ */
+const SOCIAL_PROVIDER_METHOD_IDS: readonly (readonly [string, string])[] = [
+  ["google", "google"],
+  ["github", "github"],
+  ["gitlab", "gitlab"],
+  ["microsoft", "azure-ad"],
+];
+
+/**
+ * Whether better-auth mounts this provider id as a NATIVE social button - one
+ * this deployment dials itself, rather than the broker or a generic-OAuth id.
+ * Reads the same table the rail draws from, so a provider added there is
+ * covered here without a second edit.
+ */
+export const isNativeSocialProvider = (providerId: string): boolean =>
+  SOCIAL_PROVIDER_METHOD_IDS.some(
+    ([betterAuthKey]) => betterAuthKey === providerId,
+  );
+
+/**
+ * The social providers this deployment actually MOUNTED, by the id the
+ * product dials them under, in rail order.
+ *
+ * Derived from `buildSocialProviders` rather than restated beside it, and that
+ * is the whole point: a sign-in door reading this can never offer a button
+ * that dials a provider better-auth never registered. Whatever widens or
+ * narrows what gets mounted — a credential appearing, `NEXTAUTH_PROVIDER`
+ * changing, a provider being added to the builder — moves this answer with it,
+ * in one place.
+ *
+ * It reports what is MOUNTED, never what is LICENSED. ADR-027's gate is a
+ * separate question, asked by the method policy that consumes this.
+ */
+export const configuredSocialProviderIds = (
+  e: SocialProviderEnv,
+): readonly string[] => {
+  const mounted = buildSocialProviders(e);
+  return SOCIAL_PROVIDER_METHOD_IDS.filter(
+    ([betterAuthKey]) => betterAuthKey in mounted,
+  ).map(([, methodId]) => methodId);
+};
+
+/**
+ * The better-auth key a social method id mounts under, or null for an id
+ * that is not a social provider at all (a generic-OAuth id, `email`, a
+ * typo). What `authProviderIsMounted` needs now that the social map mounts
+ * on credentials rather than on `NEXTAUTH_PROVIDER`: "is anything mounted"
+ * no longer answers "is the NAMED provider mounted", and the named one is
+ * the only one the typo protection is about.
+ */
+export const socialProviderKeyFor = (methodId: string): string | null =>
+  SOCIAL_PROVIDER_METHOD_IDS.find(([, id]) => id === methodId)?.[0] ?? null;
 
 /**
  * Forgiving issuer URL parser. Accepts:
@@ -214,6 +304,29 @@ export const parseIssuerUrl = (issuer: string, envName: string): URL => {
     );
   }
 };
+
+/** The callback path segment Azure app registrations carry for the
+ *  Microsoft provider, from the NextAuth releases where it was `azure-ad`. */
+export const MICROSOFT_LEGACY_CALLBACK_ID = "azure-ad";
+
+/**
+ * better-auth mounts the Microsoft provider as `microsoft` and would send
+ * `/api/auth/callback/microsoft`. Every Azure app registration made for
+ * LangWatch before 3.17, and every one made from the self-hosting docs since,
+ * lists `/api/auth/callback/azure-ad`, so the redirect is pinned to that path
+ * and `legacy-callback-alias.ts` routes it back to the provider.
+ */
+function microsoftRedirect(baseUrl: string | undefined): {
+  redirectURI?: string;
+} {
+  if (!baseUrl) return {};
+  return {
+    redirectURI: legacyCallbackUrl({
+      baseUrl,
+      providerId: MICROSOFT_LEGACY_CALLBACK_ID,
+    }),
+  };
+}
 
 /**
  * The callback URL an operator registers with their identity provider. One
@@ -528,5 +641,11 @@ export const buildGenericOAuthConfigs = (
   return genericOAuthConfigs.map((config) => ({
     ...config,
     accountIssuer: issuerForProviderId(config.providerId),
+    // Auth0 and Okta session MFA evidence comes from their callback ID token.
+    // Refuse those providers at initialization when discovery cannot supply
+    // the issuer and JWKS needed for BetterAuth to verify that proof.
+    ...(config.providerId === "auth0" || config.providerId === "okta"
+      ? { requireIdTokenVerification: true }
+      : {}),
   }));
 };

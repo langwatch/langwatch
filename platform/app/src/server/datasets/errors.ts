@@ -246,6 +246,53 @@ export class DatasetNotReadyError extends HandledError {
 }
 
 /**
+ * A search was asked for over more of a dataset than one search will read —
+ * more rows, or more bytes of content.
+ *
+ * One error and one code for both limits, because they are one thing to the
+ * user: the dataset is past what a search reads, and the way through is the
+ * same either way. Which limit fired is carried in `meta` for the log, not
+ * shown — "too many bytes" is not a distinction a user can act on differently
+ * from "too many rows".
+ *
+ * Distinct from DatasetTooLargeToExportError on purpose: the presentation
+ * registry is keyed by code, so reusing the export error would show the user a
+ * message about exporting a dataset they were trying to search.
+ */
+export class DatasetTooLargeToSearchError extends HandledError {
+  declare readonly code: "dataset_too_large_to_search";
+
+  readonly measured: number;
+  readonly limit: number;
+  readonly dimension: "rows" | "bytes";
+
+  constructor(
+    params:
+      | { rowCount: number; maxRows: number }
+      | { sizeBytes: number; maxBytes: number },
+  ) {
+    const isRows = "rowCount" in params;
+    const measured = isRows ? params.rowCount : params.sizeBytes;
+    const limit = isRows ? params.maxRows : params.maxBytes;
+    const dimension = isRows ? "rows" : "bytes";
+
+    super(
+      "dataset_too_large_to_search",
+      `Dataset holds ${measured} ${dimension}, more than the ${limit} a single search will read`,
+      {
+        meta: { measured, limit, dimension },
+        httpStatus: 413,
+        fault: "customer",
+      },
+    );
+    this.name = "DatasetTooLargeToSearchError";
+    this.measured = measured;
+    this.limit = limit;
+    this.dimension = dimension;
+  }
+}
+
+/**
  * Thrown when a manual normalize retry is requested on a dataset that can't be
  * re-run: it's not in a recoverable state (`failed`/`processing`) or it carries
  * no staging key to re-read (no source to normalize). The route maps it to 409

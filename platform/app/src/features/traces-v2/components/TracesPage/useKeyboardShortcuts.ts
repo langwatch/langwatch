@@ -1,8 +1,8 @@
 import { useEffect } from "react";
 import { useDensityStore } from "../../stores/densityStore";
 import { useDrawerStore } from "../../stores/drawerStore";
+import { useExplorerStore } from "../../stores/explorerStore";
 import { useFindStore } from "../../stores/findStore";
-import { useSelectionStore } from "../../stores/selectionStore";
 import { useUIStore } from "../../stores/uiStore";
 
 const isTextInput = (target: EventTarget | null): boolean => {
@@ -126,12 +126,13 @@ export const useClearSelectionShortcut = (): void => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       if (isTextInput(e.target)) return;
-      const { mode, traceIds, clear } = useSelectionStore.getState();
-      const hasSelection = mode === "all-matching" || traceIds.size > 0;
+      const { selection, clearSelection } = useExplorerStore.getState();
+      const hasSelection =
+        selection.mode === "all-matching" || selection.traceIds.size > 0;
       if (!hasSelection) return;
       e.stopPropagation();
       e.preventDefault();
-      clear();
+      clearSelection();
     };
     // Capture phase so we win against bubble-phase Escape handlers (e.g.
     // the drawer's window-level keydown listener).

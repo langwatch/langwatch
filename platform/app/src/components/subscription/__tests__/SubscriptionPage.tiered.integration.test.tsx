@@ -72,6 +72,11 @@ vi.mock("~/utils/api", async () => {
   const setup = await import("./subscription-test-setup");
   return {
     api: {
+      limits: {
+        getUsage: {
+          useQuery: () => setup.mockGetUsage(),
+        },
+      },
       plan: {
         getActivePlan: {
           useQuery: () => setup.mockGetActivePlan(),
@@ -81,6 +86,8 @@ vi.mock("~/utils/api", async () => {
         getOrganizationWithMembersAndTheirTeams: {
           useQuery: () => setup.mockGetOrganizationWithMembers(),
         },
+      },
+      invite: {
         getOrganizationPendingInvites: {
           useQuery: () => ({
             ...setup.mockGetPendingInvites(),

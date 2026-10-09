@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/hex"
 
 	otelapi "go.opentelemetry.io/otel"
@@ -93,11 +94,17 @@ func startStudioSpan(ctx context.Context, req *app.WorkflowRequest, workflowAPIK
 	// (set by sub-workflow callers via Python CustomNode.forward /
 	// Go agentblock.WorkflowRunner to prevent double-counted spans
 	// against the parent trace) and workflow.enable_tracing=false
-	// (customer opt-out). Mirrors execute_flow.py:53. When set we
-	// return a no-op span so neither this top-level span nor any
-	// engine descendants emit — same as Python's
-	// optional_langwatch_trace(do_not_trace=True).
+	// (customer opt-out). Mirrors execute_flow.py:53. When set, neither
+	// this top-level span nor any engine descendant may emit — same as
+	// Python's optional_langwatch_trace(do_not_trace=True). Returning
+	// the bare ctx is not enough for the descendants: the engine's
+	// per-node tracer.Start would see no parent and mint a fresh sampled
+	// root with a random trace id, one orphan trace per suppressed
+	// request. Install a not-sampled parent instead so parent-based
+	// sampling turns every descendant into a non-recording span.
 	if req.DoNotTrace {
+		ctx = otelsetup.WithTraceSuppressed(ctx)
+		ctx = withUnsampledParent(ctx)
 		return ctx, trace.SpanFromContext(ctx)
 	}
 	// Prefer the W3C-extracted parent span context (set by
@@ -138,6 +145,25 @@ func startStudioSpan(ctx context.Context, req *app.WorkflowRequest, workflowAPIK
 		ctx = clog.With(ctx, zap.String(clog.FieldSpanID, sc.SpanID().String()))
 	}
 	return ctx, span
+}
+
+// withUnsampledParent returns ctx carrying a valid, not-sampled remote
+// span context. Under the parent-based sampler every span started from
+// it inherits the not-sampled decision and is never exported. An
+// inbound parent keeps its ids (flags cleared); otherwise random
+// non-zero ids are used — they never leave the process.
+func withUnsampledParent(ctx context.Context) context.Context {
+	sc := trace.SpanContextFromContext(ctx)
+	if !sc.IsValid() {
+		var tid trace.TraceID
+		var sid trace.SpanID
+		_, _ = rand.Read(tid[:])
+		_, _ = rand.Read(sid[:])
+		tid[len(tid)-1] |= 1
+		sid[len(sid)-1] |= 1
+		sc = trace.NewSpanContext(trace.SpanContextConfig{TraceID: tid, SpanID: sid, Remote: true})
+	}
+	return trace.ContextWithRemoteSpanContext(ctx, sc.WithTraceFlags(sc.TraceFlags().WithSampled(false)))
 }
 
 func studioRequestAttrs(req *app.WorkflowRequest) []attribute.KeyValue {

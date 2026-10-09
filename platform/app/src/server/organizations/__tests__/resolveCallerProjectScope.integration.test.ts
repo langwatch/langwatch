@@ -8,6 +8,7 @@
  *
  * @see specs/coding-agent/pull-request-linkage.feature
  */
+
 import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -19,6 +20,7 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { resolveCallerProjectScope } from "../resolveCallerProjectScope";
@@ -127,15 +129,13 @@ beforeAll(async () => {
   });
   // Org-wide admin, so every project below is genuinely readable and the map
   // is exercised over all of them rather than over the one the caller owns.
-  await prisma.roleBinding.create({
-    data: {
-      id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-      organizationId: organization.id,
-      userId: callerUserId,
-      role: TeamUserRole.ADMIN,
-      scopeType: RoleBindingScopeType.ORGANIZATION,
-      scopeId: organization.id,
-    },
+  await seedRoleBinding(prisma, {
+    id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+    organizationId: organization.id,
+    userId: callerUserId,
+    role: TeamUserRole.ADMIN,
+    scopeType: RoleBindingScopeType.ORGANIZATION,
+    scopeId: organization.id,
   });
 
   const named = await createPersonalWorkspace({
@@ -185,6 +185,7 @@ afterAll(async () => {
     .catch(() => []);
   const teamIds = teams.map((team) => team.id);
   await cleanupTestRows(prisma, [
+    ["grant", { organizationId: organization.id }],
     ["roleBinding", { organizationId: organization.id }],
     ["teamUser", { teamId: { in: teamIds } }],
     ["project", { teamId: { in: teamIds } }],

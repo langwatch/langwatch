@@ -3,7 +3,7 @@
  * is reaching for GitHub.
  *
  * Sibling of `langwatchCommand.ts`, and it exists for the same reason. Langy
- * runs on opencode and does its GitHub work through the `gh` CLI and `git` in
+ * does its GitHub work through the `gh` CLI and `git` in
  * the `bash` tool, so the intent arrives buried in a command string. We decode
  * it ONCE, here, from the tool stream the manager already forwards
  * (`langy.tool` frames carry `name` + `input`) — and never from the model's
@@ -19,6 +19,8 @@
  *
  * @see langy-cli-envelope.service.ts — the same trick for the `langwatch` CLI.
  */
+
+import { firstPullRequestUrlIn } from "~/shared/langy/githubPrUrl";
 
 /**
  * Does this command need the user's GitHub credentials to work?
@@ -60,6 +62,12 @@ export type GithubProgressStage =
 export type GithubProgressEvent = {
   stage: GithubProgressStage;
   detail?: string;
+  /**
+   * The pull request's own URL, on the `opened` stage. It is not in the
+   * command, it is in the command's OUTPUT, which is why it is read separately
+   * from `detail` (a short human label: a branch, a commit subject, a repo).
+   */
+  url?: string;
 };
 
 /**
@@ -76,18 +84,30 @@ export interface GithubStep {
 }
 
 /**
- * Which step of the PR flow, if any, this shell command performs.
+ * Every step of the PR flow this shell command performs, in the order it runs
+ * them.
  *
  * THE SOURCE OF TRUTH IS THE COMMAND, not a marker the model was asked to print
  * alongside it. `git push` IS the push — there is nothing to announce and
- * nothing to trust. Returns null for everything else, including local edits.
+ * nothing to trust. Empty for everything else, including local edits.
+ *
+ * A chain is normal, not an edge case: an agent working in a developer's own
+ * folder runs `git add … && git commit … && git push … && gh pr create …` as one
+ * call, so reading only the first recognised segment left the card saying a
+ * commit had happened and a push had not, after both had.
  */
-export function githubStepOf(command: string): GithubStep | null {
+export function githubStepsOf(command: string): GithubStep[] {
+  const steps: GithubStep[] = [];
   for (const tokens of commandSegments(command)) {
     const step = stepOfSegment(tokens);
-    if (step) return step;
+    if (step) steps.push(step);
   }
-  return null;
+  return steps;
+}
+
+/** The FIRST step of the PR flow this command performs, if any. */
+export function githubStepOf(command: string): GithubStep | null {
+  return githubStepsOf(command)[0] ?? null;
 }
 
 function stepOfSegment(tokens: string[]): GithubStep | null {
@@ -98,8 +118,9 @@ function stepOfSegment(tokens: string[]): GithubStep | null {
     if (rest[0] === "repo" && rest[1] === "clone") {
       return { begin: "cloning", end: "cloned", detail: repoSlug(rest[2]) };
     }
-    // `gh pr create --title x --body y`. The detail — the PR's own URL — is NOT
-    // in the command. It is in the command's OUTPUT, which the caller reads.
+    // `gh pr create --title x --body y`. The pull request's own URL is NOT in
+    // the command, it is in the command's OUTPUT, which `progressForPart`
+    // reads onto the opened event.
     if (rest[0] === "pr" && rest[1] === "create") {
       return { begin: "opening_pr", end: "opened" };
     }
@@ -143,41 +164,66 @@ function stepOfSegment(tokens: string[]): GithubStep | null {
  *
  * A tool part carries the command in `input.command` and settles into an
  * `output-available` / `output-error` state. An errored command completed no
- * step — a rejected push has not pushed.
+ * step — a rejected push has not pushed. A command that chains several steps
+ * contributes all of them, because it performed all of them.
  */
 export function githubProgressFromToolParts(
   parts: readonly {
     type?: string;
     input?: unknown;
     state?: string;
+    output?: unknown;
   }[],
 ): GithubProgressEvent[] {
-  const events: GithubProgressEvent[] = [];
-  for (const part of parts) {
-    if (typeof part.type !== "string" || !part.type.startsWith("tool-"))
-      continue;
-    const command = (part.input as { command?: unknown } | undefined)?.command;
-    if (typeof command !== "string") continue;
-    const step = githubStepOf(command);
-    if (!step) continue;
+  return parts.flatMap((part) => progressForPart(part));
+}
 
-    if (part.state === "output-error") continue;
-    if (part.state === "output-available") {
-      events.push(
-        step.detail
-          ? { stage: step.end, detail: step.detail }
-          : { stage: step.end },
-      );
-    } else if (step.begin) {
-      // Still running: the card shows the step as under way.
-      events.push(
-        step.detail
-          ? { stage: step.begin, detail: step.detail }
-          : { stage: step.begin },
-      );
-    }
+/** The events one tool part contributes. Empty for a call that ran no step. */
+function progressForPart(part: {
+  type?: string;
+  input?: unknown;
+  state?: string;
+  output?: unknown;
+}): GithubProgressEvent[] {
+  if (typeof part.type !== "string" || !part.type.startsWith("tool-"))
+    return [];
+  const command = (part.input as { command?: unknown } | undefined)?.command;
+  if (typeof command !== "string") return [];
+  // An errored command completed no step — a rejected push has not pushed.
+  if (part.state === "output-error") return [];
+
+  const steps = githubStepsOf(command);
+  if (steps.length === 0) return [];
+
+  if (part.state === "output-available") {
+    // `gh pr create` prints the pull request's URL on stdout, so the opened
+    // step can link to it. Only a settled, successful call has that output.
+    const prUrl = firstPullRequestUrlIn(part.output);
+    return steps.map((step) =>
+      progressEvent(
+        step.end,
+        step.detail,
+        step.end === "opened" ? prUrl : undefined,
+      ),
+    );
   }
-  return events;
+
+  // Still running: the card shows the FIRST step of the chain as under way. The
+  // rest have not started, and a chain is run left to right.
+  const first = steps[0]!;
+  return first.begin ? [progressEvent(first.begin, first.detail)] : [];
+}
+
+function progressEvent(
+  stage: GithubProgressStage,
+  detail: string | undefined,
+  url?: string,
+): GithubProgressEvent {
+  return {
+    stage,
+    ...(detail ? { detail } : {}),
+    ...(url ? { url } : {}),
+  };
 }
 
 /** Step past git's global flags (`-C <path>`, `-c <cfg>`) to the subcommand. */

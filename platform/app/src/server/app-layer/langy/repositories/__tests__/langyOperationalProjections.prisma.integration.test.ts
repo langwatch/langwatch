@@ -156,6 +156,8 @@ afterEach(async () => {
 });
 
 describe("Langy operational projections with Postgres", () => {
+  /** @scenario "Retrying the same send does not double-count" */
+  /** @scenario "Sending the first message creates the conversation from its events" */
   it("persists a state fold and message map idempotently on retry", async () => {
     const event = continuedEvent({
       projectId: projectIds[0]!,
@@ -207,6 +209,8 @@ describe("Langy operational projections with Postgres", () => {
     ).toBe(1);
   });
 
+  /** @scenario "Every conversation read is scoped to the project" */
+  /** @scenario "A shared conversation is visible to other project members" */
   it("isolates the same conversation and message ids by project and user", async () => {
     const eventA = continuedEvent({
       projectId: projectIds[0]!,
@@ -307,6 +311,7 @@ describe("Langy operational projections with Postgres", () => {
     ]);
   });
 
+  /** @scenario "A turn folds into one render document keyed per turn" */
   it("round-trips a complete turn document and its canonical cursor", async () => {
     const projectId = projectIds[0]!;
     const key = makeConversationTurnKey(conversationId, turnId);
@@ -429,5 +434,67 @@ describe("Langy operational projections with Postgres", () => {
         where: { projectId, ConversationId: conversationId, TurnId: turnId },
       }),
     ).toBe(1);
+  });
+
+  /** @scenario "The finalized response carries the whole answer as the source of truth" */
+  /** @scenario "Restoring a conversation returns its messages in order" */
+  it("stores the assistant answer as its own row and restores both messages in send order", async () => {
+    const projectId = projectIds[0]!;
+    const question = continuedEvent({
+      projectId,
+      owner: ownerA,
+      text: "why are my traces failing?",
+      id: "restore-question",
+      acceptedAt: 4_000,
+    });
+    const answer = LangyAgentRespondedEventSchema.parse({
+      ...eventBase({ projectId, id: "restore-answer", acceptedAt: 4_100 }),
+      type: LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED,
+      version: LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONDED,
+      data: {
+        conversationId,
+        turnId,
+        messageId: `${namespace}-assistant`,
+        role: "assistant",
+        parts: [
+          { type: "text", text: "Your exporter is dropping spans on retry." },
+        ],
+        outcome: "completed",
+      },
+    });
+
+    await projectConversationAndMessage(question);
+    const answerContext = context(projectId);
+    await stateExecutor.execute({
+      projection: conversationProjection,
+      events: [answer],
+      context: answerContext,
+    });
+    await mapExecutor.execute(messageProjection, answer, answerContext);
+
+    const messages = await messageService.getAllByConversation({
+      conversationId,
+      projectId,
+      userId: ownerA,
+    });
+    expect(
+      messages.map((message) => ({
+        role: message.role,
+        text: message.parts
+          .map((part) => (part.type === "text" ? part.text : ""))
+          .join(""),
+      })),
+    ).toEqual([
+      { role: "user", text: "why are my traces failing?" },
+      { role: "assistant", text: "Your exporter is dropping spans on retry." },
+    ]);
+
+    const conversation = await conversationProjectionStore.load(
+      conversationId,
+      context(projectId),
+    );
+    expect(conversation?.state).toEqual(
+      expect.objectContaining({ MessageCount: 2, Status: "idle" }),
+    );
   });
 });

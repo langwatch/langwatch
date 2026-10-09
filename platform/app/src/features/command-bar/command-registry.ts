@@ -41,6 +41,7 @@ import {
   Users,
   Workflow,
 } from "lucide-react";
+import type { ProjectNavigation } from "~/components/sidebar/projectKindNavigation";
 import type { FrontendFeatureFlag } from "~/server/featureFlag/frontendFeatureFlags";
 import type { Command } from "./types";
 
@@ -51,6 +52,7 @@ export const navigationCommands: Command[] = [
   // Main pages
   {
     id: "nav-home",
+    navigationSection: "home",
     label: "Home",
     description: "Project home",
     icon: Home,
@@ -60,6 +62,7 @@ export const navigationCommands: Command[] = [
   },
   {
     id: "nav-analytics",
+    navigationSection: "analytics",
     label: "Analytics",
     description: "Analytics dashboard",
     icon: TrendingUp,
@@ -90,6 +93,7 @@ export const navigationCommands: Command[] = [
   },
   {
     id: "nav-agent-testing",
+    navigationSection: "test",
     label: "Agent Testing",
     description: "Test cases and their results",
     icon: FlaskConical,
@@ -103,6 +107,7 @@ export const navigationCommands: Command[] = [
   },
   {
     id: "nav-simulations",
+    navigationSection: "test",
     label: "Simulations",
     description: "Simulation runs",
     icon: Play,
@@ -118,6 +123,7 @@ export const navigationCommands: Command[] = [
   },
   {
     id: "nav-scenarios",
+    navigationSection: "test",
     label: "Scenarios",
     description: "Simulations → Scenarios",
     icon: FlaskConical,
@@ -131,6 +137,7 @@ export const navigationCommands: Command[] = [
   },
   {
     id: "nav-online-evaluations",
+    navigationSection: "onlineEvaluations",
     label: "Online Evaluations",
     description: "Configure production evaluations and guardrails",
     icon: CheckSquare,
@@ -140,6 +147,7 @@ export const navigationCommands: Command[] = [
   },
   {
     id: "nav-experiments",
+    navigationSection: "test",
     label: "Experiments",
     description: "View experiments",
     icon: FlaskConical,
@@ -149,6 +157,7 @@ export const navigationCommands: Command[] = [
   },
   {
     id: "nav-annotations",
+    navigationSection: "test",
     label: "Annotations",
     description: "Annotation queues",
     icon: Pencil,
@@ -158,6 +167,7 @@ export const navigationCommands: Command[] = [
   },
   {
     id: "nav-annotations-all",
+    navigationSection: "test",
     label: "All Annotations",
     description: "Annotations → All",
     icon: Pencil,
@@ -167,6 +177,7 @@ export const navigationCommands: Command[] = [
   },
   {
     id: "nav-annotations-inbox",
+    navigationSection: "test",
     label: "My Annotation Inbox",
     description: "Annotations → Inbox",
     icon: Inbox,
@@ -176,6 +187,7 @@ export const navigationCommands: Command[] = [
   },
   {
     id: "nav-annotations-queue",
+    navigationSection: "test",
     label: "My Annotation Queue",
     description: "Annotations → My Queue",
     icon: ListTree,
@@ -185,6 +197,7 @@ export const navigationCommands: Command[] = [
   },
   {
     id: "nav-prompts",
+    navigationSection: "build",
     label: "Prompts",
     description: "Manage prompts",
     icon: BookText,
@@ -194,6 +207,7 @@ export const navigationCommands: Command[] = [
   },
   {
     id: "nav-agents",
+    navigationSection: "build",
     label: "Agents",
     description: "Manage agents",
     icon: Bot,
@@ -203,6 +217,7 @@ export const navigationCommands: Command[] = [
   },
   {
     id: "nav-workflows",
+    navigationSection: "build",
     label: "Workflows",
     description: "Manage workflows",
     icon: Workflow,
@@ -212,6 +227,7 @@ export const navigationCommands: Command[] = [
   },
   {
     id: "nav-evaluators",
+    navigationSection: "build",
     label: "Evaluators",
     description: "Manage evaluators",
     icon: Percent,
@@ -221,6 +237,7 @@ export const navigationCommands: Command[] = [
   },
   {
     id: "nav-datasets",
+    navigationSection: "build",
     label: "Datasets",
     description: "Manage datasets",
     icon: Table,
@@ -230,6 +247,7 @@ export const navigationCommands: Command[] = [
   },
   {
     id: "nav-automations",
+    navigationSection: "build",
     label: "Automations",
     description: "Manage automations",
     icon: Bell,
@@ -341,32 +359,46 @@ export const navigationCommands: Command[] = [
     keywords: ["config", "preferences", "options", "configure"],
     path: "/settings",
   },
+  // Members, Teams & Projects and Access became tabs of Directory. Each keeps
+  // a command of its own, pointed at the tab it became: somebody typing
+  // "members" is looking for a list of people, not for a page called
+  // something else, and a command bar that answers with nothing teaches them
+  // the feature is gone.
   {
     id: "nav-settings-members",
     label: "Members",
-    description: "Settings → Members",
+    description: "Settings → Directory → People",
     icon: Users,
     category: "navigation",
-    keywords: ["users", "team", "people", "invite"],
-    path: "/settings/members",
+    keywords: ["users", "team", "people", "invite", "member", "directory"],
+    path: "/settings/directory",
   },
   {
     id: "nav-settings-teams",
     label: "Teams",
-    description: "Settings → Teams",
+    description: "Settings → Directory → Teams & projects",
     icon: Building2,
     category: "navigation",
-    keywords: ["team", "group", "department"],
-    path: "/settings/teams",
+    keywords: ["team", "group", "department", "directory"],
+    path: "/settings/directory?tab=teams",
   },
   {
     id: "nav-settings-projects",
     label: "Projects",
-    description: "Settings → Projects",
+    description: "Settings → Directory → Teams & projects",
     icon: FolderKanban,
     category: "navigation",
-    keywords: ["project", "workspace"],
-    path: "/settings/teams",
+    keywords: ["project", "workspace", "directory"],
+    path: "/settings/directory?tab=teams",
+  },
+  {
+    id: "nav-settings-groups",
+    label: "Groups",
+    description: "Settings → Directory → Groups",
+    icon: Users,
+    category: "navigation",
+    keywords: ["group", "directory", "scim", "role assignment"],
+    path: "/settings/directory?tab=groups",
   },
   {
     id: "nav-settings-roles",
@@ -443,11 +475,119 @@ export const navigationCommands: Command[] = [
   {
     id: "nav-settings-authentication",
     label: "Authentication",
-    description: "Settings → Authentication",
+    description:
+      "Settings → Authentication — single sign-on for your organization",
     icon: Shield,
     category: "navigation",
-    keywords: ["auth", "sso", "login", "security"],
+    keywords: [
+      "authentication",
+      "sso",
+      "single sign-on",
+      "saml",
+      "oidc",
+      "identity provider",
+      "okta",
+      "entra",
+      "google workspace",
+      "domain",
+      "verify",
+      // The second-factor requirement moved here from Access: it is a
+      // condition of signing in, so it is asked with the sign-in it guards.
+      "two-step",
+      "mfa",
+      "second factor",
+    ],
     path: "/settings/authentication",
+  },
+  {
+    id: "nav-settings-directory",
+    label: "Directory",
+    description: "Settings → Directory — who is here, and how they got here",
+    icon: Users,
+    category: "navigation",
+    keywords: [
+      "directory",
+      "people",
+      "members",
+      "teams",
+      "groups",
+      "identity provider",
+    ],
+    path: "/settings/directory",
+  },
+  {
+    id: "nav-settings-provisioning",
+    label: "Provisioning",
+    description:
+      "Settings → Authentication → Connectors — SCIM sync and its tokens",
+    icon: Users,
+    category: "navigation",
+    keywords: [
+      "scim",
+      "provisioning",
+      "sync",
+      "tokens",
+      "deprovision",
+      "identity provider",
+    ],
+    path: "/settings/authentication/connectors",
+  },
+  {
+    id: "nav-settings-access",
+    label: "Joining",
+    description: "Settings → Directory → who may join without an invitation",
+    icon: UserPlus,
+    category: "navigation",
+    keywords: [
+      "access",
+      "join",
+      "joining",
+      "join requests",
+      "domain",
+      "auto-join",
+      "policy",
+    ],
+    path: "/settings/directory",
+  },
+  {
+    id: "nav-settings-api-keys",
+    label: "API Keys",
+    description: "Settings → API Keys",
+    icon: Key,
+    category: "navigation",
+    keywords: ["api key", "token", "access token", "ingestion", "credentials"],
+    path: "/settings/api-keys",
+  },
+  {
+    id: "nav-settings-security",
+    label: "Security",
+    description: "Settings → Security — your own sign-in methods",
+    icon: Shield,
+    category: "navigation",
+    // "sso" and "authentication" deliberately live on the ORGANIZATION
+    // authentication entry above: this page is the person's own methods,
+    // and the collision sent administrators hunting for SSO to the wrong
+    // screen.
+    keywords: [
+      "security",
+      "login",
+      "password",
+      "passkey",
+      "two-factor",
+      "two-step",
+      "backup codes",
+      "linked accounts",
+    ],
+    path: "/settings/security",
+  },
+  {
+    id: "nav-settings-profile",
+    label: "Profile",
+    description: "Settings → Profile",
+    icon: UserCog,
+    category: "navigation",
+    keywords: ["profile", "name", "photo", "avatar"],
+    path: "/settings/profile",
   },
   {
     id: "nav-settings-audit-log",
@@ -475,6 +615,7 @@ export const navigationCommands: Command[] = [
 export const actionCommands: Command[] = [
   {
     id: "action-new-agent",
+    navigationSection: "build",
     label: "New Agent",
     description: "Create a new agent",
     icon: Plus,
@@ -483,6 +624,7 @@ export const actionCommands: Command[] = [
   },
   {
     id: "action-new-evaluation",
+    navigationSection: "test",
     label: "New Evaluation",
     description: "Create a new evaluation",
     icon: Plus,
@@ -491,6 +633,7 @@ export const actionCommands: Command[] = [
   },
   {
     id: "action-new-prompt",
+    navigationSection: "build",
     label: "New Prompt",
     description: "Create a new prompt",
     icon: Plus,
@@ -499,6 +642,7 @@ export const actionCommands: Command[] = [
   },
   {
     id: "action-new-dataset",
+    navigationSection: "build",
     label: "New Dataset",
     description: "Create a new dataset",
     icon: Plus,
@@ -507,6 +651,7 @@ export const actionCommands: Command[] = [
   },
   {
     id: "action-new-automation",
+    navigationSection: "build",
     label: "New Automation",
     description: "Create a notification or action triggered by trace filters",
     icon: Bell,
@@ -523,6 +668,7 @@ export const actionCommands: Command[] = [
   },
   {
     id: "action-new-scenario",
+    navigationSection: "test",
     label: "New Scenario",
     description: "Create a new scenario",
     icon: Plus,
@@ -762,6 +908,25 @@ export function filterCommandsByFeatureFlags({
     if (!command.featureFlag) return true;
     return flags[command.featureFlag.flag] === command.featureFlag.enabled;
   });
+}
+
+/**
+ * Drops the commands whose navigation section this project's navigation
+ * does not show, so Quick Search offers an aggregate (ADR-144) what its
+ * sidebar does and no way to create data under it. A command with no
+ * section is always offered.
+ */
+export function filterCommandsByProjectNavigation({
+  commands,
+  navigation,
+}: {
+  commands: Command[];
+  navigation: ProjectNavigation;
+}): Command[] {
+  return commands.filter(
+    (command) =>
+      !command.navigationSection || navigation[command.navigationSection],
+  );
 }
 
 /**

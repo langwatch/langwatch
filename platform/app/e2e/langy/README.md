@@ -90,7 +90,7 @@ to a filed defect and is expected to FAIL until that defect is fixed:
 | never ends a turn with nothing rendered | 27 of 260 completed turns render no text at all | `langwatch-saas#1097` |
 | answers from the project, not from memory | 40% of completed turns make zero tool calls; 58% answer under 120 chars | `langwatch-saas#1098` |
 | owns the tools it actually has | `AGENTS.md:149` calls the working `langwatch.*` tools hallucinations | `langwatch-saas#1099` |
-| stays a platform assistant | opencode coding-agent persona bleeding through (`read` 144, `edit` 68 calls) | `langwatch-saas#1100` |
+| stays a platform assistant | a stock coding-agent persona bleeding through (`read` 144, `edit` 68 calls) | `langwatch-saas#1100` |
 | creates the monitor, not just the evaluator | `langwatch.monitor.create` errors on 48% of calls | `langwatch-saas#1101` |
 | answers a single lookup inside the budget | p90 380s, p99 1,868s | `langwatch-saas#1102` |
 
@@ -147,6 +147,127 @@ Monitors are deliberately NOT on this list. `POST /api/monitors` used to demand
 `evaluations:manage` while the tRPC route behind the product's own create button
 asked only for `evaluations:create` — a route bug that looked like a boundary.
 The quality suite now asserts the monitor really gets created.
+
+## The shared folder (local-control-fixture.ts)
+
+Six files cover ADR-129, Langy working on the developer's own code. They drive
+the REAL command line, `langwatch langy --share-control`, in a tmux session
+against a demo application copied into a temporary git repository, and answer
+the permission and question cards through tRPC as the user would.
+
+| File | What it covers |
+|---|---|
+| `langy-code-access.scenario.test.ts` | the ask, the card, the folder shared, the branch and commit that follow |
+| `langy-code-access-github.scenario.test.ts` | GitHub with remember, no card in the next conversation, and the choice cleared |
+| `langy-code-access-platform-only.scenario.test.ts` | platform work never asks: no `code_access` call and no control request |
+| `langy-local-connected-agent.scenario.test.ts` | a run parameter added to a connected agent, restarted through the folder |
+| `langy-local-permissions.scenario.test.ts` | the folder boundary, a denial that is not retried, a pattern granted once |
+| `langy-local-disconnect.scenario.test.ts` | Ctrl-C mid-task, and the next code ask that asks again |
+
+`local-control-fixture.ts` is what they share:
+
+- `createDemoRepo({ language, name, install })` copies
+  `dev/dogfood/acme-support/{python,typescript}` into
+  `.claude/tmp/scenario-repos/`, points the LangWatch SDK dependency at this
+  checkout by absolute path (the demo's relative path only resolves inside the
+  monorepo), makes it a git repository on `main` with one commit, and installs
+  the dependencies. It answers the reads the assertions make: `branches()`,
+  `log()`, `diffAgainstMain()`, `status()`, `read()`.
+- `startShareControl({ repo, label })` builds the command line once
+  (`pnpm --filter langwatch exec tsup`; `LANGY_SKIP_CLI_BUILD=1` reuses `dist`)
+  and starts it in tmux. `approve()` waits for the terminal question and answers
+  Approve, `capture()` is the transcript, `disconnect()` is the two-stage Ctrl-C.
+- `watchLangyConversation({ adapter, policy, answerQuestion })` follows the
+  conversation, including the turn the connection starts on its own, and answers
+  every permission card on a policy (`deny`, `allowPattern`, `fallback`) and
+  every question card. It records each ask, so a test asserts on what was asked
+  before it asks a judge.
+- `getLocalWorkspace`, `waitForPendingRequest`, `waitForConnectedWorkspace`,
+  `setCodeAccessPreference`, `disconnectLocalWorkspace`, `readAgent` and
+  `startDemoApp` are the platform-side reads and writes.
+
+**The command line signs in the way a developer does.** A control request is
+addressed to a person, so the share-control terminal runs on a device login,
+not on a project key. `writeCliLoginConfig()` walks the product's own device
+flow as the test's user (`device-code`, `approve` with the session cookie,
+`exchange`) and writes the file `langwatch login --device` writes; the
+terminal's `LANGWATCH_CLI_CONFIG` points at that scratch file, so the
+developer's own `~/.langwatch/config.json` is never touched, and
+`LANGWATCH_API_KEY` is unset in its environment. `getCliApiKey()` still mints a
+user key with one PROJECT-scoped binding for everything else: the scenario
+library's own reporting, the demo application, and the platform reads the test
+makes.
+
+## The guided onboarding (guided-onboarding-*.scenario.test.ts)
+
+Eight files cover `specs/langy/langy-guided-onboarding.feature`, the
+conversation Langy runs after the guided sign-up: the kickoff message the tour
+sends when it ends, and each path's script from the `guided-onboarding` skill.
+
+| File | What it covers |
+|---|---|
+| `guided-onboarding-coding.scenario.test.ts` | the one command, and the completion recorded |
+| `guided-onboarding-gateway.scenario.test.ts` | the key the tour minted is reused; a skipped tour gets the no-worries line and mints the key once |
+| `guided-onboarding-governance.scenario.test.ts` | the sources question, the pick, the navigate to the sources page |
+| `guided-onboarding-home-offer.scenario.test.ts` | a second kickoff ("Let's set up Gateway then.") into the attached conversation |
+| `guided-onboarding-llmops-share-folder.scenario.test.ts` | code access first, a typed question mid-setup, the folder shared, tracing and the connect call, the proposal, the scenario in the drawer, the run, the suite, the completion |
+| `guided-onboarding-llmops-describe.scenario.test.ts` | "I'd rather describe it", the one line, the second code access ask |
+| `guided-onboarding-llmops-never-connects.scenario.test.ts` | the request runs out, GitHub is offered, nothing is created |
+| `guided-onboarding-llmops-chat-and-failure.scenario.test.ts` | "Chat about this" ends the turn with nothing created; a scenario the agent cannot pass keeps the suite |
+
+`guided-onboarding-fixture.ts` is what they share:
+
+- `seedGuidedOrganization` signs a fresh account up through the sign-up
+  endpoint and runs the rest of the process as it (`useAccount` in config.ts,
+  the browser QA pass included), then creates a fresh organization in the
+  guided variant (the picks, the current path, the tour outcome) with one
+  project and the OpenAI provider attached at organization scope as the Langy
+  model, and points the whole suite at that project with `useProject`. Every
+  file seeds its own account and organization: one run's scenarios and keys
+  never change what the next run's kickoff finds, and no other session signed
+  in on a shared account can land on the organization and send its kickoff
+  first.
+- `queueGuidedKickoff` builds the kickoff parts the panel sends (the typed
+  `guided-onboarding-kickoff` part beside the text brief, from the app's own
+  `kickoff.ts`) and hands them to `adapter.queueNextTurn`, so the next
+  `scenario.agent()` sends the kickoff through the same create or continue
+  mutation as any message. The conversation is recorded on the organization
+  the moment the adapter learns its id (`onConversationCreated`), the way the
+  panel does once the transport names it; `attachKickoffConversation` reads
+  it back for the assertions.
+- `assertPathCompletedAfterSkill` proves on the stream's tool frames (the
+  adapter's and the watcher's `toolEvents`, merged by `mergeToolEvents`) that
+  `complete-path` ran as its own step: no other call of its turn open when it
+  started, none started before it settled, after the skill call when the
+  skill reached the model as one, and after the commands the path has to
+  finish first (the suite run on the llmops path).
+- `GUIDED_LINES` and `GUIDED_OPTIONS` are the skill's verbatim lines and
+  option labels; `saysVerbatim` compares them allowing for curly quotes and
+  wrapping. The judge gets the same lines as criteria, but every verbatim
+  line is also asserted structurally on the stored text, because a judge will
+  accept a paraphrase.
+- The reads: `readGuidedState`, `listProjectScenarios`, `listProjectSuites`,
+  `listVirtualKeys`, `conversationTitle`, `conversationMessages`,
+  `gatewayPublicUrl` (the instance's own gateway, which the gateway path's
+  snippet has to name).
+
+The watcher answers the `question` cards (the proposal, the governance
+sources) through an async picker, so a file can read the world before it
+answers: the share-folder file lists the project's scenarios while the
+proposal is still open and asserts the list is empty. The watcher also records
+every `navigate` instruction of the turns it follows (`navigateHrefs`), which
+is how the scenario editor drawer and the run opening are proved without a
+browser.
+
+The Langy worker runs whatever `langwatch` is first on the PATH the app
+inherited, so the stack under test needs the CLI built from this checkout
+(`pnpm run generate` in `sdks/typescript`, then `pnpm --filter langwatch exec
+tsup`) ahead of any published one, or the `onboarding` commands are missing
+and no path can record its completion.
+
+Run one file per vitest invocation, same as every other suite here, with
+`LANGY_ADMIN_EMAIL` and `LANGY_ADMIN_PASSWORD` naming a user allowed to
+create organizations on the stack.
 
 ## Red team
 
@@ -288,6 +409,22 @@ every project-scoped call.
 
 Run the harness file first: it validates the shared request builder and the
 results fold without spending a Langy turn.
+
+## The fake Explorer tab
+
+`fake-explorer-tab.ts` is the same idea for the Trace Explorer. It claims
+`explorer.*` actions off the turn stream through `executeUiAction`, runs the
+manifest's own transform over an `ExplorerState` it holds, and answers
+`explorer.getState` through `readLiveExplorer` with the count `tracesV2.list`
+returns for that state, which is the count the table shows.
+
+It does not run the page's zustand store. The store needs React and the
+browser's storage, so the commit step (`commitExplorerState`) is covered by
+`ExplorerLangyActionsMount.integration.test.tsx` instead.
+
+| File | What it covers | Model turns |
+|---|---|---|
+| `langy-find-traces.scenario.test.ts` | thumbs down exists only as `thumbs_up_down` events with a vote of -1; Langy has to find that form, apply it through `explorer.setFilter`, and answer the page's count | one agent turn |
 
 ### Rule-adherence evaluator (over Langy's own traces)
 

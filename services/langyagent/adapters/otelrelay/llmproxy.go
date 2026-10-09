@@ -32,7 +32,7 @@ const llmPrefix = "/llm"
 const maxErrorBodyBytes = 64 * 1024
 
 // codexModelPrefix marks a turn whose model is served by the gateway's codex
-// provider. The worker itself never sees the prefix (opencode runs its native
+// provider. The worker itself never sees the prefix (it runs its native
 // openai provider); the proxy restores it request-side so the gateway routes
 // to the codex credential.
 const codexModelPrefix = "openai_codex/"
@@ -98,7 +98,7 @@ func (r *Relay) handleLLM(w http.ResponseWriter, req *http.Request) {
 	}
 	// pi workers export no OTLP of their own: the relay retells each mediated
 	// LLM call as one gen_ai span into the customer's trace (see genai.go).
-	// nil for every other harness, and for calls with no turn to parent under.
+	// nil for calls with no turn to parent under.
 	genAI := newGenAICall(r, entry, req)
 	target, err := llmTargetURL(entry.info.GatewayBaseURL, req.PathValue("token"), req.URL)
 	if err != nil {
@@ -124,7 +124,7 @@ func (r *Relay) handleLLM(w http.ResponseWriter, req *http.Request) {
 			if pr.In.Header.Get("x-api-key") != "" {
 				pr.Out.Header.Set("x-api-key", entry.info.LLMVirtualKey)
 			}
-			// Codex turns run opencode's NATIVE openai provider (the Responses
+			// Codex turns run the NATIVE openai provider (the Responses
 			// dialect the codex backend speaks), so the worker's request says
 			// "gpt-…"; restore the full provider-prefixed id on the wire and
 			// the gateway routes it to the codex credential. See provision.go.
@@ -159,10 +159,13 @@ func (r *Relay) handleLLM(w http.ResponseWriter, req *http.Request) {
 			}
 			pr.SetXForwarded()
 		},
+		// A burst 429 is re-sent by the relay itself, with the provider's
+		// Retry-After, before anything reaches the worker (llmretry.go).
+		Transport: r.llmRetryTransport(entry),
 		// Negative ⇒ flush immediately after each write: SSE pass-through.
 		FlushInterval: -1,
 		// EVERY failed call is captured so the turn's terminal error frame
-		// carries the REAL cause — opencode launders this body into
+		// carries the REAL cause — the agent launders this body into
 		// "AI_APICallError" prose the control plane must never trust. A typed
 		// gateway herr envelope decodes losslessly (herr.FromBody — the
 		// cross-process continuation); a provider-native body the gateway
@@ -208,7 +211,9 @@ func (r *Relay) captureLLMFailure(entry *workerEntry, resp *http.Response) error
 			// (OpenAI's insufficient_quota) as an in-stream error event
 			// after the stream opens. Watch the frames as they pass through
 			// untouched; a clean end clears the capture, an error event
-			// captures and latches (see llmStreamSniffer).
+			// captures and latches (see llmStreamSniffer). An answered
+			// stream is not a 429, so it ends a run of them.
+			entry.resetRateLimitStrikes()
 			resp.Body = newLLMStreamSniffer(resp.Body, entry, clog.Get(r.baseCtx))
 			return nil
 		}
@@ -544,7 +549,22 @@ func decodeProviderErrorBody(peeked []byte, status int, contentType string) herr
 		// top-level error codes and do not belong in the generated code list.
 		e.Reasons = []error{herr.E{Code: code}}
 	}
+	if refusal, ok := credentialRefusalReason(status); ok && refusal != code {
+		e.Reasons = append(e.Reasons, herr.E{Code: refusal})
+	}
 	return e
+}
+
+// credentialRefusalReason names a 401 or 403 next to the provider's own
+// discriminant. Every provider has its own vocabulary for a refused key
+// (Bedrock alone answers with a dozen exception names), and a client that
+// knows only some of them would read the rest as a failure worth retrying.
+// The status says "refused credential" in every dialect.
+func credentialRefusalReason(status int) (herr.Code, bool) {
+	if status != http.StatusUnauthorized && status != http.StatusForbidden {
+		return "", false
+	}
+	return upstreamReasonCodes[status], true
 }
 
 func providerErrorCode(body []byte) herr.Code {
@@ -585,7 +605,7 @@ func providerCodeCandidate(body []byte, path string) (herr.Code, bool) {
 // body carries no discriminant of its own (see providerErrorCode for that
 // case). Status 0 is never a real HTTP status; decodeProviderErrorBody passes
 // it for the SSE lane, where a terminal in-stream event has no status at all,
-// so every capture still carries exactly one reason.
+// so every capture still carries a reason.
 var upstreamReasonCodes = map[int]herr.Code{
 	0:                              "upstream_stream_error",
 	http.StatusBadRequest:          "upstream_bad_request",

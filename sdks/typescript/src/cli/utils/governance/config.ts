@@ -11,6 +11,12 @@ import * as path from "node:path";
 
 import type { PlatformToolPolicyMap } from "./platform-tool-policy";
 
+/** Where a CLI runs from: the node binary and the entry script, both absolute. */
+export interface CliLocation {
+  node: string;
+  entry: string;
+}
+
 export interface GovernanceConfig {
   /** AI Gateway base URL (e.g. https://gateway.langwatch.ai). */
   gateway_url: string;
@@ -74,6 +80,12 @@ export interface GovernanceConfig {
   cli_api_key_scope?: {
     kind: "organization" | "projects";
     project_ids: string[];
+    /**
+     * The permission slugs the key was minted with, so `whoami` can say what
+     * the key can do beside where it reaches. Absent when the login predates
+     * the field.
+     */
+    permissions?: string[];
   };
 
   /**
@@ -155,6 +167,22 @@ export interface GovernanceConfig {
   claude_plugin_last_update_check?: number;
 
   /**
+   * How to run this CLI from a process that cannot resolve it on PATH: the
+   * absolute path of the node binary it last ran under and of its own entry
+   * script. Written by `langwatch login`, `langwatch claude` and `langwatch
+   * instrument`, only when the values changed (see cli-location.ts).
+   *
+   * Read by the Claude Code plugin's launcher (`plugins/langwatch/scripts/
+   * launch.mjs`), which runs the hook commands through it before falling back
+   * to `langwatch` on PATH. A Claude Code started from a desktop app inherits
+   * a PATH with no version manager on it, and this is what still finds the
+   * CLI there. The launcher checks both paths exist before using them, so a
+   * node upgraded through a version manager leaves a stale record that is
+   * simply skipped.
+   */
+  cli_location?: CliLocation;
+
+  /**
    * Per-wrapped-tool routing mode answer.
    *
    *   "gateway"   — Path A: route the tool's HTTP calls through
@@ -198,9 +226,11 @@ export interface GovernanceConfig {
   daemon?: "on" | "off";
 
   /**
-   * The agent last chosen by `langwatch agent dev`, keyed by the project
+   * The agent last chosen by `langwatch agent tunnel`, keyed by the project
    * directory (absolute path) the command ran in, so the next run in the
-   * same folder skips the picker. `--agent` always overrides.
+   * same folder skips the picker. `--agent` always overrides. The field name
+   * on disk is fixed as `agent_dev_agents`: changing it would drop every
+   * user's remembered agents.
    */
   agent_dev_agents?: Record<string, string>;
 }
@@ -277,7 +307,37 @@ function isWellFormedCliKeyScope(
 export function configPath(): string {
   const env = process.env.LANGWATCH_CLI_CONFIG;
   if (env) return env;
+  return defaultConfigPath();
+}
+
+/** Where the config lives when nothing relocates it. */
+export function defaultConfigPath(): string {
   return path.join(os.homedir(), ".langwatch", "config.json");
+}
+
+/** The config path as shown to a person: the home is written `~`. */
+export function displayConfigPath(): string {
+  const file = configPath();
+  const home = os.homedir();
+  return file.startsWith(`${home}${path.sep}`)
+    ? `~${file.slice(home.length)}`
+    : file;
+}
+
+/**
+ * True when this process runs on a config of its own: LANGWATCH_CLI_CONFIG
+ * names a file other than the home's default one.
+ *
+ * The tool wiring under the home (`~/.claude/settings.json`, the `[otel]`
+ * block of `~/.codex/config.toml`, the shell rc functions) belongs to the
+ * login in the home's default config. A login kept in another file, which is
+ * what a test, a dogfood run or a second account does, is not the machine's
+ * login, so it never rewrites that wiring.
+ */
+export function isIsolatedConfig(): boolean {
+  const env = process.env.LANGWATCH_CLI_CONFIG?.trim();
+  if (!env) return false;
+  return path.resolve(env) !== path.resolve(defaultConfigPath());
 }
 
 /**

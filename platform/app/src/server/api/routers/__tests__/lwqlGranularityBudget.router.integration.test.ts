@@ -14,9 +14,12 @@
  * unprovisioned singleton answers the control case below rather than a
  * database.
  *
- * Spec: specs/analytics/lwql-workbench.feature
+ * Spec: specs/lwql/workbench.feature
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { appPermissionsService } from "~/test-utils/appPermissionsMock";
+import { globalForApp, resetApp } from "../../../app-layer/app";
+import { createTestApp } from "../../../app-layer/presets";
 
 const { mockFeatureFlagIsEnabled } = vi.hoisted(() => ({
   mockFeatureFlagIsEnabled: vi.fn().mockResolvedValue(true),
@@ -30,15 +33,21 @@ vi.mock("@ee/audit-log/auditLog", () => ({
   auditLog: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock("../../rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../rbac")>();
-  return {
-    ...actual,
-    resolveProjectPermission: vi
-      .fn()
-      .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
-  };
-});
+vi.mock(
+  "~/server/app-layer/authz/permission-adapters",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("~/server/app-layer/authz/permission-adapters")
+      >();
+    return {
+      ...actual,
+      resolveProjectPermission: vi
+        .fn()
+        .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
+    };
+  },
+);
 
 vi.mock("../../utils", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../utils")>();
@@ -83,9 +92,9 @@ function createCaller() {
 
 /** Declares the granularity parameter alongside both reserved period bounds. */
 const GRANULARITY_SQL =
-  "SELECT toStartOfInterval(OccurredAt, INTERVAL {period_granularity_seconds:UInt32} SECOND) AS bucket, " +
+  "SELECT toStartOfInterval(OccurredAt, INTERVAL {dashboard_context_granularity_seconds:UInt32} SECOND) AS bucket, " +
   "count() AS value FROM analytics.traces " +
-  "WHERE OccurredAt >= {period_start:DateTime} AND OccurredAt < {period_end:DateTime} " +
+  "WHERE OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime} " +
   "GROUP BY bucket ORDER BY bucket";
 
 /** Seven days, in seconds — the window the request reports over. */
@@ -115,6 +124,13 @@ async function causeOf(run: () => Promise<unknown>): Promise<{
 describe("given the workbench query procedure and the granularity budget", () => {
   let caller: ReturnType<typeof createCaller>;
 
+  beforeAll(async () => {
+    await resetApp();
+    globalForApp.__langwatch_app = createTestApp({
+      permissions: appPermissionsService(),
+    });
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     mockPrismaClient.project.findUnique.mockResolvedValue({
@@ -126,7 +142,7 @@ describe("given the workbench query procedure and the granularity budget", () =>
   });
 
   describe("when a statement declaring the parameter is run at one-second steps over a week", () => {
-    /** @scenario "A window that would produce more buckets than the ceiling refuses on the workbench and REST" */
+    /** @scenario "A window that would produce more buckets than the ceiling refuses on caller-owned surfaces" */
     it("is refused with the named code and the bucket arithmetic in its meta", async () => {
       const refusal = await causeOf(() =>
         caller.query({

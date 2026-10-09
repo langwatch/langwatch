@@ -57,6 +57,18 @@ vi.mock("~/stores/upgradeModalStore", () => ({
 // Mock tRPC - no create mutation needed since modal no longer creates
 vi.mock("~/utils/api", () => ({
   api: {
+    suites: {
+      // Every run of the v2 dialog is queued under a plan name.
+      runPlan: {
+        useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+      },
+    },
+    scenarios: {
+      // The run dialog reads the configurations its scope already ran with.
+      getRunConfigurations: {
+        useQuery: () => ({ data: [], isLoading: false }),
+      },
+    },
     modelProvider: {
       getAllForProject: {
         useQuery: () => ({
@@ -179,7 +191,7 @@ describe("<ScenarioCreateModal/>", () => {
       ).toBeInTheDocument();
     });
 
-    it("shows the Agent Testing test case labels", () => {
+    it("shows the Agent Testing scenario labels", () => {
       render(
         <ScenarioCreateModal
           open={true}
@@ -190,9 +202,9 @@ describe("<ScenarioCreateModal/>", () => {
       );
 
       const dialog = getDialogContent();
-      expect(within(dialog).getByText("New test case")).toBeInTheDocument();
+      expect(within(dialog).getByText("New scenario")).toBeInTheDocument();
       expect(
-        within(dialog).getByText("What should this test case prove?"),
+        within(dialog).getByText("What should this scenario prove?"),
       ).toBeInTheDocument();
       expect(
         within(dialog).queryByText("Create new scenario"),

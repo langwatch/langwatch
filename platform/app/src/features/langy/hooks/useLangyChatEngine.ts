@@ -1,11 +1,13 @@
 import { useChat } from "@ai-sdk/react";
 import type { UIMessage } from "ai";
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
+import { api } from "~/utils/api";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
 
 import type { LangyMessageDto } from "../data/langy.dtos";
 import type { createLangyChatTransport } from "../logic/langyChatTransport";
+import { isLangyTranscriptMessage } from "../logic/langyTranscript";
 
 /**
  * The panel's chat ENGINE as one owned seam: the `useChat` transport state plus
@@ -46,6 +48,7 @@ export function useLangyChatEngine({
     error,
     regenerate,
     clearError,
+    resumeStream,
   } = useChat({
     transport,
     onError: (error) => {
@@ -60,6 +63,26 @@ export function useLangyChatEngine({
     },
   });
 
+  // Langy can mutate server-side state (e.g. dashboard widgets) mid-turn, and
+  // the dashboard grid reads them through graphs.getAll, so both go stale.
+  // Nothing else observes a turn's completion, so invalidate here, once, on
+  // the submitted/streaming -> ready/error transition — a ref (not state)
+  // tracks the previous status so this doesn't re-fire every render.
+  // Invalidating on a page with no dashboard mounted is a harmless no-op.
+  const utils = api.useUtils();
+  const previousStatusRef = useRef(status);
+  useEffect(() => {
+    const wasInFlight =
+      previousStatusRef.current === "submitted" ||
+      previousStatusRef.current === "streaming";
+    const isSettled = status === "ready" || status === "error";
+    if (wasInFlight && isSettled) {
+      void utils.dashboardWidgets.list.invalidate();
+      void utils.graphs.getAll.invalidate();
+    }
+    previousStatusRef.current = status;
+  }, [status, utils]);
+
   // useChat's setMessages identity is not guaranteed stable across renders.
   // Capture it in a ref so callers' effects key on real state changes (a
   // conversation-id transition) without re-firing every render — which would
@@ -69,7 +92,7 @@ export function useLangyChatEngine({
 
   const applyHistoryToEngine = useCallback((history: LangyMessageDto[]) => {
     const uiMessages = history
-      .filter((m) => m.role === "user" || m.role === "assistant")
+      .filter(isLangyTranscriptMessage)
       // `recorded` marks a message that came from the durable fold rather than
       // from this browser's own stream. The relay stamped its card fences into
       // typed parts already, so a fence still sitting in its TEXT is one the
@@ -88,6 +111,12 @@ export function useLangyChatEngine({
     setMessagesRef.current(uiMessages as unknown as UIMessage[]);
   }, []);
 
+  const retryTurn = useRetryKeepingFailedReply({
+    messages,
+    regenerate,
+    setMessagesRef,
+  });
+
   const resetEngine = useCallback(
     ({ clearMessages }: { clearMessages: boolean }) => {
       void stop();
@@ -104,6 +133,19 @@ export function useLangyChatEngine({
     status,
     error,
     regenerate,
+    /**
+     * Re-drive the last turn after it failed, keeping what the failed turn
+     * already did (its plan, its tool calls, its partial answer) on screen.
+     * The retried turn continues the same agent session, so that work is
+     * still the context it runs in.
+     */
+    retryTurn,
+    /**
+     * Reattach to a turn this tab did not dispatch (the transport's
+     * `getResumeTarget` names it). The stream then writes into a new
+     * assistant message, or into the last message when it already is one.
+     */
+    resumeStream,
     applyHistoryToEngine,
     resetEngine,
     /**
@@ -113,4 +155,47 @@ export function useLangyChatEngine({
      */
     clearError,
   };
+}
+
+/**
+ * Re-drive the last turn and keep the failed reply on screen.
+ *
+ * `regenerate` drops the last assistant message and re-drives the turn
+ * against the user's message already on record. It reads the conversation
+ * synchronously before its first await, so the failed reply put back right
+ * after it stays on screen, and the retried turn's answer lands as a new
+ * message below it instead of replacing it.
+ */
+function useRetryKeepingFailedReply({
+  messages,
+  regenerate,
+  setMessagesRef,
+}: {
+  messages: UIMessage[];
+  regenerate: () => Promise<void>;
+  setMessagesRef: {
+    current: (update: (current: UIMessage[]) => UIMessage[]) => void;
+  };
+}): () => void {
+  // The messages as of the last render, read at call time so the callback is
+  // not re-created on every streamed token.
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
+  return useCallback(() => {
+    const failedReply = replyToKeepOnRetry(messagesRef.current);
+    void regenerate();
+    if (failedReply) {
+      setMessagesRef.current((current) => [...current, failedReply]);
+    }
+  }, [regenerate, setMessagesRef]);
+}
+
+/**
+ * The failed turn's reply, when it has something to show. `regenerate` would
+ * drop it, and with it the plan card and the tool calls the turn already ran.
+ */
+function replyToKeepOnRetry(messages: readonly UIMessage[]): UIMessage | null {
+  const last = messages.at(-1);
+  if (last?.role !== "assistant" || last.parts.length === 0) return null;
+  return last;
 }

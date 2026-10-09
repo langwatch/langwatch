@@ -1,14 +1,10 @@
-import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import { env } from "../../env.mjs";
-import {
-  getProjectModelProviders,
-  prepareLitellmParams,
-} from "../api/routers/modelProviders.utils";
+import { getProjectModelProviders } from "../api/routers/modelProviders.utils";
 import { prisma } from "../db";
-import { nlpgoProxyBaseURL } from "../nlpgo/nlpgoFetch";
 import { getCodexVercelAIModel } from "./codexGatewayModel";
 import { isCodexModel } from "./codexRestrictions";
 import { featureByKey } from "./featureRegistry";
+import { expandLatestAlias } from "./latestAliases";
+import { nlpgoModelHandle } from "./modelHandle";
 import { ModelNotConfiguredError } from "./modelNotConfiguredError";
 import { ModelProviderDisabledError } from "./modelProviderDisabledError";
 import type { MaybeStoredModelProvider } from "./registry";
@@ -77,33 +73,7 @@ export const getVercelAIModel = async ({
     return getCodexVercelAIModel({ projectId, model: model_, featureKey });
   }
 
-  const litellmParams = await prepareLitellmParams({
-    model: model_,
-    modelProvider,
-    projectId,
-  });
-  const headers = Object.fromEntries(
-    Object.entries(litellmParams).map(([key, value]) => [
-      `x-litellm-${key}`,
-      value,
-    ]),
-  );
-
-  // Go playground proxy: nlpgo's /go/proxy/v1/* (in-process AI Gateway,
-  // no LiteLLM). Wire shape is x-litellm-* headers + OpenAI body; the Go
-  // side reads x-litellm-* via the gatewayproxy package and dispatches
-  // in-process.
-  const baseURL = nlpgoProxyBaseURL({
-    baseURL: env.LANGWATCH_NLP_SERVICE!,
-  });
-  const vercelProvider = createOpenAICompatible({
-    name: `${providerKey}`,
-    apiKey: litellmParams.api_key,
-    baseURL,
-    headers,
-  });
-
-  return vercelProvider(model_);
+  return nlpgoModelHandle({ model: model_, modelProvider, projectId });
 };
 
 async function resolveModel({
@@ -117,8 +87,9 @@ async function resolveModel({
   featureKey: string;
   modelProviders: Record<string, MaybeStoredModelProvider>;
 }): Promise<string> {
-  // 1. Explicit model always wins.
-  if (explicit) return explicit;
+  // 1. Explicit model always wins. A latest alias resolves to the concrete
+  //    model here so the provider lookup below reads the real prefix.
+  if (explicit) return expandLatestAlias(explicit);
 
   // 2. Cascade-resolved default for the given feature key. Throws
   //    ModelNotConfiguredError when nothing is set at any scope —

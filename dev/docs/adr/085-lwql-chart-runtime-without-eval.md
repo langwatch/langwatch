@@ -115,5 +115,5 @@ before the specification is stored.
 - Related ADRs: [081](./081-lwql-table-function-and-ssrf-policy.md),
   [082](./082-lwql-analytics-views-invoker-column-grants-final-dedup.md),
   [083](./083-lwql-diagnostics-read-the-single-parse.md)
-- `specs/analytics/lwql-workbench.feature`
+- `specs/lwql/workbench.feature`
 - Issue #6577

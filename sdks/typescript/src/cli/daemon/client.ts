@@ -23,6 +23,44 @@ const CONNECT_TIMEOUT_MS = 500;
 const HANDSHAKE_TIMEOUT_MS = 1_000;
 
 /**
+ * The whole request, from connect to `exit`, has to finish inside this.
+ *
+ * The connect and handshake bounds only cover getting the command ACCEPTED.
+ * After `hello-ok` nothing bounded the rest, and output is held back until the
+ * command finishes, so a daemon that took the exec and then wedged left the
+ * client waiting with zero bytes written and no message. An agent harness that
+ * stops a command at 30 seconds then killed it, and the caller saw an empty
+ * result rather than a failure. The daemon's own per-request timeout is ten
+ * minutes (server.ts), far past that, so the bound has to be here.
+ *
+ * 25s leaves 5s under a 30s harness for this client to print and exit, and it
+ * clears the CLI's own longest in-command deadline (`ui call`, 20s), so a
+ * command that has its own limit always reports the failure itself.
+ */
+const REQUEST_TIMEOUT_MS = 25_000;
+
+/**
+ * What the caller sees when the deadline trips.
+ *
+ * It has to name the failure, the deadline, and the way to run without a
+ * daemon, because the shape it replaces (no output at all) tells the caller
+ * nothing and reads as the CLI producing an empty result.
+ */
+const REQUEST_TIMEOUT_MESSAGE =
+  `langwatch: the daemon accepted this command and did not answer within ${REQUEST_TIMEOUT_MS / 1000}s. ` +
+  "Nothing it produced is printed, because a partial result is worse than none.\n" +
+  "langwatch: run again with LANGWATCH_NO_DAEMON=1 to run the command in this process. " +
+  "The wedged daemon was asked to stop, so the next command starts a fresh one.\n";
+
+/**
+ * The exit status of a command the client abandoned at its deadline.
+ *
+ * The same status the daemon uses when it abandons a request at its own
+ * per-request timeout, and the shell convention for a command a timeout ended.
+ */
+const REQUEST_TIMEOUT_EXIT_CODE = 124;
+
+/**
  * Output is buffered until the command finishes, then flushed in one go.
  *
  * This is what makes the fallback airtight: if the daemon dies (or the socket
@@ -38,7 +76,7 @@ const HANDSHAKE_TIMEOUT_MS = 1_000;
 const DEFAULT_MAX_BUFFER_BYTES = 8 * 1024 * 1024;
 
 export type DaemonExecOutcome =
-  | { served: true; exitCode: number }
+  | { served: true; exitCode: number; evict?: boolean }
   | { served: false; reason: string; evict?: boolean };
 
 export interface DaemonExecOptions {
@@ -58,6 +96,8 @@ export interface DaemonExecOptions {
    */
   bin?: string;
   maxBufferBytes?: number;
+  /** How long the whole request may take. Injectable for tests. */
+  requestTimeoutMs?: number;
   /** Where served output goes. Injectable for tests. */
   stdout?: NodeJS.WritableStream;
   stderr?: NodeJS.WritableStream;
@@ -81,6 +121,7 @@ export async function execViaDaemon(
   const stdout = options.stdout ?? process.stdout;
   const stderr = options.stderr ?? process.stderr;
   const maxBufferBytes = options.maxBufferBytes ?? DEFAULT_MAX_BUFFER_BYTES;
+  const requestTimeoutMs = options.requestTimeoutMs ?? REQUEST_TIMEOUT_MS;
 
   // BEFORE connect, and above all before the pipelined `exec` hands over args,
   // cwd and the forwarded LANGWATCH_* env: the socket must be ours. See
@@ -100,6 +141,7 @@ export async function execViaDaemon(
     let committed = false;
     let settled = false;
     let handshakeTimer: NodeJS.Timeout | undefined;
+    let requestTimer: NodeJS.Timeout | undefined;
     let cancelled = false;
 
     const send = (frame: ClientFrame): void => {
@@ -118,6 +160,7 @@ export async function execViaDaemon(
       if (settled) return;
       settled = true;
       if (handshakeTimer) clearTimeout(handshakeTimer);
+      if (requestTimer) clearTimeout(requestTimer);
       removeSignalHandlers();
       socket.destroy();
       resolve(outcome);
@@ -178,6 +221,22 @@ export async function execViaDaemon(
         settle({ served: false, reason: "handshake-timeout" });
       }, HANDSHAKE_TIMEOUT_MS);
       handshakeTimer.unref();
+
+      // Armed for the WHOLE request, not for the handshake. It is cleared once
+      // output commits: from that point the caller is reading bytes as they
+      // arrive, so a long command is visibly alive and cutting it off would
+      // truncate a stream that is working.
+      requestTimer = setTimeout(() => {
+        stderr.write(REQUEST_TIMEOUT_MESSAGE);
+        // Evicted, not left running: it took an exec and stopped answering, so
+        // the next invocation would find it and wedge the same way.
+        settle({
+          served: true,
+          exitCode: REQUEST_TIMEOUT_EXIT_CODE,
+          evict: true,
+        });
+      }, requestTimeoutMs);
+      requestTimer.unref();
 
       // Pipelined: the daemon reads frames in order and will not touch `exec`
       // unless `hello` passed. Saves a round trip on the hot path.
@@ -256,6 +315,7 @@ export async function execViaDaemon(
             bufferedBytes += data.byteLength;
             if (bufferedBytes > maxBufferBytes) {
               committed = true;
+              if (requestTimer) clearTimeout(requestTimer);
               flush();
             }
             break;

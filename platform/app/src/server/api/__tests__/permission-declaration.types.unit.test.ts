@@ -68,6 +68,16 @@ const optedOutWithAllowance = protectedProcedure
     allow: { organizationId: "the organization being created into" },
   });
 
+const mfaRecoveryRead = protectedProcedure
+  .input(organizationInput)
+  .noPermission({
+    reason: "the caller's own MFA standing",
+    allow: { organizationId: "the organization whose gate they reached" },
+    mfaRecovery: {
+      reason: "the answer is needed to render the enrollment recovery screen",
+    },
+  });
+
 /** @scenario "A service-authorized procedure declares the permissions its service enforces" */
 const serviceAuthorized = protectedProcedure
   .input(z.object({ rowId: z.string() }))
@@ -137,6 +147,13 @@ protectedProcedure
     allow: { organizationId: "creating into this organization" },
   });
 
+protectedProcedure.input(projectInput).noPermission({
+  reason: "not an MFA recovery read",
+  allow: { projectId: "the project being read" },
+  // @ts-expect-error — MFA recovery is only declarable on an organization-scoped standing read
+  mfaRecovery: { reason: "must not bypass the project's organization gate" },
+});
+
 describe("typed permission declarations", () => {
   describe("when the declarations above compile", () => {
     // Each `it` below vouches for a compile-time assertion in this file: the
@@ -148,6 +165,7 @@ describe("typed permission declarations", () => {
       expect(projectScoped).toBeDefined();
       expect(mixedScoped).toBeDefined();
       expect(organizationScoped).toBeDefined();
+      expect(mfaRecoveryRead).toBeDefined();
     });
 
     /** @scenario "An input id from a tier the permission cannot be granted at fails to compile" */

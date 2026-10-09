@@ -143,12 +143,14 @@ Feature: Workflow execution engine — DSL parsing, DAG resolution, lifecycle
       When I POST /go/studio/execute and read the SSE stream
       Then I receive at least 4 "is_alive_response" events before the "done" event
 
-    @integration @unimplemented
+    # The budget is a silence budget, not a wall clock: every event restarts
+    # it, so a long run that keeps reporting progress is never cut off.
+    @integration
     Scenario: idle stream times out and closes
-      Given NLP_STREAM_IDLE_TIMEOUT_SECONDS is set to 2
-      And a workflow whose code node sleeps 10 seconds and emits no progress
+      Given NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_SECONDS is set below the run's silence
+      And a run whose engine stream emits no events at all
       When I POST /go/studio/execute and read the SSE stream
-      Then within 3 seconds I receive an "error" event with payload.message containing "idle_timeout"
+      Then I receive a terminal "error" event with payload.message containing "idle_timeout"
       And the connection closes
 
   Rule: Client cancellation propagates to in-flight nodes

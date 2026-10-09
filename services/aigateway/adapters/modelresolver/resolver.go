@@ -13,19 +13,23 @@ import (
 // the surfaces genuinely disagree: three read a top-level JSON field, one
 // reads a multipart form field, and the Gemini passthrough reads the URL path.
 // A single message naming the JSON endpoints would tell a caller posting a
-// transcription to add a JSON field to a request that carries no JSON, which
-// is worse than the vague "missing model field" it replaced.
+// transcription or an image edit to add a JSON field to a request that carries
+// no JSON, which is worse than the vague "missing model field" it replaced.
 //
 // The message is the only thing that can carry this detail: resolution runs
 // before the request is labeled with a model, so a rejected request records
 // model="unknown" on the request counter and the operator reading their own
 // client code has nothing else to go on.
 var missingModelMessages = map[domain.RequestType]string{
-	domain.RequestTypeChat:       jsonBodyMessage("POST /v1/chat/completions"),
-	domain.RequestTypeMessages:   jsonBodyMessage("POST /v1/messages"),
-	domain.RequestTypeResponses:  jsonBodyMessage("POST /v1/responses"),
-	domain.RequestTypeEmbeddings: jsonBodyMessage("POST /v1/embeddings"),
-	domain.RequestTypeSpeech:     jsonBodyMessage("POST /v1/audio/speech"),
+	domain.RequestTypeChat:            jsonBodyMessage("POST /v1/chat/completions"),
+	domain.RequestTypeMessages:        jsonBodyMessage("POST /v1/messages"),
+	domain.RequestTypeResponses:       jsonBodyMessage("POST /v1/responses"),
+	domain.RequestTypeEmbeddings:      jsonBodyMessage("POST /v1/embeddings"),
+	domain.RequestTypeSpeech:          jsonBodyMessage("POST /v1/audio/speech"),
+	domain.RequestTypeImageGeneration: jsonBodyMessage("POST /v1/images/generations"),
+	domain.RequestTypeImageEdit: `POST /v1/images/edits sends a multipart/form-data body and takes ` +
+		`the model from a form field, not from JSON. Add a "model" part naming the model or the ` +
+		`virtual key's alias for it, alongside the "image" and "prompt" parts`,
 	domain.RequestTypeTranscription: `POST /v1/audio/transcriptions sends a multipart/form-data body ` +
 		`and takes the model from a form field, not from JSON. Add a "model" part naming the ` +
 		`model or the virtual key's alias for it, alongside the "file" part`,
@@ -50,7 +54,8 @@ func jsonBodyMessage(endpoint string) string {
 // wrong one is what this map exists to avoid.
 const fallbackMissingModelMessage = `this request names no model. Supply one the way this endpoint ` +
 	`expects: a top-level "model" field in the JSON body on the completion endpoints, a "model" form ` +
-	`part on /v1/audio/transcriptions, or the model in the URL path on the Gemini surface`
+	`part on /v1/audio/transcriptions and /v1/images/edits, or the model in the URL path on the ` +
+	`Gemini surface`
 
 // missingModelSurfaceMessages says where a route that mirrors a vendor's own
 // path names the model, for the routes whose request type is shared with a

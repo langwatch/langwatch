@@ -1,17 +1,15 @@
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import scenario from "@langwatch/scenario";
+import scenario, { assertSkillWasRead } from "@langwatch/scenario";
 import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { describe, expect, it } from "vitest";
 import {
-	assertSkillWasRead,
-	createClaudeCodeAgent,
-	createSkillTestWorkDir,
-	installSkillToWorkDir,
-	SKILL_TESTS_SET_ID,
-	toolCallFix,
+  createClaudeCodeAgent,
+  createSkillTestWorkDir,
+  installSkillToWorkDir,
+  SKILL_TESTS_SET_ID,
 } from "./helpers/claude-code-adapter";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -38,6 +36,11 @@ describe("LangWatch CLI Auth Discovery: bare CLI, no skill", () => {
 			const tempFolder = createSkillTestWorkDir("langwatch-cli-auth-");
 
 			// No .env, no CLAUDE.md, no .skills/: bare directory with only the CLI.
+			// The CLI also reads the user-global config of the machine, where a
+			// developer is normally logged in. Point it at a file of this run that
+			// never exists, so the agent meets the missing-key error the scenario
+			// is about rather than the personal project of whoever runs the test.
+			const cliConfigPath = path.join(tempFolder, "langwatch-cli-config.json");
 			const result = await scenario.run({
 				setId: SKILL_TESTS_SET_ID,
 				name: "CLI auth discovery from scratch",
@@ -48,6 +51,7 @@ describe("LangWatch CLI Auth Discovery: bare CLI, no skill", () => {
 						workingDirectory: tempFolder,
 						cleanEnv: true,
 						omitEnvKeys: ["ANTHROPIC_API_KEY"],
+						extraEnv: { LANGWATCH_CLI_CONFIG: cliConfigPath },
 					}),
 					scenario.userSimulatorAgent({ model: judgeModel }),
 					scenario.judgeAgent({
@@ -63,7 +67,6 @@ describe("LangWatch CLI Auth Discovery: bare CLI, no skill", () => {
 					scenario.user("use langwatch to list my prompts"),
 					scenario.agent(),
 					(state) => {
-						toolCallFix(state);
 					},
 					scenario.judge(),
 				],
@@ -137,7 +140,6 @@ describe("given the experiments skill installed with a project key in .env", () 
 						),
 						scenario.agent(),
 						(state) => {
-							toolCallFix(state);
 							assertSkillWasRead(state, "experiments");
 							// Hard guardrail: the agent must never EXECUTE the AI-tools / device
 							// login (that is what routes evaluations to a personal project). We

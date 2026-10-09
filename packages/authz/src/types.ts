@@ -4,6 +4,7 @@
  * package (and the app's collector) can name them without importing the walk.
  */
 import type { ShareableResourceKind } from "./registry";
+import type { PROJECT_READER_ROLE_KEY } from "./roles";
 import type {
   CallerKind,
   PrincipalKind,
@@ -56,7 +57,9 @@ export type AuthzScopeRef =
  * alone carries no id.
  */
 export type AuthzPrincipalRef = {
-  [K in CallerKind]: K extends "anonymous" ? { type: K } : { type: K; id: string };
+  [K in CallerKind]: K extends "anonymous"
+    ? { type: K }
+    : { type: K; id: string };
 }[CallerKind];
 
 /**
@@ -65,7 +68,9 @@ export type AuthzPrincipalRef = {
  * grants) and `anyone`, which is the public share expressed as a row.
  */
 export type GrantAudience = {
-  [K in PrincipalKind]: K extends "anyone" ? { kind: K } : { kind: K; id: string };
+  [K in PrincipalKind]: K extends "anyone"
+    ? { kind: K }
+    : { kind: K; id: string };
 }[PrincipalKind];
 
 /** A grant at the resource tier. Matched on (kind, id, projectId) — the
@@ -78,20 +83,20 @@ export type ResourceGrant = {
   audience: GrantAudience;
 };
 
+/** Role keys currently enforced by organization, team, and project grants. */
+export type BindingRoleKey = "admin" | "member" | "viewer" | `custom:${string}`;
+
+/** ADR-144: the role a SHARED grant carries - one project reading another.
+ *  Never a legacy binding role, so it stays out of `BindingRoleKey` and the
+ *  compat `RoleBinding` head never sees it. */
+export type SharedRoleKey = typeof PROJECT_READER_ROLE_KEY;
+
 export type CollectedBinding = {
-  role: TeamUserRole;
-  customRoleId: string | null;
+  roleKey: BindingRoleKey | SharedRoleKey;
   scopeType: RoleBindingScopeType;
   scopeId: string;
   /** Present when the binding arrived via a group membership. */
   viaGroupId?: string | null;
-};
-
-export type LegacyTeamMembership = {
-  teamId: string;
-  role: TeamUserRole;
-  customRoleId: string | null;
-  isPersonal: boolean;
 };
 
 /**
@@ -101,8 +106,12 @@ export type LegacyTeamMembership = {
 export type CollectedGrants = {
   principal: AuthzPrincipalRef;
   organizationId: string;
-  /** Null for api-key principals and for users with no OrganizationUser row. */
-  organizationRole: "ADMIN" | "MEMBER" | "EXTERNAL" | null;
+  /**
+   * Null for api-key principals and for users with no OrganizationUser row.
+   * DEVELOPER (ADR-143) is a seat that holds its personal team and nothing
+   * shared; `bindingGrants` caps it the way it caps EXTERNAL.
+   */
+  organizationRole: "ADMIN" | "MEMBER" | "EXTERNAL" | "DEVELOPER" | null;
   /**
    * True when a user principal holds an ACTIVE OrganizationUser row. A row
    * an admin disabled to free its seat is not one: see `membershipDisabled`.
@@ -117,11 +126,6 @@ export type CollectedGrants = {
    */
   membershipDisabled: boolean;
   bindings: CollectedBinding[];
-  /**
-   * LEGACY-QUIRK(B): TeamUser rows, consulted only when `bindings` is empty
-   * (users migrated before role bindings existed). Deleted in stage B.
-   */
-  legacyTeamMemberships: LegacyTeamMembership[];
   /** Custom-role permission lists, prefetched for every referenced id. */
   customRolePermissions: ReadonlyMap<string, readonly string[]>;
 };
@@ -131,13 +135,14 @@ export type AuthzDenialReason =
   | "membership-disabled"
   | "no-binding"
   | "lite-member-restricted"
+  /** A Developer seat (ADR-143) asked for something outside its personal team. */
+  | "developer-restricted"
   | "owner-ceiling";
 
 export type AuthzGrantVia =
   | "binding"
   | "org-role-floor"
   | "demo-project"
-  | "legacy-team-fallback"
   | "resource-grant";
 
 export type AuthzDecision = {

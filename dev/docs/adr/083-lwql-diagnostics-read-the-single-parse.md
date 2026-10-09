@@ -110,6 +110,6 @@ growth. Revisit if a consumer needs the intersection.
 - `platform/app/src/server/analytics/lwql/__tests__/lwqlDiagnostics.unit.test.ts`
 - `platform/app/src/app/api/analytics-sql/__tests__/lwqlAnswerableQuestions.integration.test.ts`
   — every rule triggered through the public endpoint against a seeded fixture
-- `specs/analytics/lwql-api.feature`
+- `specs/lwql/api.feature`
 - ADR-082 — the LangWatchQL views whose `dedup.keyColumns` the fanout rule reads as
   grain

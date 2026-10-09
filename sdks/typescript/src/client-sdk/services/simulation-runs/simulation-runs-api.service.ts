@@ -8,12 +8,21 @@ import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
+import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 
 export type SimulationRunsListResponse =
   paths["/api/simulation-runs"]["get"]["responses"]["200"]["content"]["application/json"];
 
 export type SimulationRunResponse =
   paths["/api/simulation-runs/{scenarioRunId}"]["get"]["responses"]["200"]["content"]["application/json"];
+
+/**
+ * One evaluator's result on a finished run: its status, whether it was
+ * required, and the verdict, score or reason it produced.
+ */
+export type SimulationRunEvaluation = NonNullable<
+  NonNullable<SimulationRunResponse["results"]>["evaluations"]
+>[number];
 
 export type SimulationRunsBatchesListResponse =
   paths["/api/simulation-runs/batches/list"]["get"]["responses"]["200"]["content"]["application/json"];
@@ -47,6 +56,7 @@ export class SimulationRunsApiService {
     const message = formatApiErrorForOperation({ operation: operation, error: error, options: {
       status: extractStatusFromResponse(error),
     } });
+    throwIfHandledError({ operation, error, message });
     throw new SimulationRunsApiError(message, operation, error);
   }
 

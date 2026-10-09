@@ -72,6 +72,11 @@ vi.mock("~/utils/api", () => ({
     sharedTrace: {
       get: { useQuery: () => ({ data: undefined, isLoading: false }) },
     },
+    identity: {
+      myTestArrival: {
+        useQuery: () => ({ data: undefined, isPending: false }),
+      },
+    },
     organization: {
       getAll: {
         useQuery: () => ({
@@ -84,6 +89,17 @@ vi.mock("~/utils/api", () => ({
     modelProvider: {
       getAllForProject: {
         useQuery: () => ({ data: undefined, isLoading: false }),
+      },
+    },
+    authz: {
+      effectivePermissions: {
+        useQuery: () => ({
+          data: {
+            permissions: ["organization:manage", "project:manage"],
+          },
+          isLoading: false,
+          isFetched: true,
+        }),
       },
     },
     featureFlag: {
