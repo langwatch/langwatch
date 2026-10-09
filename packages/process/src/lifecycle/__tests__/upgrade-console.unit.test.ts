@@ -6,7 +6,7 @@ import { createHash } from "node:crypto";
 import http from "node:http";
 import { hostname } from "node:os";
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   LIVENESS_PATH,
@@ -238,12 +238,19 @@ describe("the upgrade console", () => {
 
     describe("when another site posts Retry with the console session attached", () => {
       /** @scenario "A cross-site Retry is refused even with the console session" */
-      it("refuses a cross-site or foreign-origin Retry and runs only the same-origin one", async () => {
-        const thread = await bootThread();
-        const { retried } = await showConsole(thread);
-        const cookie = await openSession(thread);
-        const own = `http://127.0.0.1:${thread.address.port}`;
+      let thread: LivenessThread;
+      let retried: Promise<boolean>;
+      let cookie: string;
+      let own: string;
 
+      beforeEach(async () => {
+        thread = await bootThread();
+        ({ retried } = await showConsole(thread));
+        cookie = await openSession(thread);
+        own = `http://127.0.0.1:${thread.address.port}`;
+      });
+
+      it("refuses a cross-site or foreign-origin Retry and runs only the same-origin one", async () => {
         const crossSite = await post(thread, UPGRADE_RETRY_PATH, {}, cookie, {
           "Sec-Fetch-Site": "same-site",
           Origin: own,
@@ -261,6 +268,13 @@ describe("the upgrade console", () => {
         expect([crossSite.status, foreign.status, opaque.status]).toEqual([403, 403, 403]);
         expect(stillPending).toBe("pending");
         expect(sameOrigin.status).toBe(303);
+        expect(await retried).toBe(true);
+      });
+
+      it("accepts a plain-HTTP browser's Retry: Origin equals its own Host, no Sec-Fetch-Site", async () => {
+        const pressed = await post(thread, UPGRADE_RETRY_PATH, {}, cookie, { Origin: own });
+
+        expect(pressed.status).toBe(303);
         expect(await retried).toBe(true);
       });
     });
