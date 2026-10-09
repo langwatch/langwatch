@@ -23,6 +23,7 @@ export type CodeStepId =
   | "project:record-created-facts"
   | "project:record-department-assignments"
   | "project:record-presence-settings"
+  | "prompt:seed-tags-for-untagged-organizations"
   | "scenario:close-stalled-runs"
   | "scim:replay-sso-connection-view"
   | "stored-object:import-clickhouse-index"

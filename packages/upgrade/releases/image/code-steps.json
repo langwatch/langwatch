@@ -179,6 +179,13 @@
     "needsOldWritersGone": true
   },
   {
+    "id": "prompt:seed-tags-for-untagged-organizations",
+    "kind": "tenant",
+    "mode": "background",
+    "owner": "prompt",
+    "description": "Seeds the production and staging prompt tags for every organization that has none."
+  },
+  {
     "id": "scenario:close-stalled-runs",
     "kind": "data",
     "mode": "background",

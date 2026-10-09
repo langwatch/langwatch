@@ -13190,9 +13190,15 @@ importers:
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../../packages/secrets
+      '@langwatch/system-migrations':
+        specifier: workspace:*
+        version: link:../../../packages/system-migrations
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
+      '@langwatch/upgrade':
+        specifier: workspace:*
+        version: link:../../../packages/upgrade
       '@langwatch/workflow-contract':
         specifier: workspace:*
         version: link:../../workflow/contract

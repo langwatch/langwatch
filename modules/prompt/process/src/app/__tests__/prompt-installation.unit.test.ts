@@ -8,6 +8,7 @@ import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { PromptApi } from "@langwatch/prompt-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { isTenantMigrationStep } from "@langwatch/upgrade/step";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
@@ -66,6 +67,27 @@ describe("prompt app installation", () => {
       ).resolves.toEqual([]);
     } finally {
       await Promise.all([first.stop(), second.stop()]);
+    }
+  });
+
+  /** @scenario "A worker collects the tag backfill as an organization tenant step" */
+  it("collects the tag backfill as an organization tenant step that proves by held tags", async () => {
+    const runtime = await process("worker").boot();
+
+    try {
+      const [step] = runtime
+        .migrationSteps(isTenantMigrationStep)
+        .filter(({ id }) => id === "prompt:seed-tags-for-untagged-organizations");
+
+      expect(step).toMatchObject({ kind: "tenant", mode: "background", tenants: "organization" });
+      await expect(step?.migrateTenant({ tenantId: "organization-1" })).resolves.toMatchObject({
+        status: "finalized",
+      });
+      await expect(
+        runtime.service(PromptApi).listTags({ organizationId: "organization-1" }),
+      ).resolves.toMatchObject([{ name: "production" }, { name: "staging" }]);
+    } finally {
+      await runtime.stop();
     }
   });
 });

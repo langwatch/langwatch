@@ -148,3 +148,9 @@ Feature: Prompt service
     When the tag backfill runs over it as a dry run
     Then it reports the organization would be seeded
     And the organization still has no prompt tags
+
+  @unit
+  Scenario: A worker collects the tag backfill as an organization tenant step
+    Given a worker installs prompt
+    When the upgrade runner migrates one untagged organization through the collected step
+    Then the step finalizes because the organization holds prompt tags
