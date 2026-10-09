@@ -153,6 +153,13 @@ Feature: Agent management
     Then I see both agents listed
     And I see a "New Agent" button at the top
 
+  @integration
+  Scenario: AgentListDrawer opened by address reads the project's agents itself
+    Given agent "Code Processor" exists
+    When the AgentListDrawer opens from the address bar with no props
+    Then I see "Code Processor" listed
+    And clicking it hands it to the flow callback and closes the drawer
+
   Scenario: AgentListDrawer empty state
     Given no agents exist
     When the AgentListDrawer opens
