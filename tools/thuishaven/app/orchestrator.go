@@ -37,6 +37,9 @@ type Orchestrator struct {
 	// keeperRespawns is when the daemon last respawned each slug's keeper, for
 	// the backoff and the crash-loop give-up (D3). Daemon tick only.
 	keeperRespawns map[string][]time.Time
+	// waitDownSince is when each service's port was first seen down, so a short
+	// restart never moves its route to the wait page. Daemon tick only.
+	waitDownSince map[string]time.Time
 	// container is the colima VM the langyagent worker runs on in its container
 	// tiers (see domain.LangyTier). May be nil in tests that never launch it.
 	container ContainerRuntime

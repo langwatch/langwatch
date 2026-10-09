@@ -11,9 +11,16 @@ Feature: Haven wait page for a service that is not answering
   @unit
   Scenario: a down service's route is pointed at the daemon
     Given a live stack "feat-x" whose app route points at the app's port
-    And nothing listens on the app's port
+    And nothing has listened on the app's port for 20 seconds
     When the daemon reconciles the stack's routes
     Then the app route points at the daemon's port
+
+  @unit
+  Scenario: a short restart keeps its route
+    Given a live stack "feat-x" whose app route points at the app's port
+    And the app's port was down for less than 20 seconds before it listened again
+    When the daemon reconciles the stack's routes
+    Then the app route is not changed
 
   @unit
   Scenario: the route goes back once the service listens
