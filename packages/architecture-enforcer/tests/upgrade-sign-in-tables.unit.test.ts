@@ -20,7 +20,17 @@ const REPOSITORY_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", ".."
 
 const roots: string[] = [];
 
-const SCHEMA = ["User", "Organization", "Session", "SsoConnection", "Role", "Dataset", "ApiKey", "Project", "Monitor"]
+const SCHEMA = [
+  "User",
+  "Organization",
+  "Session",
+  "SsoConnection",
+  "Role",
+  "Dataset",
+  "ApiKey",
+  "Project",
+  "Monitor",
+]
   .map((model) => `model ${model} {\n  id String @id\n}\n`)
   .join("");
 

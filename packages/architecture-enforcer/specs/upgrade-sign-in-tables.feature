@@ -3,9 +3,9 @@ Feature: A blocking upgrade step never touches a sign-in or ingest table
   step's frozen SQL never touches a table those doors read or write (Alex,
   2026-10-09, UPGRADE-IN-WORKER, UIW-9, API-UP-DURING-UPGRADE). Sign-in tables:
   every table auth, user, organization, authz and identity (SSO config) claim.
-  Ingest tables: every table api-key, project, evaluator, monitor, experiment
-  and governance claim (key resolution, guardrail lookups, batch result logs,
-  governance sources). The policy reuses migration-owners' touch parsing; a
+  Ingest tables: every table api-key, project, evaluation, evaluator,
+  model-provider, monitor, experiment and governance claim (key resolution,
+  evaluator and guardrail calls, batch result logs, governance sources). The policy reuses migration-owners' touch parsing; a
   change to them ships as a background step.
 
   @unit @architecture
