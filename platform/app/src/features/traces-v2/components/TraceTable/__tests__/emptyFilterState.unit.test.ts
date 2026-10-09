@@ -146,6 +146,25 @@ describe("emptyContent", () => {
         expect(actionsFor({ aggregateCreatedAt: createdAt })).toEqual([]);
       });
 
+      /** @scenario "An empty aggregate says its traces start when it was created" */
+      it("explains the creation date on every lens, with or without filters", () => {
+        for (const activeLensId of ["all-traces", "errors", "conversations"]) {
+          for (const hasFilters of [false, true]) {
+            const content = emptyContent({
+              activeLensId,
+              hasFilters,
+              rangeHours: 24 * 7,
+              isJudging: false,
+              aggregateCreatedAt: createdAt,
+              rangeFrom: lastSevenDays.from,
+              rangeTo: lastSevenDays.to,
+            });
+            expect(content.description).toContain("from 8 October 2026");
+            expect(content.description).not.toMatch(/widen|wider/);
+          }
+        }
+      });
+
       describe("when a filter matches nothing", () => {
         /** @scenario "An empty aggregate says its traces start when it was created" */
         it("advises clearing the filters but not widening the window it no longer offers", () => {

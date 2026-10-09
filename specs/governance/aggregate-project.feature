@@ -607,7 +607,8 @@ Feature: An aggregate project reads its member projects
     And it says older traces stay in each member project
     And it neither suggests nor offers a wider time window
     And a filter that matches nothing there is told to clear its filters, not to widen the window
-    And a window that ends before the aggregate was created says so on every lens, with or without filters
+    And it gives that explanation on every lens, with or without filters
+    And a window that ends before the aggregate was created says so
     And a plain project's empty state still suggests a wider time window
 
   @integration

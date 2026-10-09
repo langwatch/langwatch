@@ -131,16 +131,21 @@ function reachesBeforeAggregate({
 /**
  * What an empty aggregate says when its window reaches back before it was
  * created, or null when it does not. Members added later start later still,
- * so the date is the earliest any member trace can list from.
+ * so the date is the earliest any member trace can list from. That boundary
+ * explains the empty table on every lens, so it leads them all: a window that
+ * ends before it lists nothing at all, and a filter that matches nothing is
+ * told to clear, since a wider window is not offered here.
  */
 function aggregateEmptyContent({
   aggregateCreatedAt,
   rangeFrom,
   rangeTo,
+  hasFilters,
 }: {
   aggregateCreatedAt: number | null;
   rangeFrom: number;
   rangeTo: number;
+  hasFilters: boolean;
 }): EmptyContent | null {
   if (
     aggregateCreatedAt === null ||
@@ -148,46 +153,19 @@ function aggregateEmptyContent({
   ) {
     return null;
   }
-  return {
-    title:
-      rangeTo < aggregateCreatedAt
-        ? "This window ends before the aggregate was created"
-        : "Nothing since this aggregate was created",
-    description: `This aggregate shows member traces from ${aggregateCreatedOn(aggregateCreatedAt)}, when it was created, and a project added later from when it joined. Older traces stay in each member project.`,
-  };
-}
-
-/** The day an aggregate was created, as its empty state writes it. */
-function aggregateCreatedOn(aggregateCreatedAt: number): string {
-  return format(aggregateCreatedAt, "d MMMM yyyy");
-}
-
-/**
- * What a filter that matches nothing says. On an aggregate whose window
- * reaches back before it was created, a wider window only adds time no member
- * trace lists from, so the advice is to clear the filters alone.
- */
-function filterEmptyContent({
-  aggregateCreatedAt,
-  rangeFrom,
-}: {
-  aggregateCreatedAt: number | null;
-  rangeFrom: number;
-}): EmptyContent {
-  const title = "Nothing matches these filters";
-  if (
-    aggregateCreatedAt !== null &&
-    reachesBeforeAggregate({ aggregateCreatedAt, rangeFrom })
-  ) {
+  const createdOn = format(aggregateCreatedAt, "d MMMM yyyy");
+  const endsBeforeCreation = rangeTo < aggregateCreatedAt;
+  if (hasFilters && !endsBeforeCreation) {
     return {
-      title,
-      description: `Your query is valid, there's just nothing matching it in this window, and this aggregate only shows member traces from ${aggregateCreatedOn(aggregateCreatedAt)}, when it was created. Try clearing all filters.`,
+      title: "Nothing matches these filters",
+      description: `Your query is valid, there's just nothing matching it in this window, and this aggregate only shows member traces from ${createdOn}, when it was created. Try clearing all filters.`,
     };
   }
   return {
-    title,
-    description:
-      "Your query is valid, there's just nothing matching it in this window. Try widening the window, or clearing all filters.",
+    title: endsBeforeCreation
+      ? "This window ends before the aggregate was created"
+      : "Nothing since this aggregate was created",
+    description: `This aggregate shows member traces from ${createdOn}, when it was created, and a project added later from when it joined. Older traces stay in each member project.`,
   };
 }
 
@@ -221,16 +199,9 @@ export function emptyContent({
     aggregateCreatedAt,
     rangeFrom,
     rangeTo,
+    hasFilters,
   });
-  // A window that ends before the aggregate existed lists nothing on any lens
-  // or under any filter, so saying so comes first.
-  if (
-    aggregate &&
-    aggregateCreatedAt !== null &&
-    rangeTo < aggregateCreatedAt
-  ) {
-    return aggregate;
-  }
+  if (aggregate) return aggregate;
   if (activeLensId === "errors") {
     return {
       title: "No errors here — lucky you",
@@ -245,8 +216,13 @@ export function emptyContent({
         "A conversation gathers every trace of one exchange, so you can review a whole piece of work end to end instead of a trace at a time. They appear here once your traces carry a conversation identifier.",
     };
   }
-  if (hasFilters) return filterEmptyContent({ aggregateCreatedAt, rangeFrom });
-  if (aggregate) return aggregate;
+  if (hasFilters) {
+    return {
+      title: "Nothing matches these filters",
+      description:
+        "Your query is valid, there's just nothing matching it in this window. Try widening the window, or clearing all filters.",
+    };
+  }
   const shortRange = shortRangeEmptyContent(rangeHours);
   if (shortRange) return shortRange;
   // Else branch: not errors/conversations lens, no filters, range is
