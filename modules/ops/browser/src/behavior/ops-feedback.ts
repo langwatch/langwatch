@@ -22,6 +22,7 @@ function raise({ host, toast }: { host: ReturnType<typeof useOpsHost>; toast: Op
     host.failed({
       error: void 0,
       fallbackTitle: toast.title,
+      ...(toast.description ? { description: toast.description } : {}),
       ...(toast.id ? { id: toast.id } : {}),
     });
     return;

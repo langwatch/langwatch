@@ -51,7 +51,9 @@ export function VirtualizedTableRows({
 
   if (!shouldVirtualize) {
     const rows: ReactNode[] = [];
-    for (let i = 0; i < count; i++) rows.push(renderRow(i));
+    for (let i = 0; i < count; i++) {
+      rows.push(<Fragment key={getItemKey?.(i) ?? i}>{renderRow(i)}</Fragment>);
+    }
     return <>{rows}</>;
   }
 
