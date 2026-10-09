@@ -12,10 +12,15 @@ and §9 (the upcast paragraph); `dev/docs/adr/173-upgrades-run-on-deploy.md`; AD
 window. Rulings: `.claude/coordinator/rulings-2026-10-06-rounds.md` rounds 8 to 23. This skill routes;
 the recipes are in the skills it names.
 
+- How the upgrade machinery itself works (ledger, gate, manifests, console, tests): the `upgrade` skill.
+- Naming an LTS each April and October and moving the floor: the `lts-release` skill.
+
 ## The one rule
 
 **Every change is expand/contract inside the supported window.** The window is every release from
-the **LTS floor** (`packages/upgrade/releases/lts-floor.json`, today `3.20.1`) to head. While
+the **LTS floor** (`packages/upgrade/releases/lts-floor.json`, today `3.20.1`) to head. An LTS is named every April
+and October and the floor then moves to the previous LTS; no LTS is ever patched (Alex,
+2026-10-09, LTS-SCHEDULE). While
 `upgrade` runs, and for the whole rollout after it, the previous image keeps serving on the new
 schema, and a rollback puts an older image back on it. So:
 

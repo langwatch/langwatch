@@ -1383,6 +1383,13 @@ level-triggered background steps (Alex, 2026-10-06, round 9). The runner writes 
 its run report and raises a read hint the api relays, so the Upgrades page refreshes on it and never
 polls (Alex, 2026-10-06, rounds 8 and 9).
 
+**An LTS is an upgrade stop, never a maintained line** (Alex, 2026-10-09, LTS-SCHEDULE). An LTS is
+named every April and October; the first is 3.20.1 (2026-10-06), the next April 2027. Only the
+latest release gets fixes: no LTS or older line is ever patched. Naming an LTS moves the floor
+(`packages/upgrade/releases/lts-floor.json`) to the previous LTS, so the newest LTS always upgrades
+straight to head, a stale installation stops at most once a year, and dead schema lives about 12
+months before its contract step (ADR-173 D8) may ship.
+
 **A framework package takes module values by injection, never by import** (Alex, 2026-10-06, rounds 5
 and 6, Q211). `packages/group-queue` takes a `mintUri` function and a generic destination type for its
 tiered blob store and imports no module contract; `ClickHouseMigrateTask` takes the managed-table list
