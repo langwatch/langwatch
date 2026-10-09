@@ -92,6 +92,22 @@ Feature: One OpenTelemetry setup every process uses
       When its metrics are composed
       Then no route is contributed at "/metrics" on the health door
 
+  Rule: A process that boots no preamble reads the same logger names
+
+    @unit
+    Scenario: A process without a preamble reads the same logger names
+      Given the tasks runner or the scenario child starts with LOG_LEVEL, a collector and OTEL_SERVICE_NAME set
+      When it configures its logger from the observability slice
+      Then the logger takes that level for both sinks, exports to the collector and uses that service name
+      And with nothing set it keeps its own name and exports nothing
+
+    @unit
+    Scenario: A process without a preamble reads main's names as warned aliases
+      Given the tasks runner or the scenario child starts with PINO_LOG_LEVEL set
+      When it configures its logger from the observability slice
+      Then the logger takes that level and the process logs one deprecation warning
+      And an old name that disagrees with its replacement refuses the start
+
   Rule: A blank optional value is absent, not a value
 
     @unit

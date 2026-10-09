@@ -80,7 +80,8 @@ function telemetrySetup({
   };
 }
 
-function loggerConfiguration({
+/** The one map from the telemetry slice to a logger (ADR-175): every Node process uses it. */
+export function loggerConfiguration({
   settings,
   resolved,
   serviceName,

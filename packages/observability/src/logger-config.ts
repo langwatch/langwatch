@@ -94,39 +94,3 @@ export function resolveLoggerConfiguration(
     redactPaths: configuration.redactPaths ?? DEFAULT_LOGGER_CONFIGURATION.redactPaths,
   };
 }
-
-/**
- * The process-config shape API, worker (and any future process) hand this
- * package to produce a `LoggerConfiguration`. Kept structural on purpose:
- * this port takes only the slice of each process's own `Config` a logger reads.
- */
-export interface ProcessLoggerInputs {
-  nodeEnvironment?: string;
-  environment?: string;
-  serviceName?: string;
-  serviceVersion?: string;
-  logger: {
-    format?: LoggerFormat;
-    level?: string;
-    consoleLevel?: string;
-    otelExportEnabled?: boolean;
-  };
-}
-
-/**
- * Maps a process configuration into the `LoggerConfiguration` a logger is
- * built from. One place every process hands its parsed config to, so a new
- * logger field lands in exactly one map instead of drifting across N copies.
- */
-export function loggerConfigurationFrom(inputs: ProcessLoggerInputs): LoggerConfiguration {
-  return {
-    environment: inputs.nodeEnvironment,
-    format: inputs.logger.format,
-    level: inputs.logger.level,
-    consoleLevel: inputs.logger.consoleLevel,
-    otelExportEnabled: inputs.logger.otelExportEnabled,
-    serviceName: inputs.serviceName,
-    serviceVersion: inputs.serviceVersion,
-    deploymentEnvironment: inputs.environment,
-  };
-}

@@ -7,10 +7,16 @@ import {
   Config,
   grafana,
   otelResourceAttributes,
+  parseProcessConfig,
   serviceVersion,
   telemetryExporterEndpoint,
 } from "@langwatch/config";
-import { metricsScrapeTokenSecret, telemetryAliases } from "@langwatch/observability/node";
+import {
+  loggerConfiguration,
+  metricsScrapeTokenSecret,
+  resolveTelemetry,
+  telemetryAliases,
+} from "@langwatch/observability/node";
 import { telemetryExporterHeaders } from "@langwatch/secrets/shared-secrets";
 import { z } from "zod";
 
@@ -64,3 +70,27 @@ export const observabilityOwner = {
     metricsScrapeToken: metricsScrapeTokenSecret,
   },
 } as const;
+
+/**
+ * The logger a process that boots no preamble configures from this slice (tasks,
+ * the scenario child): the names, aliases and conflict refusal api and worker
+ * read. Throws `TelemetryAliasConflictError` when an old name disagrees.
+ */
+export function processLoggerConfiguration({
+  environment,
+  serviceName,
+}: {
+  environment: Readonly<Record<string, string | undefined>>;
+  serviceName: string;
+}) {
+  const settings = parseProcessConfig({ owners: [observabilityOwner], environment }).observability;
+  const resolved = resolveTelemetry(settings);
+  return {
+    configuration: loggerConfiguration({
+      settings,
+      resolved,
+      serviceName: resolved.serviceName ?? serviceName,
+    }),
+    deprecations: resolved.deprecations,
+  };
+}
