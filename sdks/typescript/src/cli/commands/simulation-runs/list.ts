@@ -6,6 +6,7 @@ import { readFetchFailure } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
 import { formatRelativeTime } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
+import { parsePositiveIntOrNull } from "../../utils/positiveInt";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
@@ -49,6 +50,14 @@ export const listSimulationRunsCommand = async (options: {
   status?: string;
   name?: string;
 }): Promise<CommandResult | void> => {
+  if (options.limit !== undefined) {
+    const parsedLimit = parsePositiveIntOrNull(options.limit);
+    if (parsedLimit === null || parsedLimit > 100) {
+      console.error(chalk.red("Error: --limit must be between 1 and 100"));
+      process.exit(1);
+    }
+  }
+
   await resolveCredentials();
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
@@ -80,9 +89,8 @@ export const listSimulationRunsCommand = async (options: {
 
       if (!response.ok) {
         // The status and the body go to the reader together, so a handled
-        // failure keeps its code — a 422 for `--limit 200` names
-        // validation_error and the ceiling, instead of degrading to
-        // network_error the moment it is flattened into a message string.
+        // failure keeps its code and reasons instead of degrading to a network
+        // error the moment it is flattened into a message string.
         failSpinner({
           spinner,
           error: await readFetchFailure(response),
