@@ -1,5 +1,5 @@
 // Read repository for cut-over organizations; deliberately independent for parity verification.
-import type { ShareableResourceKind } from "@langwatch/authorization";
+import { grantConditionSchema, type ShareableResourceKind } from "@langwatch/authorization";
 import type { AuthzPrincipalRef, CollectedBinding } from "@langwatch/authz-contract";
 import { type Instant, fromDate } from "@langwatch/time";
 
@@ -9,6 +9,7 @@ import {
   type CustomRolePermissionsRow,
   type OrganizationMembership,
   type OrganizationRole,
+  type SharedReadRow,
   type ShareLinkRow,
 } from "../authz-read.repository.ts";
 import { RESOURCE_KIND_TO_DB } from "../prisma/prisma.authz-grant.mapper.ts";
@@ -20,6 +21,7 @@ import {
   type RoleHolderRow,
   rolesExclusiveTo,
   type ShareLinkGrantCandidateRow,
+  sharedProjectReadsOf,
   shareLinkRowFrom,
   SYSTEM_API_KEY_ROLE_KIND,
 } from "./eventing.authz-read.mapper.ts";
@@ -298,16 +300,42 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
     projectId,
   }: {
     projectId: string;
-  }): Promise<{ teamId: string; organizationId: string } | null> => {
+  }): Promise<{ teamId: string; organizationId: string; kind: string } | null> => {
     const project = (await this.database.project.findUnique({
       where: { id: projectId, archivedAt: null },
-      select: { team: { select: { id: true, organizationId: true } } },
-    })) as { team: { id: string; organizationId: string } } | null;
+      select: { kind: true, team: { select: { id: true, organizationId: true } } },
+    })) as { kind: string; team: { id: string; organizationId: string } } | null;
     if (!project?.team) return null;
     return {
       teamId: project.team.id,
       organizationId: project.team.organizationId,
+      kind: project.kind,
     };
+  };
+
+  findLiveSharedReads = async ({
+    organizationId,
+    readerProjectId,
+  }: {
+    organizationId: string;
+    readerProjectId: string;
+  }): Promise<SharedReadRow[]> => {
+    const rows = (await liveGrants(this.database).findMany({
+      where: sharedProjectReadsOf({ organizationId, readerProjectId }),
+      select: { id: true, scopeId: true, condition: true, expiresAt: true },
+    })) as { id: string; scopeId: string; condition: unknown; expiresAt: unknown }[];
+    return rows.flatMap((row) => {
+      const condition = grantConditionSchema.safeParse(row.condition);
+      if (!condition.success) return [];
+      return [
+        {
+          grantId: row.id,
+          memberProjectId: row.scopeId,
+          condition: condition.data,
+          expiresAt: row.expiresAt instanceof Date ? fromDate(row.expiresAt) : null,
+        },
+      ];
+    });
   };
 
   /** Lineage is not a grant: the legacy query, unchanged. */

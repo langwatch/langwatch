@@ -2,13 +2,13 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { traceQueryTranslation } from "../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
 /**
  * @vitest-environment node
  * @integration
  * Verifies that filters encounter stale trace versions before version dedup collapses them.
  */
 import { FACET_REGISTRY } from "../../../features/facet/repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
+import { traceQueryTranslation } from "../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
 import { TraceListClickHouseRepository } from "../trace-list.repository.ts";
 import {
   startMigratedTraceClickHouse,
@@ -91,7 +91,6 @@ describe.skipIf(!clickHouseConfigured)(
     const filterFor = (queryText: string) => {
       const compiled = traceQueryTranslation.translateFilter({
         queryText,
-        tenantId: versionTenant,
         timeRange,
       });
       if (!compiled) throw new Error(`"${queryText}" compiled to no filter`);

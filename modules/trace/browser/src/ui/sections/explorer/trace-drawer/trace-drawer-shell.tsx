@@ -30,6 +30,13 @@ export interface TraceV2DrawerShellProps {
    * in the last project visited.
    */
   projectId?: string;
+  /**
+   * The member that owns the trace, on an aggregate (ADR-144 block F), so a
+   * reload or a copied link reopens the same member. Read by the URL
+   * hydrator into `openTrace(..., { tenantId })`; written only when it is
+   * not the drawer's own project.
+   */
+  tenantId?: string;
 }
 
 export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {

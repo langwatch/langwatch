@@ -1,10 +1,11 @@
+import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 /**
  * The server half of `instantEval.*`. Permissions match the REST family:
  * `analytics:manage` to spend, `analytics:view` to read; the opt-in switch is the
  * organization's consent, so it takes `organization:manage` via the project.
  * @see specs/traces-v2/instant-eval-search.feature
  */
-import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
+import type { Actor } from "@langwatch/authorization";
 import {
   instantEvalTrpc,
   type ExplorerInstantEvalProgress,
@@ -39,7 +40,9 @@ export interface InstantEvalBrowserApi {
   /** One run's counters, which is all a chip and a progress bar read. */
   getExplorerRun(input: { projectId: string; runId: string }): Promise<ExplorerInstantEvalProgress>;
   /** A search-bar sentence classified for trace's router; never refuses, answers null instead. */
-  classifySearch(input: ExplorerSearchClassificationInput): Promise<ExplorerSearchClassification>;
+  classifySearch(
+    input: ExplorerSearchClassificationInput & { actor: Actor },
+  ): Promise<ExplorerSearchClassification>;
 }
 
 export const InstantEvalBrowserApi = moduleApi<InstantEvalBrowserApi>()("instant-eval");
@@ -88,5 +91,5 @@ export const instantEvalTrpcTransport: TrpcRouterDeclaration<
 
   .procedure("classifySearch")
   .withPermission("analytics:view")
-  .handle(({ app, input }) => app.classifySearch(input))
+  .handle(({ app, input, actor }) => app.classifySearch({ ...input, actor }))
   .build();

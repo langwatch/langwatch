@@ -15,6 +15,8 @@ export type OnboardingProject = {
   readonly slug: string;
   /** When the project was made, so a screen with no `projectSlug` can pick the newest. */
   readonly createdAt?: TimeInput | null;
+  /** The project's kind (`application`, `aggregate`, ...), when the shell has read it. */
+  readonly kind?: string;
 };
 
 /** One team in the reader's graph, as the welcome redirect walks it. */

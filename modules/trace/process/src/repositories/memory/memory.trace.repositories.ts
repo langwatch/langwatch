@@ -9,6 +9,7 @@ import { NullLogRecordStorageRepository } from "../log-record-storage.repository
 import { NullSessionGroupsRepository } from "../session-groups.repository.ts";
 import type { TraceAnalyticsFoldCacheRepository } from "../trace-analytics-fold-cache.repository.ts";
 import { TracePayloadReaderRepository } from "../trace-payload-reader.repository.ts";
+import { TraceProjectedReadRepository } from "../trace-projected-read.repository.ts";
 import type { TraceSummaryFoldCacheRepository } from "../trace-summary-fold-cache.repository.ts";
 import type { TraceRepositories } from "../trace.repositories.ts";
 import { MemoryNullTraceAttributedRollupRepository } from "./memory.null-trace-attributed-rollup.repository.ts";
@@ -50,6 +51,37 @@ class MemoryTraceAnalyticsFoldCacheRepository implements TraceAnalyticsFoldCache
 }
 
 /** The memory tier opens no ClickHouse: a raw tenant client is refused by name, never faked. */
+/** The span tree reads ClickHouse alone, so this tier refuses it as the raw client does. */
+class MemoryTraceProjectedReadRepository extends TraceProjectedReadRepository {
+  static create(): MemoryTraceProjectedReadRepository {
+    return new MemoryTraceProjectedReadRepository();
+  }
+
+  private refuse(): Promise<never> {
+    return Promise.reject(new TraceCapabilityUnavailableError("memory", "a ClickHouse client"));
+  }
+
+  findEvaluationSpans(): Promise<never> {
+    return this.refuse();
+  }
+
+  findEvaluationEvents(): Promise<never> {
+    return this.refuse();
+  }
+
+  findIngestLag(): Promise<never> {
+    return this.refuse();
+  }
+
+  listSummaryPage(): Promise<never> {
+    return this.refuse();
+  }
+
+  findSummarySince(): Promise<never> {
+    return this.refuse();
+  }
+}
+
 class MemoryTraceClickHouseClientsRepository extends TraceClickHouse {
   static create(): MemoryTraceClickHouseClientsRepository {
     return new MemoryTraceClickHouseClientsRepository();
@@ -114,6 +146,7 @@ export class MemoryTraceRepositories {
       summaryFoldCache: MemoryTraceSummaryFoldCacheRepository.create(),
       analyticsFoldCache: MemoryTraceAnalyticsFoldCacheRepository.create(),
       spanStorage: MemorySpanStorageRepository.create(spans),
+      spanTree: MemoryTraceProjectedReadRepository.create(),
       existence: MemoryTraceExistenceRepository.create(spans),
       derivationSpans: MemoryTraceDerivationSpanRepository.create(spans),
       summary: MemoryTraceSummaryRepository.create(),

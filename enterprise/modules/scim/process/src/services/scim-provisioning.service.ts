@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import {
   type ScimCreateUserRequest,
@@ -7,6 +6,8 @@ import {
   type ScimUser,
 } from "@langwatch/enterprise-scim-contract";
 import { ScimProtocolError } from "@langwatch/enterprise-scim-contract";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { UserProfile, UserApi } from "@langwatch/user-contract";
 
 import type {
@@ -60,6 +61,7 @@ export class ScimProvisioningService {
     users,
     costCenterFacts,
     organization,
+    members,
     lifecycle,
     provenOffboarding,
     authority,
@@ -70,6 +72,7 @@ export class ScimProvisioningService {
     users: ScimUserProvisioning;
     costCenterFacts: ScimCostCenterFacts;
     organization: ScimOrganizationAdministration;
+    members: Pick<OrganizationApi, "deleteMember">;
     lifecycle: ScimSyncLifecycle;
     provenOffboarding: boolean;
     authority: Pick<ScimDirectoryIdentityService, "assertWritable">;
@@ -84,6 +87,7 @@ export class ScimProvisioningService {
       grants,
       lifecycle,
       organization,
+      members,
       provenOffboarding,
     });
     this.listing = ScimUserListingService.create(prisma);
@@ -99,6 +103,7 @@ export class ScimProvisioningService {
     users: ScimUserProvisioning;
     costCenterFacts: ScimCostCenterFacts;
     organization: ScimOrganizationAdministration;
+    members: Pick<OrganizationApi, "deleteMember">;
     lifecycle: ScimSyncLifecycle;
     provenOffboarding: boolean;
     authority: Pick<ScimDirectoryIdentityService, "assertWritable">;

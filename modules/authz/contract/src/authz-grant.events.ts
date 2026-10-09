@@ -1,5 +1,7 @@
-import { ledgerActorSchema } from "@langwatch/authorization";
+import { grantConditionSchema, ledgerActorSchema } from "@langwatch/authorization";
 import { z } from "zod";
+
+import { PROJECT_READER_ROLE_KEY } from "./roles.ts";
 
 export const AUTHZ_ENGINE_MIGRATION_NAME = "authz-engine" as const;
 
@@ -58,6 +60,7 @@ export const GRANT_EVENT_SOURCES = [
   "join-request",
   "read-through-mint",
   "migration",
+  "aggregate-reconciler",
 ] as const;
 export const grantEventSourceSchema = z.enum(GRANT_EVENT_SOURCES);
 export type GrantEventSource = z.infer<typeof grantEventSourceSchema>;
@@ -75,6 +78,11 @@ export const resourceGrantTermsSchema = z
   .strict();
 export type ResourceGrantTerms = z.infer<typeof resourceGrantTermsSchema>;
 
+/**
+ * A `project` principal sits at RESOURCE scope, as its own project's credential,
+ * or as the ADR-177 shared read: `project-reader` on another project's PROJECT
+ * scope carrying a condition whose `where` is empty (nothing compiles OTTL yet).
+ */
 export const grantShapeRefinement = {
   check: (grant: {
     principal: { type: string; id: string | null };
@@ -82,22 +90,37 @@ export const grantShapeRefinement = {
     scope: { type: string; id: string };
     resource?: unknown;
     expiresAtMs?: number;
+    condition?: { where?: string };
   }): boolean => {
     const isResourceScope = grant.scope.type === "RESOURCE";
     if (grant.principal.type === "anyone" && !isResourceScope) return false;
     if (isResourceScope && grant.expiresAtMs !== undefined) return false;
     const isOwnProjectCredential =
       grant.scope.type === "PROJECT" && grant.principal.id === grant.scope.id;
-    if (grant.principal.type === "project" && !isResourceScope && !isOwnProjectCredential) {
+    const isSharedProjectRead =
+      grant.principal.type === "project" &&
+      grant.scope.type === "PROJECT" &&
+      grant.principal.id !== grant.scope.id &&
+      grant.roleKey === PROJECT_READER_ROLE_KEY &&
+      grant.condition !== undefined &&
+      (grant.condition.where === undefined || grant.condition.where === "");
+    if (
+      grant.principal.type === "project" &&
+      !isResourceScope &&
+      !isOwnProjectCredential &&
+      !isSharedProjectRead
+    ) {
       return false;
     }
+    if ((grant.condition !== undefined) !== isSharedProjectRead) return false;
+    if ((grant.roleKey === PROJECT_READER_ROLE_KEY) !== isSharedProjectRead) return false;
     return (
       isResourceScope === (grant.resource !== undefined) &&
       isResourceScope === (grant.roleKey === null)
     );
   },
   message:
-    "a RESOURCE grant carries resource terms and a null roleKey, every other scope carries a roleKey and no resource terms; a RESOURCE grant states its expiry inside those terms and never as the grant's own `expiresAtMs`; `anyone` principals exist only at RESOURCE scope, and a `project` principal exists at RESOURCE scope or as its own project's credential (a PROJECT scope whose id is the principal's)",
+    "a RESOURCE grant carries resource terms and a null roleKey, every other scope carries a roleKey and no resource terms; a RESOURCE grant states its expiry inside those terms and never as the grant's own `expiresAtMs`; `anyone` principals exist only at RESOURCE scope, a `project` principal exists at RESOURCE scope, as its own project's credential (a PROJECT scope whose id is the principal's), or as a `project-reader` on another project's PROJECT scope carrying a condition with an empty where; only that shared read carries a condition or the `project-reader` role",
   path: ["resource"] as const,
 };
 
@@ -108,6 +131,8 @@ export const grantAttachedPayloadSchema = z
     roleKey: z.string().min(1).nullable(),
     scope: ledgerScopeSchema,
     resource: resourceGrantTermsSchema.optional(),
+    /** Present only on a shared project-reader grant (ADR-177). */
+    condition: grantConditionSchema.optional(),
     legacyRole: legacyBindingRoleSchema.optional(),
     /** When a binding stops granting; absent on every grant that never ends. */
     expiresAtMs: z.number().int().positive().optional(),
@@ -218,6 +243,8 @@ export const grantFactSchema = z
     source: grantEventSourceSchema,
     /** Current USER membership lifetime; absent for non-user/resource facts. */
     membershipStamp: z.string().min(1).optional(),
+    /** The shared grant's window (ADR-177); absent on own grants. */
+    condition: grantConditionSchema.optional(),
     occurredAtMs: z.number().int().nonnegative(),
   })
   .strict()

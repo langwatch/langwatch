@@ -1,11 +1,12 @@
 import { createTenantId, type ProjectionStoreContext } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 
+import { ownProofAuthorizer } from "../../__tests__/support/authorization-proofs.fixture.ts";
+import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
 import {
   TraceAnalyticsProjectionRepository,
   type TraceAnalyticsProjectionEntry,
 } from "../../repositories/trace-analytics-projection.repository.ts";
-import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
 import {
   TraceAnalyticsFoldProjection,
   type TraceAnalyticsData,
@@ -63,7 +64,11 @@ describe("TraceAnalyticsStore — redelivery watermark", () => {
     /** @scenario the redelivery watermark survives the write path */
     it("persists the applied-event-id watermark next to the row", async () => {
       const { storage, written } = recordingPort();
-      const store = TraceAnalyticsStore.create({ storage, defaultRetentionDays: () => 90 });
+      const store = TraceAnalyticsStore.create({
+        storage,
+        defaultRetentionDays: () => 90,
+        authorize: ownProofAuthorizer,
+      });
 
       await store.store(signalState(), context(["evt-1", "evt-2"]));
 
@@ -74,7 +79,11 @@ describe("TraceAnalyticsStore — redelivery watermark", () => {
     /** @scenario the watermark round-trips through the read-back */
     it("reads the same watermark back with the state", async () => {
       const { storage } = recordingPort();
-      const store = TraceAnalyticsStore.create({ storage, defaultRetentionDays: () => 90 });
+      const store = TraceAnalyticsStore.create({
+        storage,
+        defaultRetentionDays: () => 90,
+        authorize: ownProofAuthorizer,
+      });
       await store.store(signalState(), context(["evt-1"]));
 
       const back = await store.getWithApplied(TRACE_ID, context());

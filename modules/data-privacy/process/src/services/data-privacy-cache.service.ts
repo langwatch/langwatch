@@ -20,6 +20,8 @@ export class DataPrivacyPolicyCacheService {
   }
 
   private readonly entries = new Map<string, Entry>();
+  /** Misses in flight, so concurrent reads of one project share one cascade walk (ADR-177). */
+  private readonly inFlight = new Map<string, Promise<ResolvedDataPrivacy>>();
 
   private constructor(
     private readonly repository: DataPrivacyPolicyRepository,
@@ -28,7 +30,20 @@ export class DataPrivacyPolicyCacheService {
   ) {}
 
   /** `facts` is read only on a miss: the ingest hot path reads placement once per window. */
-  async resolve(input: {
+  resolve(input: {
+    projectId: string;
+    facts: () => Promise<DataPrivacyScopeFacts>;
+  }): Promise<ResolvedDataPrivacy> {
+    const pending = this.inFlight.get(input.projectId);
+    if (pending) return pending;
+    const resolution = this.resolveUncoalesced(input).finally(() => {
+      if (this.inFlight.get(input.projectId) === resolution) this.inFlight.delete(input.projectId);
+    });
+    this.inFlight.set(input.projectId, resolution);
+    return resolution;
+  }
+
+  private async resolveUncoalesced(input: {
     projectId: string;
     facts: () => Promise<DataPrivacyScopeFacts>;
   }): Promise<ResolvedDataPrivacy> {
@@ -53,5 +68,6 @@ export class DataPrivacyPolicyCacheService {
 
   clear(): void {
     this.entries.clear();
+    this.inFlight.clear();
   }
 }

@@ -9,6 +9,7 @@ import {
  * transcript.
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import {
   type TraceApi,
   TraceIdAmbiguousError,
@@ -29,6 +30,7 @@ const transcript = {
 function mount(readTraceTranscript: TraceApi["readTraceTranscript"]) {
   const stub = createApiFixture<TraceApi>({ readTraceTranscript });
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({
         actor: { type: "user" as const, id: "user-1" },

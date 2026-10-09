@@ -1,3 +1,4 @@
+import { AuthorizedClickHouse } from "@langwatch/clickhouse-client";
 import { clickHouseClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 // Unit tests for `findByTraceId` OccurredAt-resolution branch selection.
 // Three paths: no row -> null; positive ms -> partition-pruned; 0 -> legacy fallback
@@ -8,8 +9,11 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { ownProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
 import { createFoldState } from "../../../eventing/__tests__/trace-subscriber.fixtures.ts";
 import { TraceSummaryClickHouseRepository } from "../trace-summary.repository.ts";
+
+const authorization = ownProof({ projectId: "tenant-1" });
 
 /** A whole `findByTraceId` row, as ClickHouse's JSON writes it (64-bit integers as strings). */
 const heavyRow = {
@@ -62,28 +66,36 @@ function makeRepo(responder: (sql: string) => unknown[]) {
   const queries: string[] = [];
   const parameters: Record<string, unknown>[] = [];
   const resolvedFor: (string | undefined)[] = [];
+  const boundTenants: string[] = [];
   const client = clickHouseClientDouble({
     query: vi.fn(
       async ({
-        query,
-        query_params,
+        sql,
+        params,
+        tenantId,
       }: {
-        query: string;
-        query_params?: Record<string, unknown>;
+        sql: string;
+        params?: Record<string, unknown>;
+        tenantId: string;
       }) => {
-        queries.push(query);
-        parameters.push(query_params ?? {});
-        return { json: async () => responder(query) };
+        queries.push(sql);
+        parameters.push(params ?? {});
+        boundTenants.push(tenantId);
+        return { rows: responder(sql) };
       },
     ),
   });
   return {
     repo: TraceSummaryClickHouseRepository.create({
-      resolveClient: async (tenantId?: string) => {
-        resolvedFor.push(tenantId);
-        return client;
-      },
+      resolveClient: async () => client,
+      clickhouse: new AuthorizedClickHouse({
+        resolveClient: async (tenantId?: string) => {
+          resolvedFor.push(tenantId);
+          return client;
+        },
+      }),
     }),
+    boundTenants,
     queries,
     parameters,
     resolvedFor,
@@ -102,22 +114,20 @@ describe("TraceSummaryClickHouseRepository.findByTraceId (tenancy)", () => {
       );
 
       return repo
-        .findByTraceId({ tenantId: "tenant-1", traceId: "t1" })
+        .findByTraceId({ authorization, traceId: "t1" })
         .then(() => expect(resolvedFor).toContain("tenant-1"));
     });
 
     it("binds the tenant, not the trace, as the tenant parameter", async () => {
-      const { repo, parameters } = makeRepo((sql) =>
+      const { repo, parameters, boundTenants } = makeRepo((sql) =>
         isResolve(sql) ? [{ rowCount: "1", occurredAtMs: "0" }] : [heavyRow],
       );
 
-      await repo.findByTraceId({ tenantId: "tenant-1", traceId: "t1" });
+      await repo.findByTraceId({ authorization, traceId: "t1" });
 
       expect(parameters.length).toBeGreaterThan(0);
-      for (const params of parameters) {
-        expect(params.tenantId).toBe("tenant-1");
-        expect(params.traceId).toBe("t1");
-      }
+      expect(boundTenants.every((tenantId) => tenantId === "tenant-1")).toBe(true);
+      expect(parameters.every((params) => params.traceId === "t1")).toBe(true);
     });
   });
 });
@@ -128,7 +138,7 @@ describe("TraceSummaryClickHouseRepository.findByTraceId (unit)", () => {
       isResolve(sql) ? [{ rowCount: "1", occurredAtMs: "0" }] : [heavyRow],
     );
 
-    const result = await repo.findByTraceId({ tenantId: "tenant-1", traceId: "t1" });
+    const result = await repo.findByTraceId({ authorization, traceId: "t1" });
 
     expect(result).not.toBeNull();
     expect(result?.traceId).toBe("t1");
@@ -142,7 +152,7 @@ describe("TraceSummaryClickHouseRepository.findByTraceId (unit)", () => {
       isResolve(sql) ? [{ rowCount: "1", occurredAtMs: String(Date.now()) }] : [heavyRow],
     );
 
-    const result = await repo.findByTraceId({ tenantId: "tenant-1", traceId: "t1" });
+    const result = await repo.findByTraceId({ authorization, traceId: "t1" });
 
     expect(result?.traceId).toBe("t1");
     const heavy = queries.find((q) => q.includes("ComputedInput"));
@@ -155,7 +165,10 @@ describe("TraceSummaryClickHouseRepository.findByTraceId (unit)", () => {
       isResolve(sql) ? [{ rowCount: "0", occurredAtMs: null }] : [heavyRow],
     );
 
-    const result = await repo.findByTraceId({ tenantId: "tenant-1", traceId: "missing" });
+    const result = await repo.findByTraceId({
+      authorization,
+      traceId: "missing",
+    });
 
     expect(result).toBeNull();
     expect(queries.some((q) => q.includes("ComputedInput"))).toBe(false);
@@ -164,12 +177,11 @@ describe("TraceSummaryClickHouseRepository.findByTraceId (unit)", () => {
   it("applies an explicit window verbatim as one bounded read", async () => {
     const { repo, queries } = makeRepo(() => [heavyRow]);
 
-    const result = await repo.findByTraceId(
-      { tenantId: "tenant-1", traceId: "t1" },
-      {
-        window: { fromMs: 1_000, toMs: 2_000 },
-      },
-    );
+    const result = await repo.findByTraceId({
+      authorization,
+      traceId: "t1",
+      window: { fromMs: 1_000, toMs: 2_000 },
+    });
 
     expect(result?.traceId).toBe("t1");
     expect(queries).toHaveLength(1);
@@ -182,12 +194,11 @@ describe("TraceSummaryClickHouseRepository.findByTraceId (unit)", () => {
     // executor is about to re-read anyway.
     const { repo, queries } = makeRepo(() => []);
 
-    const result = await repo.findByTraceId(
-      { tenantId: "tenant-1", traceId: "t1" },
-      {
-        window: { fromMs: 1_000, toMs: 2_000 },
-      },
-    );
+    const result = await repo.findByTraceId({
+      authorization,
+      traceId: "t1",
+      window: { fromMs: 1_000, toMs: 2_000 },
+    });
 
     expect(result).toBeNull();
     expect(queries).toHaveLength(1);
@@ -216,12 +227,11 @@ describe("given the trace-summary row carries a storage anchor", () => {
         },
       ]);
 
-      const result = await repo.findByTraceId(
-        { tenantId: "tenant-1", traceId: "t1" },
-        {
-          window: { fromMs: baselineMs - 1_000, toMs: baselineMs + 1_000 },
-        },
-      );
+      const result = await repo.findByTraceId({
+        authorization,
+        traceId: "t1",
+        window: { fromMs: baselineMs - 1_000, toMs: baselineMs + 1_000 },
+      });
 
       expect(result?.occurredAt).toBe(baselineMs);
       expect(result?.storageAnchorMs).toBe(baselineMs);
@@ -240,12 +250,11 @@ describe("given the trace-summary row carries a storage anchor", () => {
         },
       ]);
 
-      const result = await repo.findByTraceId(
-        { tenantId: "tenant-1", traceId: "t1" },
-        {
-          window: { fromMs: anchorMs - 1_000, toMs: anchorMs + 1_000 },
-        },
-      );
+      const result = await repo.findByTraceId({
+        authorization,
+        traceId: "t1",
+        window: { fromMs: anchorMs - 1_000, toMs: anchorMs + 1_000 },
+      });
 
       expect(result?.occurredAt).toBe(baselineMs);
       expect(result?.storageAnchorMs).toBe(anchorMs);
@@ -265,12 +274,11 @@ describe("given the trace-summary row carries a storage anchor", () => {
         },
       ]);
 
-      const result = await repo.findByTraceId(
-        { tenantId: "tenant-1", traceId: "t1" },
-        {
-          window: { fromMs: anchorMs - 1_000, toMs: anchorMs + 1_000 },
-        },
-      );
+      const result = await repo.findByTraceId({
+        authorization,
+        traceId: "t1",
+        window: { fromMs: anchorMs - 1_000, toMs: anchorMs + 1_000 },
+      });
 
       expect(result?.occurredAt).toBe(baselineMs);
       expect(result?.storageAnchorMs).toBe(anchorMs);
@@ -284,6 +292,7 @@ describe("given the trace-summary row carries a storage anchor", () => {
       return {
         repo: TraceSummaryClickHouseRepository.create({
           resolveClient: async () => client,
+          clickhouse: new AuthorizedClickHouse({ resolveClient: async () => client }),
         }),
         insert,
       };

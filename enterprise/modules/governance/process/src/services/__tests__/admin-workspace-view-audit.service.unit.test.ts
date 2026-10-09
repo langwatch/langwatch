@@ -106,6 +106,7 @@ describe("DefaultGovernanceAdminWorkspaceViewAuditService", () => {
     const teams = new StubTeams();
     const ocsf = new StubOcsf();
     const service = DefaultGovernanceAdminWorkspaceViewAuditService.create({
+      targets: stubProjects(),
       auditLog: repository,
       teams: teams.api(),
       projects: stubProjects(),
@@ -141,6 +142,7 @@ describe("DefaultGovernanceAdminWorkspaceViewAuditService", () => {
     const teams = new StubTeams();
     teams.target = null;
     const service = DefaultGovernanceAdminWorkspaceViewAuditService.create({
+      targets: stubProjects(),
       auditLog: repository,
       teams: teams.api(),
     });
@@ -167,6 +169,7 @@ describe("DefaultGovernanceAdminWorkspaceViewAuditService", () => {
     const teams = new StubTeams();
     teams.target = { ...ownerWorkspace, isPersonal: false, name: "Shared workspace" };
     const service = DefaultGovernanceAdminWorkspaceViewAuditService.create({
+      targets: stubProjects(),
       auditLog: repository,
       teams: teams.api(),
     });
@@ -188,6 +191,7 @@ describe("DefaultGovernanceAdminWorkspaceViewAuditService", () => {
     const teams = new StubTeams();
     repository.recent = true;
     const service = DefaultGovernanceAdminWorkspaceViewAuditService.create({
+      targets: stubProjects(),
       auditLog: repository,
       teams: teams.api(),
       clock: () => 1_700_000_000_000,
@@ -208,6 +212,7 @@ describe("DefaultGovernanceAdminWorkspaceViewAuditService", () => {
     ocsf.insertEvent.mockRejectedValueOnce(new Error("ClickHouse unavailable"));
     const diagnostics = { warn: vi.fn() };
     const service = DefaultGovernanceAdminWorkspaceViewAuditService.create({
+      targets: stubProjects(),
       auditLog: repository,
       teams: teams.api(),
       projects: stubProjects(),

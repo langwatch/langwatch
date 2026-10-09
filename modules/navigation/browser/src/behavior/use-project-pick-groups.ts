@@ -1,5 +1,6 @@
 /** Projects switcher offers; one answer for both; "New Project" for project:create access */
 
+import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { useMemo } from "react";
 
 import { useOptionalNavigationHost } from "../model/navigation-host.ts";
@@ -71,6 +72,7 @@ export function useProjectPickGroups(): ProjectPickGroup[] {
         projects: team.projects.map((candidate) => ({
           projectId: candidate.id,
           label: candidate.name,
+          isAggregate: isAggregateProjectKind(candidate.kind),
           href: projectSwitchHref({
             pathname,
             routePattern,

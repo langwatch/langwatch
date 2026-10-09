@@ -718,3 +718,29 @@ describe("given files the rule does not read", () => {
     expect(report(code, filename)).toEqual([]);
   });
 });
+
+describe("given a handler handed the door's proof", () => {
+  /** @scenario "A handler passes the door's authorization through to its one operation" */
+  it("accepts the proof passed through and still reports a branch on it", () => {
+    const head = [
+      'import { defineTrpcRouter } from "@langwatch/api/trpc";',
+      'export const router = defineTrpcRouter().query("x", (p) =>',
+    ];
+    const passed = [
+      ...head,
+      '  p.withPermission("traces:view").handle(({ input, app, authorization }) => app.x.list({ input, authorization })),',
+      ");",
+    ].join("\n");
+    const branched = [
+      ...head,
+      '  p.withPermission("traces:view").handle(({ input, app, authorization }) => {',
+      "    if (authorization === null) return app.x.empty();",
+      "    return app.x.list({ input, authorization });",
+      "  }),",
+      ");",
+    ].join("\n");
+
+    expect(report(passed)).toEqual([]);
+    expect(found(branched)).toEqual([["handlerControlFlow", 4]]);
+  });
+});

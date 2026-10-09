@@ -10,6 +10,7 @@ import type {
   ModelProviderCredentialVerdict,
 } from "@langwatch/model-provider-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { mintTestAuthorization } from "@langwatch/test-harness/trpc-members";
 
 import { createModelProviderTestApp } from "../../app/__tests__/model-provider.fixture.ts";
 import type {
@@ -51,6 +52,7 @@ export function modelProviderTrpcTestMembers(
           organizationRole: null,
         }),
         checkScopeLineage: async () => ({ kind: "consistent" }),
+        authorization: mintTestAuthorization,
       }),
     },
     denials: {

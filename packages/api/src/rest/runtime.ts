@@ -1,8 +1,10 @@
 import {
   actorSchema,
   type Actor,
+  type Authorization,
   type AuthzDeclaredScopeId,
   type AuthzPermission,
+  writesUnderProject,
 } from "@langwatch/authorization";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger, validationMeta } from "@langwatch/observability";
@@ -29,9 +31,12 @@ import {
   decide,
   decideEntitlement,
   decidePlatform,
+  mintAuthorization,
   platformRefusal,
   refuseImpersonatedMint,
+  refuseWriteUnderAggregate,
   routeScopeOf,
+  scopeWithOrganization,
   type AccessDenial,
   type Authorize,
   type Credential,
@@ -65,6 +70,7 @@ import {
   routePermissions,
   type RestDeprecation,
   type RestDoorCredential,
+  type RestPermissionTarget,
   type RestRouteAnswers,
   type RestTransportDeclaration,
   type RestTransportRoute,
@@ -139,6 +145,7 @@ const VERSION_REQUEST = "apiVersionRequest" as const;
 const ROUTE_INPUT = "endpointInput" as const;
 const ROUTE_HEADER_FACTS = "endpointHeaderFacts" as const;
 const ROUTE_RAW_BODY = "endpointRawBody" as const;
+const ROUTE_BODY_SCOPE = "endpointBodyScope" as const;
 const ROUTE_FORM_FIELDS = "endpointFormFields" as const;
 const ROUTE_FILES = "endpointFiles" as const;
 
@@ -760,6 +767,7 @@ function routeStack<Api>({
         ]
       : []),
     ...validators({ route, documented: documents, paramSource }),
+    ...bodyScopeValidator(route),
     inputMiddleware({ route, paramSource }),
     handlerMiddleware({
       route,
@@ -1083,6 +1091,45 @@ function readingAbsentBody({
   return absentBodyAsEmptyObject({ schema, validate });
 }
 
+/** A raw JSON body whose permission is asked at a project it names: parsed and validated here. */
+function bodyScopeValidator(route: RestTransportRoute<unknown>): MiddlewareHandler[] {
+  const target = route.permissionTarget;
+
+  if (target?.at !== "body") return [];
+
+  return [
+    async (context, next) => {
+      const raw: unknown = context.get(ROUTE_RAW_BODY);
+      const parsed = parsedJson(typeof raw === "string" ? raw : "");
+
+      if (!parsed.ok) throw new MalformedRequestError({ target: "json", detail: parsed.detail });
+
+      const result = target.schema.safeParse(parsed.value);
+
+      if (!result.success) {
+        throw requestValidationErrorFrom({
+          target: "json",
+          error: result.error,
+          input: parsed.value,
+        });
+      }
+
+      context.set(ROUTE_BODY_SCOPE, result.data);
+      await next();
+    },
+  ];
+}
+
+function parsedJson(
+  text: string,
+): Readonly<{ ok: true; value: unknown }> | Readonly<{ ok: false; detail: string }> {
+  try {
+    return { ok: true, value: JSON.parse(text) };
+  } catch (error) {
+    return { ok: false, detail: error instanceof Error ? error.message : String(error) };
+  }
+}
+
 /**
  * An absent body is read as the empty object (ARCHITECTURE.md §8), so a bodiless action keeps
  * working; any body that was sent, `null` and malformed ones included, is parsed as sent.
@@ -1325,6 +1372,7 @@ function handlerMiddleware<Api>({
     const resolved = target ?? decision.scope;
 
     if (!planFirst(route)) await checkEntitlement({ route, ports, scope: resolved, input, family });
+    await refuseAggregateWrite({ route, ports, scope: resolved, request: context.req.raw });
 
     await countCall(capabilities);
 
@@ -1335,6 +1383,13 @@ function handlerMiddleware<Api>({
     if (stored) return stored;
 
     const actor = doorActorOf({ credential, actor: decision.actor });
+    const authorization = await mintAuthorization({
+      permission: route.permission,
+      actor,
+      scope: resolved,
+      authorize: ports.authorization?.forRequest(context.req.raw),
+      route: `${family}.${route.operation}`,
+    });
 
     const run = async (): Promise<Response | undefined> => {
       const result = await auditing({
@@ -1353,6 +1408,7 @@ function handlerMiddleware<Api>({
               actor,
               scope: handlerScopeOf({ route, credential, caller }),
               target,
+              authorization,
               session: sessionOf({ route, credential, caller }),
               key: keyOf({ route, credential, request: context.req.raw }),
             }),
@@ -1371,6 +1427,32 @@ function handlerMiddleware<Api>({
 
     return keepAnswer({ ...capabilities, answer });
   };
+}
+
+/**
+ * ADR-177 decision 8, asked as the tRPC door asks it of a mutation: a request that writes, under
+ * a permission that writes under its project, is refused on an aggregate. Reads pay no kind read.
+ */
+async function refuseAggregateWrite({
+  route,
+  ports,
+  scope,
+  request,
+}: {
+  route: RestTransportRoute<unknown>;
+  ports: RestRuntimeMembers;
+  scope: AuthzDeclaredScopeId | null;
+  request: Request;
+}): Promise<void> {
+  const permissions = routePermissions(route);
+  if (["GET", "HEAD", "OPTIONS"].includes(request.method)) return;
+  if (scope?.tier !== "project" || !permissions.some(writesUnderProject)) return;
+
+  const authorize = ports.authorization?.forRequest(request);
+  refuseWriteUnderAggregate({
+    permissions,
+    scope: await scopeWithOrganization({ scope, authorize }),
+  });
 }
 
 /**
@@ -1715,6 +1797,7 @@ function handlerArguments<Api>({
   actor,
   scope,
   target,
+  authorization = null,
   session,
   key,
 }: {
@@ -1725,6 +1808,7 @@ function handlerArguments<Api>({
   actor: Actor | null;
   scope: AuthzDeclaredScopeId | null;
   target: AuthzDeclaredScopeId | null;
+  authorization?: Authorization | null;
   session?: unknown;
   key?: RestKeyCredential | undefined;
 }): StoredHandlerArguments<Api> {
@@ -1734,6 +1818,7 @@ function handlerArguments<Api>({
     actor,
     scope,
     target,
+    authorization,
     session,
     key,
     signal: context.req.raw.signal,
@@ -1805,6 +1890,38 @@ function headerScopeInput(
     throw new Error(`REST ${route.operation} header schema returned no object`);
 
   return { [target.param]: Reflect.get(headers, target.header) };
+}
+
+/** The fields the route's permission target reads its scope from, wherever it is located. */
+function permissionScopeInput({
+  route,
+  target,
+  input,
+  context,
+}: {
+  route: RestTransportRoute<unknown>;
+  target: RestPermissionTarget;
+  input: unknown;
+  context: Context;
+}): unknown {
+  if (target.at === "header") return headerScopeInput(route, context, target);
+  if (target.at === "body") return bodyScopeInput(target, context);
+
+  return pathScopeInput(target, input);
+}
+
+/** The scope a raw JSON body names, read from the body its location validated. */
+function bodyScopeInput(
+  target: Readonly<{ param: string; field?: string }>,
+  context: Context,
+): Record<string, unknown> {
+  const body: unknown = context.get(ROUTE_BODY_SCOPE);
+  const value =
+    typeof body === "object" && body !== null
+      ? Reflect.get(body, target.field ?? target.param)
+      : void 0;
+
+  return { [target.param]: value };
 }
 
 /** The route's input, with the scope its path spells under another name read as the tier's own. */
@@ -1895,10 +2012,12 @@ function askedAfterBody({
   const permissions = chosen ? [chosen.permission] : routePermissions(route);
 
   if (route.permissionTarget) {
-    const scopeInput =
-      route.permissionTarget.at === "header"
-        ? headerScopeInput(route, context, route.permissionTarget)
-        : pathScopeInput(route.permissionTarget, input);
+    const scopeInput = permissionScopeInput({
+      route,
+      target: route.permissionTarget,
+      input,
+      context,
+    });
     const target = routeScopeOf({ param: route.permissionTarget.param, input: scopeInput });
 
     return { permissions, target, named: true };

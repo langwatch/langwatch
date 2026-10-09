@@ -30,7 +30,9 @@ export const traceEvaluationsQuerySchema = z.object({
 export type TraceEvaluationsQuery = z.infer<typeof traceEvaluationsQuerySchema>;
 
 export const evaluationInputsQuerySchema = z.object({
-  tenantId: z.string(),
+  projectId: z.string(),
   evaluationId: z.string(),
+  /** On an aggregate, the member that holds the evaluation; the proof narrows to it. */
+  tenantId: z.string().min(1).optional(),
 });
 export type EvaluationInputsQuery = z.infer<typeof evaluationInputsQuerySchema>;

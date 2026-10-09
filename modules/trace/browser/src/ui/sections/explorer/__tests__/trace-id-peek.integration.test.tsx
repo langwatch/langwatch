@@ -18,11 +18,13 @@ type HeaderInput = {
   projectId: string;
   traceId: string;
   occurredAtMs?: number;
+  tenantId?: string | null;
 };
 
-const { openDrawerMock, capturedHeaderInputs } = vi.hoisted(() => ({
+const { openDrawerMock, capturedHeaderInputs, useOrganizationTeamProjectMock } = vi.hoisted(() => ({
   openDrawerMock: vi.fn(),
   capturedHeaderInputs: [] as HeaderInput[],
+  useOrganizationTeamProjectMock: vi.fn(() => ({ project: { id: "p1" } })),
 }));
 
 vi.mock("@langwatch/browser-host/drawer", async (importOriginal) => ({
@@ -30,11 +32,15 @@ vi.mock("@langwatch/browser-host/drawer", async (importOriginal) => ({
   useDrawer: () => ({ openDrawer: openDrawerMock }),
 }));
 
-// The popover's body and its `traces.header` read now live in
-// `@langwatch/trace-browser` as `TracePeekSummary`. This file still owns the
-// partition-pruning hint, so capture what the hover hands the summary; that the
-// summary forwards it to the header query is asserted in the package, beside
-// the query.
+vi.mock("@langwatch/browser-host/use-organization-team-project", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useOrganizationTeamProject: useOrganizationTeamProjectMock,
+}));
+
+// The popover's body and its `traces.header` read live in `TracePeekSummary`.
+// This file owns the partition-pruning hint, so capture what the hover hands
+// the summary; that the summary forwards it to the header query is asserted
+// beside the query.
 vi.mock("../../trace-peek-summary.tsx", () => ({
   TracePeekSummary: (input: HeaderInput) => {
     capturedHeaderInputs.push(input);
@@ -70,6 +76,7 @@ const lastHeaderInput = (): HeaderInput => {
 describe("TraceIdPeek", () => {
   beforeEach(() => {
     openDrawerMock.mockClear();
+    useOrganizationTeamProjectMock.mockClear();
     capturedHeaderInputs.length = 0;
   });
 
@@ -130,6 +137,47 @@ describe("TraceIdPeek", () => {
 
         await waitFor(() => expect(capturedHeaderInputs.length).toBeGreaterThan(0));
         expect(lastHeaderInput().occurredAtMs).toBeUndefined();
+      });
+    });
+  });
+
+  describe("given the row names no project that owns the trace", () => {
+    it("renders without resolving the current project", () => {
+      render(<TraceIdPeek traceId="trace-1" />, { wrapper: Wrapper });
+
+      expect(useOrganizationTeamProjectMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given the row names a member of the aggregate project as the owner", () => {
+    describe("when the eye icon is clicked", () => {
+      it("opens the drawer on that member", async () => {
+        render(<TraceIdPeek traceId="trace-1" ownerProjectId="member-1" />, {
+          wrapper: Wrapper,
+        });
+
+        await userEvent.click(screen.getByRole("button"));
+
+        expect(openDrawerMock).toHaveBeenCalledWith("traceV2Details", {
+          traceId: "trace-1",
+          tenantId: "member-1",
+        });
+      });
+    });
+  });
+
+  describe("given the row names the current project as the owner", () => {
+    describe("when the eye icon is clicked", () => {
+      it("opens the drawer naming no member", async () => {
+        render(<TraceIdPeek traceId="trace-1" ownerProjectId="p1" />, {
+          wrapper: Wrapper,
+        });
+
+        await userEvent.click(screen.getByRole("button"));
+
+        expect(openDrawerMock).toHaveBeenCalledWith("traceV2Details", {
+          traceId: "trace-1",
+        });
       });
     });
   });

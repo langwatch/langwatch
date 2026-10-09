@@ -5,7 +5,11 @@
  */
 
 import type { UiAuthClient } from "@langwatch/auth-contract";
-import { permissionSatisfiedBy } from "@langwatch/authorization";
+import {
+  isRegistryPermission,
+  permissionSatisfiedBy,
+  refusedOnAggregate,
+} from "@langwatch/authorization";
 import { useUiAddress } from "@langwatch/browser-host/address";
 import type { UiActor, UiFeedback } from "@langwatch/browser-host/capabilities";
 import { UiSession } from "@langwatch/browser-host/capabilities";
@@ -282,7 +286,7 @@ export function useBrowserUiSession({
     scope,
     permissions: isPublicRoute
       ? NO_PERMISSIONS_ON_A_PUBLIC_PAGE
-      : readPermissions(scope.status, permissions),
+      : readPermissions(scope, permissions),
   };
 
   return BrowserUiSession.create({ snapshot, flags, askFlag, refresh });
@@ -308,16 +312,25 @@ function readSession(query: UseQueryResult<UiSessionResponse>): UiSessionReading
   return { status: "anonymous", user: null };
 }
 
-/** One grant read answers both, as on main: organization permissions follow it (scope knot Q2). */
+/**
+ * One grant read answers both, as on main: organization permissions follow it
+ * (scope knot Q2). A project write on an aggregate is refused (ADR-177 decision 8).
+ */
 function readPermissions(
-  scopeStatus: UiActiveScopeReading["status"],
+  scope: UiActiveScopeReading,
   grantRead: UseQueryResult<UiEffectivePermissionsRead>,
 ): UiSessionSnapshot["permissions"] {
-  const status = permissionStatus(scopeStatus, grantRead);
+  const status = permissionStatus(scope.status, grantRead);
   const grants = new Set(grantRead.isError ? [] : grantRead.data?.permissions);
+  const canInOrganization = (requested: string) =>
+    scope.status === "ready" && permissionSatisfiedBy({ granted: grants, requested });
   const can = (requested: string) =>
-    scopeStatus === "ready" && permissionSatisfiedBy({ granted: grants, requested });
-  return { status, isLoading: status === "loading", can, canInOrganization: can };
+    canInOrganization(requested) &&
+    !(
+      isRegistryPermission(requested) &&
+      refusedOnAggregate({ kind: scope.project?.kind, permission: requested })
+    );
+  return { status, isLoading: status === "loading", can, canInOrganization };
 }
 
 function permissionStatus(

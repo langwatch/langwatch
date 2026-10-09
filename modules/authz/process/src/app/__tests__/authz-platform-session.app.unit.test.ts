@@ -50,3 +50,49 @@ describe("AuthzModule.effectivePermissionsFor", () => {
     });
   });
 });
+
+describe("AuthzModule.effectivePermissionsFor on an aggregate project", () => {
+  const AGGREGATE_SCOPE = {
+    type: "project",
+    id: "proj_aggregate",
+    teamId: "team_1",
+    organizationId: "org_1",
+    kind: "aggregate",
+  } as const;
+
+  function aggregateAppFor({ organizationRole }: { organizationRole: "ADMIN" | "MEMBER" }) {
+    return createAuthzTestApp({
+      permissions: {
+        getScope: async () => AGGREGATE_SCOPE,
+        getDecision: async () => ({ permitted: true, organizationRole }),
+        effectivePermissions: async () => ["traces:view"],
+        can: async () => false,
+      },
+    });
+  }
+
+  describe("given the caller is not an organisation admin", () => {
+    it("answers that they may do nothing there", async () => {
+      const answer = await aggregateAppFor({ organizationRole: "MEMBER" }).effectivePermissionsFor(
+        { projectId: AGGREGATE_SCOPE.id },
+        OPERATOR,
+      );
+
+      expect(answer).toEqual({
+        scope: { type: "project", id: AGGREGATE_SCOPE.id },
+        permissions: [],
+      });
+    });
+  });
+
+  describe("given the caller is an organisation admin", () => {
+    it("answers their permissions there", async () => {
+      const answer = await aggregateAppFor({ organizationRole: "ADMIN" }).effectivePermissionsFor(
+        { projectId: AGGREGATE_SCOPE.id },
+        OPERATOR,
+      );
+
+      expect(answer.permissions).toEqual(["traces:view"]);
+    });
+  });
+});

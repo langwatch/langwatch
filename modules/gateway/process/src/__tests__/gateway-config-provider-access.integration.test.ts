@@ -71,7 +71,7 @@ function createSuiteProjects(): ProjectApi {
       ): ReturnType<ProjectApi["findTraceDestination"]> {
         return prisma.project.findUnique({
           where: { id: projectId },
-          select: { id: true, teamId: true, archivedAt: true },
+          select: { id: true, teamId: true, archivedAt: true, kind: true },
         });
       },
 
@@ -80,7 +80,7 @@ function createSuiteProjects(): ProjectApi {
       ): ReturnType<ProjectApi["listTraceDestinations"]> {
         return prisma.project.findMany({
           where: { id: { in: projectIds } },
-          select: { id: true, teamId: true, archivedAt: true },
+          select: { id: true, teamId: true, archivedAt: true, kind: true },
         });
       },
 

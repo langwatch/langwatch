@@ -64,6 +64,14 @@ function mount({
     getLegacyKeyStatus,
     probePermission: probe,
     archiveOtherProject: (input) => requests.archiveOtherProject(input),
+    updateAggregateRule: async () => ({
+      attached: [],
+      revoked: [],
+      unchanged: [],
+      failed: [],
+      pending: [],
+    }),
+    aggregateMemberCandidates: async () => [],
   };
 
   const trpc = initTRPC.context<ProjectTrpcTestContext>().create();
@@ -88,12 +96,14 @@ describe("the project tRPC namespace", () => {
       const { router } = mount();
 
       expect(Object.keys(router._def.procedures).toSorted()).toEqual([
+        "aggregateMemberCandidates",
         "archiveById",
         "create",
         "getHasFirstMessage",
         "getLegacyKeyStatus",
         "revokeProjectApiKey",
         "update",
+        "updateAggregateRule",
       ]);
     });
   });

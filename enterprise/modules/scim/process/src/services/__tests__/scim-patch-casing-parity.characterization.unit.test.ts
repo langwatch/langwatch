@@ -7,7 +7,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
 import { HeldConnectionsFake } from "../../__tests__/support/held-connections-fake.ts";
-import { OrganizationAdministrationFake } from "../../__tests__/support/organization-administration-fake.ts";
+import {
+  MembersFake,
+  OrganizationAdministrationFake,
+} from "../../__tests__/support/organization-administration-fake.ts";
 import { scimRepositoryFixture } from "../../__tests__/support/scim-repository-fixture.ts";
 import type { ScimCostCenterFacts } from "../scim-cost-center.service.ts";
 import { ScimDirectoryService } from "../scim-directory.service.ts";
@@ -130,7 +133,9 @@ describe("SCIM PATCH operation casing parity", () => {
         },
       })),
     });
+    const members = new MembersFake();
     const service = ScimService.create({
+      members,
       connections: HeldConnectionsFake.of(),
       prisma: repo,
       writer: new GrantsFake(),
@@ -151,7 +156,7 @@ describe("SCIM PATCH operation casing parity", () => {
       expect.objectContaining({ userId: "user-1", active: false }),
     );
     // A leaver stays a member holding nothing (scim-connection-sync.feature).
-    expect(repo.removeMembership).not.toHaveBeenCalled();
+    expect(members.deleteMember).not.toHaveBeenCalled();
   });
 
   it("applies a capitalized Replace to group renaming", async () => {

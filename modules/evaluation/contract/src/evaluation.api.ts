@@ -1,3 +1,4 @@
+import type { Authorization } from "@langwatch/authorization";
 import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
 import { moduleApi } from "@langwatch/module";
 
@@ -66,7 +67,10 @@ export interface EvaluationApi {
   getRunByEvaluationId(input: EvaluationRunLookup): Promise<EvaluationRunData>;
   findRunByEvaluationId(input: EvaluationRunLookup): Promise<EvaluationRunData | null>;
   findRunsByTraceId(input: EvaluationRunsByTraceQuery): Promise<EvaluationRunData[]>;
-  findInputs(input: EvaluationInputsQuery): Promise<Record<string, unknown> | null>;
+  /** Read through the proof; null when none are stored or the viewer may not read content. */
+  findInputs(
+    input: EvaluationInputsQuery & { authorization: Authorization; userId: string | null },
+  ): Promise<Record<string, unknown> | null>;
   getMonitorPerformance(input: MonitorPerformanceQuery): Promise<OnlineEvaluationPerformance[]>;
   /** The seven-day trend of every monitor the project has; none when it has no monitors. */
   findMonitorPerformance(

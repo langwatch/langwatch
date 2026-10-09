@@ -3,6 +3,7 @@
 import { Menu } from "@langwatch/design-system/menu";
 import { Button, HStack, Portal, Text } from "@langwatch/design-system/primitives";
 import type { NavigationOrganization } from "@langwatch/navigation-contract";
+import { findLandingProjects } from "@langwatch/project-contract";
 import { Building2, Check, ChevronsUpDown } from "lucide-react";
 
 import { useProductFlagsByOrganization } from "../../behavior/use-product-flags-by-organization.ts";
@@ -13,7 +14,8 @@ import { resolveOrgSwitchDestination } from "../../model/resolve-org-switch-dest
 function firstProjectSlug(organization: NavigationOrganization): string | null {
   for (const team of organization.teams ?? []) {
     if (team.isPersonal) continue;
-    const project = team.projects?.[0];
+    // An aggregate is opened on purpose, never landed on (ADR-177 block F).
+    const project = findLandingProjects(team.projects ?? [])[0];
     if (project) return project.slug;
   }
   return null;

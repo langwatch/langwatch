@@ -41,7 +41,7 @@ Opened from lists the other modules (and `ui`, the app) whose browser source nam
 
 ## Calls
 
-- Client packages (package.json): `@langwatch/enterprise-governance-client`, `@langwatch/model-provider-client`, `@langwatch/onboarding-client`, `@langwatch/project-client`.
+- Client packages (package.json): `@langwatch/enterprise-governance-client`, `@langwatch/model-provider-client`, `@langwatch/onboarding-client`, `@langwatch/project-client`, `@langwatch/webhook-client`.
 - Lends: `SampleChoiceToken`.
 - Host APIs it requires: `GovernanceHostApi`.
 

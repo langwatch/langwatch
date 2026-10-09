@@ -7,7 +7,7 @@ import {
   exitTraceEditMode,
 } from "../../../behavior/explorer/utils/trace-edit-mode.ts";
 import { getTraceDrawer, useTraceDrawer } from "../../../behavior/trace-drawer.ts";
-import { TRACE_DRAWER_NAME } from "../../../model/trace-drawer-params.ts";
+import { TRACE_DRAWER_NAME, traceDrawerParams } from "../../../model/trace-drawer-params.ts";
 import { selectIsTraceEditDirty, useTraceEditStore } from "./trace-edit.store.ts";
 
 /** The trace the drawer was last open on, so a close can be told from "never opened". */
@@ -15,6 +15,7 @@ interface OpenTrace {
   traceId: string;
   occurredAtMs: number | null;
   projectId: string | null;
+  tenantId: string | null;
 }
 
 /**
@@ -28,6 +29,7 @@ export function useTraceDrawerUrlHydrator(): void {
   const traceId = useTraceDrawer((s) => s.traceId);
   const occurredAtMs = useTraceDrawer((s) => s.occurredAtMs);
   const projectId = useTraceDrawer((s) => s.projectId);
+  const tenantId = useTraceDrawer((s) => s.tenantId);
   const isEditing = useTraceDrawer((s) => s.isEditing);
   const lastOpen = useRef<OpenTrace | null>(null);
   // Held in a ref rather than as dependencies: both change identity with every
@@ -47,12 +49,12 @@ export function useTraceDrawerUrlHydrator(): void {
 
   useEffect(() => {
     if (isOpen && traceId) {
-      lastOpen.current = { traceId, occurredAtMs, projectId };
+      lastOpen.current = { traceId, occurredAtMs, projectId, tenantId };
       syncEditMode({ traceId, wantsEdit: isEditing });
       return;
     }
     settleClose({ lastOpen, drawer: drawerRef.current });
-  }, [isOpen, traceId, occurredAtMs, projectId, isEditing]);
+  }, [isOpen, traceId, occurredAtMs, projectId, tenantId, isEditing]);
 
   useEffect(() => () => settleClose({ lastOpen, drawer: drawerRef.current }), []);
 }
@@ -91,8 +93,11 @@ function keepDrawerForUnsavedEdit({
   if (!selectIsTraceEditDirty(editStore)) return false;
 
   drawer.openDrawer(TRACE_DRAWER_NAME, {
-    traceId: editingTraceId,
-    ...(closed.occurredAtMs !== null ? { t: String(closed.occurredAtMs) } : {}),
+    ...traceDrawerParams({
+      traceId: editingTraceId,
+      occurredAtMs: closed.occurredAtMs,
+      tenantId: closed.tenantId,
+    }),
     ...(closed.projectId !== null ? { projectId: closed.projectId } : {}),
     urlParams: { edit: "1" },
   });

@@ -56,5 +56,8 @@ export const dashboardTrpcTransport: TrpcRouterDeclaration<DashboardApi, typeof 
 
     .procedure("getOrCreateFirst")
     .withPermission("analytics:view")
-    .handle(async ({ app, input }) => app.getOrCreateFirst({ projectId: input.projectId }))
+    .handle(
+      async ({ app, input }) =>
+        (await app.getOrCreateFirst({ projectId: input.projectId }))[0] ?? null,
+    )
     .build();

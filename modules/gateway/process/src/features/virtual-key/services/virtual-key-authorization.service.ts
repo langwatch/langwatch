@@ -100,7 +100,7 @@ export class VirtualKeyAuthorizationService {
   static create(input: {
     directory: VirtualKeyAuthorizationRepository;
     organizations: Pick<OrganizationApi, "getMember" | "findMemberTeamIds">;
-    projects: Pick<ProjectApi, "findIdentity" | "listIdsByOrganization">;
+    projects: Pick<ProjectApi, "findIdentity" | "listIdsByOrganization" | "findTraceDestination">;
   }): VirtualKeyAuthorizationService {
     return new VirtualKeyAuthorizationService(input.directory, input.organizations, input.projects);
   }
@@ -111,7 +111,10 @@ export class VirtualKeyAuthorizationService {
   private constructor(
     private readonly directory: VirtualKeyAuthorizationRepository,
     organizations: Pick<OrganizationApi, "getMember" | "findMemberTeamIds">,
-    private readonly projects: Pick<ProjectApi, "findIdentity" | "listIdsByOrganization">,
+    private readonly projects: Pick<
+      ProjectApi,
+      "findIdentity" | "listIdsByOrganization" | "findTraceDestination"
+    >,
   ) {
     this.membership = VirtualKeyMembershipService.create({ directory, organizations, projects });
     this.ownership = VirtualKeyOrgOwnershipService.create({ directory, projects });

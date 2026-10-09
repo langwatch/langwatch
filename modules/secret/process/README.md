@@ -130,7 +130,7 @@ Permission `secrets:view`. Declared at `src/transport/secret.rest.ts:75`.
 Answers at `/api/secrets/:id`, `/api/v1/secrets/:id`; also, undocumented, `/api/secrets/2026-08-24/:id`, `/api/v1/secrets/2026-08-24/:id`, `/api/secrets/latest/:id`, `/api/v1/secrets/latest/:id`.
 
 ```typescript
-// Params: secretPublicAliasParamsSchema, ../contract/src/secret-rest.schemas.ts:35
+// Params: secretPublicAliasParamsSchema, ../contract/src/secret-rest.schemas.ts:34
 interface Params {
   id: string;
 }
@@ -154,7 +154,7 @@ Permission `secrets:manage`. Declared at `src/transport/secret.rest.ts:85`.
 Answers at `/api/secrets`, `/api/v1/secrets`; also, undocumented, `/api/secrets/2026-08-24`, `/api/v1/secrets/2026-08-24`, `/api/secrets/latest`, `/api/v1/secrets/latest`.
 
 ```typescript
-// Body: secretPublicCreateInputSchema, ../contract/src/secret-rest.schemas.ts:44
+// Body: secretPublicCreateInputSchema, ../contract/src/secret-rest.schemas.ts:43
 interface Body {
   projectId?: string;
   name: string;
@@ -172,8 +172,8 @@ Permission `secrets:manage`. Declared at `src/transport/secret.rest.ts:101`.
 Answers at `/api/secrets/:id`, `/api/v1/secrets/:id`; also, undocumented, `/api/secrets/2026-08-24/:id`, `/api/v1/secrets/2026-08-24/:id`, `/api/secrets/latest/:id`, `/api/v1/secrets/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof secretPublicAliasParamsSchema>; // ../contract/src/secret-rest.schemas.ts:35
-// Body: secretPublicUpdateInputSchema, ../contract/src/secret-rest.schemas.ts:53
+type Params = z.infer<typeof secretPublicAliasParamsSchema>; // ../contract/src/secret-rest.schemas.ts:34
+// Body: secretPublicUpdateInputSchema, ../contract/src/secret-rest.schemas.ts:52
 interface Body {
   projectId?: string;
   value: string;
@@ -190,12 +190,12 @@ Permission `secrets:manage`. Declared at `src/transport/secret.rest.ts:117`.
 Answers at `/api/secrets/:id`, `/api/v1/secrets/:id`; also, undocumented, `/api/secrets/2026-08-24/:id`, `/api/v1/secrets/2026-08-24/:id`, `/api/secrets/latest/:id`, `/api/v1/secrets/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof secretPublicAliasParamsSchema>; // ../contract/src/secret-rest.schemas.ts:35
-// Body: secretPublicDeleteInputSchema, ../contract/src/secret-rest.schemas.ts:41
+type Params = z.infer<typeof secretPublicAliasParamsSchema>; // ../contract/src/secret-rest.schemas.ts:34
+// Body: secretPublicDeleteInputSchema, ../contract/src/secret-rest.schemas.ts:40
 interface Body {
   projectId?: string;
 }
-// Response: secretPublicDeleteOutputSchema, ../contract/src/secret-rest.schemas.ts:58
+// Response: secretPublicDeleteOutputSchema, ../contract/src/secret-rest.schemas.ts:57
 interface Response {
   id: string;
   deleted: true;
@@ -240,7 +240,7 @@ interface Input {
   secretId: string;
   value: string;
 }
-// Output: secretWriteAcknowledgedSchema, ../contract/src/secret.ts:126
+// Output: secretWriteAcknowledgedSchema, ../contract/src/secret.ts:125
 interface Output {
   success: boolean;
 }
@@ -251,7 +251,7 @@ interface Input {
   projectId: string;
   secretId: string;
 }
-type Output = z.infer<typeof secretWriteAcknowledgedSchema>; // ../contract/src/secret.ts:126
+type Output = z.infer<typeof secretWriteAcknowledgedSchema>; // ../contract/src/secret.ts:125
 
 // secrets.revealOnce
 // Input: revealOnceInputSchema, ../contract/src/one-time-reveal.ts:34

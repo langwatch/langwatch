@@ -187,6 +187,7 @@ export default function PromptHostMount({ children }: { children?: ReactNode }) 
       teamId: scopeHost?.team()?.id,
       projectId: projectId ?? undefined,
       projectSlug: scopeHost?.project()?.slug,
+      projectKind: scopeHost?.project()?.kind,
     }),
     [organizationId, projectId, scopeHost],
   );

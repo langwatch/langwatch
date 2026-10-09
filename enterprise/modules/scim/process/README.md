@@ -6,7 +6,7 @@ The server half of [scim](../README.md). SCIM provisioning: directory connection
 
 ## Installation
 
-`defineProcessModule("scim").withRepositories(scimRepositories).withApi(ScimModule).withTransports(scimTokenRest, scimTokenTrpcTransport, scimReconciliationTrpcTransport, scimOversightTrpcTransport, scimProtocolRest, scimWebhookRest).withTransportFacts(…).withEventing(scimEventing).withEventing(scimDirectoryEventing).withEventing(scimSyncEventing).withEventing(scimCostCenterEventing).withEventing(scimSsoConnectionEventing).withMigrations(…)`, `src/scim.module.ts:35`.
+`defineProcessModule("scim").withRepositories(scimRepositories).withChannels(scimChannels).withApi(ScimModule).withTransports(scimTokenRest, scimTokenTrpcTransport, scimReconciliationTrpcTransport, scimOversightTrpcTransport, scimProtocolRest, scimWebhookRest).withTransportFacts(…).withEventing(scimEventing).withEventing(scimDirectoryEventing).withEventing(scimSyncEventing).withEventing(scimCostCenterEventing).withEventing(scimSsoConnectionEventing).withMigrations(…)`, `src/scim.module.ts:38`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -565,7 +565,7 @@ interface Response {
 
 |             |                                         |
 | ----------- | --------------------------------------- |
-| Declared at | `src/transport/scim-webhook.rest.ts:50` |
+| Declared at | `src/transport/scim-webhook.rest.ts:45` |
 | Base URL    | none: each route's path is its address  |
 | Addressing  | literal                                 |
 | Credential  | project                                 |
@@ -574,13 +574,13 @@ interface Response {
 
 Receive an Auth0 SCIM log-stream delivery
 
-Public: the provider signs every delivery with the deployment secret and the route verifies it over the raw bytes, then reads the tenant off the SCIM token presented; no API credential opens this door. Declared at `src/transport/scim-webhook.rest.ts:55`.
+Public: the provider signs every delivery with the deployment secret and the route verifies it over the raw bytes, then reads the tenant off the SCIM token presented; no API credential opens this door. Declared at `src/transport/scim-webhook.rest.ts:50`.
 
 Answers at `/api/webhooks/auth0-scim`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/scim-webhook.rest.ts:58)
-// Response: inline, src/transport/scim-webhook.rest.ts:69
+// Rawbody: "text" (inline, src/transport/scim-webhook.rest.ts:53)
+// Response: inline, src/transport/scim-webhook.rest.ts:64
 type Response = unknown;
 ```
 
@@ -599,23 +599,23 @@ Contract `../contract/src/scim-oversight.trpc.ts:18`, router `src/transport/scim
 
 ```typescript
 // scimOversight.getAll
-// Input: listOversightSyncsInputSchema, ../contract/src/scim-oversight.ts:60
+// Input: listOversightSyncsInputSchema, ../contract/src/scim-oversight.ts:59
 interface Input {
   page?: number;
   pageSize?: number;
   search?: string;
 }
-type Output = z.infer<typeof oversightSyncListSchema>; // ../contract/src/scim-oversight.ts:43
+type Output = z.infer<typeof oversightSyncListSchema>; // ../contract/src/scim-oversight.ts:42
 
 // scimOversight.getById
-// Input: oversightConnectionInputSchema, ../contract/src/scim-oversight.ts:67
+// Input: oversightConnectionInputSchema, ../contract/src/scim-oversight.ts:66
 interface Input {
   connectionId: string;
 }
 // Output: oversightSyncSchema.nullable() (inline, ../contract/src/scim-oversight.trpc.ts:25)
 
 // scimOversight.directoryIdentities
-type Input = z.infer<typeof oversightConnectionInputSchema>; // ../contract/src/scim-oversight.ts:67
+type Input = z.infer<typeof oversightConnectionInputSchema>; // ../contract/src/scim-oversight.ts:66
 // Output: inline, ../contract/src/scim-oversight.trpc.ts:29
 type Output = {
   connectionId: string;
@@ -626,12 +626,12 @@ type Output = {
 }[];
 
 // scimOversight.redriveRetiredApply
-// Input: redriveRetiredApplyInputSchema, ../contract/src/scim-oversight.ts:70
+// Input: redriveRetiredApplyInputSchema, ../contract/src/scim-oversight.ts:69
 interface Input {
   connectionId: string;
   retiredAtMs: number;
 }
-// Output: redriveRetiredApplyResultSchema, ../contract/src/scim-oversight.ts:77
+// Output: redriveRetiredApplyResultSchema, ../contract/src/scim-oversight.ts:76
 interface Output {
   applied: boolean;
 }
@@ -650,11 +650,11 @@ Contract `../contract/src/scim-reconciliation.trpc.ts:20`, router `src/transport
 
 ```typescript
 // scimReconciliation.getAll
-// Input: scimReconciliationScopeSchema, ../contract/src/scim-reconciliation.ts:99
+// Input: scimReconciliationScopeSchema, ../contract/src/scim-reconciliation.ts:98
 interface Input {
   organizationId: string;
 }
-type Output = z.infer<typeof organizationReconciliationSchema>; // ../contract/src/scim-reconciliation.ts:69
+type Output = z.infer<typeof organizationReconciliationSchema>; // ../contract/src/scim-reconciliation.ts:68
 
 // scimReconciliation.getActivity
 // Input: scimConnectionRequestsInputSchema, ../contract/src/scim-request-log.ts:73
@@ -798,10 +798,10 @@ Declared at `src/eventing/scim.pipeline.ts:39`.
 
 | Kind   | Leaf                  | Environment variable          | Declared at                               |
 | ------ | --------------------- | ----------------------------- | ----------------------------------------- |
-| secret | `auth0WebhookSecret`  | `AUTH0_SCIM_WEBHOOK_SECRET`   | `../contract/src/scim.config.ts:13`       |
+| secret | `auth0WebhookSecret`  | `AUTH0_SCIM_WEBHOOK_SECRET`   | `../contract/src/scim.config.ts:14`       |
 | secret | `tokenPepper`         | `CREDENTIALS_SECRET`          | `../contract/src/scim-token-pepper.ts:10` |
 | secret | `tokenPepperFallback` | `NEXTAUTH_SECRET`             | `../contract/src/scim-token-pepper.ts:11` |
 | secret | `tokenPepperPrevious` | `CREDENTIALS_SECRET_PREVIOUS` | `../contract/src/scim-token-pepper.ts:13` |
-| config | `provenOffboarding`   | `SCIM_V2_GRANTS`              | `../contract/src/scim.config.ts:6`        |
+| config | `provenOffboarding`   | `SCIM_V2_GRANTS`              | `../contract/src/scim.config.ts:7`        |
 
 <!-- readme:generated:end -->

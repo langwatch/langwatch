@@ -5,6 +5,7 @@
  */
 import { ScimProtocolError } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import { fromDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
@@ -59,6 +60,15 @@ class DirectoryStore {
 
   private key(organizationId: string, userId: string): string {
     return `${organizationId}:${userId}`;
+  }
+
+  /** Organization's member removal, over the same memberships the repository reads. */
+  members(): Pick<OrganizationApi, "deleteMember"> {
+    return {
+      deleteMember: vi.fn(async ({ organizationId, userId }) => {
+        this.memberships.delete(this.key(organizationId, userId));
+      }),
+    };
   }
 
   live(organizationId: string): ScimUserResourceRecord[] {
@@ -134,9 +144,6 @@ class DirectoryStore {
       addMembership: vi.fn(async ({ organizationId, userId }) => {
         this.memberships.add(this.key(organizationId, userId));
       }),
-      removeMembership: vi.fn(async ({ organizationId, userId }) => {
-        this.memberships.delete(this.key(organizationId, userId));
-      }),
       findOrganizationUsers: vi.fn(async ({ organizationId, userName, startIndex, count }) => {
         const matches = (value: string | null): boolean =>
           userName === void 0 || (value ?? "").toLowerCase() === userName.toLowerCase();
@@ -205,6 +212,7 @@ function directory(store: DirectoryStore) {
     users,
     minted,
     service: ScimService.create({
+      members: store.members(),
       connections: HeldConnectionsFake.of(),
       prisma: store.repository(),
       writer: new GrantsFake(),
@@ -463,6 +471,7 @@ describe("the organization's own directory resource", () => {
     vi.spyOn(repository, "findUserByResourceName").mockResolvedValue(null);
 
     const raced = ScimService.create({
+      members: store.members(),
       connections: HeldConnectionsFake.of(),
       prisma: repository,
       writer: new GrantsFake(),

@@ -75,6 +75,7 @@ import { nowInstant, type Instant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
 import type { ZodError, ZodType } from "zod";
 
+import type { ScimChannels } from "../channels/scim.channels.ts";
 import type { RequestDirectoryMoveCommandData } from "../eventing/scim-directory-move.intent.ts";
 import {
   buildScimDirectoryPipeline,
@@ -110,7 +111,12 @@ import { ScimSyncReadsService } from "../services/scim-sync-reads.service.ts";
 import { ScimTokenMintService } from "../services/scim-token-mint.service.ts";
 import type { ScimService } from "../services/scim.service.ts";
 
-type ScimSetup = FeatureSetup<typeof ScimModule.dependencies, ScimServerConfig, ScimRepositories>;
+type ScimSetup = FeatureSetup<
+  typeof ScimModule.dependencies,
+  ScimServerConfig,
+  ScimRepositories,
+  ScimChannels
+>;
 
 const CONNECTION_NOT_WRITABLE =
   "This directory token can no longer write through its single sign-on connection";
@@ -281,7 +287,7 @@ export class ScimModule implements ScimApiContract {
   }
 
   static async create(setup: ScimSetup): Promise<ScimModule> {
-    const { dependencies, config, secrets, repositories } = setup;
+    const { dependencies, config, secrets, repositories, channels } = setup;
     const auth0WebhookSecret = await secrets.into(scimSecrets.auth0WebhookSecret, (value) => value);
     const tokenPepper = await secrets.into(ScimModule.secrets.tokenPepper, (credentials) =>
       secrets.into(ScimModule.secrets.tokenPepperFallback, (session) => credentials ?? session),
@@ -306,6 +312,7 @@ export class ScimModule implements ScimApiContract {
       users: dependencies.users,
       costCenterFacts,
       organization: dependencies.authorization,
+      members: channels.members,
       entitlements: dependencies.entitlements,
       lifecycle,
       provenOffboarding: config.provenOffboarding,

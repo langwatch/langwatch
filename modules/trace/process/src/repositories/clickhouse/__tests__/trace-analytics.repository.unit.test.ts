@@ -7,11 +7,14 @@ import { env as nodeProcessEnv } from "node:process";
 
 nodeProcessEnv.TZ = "Asia/Kolkata";
 
-import { setWindowedReadMetrics } from "@langwatch/clickhouse-client";
+import { AuthorizedClickHouse, setWindowedReadMetrics } from "@langwatch/clickhouse-client";
+import { clickHouseClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it } from "vitest";
 
 import type { TraceAnalyticsRow } from "#eventing/trace-derived.projection";
 
+import { ownProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
+import type { TraceClickHouseWriteClient } from "../clickhouse.trace-member-client.repository.ts";
 import { TraceAnalyticsClickHouseRepository } from "../trace-metrics-analytics.repository.ts";
 import {
   capturingInsertClient,
@@ -21,15 +24,34 @@ import {
 } from "./clickhouse-test-helpers.ts";
 
 const TENANT_ID = "project_analyticsreadbackunit";
+const AUTHORIZATION = ownProof({ projectId: TENANT_ID });
 const TRACE_ID = "trace-tz";
 const TABLE = "trace_analytics";
 /** The policy counts through one process-wide sink, so the test registers its own. */
 const windowedReadMetrics = new TestWindowedReadMetrics();
 setWindowedReadMetrics(windowedReadMetrics);
 
+/** The authorized read path over a legacy-shaped double: expanded SQL in, `{ rows }` out. */
+function readsOver(client: TraceClickHouseWriteClient): AuthorizedClickHouse {
+  return new AuthorizedClickHouse({
+    resolveClient: async () =>
+      clickHouseClientDouble({
+        query: async ({ sql, params }: { sql: string; params: Record<string, unknown> }) => {
+          const result = await client.query({
+            query: sql,
+            query_params: params,
+            format: "JSONEachRow",
+          });
+          return { rows: await result.json() };
+        },
+      }),
+  });
+}
+
 function makeRepositoryReturning(record: Record<string, unknown>) {
   return TraceAnalyticsClickHouseRepository.create({
     resolveClient: async () => clientReturning(record),
+    clickhouse: readsOver(clientReturning(record)),
   });
 }
 
@@ -38,6 +60,7 @@ function makeOrderingRepository(rows: Record<string, unknown>[]) {
   return {
     repository: TraceAnalyticsClickHouseRepository.create({
       resolveClient: async () => client,
+      clickhouse: readsOver(client),
     }),
     seen,
   };
@@ -88,7 +111,7 @@ describe("TraceAnalyticsClickHouseRepository DateTime64 decode", () => {
         });
 
         const read = await repository.findByTraceId({
-          tenantId: TENANT_ID,
+          authorization: AUTHORIZATION,
           traceId: TRACE_ID,
         });
 
@@ -127,7 +150,7 @@ describe("TraceAnalyticsClickHouseRepository tied-version read", () => {
         ]);
 
         const read = await repository.findByTraceId({
-          tenantId: TENANT_ID,
+          authorization: AUTHORIZATION,
           traceId: TRACE_ID,
         });
 
@@ -155,7 +178,7 @@ describe("TraceAnalyticsClickHouseRepository tied-version read", () => {
         ]);
 
         const read = await repository.findByTraceId({
-          tenantId: TENANT_ID,
+          authorization: AUTHORIZATION,
           traceId: TRACE_ID,
         });
 
@@ -189,7 +212,7 @@ describe("TraceAnalyticsClickHouseRepository tied-version read", () => {
         ]);
 
         const read = await repository.findByTraceId({
-          tenantId: TENANT_ID,
+          authorization: AUTHORIZATION,
           traceId: TRACE_ID,
         });
 
@@ -221,7 +244,7 @@ describe("TraceAnalyticsClickHouseRepository windowed read", () => {
         ]);
 
         await repository.findByTraceId({
-          tenantId: TENANT_ID,
+          authorization: AUTHORIZATION,
           traceId: TRACE_ID,
           window: { fromMs: 1_750_000_000_000, toMs: 1_750_000_345_679 },
         });
@@ -247,7 +270,7 @@ describe("TraceAnalyticsClickHouseRepository windowed read", () => {
         const { repository } = makeOrderingRepository([]);
 
         await repository.findByTraceId({
-          tenantId: TENANT_ID,
+          authorization: AUTHORIZATION,
           traceId: TRACE_ID,
           window: { fromMs: 1_750_000_000_000, toMs: 1_750_000_345_679 },
         });
@@ -265,7 +288,7 @@ describe("TraceAnalyticsClickHouseRepository windowed read", () => {
         const { repository, seen } = makeOrderingRepository([]);
 
         await repository.findByTraceId({
-          tenantId: TENANT_ID,
+          authorization: AUTHORIZATION,
           traceId: TRACE_ID,
           window: { fromMs: 1_750_000_000_000, toMs: 1_750_000_345_679 },
         });
@@ -281,13 +304,15 @@ describe("TraceAnalyticsClickHouseRepository windowed read", () => {
         const { repository, seen } = makeOrderingRepository([]);
 
         await repository.findByTraceId({
-          tenantId: TENANT_ID,
+          authorization: AUTHORIZATION,
           traceId: TRACE_ID,
           window: { fromMs: 1_750_000_000_000, toMs: 1_750_000_345_679 },
         });
 
+        // The fence the proof expands into is itself an `IN (...)`, so the
+        // dedup subquery is found by its tuple, not by the first `IN`.
         const query = seen[0]?.query ?? "";
-        const innerScopeStart = query.indexOf("IN (");
+        const innerScopeStart = query.indexOf("(TenantId, TraceId, UpdatedAt) IN (");
         const outerScope = query.slice(0, innerScopeStart);
         const innerScope = query.slice(innerScopeStart, query.indexOf("GROUP BY"));
 
@@ -307,7 +332,7 @@ describe("TraceAnalyticsClickHouseRepository windowed read", () => {
         const { repository, seen } = makeOrderingRepository([]);
 
         await repository.findByTraceId({
-          tenantId: TENANT_ID,
+          authorization: AUTHORIZATION,
           traceId: TRACE_ID,
         });
 
@@ -370,6 +395,7 @@ describe("TraceAnalyticsClickHouseRepository insert settings", () => {
         const { client, inserts } = capturingInsertClient();
         const repository = TraceAnalyticsClickHouseRepository.create({
           resolveClient: async () => client,
+          clickhouse: readsOver(client),
         });
 
         await repository.upsert({ row: ROW, retentionDays: 30 });
@@ -385,6 +411,7 @@ describe("TraceAnalyticsClickHouseRepository insert settings", () => {
         const { client, inserts } = capturingInsertClient();
         const repository = TraceAnalyticsClickHouseRepository.create({
           resolveClient: async () => client,
+          clickhouse: readsOver(client),
         });
 
         await repository.upsertBatch([{ row: ROW, retentionDays: 30 }]);

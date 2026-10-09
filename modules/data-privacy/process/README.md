@@ -6,7 +6,7 @@ The server half of [data-privacy](../README.md). Data privacy: per-scope rules a
 
 ## Installation
 
-`defineProcessModule("data-privacy").withRepositories(dataPrivacyRepositories).withChannels(dataPrivacyChannels).withApi(DataPrivacyModule).withTransports(dataPrivacyTrpcTransport)`, `src/data-privacy.module.ts:8`.
+`defineProcessModule("data-privacy").withRepositories(dataPrivacyRepositories).withChannels(dataPrivacyChannels).withApi(DataPrivacyModule).withTransports(dataPrivacyTrpcTransport)`, `src/data-privacy.module.ts:13`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,12 +14,20 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Callable data-privacy operations shared by process peers after composition.
 
-Peers call these through the token, declared at `../contract/src/data-privacy.api.ts:49`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/data-privacy.api.ts:50`; nothing else in this package is public.
 
 #### `getResolvedForProject`
 
 ```typescript
 getResolvedForProject(input: { projectId: string }): Promise<ResolvedDataPrivacy>;
+```
+
+#### `getResolvedForProjects`
+
+The strictest fold of every listed project's policy, for a read that sees several (ADR-177 decision 9). The memo holds one request's folds.
+
+```typescript
+getResolvedForProjects(input: { projectIds: readonly string[]; memo?: PrivacyPolicyRequestMemo; }): Promise<ResolvedDataPrivacy>;
 ```
 
 #### `intoGoogleApplicationCredentials`
@@ -174,7 +182,7 @@ None: data-privacy declares no pipeline, process manager, subscriber or task.
 
 | Kind   | Leaf                           | Environment variable                 | Declared at                                 |
 | ------ | ------------------------------ | ------------------------------------ | ------------------------------------------- |
-| secret | `googleApplicationCredentials` | `GOOGLE_APPLICATION_CREDENTIALS`     | `src/app/data-privacy.app.ts:102`           |
+| secret | `googleApplicationCredentials` | `GOOGLE_APPLICATION_CREDENTIALS`     | `src/app/data-privacy.app.ts:103`           |
 | config | `googleDlpDisabled`            | `LANGWATCH_DISABLE_GOOGLE_DLP`       | `../contract/src/data-privacy.config.ts:11` |
 | config | `enforcement`                  | `LANGWATCH_DATA_PRIVACY_ENFORCEMENT` | `../contract/src/data-privacy.config.ts:16` |
 | config | `nodeEnvironment`              | `NODE_ENV`                           | `../contract/src/data-privacy.config.ts:18` |

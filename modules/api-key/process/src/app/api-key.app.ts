@@ -210,6 +210,7 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
     const ingestionKeys = IngestionKeyMintService.create({ apiKeys: service });
     const provisioning = ProjectProvisioningService.create({
       apiKeys: service,
+      organizations: setup.dependencies.organizations,
       projects: setup.dependencies.projects,
     });
     const organizationProvisioning = OrganizationProvisioningService.create({

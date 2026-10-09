@@ -531,6 +531,7 @@ export class LangyModule implements LangyApiContract {
     return {
       turns: {
         models: LangyModelService.create({ modelProviders: dependencies.modelProviders }),
+        projects: dependencies.projects,
         worker,
         tokenBuffer: repositories.tokenBuffer.open(),
         permits: LangyGithubPrPermitService.create(

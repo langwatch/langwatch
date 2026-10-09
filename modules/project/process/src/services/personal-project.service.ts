@@ -7,6 +7,7 @@ import type {
 import { Temporal } from "@langwatch/time";
 
 import type { ProjectRepository } from "../repositories/project.repository.ts";
+import type { ProjectCreatedNoticeService } from "./project-created-notice.service.ts";
 
 /** The personal project's ingestion key length, in the `pkey_` format organization minted. */
 const PERSONAL_PROJECT_API_KEY_CHARS = 40;
@@ -18,16 +19,21 @@ function personalProjectApiKey(): string {
   return `pkey_${random.slice(0, PERSONAL_PROJECT_API_KEY_CHARS)}`;
 }
 
+type PersonalProjectDependencies = Readonly<{
+  projects: ProjectRepository;
+  lifecycle: Pick<ProjectCreatedNoticeService, "revived">;
+}>;
+
 /**
  * Project's side of organization's personal-workspace facts (§9, ruling C, 2026-10-08): the
  * personal project follows its personal team. Each reaction is idempotent, so a redelivery is safe.
  */
 export class PersonalProjectService {
-  static create(deps: { projects: ProjectRepository }): PersonalProjectService {
+  static create(deps: PersonalProjectDependencies): PersonalProjectService {
     return new PersonalProjectService(deps);
   }
 
-  private constructor(private readonly deps: { projects: ProjectRepository }) {}
+  private constructor(private readonly deps: PersonalProjectDependencies) {}
 
   /** Answers the team's personal project id: a redelivered fact's own id may have no row. */
   create({
@@ -56,8 +62,18 @@ export class PersonalProjectService {
     });
   }
 
-  revive({ teamId }: { teamId: string }): Promise<void> {
-    return this.deps.projects.revivePersonalInTeam({ teamId });
+  /** Records each revived project; aggregates reading personal projects react (ADR-177). */
+  async revive({
+    teamId,
+    organizationId,
+  }: {
+    teamId: string;
+    organizationId: string;
+  }): Promise<void> {
+    const revived = await this.deps.projects.revivePersonalInTeam({ teamId });
+    for (const projectId of revived) {
+      await this.deps.lifecycle.revived({ projectId, organizationId });
+    }
   }
 
   setFeatures({

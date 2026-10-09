@@ -38,6 +38,7 @@ beforeEach(() => {
   memory = MemoryOrganizationDatabase.create();
   service = OrganizationMembershipService.create({
     workspaceNotices: { personalWorkspaceArchived: () => Promise.resolve() },
+    memberNotices: { memberRemoved: async () => {}, memberDepartmentChanged: async () => {} },
     repository: MemoryOrganizationMembershipRepository.create({ memory }),
     creations: createApiFixture<OrganizationCreationNotice>(),
     seats: createApiFixture<OrganizationSeatLicense>(),

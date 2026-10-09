@@ -1,5 +1,12 @@
 import type { PersonalFeatures } from "@langwatch/organization-contract";
 import {
+  NEVER_LANDED_ON_PROJECT_KINDS,
+  NON_DESTINATION_PROJECT_KINDS,
+  aggregateRuleSchema,
+  type AggregateMemberCandidate,
+  type AggregateRule,
+  type LiveAggregate,
+  type StoredAggregateProject,
   PROJECT_KIND,
   ProjectNotFoundError,
   internalProjectSchema,
@@ -24,6 +31,7 @@ import {
   type ProjectIdPageInput,
   type ProjectOrganizationPage,
   type ProjectUsageCount,
+  type ProjectKind,
 } from "@langwatch/project-contract";
 import { nowInstant, toDate, type Instant } from "@langwatch/time";
 
@@ -73,14 +81,17 @@ export class MemoryProjectRepository implements ProjectRepository {
 
   async findProjectsWithDepartments({
     organizationId,
+    hiddenKinds,
   }: {
     organizationId: string;
+    hiddenKinds: readonly string[];
   }): Promise<{ id: string; name: string; departmentId: string | null }[]> {
     return this.#database
       .projects()
       .filter(
         (row) =>
           row.kind !== PROJECT_KIND.INTERNAL_GOVERNANCE &&
+          !hiddenKinds.includes(row.kind) &&
           this.#database.isInOrganization(row, organizationId),
       )
       .map((row) => ({ id: row.id, name: row.name, departmentId: row.departmentId }))
@@ -264,6 +275,7 @@ export class MemoryProjectRepository implements ProjectRepository {
     limit: number;
     projectIds?: string[];
     includeGovernance?: boolean;
+    hiddenKinds?: ProjectKind[];
   }): Promise<PaginatedProjects> {
     const matching = this.#database
       .projects()
@@ -271,6 +283,7 @@ export class MemoryProjectRepository implements ProjectRepository {
         (project) =>
           project.archivedAt === null &&
           (input.includeGovernance === true || project.kind !== PROJECT_KIND.INTERNAL_GOVERNANCE) &&
+          !input.hiddenKinds?.some((kind) => kind === project.kind) &&
           this.#database.isInOrganization(project, input.organizationId) &&
           (!input.projectIds || input.projectIds.includes(project.id)),
       )
@@ -395,6 +408,7 @@ export class MemoryProjectRepository implements ProjectRepository {
           team?.organizationId === organizationId &&
           !team.isPersonal &&
           project.archivedAt === null &&
+          !NEVER_LANDED_ON_PROJECT_KINDS.includes(project.kind) &&
           (memberUserId === undefined || this.#database.isTeamMember(team.id, memberUserId))
         );
       })
@@ -497,6 +511,7 @@ export class MemoryProjectRepository implements ProjectRepository {
     if (
       !project ||
       project.archivedAt !== null ||
+      project.kind === PROJECT_KIND.AGGREGATE ||
       !this.#database.isInOrganization(project, input.organizationId)
     ) {
       return null;
@@ -598,12 +613,120 @@ export class MemoryProjectRepository implements ProjectRepository {
     }
   }
 
-  async revivePersonalInTeam(input: { teamId: string }): Promise<void> {
+  async revivePersonalInTeam(input: { teamId: string }): Promise<string[]> {
+    const revived: string[] = [];
     for (const project of this.#database.projects()) {
       if (project.teamId !== input.teamId) continue;
       if (!project.isPersonal || project.archivedAt === null) continue;
       this.#database.putProject({ ...project, archivedAt: null });
+      revived.push(project.id);
     }
+    return revived;
+  }
+
+  async updateAggregateRule(input: {
+    id: string;
+    organizationId: string;
+    aggregateRule: AggregateRule;
+  }): Promise<Project> {
+    const project = this.#live(input.id, input.organizationId);
+    if (project.kind !== PROJECT_KIND.AGGREGATE)
+      throw new ProjectNotFoundError("Project not found");
+    const updated = { ...project, aggregateRule: input.aggregateRule };
+    this.#database.putProject(updated);
+    return updated;
+  }
+
+  async findPersonalProjectIds(input: {
+    organizationId: string;
+    ownerUserIds?: readonly string[];
+  }): Promise<string[]> {
+    return this.#readable(input.organizationId)
+      .filter(
+        (project) =>
+          project.isPersonal &&
+          (input.ownerUserIds === undefined ||
+            (project.ownerUserId !== null && input.ownerUserIds.includes(project.ownerUserId))),
+      )
+      .map((project) => project.id)
+      .toSorted();
+  }
+
+  async findReadableProjectIds(input: {
+    organizationId: string;
+    projectIds: readonly string[];
+  }): Promise<string[]> {
+    return this.#readable(input.organizationId)
+      .filter((project) => input.projectIds.includes(project.id))
+      .map((project) => project.id)
+      .toSorted();
+  }
+
+  /** The memory twin holds no users, so a personal owner reads as nameless. */
+  async findCandidateMembers(input: {
+    organizationId: string;
+  }): Promise<AggregateMemberCandidate[]> {
+    return this.#readable(input.organizationId)
+      .toSorted(
+        (left, right) => left.name.localeCompare(right.name) || left.id.localeCompare(right.id),
+      )
+      .map((project) => ({
+        id: project.id,
+        name: project.name,
+        isPersonal: project.isPersonal,
+        owner: project.isPersonal && project.ownerUserId ? { name: null, email: null } : null,
+      }));
+  }
+
+  async findAggregate(input: { aggregateProjectId: string }): Promise<StoredAggregateProject[]> {
+    const project = this.#database.findProject(input.aggregateProjectId);
+    if (!project || project.kind !== PROJECT_KIND.AGGREGATE) return [];
+    const team = this.#database.findTeam(project.teamId);
+    if (!team) return [];
+    return [
+      {
+        id: project.id,
+        organizationId: team.organizationId,
+        archived: project.archivedAt !== null || team.archivedAt !== null,
+        // A malformed stored rule reads as none: guessing would attach reads nobody asked for.
+        rule: aggregateRuleSchema.safeParse(project.aggregateRule).data ?? null,
+      },
+    ];
+  }
+
+  async findLiveAggregateIds(input: { organizationId: string }): Promise<string[]> {
+    return this.#liveAggregates()
+      .filter((aggregate) => aggregate.organizationId === input.organizationId)
+      .map((aggregate) => aggregate.id);
+  }
+
+  async findAllLiveAggregates(): Promise<LiveAggregate[]> {
+    return this.#liveAggregates();
+  }
+
+  /** Live projects of live teams of the organisation whose kind an aggregate may read. */
+  #readable(organizationId: string): Project[] {
+    return this.#database.projects().filter((project) => {
+      const team = this.#database.findTeam(project.teamId);
+      return (
+        team?.organizationId === organizationId &&
+        team.archivedAt === null &&
+        project.archivedAt === null &&
+        !NON_DESTINATION_PROJECT_KINDS.includes(project.kind)
+      );
+    });
+  }
+
+  #liveAggregates(): LiveAggregate[] {
+    return this.#database
+      .projects()
+      .flatMap((project) => {
+        const team = this.#database.findTeam(project.teamId);
+        if (project.kind !== PROJECT_KIND.AGGREGATE || project.archivedAt !== null) return [];
+        if (!team || team.archivedAt !== null) return [];
+        return [{ id: project.id, organizationId: team.organizationId }];
+      })
+      .toSorted((left, right) => left.id.localeCompare(right.id));
   }
 
   async updatePersonalFeatures(input: {
@@ -666,6 +789,7 @@ export class MemoryProjectRepository implements ProjectRepository {
       organizationId: team.organizationId,
       isPersonal: project.isPersonal,
       ownerUserId: project.ownerUserId,
+      kind: project.kind,
     };
   }
 
@@ -686,6 +810,7 @@ export class MemoryProjectRepository implements ProjectRepository {
       id: project.id,
       teamId: project.teamId,
       archivedAt: project.archivedAt,
+      kind: project.kind,
     });
   }
 
@@ -712,6 +837,7 @@ export class MemoryProjectRepository implements ProjectRepository {
       ownerUserId: null,
       personalFeatures: {},
       departmentId: null,
+      aggregateRule: null,
       langyEgressAllowlist: null,
       lastCodingAgentSessionAt: null,
       lastCodingAgentPullRequestAt: null,

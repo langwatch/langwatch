@@ -14,6 +14,8 @@ export type PromptHostScope = {
   teamId: string | undefined;
   projectId: string | undefined;
   projectSlug: string | undefined;
+  /** The project's kind (`application`, `aggregate`, ...), once the shell has read it. */
+  projectKind?: string;
 };
 
 /** The path parameters and query string the screen was opened with. */

@@ -5,6 +5,8 @@ import {
 } from "@langwatch/api-key-client";
 import { Kbd } from "@langwatch/design-system/kbd";
 import { Box, HStack, Tabs, Text, VStack } from "@langwatch/design-system/primitives";
+import { AggregateReadOnlyNotice } from "@langwatch/error-views";
+import { isAggregateProjectKind } from "@langwatch/project-contract";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { AnalyticsBoundary } from "react-contextual-analytics";
@@ -120,16 +122,22 @@ export function IntegrateDrawer({
           <Drawer.CloseTrigger />
         </Drawer.Header>
         <Drawer.Body>
-          <ActiveProjectProvider value={activeProjectContext}>
-            <IntegrationContent
-              projectId={project.id}
-              minting={minting}
-              segment={segment}
-              onSegmentChange={setSegment}
-              activeSegmentDescription={activeSegment?.description ?? ""}
-              enabled={open}
-            />
-          </ActiveProjectProvider>
+          {/* An aggregate (ADR-177) is never sent traces and owns no key,
+              so the drawer mints nothing on it. */}
+          {isAggregateProjectKind(project.kind) ? (
+            <AggregateReadOnlyNotice />
+          ) : (
+            <ActiveProjectProvider value={activeProjectContext}>
+              <IntegrationContent
+                projectId={project.id}
+                minting={minting}
+                segment={segment}
+                onSegmentChange={setSegment}
+                activeSegmentDescription={activeSegment?.description ?? ""}
+                enabled={open}
+              />
+            </ActiveProjectProvider>
+          )}
         </Drawer.Body>
       </Drawer.Content>
     </Drawer.Root>

@@ -61,6 +61,7 @@ export function toNavigationOrganizations(read: NavigationGraphRead): Navigation
         id: project.id,
         name: project.name,
         slug: project.slug,
+        kind: project.kind,
         isPersonal: team.isPersonal,
         lastCodingAgentSessionAt: project.lastCodingAgentSessionAt,
         lastCodingAgentPullRequestAt: project.lastCodingAgentPullRequestAt,

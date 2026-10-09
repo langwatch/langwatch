@@ -2,7 +2,7 @@ import { Box, Combobox, HStack, Portal } from "@langwatch/design-system/primitiv
 import { Check, Plus, Search } from "lucide-react";
 
 import type { ProjectPickGroup, ProjectPickItem } from "../../model/project-pick-items.ts";
-import { ProjectAvatar } from "../elements/project-avatar.tsx";
+import { AggregateProjectAvatar, ProjectAvatar } from "../elements/project-avatar.tsx";
 
 /**
  * The portaled popup of the project switcher combobox: the search field,
@@ -105,6 +105,8 @@ function ProjectItemRow({ item, isCurrent }: { item: ProjectPickItem; isCurrent:
       <HStack gap={2} width="full">
         {item.kind === "new-project" ? (
           <Plus size={13} aria-hidden />
+        ) : item.isAggregate ? (
+          <AggregateProjectAvatar name={item.label} />
         ) : (
           <ProjectAvatar name={item.label} />
         )}

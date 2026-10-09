@@ -1492,7 +1492,11 @@ organization's projects (a gateway budget's ledger) declares its **tenant set** 
 the tenant guard accepts `TenantId IN (...)` only when the list binds exactly that set, the request's
 `tenantId` among them, with no `OR` disjoining it; the member's router resolves every tenant through
 the tenant directory it already routes by and refuses a set spanning organizations. One statement,
-answered on that organization's server, never an `unscoped` reason (Alex, 2026-09-29). Eventing's replay
+answered on that organization's server, never an `unscoped` reason (Alex, 2026-09-29). The list may
+also be one `Array(String)` parameter holding exactly that set, as the proof fence binds it, and an `OR`
+bracketed beneath that set does not weaken it (M8487-GUARD-ARRAY, Alex, 2026-10-09); an `OR` in a
+subquery beneath the set, and a `NOT` in front of any tenant predicate, are refused (GUARD-FOLLOWUPS,
+Alex, 2026-10-09). Eventing's replay
 reads through the member's own surface (`query`, `stream`, `command`); `stream` yields a large read
 batch by batch under the tenant guard and the route, holding no slot and never retried.
 
@@ -1655,6 +1659,9 @@ office deactivates only through user, so it keeps no picked date (Alex, 2026-10-
 - A REST request is authenticated before its body is capped, parsed or validated: a missing or invalid credential
   answers 401/403, never 422 or 413. A door that signs over the body reads the capped raw bytes first. Which project
   the caller acts on is resolved after, from the parsed input (Alex, 2026-09-30).
+- A permission is asked where its scope location says: `{ at: "route" }`, `{ at: "header" }`, or
+  `{ at: "body"; param; schema; field? }` for a raw text JSON body, which the door's runtime parses and validates
+  against `schema` after the credential (400, then 422), then asks at the project its field names (merge #8487).
 - The exception is a hidden family, whose 404 comes before the credential or the body: `instance_admin` with no key
   set or on SaaS, and `/api/admin/*` for a caller who is not an admin (as main, 2026-09-30).
 - REST runs in three steps: the credential and identity checks that read no body (the door, and a public route's

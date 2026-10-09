@@ -4,6 +4,7 @@ import { vi } from "vitest";
 
 import { StubAuthzEpoch } from "../../../repositories/__tests__/support/authz-epoch.stub.ts";
 import type { AuthzEpochRepository } from "../../../repositories/authz-epoch.repository.ts";
+import type { ScopeLineageRepository } from "../../../repositories/authz-read.repository.ts";
 import { EventingAuthzReadRepository } from "../../../repositories/eventing/eventing.authz-read.repository.ts";
 import { PrismaAuthzLedgerReadRepository } from "../../../repositories/prisma/prisma.authz-ledger-read.repository.ts";
 import {
@@ -54,10 +55,12 @@ export function harness({
   poll,
   dispatcher,
   epoch: epochOverride,
+  lineage: lineageOverride,
 }: {
   poll?: { intervalMs: number; timeoutMs: number };
   dispatcher?: AuthzGrantsCommandDispatcher;
   epoch?: AuthzEpochRepository;
+  lineage?: Pick<ScopeLineageRepository, "findProjectLineage">;
 }) {
   const sent: { verb: string; data: unknown }[] = [];
   const db = {
@@ -101,6 +104,7 @@ export function harness({
   });
   const writer = EventingAuthzLedgerAdapter.create({
     reads,
+    lineage: lineageOverride ?? lineage,
     dispatcher: dispatcher ?? new RecordingDispatcher(sent),
     epoch,
     revocation,

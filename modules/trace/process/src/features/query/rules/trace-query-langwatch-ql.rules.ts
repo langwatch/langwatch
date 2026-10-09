@@ -146,7 +146,6 @@ export function compile({ filter }: { filter: string }): LangWatchQLTraceFilter 
     paramCounter: 0,
     nodeCount: 0,
     params: {},
-    tenantId: "",
     timeRange: { from: 0, to: 0 },
   };
   try {

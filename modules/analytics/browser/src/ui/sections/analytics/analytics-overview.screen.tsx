@@ -11,6 +11,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { ArrowUpRight, Plus } from "lucide-react";
 import { useMemo } from "react";
 import { BarChart2 } from "react-feather";
@@ -28,6 +29,7 @@ import {
 import { FilterSidebar } from "../../../ui/sections/filter-sidebar.tsx";
 import { LLMMetrics } from "../../../ui/sections/llm-metrics.tsx";
 import { UserMetrics } from "../../../ui/sections/user-metrics.tsx";
+import { withAggregateAnalyticsGate } from "../aggregate-analytics-gate.tsx";
 
 function AnalyticsContent() {
   const host = useAnalyticsHost();
@@ -123,6 +125,8 @@ function CustomReportsSection({ slug }: { slug: string }) {
   const dashboards = dashboardsQuery.data ?? [];
 
   if (dashboards.length === 0 && !dashboardsQuery.isLoading) {
+    // An aggregate (ADR-177) keeps no dashboards of its own, so it is not invited to build one.
+    if (isAggregateProjectKind(project?.kind)) return null;
     return (
       <>
         <Heading as="h2" size="md" paddingTop={6} paddingBottom={2}>
@@ -206,4 +210,4 @@ function CustomReportsSection({ slug }: { slug: string }) {
  * `analytics:view` permission and layout chrome are stated once in
  * `analytics-routes.tsx`, in front of the same loader registry.
  */
-export default AnalyticsContent;
+export default withAggregateAnalyticsGate("Analytics", AnalyticsContent);

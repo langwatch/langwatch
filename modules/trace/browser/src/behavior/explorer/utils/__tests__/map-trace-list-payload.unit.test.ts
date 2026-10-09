@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { NO_TRACE_EVENTS } from "../../types/trace.ts";
+import { NO_TRACE_EVENTS, type TraceEvalResult, type TraceListItem } from "../../types/trace.ts";
 import { mapTraceListPayload } from "../map-trace-list-payload.ts";
+
+/**
+ * A list row with only the fields a case is about. The mapper copies every
+ * field through and defaults the few it owns, so the rest are irrelevant.
+ */
+const row = (fields: Partial<TraceListItem>): TraceListItem => fields as TraceListItem;
+
+type RowEvaluation = TraceEvalResult;
 
 describe("mapTraceListPayload", () => {
   describe("when the payload is undefined", () => {
@@ -13,7 +21,7 @@ describe("mapTraceListPayload", () => {
   describe("when items carry no evaluations", () => {
     it("defaults spanCount and events and attaches an empty evaluations list", () => {
       const rows = mapTraceListPayload({
-        items: [{ traceId: "t1", name: "trace one" }],
+        items: [row({ traceId: "t1", name: "trace one" })],
       });
       expect(rows).toHaveLength(1);
       expect(rows[0]).toMatchObject({
@@ -25,35 +33,38 @@ describe("mapTraceListPayload", () => {
     });
   });
 
-  describe("when the evaluations map has entries for a trace", () => {
-    it("attaches that trace's evaluations by id", () => {
+  describe("when two rows hold the same trace id under different projects", () => {
+    it("keeps each row's own evaluations", () => {
+      const toxicity = {
+        evaluatorId: "e1",
+        evaluatorName: "Toxicity",
+        status: "processed" as const,
+        score: 0.9,
+        passed: true,
+        label: "safe",
+      };
       const rows = mapTraceListPayload({
-        items: [{ traceId: "t1" }, { traceId: "t2" }],
-        evaluations: {
-          t1: [
-            {
-              evaluatorId: "e1",
-              evaluatorName: "Toxicity",
-              status: "processed",
-              score: 0.9,
-              passed: true,
-              label: "safe",
-            },
-          ],
-        },
+        items: [
+          row({
+            traceId: "t1",
+            projectId: "member-a",
+            evaluations: [
+              {
+                ...toxicity,
+                evaluationId: "ev1",
+                evaluatorType: "langevals/toxicity",
+                traceId: "t1",
+                isGuardrail: false,
+              } satisfies RowEvaluation,
+            ],
+          }),
+          row({ traceId: "t1", projectId: "member-b", evaluations: [] }),
+        ],
       });
-      expect(rows[0]?.evaluations).toEqual([
-        {
-          evaluatorId: "e1",
-          evaluatorName: "Toxicity",
-          status: "processed",
-          score: 0.9,
-          passed: true,
-          label: "safe",
-        },
-      ]);
-      // t2 has no entry in the map, so it gets an empty list, not undefined.
+      expect(rows[0]?.evaluations).toEqual([toxicity]);
+      // The second row has none of its own, so it gets an empty list.
       expect(rows[1]?.evaluations).toEqual([]);
+      expect(rows.map((row) => row.projectId)).toEqual(["member-a", "member-b"]);
     });
   });
 
@@ -61,7 +72,7 @@ describe("mapTraceListPayload", () => {
     describe("when mapping the payload", () => {
       it("preserves the supplied value", () => {
         const rows = mapTraceListPayload({
-          items: [{ traceId: "t1", spanCount: 7 }],
+          items: [row({ traceId: "t1", spanCount: 7 })],
         });
         expect(rows[0]?.spanCount).toBe(7);
       });
@@ -74,7 +85,7 @@ describe("mapTraceListPayload", () => {
         // Events are not on the trace summary — `useTraceListEvents` merges
         // them in from `traces.listEvents`, so the list payload never
         // carries any.
-        const rows = mapTraceListPayload({ items: [{ traceId: "t1" }] });
+        const rows = mapTraceListPayload({ items: [row({ traceId: "t1" })] });
         expect(rows[0]?.events).toEqual(NO_TRACE_EVENTS);
       });
     });

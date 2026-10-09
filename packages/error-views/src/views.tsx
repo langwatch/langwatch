@@ -5,7 +5,7 @@
  */
 
 import { Alert, Box, Button, Text, VStack } from "@langwatch/design-system/primitives";
-import { explainAnyError } from "@langwatch/handled-error/presentation";
+import { explainAnyError, explainHandledError } from "@langwatch/handled-error/presentation";
 import type { ReactNode } from "react";
 
 /**
@@ -97,4 +97,45 @@ export function HandledErrorAlert({
       )}
     </Alert.Root>
   );
+}
+
+/** The aggregate refusal's words, from the registry, so the notice and the server agree (ADR-177). */
+const AGGREGATE_READ_ONLY_COPY = explainHandledError({
+  code: "aggregate_project_is_read_only",
+  meta: {},
+  httpStatus: 403,
+  fault: "customer",
+  retryable: false,
+  tips: [],
+  docsUrl: undefined,
+  traceId: undefined,
+  reasons: [],
+});
+
+/** Shown in place of anything that would add data to an aggregate project. */
+export function AggregateReadOnlyNotice() {
+  return (
+    <Alert.Root status="info" size="sm" variant="subtle" width="full">
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Title>{AGGREGATE_READ_ONLY_COPY.title}</Alert.Title>
+        {AGGREGATE_READ_ONLY_COPY.description && (
+          <Alert.Description fontSize="sm">
+            {AGGREGATE_READ_ONLY_COPY.description}
+          </Alert.Description>
+        )}
+      </Alert.Content>
+    </Alert.Root>
+  );
+}
+
+/** The read-only notice in place of `children` on an aggregate, `children` everywhere else. */
+export function AggregateReadOnlyGate({
+  isAggregate,
+  children,
+}: {
+  isAggregate: boolean;
+  children: ReactNode;
+}) {
+  return isAggregate ? <AggregateReadOnlyNotice /> : <>{children}</>;
 }

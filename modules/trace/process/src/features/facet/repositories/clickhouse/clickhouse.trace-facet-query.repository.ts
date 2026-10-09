@@ -3,7 +3,17 @@
  * One source of truth — every facet builder consumes these.
  */
 
+import { type TenantScopeTimeColumn, tenantScope } from "@langwatch/clickhouse-client";
+
 import type { FacetQueryContext } from "../../rules/trace-facet-registry.rules.ts";
+import { scopeTraceFilterToTable } from "./clickhouse.trace-facet-scope.mapper.ts";
+
+/** The facet table each builder's time column windows. */
+const FACET_TABLE_BY_TIME_COLUMN = {
+  OccurredAt: "trace_summaries",
+  StartTime: "stored_spans",
+  ScheduledAt: "evaluation_runs",
+} as const satisfies Partial<Record<TenantScopeTimeColumn, string>>;
 
 /**
  * Per-query memory settings for high-cardinality key-discovery facets.
@@ -22,14 +32,25 @@ export class ClickHouseTraceFacetQueryRepository {
   }
 
   /**
-   * WHERE predicate with tenant filtering and time window, per clickhouse-queries.md.
+   * WHERE predicate: the tenant marker first (the authorized reader expands it
+   * into the proof's fence, ADR-177 block C), then the time window.
    */
-  buildTimeWhere(timeColumn: string, ctx?: Pick<FacetQueryContext, "traceScope">): string {
+  buildTimeWhere(
+    timeColumn: keyof typeof FACET_TABLE_BY_TIME_COLUMN,
+    ctx?: Pick<FacetQueryContext, "filterWhere" | "isLiveWindow">,
+  ): string {
+    const traceScope = ctx?.filterWhere
+      ? scopeTraceFilterToTable({
+          table: FACET_TABLE_BY_TIME_COLUMN[timeColumn],
+          filterWhere: ctx.filterWhere,
+          isLiveWindow: ctx.isLiveWindow === true,
+        })
+      : undefined;
     return [
-      "TenantId = {tenantId:String}",
+      tenantScope(timeColumn),
       `${timeColumn} >= fromUnixTimestamp64Milli({timeFrom:Int64})`,
       `${timeColumn} <= fromUnixTimestamp64Milli({timeTo:Int64})`,
-      ...(ctx?.traceScope ? [ctx.traceScope.sql] : []),
+      ...(traceScope ? [traceScope.sql] : []),
     ].join(" AND ");
   }
 
@@ -40,8 +61,7 @@ export class ClickHouseTraceFacetQueryRepository {
    */
   baseParams(ctx: FacetQueryContext): Record<string, unknown> {
     return {
-      ...ctx.traceScope?.params,
-      tenantId: ctx.tenantId,
+      ...ctx.filterWhere?.params,
       timeFrom: ctx.timeRange.from,
       timeTo: ctx.timeRange.to,
       limit: ctx.limit,

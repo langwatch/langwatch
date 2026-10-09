@@ -100,6 +100,7 @@ export const apiKeyProjectsRest = defineRestRouter(ApiKeyProjectsDoorApi)
   .handle(async ({ app, input, scope }, credential) => {
     const result = await app.listVisibleProjects({
       apiKeyId: credential.apiKeyId,
+      userId: credential.userId,
       organizationId: scope.id,
       page: input.page,
       limit: input.limit,

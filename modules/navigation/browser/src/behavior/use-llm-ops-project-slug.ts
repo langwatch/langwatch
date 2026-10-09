@@ -1,4 +1,5 @@
 import type { NavigationTeam } from "@langwatch/navigation-contract";
+import { findLandingProjects } from "@langwatch/project-contract";
 
 import { useNavigationHost } from "../model/navigation-host.ts";
 
@@ -22,7 +23,8 @@ export function resolveLlmOpsProjectSlug({
     .find((project) => project.slug === rememberedProjectSlug);
   if (remembered) return remembered.slug;
 
-  return candidates[0]?.projects[0]?.slug ?? null;
+  // Never an aggregate by default (ADR-177 block F).
+  return findLandingProjects(candidates[0]?.projects ?? [])[0]?.slug ?? null;
 }
 
 /** `resolveLlmOpsProjectSlug` against the live workspace and this device. */

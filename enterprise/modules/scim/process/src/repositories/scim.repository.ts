@@ -181,7 +181,6 @@ export abstract class ScimRepository {
     userId: string;
     role: string;
   }) => Promise<void>;
-  abstract removeMembership: (input: { organizationId: string; userId: string }) => Promise<void>;
   /** This organization's SCIM-pushed groups this person belongs to. */
   abstract findDirectoryGroupIds(input: {
     organizationId: string;

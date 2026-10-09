@@ -5,6 +5,9 @@
  */
 import { z } from "zod";
 
+import { aggregateRuleSchema } from "./project.aggregate-rule.ts";
+import { PROJECT_KIND } from "./project.ts";
+
 /** The project a procedure acts on, and the only field most of them take. */
 export const projectScopeSchema = z.object({ projectId: z.string() });
 export type ProjectScopeInput = z.infer<typeof projectScopeSchema>;
@@ -21,6 +24,9 @@ export const projectCreateInputSchema = z.object({
   name: z.string(),
   language: z.string(),
   framework: z.string(),
+  /** ADR-177: an aggregate reads its members and owns no traces. */
+  kind: z.enum([PROJECT_KIND.APPLICATION, PROJECT_KIND.AGGREGATE]).optional(),
+  aggregateRule: aggregateRuleSchema.optional(),
 });
 export type ProjectCreateInput = z.infer<typeof projectCreateInputSchema>;
 
@@ -58,3 +64,13 @@ export const projectArchiveByIdInputSchema = z.object({
   projectToArchiveId: z.string(),
 });
 export type ProjectArchiveByIdInput = z.infer<typeof projectArchiveByIdInputSchema>;
+
+/** An organisation admin replaces which projects an aggregate reads. */
+export const projectUpdateAggregateRuleInputSchema = z.object({
+  projectId: z.string(),
+  aggregateRule: aggregateRuleSchema,
+});
+export type ProjectUpdateAggregateRuleInput = z.infer<typeof projectUpdateAggregateRuleInputSchema>;
+
+/** The organisation whose projects an aggregate's explicit rule may name. */
+export const projectAggregateMemberCandidatesInputSchema = z.object({ organizationId: z.string() });

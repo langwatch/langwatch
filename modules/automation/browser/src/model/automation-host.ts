@@ -30,6 +30,8 @@ export type AutomationProject = {
   id: string;
   name: string;
   slug: string;
+  /** The project's kind (`application`, `aggregate`, ...), once the shell has read it. */
+  kind?: string;
 };
 
 /** The path parameters and query string the screen was opened with. */

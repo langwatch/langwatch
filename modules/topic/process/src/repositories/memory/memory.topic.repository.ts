@@ -32,7 +32,9 @@ export class MemoryTopicRepository implements TopicRepository {
     if (input.ids.length === 0) return Promise.resolve(new Map());
 
     const wanted = new Set(input.ids);
-    const topics = this.store.projects.get(input.projectId)?.topics ?? [];
+    const topics = input.projectIds.flatMap(
+      (projectId) => this.store.projects.get(projectId)?.topics ?? [],
+    );
 
     return Promise.resolve(
       new Map(

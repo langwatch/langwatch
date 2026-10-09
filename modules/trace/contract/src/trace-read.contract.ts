@@ -109,12 +109,12 @@ export interface PromptStudioSpanResult {
     model: string | null;
     /** Absent when the span carried no system message: JSON drops the key. */
     systemPrompt?: ChatMessage["content"];
-    temperature: number | null;
+    temperature: number | string | null;
     maxTokens: number | null;
     topP: number | null;
     frequencyPenalty: number | null;
     presencePenalty: number | null;
-    seed: number | null;
+    seed: number | string | null;
     topK: number | null;
     minP: number | null;
     repetitionPenalty: number | null;

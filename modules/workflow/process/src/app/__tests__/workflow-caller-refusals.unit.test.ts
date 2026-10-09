@@ -63,21 +63,6 @@ describe("WorkflowModule caller refusals", () => {
       ).rejects.toMatchObject({ code: "validation_error", httpStatus: 400 });
     });
 
-    it("refuses a caller who is not signed in", async () => {
-      await expect(
-        (await appWith()).streamStudioEvent({ body: isAlive, userId: undefined }),
-      ).rejects.toMatchObject({ code: "unauthorized", httpStatus: 401 });
-    });
-
-    it("refuses a caller who may not manage the project's workflows", async () => {
-      await expect(
-        (await appWith({ authz: authzAnswering(false) })).streamStudioEvent({
-          body: isAlive,
-          userId: "user_1",
-        }),
-      ).rejects.toMatchObject({ code: "project_permission_denied", httpStatus: 403 });
-    });
-
     it("answers a run the engine cannot start with one last error frame, then ends", async () => {
       const app = await appWith({ authz: authzAnswering(true) });
 

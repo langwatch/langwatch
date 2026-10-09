@@ -22,12 +22,27 @@ export interface PersonalWorkspaceArchiveNotice {
   }): Promise<void>;
 }
 
+/** Records a membership change as organization's fact; peers such as governance react (§9). */
+export interface OrganizationMemberChangeNotice {
+  memberRemoved(input: {
+    organizationId: string;
+    userId: string;
+    removedByUserId: string | null;
+  }): Promise<void>;
+  memberDepartmentChanged(input: {
+    organizationId: string;
+    userId: string;
+    departmentId: string | null;
+  }): Promise<void>;
+}
+
 /** Admitting a member on the joiner seat, and removing one without orphaning the organization. */
 export class OrganizationMemberAdmissionService {
   static create(dependencies: {
     repository: OrganizationMembershipRepository;
     admissions: OrganizationAdmissions;
     workspaceNotices: PersonalWorkspaceArchiveNotice;
+    memberNotices: OrganizationMemberChangeNotice;
   }): OrganizationMemberAdmissionService {
     return new OrganizationMemberAdmissionService(dependencies);
   }
@@ -37,6 +52,7 @@ export class OrganizationMemberAdmissionService {
       repository: OrganizationMembershipRepository;
       admissions: OrganizationAdmissions;
       workspaceNotices: PersonalWorkspaceArchiveNotice;
+      memberNotices: OrganizationMemberChangeNotice;
     },
   ) {}
 
@@ -65,6 +81,11 @@ export class OrganizationMemberAdmissionService {
       organizationId: params.organizationId,
       userId: params.userId,
       actingUserId: params.actingUserId ?? null,
+    });
+    await this.dependencies.memberNotices.memberRemoved({
+      organizationId: params.organizationId,
+      userId: params.userId,
+      removedByUserId: params.actingUserId ?? null,
     });
     if (teamIds.length === 0) return;
     await this.dependencies.workspaceNotices.personalWorkspaceArchived({

@@ -164,6 +164,8 @@ function application(
     recordProjectArchived: { send: async () => undefined },
     recordProjectDepartmentAssigned: { send: async () => undefined },
     recordProjectTraceSharingDisabled: { send: async () => undefined },
+    recordProjectAggregateRuleChanged: { send: async () => undefined },
+    recordProjectRevived: { send: async () => undefined },
   });
 
   return { app, database, asked, logged: reported.entries };

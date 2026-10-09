@@ -40,6 +40,13 @@ const ON_PERSONAL: UiActiveScopeReading = {
   project: { id: "proj-personal", slug: "personal-jane", name: "Personal" },
 };
 
+const ON_AGGREGATE: UiActiveScopeReading = {
+  status: "ready",
+  organization: { id: "org-acme" },
+  team: { id: "team-shared" },
+  project: { id: "proj-all", slug: "acme-all", name: "ACME All", kind: "aggregate" },
+};
+
 const RESOLVING: UiActiveScopeReading = {
   status: "loading",
   organization: void 0,
@@ -81,6 +88,7 @@ function GrantProbe({
   return (
     <div>
       <span data-testid="can-project">{String(permissions.can("annotations:update"))}</span>
+      <span data-testid="can-manage">{String(permissions.can("project:update"))}</span>
       <span data-testid="can-org">
         {String(permissions.canInOrganization("annotations:update"))}
       </span>
@@ -115,6 +123,23 @@ function renderGrants({
   dispose = () => view.unmount();
   return { ...view, client, moveTo: (next: UiActiveScopeReading) => view.rerender(tree(next)) };
 }
+
+describe("given an aggregate project", () => {
+  /** @scenario "The app marks the aggregate and offers no way to add data to it" */
+  it("refuses a write under the project while managing it and organisation checks stay open", async () => {
+    const view = renderGrants({
+      scope: ON_AGGREGATE,
+      transport: answeringTransport(() =>
+        Promise.resolve({ permissions: ["annotations:update", "project:update"] }),
+      ),
+    });
+
+    await waitFor(() => expect(view.getByTestId("can-manage").textContent).toBe("true"));
+    expect(view.getByTestId("can-project").textContent).toBe("false");
+    expect(view.getByTestId("legacy-can").textContent).toBe("false");
+    expect(view.getByTestId("can-org").textContent).toBe("true");
+  });
+});
 
 describe("given grants answered for the scope the reader is standing in", () => {
   /** @scenario "Organization permissions follow the active project's grant" */

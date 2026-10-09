@@ -19,7 +19,9 @@ import {
 } from "@langwatch/design-system/primitives";
 import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { AggregateReadOnlyGate } from "@langwatch/error-views";
 import type { Monitor as StoredMonitor } from "@langwatch/monitor-contract";
+import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { type NamedSlackConnection } from "@langwatch/slack-contract";
 import { toEpochMs } from "@langwatch/time";
 import { useMemo, useState } from "react";
@@ -266,6 +268,7 @@ function datasetLinkOf({
  */
 export function AutomationsPage({ section = "overview" }: { section?: AutomationSection } = {}) {
   const { project } = useOrganizationTeamProject();
+  const projectIsAggregate = isAggregateProjectKind(project?.kind);
   const projectId = project?.id ?? "";
   const toaster = useAutomationToaster();
   const showErrorToast = useShowErrorToast();
@@ -482,43 +485,47 @@ export function AutomationsPage({ section = "overview" }: { section?: Automation
             {details.description}
           </Text>
 
-          {triggers.isLoading ? (
-            <Text textStyle="sm" color="fg.muted">
-              Loading...
-            </Text>
-          ) : (
-            <>
-              {section === "overview" && (
-                <OverviewSection
-                  overview={overview}
-                  activity={activity.data ?? []}
-                  isActivityLoading={activity.isLoading}
-                  triggers={triggers.data ?? []}
-                  openView={openView}
-                  openCreate={openCreate}
-                />
-              )}
-              {section === "reports" && (
-                <ReportsSection
-                  reports={reports}
-                  graphNameById={graphNameById}
-                  scheduleByTriggerId={scheduleByTriggerId}
-                  isScheduleLoading={reportSchedules.isLoading}
-                  openEdit={openEdit}
-                  openCreate={openCreate}
-                  activeCell={activeCell}
-                  rowActionsMenu={rowActionsMenu}
-                />
-              )}
-              {section === "automations" && (
-                <AutomationsSection
-                  automations={automations}
-                  openCreate={openCreate}
-                  rowCells={rowCells}
-                />
-              )}
-            </>
-          )}
+          {/* An aggregate (ADR-177) runs nothing of its own, and the server
+              refuses an automation created under it. */}
+          <AggregateReadOnlyGate isAggregate={projectIsAggregate}>
+            {triggers.isLoading ? (
+              <Text textStyle="sm" color="fg.muted">
+                Loading...
+              </Text>
+            ) : (
+              <>
+                {section === "overview" && (
+                  <OverviewSection
+                    overview={overview}
+                    activity={activity.data ?? []}
+                    isActivityLoading={activity.isLoading}
+                    triggers={triggers.data ?? []}
+                    openView={openView}
+                    openCreate={openCreate}
+                  />
+                )}
+                {section === "reports" && (
+                  <ReportsSection
+                    reports={reports}
+                    graphNameById={graphNameById}
+                    scheduleByTriggerId={scheduleByTriggerId}
+                    isScheduleLoading={reportSchedules.isLoading}
+                    openEdit={openEdit}
+                    openCreate={openCreate}
+                    activeCell={activeCell}
+                    rowActionsMenu={rowActionsMenu}
+                  />
+                )}
+                {section === "automations" && (
+                  <AutomationsSection
+                    automations={automations}
+                    openCreate={openCreate}
+                    rowCells={rowCells}
+                  />
+                )}
+              </>
+            )}
+          </AggregateReadOnlyGate>
         </VStack>
       </Box>
       <ConfirmDialog

@@ -1,4 +1,6 @@
 import { AnalyticsApi } from "@langwatch/analytics-contract";
+import { internalActor } from "@langwatch/authorization";
+import { AuthzApi } from "@langwatch/authz-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { DatasetApi } from "@langwatch/dataset-contract";
 import {
@@ -268,6 +270,8 @@ export class EvaluationModule implements EvaluationApiContract {
     datasets: DatasetApi,
     /** Answers a judge whose model is Instant Evals; a leaf, so no peer cycle (ADR-174 d. 13). */
     judges: InstantEvalJudgeApi,
+    /** Mints the own-only proof each evaluation_runs read is fenced by; a leaf (AGG-EVAL-PROOF). */
+    authz: AuthzApi,
   };
   static readonly secrets = {
     openAi: openAiApiKey,
@@ -512,6 +516,13 @@ export class EvaluationModule implements EvaluationApiContract {
           resolve: (tenantId) =>
             dependencies.retention.getResolvedForProject({ projectId: tenantId }),
         },
+        authorizeFoldRead: ({ projectId, purpose }) =>
+          dependencies.authz.authorizeInternal({
+            actor: internalActor("evaluation.fold-read"),
+            projectId,
+            permission: "traces:view",
+            purpose,
+          }),
       }),
     });
   }
@@ -548,6 +559,8 @@ export class EvaluationModule implements EvaluationApiContract {
         execution: members.execution,
         inputResolution: members.inputResolution,
         workflows: dependencies.workflows,
+        traces: dependencies.traces,
+        authz: dependencies.authz,
       }),
       dependencies,
       members,

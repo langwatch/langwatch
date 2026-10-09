@@ -12,8 +12,10 @@ import {
   type User,
   type FullyLoadedOrganization,
   type OrganizationWithMembersAndTheirTeams,
+  MemberNotFoundError,
   MemberSeatLimitReachedError,
 } from "@langwatch/organization-contract";
+import type { Instant } from "@langwatch/time";
 
 import type {
   AuditLogFilters,
@@ -29,6 +31,7 @@ import type { OrganizationGrantCeilingService } from "./organization-grant-ceili
 import {
   OrganizationMemberAdmissionService,
   type OrganizationAdmissions,
+  type OrganizationMemberChangeNotice,
   type PersonalWorkspaceArchiveNotice,
 } from "./organization-member-admission.service.ts";
 import type {
@@ -70,6 +73,7 @@ export class OrganizationMembershipService {
     testArrivals: OrganizationTestArrivals;
     admissions: OrganizationAdmissions;
     workspaceNotices: PersonalWorkspaceArchiveNotice;
+    memberNotices: OrganizationMemberChangeNotice;
     /** Authz's escalation rule, asked before a role change writes anything. */
     ceiling: Pick<OrganizationGrantCeilingService, "assertWithinCaller">;
   }): OrganizationMembershipService {
@@ -86,6 +90,7 @@ export class OrganizationMembershipService {
       testArrivals: OrganizationTestArrivals;
       admissions: OrganizationAdmissions;
       workspaceNotices: PersonalWorkspaceArchiveNotice;
+      memberNotices: OrganizationMemberChangeNotice;
       /** Authz's escalation rule, asked before a role change writes anything. */
       ceiling: Pick<OrganizationGrantCeilingService, "assertWithinCaller">;
     },
@@ -108,6 +113,19 @@ export class OrganizationMembershipService {
     teamId: string;
   }): Promise<OrganizationUserRole | null> {
     return this.repo.findUserOrgRoleByTeamId(params);
+  }
+
+  /** The person's organisation role, or null where they are not a member. */
+  async findOrganizationRole(params: {
+    organizationId: string;
+    userId: string;
+  }): Promise<OrganizationUserRole | null> {
+    try {
+      return (await this.repo.getMembership(params)).role;
+    } catch (error) {
+      if (error instanceof MemberNotFoundError) return null;
+      throw error;
+    }
   }
 
   /** Refuses a Lite Member's team-role change the organization has no seat for. */
@@ -253,18 +271,21 @@ export class OrganizationMembershipService {
     {
       userId: string;
       departmentId: string | null;
+      disabledAt: Instant | null;
       user: { name: string | null; email: string | null };
     }[]
   > {
     return this.repo.findMembersWithDepartments(input);
   }
 
-  assignMemberDepartment(input: {
+  async assignMemberDepartment(input: {
     organizationId: string;
     userId: string;
     departmentId: string | null;
   }): Promise<boolean> {
-    return this.repo.assignMemberDepartment(input);
+    if (!(await this.repo.assignMemberDepartment(input))) return false;
+    await this.dependencies.memberNotices.memberDepartmentChanged(input);
+    return true;
   }
 
   findTeamsWithDepartments(input: {

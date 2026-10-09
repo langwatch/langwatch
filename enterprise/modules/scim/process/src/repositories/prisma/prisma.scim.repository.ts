@@ -120,7 +120,7 @@ export class PrismaScimRepository extends ScimRepository {
   }
 
   // Arrow instance properties, not prototype methods, from here through
-  // `removeMembership`: the base class declares these members as properties
+  // `addMembership`: the base class declares these members as properties
   // of function type (so tests can reference a mock repository's methods
   // unbound without tripping `typescript/unbound-method`), and TypeScript
   // requires a subclass to match that declaration shape exactly (TS2425).
@@ -341,11 +341,6 @@ export class PrismaScimRepository extends ScimRepository {
   }): Promise<void> => {
     await this.prisma.organizationUser.create({
       data: { ...input, role: organizationUserRole(input.role) },
-    });
-  };
-  removeMembership = async (input: { organizationId: string; userId: string }): Promise<void> => {
-    await this.prisma.organizationUser.delete({
-      where: { userId_organizationId: input },
     });
   };
   async findDirectoryGroupIds(input: {

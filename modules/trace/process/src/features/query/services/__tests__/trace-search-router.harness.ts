@@ -4,16 +4,24 @@
  * put the router in.
  */
 
+import type { Authorization } from "@langwatch/authorization";
 import { HandledError } from "@langwatch/handled-error";
 import type { RouteSearchInput } from "@langwatch/trace-contract";
 import { vi, type Mock } from "vitest";
 
+import { ownProof } from "../../../../__tests__/support/authorization-proofs.fixture.ts";
 import type { TraceSearchRouterDeps } from "../trace-search-router.service.ts";
+
+/** The proof the route minted; every builder receives it alongside the project. */
+export const PROOF = ownProof({ projectId: "project-1" });
 
 export const RANGE = { from: 1_000_000, to: 1_000_000 + 24 * 3_600_000 };
 
-export const input = (overrides: Partial<RouteSearchInput> = {}): RouteSearchInput => ({
+export const input = (
+  overrides: Partial<RouteSearchInput> = {},
+): RouteSearchInput & { authorization: Authorization } => ({
   projectId: "project-1",
+  authorization: PROOF,
   text: "annoyed users",
   timeRange: RANGE,
   activeQuery: "",

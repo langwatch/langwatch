@@ -5,6 +5,7 @@
  */
 import { randomBytes } from "node:crypto";
 
+import { isAggregateProjectKind, NON_DESTINATION_PROJECT_KINDS } from "@langwatch/project-contract";
 import { nowInstant, type TimeInput } from "@langwatch/time";
 
 import type { McpOAuthClientRepository } from "../repositories/mcp-oauth-client.repository.ts";
@@ -35,6 +36,7 @@ export type McpApprover = Readonly<{ user: Readonly<{ id: string }> }>;
 type McpAuthorizeProject = Readonly<{
   id: string;
   organizationId: string;
+  kind: string;
   /** When the project was archived, in whatever shape the host holds one. */
   archivedAt: TimeInput | null;
 }>;
@@ -156,6 +158,13 @@ export class McpAuthorizationService {
     const project = await this.#reachableProject(request);
 
     if (!project) return { kind: "denied" };
+
+    // ADR-177 decision 7: the code carries the project's base key, and these kinds hold none.
+    if (NON_DESTINATION_PROJECT_KINDS.includes(project.kind)) {
+      return isAggregateProjectKind(project.kind)
+        ? { kind: "aggregate-project-has-no-credential" }
+        : { kind: "denied" };
+    }
 
     if (!this.#collaborators.codes.isAvailable()) return { kind: "unavailable" };
 

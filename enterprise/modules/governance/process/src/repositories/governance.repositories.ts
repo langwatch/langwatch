@@ -4,6 +4,7 @@ import type { GovernanceOcsfExportRow } from "@langwatch/enterprise-governance-c
 import type { Instant } from "@langwatch/time";
 
 import type { ActivityMonitorRepository } from "./activity-monitor.repository.ts";
+import type { AggregateReconcileLockRepository } from "./aggregate-reconcile-lock.repository.ts";
 import type { AiToolCatalogRepository } from "./ai-tool-catalog.repository.ts";
 import type { AnomalyRuleRepository } from "./anomaly-rule.repository.ts";
 import type {
@@ -130,6 +131,7 @@ export interface GovernanceOcsfEventWriter {
  */
 export interface GovernanceRepositories {
   readonly activityMonitor: ActivityMonitorRepository;
+  readonly aggregateReconcileLock: AggregateReconcileLockRepository;
   readonly aiTools: AiToolCatalogRepository;
   readonly anomalyRules: AnomalyRuleRepository;
   readonly costAttributionPolicies: CostAttributionPolicyRepository;

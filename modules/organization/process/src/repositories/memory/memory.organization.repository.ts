@@ -497,9 +497,10 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     });
   }
 
-  // shortcut: memory rows carry no project kind, so no governance project is excluded here.
+  // shortcut: memory rows carry no project kind, so `hiddenKinds` excludes nothing here.
   async findProjects(input: {
     organizationId: string;
+    hiddenKinds: readonly string[];
     teamId?: string;
     limit?: number;
   }): Promise<OrganizationTeamProject[]> {

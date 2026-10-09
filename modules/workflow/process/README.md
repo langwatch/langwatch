@@ -6,7 +6,7 @@ The server half of [workflow](../README.md). Workflows: definitions, graph versi
 
 ## Installation
 
-`defineProcessModule("workflow").withRepositories(workflowRepositories).withChannels(workflowChannels).withApi(WorkflowModule).withTransports(…, workflowTrpcTransport, workflowOptimizationTrpcTransport, workflowRunRest, workflowStudioRest, workflowExecuteSyncRest).withEventing(workflowNlpLambdaCleanupEventing).withEventing(workflowLifecycleEventing).withEventing(workflowAgentArchiveCascadeEventing).withTasks(…).withMigrations(…).withTransportFacts(…)`, `src/workflow.module.ts:25`.
+`defineProcessModule("workflow").withRepositories(workflowRepositories).withChannels(workflowChannels).withApi(WorkflowModule).withTransports(…, workflowTrpcTransport, workflowOptimizationTrpcTransport, workflowRunRest, workflowStudioRest, workflowExecuteSyncRest).withEventing(workflowNlpLambdaCleanupEventing).withEventing(workflowLifecycleEventing).withEventing(workflowAgentArchiveCascadeEventing).withTasks(…).withMigrations(…).withTransportFacts(…)`, `src/workflow.module.ts:30`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -193,7 +193,7 @@ completeCode(input: { projectId: string; body: WorkflowRestEnvelope; }): Promise
 The Studio editor's posted event, checked and prepared, answered as the engine's events. A `done` keeps the stream open one more second so a trailing frame still reaches the editor.
 
 ```typescript
-streamStudioEvent(input: { body: string; /** Absent when no one is signed in, which is refused. */ userId: string | undefined; }): Promise<AsyncIterable<StudioServerEvent>>;
+streamStudioEvent(input: { body: string; /** The signed-in user the door admitted with workflows:manage at the body's project. */ userId: string; }): Promise<AsyncIterable<StudioServerEvent>>;
 ```
 
 #### `postStudioEvent`
@@ -463,14 +463,14 @@ type Response = z.infer<typeof workflowRunAnswerSchema>; // ../contract/src/work
 
 |             |                                            |
 | ----------- | ------------------------------------------ |
-| Declared at | `src/transport/workflow-studio.rest.ts:25` |
+| Declared at | `src/transport/workflow-studio.rest.ts:19` |
 | Base URL    | none: each route's path is its address     |
 | Addressing  | literal                                    |
 | Credential  | browser                                    |
 
 #### `POST /api/workflows/code-completion` · `completeWorkflowCode`
 
-Permission `workflows:manage`. Declared at `src/transport/workflow-studio.rest.ts:31`.
+Permission `workflows:manage`. Declared at `src/transport/workflow-studio.rest.ts:25`.
 
 Answers at `/api/workflows/code-completion`.
 
@@ -491,13 +491,13 @@ interface Response {
 
 #### `POST /api/workflows/post_event` · `postWorkflowStudioEvent`
 
-Optional credential: the event door answers an invalid body 400 before it asks who is calling, as main did; the project it asks workflows:manage at is inside that body, so the app asks it after the check. Declared at `src/transport/workflow-studio.rest.ts:42`.
+Permission `workflows:manage`. Declared at `src/transport/workflow-studio.rest.ts:36`.
 
 Answers at `/api/workflows/post_event`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/workflow-studio.rest.ts:43)
-// Response: inline, src/transport/workflow-studio.rest.ts:46
+// Rawbody: "text" (inline, src/transport/workflow-studio.rest.ts:37)
+// Response: inline, src/transport/workflow-studio.rest.ts:44
 type Response = unknown;
 ```
 
@@ -881,8 +881,9 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                         | Environment variable                      | Declared at                             |
 | ------ | ---------------------------- | ----------------------------------------- | --------------------------------------- |
-| secret | `nlpLambdaFleet`             | `LANGWATCH_NLP_LAMBDA_CONFIG`             | `src/app/workflow.app.ts:493`           |
-| secret | `nlpInternal`                | `LANGWATCH_NLP_INTERNAL_SECRET`           | `src/app/workflow.app.ts:494`           |
+| secret | `nlpLambdaFleet`             | `LANGWATCH_NLP_LAMBDA_CONFIG`             | `src/app/workflow.app.ts:497`           |
+| secret | `nlpInternal`                | `LANGWATCH_NLP_INTERNAL_SECRET`           | `src/app/workflow.app.ts:498`           |
+| secret | `s3KeySalt`                  | `S3_KEY_SALT`                             | `src/app/workflow.app.ts:499`           |
 | config | `nlpServiceUrl`              | `LANGWATCH_NLP_SERVICE`                   | `../contract/src/workflow.config.ts:79` |
 | config | `stagingThresholdBytes`      | `LANGEVALS_STAGING_THRESHOLD_BYTES`       | `../contract/src/workflow.config.ts:81` |
 | config | `stagingTtlSeconds`          | `LANGEVALS_STAGING_TTL_SECONDS`           | `../contract/src/workflow.config.ts:82` |

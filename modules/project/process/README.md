@@ -6,13 +6,13 @@ The server half of [project](../README.md). Projects: finding them, their summar
 
 ## Installation
 
-`defineProcessModule("project").withRepositories(projectRepositories).withApi(ProjectModule).withTransports(projectRest, projectTrpcTransport).withEventing(projectLifecycleEventing).withTasks(…)`, `src/project.module.ts:14`.
+`defineProcessModule("project").withRepositories(projectRepositories).withApi(ProjectModule).withTransports(projectRest, projectTrpcTransport).withTransportFacts(…).withEventing(projectLifecycleEventing).withTasks(…)`, `src/project.module.ts:15`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
 ## Module API (`ProjectApi`)
 
-Peers call these through the token, declared at `../contract/src/project.api.ts:64`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/project.api.ts:71`; nothing else in this package is public.
 
 #### `listPaths`
 
@@ -22,10 +22,10 @@ listPaths(input: { projectIds: string[] }): Promise<ProjectPath[]>;
 
 #### `findProjectsWithDepartments`
 
-Every non-governance project with its department (main `department.service.ts:126-133`).
+Every non-governance project with its department, less `hiddenKinds` (main `department.service.ts:126-133`; callers pass `projectKindsHiddenFrom(role)`).
 
 ```typescript
-findProjectsWithDepartments(input: { organizationId: string; }): Promise<{ id: string; name: string; departmentId: string | null }[]>;
+findProjectsWithDepartments(input: { organizationId: string; hiddenKinds: readonly string[]; }): Promise<{ id: string; name: string; departmentId: string | null }[]>;
 ```
 
 #### `assignProjectDepartment`
@@ -87,7 +87,7 @@ findWithTeam(id: string): Promise<ProjectWithTeam | null>;
 #### `listByOrganization`
 
 ```typescript
-listByOrganization(input: { organizationId: string; page: number; limit: number; projectIds?: string[]; /** The organization's hidden governance project is left out unless this is true. */ includeGovernance?: boolean; }): Promise<PaginatedProjects>;
+listByOrganization(input: { organizationId: string; page: number; limit: number; projectIds?: string[]; /** The organization's hidden governance project is left out unless this is true. */ includeGovernance?: boolean; /** Kinds left out as well, e.g. `projectKindsHiddenFrom(role)` for a non-admin caller. */ hiddenKinds?: ProjectKind[]; }): Promise<PaginatedProjects>;
 ```
 
 #### `listByTeam`
@@ -135,7 +135,7 @@ findLiveByRef(input: Readonly<{ projectRef: string; organizationId: string }>): 
 #### `create`
 
 ```typescript
-create(input: Readonly<{ organizationId: string; teamId?: string | undefined; newTeamName?: string | undefined; name: string; language: string; framework: string; }>, by: Readonly<{ id: string }>): Promise<Project>;
+create(input: Readonly<{ organizationId: string; teamId?: string | undefined; newTeamName?: string | undefined; name: string; language: string; framework: string; /** ADR-177: `"aggregate"` reads its members through grants; organisation admins only. */ kind?: "application" | "aggregate" | undefined; /** Only read for an aggregate; defaults to `AGGREGATE_DEFAULT_RULE`. */ aggregateRule?: AggregateRule | undefined; }>, by: Readonly<{ id: string }>): Promise<Project>;
 ```
 
 #### `createInOrganization`
@@ -316,32 +316,80 @@ Every project with its organisation, paged like `listAllIds`, for the storage mi
 listAllWithOrganization(input?: ProjectIdPageInput): Promise<ProjectOrganizationPage>;
 ```
 
+#### `findAggregate`
+
+ADR-177: the aggregate with this id, or nothing when no aggregate project has it.
+
+```typescript
+findAggregate(input: { aggregateProjectId: string }): Promise<StoredAggregateProject[]>;
+```
+
+#### `findLiveAggregateIds`
+
+ADR-177: the organisation's live aggregates, ordered by id.
+
+```typescript
+findLiveAggregateIds(input: { organizationId: string }): Promise<string[]>;
+```
+
+#### `findAllLiveAggregates`
+
+ADR-177: every live aggregate in every organisation, ordered by id, for the sweep.
+
+```typescript
+findAllLiveAggregates(): Promise<LiveAggregate[]>;
+```
+
+#### `findPersonalProjectIds`
+
+ADR-177: live personal projects an aggregate may read, ordered by id; with `ownerUserIds`, only theirs (governance resolves a department to its members).
+
+```typescript
+findPersonalProjectIds(input: { organizationId: string; ownerUserIds?: readonly string[]; }): Promise<string[]>;
+```
+
+#### `findReadableProjectIds`
+
+ADR-177: of `projectIds`, the live ones of this organisation an aggregate may read.
+
+```typescript
+findReadableProjectIds(input: { organizationId: string; projectIds: readonly string[]; }): Promise<string[]>;
+```
+
+#### `findCandidateMembers`
+
+ADR-177: every project an explicit rule may name, with its owner, ordered by name.
+
+```typescript
+findCandidateMembers(input: { organizationId: string }): Promise<AggregateMemberCandidate[]>;
+```
+
 ## REST transport
 
 ### `projectRest`
 
-|             |                                    |
-| ----------- | ---------------------------------- |
-| Declared at | `src/transport/project.rest.ts:91` |
-| Base URL    | `/api/projects`                    |
-| Addressing  | dated                              |
-| Credential  | organization                       |
-| Versions    | `2026-08-07`                       |
+|             |                                     |
+| ----------- | ----------------------------------- |
+| Declared at | `src/transport/project.rest.ts:103` |
+| Base URL    | `/api/projects`                     |
+| Addressing  | dated                               |
+| Credential  | organization                        |
+| Versions    | `2026-08-07`                        |
 
 #### `GET /:id` · `getProject`
 
 Get a project
 
-Permission `project:view`. Declared at `src/transport/project.rest.ts:98`.
+Permission `project:view`. Declared at `src/transport/project.rest.ts:110`.
 
 Answers at `/api/projects/:id`; also, undocumented, `/api/projects/2026-08-07/:id`, `/api/projects/latest/:id`.
 
 ```typescript
-// Params: projectRestParamsSchema, ../contract/src/project.ts:279
+// Params: projectRestParamsSchema, ../contract/src/project.ts:292
 interface Params {
   id: string;
 }
-// Response: projectRestDetailSchema, ../contract/src/project.responses.ts:66
+// Response: projectRestDetailSchema, ../contract/src/project.responses.ts:71
 interface Response {
   id: string;
   name: string;
@@ -359,13 +407,13 @@ interface Response {
 
 Update a project
 
-Permission `project:update`. Declared at `src/transport/project.rest.ts:116`.
+Permission `project:update`. Declared at `src/transport/project.rest.ts:134`.
 
 Answers at `/api/projects/:id`; also, undocumented, `/api/projects/2026-08-07/:id`, `/api/projects/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project.ts:279
-// Body: projectRestUpdateSchema, ../contract/src/project.ts:269
+type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project.ts:292
+// Body: projectRestUpdateSchema, ../contract/src/project.ts:282
 interface Body {
   name?: string;
   language?: string;
@@ -373,20 +421,20 @@ interface Body {
   teamId?: string;
   piiRedactionLevel?: "STRICT" | "ESSENTIAL" | "DISABLED";
 }
-type Response = z.infer<typeof projectRestDetailSchema>; // ../contract/src/project.responses.ts:66
+type Response = z.infer<typeof projectRestDetailSchema>; // ../contract/src/project.responses.ts:71
 ```
 
 #### `DELETE /:id` · `archiveProject`
 
 Archive a project
 
-Permission `project:delete`. Declared at `src/transport/project.rest.ts:133`.
+Permission `project:delete`. Declared at `src/transport/project.rest.ts:156`.
 
 Answers at `/api/projects/:id`; also, undocumented, `/api/projects/2026-08-07/:id`, `/api/projects/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project.ts:279
-// Response: projectRestArchivedSchema, ../contract/src/project.responses.ts:72
+type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project.ts:292
+// Response: projectRestArchivedSchema, ../contract/src/project.responses.ts:77
 interface Response {
   id: string;
   name: string;
@@ -398,13 +446,13 @@ interface Response {
 
 Get the project API key
 
-Authenticated: the base key is never handed to an API token, so there is no permission that would grant this and the refusal is the answer for every authenticated caller. Declared at `src/transport/project.rest.ts:155`.
+Authenticated: the base key is never handed to an API token, so there is no permission that would grant this and the refusal is the answer for every authenticated caller. Declared at `src/transport/project.rest.ts:180`.
 
 Answers at `/api/projects/:id/api-key`; also, undocumented, `/api/projects/2026-08-07/:id/api-key`, `/api/projects/latest/:id/api-key`.
 
 ```typescript
-type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project.ts:279
-// Response: projectApiKeyRotationSchema, ../contract/src/project.responses.ts:30
+type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project.ts:292
+// Response: projectApiKeyRotationSchema, ../contract/src/project.responses.ts:35
 interface Response {
   apiKey: string;
 }
@@ -414,92 +462,116 @@ interface Response {
 
 Regenerate the project API key
 
-Authenticated: the base key is never handed to an API token, so there is no permission that would grant this and the refusal is the answer for every authenticated caller. Declared at `src/transport/project.rest.ts:174`.
+Authenticated: the base key is never handed to an API token, so there is no permission that would grant this and the refusal is the answer for every authenticated caller. Declared at `src/transport/project.rest.ts:199`.
 
 Answers at `/api/projects/:id/regenerate-api-key`; also, undocumented, `/api/projects/2026-08-07/:id/regenerate-api-key`, `/api/projects/latest/:id/regenerate-api-key`.
 
 ```typescript
-type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project.ts:279
-// Body: projectRestRegenerateApiKeyInputSchema, ../contract/src/project.ts:282
+type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project.ts:292
+// Body: projectRestRegenerateApiKeyInputSchema, ../contract/src/project.ts:295
 type Body = Record<string, unknown>;
-type Response = z.infer<typeof projectApiKeyRotationSchema>; // ../contract/src/project.responses.ts:30
+type Response = z.infer<typeof projectApiKeyRotationSchema>; // ../contract/src/project.responses.ts:35
 ```
 
 ## tRPC transport
 
 ### `project`
 
-Contract `../contract/src/project.trpc.ts:24`, router `src/transport/project.trpc.ts:64`.
+Contract `../contract/src/project.trpc.ts:28`, router `src/transport/project.trpc.ts:80`.
 
-| Procedure                     | Kind     | Gate                                                                                                                                                                                                                                                                | Input                           | Output                         |
-| ----------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- | ------------------------------ |
-| `project.create`              | mutation | Service-authorized: project:create, organization:manage; creating INTO a team asks that team for project:create; creating a team alongside asks the organization for organization:manage, and which of the two was asked for is only known once the input is parsed | `projectCreateInputSchema`      | `projectProvisionedSchema`     |
-| `project.getHasFirstMessage`  | query    | Permission `project:view`                                                                                                                                                                                                                                           | `projectScopeSchema`            | `projectFirstMessageSchema`    |
-| `project.getLegacyKeyStatus`  | query    | Permission `project:manage`                                                                                                                                                                                                                                         | `projectScopeSchema`            | `projectLegacyKeyStatusSchema` |
-| `project.revokeProjectApiKey` | mutation | Permission `project:manage`                                                                                                                                                                                                                                         | `projectScopeSchema`            | `projectApiKeyRevokedSchema`   |
-| `project.update`              | mutation | Permission `project:update`                                                                                                                                                                                                                                         | `projectUpdateInputSchema`      | `projectSettingsSavedSchema`   |
-| `project.archiveById`         | mutation | Permission `project:delete`                                                                                                                                                                                                                                         | `projectArchiveByIdInputSchema` | `projectArchivedSchema`        |
+| Procedure                           | Kind     | Gate                                                                                                                                                                                                                                                                | Input                                         | Output                                   |
+| ----------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- | ---------------------------------------- |
+| `project.create`                    | mutation | Service-authorized: project:create, organization:manage; creating INTO a team asks that team for project:create; creating a team alongside asks the organization for organization:manage, and which of the two was asked for is only known once the input is parsed | `projectCreateInputSchema`                    | `projectProvisionedSchema`               |
+| `project.getHasFirstMessage`        | query    | Permission `project:view`                                                                                                                                                                                                                                           | `projectScopeSchema`                          | `projectFirstMessageSchema`              |
+| `project.getLegacyKeyStatus`        | query    | Permission `project:manage`                                                                                                                                                                                                                                         | `projectScopeSchema`                          | `projectLegacyKeyStatusSchema`           |
+| `project.revokeProjectApiKey`       | mutation | Permission `project:manage`                                                                                                                                                                                                                                         | `projectScopeSchema`                          | `projectApiKeyRevokedSchema`             |
+| `project.update`                    | mutation | Permission `project:update`                                                                                                                                                                                                                                         | `projectUpdateInputSchema`                    | `projectSettingsSavedSchema`             |
+| `project.archiveById`               | mutation | Permission `project:delete`                                                                                                                                                                                                                                         | `projectArchiveByIdInputSchema`               | `projectArchivedSchema`                  |
+| `project.updateAggregateRule`       | mutation | Permission `organization:manage`                                                                                                                                                                                                                                    | `projectUpdateAggregateRuleInputSchema`       | `projectAggregateRuleUpdatedSchema`      |
+| `project.aggregateMemberCandidates` | query    | Permission `organization:manage`                                                                                                                                                                                                                                    | `projectAggregateMemberCandidatesInputSchema` | `projectAggregateMemberCandidatesSchema` |
 
 ```typescript
 // project.create
-// Input: projectCreateInputSchema, ../contract/src/project-trpc.schemas.ts:17
-interface Input {
-  organizationId: string;
-  teamId?: string;
-  newTeamName?: string;
-  name: string;
-  language: string;
-  framework: string;
-}
-// Output: projectProvisionedSchema, ../contract/src/project.responses.ts:14
+type Input = z.infer<typeof projectCreateInputSchema>; // ../contract/src/project-trpc.schemas.ts:20
+// Output: projectProvisionedSchema, ../contract/src/project.responses.ts:19
 interface Output {
   success: true;
   projectSlug: string;
 }
 
 // project.getHasFirstMessage
-// Input: projectScopeSchema, ../contract/src/project-trpc.schemas.ts:9
+// Input: projectScopeSchema, ../contract/src/project-trpc.schemas.ts:12
 interface Input {
   projectId: string;
 }
-// Output: projectFirstMessageSchema, ../contract/src/project.responses.ts:26
+// Output: projectFirstMessageSchema, ../contract/src/project.responses.ts:31
 interface Output {
   firstMessage: boolean;
 }
 
 // project.getLegacyKeyStatus
-type Input = z.infer<typeof projectScopeSchema>; // ../contract/src/project-trpc.schemas.ts:9
-// Output: projectLegacyKeyStatusSchema, ../contract/src/project.responses.ts:34
+type Input = z.infer<typeof projectScopeSchema>; // ../contract/src/project-trpc.schemas.ts:12
+// Output: projectLegacyKeyStatusSchema, ../contract/src/project.responses.ts:39
 interface Output {
   present: boolean;
 }
 
 // project.revokeProjectApiKey
-type Input = z.infer<typeof projectScopeSchema>; // ../contract/src/project-trpc.schemas.ts:9
-// Output: projectApiKeyRevokedSchema, ../contract/src/project.responses.ts:38
+type Input = z.infer<typeof projectScopeSchema>; // ../contract/src/project-trpc.schemas.ts:12
+// Output: projectApiKeyRevokedSchema, ../contract/src/project.responses.ts:43
 interface Output {
   revoked: true;
 }
 
 // project.update
-type Input = z.infer<typeof projectUpdateInputSchema>; // ../contract/src/project-trpc.schemas.ts:31
-// Output: projectSettingsSavedSchema, ../contract/src/project.responses.ts:20
+type Input = z.infer<typeof projectUpdateInputSchema>; // ../contract/src/project-trpc.schemas.ts:37
+// Output: projectSettingsSavedSchema, ../contract/src/project.responses.ts:25
 interface Output {
   success: boolean;
   projectSlug: string;
 }
 
 // project.archiveById
-// Input: projectArchiveByIdInputSchema, ../contract/src/project-trpc.schemas.ts:56
+// Input: projectArchiveByIdInputSchema, ../contract/src/project-trpc.schemas.ts:62
 interface Input {
   projectId: string;
   projectToArchiveId: string;
 }
-// Output: projectArchivedSchema, ../contract/src/project.responses.ts:42
+// Output: projectArchivedSchema, ../contract/src/project.responses.ts:47
 interface Output {
   success: true;
   alreadyArchived: boolean;
 }
+
+// project.updateAggregateRule
+type Input = z.infer<typeof projectUpdateAggregateRuleInputSchema>; // ../contract/src/project-trpc.schemas.ts:69
+// Output: projectAggregateRuleUpdatedSchema, ../contract/src/project.responses.ts:87
+interface Output {
+  success: true;
+  members: {
+    attached: string[];
+    revoked: string[];
+    unchanged: string[];
+    failed: string[];
+    pending: string[];
+  };
+}
+
+// project.aggregateMemberCandidates
+// Input: projectAggregateMemberCandidatesInputSchema, ../contract/src/project-trpc.schemas.ts:76
+interface Input {
+  organizationId: string;
+}
+// Output: projectAggregateMemberCandidatesSchema, ../contract/src/project.responses.ts:93
+type Output = {
+  id: string;
+  name: string;
+  isPersonal: boolean;
+  owner: {
+    name: string | null;
+    email: string | null;
+  } | null;
+}[];
 ```
 
 ## Sockets
@@ -510,17 +582,19 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `project_lifecycle` (aggregate `project`)
 
-Declared at `src/eventing/project-lifecycle.pipeline.ts:47`. Events: `projectCreatedEventSchema`, `projectLegacyKeyRevokedEventSchema`, `projectPresenceSettingChangedEventSchema`, `projectMovedEventSchema`, `projectArchivedEventSchema`, `projectDepartmentAssignedEventSchema`, `projectTraceSharingDisabledEventSchema`.
+Declared at `src/eventing/project-lifecycle.pipeline.ts:51`. Events: `projectCreatedEventSchema`, `projectLegacyKeyRevokedEventSchema`, `projectPresenceSettingChangedEventSchema`, `projectMovedEventSchema`, `projectArchivedEventSchema`, `projectDepartmentAssignedEventSchema`, `projectTraceSharingDisabledEventSchema`, `projectAggregateRuleChangedEventSchema`, `projectRevivedEventSchema`.
 
 | Kind    | Name                                | Handles | Declared at                                     |
 | ------- | ----------------------------------- | ------- | ----------------------------------------------- |
-| command | `recordProjectCreated`              | –       | `src/eventing/project-lifecycle.pipeline.ts:60` |
-| command | `recordProjectLegacyKeyRevoked`     | –       | `src/eventing/project-lifecycle.pipeline.ts:61` |
-| command | `recordPresenceSettingChanged`      | –       | `src/eventing/project-lifecycle.pipeline.ts:62` |
-| command | `recordProjectMoved`                | –       | `src/eventing/project-lifecycle.pipeline.ts:63` |
-| command | `recordProjectArchived`             | –       | `src/eventing/project-lifecycle.pipeline.ts:64` |
-| command | `recordProjectDepartmentAssigned`   | –       | `src/eventing/project-lifecycle.pipeline.ts:65` |
-| command | `recordProjectTraceSharingDisabled` | –       | `src/eventing/project-lifecycle.pipeline.ts:66` |
+| command | `recordProjectCreated`              | –       | `src/eventing/project-lifecycle.pipeline.ts:66` |
+| command | `recordProjectLegacyKeyRevoked`     | –       | `src/eventing/project-lifecycle.pipeline.ts:67` |
+| command | `recordPresenceSettingChanged`      | –       | `src/eventing/project-lifecycle.pipeline.ts:68` |
+| command | `recordProjectMoved`                | –       | `src/eventing/project-lifecycle.pipeline.ts:69` |
+| command | `recordProjectArchived`             | –       | `src/eventing/project-lifecycle.pipeline.ts:70` |
+| command | `recordProjectDepartmentAssigned`   | –       | `src/eventing/project-lifecycle.pipeline.ts:71` |
+| command | `recordProjectTraceSharingDisabled` | –       | `src/eventing/project-lifecycle.pipeline.ts:72` |
+| command | `recordProjectAggregateRuleChanged` | –       | `src/eventing/project-lifecycle.pipeline.ts:73` |
+| command | `recordProjectRevived`              | –       | `src/eventing/project-lifecycle.pipeline.ts:74` |
 
 ### Tasks
 

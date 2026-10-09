@@ -10,6 +10,8 @@ export type UiHostProject = {
   id: string;
   name: string;
   slug: string;
+  /** The project's kind (`application`, `aggregate`, ...), when the host has read it. */
+  kind?: string;
   /** A Mustache template turning a `user_id` into a link, when the project set one. */
   userLinkTemplate?: string | null;
 };

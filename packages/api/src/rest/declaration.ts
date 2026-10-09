@@ -5,11 +5,13 @@
  */
 import type {
   Actor,
+  Authorization,
   AuthzDeclaredScopeId,
   AuthzPermission,
   CliTokenActor,
   PlatformTierPermission,
   ScopeTierField,
+  ProofBearingPermission,
 } from "@langwatch/authorization";
 import type { ModuleApiToken, ModuleName } from "@langwatch/module";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
@@ -249,6 +251,10 @@ type SessionArguments<Session extends RouteSession> = Session extends z.ZodType
 type KeyArguments<Key extends boolean> = Key extends true
   ? { readonly key: RestKeyCredential }
   : unknown;
+/** A route that declared a proof-bearing permission is handed the door's proof, never null. */
+type ProofArguments<Proof extends boolean> = Proof extends true
+  ? { readonly authorization: Authorization }
+  : unknown;
 /**
  * What a route's own door may be told: the session it hands, whether the handler reads the key
  * (key doors only, E5), and the key kinds it admits (the project door only, E7).
@@ -334,6 +340,7 @@ export type StoredHandlerArguments<Api> = Readonly<{
   actor: Actor | null;
   scope: AuthzDeclaredScopeId | null;
   target: AuthzDeclaredScopeId | null;
+  authorization: Authorization | null;
   /** The door's session parsed against the route's schema; undefined when it declared none. */
   session: unknown;
   /** The key the door resolved, for a route that declared it reads it; undefined elsewhere. */
@@ -495,7 +502,8 @@ type RawResponseArguments<Output extends RouteAnswer> = Output extends RestRawAn
  */
 export type RestPermissionTarget =
   | Readonly<{ at: "route"; param: ScopeTierField; field?: string }>
-  | Readonly<{ at: "header"; param: ScopeTierField; header: string }>;
+  | Readonly<{ at: "header"; param: ScopeTierField; header: string }>
+  | Readonly<{ at: "body"; param: ScopeTierField; schema: z.ZodObject; field?: string }>;
 
 /** A platform-tier permission asked of the operator's PLATFORM grant (E4). */
 export type RestPermissionPlatform = PlatformPermissionTarget;
@@ -704,6 +712,8 @@ type RouteShape = Readonly<{
   answer: RouteAnswer;
   /** Whether the route has said how it is reached - a permission or an access kind. */
   permission: boolean;
+  /** Whether that permission mints the proof the handler is handed (ADR-166). */
+  proof: boolean;
   middleware: readonly RestTransportMiddleware[];
   access: RouteAccessKind;
   /** The family's door, which a route may narrow to its own. */
@@ -1040,6 +1050,11 @@ class RouteBuilder<Api, S extends RouteShape> {
     });
   }
 
+  /** A proof-bearing permission: the door mints the proof and the handler is handed it. */
+  withPermission(
+    permission: ProofBearingPermission,
+    target?: RestPermissionTarget,
+  ): RouteBuilder<Api, With<S, { permission: true; proof: true }>>;
   /**
    * The permission this route demands, and where it is asked. `{ at: "route", param }` asks at
    * the scope the route's own path names, for a credential one tier wider than the resource.
@@ -1380,6 +1395,7 @@ class RouteBuilder<Api, S extends RouteShape> {
         S["session"]
       > &
         KeyArguments<S["key"]> &
+        ProofArguments<S["proof"]> &
         RawBodyArguments<S["body"]> &
         MultipartArguments<S["body"]> &
         RawResponseArguments<S["answer"]> &
@@ -1647,6 +1663,7 @@ type OpenRoute<
     query: Missing;
     answer: Missing;
     permission: false;
+    proof: false;
     middleware: [];
     access: "scoped";
     family: Door;
@@ -2419,6 +2436,7 @@ function assertPermissionTarget({
     params?: z.ZodObject;
     query?: z.ZodObject;
     input?: SourceSchema;
+    rawBody?: RestRawBody;
     permissionTarget?: RestPermissionTarget;
     middleware?: readonly RestTransportMiddleware[];
   }>;
@@ -2437,6 +2455,19 @@ function assertPermissionTarget({
     if (!declared)
       throw new Error(
         `REST ${operation} checks header "${target.header}" without declaring it withHeaders()`,
+      );
+
+    return;
+  }
+
+  // A raw JSON body is validated against the location's own schema, after the door (§8).
+  if (target.at === "body") {
+    const field = target.field ?? param;
+
+    if (state.rawBody?.form !== "text" || !sourceKeys(target.schema).includes(field))
+      throw new Error(
+        `REST ${operation} checks its permission at the body's "${field}" and needs a raw text ` +
+          "body and a schema that parses that field",
       );
 
     return;

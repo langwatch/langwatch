@@ -13,6 +13,8 @@ export type EvaluationProjectScope = z.infer<typeof evaluationProjectScopeSchema
 export const evaluationInputsInputSchema = z.object({
   projectId: z.string(),
   evaluationId: z.string(),
+  /** On an aggregate, the member the drawer is on, which holds the evaluation. */
+  tenantId: z.string().min(1).optional(),
 });
 
 /** What an evaluation was run over, offloaded inputs resolved; null when none are stored. */

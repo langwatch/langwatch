@@ -41,7 +41,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "@langwatch/prisma-client/generated";
-import { fromDate } from "@langwatch/time";
+import { fromDate, type Instant } from "@langwatch/time";
 
 import {
   DEVELOPER_ADMISSION_AUDIT_ACTION,
@@ -1499,13 +1499,20 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     {
       userId: string;
       departmentId: string | null;
+      disabledAt: Instant | null;
       user: { name: string | null; email: string | null };
     }[]
   > {
-    return this.prisma.organizationUser.findMany({
+    const rows = await this.prisma.organizationUser.findMany({
       where: { organizationId },
-      select: { userId: true, departmentId: true, user: { select: { name: true, email: true } } },
+      select: {
+        userId: true,
+        departmentId: true,
+        disabledAt: true,
+        user: { select: { name: true, email: true } },
+      },
     });
+    return rows.map((row) => ({ ...row, disabledAt: row.disabledAt && fromDate(row.disabledAt) }));
   }
 
   async assignMemberDepartment(input: {

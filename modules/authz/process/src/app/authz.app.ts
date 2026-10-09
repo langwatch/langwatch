@@ -1,4 +1,4 @@
-import { type AuthzPermission } from "@langwatch/authorization";
+import { type AuthzPermission, isAggregateProjectKind } from "@langwatch/authorization";
 import {
   AuthzApi as AuthzApiToken,
   authzBrowserConfig,
@@ -24,11 +24,22 @@ import {
   PLATFORM_OPERATOR_PERMISSIONS,
   newAuthzGrantId,
 } from "@langwatch/authz-contract";
+import type { EventingCommandSender } from "@langwatch/eventing";
 import type { FeatureSetup } from "@langwatch/process";
 import type { SystemMigration } from "@langwatch/system-migrations";
 
+import type { RecordAggregateReadCommandData } from "../eventing/authz-aggregate-read.events.ts";
+import {
+  type AuthzAggregateReadDefinition,
+  buildAuthzAggregateReadPipeline,
+} from "../eventing/authz-aggregate-read.pipeline.ts";
 import { type AuthzGrantPipeline, EventingAuthzAdapter } from "../eventing/authz-grant.pipeline.ts";
 import { EventingAuthzLedgerAdapter } from "../eventing/authz-grant.store.ts";
+import type { RecordMemberOffboardedCommandData } from "../eventing/authz-member-offboarded.events.ts";
+import {
+  type AuthzMemberOffboardedDefinition,
+  buildAuthzMemberOffboardedPipeline,
+} from "../eventing/authz-member-offboarded.pipeline.ts";
 import {
   type AttachGrantLedgerInput,
   type AuthzEngineLedger,
@@ -42,6 +53,7 @@ import type { AuthzRepositories } from "../repositories/authz.repositories.ts";
 import { EventingAuthzGrantRepository } from "../repositories/eventing/eventing.authz-grant.repository.ts";
 import { bindingWire } from "../rules/role-binding-read-back.rules.ts";
 import { AuthzAdmissionService } from "../services/authz-admission.service.ts";
+import { AuthzAggregateReadAuditService } from "../services/authz-aggregate-read-audit.service.ts";
 import { AuthzCutoverGateService } from "../services/authz-cutover-gate.service.ts";
 import { AuthzGrantIdentityService } from "../services/authz-grant-identity.service.ts";
 import {
@@ -49,6 +61,7 @@ import {
   AuthzCommandDispatcherService,
 } from "../services/authz-grants-command-dispatcher.service.ts";
 import { AuthzGrantsService as AuthzGrantWriteService } from "../services/authz-grants.service.ts";
+import { AuthzMemberOffboardedNoticeService } from "../services/authz-member-offboarded-notice.service.ts";
 import { AuthzPlatformOperatorsService } from "../services/authz-platform-operators.service.ts";
 import { AuthzSessionVersionService } from "../services/authz-session-version.service.ts";
 import { AuthzUserStandingService } from "../services/authz-user-standing.service.ts";
@@ -67,6 +80,10 @@ export interface AuthzCompatibilityLedger {
   ): Promise<AuthzAttachBindingsOutput>;
   attachResourceGrant(args: AuthzAttachResourceGrantInput): Promise<void>;
   revokeResourceGrants(args: AuthzRevokeResourceGrantsInput): Promise<void>;
+  findLiveSharedProjectGrants: AuthzApi["findLiveSharedProjectGrants"];
+  attachSharedProjectGrant: AuthzApi["attachSharedProjectGrant"];
+  awaitSharedProjectGrants: AuthzApi["awaitSharedProjectGrants"];
+  revokeSharedProjectGrants: AuthzApi["revokeSharedProjectGrants"];
   changeBindingRole(args: Omit<AuthzChangeBindingRoleInput, "caller">): Promise<void>;
   revokeBindings(args: AuthzRevokeBindingsInput): Promise<void>;
   revokeBindingsWhere(args: AuthzRevokeBindingsWhereInput): Promise<AuthzRevokeBindingsWhereOutput>;
@@ -157,6 +174,10 @@ export class AuthzModule implements AuthzApi {
    * Absent on an app built by {@link AuthzModule.fromServices}, which composes no platform tier.
    */
   #platformOperators: AuthzPlatformOperatorsService | undefined;
+  /** Absent on an app built by {@link AuthzModule.fromServices}, which audits no aggregate read. */
+  #aggregateReads: AuthzAggregateReadAuditService | undefined;
+  /** Absent on an app built by {@link AuthzModule.fromServices}, which records no offboarding. */
+  #memberOffboardings: AuthzMemberOffboardedNoticeService | undefined;
 
   private constructor(
     permissions: AuthzPermissions,
@@ -169,6 +190,8 @@ export class AuthzModule implements AuthzApi {
       memberships?: AuthzPermissionService;
       sessionVersions?: AuthzSessionVersionService;
       platformOperators?: AuthzPlatformOperatorsService;
+      aggregateReads?: AuthzAggregateReadAuditService;
+      memberOffboardings?: AuthzMemberOffboardedNoticeService;
       eventing?: Readonly<{
         pipeline: AuthzPipeline;
         dispatcher: AuthzCommandDispatcherService;
@@ -186,6 +209,34 @@ export class AuthzModule implements AuthzApi {
     this.#migration = options.migration;
     this.#sessionVersions = options.sessionVersions;
     this.#platformOperators = options.platformOperators;
+    this.#aggregateReads = options.aggregateReads;
+    this.#memberOffboardings = options.memberOffboardings;
+  }
+
+  /** authz_aggregate_read: authz records the fact, governance writes the audit row (§9). */
+  aggregateReadPipeline(): AuthzAggregateReadDefinition {
+    return buildAuthzAggregateReadPipeline();
+  }
+
+  connectAggregateRead(
+    commands: Readonly<{
+      recordAggregateRead: EventingCommandSender<RecordAggregateReadCommandData>;
+    }>,
+  ): void {
+    this.#aggregateReads?.connect(commands.recordAggregateRead);
+  }
+
+  /** authz_member_offboarded: authz records the fact, organization records the removal (§9). */
+  memberOffboardedPipeline(): AuthzMemberOffboardedDefinition {
+    return buildAuthzMemberOffboardedPipeline();
+  }
+
+  connectMemberOffboarded(
+    commands: Readonly<{
+      recordMemberOffboarded: EventingCommandSender<RecordMemberOffboardedCommandData>;
+    }>,
+  ): void {
+    this.#memberOffboardings?.connect(commands.recordMemberOffboarded);
   }
 
   /**
@@ -214,6 +265,7 @@ export class AuthzModule implements AuthzApi {
     const cutover = AuthzCutoverGateService.create({ repository: repositories.cutover });
     const ledger = EventingAuthzLedgerAdapter.create({
       reads: repositories.ledgerReads,
+      lineage: repositories.read,
       dispatcher,
       epoch,
       revocation: repositories.revocation,
@@ -229,6 +281,8 @@ export class AuthzModule implements AuthzApi {
       standings: repositories.userStandings,
       platformOperators,
     });
+    const aggregateReads = AuthzAggregateReadAuditService.create();
+    const memberOffboardings = AuthzMemberOffboardedNoticeService.create();
     // Migration completion still answers compatibility writes and legacy
     // API-key adoption; every decision and listing reads the grants head.
     const permissions = AuthzPermissionService.create({
@@ -242,6 +296,7 @@ export class AuthzModule implements AuthzApi {
       platformOperators,
       cacheEnabled: config.cacheEnabled,
       demoProjectId: config.demoProjectId,
+      aggregateReads,
     });
     const grants = AuthzGrantWriteService.create({
       repository: EventingAuthzGrantRepository.create({
@@ -254,6 +309,7 @@ export class AuthzModule implements AuthzApi {
       ledger,
       bindings: repositories.bindings,
       permissions,
+      offboarded: memberOffboardings,
     });
     const sessionVersions = AuthzSessionVersionService.create({
       versions: repositories.sessionVersions,
@@ -280,6 +336,8 @@ export class AuthzModule implements AuthzApi {
       memberships: permissions,
       sessionVersions,
       platformOperators,
+      aggregateReads,
+      memberOffboardings,
       eventing: { pipeline, dispatcher },
     });
   }
@@ -329,6 +387,17 @@ export class AuthzModule implements AuthzApi {
       }
       throw error;
     }
+    // ADR-177 decision 5: only an organisation admin opens an aggregate; the role is read only here.
+    if (scope.type === "project" && isAggregateProjectKind(scope.kind)) {
+      const { organizationRole } = await this.#permissions.getDecision({
+        userId: by.id,
+        permission: "project:view",
+        scope: { tier: "project", id: scope.id },
+      });
+      if (organizationRole !== "ADMIN") {
+        return { scope: { type: scope.type, id: scope.id }, permissions: [] };
+      }
+    }
     const [scoped, platform] = await Promise.all([
       this.effectivePermissions({ principal: { type: "user", id: by.id }, scope }),
       this.platformPermissionsOf(by),
@@ -357,6 +426,7 @@ export class AuthzModule implements AuthzApi {
   checkDetailed: AuthzApi["checkDetailed"] = (a) => this.#permissions.checkDetailed(a);
   can: AuthzApi["can"] = (a) => this.#permissions.can(a);
   authorize: AuthzApi["authorize"] = (a) => this.#permissions.authorize(a);
+  authorizeInternal: AuthzApi["authorizeInternal"] = (a) => this.#permissions.authorizeInternal(a);
   effectivePermissions: AuthzApi["effectivePermissions"] = (a) =>
     this.#permissions.effectivePermissions(a);
   checkByIds: AuthzApi["checkByIds"] = (a) => this.#permissions.checkByIds(a);
@@ -452,6 +522,14 @@ export class AuthzModule implements AuthzApi {
   attachResourceGrant: AuthzApi["attachResourceGrant"] = (a) => this.#grants.attachResourceGrant(a);
   revokeResourceGrants: AuthzApi["revokeResourceGrants"] = (a) =>
     this.#grants.revokeResourceGrants(a);
+  findLiveSharedProjectGrants: AuthzApi["findLiveSharedProjectGrants"] = (a) =>
+    this.#grants.findLiveSharedProjectGrants(a);
+  attachSharedProjectGrant: AuthzApi["attachSharedProjectGrant"] = (a) =>
+    this.#grants.attachSharedProjectGrant(a);
+  awaitSharedProjectGrants: AuthzApi["awaitSharedProjectGrants"] = (a) =>
+    this.#grants.awaitSharedProjectGrants(a);
+  revokeSharedProjectGrants: AuthzApi["revokeSharedProjectGrants"] = (a) =>
+    this.#grants.revokeSharedProjectGrants(a);
   changeBindingRole: AuthzApi["changeBindingRole"] = (a) => this.#grants.changeBindingRole(a);
   revokeBindings: AuthzApi["revokeBindings"] = (a) => this.#grants.revokeBindings(a);
   revokeBindingsWhere: AuthzApi["revokeBindingsWhere"] = (a) => this.#grants.revokeBindingsWhere(a);

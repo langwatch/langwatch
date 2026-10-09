@@ -83,7 +83,7 @@ describe.each(backends)("given the $name topic backend", ({ create }) => {
 
       await expect(repositories.topics.findAll({ projectId: PROJECT_ID })).resolves.toEqual([]);
       await expect(
-        repositories.topics.findNamesByIds({ projectId: PROJECT_ID, ids: ["topic-1"] }),
+        repositories.topics.findNamesByIds({ projectIds: [PROJECT_ID], ids: ["topic-1"] }),
       ).resolves.toEqual(new Map());
       await expect(
         repositories.topics.findClusteringStatus({ projectId: PROJECT_ID }),

@@ -3,7 +3,7 @@
  * resolved scope: one question, "any of these", and two batch forms. Each
  * reads the principal's epoch-checked snapshot ONCE and answers every candidate from it.
  */
-import { type AuthzPermission } from "@langwatch/authorization";
+import { applyAggregateAdminGate, type AuthzPermission } from "@langwatch/authorization";
 import {
   type AuthzEngine,
   scopeOrganizationId,
@@ -24,6 +24,32 @@ type ScopeIds = {
 };
 
 type OrganizationRoleOrNull = CollectedGrants["organizationRole"];
+
+/** The role the aggregate admin gate reads: a key acts with its owner's; a service key, none. */
+function gateRoleOf({
+  principal,
+  grants,
+  ownerGrants,
+}: {
+  principal: AuthzPrincipalRef;
+  grants: CollectedGrants;
+  ownerGrants: CollectedGrants | null;
+}): OrganizationRoleOrNull {
+  if (principal.type === "apiKey") return ownerGrants?.organizationRole ?? null;
+  return grants.organizationRole;
+}
+
+/** ADR-177 decision 5: whether a project of this kind is closed to this organization role. */
+function isClosedAggregate({
+  kind,
+  organizationRole,
+}: {
+  kind: string | undefined;
+  organizationRole: OrganizationRoleOrNull;
+}): boolean {
+  return !applyAggregateAdminGate({ decision: { permitted: true, organizationRole }, kind })
+    .permitted;
+}
 
 type AuthzIdDecisionsOptions = {
   engine: AuthzEngine;
@@ -141,6 +167,17 @@ export class AuthzIdDecisionsService {
 
       firstDenied ??= decision;
     }
+    const kind = scope.type === "project" ? scope.kind : undefined;
+    if (
+      matched &&
+      isClosedAggregate({ kind, organizationRole: gateRoleOf({ principal, grants, ownerGrants }) })
+    ) {
+      return {
+        allowed: false,
+        organizationRole: grants.organizationRole,
+        denialReason: "no-binding",
+      };
+    }
 
     const result: {
       allowed: boolean;
@@ -246,6 +283,20 @@ export class AuthzIdDecisionsService {
           : await this.deps.collector.findScopeRef({ projectId }),
       ]),
     );
+    const projectAnswers = new Map(
+      permissions.map((permission) => [
+        permission,
+        new Map(
+          projectScopes.map(([projectId, scope]) => [projectId, allowedAt(permission, scope)]),
+        ),
+      ]),
+    );
+    const closed = await this.findClosedAggregates({
+      organizationRole: gateRoleOf({ principal, grants, ownerGrants }),
+      projectScopes: projectScopes.filter(([projectId]) =>
+        [...projectAnswers.values()].some((answers) => answers.get(projectId)),
+      ),
+    });
 
     return {
       byPermission: new Map(
@@ -259,12 +310,38 @@ export class AuthzIdDecisionsService {
               ]),
             ),
             projects: new Map(
-              projectScopes.map(([projectId, scope]) => [projectId, allowedAt(permission, scope)]),
+              [...(projectAnswers.get(permission) ?? [])].map(([projectId, permitted]) => [
+                projectId,
+                permitted && !closed.has(projectId),
+              ]),
             ),
           },
         ]),
       ),
       organizationRole: grants.organizationRole,
     };
+  }
+
+  /**
+   * M8487-BATCH-GATE: the aggregates among these projects this role may not open, so a batch
+   * never admits what a single check refuses. An admin pays no read; anyone else one lineage
+   * read per project whose scope does not already carry its kind.
+   */
+  private async findClosedAggregates({
+    organizationRole,
+    projectScopes,
+  }: {
+    organizationRole: OrganizationRoleOrNull;
+    projectScopes: readonly [string, AuthzScopeRef | null][];
+  }): Promise<ReadonlySet<string>> {
+    if (organizationRole === "ADMIN") return new Set();
+    const closed = await Promise.all(
+      projectScopes.map(async ([projectId, scope]) => {
+        const known = scope?.type === "project" ? scope.kind : undefined;
+        const kind = known ?? (await this.deps.collector.findScopeRef({ projectId }))?.kind;
+        return isClosedAggregate({ kind, organizationRole }) ? [projectId] : [];
+      }),
+    );
+    return new Set(closed.flat());
   }
 }

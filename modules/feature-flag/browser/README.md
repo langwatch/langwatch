@@ -4,7 +4,7 @@ The browser half of [feature-flag](../README.md). What a browser installs when i
 
 <!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
 
-Declared in `src/feature-flag.web.ts:8` (`defineBrowserModule("feature-flag")`), exported as `featureFlagWeb` at `./declaration`.
+Declared in `src/feature-flag.web.ts:9` (`defineBrowserModule("feature-flag")`), exported as `featureFlagWeb` at `./declaration`.
 
 Installed by ui, from the app's generated module list (`pnpm generate:modules`).
 
@@ -18,6 +18,6 @@ None.
 
 ## Calls
 
-None: no `withApi`, client package, lend, host or capability.
+- Client packages (package.json): `@langwatch/feature-flag-client`.
 
 <!-- readme:generated:end -->

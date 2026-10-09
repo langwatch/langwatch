@@ -81,10 +81,10 @@ export const instantEvalRest: Readonly<{
     tags: INSTANT_EVAL_TAGS,
     description: CREATE_RUN_DESCRIPTION,
   })
-  .handle(({ app, input, scope }, credential) =>
+  .handle(({ app, input, scope, actor }, credential) =>
     app.createRun({
       projectId: scope.id,
-      actor: { kind: "credential", credential },
+      actor: { kind: "credential", credential, actor },
       input: instantEvalRunInputOf(input),
     }),
   )
@@ -99,10 +99,10 @@ export const instantEvalRest: Readonly<{
     tags: INSTANT_EVAL_TAGS,
     description: ESTIMATE_RUN_DESCRIPTION,
   })
-  .handle(({ app, input, scope }, credential) =>
+  .handle(({ app, input, scope, actor }, credential) =>
     app.estimateRun({
       projectId: scope.id,
-      actor: { kind: "credential", credential },
+      actor: { kind: "credential", credential, actor },
       input: instantEvalRunInputOf(input),
     }),
   )
@@ -192,10 +192,10 @@ export const instantEvalRest: Readonly<{
     description: SAMPLE_DESCRIPTION,
     errors: [RUN_NOT_FOUND],
   })
-  .handle(({ app, input, scope }, credential) =>
+  .handle(({ app, input, scope, actor }, credential) =>
     app.getSample({
       projectId: scope.id,
-      actor: { kind: "credential", credential },
+      actor: { kind: "credential", credential, actor },
       runId: input.id,
       rows: input.n,
     }),

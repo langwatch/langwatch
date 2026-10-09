@@ -15,9 +15,12 @@ export function useTraceHeader({
   traceId,
   occurredAtMs,
   full,
+  tenantId,
   enabled = true,
 }: TraceHeaderReadInput & {
   full: boolean;
+  /** The member that owns the trace on an aggregate (ADR-177 block F). */
+  tenantId?: string | null;
   /** Hold the read off until the caller has what it needs to ask. */
   enabled?: boolean;
 }): UseTraceHeaderResult {
@@ -26,6 +29,7 @@ export function useTraceHeader({
       projectId,
       traceId,
       ...(occurredAtMs !== void 0 ? { occurredAtMs } : {}),
+      ...(tenantId ? { tenantId } : {}),
       full,
     },
     { enabled: enabled && projectId.length > 0 && traceId.length > 0 },

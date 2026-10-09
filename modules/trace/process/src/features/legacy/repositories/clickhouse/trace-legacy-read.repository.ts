@@ -1,6 +1,9 @@
 import { annotationSuggestedOutput } from "@langwatch/annotation-contract";
+import type { Authorization } from "@langwatch/authorization";
 import {
   DEFAULT_PARTITION_WINDOW_MS,
+  expandFragment,
+  fenceFor,
   queryWindowed,
   RetentionFloorService,
   type RetentionDaysProvider,
@@ -8,11 +11,6 @@ import {
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "@langwatch/data-retention-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import {
-  LLM_PARAMETER_MAP,
-  parsePromptTraceReference,
-  findPromptReferenceInAncestors,
-} from "@langwatch/prompt-contract";
 import { nowInstant } from "@langwatch/time";
 import type {
   Protections,
@@ -22,7 +20,6 @@ import type {
   NormalizedSpanKind,
   NormalizedStatusCode,
   Event,
-  Span,
   Trace,
   ProjectableTrace,
   ProjectedAnnotation,
@@ -51,34 +48,6 @@ import {
   traceSpansBatchResolverMisalignedError,
 } from "#rules/trace-spans-batch-resolver-contract-error.rules";
 
-import {
-  mapClickHouseEvaluationToTraceEvaluation,
-  mapTraceEvaluationsToLegacyEvaluations,
-  type ClickHouseEvaluationRunRow,
-  EVALUATION_RUN_COLUMNS_WITH_INPUTS,
-} from "../../../../rules/trace-evaluation-mapping.rules.ts";
-import { mapEventAttrsToEvent } from "../../../../rules/trace-event-attribute-mapping.rules.ts";
-import { type EventSpanRow } from "../../../../rules/trace-event-attribute-mapping.rules.ts";
-import { translateLegacyFilters } from "../../rules/trace-legacy-filter-conditions.rules.ts";
-import { mapNormalizedSpansToSpans } from "../../rules/trace-legacy-span-mapping.rules.ts";
-import { mapTraceSummaryToTrace } from "../../rules/trace-legacy-summary-mapping.rules.ts";
-import {
-  parseLLMSpanMessages,
-  systemPromptFieldOfLlmSpan,
-} from "../../../conversation/rules/trace-llm-span-messages.rules.ts";
-import {
-  applyEventProtections,
-  applyTraceProtections,
-  extractRedactionsForObject,
-} from "../../../../rules/trace-read-redaction.rules.ts";
-import type { ResolvedTraceSpans } from "../../../../services/trace-offload-resolution.service.ts";
-import type { TraceAnnotationScoresReadRepository } from "../../../../repositories/trace-annotation-scores.repository.ts";
-import type { TraceAnnotationsReadRepository } from "../../../../repositories/trace-annotations.repository.ts";
-import {
-  TraceLegacyReadRepository,
-  type ResolveTraceSpansBatchFn,
-  type ResolveTraceSpansFn,
-} from "../trace-legacy-read.repository.ts";
 import type { TraceClickHouseClient } from "../../../../repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
 import {
   chBoolean,
@@ -88,6 +57,34 @@ import {
   deserializeAttributes,
   ensureStringRecord,
 } from "../../../../repositories/clickhouse/stored-span-row.mapper.ts";
+import type { TraceAnnotationScoresReadRepository } from "../../../../repositories/trace-annotation-scores.repository.ts";
+import type { TraceAnnotationsReadRepository } from "../../../../repositories/trace-annotations.repository.ts";
+import {
+  mapClickHouseEvaluationToTraceEvaluation,
+  mapTraceEvaluationsToLegacyEvaluations,
+  type ClickHouseEvaluationRunRow,
+  EVALUATION_RUN_COLUMNS_WITH_INPUTS,
+} from "../../../../rules/trace-evaluation-mapping.rules.ts";
+import { mapEventAttrsToEvent } from "../../../../rules/trace-event-attribute-mapping.rules.ts";
+import { type EventSpanRow } from "../../../../rules/trace-event-attribute-mapping.rules.ts";
+import {
+  applyEventProtections,
+  applyTraceProtections,
+  extractRedactionsForObject,
+} from "../../../../rules/trace-read-redaction.rules.ts";
+import type { ResolvedTraceSpans } from "../../../../services/trace-offload-resolution.service.ts";
+import { translateLegacyFilters } from "../../rules/trace-legacy-filter-conditions.rules.ts";
+import {
+  type PromptStudioSpanRow,
+  derivePromptStudioSpan,
+} from "../../rules/trace-legacy-prompt-studio-span.rules.ts";
+import { mapNormalizedSpansToSpans } from "../../rules/trace-legacy-span-mapping.rules.ts";
+import { mapTraceSummaryToTrace } from "../../rules/trace-legacy-summary-mapping.rules.ts";
+import {
+  TraceLegacyReadRepository,
+  type ResolveTraceSpansBatchFn,
+  type ResolveTraceSpansFn,
+} from "../trace-legacy-read.repository.ts";
 
 const attributeMapSchema = z.record(z.string(), z.unknown());
 const traceIdRowsSchema = z.array(z.looseObject({ TraceId: chString }));
@@ -103,7 +100,7 @@ const evaluatorNameRowsSchema = z.array(z.looseObject({ id: chString, name: chSt
 const occurredAtRangeRowsSchema = z.array(
   z.looseObject({ fromMs: chNumber.nullable(), toMs: chNumber.nullable() }),
 );
-const promptStudioSpanRowsSchema = z.array(
+const promptStudioSpanRowsSchema: z.ZodType<PromptStudioSpanRow[]> = z.array(
   z.looseObject({
     SpanId: chString,
     TraceId: chString,
@@ -365,6 +362,25 @@ export interface ClickHouseTraceLegacyReadOptions {
         scores: Pick<TraceAnnotationScoresReadRepository, "findScoreNames">;
       }
     | undefined;
+}
+
+/** The compiled filter, its tenant markers expanded into the proof's fence (ADR-177 block C). */
+function fenceFilterWhere({
+  filterWhere,
+  authorization,
+}: {
+  filterWhere: GetAllTracesForProjectOptions["filterWhere"];
+  authorization: Authorization | undefined;
+}): GetAllTracesForProjectOptions["filterWhere"] {
+  if (!filterWhere) return undefined;
+  if (!authorization) {
+    throw new Error("A compiled trace filter needs the proof its tenant markers expand into");
+  }
+  return expandFragment({
+    fragment: filterWhere.sql,
+    queryParams: filterWhere.params,
+    fence: fenceFor({ authorization, reads: "traces" }),
+  });
 }
 
 function mergeFilterWhere({
@@ -1453,7 +1469,10 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           const { filterConditions, filterParams } = mergeFilterWhere({
             conditions: legacyFilterConditions,
             params: legacyFilterParams,
-            filterWhere: options.filterWhere,
+            filterWhere: fenceFilterWhere({
+              filterWhere: options.filterWhere,
+              authorization: options.authorization,
+            }),
           });
 
           // Pinned once on the first page and carried by the cursor so every later page
@@ -1823,7 +1842,6 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
   async findSpanForPromptStudio({
     projectId,
     spanId,
-    protections,
   }: {
     projectId: string;
     spanId: string;
@@ -1868,40 +1886,8 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
             format: "JSONEachRow",
           });
 
-          const allRows = promptStudioSpanRowsSchema.parse(await queryResult.json());
-
-          const requestedRow = allRows.find((r) => r.SpanId === spanId);
-          if (!requestedRow) {
-            return null;
-          }
-
-          // If the caller pointed at a non-llm span, resolve to the nearest llm span the
-          // operator most likely meant: a descendant first, then a later sibling. The
-          // playground form needs an llm span's messages + config.
-          const requestedType = requestedRow.SpanAttributes["langwatch.span.type"] as
-            | string
-            | undefined;
-          const row =
-            requestedType === "llm"
-              ? requestedRow
-              : (findNearestLlm(allRows, requestedRow) ?? null);
-          if (!row) {
-            return null;
-          }
-
-          // Extract span data from attributes
-          const result = this.extractPromptStudioDataFromClickHouse(row, protections);
-
-          // If the LLM span itself doesn't have a prompt reference,
-          // search ancestors and their siblings to find it (SDK sets it on
-          // sibling spans like Prompt.compile or PromptApiService.get)
-          applyAncestorPromptReference({
-            result,
-            rows: allRows,
-            targetSpanId: row.SpanId,
-          });
-
-          return result;
+          const rows = promptStudioSpanRowsSchema.parse(await queryResult.json());
+          return derivePromptStudioSpan({ rows, spanId }) ?? null;
         } catch (error) {
           this.logger.warn(
             {
@@ -1915,109 +1901,6 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
         }
       },
     );
-  }
-
-  /**
-   * Extract prompt studio data from ClickHouse span row.
-   * @internal
-   */
-  private extractPromptStudioDataFromClickHouse(
-    row: {
-      SpanId: string;
-      TraceId: string;
-      SpanName: string;
-      SpanAttributes: Record<string, unknown>;
-      StartTime: number;
-      EndTime: number;
-      DurationMs: number;
-      StatusCode: number | null;
-      StatusMessage: string | null;
-    },
-    _protections: Protections,
-  ): PromptStudioSpanResult {
-    const attrs = row.SpanAttributes;
-    // Pure extraction of input + output messages from the span's
-    // attributes. Lives in parseLLMSpanMessages so the wire-shape
-    // contract — including the single-message-object form nlpgo emits
-    // for langwatch.output — is unit-testable without standing up the
-    // full service. See that file's docstring for the shape catalog.
-    const messages: PromptStudioSpanResult["messages"] = parseLLMSpanMessages(attrs);
-
-    // Extract LLM config
-    const model =
-      (attrs["gen_ai.response.model"] as string) ??
-      (attrs["gen_ai.request.model"] as string) ??
-      (attrs["llm.model"] as string) ??
-      null;
-    const vendor = (attrs["gen_ai.system"] as string) ?? null;
-
-    // Build llmConfig dynamically from the parameter map
-    const llmConfig: PromptStudioSpanResult["llmConfig"] = {
-      model,
-      ...systemPromptFieldOfLlmSpan({ attrs, messages }),
-      temperature: null,
-      maxTokens: null,
-      topP: null,
-      frequencyPenalty: null,
-      presencePenalty: null,
-      seed: null,
-      topK: null,
-      minP: null,
-      repetitionPenalty: null,
-      reasoning: null,
-      verbosity: null,
-      litellmParams: {},
-    };
-
-    for (const param of LLM_PARAMETER_MAP) {
-      if (param.otelAttr === null) continue;
-      const raw = attrs[param.otelAttr];
-      if (raw != null) {
-        (llmConfig as Record<string, unknown>)[param.formField] = raw;
-      }
-    }
-
-    // Extract metrics
-    const promptTokens = attrs["gen_ai.usage.prompt_tokens"] as number | undefined;
-    const completionTokens = attrs["gen_ai.usage.completion_tokens"] as number | undefined;
-
-    // Build error if present
-    let error: Span["error"] | null = null;
-    if (row.StatusCode === 2) {
-      error = {
-        has_error: true,
-        message: row.StatusMessage ?? "Unknown error",
-        stacktrace: [],
-      };
-    }
-
-    // Extract prompt reference from attributes
-    const promptRef = parsePromptTraceReference(attrs);
-
-    return {
-      spanId: row.SpanId,
-      traceId: row.TraceId,
-      spanName: row.SpanName ?? null,
-      messages,
-      llmConfig,
-      vendor,
-      error,
-      timestamps: {
-        started_at: row.StartTime,
-        finished_at: row.EndTime,
-      },
-      metrics:
-        promptTokens !== undefined || completionTokens !== undefined
-          ? {
-              prompt_tokens: promptTokens,
-              completion_tokens: completionTokens,
-            }
-          : null,
-      promptHandle: promptRef.promptHandle,
-      promptVersionNumber: promptRef.promptVersionNumber,
-      promptTag: promptRef.promptTag,
-      promptVariables: promptRef.promptVariables,
-    };
   }
 
   /**
@@ -3754,127 +3637,6 @@ interface JoinedTraceSpanRow extends TraceSummaryRow {
   ss_DroppedAttributesCount: number | null;
   ss_DroppedEventsCount: number | null;
   ss_DroppedLinksCount: number | null;
-}
-
-interface PromptStudioCandidateRow {
-  SpanId: string;
-  ParentSpanId: string | null;
-  SpanAttributes: Record<string, unknown>;
-  StartTime: number;
-}
-
-function applyAncestorPromptReference({
-  result,
-  rows,
-  targetSpanId,
-}: {
-  result: PromptStudioSpanResult;
-  rows: PromptStudioCandidateRow[];
-  targetSpanId: string;
-}): void {
-  if (result.promptHandle) {
-    return;
-  }
-
-  const ancestorSpans = rows.map((row) => {
-    const attributes: Record<string, unknown> = {};
-    const promptId = row.SpanAttributes["langwatch.prompt.id"];
-    if (promptId) attributes["langwatch.prompt.id"] = promptId;
-    const promptVars = row.SpanAttributes["langwatch.prompt.variables"];
-    if (promptVars) attributes["langwatch.prompt.variables"] = promptVars;
-    const promptHandle = row.SpanAttributes["langwatch.prompt.handle"];
-    if (promptHandle) attributes["langwatch.prompt.handle"] = promptHandle;
-    const promptVersion = row.SpanAttributes["langwatch.prompt.version.number"];
-    if (promptVersion) attributes["langwatch.prompt.version.number"] = promptVersion;
-    return {
-      spanId: row.SpanId,
-      parentSpanId: row.ParentSpanId ?? null,
-      startTime: row.StartTime,
-      attributes,
-    };
-  });
-
-  const ancestorRef = findPromptReferenceInAncestors({
-    targetSpanId,
-    spans: ancestorSpans,
-  });
-  if (!ancestorRef?.promptHandle) {
-    return;
-  }
-
-  result.promptHandle = ancestorRef.promptHandle;
-  result.promptVersionNumber = ancestorRef.promptVersionNumber;
-  result.promptTag = ancestorRef.promptTag;
-  result.promptVariables = ancestorRef.promptVariables;
-}
-
-/**
- * Given a non-llm span, finds the nearest llm span in the same trace to load into the
- * playground instead. Preference order: closest descendant, then next sibling by start time,
- * then the trace's first llm span. Returns null when the trace has no llm spans.
- */
-function findNearestLlm<T extends PromptStudioCandidateRow>(rows: T[], requested: T): T | null {
-  const isLlm = (r: T) => (r.SpanAttributes["langwatch.span.type"] as string | undefined) === "llm";
-
-  const llmRows = rows.filter(isLlm);
-  if (llmRows.length === 0) return null;
-
-  // 1. Descendant llm closest to the requested span (smallest depth diff).
-  const childrenByParent = new Map<string, T[]>();
-  for (const r of rows) {
-    if (!r.ParentSpanId) continue;
-    const list = childrenByParent.get(r.ParentSpanId);
-    if (list) list.push(r);
-    else childrenByParent.set(r.ParentSpanId, [r]);
-  }
-  const closestDescendant = findClosestDescendantLlm({
-    childrenByParent,
-    requested,
-    isLlm,
-  });
-  if (closestDescendant) return closestDescendant;
-
-  // 2. Sibling llm under the same parent that started at/after the requested span. Earliest
-  // qualifying sibling wins, landing on the next call rather than one further down the chain.
-  // Earlier siblings belong to a prior turn and fall through to step 3 instead.
-  const siblingPool =
-    requested.ParentSpanId == null
-      ? rows.filter((r) => r.ParentSpanId == null)
-      : (childrenByParent.get(requested.ParentSpanId) ?? []);
-  const siblings = siblingPool
-    .filter((s) => s.SpanId !== requested.SpanId && isLlm(s))
-    .toSorted((a, b) => a.StartTime - b.StartTime);
-  const nextOrSame = siblings.find((s) => s.StartTime >= requested.StartTime);
-  if (nextOrSame) return nextOrSame;
-
-  // 3. Earliest llm in the trace.
-  return llmRows.toSorted((a, b) => a.StartTime - b.StartTime)[0] ?? null;
-}
-
-function findClosestDescendantLlm<T extends PromptStudioCandidateRow>({
-  childrenByParent,
-  requested,
-  isLlm,
-}: {
-  childrenByParent: Map<string, T[]>;
-  requested: T;
-  isLlm: (row: T) => boolean;
-}): T | null {
-  const visited = new Set<string>();
-  const queue: T[] = [requested];
-
-  while (queue.length > 0) {
-    const current = queue.shift()!;
-    if (visited.has(current.SpanId)) continue;
-    visited.add(current.SpanId);
-    const children = childrenByParent.get(current.SpanId) ?? [];
-    for (const child of children) {
-      if (isLlm(child)) return child;
-      queue.push(child);
-    }
-  }
-
-  return null;
 }
 
 /**

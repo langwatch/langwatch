@@ -36,6 +36,7 @@ import {
   expiryIncompleteReason,
   resolveExpiresAt,
 } from "../../model/virtual-key-expiration.ts";
+import { virtualKeyProjectOptions } from "../../model/virtual-key-project-options.ts";
 import {
   TAGS_CSV_MAX_LENGTH,
   VK_TAGS_FIELD_DESCRIPTION,
@@ -90,7 +91,12 @@ function seededOwnership(
   },
 ): VirtualKeyOwnership {
   if (prev.projectId ?? prev.teamId) return prev;
-  const seedProject = input.projectId ?? input.availableProjects[0]?.id ?? null;
+  // The current project only when a key may use it: an aggregate (ADR-177)
+  // is not, so the first offered project stands in.
+  const seedProject =
+    input.availableProjects.find((option) => option.id === input.projectId)?.id ??
+    input.availableProjects[0]?.id ??
+    null;
   const seedTeam = input.availableTeams.length === 1 ? (input.availableTeams[0]?.id ?? null) : null;
   if (prev.projectId === seedProject && prev.teamId === seedTeam) {
     return prev;
@@ -204,14 +210,7 @@ export function VirtualKeyCreateDrawer({
     [organization?.teams],
   );
   const availableProjects = useMemo(
-    () =>
-      organization?.teams?.flatMap((t) =>
-        t.projects.map((p) => ({
-          id: p.id,
-          name: p.name,
-          teamId: t.id,
-        })),
-      ) ?? [],
+    () => virtualKeyProjectOptions(organization?.teams),
     [organization?.teams],
   );
 

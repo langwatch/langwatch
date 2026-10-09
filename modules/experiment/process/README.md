@@ -460,7 +460,7 @@ countUsage(input: { projectIds: readonly string[]; since?: number; }): Promise<E
 
 |             |                                                 |
 | ----------- | ----------------------------------------------- |
-| Declared at | `src/transport/experiment-batch-log.rest.ts:85` |
+| Declared at | `src/transport/experiment-batch-log.rest.ts:67` |
 | Base URL    | none: each route's path is its address          |
 | Addressing  | literal                                         |
 | Credential  | project                                         |
@@ -469,13 +469,14 @@ countUsage(input: { projectIds: readonly string[]; since?: number; }): Promise<E
 
 Report batch evaluation results
 
-Permission `evaluations:manage`. Declared at `src/transport/experiment-batch-log.rest.ts:91`.
+Permission `evaluations:manage`. Declared at `src/transport/experiment-batch-log.rest.ts:73`.
 
 Answers at `/api/evaluations/batch/log_results`, `/api/v1/evaluations/batch/log_results`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/experiment-batch-log.rest.ts:92)
-// Response: inline, src/transport/experiment-batch-log.rest.ts:95
+// Body: inline, src/transport/experiment-batch-log.rest.ts:74
+type Body = Record<string, unknown>;
+// Response: inline, src/transport/experiment-batch-log.rest.ts:77
 type Response = unknown;
 ```
 
@@ -483,7 +484,7 @@ type Response = unknown;
 
 |             |                                                          |
 | ----------- | -------------------------------------------------------- |
-| Declared at | `src/transport/experiment-dataset-evaluation.rest.ts:79` |
+| Declared at | `src/transport/experiment-dataset-evaluation.rest.ts:56` |
 | Base URL    | none: each route's path is its address                   |
 | Addressing  | literal                                                  |
 | Credential  | project                                                  |
@@ -492,13 +493,14 @@ type Response = unknown;
 
 Evaluate a dataset
 
-Permission `evaluations:manage`. Declared at `src/transport/experiment-dataset-evaluation.rest.ts:85`.
+Permission `evaluations:manage`. Declared at `src/transport/experiment-dataset-evaluation.rest.ts:62`.
 
 Answers at `/api/dataset/evaluate`, `/api/v1/dataset/evaluate`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/experiment-dataset-evaluation.rest.ts:87)
-// Response: inline, src/transport/experiment-dataset-evaluation.rest.ts:90
+// Body: inline, src/transport/experiment-dataset-evaluation.rest.ts:64
+type Body = Record<string, unknown>;
+// Response: inline, src/transport/experiment-dataset-evaluation.rest.ts:67
 type Response = unknown;
 ```
 
@@ -566,14 +568,14 @@ interface Response {
 
 |             |                                                 |
 | ----------- | ----------------------------------------------- |
-| Declared at | `src/transport/experiment-v3-legacy.rest.ts:46` |
+| Declared at | `src/transport/experiment-v3-legacy.rest.ts:42` |
 | Base URL    | `/api/evaluations/v3`                           |
 | Addressing  | v1-in-path                                      |
 | Credential  | project                                         |
 
 #### `POST /:evaluationSlug/run` · `postApiEvaluationsV3BySlugRun`
 
-Permission `evaluations:create`. Declared at `src/transport/experiment-v3-legacy.rest.ts:51`.
+Permission `evaluations:create`. Declared at `src/transport/experiment-v3-legacy.rest.ts:47`.
 
 Answers at `/api/evaluations/v3/:evaluationSlug/run`.
 
@@ -582,14 +584,14 @@ Answers at `/api/evaluations/v3/:evaluationSlug/run`.
 interface Params {
   evaluationSlug: string;
 }
-// Rawbody: "text" (inline, src/transport/experiment-v3-legacy.rest.ts:53)
-// Response: inline, src/transport/experiment-v3-legacy.rest.ts:56
+// Rawbody: "text" (inline, src/transport/experiment-v3-legacy.rest.ts:49)
+// Response: inline, src/transport/experiment-v3-legacy.rest.ts:52
 type Response = unknown;
 ```
 
 #### `GET /runs` · `getApiEvaluationsV3Runs`
 
-Permission `evaluations:view`. Declared at `src/transport/experiment-v3-legacy.rest.ts:73`.
+Permission `evaluations:view`. Declared at `src/transport/experiment-v3-legacy.rest.ts:69`.
 
 Answers at `/api/evaluations/v3/runs`.
 
@@ -604,7 +606,7 @@ interface Query {
 
 #### `GET /runs/:runId` · `getApiEvaluationsV3RunsByRunId`
 
-Permission `evaluations:view`. Declared at `src/transport/experiment-v3-legacy.rest.ts:80`.
+Permission `evaluations:view`. Declared at `src/transport/experiment-v3-legacy.rest.ts:76`.
 
 Answers at `/api/evaluations/v3/runs/:runId`.
 
@@ -618,7 +620,7 @@ type Response = z.infer<typeof runStatusResponseSchema>; // ../contract/src/expe
 
 #### `GET /runs/:runId/results` · `getApiEvaluationsV3RunsByRunIdResults`
 
-Permission `evaluations:view`. Declared at `src/transport/experiment-v3-legacy.rest.ts:87`.
+Permission `evaluations:view`. Declared at `src/transport/experiment-v3-legacy.rest.ts:83`.
 
 Answers at `/api/evaluations/v3/runs/:runId/results`.
 
@@ -633,7 +635,7 @@ type Response = z.infer<typeof runResultsResponseSchema>; // ../contract/src/exp
 
 #### `GET /:evaluationSlug/workbench-state` · `getApiEvaluationsV3BySlugWorkbenchState`
 
-Permission `experiments:view`. Declared at `src/transport/experiment-v3-legacy.rest.ts:95`.
+Permission `experiments:view`. Declared at `src/transport/experiment-v3-legacy.rest.ts:91`.
 
 Answers at `/api/evaluations/v3/:evaluationSlug/workbench-state`.
 
@@ -656,7 +658,7 @@ interface Response {
 
 #### `PUT /:evaluationSlug/workbench-state` · `putApiEvaluationsV3BySlugWorkbenchState`
 
-Permission `experiments:update`. Declared at `src/transport/experiment-v3-legacy.rest.ts:109`.
+Permission `experiments:update`. Declared at `src/transport/experiment-v3-legacy.rest.ts:105`.
 
 Answers at `/api/evaluations/v3/:evaluationSlug/workbench-state`.
 
@@ -676,7 +678,7 @@ interface Response {
 
 #### `GET /:evaluationSlug/versions` · `getApiEvaluationsV3BySlugVersions`
 
-Permission `experiments:view`. Declared at `src/transport/experiment-v3-legacy.rest.ts:123`.
+Permission `experiments:view`. Declared at `src/transport/experiment-v3-legacy.rest.ts:119`.
 
 Answers at `/api/evaluations/v3/:evaluationSlug/versions`.
 
@@ -692,7 +694,7 @@ type Response = z.infer<typeof listWorkbenchVersionsResponseSchema>; // ../contr
 
 #### `POST /:evaluationSlug/versions/:version/restore` · `postApiEvaluationsV3BySlugVersionsByVersionRestore`
 
-Permission `experiments:update`. Declared at `src/transport/experiment-v3-legacy.rest.ts:133`.
+Permission `experiments:update`. Declared at `src/transport/experiment-v3-legacy.rest.ts:129`.
 
 Answers at `/api/evaluations/v3/:evaluationSlug/versions/:version/restore`.
 
@@ -714,26 +716,26 @@ interface Response {
 
 |             |                                                  |
 | ----------- | ------------------------------------------------ |
-| Declared at | `src/transport/experiment-v3-legacy.rest.ts:155` |
+| Declared at | `src/transport/experiment-v3-legacy.rest.ts:151` |
 | Base URL    | `/api/evaluations/v3`                            |
 | Addressing  | v1-in-path                                       |
 | Credential  | browser                                          |
 
 #### `POST /execute` · `executeEvaluationsV3Experiment`
 
-Permission `evaluations:manage`. Declared at `src/transport/experiment-v3-legacy.rest.ts:161`.
+Permission `evaluations:manage`. Declared at `src/transport/experiment-v3-legacy.rest.ts:157`.
 
 Answers at `/api/evaluations/v3/execute`.
 
 ```typescript
 type Body = z.infer<typeof executionRequestSchema>; // ../contract/src/workbench/execution/types.ts:163
-// Response: inline, src/transport/experiment-v3-legacy.rest.ts:164
+// Response: inline, src/transport/experiment-v3-legacy.rest.ts:160
 type Response = unknown;
 ```
 
 #### `POST /abort` · `abortEvaluationsV3ExperimentRun`
 
-Permission `evaluations:manage`. Declared at `src/transport/experiment-v3-legacy.rest.ts:170`.
+Permission `evaluations:manage`. Declared at `src/transport/experiment-v3-legacy.rest.ts:166`.
 
 Answers at `/api/evaluations/v3/abort`.
 
@@ -1287,12 +1289,14 @@ Declared at `src/eventing/experiment-run-processing.pipeline.ts:128`. Events: `e
 
 ## Configuration
 
-| Kind   | Leaf                  | Environment variable     | Declared at                               |
-| ------ | --------------------- | ------------------------ | ----------------------------------------- |
-| config | `blockLocalHttpCalls` | `BLOCK_LOCAL_HTTP_CALLS` | `../contract/src/experiment.config.ts:13` |
-| config | `allowedProxyHosts`   | `ALLOWED_PROXY_HOSTS`    | `../contract/src/experiment.config.ts:14` |
-| config | `runConcurrency`      | `EVAL_V3_CONCURRENCY`    | `../contract/src/experiment.config.ts:16` |
-| config | `publicBaseUrl`       | `BASE_HOST`              | `../contract/src/experiment.config.ts:18` |
-| config | `isSaas`              | `IS_SAAS`                | `../contract/src/experiment.config.ts:20` |
+| Kind   | Leaf                  | Environment variable               | Declared at                               |
+| ------ | --------------------- | ---------------------------------- | ----------------------------------------- |
+| config | `blockLocalHttpCalls` | `BLOCK_LOCAL_HTTP_CALLS`           | `../contract/src/experiment.config.ts:14` |
+| config | `allowedProxyHosts`   | `ALLOWED_PROXY_HOSTS`              | `../contract/src/experiment.config.ts:15` |
+| config | `runConcurrency`      | `EVAL_V3_CONCURRENCY`              | `../contract/src/experiment.config.ts:17` |
+| config | `publicBaseUrl`       | `BASE_HOST`                        | `../contract/src/experiment.config.ts:19` |
+| config | `legacyPublicBaseUrl` | `NEXT_PUBLIC_BASE_URL`             | `../contract/src/experiment.config.ts:21` |
+| config | `foldCacheTtlSeconds` | `LANGWATCH_FOLD_CACHE_TTL_SECONDS` | `../contract/src/experiment.config.ts:29` |
+| config | `isSaas`              | `IS_SAAS`                          | `../contract/src/experiment.config.ts:30` |
 
 <!-- readme:generated:end -->

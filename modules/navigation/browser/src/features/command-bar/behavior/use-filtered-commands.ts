@@ -11,12 +11,14 @@ import {
   actionCommands,
   filterCommands,
   filterCommandsByFeatureFlags,
+  filterCommandsByProjectNavigation,
   navigationCommands,
   supportCommands,
   themeCommands,
 } from "../model/command-catalogue.ts";
 import { getPageCommands } from "../model/command-page-commands.ts";
 import { useCommandFeatureFlags } from "./use-command-feature-flags.ts";
+import { useCommandProjectNavigation } from "./use-command-project-navigation.ts";
 
 export interface FilteredCommands {
   navigation: Command[];
@@ -79,16 +81,17 @@ export function useFilteredCommands({
   const host = useNavigationHost();
   const hasOpsAccess = host.opsAccess().hasAccess;
   const commandFeatureFlags = useCommandFeatureFlags();
+  const projectNavigation = useCommandProjectNavigation();
 
   const availableNavCommands = useMemo(() => {
     const commands = hasOpsAccess
       ? navigationCommands
       : navigationCommands.filter((cmd) => !cmd.id.startsWith("nav-ops"));
-    return filterCommandsByFeatureFlags({
-      commands,
-      flags: commandFeatureFlags,
+    return filterCommandsByProjectNavigation({
+      commands: filterCommandsByFeatureFlags({ commands, flags: commandFeatureFlags }),
+      navigation: projectNavigation,
     });
-  }, [hasOpsAccess, commandFeatureFlags]);
+  }, [hasOpsAccess, commandFeatureFlags, projectNavigation]);
 
   const filteredNavigation = useMemo(
     () =>
@@ -102,10 +105,11 @@ export function useFilteredCommands({
   );
 
   const availableActionCommands = useMemo(() => {
-    return hasOpsAccess
+    const commands = hasOpsAccess
       ? actionCommands
       : actionCommands.filter((cmd) => cmd.id !== "action-send-trace");
-  }, [hasOpsAccess]);
+    return filterCommandsByProjectNavigation({ commands, navigation: projectNavigation });
+  }, [hasOpsAccess, projectNavigation]);
 
   const filteredActions = useMemo(
     () =>

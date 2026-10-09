@@ -234,6 +234,8 @@ describe("the projects REST family over the application the composition builds",
         recordProjectArchived: { send: async () => undefined },
         recordProjectDepartmentAssigned: { send: async () => undefined },
         recordProjectTraceSharingDisabled: { send: async () => undefined },
+        recordProjectAggregateRuleChanged: { send: async () => undefined },
+        recordProjectRevived: { send: async () => undefined },
       });
     });
 

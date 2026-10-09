@@ -105,7 +105,13 @@ export type AuthzDeclaredScopeId = z.infer<typeof declaredScopeIdSchema>;
  */
 export const handlerScopeSchema = z.discriminatedUnion("tier", [
   z
-    .object({ tier: z.literal("project"), id: z.string(), organizationId: z.string().nullable() })
+    .object({
+      tier: z.literal("project"),
+      id: z.string(),
+      organizationId: z.string().nullable(),
+      /** `Project.kind` (ADR-177), when the door read it with the scope. */
+      kind: z.string().nullable().optional(),
+    })
     .strict(),
   z
     .object({ tier: z.literal("team"), id: z.string(), organizationId: z.string().nullable() })
@@ -165,6 +171,12 @@ export type TierOfScopeArg<A> = A extends { projectId: string }
 export function permissionGrantTiers(permission: AuthzPermission): DeclaredScopeTier[] {
   const scopes = scopesOf(permission);
   return DECLARED_SCOPE_TIERS.filter((tier) => scopes.includes(tier));
+}
+
+/** Whether `permission` is granted only at the organization tier: no project or team grants it. */
+export function isOrgScopedPermission(permission: AuthzPermission): boolean {
+  const tiers = permissionGrantTiers(permission);
+  return tiers.length === 1 && tiers[0] === "organization";
 }
 
 export function isPlatformTierPermission(permission: AuthzPermission): boolean {

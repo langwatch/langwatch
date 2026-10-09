@@ -4,6 +4,7 @@
  * @see modules/trace/specs/sessions-lens.feature
  * @see modules/coding-agent/specs/coding-agent-trace-reads.feature
  */
+import { sealAuthorization } from "@langwatch/authorization";
 import type {
   CodingAgentSession,
   CodingAgentTracePullRequestLink,
@@ -26,6 +27,16 @@ type PageRow = TracesSessionsPage["sessions"][number];
 
 const PROJECT_ID = "project-1";
 const VIEWER = "viewer-1";
+const VIEWER_ACTOR = { type: "user", id: VIEWER } as const;
+/** The proof the traces:view door mints for the viewer; coding-agent only hands it on. */
+const PROOF = sealAuthorization({
+  actor: VIEWER_ACTOR,
+  principal: VIEWER_ACTOR,
+  scope: { organizationId: "organization-1" },
+  grants: [{ projectId: PROJECT_ID, permissions: ["traces:view"], via: [], kind: "own" }],
+  expiresAt: Date.now() + 5 * 60 * 1000,
+  purpose: { kind: "route", route: "test" },
+});
 const FULL_VIEW: Protections = { canSeeCapturedInput: true, canSeeCapturedOutput: true };
 
 function pageRow(overrides: Partial<PageRow> = {}): PageRow {
@@ -112,6 +123,7 @@ function harness({
       timeRange: { from: 0, to: 2_000_000_000_000 },
       pageSize: 10,
       viewerUserId: VIEWER,
+      authorization: PROOF,
     });
 
   return { read, resolveViewerProtections, readSessionGroups, linkTraceSessionsToPullRequests };
@@ -135,7 +147,12 @@ describe("CodingAgentSessionGroupsReadService", () => {
         userId: VIEWER,
       });
       expect(readSessionGroups).toHaveBeenCalledWith(
-        expect.objectContaining({ projectId: PROJECT_ID, pageSize: 10, protections }),
+        expect.objectContaining({
+          projectId: PROJECT_ID,
+          pageSize: 10,
+          protections,
+          authorization: PROOF,
+        }),
       );
       expect(readSessionGroups.mock.calls[0]?.[0]).not.toHaveProperty("viewerUserId");
       expect(page.sessions[0]?.codingAgent?.modelCalls).toBe(4);

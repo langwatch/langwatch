@@ -1,3 +1,4 @@
+import type { Authorization } from "@langwatch/authorization";
 /**
  * Read side of the Sessions lens (specs/traces-v2/sessions-lens.feature):
  * one row per `gen_ai.conversation.id`, rolled up in ClickHouse over EVERY
@@ -25,10 +26,17 @@ interface SessionGroupSort {
 export interface SessionGroupCursor {
   sortValue: number;
   conversationId: string;
+  /**
+   * The tenant of the boundary session (ADR-177 block F). On an aggregate two
+   * members may share a conversation id, so the pair is the tie-breaker.
+   * Absent on an older cursor, which pages on the conversation id alone.
+   */
+  tenantId?: string;
 }
 
 export interface SessionGroupsQuery {
-  tenantId: string;
+  /** The proof the read is fenced by; the reader applies its tenant set. */
+  authorization: Authorization;
   timeRange: { from: number; to: number; live?: boolean };
   sort: SessionGroupSort;
   limit: number;
@@ -49,6 +57,12 @@ export interface SessionGroupsQuery {
 
 export interface SessionGroupRow {
   conversationId: string;
+  /**
+   * The project the session's traces belong to. A session is a conversation
+   * within one project: two members of an aggregate sharing a conversation id
+   * are two sessions, not one (ADR-177 block F).
+   */
+  tenantId: string;
   traceCount: number;
   totalCost: number;
   totalTokens: number;

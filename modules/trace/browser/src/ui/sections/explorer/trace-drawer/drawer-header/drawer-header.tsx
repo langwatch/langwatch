@@ -75,6 +75,7 @@ import { EditedOriginalToggle } from "../edit-mode/edited-original-toggle.tsx";
 import { ModeSwitch } from "../mode-switch.tsx";
 import { RawJsonDialog } from "../raw-json-dialog.tsx";
 import { useTraceHeaderChipDefs } from "../trace-header-chips.tsx";
+import { MemberProjectChip } from "./member-project-chip.tsx";
 import { MetricPill } from "./metric-pill.tsx";
 import { type CategorizedPin, type PinCategory, renderPinPills } from "./pin-strip.tsx";
 import { ShareTraceDialog } from "./share-trace-dialog.tsx";
@@ -1562,6 +1563,7 @@ function HeaderIdentity({
         />
       )}
       <StatusChip trace={trace} statusColor={statusColor} />
+      <MemberProjectChip />
       <SyntheticTraceBadge attributes={trace.attributes} />
     </HStack>
   );

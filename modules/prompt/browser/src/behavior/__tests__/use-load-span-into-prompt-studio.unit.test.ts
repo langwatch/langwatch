@@ -3,9 +3,11 @@ import { describe, expect, it } from "vitest";
 
 import { DEFAULT_MODEL } from "../../model/prompt-constants.ts";
 import {
+  buildPlaygroundSpanUrl,
   coerceToNumber,
   coerceToString,
   createDefaultPromptFormValues,
+  readPlaygroundSpanParams,
 } from "../use-load-span-into-prompt-studio.ts";
 
 type SpanData = PromptStudioSpanResult;
@@ -289,6 +291,84 @@ describe("createDefaultPromptFormValues()", () => {
       expect(result.version.configData.llm.frequencyPenalty).toBeUndefined();
       expect(result.version.configData.llm.presencePenalty).toBeUndefined();
       expect(result.version.configData.llm.reasoning).toBeUndefined();
+    });
+  });
+});
+
+describe("playground span links", () => {
+  const origin = "https://app.test";
+
+  describe("when a link names the span's trace under an aggregate", () => {
+    /** @scenario "A member span opens in the playground under the aggregate" */
+    it("carries the trace, the member and the time hint to the loader", () => {
+      const url = buildPlaygroundSpanUrl({
+        projectSlug: "company-view",
+        origin,
+        spanId: "span-1",
+        action: "create-new",
+        trace: {
+          traceId: "trace-1",
+          tenantId: "member-project",
+          occurredAtMs: 1_700_000_000_000,
+        },
+      });
+
+      expect(readPlaygroundSpanParams(url.searchParams)).toEqual({
+        spanId: "span-1",
+        action: "create-new",
+        trace: {
+          traceId: "trace-1",
+          tenantId: "member-project",
+          occurredAtMs: 1_700_000_000_000,
+        },
+      });
+    });
+  });
+
+  describe("when a link on a plain project names its trace but no member", () => {
+    it("sends no member", () => {
+      const url = buildPlaygroundSpanUrl({
+        projectSlug: "plain",
+        origin,
+        spanId: "span-1",
+        trace: { traceId: "trace-1", tenantId: null, occurredAtMs: null },
+      });
+
+      expect(readPlaygroundSpanParams(url.searchParams).trace).toEqual({
+        traceId: "trace-1",
+      });
+    });
+  });
+
+  describe("when a link names only the span", () => {
+    /** @scenario "A playground link on a plain project opens as before" */
+    it("asks for the span alone, as links always have", () => {
+      const url = buildPlaygroundSpanUrl({
+        projectSlug: "plain",
+        origin,
+        spanId: "span-1",
+      });
+
+      expect(url.searchParams.get("promptPlaygroundSpanId")).toBe("span-1");
+      expect(readPlaygroundSpanParams(url.searchParams)).toEqual({
+        spanId: "span-1",
+        action: null,
+        trace: null,
+      });
+    });
+  });
+
+  describe("when the time hint in a link is malformed", () => {
+    it("drops the hint and keeps the trace", () => {
+      const params = new URLSearchParams({
+        promptPlaygroundSpanId: "span-1",
+        promptPlaygroundTraceId: "trace-1",
+        promptPlaygroundOccurredAtMs: "yesterday",
+      });
+
+      expect(readPlaygroundSpanParams(params).trace).toEqual({
+        traceId: "trace-1",
+      });
     });
   });
 });

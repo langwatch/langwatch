@@ -7,6 +7,7 @@
 import { Menu } from "@langwatch/design-system/menu";
 import { Badge, Box, Button, HStack, Portal, Text } from "@langwatch/design-system/primitives";
 import { CreateProjectDrawerToken } from "@langwatch/organization-client";
+import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { Check, ChevronsUpDown, Plus } from "lucide-react";
 
 import { useProjectPickGroups } from "../../behavior/use-project-pick-groups.ts";
@@ -15,7 +16,7 @@ import type { ProductId } from "../../model/products.ts";
 import type { ProjectPickGroup } from "../../model/project-pick-items.ts";
 import { ProjectSwitcherCombobox } from "../blocks/project-switcher-combobox.tsx";
 import { NavigationLink } from "../elements/navigation-link.tsx";
-import { ProjectAvatar } from "../elements/project-avatar.tsx";
+import { AggregateProjectAvatar, ProjectAvatar } from "../elements/project-avatar.tsx";
 
 function ScopeDivider() {
   return (
@@ -73,6 +74,7 @@ function ProjectScopeMenu() {
 
   const projectCount = groups.reduce((count, group) => count + group.projects.length, 0);
   const showTeamHeaders = groups.length > 1;
+  const currentProjectIsAggregate = isAggregateProjectKind(project.kind);
 
   return (
     <>
@@ -82,6 +84,7 @@ function ProjectScopeMenu() {
           groups={groups}
           currentProjectId={project.id}
           currentProjectName={project.name}
+          currentProjectIsAggregate={currentProjectIsAggregate}
           showTeamHeaders={showTeamHeaders}
           onCreateProjectForTeam={onCreateProjectForTeam}
         />
@@ -90,6 +93,7 @@ function ProjectScopeMenu() {
           groups={groups}
           currentProjectId={project.id}
           currentProjectName={project.name}
+          currentProjectIsAggregate={currentProjectIsAggregate}
           showTeamHeaders={showTeamHeaders}
           onCreateProjectForTeam={onCreateProjectForTeam}
         />
@@ -103,12 +107,14 @@ function ProjectMenu({
   groups,
   currentProjectId,
   currentProjectName,
+  currentProjectIsAggregate,
   showTeamHeaders,
   onCreateProjectForTeam,
 }: {
   groups: ProjectPickGroup[];
   currentProjectId: string;
   currentProjectName: string;
+  currentProjectIsAggregate: boolean;
   showTeamHeaders: boolean;
   onCreateProjectForTeam: ({ teamId, orgId }: { teamId: string; orgId: string }) => void;
 }) {
@@ -128,7 +134,11 @@ function ProjectMenu({
           gap={2}
           _hover={{ backgroundColor: "bg.muted" }}
         >
-          <ProjectAvatar name={currentProjectName} />
+          {currentProjectIsAggregate ? (
+            <AggregateProjectAvatar name={currentProjectName} />
+          ) : (
+            <ProjectAvatar name={currentProjectName} />
+          )}
           <Text whiteSpace="nowrap">{currentProjectName}</Text>
           <ChevronsUpDown size={12} color="var(--chakra-colors-fg-muted)" />
         </Button>
@@ -146,7 +156,11 @@ function ProjectMenu({
                 >
                   <NavigationLink href={candidate.href} _hover={{ textDecoration: "none" }}>
                     <HStack gap={2} width="full">
-                      <ProjectAvatar name={candidate.label} />
+                      {candidate.isAggregate ? (
+                        <AggregateProjectAvatar name={candidate.label} />
+                      ) : (
+                        <ProjectAvatar name={candidate.label} />
+                      )}
                       <Text flex={1}>{candidate.label}</Text>
                       {candidate.projectId === currentProjectId && (
                         <Check size={13} aria-label="Current project" />

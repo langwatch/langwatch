@@ -16,6 +16,7 @@ import {
   assertPersonalWorkspaceMove,
   ProjectSlugConflictError,
   TeamNotInOrganizationError,
+  type AggregateRule,
 } from "@langwatch/project-contract";
 
 import type { ProjectRepository } from "../repositories/project.repository.ts";
@@ -80,6 +81,9 @@ export class ProjectWriteService {
     name: string;
     language: string;
     framework: string;
+    /** Already checked by `AggregateProjectService.createFields`. */
+    kind?: "aggregate" | undefined;
+    aggregateRule?: AggregateRule | undefined;
   }): Promise<Project> {
     if (!input.teamId && !input.newTeamName) {
       throw new ProjectCreateTargetMissingError();
@@ -129,6 +133,7 @@ export class ProjectWriteService {
         framework: input.framework,
         teamId,
         apiKey: this.credentials.generateApiKey(),
+        ...(input.kind ? { kind: input.kind, aggregateRule: input.aggregateRule } : {}),
       }),
     );
     await this.created.created({

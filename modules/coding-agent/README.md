@@ -11,19 +11,20 @@ Coding-agent observability: sessions built from coding-agent traces, their trans
 | Classification | core (`modules/catalogue.json`)                                                                                          |
 | Subjects       | coding-agent                                                                                                             |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser) · [client](client)                              |
-| Api token      | `CodingAgentApi` = `moduleApi<CodingAgentApi>()("coding-agent")`, `contract/src/coding-agent.api.ts:144` (20 operations) |
+| Api token      | `CodingAgentApi` = `moduleApi<CodingAgentApi>()("coding-agent")`, `contract/src/coding-agent.api.ts:146` (20 operations) |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                                               |
 
 ## What coding-agent owns
 
-| Kind                      | Name                          | Declared at                                                                                   |
-| ------------------------- | ----------------------------- | --------------------------------------------------------------------------------------------- |
-| ClickHouse table (writes) | `coding_agent_session_events` | `process/src/repositories/clickhouse/clickhouse.coding-agent-session-event.repository.ts:213` |
-| ClickHouse table (writes) | `coding_agent_sessions`       | `process/src/repositories/clickhouse/clickhouse.coding-agent-session.repository.ts:437`       |
-| ClickHouse table (writes) | `coding_agent_trace_sessions` | `process/src/repositories/clickhouse/clickhouse.coding-agent-trace-session.repository.ts:73`  |
-| ClickHouse table (writes) | `session_metric_series`       | `process/src/repositories/clickhouse/clickhouse.session-metric-series.repository.ts:93`       |
-| Stores required           | clickhouse                    | `process/src/repositories/clickhouse/clickhouse.coding-agent.repositories.ts:23`              |
-| Stores required           | clickhouse, redis             | `process/src/repositories/live/live.coding-agent.repositories.ts:11`                          |
+| Kind                      | Name                                                     | Declared at                                                                                   |
+| ------------------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| ClickHouse table (writes) | `coding_agent_session_events`                            | `process/src/repositories/clickhouse/clickhouse.coding-agent-session-event.repository.ts:213` |
+| ClickHouse table (writes) | `coding_agent_sessions`                                  | `process/src/repositories/clickhouse/clickhouse.coding-agent-session.repository.ts:437`       |
+| ClickHouse table (writes) | `coding_agent_trace_sessions`                            | `process/src/repositories/clickhouse/clickhouse.coding-agent-trace-session.repository.ts:73`  |
+| ClickHouse table (writes) | `session_metric_series`                                  | `process/src/repositories/clickhouse/clickhouse.session-metric-series.repository.ts:93`       |
+| Stores required           | clickhouse                                               | `process/src/repositories/clickhouse/clickhouse.coding-agent.repositories.ts:23`              |
+| Stores required           | clickhouse, redis                                        | `process/src/repositories/live/live.coding-agent.repositories.ts:12`                          |
+| Config                    | `foldCacheTtlSeconds` (LANGWATCH_FOLD_CACHE_TTL_SECONDS) | `contract/src/coding-agent.config.ts:4`                                                       |
 
 Anything else coding-agent needs belongs to another module and is reached through its `*Api`.
 

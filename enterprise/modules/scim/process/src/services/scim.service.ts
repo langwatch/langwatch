@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import {
   type ScimCreateUserRequest,
   type ScimDirectoryOwnership,
@@ -15,6 +14,8 @@ import {
   type ScimTokenSummary,
 } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { Instant } from "@langwatch/time";
 import type { UserProfile } from "@langwatch/user-contract";
 
@@ -55,6 +56,7 @@ export class ScimService {
     users,
     costCenterFacts,
     organization,
+    members,
     entitlements,
     lifecycle,
     provenOffboarding,
@@ -67,6 +69,7 @@ export class ScimService {
     users: ScimUserProvisioning;
     costCenterFacts: ScimCostCenterFacts;
     organization: ScimOrganizationAdministration;
+    members: Pick<OrganizationApi, "deleteMember">;
     entitlements: Pick<EntitlementApi, "getActivePlan">;
     lifecycle: ScimSyncLifecycle;
     provenOffboarding: boolean;
@@ -86,6 +89,7 @@ export class ScimService {
       users,
       costCenterFacts,
       organization,
+      members,
       lifecycle,
       provenOffboarding,
       authority: this.identities,
@@ -111,6 +115,7 @@ export class ScimService {
     users: ScimUserProvisioning;
     costCenterFacts: ScimCostCenterFacts;
     organization: ScimOrganizationAdministration;
+    members: Pick<OrganizationApi, "deleteMember">;
     entitlements: Pick<EntitlementApi, "getActivePlan">;
     lifecycle: ScimSyncLifecycle;
     provenOffboarding: boolean;

@@ -20,9 +20,13 @@ export const topicProjectInputSchema = z
   })
   .strict();
 
-export const topicNamesInputSchema = topicProjectInputSchema.safeExtend({
-  ids: z.array(z.string()),
-});
+/** An aggregate's facets name its members' topics, so the lookup spans every project read. */
+export const topicNamesInputSchema = z
+  .object({
+    projectIds: z.array(z.string().min(1)),
+    ids: z.array(z.string()),
+  })
+  .strict();
 
 export const topicClusteringRequestInputSchema = topicProjectInputSchema.safeExtend({
   occurredAt: z.number(),

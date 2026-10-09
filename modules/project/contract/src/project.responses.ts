@@ -10,6 +10,11 @@
 import { dataPrivacyPiiRedactionLevelSchema } from "@langwatch/data-privacy-contract";
 import { z } from "zod";
 
+import {
+  aggregateMemberCandidateSchema,
+  aggregateRuleMembersSchema,
+} from "./project.aggregate-rule.ts";
+
 /** A project was provisioned; the slug is what the caller navigates to. */
 export const projectProvisionedSchema = z
   .object({ success: z.literal(true), projectSlug: z.string().min(1) })
@@ -77,3 +82,12 @@ export const projectRestArchivedSchema = z
   })
   .strict();
 export type ProjectRestArchived = z.infer<typeof projectRestArchivedSchema>;
+
+/** An aggregate's rule was replaced; its members are pending until governance reconciles. */
+export const projectAggregateRuleUpdatedSchema = z
+  .object({ success: z.literal(true), members: aggregateRuleMembersSchema })
+  .strict();
+export type ProjectAggregateRuleUpdated = z.infer<typeof projectAggregateRuleUpdatedSchema>;
+
+/** Every project an explicit aggregate rule may name, ordered by name. */
+export const projectAggregateMemberCandidatesSchema = z.array(aggregateMemberCandidateSchema);

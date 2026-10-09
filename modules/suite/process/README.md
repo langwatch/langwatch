@@ -684,8 +684,9 @@ Declared at `src/eventing/suite-run-processing.pipeline.ts:103`. Events: `SuiteR
 
 ## Configuration
 
-| Kind   | Leaf            | Environment variable | Declared at                         |
-| ------ | --------------- | -------------------- | ----------------------------------- |
-| config | `publicBaseUrl` | `BASE_HOST`          | `../contract/src/suite.config.ts:5` |
+| Kind   | Leaf                  | Environment variable               | Declared at                         |
+| ------ | --------------------- | ---------------------------------- | ----------------------------------- |
+| config | `foldCacheTtlSeconds` | `LANGWATCH_FOLD_CACHE_TTL_SECONDS` | `../contract/src/suite.config.ts:5` |
+| config | `publicBaseUrl`       | `BASE_HOST`                        | `../contract/src/suite.config.ts:6` |
 
 <!-- readme:generated:end -->

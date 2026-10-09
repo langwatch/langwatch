@@ -1,7 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { UiFailureNotice, UiSuccessNotice } from "../capabilities.ts";
-import { applyHandledErrorToForm, describeError, showErrorToast, toError } from "../errors.ts";
+import {
+  applyHandledErrorToForm,
+  describeError,
+  reloadingWriteOptions,
+  showErrorToast,
+  toError,
+} from "../errors.ts";
 import { setUiFeedbackHost } from "../toaster.ts";
 
 function recordingHost() {
@@ -126,5 +132,33 @@ describe("toError", () => {
     expect(toError(error)).toBe(error);
     expect(toError("boom").message).toBe("boom");
     expect(toError({ a: 1 }).message).toBe('{"a":1}');
+  });
+});
+
+describe("reloadingWriteOptions", () => {
+  describe("when the write succeeds", () => {
+    it("reloads and shows no toast", () => {
+      const { failed, host } = recordingHost();
+      setUiFeedbackHost(host);
+      const reload = vi.fn();
+
+      reloadingWriteOptions({ fallbackTitle: "Couldn't save", reload }).onSuccess();
+
+      expect(reload).toHaveBeenCalledTimes(1);
+      expect(failed).toHaveLength(0);
+    });
+  });
+
+  describe("when the server refuses the write", () => {
+    it("toasts under the fallback title and reloads", () => {
+      const { failed, host } = recordingHost();
+      setUiFeedbackHost(host);
+      const reload = vi.fn();
+
+      reloadingWriteOptions({ fallbackTitle: "Couldn't save", reload }).onError(handled);
+
+      expect(failed[0]?.fallbackTitle).toBe("Couldn't save");
+      expect(reload).toHaveBeenCalledTimes(1);
+    });
   });
 });

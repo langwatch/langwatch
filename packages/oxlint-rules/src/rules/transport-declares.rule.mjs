@@ -21,7 +21,7 @@ import {
 import { reportRequestRechecks } from "./transport-request-checks.mjs";
 
 // ARCHITECTURE.md §8: transport files declare; the framework parses, refuses,
-// serialises, and a handler takes `{ input, app, actor, scope, signal }`, calls
+// serialises, and a handler takes `{ input, app, actor, scope, authorization, signal }`, calls
 // one API operation and returns a plain value or throws (ADR-133).
 
 const SOURCE = /\.[cm]?[jt]sx?$/;
@@ -84,7 +84,7 @@ const PROPERTY_NODES = new Set([
 ]);
 
 const HANDLER_FIELDS_FIX =
-  'Take only `{ input, app, actor, scope, signal }` and the producer this route\'s own chain declares: `response` from `.withResponse(...)`, `request` from `.withResponse("protocol" | "forwarded", ...)`, `raw` from `.withRawBody(...)`, `files` from `.withMultipart(...)`; the framework resolves the session and the headers before the handler runs.';
+  'Take only `{ input, app, actor, scope, authorization, signal }` and the producer this route\'s own chain declares: `response` from `.withResponse(...)`, `request` from `.withResponse("protocol" | "forwarded", ...)`, `raw` from `.withRawBody(...)`, `files` from `.withMultipart(...)`; the framework resolves the session and the headers before the handler runs.';
 const PLAIN_RESULT_FIX =
   "Return the plain value `.withOutput()` declares, or nothing for an empty response, and throw a `HandledError` to refuse; the framework serialises both.";
 const DECLARE_ROUTE_FIX =

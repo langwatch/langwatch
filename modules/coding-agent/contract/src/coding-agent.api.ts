@@ -1,3 +1,4 @@
+import type { Authorization } from "@langwatch/authorization";
 import { moduleApi } from "@langwatch/module";
 import type { TraceSessionGroupsInput, TracesSessionsPage } from "@langwatch/trace-contract";
 
@@ -69,6 +70,7 @@ export interface CodingAgentApi {
     traceId: string;
     occurredAtMs?: number | undefined;
     viewerUserId: string;
+    authorization?: Authorization;
   }): Promise<CodingAgentTranscript>;
   linkTraceSessionsToPullRequests(
     input: CodingAgentTracePullRequestInput,
@@ -96,7 +98,7 @@ export interface CodingAgentApi {
   contributeSpanFacts(data: ContributeSpanFactsCommandData): Promise<void>;
   /** The Sessions lens (main's `traces.sessions`): trace's page for the viewer, enriched here. */
   readSessionGroupsForViewer(
-    input: TraceSessionGroupsInput & { viewerUserId: string },
+    input: TraceSessionGroupsInput & { viewerUserId: string; authorization: Authorization },
   ): Promise<TracesSessionsPage>;
   /** Records who read an answer that names people. */
   recordPullRequestUsageRead(read: CodingAgentPullRequestUsageRead): Promise<void>;

@@ -386,10 +386,10 @@ findMembersIncludingDeactivated(input: Readonly<{ organizationId: string }>): Pr
 
 #### `findMembersWithDepartments`
 
-Every member's department column with their name (main `department.service.ts:112-119`).
+Every member's department, name and disabledAt (main `department.service.ts:112-119`).
 
 ```typescript
-findMembersWithDepartments(input: { organizationId: string }): Promise< { userId: string; departmentId: string | null; user: { name: string | null; email: string | null }; }[] >;
+findMembersWithDepartments(input: { organizationId: string }): Promise< { userId: string; departmentId: string | null; disabledAt: Instant | null; user: { name: string | null; email: string | null }; }[] >;
 ```
 
 #### `assignMemberDepartment`
@@ -885,7 +885,7 @@ listTeamsWithProjects(input: Readonly<{ organizationId: string }>, by: Organizat
 #### `listTeamAccessMatrix`
 
 ```typescript
-listTeamAccessMatrix(input: Readonly<{ organizationId: string }>): Promise<OrganizationTeamAccess[]>;
+listTeamAccessMatrix(input: Readonly<{ organizationId: string }>, by: OrganizationCaller): Promise<OrganizationTeamAccess[]>;
 ```
 
 #### `getTeamWithProjects`
@@ -1458,7 +1458,7 @@ interface Response {
 
 |             |                                    |
 | ----------- | ---------------------------------- |
-| Declared at | `src/transport/team.rest.ts:102`   |
+| Declared at | `src/transport/team.rest.ts:104`   |
 | Base URL    | `/api/teams`, twin `/api/v1/teams` |
 | Addressing  | dated                              |
 | Credential  | organization                       |
@@ -1468,7 +1468,7 @@ interface Response {
 
 List all non-archived teams for the organization (paginated)
 
-Permission `team:view`. Declared at `src/transport/team.rest.ts:107`.
+Permission `team:view`. Declared at `src/transport/team.rest.ts:109`.
 
 Answers at `/api/teams`, `/api/v1/teams`; also, undocumented, `/api/teams/2026-08-07`, `/api/v1/teams/2026-08-07`, `/api/teams/latest`, `/api/v1/teams/latest`.
 
@@ -1485,7 +1485,7 @@ type Response = z.infer<typeof organizationTeamRestPageSchema>; // ../contract/s
 
 Create a new team that can group projects and members
 
-Permission `team:manage`. Declared at `src/transport/team.rest.ts:129`.
+Permission `team:manage`. Declared at `src/transport/team.rest.ts:131`.
 
 Answers at `/api/teams`, `/api/v1/teams`; also, undocumented, `/api/teams/2026-08-07`, `/api/v1/teams/2026-08-07`, `/api/teams/latest`, `/api/v1/teams/latest`.
 
@@ -1509,7 +1509,7 @@ interface Response {
 
 Get a team by its id
 
-Permission `team:view`. Declared at `src/transport/team.rest.ts:148`.
+Permission `team:view`. Declared at `src/transport/team.rest.ts:150`.
 
 Answers at `/api/teams/:teamId`, `/api/v1/teams/:teamId`; also, undocumented, `/api/teams/2026-08-07/:teamId`, `/api/v1/teams/2026-08-07/:teamId`, `/api/teams/latest/:teamId`, `/api/v1/teams/latest/:teamId`.
 
@@ -1525,7 +1525,7 @@ type Response = z.infer<typeof organizationTeamRestSchema>; // ../contract/src/f
 
 Update a team by its id
 
-Permission `team:manage`. Declared at `src/transport/team.rest.ts:166`.
+Permission `team:manage`. Declared at `src/transport/team.rest.ts:168`.
 
 Answers at `/api/teams/:teamId`, `/api/v1/teams/:teamId`; also, undocumented, `/api/teams/2026-08-07/:teamId`, `/api/v1/teams/2026-08-07/:teamId`, `/api/teams/latest/:teamId`, `/api/v1/teams/latest/:teamId`.
 
@@ -1542,7 +1542,7 @@ type Response = z.infer<typeof organizationTeamRestSchema>; // ../contract/src/f
 
 Archive a team (soft-delete)
 
-Permission `team:manage`. Declared at `src/transport/team.rest.ts:186`.
+Permission `team:manage`. Declared at `src/transport/team.rest.ts:188`.
 
 Answers at `/api/teams/:teamId`, `/api/v1/teams/:teamId`; also, undocumented, `/api/teams/2026-08-07/:teamId`, `/api/v1/teams/2026-08-07/:teamId`, `/api/teams/latest/:teamId`, `/api/v1/teams/latest/:teamId`.
 
@@ -1560,7 +1560,7 @@ interface Response {
 
 List members of a team
 
-Permission `team:view`. Declared at `src/transport/team.rest.ts:208`.
+Permission `team:view`. Declared at `src/transport/team.rest.ts:210`.
 
 Answers at `/api/teams/:teamId/members`, `/api/v1/teams/:teamId/members`; also, undocumented, `/api/teams/2026-08-07/:teamId/members`, `/api/v1/teams/2026-08-07/:teamId/members`, `/api/teams/latest/:teamId/members`, `/api/v1/teams/latest/:teamId/members`.
 
@@ -1581,7 +1581,7 @@ interface Response {
 
 Add a member to a team
 
-Permission `team:manage`. Declared at `src/transport/team.rest.ts:235`.
+Permission `team:manage`. Declared at `src/transport/team.rest.ts:237`.
 
 Answers at `/api/teams/:teamId/members`, `/api/v1/teams/:teamId/members`; also, undocumented, `/api/teams/2026-08-07/:teamId/members`, `/api/v1/teams/2026-08-07/:teamId/members`, `/api/teams/latest/:teamId/members`, `/api/v1/teams/latest/:teamId/members`.
 
@@ -1602,7 +1602,7 @@ interface Response {
 
 Remove a member from a team
 
-Permission `team:manage`. Declared at `src/transport/team.rest.ts:266`.
+Permission `team:manage`. Declared at `src/transport/team.rest.ts:268`.
 
 Answers at `/api/teams/:teamId/members/:userId`, `/api/v1/teams/:teamId/members/:userId`; also, undocumented, `/api/teams/2026-08-07/:teamId/members/:userId`, `/api/v1/teams/2026-08-07/:teamId/members/:userId`, `/api/teams/latest/:teamId/members/:userId`, `/api/v1/teams/latest/:teamId/members/:userId`.
 
@@ -1619,7 +1619,7 @@ type Response = z.infer<typeof organizationTeamRestSuccessSchema>; // ../contrac
 
 List projects in a team
 
-Permission `team:view`. Declared at `src/transport/team.rest.ts:289`.
+Permission `team:view`. Declared at `src/transport/team.rest.ts:291`.
 
 Answers at `/api/teams/:teamId/projects`, `/api/v1/teams/:teamId/projects`; also, undocumented, `/api/teams/2026-08-07/:teamId/projects`, `/api/v1/teams/2026-08-07/:teamId/projects`, `/api/teams/latest/:teamId/projects`, `/api/v1/teams/latest/:teamId/projects`.
 
@@ -1978,9 +1978,9 @@ interface Input {
 type Output = unknown[];
 
 // organization.getScopeGraph
-// Input: organizationApiScopeGraphInputSchema, ../contract/src/scope-graph.ts:50
+// Input: organizationApiScopeGraphInputSchema, ../contract/src/scope-graph.ts:51
 type Input = Record<string, unknown>;
-type Output = z.infer<typeof scopeGraphSchema>; // ../contract/src/scope-graph.ts:53
+type Output = z.infer<typeof scopeGraphSchema>; // ../contract/src/scope-graph.ts:54
 
 // organization.update
 // Input: organizationApiUpdateInputSchema, ../contract/src/organization.trpc-schemas.ts:93
@@ -2238,23 +2238,26 @@ Declared at `src/eventing/organization-audit.pipeline.ts:46`. Events: `organizat
 
 ### Pipeline `organization_lifecycle` (aggregate `organization`)
 
-Declared at `src/eventing/organization-lifecycle.pipeline.ts:84`. Events: `organizationSignedUpEventSchema`, `membersInvitedEventSchema`, `inviteAcceptedEventSchema`, `integrationMethodChosenEventSchema`, `personalWorkspaceProvisionedEventSchema`, `personalTeamCreatedEventSchema`, `personalWorkspaceArchivedEventSchema`, `personalWorkspaceRevivedEventSchema`, `personalWorkspaceFeaturesChangedEventSchema`, `organizationPresenceSettingChangedEventSchema`, `organizationTraceSharingDisabledEventSchema`, `organizationMemberDisabledEventSchema`, `organizationCreatedEventSchema`.
+Declared at `src/eventing/organization-lifecycle.pipeline.ts:101`. Events: `organizationSignedUpEventSchema`, `membersInvitedEventSchema`, `inviteAcceptedEventSchema`, `integrationMethodChosenEventSchema`, `personalWorkspaceProvisionedEventSchema`, `personalTeamCreatedEventSchema`, `personalWorkspaceArchivedEventSchema`, `personalWorkspaceRevivedEventSchema`, `personalWorkspaceFeaturesChangedEventSchema`, `organizationPresenceSettingChangedEventSchema`, `organizationTraceSharingDisabledEventSchema`, `organizationMemberDisabledEventSchema`, `organizationMemberEnabledEventSchema`, `organizationMemberRemovedEventSchema`, `organizationMemberDepartmentChangedEventSchema`, `organizationCreatedEventSchema`.
 
 | Kind    | Name                                     | Handles | Declared at                                           |
 | ------- | ---------------------------------------- | ------- | ----------------------------------------------------- |
-| command | `recordSignedUp`                         | –       | `src/eventing/organization-lifecycle.pipeline.ts:103` |
-| command | `recordMembersInvited`                   | –       | `src/eventing/organization-lifecycle.pipeline.ts:104` |
-| command | `recordInviteAccepted`                   | –       | `src/eventing/organization-lifecycle.pipeline.ts:105` |
-| command | `recordIntegrationMethodChosen`          | –       | `src/eventing/organization-lifecycle.pipeline.ts:106` |
-| command | `recordPersonalWorkspaceProvisioned`     | –       | `src/eventing/organization-lifecycle.pipeline.ts:107` |
-| command | `recordPersonalTeamCreated`              | –       | `src/eventing/organization-lifecycle.pipeline.ts:108` |
-| command | `recordPersonalWorkspaceArchived`        | –       | `src/eventing/organization-lifecycle.pipeline.ts:109` |
-| command | `recordPersonalWorkspaceRevived`         | –       | `src/eventing/organization-lifecycle.pipeline.ts:110` |
-| command | `recordPersonalWorkspaceFeaturesChanged` | –       | `src/eventing/organization-lifecycle.pipeline.ts:111` |
-| command | `recordPresenceSettingChanged`           | –       | `src/eventing/organization-lifecycle.pipeline.ts:115` |
-| command | `recordTraceSharingDisabled`             | –       | `src/eventing/organization-lifecycle.pipeline.ts:116` |
-| command | `recordMemberDisabled`                   | –       | `src/eventing/organization-lifecycle.pipeline.ts:117` |
-| command | `recordCreated`                          | –       | `src/eventing/organization-lifecycle.pipeline.ts:118` |
+| command | `recordSignedUp`                         | –       | `src/eventing/organization-lifecycle.pipeline.ts:123` |
+| command | `recordMembersInvited`                   | –       | `src/eventing/organization-lifecycle.pipeline.ts:124` |
+| command | `recordInviteAccepted`                   | –       | `src/eventing/organization-lifecycle.pipeline.ts:125` |
+| command | `recordIntegrationMethodChosen`          | –       | `src/eventing/organization-lifecycle.pipeline.ts:126` |
+| command | `recordPersonalWorkspaceProvisioned`     | –       | `src/eventing/organization-lifecycle.pipeline.ts:127` |
+| command | `recordPersonalTeamCreated`              | –       | `src/eventing/organization-lifecycle.pipeline.ts:128` |
+| command | `recordPersonalWorkspaceArchived`        | –       | `src/eventing/organization-lifecycle.pipeline.ts:129` |
+| command | `recordPersonalWorkspaceRevived`         | –       | `src/eventing/organization-lifecycle.pipeline.ts:130` |
+| command | `recordPersonalWorkspaceFeaturesChanged` | –       | `src/eventing/organization-lifecycle.pipeline.ts:131` |
+| command | `recordPresenceSettingChanged`           | –       | `src/eventing/organization-lifecycle.pipeline.ts:135` |
+| command | `recordTraceSharingDisabled`             | –       | `src/eventing/organization-lifecycle.pipeline.ts:136` |
+| command | `recordMemberDisabled`                   | –       | `src/eventing/organization-lifecycle.pipeline.ts:137` |
+| command | `recordMemberEnabled`                    | –       | `src/eventing/organization-lifecycle.pipeline.ts:138` |
+| command | `recordMemberRemoved`                    | –       | `src/eventing/organization-lifecycle.pipeline.ts:139` |
+| command | `recordMemberDepartmentChanged`          | –       | `src/eventing/organization-lifecycle.pipeline.ts:140` |
+| command | `recordCreated`                          | –       | `src/eventing/organization-lifecycle.pipeline.ts:141` |
 
 ### Pipeline `organization_seat_limit` (aggregate `organization_seat_limit`)
 
@@ -2276,7 +2279,7 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                          | Environment variable      | Declared at                                 |
 | ------ | ----------------------------- | ------------------------- | ------------------------------------------- |
-| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:298`           |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:299`           |
 | config | `signUp.mode`                 | `SIGN_UP_MODE`            | `../contract/src/organization.config.ts:17` |
 | config | `signUp.allowedDomains`       | `SIGN_UP_ALLOWED_DOMAINS` | `../contract/src/organization.config.ts:18` |
 | config | `signUp.adminEmails`          | `ADMIN_EMAILS`            | `../contract/src/organization.config.ts:19` |

@@ -9,7 +9,7 @@ import {
   resolver,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
-import type { PrincipalRef } from "@langwatch/authorization";
+import type { Authorization, PrincipalRef } from "@langwatch/authorization";
 import { createLogger } from "@langwatch/observability";
 import { resolveRequestBound } from "@langwatch/plans";
 import { toEpochMs } from "@langwatch/time";
@@ -38,6 +38,8 @@ import {
 } from "@langwatch/trace-contract";
 import type { z } from "zod";
 
+import { unkeyedLegacyFilterViolations } from "#features/legacy/rules/trace-legacy-filter-keys.rules";
+import { compileProjection } from "#features/projection/rules/trace-projection-compile.rules";
 import { enrichTracesWithEvaluations } from "#rules/trace-evaluation-enrichment.rules";
 /**
  * /api/traces: v1 trace reads (search, facets, get-by-id, transcript, metadata
@@ -45,9 +47,7 @@ import { enrichTracesWithEvaluations } from "#rules/trace-evaluation-enrichment.
  * literal /facets, before the bare :traceId.
  */
 import { formatTraceSummaryDigest } from "#rules/trace-formatting.rules";
-import { unkeyedLegacyFilterViolations } from "#features/legacy/rules/trace-legacy-filter-keys.rules";
 import { tracePath } from "#rules/trace-platform-url.rules";
-import { compileProjection } from "#features/projection/rules/trace-projection-compile.rules";
 
 const logger = createLogger("langwatch:api:traces");
 
@@ -210,12 +210,14 @@ async function searchTraces({
   scope,
   project,
   caller,
+  authorization,
 }: {
   app: TraceApi;
   input: z.infer<typeof traceSearchBodySchema>;
   scope: { id: string };
   project: { projectSlug: string };
   caller: { principal: PrincipalRef | null };
+  authorization: Authorization;
 }): Promise<string> {
   const params = input;
   const {
@@ -274,6 +276,7 @@ async function searchTraces({
       scrollId: scrollId ?? undefined,
       dateField,
       filterWhere,
+      authorization,
       ...(projection ? { projection: projection.plan } : {}),
     },
   });
@@ -325,8 +328,8 @@ function createTracesRest(): Readonly<{
         ...SHARED_ERROR_ANSWERS,
       },
     })
-    .handle(async ({ app, input, scope, response }, project, caller) =>
-      response.buffer(await searchTraces({ app, input, scope, project, caller }), {
+    .handle(async ({ app, input, scope, authorization, response }, project, caller) =>
+      response.buffer(await searchTraces({ app, input, scope, project, caller, authorization }), {
         mediaType: "application/json",
       }),
     );
@@ -357,9 +360,10 @@ function createTracesRest(): Readonly<{
         ...FACETS_ERROR_ANSWERS,
       },
     })
-    .handle(({ app, input, scope }, _project, caller) =>
+    .handle(({ app, input, scope, authorization }, _project, caller) =>
       app.readTraceFacetsForApiKey({
         projectId: scope.id,
+        authorization,
         query: input,
         principal: caller.principal,
       }),

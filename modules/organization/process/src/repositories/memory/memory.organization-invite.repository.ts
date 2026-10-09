@@ -9,6 +9,7 @@ import {
   type OrganizationJsonValue,
   type OrganizationUser,
 } from "@langwatch/organization-contract";
+import { NEVER_LANDED_ON_PROJECT_KINDS } from "@langwatch/project-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 
 import {
@@ -210,7 +211,12 @@ export class MemoryOrganizationInviteRepository extends OrganizationInviteReposi
 
   async findProjectSlugsForTeams(input: { teamIds: string[] }): Promise<string[]> {
     return [...this.memory.projects.values()]
-      .filter((project) => input.teamIds.includes(project.teamId) && project.archivedAt === null)
+      .filter(
+        (project) =>
+          input.teamIds.includes(project.teamId) &&
+          project.archivedAt === null &&
+          !isNeverLandedOn(project.kind),
+      )
       .map((project) => project.slug);
   }
 
@@ -220,6 +226,7 @@ export class MemoryOrganizationInviteRepository extends OrganizationInviteReposi
         const team = this.memory.teams.get(project.teamId);
         return (
           project.archivedAt === null &&
+          !isNeverLandedOn(project.kind) &&
           team?.organizationId === input.organizationId &&
           team.archivedAt === null
         );
@@ -440,4 +447,9 @@ export class MemoryOrganizationInviteRepository extends OrganizationInviteReposi
 /** A copy, so a caller holding the answer never writes through to the table. */
 function inviteOfRow(row: MemoryOrganizationInviteRow): OrganizationInvite {
   return { ...row };
+}
+
+/** Whether the app never lands on this kind (main's `NEVER_LANDED_ON_PROJECT_KINDS`). */
+function isNeverLandedOn(kind: string | undefined): boolean {
+  return kind !== undefined && NEVER_LANDED_ON_PROJECT_KINDS.includes(kind);
 }

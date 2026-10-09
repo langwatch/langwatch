@@ -225,6 +225,7 @@ function readActiveScope({
           id: project.id,
           slug: project.slug,
           name: project.name ?? project.slug,
+          kind: project.kind,
           userLinkTemplate: project.userLinkTemplate ?? null,
         }
       : void 0,

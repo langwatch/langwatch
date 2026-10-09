@@ -43,7 +43,7 @@ Answers at `/api/demo/hotel_bot`.
 // Body: hotelBotRequestSchema, ../contract/src/sample-agents.api.ts:13
 type Body = Record<string, unknown>;
 type Headers = z.infer<typeof hotelBotHeadersSchema>; // ../contract/src/sample-agents.api.ts:16
-// Response: hotelBotReplySchema, ../contract/src/sample-agents.api.ts:27
+// Response: hotelBotReplySchema, ../contract/src/sample-agents.api.ts:25
 interface Response {
   message: "Sent to LangWatch";
   ragResponse?: string | null;

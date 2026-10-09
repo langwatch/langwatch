@@ -10,6 +10,7 @@ import {
  * `TraceApi` itself is a double.
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import {
   explorerHiddenOrigins,
   FilterParseError,
@@ -20,12 +21,12 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import type * as projectionCompileRules from "#features/projection/rules/trace-projection-compile.rules";
+import { compileProjection } from "#features/projection/rules/trace-projection-compile.rules";
 import {
   andFilterConditions,
   findHiddenOriginConditions,
 } from "#rules/trace-filter-hidden-origins.rules";
-import type * as projectionCompileRules from "#features/projection/rules/trace-projection-compile.rules";
-import { compileProjection } from "#features/projection/rules/trace-projection-compile.rules";
 
 import { traceQueryTranslation } from "../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
 import { tracesRestCredential, tracesRest } from "../traces.rest.ts";
@@ -49,7 +50,6 @@ function compileExplorerTraceFilter(input: {
 }): { sql: string; params: Record<string, unknown> } {
   const compiled = traceQueryTranslation.translateFilter({
     queryText: input.query,
-    tenantId: input.tenantId,
     timeRange: input.timeRange,
   });
 
@@ -147,6 +147,7 @@ function mount(overrides: Readonly<{ listTraces?: TraceApi["listTraces"] }> = {}
   });
 
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({
         actor: { type: "user" as const, id: "user-1" },
@@ -576,7 +577,7 @@ describe("POST /search with a trace filter", () => {
       await send({ startDate: 1000, endDate: 5000, filter: "status:error" });
       const filterWhere = filterWhereOf(listTraces);
       expect(filterWhere?.sql).toContain("ContainsErrorStatus");
-      expect(filterWhere?.params.tenantId).toBe("project-123");
+      expect(filterWhere?.params).not.toHaveProperty("tenantId");
     });
 
     it("bounds the translation to the window the search asked for", async () => {
@@ -585,6 +586,16 @@ describe("POST /search with a trace filter", () => {
       const filterWhere = filterWhereOf(listTraces);
       expect(filterWhere?.params.timeFrom).toBe(1000);
       expect(filterWhere?.params.timeTo).toBe(5000);
+    });
+
+    it("reads through the door's proof, fenced to the key's own project", async () => {
+      const { send, listTraces } = mount();
+      await send({ startDate: 1000, endDate: 5000, filter: "status:error" });
+      expect(vi.mocked(listTraces).mock.calls[0]?.[0]?.options?.authorization).toEqual(
+        expect.objectContaining({
+          grants: [expect.objectContaining({ projectId: "project-123", kind: "own" })],
+        }),
+      );
     });
 
     it("does not forward the raw string as a search field", async () => {

@@ -7,7 +7,13 @@
 // The permission vocabulary is `@langwatch/authorization`'s; nothing here mirrors it.
 import {
   type Actor,
+  applyAggregateAdminGate,
+  assertProjectAcceptsWrites,
+  type Authorization,
+  type AuthorizationPurpose,
   BlankScopeIdError,
+  PROOF_BEARING_PERMISSIONS,
+  writesUnderProject,
   isPlatformTierPermission,
   permissionGrantTiers,
   PermissionDeniedError,
@@ -181,6 +187,16 @@ export interface Authorize {
     userId: string;
     permission: PlatformTierPermission;
   }): Promise<PlatformDecision>;
+  /** A project's `kind` (ADR-177), null when unknown; absent reads none and gates nothing. */
+  projectKindOf?(projectId: string): Promise<string | null>;
+  /** AuthzApi.authorize's sealed proof for one admitted project read (ADR-166); absent
+   *  mints none. */
+  authorization?(input: {
+    actor: Actor;
+    permission: AuthzPermission;
+    projectId: string;
+    purpose: AuthorizationPurpose;
+  }): Promise<Authorization>;
   /** Refuses a person the organization holds at its second-factor gate; absent asks nothing. */
   assertSecondFactor?(input: {
     userId: string;
@@ -654,8 +670,9 @@ export async function scopeWithOrganization({
   const organizationId = authorize?.organizationOf
     ? await authorize.organizationOf({ tier: scope.tier, id: scope.id })
     : null;
+  if (scope.tier === "team" || !authorize?.projectKindOf) return { ...scope, organizationId };
 
-  return { ...scope, organizationId };
+  return { ...scope, organizationId, kind: await authorize.projectKindOf(scope.id) };
 }
 
 /**
@@ -736,10 +753,14 @@ async function decidePermission({
     ...(declaration.via ? { via: declaration.via } : {}),
   });
 
-  const decision = await decisions.getDecision({
-    userId: actor.id,
-    permission: declaration.permission,
+  const decision = await gatedDecision({
+    decisions,
     scope,
+    decision: await decisions.getDecision({
+      userId: actor.id,
+      permission: declaration.permission,
+      scope,
+    }),
   });
   recordDecision({ actor, permission: declaration.permission, scope, decision });
 
@@ -774,10 +795,14 @@ async function decidePermissionAny({
   // missing split is decided in exactly one place.
   const scope = requireDeclaredScope({ permission: first, input, via: "projectId" });
 
-  const decision = await decisions.getProjectAnyDecision({
-    userId: actor.id,
-    projectId: scope.id,
-    permissions: [first, ...rest],
+  const decision = await gatedDecision({
+    decisions,
+    scope,
+    decision: await decisions.getProjectAnyDecision({
+      userId: actor.id,
+      projectId: scope.id,
+      permissions: [first, ...rest],
+    }),
   });
   recordDecision({ actor, permission: first, scope, decision });
 
@@ -812,7 +837,11 @@ async function decidePermissionAll({
   });
 
   for (const permission of declaration.permissions) {
-    const decision = await decisions.getDecision({ userId: actor.id, permission, scope });
+    const decision = await gatedDecision({
+      decisions,
+      scope,
+      decision: await decisions.getDecision({ userId: actor.id, permission, scope }),
+    });
     recordDecision({ actor, permission, scope, decision });
 
     if (!decision.permitted) throw denied({ permission, scope, decision, denials });
@@ -846,12 +875,98 @@ async function decidePermissionByInput({
       ...(declaration.via ? { via: declaration.via } : {}),
     });
 
-  const decision = await decisions.getDecision({ userId: actor.id, permission, scope });
+  const decision = await gatedDecision({
+    decisions,
+    scope,
+    decision: await decisions.getDecision({ userId: actor.id, permission, scope }),
+  });
   recordDecision({ actor, permission, scope, decision });
 
   if (!decision.permitted) throw denied({ permission, scope, decision, denials });
 
   return { actor, scope };
+}
+
+/**
+ * ADR-177 decision 5 on a project decision: a permitted non-admin pays one kind read and is
+ * refused an aggregate; an admin and a refusal pass untouched without a read.
+ */
+async function gatedDecision({
+  decisions,
+  scope,
+  decision,
+}: {
+  decisions: Authorize;
+  scope: AuthzDeclaredScopeId;
+  decision: PermissionDecision;
+}): Promise<PermissionDecision> {
+  if (scope.tier !== "project" || !decision.permitted || decision.organizationRole === "ADMIN") {
+    return decision;
+  }
+  if (!decisions.projectKindOf) return decision;
+
+  return applyAggregateAdminGate({ decision, kind: await decisions.projectKindOf(scope.id) });
+}
+
+/**
+ * The sealed proof the door mints for an admitted project read under a proof-bearing permission
+ * (ADR-166, ADR-177 block B); null for every other route, so no other route pays the mint. A
+ * proof-bearing route the door cannot mint for is refused before its handler runs.
+ */
+export async function mintAuthorization({
+  permission,
+  actor,
+  scope,
+  authorize,
+  route,
+}: {
+  permission: AuthzPermission | undefined;
+  actor: Actor | null;
+  scope: AuthzDeclaredScopeId | null;
+  authorize: Authorize | undefined;
+  route: string;
+}): Promise<Authorization | null> {
+  if (!permission || !PROOF_BEARING_PERMISSIONS.has(permission)) return null;
+  if (scope?.tier !== "project" || !actor || !authorize?.authorization) {
+    throw new PermissionDeniedError({
+      permission,
+      scope: scope ? { type: scope.tier, id: scope.id } : { type: "resource", id: route },
+      denialReason: "no-binding",
+    });
+  }
+
+  return authorize.authorization({
+    actor,
+    permission,
+    projectId: scope.id,
+    purpose: { kind: "route", route },
+  });
+}
+
+/** The permissions a declaration admits under: any one admits, so any one that writes counts. */
+export function declaredPermissions(declaration: AccessDeclaration): readonly AuthzPermission[] {
+  switch (declaration.kind) {
+    case "permission":
+      return [declaration.permission];
+    case "permission-any":
+    case "permission-all":
+      return declaration.permissions;
+    default:
+      return [];
+  }
+}
+
+/** ADR-177 decision 8: a write under a project-tier permission is refused on an aggregate. */
+export function refuseWriteUnderAggregate({
+  permissions,
+  scope,
+}: {
+  permissions: readonly AuthzPermission[];
+  scope: AuthzHandlerScope | null;
+}): void {
+  if (scope?.tier !== "project" || !permissions.some(writesUnderProject)) return;
+
+  assertProjectAcceptsWrites({ kind: scope.kind });
 }
 
 /**
