@@ -56,6 +56,11 @@ export const UNPUBLISHED = [
     why: "the app's own tRPC transport; its contract is the TypeScript router, not an HTTP schema",
   },
   {
+    match: "POST /api/scenario/execute-sync",
+    category: "internal",
+    why: "the scenario child process asking the control plane to run one turn on this project's own engine, because the credential that invokes it may invoke any project's",
+  },
+  {
     match: "/api/sse",
     category: "internal",
     why: "server-sent event channels the dashboard subscribes to, with no stable per-message contract to publish",

@@ -10,7 +10,6 @@ import { describe, expect, it } from "vitest";
 import { MAX_FILTER_NODE_COUNT } from "../../query-language/queries";
 import { translateFilterToClickHouse } from "../ast";
 
-const TENANT = "tenant-1";
 const RANGE = { from: 0, to: 1 };
 
 const words = (n: number): string =>
@@ -18,7 +17,7 @@ const words = (n: number): string =>
 
 function refusal(query: string): HandledError {
   try {
-    translateFilterToClickHouse(query, TENANT, RANGE);
+    translateFilterToClickHouse(query, RANGE);
   } catch (error) {
     if (error instanceof HandledError) return error;
     throw error;
@@ -42,12 +41,40 @@ describe("given eleven bare words", () => {
 describe("given the same sentence in quotes", () => {
   describe("when the filter is translated", () => {
     it("compiles as one phrase node", () => {
-      const compiled = translateFilterToClickHouse(
-        `"${words(11)}"`,
-        TENANT,
-        RANGE,
-      );
+      const compiled = translateFilterToClickHouse(`"${words(11)}"`, RANGE);
       expect(compiled?.sql).toContain("ILIKE");
+    });
+  });
+});
+
+describe("given an evaluator bound to excluded verdicts", () => {
+  /**
+   * `head` and n excluded verdicts span 3n + 1 nodes either way: n ANDs, the
+   * head, and a NOT plus a tag per verdict. With `evaluator:X` as the head the
+   * group is bound and compiled without walking it; with `evaluatorStatus` it
+   * is walked tag by tag. Both must stop at the same length.
+   */
+  const chain = (head: string, n: number): string =>
+    [
+      head,
+      ...Array.from({ length: n }, () => "NOT evaluatorVerdict:fail"),
+    ].join(" AND ");
+  const lastAllowed = Math.floor((MAX_FILTER_NODE_COUNT - 1) / 3);
+
+  describe.each([
+    ["bound", "evaluator:X"],
+    ["walked tag by tag", "evaluatorStatus:processed"],
+  ])("when the chain is %s", (_, head) => {
+    it("compiles at the ceiling", () => {
+      expect(
+        translateFilterToClickHouse(chain(head, lastAllowed), RANGE),
+      ).not.toBeNull();
+    });
+
+    it("refuses one verdict past it", () => {
+      expect(refusal(chain(head, lastAllowed + 1)).code).toBe(
+        "filter_too_complex",
+      );
     });
   });
 });

@@ -590,3 +590,33 @@ func TestAgent_TurnEnded_IsANoOpWhenNothingWasOrphaned(t *testing.T) {
 		t.Fatal("TurnEnded blocked on an empty handoff channel")
 	}
 }
+
+// A retried model call shows as the panel's status line and clears once the
+// retried call answers (specs/langy/langy-model-call-retry.feature, "The panel
+// shows which attempt is running", "The retry line clears once the call succeeds").
+func TestStreamState_RetryEventsDrawTheStatusLine(t *testing.T) {
+	var got []string
+	state := newStreamState(func(f frames.Frame) bool {
+		got = append(got, f.JSON())
+		return true
+	})
+	if !state.apply(wireEvent{Type: eventRetrying, TurnID: "t1", Attempt: 2, MaxAttempts: 5, DelayMs: 2140}) {
+		t.Fatal("the retrying status did not reach the relay")
+	}
+	if !state.apply(wireEvent{Type: eventRetrySettled, TurnID: "t1"}) {
+		t.Fatal("the cleared status did not reach the relay")
+	}
+
+	want := []string{
+		`{"type":"status","status":"Retrying (2 of 5)"}`,
+		`{"type":"status","status":""}`,
+	}
+	if len(got) != len(want) {
+		t.Fatalf("frames = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("frame %d = %s, want %s", i, got[i], want[i])
+		}
+	}
+}

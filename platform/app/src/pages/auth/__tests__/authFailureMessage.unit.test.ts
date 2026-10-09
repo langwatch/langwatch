@@ -115,6 +115,13 @@ describe("authFailureMessage", () => {
       expect(message).not.toContain("INVALID_ORIGIN");
       expect(message).not.toMatch(/origin/i);
     });
+
+    /** @scenario "A sign-up on a web address the installation is not set up for writes no account" */
+    it("reads the same for the sign-up procedures' own refusal", () => {
+      expect(authFailureMessage({ code: "auth_invalid_origin" })).toBe(
+        authFailureMessage({ code: "INVALID_ORIGIN" }),
+      );
+    });
   });
 
   describe("when nothing recognizable comes back", () => {

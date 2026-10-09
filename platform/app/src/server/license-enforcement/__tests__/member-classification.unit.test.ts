@@ -133,6 +133,22 @@ describe("classifyMemberType", () => {
         "LiteMember",
       );
     });
+
+    /** @scenario Developers are counted and never capped */
+    it("returns Developer for DEVELOPER role, whatever permissions are passed", () => {
+      expect(
+        classifyMemberType(OrganizationUserRole.DEVELOPER, undefined),
+      ).toBe("Developer");
+      expect(
+        classifyMemberType(OrganizationUserRole.DEVELOPER, ["project:manage"]),
+      ).toBe("Developer");
+      expect(isFullMember(OrganizationUserRole.DEVELOPER, undefined)).toBe(
+        false,
+      );
+      expect(isLiteMember(OrganizationUserRole.DEVELOPER, undefined)).toBe(
+        false,
+      );
+    });
   });
 
   describe("EXTERNAL role (Lite Member) with custom permissions", () => {
@@ -306,6 +322,50 @@ describe("getRoleChangeType", () => {
           ["project:view"],
         ),
       ).toBe("no-change");
+    });
+
+    describe("when the change involves a Developer seat", () => {
+      /** @scenario Developers are counted and never capped */
+      it("returns to-developer when moving onto a Developer seat from either pool", () => {
+        expect(
+          getRoleChangeType(
+            OrganizationUserRole.MEMBER,
+            undefined,
+            OrganizationUserRole.DEVELOPER,
+            undefined,
+          ),
+        ).toBe("to-developer");
+        expect(
+          getRoleChangeType(
+            OrganizationUserRole.EXTERNAL,
+            undefined,
+            OrganizationUserRole.DEVELOPER,
+            undefined,
+          ),
+        ).toBe("to-developer");
+      });
+
+      it("enters the Full pool when a Developer becomes a Member", () => {
+        expect(
+          getRoleChangeType(
+            OrganizationUserRole.DEVELOPER,
+            undefined,
+            OrganizationUserRole.MEMBER,
+            undefined,
+          ),
+        ).toBe("lite-to-full");
+      });
+
+      it("enters the Lite pool when a Developer becomes a Lite Member", () => {
+        expect(
+          getRoleChangeType(
+            OrganizationUserRole.DEVELOPER,
+            undefined,
+            OrganizationUserRole.EXTERNAL,
+            undefined,
+          ),
+        ).toBe("full-to-lite");
+      });
     });
 
     it("returns no-change when EXTERNAL with non-view to MEMBER (both Full Member)", () => {

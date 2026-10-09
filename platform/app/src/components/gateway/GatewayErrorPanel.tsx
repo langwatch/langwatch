@@ -1,25 +1,46 @@
 import { Box, Button, EmptyState, Text, VStack } from "@chakra-ui/react";
 import { AlertTriangle } from "lucide-react";
+import {
+  isPermissionRefusal,
+  PermissionRefusedNotice,
+} from "~/components/PermissionRequiredNotice";
 
 export type GatewayErrorPanelProps = {
   title?: string;
-  error?: { message?: string } | null;
+  /** Whatever the failed query carried: a tRPC client error, an Error, or nothing. */
+  error?: unknown;
   onRetry?: () => void;
 };
 
+function readMessage(error: unknown): string {
+  if (typeof error !== "object" || error === null) return "";
+  const message = (error as { message?: unknown }).message;
+  return typeof message === "string" ? message.trim() : "";
+}
+
 /**
  * Renders a consistent error surface for gateway list pages when the
- * tRPC query fails (500, network blip, permission regression, etc).
- * Replaces the silent infinite-spinner anti-pattern where pages only
- * branch on isLoading and never surface isError to the operator.
+ * tRPC query fails (500, network blip, etc), so a page never sits on a
+ * spinner for a query that already failed.
+ *
+ * A refusal for a grant the viewer does not hold is not a failed load:
+ * retrying cannot change it, so it renders as a no-access notice naming the
+ * grant, with no retry.
  */
 export function GatewayErrorPanel({
   title = "Failed to load data",
   error,
   onRetry,
 }: GatewayErrorPanelProps) {
+  if (isPermissionRefusal(error)) {
+    return (
+      <Box paddingY={6}>
+        <PermissionRefusedNotice error={error} />
+      </Box>
+    );
+  }
   const message =
-    error?.message?.trim() ||
+    readMessage(error) ||
     "The request failed unexpectedly. Please try again or check the server logs.";
   return (
     <Box paddingY={12}>

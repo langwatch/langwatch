@@ -18,7 +18,6 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { keepPreviousData } from "@tanstack/react-query";
-
 import {
   chakraComponents,
   Select as MultiSelect,
@@ -58,6 +57,7 @@ import {
 } from "react-hook-form";
 import { LuChartArea, LuPlus } from "react-icons/lu";
 import { useDebounceValue } from "usehooks-ts";
+import { withAggregateAnalyticsGate } from "~/components/analytics/AggregateAnalyticsGate";
 import { RenderCode } from "~/components/code/RenderCode";
 import { Dialog } from "~/components/ui/dialog";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
@@ -65,6 +65,7 @@ import { Menu } from "~/components/ui/menu";
 import { Select } from "~/components/ui/select";
 import { Switch } from "~/components/ui/switch";
 import { Tooltip } from "~/components/ui/tooltip";
+import { showErrorToast } from "~/features/errors";
 import { useDrawer } from "~/hooks/useDrawer";
 import { type FilterParam, useFilterParams } from "~/hooks/useFilterParams";
 import { useRouter } from "~/utils/compat/next-router";
@@ -387,22 +388,22 @@ function AnalyticsCustomGraphContent({
                   <HStack gap={2}>
                     {/*
                      * ADR-034 Phase 8: both the bell-icon (edit) and the
-                     * "Add alert" (create) paths open the automations
+                     * "Add automation" (create) paths open the automations
                      * drawer pre-filled with this graph + its first series,
                      * mirroring the dashboard chart card flow from Phase
                      * 5.2. `deriveSeriesIdentifier` emits the canonical
                      * "{index}/{key|metric}/{aggregation}" form the
                      * automations secondary drawer matches against
                      * (Series.name is a free-form label and would not
-                     * pre-select). Alerts only exist for saved graphs —
-                     * `customId` is unset until the first save, so the
-                     * entry point hides rather than opening a drawer that
-                     * can't reference the graph.
+                     * pre-select). A graph-watching automation only exists
+                     * for a saved graph — `customId` is unset until the
+                     * first save, so the entry point hides rather than
+                     * opening a drawer that can't reference the graph.
                      */}
                     {customId ? (
                       form.watch("alert.enabled") ? (
                         <Tooltip
-                          content="Alert configured"
+                          content="Edit automation"
                           positioning={{ placement: "top" }}
                         >
                           <Box
@@ -438,7 +439,7 @@ function AnalyticsCustomGraphContent({
                           }
                         >
                           <Bell width={16} />
-                          Add alert
+                          Add automation
                         </Button>
                       )
                     ) : null}
@@ -717,9 +718,9 @@ function CustomGraphForm({
       graphJson.height = 300;
     }
 
-    // Alert-writing moved to the automations drawer (ADR-034 Phase 5.2 —
-    // the chart-card `Add alert` bell opens `automation` drawer with
-    // `prefilledGraphId`). This graph mutation is graph-shape only.
+    // Automation-writing moved to the automations drawer (ADR-034 Phase 5.2
+    // — the chart-card `Add automation` bell opens the `automation` drawer
+    // with `prefilledGraphId`). This graph mutation is graph-shape only.
 
     addNewGraph.mutate(
       {
@@ -732,12 +733,20 @@ function CustomGraphForm({
       {
         onSuccess: () => {
           void trpc.graphs.getById.invalidate();
+          // Every picker that offers "which graph?" (the automation drawer's
+          // graph select among them) reads the full list. Without this the
+          // graph just created is absent from it until a page reload.
+          void trpc.graphs.getAll.invalidate();
           // Navigate back to the same page we came from
           const dashboardUrl = dashboardId
             ? `/${project?.slug}/analytics/reports?dashboard=${dashboardId}`
             : `/${project?.slug}/analytics/reports`;
           void router.push(dashboardUrl);
         },
+        // A refused save (an aggregate project is read only, a plan limit,
+        // a lost permission) leaves the editor open; say why.
+        onError: (error) =>
+          showErrorToast({ error, fallbackTitle: "Couldn't save the graph" }),
       },
     );
   };
@@ -761,12 +770,17 @@ function CustomGraphForm({
       {
         onSuccess: () => {
           void trpc.graphs.getById.invalidate();
+          // A rename changes how the graph reads in every list that offers it,
+          // so the full list is as stale as the single graph is.
+          void trpc.graphs.getAll.invalidate();
           // Navigate back to the same dashboard we came from
           const dashboardUrl = dashboardId
             ? `/${project?.slug}/analytics/reports?dashboard=${dashboardId}`
             : `/${project?.slug}/analytics/reports`;
           void router.push(dashboardUrl);
         },
+        onError: (error) =>
+          showErrorToast({ error, fallbackTitle: "Couldn't save the graph" }),
       },
     );
   };
@@ -1643,4 +1657,7 @@ function GraphTypeField({
 }
 
 // No SSR in Vite — export directly (was wrapped in dynamic() for Next.js SSR avoidance)
-export default AnalyticsCustomGraphContent;
+export default withAggregateAnalyticsGate(
+  "Custom Graph",
+  AnalyticsCustomGraphContent,
+);

@@ -46,6 +46,24 @@ describe("CLI default scopes use current grants", () => {
     expect(await subject.selection()).toBeNull();
   });
 
+  /** @scenario A Developer works inside their own project */
+  it("gives a Developer nothing through a group grant on a shared team", async () => {
+    const subject = fixture();
+    subject.memberships.set(USER, { role: "DEVELOPER", disabledAt: null });
+    subject.groups.push({ userId: USER, groupId: GROUP, organizationId: ORG });
+    subject.grants.push(
+      grant({ principalType: "GROUP", principalId: GROUP, roleKey: "member" }),
+    );
+
+    // The same group grant hands a Member the team; the Developer seat is
+    // capped at resolution and the shared team never becomes a key scope.
+    expect(await subject.selection()).toBeNull();
+    subject.memberships.set(USER, { role: "MEMBER", disabledAt: null });
+    expect((await subject.selection())?.bindings).toEqual([
+      { scopeType: "TEAM", scopeId: TEAM },
+    ]);
+  });
+
   it("does not treat the old organization admin role as an admin grant", async () => {
     const subject = fixture();
     subject.memberships.set(USER, { role: "ADMIN", disabledAt: null });

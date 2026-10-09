@@ -5,6 +5,7 @@
  * `./route-search.ts`.
  */
 
+import type { Authorization } from "@langwatch/actor";
 import { type Counter, metrics } from "@opentelemetry/api";
 
 import { getApp } from "~/server/app-layer/app";
@@ -36,17 +37,17 @@ const KNOWN_SIGNALS_LIMIT = 20;
  * context one list, never the search.
  */
 async function listKnownSignals({
-  projectId,
+  authorization,
   timeRange,
 }: {
-  projectId: string;
+  authorization: Authorization;
   timeRange: { from: number; to: number };
 }): Promise<KnownProjectSignals> {
   const app = getApp();
   const [evaluators, events] = await Promise.allSettled(
     ["evaluator", "event"].map((facetKey) =>
       app.traces.list.getFacetValues({
-        tenantId: projectId,
+        authorization,
         timeRange,
         facetKey,
         limit: KNOWN_SIGNALS_LIMIT,

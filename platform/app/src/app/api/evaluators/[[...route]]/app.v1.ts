@@ -13,6 +13,7 @@ import {
   getEvaluatorDefinitions,
   getEvaluatorModelSettingFields,
 } from "~/server/evaluations/getEvaluator";
+import { enforceCreationLimit } from "~/server/license-enforcement";
 import { resolveModelForFeature } from "~/server/modelProviders/resolveModelForFeature";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import {
@@ -197,6 +198,12 @@ export function registerEvaluatorRoutes(
         { projectId: project.id, name: data.name },
         "Creating evaluator",
       );
+
+      await enforceCreationLimit({
+        prisma,
+        projectId: project.id,
+        limitType: "evaluators",
+      });
 
       // Resolve the DEFAULT and EMBEDDINGS models via the cascade, but only
       // the ones this evaluator type will actually store.

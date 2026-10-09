@@ -18,6 +18,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { getApp } from "~/server/app-layer/app";
 
 export const departmentsRouter = createTRPCRouter({
   list: protectedProcedure
@@ -33,8 +34,14 @@ export const departmentsRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string() }))
     .permission("governance:view")
     .query(async ({ ctx, input }) => {
+      const callerOrganizationRole =
+        await getApp().organizations.getUserOrgRole({
+          userId: ctx.session.user.id,
+          organizationId: input.organizationId,
+        });
       return await DepartmentService.create(ctx.prisma).getAssignments({
         organizationId: input.organizationId,
+        callerOrganizationRole,
       });
     }),
 

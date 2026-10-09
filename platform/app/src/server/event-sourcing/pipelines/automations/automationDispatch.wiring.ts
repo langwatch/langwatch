@@ -1,3 +1,4 @@
+import { internalActor } from "@langwatch/actor";
 import { Cluster, type Redis } from "ioredis";
 import { env } from "~/env.mjs";
 import type { PrismaClient } from "~/generated/prisma/client";
@@ -5,6 +6,7 @@ import { createOrUpdateQueueItems } from "~/server/api/routers/annotation";
 import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord.utils";
 import { getProtectionsForProject } from "~/server/api/utils";
 import { getApp } from "~/server/app-layer/app";
+import type { AuthorizationService } from "~/server/app-layer/authz/authorization.service";
 import { AutomationCustomGraphService } from "~/server/app-layer/automations/custom-graph.service";
 import { sendRenderedSlackMessage } from "~/server/app-layer/automations/delivery/sendSlackWebhook";
 import { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
@@ -32,7 +34,9 @@ import {
 import { PrismaGraphTriggerSentRepository } from "~/server/app-layer/automations/repositories/trigger.prisma.repository";
 import { defaultRunawayContainmentDeps } from "~/server/app-layer/automations/runaway-containment.deps";
 import { handlePersistCapBreach } from "~/server/app-layer/automations/runaway-containment.service";
+import { createSlackDestinationResolver } from "~/server/app-layer/automations/slack-integration/slack-integration.wiring";
 import type { TriggerService } from "~/server/app-layer/automations/trigger.service";
+import { createTriggerLatestEvaluationService } from "~/server/app-layer/automations/trigger-latest-evaluation.wiring";
 import { WebhookDeliveryService } from "~/server/app-layer/automations/webhook-delivery.service";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
 import type { ProjectService } from "~/server/app-layer/projects/project.service";
@@ -81,6 +85,7 @@ export function buildAutomationDispatchPorts({
   traces,
   traceSummaryRepository,
   resolveClickHouseClient,
+  authorization,
 }: {
   prisma: PrismaClient;
   redis: Redis | Cluster | null;
@@ -93,6 +98,9 @@ export function buildAutomationDispatchPorts({
   /** The composition root's ClickHouse resolver — the heartbeat's recency
    *  probe reads through it. Passed down, never imported. */
   resolveClickHouseClient: ClickHouseClientResolver;
+  /** Mints the own-only proof the settle confirm's event read is fenced by
+   *  (ADR-144 block C); the confirm names its project from the match. */
+  authorization: Pick<AuthorizationService, "authorizeInternal">;
 }): AutomationDispatchPorts {
   // Fail loud if BASE_HOST is missing: every alert dispatch interpolates it
   // into deep links; an empty baseHost silently ships broken links.
@@ -106,14 +114,26 @@ export function buildAutomationDispatchPorts({
   // Shared trace fold store — dispatch re-reads it for the settle confirm.
   // RedisCachedFoldStore takes a standalone `Redis` client; a Cluster
   // client falls back to the uncached store.
+  // The dispatch reads committed fold state outside a fold step, so the
+  // store's read proof names the dispatch as the reader (ADR-144 block C).
+  const uncachedTraceSummaryStore = new TraceSummaryStore({
+    repository: traceSummaryRepository,
+    authorize: ({ projectId, purpose }) =>
+      authorization.authorizeInternal({
+        actor: internalActor(
+          "event-sourcing/pipelines/automations/automationDispatch.wiring",
+        ),
+        projectId,
+        permission: "traces:view",
+        purpose,
+      }),
+  });
   const traceSummaryStore: FoldProjectionStore<TraceSummaryData> =
     redis && !(redis instanceof Cluster)
-      ? new RedisCachedFoldStore(
-          new TraceSummaryStore(traceSummaryRepository),
-          redis,
-          { keyPrefix: "trace_summaries" },
-        )
-      : new TraceSummaryStore(traceSummaryRepository);
+      ? new RedisCachedFoldStore(uncachedTraceSummaryStore, redis, {
+          keyPrefix: "trace_summaries",
+        })
+      : uncachedTraceSummaryStore;
 
   const traceReadDerivation = new TraceReadDerivationService(traces.spans);
 
@@ -152,6 +172,14 @@ export function buildAutomationDispatchPorts({
   // prisma — same query shape, service/repository layering (no direct
   // prisma in composition-root closures).
   const customGraphs = AutomationCustomGraphService.create(prisma);
+  // ADR-093 §5a: one resolver in front of every Slack dispatch, built once so
+  // the digest path and the graph-alert path can never disagree about where a
+  // delivery goes.
+  const resolveSlackDestination = createSlackDestinationResolver({ prisma });
+  // What each check observed, so the automation's view can explain a quiet
+  // alert. The service swallows its own write failures — an alert must never
+  // go unsent because its observation could not be recorded.
+  const latestEvaluations = createTriggerLatestEvaluationService(prisma);
   const graphTriggerEvalDeps: GraphTriggerEvaluationDeps = {
     loadTrigger: async ({ triggerId, projectId }) =>
       triggers.getById({ triggerId, projectId }),
@@ -163,6 +191,8 @@ export function buildAutomationDispatchPorts({
     triggerSent: graphTriggerSentRepo,
     updateLastRunAt: async ({ triggerId, projectId }) =>
       triggers.updateLastRunAt(triggerId, projectId),
+    recordEvaluation: async (input) => latestEvaluations.record(input),
+    resolveSlackDestination,
     notifier: {
       dispatch: async (input) =>
         dispatchGraphAlertAction({
@@ -246,8 +276,30 @@ export function buildAutomationDispatchPorts({
     projects,
     baseHost,
     traceSummaryStore,
-    evaluationRuns: evaluations.runs,
-    deriveEvents: (params) => traceReadDerivation.deriveEvents(params),
+    findEvaluations: async ({ tenantId, traceId }) =>
+      evaluations.runs.findByTraceId({
+        authorization: await authorization.authorizeInternal({
+          actor: internalActor(
+            "app-layer/automations/dispatch/confirmSettledMatch",
+          ),
+          projectId: tenantId,
+          permission: "traces:view",
+          purpose: { kind: "operator", entry: "confirmSettledMatch" },
+        }),
+        traceId,
+      }),
+    deriveEvents: async ({ tenantId, ...params }) =>
+      traceReadDerivation.deriveEvents({
+        authorization: await authorization.authorizeInternal({
+          actor: internalActor(
+            "app-layer/automations/dispatch/confirmSettledMatch",
+          ),
+          projectId: tenantId,
+          permission: "traces:view",
+          purpose: { kind: "operator", entry: "confirmSettledMatch" },
+        }),
+        ...params,
+      }),
     emailHourlyCap: env.TRIGGER_EMAIL_HOURLY_CAP,
     consumeEmailCapSlot: ({ projectId, triggerId, now, dedupKey }) =>
       consumeEmailCapSlot({
@@ -287,6 +339,7 @@ export function buildAutomationDispatchPorts({
       await createManyDatasetRecords(params);
     },
     recordWebhookDelivery,
+    resolveSlackDestination,
     resolvePersistDailyCap: (projectId) => resolvePersistDailyCap(projectId),
     consumePersistCapSlot: (params) =>
       consumePersistCapSlot({ ...params, redis }),

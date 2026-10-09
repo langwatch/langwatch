@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { KNOWN_FIELDS } from "~/server/app-layer/traces/filter-to-clickhouse/build-handlers";
 import {
   type Condition,
+  checkQuery,
   operatorsForValueType,
+  queryIsValid,
   queryToConditions,
   serializeConditions,
 } from "../conditionQuery";
@@ -204,5 +207,46 @@ describe("operatorsForValueType", () => {
   it("offers membership for everything else", () => {
     expect(operatorsForValueType("categorical")).toEqual(["is", "is_not"]);
     expect(operatorsForValueType(undefined)).toEqual(["is", "is_not"]);
+  });
+});
+
+describe("checkQuery", () => {
+  it("reports a parse error", () => {
+    expect(checkQuery("status:error AND (model:gpt").error).not.toBeNull();
+  });
+
+  it("reports a missing value as an error", () => {
+    expect(checkQuery("status:").error).toMatch(/Missing value/);
+  });
+
+  it("warns on a value outside a closed set", () => {
+    expect(checkQuery("status:error#simplified").warnings).toEqual([
+      "`status` is never `error#simplified`: expected one of error, warning, ok.",
+    ]);
+  });
+
+  it("warns on an unknown field", () => {
+    expect(checkQuery("stauts:error").warnings[0]).toMatch(/Unknown field/);
+  });
+
+  it("knows every field the translator reads, trace and evaluatorPassed included", () => {
+    const unknown = KNOWN_FIELDS.filter((field) =>
+      checkQuery(`${field}:x`).warnings.some((warning) =>
+        warning.startsWith("Unknown field"),
+      ),
+    );
+    expect(unknown).toEqual([]);
+  });
+
+  it("accepts known fields, attribute prefixes and wildcards", () => {
+    expect(
+      checkQuery("status:error AND trace.attribute.plan:pro AND model:gpt*"),
+    ).toEqual({ error: null, warnings: [] });
+  });
+
+  it("marks only a clean, non-empty query valid", () => {
+    expect(queryIsValid("status:error")).toBe(true);
+    expect(queryIsValid("")).toBe(false);
+    expect(queryIsValid("status:nope")).toBe(false);
   });
 });

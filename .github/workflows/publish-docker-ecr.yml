@@ -205,6 +205,7 @@ jobs:
             langwatch-langevals:
               - 'infra/docker/Dockerfile.langevals'
               - 'services/langevals/**'
+              - 'platform/app/src/server/modelProviders/llmModels*.json'
               - '.github/workflows/publish-docker-ecr.yml'
             langwatch-gateway:
               - 'infra/docker/Dockerfile.go_service'
@@ -336,6 +337,10 @@ jobs:
           provenance: false
           cache-from: type=gha,scope=ecr-${{ matrix.image }}-${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=ecr-${{ matrix.image }}-${{ matrix.arch }}
+          # The Go images stamp this into main.Version, which every log line and
+          # the OTel resource report; the other images ignore it.
+          build-args: |
+            VERSION=${{ needs.meta.outputs.version || needs.meta.outputs.image_tag }}
           tags: |
             ${{ steps.ecr.outputs.registry }}/${{ matrix.image }}:${{ needs.meta.outputs.image_tag }}-${{ matrix.arch }}
 

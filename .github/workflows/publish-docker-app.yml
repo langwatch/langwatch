@@ -135,6 +135,12 @@ jobs:
           platforms: ${{ matrix.platform }}
           cache-from: type=gha,scope=${{ matrix.image }}-${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}-${{ matrix.arch }}
+          # The Go images stamp this into main.Version, which every log line and
+          # the OTel resource report. Go_service and langwatch_nlp read VERSION,
+          # langyagent reads SERVICE_VERSION; the other images ignore both.
+          build-args: |
+            VERSION=${{ needs.extract-version.outputs.version || format('git-{0}', needs.extract-version.outputs.short_hash) }}
+            SERVICE_VERSION=${{ needs.extract-version.outputs.version || format('git-{0}', needs.extract-version.outputs.short_hash) }}
           tags: |
             langwatch/${{ matrix.image }}:${{ needs.extract-version.outputs.short_hash }}-${{ matrix.arch }}
 

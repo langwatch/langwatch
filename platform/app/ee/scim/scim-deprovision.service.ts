@@ -39,10 +39,12 @@ import type { GrantsService } from "@langwatch/authz-server";
 import { HandledError } from "@langwatch/handled-error";
 import type { ScimApplyOp } from "@langwatch/identity";
 import { createLogger } from "@langwatch/observability";
+import { tryGetApp } from "~/server/app-layer/app";
 import {
   CannotDisableLastAdminError,
   CannotRemoveLastAdminError,
 } from "~/server/app-layer/organizations/errors";
+import type { AggregateReconciler } from "~/server/app-layer/projects/aggregate-reconciler.service";
 import type { ScimSyncLifecycle } from "./scim-sync.service";
 
 const logger = createLogger("langwatch:scim:deprovision");
@@ -63,6 +65,12 @@ export type ScimRemovalManifest = {
 export interface ScimDeprovisionDeps {
   grants: GrantsService;
   syncLifecycle: ScimSyncLifecycle;
+  /**
+   * ADR-144 block E: re-reads the organisation's aggregates once a removal
+   * has archived the person's personal project. Unset means the App's
+   * reconciler, resolved when someone is removed.
+   */
+  aggregateMembers?: Pick<AggregateReconciler, "reconcileOrganizationOrLog">;
 }
 
 export class ScimDeprovisionService {
@@ -94,6 +102,14 @@ export class ScimDeprovisionService {
         organizationId,
       });
       this.reportManifest({ userId, organizationId, needsHumanDecision });
+      // Never throws: the removal stands, and each aggregate's nightly sweep
+      // is the retry.
+      await (
+        this.deps.aggregateMembers ?? tryGetApp()?.projects.aggregateReconciler
+      )?.reconcileOrganizationOrLog({
+        organizationId,
+        trigger: "member-offboarded",
+      });
       return needsHumanDecision;
     } catch (error) {
       const surfacedError =

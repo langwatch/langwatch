@@ -28,7 +28,7 @@ import {
  * it runs and which department drove it. The rest stay on the card, which has
  * the room and draws only the rows that tool actually has.
  *
- * HEADERS ARE SPELLED OUT. "Licence per month", not "Licence / mo"; "Usage ·
+ * HEADERS ARE SPELLED OUT. "License per month", not "License / mo"; "Usage ·
  * 30 days", not "Usage · 30d". A shortened header saves a few pixels and costs
  * the reader a guess, and this is the screen where a wrong guess about a money
  * column is expensive. Where that makes the table wider than the pane, the

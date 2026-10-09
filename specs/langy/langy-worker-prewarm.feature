@@ -100,6 +100,25 @@ Feature: Langy worker pre-warm on panel open
       # so the first turn, which strips the token the same way, still
       # matches the warmed worker's signature and reuses it
 
+    @unit
+    Scenario: The warm and the turn's probe carry the same disabled skills
+      Given a skill is gated off for the user by a feature flag
+      When the warm request is handled
+      Then the warmed worker carries that skill as disabled
+      And the warm probe asks for a worker with that skill disabled
+      When the user sends the first message
+      Then the turn's probe asks for a worker with that skill disabled
+      # so a probe hit means the dispatch reuses the warmed worker, instead of
+      # replacing it with a spawn that carries no session key
+
+    @unit
+    Scenario: A keyless dispatch that needs a spawn is logged as the fallback, not an error
+      Given the control plane dispatched a turn without a session key
+      And the conversation has no worker the turn can reuse
+      When the manager handles the dispatch
+      Then it answers credentials_required so the control plane mints a key and re-sends
+      And it logs that outcome at info level with no stacktrace
+
   Rule: Warm failures are invisible to the user
 
     @unit

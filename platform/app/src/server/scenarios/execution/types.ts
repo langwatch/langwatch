@@ -338,10 +338,14 @@ export type TargetAdapterData = z.infer<typeof TargetAdapterDataSchema>;
 // LiteLLM Types
 // ============================================================================
 
-/** LiteLLM proxy parameters for model access */
+/**
+ * Params from `prepareLitellmParams`. `api_key` is optional because Bedrock
+ * (AWS access keys) and Vertex (service account credentials) authenticate
+ * through their own fields, which ride the catchall.
+ */
 export const LiteLLMParamsSchema = z
   .object({
-    api_key: z.string(),
+    api_key: z.string().optional(),
     model: z.string(),
   })
   .catchall(z.string());
@@ -374,6 +378,24 @@ export const ExecutionContextSchema = z.object({
   scenarioRunId: z.string().optional(),
 });
 export type ExecutionContext = z.infer<typeof ExecutionContextSchema>;
+
+/**
+ * Where a code or workflow target's `execute_sync` POST goes.
+ *
+ * Chosen by the parent, because only the parent can see whether this
+ * deployment gives each project its own engine. `direct` posts to the engine
+ * itself, which is what a self-hosted install does. `relay` posts to the
+ * control plane, which then invokes that project's own engine: on SaaS the
+ * credential for that invoke may reach any project's function, so it stays in
+ * the control plane and never enters the child.
+ *
+ * @see ./serialized-adapters/execute-sync-transport.ts
+ */
+export const ExecuteSyncRouteSchema = z.discriminatedUnion("mode", [
+  z.object({ mode: z.literal("direct"), nlpServiceUrl: z.string() }),
+  z.object({ mode: z.literal("relay"), relayBaseUrl: z.string() }),
+]);
+export type ExecuteSyncRoute = z.infer<typeof ExecuteSyncRouteSchema>;
 
 /** Model configuration - LLM settings */
 export const ModelConfigSchema = z.object({
@@ -497,6 +519,15 @@ export const ChildProcessJobDataSchema = z
      *  fallback as the simulator, from the scenarios.judge default. */
     judgeModelParams: LiteLLMParamsSchema.optional(),
     nlpServiceUrl: z.string(),
+    /**
+     * Where this run's code or workflow target sends `execute_sync`.
+     *
+     * Optional so a job queued before the route existed still parses and
+     * still runs: the child falls back to posting to `nlpServiceUrl`, which
+     * is what it has always done. That is what lets a deploy drain its queue
+     * instead of failing every in-flight run.
+     */
+    executeSyncRoute: ExecuteSyncRouteSchema.optional(),
     target: TargetConfigSchema,
     /**
      * Total time in milliseconds the judge waits at verdict time for an http

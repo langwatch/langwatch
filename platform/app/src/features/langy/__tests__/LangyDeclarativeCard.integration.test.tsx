@@ -277,7 +277,7 @@ describe("LangyDeclarativeCard", () => {
           output: "Created trigger Alert on errors",
         });
 
-        expect(screen.getByText("New trigger")).toBeTruthy();
+        expect(screen.getByText("New automation")).toBeTruthy();
         expect(screen.getByText("Alert on errors")).toBeTruthy();
         expect(screen.getByText("Created and ready to use.")).toBeTruthy();
       });
@@ -367,7 +367,7 @@ describe("LangyDeclarativeCard", () => {
           output: "Deleted",
         });
 
-        expect(screen.getByText("Delete trigger")).toBeTruthy();
+        expect(screen.getByText("Delete automation")).toBeTruthy();
         expect(screen.getByText("Removed.")).toBeTruthy();
       });
     });
