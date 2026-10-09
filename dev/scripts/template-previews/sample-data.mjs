@@ -163,7 +163,7 @@ const BATCHES = [
 
 /** Every widget query's answer, by `widget/query`. */
 export const SAMPLES = {
-  // Flight deck: one glance.
+  // Agent health: one glance.
   "ck-kpis/present": PRESENT,
   "ck-kpis/outcomes": [outcomes()],
   "ck-kpis/spend": [spend],
