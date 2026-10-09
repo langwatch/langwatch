@@ -1,5 +1,5 @@
 import { Link } from "@langwatch/browser-host/link";
-import { Box, Button, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
+import { Button, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import { useEffect, useRef, useState } from "react";
 
 import { authApi as api } from "../../behavior/auth-api.ts";
@@ -11,6 +11,7 @@ import { acceptInviteResultSchema } from "../../model/invite-messages.ts";
 import { readHandledError } from "../../model/read-handled-error.ts";
 import { AuthCard } from "../elements/auth-card.tsx";
 import {
+  FRONT_DOOR_ACTION_GEOMETRY,
   FRONT_DOOR_PRIMARY_STYLE,
   FrontDoorPrimaryButton,
 } from "../elements/front-door-primary-button.tsx";
@@ -190,24 +191,24 @@ function SignedOutInvite({
           onPasskeyError={setPasskeyError}
           onFederatedMethodChosen={(method) => void signIn(method.id, { callbackUrl })}
           renderLocalMethod={() => (
-            <HStack gap={4}>
-              <Box asChild>
-                <Link
-                  href={`/auth/signin?callbackUrl=${encodeURIComponent(callbackUrl)}`}
-                  style={{ textDecoration: "underline" }}
-                >
+            <VStack width="full" align="stretch" gap={3}>
+              <Button asChild {...FRONT_DOOR_PRIMARY_STYLE}>
+                <Link href={`/auth/signin?callbackUrl=${encodeURIComponent(callbackUrl)}`}>
                   Sign in
                 </Link>
-              </Box>
-              <Box asChild>
-                <Link
-                  href={`/auth/signup?callbackUrl=${encodeURIComponent(callbackUrl)}`}
-                  style={{ textDecoration: "underline" }}
-                >
+              </Button>
+              <Button
+                asChild
+                variant="outline"
+                {...FRONT_DOOR_ACTION_GEOMETRY}
+                borderColor="frontDoor.fieldBorder"
+                _hover={{ backgroundColor: "frontDoor.fieldBg", borderColor: "fg.subtle" }}
+              >
+                <Link href={`/auth/signup?callbackUrl=${encodeURIComponent(callbackUrl)}`}>
                   Create an account
                 </Link>
-              </Box>
-            </HStack>
+              </Button>
+            </VStack>
           )}
         />
       ) : null}
