@@ -71,7 +71,8 @@ export class AgentHttpCredentialsBackfillService {
     }
     if (report.held > 0) {
       throw new Error(
-        `${report.held} HTTP agent credential(s) could not be stored as project secrets; the worker log names each agent. Retry the step once the cause is fixed.`,
+        `${report.held} HTTP agent credential(s) could not be stored as project secrets; ` +
+          "the worker log names each agent. Retry the step once the cause is fixed.",
       );
     }
 
