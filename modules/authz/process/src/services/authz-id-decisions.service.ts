@@ -175,7 +175,7 @@ export class AuthzIdDecisionsService {
       return {
         allowed: false,
         organizationRole: grants.organizationRole,
-        denialReason: "no-binding",
+        denialReason: "no-grant",
       };
     }
 

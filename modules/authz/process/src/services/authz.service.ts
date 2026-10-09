@@ -284,7 +284,7 @@ export class AuthzService {
         })
         .catch((error: unknown) => {
           if (!(error instanceof AccessNotGrantedError)) throw error;
-          throw new PermissionDeniedError({ permission, scope, denialReason: "no-binding" });
+          throw new PermissionDeniedError({ permission, scope, denialReason: "no-grant" });
         });
       const witness = this.mintAuthorizationWitness({
         tier: "project",
@@ -301,7 +301,7 @@ export class AuthzService {
       throw new PermissionDeniedError({
         permission,
         scope,
-        denialReason: decision.denialReason ?? "no-binding",
+        denialReason: decision.denialReason ?? "no-grant",
       });
     }
 

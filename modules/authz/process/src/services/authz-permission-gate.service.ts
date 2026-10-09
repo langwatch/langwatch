@@ -165,7 +165,7 @@ export class AuthzPermissionGateService {
           type: declaredScope?.tier ?? "project",
           id: declaredScope?.id ?? "unresolved",
         },
-        denialReason: "no-binding",
+        denialReason: "no-grant",
       });
     }
 
