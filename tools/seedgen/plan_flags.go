@@ -75,16 +75,19 @@ type Flags struct {
 	DryRun bool   `json:"-"`
 }
 
-// OrgSpec is one --org: name=..,plan=..,users=N[,persona=..]; users counts the owner.
+// OrgSpec is one --org: name=..,plan=..,users=N[,persona=..][,owner=EMAIL]; users counts the owner.
 type OrgSpec struct {
 	Name    string `json:"name"`
 	Plan    string `json:"plan"`
 	Users   int    `json:"users"`
 	Persona string `json:"persona"`
+	// Owner, when set, is the owner's email, e.g. an idpsim tenant's admin so the org can bind that tenant.
+	Owner string `json:"owner,omitempty"`
 }
 
-// OrgPlans are the plans an --org may name; licence and saas arrive with slice S6.
-var OrgPlans = []string{"free"}
+// OrgPlans are the plans an --org may name: licence is an Enterprise licence signed by the
+// stack's dev key (seed plan §18.1); saas arrives with slice S6.
+var OrgPlans = []string{"free", "licence"}
 
 // MaxOrgUsers bounds users= in one --org.
 const MaxOrgUsers = 500
@@ -98,7 +101,7 @@ func ParseOrgSpec(value string) (OrgSpec, error) {
 	for part := range strings.SplitSeq(value, ",") {
 		key, field, ok := strings.Cut(part, "=")
 		if !ok {
-			return spec, refuse("name=..,plan=..,users=N,persona=.. pairs")
+			return spec, refuse("name=..,plan=..,users=N,persona=..,owner=.. pairs")
 		}
 		switch key {
 		case "name":
@@ -107,6 +110,8 @@ func ParseOrgSpec(value string) (OrgSpec, error) {
 			spec.Plan = field
 		case "persona":
 			spec.Persona = field
+		case "owner":
+			spec.Owner = field
 		case "users":
 			n, err := strconv.Atoi(field)
 			if err != nil {
@@ -114,18 +119,20 @@ func ParseOrgSpec(value string) (OrgSpec, error) {
 			}
 			spec.Users = n
 		default:
-			return spec, refuse("the keys name, plan, users and persona")
+			return spec, refuse("the keys name, plan, users, persona and owner")
 		}
 	}
 	switch {
 	case !orgNamePattern.MatchString(spec.Name):
 		return spec, refuse("name= of lowercase letters, digits and hyphens")
 	case !slices.Contains(OrgPlans, spec.Plan):
-		return spec, refuse("plan=" + strings.Join(OrgPlans, "|") + " (licence and saas plans are not built yet)")
+		return spec, refuse("plan=" + strings.Join(OrgPlans, "|") + " (the saas plan is not built yet)")
 	case spec.Users < 1 || spec.Users > MaxOrgUsers:
 		return spec, refuse(fmt.Sprintf("users=1 to %d", MaxOrgUsers))
 	case !slices.Contains(Personas, spec.Persona):
 		return spec, refuse("persona=" + strings.Join(Personas, "|"))
+	case spec.Owner != "" && !strings.Contains(spec.Owner, "@"):
+		return spec, refuse("owner= an email address")
 	}
 	return spec, nil
 }

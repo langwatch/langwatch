@@ -32,6 +32,7 @@ type Org struct {
 	Persona  string
 	Ref, Key string
 	Name     string
+	Plan     string // "licence" seeds an Enterprise licence; anything else leaves the product's default
 	Private  bool
 	Projects []*Project
 	Users    []User
@@ -71,8 +72,11 @@ func NewPlan(flags Flags) (*Plan, error) {
 	case len(flags.Orgs) > 0:
 		for _, spec := range flags.Orgs {
 			org := plan.newOrg(spec.Persona, spec.Name, false)
-			org.Key = spec.Name // the org is named as asked; its users' emails derive from the name
+			org.Key, org.Plan = spec.Name, spec.Plan // the org is named as asked; its users' emails derive from the name
 			plan.fill(org, 1, spec.Users)
+			if spec.Owner != "" {
+				org.Users[0].Email = spec.Owner
+			}
 			plan.Orgs = append(plan.Orgs, org)
 		}
 	default:
@@ -351,6 +355,10 @@ func (org *Org) actions(days int, withAdmin bool) []Action {
 		actions = append(actions, userAction(owner),
 			Action{Kind: KindOrgCreate, Ref: org.Ref, As: owner.Ref, Key: org.Key,
 				Input: inputOf(map[string]any{"name": org.Key, "persona": org.Persona, "team": "main"})})
+	}
+	if org.Plan == "licence" {
+		actions = append(actions, Action{Kind: KindLicenseIssue, Org: org.Ref, As: owner.Ref, Key: org.Key,
+			Input: inputOf(map[string]any{"name": org.Key, "email": owner.Email})})
 	}
 	actions = append(actions,
 		Action{Kind: KindRetentionSet, Org: org.Ref, As: owner.Ref, Key: org.Key,
