@@ -46,8 +46,11 @@ services:
     image: langwatch/clickhouse-serverless:0.2.0
     environment:
       CLICKHOUSE_PASSWORD: langwatch
+    # Loopback only, for the migration tool in Step 3. Docker-published ports
+    # bypass host firewalls such as ufw, so never publish it as "8123:8123".
+    # Remove the ports block once the migration is done.
     ports:
-      - "8123:8123"
+      - "127.0.0.1:8123:8123"
     volumes:
       - clickhouse-data:/var/lib/clickhouse
     deploy:

@@ -41,12 +41,23 @@ Docker Compose starts the following services:
 | `app` | `langwatch/langwatch:latest` | 5560 | Main application |
 | `workers` | `langwatch/langwatch:latest` | - | Background job processing |
 | `langwatch_nlp` | `langwatch/langwatch_nlp:latest` | - | NLP processing, workflows |
-| `langevals` | `langwatch/langevals:latest` | 5562 | Evaluators, guardrails |
-| `postgres` | `postgres:16` | 5432 | Control plane database |
+| `langevals` | `langwatch/langevals:latest` | - | Evaluators, guardrails |
+| `postgres` | `postgres:16` | - | Control plane database |
 | `redis` | `redis:alpine` | - | Job queue, caching |
-| `clickhouse` | `langwatch/clickhouse-serverless:0.2.0` | 8123 | Trace and analytics storage |
+| `clickhouse` | `langwatch/clickhouse-serverless:0.2.0` | - | Trace and analytics storage |
 
-Services with no host port bind no port on the host's interfaces, so they do not answer on `localhost` and are not reachable from another machine. `langwatch_nlp` listens on 5561 inside the Docker network, which is what `LANGWATCH_NLP_SERVICE` points the app and the workers at. A process on the Docker host itself can still reach a container directly on its own network address, so treat this as removing an exposed entry point, not as a network boundary.
+Only the app publishes a port on the host. Every other service listens inside the Docker network, where the app and the workers reach it by service name (`postgres:5432`, `clickhouse:8123`, `langevals:5562`, `langwatch_nlp:5561`). Those services do not answer on `localhost` and are not reachable from another machine. A process on the Docker host itself can still reach a container directly on its own network address, so treat this as removing an exposed entry point, not as a network boundary.
+
+<Warning>
+Docker writes its own firewall rules ahead of host firewalls such as ufw and firewalld, so a published port is reachable from the internet even when the host firewall denies it. If you need a database on the host, for a backup tool or a SQL client, publish it on loopback only, never as a bare `"5432:5432"`:
+
+```yaml
+services:
+  postgres:
+    ports:
+      - "127.0.0.1:5432:5432"
+```
+</Warning>
 
 ## Configuration
 
@@ -70,6 +81,18 @@ LANGWATCH_NLP_INTERNAL_SECRET=
 # or a signed license key (works offline)
 LANGWATCH_LICENSE_KEY=
 ```
+
+### Database passwords
+
+Postgres and ClickHouse default to the passwords `prisma` and `langwatch`. They are only reachable inside the Docker network, but set your own before the first start. Compose reads them from a `.env` file in the repository root (not `platform/app/.env`) or from your shell:
+
+```bash
+# Run from the repository root. Hex keeps each value safe inside connection URLs.
+echo "POSTGRES_PASSWORD=$(openssl rand -hex 24)" >> .env
+echo "CLICKHOUSE_PASSWORD=$(openssl rand -hex 24)" >> .env
+```
+
+Postgres applies its password only when it first creates the database volume, so on an existing install either keep the default or change it inside Postgres first (`ALTER USER prisma PASSWORD '...'`), then set the same value here.
 
 See [Editions and licensing](/self-hosting/licensing#two-forms-of-license) for how each form is applied at startup. Keep `CREDENTIALS_SECRET` stable once LangWatch holds data: changing it makes stored credentials unreadable and invalidates API keys. See [Security](/self-hosting/security#credentials-secret). See [Environment Variables](/self-hosting/configuration/environment-variables) for the full reference.
 
