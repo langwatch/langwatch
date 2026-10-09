@@ -34,6 +34,10 @@
   --sim-accent: var(--amber);
 }
 
+.sim-console[data-sim="payment"] {
+  --sim-accent: var(--brand-deep);
+}
+
 .sim-console[data-sim="telemetry"] {
   --sim-accent: var(--rust);
 }

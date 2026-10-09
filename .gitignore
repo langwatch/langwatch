@@ -55,6 +55,9 @@ dist/
 !/services/outboundsim/web/dist/
 /services/outboundsim/web/dist/*
 !/services/outboundsim/web/dist/.gitkeep
+!/services/paymentsim/web/dist/
+/services/paymentsim/web/dist/*
+!/services/paymentsim/web/dist/.gitkeep
 /dev/.cache/
 
 langwatch_server/

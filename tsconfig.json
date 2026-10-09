@@ -589,6 +589,9 @@
       "path": "apps/outboundsim-web/tsconfig.json"
     },
     {
+      "path": "apps/paymentsim-web/tsconfig.json"
+    },
+    {
       "path": "packages/oxlint-rules/tsconfig.json"
     },
     {

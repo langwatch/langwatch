@@ -52,6 +52,7 @@ const INTERNAL_CONSOLES = new Set([
   "llmsim-web",
   "mailsim-web",
   "outboundsim-web",
+  "paymentsim-web",
   "storagesim-web",
   "telemetrysim-web",
   "voicesim-web",

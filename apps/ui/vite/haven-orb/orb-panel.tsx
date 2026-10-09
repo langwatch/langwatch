@@ -567,7 +567,17 @@ const GROUPS: Group[] = [
   {
     name: "Sims",
     icon: FlaskConical,
-    members: ["llm", "mail", "storage", "idp", "voice", "analytics", "outbound", "telemetry"],
+    members: [
+      "llm",
+      "mail",
+      "storage",
+      "idp",
+      "voice",
+      "analytics",
+      "outbound",
+      "payment",
+      "telemetry",
+    ],
   },
   { name: "Data", icon: Database, members: ["postgres", "redis", "clickhouse"], copies: true },
   { name: "Tools", icon: Wrench, members: [] },

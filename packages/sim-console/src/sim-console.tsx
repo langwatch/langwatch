@@ -10,6 +10,7 @@ export type SimKind =
   | "voice"
   | "analytics"
   | "outbound"
+  | "payment"
   | "telemetry";
 
 export type SimTab = { id: string; label: string; count?: number };

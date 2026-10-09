@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"testing/fstest"
 	"time"
 )
 
@@ -431,5 +432,57 @@ func TestFormDecodesBrackets(t *testing.T) {
 	}
 	if e := p.strings("expand"); strings.Join(e, ",") != "x,y" {
 		t.Fatalf("expand %v", e)
+	}
+}
+
+// @scenario "The control API lists what paymentsim holds"
+func TestControlAPIListsWhatItHolds(t *testing.T) {
+	g := newRig(t)
+	cusID, subID := g.subscribe(2)
+	for _, c := range []struct{ path, key, id string }{
+		{"/_sim/api/customers", "customers", cusID},
+		{"/_sim/api/subscriptions", "subscriptions", subID},
+		{"/_sim/api/checkout", "sessions", "cs_test_sim000001"},
+	} {
+		status, out := g.control(http.MethodGet, c.path, "")
+		items, _ := out[c.key].([]any)
+		if status != http.StatusOK || len(items) != 1 || items[0].(map[string]any)["id"] != c.id {
+			t.Fatalf("%s: %d %v", c.path, status, out)
+		}
+	}
+	if _, out := g.control(http.MethodGet, "/_sim/api/invoices", ""); len(out["invoices"].([]any)) != 1 {
+		t.Fatalf("invoices %v", out)
+	}
+	if status, _ := g.control(http.MethodGet, "/_sim/api/nope", ""); status != http.StatusNotFound {
+		t.Fatalf("an unknown control path answered %d", status)
+	}
+	if status, _ := g.stripe(http.MethodGet, "/v1/customers/"+cusID, ""); status != http.StatusOK {
+		t.Fatalf("the Stripe API answered %d", status)
+	}
+}
+
+// @scenario "The console is served at the root"
+func TestConsoleIsServedAtTheRoot(t *testing.T) {
+	get := func(bundle fstest.MapFS, path string) (int, string) {
+		s, err := newServer(Config{}, bundle)
+		if err != nil {
+			t.Fatal(err)
+		}
+		rec := httptest.NewRecorder()
+		s.Handler().ServeHTTP(rec, httptest.NewRequestWithContext(t.Context(), http.MethodGet, path, nil))
+		return rec.Code, rec.Body.String()
+	}
+	built := fstest.MapFS{"index.html": {Data: []byte("<div id=\"root\"></div>")}, "assets/app.js": {Data: []byte("x")}}
+	if code, body := get(built, "/"); code != http.StatusOK || !strings.Contains(body, `id="root"`) {
+		t.Fatalf("root: %d %s", code, body)
+	}
+	if code, _ := get(built, "/assets/app.js"); code != http.StatusOK {
+		t.Fatalf("asset: %d", code)
+	}
+	if code, body := get(fstest.MapFS{}, "/"); code == http.StatusOK || !strings.Contains(body, "paymentsim-web") {
+		t.Fatalf("not built: %d %s", code, body)
+	}
+	if code, _ := get(built, "/checkout"); code != http.StatusNotFound {
+		t.Fatalf("a path the console does not own answered %d", code)
 	}
 }

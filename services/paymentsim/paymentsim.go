@@ -14,6 +14,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"net"
 	"net/http"
 	"os"
@@ -64,18 +65,23 @@ func withDefaults(cfg Config) Config {
 
 // Server answers Stripe's API, the control API and the checkout and portal pages.
 type Server struct {
-	cfg  Config
-	mu   sync.Mutex
-	st   *state
-	hook *hooks
-	real func() time.Time
-	mux  *http.ServeMux
+	cfg     Config
+	mu      sync.Mutex
+	st      *state
+	hook    *hooks
+	real    func() time.Time
+	mux     *http.ServeMux
+	console http.Handler
 }
 
 // NewServer builds the server, seeding the catalogue file when one is named.
 func NewServer(cfg Config) (*Server, error) {
+	return newServer(cfg, embeddedConsole())
+}
+
+func newServer(cfg Config, bundle fs.FS) (*Server, error) {
 	cfg = withDefaults(cfg)
-	s := &Server{cfg: cfg, st: newState(), real: time.Now}
+	s := &Server{cfg: cfg, st: newState(), real: time.Now, console: newConsole(bundle)}
 	s.hook = newHooks(cfg.WebhookURL, cfg.WebhookSecret, func() time.Time { return s.real() })
 	if cfg.CatalogPath != "" {
 		raw, err := os.ReadFile(cfg.CatalogPath)
@@ -100,6 +106,12 @@ func (s *Server) routes() *http.ServeMux {
 	})
 	s.apiRoutes(mux)
 	s.controlRoutes(mux)
+	// The console owns only the root and its assets; every other path stays Stripe's or a 404.
+	mux.HandleFunc("GET /_sim/api/", func(w http.ResponseWriter, r *http.Request) {
+		controlError(w, http.StatusNotFound, "paymentsim does not fake %s %s", r.Method, r.URL.Path)
+	})
+	mux.HandleFunc("GET /{$}", s.handleConsole)
+	mux.HandleFunc("GET /assets/", s.handleConsole)
 	return mux
 }
 

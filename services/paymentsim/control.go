@@ -16,6 +16,10 @@ import (
 // controlRoutes is what a test, haven or a developer drives paymentsim with.
 func (s *Server) controlRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /_sim/api/status", s.handleStatus)
+	mux.HandleFunc("GET /_sim/api/customers", s.handleCustomers)
+	mux.HandleFunc("GET /_sim/api/subscriptions", s.handleSubscriptions)
+	mux.HandleFunc("GET /_sim/api/checkout", s.handleSessions)
+	mux.HandleFunc("GET /_sim/api/invoices", s.handleInvoices)
 	mux.HandleFunc("POST /_sim/api/catalog", s.handleCatalog)
 	mux.HandleFunc("POST /_sim/api/prices", s.handleSeedPrice)
 	mux.HandleFunc("POST /_sim/api/meters", s.handleSeedMeter)
@@ -342,4 +346,65 @@ func (s *Server) handlePortalPage(w http.ResponseWriter, r *http.Request) {
 	}
 	back, _ := portal["return_url"].(*string)
 	_ = pageTemplate.Execute(w, pageData{Title: "customer portal", Lines: []string{"customer " + fmt.Sprint(portal["customer"])}, Back: deref(back)})
+}
+
+// newestFirst sorts held objects by creation time, latest first, for the console's lists.
+func newestFirst[T any](items []T, created func(T) int64, id func(T) string) []T {
+	sort.Slice(items, func(i, j int) bool {
+		if a, b := created(items[i]), created(items[j]); a != b {
+			return a > b
+		}
+		return id(items[i]) > id(items[j])
+	})
+	return items
+}
+
+// handleCustomers lists the customers that are not deleted, newest first.
+func (s *Server) handleCustomers(w http.ResponseWriter, _ *http.Request) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := []Customer{}
+	for _, c := range s.st.customers {
+		if !c.deleted {
+			out = append(out, *c)
+		}
+	}
+	out = newestFirst(out, func(c Customer) int64 { return c.Created }, func(c Customer) string { return c.ID })
+	writeJSON(w, http.StatusOK, map[string]any{"customers": out})
+}
+
+// handleSubscriptions lists every subscription with its items, newest first.
+func (s *Server) handleSubscriptions(w http.ResponseWriter, _ *http.Request) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]Subscription, 0, len(s.st.subscriptions))
+	for _, sub := range s.st.subscriptions {
+		out = append(out, *sub)
+	}
+	out = newestFirst(out, func(x Subscription) int64 { return x.Created }, func(x Subscription) string { return x.ID })
+	writeJSON(w, http.StatusOK, map[string]any{"subscriptions": out})
+}
+
+// handleSessions lists the checkout sessions, newest first.
+func (s *Server) handleSessions(w http.ResponseWriter, _ *http.Request) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]Session, 0, len(s.st.sessions))
+	for _, sess := range s.st.sessions {
+		out = append(out, *sess)
+	}
+	out = newestFirst(out, func(x Session) int64 { return x.Created }, func(x Session) string { return x.ID })
+	writeJSON(w, http.StatusOK, map[string]any{"sessions": out})
+}
+
+// handleInvoices lists every invoice, newest first.
+func (s *Server) handleInvoices(w http.ResponseWriter, _ *http.Request) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]Invoice, 0, len(s.st.invoices))
+	for _, inv := range s.st.invoices {
+		out = append(out, *inv)
+	}
+	out = newestFirst(out, func(x Invoice) int64 { return x.Created }, func(x Invoice) string { return x.ID })
+	writeJSON(w, http.StatusOK, map[string]any{"invoices": out})
 }
