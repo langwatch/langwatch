@@ -22,6 +22,7 @@ import {
   RecordingSsoSetupCommands,
 } from "../../app/__tests__/sso.fixture.ts";
 import { ssoConnectionTrpcTransport } from "../sso-connection.trpc.ts";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 
 const STAFF_ID = "user_olive";
 const CUSTOMER_ID = "user_customer";
@@ -52,6 +53,7 @@ function runtimePorts(): TrpcRuntimeMembers<TestContext> {
     },
     authorization: {
       forRequest: () => ({
+        ...testAuthorizeDefaults,
         getDecision: async () => ({ permitted: true, organizationRole: null }),
         getProjectAnyDecision: async () => ({ permitted: true, organizationRole: null }),
         checkScopeLineage: async () => ({ kind: "consistent" }),
