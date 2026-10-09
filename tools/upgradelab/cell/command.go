@@ -67,10 +67,24 @@ func parse(args []string) (Options, error) {
 	flags.DurationVar(&options.WorkerDelay, "worker-delay", 10*time.Second, "head's api starts this long before its worker")
 	flags.DurationVar(&options.Rate, "rate", time.Second, "each ingest kind fires once per rate; API kinds slower")
 	flags.DurationVar(&options.Hold, "hold", 60*time.Second, "how long a held request may take before it counts as failed")
+	flags.StringVar(&options.ServiceBin, "service-bin", ".claude/tmp/upgradelab/bin/service", "the Go service binary hosting storagesim (go build -tags dev -o <path> ./cmd/service), for profiles with object stores")
 	flags.BoolVar(&options.Keep, "keep", false, "keep the cell's databases afterwards (kept anyway when a step fails)")
 	flags.BoolVar(&options.Shots, "shots", true, "screenshot each api phase and Ops > Upgrades (Playwright from head's apps/ui)")
+	drills := flags.String("drills", "", "comma-separated drills on top of the profile: api-early (switch on /healthz), worker-restart, retry")
 	if err := flags.Parse(args); err != nil {
 		return options, err
+	}
+	for _, drill := range strings.Split(*drills, ",") {
+		switch drill {
+		case "":
+		case DrillAPIEarly:
+			options.SwitchOn = "/healthz"
+			options.Drills = append(options.Drills, drill)
+		case DrillWorkerRestart, DrillRetry:
+			options.Drills = append(options.Drills, drill)
+		default:
+			return options, fmt.Errorf("unknown drill %q: want %s, %s or %s", drill, DrillAPIEarly, DrillWorkerRestart, DrillRetry)
+		}
 	}
 	return withDefaults(options)
 }

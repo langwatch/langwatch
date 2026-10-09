@@ -110,12 +110,21 @@ var ProductKinds = []ProductKind{
 
 // PrivateTargets is the shape's tenant-to-target assignment, label -> organization id, read from its
 // CLICKHOUSE_URL__<label>__<organization> names; organizations not named stay on the shared target.
-func (env ShapeEnv) PrivateTargets() map[string]string {
+func (env ShapeEnv) PrivateTargets() map[string]string { return env.privateFamily("CLICKHOUSE_URL__") }
+
+// PrivateObjectTargets is the same for private S3 accounts, from DATAPLANE_S3__<label>__<organization>.
+func (env ShapeEnv) PrivateObjectTargets() map[string]string {
+	return env.privateFamily("DATAPLANE_S3__")
+}
+
+func (env ShapeEnv) privateFamily(prefix string) map[string]string {
 	targets := map[string]string{}
-	for _, name := range env.SecretNames {
-		if rest, ok := strings.CutPrefix(name, "CLICKHOUSE_URL__"); ok {
-			if label, organization, ok := strings.Cut(rest, "__"); ok {
-				targets[label] = organization
+	for _, names := range []map[string]string{env.Values, env.Secrets} {
+		for name := range names {
+			if rest, ok := strings.CutPrefix(name, prefix); ok {
+				if label, organization, ok := strings.Cut(rest, "__"); ok {
+					targets[label] = organization
+				}
 			}
 		}
 	}

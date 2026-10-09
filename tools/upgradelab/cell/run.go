@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/http"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -33,7 +33,8 @@ type Options struct {
 	Before, AtCut, AfterReady        time.Duration // traffic on main, with main's worker paused, after head is ready
 	ReadyWithin, SettleWithin        time.Duration
 	WorkerDelay, Rate, Hold          time.Duration
-	SwitchOn                         string
+	SwitchOn, ServiceBin             string
+	Drills                           []string // DrillAPIEarly, DrillWorkerRestart, DrillRetry
 	Keep, Shots                      bool
 }
 
@@ -51,6 +52,9 @@ type run struct {
 	client             Client
 	before             snapshot.Fingerprint
 	traffic            *Traffic
+	privateTraffic     *Traffic // a private organization's project (hybrid), on privateLabel's stores
+	privateLabel       string
+	drills             drillState
 	poller             *Poller
 	queue              []QueueSample
 	queueMu            sync.Mutex
@@ -86,7 +90,7 @@ func Run(ctx context.Context, options Options) (*Report, error) {
 	}{
 		{"stores", cell.freshStores}, {"from-schema", cell.fromSchema}, {"from-up", cell.fromUp}, {"seed", cell.seed},
 		{"traffic-before", cell.trafficBefore}, {"cut", cell.cut}, {"switch", cell.switchToHead}, {"ready", cell.awaitReady},
-		{"settle", cell.settle}, {"checks", cell.checks},
+		{"settle", cell.settle}, {"drill-retry", cell.retryFailedStep}, {"checks", cell.checks},
 	}
 	for _, step := range steps {
 		started := time.Now()
@@ -111,7 +115,7 @@ func (cell *run) partialTraffic() {
 	if cell.poller != nil {
 		cell.report.Phases = cell.poller.Timeline()
 	}
-	cell.report.Traffic, cell.report.Timeline = Summarize(cell.traffic.Calls(), ServedTimeline(cell.report.Phases, cell.marks["switched"]), nil)
+	cell.report.Traffic, cell.report.Timeline = Summarize(cell.allCalls(), ServedTimeline(cell.report.Phases, cell.marks["switched"]), nil)
 	cell.report.Notes = append(cell.report.Notes, "stopped early: writes were not checked, so Lost counts every 2xx write")
 }
 
@@ -170,6 +174,11 @@ func (cell *run) freshStores(ctx context.Context) error {
 	if err := cell.stores.Fresh(ctx); err != nil {
 		return err
 	}
+	if cell.profile.Objects {
+		if err := cell.startObjectStores(slices.Collect(maps.Keys(shape.PrivateObjectTargets()))); err != nil {
+			return err
+		}
+	}
 	redis, err := Start(ProcSpec{Name: "redis", Dir: cell.options.RunDir, Log: cell.logPath("redis"),
 		Args: []string{"redis-server", "--port", cell.stores.RedisPort, "--save", "", "--appendonly", "no"}, Env: Env(map[string]string{"PATH": os.Getenv("PATH")})})
 	if err != nil {
@@ -200,7 +209,7 @@ func (cell *run) ports() error {
 }
 
 func apiPort() (int, error) {
-	for range 20 {
+	for range 1000 { // macOS hands out ephemeral ports in sequence: up to 535 in a row sit above 65000
 		port, err := FreePort()
 		if err != nil {
 			return 0, err
@@ -312,6 +321,9 @@ func (cell *run) seed(ctx context.Context) error {
 	if cell.client.APIKey == "" {
 		return errors.New("the seed project has no API key: product seeds never reached it")
 	}
+	if private, label, ok := cell.privateClient(); ok {
+		cell.privateTraffic, cell.privateLabel = &Traffic{Client: private, Kinds: PrivateMix(cell.options.Rate), Origin: cell.origin, Hold: cell.options.Hold}, label
+	}
 	if err := cell.basePrompt(ctx); err != nil {
 		cell.report.Notes = append(cell.report.Notes, "base prompt (prompt-update writes to it): "+err.Error())
 	}
@@ -342,12 +354,25 @@ func (cell *run) trafficBefore(ctx context.Context) error {
 	cell.stopTraffic = stop
 	cell.trafficDone = make(chan struct{})
 	go func() {
+		var private sync.WaitGroup
+		if cell.privateTraffic != nil {
+			private.Go(func() { cell.privateTraffic.Run(trafficCtx) })
+		}
 		cell.traffic.Run(trafficCtx)
+		private.Wait()
 		close(cell.trafficDone)
 	}()
 	go cell.sampleQueue(trafficCtx)
 	cell.mark("trafficStart")
 	return sleep(ctx, cell.options.Before)
+}
+
+// allCalls is every call the cell's traffic sent, the private project's included.
+func (cell *run) allCalls() []Call {
+	if cell.privateTraffic == nil {
+		return cell.traffic.Calls()
+	}
+	return append(cell.traffic.Calls(), cell.privateTraffic.Calls()...)
 }
 
 func sleep(ctx context.Context, span time.Duration) error {
@@ -432,7 +457,7 @@ func (cell *run) switchToHead(ctx context.Context) error {
 	}
 	cell.proc("from-worker").Stop(20 * time.Second)
 	cell.mark("headWorkerStarted")
-	if err := cell.startHead("head-worker", "apps/worker", map[string]string{"WORKER_METRICS_PORT": itoa(mustPort()), "OTEL_EXPORTER_PROMETHEUS_PORT": itoa(mustPort())}); err != nil {
+	if err := cell.startHeadWorker(); err != nil {
 		return err
 	}
 	if cell.profile.StopStart {
@@ -445,8 +470,9 @@ func (cell *run) switchToHead(ctx context.Context) error {
 func (cell *run) rollOver(ctx context.Context) error {
 	err := waitFor(ctx, cell.options.ReadyWithin, func() bool {
 		cell.reviveAPI()
+		cell.restartWorkerMidUpgrade(ctx)
 		status, _, err := get(ctx, httpClient, cell.headURL()+cell.options.SwitchOn)
-		return (err == nil && status == http.StatusOK) || cell.headDied()
+		return (err == nil && status/100 == 2) || cell.headDied()
 	})
 	if err != nil || cell.headDied() {
 		return errors.Join(err, cell.deathNote())
@@ -494,6 +520,10 @@ func (cell *run) reviveAPI() {
 	}
 }
 
+func (cell *run) startHeadWorker() error {
+	return cell.startHead("head-worker", "apps/worker", map[string]string{"WORKER_METRICS_PORT": itoa(mustPort()), "OTEL_EXPORTER_PROMETHEUS_PORT": itoa(mustPort())})
+}
+
 func (cell *run) startHead(name, app string, extra map[string]string) error {
 	proc, err := Start(ProcSpec{Name: name, Dir: filepath.Join(cell.options.HeadDir, app), Log: cell.logPath(name),
 		Args: []string{"node", "--experimental-transform-types", "src/main.ts"}, Env: cell.envWith(extra)})
@@ -506,6 +536,7 @@ func (cell *run) startHead(name, app string, extra map[string]string) error {
 func (cell *run) awaitReady(ctx context.Context) error {
 	err := waitFor(ctx, cell.options.ReadyWithin, func() bool {
 		cell.reviveAPI()
+		cell.restartWorkerMidUpgrade(ctx)
 		return FirstAt(cell.poller.Timeline(), "ready") >= 0 || cell.headDied()
 	})
 	if err != nil || cell.headDied() {
@@ -513,6 +544,7 @@ func (cell *run) awaitReady(ctx context.Context) error {
 	}
 	cell.mark("ready")
 	cell.grantOperator(ctx)
+	cell.assertOldWritersGone(ctx)
 	ledger, err := Ledger(ctx, cell.stores)
 	cell.atReady = ledger
 	if err != nil {
@@ -531,6 +563,19 @@ func (cell *run) grantOperator(ctx context.Context) {
 	_ = os.WriteFile(cell.logPath("grant-operator"), out, 0o600)
 	if err != nil {
 		cell.report.Notes = append(cell.report.Notes, "grant-platform-operator: "+err.Error()+": "+tail(out))
+	}
+}
+
+// assertOldWritersGone is the operator's act once the old release is stopped (rehearse.sh does the
+// same): from main, writers predate the serving roster, so needs-old-writers-gone steps otherwise
+// wait out the 30 min pre-roster grace, far past the settle window.
+func (cell *run) assertOldWritersGone(ctx context.Context) {
+	command := exec.CommandContext(ctx, "node", "--experimental-transform-types", "src/main.ts", "upgrade", "old-writers-gone") // #nosec G204 -- fixed argv.
+	command.Dir, command.Env = filepath.Join(cell.options.HeadDir, "apps", "tasks"), cell.envWith(nil)
+	out, err := command.CombinedOutput()
+	_ = os.WriteFile(cell.logPath("old-writers-gone"), out, 0o600)
+	if err != nil {
+		cell.report.Notes = append(cell.report.Notes, "upgrade old-writers-gone: "+err.Error()+": "+tail(out))
 	}
 }
 

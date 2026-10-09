@@ -31,6 +31,7 @@ type Call struct {
 	RetryWindowMs     int64 `json:"retryWindowMs,omitempty"`
 	UpgradeInProgress int   `json:"upgradeInProgress,omitempty"`
 	NonOK             int   `json:"nonOk,omitempty"`
+	MissingRetryAfter int   `json:"missingRetryAfter,omitempty"` // upgrade_in_progress answers with no Retry-After
 	firstRetryMs      int64
 }
 
@@ -272,6 +273,9 @@ func (traffic *Traffic) attempt(ctx context.Context, kind Kind, call *Call) time
 		return 0
 	}
 	call.UpgradeInProgress++
+	if response.Header.Get("Retry-After") == "" {
+		call.MissingRetryAfter++
+	}
 	return retryAfter(response.Header.Get("Retry-After"))
 }
 

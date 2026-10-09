@@ -3,6 +3,7 @@
 // Usage: node product.mjs seed|readback  (APP_BASE, SEED_EMAIL, SEED_PASSWORD, SEED_LABEL, OUT)
 // readback also reads SEEDS (the seed run's JSON). Each kind is seeded or names why it was not.
 
+import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
@@ -39,7 +40,7 @@ export const PRODUCT_KINDS = [
         projectId: ctx.projectId,
         scope: { scopeType: "PROJECT", scopeId: ctx.projectId },
         category: "traces",
-        retentionDays: 45,
+        retentionDays: 63,
       },
     }),
     read: ({ ctx }) => ({ path: "dataRetention.getRules", input: { projectId: ctx.projectId } }),
@@ -54,6 +55,7 @@ export const PRODUCT_KINDS = [
         traceId: ctx.traceId,
         comment: `rehearsal ${ctx.label}`,
         isThumbsUp: true,
+        scoreOptions: {},
       },
     }),
     read: ({ ctx }) => ({
@@ -111,15 +113,6 @@ export const PRODUCT_KINDS = [
     }),
     read: ({ ctx }) => ({ path: "dashboards.getAll", input: { projectId: ctx.projectId } }),
     marker: ({ ctx }) => `rehearsal report ${ctx.label}`,
-  },
-  {
-    kind: "suite",
-    create: ({ ctx }) => ({
-      path: "suites.create",
-      input: { projectId: ctx.projectId, name: `rehearsal suite ${ctx.label}` },
-    }),
-    read: ({ ctx }) => ({ path: "suites.getAll", input: { projectId: ctx.projectId } }),
-    marker: ({ ctx }) => `rehearsal suite ${ctx.label}`,
   },
   {
     kind: "dataset",
@@ -220,6 +213,19 @@ export const PRODUCT_KINDS = [
     marker: ({ ctx, i }) => `rehearsal scenario ${ctx.label} ${nth(i)}`,
   },
   {
+    kind: "suite",
+    create: ({ ctx }) => ({
+      path: "suites.create",
+      input: {
+        projectId: ctx.projectId,
+        name: `rehearsal suite ${ctx.label}`,
+        scenarioIds: [ctx.created?.scenario?.[0]?.id].filter(Boolean),
+      },
+    }),
+    read: ({ ctx }) => ({ path: "suites.getAll", input: { projectId: ctx.projectId } }),
+    marker: ({ ctx }) => `rehearsal suite ${ctx.label}`,
+  },
+  {
     kind: "licence",
     unseedable: ({ ctx }) =>
       ctx.licenceKey ? null : "no REHEARSAL_LICENSE_KEY: the old image accepts only a signed key",
@@ -250,18 +256,44 @@ export function holdsMarker({ answer, marker }) {
   return marker === null || JSON.stringify(answer).includes(marker);
 }
 
+/** Retries the org create while the old worker misses the api's read-your-writes window. */
+async function initializeOrganization({ wire, ctx }) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await wire.mutate({
+        path: "onboarding.initializeOrganization",
+        input: { orgName: `Rehearsal ${ctx.label}`, projectName: `rehearsal ${ctx.label}` },
+      });
+    } catch (error) {
+      const message = String(error?.message ?? error);
+      if (attempt >= 6 || !message.includes("authz_grant_not_confirmed")) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 10_000));
+    }
+  }
+}
+
 async function prepare({ wire, ctx }) {
   await wire.signIn({ email: ctx.email, password: ctx.password });
-  const created = await wire.mutate({
-    path: "onboarding.initializeOrganization",
-    input: { orgName: `Rehearsal ${ctx.label}`, projectName: `rehearsal ${ctx.label}` },
-  });
+  const created = await initializeOrganization({ wire, ctx });
   ctx.organizationId = created.organizationId;
+  ctx.grantPaidPlan?.({ organizationId: ctx.organizationId }); // retention overrides refuse a free plan
   const organizations = await wire.query({ path: "organization.getAll", input: {} });
   ctx.projectId = findProjectId({ organizations, slug: created.projectSlug });
   if (!ctx.projectId) {
     ctx.projectId = organizations?.[0]?.teams?.[0]?.projects?.[0]?.id;
   }
+  // Main's prompts.create refuses MODEL_NOT_CONFIGURED without a default model at some scope.
+  await wire
+    .mutate({
+      path: "modelProvider.setRoleAssignmentForScope",
+      input: {
+        scopeType: "PROJECT",
+        scopeId: ctx.projectId,
+        role: "DEFAULT",
+        model: "openai/gpt-5",
+      },
+    })
+    .catch(() => {}); // a failure shows up as the prompt kind's own MODEL_NOT_CONFIGURED
   const { apiKey } = await wire.query({
     path: "project.getProjectAPIKey",
     input: { projectId: ctx.projectId },
@@ -376,6 +408,24 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
     licenceKey: process.env.REHEARSAL_LICENSE_KEY,
     perKind: Number(process.env.SEED_PER_KIND ?? 1),
   };
+  // SaaS has no headless checkout, so an ACTIVE paid subscription is written straight to Postgres.
+  if (process.env.DATABASE_URL) {
+    ctx.grantPaidPlan = ({ organizationId }) =>
+      execFileSync(
+        "psql",
+        [
+          process.env.DATABASE_URL.split("?")[0],
+          "-q",
+          "-v",
+          "ON_ERROR_STOP=1",
+          "-v",
+          `org=${organizationId}`,
+        ],
+        {
+          input: `INSERT INTO "Subscription" (id, "organizationId", plan, status) VALUES ('rehearsal_sub_' || md5(random()::text), :'org', 'LAUNCH', 'ACTIVE');`,
+        },
+      );
+  }
   const wire = createWire({ appBase: process.env.APP_BASE });
   const result =
     mode === "seed"

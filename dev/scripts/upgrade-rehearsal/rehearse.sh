@@ -151,6 +151,9 @@ write_env_file() {
     echo "AUTH_PROVIDER=email"
     echo "IS_SAAS=true"
     echo "GROUP_QUEUE_ENVELOPE_WRITES_ENABLED=true"
+    # Main's SaaS boot throws without a Stripe key; a dummy test key, never a real one.
+    echo "STRIPE_SECRET_KEY=sk_test_rehearsal"
+    echo "STRIPE_WEBHOOK_SECRET=whsec_rehearsal"
     for key in NEXTAUTH_SECRET CREDENTIALS_SECRET API_TOKEN_JWT_SECRET LW_VIRTUAL_KEY_PEPPER \
       LW_GATEWAY_INTERNAL_SECRET LW_GATEWAY_JWT_SECRET LANGWATCH_NLP_INTERNAL_SECRET LANGY_INTERNAL_SECRET; do
       echo "$key=$(secret)"
@@ -222,7 +225,8 @@ phase0_products() {
   PATH="$RUN_DIR/bin:$PATH" DATABASE_URL="postgresql://prisma:prisma@postgres:5432/mydb?schema=mydb" \
     bash "$REPO_ROOT/dev/scripts/migration-compat-smoke/seed-account.sh" "$SEED_EMAIL" "$SEED_PASSWORD" \
     >"$RUN_DIR/evidence/logs/product-seed.log" 2>&1 &&
-    APP_BASE="http://localhost:${OLD_APP_PORT}" SEED_EMAIL="$SEED_EMAIL" SEED_PASSWORD="$SEED_PASSWORD" \
+    PATH="$RUN_DIR/bin:$PATH" DATABASE_URL="postgresql://prisma:prisma@postgres:5432/mydb?schema=mydb" \
+      APP_BASE="http://localhost:${OLD_APP_PORT}" SEED_EMAIL="$SEED_EMAIL" SEED_PASSWORD="$SEED_PASSWORD" \
       SEED_LABEL="$RUN_ID" SEED_PER_KIND="$SEED_PER_KIND" OUT="$RUN_DIR/evidence/product-seeds.json" node "$HERE/seed/product.mjs" seed \
       >>"$RUN_DIR/evidence/logs/product-seed.log" 2>&1 ||
     log "phase 0: product seeds failed (logs/product-seed.log); their findings read inconclusive"
@@ -542,6 +546,7 @@ main() {
   HEAD_WORKER_METRICS_PORT="${HEAD_WORKER_METRICS_PORT:-12999}"
   export OLD_APP_PORT HEAD_API_PORT HEAD_WORKER_METRICS_PORT
   mkdir -p "$RUN_DIR/evidence/logs"
+  RUN_DIR="$(cd "$RUN_DIR" && pwd)" # compose resolves a relative env_file against compose.yml's directory
   write_env_file
   node -e 'process.stdout.write(JSON.stringify(Object.fromEntries(process.argv.slice(1).map((kv) => kv.split(/=(.*)/s).slice(0, 2))), null, 2))' \
     $plan "startedAt=$(date -u +%FT%TZ)" "runId=$RUN_ID" |

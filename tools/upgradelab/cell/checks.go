@@ -31,13 +31,14 @@ func (cell *run) checks(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	cell.report.Traffic, cell.report.Timeline = Summarize(cell.traffic.Calls(), ServedTimeline(cell.report.Phases, cell.marks["switched"]), visible)
+	cell.report.Traffic, cell.report.Timeline = Summarize(cell.allCalls(), ServedTimeline(cell.report.Phases, cell.marks["switched"]), visible)
 	cell.report.Queue = cell.queueSummary(ctx)
 	cell.report.Verdicts = append(cell.report.Verdicts,
 		cell.holdingVerdict(), ledgerVerdict(final), reopenedVerdict(cell.atReady, final), cell.rosterVerdict(ctx),
 		cell.copyVerdict(ctx), cell.readBackVerdict(ctx), cell.secondRunVerdict(ctx, final), cell.logVerdict(),
-		cell.apiEarlyVerdict(), cell.crashVerdict(), droppedVerdict(cell.report.Traffic), ingestVerdict(cell.report.Traffic), unansweredVerdict(cell.traffic.Calls()), lostVerdict(cell.report.Traffic), cell.queueVerdict(), cell.opsVerdict(final))
+		cell.apiEarlyVerdict(), cell.crashVerdict(), droppedVerdict(cell.report.Traffic), ingestVerdict(cell.report.Traffic), unansweredVerdict(cell.allCalls()), lostVerdict(cell.report.Traffic), cell.queueVerdict(), cell.opsVerdict(final))
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.hybridVerdicts(ctx)...)
+	cell.report.Verdicts = append(cell.report.Verdicts, cell.drillVerdicts(final)...)
 	return nil
 }
 
@@ -286,14 +287,26 @@ func errSuffix(err string) string {
 
 // visibleWrites asks the stores and head's API which write ids exist after settle.
 func (cell *run) visibleWrites(ctx context.Context) (map[string]bool, error) {
-	stored, err := StoredIDs(ctx, cell.stores, cell.client.Project)
+	stored, err := StoredIDs(ctx, cell.stores, "", cell.client.Project)
 	if err != nil {
 		return nil, err
 	}
+	privateSpans := map[string]bool{}
+	if cell.privateTraffic != nil {
+		private, err := StoredIDs(ctx, cell.stores, cell.privateLabel, cell.privateTraffic.Client.Project)
+		if err != nil {
+			return nil, err
+		}
+		privateSpans = private["spans"]
+	}
 	visible := map[string]bool{}
 	seen := evidence{stored: stored, versions: cell.promptVersions(ctx)}
-	for _, call := range cell.traffic.Calls() {
+	for _, call := range cell.allCalls() {
 		if !call.Write || !call.ok() {
+			continue
+		}
+		if strings.HasPrefix(call.Kind, privatePrefix) {
+			visible[call.Kind+"/"+call.ID] = cell.privateVisible(ctx, call, privateSpans)
 			continue
 		}
 		visible[call.Kind+"/"+call.ID] = cell.isVisible(ctx, call, seen)
@@ -359,8 +372,7 @@ func (cell *run) hybridVerdicts(ctx context.Context) []Verdict {
 	}
 	misplaced, err := cell.misplacedTenants(ctx)
 	placement := verdict("H1", len(misplaced) == 0 && err == nil, fmt.Sprintf("misplaced: %v %s", misplaced, errText(err)))
-	return []Verdict{placement, cell.targetsVerdict(ctx),
-		{ID: "H3", Name: "a private organization's reads in the UI and API come from its target", Result: "inconclusive", Detail: "traffic speaks as the seed project (shared) only; next: a client per private organization"}}
+	return append([]Verdict{placement, cell.targetsVerdict(ctx)}, cell.isolationVerdicts(ctx)...)
 }
 
 // misplacedTenants names every tenant found on a target other than its own.
@@ -381,10 +393,11 @@ func (cell *run) misplacedTenants(ctx context.Context) ([]string, error) {
 	return misplaced, nil
 }
 
-// homes maps each private organization's project to its target label; an absent project is shared ("").
+// homes maps each private organization and its projects to its target label; an absent tenant is shared ("").
 func (cell *run) homes() map[string]string {
 	home := map[string]string{}
 	for label, organization := range cell.private {
+		home[organization] = label // organization-level events (event_log) carry the organization as tenant
 		for _, project := range cell.tenancy.ProjectsOf(organization) {
 			home[project] = label
 		}
