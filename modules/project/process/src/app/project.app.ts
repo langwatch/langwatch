@@ -392,6 +392,12 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     return this.#projectService.listAllWithOrganization(input);
   }
 
+  listAllWithPrivateS3(
+    input?: projectContractModule.ProjectIdPageInput,
+  ): Promise<projectContractModule.ProjectPrivateS3Page> {
+    return this.#projectService.listAllWithPrivateS3(input);
+  }
+
   listLwqlKeys(
     input?: projectContractModule.ProjectIdPageInput,
   ): Promise<projectContractModule.ProjectLwqlKeyPage> {
