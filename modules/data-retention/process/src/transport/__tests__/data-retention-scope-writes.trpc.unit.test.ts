@@ -23,6 +23,7 @@ import type { DataRetentionModule } from "../../app/data-retention.app.ts";
 import { MemoryDataRetentionProjectScopeRepository } from "../../repositories/memory/memory.data-retention-project-scope.repository.ts";
 import { MemoryDataRetentionRepositories } from "../../repositories/memory/memory.data-retention.repositories.ts";
 import { dataRetentionTrpcTransport } from "../data-retention.trpc.ts";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 
 type DoorContext = { actor: { id: string } };
 type Asked = { permission: string; scope: { tier: string; id: string } };
@@ -63,6 +64,7 @@ function door({
     identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
     authorization: {
       forRequest: () => ({
+        ...testAuthorizeDefaults,
         getDecision: async ({ permission, scope }) => {
           asked.push({ permission, scope });
 
