@@ -7,14 +7,30 @@ const slackBlockSchema = z.looseObject({
   block_id: z.string().optional(),
 });
 
+const SLACK_WEBHOOK_ORIGIN = "https://hooks.slack.com";
+
 // Slack incoming-webhook sender, created per send because webhook URLs are
 // tenant-owned credentials that cannot be cached across tenants.
 export class SlackWebhookClientChannel {
-  static create(): SlackWebhookClientChannel {
-    return new SlackWebhookClientChannel();
+  static create(
+    options: {
+      /** Slack's incoming-webhook origin, or the stand-in a dev stack names. */
+      webhookBase?: string;
+    } = {},
+  ): SlackWebhookClientChannel {
+    return new SlackWebhookClientChannel(
+      (options.webhookBase ?? SLACK_WEBHOOK_ORIGIN).replace(/\/+$/, ""),
+    );
   }
 
-  private constructor() {}
+  private constructor(private readonly webhookBase: string) {}
+
+  /** The URL a send reaches: a Slack webhook's path under the configured origin. */
+  private addressed(webhook: string): string {
+    return webhook.startsWith(`${SLACK_WEBHOOK_ORIGIN}/`)
+      ? this.webhookBase + webhook.slice(SLACK_WEBHOOK_ORIGIN.length)
+      : webhook;
+  }
 
   async send(input: {
     webhook: string;
@@ -32,6 +48,6 @@ export class SlackWebhookClientChannel {
             blocks: input.payload.blocks.map((block) => slackBlockSchema.parse(block)),
           };
 
-    await new IncomingWebhook(input.webhook).send(request);
+    await new IncomingWebhook(this.addressed(input.webhook)).send(request);
   }
 }

@@ -210,6 +210,14 @@ Feature: outboundsim, a local stand-in for Slack, webhook receivers and SQS
       When the developer runs "haven up +outbound"
       Then the overlay leaves that setting alone
 
+    @unit
+    Scenario: The overlay points the product's Slack addresses at outboundsim
+      Given the worktree's environment names neither SLACK_API_BASE nor SLACK_WEBHOOK_BASE
+      When the developer runs "haven up +outbound"
+      Then the overlay points SLACK_API_BASE at outboundsim's /api and SLACK_WEBHOOK_BASE at its origin
+      And a token check or webhook test fire from the product lands in outboundsim, not at Slack
+      And an address .env names is left alone
+
     @unimplemented
     Scenario: The agent CLI reads and waits on records
       Given an outbound lane is running
