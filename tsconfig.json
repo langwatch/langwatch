@@ -394,6 +394,9 @@
       "path": "modules/github/browser/tsconfig.json"
     },
     {
+      "path": "modules/github/client/tsconfig.json"
+    },
+    {
       "path": "modules/github/contract/tsconfig.json"
     },
     {

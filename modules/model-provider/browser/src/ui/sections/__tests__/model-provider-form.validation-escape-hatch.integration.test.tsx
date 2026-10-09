@@ -19,7 +19,8 @@ const {
   mockValidateApiKey: vi.fn().mockResolvedValue(true),
 }));
 
-vi.mock("../../../behavior/use-model-providers-settings.ts", () => ({
+vi.mock("@langwatch/model-provider-client", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   useModelProvidersSettings: (...args: unknown[]) => mockUseModelProvidersSettings(...args),
 }));
 
@@ -48,7 +49,7 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({ closeDrawer: vi.fn(), openDrawer: vi.fn() }),
 }));
 
-vi.mock("@langwatch/browser-host/feature-flag", () => ({
+vi.mock("@langwatch/feature-flag-client", () => ({
   useFeatureFlag: () => ({ enabled: false, isLoading: false }),
 }));
 

@@ -2,6 +2,7 @@ import { useDrawer } from "@langwatch/browser-host/drawer";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Box, Heading, HStack, Spinner, VStack } from "@langwatch/design-system/primitives";
 import { modelProviderIcons } from "@langwatch/design-system/provider-icons";
+import { useModelProvidersSettings } from "@langwatch/model-provider-client";
 import { modelProviders } from "@langwatch/model-provider-contract";
 
 import {
@@ -9,7 +10,6 @@ import {
   isResolvableProviderId,
   useAllModelProvidersList,
 } from "../../behavior/use-all-model-providers-list.ts";
-import { useModelProvidersSettings } from "../../behavior/use-model-providers-settings.ts";
 import { EditModelProviderForm } from "./model-provider-form.tsx";
 
 type EditModelProviderDrawerProps = {

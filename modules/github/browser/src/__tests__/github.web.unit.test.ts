@@ -1,6 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { createUi } from "@langwatch/browser";
+import { GithubConnectPopupToken } from "@langwatch/github-client";
 import { describe, expect, it } from "vitest";
 
 import { githubWeb } from "../github.web.ts";
@@ -22,6 +23,17 @@ describe("given a browser that installs github", () => {
         .render();
 
       expect(installed.modules).toContain(githubWeb);
+    });
+  });
+
+  describe("when a reader looks up the connect popup token from github's client", () => {
+    /** @scenario github lends its install popup by its client token */
+    it("lends the popup hooks as an eager value", () => {
+      const lend = githubWeb.installation.lends.find(
+        ({ token }) => token.key === GithubConnectPopupToken.key,
+      );
+
+      expect(lend && "value" in lend ? lend.value : undefined).toBeTypeOf("object");
     });
   });
 });

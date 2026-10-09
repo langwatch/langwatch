@@ -1,5 +1,4 @@
 import { useDrawer } from "@langwatch/browser-host/drawer";
-import { useFeatureFlag } from "@langwatch/browser-host/feature-flag";
 import {
   Box,
   Button,
@@ -11,9 +10,13 @@ import {
 } from "@langwatch/design-system/primitives";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import { Switch } from "@langwatch/design-system/switch";
-import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
+import { useFeatureFlag } from "@langwatch/feature-flag-client";
+import { FrontendFlags, NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
-import type { EditModelProviderFormProps } from "@langwatch/model-provider-client";
+import {
+  type EditModelProviderFormProps,
+  useModelProvidersSettings,
+} from "@langwatch/model-provider-client";
 import {
   skipListToInput,
   type ModelProviderEditorValue,
@@ -35,7 +38,6 @@ import { useCredentialProbeGate } from "../../behavior/use-credential-probe-gate
 import { useApplyGuidedModel, useGuidedSave } from "../../behavior/use-guided-save.ts";
 import { useModelProviderApiKeyValidation } from "../../behavior/use-model-provider-api-key-validation.ts";
 import { useModelProviderForm } from "../../behavior/use-model-provider-form.ts";
-import { useModelProvidersSettings } from "../../behavior/use-model-providers-settings.ts";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
 import type { AdvancedGatewayPayload } from "../../behavior/use-provider-form-submit.ts";
 import { useRequiredCredentialKeys } from "../../behavior/use-required-credential-keys.ts";
@@ -733,11 +735,14 @@ export const EditModelProviderForm = ({
   // Gateway feature flag — orgs without the gateway never see the
   // accordion AND the form never spreads advanced fields into the
   // payload, so toggling the flag has no payload-shape side effects.
-  const { enabled: gatewayMenuEnabled } = useFeatureFlag("release_ui_ai_gateway_menu_enabled", {
-    projectId: project?.id ?? NOT_TARGETED,
-    organizationId: organization?.id,
-    enabled: !!organization?.id,
-  });
+  const { enabled: gatewayMenuEnabled } = useFeatureFlag(
+    FrontendFlags.release_ui_ai_gateway_menu_enabled,
+    {
+      projectId: project?.id ?? NOT_TARGETED,
+      organizationId: organization?.id,
+      enabled: !!organization?.id,
+    },
+  );
   const [advancedDraft, setAdvancedDraft] =
     useState<ModelProviderAdvancedDraft>(EMPTY_ADVANCED_DRAFT);
   const [advancedJsonError, setAdvancedJsonError] = useState<string | null>(null);

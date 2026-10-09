@@ -9090,6 +9090,9 @@ importers:
       '@langwatch/browser':
         specifier: workspace:*
         version: link:../../../packages/browser
+      '@langwatch/github-client':
+        specifier: workspace:*
+        version: link:../client
       react:
         specifier: ^19.2.7
         version: 19.2.8
@@ -9133,6 +9136,16 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 5.0.1(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  modules/github/client:
+    dependencies:
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
 
   modules/github/contract:
     dependencies:
@@ -9862,9 +9875,15 @@ importers:
       '@langwatch/experiment-contract':
         specifier: workspace:*
         version: link:../../experiment/contract
+      '@langwatch/feature-flag-client':
+        specifier: workspace:*
+        version: link:../../feature-flag/client
       '@langwatch/feature-flag-contract':
         specifier: workspace:*
         version: link:../../feature-flag/contract
+      '@langwatch/github-client':
+        specifier: workspace:*
+        version: link:../../github/client
       '@langwatch/github-contract':
         specifier: workspace:*
         version: link:../../github/contract
@@ -10546,10 +10565,22 @@ importers:
 
   modules/model-provider/client:
     dependencies:
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../packages/api
+      '@langwatch/model-provider-contract':
+        specifier: workspace:*
+        version: link:../contract
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
     devDependencies:
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.2.18
+      react:
+        specifier: ^19.2.7
+        version: 19.2.8
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
