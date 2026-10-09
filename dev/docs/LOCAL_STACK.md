@@ -34,6 +34,21 @@ Credential-carrying variables are classified once in `packages/secrets`
 its Zod parse. Never read `.env` to find a value and never print one:
 `haven env` masks every classified key (`--reveal` for the shell form).
 
+### Credentials haven makes up
+
+A haven stack needs no real credential. haven makes up `NEXTAUTH_SECRET`,
+`CREDENTIALS_SECRET`, `LANGWATCH_INSTANCE_ADMIN_API_KEY` and
+`HAVEN_SEED_SCIM_TOKEN` per stack, keeps them in its own state (never the
+checkout), and rotates them only on `haven destroy`; one you set in `.env` wins.
+The seeded admin login, slugs and access tokens are fixed. `haven seed` ends by
+printing all of them, masked (`--reveal` shows the values, `--json` gives one
+object); `haven env --reveal` has the same credentials.
+
+Stripe is paymentsim on every local and CI stack: `haven up` runs it and points
+billing at it unless `.env` or the shell sets `STRIPE_SECRET_KEY`,
+`STRIPE_WEBHOOK_SECRET` or `STRIPE_API_BASE`, in which case your keys are used.
+`haven up` prints which (`Stripe: paymentsim` or `Stripe: your key from .env`).
+
 ### Keeping a credential in 1Password
 
 Addressing is convention plus one key (ARCHITECTURE.md §6): vault `Private`,
@@ -53,6 +68,10 @@ literally.
    left behind wins) and set `LANGWATCH_OP_ACCOUNT="<shorthand>"`.
 4. `haven down && haven up` (a restart keeps the old env), then
    `haven env --agent | grep -E 'STRIPE|LANGWATCH_OP'` shows only the account.
+
+Under haven, a Stripe pair kept only in 1Password is not used: haven sees no
+Stripe key in env or `.env`, injects paymentsim's pair, and env answers first.
+Keep your own Stripe test keys in `.env` to use them.
 
 With the account set, each boot probes once with `op whoami`, then reads every
 handle missing from env and `.env` in parallel. 1Password is best effort: when

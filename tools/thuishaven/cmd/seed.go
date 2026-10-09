@@ -24,10 +24,12 @@ func seedSpec() commandSpec {
 		{long: "--shape", takesValue: true, value: "saas|sh-licensed|sh-free", summary: "deployment shape"},
 		{long: "--live", summary: "stream a gentle live load into the last seed's orgs"},
 		{long: "--dry-run", summary: "print the plan's counts, rows, bytes and duration; write nothing"},
+		{long: "--json", summary: "end with the logins and credentials as one JSON object"},
+		{long: "--reveal", summary: "print the credentials instead of masking them"},
 	}
 	return commandSpec{
 		name:    "seed",
-		summary: "fill this stack with seeded data: --size, --days, --persona, --seed; `seed status` shows the last run",
+		summary: "fill this stack with seeded data, then print its logins and credentials (--json, --reveal); `seed status` shows the last run",
 		args:    "[status]",
 		maxArgs: 1,
 		flags:   flags,
@@ -43,7 +45,7 @@ func runSeed(ctx context.Context, d deps, inv invocation) error {
 		}
 		return d.orch.SeedStatus(d.params)
 	}
-	err := d.orch.Seed(ctx, d.params, app.SeedRequest{Args: seedgenArgs(inv), Live: inv.has("--live")})
+	err := d.orch.Seed(ctx, d.params, app.SeedRequest{Args: seedgenArgs(inv), Live: inv.has("--live"), JSON: inv.has("--json") || d.isAgent, Reveal: inv.has("--reveal")})
 	if code := seedExitCode(err); code > 1 {
 		fmt.Fprintln(os.Stderr, "haven:", err)
 		os.Exit(code)

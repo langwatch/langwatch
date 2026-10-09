@@ -63,11 +63,12 @@ hostname through the portless proxy:
     nlp.portless.langwatch.localhost         NLP engine (Go)
     clickhouse.portless.langwatch.localhost  ClickHouse (this stack's own DB, HTTP)
 
-The eight simulators each have a console at <name>.<slug>.langwatch.localhost: mail,
-idp and storage run by default; llm, voice, analytics, outbound and telemetry come with
-"haven up +llm +voice +analytics +outbound +telemetry". "haven sims --json" lists every one: running
+The nine simulators each have a console at <name>.<slug>.langwatch.localhost: mail,
+idp, storage, payment and telemetry run by default; llm, voice, analytics and outbound come with
+"haven up +llm +voice +analytics +outbound". Billing uses paymentsim unless .env sets a Stripe
+key; "haven up" prints which. "haven sims --json" lists every one: running
 here or not, its console, its verbs and its skill. Read one's output with "haven logs
-<name>". Drive one from a terminal with "haven mail|idp|llm|analytics|outbound|storage|voice|telemetry
+<name>". Drive one from a terminal with "haven mail|idp|llm|analytics|outbound|payment|storage|voice|telemetry
 <verb>" (--json on every read).
 
     mail|idp|storage|llm|voice|analytics|outbound|telemetry.portless.langwatch.localhost

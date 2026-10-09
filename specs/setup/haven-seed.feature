@@ -77,6 +77,15 @@ Feature: haven seed fills a stack with every kind of data, at any size, without 
     And no store is touched
 
   @unit
+  Scenario: haven seed returns the logins and the credentials haven made up
+    Given a stack that is up
+    When "haven seed" finishes
+    Then it prints the app URL, the seeded admin login, the organization, team and project slugs,
+      the project API key, the personal access token, the SCIM token and the instance admin key
+    And every secret value is masked unless "--reveal" is given
+    And "--json" prints the same as one object
+
+  @unit
   Scenario: haven seed refuses a stack that is not up
     Given the stack's api or worker is not running
     When I run "haven seed"

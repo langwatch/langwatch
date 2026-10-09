@@ -495,14 +495,30 @@ const (
 	PaymentSimWebhookSecret = "whsec_paymentsim"
 )
 
+// HasOwnStripe reports whether .env or the shell names any Stripe setting.
+func HasOwnStripe(resolved map[string]string) bool {
+	return resolved["STRIPE_SECRET_KEY"] != "" || resolved["STRIPE_WEBHOOK_SECRET"] != "" || resolved["STRIPE_API_BASE"] != ""
+}
+
 // PaymentProviderEnv points billing's Stripe client at paymentsim, only when the
 // resolved environment names neither Stripe credential: billing refuses half a
 // pair, and a developer's own Stripe test account is never rewired.
 func PaymentProviderEnv(resolved map[string]string, endpoint string) []string {
-	if resolved["STRIPE_SECRET_KEY"] != "" || resolved["STRIPE_WEBHOOK_SECRET"] != "" || resolved["STRIPE_API_BASE"] != "" {
+	if HasOwnStripe(resolved) {
 		return nil
 	}
 	return []string{"STRIPE_API_BASE=" + endpoint, "STRIPE_SECRET_KEY=" + PaymentSimSecretKey, "STRIPE_WEBHOOK_SECRET=" + PaymentSimWebhookSecret}
+}
+
+// StripeNotice is the line `haven up` prints: which Stripe billing talks to.
+func StripeNotice(resolved map[string]string, isPaymentSimOn bool) string {
+	switch {
+	case HasOwnStripe(resolved):
+		return "Stripe: your key from .env"
+	case isPaymentSimOn:
+		return "Stripe: paymentsim"
+	}
+	return "Stripe: none, billing is off (`haven up +payment` starts paymentsim)"
 }
 
 // llmProbeProviders are the providers whose credential probe the model-provider

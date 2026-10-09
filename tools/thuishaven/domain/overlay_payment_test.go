@@ -18,3 +18,25 @@ func TestPaymentProviderEnv(t *testing.T) {
 		}
 	}
 }
+
+// @scenario "haven up says which Stripe billing talks to"
+func TestStripeNotice(t *testing.T) {
+	cases := []struct {
+		resolved map[string]string
+		isOn     bool
+		want     string
+	}{
+		{map[string]string{}, true, "Stripe: paymentsim"},
+		{map[string]string{"STRIPE_SECRET_KEY": "set"}, true, "Stripe: your key from .env"},
+		{map[string]string{"STRIPE_SECRET_KEY": "set"}, false, "Stripe: your key from .env"},
+		{map[string]string{}, false, "Stripe: none, billing is off (`haven up +payment` starts paymentsim)"},
+	}
+	for _, c := range cases {
+		if got := StripeNotice(c.resolved, c.isOn); got != c.want {
+			t.Errorf("StripeNotice(%v, %v) = %q, want %q", c.resolved, c.isOn, got, c.want)
+		}
+	}
+	if !DefaultSelection().Payment {
+		t.Error("paymentsim is off on a default haven up")
+	}
+}

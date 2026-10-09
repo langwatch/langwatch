@@ -549,7 +549,8 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 		}
 	}()
 	endRegistration()
-	fmt.Printf("  %s\n\n", opts.Selection.DescribeForLayout(st.Layout))
+	fmt.Printf("  %s\n", opts.Selection.DescribeForLayout(st.Layout))
+	fmt.Printf("  %s\n\n", domain.StripeNotice(resolvedDevEnv(p.WorktreeDir), opts.Selection.Payment))
 
 	seed, err := o.prepareWorktree(ctx, p, st)
 	if err != nil {
