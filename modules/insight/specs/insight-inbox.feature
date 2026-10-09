@@ -131,3 +131,30 @@ Feature: The insights inbox
       When a member opens the bell in the top bar
       Then it shows the 4 newest
       And a link that opens the inbox
+
+    @integration
+    Scenario: An archived insight offers Restore
+      Given an insight the reader marked done
+      When the reader opens the Archived folder and chooses Restore
+      Then the insight is kept for that reader
+      And it is back in their Inbox folder
+
+  Rule: The line under the title
+
+    @unit
+    Scenario: An insight seen again today says so
+      Given an insight a later run found still true today
+      When the line under its title is written
+      Then it reads "Seen again today · still true through" and the day its validity ends
+
+    @unit
+    Scenario: An insight seen again on an earlier day names that day
+      Given an insight a later run found still true 2 days ago
+      When the line under its title is written
+      Then it reads "Seen again" with that day, then "still true through" and the day its validity ends
+
+    @unit
+    Scenario: A kept insight says it was kept as still relevant
+      Given an insight the reader kept
+      When the line under its title is written
+      Then it reads "Kept as still relevant"

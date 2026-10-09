@@ -6,7 +6,14 @@
 
 import { Box, Button, chakra, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { type InsightEntry, type InsightFolder, insightSnippet } from "@langwatch/insight-contract";
-import { Check, Clock3, type LucideIcon, MessageCircleMore, ThumbsDown } from "lucide-react";
+import {
+  Check,
+  Clock3,
+  type LucideIcon,
+  MessageCircleMore,
+  RotateCcw,
+  ThumbsDown,
+} from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -22,6 +29,7 @@ export type InsightDensity = "expanded" | "summary";
 export type InsightRowActions = {
   onDone: () => void;
   onKeep: () => void;
+  onRestore: () => void;
   onChat: () => void;
   onNotUseful: () => void;
 };
@@ -177,6 +185,9 @@ export function InsightRow({
           )}
           {folder !== "archived" && (
             <FooterButton icon={Check} label="Mark done" onClick={actions.onDone} />
+          )}
+          {folder === "archived" && (
+            <FooterButton icon={RotateCcw} label="Restore" onClick={actions.onRestore} />
           )}
           <FooterButton icon={MessageCircleMore} label="Chat about it" onClick={actions.onChat} />
           {folder !== "archived" && (

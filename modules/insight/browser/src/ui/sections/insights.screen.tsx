@@ -197,6 +197,7 @@ function FolderView({
                 actions={{
                   onDone: () => actions.markDone(entry.id),
                   onKeep: () => actions.keep(entry.id),
+                  onRestore: () => actions.restore(entry.id),
                   onChat: () =>
                     host.askLangy({ draft: `Follow up on the insight "${entry.title}": ` }),
                   onNotUseful: () =>

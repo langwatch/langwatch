@@ -39,7 +39,12 @@ export function insightDay(entry: InsightEntry): string {
 
 export type ValidityLine = { text: string; tone: "muted" | "warn" | "ok" };
 
-/** The line under the title: done, expired, renewed, or how long it stays true. */
+/** "today", or the short day a later run found the insight still true. */
+function seenAgainDay({ at, now }: { at: number; now: number }): string {
+  return differenceInCalendarDays(now, at) === 0 ? "today" : format(at, "MMM d");
+}
+
+/** The line under the title: done, expired, kept, seen again, or how long it stays true. */
 export function insightValidity({
   entry,
   folder,
@@ -54,7 +59,11 @@ export function insightValidity({
   if (folder === "stale") return { text: `Expired ${format(expiry, "MMM d")}`, tone: "warn" };
   if (entry.keptAt !== null) return { text: "Kept as still relevant", tone: "ok" };
   if (entry.renewedAt !== null) {
-    return { text: `Renewed · still true through ${format(expiry, "MMM d")}`, tone: "ok" };
+    const seenAgain = seenAgainDay({ at: entry.renewedAt, now });
+    return {
+      text: `Seen again ${seenAgain} · still true through ${format(expiry, "MMM d")}`,
+      tone: "ok",
+    };
   }
   const daysLeft = differenceInCalendarDays(expiry, now);
   const through = `Valid through ${format(expiry, "MMM d")}`;

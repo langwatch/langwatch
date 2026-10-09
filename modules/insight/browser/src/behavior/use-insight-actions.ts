@@ -28,6 +28,32 @@ export function useInsightActions({ projectId }: { projectId: string }) {
   const archive = insightApi.insights.archive.useMutation();
   const keep = insightApi.insights.keep.useMutation();
 
+  /** Keeping is what brings an insight back, from Stale and from Archived alike. */
+  const backToInbox = ({
+    insightId,
+    done,
+    fallbackTitle,
+  }: {
+    insightId: string;
+    done: string;
+    fallbackTitle: string;
+  }) => {
+    patch({
+      insightIds: [insightId],
+      apply: (entry, now) => ({ ...entry, keptAt: now, archivedAt: null }),
+    });
+    keep.mutate(
+      { projectId, insightId },
+      {
+        onSuccess: () => host.succeeded({ title: done }),
+        onError: (error) => {
+          reload();
+          host.failed({ error, fallbackTitle });
+        },
+      },
+    );
+  };
+
   return {
     markDone(insightId: string) {
       patch({ insightIds: [insightId], apply: (entry, now) => ({ ...entry, archivedAt: now }) });
@@ -43,20 +69,18 @@ export function useInsightActions({ projectId }: { projectId: string }) {
       );
     },
     keep(insightId: string) {
-      patch({
-        insightIds: [insightId],
-        apply: (entry, now) => ({ ...entry, keptAt: now, archivedAt: null }),
+      backToInbox({
+        insightId,
+        done: "Kept. Back in the inbox.",
+        fallbackTitle: "Couldn't keep this insight",
       });
-      keep.mutate(
-        { projectId, insightId },
-        {
-          onSuccess: () => host.succeeded({ title: "Kept. Back in the inbox." }),
-          onError: (error) => {
-            reload();
-            host.failed({ error, fallbackTitle: "Couldn't keep this insight" });
-          },
-        },
-      );
+    },
+    restore(insightId: string) {
+      backToInbox({
+        insightId,
+        done: "Restored. Back in the inbox.",
+        fallbackTitle: "Couldn't restore this insight",
+      });
     },
   };
 }
