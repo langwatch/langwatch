@@ -4,13 +4,13 @@
  * Spec: specs/licensing/self-serving-license-purchase.feature
  */
 import {
-  UiCapabilityContextProvider,
+  UiHostServicesContextProvider,
   UiScope,
   UiSession,
   type UiActiveScope,
-  type UiCapabilities,
+  type UiHostServices,
 } from "@langwatch/browser-host/capabilities";
-import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -44,9 +44,9 @@ class AdminSession extends UiSession {
   }
 }
 
-function capabilitiesWith({ licensePaymentUrl }: { licensePaymentUrl?: string }): UiCapabilities {
+function capabilitiesWith({ licensePaymentUrl }: { licensePaymentUrl?: string }): UiHostServices {
   return {
-    ...createUiCapabilitiesFromHost(
+    ...createUiHostServicesFromHost(
       { route: () => ({ params: {}, query: {} }), navigate: () => void 0 },
       new AdminSession(),
     ),
@@ -68,13 +68,13 @@ function PurchaseUrlReader() {
   return <span data-testid="url">{useLicensingHost().licensePurchaseUrl() ?? "(none)"}</span>;
 }
 
-function renderMount(capabilities: UiCapabilities) {
+function renderMount(capabilities: UiHostServices) {
   render(
-    <UiCapabilityContextProvider value={capabilities}>
+    <UiHostServicesContextProvider value={capabilities}>
       <LicensingHostMount>
         <PurchaseUrlReader />
       </LicensingHostMount>
-    </UiCapabilityContextProvider>,
+    </UiHostServicesContextProvider>,
   );
 }
 

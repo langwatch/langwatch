@@ -6,7 +6,13 @@
 
 import { describe, expect, it } from "vitest";
 
-import { CATALOGUE_TEMPLATES, CATALOGUE_WIDGETS, templateSetupNeeds } from "../index.ts";
+import { MAX_WIDGET_DRAFT_LENGTH } from "../../langy/model/board-langy.ts";
+import {
+  CATALOGUE_TEMPLATES,
+  CATALOGUE_WIDGETS,
+  templateSetupNeeds,
+  templateWidgetGaps,
+} from "../index.ts";
 
 describe("given every template's report prompt", () => {
   /** @scenario "Template prompt: Langy also checks what the template needs that is not set up yet" */
@@ -30,5 +36,21 @@ describe("given every template's report prompt", () => {
     )!;
 
     expect(templateSetupNeeds([tracesOnly.id])).toEqual([]);
+  });
+
+  /** @scenario "Template prompt: Langy also checks what the template needs that is not set up yet" */
+  it("names each widget that waits for data and what it needs, within the draft limit", () => {
+    for (const { id, reportPrompt, widgets } of CATALOGUE_TEMPLATES) {
+      const gaps = templateWidgetGaps(widgets);
+      expect(reportPrompt.includes("These widgets wait for data: "), id).toBe(gaps.length > 0);
+      const missing = gaps.filter(
+        ({ widget, gap }) => !reportPrompt.includes(`"${widget}" needs ${gap}`),
+      );
+      expect(missing, id).toEqual([]);
+      expect(reportPrompt.length, id).toBeLessThan(MAX_WIDGET_DRAFT_LENGTH / 2);
+    }
+    expect(CATALOGUE_TEMPLATES.some(({ widgets }) => templateWidgetGaps(widgets).length > 0)).toBe(
+      true,
+    );
   });
 });

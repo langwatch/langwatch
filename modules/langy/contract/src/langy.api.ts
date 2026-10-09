@@ -24,7 +24,8 @@ import type {
 } from "./features/local-control/langy.local-control-http.ts";
 import type {
   CliFrame,
-  LocalControlConnectCredentials,
+  LocalControlCredential,
+  LocalControlRefusedCode,
   PlatformFrame,
   RegisterFrame,
 } from "./features/local-control/langy.local-control-protocol.ts";
@@ -152,7 +153,13 @@ export type LangyUiActionDispatched =
 
 /** A public surface's caller: the key's owner and project, and which surface's rollout gates it. */
 export type LangyControlRegisterInput = LangyKeyCaller &
-  Readonly<{ authorization: string; frame: RegisterFrame }>;
+  Readonly<{ credential: LocalControlCredential; frame: RegisterFrame }>;
+/** Who holds a minted session key, and what the key controls: the session its door hands on. */
+export type LocalControlKeyHolder = SessionKeyHolder & LocalControlCredential;
+/** A socket the session key door admitted with its credential, or refused with main's frame. */
+export type LocalControlConnectionOpened =
+  | Readonly<{ admitted: LocalControlCredential }>
+  | Readonly<{ refused: Readonly<{ code: LocalControlRefusedCode; message: string }> }>;
 export type LangyControlRegistered = Readonly<{ frame: PlatformFrame; instanceToken: string }>;
 export type LangyControlPollInput = Readonly<{
   instanceToken: string;
@@ -368,7 +375,7 @@ export interface LangyApi {
   ): Promise<ApproveControlRequestResponse>;
   cancelLocalControlRequest(input: LangyControlRequestInput): Promise<LangyControlRequestCancelled>;
   /** The session-key door's check: who holds a minted key; any other key throws its refusal. */
-  verifyLocalControlSessionKey(presented: SessionKeyPresented): Promise<SessionKeyHolder>;
+  verifyLocalControlSessionKey(presented: SessionKeyPresented): Promise<LocalControlKeyHolder>;
   /** Shares a folder over long-poll: the registered frame and the token its polls carry. */
   registerLocalControlSession(input: LangyControlRegisterInput): Promise<LangyControlRegistered>;
   /** Holds until the folder has frames; an unknown instance token throws not found. */
@@ -378,7 +385,7 @@ export interface LangyApi {
   /** Holds one folder's socket from its register frame until it closes; refusals are frames. */
   acceptLocalControlConnection(
     connection: ProtocolConnection,
-    credentials: LocalControlConnectCredentials,
+    opened: LocalControlConnectionOpened,
   ): Promise<void>;
 
   // The panel's `langy.*` and `langyEgress.*` procedures, each behind the Langy rollout gate.

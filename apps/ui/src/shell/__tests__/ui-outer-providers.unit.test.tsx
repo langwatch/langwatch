@@ -5,9 +5,9 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { composeUiDesignSystem, loadUiRootCapabilities } from "../ui-root-capabilities";
+import { composeUiDesignSystem, loadUiRootHostServices } from "../ui-root-host-services";
 
-const uiDesignSystem = composeUiDesignSystem(await loadUiRootCapabilities());
+const uiDesignSystem = composeUiDesignSystem(await loadUiRootHostServices());
 
 let installedSystem: unknown;
 

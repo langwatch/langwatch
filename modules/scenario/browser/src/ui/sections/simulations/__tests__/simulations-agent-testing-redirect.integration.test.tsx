@@ -1,5 +1,5 @@
-import { UiCapabilityContextProvider } from "@langwatch/browser-host/capabilities";
-import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import { UiHostServicesContextProvider } from "@langwatch/browser-host/capabilities";
+import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
 import {
   createUiScopeHost,
   UiScopeHostProvider,
@@ -86,11 +86,11 @@ function TestScenarioHost({ children }: { children: React.ReactNode }) {
   });
 
   return (
-    <UiCapabilityContextProvider value={createUiCapabilitiesFromHost(host)}>
+    <UiHostServicesContextProvider value={createUiHostServicesFromHost(host)}>
       <UiScopeHostProvider value={shellScope}>
         <ScenarioHostProvider value={host}>{children}</ScenarioHostProvider>
       </UiScopeHostProvider>
-    </UiCapabilityContextProvider>
+    </UiHostServicesContextProvider>
   );
 }
 

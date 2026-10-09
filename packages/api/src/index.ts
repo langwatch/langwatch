@@ -43,6 +43,8 @@ export {
   type ProtocolConnection,
   type WebSocketCaller,
   type WebSocketDoor,
+  type WebSocketSessionCaller,
+  type WebSocketSessionKeyDoor,
 } from "./websocket.ts";
 export {
   RAW_SOCKET_LIVENESS_PATH,

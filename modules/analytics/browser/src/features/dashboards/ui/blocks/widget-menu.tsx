@@ -1,22 +1,15 @@
 /**
  * A widget's "⋮" menu on a board, in the prototype's order: edit it (with Langy, or its code),
- * copy its id or the API call that edits it, then Set an alert and Send as a report, then
- * Duplicate and Delete. The Langy actions show only when Langy is available.
+ * copy its id or the API call that edits it, Export CSV, then Set an alert and Send as a
+ * report, then Duplicate and Delete. The Langy actions show only when Langy is available.
  */
 
 import { Menu } from "@langwatch/design-system/menu";
-import { IconButton } from "@langwatch/design-system/primitives";
-import {
-  BellPlus,
-  Braces,
-  Code2,
-  Copy,
-  Hash,
-  MoreVertical,
-  Send,
-  Sparkles,
-  Trash2,
-} from "lucide-react";
+import { BellPlus, Braces, Code2, Copy, Hash, Send, Sparkles, Trash2 } from "lucide-react";
+
+import type { WidgetCsvExportItem } from "../../behavior/use-widget-csv-export.ts";
+import { WidgetMenuTrigger } from "../elements/widget-menu-trigger.tsx";
+import { ExportCsvMenuItem } from "./widget-export-menu.tsx";
 
 export function WidgetMenu({
   name,
@@ -25,6 +18,7 @@ export function WidgetMenu({
   onEditCode,
   onCopyId,
   onCopyApiSnippet,
+  exportCsv,
   onSetAlert,
   onSendReport,
   onDuplicate,
@@ -34,9 +28,12 @@ export function WidgetMenu({
   disabled: boolean;
   /** Opens the editor with an edit drafted in Langy; absent when Langy is not available. */
   onEditWithLangy?: () => void;
-  onEditCode: () => void;
+  /** Absent when the reader may not see the widget's data and may not edit widgets either. */
+  onEditCode?: () => void;
   onCopyId: () => void;
   onCopyApiSnippet: () => void;
+  /** Absent when the widget has nothing of its own to export. */
+  exportCsv?: WidgetCsvExportItem;
   /** Drafts an alert on this widget in Langy; absent when Langy is not available. */
   onSetAlert?: () => void;
   /** Drafts a scheduled report of this widget in Langy; absent when Langy is not available. */
@@ -46,33 +43,30 @@ export function WidgetMenu({
 }) {
   return (
     <Menu.Root positioning={{ placement: "bottom-end" }}>
-      <Menu.Trigger asChild>
-        <IconButton
-          aria-label={`Actions for ${name}`}
-          variant="ghost"
-          size="xs"
-          color="fg.subtle"
-          _hover={{ color: "fg", background: "bg.muted" }}
-          disabled={disabled}
-        >
-          <MoreVertical size={14} aria-hidden />
-        </IconButton>
-      </Menu.Trigger>
+      <WidgetMenuTrigger name={name} disabled={disabled} />
       <Menu.Content minWidth="200px">
         {onEditWithLangy && (
           <Menu.Item value="edit-langy" onClick={onEditWithLangy}>
             <Sparkles size={14} /> Edit with Langy
           </Menu.Item>
         )}
-        <Menu.Item value="edit-code" onClick={onEditCode}>
-          <Code2 size={14} /> Edit code
-        </Menu.Item>
+        {onEditCode && (
+          <Menu.Item value="edit-code" onClick={onEditCode}>
+            <Code2 size={14} /> Edit code
+          </Menu.Item>
+        )}
         <Menu.Item value="copy-id" onClick={onCopyId}>
           <Hash size={14} /> Copy widget id
         </Menu.Item>
         <Menu.Item value="copy-api" onClick={onCopyApiSnippet}>
           <Braces size={14} /> Copy API snippet
         </Menu.Item>
+        {exportCsv && (
+          <>
+            <Menu.Separator />
+            <ExportCsvMenuItem item={exportCsv} />
+          </>
+        )}
         {(onSetAlert || onSendReport) && <Menu.Separator />}
         {onSetAlert && (
           <Menu.Item value="alert" onClick={onSetAlert}>

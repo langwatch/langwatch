@@ -32,6 +32,11 @@ type Orchestrator struct {
 	obs   Observability
 	hyg   Hygiene
 	sem   Semaphore
+	// daemon is the up's line to the daemon, which starts every keeper.
+	daemon DaemonClient
+	// keeperRespawns is when the daemon last respawned each slug's keeper, for
+	// the backoff and the crash-loop give-up (D3). Daemon tick only.
+	keeperRespawns map[string][]time.Time
 	// container is the colima VM the langyagent worker runs on in its container
 	// tiers (see domain.LangyTier). May be nil in tests that never launch it.
 	container ContainerRuntime
@@ -86,6 +91,7 @@ type Deps struct {
 	Obs       Observability
 	Hyg       Hygiene
 	Sem       Semaphore
+	Daemon    DaemonClient
 	Container ContainerRuntime
 	Janitor   ContainerJanitor
 	Jobs      JobScratch
@@ -108,7 +114,7 @@ func New(d Deps) *Orchestrator {
 	}
 	return &Orchestrator{
 		cfg: d.Cfg, proxy: d.Proxy, store: d.Store, sup: d.Sup, sys: d.Sys,
-		ch: d.CH, pg: d.PG, rds: d.RDS, obs: d.Obs, hyg: d.Hyg, sem: d.Sem,
+		ch: d.CH, pg: d.PG, rds: d.RDS, obs: d.Obs, hyg: d.Hyg, sem: d.Sem, daemon: d.Daemon,
 		container: d.Container, janitor: d.Janitor, jobs: d.Jobs, claudeState: d.State, procTel: d.ProcTel, claude: d.Claude, codex: d.Codex,
 		prereqs: d.Prereqs, log: d.Log,
 	}
@@ -341,6 +347,11 @@ func (o *Orchestrator) heartbeat(ctx context.Context, st domain.Stack) {
 		case <-ctx.Done():
 			return
 		case <-t.C:
+			// A record removed (down, a failed hand-over) or taken by another
+			// launcher is never written back: that resurrected a stack with no routes.
+			if cur, ok := o.stackBySlug(st.Slug); !ok || cur.LauncherPID != st.LauncherPID {
+				return
+			}
 			st.UpdatedAt = o.sys.Now()
 			_ = o.store.SaveStack(st)
 		}
@@ -543,7 +554,7 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 	children := o.planChildren(st, opts, p.WorktreeDir)
 	retireStaleSimsCapture(children)
 	stopBeat()
-	if err := o.handOver(st, children, opts.IsForegroundClient); err != nil {
+	if err := o.handOver(ctx, st, o.keeperPlan(children, opts.IsForegroundClient)); err != nil {
 		return err
 	}
 	isHandedOver = true
@@ -798,6 +809,7 @@ func (o *Orchestrator) reconcileRunningStack(p UpParams, opts PlanOptions) (proc
 			o.removeStackRoutes(slug, st.Services)
 		}
 		o.store.RemoveStack(slug)
+		removeKeeperPlan(st.WorktreeDir, slug) // a dead keeper's plan must not be respawned from
 		return true, nil
 	}
 	// Everything that makes the running stack differ from what was asked for.
@@ -843,6 +855,7 @@ func (o *Orchestrator) reconcileRunningStack(p UpParams, opts PlanOptions) (proc
 	}
 	o.sys.Terminate(st.LauncherPID)
 	o.waitForProcessesDead([]int{st.LauncherPID})
+	removeKeeperPlan(st.WorktreeDir, slug)
 	return true, nil
 }
 

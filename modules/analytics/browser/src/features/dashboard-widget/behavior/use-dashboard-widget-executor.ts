@@ -4,9 +4,10 @@
  * button) share one validation gate, so a query runs identically either way.
  */
 
-import type {
-  LangWatchQLAcceptedGranularityStep,
-  LangWatchQLGranularityStep,
+import {
+  findLangWatchQLMissingGates,
+  type LangWatchQLAcceptedGranularityStep,
+  type LangWatchQLGranularityStep,
 } from "@langwatch/analytics-contract";
 import type {
   ChartFrameDashboardContext,
@@ -42,11 +43,17 @@ function toChartQueryError(error: unknown): ChartQueryError {
   // ADR-045: registry copy only, with the lwql_* code riding along.
   const explained = explainAnyError(error);
   const handled = readHandledError(error);
+  // A refusal about what the reader may see, not about the query: the card says so.
+  const missingGates =
+    handled?.code === "lwql_not_permitted"
+      ? findLangWatchQLMissingGates(handled.meta.violations)
+      : [];
   return {
     code: handled?.code ?? "unknown",
     title: explained.title,
     message: explained.description,
     ...(handled?.retryable === true ? { retryable: true } : {}),
+    ...(missingGates.length > 0 ? { missingGates } : {}),
   };
 }
 

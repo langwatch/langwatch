@@ -34,6 +34,10 @@ const spanCosts = SpanCostService.create({
     estimate(): number {
       return 0;
     }
+
+    isUnpriced(): boolean {
+      return false;
+    }
   })(),
 });
 

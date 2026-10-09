@@ -6,14 +6,14 @@
 
 import {
   UNAVAILABLE_UI_SCOPE,
-  useOptionalUiCapabilities,
+  useOptionalUiHostServices,
 } from "@langwatch/browser-host/capabilities";
 import { UiRouteOutlet } from "@langwatch/browser/route-objects";
 import type { ProcessWebConfig } from "@langwatch/config/public-app-config";
 
 import { UiNavigationHost } from "./navigation-host-provider";
 import { UiScreenErrorBoundary } from "./ui-error-page";
-import type { UiRootCapabilities } from "./ui-root-capabilities";
+import type { UiRootHostServices } from "./ui-root-host-services";
 import { useAnalyticsIdentity } from "./use-analytics-identity";
 
 export default function UiAppChrome({
@@ -21,13 +21,13 @@ export default function UiAppChrome({
   process,
   fullScreen = false,
 }: {
-  capabilities: UiRootCapabilities;
+  capabilities: UiRootHostServices;
   /** The process owner's slice: the chrome's development badge reads it. */
   process: ProcessWebConfig;
   /** Draws the page with no top bar or sidebar, behind the same gates. */
   fullScreen?: boolean;
 }) {
-  const capabilities = useOptionalUiCapabilities();
+  const capabilities = useOptionalUiHostServices();
   // Mounted outside an application shell, or inside one that declared no
   // scope — a route-table test, never the product, where the composition
   // always supplies both. Nothing has been read, so there is no host to mount
@@ -53,7 +53,7 @@ function UiAppChromeFrame({
   navigationChrome: { NavigationShell, useNavigationTracking },
   fullScreen,
   isDevelopment,
-}: Pick<UiRootCapabilities, "scope" | "navigationChrome"> & {
+}: Pick<UiRootHostServices, "scope" | "navigationChrome"> & {
   fullScreen: boolean;
   isDevelopment: boolean;
 }) {

@@ -1,9 +1,9 @@
 import {
-  UiCapabilityContextProvider,
-  type UiCapabilities,
+  UiHostServicesContextProvider,
+  type UiHostServices,
 } from "@langwatch/browser-host/capabilities";
 import { uiDeclarations } from "@langwatch/browser-host/declarations";
-import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
 /**
  * @vitest-environment jsdom
  *
@@ -110,8 +110,8 @@ const datasetLends = uiDeclarations([
   },
 ]);
 
-const capabilities: UiCapabilities = {
-  ...createUiCapabilitiesFromHost({
+const capabilities: UiHostServices = {
+  ...createUiHostServicesFromHost({
     route: () => ({ params: {}, query: {} }),
     navigate: () => void 0,
   }),
@@ -121,7 +121,7 @@ const capabilities: UiCapabilities = {
 /** Renders under the capabilities that carry dataset's lends, as the shell would. */
 function renderWithLends(ui: ReactElement) {
   return renderWithDesignSystem(
-    <UiCapabilityContextProvider value={capabilities}>{ui}</UiCapabilityContextProvider>,
+    <UiHostServicesContextProvider value={capabilities}>{ui}</UiHostServicesContextProvider>,
   );
 }
 

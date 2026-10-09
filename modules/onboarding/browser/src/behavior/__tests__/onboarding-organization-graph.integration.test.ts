@@ -5,11 +5,11 @@
  * Spec: specs/features/onboarding/manual-setup-api-key.feature
  */
 import {
-  UiCapabilityContextProvider,
+  UiHostServicesContextProvider,
   UiSession,
   type UiActor,
 } from "@langwatch/browser-host/capabilities";
-import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
 import { renderHook } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -65,13 +65,13 @@ class SignedInSession extends UiSession {
   }
 }
 
-const capabilities = createUiCapabilitiesFromHost(
+const capabilities = createUiHostServicesFromHost(
   { route: () => ({ params: {}, query: {} }), navigate: () => void 0 },
   new SignedInSession(),
 );
 
 function SignedIn({ children }: { children: ReactNode }) {
-  return createElement(UiCapabilityContextProvider, { value: capabilities }, children);
+  return createElement(UiHostServicesContextProvider, { value: capabilities }, children);
 }
 
 describe("useOnboardingOrganizationGraph", () => {

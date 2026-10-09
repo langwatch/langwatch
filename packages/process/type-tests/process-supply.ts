@@ -74,11 +74,11 @@ expectTypeOf<MissingNames<typeof wrongEarlier>>().toEqualTypeOf<"peer.project">(
 
 const all = createApp({ role: "api" }).withModules([facilityModule, configModule, peerModule]);
 expectTypeOf<MissingNames<typeof all>>().toEqualTypeOf<
-  | "relational"
-  | "keyvalue"
+  | "prisma"
+  | "redis"
   | "clock"
-  | "logging"
-  | "metrics"
+  | "logger"
+  | "telemetry"
   | "tracing"
   | "secrets"
   | "encryption"
@@ -90,28 +90,28 @@ void all.boot();
 const ready = all
   .withConfig({ "api-key": { pepper: "test" } })
   .provide({ project })
-  .withMembers({ relational: facilities.relational, keyvalue: facilities.keyvalue })
+  .withMembers({ prisma: facilities.prisma, redis: facilities.redis })
   .withClock(clock)
   .withSecrets(facilities.secrets)
   .withEncryption(facilities.encryption)
   .withObservability((o) =>
     o
-      .withLogging(facilities.logging)
+      .withLogging(facilities.logger)
       .withTracing(facilities.tracing)
-      .withMetrics(facilities.metrics),
+      .withMetrics(facilities.telemetry),
   )
   .expose(() => ({ hosts: {}, serve: () => void 0 }));
 expectTypeOf<MissingNames<typeof ready>>().toEqualTypeOf<never>();
 void (() => ready.boot());
-const wrongFacility = minimal.withObservability((o) => o.withMetrics(facilities.metrics));
+const wrongFacility = minimal.withObservability((o) => o.withMetrics(facilities.telemetry));
 expectTypeOf<MissingNames<typeof wrongFacility>>().toEqualTypeOf<"clock">();
 // @ts-expect-error an unrelated facility does not satisfy the clock
 void wrongFacility.boot();
 
 const repositoryOnly = createApp({ role: "api" }).withModules([repositoryModule]);
-expectTypeOf<MissingNames<typeof repositoryOnly>>().toEqualTypeOf<"relational" | "clock">();
+expectTypeOf<MissingNames<typeof repositoryOnly>>().toEqualTypeOf<"prisma" | "clock">();
 const repositorySupplied = repositoryOnly
-  .withMembers({ relational: facilities.relational })
+  .withMembers({ prisma: facilities.prisma })
   .withClock(clock);
 expectTypeOf<MissingNames<typeof repositorySupplied>>().toEqualTypeOf<never>();
 void (() => repositorySupplied.boot());

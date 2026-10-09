@@ -134,9 +134,9 @@ export async function storageSeed({ connections, chain, environment }: TaskInput
 
   // The licence must be valid under the key this stack boots with. No licence is committed:
   // the seed signs one with the private key from secrets (seed-license.ts has the order).
-  const existingOrganization = await prisma.organization.findUnique({
-    where: { id: ORG_ID },
-    select: { license: true },
+  const existingLicense = await prisma.organizationLicense.findUnique({
+    where: { organizationId: ORG_ID },
+    select: { licenseKey: true },
   });
   const { licensing } = parseProcessConfig({
     owners: [{ name: "licensing", config: licensingConfig }],
@@ -147,7 +147,7 @@ export async function storageSeed({ connections, chain, environment }: TaskInput
   ]);
   const licenseChoice = await secrets.into(licensingSecrets.licensePrivateKey, (privateKey) =>
     chooseSeedLicense({
-      stored: existingOrganization?.license ?? null,
+      stored: existingLicense?.licenseKey ?? null,
       publicKey: licensing.publicKey ?? DEFAULT_LICENSE_PUBLIC_KEY,
       privateKey,
       organization: { id: ORG_ID, name: ORG_NAME, email: adminEmail },
@@ -164,6 +164,12 @@ export async function storageSeed({ connections, chain, environment }: TaskInput
       license,
     },
     update: { license },
+  });
+  // Licensing reads its own row first (round 37 D6); organization's column goes with its contract.
+  await prisma.organizationLicense.upsert({
+    where: { organizationId: ORG_ID },
+    create: { organizationId: ORG_ID, licenseKey: license },
+    update: { licenseKey: license },
   });
 
   // Prompt tags are org-defined, and `production` is the one

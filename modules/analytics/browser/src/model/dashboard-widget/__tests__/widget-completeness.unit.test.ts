@@ -129,6 +129,64 @@ describe("widgetFace", () => {
     expect(widgetFace(records)).toEqual({ kind: "no_traffic", unit: "traces" });
   });
 
+  describe("when a query is refused because the reader may not see what it reads", () => {
+    const NO_COST = {
+      code: "lwql_not_permitted",
+      title: "Not permitted",
+      message: "The query is not permitted.",
+      missingGates: ["cost:view"],
+    };
+    const refused = recordQueryFailure({ records: {}, queryName: "cost", error: NO_COST });
+
+    /** @scenario "A widget whose query is refused for access shows no access, before any other state" */
+    it("is no access with the gates the reader lacks, before a failure or a missing field", () => {
+      const withFailure = recordQueryFailure({
+        records: refused,
+        queryName: "broken",
+        error: BROKEN,
+      });
+      const withMissing = recordQueryResult({
+        records: refused,
+        queryName: "topics",
+        completeness: MISSING,
+      });
+
+      expect(widgetFace(refused)).toEqual({ kind: "no_access", missingGates: ["cost:view"] });
+      expect(widgetFace(withFailure).kind).toBe("no_access");
+      expect(widgetFace(withMissing).kind).toBe("no_access");
+    });
+
+    it("names every gate the queries were refused for, once", () => {
+      const both = recordQueryFailure({
+        records: refused,
+        queryName: "said",
+        error: { ...NO_COST, missingGates: ["output", "cost:view"] },
+      });
+
+      expect(widgetFace(both)).toEqual({
+        kind: "no_access",
+        missingGates: ["cost:view", "output"],
+      });
+    });
+
+    /** @scenario "A widget whose query is refused for access shows no access, before any other state" */
+    it("still fails the widget when the refusal names no gate", () => {
+      const { missingGates: _gates, ...notPermitted } = NO_COST;
+
+      expect(widgetFace(failTimes({ times: 1, error: notPermitted })).kind).toBe("failed");
+    });
+
+    it("draws the chart again once the query answers", () => {
+      const answered = recordQueryResult({
+        records: refused,
+        queryName: "cost",
+        completeness: report({}),
+      });
+
+      expect(widgetFace(answered).kind).toBe("chart");
+    });
+  });
+
   /** @scenario "A widget that also reads outside the period draws its own empty face" */
   it("leaves an empty period to the widget when a query reads outside it", () => {
     const empty = recordQueryResult({ records: {}, queryName: "main", completeness: NO_TRAFFIC });

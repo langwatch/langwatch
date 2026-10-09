@@ -7,7 +7,7 @@
 import { Link as ChakraLink } from "@langwatch/design-system/primitives";
 import type { ComponentProps, MouseEvent } from "react";
 
-import { useOptionalUiCapabilities } from "./capabilities.ts";
+import { useOptionalUiHostServices } from "./capabilities.ts";
 
 type LinkProps = {
   href: string | undefined;
@@ -40,7 +40,7 @@ function isBrowserClick(event: MouseEvent<HTMLAnchorElement>): boolean {
 }
 
 export const Link = ({ href, isExternal, children, onClick, ...props }: LinkProps) => {
-  const capabilities = useOptionalUiCapabilities();
+  const capabilities = useOptionalUiHostServices();
 
   if (isExternal) {
     return (

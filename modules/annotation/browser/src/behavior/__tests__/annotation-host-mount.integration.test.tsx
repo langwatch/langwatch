@@ -4,16 +4,16 @@
  * Spec: specs/traces/trace-list-page-size-cap.feature
  */
 import {
-  UiCapabilityContextProvider,
+  UiHostServicesContextProvider,
   UiScope,
   UiSession,
   UiTraceFilters,
   type UiActiveScope,
-  type UiCapabilities,
+  type UiHostServices,
   type UiTraceFilterReading,
 } from "@langwatch/browser-host/capabilities";
 import type { UiScopeStatus, UiSessionSnapshot } from "@langwatch/browser-host/session";
-import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
 import { renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -85,8 +85,8 @@ function hostUnder({
   traceFilters?: UiTraceFilters | undefined;
   scopeStatus?: UiScopeStatus;
 }) {
-  const capabilities: UiCapabilities = {
-    ...createUiCapabilitiesFromHost(
+  const capabilities: UiHostServices = {
+    ...createUiHostServicesFromHost(
       {
         route: () => ({ params: {}, query: {} }),
         navigate: () => void 0,
@@ -97,9 +97,9 @@ function hostUnder({
     ...(traceFilters ? { traceFilters } : {}),
   };
   const wrapper = ({ children }: { children: ReactNode }) => (
-    <UiCapabilityContextProvider value={capabilities}>
+    <UiHostServicesContextProvider value={capabilities}>
       <AnnotationHostMount>{children}</AnnotationHostMount>
-    </UiCapabilityContextProvider>
+    </UiHostServicesContextProvider>
   );
   return renderHook(() => useAnnotationHost(), { wrapper }).result.current;
 }

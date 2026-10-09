@@ -14,7 +14,11 @@ import type { FeatureTransportDescriptor } from "./feature-installer.ts";
 
 /** A process's upgrade router, as the installer calls it. */
 export interface FeatureWebSocketHost {
-  mount(declaration: MountableTransport, app: () => unknown): void;
+  mount(
+    declaration: MountableTransport,
+    app: () => unknown,
+    options?: Readonly<{ facts?: readonly TransportFactBinding[] }>,
+  ): void;
 }
 
 /** The role's own port for sockets handed on unopened, as the installer calls it. */
@@ -141,7 +145,9 @@ function mountSocket(
   host: FeatureWebSocketHost | undefined,
 ): void {
   if (!host) throw new MissingTransportHostError(entry.feature, "WebSocket");
-  host.mount(descriptor.router(), entry.provided);
+  // A socket may name its module's own session key door, bound as a REST credential is.
+  const facts = entry.facts.filter((binding) => "credential" in binding);
+  host.mount(descriptor.router(), entry.provided, facts.length > 0 ? { facts } : {});
 }
 
 /** One raw-socket door on the role's own port, bound to the feature's app. */

@@ -240,7 +240,7 @@ jobs:
             "package/app/apps/worker/src/main.ts"
             # The task launcher the first boot runs: `upgrade`, then the
             # system-migrations pass; `upgrade` reads the release manifests.
-            "package/app/apps/tasks/src/tasks.entrypoint.ts"
+            "package/app/apps/tasks/src/main.ts"
             "package/app/packages/upgrade/releases"
             "package/app/apps/api/prisma.config.ts"
             "package/app/packages/prisma-client/prisma.config.ts"

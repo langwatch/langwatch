@@ -9,6 +9,7 @@ import {
   type LangyCredentialSession,
   type LangyMessagePart,
   type LangyMessageRole,
+  type LocalControlCredential,
   type LocalControlRefusedCode,
   type PlatformFrame,
   type WorkspaceInfo,
@@ -18,15 +19,7 @@ import type { ConnectedWorkspace } from "../repositories/langy-local-presence.re
 import type { LangyTokenBufferRepository } from "../repositories/langy-token-buffer.repository.ts";
 
 /** The credential behind one socket, once it resolved to a conversation. */
-export interface ControlCredential {
-  apiKeyId: string;
-  projectId: string;
-  /** The project's own address segment, so the follow along link names it. */
-  projectSlug: string;
-  userId: string;
-  conversationId: string;
-  requestId: string;
-}
+export type ControlCredential = LocalControlCredential;
 
 /** One registered folder, as both transports hold it. */
 export interface ControlSession {

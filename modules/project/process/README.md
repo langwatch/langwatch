@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`ProjectApi`)
 
-Peers call these through the token, declared at `../contract/src/project.api.ts:64`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/project.api.ts:86`; nothing else in this package is public.
 
 #### `listPaths`
 
@@ -322,6 +322,22 @@ Every project with its organisation, paged like `listAllIds`, for the storage mi
 
 ```typescript
 listAllWithOrganization(input?: ProjectIdPageInput): Promise<ProjectOrganizationPage>;
+```
+
+#### `listAllWithPrivateS3`
+
+Every project with whether it names its own S3 bucket, paged like `listAllIds`, for the object-storage migration inventory: a global provider move leaves those projects out.
+
+```typescript
+listAllWithPrivateS3(input?: ProjectIdPageInput): Promise<ProjectPrivateS3Page>;
+```
+
+#### `listLwqlKeys`
+
+Every project with its LangWatchQL key, paged like `listAllIds`, for the key-map backfill.
+
+```typescript
+listLwqlKeys(input?: ProjectIdPageInput): Promise<ProjectLwqlKeyPage>;
 ```
 
 ## REST transport

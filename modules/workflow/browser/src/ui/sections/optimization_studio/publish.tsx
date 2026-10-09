@@ -1,5 +1,5 @@
 import { useMintPersonalToken } from "@langwatch/api-key-client";
-import { useOptionalUiCapabilities } from "@langwatch/browser-host/capabilities";
+import { useOptionalUiHostServices } from "@langwatch/browser-host/capabilities";
 import { showErrorToast } from "@langwatch/browser-host/errors";
 import { Link } from "@langwatch/browser-host/link";
 import { toaster } from "@langwatch/browser-host/toaster";
@@ -673,7 +673,7 @@ export const ApiModalContent = () => {
   const minting = useMintPersonalToken({
     organizationId: organization?.id,
     projectId: project?.id,
-    userId: useOptionalUiCapabilities()?.session.currentUser()?.id,
+    userId: useOptionalUiHostServices()?.session.currentUser()?.id,
     name: "Personal access token",
     permissions: ["workflows:manage"],
   });

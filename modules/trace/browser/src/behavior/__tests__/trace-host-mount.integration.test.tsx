@@ -55,7 +55,7 @@ vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => {
   };
   return {
     ...original,
-    useUiCapabilities: () => ({
+    useUiHostServices: () => ({
       session,
       navigation: { navigate: vi.fn(), replace: vi.fn() },
       route: { reading: () => ({ params: {}, query: {} }), setQuery: vi.fn() },

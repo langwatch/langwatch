@@ -6,6 +6,7 @@
 
 import { Link } from "@langwatch/browser-host/link";
 import { Badge, Button, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
+import { SettingsSection, SettingsSectionRow } from "@langwatch/design-system/settings-section";
 import { KeyRound } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -15,16 +16,7 @@ import { signInMethodRows, type SignInMethodRow } from "../../model/sign-in-meth
 
 function MethodRow({ label, detail, chip, testId }: Omit<SignInMethodRow, "key">) {
   return (
-    <HStack
-      width="full"
-      gap={3}
-      paddingX={4}
-      paddingY={3}
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="lg"
-      data-testid={testId}
-    >
+    <SettingsSectionRow data-testid={testId}>
       <Text fontSize="sm" fontWeight={500} minWidth="160px">
         {label}
       </Text>
@@ -42,7 +34,7 @@ function MethodRow({ label, detail, chip, testId }: Omit<SignInMethodRow, "key">
           </Badge>
         )}
       </HStack>
-    </HStack>
+    </SettingsSectionRow>
   );
 }
 
@@ -83,24 +75,19 @@ export function SignInMethodsSummary() {
   });
 
   return (
-    <VStack align="stretch" gap={3} width="full" data-testid="sign-in-methods-summary">
-      <HStack justify="space-between" width="full">
-        <VStack align="start" gap={1}>
-          <HStack gap={2}>
-            <KeyRound size={18} />
-            <Text fontWeight={600}>Sign-in methods</Text>
-          </HStack>
-          <Text color="fg.muted" fontSize="sm">
-            What this account can prove it is with.
-          </Text>
-        </VStack>
+    <SettingsSection
+      icon={<KeyRound size={18} />}
+      title="Sign-in methods"
+      hint="What this account can prove it is with."
+      actions={
         <Button asChild size="xs" variant="outline" data-testid="sign-in-methods-manage">
           <Link unstyled href="/settings/security">
             Manage
           </Link>
         </Button>
-      </HStack>
-
+      }
+      data-testid="sign-in-methods-summary"
+    >
       {identifiers.isPending || confirmation.isPending ? (
         <Spinner size="sm" />
       ) : (
@@ -110,7 +97,7 @@ export function SignInMethodsSummary() {
           ))}
         </VStack>
       )}
-    </VStack>
+    </SettingsSection>
   );
 }
 

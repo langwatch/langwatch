@@ -27,7 +27,7 @@ vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => {
   const scope = { activeScope: () => ({ organizationId: "org_1", projectId: "proj_1" }) };
   return {
     ...original,
-    useUiCapabilities: () => capabilities,
+    useUiHostServices: () => capabilities,
     useUiScope: () => scope,
     useUiDeployment: () => deployment,
   };

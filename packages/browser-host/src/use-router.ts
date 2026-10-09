@@ -6,7 +6,7 @@
 
 import { useMemo } from "react";
 
-import { useOptionalUiCapabilities } from "./capabilities.ts";
+import { useOptionalUiHostServices } from "./capabilities.ts";
 
 export type UiRouterValues = Readonly<Record<string, string | undefined>>;
 
@@ -121,7 +121,7 @@ function asAddress(to: UiRouterTarget, currentPathname: string): string {
  * `UiRoute.setQuery` takes. An address with a path is a navigation.
  */
 export function useRouter(): UiRouter {
-  const capabilities = useOptionalUiCapabilities();
+  const capabilities = useOptionalUiHostServices();
 
   return useMemo(() => {
     if (!capabilities) return NO_ROUTER;

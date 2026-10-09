@@ -2,11 +2,11 @@
 
 import "@testing-library/jest-dom/vitest";
 import {
-  UiCapabilityContextProvider,
-  type UiCapabilities,
+  UiHostServicesContextProvider,
+  type UiHostServices,
 } from "@langwatch/browser-host/capabilities";
 import { uiDeclarations, type UiDeclarations } from "@langwatch/browser-host/declarations";
-import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
 import { ParameterLineFieldToken, type ParameterLineFieldProps } from "@langwatch/scenario-client";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -43,15 +43,15 @@ function renderField({
   declarations: UiDeclarations;
   definitions: ParameterLineFieldProps["definitions"];
 }) {
-  const capabilities: UiCapabilities = {
-    ...createUiCapabilitiesFromHost({
+  const capabilities: UiHostServices = {
+    ...createUiHostServicesFromHost({
       route: () => ({ params: {}, query: {} }),
       navigate: () => void 0,
     }),
     declarations,
   };
   return render(
-    <UiCapabilityContextProvider value={capabilities}>
+    <UiHostServicesContextProvider value={capabilities}>
       <ParameterLineField
         ariaLabel="Parameters"
         testId="agent-test-parameters"
@@ -59,7 +59,7 @@ function renderField({
         onChange={vi.fn()}
         definitions={definitions}
       />
-    </UiCapabilityContextProvider>,
+    </UiHostServicesContextProvider>,
   );
 }
 

@@ -20,7 +20,6 @@ export type UiInnerProviderInstall = {
   usePublicAppConfig: () => { data: UiPublicTelemetry | undefined };
   commandBar: UiProviderShell;
   toaster: ComponentType;
-  footer: ComponentType;
   /**
    * Whether this is a development build. Supplied by the composing
    * application: browser UI never reads the process environment, and the
@@ -33,7 +32,6 @@ export function createUiInnerProvider({
   usePublicAppConfig,
   commandBar: CommandBar,
   toaster: Toaster,
-  footer: Footer,
 }: UiInnerProviderInstall): UiProviderShell {
   return function UiInnerProviders({ children }: { children: ReactNode }) {
     const publicConfig = usePublicAppConfig();
@@ -48,17 +46,14 @@ export function createUiInnerProvider({
     useNavigationTracing({ enabled: !!publicConfig.data?.telemetry.browserTracing });
 
     return (
-      <>
-        <CommandBar>
-          {/* Always wrap in PostHogProvider with the module singleton: conditionally
+      <CommandBar>
+        {/* Always wrap in PostHogProvider with the module singleton: conditionally
                 wrapping changes the element type here, so React unmounts and remounts
                 the ENTIRE routed page after boot, wiping in-flight state (#5550). The
                 uninitialized singleton is inert with no POSTHOG_KEY configured. */}
-          <PostHogProvider client={posthog}>{children}</PostHogProvider>
-          <Toaster />
-        </CommandBar>
-        <Footer />
-      </>
+        <PostHogProvider client={posthog}>{children}</PostHogProvider>
+        <Toaster />
+      </CommandBar>
     );
   };
 }

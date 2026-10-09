@@ -115,9 +115,12 @@ rollback; a rollback reopens the step with its checkpoint cleared, so the re-run
 later release. Deleting the old copy is a contract step under the floor rule, with
 `-- contract: retired in <release>` (the `postgres-migration` skill).
 
-**Archive-or-fail** (plan 6.8). When a contract drops a tenant step's legacy source, it first copies
-the still-held tenants' rows into a retained `_retired_<table>`, marks them `failed`, named and
-alerted, then drops. Nothing waits on a held tenant.
+**Archive-or-fail** (record, ARCHIVE-OR-FAIL). A contract never drops unarchived data: its SQL
+names each table it retires with `-- archive: <table>` beside `-- contract: retired in <release>`, and
+the upgrade runner (`packages/upgrade/src/runner/contract-archive/`) copies it into
+`_retired_<table>_<release>` and checks the row count before any schema apply, or fails the contract
+step and applies nothing. `upgrade plan` lists the archives. Postgres only so far; a goose contract
+that asks fails.
 
 ## 5. Tenant and procedure steps
 

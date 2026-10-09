@@ -5,8 +5,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { havenOrb, havenOrbTags } from "../haven-orb";
 import { buildFeedback, feedbackSchema, havenEndpoint, postToHaven } from "../haven-orb/feedback";
+import { readDock } from "../haven-orb/langy-dock";
 import { OrbIsland } from "../haven-orb/orb-panel";
-import { hideForSession, isHiddenForSession, setTheme } from "../haven-orb/orb-prefs";
+import { hideForSession, isHiddenForSession } from "../haven-orb/orb-prefs";
 import {
   attachPageBuffer,
   networkEntrySchema,
@@ -14,6 +15,7 @@ import {
   type PageBuffer,
 } from "../haven-orb/page-buffer";
 import { pickElement } from "../haven-orb/pickers";
+import { orbShell, whenAppPainted } from "../haven-orb/reveal";
 
 const realFetch = window.fetch;
 let buffer: PageBuffer | undefined;
@@ -46,7 +48,7 @@ describe("haven dev orb", () => {
       const [tag] = havenOrbTags({ slug: "feat-x" });
       expect(tag).toMatchObject({
         tag: "script",
-        injectTo: "head-prepend",
+        injectTo: "head",
         attrs: { type: "module" },
       });
       expect(tag?.attrs?.src).toMatch(/^\/@fs\/.*haven-orb\/orb-client\.ts$/u);
@@ -202,28 +204,107 @@ describe("haven dev orb", () => {
       await waitFor(() => expect(send).toHaveBeenCalledTimes(2));
     });
 
-    /** @scenario "the orb sits clear of Langy's launcher" */
-    it("places the orb above Langy's 46px launcher at 20px from the corner", () => {
+    /** @scenario "the panel says plainly when haven does not answer" */
+    it("asks haven again when the reader reopens an offline orb", async () => {
+      const send = vi.fn(async () => {
+        throw new TypeError("Failed to fetch");
+      });
+      mount({ send });
+      const orb = screen.getByRole("button", { name: "Haven dev tools" });
+      fireEvent.click(orb);
+      expect(await screen.findByText("Haven is not answering for this stack.")).toBeTruthy();
+      fireEvent.click(orb);
+      fireEvent.click(orb);
+      await waitFor(() => expect(send).toHaveBeenCalledTimes(2));
+    });
+
+    /** @scenario "the panel lists the stack's facts and consoles" */
+    /** @scenario "the orb shows each service's health" */
+    it("reads as ready when a database address has no scheme", async () => {
+      const facts = {
+        slug: "feat-x",
+        branch: "feat/x",
+        commit: "abc1234",
+        links: [
+          { label: "mail", href: "https://mail.feat-x.langwatch.localhost", status: "live" },
+          { label: "postgres", href: "postgres.feat-x.langwatch.localhost:5432" },
+        ],
+      };
+      mount({ send: vi.fn(async () => Response.json(facts)) });
+      fireEvent.click(screen.getByRole("button", { name: "Haven dev tools" }));
+      expect(await screen.findByText("feat/x · abc1234")).toBeTruthy();
+      expect(screen.queryByText("Haven is not answering for this stack.")).toBeNull();
+      expect(screen.queryByRole("link", { name: /mail/u })).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: /Sims/u }));
+      expect(screen.getByRole("link", { name: /mail/u }).getAttribute("href")).toBe(
+        "https://mail.feat-x.langwatch.localhost",
+      );
+      expect(screen.getByText("live")).toBeTruthy();
+      fireEvent.click(screen.getByRole("button", { name: /Data/u }));
+      expect(screen.getByTitle("Copy postgres.feat-x.langwatch.localhost:5432")).toBeTruthy();
+    });
+
+    /** @scenario "the orb stands alone without Langy's launcher" */
+    it("places a 36px orb 20px off the bottom-right corner", () => {
       mount({ send: vi.fn(async () => new Response("{}", { status: 404 })) });
       const orb = screen.getByRole("button", { name: "Haven dev tools" });
-      const { right, bottom, width } = getComputedStyle(orb);
-      expect({ right, bottom, width }).toEqual({ right: "25px", bottom: "78px", width: "36px" });
+      const point = orb.parentElement;
+      if (!point) throw new Error("the orb has no dock point");
+      expect(getComputedStyle(orb).width).toBe("36px");
+      const { right, bottom } = getComputedStyle(point);
+      expect({ right, bottom }).toEqual({ right: "38px", bottom: "38px" });
+    });
+  });
+
+  describe("given Langy's launcher", () => {
+    const launcher = ({ left, top }: { left: number; top: number }) => {
+      document.body.innerHTML = `<button data-langy-orb></button>`;
+      const element = document.querySelector<HTMLElement>("[data-langy-orb]");
+      if (!element) throw new Error("the fixture has no launcher");
+      for (const [key, value] of Object.entries({
+        offsetWidth: 46,
+        offsetLeft: left,
+        offsetTop: top,
+      }))
+        Object.defineProperty(element, key, { configurable: true, value });
+    };
+
+    /** @scenario "the orb docks to Langy's launcher" */
+    it("puts the satellite on the launcher's upper rim, facing the page", () => {
+      launcher({ left: window.innerWidth - 66, top: window.innerHeight - 66 });
+      const dock = readDock({ host: window });
+      expect(dock).toMatchObject({ mirrored: false, edge: 49 });
+      expect(dock?.left).toBe(window.innerWidth - 43 - 26);
+      expect(dock?.top).toBe(window.innerHeight - 43 - 26);
+    });
+
+    /** @scenario "the orb docks to Langy's launcher" */
+    it("mirrors to the right of the rim while the launcher dodges to the left", () => {
+      launcher({ left: 20, top: window.innerHeight - 66 });
+      expect(readDock({ host: window })).toMatchObject({ left: 43 + 26, mirrored: true });
+    });
+  });
+
+  describe("given the page loading", () => {
+    /** @scenario "the orb waits for the app to paint" */
+    it("reveals the orb only once the app renders into #root", async () => {
+      document.body.innerHTML = `<div id="root"></div>`;
+      const onPainted = vi.fn();
+      whenAppPainted({ doc: document, onPainted });
+      expect(onPainted).not.toHaveBeenCalled();
+      document.getElementById("root")?.append(document.createElement("main"));
+      await waitFor(() => expect(onPainted).toHaveBeenCalledTimes(1));
+    });
+
+    /** @scenario "the orb stays clickable above the app's overlays" */
+    it("mounts the orb in a fixed shell on the topmost layer", () => {
+      const shell = orbShell({ doc: document });
+      expect(shell.parentElement).toBe(document.body);
+      expect(getComputedStyle(shell)).toMatchObject({ position: "fixed", zIndex: "2147483647" });
     });
   });
 
   describe("given the panel's preferences", () => {
-    /** @scenario "the theme switch follows the reader's choice" */
-    it("stores the theme and tells the theme provider through a storage event", () => {
-      const heard = vi.fn();
-      window.addEventListener("storage", heard);
-      setTheme({ host: window, theme: "dark" });
-      window.removeEventListener("storage", heard);
-      expect(localStorage.getItem("theme")).toBe("dark");
-      expect(heard).toHaveBeenCalledWith(
-        expect.objectContaining({ key: "theme", newValue: "dark" }),
-      );
-    });
-
     /** @scenario "hiding the orb lasts for the tab's session" */
     it("keeps the orb hidden in session storage, not across tabs", () => {
       expect(isHiddenForSession({ host: window })).toBe(false);

@@ -5,13 +5,13 @@
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { UiAnalytics } from "@langwatch/browser-host/analytics";
-import { UiCapabilityContextProvider } from "@langwatch/browser-host/capabilities";
+import { UiHostServicesContextProvider } from "@langwatch/browser-host/capabilities";
 import {
   uiDeclarations,
   type ReleaseFlagToken,
   type UiDrawerToken,
 } from "@langwatch/browser-host/declarations";
-import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
 import { ContactSalesToken } from "@langwatch/enterprise-billing-client";
 import { render } from "@testing-library/react";
 import type { ReactElement, ReactNode } from "react";
@@ -186,7 +186,7 @@ export class FakeOrganizationHost extends OrganizationHostApi {
 
 /** Billing lends the sales card by token, as its declaration does in the browser app. */
 const billingLendsContactSales = {
-  ...createUiCapabilitiesFromHost({ route: () => ({ params: {}, query: {} }), navigate: () => {} }),
+  ...createUiHostServicesFromHost({ route: () => ({ params: {}, query: {} }), navigate: () => {} }),
   declarations: uiDeclarations([
     {
       name: "billing",
@@ -215,11 +215,11 @@ export function renderWithOrganizationHost(
     host,
     ...render(
       <ChakraProvider value={defaultSystem}>
-        <UiCapabilityContextProvider
+        <UiHostServicesContextProvider
           value={{ ...billingLendsContactSales, ...(analytics ? { analytics } : {}) }}
         >
           <OrganizationHostProvider value={host}>{element}</OrganizationHostProvider>
-        </UiCapabilityContextProvider>
+        </UiHostServicesContextProvider>
       </ChakraProvider>,
     ),
   };

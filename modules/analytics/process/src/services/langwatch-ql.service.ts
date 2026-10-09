@@ -196,6 +196,9 @@ export class LangWatchQLService {
       // dataset must stay gated so that naming it unqualified — where no table
       // reference reveals which dataset it came from — is refused too.
       gatedColumns: catalogShapes.gatedColumns({ protections, views: this.views }),
+      // What would lift each of those, so a refusal can say "you may not see this" apart from
+      // "this query is broken". It names a permission, never a value.
+      gatedColumnGates: catalogShapes.gatedColumnGates({ protections, views: this.views }),
       // An app function returning captured content is as restricted as a
       // column holding it, so the gate reads the same permissions.
       heldPermissions: [...catalogShapes.heldPermissions(protections)],

@@ -50,6 +50,10 @@
       "types": "./dist/metrics/testing.d.ts",
       "default": "./src/metrics/testing.ts"
     },
+    "./register": {
+      "types": "./dist/register.d.ts",
+      "default": "./src/register.ts"
+    },
     "./grafana-links": {
       "types": "./dist/trace/grafana-links.d.ts",
       "default": "./src/trace/grafana-links.ts"
@@ -64,6 +68,10 @@
     "@opentelemetry/api": "catalog:",
     "@opentelemetry/exporter-metrics-otlp-http": "0.221.0",
     "@opentelemetry/host-metrics": "^0.39.0",
+    "@opentelemetry/instrumentation": "catalog:",
+    "@opentelemetry/instrumentation-aws-sdk": "^0.76.0",
+    "@opentelemetry/instrumentation-ioredis": "^0.69.0",
+    "@opentelemetry/instrumentation-openai": "^0.19.0",
     "@opentelemetry/otlp-exporter-base": "0.221.0",
     "@opentelemetry/otlp-transformer-telemetry": "npm:@opentelemetry/otlp-transformer@0.221.0",
     "@opentelemetry/resources": "catalog:",
@@ -83,5 +91,8 @@
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
-  "packageManager": "pnpm@12.6.0"
+  "packageManager": "pnpm@12.6.0",
+  "langwatch": {
+    "group": "telemetry"
+  }
 }

@@ -134,11 +134,12 @@ describe("a reissued license over a sync", () => {
         replacesId: "license-1",
         pendingDeliveryLicense: reissued,
         maxMembers: 80,
-        virtualKeyId: null,
+        // Gateway provisioned the reissue's key from its issued fact before the install presents it.
+        virtualKeyId: "vk-2",
       }),
     ]);
     const managedKeys = {
-      provision: async () => ({ id: "vk-2" }),
+      issue: async () => undefined,
       retire: async () => undefined,
       invalidate: async () => undefined,
       setConnectServices: async () => undefined,

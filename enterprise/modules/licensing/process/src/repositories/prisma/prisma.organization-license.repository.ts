@@ -3,7 +3,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { prismaTables } from "@langwatch/prisma-client/ownership";
 import { fromDate, toDate, type Instant } from "@langwatch/time";
 
-import { isOrganizationNewer } from "../../rules/license-columns.rules.ts";
+import { newerLicense } from "../../rules/license-columns.rules.ts";
 import type {
   LicenseColumns,
   OrganizationLicenseCandidate,
@@ -45,18 +45,11 @@ type DatedOrganization = { license: string | null; updatedAt: Date };
 type DatedRow = { licenseKey: string | null; updatedAt: Date };
 
 /** The key read: organization's column where it is newer than the row, else the row's. */
-const keyOf = ({
-  organization,
-  own,
-}: {
-  organization: DatedOrganization;
-  own: DatedRow | null;
-}) => {
-  const organizationUpdatedAt = fromDate(organization.updatedAt);
-  const licenseUpdatedAt = own === null ? null : fromDate(own.updatedAt);
-  const organizationWins = isOrganizationNewer({ organizationUpdatedAt, licenseUpdatedAt });
-  return organizationWins ? organization.license : (own?.licenseKey ?? null);
-};
+const keyOf = ({ organization, own }: { organization: DatedOrganization; own: DatedRow | null }) =>
+  newerLicense({
+    columns: { licenseKey: organization.license, updatedAt: fromDate(organization.updatedAt) },
+    own: own && { licenseKey: own.licenseKey, updatedAt: fromDate(own.updatedAt) },
+  }).licenseKey;
 
 /** Licensing's licence rows beside organization's columns, the newer side winning (`keyOf`). */
 export class PrismaOrganizationLicenseRepository implements OrganizationLicenseRepository {

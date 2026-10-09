@@ -4,14 +4,17 @@
  * Spec: modules/analytics/specs/analytics-overview-setup-prompt.feature
  */
 import {
-  UiCapabilityContextProvider,
+  UiHostServiceProvider,
+  UiHostServicesContextProvider,
   UiScope,
   UiSession,
   type UiActiveScope,
-  type UiCapabilities,
+  type UiHostServices,
 } from "@langwatch/browser-host/capabilities";
+import { UiFlagsService } from "@langwatch/browser-host/feature-flag";
 import type { UiSessionSnapshot } from "@langwatch/browser-host/session";
-import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
+import { FrontendFlags } from "@langwatch/feature-flag-contract";
 import { render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -60,17 +63,17 @@ class ProjectSession extends UiSession {
 }
 
 function Harness({ children }: { children: ReactNode }) {
-  const capabilities: UiCapabilities = {
-    ...createUiCapabilitiesFromHost(
+  const capabilities: UiHostServices = {
+    ...createUiHostServicesFromHost(
       { route: () => ({ params: {}, query: {} }), navigate: () => void 0 },
       new ProjectSession(),
     ),
     scope: new TestScope(),
   };
   return (
-    <UiCapabilityContextProvider value={capabilities}>
+    <UiHostServicesContextProvider value={capabilities}>
       <AnalyticsHostMount>{children}</AnalyticsHostMount>
-    </UiCapabilityContextProvider>
+    </UiHostServicesContextProvider>
   );
 }
 
@@ -80,7 +83,46 @@ function FirstMessageReader() {
   return <span data-testid="first-message">{String(project?.hasFirstMessage)}</span>;
 }
 
+/** Stands in for the Dashboards gate and the Langy entry points: each reads one flag. */
+function ReleaseFlagReader() {
+  const host = useAnalyticsHost();
+  return (
+    <>
+      <span data-testid="dashboards">{String(host.featureFlag("release_dashboards"))}</span>
+      <span data-testid="langy">{String(host.featureFlag("release_langy_enabled"))}</span>
+    </>
+  );
+}
+
+function renderWithFlags(answers: Readonly<Record<string, boolean>>) {
+  const flags = { flag: ({ name }: { name: string }) => answers[name] };
+  render(
+    <UiHostServiceProvider value={new Map([[UiFlagsService.name, flags]])}>
+      <Harness>
+        <ReleaseFlagReader />
+      </Harness>
+    </UiHostServiceProvider>,
+  );
+}
+
 describe("given the analytics host mounted over the project in scope", () => {
+  describe("when the flags service answers the release flags", () => {
+    it.each([
+      { dashboards: true, langy: false },
+      { dashboards: false, langy: true },
+    ])("reports dashboards $dashboards and langy $langy", ({ dashboards, langy }) => {
+      firstMessage.mockReturnValue({});
+
+      renderWithFlags({
+        [FrontendFlags.release_dashboards.name]: dashboards,
+        [FrontendFlags.release_langy_enabled.name]: langy,
+      });
+
+      expect(screen.getByTestId("dashboards")).toHaveTextContent(String(dashboards));
+      expect(screen.getByTestId("langy")).toHaveTextContent(String(langy));
+    });
+  });
+
   describe("when the project has received a trace", () => {
     /** @scenario "A project that has received traces shows no setup prompt" */
     it("reports its first message", () => {

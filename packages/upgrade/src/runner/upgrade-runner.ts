@@ -3,7 +3,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { generate } from "@langwatch/ksuid";
 
 import { BackgroundStepsService } from "../background/background-steps.service.ts";
-import { imageContractSteps } from "../gate/image-tree.ts";
+import { imageContractArchives, imageContractSteps } from "../gate/image-tree.ts";
 import { UpgradeLedgerSeedService } from "../ledger-seed.service.ts";
 import { UpgradeLedgerRepository } from "../ledger.repository.ts";
 import type { UpcastStepInput, UpgradeRun, UpgradeStep, UpgradeStepStatus } from "../ledger.ts";
@@ -26,6 +26,12 @@ import {
 } from "../seed-sources.ts";
 import type { MigrationStep } from "../step/migration-step.ts";
 import { isRerunnablePrismaMigration } from "../stepping/rerunnable-migrations.ts";
+import { ContractArchiveRepository } from "./contract-archive/contract-archive.repository.ts";
+import {
+  ContractArchiveError,
+  type ContractArchiveEntry,
+  ContractArchiveService,
+} from "./contract-archive/contract-archive.service.ts";
 import { UPGRADE_READ_HINT_PATH, type UpgradeReadHintPublish } from "./run-hint.ts";
 import { redactSecrets, resolveCommand, UpgradeRunLog } from "./run-log.ts";
 import { RunPhases, type UpgradePhaseChange, type UpgradePhaseOutcome } from "./run-phases.ts";
@@ -54,6 +60,8 @@ export interface UpgradeRunnerOptions {
   codeSteps?: readonly MigrationStep[];
   /** Contract ids, each with the steps its SQL names `after`; read from the image if not given. */
   contracts?: ReadonlyMap<string, readonly string[]>;
+  /** Contract ids, each with the tables its `-- archive:` notes name; else read from the image. */
+  archives?: ReadonlyMap<string, readonly string[]>;
   reconcilers?: readonly UpgradeReconciler[];
   /** The image's declared event upcasts and the stored events each covers (record §9). */
   upcasts?: () => Promise<readonly UpcastStepInput[]>;
@@ -176,6 +184,7 @@ export class UpgradeRunnerService {
   private readonly shipped: RegisteredStep[];
   private readonly narrate: UpgradeRunLog;
   private readonly shippedIds: ReadonlySet<string>;
+  private readonly archiver: ContractArchiveService;
   private resolved: { migration: string; attempt: number }[] = [];
 
   private constructor(private readonly options: UpgradeRunnerOptions) {
@@ -186,6 +195,8 @@ export class UpgradeRunnerService {
     this.shipped = shippedSteps({ image: options.image, manifests: options.releases.manifests });
     this.narrate = new UpgradeRunLog(options.log);
     this.shippedIds = new Set(this.shipped.map((step) => step.id));
+    const store = ContractArchiveRepository.create({ postgres: options.postgres });
+    this.archiver = ContractArchiveService.create({ store });
   }
 
   static create(options: UpgradeRunnerOptions): UpgradeRunnerService {
@@ -251,9 +262,18 @@ export class UpgradeRunnerService {
     }
   }
 
-  /** What `upgrade plan` prints: read-only, no lease, nothing written. */
-  async plan(): Promise<{ installed: string | null; plan: UpgradePlan }> {
-    return this.planFrom(await this.readLedger());
+  /** What `upgrade plan` prints: read-only, no lease, nothing written, archives a dry run. */
+  async plan(): Promise<{
+    installed: string | null;
+    plan: UpgradePlan;
+    archives: ContractArchiveEntry[];
+  }> {
+    const planned = this.planFrom(await this.readLedger());
+    const archives =
+      planned.plan.outcome === "planned"
+        ? await this.archiveContracts({ releases: planned.plan.releases, runId: null })
+        : [];
+    return { ...planned, archives };
   }
 
   /** What `upgrade status` prints, read by the reader. */
@@ -449,6 +469,8 @@ export class UpgradeRunnerService {
     const recorded = new Map(before.steps.map((step) => [step.id, step]));
     const applied: string[] = [];
     const inline = await this.inlineBeforeContracts({ plan });
+    const declared = this.options.archives ?? imageContractArchives();
+    const archived: ContractArchiveEntry[] = [];
     for (const [index, release] of plan.releases.entries()) {
       signal.throwIfAborted();
       for (const id of inline[index] ?? []) {
@@ -456,6 +478,8 @@ export class UpgradeRunnerService {
         applied.push(id);
       }
       if (release.schema.length > 0) {
+        const ahead = plan.releases.slice(index);
+        archived.push(...(await this.archiveContracts({ releases: ahead, runId, declared })));
         await this.applySchema({ release, signal, runId, phases });
         applied.push(...release.schema);
       }
@@ -467,7 +491,52 @@ export class UpgradeRunnerService {
     await phases.start({ name: "reconcile" });
     await this.runReconcilers({ signal });
     await phases.end({ name: "reconcile", outcome: "succeeded" });
-    return { applied, notNeeded: plan.notNeeded, reopened, resolved: this.resolved };
+    const kept = archived.filter((entry) => entry.state === "copied");
+    return {
+      applied,
+      notNeeded: plan.notNeeded,
+      reopened,
+      resolved: this.resolved,
+      archived: kept,
+    };
+  }
+
+  /**
+   * Archive-or-fail (Alex, 2026-10-09): before any schema apply, every table a contract still
+   * ahead archives is copied and checked, since an applier that cannot step applies them all at
+   * once. A failure fails the contract step; `runId` null is the dry run.
+   */
+  private async archiveContracts({
+    releases,
+    runId,
+    declared = this.options.archives ?? imageContractArchives(),
+  }: {
+    releases: readonly PlannedRelease[];
+    runId: string | null;
+    declared?: ReadonlyMap<string, readonly string[]>;
+  }): Promise<ContractArchiveEntry[]> {
+    const entries: ContractArchiveEntry[] = [];
+    for (const { release, schema } of releases) {
+      for (const step of schema) {
+        const tables = declared.get(step);
+        if (!tables) continue;
+        try {
+          const dryRun = runId === null;
+          entries.push(...(await this.archiver.archive({ step, tables, release, dryRun })));
+        } catch (error) {
+          if (!(error instanceof ContractArchiveError) || runId === null) throw error;
+          const lastError = error.message;
+          await this.runner.setStatus({ ids: [step], status: "failed", runId, lastError });
+          this.narrate.warn(lastError, {
+            phase: "archive",
+            step,
+            next: "nothing was dropped; fix what the error names, then run the upgrade again",
+          });
+          throw new UpgradeRunFailure("step_failed", lastError, { step, error: error.code });
+        }
+      }
+    }
+    return entries;
   }
 
   /** Round 21, S3-RETRY: the failed rows the runner may resolve, or why it may not. */

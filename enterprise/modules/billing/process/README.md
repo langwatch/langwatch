@@ -6,7 +6,7 @@ The server half of [billing](../README.md). Billing: subscriptions, invoices and
 
 ## Installation
 
-`defineProcessModule("billing").withRepositories(billingRepositories).withApi(BillingModule).withTransports(connectedBillingTrpcTransport, billingStripeWebhookRest, currencyTrpcTransport, subscriptionTrpcTransport).withEventing(connectedBillingEventing).withEventing(billingReportingEventing).withEventing(billingLifecycleEventing).withMigrations(…).withTasks(…)`, `src/billing.module.ts:41`.
+`defineProcessModule("billing").withRepositories(billingRepositories).withChannels(billingChannels).withApi(BillingModule).withTransports(connectedBillingTrpcTransport, billingStripeWebhookRest, currencyTrpcTransport, subscriptionTrpcTransport).withEventing(connectedBillingEventing).withEventing(billingReportingEventing).withEventing(billingLifecycleEventing).withMigrations(…).withTasks(…)`, `src/billing.module.ts:42`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -355,12 +355,12 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                                | Environment variable                           | Declared at                            |
 | ------ | ----------------------------------- | ---------------------------------------------- | -------------------------------------- |
-| secret | `stripeSecretKey`                   | `STRIPE_SECRET_KEY`                            | `src/app/billing.app.ts:183`           |
-| secret | `stripeWebhookSecret`               | `STRIPE_WEBHOOK_SECRET`                        | `src/app/billing.app.ts:184`           |
-| secret | `internalSlackPlanLimitWebhook`     | `SLACK_PLAN_LIMIT_CHANNEL`                     | `src/app/billing.app.ts:185`           |
-| secret | `internalSlackSubscriptionsWebhook` | `SLACK_CHANNEL_SUBSCRIPTIONS`                  | `src/app/billing.app.ts:186`           |
-| secret | `internalSlackSelfHostedWebhook`    | `SLACK_CHANNEL_SELF_HOSTED`                    | `src/app/billing.app.ts:187`           |
-| secret | `internalSlackSignupsWebhook`       | ≈ `billingSecrets.internalSlackSignupsWebhook` | `src/app/billing.app.ts:188`           |
+| secret | `stripeSecretKey`                   | `STRIPE_SECRET_KEY`                            | `src/app/billing.app.ts:179`           |
+| secret | `stripeWebhookSecret`               | `STRIPE_WEBHOOK_SECRET`                        | `src/app/billing.app.ts:180`           |
+| secret | `internalSlackPlanLimitWebhook`     | `SLACK_PLAN_LIMIT_CHANNEL`                     | `src/app/billing.app.ts:181`           |
+| secret | `internalSlackSubscriptionsWebhook` | `SLACK_CHANNEL_SUBSCRIPTIONS`                  | `src/app/billing.app.ts:182`           |
+| secret | `internalSlackSelfHostedWebhook`    | `SLACK_CHANNEL_SELF_HOSTED`                    | `src/app/billing.app.ts:183`           |
+| secret | `internalSlackSignupsWebhook`       | ≈ `billingSecrets.internalSlackSignupsWebhook` | `src/app/billing.app.ts:184`           |
 | config | `licensePaymentLinkId`              | `STRIPE_LICENSE_PAYMENT_LINK_ID`               | `../contract/src/billing.config.ts:12` |
 | config | `licensePaymentUrl`                 | `STRIPE_LICENSE_PAYMENT_LINK_URL`              | `../contract/src/billing.config.ts:14` |
 | config | `hubspotPortalId`                   | `HUBSPOT_PORTAL_ID`                            | `../contract/src/billing.config.ts:22` |

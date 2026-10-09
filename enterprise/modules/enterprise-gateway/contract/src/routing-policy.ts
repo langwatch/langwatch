@@ -162,10 +162,7 @@ export class RoutingPolicyProviderScopeError extends Error {
   }
 }
 
-/**
- * A ready personal workspace on main's wire. `project.apiKey` is always blank: a cached
- * read carries no credential. `created` is main's field; a pending workspace answers 409.
- */
+/** `project.apiKey` is always blank: a cached read carries no credential. */
 const personalContextWorkspaceSchema = personalWorkspaceSchema.safeExtend({
   project: personalWorkspaceSchema.shape.project.safeExtend({ apiKey: z.string() }),
   created: z.boolean(),

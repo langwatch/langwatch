@@ -416,7 +416,8 @@ describe("the api process installation", () => {
       const answers = await Promise.all(
         OTLP_POSTS.map(async ([path, body]) => {
           const response = await post(path, body);
-          return [path, response.status, Object.keys(await response.json())];
+          const json: unknown = await response.json();
+          return [path, response.status, Object.keys(json ?? {})];
         }),
       );
 

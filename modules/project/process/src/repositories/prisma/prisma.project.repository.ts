@@ -24,7 +24,9 @@ import {
   type UpdateProjectMetadataInput,
   type ProjectIdPage,
   type ProjectIdPageInput,
+  type ProjectLwqlKeyPage,
   type ProjectOrganizationPage,
+  type ProjectPrivateS3Page,
   type ProjectUsageCount,
 } from "@langwatch/project-contract";
 import { fromDate, toDate, type Instant } from "@langwatch/time";
@@ -135,6 +137,34 @@ export class PrismaProjectRepository
       ...(limit === undefined ? {} : { take: limit + 1 }),
     });
     const projects = rows.map((row) => ({ id: row.id, organizationId: row.team.organizationId }));
+    if (limit === undefined || projects.length <= limit) return { projects, next: null };
+    const page = projects.slice(0, limit);
+    return { projects: page, next: page[page.length - 1]?.id ?? null };
+  }
+
+  async listAllWithPrivateS3({
+    after,
+    limit,
+  }: ProjectIdPageInput = {}): Promise<ProjectPrivateS3Page> {
+    const rows = await this.prisma.project.findMany({
+      select: { id: true, s3Bucket: true },
+      orderBy: { id: "asc" },
+      ...(after === undefined ? {} : { where: { id: { gt: after } } }),
+      ...(limit === undefined ? {} : { take: limit + 1 }),
+    });
+    const projects = rows.map((row) => ({ id: row.id, privateS3: !!row.s3Bucket }));
+    if (limit === undefined || projects.length <= limit) return { projects, next: null };
+    const page = projects.slice(0, limit);
+    return { projects: page, next: page[page.length - 1]?.id ?? null };
+  }
+
+  async listLwqlKeys({ after, limit }: ProjectIdPageInput = {}): Promise<ProjectLwqlKeyPage> {
+    const projects = await this.prisma.project.findMany({
+      select: { id: true, lwqlKey: true },
+      orderBy: { id: "asc" },
+      ...(after === undefined ? {} : { where: { id: { gt: after } } }),
+      ...(limit === undefined ? {} : { take: limit + 1 }),
+    });
     if (limit === undefined || projects.length <= limit) return { projects, next: null };
     const page = projects.slice(0, limit);
     return { projects: page, next: page[page.length - 1]?.id ?? null };

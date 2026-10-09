@@ -5,7 +5,7 @@
  */
 
 import {
-  useUiCapabilities,
+  useUiHostServices,
   useUiScope,
   type UiFeedback,
   type UiNavigation,
@@ -145,7 +145,7 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
  * that is what `mounts.load` resolves.
  */
 export default function AnalyticsHostMount({ children }: { children?: ReactNode }) {
-  const { session, navigation, route, feedback } = useUiCapabilities();
+  const { session, navigation, route, feedback } = useUiHostServices();
   const langy = useLentOperations(LangyAskToken);
   // Read as primitives: the flags service hands a new object on every render.
   const uiFlags = useUiFlags();

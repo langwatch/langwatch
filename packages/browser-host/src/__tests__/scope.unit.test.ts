@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { UiCapabilityUnavailableError, UNAVAILABLE_UI_SCOPE } from "../capabilities.ts";
+import { UiHostServiceUnavailableError, UNAVAILABLE_UI_SCOPE } from "../capabilities.ts";
 import { UiScope } from "../scope.ts";
 
 class SomewhereScope extends UiScope {
@@ -16,9 +16,9 @@ class SomewhereScope extends UiScope {
 describe("given a composition that named no scope source", () => {
   describe("when a screen asks where it is standing", () => {
     it("refuses by name rather than answering an organization of null", () => {
-      expect(() => UNAVAILABLE_UI_SCOPE.activeScope()).toThrow(UiCapabilityUnavailableError);
+      expect(() => UNAVAILABLE_UI_SCOPE.activeScope()).toThrow(UiHostServiceUnavailableError);
       expect(() => UNAVAILABLE_UI_SCOPE.activeScope()).toThrow(
-        /"scope" UI capability has no implementation/,
+        /"scope" UI host service has no implementation/,
       );
     });
   });
