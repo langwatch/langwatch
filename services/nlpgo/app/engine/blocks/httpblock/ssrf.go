@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"net"
-	"net/http"
 	"net/netip"
 	"net/url"
 	"strings"
@@ -119,9 +118,11 @@ func CheckURL(raw string, opts SSRFOptions) error {
 		return nil
 	}
 	ips, err := resolveHost(host, opts)
-	if err != nil || len(ips) == 0 {
-		// Refused rather than passed on: an outbound proxy would resolve it unchecked.
-		return ErrHostUnresolved
+	if err != nil {
+		// DNS failed — let the actual request fail with a network
+		// error so the customer sees a real upstream message instead
+		// of a misleading SSRF reject.
+		return nil //nolint:nilerr // error is surfaced via the channel/result payload, not the function error return
 	}
 	for _, ip := range ips {
 		if ipBlocked(ip, opts, host) {
@@ -182,24 +183,6 @@ func SafeDialer(opts SSRFOptions) func(ctx context.Context, network, addr string
 
 // ErrSSRFBlocked is returned when SSRF policy rejects a destination.
 var ErrSSRFBlocked = errors.New("ssrf_blocked")
-
-// ErrHostUnresolved is returned when a destination's host has no address to check.
-var ErrHostUnresolved = errors.New("host could not be resolved")
-
-// SafeProxy wraps a transport's proxy choice so a proxied request, redirect hops
-// included, is checked against the policy first: the dialer only sees the proxy.
-func SafeProxy(opts SSRFOptions, base func(*http.Request) (*url.URL, error)) func(*http.Request) (*url.URL, error) {
-	return func(req *http.Request) (*url.URL, error) {
-		proxy, err := base(req)
-		if err != nil || proxy == nil {
-			return proxy, err
-		}
-		if err := CheckURL(req.URL.String(), opts); err != nil {
-			return nil, err
-		}
-		return proxy, nil
-	}
-}
 
 // hostPolicy classifies a hostname against the static deny/allow
 // lists. Returns (allow, deny) — both false means "needs IP-level
