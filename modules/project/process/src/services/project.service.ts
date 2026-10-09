@@ -34,6 +34,7 @@ import {
   ProjectNotFoundError,
   type ProjectIdPage,
   type ProjectIdPageInput,
+  type ProjectLwqlKeyPage,
   type ProjectOrganizationPage,
   type ProjectUsageCount,
 } from "@langwatch/project-contract";
@@ -327,6 +328,10 @@ export class ProjectService {
 
   listAllWithOrganization(input?: ProjectIdPageInput): Promise<ProjectOrganizationPage> {
     return this.repository.listAllWithOrganization(input);
+  }
+
+  listLwqlKeys(input?: ProjectIdPageInput): Promise<ProjectLwqlKeyPage> {
+    return this.repository.listLwqlKeys(input);
   }
 
   findSharedProjectSlugs(input: {

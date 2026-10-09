@@ -24,6 +24,7 @@ import {
   type UpdateProjectMetadataInput,
   type ProjectIdPage,
   type ProjectIdPageInput,
+  type ProjectLwqlKeyPage,
   type ProjectOrganizationPage,
   type ProjectUsageCount,
 } from "@langwatch/project-contract";
@@ -135,6 +136,18 @@ export class PrismaProjectRepository
       ...(limit === undefined ? {} : { take: limit + 1 }),
     });
     const projects = rows.map((row) => ({ id: row.id, organizationId: row.team.organizationId }));
+    if (limit === undefined || projects.length <= limit) return { projects, next: null };
+    const page = projects.slice(0, limit);
+    return { projects: page, next: page[page.length - 1]?.id ?? null };
+  }
+
+  async listLwqlKeys({ after, limit }: ProjectIdPageInput = {}): Promise<ProjectLwqlKeyPage> {
+    const projects = await this.prisma.project.findMany({
+      select: { id: true, lwqlKey: true },
+      orderBy: { id: "asc" },
+      ...(after === undefined ? {} : { where: { id: { gt: after } } }),
+      ...(limit === undefined ? {} : { take: limit + 1 }),
+    });
     if (limit === undefined || projects.length <= limit) return { projects, next: null };
     const page = projects.slice(0, limit);
     return { projects: page, next: page[page.length - 1]?.id ?? null };

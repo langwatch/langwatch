@@ -58,6 +58,17 @@ export interface ProjectOrganizationPage {
   next: string | null;
 }
 
+/** A project and its LangWatchQL key, as the key-map backfill reads them. */
+export interface ProjectLwqlKey {
+  id: string;
+  lwqlKey: string;
+}
+
+export interface ProjectLwqlKeyPage {
+  projects: ProjectLwqlKey[];
+  next: string | null;
+}
+
 /** The page size fleet scans pass to `listAllIds`. */
 export const PROJECT_ID_PAGE_LIMIT = 500;
 
@@ -213,6 +224,8 @@ export interface ProjectApi {
    * migration inventory (main `migrateObjectStorage.ts` `listProjectsPage`).
    */
   listAllWithOrganization(input?: ProjectIdPageInput): Promise<ProjectOrganizationPage>;
+  /** Every project with its LangWatchQL key, paged like `listAllIds`, for the key-map backfill. */
+  listLwqlKeys(input?: ProjectIdPageInput): Promise<ProjectLwqlKeyPage>;
 }
 
 export const ProjectApi = moduleApi<ProjectApi>()("project");

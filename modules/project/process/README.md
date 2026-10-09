@@ -6,13 +6,13 @@ The server half of [project](../README.md). Projects: finding them, their summar
 
 ## Installation
 
-`defineProcessModule("project").withRepositories(projectRepositories).withApi(ProjectModule).withTransports(projectRest, projectTrpcTransport).withEventing(projectLifecycleEventing).withTasks(…)`, `src/project.module.ts:14`.
+`defineProcessModule("project").withRepositories(projectRepositories).withApi(ProjectModule).withTransports(projectRest, projectTrpcTransport).withEventing(projectLifecycleEventing).withMigrations(…).withTasks(…)`, `src/project.module.ts:16`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
 ## Module API (`ProjectApi`)
 
-Peers call these through the token, declared at `../contract/src/project.api.ts:64`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/project.api.ts:75`; nothing else in this package is public.
 
 #### `listPaths`
 
@@ -314,6 +314,14 @@ Every project with its organisation, paged like `listAllIds`, for the storage mi
 
 ```typescript
 listAllWithOrganization(input?: ProjectIdPageInput): Promise<ProjectOrganizationPage>;
+```
+
+#### `listLwqlKeys`
+
+Every project with its LangWatchQL key, paged like `listAllIds`, for the key-map backfill.
+
+```typescript
+listLwqlKeys(input?: ProjectIdPageInput): Promise<ProjectLwqlKeyPage>;
 ```
 
 ## REST transport

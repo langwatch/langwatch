@@ -392,6 +392,12 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     return this.#projectService.listAllWithOrganization(input);
   }
 
+  listLwqlKeys(
+    input?: projectContractModule.ProjectIdPageInput,
+  ): Promise<projectContractModule.ProjectLwqlKeyPage> {
+    return this.#projectService.listLwqlKeys(input);
+  }
+
   findSharedProjectSlugs(input: {
     organizationId: string;
     memberUserId?: string;

@@ -18,6 +18,7 @@ import type {
   UpdateProjectMetadataInput,
   ProjectIdPage,
   ProjectIdPageInput,
+  ProjectLwqlKeyPage,
   ProjectOrganizationPage,
   ProjectUsageCount,
 } from "@langwatch/project-contract";
@@ -149,4 +150,5 @@ export interface ProjectRepository {
   listAllIds(input?: ProjectIdPageInput): Promise<ProjectIdPage>;
   /** Every project with its team's organisation, archived included, paged like `listAllIds`. */
   listAllWithOrganization(input?: ProjectIdPageInput): Promise<ProjectOrganizationPage>;
+  listLwqlKeys(input?: ProjectIdPageInput): Promise<ProjectLwqlKeyPage>;
 }

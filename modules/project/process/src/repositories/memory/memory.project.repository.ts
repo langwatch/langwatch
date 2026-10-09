@@ -22,6 +22,7 @@ import {
   type UpdateProjectMetadataInput,
   type ProjectIdPage,
   type ProjectIdPageInput,
+  type ProjectLwqlKeyPage,
   type ProjectOrganizationPage,
   type ProjectUsageCount,
 } from "@langwatch/project-contract";
@@ -361,6 +362,17 @@ export class MemoryProjectRepository implements ProjectRepository {
         const organizationId = this.#database.findTeam(project.teamId)?.organizationId;
         return organizationId === undefined ? [] : [{ id: project.id, organizationId }];
       });
+    if (limit === undefined || projects.length <= limit) return { projects, next: null };
+    const page = projects.slice(0, limit);
+    return { projects: page, next: page[page.length - 1]?.id ?? null };
+  }
+
+  async listLwqlKeys({ after, limit }: ProjectIdPageInput = {}): Promise<ProjectLwqlKeyPage> {
+    const projects = this.#database
+      .projects()
+      .filter((project) => after === undefined || project.id > after)
+      .toSorted((left, right) => (left.id < right.id ? -1 : 1))
+      .map((project) => ({ id: project.id, lwqlKey: project.lwqlKey }));
     if (limit === undefined || projects.length <= limit) return { projects, next: null };
     const page = projects.slice(0, limit);
     return { projects: page, next: page[page.length - 1]?.id ?? null };
