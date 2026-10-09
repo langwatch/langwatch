@@ -45,7 +45,7 @@ Shapes: self-hosted · cloud · cloud hybrid (tenants on their own ClickHouse an
 | Retention (8 more) | Tenant policy on eight more pipelines' event rows |
 | Image | One image boots as api, worker or task; draft langwatch-saas#1295 |
 | Seed SG5 | Memory guard, executors, preflight, resume |
-| Ledger | 41 area comments, 2,100+ rows after deep audits of 24 areas |
+| Ledger | 41 area comments, 1,964 rows after deep audits of 24 areas |
 | Upgrade cell UP-01 | Cloud, small, with overlap: 9 of 16 invariants; findings UPG-001..005 on #8553 |
 | Evaluations | Monitor evaluations dated by span end; alert staleness by processing time; peer subscribers get `createdAt` |
 | Seed | Plan core, protocol, checkpoint, CLI (SG1) · runner and `seed:apply` (SG3) · static coverage, 612 gaps (SG11) · telemetry backfill and chunker (SG2) · local identity grants through commands (SG4) · `haven seed` and auto-seed (SG12) |
