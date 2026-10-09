@@ -12,6 +12,7 @@ import { describe, expect, it } from "vitest";
 
 import { auditLogProcessModule } from "../../audit-log.module.ts";
 import { homeTrpcTransport } from "../home.trpc.ts";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 
 const ACTOR = { id: "user-1" };
 const PROJECT_ID = "project_1";
@@ -26,6 +27,7 @@ async function installed() {
   const host = TrpcHost.create({
     sessions: SessionReader.create({ verify: async () => ({ userId: ACTOR.id }) }),
     authz: {
+      ...testAuthorizeDefaults,
       getDecision: async () => PERMITTED,
       getProjectAnyDecision: async () => PERMITTED,
       checkScopeLineage: async () => ({ kind: "consistent" }),
