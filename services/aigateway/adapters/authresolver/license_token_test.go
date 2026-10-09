@@ -222,3 +222,17 @@ func TestResolve_LicenseToken_StaleEntry_RefusalEvictsInsteadOfServingStale(t *t
 	_, cached := svc.l1.Get(hashKey(key))
 	assert.False(t, cached, "a revoked license must not ride the stale window")
 }
+
+// @scenario "A licence whose managed key is still being set up is asked again on every call"
+func TestResolve_LicenseToken_Pending_IsNeverRemembered(t *testing.T) {
+	resolver := &registryResolver{answer: refusing(domain.ErrConnectCredentialPending)}
+	svc, _ := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver})
+	key := domain.PresentedKey{Token: licenseToken, InstanceID: "instance-a"}
+
+	for range 3 {
+		_, err := svc.Resolve(context.Background(), key)
+		require.ErrorIs(t, err, domain.ErrConnectCredentialPending)
+	}
+
+	assert.Equal(t, 3, resolver.timesAsked(), "a pending key is retried, never answered from memory")
+}

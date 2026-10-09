@@ -169,3 +169,9 @@ Feature: The license is the credential for hosted services
     When a call presents the same license token with instance id "instance-b"
     Then the cached credential is not used
     And the call is checked against the registry
+
+  @unit
+  Scenario: A licence whose managed key is still being set up is asked again on every call
+    Given a license token whose managed key the control plane answers as pending
+    When the install calls the gateway three times with it
+    Then the gateway asks the control plane each time and answers connect_credential_pending
