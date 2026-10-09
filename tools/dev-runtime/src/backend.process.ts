@@ -1,3 +1,5 @@
+import net from "node:net";
+
 /**
  * The two halves of the backend process, each as its own app's start seam
  * answered: a server this launcher drains. Neither owns the process.
@@ -67,7 +69,7 @@ export type BackendHalfOptions = Readonly<{
 
 /** What each hosted application is booted with, injectable for tests. */
 export type BackendStartOptions = {
-  startApi: (options: BackendHalfOptions) => Promise<BackendApiHalf>;
+  startApi: (options: BackendHalfOptions & { port?: number }) => Promise<BackendApiHalf>;
   startWorker: (options: BackendHalfOptions) => Promise<BackendWorkerHalf>;
 };
 
@@ -90,6 +92,86 @@ export async function startBackend(options: BackendStartOptions): Promise<Backen
     await worker.close();
     throw error;
   }
+}
+
+/** A reload's outcome: the api always serves; a worker that refused boot is named, not thrown. */
+export type ReplacedBackend = Readonly<{ halves: BackendHalves; workerFailure?: unknown }>;
+
+const IDLE_WORKER: BackendWorkerHalf = { close: async () => {} };
+
+/**
+ * A reload beside a serving generation: the next api boots on `apiPort`, `route` moves the port
+ * to it, the old one drains, the next worker starts. A refused api leaves the old one untouched.
+ * Spec: specs/setup/dev-process-topology.feature
+ */
+export async function replaceBackend({
+  startApi,
+  startWorker,
+  apiPort,
+  route,
+  disposeOld,
+}: BackendStartOptions & {
+  apiPort: number;
+  route: (port: number) => void;
+  disposeOld: () => Promise<void>;
+}): Promise<ReplacedBackend> {
+  const api = await bootHalf("api", () =>
+    startApi({ ownsProcess: false, ownsTelemetry: false, port: apiPort }),
+  );
+  route(apiPort);
+  await disposeOld();
+  try {
+    const worker = await bootHalf("worker", () =>
+      startWorker({ ownsProcess: false, ownsTelemetry: true }),
+    );
+    return { halves: { api, worker } };
+  } catch (workerFailure) {
+    return { halves: { api, worker: IDLE_WORKER }, workerFailure };
+  }
+}
+
+/** A port nothing on loopback holds right now, for the next api generation to bind. */
+export async function freeLoopbackPort(): Promise<number> {
+  const probe = net.createServer();
+  await new Promise<void>((resolve, reject) => {
+    probe.once("error", reject);
+    probe.listen(0, "127.0.0.1", resolve);
+  });
+  const address = probe.address();
+  await new Promise<void>((resolve) => probe.close(() => resolve()));
+  if (address === null || typeof address === "string") throw new Error("no loopback port bound");
+  return address.port;
+}
+
+export type PortForwarder = Readonly<{ route(port: number): void; close(): Promise<void> }>;
+
+/**
+ * Owns the api's stable port and pipes each connection to the generation serving now, so a
+ * reload moves the target and never closes the listener. Unrouted, a connection is refused.
+ */
+export async function forwardPort({ port }: { port: number }): Promise<PortForwarder> {
+  let target: number | undefined;
+  const server = net.createServer((client) => {
+    if (target === undefined) return void client.destroy();
+    const upstream = net.connect(target, "127.0.0.1");
+    const end = (): void => {
+      client.destroy();
+      upstream.destroy();
+    };
+    client.on("error", end).on("close", end);
+    upstream.on("error", end).on("close", end);
+    client.pipe(upstream).pipe(client);
+  });
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(port, resolve);
+  });
+  return {
+    route(next) {
+      target = next;
+    },
+    close: () => new Promise<void>((resolve) => server.close(() => resolve())),
+  };
 }
 
 /** A process listener, as `EventEmitter.listeners` hands it back. */
