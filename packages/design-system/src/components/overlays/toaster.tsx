@@ -12,7 +12,7 @@ import {
   Toast,
 } from "@chakra-ui/react";
 import { AlertCircle, CheckCircle2, Info, TriangleAlert } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 
 /** How many cards a collapsed stack shows: the newest and two peeking behind it. */
 export const STACK_DEPTH = 3;
@@ -147,9 +147,26 @@ export function Toaster({
 }: {
   renderMeta?: (meta: Record<string, unknown> | undefined) => ReactNode;
 }) {
+  const [open, setOpen] = useState(false);
+  const region = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const away = (event: PointerEvent) => {
+      if (event.target instanceof Node && !region.current?.contains(event.target)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", away);
+    return () => document.removeEventListener("pointerdown", away);
+  }, [open]);
   return (
     <Portal>
-      <ChakraToaster toaster={toaster} insetInline={{ mdDown: "4" }}>
+      <ChakraToaster
+        ref={region}
+        toaster={toaster}
+        insetInline={{ mdDown: "4" }}
+        data-fan={open ? undefined : ""}
+        onClick={() => setOpen(true)}
+        onMouseLeave={() => setOpen(false)}
+      >
         {(toast) => {
           const status = statusOf(toast.type);
           const stack = toaster.getVisibleToasts();
