@@ -192,8 +192,8 @@ type AuthAppPeers = Readonly<{
   apiKeys: ApiKeyApi;
   featureFlags: FeatureFlagApi;
   identity: Pick<IdentityApi, "routeSignIn" | "sendOwnAddressConfirmation">;
-  /** Whether the installation's sign-up policy admits an address, before its proof is spent. */
-  organizations: SignUpPolicy;
+  /** The sign-up policy, and the invitation an invite link lands on (organization's). */
+  organizations: SignUpPolicy & Pick<OrganizationApi, "getInviteLanding" | "requestFreshInvite">;
   /** The account writes auth's lifecycle doors run before ending credentials. */
   users: Pick<
     UserApi,
@@ -581,7 +581,11 @@ export class AuthModule implements AuthApiContract {
         apiKeys: dependencies.apiKeys,
         featureFlags: dependencies.featureFlags,
         identity: dependencies.identity,
-        organizations: { checkSignUp },
+        organizations: {
+          checkSignUp,
+          getInviteLanding: (input) => dependencies.organizations.getInviteLanding(input),
+          requestFreshInvite: (input) => dependencies.organizations.requestFreshInvite(input),
+        },
         users: dependencies.users,
       },
       legacySsoAccess: LegacySsoAccessService.create({
