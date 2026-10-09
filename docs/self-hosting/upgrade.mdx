@@ -32,10 +32,12 @@ organization, without waiting. See
 The preparation step still fails in three cases: the migration runner itself
 fails outright, the queue behind it fails to drain, or the fleet makes no
 progress for 25 passes (about two minutes: for example because Redis is
-unreachable, or another process holds every claim). It exits non-zero, which
-fails the upgrade (the Helm pre-upgrade Job where one renders, otherwise the
-workers), and the new api is not ready until the installation is current, so
-the previous version keeps serving; the next run retries from scratch.
+unreachable, or another process holds every claim).
+
+In any of them it exits non-zero, which fails the upgrade (the Helm
+pre-upgrade Job where one renders, otherwise the workers), and the new api is
+not ready until the installation is current, so the previous version keeps
+serving; the next run retries from scratch.
 
 Keep the current identity-provider configuration, callback URLs, and
 `CREDENTIALS_SECRET` during the upgrade. The migration preserves the existing
