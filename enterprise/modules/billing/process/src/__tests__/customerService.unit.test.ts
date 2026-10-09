@@ -156,7 +156,6 @@ describe("customerService", () => {
         stripeCustomerId: null,
         pricingModel: "SEAT_EVENT",
         currency: null,
-        license: null,
         selfHostedCustomer: false,
         teamIds: [],
         signupData: {},

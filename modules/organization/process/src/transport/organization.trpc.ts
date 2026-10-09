@@ -288,9 +288,6 @@ function organizationOnWire(organization: Organization) {
     createdAt: toDate(organization.createdAt),
     updatedAt: toDate(organization.updatedAt),
     sentPlanLimitAlert: organization.sentPlanLimitAlert && toDate(organization.sentPlanLimitAlert),
-    licenseExpiresAt: organization.licenseExpiresAt && toDate(organization.licenseExpiresAt),
-    licenseLastValidatedAt:
-      organization.licenseLastValidatedAt && toDate(organization.licenseLastValidatedAt),
   };
 }
 

@@ -230,9 +230,6 @@ export function organizationOfRow(row: MemoryOrganizationRow): Organization {
     stripeCustomerId: row.stripeCustomerId,
     currency: "USD",
     pricingModel: "SEAT_EVENT",
-    license: row.license ?? null,
-    licenseExpiresAt: row.licenseExpiresAt ?? null,
-    licenseLastValidatedAt: row.licenseLastValidatedAt ?? null,
   };
 }
 

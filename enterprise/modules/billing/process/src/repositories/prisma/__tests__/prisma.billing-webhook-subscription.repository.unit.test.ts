@@ -1,4 +1,3 @@
-import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { Temporal } from "@langwatch/time";
 /**
  * @see enterprise/modules/billing/specs/stripe-webhook.feature
@@ -60,34 +59,20 @@ function repositoryDouble(
   };
 }
 
-function compose(
-  options: {
-    repository?: BillingSubscriptionRepository;
-    license?: string | null;
-  } = {},
-) {
+function compose(options: { repository?: BillingSubscriptionRepository } = {}) {
   const subscriptions = options.repository ?? repositoryDouble();
-  const database = prismaDouble({
-    organization: {
-      findUnique: async () => ({ license: options.license ?? null }),
-    },
-  });
-
   return {
     subscriptions,
-    adapter: PrismaBillingWebhookSubscriptionRepository.create({ subscriptions, database }),
+    adapter: PrismaBillingWebhookSubscriptionRepository.create({ subscriptions }),
   };
 }
 
 describe("PrismaBillingWebhookSubscriptionRepository", () => {
   describe("when a payment activates the subscription", () => {
-    /** @scenario "An activation carries the organization's trial licence to the webhook" */
-    it("carries the organization's trial licence beside the activated row", async () => {
+    /** @scenario "The webhook's unrenamed subscription writes reach the repository unchanged" */
+    it("returns the activated row with its organization", async () => {
       const activate = vi.fn(() => Promise.resolve(WITH_ORGANIZATION));
-      const { adapter } = compose({
-        license: "trial-key",
-        repository: repositoryDouble({ activate }),
-      });
+      const { adapter } = compose({ repository: repositoryDouble({ activate }) });
 
       const result = await adapter.activate({
         id: "subscription-1",
@@ -98,23 +83,13 @@ describe("PrismaBillingWebhookSubscriptionRepository", () => {
         id: "subscription-1",
         previousStatus: "PENDING",
       });
-      expect(result).toEqual({
-        outcome: "activated",
-        subscription: expect.objectContaining({
-          organization: {
-            id: "organization-1",
-            name: "Acme",
-            stripeCustomerId: "cus_1",
-            license: "trial-key",
-          },
-        }),
-      });
+      expect(result).toEqual({ outcome: "activated", subscription: WITH_ORGANIZATION });
     });
   });
 
   describe("when a subscription update raises the priced quantities", () => {
-    /** @scenario "An activation carries the organization's trial licence to the webhook" */
-    it("writes both quantities and reports no trial licence where there is none", async () => {
+    /** @scenario "The webhook's unrenamed subscription writes reach the repository unchanged" */
+    it("writes both quantities and returns the updated row", async () => {
       const updateQuantities = vi.fn(() => Promise.resolve(WITH_ORGANIZATION));
       const { adapter } = compose({ repository: repositoryDouble({ updateQuantities }) });
 
@@ -129,8 +104,7 @@ describe("PrismaBillingWebhookSubscriptionRepository", () => {
         maxMembers: 12,
         maxMessagesPerMonth: 100_000,
       });
-      expect(result.outcome).toBe("updated");
-      expect(result.outcome === "updated" && result.subscription.organization.license).toBeNull();
+      expect(result).toEqual({ outcome: "updated", subscription: WITH_ORGANIZATION });
     });
   });
 

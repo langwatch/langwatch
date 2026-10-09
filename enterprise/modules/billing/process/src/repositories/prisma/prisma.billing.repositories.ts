@@ -40,10 +40,7 @@ export class PostgresBillingRepositories {
       seatEventSubscriptions: PrismaSeatEventSubscriptionRepository.create(prisma),
       subscriptions,
       webhookOrganizations: PrismaBillingWebhookOrganizationRepository.create({ database: prisma }),
-      webhookSubscriptions: PrismaBillingWebhookSubscriptionRepository.create({
-        subscriptions,
-        database: prisma,
-      }),
+      webhookSubscriptions: PrismaBillingWebhookSubscriptionRepository.create({ subscriptions }),
     };
   }
 }

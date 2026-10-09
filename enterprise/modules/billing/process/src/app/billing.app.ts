@@ -141,7 +141,7 @@ type StripeWebhookComposition = Readonly<{
   /** Main's licence purchase: signs, records, mails and announces; absent without the key. */
   licensePurchase?: LicensePurchaseHandler;
   /** Clears a trial's licence once its subscription activates; licensing owns it. */
-  licenses: Pick<LicensingApi, "removeLicense">;
+  licenses: Pick<LicensingApi, "removeLicense" | "getLicenseStatus">;
 }>;
 
 type SubscriptionComposition = Readonly<{

@@ -1,14 +1,11 @@
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: Null* repos intentionally empty.
 
 import type {
-  BillingOrganizationRecord,
   BillingSubscriptionRecord,
+  BillingSubscriptionWithOrganization,
 } from "./subscription.repository.ts";
 
-export type SubscriptionWithOrg = BillingSubscriptionRecord & {
-  /** The trial licence a paid subscription retires. */
-  organization: BillingOrganizationRecord & { license: string | null };
-};
+export type SubscriptionWithOrg = BillingSubscriptionWithOrganization;
 export type CancelledSubscription = { stripeSubscriptionId: string | null };
 
 /** Outcome names the why; never collapses to null. */

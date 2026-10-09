@@ -18,7 +18,6 @@ export type MemoryBillingOrganization = {
   stripeCustomerId: string | null;
   pricingModel: string | null;
   currency: string | null;
-  license: string | null;
   /** An operator marked this organization a connected self-hosted customer. */
   selfHostedCustomer: boolean;
   teamIds: string[];
