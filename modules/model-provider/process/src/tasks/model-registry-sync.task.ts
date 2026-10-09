@@ -12,6 +12,11 @@ import { nowInstant } from "@langwatch/time";
 import { OpenRouter } from "@openrouter/sdk";
 import type { Model } from "@openrouter/sdk/models";
 
+import type {
+  DoublewordModelChannel,
+  DoublewordModelList,
+} from "../channels/doubleword-model.channel.ts";
+import { HttpDoublewordModelChannel } from "../channels/http/http.doubleword-model.channel.ts";
 import { HttpLitellmPriceChannel } from "../channels/http/http.litellm-price.channel.ts";
 import type {
   LitellmPriceChannel,
@@ -21,14 +26,17 @@ import {
   auditCatalog,
   blockingFindings,
   renderAuditMarkdown,
+  withoutAcceptedCrossSource,
   type AuditBaseline,
   type AuditReport,
 } from "../rules/catalog-price-audit.rules.ts";
+import { resolveDoublewordEntries } from "../rules/doubleword-models.rules.ts";
+import { applyLitellmPreference } from "../rules/litellm-preferred.rules.ts";
 import {
   litellmPricingById,
-  mapLitellmAudioModels,
+  mapLitellmModels,
   type UnrepresentableModel,
-} from "../rules/litellm-audio-prices.rules.ts";
+} from "../rules/litellm-prices.rules.ts";
 import {
   extractProvider,
   hasVariantSuffix,
@@ -43,7 +51,7 @@ const OUTPUT_PATH = fileURLToPath(
   new URL("../../../contract/src/catalog/model-catalog.json", import.meta.url),
 );
 // The hand-curated overlay: any model id present there is skipped by the
-// litellm audio merge, so manual price corrections always win over the sync.
+// litellm and Doubleword merges, so manual price corrections always win over the sync.
 const OVERLAY_PATH = fileURLToPath(
   new URL("../../../contract/src/catalog/model-catalog.overlay.json", import.meta.url),
 );
@@ -73,6 +81,19 @@ function readOverlayModels(): Record<string, LLMModelEntry> {
     return overlay.models ?? {};
   } catch (error) {
     logger.warn({ error }, "Could not read overlay");
+    return {};
+  }
+}
+
+/** The catalog currently on disk (empty if unreadable). */
+function readPreviousModels(): Record<string, LLMModelEntry> {
+  try {
+    const previous = JSON.parse(fs.readFileSync(OUTPUT_PATH, "utf8")) as {
+      models?: Record<string, LLMModelEntry>;
+    };
+    return previous.models ?? {};
+  } catch (error) {
+    logger.warn({ error }, "Could not read the previous catalog");
     return {};
   }
 }
@@ -217,6 +238,49 @@ function transformModel(model: Model, raw?: RawPricing): LLMModelEntry {
   return entry;
 }
 
+const DOUBLEWORD_KEY_NOT_SET: DoublewordModelList = {
+  outcome: "unavailable",
+  reason: "key_not_set",
+  detail: "DOUBLEWORD_API_KEY is not set",
+};
+
+/**
+ * Merges Doubleword's models into the catalog. Ids the overlay or an earlier
+ * source already covers are left alone.
+ */
+async function mergeDoublewordModels({
+  transformedModels,
+  overlayModels,
+  apiKey,
+  doubleword,
+}: {
+  transformedModels: Record<string, LLMModelEntry>;
+  overlayModels: Record<string, LLMModelEntry>;
+  apiKey: string | undefined;
+  doubleword: DoublewordModelChannel;
+}): Promise<void> {
+  const excludeIds = new Set([...Object.keys(overlayModels), ...Object.keys(transformedModels)]);
+  logger.info("Fetching models from Doubleword");
+  const list = apiKey ? await doubleword.fetchModels({ apiKey }) : DOUBLEWORD_KEY_NOT_SET;
+  if (list.outcome === "unavailable") {
+    logger.warn(
+      { reason: list.reason, detail: list.detail },
+      "Doubleword models not read; keeping the Doubleword models already in the catalog",
+    );
+  }
+  const fetched = list.outcome === "fetched" ? list.models : undefined;
+  const entries = resolveDoublewordEntries({
+    fetched,
+    previousModels: fetched ? {} : readPreviousModels(),
+    excludeIds,
+  });
+  for (const entry of entries) transformedModels[entry.id] = entry;
+  logger.info(
+    { received: fetched?.length ?? 0, merged: entries.length, source: list.outcome },
+    "Merged Doubleword models",
+  );
+}
+
 /**
  * Audits the catalog this run produced against litellm, writes the report,
  * and logs every blocking finding. litellm is independent of OpenRouter,
@@ -238,8 +302,12 @@ function auditAndReport({
     upstream.litellm = litellmPricingById(litellmPrices.prices);
   }
 
-  const report = auditCatalog({ overlay, generated, upstream, unrepresentable });
-  const blocking = blockingFindings(report, readAuditBaseline());
+  const baseline = readAuditBaseline();
+  const report = withoutAcceptedCrossSource(
+    auditCatalog({ overlay, generated, upstream, unrepresentable }),
+    baseline,
+  );
+  const blocking = blockingFindings(report, baseline);
 
   try {
     fs.writeFileSync(AUDIT_PATH, `${renderAuditMarkdown(report, blocking)}\n`);
@@ -266,17 +334,46 @@ export type ModelRegistrySyncResult = {
   errors: string[];
 };
 
+/** Logs what the written catalog holds, by provider and by mode. */
+function logCatalogSummary(models: Record<string, LLMModelEntry>): void {
+  const entries = Object.values(models);
+  const countByMode = (mode: LLMModelEntry["mode"]): number =>
+    entries.filter((model) => model.mode === mode).length;
+  logger.info(
+    {
+      providers: [...new Set(entries.map((model) => model.provider))].toSorted(),
+      withReasoningParameter: entries.filter(
+        (model) =>
+          model.supportedParameters.includes("reasoning") ||
+          model.supportedParameters.includes("reasoning_effort"),
+      ).length,
+      withReasoningConfig: entries.filter((model) => model.reasoningConfig !== undefined).length,
+      multimodal: entries.filter((model) => model.supportsImageInput || model.supportsAudioInput)
+        .length,
+      chat: countByMode("chat"),
+      embedding: countByMode("embedding"),
+      audio: countByMode("audio"),
+      image: countByMode("image"),
+    },
+    "Catalog summary",
+  );
+}
+
 /**
  * Fetches every model from OpenRouter (chat plus embeddings), merges in
- * litellm's audio/transcription/realtime family, and writes
- * `model-catalog.json`. The overlay file is read, but never written, here.
+ * litellm's audio and image families and Doubleword's hosted models, and
+ * writes `model-catalog.json`. The overlay file is read, but never written, here.
  */
 export async function syncModelRegistry({
   apiKey,
+  doublewordApiKey,
   litellm,
+  doubleword,
 }: {
   apiKey: string;
+  doublewordApiKey: string | undefined;
   litellm: LitellmPriceChannel;
+  doubleword: DoublewordModelChannel;
 }): Promise<ModelRegistrySyncResult> {
   logger.info("Fetching models from OpenRouter API");
   const openRouter = new OpenRouter({ apiKey });
@@ -298,6 +395,15 @@ export async function syncModelRegistry({
   );
 
   const rawPricing = await fetchRawPricing(apiKey);
+  logger.info(
+    {
+      count: rawPricing.size,
+      withHourLongCacheWrite: [...rawPricing.values()].filter(
+        (pricing) => pricing.input_cache_write_1h,
+      ).length,
+    },
+    "Raw pricing available",
+  );
 
   const transformedModels: Record<string, LLMModelEntry> = {};
   const errors: string[] = [];
@@ -312,23 +418,46 @@ export async function syncModelRegistry({
     }
   }
 
-  logger.info("Fetching audio model prices from litellm");
+  logger.info("Fetching audio and image model prices from litellm");
   const overlayModels = readOverlayModels();
   const litellmPrices = await litellm.fetchPriceRegistry();
   let unrepresentable: UnrepresentableModel[] = [];
   if (litellmPrices.outcome === "fetched") {
     const excludeIds = new Set([...Object.keys(overlayModels), ...Object.keys(transformedModels)]);
-    const mapping = mapLitellmAudioModels(litellmPrices.prices, excludeIds);
+    const mapping = mapLitellmModels(litellmPrices.prices, excludeIds);
     unrepresentable = mapping.unrepresentable;
     for (const entry of mapping.entries) {
       transformedModels[entry.id] = entry;
     }
-    logger.info({ count: mapping.entries.length }, "Merged audio models from litellm");
+    logger.info({ count: mapping.entries.length }, "Merged audio and image models from litellm");
+    if (unrepresentable.length > 0) {
+      logger.warn(
+        { ids: unrepresentable.map((model) => model.id) },
+        "Models priced upstream but not expressible in the catalog",
+      );
+    }
   } else {
     logger.warn(
       { reason: litellmPrices.reason, detail: litellmPrices.detail },
-      "litellm price fetch failed; audio models not merged this run",
+      "litellm price fetch failed; audio and image models not merged this run",
     );
+  }
+
+  await mergeDoublewordModels({
+    transformedModels,
+    overlayModels,
+    apiKey: doublewordApiKey,
+    doubleword,
+  });
+
+  // Where a person decided litellm is the right side of a price disagreement,
+  // its rates are taken before the audit runs, so the audit checks what is written.
+  if (litellmPrices.outcome === "fetched") {
+    const preferred = applyLitellmPreference({
+      models: transformedModels,
+      litellmById: litellmPricingById(litellmPrices.prices),
+    });
+    logger.info({ ids: preferred }, "Took litellm's rates for the preferred models");
   }
 
   auditAndReport({
@@ -346,36 +475,56 @@ export async function syncModelRegistry({
 
   fs.writeFileSync(OUTPUT_PATH, JSON.stringify(registry, null, 2));
   logger.info({ modelCount: registry.modelCount, outputPath: OUTPUT_PATH }, "Wrote model catalog");
+  logCatalogSummary(transformedModels);
 
   return { modelCount: registry.modelCount, outputPath: OUTPUT_PATH, errors };
 }
 
 /**
- * The task-launcher entry — `pnpm --filter @langwatch/tasks task
- * model-registry-sync`. Regenerates `model-catalog.json` from OpenRouter and
- * litellm; never touches `model-catalog.overlay.json`.
+ * The task-launcher entry: `pnpm --filter @langwatch/tasks task model-registry-sync`.
+ * Regenerates `model-catalog.json`; never touches `model-catalog.overlay.json`. Without
+ * `DOUBLEWORD_API_KEY` (a platform key) the Doubleword entries already in the catalog are kept.
  */
 export class ModelRegistrySyncTask extends Task {
   readonly name = "model-registry-sync";
   readonly description =
-    "Regenerates model-catalog.json from OpenRouter and litellm's price registry.";
+    "Regenerates model-catalog.json from OpenRouter, litellm's price registry and Doubleword.";
 
   private constructor(
-    private readonly apiKey: () => string | undefined,
+    private readonly keys: {
+      apiKey: () => string | undefined;
+      doublewordApiKey: () => string | undefined;
+    },
     private readonly litellm: LitellmPriceChannel,
+    private readonly doubleword: DoublewordModelChannel,
   ) {
     super();
   }
 
-  static create({ apiKey }: { apiKey: () => string | undefined }): ModelRegistrySyncTask {
-    return new ModelRegistrySyncTask(apiKey, HttpLitellmPriceChannel.create());
+  static create({
+    apiKey,
+    doublewordApiKey = () => undefined,
+  }: {
+    apiKey: () => string | undefined;
+    doublewordApiKey?: () => string | undefined;
+  }): ModelRegistrySyncTask {
+    return new ModelRegistrySyncTask(
+      { apiKey, doublewordApiKey },
+      HttpLitellmPriceChannel.create(),
+      HttpDoublewordModelChannel.create(),
+    );
   }
 
   async run(_input: { args: readonly string[]; signal: AbortSignal }): Promise<void> {
-    const apiKey = this.apiKey();
+    const apiKey = this.keys.apiKey();
     if (!apiKey) {
       throw new Error("OPENROUTER_API_KEY environment variable is not set");
     }
-    await syncModelRegistry({ apiKey, litellm: this.litellm });
+    await syncModelRegistry({
+      apiKey,
+      doublewordApiKey: this.keys.doublewordApiKey(),
+      litellm: this.litellm,
+      doubleword: this.doubleword,
+    });
   }
 }

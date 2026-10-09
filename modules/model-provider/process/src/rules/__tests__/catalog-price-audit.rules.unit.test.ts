@@ -8,6 +8,7 @@ import {
   isPricedElsewhere,
   pricedUnits,
   renderAuditMarkdown,
+  withoutAcceptedCrossSource,
   type AuditBaseline,
 } from "../catalog-price-audit.rules.ts";
 
@@ -278,5 +279,153 @@ describe("renderAuditMarkdown", () => {
     );
     expect(markdown).toContain("not expressible in the catalog (1)");
     expect(markdown).not.toContain("need a decision");
+  });
+});
+
+describe("findUnpricedModels, image rates", () => {
+  it("counts an image-token-only rate as priced", () => {
+    // An image model can carry no text rates at all: it reads a prompt of
+    // image tokens and answers with image tokens.
+    const models = {
+      "openai/gpt-image-1": {
+        ...model("openai/gpt-image-1", { imageCostPerToken: 1e-5, imageOutputCostPerToken: 4e-5 }),
+        mode: "image" as const,
+      },
+    };
+    expect(findUnpricedModels(models)).toEqual([]);
+  });
+});
+
+describe("auditCatalog, cache writes and overridden ids", () => {
+  it("reports a cache-write rate the two sources disagree on", () => {
+    const generated = {
+      "openai/gpt-5.6-sol": model("openai/gpt-5.6-sol", {
+        inputCostPerToken: 4e-6,
+        inputCacheWritePerToken: 2.5e-6,
+      }),
+    };
+    const upstream = {
+      litellm: {
+        "openai/gpt-5.6-sol": price({ inputCostPerToken: 4e-6, inputCacheWritePerToken: 5e-6 }),
+      },
+    };
+    const { crossSource } = auditCatalog({ overlay: {}, generated, upstream });
+    expect(crossSource).toHaveLength(1);
+    expect(crossSource[0]).toMatchObject({
+      modelId: "openai/gpt-5.6-sol",
+      field: "inputCacheWritePerToken",
+      catalog: 2.5e-6,
+      upstream: 5e-6,
+    });
+  });
+
+  it("does not report the generated rate of an id the overlay overrides", () => {
+    // The overlay wins at load time, so the generated rate never bills. The
+    // overlay's own rate is still checked, as drift.
+    const overlay = {
+      "openai/gpt-audio-mini": model("openai/gpt-audio-mini", { audioCostPerToken: 1e-5 }),
+    };
+    const generated = {
+      "openai/gpt-audio-mini": model("openai/gpt-audio-mini", { audioCostPerToken: 6e-7 }),
+    };
+    const upstream = { litellm: { "openai/gpt-audio-mini": price({ audioCostPerToken: 1e-5 }) } };
+    const report = auditCatalog({ overlay, generated, upstream });
+    expect(report.crossSource).toEqual([]);
+    expect(report.drift).toEqual([]);
+    expect(report.overriding).toEqual(["openai/gpt-audio-mini"]);
+  });
+});
+
+describe("withoutAcceptedCrossSource", () => {
+  it("drops only the cross-source rows the baseline accepts", () => {
+    const row = (modelId: string, field: string) => ({
+      modelId,
+      origin: "generated" as const,
+      field,
+      catalog: 4e-8,
+      upstream: 2e-7,
+      gap: 0.8,
+      source: "litellm",
+    });
+    const report = {
+      unpriced: [],
+      unitMismatch: [],
+      drift: [],
+      crossSource: [
+        row("inception/mercury-2.5", "inputCostPerToken"),
+        row("inception/mercury-2.5", "outputCostPerToken"),
+      ],
+      overriding: [],
+      unrepresentable: [],
+    };
+    const baseline: AuditBaseline = {
+      disagreements: { "inception/mercury-2.5::inputCostPerToken": "vendor page confirms" },
+    };
+    expect(withoutAcceptedCrossSource(report, baseline).crossSource.map((d) => d.field)).toEqual([
+      "outputCostPerToken",
+    ]);
+    expect(withoutAcceptedCrossSource(report, {}).crossSource).toHaveLength(2);
+  });
+});
+
+describe("auditCatalog, image rates", () => {
+  it("reports a hand-written image rate that drifted from upstream", () => {
+    const overlay = {
+      "openai/gpt-image-1": model("openai/gpt-image-1", {
+        inputCostPerToken: 5e-6,
+        imageCostPerToken: 1e-5,
+        imageOutputCostPerToken: 4e-5,
+      }),
+    };
+    const upstream = {
+      litellm: {
+        "openai/gpt-image-1": price({
+          inputCostPerToken: 5e-6,
+          imageCostPerToken: 1e-5,
+          imageOutputCostPerToken: 8e-5,
+        }),
+      },
+    };
+
+    const report = auditCatalog({ overlay, generated: {}, upstream });
+    expect(report.drift).toEqual([
+      {
+        modelId: "openai/gpt-image-1",
+        origin: "overlay",
+        field: "imageOutputCostPerToken",
+        catalog: 4e-5,
+        upstream: 8e-5,
+        gap: 0.5,
+        source: "litellm",
+      },
+    ]);
+    expect(blockingFindings(report, {})).toEqual([
+      "overlay drift: openai/gpt-image-1::imageOutputCostPerToken is 0.00004, litellm says 0.00008",
+    ]);
+  });
+
+  it("stays quiet when the overlay and upstream agree on the image rates", () => {
+    const overlay = {
+      "openai/gpt-image-2": model("openai/gpt-image-2", {
+        inputCostPerToken: 5e-6,
+        imageCostPerToken: 8e-6,
+        imageOutputCostPerToken: 3e-5,
+      }),
+    };
+    const upstream = {
+      litellm: {
+        "openai/gpt-image-2": price({
+          inputCostPerToken: 5e-6,
+          outputCostPerToken: 1e-5,
+          imageCostPerToken: 8e-6,
+          imageOutputCostPerToken: 3e-5,
+        }),
+      },
+    };
+
+    const report = auditCatalog({ overlay, generated: {}, upstream });
+    expect(report.drift).toEqual([]);
+    expect(report.unitMismatch).toEqual([]);
+    expect(report.unpriced).toEqual([]);
   });
 });
