@@ -40,10 +40,11 @@ Feature: The worker runs the upgrade from every entry point; the api never migra
     And the new api pods report not ready until the ledger is current, so old pods keep serving
 
   @unit
-  Scenario: The chart refuses a release without workers, because the workers run the upgrade
+  Scenario: A release without workers runs the worker as a sidecar in the app pods
     Given the chart with `workers.enabled` false
     When it renders
-    Then it fails, naming `workers.enabled` and saying the workers run the upgrade
+    Then each app pod carries the worker container, running `pnpm run start` in /app/apps/worker
+    And the pod's grace period is the longer of the app's and the workers'
 
   @unit
   Scenario: The Helm pre-roll Job renders only when upgrades are serialised

@@ -113,6 +113,13 @@ test_role_is_scoped() {
   echo "ok   [role] get on the two Deployments only"
 }
 
+test_role_names_the_app_only_without_workers() {
+  local role
+  role=$(hook_block "$ON --set workers.enabled=false" | hook_doc Role)
+  expect_contains "no-workers" "$role" "- \"lw-app\"" || return
+  expect_absent "no-workers" "$role" "lw-workers" || return
+  echo "ok   [no-workers] the Role names the app only"
+}
 
 test_token_reaches_the_wait_only() {
   local job assert_block
@@ -134,6 +141,7 @@ test_assert_container_runs_the_command() {
 test_default_renders_no_hook
 test_hook_documents_are_post_upgrade_only
 test_role_is_scoped
+test_role_names_the_app_only_without_workers
 test_token_reaches_the_wait_only
 test_assert_container_runs_the_command
 

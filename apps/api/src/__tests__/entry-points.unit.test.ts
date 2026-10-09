@@ -74,19 +74,24 @@ describe("the entry points", () => {
   });
 
   describe("given the chart without workers", () => {
-    /** @scenario "The chart refuses a release without workers, because the workers run the upgrade" */
-    it("fails the render from the app Deployment, naming workers.enabled", () => {
+    /** @scenario "A release without workers runs the worker as a sidecar in the app pods" */
+    it("adds the worker container to the app pod and takes the longer grace period", () => {
       const helpers = readFromRoot("charts/langwatch/templates/_helpers.tpl");
-      const guard = helpers.slice(
-        helpers.indexOf('{{- define "langwatch.workersRequiredGuard" -}}'),
+      const container = helpers.slice(
+        helpers.indexOf('{{- define "langwatch.workersContainer" -}}'),
       );
+      const app = readFromRoot("charts/langwatch/templates/app/deployment.yaml");
 
-      expect(guard).toMatch(
-        /^\{\{- define "langwatch\.workersRequiredGuard" -\}\}\n\{\{- if not \.Values\.workers\.enabled \}\}\n\{\{- fail "workers\.enabled must be true: the workers run the upgrade/,
+      expect(container).toMatch(
+        /^\{\{- define "langwatch\.workersContainer" -\}\}\n- name: \{\{ \.Release\.Name \}\}-workers\n[^]*?workingDir: \/app\/apps\/worker\n {2}command: \['pnpm'\]\n {2}args: \['run', 'start'\]/,
       );
-      expect(readFromRoot("charts/langwatch/templates/app/deployment.yaml").split("\n")[1]).toBe(
-        '{{- include "langwatch.workersRequiredGuard" . }}',
+      expect(app).toContain(
+        '{{- if not .Values.workers.enabled }}\n        {{- include "langwatch.workersContainer" . | nindent 8 }}',
       );
+      expect(app).toContain(
+        '{{- $grace = max $grace (int (include "langwatch.terminationGracePeriod" (dict "component" .Values.workers "name" "workers"))) }}',
+      );
+      expect(helpers).not.toContain("workersRequiredGuard");
     });
   });
 

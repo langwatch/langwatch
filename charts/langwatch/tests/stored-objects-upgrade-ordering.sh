@@ -428,17 +428,19 @@ test_dataplane_renders_no_hook() {
   echo "ok   [dataplane] no stored-objects PVC and no hooks"
 }
 
-# The upgrade runs on the workers, so a release without them is refused at render.
-# specs/upgrade/entry-points.feature binds the scenarios; this renders them.
-test_no_workers_is_refused() {
-  local out
-  # shellcheck disable=SC2086
-  if out=$(helm template lw . $BASE --set workers.enabled=false 2>&1); then
-    fail "workers off" "the chart rendered a release without workers"
-    return
-  fi
-  expect_contains "workers off" "$out" "workers.enabled must be true: the workers run the upgrade" || return 0
-  echo "ok   [workers off] the chart refuses a release without workers"
+# A release without workers runs the worker as a sidecar in each app pod, so the
+# upgrade still runs. specs/upgrade/entry-points.feature binds the scenario.
+test_no_workers_runs_a_worker_sidecar() {
+  local out app
+  out=$(render "--set workers.enabled=false --set workers.terminationGracePeriodSeconds=90")
+  expect_absent "workers off" "$out" "langwatch/templates/workers/deployment.yaml" || return 0
+  app=$(render "--set workers.enabled=false --set workers.terminationGracePeriodSeconds=90 -s templates/app/deployment.yaml")
+  expect_contains "workers off" "$app" "- name: lw-app" || return 0
+  expect_contains "workers off" "$app" "- name: lw-workers" || return 0
+  expect_contains "workers off" "$app" "workingDir: /app/apps/worker" || return 0
+  expect_contains "workers off" "$app" "terminationGracePeriodSeconds: 90" || return 0
+  expect_absent "workers on" "$(render "-s templates/app/deployment.yaml")" "- name: lw-workers" || return 0
+  echo "ok   [workers off] the app pod runs the worker as a sidecar with the longer grace period"
 }
 
 test_no_pre_roll_job_without_serialised_upgrades() {
@@ -810,7 +812,7 @@ test_wait_outlasts_the_grace_period
 test_workers_come_back_after_the_app_rollout
 test_rollout_check_waits_for_the_new_pod
 test_dataplane_renders_no_hook
-test_no_workers_is_refused
+test_no_workers_runs_a_worker_sidecar
 test_no_pre_roll_job_without_serialised_upgrades
 test_knob_off_renders_no_hook
 test_hook_rbac_is_scoped
