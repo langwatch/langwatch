@@ -39,7 +39,9 @@ export function GrantsTable({ grants, canManage, onChangeRole, onRevoke }: Grant
           <Table.Row key={grant.id} data-testid="grant-row">
             <Table.Cell>
               <Badge size="sm" colorPalette={grant.role.builtIn ? "orange" : "purple"}>
-                {grant.role.name ?? grant.role.id}
+                <Text as="span" truncate maxWidth="200px" title={grant.role.name ?? grant.role.id}>
+                  {grant.role.name ?? grant.role.id}
+                </Text>
               </Badge>
             </Table.Cell>
             <Table.Cell>
