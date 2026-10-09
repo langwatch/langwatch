@@ -40,6 +40,7 @@ export const lwqlViolationSchema: z.ZodType<LangWatchQLViolation> = z
     view: z.string().optional(),
     availableColumns: z.array(z.string()).readonly().optional(),
     maxRows: z.number().optional(),
+    missingGates: z.array(z.string()).readonly().optional(),
   })
   .strict();
 

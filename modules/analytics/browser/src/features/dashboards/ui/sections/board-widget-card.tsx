@@ -6,14 +6,17 @@
 
 import { Box } from "@langwatch/design-system/primitives";
 import { GripVertical } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
+import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
+import type { WidgetFace } from "../../../../model/dashboard-widget/widget-completeness.ts";
 import { CHART_GRID_DRAG_HANDLE_CLASS } from "../../../../ui/sections/chart-grid.tsx";
 import { DashboardWidgetFrameOverWindow } from "../../../dashboard-widget/ui/sections/dashboard-widget-frame.tsx";
 import { useWidgetClipboard } from "../../behavior/use-widget-clipboard.ts";
 import type { WidgetSetup } from "../../langy/model/board-langy.ts";
 import type { BoardPeriod } from "../../model/board-period.ts";
 import type { BoardWidget } from "../../model/board-widgets.ts";
+import { WIDGET_EDIT_PERMISSION } from "../../model/dashboards-access.ts";
 import { AskLangyButton } from "../blocks/ask-langy-button.tsx";
 import { WidgetCardShell, widgetBodyHeightPx } from "../blocks/widget-card-shell.tsx";
 import { WidgetMenu } from "../blocks/widget-menu.tsx";
@@ -52,7 +55,12 @@ export function BoardWidgetCard({
   onDuplicate: () => void;
   onDelete: () => void;
 }) {
+  const host = useAnalyticsHost();
   const clipboard = useWidgetClipboard({ dashboardId });
+  const [face, setFace] = useState<WidgetFace["kind"]>("chart");
+  // A widget the reader may not see offers nothing that reads its data: no Langy, alert or report.
+  const langyOnData = face === "no_access" ? undefined : langy;
+  const canEditCode = face !== "no_access" || host.hasPermission(WIDGET_EDIT_PERMISSION);
   const { periodStart, periodEnd, granularitySeconds } = period;
   const timeWindow = useMemo(
     () => ({ start: periodStart, end: periodEnd }),
@@ -79,16 +87,16 @@ export function BoardWidgetCard({
           >
             <GripVertical size={14} aria-hidden />
           </Box>
-          {langy && <AskLangyButton name={widget.name} onClick={langy.ask} />}
+          {langyOnData && <AskLangyButton name={widget.name} onClick={langyOnData.ask} />}
           <WidgetMenu
             name={widget.name}
             disabled={isWriting}
-            onEditWithLangy={langy && (() => onEdit({ withLangy: true }))}
-            onEditCode={() => onEdit({ withLangy: false })}
+            onEditWithLangy={langyOnData && (() => onEdit({ withLangy: true }))}
+            onEditCode={canEditCode ? () => onEdit({ withLangy: false }) : undefined}
             onCopyId={() => clipboard.copyId(widget.id)}
             onCopyApiSnippet={() => clipboard.copyApiSnippet(widget.id)}
-            onSetAlert={langy && (() => langy.setUp("alert"))}
-            onSendReport={langy && (() => langy.setUp("report"))}
+            onSetAlert={langyOnData && (() => langyOnData.setUp("alert"))}
+            onSendReport={langyOnData && (() => langyOnData.setUp("report"))}
             onDuplicate={onDuplicate}
             onDelete={onDelete}
           />
@@ -105,6 +113,7 @@ export function BoardWidgetCard({
         maxHeight={widgetBodyHeightPx(widget.placement.rowSpan)}
         timeWindow={timeWindow}
         granularitySeconds={granularitySeconds}
+        onFaceChange={setFace}
         {...(langy ? { onAskLangyToSetUp: langy.setUpMissing } : {})}
       />
     </WidgetCardShell>

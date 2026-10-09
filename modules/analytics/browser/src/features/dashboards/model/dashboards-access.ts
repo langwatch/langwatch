@@ -6,6 +6,8 @@
 
 export const DASHBOARDS_FLAG = "release_dashboards";
 export const DASHBOARDS_PERMISSION = "analytics:view";
+/** What saving a widget's code asks of the reader (`dashboardWidgets.update`). */
+export const WIDGET_EDIT_PERMISSION = "analytics:update";
 
 export type DashboardsAccess = "loading" | "not-found" | "open";
 

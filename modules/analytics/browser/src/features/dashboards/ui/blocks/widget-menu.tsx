@@ -34,7 +34,8 @@ export function WidgetMenu({
   disabled: boolean;
   /** Opens the editor with an edit drafted in Langy; absent when Langy is not available. */
   onEditWithLangy?: () => void;
-  onEditCode: () => void;
+  /** Absent when the reader may not see the widget's data and may not edit widgets either. */
+  onEditCode?: () => void;
   onCopyId: () => void;
   onCopyApiSnippet: () => void;
   /** Drafts an alert on this widget in Langy; absent when Langy is not available. */
@@ -64,9 +65,11 @@ export function WidgetMenu({
             <Sparkles size={14} /> Edit with Langy
           </Menu.Item>
         )}
-        <Menu.Item value="edit-code" onClick={onEditCode}>
-          <Code2 size={14} /> Edit code
-        </Menu.Item>
+        {onEditCode && (
+          <Menu.Item value="edit-code" onClick={onEditCode}>
+            <Code2 size={14} /> Edit code
+          </Menu.Item>
+        )}
         <Menu.Item value="copy-id" onClick={onCopyId}>
           <Hash size={14} /> Copy widget id
         </Menu.Item>

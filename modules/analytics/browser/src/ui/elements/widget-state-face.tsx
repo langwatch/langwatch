@@ -1,11 +1,11 @@
 /**
  * What a widget card shows in place of its chart when the chart would mislead: no traffic in
- * the period, a field its query needs that no trace carries, or a failure it cannot draw past.
- * The rules: features/dashboards/WIDGET_STANDARD.md.
+ * the period, a field its query needs that no trace carries, data the reader may not see, or a
+ * failure it cannot draw past. The rules: features/dashboards/WIDGET_STANDARD.md.
  */
 
 import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
-import { Plug, RotateCcw, Sparkles, TriangleAlert } from "lucide-react";
+import { Lock, Plug, RotateCcw, Sparkles, TriangleAlert } from "lucide-react";
 
 /** The query found nothing in the board's period at all: "No traces in this period". */
 export function WidgetNoTrafficFace({ unit }: { unit: string }) {
@@ -52,6 +52,35 @@ export function WidgetSetupFace({
           Ask Langy to help
         </Button>
       )}
+    </VStack>
+  );
+}
+
+/**
+ * The reader's role may not see what the widget shows: what is withheld, and who to ask. It is
+ * not a failure, so it has no warning colour and no Retry.
+ */
+export function WidgetNoAccessFace({ what, ask }: { what: string; ask: string }) {
+  return (
+    <VStack
+      height="full"
+      align="start"
+      justify="center"
+      gap={1.5}
+      paddingX={4}
+      data-widget-state="no_access"
+    >
+      <HStack gap={1.5}>
+        <Box display="flex" color="fg.subtle">
+          <Lock size={13} aria-hidden />
+        </Box>
+        <Text fontSize="12.5px" fontWeight="medium">
+          {what}
+        </Text>
+      </HStack>
+      <Text fontSize="12px" color="fg.muted">
+        {ask}
+      </Text>
     </VStack>
   );
 }

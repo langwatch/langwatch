@@ -86,3 +86,73 @@ Feature: A dashboard widget frame shows what its queries report
       Given one query reports "complete" and another, over last week, "no_traffic"
       When the widget's state is worked out
       Then it is "complete", and it is "no_traffic" only when every query found none
+
+  Rule: A reader who may not see a widget's data is told so
+
+    A query that reads a column or calls a function the reader's role may not see is refused as
+    a whole by the server. The refusal names what the reader lacks, and the frame says so in
+    place of the chart. It is not a failure: no red, no Retry, no reason from the query.
+
+    @unit
+    Scenario: A refusal that is only about access names what the reader lacks
+      Given a statement that reads a column the caller's permissions withhold
+      When the validator refuses it
+      Then every violation carries the gates the caller lacks, such as "cost:view"
+      And the refusal is classified as one of access, with those gates
+
+    @unit
+    Scenario: A refusal about the query's shape is not one of access
+      Given a statement refused for a withheld column and for something else, such as a SETTINGS clause
+      When the refusal is classified
+      Then it is not one of access, so a broken query still reads as a failure
+
+    @unit
+    Scenario: A function the caller lacks the permission for names that permission
+      Given a statement that calls an app function gated on content the caller may not see
+      When the validator refuses it
+      Then the violation carries the gates the caller lacks
+      And a function refused because Instant Evals is off carries none
+
+    @integration
+    Scenario: A member without cost access is refused a cost query as a matter of access
+      Given a member who holds every catalogue permission but "cost:view"
+      When they run a statement that sums TotalCost over analytics.lwql.query
+      Then the answer is the handled error "lwql_not_permitted", not an internal error
+      And its violations classify as an access refusal naming "cost:view"
+      And the same member's statement that reads no cost is not refused by the policy
+
+    @unit
+    Scenario: A widget whose query is refused for access shows no access, before any other state
+      Given a widget with one query refused for access and another that failed or found a missing field
+      When the widget's state is worked out
+      Then it is "no_access" with the gates the reader lacks
+      And a query refused for another reason still fails the widget
+
+    @unit
+    Scenario: The no access state says what is withheld and who to ask
+      Given the reader lacks "cost:view" in the project "Checkout Agent"
+      When the state's words are written
+      Then they read "Cost figures are hidden for your role" and "Ask an admin of Checkout Agent if you need to see them."
+      And any other gate reads "This data is hidden for your role"
+
+    @integration
+    Scenario: A widget the reader may not see says so in place of the chart
+      Given a widget named "Cost per trace" on a board
+      When its query is refused because the reader lacks "cost:view"
+      Then the card says "Cost figures are hidden for your role" and who to ask
+      And it shows no Retry, no failure title and none of the refusal's own words
+
+    @integration
+    Scenario: A widget with no access offers nothing that reads its data
+      Given a stored board's widget whose query is refused for access, on a board that offers Langy
+      When the reader looks at the card's controls
+      Then there is no Ask Langy, no Edit with Langy, no Set an alert and no Send as a report
+      And Edit code is offered only to a reader who may edit widgets
+      And the widget keeps its title, and Copy widget id, Duplicate and Delete stay
+
+    @integration
+    Scenario: A From LangWatch widget with no access offers no Ask Langy
+      Given a From LangWatch board's widget whose query is refused for access
+      When the reader looks at the card
+      Then the card keeps its title and shows the no access state
+      And it offers no Ask Langy

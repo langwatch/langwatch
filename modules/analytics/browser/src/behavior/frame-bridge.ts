@@ -278,12 +278,22 @@ export function toChartQueryErrorPayload(error: unknown): ChartQueryError {
   if (!("code" in error && "title" in error && "message" in error)) {
     return unknownChartQueryError();
   }
-  const shaped = error as { code: unknown; title: unknown; message: unknown; retryable?: unknown };
+  const shaped = error as {
+    code: unknown;
+    title: unknown;
+    message: unknown;
+    retryable?: unknown;
+    missingGates?: unknown;
+  };
+  const missingGates = Array.isArray(shaped.missingGates)
+    ? shaped.missingGates.filter((gate): gate is string => typeof gate === "string")
+    : [];
   return {
     code: String(shaped.code),
     title: String(shaped.title),
     message: String(shaped.message),
     ...(shaped.retryable === true ? { retryable: true } : {}),
+    ...(missingGates.length > 0 ? { missingGates } : {}),
   };
 }
 

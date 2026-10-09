@@ -6,7 +6,6 @@
 import { useMemo } from "react";
 
 import { ChartGrid } from "../../../../ui/sections/chart-grid.tsx";
-import { DashboardWidgetFrameOverWindow } from "../../../dashboard-widget/ui/sections/dashboard-widget-frame.tsx";
 import {
   atLeastBoardMinRows,
   BOARD_GRID_ROW_HEIGHT_PX,
@@ -14,8 +13,7 @@ import {
 } from "../../model/board-grid.ts";
 import type { BoardPeriod } from "../../model/board-period.ts";
 import type { BoardTemplateWidget } from "../../templates/index.ts";
-import { AskLangyButton } from "../blocks/ask-langy-button.tsx";
-import { WidgetCardShell, widgetBodyHeightPx } from "../blocks/widget-card-shell.tsx";
+import { CuratedWidgetCard } from "./curated-widget-card.tsx";
 
 export function CuratedWidgetsGrid({
   projectId,
@@ -51,26 +49,17 @@ export function CuratedWidgetsGrid({
       renderCard={({ graphId, rowSpan }) => {
         const widget = byKey.get(graphId);
         if (!widget) return null;
-        const { name, definition } = widget;
         return (
-          <WidgetCardShell
-            name={name}
-            description={definition.description}
-            controls={
-              onAskLangy && <AskLangyButton name={name} onClick={() => onAskLangy(widget)} />
-            }
-          >
-            <DashboardWidgetFrameOverWindow
-              id={`${templateId}-${graphId}`}
-              graph={definition}
-              projectId={projectId}
-              projectSlug={projectSlug}
-              widgetName={name}
-              maxHeight={widgetBodyHeightPx(rowSpan)}
-              timeWindow={timeWindow}
-              granularitySeconds={granularitySeconds}
-            />
-          </WidgetCardShell>
+          <CuratedWidgetCard
+            widget={widget}
+            frameId={`${templateId}-${graphId}`}
+            projectId={projectId}
+            projectSlug={projectSlug}
+            rowSpan={rowSpan}
+            timeWindow={timeWindow}
+            granularitySeconds={granularitySeconds}
+            onAskLangy={onAskLangy && (() => onAskLangy(widget))}
+          />
         );
       }}
     />
