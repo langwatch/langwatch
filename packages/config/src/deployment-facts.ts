@@ -355,3 +355,8 @@ export const { posthogKey, posthogHost } = Config.define((c) => ({
   posthogKey: c.env("POSTHOG_KEY", z.string().optional()),
   posthogHost: c.env("POSTHOG_HOST", z.string().optional()),
 }));
+
+/** How long a fold's cached state lives in Redis (main's knob); the cache floors it at 300. */
+export const { foldCacheTtlSeconds } = Config.define((c) => ({
+  foldCacheTtlSeconds: c.env("LANGWATCH_FOLD_CACHE_TTL_SECONDS", positiveInteger.default(300)),
+}));

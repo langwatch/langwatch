@@ -1,4 +1,5 @@
 import {
+  foldCacheTtlSeconds,
   Config,
   langevalsStagingThresholdBytes,
   langevalsStagingTtlSeconds,
@@ -34,6 +35,7 @@ export const evaluationConfig = Config.define((c) => ({
   azureContentSafetyEndpoint: c.env("AZURE_CONTENT_SAFETY_ENDPOINT", z.string().optional()),
   enablePresidio: c.env("LANGWATCH_ENABLE_PRESIDIO", z.string().optional()),
   enableLingua: c.env("LANGWATCH_ENABLE_LINGUA", z.string().optional()),
+  foldCacheTtlSeconds,
 }));
 
 export type EvaluationServerConfig = ConfigOf<typeof evaluationConfig>;

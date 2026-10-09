@@ -22,6 +22,7 @@ export {
   allowedProxyHosts,
   allowLoopbackVoiceProviders,
   blockLocalHttpCalls,
+  foldCacheTtlSeconds,
   gatewayAddressOf,
   gatewayInternalUrl,
   gatewayLegacyUrl,

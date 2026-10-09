@@ -3,6 +3,7 @@ import {
   blockLocalHttpCalls,
   Config,
   type ConfigOf,
+  foldCacheTtlSeconds,
   isSaas,
   publicBaseUrl,
 } from "@langwatch/config";
@@ -25,6 +26,7 @@ export const experimentConfig = Config.define((c) => ({
       .transform((value) => value?.trim() || void 0),
   ),
   /** LangWatch's own cloud, where a run's outbound calls verify TLS. */
+  foldCacheTtlSeconds,
   isSaas,
 }));
 

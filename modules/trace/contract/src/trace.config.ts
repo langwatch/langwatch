@@ -1,4 +1,4 @@
-import { Config, publicBaseUrl, type ConfigOf } from "@langwatch/config";
+import { Config, foldCacheTtlSeconds, publicBaseUrl, type ConfigOf } from "@langwatch/config";
 import { z } from "zod";
 
 /**
@@ -28,6 +28,7 @@ export const traceConfig = Config.define((c) => ({
       .optional()
       .transform((value) => value === "true"),
   ),
+  foldCacheTtlSeconds,
   publicBaseUrl,
 }));
 
