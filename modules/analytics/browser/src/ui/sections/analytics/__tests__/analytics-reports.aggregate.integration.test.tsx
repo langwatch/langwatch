@@ -150,3 +150,26 @@ describe("<ReportsContent/>", () => {
     });
   });
 });
+
+describe("<ReportsContent/> opened on a dashboard id that does not exist", () => {
+  /** @scenario "A link to a missing dashboard says so" */
+  it("says the dashboard does not exist instead of an empty grid", () => {
+    projectRef.current = { id: "proj-1", slug: "proj", kind: "application" };
+
+    render(
+      <AnalyticsTestHarness
+        host={
+          new StubAnalyticsHost({
+            permissions: ["analytics:view", "analytics:create", "analytics:update"],
+            route: { params: {}, query: { dashboard: "dashboard_missing" } },
+          })
+        }
+      >
+        <ReportsContent />
+      </AnalyticsTestHarness>,
+    );
+
+    expect(screen.getByText("This dashboard doesn't exist")).toBeInTheDocument();
+    expect(screen.queryByText("Add your custom graphs here")).toBeNull();
+  });
+});
