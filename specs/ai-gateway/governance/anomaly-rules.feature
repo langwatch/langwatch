@@ -329,3 +329,30 @@ Scenario: The destination migration resumes after its checkpoint
   When the migration runs again from that checkpoint
   Then only the organisations after it are migrated
   And each completed page is saved as the next checkpoint
+
+@unit @anomaly-rules @migration
+Scenario: A rule edited while the destination migration runs keeps the edit
+  Given a rule with an inline webhook destination
+  And an admin changes the rule's destinations after the migration read it
+  When the migration writes the rule
+  Then the admin's destinations stay
+  And the endpoint made from the rule as it was read is archived
+
+@unit @anomaly-rules @migration
+Scenario: A release rolled back after the destination migration still delivers each rule's alerts
+  Given the destination migration has run on a rule with an inline webhook destination
+  When an image older than the migration reads the rule
+  Then it still finds the inline webhook URL and secret and delivers to them
+
+@unit @anomaly-rules @migration
+Scenario: A migrated inline destination delivers through its endpoint
+  Given the destination migration gave a rule's inline webhook destination an endpoint
+  When the rule fires an alert
+  Then the alert is delivered through that endpoint
+  And nothing is posted to the inline URL
+
+@unit @anomaly-rules @migration
+Scenario: A destination migration stopped between endpoint creation and the rule write makes no second endpoint
+  Given the migration created an endpoint for a rule and stopped before writing the rule
+  When the migration runs again
+  Then the rule names that same endpoint and no other endpoint exists for it

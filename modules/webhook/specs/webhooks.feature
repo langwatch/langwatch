@@ -66,3 +66,30 @@ Feature: Enterprise webhook endpoints
     When a batch is delivered to an endpoint whose destination is an Amazon SQS queue
     Then the send to the queue host is routed through the proxy
     And a queue host listed as a proxy exception is contacted directly
+
+  # Governance's anomaly destination migration only (Alex, 2026-10-09, D2): no door accepts the key.
+  @unit @integration
+  Scenario: A create that repeats an idempotency key answers the endpoint it made
+    Given an organization created an endpoint with an idempotency key
+    When a create carries the same key again
+    Then it answers the existing endpoint and its signing secret
+    And the organization still has one endpoint
+
+  @unit @integration
+  Scenario: Concurrent creates with one idempotency key make one endpoint
+    Given no endpoint carries an idempotency key yet
+    When several creates with that key run at once in one organization
+    Then every create answers the same endpoint
+    And exactly one endpoint is stored with that key
+
+  @unit @integration
+  Scenario: Another organization's identical idempotency key makes its own endpoint
+    Given an organization created an endpoint with an idempotency key
+    When another organization creates an endpoint with the same key
+    Then the second organization gets its own endpoint
+
+  @unit @integration
+  Scenario: An archived endpoint gives its idempotency key up
+    Given an endpoint created with an idempotency key is archived
+    When a create carries the same key again
+    Then a new active endpoint is created

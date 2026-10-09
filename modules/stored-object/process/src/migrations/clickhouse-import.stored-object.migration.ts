@@ -10,47 +10,29 @@ import {
   type StoredObjectId,
   type StoredObjectProjectId,
 } from "@langwatch/stored-object-contract";
-import type { SystemMigration, TenantMigrationOutcome } from "@langwatch/system-migrations";
+import type { TenantMigrationOutcome } from "@langwatch/system-migrations";
 import { type Instant, nowInstant, toDate } from "@langwatch/time";
+import { defineMigrationStep, type TenantMigrationStep } from "@langwatch/upgrade/step";
 
-import type { StoredObjectLegacyLocationRepository } from "../repositories/stored-object-legacy-location.repository.ts";
 import type {
   LegacyStoredObjectRow,
   StoredObjectLegacySourceRepository,
 } from "../repositories/stored-object-legacy-source.repository.ts";
-import type { StoredObjectLegacyWriterDrainRepository } from "../repositories/stored-object-legacy-writer-drain.repository.ts";
-import type { StoredObjectProjectSourceRepository } from "../repositories/stored-object-project-source.repository.ts";
 import type {
   StoredObjectRecord,
   StoredObjectRecordRepository,
 } from "../repositories/stored-object-record.repository.ts";
-
-const STORED_OBJECTS_CLICKHOUSE_IMPORT_MIGRATION_NAME =
-  "stored-objects-clickhouse-import-v0" as const;
+import { legacyStorageAddressOf } from "../rules/legacy-storage-address.rules.ts";
 
 type ClickHouseImportStoredObjectMigrationOptions = Readonly<{
-  projects: StoredObjectProjectSourceRepository;
   legacy: StoredObjectLegacySourceRepository;
-  locations: StoredObjectLegacyLocationRepository;
-  drain: StoredObjectLegacyWriterDrainRepository;
   records: StoredObjectRecordRepository;
   pageSize?: number;
   now?: () => Instant;
 }>;
 
-/** In-place, idempotent import driven by the shared system-migration runner. */
-export class ClickHouseImportStoredObjectMigration implements SystemMigration {
-  readonly executionMode = "startup" as const;
-  readonly name = STORED_OBJECTS_CLICKHOUSE_IMPORT_MIGRATION_NAME;
-  readonly title = "Stored Objects ClickHouse import";
-  readonly description =
-    "Imports each organization's latest Stored Object metadata from " +
-    "ClickHouse into Postgres, then waits for proof that legacy writers have " +
-    "drained before allowing the tenant to cut over.";
-  readonly requiresOperatorConfirmation = false;
-  readonly runsAutomaticallyOnSelfHosted = true;
-  readonly enrolledAutomatically = true;
-
+/** In-place, idempotent import of one project's legacy rows; the source stays intact. */
+export class ClickHouseImportStoredObjectMigration {
   static create(
     options: ClickHouseImportStoredObjectMigrationOptions,
   ): ClickHouseImportStoredObjectMigration {
@@ -63,55 +45,36 @@ export class ClickHouseImportStoredObjectMigration implements SystemMigration {
     this.now = options.now ?? nowInstant;
   }
 
-  async migrateTenant(input: {
+  /**
+   * Per project, waiting until no old image serves: old images are the only legacy writers, so
+   * the serving roster replaces a drain proof (Alex, 2026-10-09). Legacy reads stay in place.
+   */
+  step(): TenantMigrationStep {
+    return defineMigrationStep({
+      id: "stored-object:import-clickhouse-index",
+      kind: "tenant",
+      mode: "background",
+      tenants: "project",
+      needsOldWritersGone: true,
+      title: "Stored Objects ClickHouse import",
+      description:
+        "Copies each project's latest Stored Object metadata from the ClickHouse index into Postgres.",
+      requiresOperatorConfirmation: false,
+      runsAutomaticallyOnSelfHosted: true,
+      enrolledAutomatically: true,
+      migrateTenant: (args) => this.migrateTenant(args),
+    });
+  }
+
+  async migrateTenant({
+    tenantId,
+    signal,
+  }: {
     tenantId: string;
     signal?: AbortSignal;
   }): Promise<TenantMigrationOutcome> {
-    const initialDrain = await this.options.drain.get({ organizationId: input.tenantId });
-    const projects = await this.options.projects.findForOrganization({
-      organizationId: input.tenantId,
-    });
-    let scanned = 0;
-    let imported = 0;
-    let unchanged = 0;
-    for (const project of projects) {
-      this.assertActive(input.signal);
-      const counts = await this.importProject({ projectId: project.id, signal: input.signal });
-      scanned += counts.scanned;
-      imported += counts.imported;
-      unchanged += counts.unchanged;
-    }
-
-    const drain = initialDrain.valid
-      ? await this.options.drain.get({
-          organizationId: input.tenantId,
-        })
-      : initialDrain;
-    if (drain.valid) {
-      return {
-        status: "finalized",
-        report: {
-          kind: "stored_objects_imported",
-          projects: projects.length,
-          scanned,
-          imported,
-          unchanged,
-          drainProved: true,
-          minimumWriterGeneration: drain.minimumWriterGeneration,
-        },
-      };
-    }
-    return {
-      status: "migrated",
-      report: {
-        kind: "stored_objects_held",
-        projects: projects.length,
-        scanned,
-        imported,
-        unchanged,
-        drainProved: false,
-      },
-    };
+    const counts = await this.importProject({ projectId: tenantId, signal });
+    return { status: "finalized", report: { kind: "stored_objects_imported", ...counts } };
   }
 
   private async importProject({
@@ -160,10 +123,7 @@ export class ClickHouseImportStoredObjectMigration implements SystemMigration {
     if (!audience) {
       throw new TypeError("Legacy Stored Object purpose has no delivery audience");
     }
-    const address = await this.options.locations.parse({
-      projectId,
-      storageUri: row.storageUri,
-    });
+    const address = legacyStorageAddressOf({ projectId, storageUri: row.storageUri });
     const fingerprint = this.fingerprint(row);
     const current = await this.options.records.findById({ tenantId: projectId, id });
     if (current?.source === "canonical" || current?.legacyFingerprint === fingerprint) {

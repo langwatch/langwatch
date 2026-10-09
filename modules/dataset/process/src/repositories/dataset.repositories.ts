@@ -22,7 +22,7 @@ export interface DatasetRepositories {
   readonly count: DatasetCountRepository;
   /** The object-storage chunks an object-backed dataset's entries live in. */
   readonly chunks: DatasetChunkRepository;
-  /** The one-off content move only the dataset-content-backfill task runs. */
+  /** The one-off content move only the dataset:move-content-to-object-storage step runs. */
   readonly migration: DatasetMigrationRepository;
   /** The chunk store that move writes into. */
   readonly migrationChunks: DatasetChunkRepository;

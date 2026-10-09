@@ -90,9 +90,11 @@ Feature: Enterprise licensing lifecycle
     Round 37 (D6) moved the licence and its dates from organization's columns
     to a table licensing owns. Until organization reads the licence through
     LicensingApi, every write also lands on organization's columns, and an
-    organization licensing holds no row for is read from those columns. Once
-    no old image is still writing, a background step copies the rest and
-    overwrites any row that differs from organization's columns (R42).
+    organization is read from those columns where licensing holds no row for it
+    or the columns were written after the row. Once no old image is still
+    writing, a background step copies the rest and overwrites a row that
+    differs from organization's columns written after it (R42; newest wins,
+    Alex 2026-10-09).
 
     @unit
     Scenario: A stored licence lands on licensing's own row and on organization's columns
@@ -114,16 +116,23 @@ Feature: Enterprise licensing lifecycle
       Then it answers the key from organization's columns
 
     @unit
+    Scenario: A licence written to organization's columns after licensing's row is read from them
+      Given an organization whose row of licensing's holds a key
+      When an old image writes another key to organization's columns afterwards
+      Then licensing reads the columns' key, and the platform-access scan lists it
+
+    @unit
     Scenario: The worker brings licensing's licence rows level with organization's columns
       Given organizations whose licences are only on organization's columns
-      And one whose row differs from its columns and one whose row matches them
+      And one whose row differs from columns written after it, one whose row differs from older columns, and one whose row matches
       When the licence copy runs twice
-      Then the first run copies each missing licence with its dates and overwrites the row that differs
+      Then the first run copies each missing licence with its dates and overwrites the row older than its differing columns
+      And it leaves the row newer than its columns
       And the second run copies nothing and organization's columns are as they were
 
     @unit
     Scenario: A licence cleared on organization's columns alone is cleared on licensing's row
-      Given an organization whose row holds a key its columns no longer hold
+      Given an organization whose row holds a key its columns, written after it, no longer hold
       When the licence copy runs
       Then licensing reads no key for it and leaves it out of the platform-access scan
 

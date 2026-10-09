@@ -136,6 +136,40 @@ Feature: The upgrade command
     Then both reconcilers run after every schema step
     And the run is recorded failed naming the failing reconciler
 
+  # Record §9: each declared event upcast is a background step, level-triggered on its stored events.
+  @integration
+  Scenario: An upgrade run records each declared event upcast in the ledger
+    Given the image declares an upcast from "lw.usage.month_counted" covering 2 stored events
+    When the upgrade runs
+    Then the ledger holds a step "upcast:entitlement:lw.usage.month_counted" of kind "event-upcast", mode "background", "pending"
+    And a later run that finds no stored event of that type records the step "done"
+
+  @integration
+  Scenario: An upgrade run that cannot count an upcast's stored events fails
+    Given the event log cannot be read
+    When the upgrade runs
+    Then the run is recorded failed naming the cause
+
+  # Alex, 2026-10-09: the booted tasks process answers its upcasts; the eventing member counts them.
+  @unit
+  Scenario: The upgrade reads each declared upcast from the booted tasks process
+    Given the tasks process declares an upcast whose stored type still has 3 events
+    When the upgrade asks for its upcast steps
+    Then it receives the upcast's step id with 3 stored events and its pipeline in the report
+
+  @unit
+  Scenario: A tasks process without an event log hands the upgrade no upcast steps
+    Given the tasks process holds no event log
+    When the upgrade asks for its upcast steps
+    Then it receives none
+
+  # LangWatchQL's boot convergence only logs a refused DDL (ADR-159); the upgrade's reconciler must not.
+  @unit
+  Scenario: A LangWatchQL provisioning failure fails the upgrade run
+    Given LangWatchQL is configured and its ClickHouse refuses the provisioning DDL
+    When the upgrade runs
+    Then the run is recorded failed naming the reconciler "langwatchql"
+
   @integration
   Scenario: Running an older image marks completed background steps pending again
     Given the ledger records a succeeded upgrade to 3.22.0 with a done background step of 3.22.0
@@ -221,3 +255,12 @@ Feature: The upgrade command
     Then it exits with code 0 naming "trace:backfill-cost" as reopened
     And "trace:backfill-cost" is pending again
     And the ledger reports the rollback after the assertion
+
+  # Alex, 2026-10-09: the old root migrate scripts keep their names but apply nothing on their own.
+  @unit
+  Scenario: The root migrate scripts are aliases of the upgrade command
+    Given the root package.json scripts "prisma:migrate" and "clickhouse:migrate"
+    When either script runs
+    Then it builds the bundles first and runs "task upgrade" in the tasks app
+    And neither script names the "prisma-migrate" or "clickhouse-migrate" task
+    And no CI workflow runs the "prisma-migrate" or "clickhouse-migrate" task

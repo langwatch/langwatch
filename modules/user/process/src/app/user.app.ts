@@ -1,5 +1,6 @@
 /** The User application: one object behind every user door this product opens. */
 import { AuthzApi } from "@langwatch/authz-contract";
+import type { EventingParticipation, OwnEventStore } from "@langwatch/eventing";
 import type { MailSender } from "@langwatch/mail";
 import { NotificationService } from "@langwatch/notification-contract";
 import { createLogger } from "@langwatch/observability";
@@ -66,6 +67,7 @@ import {
 import { userBudgetRequestMailChannels } from "../channels/user-budget-request-mail-channels.registry.ts";
 import type { UserBudgetRequestMailChannel } from "../channels/user-budget-request-mail.channel.ts";
 import type { UserChannels } from "../channels/user.channels.ts";
+import { EventingUserStandingRepository } from "../repositories/eventing/eventing.user-standing.repository.ts";
 import type { UserRateLimitRepository } from "../repositories/user-rate-limit.repository.ts";
 import type { UserRepositories } from "../repositories/user.repositories.ts";
 import { isServableUserAvatar, type ServableUserAvatar } from "../rules/user-avatar-read.rules.ts";
@@ -84,6 +86,11 @@ import {
 import { UserOrganizationDirectoryService } from "../services/user-organization-directory.service.ts";
 import { type UserPasswordHasher, UserPasswordService } from "../services/user-password.service.ts";
 import { UserCredentialService } from "../services/user-signin-credential.service.ts";
+import {
+  UserStandingFactBackfillService,
+  type UserStandingFactBackfillReport,
+  type UserStandingFactBackfillRun,
+} from "../services/user-standing-fact-backfill.service.ts";
 import { UserService } from "../services/user.service.ts";
 
 const logger = createLogger("langwatch:user-app");
@@ -187,6 +194,7 @@ export class UserModule implements UserApi {
     now = nowInstant,
   }: UserTestSetup): UserModule {
     const lifecycle = UserLifecycleNoticeService.create();
+    const lifecycleLog = EventingUserStandingRepository.create();
     const avatarObjects = UserAvatarObjectService.create({
       storedObjects: dependencies.storedObjects,
     });
@@ -205,6 +213,12 @@ export class UserModule implements UserApi {
       lifecycle,
       createdFactBackfill: UserCreatedFactBackfillService.create({
         users: repositories.users,
+        lifecycle,
+      }),
+      lifecycleLog,
+      standingFactBackfill: UserStandingFactBackfillService.create({
+        users: repositories.users,
+        standings: lifecycleLog,
         lifecycle,
       }),
       credentials: UserCredentialService.create({
@@ -228,6 +242,8 @@ export class UserModule implements UserApi {
   readonly #users: UserService;
   readonly #lifecycle: UserLifecycleNoticeService;
   readonly #createdFactBackfill: UserCreatedFactBackfillService;
+  readonly #lifecycleLog: EventingUserStandingRepository;
+  readonly #standingFactBackfill: UserStandingFactBackfillService;
   readonly #credentials: UserCredentialService;
   readonly #account: UserAccountService;
   readonly #peers: UserAppDependencies;
@@ -244,6 +260,8 @@ export class UserModule implements UserApi {
     users: UserService;
     lifecycle: UserLifecycleNoticeService;
     createdFactBackfill: UserCreatedFactBackfillService;
+    lifecycleLog: EventingUserStandingRepository;
+    standingFactBackfill: UserStandingFactBackfillService;
     credentials: UserCredentialService;
     directory: UserOrganizationDirectoryService;
     avatarObjects: UserAvatarObjectService;
@@ -258,6 +276,8 @@ export class UserModule implements UserApi {
     this.#users = input.users;
     this.#lifecycle = input.lifecycle;
     this.#createdFactBackfill = input.createdFactBackfill;
+    this.#lifecycleLog = input.lifecycleLog;
+    this.#standingFactBackfill = input.standingFactBackfill;
     this.#credentials = input.credentials;
     this.#account = UserAccountService.create();
     this.#peers = input.dependencies;
@@ -503,6 +523,21 @@ export class UserModule implements UserApi {
     return this.#createdFactBackfill.recordExisting(input);
   }
 
+  /** Keeps user_lifecycle's own event store as the process builds it; a listing keeps none. */
+  keepLifecycleEventStore(input: {
+    participation: EventingParticipation;
+    eventStore: Pick<OwnEventStore, "read"> | undefined;
+  }): void {
+    this.#lifecycleLog.keep(input);
+  }
+
+  /** The `user:record-standing-facts` step's body: each account's standing re-stated. */
+  recordExistingStandingFacts(
+    input: UserStandingFactBackfillRun,
+  ): Promise<UserStandingFactBackfillReport> {
+    return this.#standingFactBackfill.recordExisting(input);
+  }
+
   /** The fact outbox's delivery, on the worker: one committed fact recorded on user_lifecycle. */
   recordLifecycleFact(intent: UserFactIntent): Promise<void> {
     return this.#lifecycle.record(intent);
@@ -553,15 +588,7 @@ export class UserModule implements UserApi {
 
     if (!allowance.allowed) throw new UserAvatarRateLimitedError();
 
-    const profile = await this.#users.findById({ id: input.userId });
-
-    return this.#users.setAvatar({
-      userId: input.userId,
-      organizationId: input.organizationId,
-      imageDataUrl: input.imageDataUrl,
-      displayName: profile?.name ?? null,
-      displayEmail: profile?.email ?? null,
-    });
+    return this.#users.setAvatar(input);
   }
 
   /** Clears the uploaded avatar so the fallbacks apply again. */

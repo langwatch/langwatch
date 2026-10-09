@@ -34,6 +34,7 @@ import type {
   CreatePasskeyUserRow,
   SetFirstUserPasswordRow,
   UserCreatedRow,
+  UserStandingRow,
   UserDeactivationOutcome,
   UserRepository,
   StoredProfileChange,
@@ -197,6 +198,25 @@ export class PrismaUserRepository
       select: { id: true, createdAt: true },
     });
     return rows.map((row) => ({ id: row.id, createdAt: fromDate(row.createdAt) }));
+  }
+
+  async findStandingPage({
+    afterId,
+    limit,
+  }: {
+    afterId: string | null;
+    limit: number;
+  }): Promise<UserStandingRow[]> {
+    const rows = await this.prisma.user.findMany({
+      where: afterId === null ? {} : { id: { gt: afterId } },
+      orderBy: { id: "asc" },
+      take: limit,
+      select: { id: true, deactivatedAt: true },
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      deactivatedAt: row.deactivatedAt ? fromDate(row.deactivatedAt) : null,
+    }));
   }
 
   async findProfiles(userIds: string[]): Promise<UserFullProfile[]> {

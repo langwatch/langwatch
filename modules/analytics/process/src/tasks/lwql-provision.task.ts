@@ -291,13 +291,16 @@ export interface LwqlConvergencePlan {
 /**
  * Every configured boot converges the whole model, and never throws: a server refusing
  * the DDL degrades to a loud log and a fail-closed endpoint, not a crashloop (ADR-159).
+ * `failOnError` rethrows instead, so the upgrade run fails naming it (Alex, 2026-10-09).
  */
 export async function convergeLwqlAccessModel({
   database,
   plan,
+  failOnError = false,
 }: {
   database: LwqlProvisioningDatabase;
   plan: LwqlConvergencePlan;
+  failOnError?: boolean;
 }): Promise<void> {
   const { request, names, schema } = plan;
   try {
@@ -344,6 +347,7 @@ export async function convergeLwqlAccessModel({
       { error: clickHouseErrorSummary(error) },
       "lwql self-provisioning failed — continuing boot; LangWatchQL queries stay refused (fail-closed) until a later deploy converges",
     );
+    if (failOnError) throw error;
   }
 }
 
@@ -360,8 +364,10 @@ function connectionLimitFields(databaseUrl: string | undefined): { connectionLim
 async function runLwqlProvisioningTask({
   database,
   source,
+  failOnError,
 }: {
   database: LwqlProvisioningDatabase;
+  failOnError: boolean;
   /** The environment the launching process was configured with. */
   source: Record<string, string | undefined>;
 }): Promise<void> {
@@ -380,6 +386,7 @@ async function runLwqlProvisioningTask({
 
   await convergeLwqlAccessModel({
     database,
+    failOnError,
     plan: {
       request: selfProvision,
       names: lwqlProvisioning.names({ connection: selfProvision.connection }),
@@ -411,6 +418,7 @@ export class LwqlProvisionTask extends Task {
       database: () => LwqlProvisioningDatabase;
       source: Record<string, string | undefined>;
       skipped: boolean;
+      failOnError: boolean;
     },
   ) {
     super();
@@ -425,13 +433,16 @@ export class LwqlProvisionTask extends Task {
     database,
     source,
     skipped = false,
+    failOnError = false,
   }: {
     database: () => LwqlProvisioningDatabase;
     /** The environment the launching process was configured with. */
     source: Record<string, string | undefined>;
     skipped?: boolean;
+    /** The upgrade's reconciler fails its run on a refusal; boot keeps the default. */
+    failOnError?: boolean;
   }): LwqlProvisionTask {
-    return new LwqlProvisionTask({ database, source, skipped });
+    return new LwqlProvisionTask({ database, source, skipped, failOnError });
   }
 
   async run(_input: { args: readonly string[]; signal: AbortSignal }): Promise<void> {
@@ -442,6 +453,7 @@ export class LwqlProvisionTask extends Task {
     await runLwqlProvisioningTask({
       database: this.inputs.database(),
       source: this.inputs.source,
+      failOnError: this.inputs.failOnError,
     });
   }
 }

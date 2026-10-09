@@ -25,6 +25,22 @@ const SCHEDULE_SEED_DONE_KEY = "topic-clustering:schedule-seed:v1:done";
 /** Projects fetched (and bootstrapped) per round-trip. */
 const SCHEDULE_SEED_PAGE_SIZE = 500;
 
+/** What a ledger seed step reads from its checkpoint and saves after each committed page. */
+export type TopicSeedStepInput = {
+  afterId: string | null;
+  dryRun: boolean;
+  signal: AbortSignal;
+  onPage: (report: TopicSeedStepReport) => Promise<void>;
+};
+
+export type TopicSeedStepReport = {
+  afterId: string | null;
+  seeded: number;
+  skipped: number;
+  failed: number;
+  dryRun: boolean;
+};
+
 interface TopicClusteringBackfillSummary {
   /** Bootstrap request accepted for a project that had no scheduled wake. */
   succeeded: number;
@@ -138,6 +154,108 @@ export class LegacyImportTopicClusteringMigration {
       // is the contract.
       await this.releaseSeedClaim(TOPICS_SEED_CLAIM_KEY);
     }
+  }
+
+  /**
+   * The ledger step's topic-model pass: resumes after `afterId`, saves after each clean page and
+   * never past a failed project, so a retry reaches it again. A dry run counts unowned projects.
+   */
+  async seedTopicModelHistoryStep(input: TopicSeedStepInput): Promise<TopicSeedStepReport> {
+    return this.walkSeedStep({
+      input,
+      findPage: (afterId) =>
+        this.repository.findProjectsWithTopicsPage({ afterId, take: TOPICS_SEED_PAGE_SIZE }),
+      seedPage: async (page) => {
+        if (!input.dryRun) return this.seedTopicModelPage(page);
+        const owned = new Set(
+          await this.repository.findOwnedTopicModelProjectIds(page.map((project) => project.id)),
+        );
+        const seeded = page.filter((project) => !owned.has(project.id)).length;
+        return { seeded, skipped: page.length - seeded, failed: 0 };
+      },
+    });
+  }
+
+  /** The ledger step's schedule pass: bootstraps each eligible project with no scheduled wake. */
+  async seedClusteringSchedulesStep(input: TopicSeedStepInput): Promise<TopicSeedStepReport> {
+    return this.walkSeedStep({
+      input,
+      findPage: (afterId) =>
+        this.repository.findEligibleProjectsPage({
+          afterId,
+          take: this.schedulePageSize ?? SCHEDULE_SEED_PAGE_SIZE,
+        }),
+      seedPage: async (page) => {
+        const tally = { seeded: 0, skipped: 0, failed: 0 };
+        for (const project of page) {
+          const outcome = await this.seedProjectScheduleIsolated({
+            projectId: project.id,
+            dryRun: input.dryRun,
+          });
+          tally[outcome]++;
+        }
+        return tally;
+      },
+    });
+  }
+
+  private async seedProjectScheduleIsolated({
+    projectId,
+    dryRun,
+  }: {
+    projectId: string;
+    dryRun: boolean;
+  }): Promise<"seeded" | "skipped" | "failed"> {
+    if ((await this.schedule.findNextWakeAt({ projectId })) !== null) return "skipped";
+    if (dryRun) return "seeded";
+    try {
+      await this.commands.requestClustering({
+        tenantId: projectId,
+        occurredAt: nowInstant().epochMilliseconds,
+        trigger: "bootstrap",
+      });
+      return "seeded";
+    } catch (error) {
+      scheduleLogger.error({ error, projectId }, "Topic clustering bootstrap failed for project");
+      return "failed";
+    }
+  }
+
+  private async walkSeedStep({
+    input,
+    findPage,
+    seedPage,
+  }: {
+    input: TopicSeedStepInput;
+    findPage: (afterId: string | null) => Promise<readonly { id: string }[]>;
+    seedPage: (
+      page: readonly { id: string }[],
+    ) => Promise<{ seeded: number; skipped: number; failed: number }>;
+  }): Promise<TopicSeedStepReport> {
+    const report: TopicSeedStepReport = {
+      afterId: input.afterId,
+      seeded: 0,
+      skipped: 0,
+      failed: 0,
+      dryRun: input.dryRun,
+    };
+    while (!input.signal.aborted) {
+      const page = await findPage(report.afterId);
+      const last = page.at(-1);
+      if (!last) break;
+      const tally = await seedPage(page);
+      report.seeded += tally.seeded;
+      report.skipped += tally.skipped;
+      report.failed += tally.failed;
+      report.afterId = last.id;
+      if (!input.dryRun && report.failed === 0) await input.onPage({ ...report });
+    }
+    if (report.failed > 0) {
+      throw new Error(
+        `${report.failed} projects could not be seeded; retry the step to reach them`,
+      );
+    }
+    return report;
   }
 
   private async runTopicModelSeedPass(): Promise<{ seeded: number; skipped: number }> {

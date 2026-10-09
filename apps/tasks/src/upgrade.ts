@@ -11,10 +11,16 @@ import {
   runMigrations,
   type GooseOptions,
 } from "@langwatch/clickhouse-migrations";
+import type { EventUpcastReader } from "@langwatch/eventing";
 import { READ_HINT_BROADCAST_CHANNEL } from "@langwatch/eventing/server";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
-import { imageSteps, type UpgradeClickHouse, type UpgradePostgres } from "@langwatch/upgrade";
+import {
+  imageSteps,
+  type UpcastStepInput,
+  type UpgradeClickHouse,
+  type UpgradePostgres,
+} from "@langwatch/upgrade";
 import { IMAGE_MIGRATION_DIRECTORIES, readImageTree } from "@langwatch/upgrade/gate";
 import {
   compareReleases,
@@ -491,7 +497,7 @@ function reconcilers({ input }: { input: TaskInput }): UpgradeReconciler[] {
           verbose: true,
         }),
     })),
-    { name: "langwatchql", run: () => lwqlProvision(input) },
+    { name: "langwatchql", run: () => lwqlProvision({ ...input, failOnError: true }) },
   ];
 }
 
@@ -580,14 +586,35 @@ function writeLine({
   logger[line.level](line.fields, line.message);
 }
 
-/** Hands `use` the steps the installed modules declare, then closes the process that built them. */
+/**
+ * Hands `use` the steps the installed modules declare and, where the process holds an event log,
+ * their upcasts; then closes the process that built them.
+ */
 export type DeclaredCodeSteps = <Result>(
-  use: (steps: readonly (MigrationStep | TenantMigrationStep)[]) => Promise<Result>,
+  use: (declared: {
+    steps: readonly (MigrationStep | TenantMigrationStep)[];
+    upcasts?: () => Promise<readonly UpcastStepInput[]>;
+  }) => Promise<Result>,
 ) => Promise<Result>;
 
-/** The tasks process's `.withMigrations` steps (round 14: the framework runs them). */
+/** The tasks process's `.withMigrations` steps (round 14) and event upcasts (Alex, 2026-10-09). */
 export const installedCodeSteps: DeclaredCodeSteps = (use) =>
-  withTasksApp({ use: (app) => use(app.migrationSteps(isDeclaredMigrationStep)) });
+  withTasksApp({
+    use: (app) =>
+      use({ steps: app.migrationSteps(isDeclaredMigrationStep), upcasts: upcastStepsOf({ app }) }),
+  });
+
+/** The declared event upcasts as ledger rows (§9); none where the process holds no event log. */
+export function upcastStepsOf({
+  app,
+}: {
+  app: { upcastReader(): Pick<EventUpcastReader, "findActiveUpcasts"> | undefined };
+}): () => Promise<UpcastStepInput[]> {
+  return async () => {
+    const active = (await app.upcastReader()?.findActiveUpcasts()) ?? [];
+    return active.map(({ id, storedEvents, ...report }) => ({ id, storedEvents, report }));
+  };
+}
 
 /** A declared step as the image's tree names it: its owner is the module its id starts with. */
 export function codeStepOf(step: MigrationStep | TenantMigrationStep): ManifestStep {
@@ -626,7 +653,9 @@ export async function runUpgradeCommand({
     if (!database) throw new Error("DATABASE_URL is required to upgrade");
     return runPreRosterCommand({ command: command.command, postgres: database.sql, write });
   }
-  return codeSteps((steps) => runWithCodeSteps({ command, input, write, steps }));
+  return codeSteps(({ steps, upcasts }) =>
+    runWithCodeSteps({ command, input, write, steps, upcasts }),
+  );
 }
 
 /** Records one override for writers before the roster; no lease and no module boot. Exit 0. */
@@ -664,11 +693,13 @@ async function runWithCodeSteps({
   input,
   write,
   steps,
+  upcasts,
 }: {
   command: UpgradeCommand;
   input: TaskInput;
   write: (text: string) => void;
   steps: readonly (MigrationStep | TenantMigrationStep)[];
+  upcasts: (() => Promise<readonly UpcastStepInput[]>) | undefined;
 }): Promise<number> {
   const database = input.connections.database;
   if (!database) throw new Error("DATABASE_URL is required to upgrade");
@@ -707,6 +738,7 @@ async function runWithCodeSteps({
       identity: { image: newest ?? "unreleased", host: hostname() },
       log: runnerLog(),
       hints: readHints({ input }),
+      ...(upcasts === undefined ? {} : { upcasts }),
     });
     if (command.command === "status") {
       const status = await runner.status();

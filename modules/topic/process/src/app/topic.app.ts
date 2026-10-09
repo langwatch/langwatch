@@ -25,7 +25,11 @@ import {
 } from "../eventing/topic-clustering-processing.pipeline.ts";
 import { TopicClusteringRunner } from "../eventing/topic-clustering-runner.intent.ts";
 import { classifyClusteringError } from "../eventing/topic-clustering.intent.ts";
-import { LegacyImportTopicClusteringMigration } from "../migrations/legacy-import.topic-clustering.migration.ts";
+import {
+  LegacyImportTopicClusteringMigration,
+  type TopicSeedStepInput,
+  type TopicSeedStepReport,
+} from "../migrations/legacy-import.topic-clustering.migration.ts";
 import type { TopicRepositories } from "../repositories/topic.repositories.ts";
 import { TopicClusteringBootstrapService } from "../services/topic-clustering-bootstrap.service.ts";
 import {
@@ -65,6 +69,7 @@ export class TopicModule implements TopicApi, TopicBrowserApi {
   readonly #manualRun: TopicClusteringManualRunService;
   readonly #trigger: TopicClusteringTriggerService;
   readonly #pipeline: TopicClusteringProcessingPipelineDefinition;
+  readonly #seeds: LegacyImportTopicClusteringMigration;
 
   private constructor(parts: {
     topics: TopicService;
@@ -73,6 +78,7 @@ export class TopicModule implements TopicApi, TopicBrowserApi {
     outcomes: EventingTopicClusteringOutcomeCommandsService;
     manualRun: TopicClusteringManualRunService;
     pipeline: TopicClusteringProcessingPipelineDefinition;
+    seeds: LegacyImportTopicClusteringMigration;
   }) {
     this.#trigger = TopicClusteringTriggerService.create({
       clustering: this,
@@ -86,6 +92,17 @@ export class TopicModule implements TopicApi, TopicBrowserApi {
     this.#outcomes = parts.outcomes;
     this.#manualRun = parts.manualRun;
     this.#pipeline = parts.pipeline;
+    this.#seeds = parts.seeds;
+  }
+
+  /** The `topic:seed-topic-model-history` ledger step's pass, through the connected pipeline. */
+  seedTopicModelHistoryStep(input: TopicSeedStepInput): Promise<TopicSeedStepReport> {
+    return this.#seeds.seedTopicModelHistoryStep(input);
+  }
+
+  /** The `topic:seed-clustering-schedules` ledger step's pass. */
+  seedClusteringSchedulesStep(input: TopicSeedStepInput): Promise<TopicSeedStepReport> {
+    return this.#seeds.seedClusteringSchedulesStep(input);
   }
 
   static create(setup: TopicSetup): TopicModule {
@@ -122,6 +139,7 @@ export class TopicModule implements TopicApi, TopicBrowserApi {
       commands,
       outcomes,
       manualRun: TopicClusteringManualRunService.create({ runner }),
+      seeds: migration,
       pipeline: createTopicClusteringProcessingPipeline({
         topicClusteringRunStatusStore: repositories.runStatus,
         topicClusteringRunHistoryStore: repositories.runHistory,

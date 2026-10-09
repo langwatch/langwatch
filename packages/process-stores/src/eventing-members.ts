@@ -13,6 +13,7 @@ import {
   type EventSourcingOptions,
   type EventStore,
   EventStoreProducerOnly,
+  EventUpcastReader,
   pipelineUpcastsOf,
   type ProcessStore,
   replayLeanOf,
@@ -125,7 +126,19 @@ export function buildEventing(options: {
         }),
   });
 
-  return { value: eventing, close: () => eventing.close() };
+  const eventLogMembers = options.eventLog;
+  // The kernel's eventing host reads it by name; the tasks role hands it to the upgrade (§9).
+  const value =
+    eventLogMembers === undefined
+      ? eventing
+      : Object.assign(eventing, {
+          upcastReader: () =>
+            upcastReaderOver({
+              clickhouse: eventLogMembers.clickhouse,
+              definitions: eventing.definitions,
+            }),
+        });
+  return { value, close: () => eventing.close() };
 }
 
 /**
@@ -211,6 +224,26 @@ function replayEngineOver({
       },
     };
   };
+}
+
+/**
+ * The declared upcasts, counted on the raw event log: the upcast-wrapped replay source answers
+ * stored types as current ones (Alex, 2026-10-09).
+ */
+function upcastReaderOver({
+  clickhouse,
+  definitions,
+}: {
+  readonly clickhouse: ClickHouseQueryClient;
+  readonly definitions: EventSourcing["definitions"];
+}): EventUpcastReader {
+  return EventUpcastReader.create({
+    upcasts: pipelineUpcastsOf(definitions),
+    coverage: new EventingClickHouseReplayEventSource({
+      clickhouse,
+      lean: replayLeanOf(definitions),
+    }),
+  });
 }
 
 /** Where this role appends: a producer refuses reads, a draining role reads the event log. */

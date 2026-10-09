@@ -165,11 +165,15 @@ describe("given ops's system-migrations declaration", () => {
     /** @scenario "A fleet with nothing to re-drive does not sweep" */
     it("asks the stored state and runs no pass", async () => {
       const hasTenantAwaitingRedrive = vi.fn(async () => false);
-      const service = passes({ hasTenantAwaitingRedrive });
+      const runPass = vi.fn(async () => PASS);
+      const service = passes({ hasTenantAwaitingRedrive, runPass });
+      const { process } = built((input) => service.executePass(input));
 
-      await deliver(built((input) => service.executePass(input)).process, true);
+      await deliver(process, true);
+      await deliver(process, true);
 
       expect(hasTenantAwaitingRedrive).toHaveBeenCalledOnce();
+      expect(runPass).toHaveBeenCalledOnce();
     });
   });
 

@@ -19,6 +19,7 @@ export type MemoryWebhookEndpointRow = {
   sqsSecretAccessKeyEncrypted: string | null;
   secretEncrypted: string;
   signatureScheme?: WebhookSignatureScheme | null;
+  idempotencyKey?: string | null;
   previousSecretEncrypted: string | null;
   previousSecretExpiresAt: Instant | null;
   enabledEvents: string[];

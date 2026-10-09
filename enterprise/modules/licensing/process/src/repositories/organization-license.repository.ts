@@ -45,13 +45,16 @@ export type LicenseColumns = Readonly<{
 export type OrganizationLicensePair = Readonly<{
   organizationId: string;
   columns: LicenseColumns;
+  /** When organization's row was last written, for any reason. */
+  columnsUpdatedAt: Instant;
   own: LicenseColumns | null;
+  ownUpdatedAt: Instant | null;
 }>;
 
 /**
- * Licensing's own licence rows (round 37 D6). Until the copy step has run, an
- * organization with no row is read from organization's columns, which stay
- * written through `setLicense` and `clearLicense` until organization reads here.
+ * Licensing's own licence rows (round 37 D6). While dual writes last, an
+ * organization is read from organization's columns where it has no row or its
+ * columns were written after the row (`isOrganizationNewer`).
  */
 export interface OrganizationLicenseRepository extends OrganizationLicenseReads {
   organizationExists(organizationId: string): Promise<boolean>;
@@ -73,8 +76,8 @@ export interface OrganizationLicenseRepository extends OrganizationLicenseReads 
     input: Readonly<{ afterOrganizationId: string | null; limit: number }>,
   ): Promise<OrganizationLicensePair[]>;
   /**
-   * Writes each pair's columns only where its row is still `own` and organization's
-   * columns are still `columns`, so a newer write on either side is kept.
+   * Writes each pair's columns only where its row is still `own` as of `ownUpdatedAt`
+   * and organization's columns are still `columns`, so a newer write on either side is kept.
    */
   overwriteLicenses(
     input: Readonly<{ pairs: readonly OrganizationLicensePair[] }>,

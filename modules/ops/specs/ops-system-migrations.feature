@@ -29,6 +29,22 @@ Feature: Ops runs the system migration passes and names their cohorts
     And once a later pass leaves no tenant held, the row is settled
 
   @unit
+  Scenario: The worker's re-drive discovers a tenant migration no pass has run
+    Given an installation where no parked or held tenant exists
+    And an automatic tenant migration, registered or declared, that no tenant has met yet
+    When the worker's hourly re-drive wakes
+    Then it runs a pass, so a fresh install or a new release's migration is picked up
+    And a declared tenant step with a parked tenant is re-driven beside its finalised ones
+
+  @unit
+  Scenario: A latched fleet skips the worker's re-drive
+    Given every automatic tenant migration has a finalised or rolled-back tenant
+    And no tenant is parked or held
+    And a cloud migration still soaking has no enrolled organization
+    When the worker's hourly re-drive wakes
+    Then no pass runs
+
+  @unit
   Scenario: An organization that finished an ops-held migration does not run it again after its owner declares it
     Given organization "acme" finished the Slack connections migration under ops' legacy name
     And organization "beta" was rolled back from it and organization "gamma" is still held
@@ -44,3 +60,11 @@ Feature: Ops runs the system migration passes and names their cohorts
     When the upgrade runs the blocking step that copies the migration's state to automation's step
     Then "acme" is enrolled under automation's step and "delta" keeps its one enrolment there
     And the legacy enrolments are left in place, and a second run copies nothing
+
+  @unit
+  Scenario: Each worker process finishes an interrupted pass on its first re-drive
+    Given a pass died part-way, so the stored state reads latched while some tenants have no row
+    When a worker process's first hourly re-drive wakes
+    Then it runs a pass without asking the stored state
+    And its later re-drives ask the stored state first
+    And a first pass that fails leaves the next re-drive ungated too

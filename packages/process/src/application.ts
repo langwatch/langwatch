@@ -1,5 +1,5 @@
 import { type BoundTransportFacts, type TransportPeers } from "@langwatch/api";
-import { type FeatureEventing } from "@langwatch/eventing";
+import { type EventUpcastReader, type FeatureEventing } from "@langwatch/eventing";
 import {
   type DependencyToken,
   type FeatureApiIdentity,
@@ -111,6 +111,8 @@ export class BootedRuntime<Members, Rest = never, Trpc = never> {
    * everything mounted. Absent in every role that serves no requests, and in a test.
    */
   readonly handler: unknown;
+  /** This role's event-sourcing runtime, where it holds one. */
+  private readonly eventing: EventingHost | undefined;
 
   constructor({
     name,
@@ -124,6 +126,7 @@ export class BootedRuntime<Members, Rest = never, Trpc = never> {
     services,
     declaredBy = new Map(),
     handler = void 0,
+    eventing = void 0,
   }: {
     name: string;
     role: ServerRole;
@@ -136,6 +139,7 @@ export class BootedRuntime<Members, Rest = never, Trpc = never> {
     services: readonly RuntimeService[];
     declaredBy?: ReadonlyMap<unknown, string>;
     handler?: unknown;
+    eventing?: EventingHost | undefined;
   }) {
     this.name = name;
     this.role = role;
@@ -146,6 +150,7 @@ export class BootedRuntime<Members, Rest = never, Trpc = never> {
     this.contributions = contributions;
     this.declaredBy = declaredBy;
     this.handler = handler;
+    this.eventing = eventing;
     this.lifecycle = new RuntimeLifecycle(services, scope);
     this.services = services;
   }
@@ -183,6 +188,14 @@ export class BootedRuntime<Members, Rest = never, Trpc = never> {
   ): readonly Step[] {
     const { name, role, installed } = this;
     return migrationStepsOf({ process: name, role, installed, isMigrationStep });
+  }
+
+  /**
+   * The declared event upcasts and the stored events each still covers, for the upgrade ledger
+   * (§9; Alex, 2026-10-09). Undefined where this role holds no event log.
+   */
+  upcastReader(): EventUpcastReader | undefined {
+    return this.eventing?.upcastReader?.();
   }
 
   /**
@@ -597,6 +610,7 @@ export class ApplicationBuilder<
       services: [...featureServices, ...this.state.services, ...consumers],
       declaredBy: contributions.declaredBy,
       handler,
+      eventing,
     });
   }
 

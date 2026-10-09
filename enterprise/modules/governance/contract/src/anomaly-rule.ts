@@ -88,6 +88,8 @@ export const webhookDestinationSchema = z
         message: "url must use the https scheme",
       }),
     sharedSecret: z.string().min(1).max(512).optional(),
+    /** Set by the destination migration: delivery goes through this endpoint (Alex, 2026-10-09). */
+    endpointId: z.string().min(1).optional(),
   })
   .strict();
 /** One of the organisation's registered webhook endpoints, delivered via WebhookApi (ADR-167). */

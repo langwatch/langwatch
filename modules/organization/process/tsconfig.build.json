@@ -27,9 +27,6 @@
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {
-      "path": "../../api-key/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/authorization/tsconfig.build.json"
     },
     {
@@ -106,6 +103,9 @@
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/upgrade/tsconfig.build.json"
     }
   ]
 }

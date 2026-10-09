@@ -7,6 +7,7 @@ import {
   PipelineEventStore,
   type EventingParticipation,
   type EventStore,
+  type EventUpcastReader,
   type FeatureEventingSetup,
   type FeatureEventing,
   type OwnEventLog,
@@ -142,6 +143,8 @@ export interface EventingHost {
   readonly definitions?: readonly SealedPipelineDefinition[] | undefined;
   /** Opens one replay run's engine over the event log; absent where the role holds no log. */
   replayEngine?(): ProjectionReplayEngine | undefined;
+  /** The declared upcasts over the event log; absent where the role holds no log. */
+  upcastReader?(): EventUpcastReader;
 }
 
 /** One replay run's engine, opened by the eventing member and closed when the run ends. */
@@ -349,6 +352,9 @@ export function eventingHostFrom(pool: unknown, role: ServerRole): EventingHost 
       : {}),
     ...(typeof host.replayEngine === "function"
       ? { replayEngine: host.replayEngine.bind(candidate) }
+      : {}),
+    ...(typeof host.upcastReader === "function"
+      ? { upcastReader: host.upcastReader.bind(candidate) }
       : {}),
     ...consumerControls(host, candidate),
   };

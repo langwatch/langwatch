@@ -102,6 +102,19 @@ export const opsProcessModule: PublishedProcessModule<"ops", OpsApi, OpsServerCo
             : { copied, enrolmentsCopied };
         },
       }),
+      // The fresh-install wait for a first user stays on ops_platform_operator_seed
+      // (Alex, 2026-10-09).
+      defineMigrationStep({
+        id: "ops:seed-platform-operators",
+        kind: "data",
+        mode: "background",
+        description:
+          "Grants the platform-operator role to the verified users a still-set ADMIN_EMAILS names, while nobody holds it.",
+        run: async ({ dryRun }) => {
+          const granted = await app.seedPlatformOperatorsFromAdminEmails({ dryRun });
+          return dryRun ? { wouldGrant: granted } : { granted };
+        },
+      }),
     ]);
 
 /** One request's presented project credential, unverified, or none at all. */

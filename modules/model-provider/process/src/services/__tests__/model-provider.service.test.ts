@@ -70,6 +70,9 @@ class Providers implements ModelProviderRepository {
   }
 
   async updateLegacyColumns(): Promise<void> {}
+  async updateLegacyColumnsIfUnchanged(): Promise<boolean> {
+    return false;
+  }
 
   async countUsage(): Promise<{ providers: string[] }> {
     return { providers: [] };

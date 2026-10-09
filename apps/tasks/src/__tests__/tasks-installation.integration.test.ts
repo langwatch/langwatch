@@ -146,21 +146,15 @@ describe("the tasks process installation", () => {
     try {
       const names = runtime.tasks(isTask).map((task) => task.name);
       expect(names).toEqual([
-        "backfill-http-agent-credentials-to-secrets",
         "backfill-annotations-to-clickhouse",
         "clear-stale-pending-sso-setup",
         "slack-alert",
-        "report-schedule-backfill",
-        "usage-billing-catch-up",
         "tiered-free-to-seat-event",
         "stripe-prices-sync",
-        "dataset-content-backfill",
         "demo-data",
         "trace-destination-report",
-        "instant-eval-judge-spend-catch-up",
         "generate-license",
         "model-registry-sync",
-        "model-provider-migrate-credentials",
         "model-provider-migrate-custom-models",
         "process-manager-purge",
         "credentials-reseal",
@@ -170,12 +164,23 @@ describe("the tasks process installation", () => {
         "backfill-project-created",
         "backfill-project-presence-setting",
         "backfill-project-department-assigned",
-        "stalled-runs-backfill",
         "topic-clustering-run",
         "user-data-erase",
         "webhook-signature-vectors",
-        "backfill-http-credentials-to-secrets",
       ]);
+    } finally {
+      await runtime.stop();
+    }
+  });
+
+  /** @scenario "No module task runs a catch-up step's code" */
+  it("lists no task that runs the usage-billing or the spend catch-up step", async () => {
+    const { runtime } = await bootTasks();
+
+    try {
+      const names = runtime.tasks(isTask).map((task) => task.name);
+      expect(names).not.toContain("usage-billing-catch-up");
+      expect(names).not.toContain("instant-eval-judge-spend-catch-up");
     } finally {
       await runtime.stop();
     }

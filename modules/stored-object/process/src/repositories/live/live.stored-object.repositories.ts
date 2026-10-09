@@ -2,6 +2,7 @@ import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { RateLimiter } from "@langwatch/process-stores";
 import type { Encryption, ObjectStorage } from "@langwatch/process-stores/members";
 
+import { ClickHouseStoredObjectLegacySourceRepository } from "../clickhouse/clickhouse.stored-object-legacy-source.repository.ts";
 import {
   ClickHouseStoredObjectsRepository,
   RoutedStoredObjectsClickHouse,
@@ -40,12 +41,12 @@ export class LiveStoredObjectRepositories {
     encryption: Encryption;
     rateLimiter: RateLimiter;
   }>): StoredObjectRepositories {
+    const legacyClickHouse = RoutedStoredObjectsClickHouse.create(clickhouse);
     return {
       ...PostgresStoredObjectRepositories.create({ prisma }),
       bytes: ObjectStorageStoredObjectBytesRepository.create({ objectStorage }),
-      legacyIndex: ClickHouseStoredObjectsRepository.create(
-        RoutedStoredObjectsClickHouse.create(clickhouse),
-      ),
+      legacyIndex: ClickHouseStoredObjectsRepository.create(legacyClickHouse),
+      legacySource: ClickHouseStoredObjectLegacySourceRepository.create(legacyClickHouse),
       legacyStorage: ObjectStorageStoredObjectLegacyStorageRepository.create(objectStorage),
       rateLimits: RedisStoredObjectRateLimitRepository.create(rateLimiter),
       seals: EncryptionStoredObjectSealRepository.create(encryption),

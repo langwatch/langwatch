@@ -1159,6 +1159,7 @@ export const prismaModelFieldCatalogue = {
     "sqsSecretAccessKeyEncrypted",
     "secretEncrypted",
     "signatureScheme",
+    "idempotencyKey",
     "previousSecretEncrypted",
     "previousSecretExpiresAt",
     "enabledEvents",

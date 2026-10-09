@@ -220,7 +220,22 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRepositor
     maxInFlight?: number;
     signatureScheme?: WebhookSignatureScheme;
     sharedSecret?: string;
+    idempotencyKey?: string;
   }): Promise<{ endpoint: WebhookEndpointView; secret: string }> {
+    const repeated = this.#database
+      .endpoints()
+      .find(
+        (row) =>
+          params.idempotencyKey !== undefined &&
+          row.organizationId === params.organizationId &&
+          row.idempotencyKey === params.idempotencyKey,
+      );
+    if (repeated) {
+      return {
+        endpoint: toView(repeated),
+        secret: this.#options.secrets.decrypt(repeated.secretEncrypted),
+      };
+    }
     const destinationKind = params.destinationKind ?? "http";
     const destination = storedDestination(params, this.#options.secrets);
     const secret = params.sharedSecret ?? newSecret();
@@ -241,6 +256,7 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRepositor
       lastSuccessAt: null,
       lastFailureAt: null,
       signatureScheme: params.signatureScheme ?? null,
+      idempotencyKey: params.idempotencyKey ?? null,
       maxBatchSize: params.signatureScheme !== undefined ? 1 : (params.maxBatchSize ?? 100),
       maxBatchDelayMs: params.maxBatchDelayMs ?? 250,
       maxInFlight: params.maxInFlight ?? 4,
@@ -372,6 +388,7 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRepositor
       ...endpoint,
       archivedAt: nowInstant(),
       status: "DISABLED",
+      idempotencyKey: null,
       updatedAt: nowInstant(),
     });
   }

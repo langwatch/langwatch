@@ -27,6 +27,7 @@ type Seed = Readonly<{
   licenseKey: string | null;
   expiresAt?: Instant | null;
   validatedAt?: Instant | null;
+  updatedAt?: Instant;
 }>;
 
 type Backend = Readonly<{
@@ -39,6 +40,8 @@ type Backend = Readonly<{
 
 const EXPIRES = fromDate(new Date("2031-02-03T04:05:06.000Z"));
 const VALIDATED = fromDate(new Date("2030-01-02T03:04:05.000Z"));
+/** Organization's row written after any row the cases save. */
+const LATER = fromDate(new Date("2099-01-01T00:00:00.000Z"));
 
 /** Instants compare by value, so the cases read them as strings. */
 const view = (columns: LicenseColumns | null) =>
@@ -103,6 +106,34 @@ function contractCases(backend: Backend): void {
       mine(organizationId),
     );
     expect(scanned).toEqual([{ organizationId: id("a"), licenseKey: "own-key" }]);
+  });
+
+  it("reads organization's columns where they were written after the row, scan included", async () => {
+    const repository = await backend.seed({
+      [id("a")]: { licenseKey: "column-key" },
+      [id("b")]: { licenseKey: "column-key" },
+    });
+    const own = { licenseKey: "own-key", expiresAt: EXPIRES, validatedAt: null };
+    await repository.saveLicense({ organizationId: id("a"), license: own });
+    await repository.saveLicense({ organizationId: id("b"), license: own });
+
+    await backend.writeColumns({
+      organizationId: id("a"),
+      columns: { licenseKey: "newer-key", updatedAt: LATER },
+    });
+    await backend.writeColumns({
+      organizationId: id("b"),
+      columns: { licenseKey: null, updatedAt: LATER },
+    });
+
+    await expect(repository.getOrganizationLicense(id("a"))).resolves.toEqual({
+      licenseKey: "newer-key",
+    });
+    await expect(repository.getOrganizationLicense(id("b"))).resolves.toEqual({ licenseKey: null });
+    const scanned = (await repository.findOrganizationsWithLicense()).filter(({ organizationId }) =>
+      mine(organizationId),
+    );
+    expect(scanned).toEqual([{ organizationId: id("a"), licenseKey: "newer-key" }]);
   });
 
   it("keeps a cleared licence cleared, never reading the column's key back", async () => {
@@ -288,7 +319,11 @@ function contractCases(backend: Backend): void {
     await backend.writeColumns({ organizationId: id("a"), columns: newer });
     const after = await repository.findLicensePairs(page);
     // Organization's columns as read before the write, licensing's row as read after it.
-    const pairs = before.map((pair, index) => ({ ...pair, own: after[index]?.own ?? null }));
+    const pairs = before.map((pair, index) => ({
+      ...pair,
+      own: after[index]?.own ?? null,
+      ownUpdatedAt: after[index]?.ownUpdatedAt ?? null,
+    }));
     expect(pairs.map(viewPair)).toEqual([
       {
         organizationId: id("a"),
@@ -344,6 +379,7 @@ const licenseData = (columns: Seed) => ({
   license: columns.licenseKey,
   licenseExpiresAt: columns.expiresAt ? toDate(columns.expiresAt) : null,
   licenseLastValidatedAt: columns.validatedAt ? toDate(columns.validatedAt) : null,
+  ...(columns.updatedAt === undefined ? {} : { updatedAt: toDate(columns.updatedAt) }),
 });
 
 describe.skipIf(!TEST_DATABASE_URL)("given the licence Postgres repository", () => {

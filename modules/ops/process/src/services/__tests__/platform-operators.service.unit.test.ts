@@ -466,3 +466,53 @@ describe("PlatformOperatorsService", () => {
     });
   });
 });
+
+describe("PlatformOperatorsService.seedFromAdminEmails", () => {
+  const settings = { adminEmails: ["ada@acme.com", "bob@acme.com"], cloud: false };
+  const users = [user("ada"), user("bob", { emailVerified: false })];
+
+  describe("given nobody holds the grant and ADMIN_EMAILS names a verified and an unverified user", () => {
+    /** @scenario "The upgrade step grants the verified users a still-set ADMIN_EMAILS names" */
+    it("grants only the verified user, as the system, with source migration", async () => {
+      const { service, granted } = world({ users });
+
+      await expect(service.seedFromAdminEmails({ settings, dryRun: false })).resolves.toBe(1);
+
+      expect(granted).toEqual([
+        expect.objectContaining({
+          principal: { type: "user", id: "ada" },
+          caller: { type: "system" },
+          actor: PLATFORM_OPERATOR_SEED_ACTOR,
+          source: "migration",
+        }),
+      ]);
+    });
+
+    /** @scenario "The upgrade step grants the verified users a still-set ADMIN_EMAILS names" */
+    it("grants nobody on a dry run and counts the one it would grant", async () => {
+      const { service, granted } = world({ users });
+
+      await expect(service.seedFromAdminEmails({ settings, dryRun: true })).resolves.toBe(1);
+      expect(granted).toEqual([]);
+    });
+  });
+
+  describe("given any case the seed's wait decides", () => {
+    /** @scenario "The upgrade step leaves every other case to the seed's wait" */
+    it.each([
+      { case: "a holder exists", holders: [holder("carol")], step: settings },
+      { case: "ADMIN_EMAILS is empty", holders: [], step: { adminEmails: [], cloud: false } },
+      {
+        case: "no named user is verified",
+        holders: [],
+        step: { ...settings, adminEmails: ["bob@acme.com"] },
+      },
+      { case: "the hosted service", holders: [], step: { ...settings, cloud: true } },
+    ])("grants nobody when $case", async ({ holders, step }) => {
+      const { service, granted } = world({ users, holders });
+
+      await expect(service.seedFromAdminEmails({ settings: step, dryRun: false })).resolves.toBe(0);
+      expect(granted).toEqual([]);
+    });
+  });
+});

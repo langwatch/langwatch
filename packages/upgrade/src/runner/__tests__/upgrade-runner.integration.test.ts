@@ -847,4 +847,34 @@ describe.skipIf(!DB_URL)("the upgrade runner", () => {
       expect(order).toEqual(["schema 3.22.0"]);
     });
   });
+
+  describe("when the image declares event upcasts", () => {
+    const upcast = (storedEvents: number) => [
+      { id: "upcast:entitlement:lw.usage.month_counted", storedEvents, report: {} },
+    ];
+
+    /** @scenario "An upgrade run records each declared event upcast in the ledger" */
+    it("records each upcast as a background event-upcast step after the schema", async () => {
+      const applier = fakeApplier({ release: "3.21.0" });
+      const outcome = await run(
+        runnerFor({ release: "3.21.0", applier, upcasts: async () => upcast(2) }),
+      );
+      expect(outcome.code).toBe("done");
+      const step = (await ledger().findSteps()).find((s) => s.id === upcast(0)[0]?.id);
+      expect(step).toMatchObject({ kind: "event-upcast", mode: "background", status: "pending" });
+      await run(runnerFor({ release: "3.21.0", applier, upcasts: async () => upcast(0) }));
+      expect(await statusOf("upcast:entitlement:lw.usage.month_counted")).toBe("done");
+    });
+
+    /** @scenario "An upgrade run that cannot count an upcast's stored events fails" */
+    it("fails the run when the upcasts cannot be read", async () => {
+      const applier = fakeApplier({ release: "3.21.0" });
+      const upcasts = async () => {
+        throw new Error("Code: 210. Connection refused");
+      };
+      const outcome = await run(runnerFor({ release: "3.21.0", applier, upcasts }));
+      expect(outcome.code).toBe("failed");
+      expect(outcome.message).toContain("Connection refused");
+    });
+  });
 });
