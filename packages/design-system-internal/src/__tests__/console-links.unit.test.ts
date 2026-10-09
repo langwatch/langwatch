@@ -52,6 +52,11 @@ describe("consoleLinks", () => {
           group: "Sims",
         },
         {
+          label: "Payment",
+          href: "https://payment.feat-x.langwatch.localhost:1355",
+          group: "Sims",
+        },
+        {
           label: "Telemetry",
           href: "https://telemetry.feat-x.langwatch.localhost:1355",
           group: "Sims",

@@ -44,6 +44,7 @@
   "apps/storagesim-web/package.json",
   "apps/voicesim-web/package.json",
   "apps/outboundsim-web/package.json",
+  "apps/paymentsim-web/package.json",
   "apps/telemetrysim-web/package.json",
   "tools/fuzz/runner/package.json",
   "tools/interactionsimulator/package.json"

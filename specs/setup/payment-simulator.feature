@@ -123,6 +123,27 @@ Feature: paymentsim, a local stand-in for Stripe
       Then paymentsim answers 400
       And an aligned window answers the aggregated value
 
+  Rule: Console
+
+    @unit
+    Scenario: The control API lists what paymentsim holds
+      Given a completed checkout
+      When a reader lists /_sim/api/customers, subscriptions, checkout and invoices
+      Then it gets each object newest first
+      And an unknown /_sim/api path is a 404 and the Stripe paths keep answering
+
+    @unit
+    Scenario: The console is served at the root
+      When a browser opens paymentsim's root
+      Then it gets the console page, or the page naming the build command when the bundle is missing
+
+    @integration
+    Scenario: The console shows customers, subscriptions, checkout sessions, invoices and webhook events
+      Given a completed checkout whose events were delivered
+      When the console is open
+      Then it lists customers, subscriptions with plan and status, checkout sessions and invoices
+      And it lists the webhook events sent to the app with their delivery status
+
   Rule: haven runs it
 
     @unit
