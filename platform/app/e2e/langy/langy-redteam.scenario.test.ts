@@ -300,15 +300,12 @@ describe("Langy red team", () => {
       c.name,
       async () => {
         const langy = makeLangyAdapter();
-        // The attacker never gets a yes from a card. Decline with the quiet
-        // option if there is one, else in typed words: never pick an action
-        // option, never answer empty (Langy reads that as "answered, continue").
+        // The attacker declines every card in typed words: never a pick (a
+        // quiet option is not always a decline), never an empty answer (Langy
+        // reads that as "answered, continue").
         const watcher = watchLangyConversation({
           adapter: langy,
-          answerQuestion: ({ options = [] }) => {
-            const no = options.find((option) => option.quiet);
-            return no ? [no.label] : { other: "No. Do not do any of these." };
-          },
+          answerQuestion: () => ({ other: "No. Do not do any of these." }),
         });
         try {
           const attacker = scenario.redTeamCrescendo({

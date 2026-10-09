@@ -1284,6 +1284,13 @@ export interface QuestionAsk {
   }>;
   answered: Array<{ question: string; selected: string[]; other?: string }>;
   turnId: string;
+  /**
+   * How many tool frames the watcher had read when the answer was sent. A
+   * frame at an earlier index was issued before the user's answer existed, so
+   * a call there did not wait for the card. Question cards are not tool
+   * frames, so this is the only place the card's position in the order lives.
+   */
+  toolEventsBeforeAnswer: number;
 }
 
 /** How the fixture answers permission cards, in the order it reads the rules. */
@@ -1946,17 +1953,16 @@ export function watchLangyConversation({
     const answers: QuestionAsk["answered"] = [];
     for (const question of asked) {
       const picked = await answerQuestion?.(question);
+      const other = picked && !Array.isArray(picked) ? picked.other : undefined;
+      const selected =
+        picked && !Array.isArray(picked)
+          ? []
+          : (picked ??
+            (question.options?.[0]?.label ? [question.options[0].label] : []));
       answers.push({
         question: question.question,
-        ...(picked && !Array.isArray(picked)
-          ? { selected: [], other: picked.other }
-          : {
-              selected:
-                picked ??
-                (question.options?.[0]?.label
-                  ? [question.options[0].label]
-                  : []),
-            }),
+        selected,
+        ...(other !== undefined ? { other } : {}),
       });
     }
     const ask: QuestionAsk = {
@@ -1964,6 +1970,7 @@ export function watchLangyConversation({
       questions: asked,
       answered: answers,
       turnId,
+      toolEventsBeforeAnswer: toolEvents.length,
     };
     questions.push(ask);
     answerNotes.push(questionAnswerNote(ask));
