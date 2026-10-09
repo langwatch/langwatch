@@ -1,8 +1,8 @@
 # ADR-177: An aggregate project reads its member projects through shared grants
 
-**Date:** 2026-09-26, revised 2026-10-07
+**Date:** 2026-09-26, revised 2026-10-09
 
-**Status:** Accepted (v4.9, 2026-10-07)
+**Status:** Accepted (v4.10, 2026-10-09)
 
 **Builds on:** ADR-166 (grant-scoped data access: a sealed `Authorization`
 proof minted once at the door, carried by hand, applied by the store client),
@@ -127,8 +127,20 @@ departmentId }`, or `{ kind: "explicit", projectIds: [...] }`. The default
    (aggregate, member) pair: principal `PROJECT` = the aggregate, scope
    `PROJECT` = the member, `roleKey = "project-reader"`,
    `source = "aggregate-reconciler"`, and a `condition` of
-   `{ type: "trace", from: <attach time>, until: null }` with no `where`.
-   Grant ids are deterministic KSUIDs derived from the pair, so a replay or
+   `{ type: "trace", from: <window start> }` with no `where` and no
+   `until`. The window start depends on the rule kind (v4.10). Under
+   `all-personal` and `explicit` it is the beginning of time, the epoch
+   `1970-01-01T00:00:00Z`, so a member's whole history shows, imported
+   traces with older timestamps included; the member project's creation
+   date would hide those. Under `personal-by-department` it is the attach
+   time, so a person who moves from Sales to Engineering never shows
+   Engineering their Sales past. The start is always written: a missing
+   `from` keeps the member out of the proof, it never means everything. A
+   held grant whose start is wrong for its rule kind is revoked with
+   reason `aggregate_read_window_changed` and attached again with the
+   right one; under `personal-by-department` any attach-time start is
+   right, so a correct grant is never rewritten. Grant ids are
+   deterministic KSUIDs derived from the pair, so a replay or
    a repeated run is idempotent. The reconciler runs on four triggers: rule
    created or edited, personal workspace created or reactivated, department
    assigned, and a nightly sweep, one scheduled job per aggregate, that
@@ -248,6 +260,7 @@ AND StartTime within the grant's window))` onto the query. A trace from a
 | Admins only                              | A non-admin, including a Developer seat, is refused at the route guard and the tRPC guard                                                  | `projectFilter.invariant.integration.test.ts` extension plus guard unit test                                                                                                                                                                                                                                                                                                                                                  |
 | Reconciler is idempotent                 | Two runs, or a replay, produce the same grant ids and no duplicate rows                                                                    | reconciler test comparing ledger state after two runs                                                                                                                                                                                                                                                                                                                                                                         |
 | Rule changes converge                    | Removing a project from an explicit rule revokes its grant; a new personal project under `all-personal` is attached on creation            | reconciler trigger tests                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Read window follows the rule             | All-personal and explicit members read from the epoch, department members from attach; only a wrong start is rewritten                     | `aggregate-reconciler.service.unit.test.ts`; `aggregate-membership.rules.unit.test.ts`                                                                                                                                                                                                                                                                                                                                        |
 | Data stored once                         | The aggregate's own tenant id holds zero spans; billing counts unchanged                                                                   | ingest route test returns 403 for kind `aggregate`; `trace-usage.service` test unchanged                                                                                                                                                                                                                                                                                                                                      |
 | Every visit is audited                   | Any aggregate read writes one admin view audit row of kind `aggregate`, deduplicated for five minutes                                      | audit service test                                                                                                                                                                                                                                                                                                                                                                                                            |
 | Strictest policy wins                    | With members at policies A (loose) and B (strict), the aggregate read applies B                                                            | privacy policy read test                                                                                                                                                                                                                                                                                                                                                                                                      |
@@ -357,7 +370,8 @@ PROJECT`, `scopeType = PROJECT`, `roleKey = "project-reader"`, `source =
 
 Positive: one shared grant and one proof unblock three callers and the
 ADR-166 migration; the company-wide view appears automatically for every new
-personal project; the trace repositories lose their hand-written tenants;
+personal project, with that project's whole history under an all-personal or
+explicit rule; the trace repositories lose their hand-written tenants;
 every visit is audited the same way admin workspace views are; no data is
 duplicated; the hidden governance project stays untouched.
 
@@ -369,7 +383,11 @@ authz read per trace request, cached per organisation epoch for at most
 30 seconds behind the same rollout flag as the engine's snapshot cache; the blocks must be moved
 once PR 7536 lands; online evaluations and annotations on member traces wait
 for a later decision; the `aggregate` kind must be remembered by every future
-"send traces here" surface.
+"send traces here" surface; a full-history rule shows an organisation admin
+traces a member wrote before the aggregate existed, which is the point of
+the view and stays behind decision 5 (admins only) and decision 9 (every
+visit audited); a department aggregate shows a member only from the day it
+joined, so its early days look emptier than an all-personal one.
 
 Neutral: the governance area keeps configuration and dashboards; the project
 switcher shows aggregates to admins alongside other projects; the Postgres
@@ -378,7 +396,8 @@ side keeps its existing guards until ADR-166's `prisma.as` lands.
 ## Open questions
 
 - Department rule and history: should a project follow its owner's
-  department on the day a trace was written rather than today? Owner:
+  department on the day a trace was written rather than today? Until that
+  is decided a department read starts at its attach time (v4.10). Owner:
   product, for v2.
 - Online evaluations and annotations on member traces: where results live
   and who pays. Owner: product, fork for v2 via a revision here, reusing
@@ -758,3 +777,23 @@ side keeps its existing guards until ADR-166's `prisma.as` lands.
   lingering until the next refetch. Scenarios: the refused-write rollback
   in `specs/traces/saved-views.feature` and the lens refusals in
   `specs/governance/aggregate-project.feature`.
+
+- v4.10 (2026-10-09, decision 3 changed: where a member's read starts). A
+  member read used to start at its attach time under every rule, so an
+  aggregate showed nothing a member wrote before it joined. Under
+  `all-personal` and `explicit` the read now starts at the epoch
+  (`1970-01-01T00:00:00Z`), not at the member project's creation date,
+  since imported history can carry older timestamps. Under
+  `personal-by-department` it still starts at attach time, because
+  department history is an open question and a move must not hand the new
+  department the old one's past. The start is never left blank: the door
+  drops a read with no start from the proof rather than opening it wide.
+  The ledger's live shared-read list now carries each grant's condition
+  (null when it no longer parses), and the reconciler compares it with the
+  rule's window: a wrong start is revoked with reason
+  `aggregate_read_window_changed` and attached again, after the dropped
+  members are revoked, and the nightly sweep brings every existing
+  aggregate across. A department read with any attach-time start is left
+  alone, so nothing is rewritten on a later run. A member is unread
+  between its revoke and its new attach; a failed attach is retried by the
+  next reconcile, like any other.
