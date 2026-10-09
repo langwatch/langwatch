@@ -60,7 +60,7 @@ Shapes: self-hosted · cloud · cloud hybrid (tenants on their own ClickHouse an
 | Tested-flow ledger | Missing area files, fold in the code sweep (3,103 rows), assemble the #8553 body; coordinator publishes |
 | Upgrade e2e harness | First proven cell (cloud, no hybrid, small) with overlap; verdicts per invariant into #8553 |
 | UPG-003 | Legacy and ownerless main keys keep main's access; no legacy key for new projects |
-| Retention loop | Waits on C3 (the connect module, another session): once licensing no longer depends on gateway and Instant Eval, apply the saved retention patch (local handoff `gw-ie-retention.patch`); every current peer-cycle finding runs through those two edges |
+| Retention loop | C3 cuts licensing's edges: C3a-S1 (connect module, lane running) removes licensing → Instant Eval; C3b-3 (after S1; fingerprint fact, ruled) and C3a-S2/S3 remove licensing → gateway. Then apply the saved retention patch (local handoff `gw-ie-retention.patch`) |
 | Haven | Paymentsim is Stripe on every stack (opt-out only); `haven seed` returns logins and made-up credentials; skills updated |
 | Upgrade cells 2 | Hybrid small (UP-04), self-hosted small (UP-06), drills |
 
