@@ -15,6 +15,9 @@ if TYPE_CHECKING:
     from ..models.post_api_gateway_v1_virtual_keys_by_id_rotate_response_403_meta import (
         PostApiGatewayV1VirtualKeysByIdRotateResponse403Meta,
     )
+    from ..models.post_api_gateway_v1_virtual_keys_by_id_rotate_response_403_trace import (
+        PostApiGatewayV1VirtualKeysByIdRotateResponse403Trace,
+    )
 
 
 T = TypeVar("T", bound="PostApiGatewayV1VirtualKeysByIdRotateResponse403")
@@ -31,6 +34,7 @@ class PostApiGatewayV1VirtualKeysByIdRotateResponse403:
         meta (PostApiGatewayV1VirtualKeysByIdRotateResponse403Meta | Unset):
         trace_id (str | Unset):
         span_id (str | Unset):
+        trace (PostApiGatewayV1VirtualKeysByIdRotateResponse403Trace | Unset):
         tips (list[str] | Unset):
         docs_url (str | Unset):
         fault (PostApiGatewayV1VirtualKeysByIdRotateResponse403Fault | Unset):
@@ -44,6 +48,7 @@ class PostApiGatewayV1VirtualKeysByIdRotateResponse403:
     meta: PostApiGatewayV1VirtualKeysByIdRotateResponse403Meta | Unset = UNSET
     trace_id: str | Unset = UNSET
     span_id: str | Unset = UNSET
+    trace: PostApiGatewayV1VirtualKeysByIdRotateResponse403Trace | Unset = UNSET
     tips: list[str] | Unset = UNSET
     docs_url: str | Unset = UNSET
     fault: PostApiGatewayV1VirtualKeysByIdRotateResponse403Fault | Unset = UNSET
@@ -66,6 +71,10 @@ class PostApiGatewayV1VirtualKeysByIdRotateResponse403:
         trace_id = self.trace_id
 
         span_id = self.span_id
+
+        trace: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.trace, Unset):
+            trace = self.trace.to_dict()
 
         tips: list[str] | Unset = UNSET
         if not isinstance(self.tips, Unset):
@@ -97,6 +106,8 @@ class PostApiGatewayV1VirtualKeysByIdRotateResponse403:
             field_dict["trace_id"] = trace_id
         if span_id is not UNSET:
             field_dict["span_id"] = span_id
+        if trace is not UNSET:
+            field_dict["trace"] = trace
         if tips is not UNSET:
             field_dict["tips"] = tips
         if docs_url is not UNSET:
@@ -112,6 +123,9 @@ class PostApiGatewayV1VirtualKeysByIdRotateResponse403:
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.post_api_gateway_v1_virtual_keys_by_id_rotate_response_403_meta import (
             PostApiGatewayV1VirtualKeysByIdRotateResponse403Meta,
+        )
+        from ..models.post_api_gateway_v1_virtual_keys_by_id_rotate_response_403_trace import (
+            PostApiGatewayV1VirtualKeysByIdRotateResponse403Trace,
         )
 
         d = dict(src_dict)
@@ -134,6 +148,13 @@ class PostApiGatewayV1VirtualKeysByIdRotateResponse403:
 
         span_id = d.pop("span_id", UNSET)
 
+        _trace = d.pop("trace", UNSET)
+        trace: PostApiGatewayV1VirtualKeysByIdRotateResponse403Trace | Unset
+        if isinstance(_trace, Unset):
+            trace = UNSET
+        else:
+            trace = PostApiGatewayV1VirtualKeysByIdRotateResponse403Trace.from_dict(_trace)
+
         tips = cast(list[str], d.pop("tips", UNSET))
 
         docs_url = d.pop("docs_url", UNSET)
@@ -155,6 +176,7 @@ class PostApiGatewayV1VirtualKeysByIdRotateResponse403:
             meta=meta,
             trace_id=trace_id,
             span_id=span_id,
+            trace=trace,
             tips=tips,
             docs_url=docs_url,
             fault=fault,
