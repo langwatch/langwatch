@@ -68156,7 +68156,7 @@ The **Ops Console** (`/ops`) is a platform-wide operations interface built for t
 | Want to test trace ingestion against a project | [The Foundry](/self-hosting/ops/foundry): build and send synthetic traces                                    |
 | SSO setup or directory sync needs investigation | The identity and directory Backoffice pages below                                                            |
 | An upgrade is running, behind or failed       | `/ops/upgrades`: the installation's state, each release's steps and every run ([Upgrade Guide](/self-hosting/upgrade#while-it-runs-and-after)) |
-| An upgrade is waiting on an organization migration | `/ops/migrations`: inspect its result and report                                                          |
+| An upgrade is waiting on an organization migration | `/ops/upgrades?tab=tenants`: Ops > Upgrades > Tenant migrations, to inspect its result and report         |
 | Failed jobs need reprocessing                  | [Queue Management](/self-hosting/ops/queue-management): redrive from the DLQ                                 |
 
 ## Feature Overview
@@ -68215,7 +68215,7 @@ across organizations.
 | `/ops/backoffice/sso-connections` | Inspect connection state and domain evidence, investigate setup, or pause and resume a connection. |
 | `/ops/backoffice/directory-sync` | Inspect SCIM sync failures, provisioning attempts and external user mappings. Retry a retired apply after fixing its cause. |
 | `/ops/upgrades` | Follow an upgrade: the installation's state, each release's steps and every run with its phases and error. |
-| `/ops/migrations` | Inspect migration progress and reports, or run a targeted migration for an organization. |
+| `/ops/upgrades?tab=tenants` | Ops > Upgrades > Tenant migrations: inspect migration progress and reports, or run a targeted migration for an organization. |
 
 Pausing SSO stops new sign-ins through the connection. It leaves existing
 sessions and SCIM provisioning in place. Removing a connection also stops
@@ -70097,10 +70097,11 @@ resolve held or parked tenants; they are not a routine preflight.
 ## Check the migration results
 
 Sign in with an operator account from `ADMIN_EMAILS` and open **Ops >
-Migrations** (`/ops/migrations`). It lists every registered migration with
-Held and Parked counts, and lets you search for an organization to inspect
-its status, target a migration run for it, or kick a fresh pass immediately
-rather than waiting for the next restart.
+Upgrades > Tenant migrations** (`/ops/upgrades?tab=tenants`). It lists every
+registered tenant migration with its Finalized, Held and Parked counts, and
+lets you search for an organization to inspect its status, target a migration
+run for it, or start a fresh pass immediately rather than waiting for the next
+restart.
 
 The live connection indexes deliberately refuse duplicate slots rather than
 silently choosing a connection. `REJECTED`, `DRAFT`, and `CLAIMED` still occupy
@@ -70458,9 +70459,9 @@ The upgrade keeps existing accounts working with no manual step, apart from the 
 - SSO users land on their existing user and organization. The callback URL stays `/api/auth/callback/<provider>`, so the identity provider registration does not change.
 - Azure AD accounts move to the key the new sign-in looks them up by on each user's first sign-in after the upgrade. There is no SQL to run.
 - Browser sessions and API keys keep working.
-- The identity migrations run on first start. Check **Ops > Migrations** afterwards; see [Check the migration results](#check-the-migration-results).
+- The identity migrations run on first start. Check **Ops > Upgrades > Tenant migrations** afterwards; see [Check the migration results](#check-the-migration-results).
 
-The first start runs a migration preflight before the app reports ready. `--timeout 45m` on `helm upgrade` gives it room to start. A migration that cannot finish during the preflight stays gated and does not block startup, so check **Ops > Migrations** once the rollout completes. The app can restart once or twice while the bundled ClickHouse restarts on its new image; that is expected.
+The first start runs a migration preflight before the app reports ready. `--timeout 45m` on `helm upgrade` gives it room to start. A migration that cannot finish during the preflight stays gated and does not block startup, so check **Ops > Upgrades > Tenant migrations** once the rollout completes. The app can restart once or twice while the bundled ClickHouse restarts on its new image; that is expected.
 
 **Provider setting.** The chart now passes `app.nextAuth.provider` to the app as `AUTH_PROVIDER`. `NEXTAUTH_PROVIDER` is still read and logs a deprecation warning. If you select the provider with `NEXTAUTH_PROVIDER` in `app.extraEnvs`, the chart leaves the setting to you, as before. Outside the chart, set `AUTH_PROVIDER`; when both are set it wins.
 
