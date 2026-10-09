@@ -15,7 +15,7 @@ import {
   replayColumns,
 } from "./prisma.insight.mapper.ts";
 
-/** The shared record is the inbox entry without a reader, so the read mapper serves both. */
+/** The folded record is the inbox entry without a reader, so the read mapper serves both. */
 function fromRow(row: InsightRow): StoredProjection<InsightState> {
   const {
     id: _id,

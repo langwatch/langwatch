@@ -25,6 +25,20 @@ import {
   type InsightSuccessNotice,
 } from "../model/insight-host.ts";
 
+/**
+ * The one DOM ability no capability carries, written the way `@langwatch/browser-host`'s own
+ * `CopyButton` writes it. A page served without a secure origin has no clipboard.
+ */
+async function writeToClipboard(text: string): Promise<boolean> {
+  if (typeof navigator === "undefined" || !navigator.clipboard) return false;
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 class CapabilityInsightHost extends InsightHostApi {
   constructor(
     private readonly deps: {
@@ -70,6 +84,10 @@ class CapabilityInsightHost extends InsightHostApi {
 
   failed(failure: InsightFailureNotice): void {
     this.deps.feedback.failed(failure);
+  }
+
+  copyToClipboard(text: string): Promise<boolean> {
+    return writeToClipboard(text);
   }
 
   askLangy(request: LangyAskRequest): void {

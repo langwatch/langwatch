@@ -1,6 +1,6 @@
 import { HandledError } from "@langwatch/handled-error";
 
-/** An insight the project does not have. */
+/** An insight the project does not have, or one another person owns: the two answer alike. */
 export class InsightNotFoundError extends HandledError {
   declare readonly code: "insight_not_found";
 

@@ -1,6 +1,7 @@
 /**
- * Every `insights.*` procedure, declared once. Reads refetch on any insight event, so a
- * teammate's filing or this reader's own act in another tab shows up without a timer.
+ * Every `insights.*` procedure, declared once. Reads refetch on any insight event in the
+ * project, so a filing or the owner's own act in another tab shows up without a timer. The
+ * hint carries no data: the refetch answers the caller's own insights and nobody else's.
  */
 
 import { defineTrpcContract } from "@langwatch/module";

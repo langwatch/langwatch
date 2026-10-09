@@ -2244,8 +2244,9 @@ model DashboardFavourite {
   @@map("DashboardFavourite")
 }
 
-/// One insight in a project's inbox, folded from its `insight` aggregate (modules/insight).
-/// A read model: rebuildable by replaying the event log. Epochs in milliseconds.
+/// One insight in its owner's inbox in a project, folded from its `insight` aggregate
+/// (modules/insight). A read model: rebuildable by replaying the event log. Epochs in
+/// milliseconds.
 model InsightProjection {
   /// The insight id, which is also its aggregate id.
   id                       String  @id
@@ -2283,12 +2284,16 @@ model InsightProjection {
   replayGranularitySeconds Int?
   /// The values in force when it was filed: `{ period, parameters }`.
   replayContext            Json?
+  /// Whose insight it is: the one person who reads it. NULL on a row folded before the
+  /// column existed, which is owned by whoever filed it (`filedByUserId`).
+  ownerUserId              String?
 
   @@index([projectId, filedAt])
+  @@index([projectId, ownerUserId, filedAt])
 }
 
 /// One reader's own state on one insight (seen, done, kept), folded from the same stream.
-/// Personal: one member marking an insight done never moves it for another.
+/// An insight has one reader today, its owner; a later forward may add more.
 model InsightReaderProjection {
   id                String @id
   projectId         String

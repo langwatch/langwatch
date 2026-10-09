@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
- * The Insights page over the real tRPC hooks: what a project with no insights is told, and
- * what a folder visit sends.
+ * The Insights page over the real tRPC hooks: what a project with no insights is told, whose
+ * the page says the insights are, what a folder visit sends and what Copy writes.
  * @see modules/insight/specs/insight-inbox.feature
  */
 
@@ -11,7 +11,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
-import { insightEntry, renderWithInsightHost } from "../../../testing.tsx";
+import { insightEntry, renderWithInsightHost, StubInsightHost } from "../../../testing.tsx";
 import InsightsScreen from "../insights.screen.tsx";
 
 const HOUR_MS = 3_600_000;
@@ -38,17 +38,82 @@ function project({ entries }: { entries: ReturnType<typeof insightEntry>[] }) {
 describe("given a project with no insights", () => {
   describe("when a member opens Insights", () => {
     /** @scenario "A project with no insights shows how to get the first one" */
-    it("says Langy writes the brief here and offers an action that opens Langy", async () => {
+    it("says Langy writes the brief here, for them alone, and offers an action that opens Langy", async () => {
       const { host } = renderWithInsightHost({
         element: <InsightsScreen />,
         answer: project({ entries: [] }).answer,
       });
 
       expect(await screen.findByText("Langy writes your brief here")).toBeInTheDocument();
+      expect(screen.getByText(/It is yours alone; copy one to share it\./)).toBeInTheDocument();
 
       await userEvent.click(screen.getByRole("button", { name: "Open Langy" }));
 
       expect(host.langyAsks).toEqual([{ draft: "" }]);
+    });
+  });
+});
+
+describe("given a member opens Insights", () => {
+  describe("when the page draws", () => {
+    /** @scenario "The page says only you see your insights" */
+    it("reads that only they see their insights", async () => {
+      renderWithInsightHost({
+        element: <InsightsScreen />,
+        answer: project({ entries: [insightEntry({ seenAt: NOW })] }).answer,
+      });
+
+      expect(await screen.findByText("Only you see your insights.")).toBeInTheDocument();
+    });
+  });
+});
+
+describe("given an insight in the inbox", () => {
+  const entry = insightEntry({
+    title: "Checkout errors doubled",
+    body: "Checkout errors doubled overnight: 240 failed against 118 the day before.",
+    board: { id: "board-1", name: "Checkout health", widget: null },
+    seenAt: NOW,
+  });
+
+  describe("when the reader chooses Copy", () => {
+    /** @scenario "Copy puts the insight on the clipboard and says so" */
+    it("writes its plain text to the clipboard and says it was copied", async () => {
+      const { host } = renderWithInsightHost({
+        element: <InsightsScreen />,
+        answer: project({ entries: [entry] }).answer,
+      });
+
+      await userEvent.click(await screen.findByRole("button", { name: "Copy" }));
+
+      await waitFor(() =>
+        expect(host.successes).toEqual([{ title: "Copied. Paste it anywhere." }]),
+      );
+      expect(host.clipboard).toEqual([
+        "Checkout errors doubled\n\n" +
+          "Checkout errors doubled overnight: 240 failed against 118 the day before.\n\n" +
+          "From: Checkout health",
+      ]);
+    });
+  });
+
+  describe("when the browser refuses the clipboard", () => {
+    /** @scenario "A clipboard that refuses says the copy failed" */
+    it("says the insight could not be copied, and confirms nothing", async () => {
+      const { host } = renderWithInsightHost({
+        element: <InsightsScreen />,
+        answer: project({ entries: [entry] }).answer,
+        host: new StubInsightHost({ clipboardRefuses: true }),
+      });
+
+      await userEvent.click(await screen.findByRole("button", { name: "Copy" }));
+
+      await waitFor(() =>
+        expect(host.failures.map((failure) => failure.fallbackTitle)).toEqual([
+          "Couldn't copy this insight",
+        ]),
+      );
+      expect(host.successes).toEqual([]);
     });
   });
 });

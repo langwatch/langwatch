@@ -1,7 +1,7 @@
 /**
  * The port the inbox screen and everything insight lends read: scope, the release flag,
- * grants, the address, notices and Langy's ask. Mounted above the routed tree, so the bell
- * in the topbar and the action under a Langy answer find it too.
+ * grants, the address, notices, the clipboard and Langy's ask. Mounted above the routed tree,
+ * so the bell in the topbar and the action under a Langy answer find it too.
  */
 
 import type { LangyAskRequest } from "@langwatch/langy-contract";
@@ -32,6 +32,9 @@ export abstract class InsightHostApi {
   abstract succeeded(notice: InsightSuccessNotice): void;
 
   abstract failed(failure: InsightFailureNotice): void;
+
+  /** Writes plain text to the clipboard; false where the browser refuses or has none. */
+  abstract copyToClipboard(text: string): Promise<boolean>;
 
   /** Opens Langy with a question or a draft; does nothing where Langy is not installed. */
   abstract askLangy(request: LangyAskRequest): void;

@@ -75,7 +75,7 @@ export const insightReplaySchema = z
   });
 export type InsightReplay = z.infer<typeof insightReplaySchema>;
 
-/** One insight as a reader sees it: the shared record plus that reader's own state. */
+/** One insight as its owner sees it: the record plus their own seen, done and kept state. */
 export const insightEntrySchema = z.object({
   id: z.string(),
   title: z.string(),
@@ -90,6 +90,8 @@ export const insightEntrySchema = z.object({
   source: insightSourceSchema.nullable(),
   board: insightBoardSchema.nullable(),
   filedVia: insightFiledViaSchema,
+  /** Whose insight it is: the one person who reads it. Null only where nobody can. */
+  ownerUserId: z.string().nullable(),
   filedByUserId: z.string().nullable(),
   /** Epoch milliseconds. */
   filedAt: z.number(),

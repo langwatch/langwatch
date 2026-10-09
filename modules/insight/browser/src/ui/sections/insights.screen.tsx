@@ -1,7 +1,7 @@
 /**
- * The Insights inbox. What people read is timeline-shaped, what they act on is inbox-shaped:
- * a few insights, judged good or bad, that drop to Stale once they stop being true and to
- * Archived once marked done. Folders, seen and done are each reader's own.
+ * The Insights inbox, one person's own. What they read is timeline-shaped, what they act on is
+ * inbox-shaped: a few insights, judged good or bad, that drop to Stale once they stop being
+ * true and to Archived once marked done. Nobody else reads them; Copy is how one is shared.
  * @see modules/insight/specs/insight-inbox.feature
  */
 
@@ -35,6 +35,7 @@ import { InsightBoardTrail } from "./insight-board-trail.tsx";
 import { InsightEvidence } from "./insight-evidence.tsx";
 
 const HINT = "Langy's brief: a few things worth acting on, kept fresh, never a feed.";
+const ONLY_YOU = "Only you see your insights.";
 
 const EMPTY_FOLDER_COPY: Record<InsightFolder, string> = {
   inbox: "Inbox zero. Langy files only what deserves attention.",
@@ -74,9 +75,14 @@ export default function InsightsScreen() {
         />
       </PageLayout.Header>
       <PageLayout.Container paddingTop={4}>
-        <Text fontSize="13px" color="fg.muted" marginBottom={5}>
-          {HINT}
-        </Text>
+        <VStack align="start" gap={0.5} marginBottom={5}>
+          <Text fontSize="13px" color="fg.muted">
+            {HINT}
+          </Text>
+          <Text fontSize="12px" color="fg.subtle">
+            {ONLY_YOU}
+          </Text>
+        </VStack>
         <InboxBody
           reading={reading}
           folder={folder}
@@ -118,7 +124,7 @@ function InboxBody({
     return (
       <NoDataInfoBlock
         title="Langy writes your brief here"
-        description="Save a Langy answer as an insight and it lands here: judged good or bad news, kept until it stops being true, with the whole team reading the same brief."
+        description="Save a Langy answer as an insight and it lands here: judged good or bad news, kept until it stops being true. It is yours alone; copy one to share it."
         icon={<Inbox size={24} />}
         testId="insights-day-zero"
       >
@@ -204,6 +210,7 @@ function FolderView({
                   onRestore: () => actions.restore(entry.id),
                   onChat: () =>
                     host.askLangy({ draft: `Follow up on the insight "${entry.title}": ` }),
+                  onCopy: () => void actions.copy(entry),
                   onNotUseful: () =>
                     host.askLangy({
                       draft: `The insight "${entry.title}" isn't useful because `,

@@ -1,13 +1,16 @@
 # Insight
 
-Owns insights: short findings about a project that Langy writes into an inbox.
+Owns insights: short findings about a project that Langy writes for one person.
+An insight has one owner, the person whose Langy made it, and only the owner
+reads it or acts on it (ADR-003).
 
 - `contract/`: schemas, the folder rules (`deriveInsightInbox`), errors, the
   `InsightApi` token and the tRPC declaration.
 - `process/`: the `insight_processing` pipeline, its two Postgres projections
   and the `InsightModule`.
-- `browser/`: the Insights page, the top bar bell, the sidebar count and the
-  "Save as insight" action on Langy answers.
+- `browser/`: the Insights page, the top bar bell, the sidebar count, the
+  "Save as insight" action on Langy answers and Copy, which is how an owner
+  shares an insight.
 
 An insight may point at the board and widget it came from, and keeps its
 evidence as a query with fixed dates. Analytics lends the links and the chart
@@ -25,7 +28,7 @@ Decisions: [ADRs](./adrs/README.md).
 | Classification | core (`modules/catalogue.json`)                                                                      |
 | Subjects       | insight                                                                                              |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                             |
-| Api token      | `InsightApi` = `moduleApi<InsightApi>()("insight")`, `contract/src/insight.api.ts:26` (5 operations) |
+| Api token      | `InsightApi` = `moduleApi<InsightApi>()("insight")`, `contract/src/insight.api.ts:28` (5 operations) |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                           |
 
 ## What insight owns
@@ -34,8 +37,8 @@ Decisions: [ADRs](./adrs/README.md).
 | -------------- | ------------------------- | ----------------------------------------------------------------------------------- |
 | Postgres table | `InsightProjection`       | `process/src/repositories/prisma/prisma.insight-projection.repository.ts:39`        |
 | Postgres table | `InsightReaderProjection` | `process/src/repositories/prisma/prisma.insight-reader-projection.repository.ts:27` |
-| Postgres table | `InsightProjection`       | `process/src/repositories/prisma/prisma.insight.repository.ts:12`                   |
-| Postgres table | `InsightReaderProjection` | `process/src/repositories/prisma/prisma.insight.repository.ts:12`                   |
+| Postgres table | `InsightProjection`       | `process/src/repositories/prisma/prisma.insight.repository.ts:22`                   |
+| Postgres table | `InsightReaderProjection` | `process/src/repositories/prisma/prisma.insight.repository.ts:22`                   |
 
 Anything else insight needs belongs to another module and is reached through its `*Api`.
 

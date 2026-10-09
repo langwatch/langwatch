@@ -1,6 +1,7 @@
 /**
- * The server half of `insights.*`. Reading and keeping your own inbox takes `analytics:view`;
- * filing an insight the whole team sees takes `analytics:manage`.
+ * The server half of `insights.*`. Every procedure takes `analytics:view` on the project and
+ * answers for the caller alone: an insight is its owner's, so filing one writes nothing a
+ * teammate reads. The module refuses another person's insight; the door only names the caller.
  */
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { InsightApi, insightTrpc } from "@langwatch/insight-contract";
@@ -14,7 +15,7 @@ export const insightTrpcTransport: TrpcRouterDeclaration<InsightApi, typeof insi
     )
 
     .procedure("file")
-    .withPermission("analytics:manage")
+    .withPermission("analytics:view")
     .handle(({ app, input, actor }) => app.fileInsight({ ...input, userId: actor.id }))
 
     .procedure("markSeen")

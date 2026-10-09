@@ -8263,7 +8263,7 @@
     {
       "name": "InsightProjection",
       "tableName": "InsightProjection",
-      "documentation": "One insight in a project's inbox, folded from its `insight` aggregate (modules/insight).\nA read model: rebuildable by replaying the event log. Epochs in milliseconds.",
+      "documentation": "One insight in its owner's inbox in a project, folded from its `insight` aggregate\n(modules/insight). A read model: rebuildable by replaying the event log. Epochs in\nmilliseconds.",
       "primaryKey": [
         "id"
       ],
@@ -8519,13 +8519,22 @@
           "isList": false,
           "isOptional": true,
           "documentation": "The values in force when it was filed: `{ period, parameters }`."
+        },
+        {
+          "name": "ownerUserId",
+          "columnName": "ownerUserId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "Whose insight it is: the one person who reads it. NULL on a row folded before the\ncolumn existed, which is owned by whoever filed it (`filedByUserId`)."
         }
       ]
     },
     {
       "name": "InsightReaderProjection",
       "tableName": "InsightReaderProjection",
-      "documentation": "One reader's own state on one insight (seen, done, kept), folded from the same stream.\nPersonal: one member marking an insight done never moves it for another.",
+      "documentation": "One reader's own state on one insight (seen, done, kept), folded from the same stream.\nAn insight has one reader today, its owner; a later forward may add more.",
       "primaryKey": [
         "id"
       ],

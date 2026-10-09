@@ -14,9 +14,9 @@ import {
 } from "./insight.ts";
 
 /**
- * An insight filed by a person saving a Langy answer, or by Langy itself. `replay`, `board`
- * and `filedVia` came after the first filings: each has a default, so an event stored
- * without them reads as no window, no pointer and saved from a chat.
+ * An insight filed for one person, by that person saving a Langy answer or by Langy on a run.
+ * `replay`, `board`, `filedVia` and `ownerUserId` came after the first filings, each with a
+ * default: an old event reads as no window, no pointer, saved from a chat, owned by its filer.
  */
 export const insightFiledEventDataSchema = z.object({
   insightId: z.string().min(1),
@@ -30,12 +30,14 @@ export const insightFiledEventDataSchema = z.object({
   source: insightSourceSchema.nullable(),
   board: insightBoardSchema.nullable().default(null),
   filedVia: insightFiledViaSchema.default("chat"),
-  /** Null when Langy filed it on a scheduled run. */
+  /** Whose insight it is. Null only on an event stored before owners: its filer owns it. */
+  ownerUserId: z.string().min(1).nullable().default(null),
+  /** The person who saved it; null when Langy filed it on a scheduled run. */
   filedByUserId: z.string().nullable(),
 });
 export type InsightFiledEventData = z.infer<typeof insightFiledEventDataSchema>;
 
-/** One reader's own act on an insight: seen, marked done, or kept as still relevant. */
+/** The owner's act on their insight: seen, marked done, or kept as still relevant. */
 export const insightReaderEventDataSchema = z.object({
   insightId: z.string().min(1),
   userId: z.string().min(1),

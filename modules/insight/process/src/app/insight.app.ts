@@ -1,6 +1,6 @@
 /**
  * The insight module: what its doors call. Every operation asks the `release_insights` gate
- * first, then hands the work to the service.
+ * first, then hands the work to the service, which answers for the caller's own insights only.
  */
 
 import type { EventingCommands } from "@langwatch/eventing";

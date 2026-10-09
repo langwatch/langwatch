@@ -1,6 +1,6 @@
 /**
- * One reader's own state on one insight, keyed `insightId:userId`. Personal on purpose: one
- * member marking an insight done never moves it for the team.
+ * One reader's own state on one insight, keyed `insightId:userId`. An insight has one reader
+ * today, its owner; the state stays apart from the insight so a later forward can add more.
  */
 
 import type { StateProjectionDefinition, StateProjectionStore } from "@langwatch/eventing";

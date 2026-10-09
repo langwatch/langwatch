@@ -755,6 +755,7 @@ export interface LwqlPrismaRows {
     readonly replayEnd: "Float?";
     readonly replayGranularitySeconds: "Int?";
     readonly replayContext: "Json?";
+    readonly ownerUserId: "String?";
   };
   readonly InsightReaderProjection: {
     readonly id: "String";

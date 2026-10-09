@@ -1,7 +1,7 @@
 /**
- * "Save as insight" under a settled Langy answer, lent through Langy's answer-action
- * extension point. Opens a short form prefilled from the answer; saving files the insight
- * for the whole project. Draws nothing without the flag or `analytics:manage`.
+ * "Save as insight" under a settled Langy answer, lent through Langy's answer-action extension
+ * point. Opens a short form prefilled from the answer; saving files the insight for the person
+ * who saved it, and nobody else reads it. Draws nothing without the flag or `analytics:view`.
  */
 
 import { Dialog } from "@langwatch/design-system/dialog";
@@ -38,7 +38,7 @@ export function SaveAsInsightAction(props: LangyAnswerActionProps) {
   const [open, setOpen] = useState(false);
   const [saved, setSaved] = useState(false);
   const project = host.project();
-  if (host.isEnabled() !== true || !host.hasPermission("analytics:manage")) return null;
+  if (host.isEnabled() !== true || !host.hasPermission("analytics:view")) return null;
   if (project?.id !== props.projectId) return null;
 
   return (
@@ -63,7 +63,7 @@ export function SaveAsInsightAction(props: LangyAnswerActionProps) {
             setSaved(true);
             host.succeeded({
               title: "Saved to Insights",
-              description: "The whole project sees it in the inbox.",
+              description: "Only you see it, in your inbox.",
             });
           }}
         />

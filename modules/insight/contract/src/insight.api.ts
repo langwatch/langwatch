@@ -2,18 +2,20 @@ import { moduleApi } from "@langwatch/module";
 
 import type { FileInsightInput, InsightEntry } from "./insight.ts";
 
-/** Who is asking: per-reader state is always the caller's own. */
+/** Who is asking. An insight is read and acted on by its owner alone. */
 type Reader = { userId: string };
 
 /**
- * The project's insights inbox. Every operation refuses with `insights_not_enabled` while
- * `release_insights` is off for the project.
+ * Each person's own insights in a project. Every operation refuses with
+ * `insights_not_enabled` while `release_insights` is off for the project, and an insight
+ * another person owns answers `insight_not_found`, exactly as an id no insight has.
  */
 export interface InsightApi {
-  /** The project's insights, newest first, each with the reader's own state. */
+  /** The reader's own insights in the project, newest first, each with their own state. */
   findInsights(input: { projectId: string } & Reader): Promise<InsightEntry[]>;
-  /** Files an insight; the answer is the entry as the inbox will show it. */
+  /** Files an insight the reader owns; the answer is the entry as their inbox will show it. */
   fileInsight(input: FileInsightInput & Reader): Promise<InsightEntry>;
+  /** Ids the reader does not own are skipped, like ids no insight has. */
   markInsightsSeen(
     input: { projectId: string; insightIds: readonly string[] } & Reader,
   ): Promise<void>;

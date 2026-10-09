@@ -1,6 +1,7 @@
 /**
  * The insight pipeline's names. One aggregate per insight, the project is the tenant, and
- * per-reader state rides on the same stream. @see modules/insight/adrs/001-insight-aggregate.md
+ * its owner's seen, done and kept state rides on the same stream.
+ * @see modules/insight/adrs/001-insight-aggregate.md
  */
 
 export const INSIGHT_EVENT_TYPES = {
@@ -18,7 +19,7 @@ export const INSIGHT_PROCESSING_EVENT_TYPES = [
   INSIGHT_EVENT_TYPES.KEPT,
 ] as const;
 
-/** The events a reader's own state folds from. */
+/** The events the reader projection folds: the owner's own acts. */
 export const INSIGHT_READER_EVENT_TYPES = [
   INSIGHT_EVENT_TYPES.SEEN,
   INSIGHT_EVENT_TYPES.ARCHIVED,

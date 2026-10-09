@@ -68,7 +68,10 @@ export function replayColumns(replay: InsightReplay | null): ReplayColumns {
   };
 }
 
-/** `tone` and `filedVia` are TEXT, so the read narrows them back; an unknown one refuses loudly. */
+/**
+ * `tone` and `filedVia` are TEXT, so the read narrows them back; an unknown one refuses loudly.
+ * A row with no owner column is owned by whoever filed it.
+ */
 export function insightEntryFromRows({
   insight,
   reader,
@@ -91,6 +94,7 @@ export function insightEntryFromRows({
         : null,
     ...boardField(insight),
     filedVia: insightFiledViaSchema.parse(insight.filedVia),
+    ownerUserId: insight.ownerUserId ?? insight.filedByUserId,
     filedByUserId: insight.filedByUserId,
     filedAt: insight.filedAt,
     renewedAt: insight.renewedAt,

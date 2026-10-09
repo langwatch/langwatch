@@ -1,6 +1,6 @@
 /**
- * The reader's acts on an insight. Each writes optimistically into the cached inbox, since the
- * worker folds the event a moment later; the read hint then brings the folded row back.
+ * The owner's acts on their insight. Each write lands optimistically in the cached inbox, since
+ * the worker folds the event a moment later; the read hint then brings the folded row back.
  */
 
 import type { FileInsightInput, InsightEntry } from "@langwatch/insight-contract";
@@ -8,6 +8,7 @@ import { nowInstant } from "@langwatch/time";
 import { useEffect } from "react";
 
 import { useInsightHost } from "../model/insight-host.ts";
+import { insightPlainText } from "../model/insight-presentation.ts";
 import { insightApi } from "./insight-api.ts";
 
 type Patch = (entry: InsightEntry, now: number) => InsightEntry;
@@ -80,6 +81,18 @@ export function useInsightActions({ projectId }: { projectId: string }) {
         insightId,
         done: "Restored. Back in the inbox.",
         fallbackTitle: "Couldn't restore this insight",
+      });
+    },
+    /** The one way an insight leaves its owner: its plain text, pasted where they choose. */
+    async copy(entry: InsightEntry) {
+      const copied = await host.copyToClipboard(insightPlainText(entry));
+      if (copied) {
+        host.succeeded({ title: "Copied. Paste it anywhere." });
+        return;
+      }
+      host.failed({
+        error: new Error("Clipboard unavailable"),
+        fallbackTitle: "Couldn't copy this insight",
       });
     },
   };

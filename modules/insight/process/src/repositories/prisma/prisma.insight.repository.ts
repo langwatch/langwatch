@@ -1,12 +1,22 @@
 import { type InsightEntry, InsightNotFoundError } from "@langwatch/insight-contract";
 import { PrismaRepository } from "@langwatch/prisma-client";
+import type { Prisma } from "@langwatch/prisma-client/generated";
 
 import type { InsightRepository } from "../insight.repository.ts";
 import { insightEntryFromRows } from "./prisma.insight.mapper.ts";
 
 /**
- * The inbox read: the project's insights, then that reader's rows for them, joined here
- * because both tables are this module's own. Every query carries `projectId`.
+ * The rows one person owns. A row folded before the owner column existed, or by an image that
+ * does not know it, holds no owner: whoever filed it owns it.
+ */
+function ownedBy(userId: string): Prisma.InsightProjectionWhereInput {
+  return { OR: [{ ownerUserId: userId }, { ownerUserId: null, filedByUserId: userId }] };
+}
+
+/**
+ * The inbox read: the insights the reader owns, then their rows for them, joined here because
+ * both tables are this module's own. Every query carries `projectId` and the owner, so another
+ * person's insight and an unknown id take the same path to the same answer.
  */
 export class PrismaInsightRepository
   extends PrismaRepository.for("InsightProjection", "InsightReaderProjection")
@@ -24,7 +34,7 @@ export class PrismaInsightRepository
     limit: number;
   }): Promise<InsightEntry[]> {
     const insights = await this.prisma.insightProjection.findMany({
-      where: { projectId },
+      where: { projectId, ...ownedBy(userId) },
       orderBy: { filedAt: "desc" },
       take: limit,
     });
@@ -48,7 +58,7 @@ export class PrismaInsightRepository
     userId: string;
   }): Promise<InsightEntry> {
     const insight = await this.prisma.insightProjection.findFirst({
-      where: { id: insightId, projectId },
+      where: { id: insightId, projectId, ...ownedBy(userId) },
     });
     if (!insight) throw new InsightNotFoundError(insightId);
     const reader = await this.prisma.insightReaderProjection.findFirst({

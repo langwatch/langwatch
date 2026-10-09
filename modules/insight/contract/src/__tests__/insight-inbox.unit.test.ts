@@ -30,6 +30,7 @@ function entry(overrides: Partial<InsightEntry> = {}): InsightEntry {
     source: null,
     board: null,
     filedVia: "chat",
+    ownerUserId: "user-filer",
     filedByUserId: "user-filer",
     filedAt: NOW,
     renewedAt: null,

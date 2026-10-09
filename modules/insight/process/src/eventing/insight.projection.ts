@@ -1,6 +1,6 @@
 /**
- * The shared record of one insight, folded onto its row. Reader acts ride the same stream
- * and are folded by `insight-reader.projection.ts`, never here.
+ * The record of one insight and whose it is, folded onto its row. The owner's acts ride the
+ * same stream and are folded by `insight-reader.projection.ts`, never here.
  */
 
 import type { StateProjectionDefinition, StateProjectionStore } from "@langwatch/eventing";
@@ -27,6 +27,8 @@ export interface InsightState {
   readonly source: InsightSource | null;
   readonly board: InsightBoard | null;
   readonly filedVia: InsightFiledVia;
+  /** The one person who reads the insight; null only when the event names nobody at all. */
+  readonly ownerUserId: string | null;
   readonly filedByUserId: string | null;
   /** Epoch milliseconds. */
   readonly filedAt: number;
@@ -44,6 +46,7 @@ const INITIAL_INSIGHT_STATE: InsightState = {
   source: null,
   board: null,
   filedVia: "chat",
+  ownerUserId: null,
   filedByUserId: null,
   filedAt: 0,
   renewedAt: null,
@@ -54,8 +57,14 @@ export function applyInsightEvent(
   event: InsightProcessingEvent,
 ): InsightState {
   if (event.type !== INSIGHT_EVENT_TYPES.FILED) return state;
-  const { insightId: _insightId, ...filed } = event.data;
-  return { ...state, ...filed, filedAt: event.occurredAt };
+  const { insightId: _insightId, ownerUserId, ...filed } = event.data;
+  return {
+    ...state,
+    ...filed,
+    // An event stored before owners existed names none: whoever filed it owns it.
+    ownerUserId: ownerUserId ?? filed.filedByUserId,
+    filedAt: event.occurredAt,
+  };
 }
 
 export function createInsightProjection(deps: {

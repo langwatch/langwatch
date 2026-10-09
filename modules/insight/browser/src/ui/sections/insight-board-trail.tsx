@@ -8,6 +8,8 @@ import { Lent } from "@langwatch/browser-host/lent";
 import { Text } from "@langwatch/design-system/primitives";
 import type { InsightBoard } from "@langwatch/insight-contract";
 
+import { boardTrailWords } from "../../model/insight-presentation.ts";
+
 export function InsightBoardTrail({ board }: { board: InsightBoard }) {
   return (
     <Lent
@@ -19,7 +21,7 @@ export function InsightBoardTrail({ board }: { board: InsightBoard }) {
       }}
       fallback={
         <Text as="span" truncate maxWidth="full">
-          {board.widget ? `${board.name} › ${board.widget.name}` : board.name}
+          {boardTrailWords(board)}
         </Text>
       }
     />

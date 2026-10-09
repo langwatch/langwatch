@@ -49,7 +49,7 @@ export class MemoryInsightRepository implements InsightRepository {
     userId: string;
   }): InsightEntry | undefined {
     const insight = this.rows.insights.get(InsightMemoryStore.insightKey({ projectId, insightId }));
-    if (!insight) return void 0;
+    if (insight?.state.ownerUserId !== userId) return void 0;
     const reader = this.rows.readers.get(
       InsightMemoryStore.readerKey({ projectId, insightId, userId }),
     )?.state;

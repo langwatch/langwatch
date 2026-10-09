@@ -1,7 +1,9 @@
 /**
- * insight_processing: one aggregate per insight, two Postgres projections (the shared record
- * and each reader's own state) and four commands. The api sends; the worker folds.
+ * insight_processing: one aggregate per insight, two Postgres projections (the insight with
+ * its owner, and the owner's own state on it) and four commands. The api sends; the worker
+ * folds.
  * @see modules/insight/adrs/001-insight-aggregate.md
+ * @see modules/insight/adrs/003-personal-insights.md
  */
 
 import {

@@ -1,7 +1,7 @@
 Feature: The insights inbox
-  Langy writes short findings about a project into an inbox. A member reads
-  them, marks them done or keeps them. An insight is shared by the project;
-  what one member has seen, archived or kept belongs to that member alone.
+  Langy writes short findings about a project for one person. An insight has one owner,
+  the person whose Langy made it. Only the owner reads it, marks it done or keeps it; to
+  everyone else it does not exist. Copying its text is how an owner shares it.
 
   Background:
     Given the release_insights flag is on for the project
@@ -10,22 +10,27 @@ Feature: The insights inbox
 
     @integration
     Scenario: A member saves a Langy answer as an insight
-      Given a member with analytics:manage on the project
+      Given a member with analytics:view on the project
       When they save a Langy answer as an insight with a title, a body and a tone
-      Then the insight is filed against the project
+      Then the insight is filed in the project, with them as its owner
       And it records the Langy conversation and message it came from
       And it shows at the top of their inbox
+
+    @integration
+    Scenario: Saving a Langy answer says only the saver sees the insight
+      Given a member with analytics:view and no more
+      When they save a Langy answer as an insight
+      Then they are told it is saved and that only they see it
 
     @unit
     Scenario: The member who files an insight has already seen it
       Given a member files an insight
       When they read their inbox
       Then that insight does not count as unseen for them
-      And it counts as unseen for every other member
 
     @integration
-    Scenario: A viewer cannot file an insight
-      Given a member with analytics:view but not analytics:manage
+    Scenario: A member without analytics:view cannot file an insight
+      Given a member without analytics:view on the project
       When they try to file an insight
       Then the request is refused before the handler runs
 
@@ -34,6 +39,72 @@ Feature: The insights inbox
       Given a file request with an empty title
       When the request is validated
       Then it is refused with a field error on the title
+
+  Rule: An insight belongs to one person
+    The owner is the person whose Langy made the insight: whoever saved the answer, or the
+    person a run filed it for. Every read and every act is the owner's alone, and another
+    member's insight answers exactly as an id no insight has.
+
+    @unit
+    Scenario: An insight a run files for a person belongs to that person
+      Given a run files an insight for a member, with no person who saved it
+      When the project's members read their inboxes
+      Then the member it was filed for reads it, unseen
+      And no other member's inbox holds it
+
+    @unit
+    Scenario: An insight filed before owners existed belongs to whoever filed it
+      Given a filed event stored without an owner
+      When the event is folded
+      Then the person who filed it owns the insight
+
+    @integration
+    Scenario: An insight stored before owners existed belongs to whoever filed it
+      Given an insight row written before the owner column existed
+      When the person who filed it and another member read their inboxes
+      Then the person who filed it reads it
+      And the other member's inbox does not hold it
+
+    @integration
+    Scenario: Another member's inbox does not hold the insight
+      Given a member filed an insight with a query and a window
+      When another member of the project asks for their insights
+      Then the answer holds no insight, so no title, no query and no window
+      And their unseen count is 0
+
+    @integration
+    Scenario: Another member's insight answers as an unknown one
+      Given a member filed an insight
+      When another member of the project marks it done, then keeps it
+      Then each request is refused with insight_not_found
+      And each refusal matches the refusal for an id no insight has
+      And the insight has not moved for its owner
+
+    @integration
+    Scenario: Marking another member's insight seen records nothing
+      Given a member filed an insight
+      When another member of the project marks it seen
+      Then the request answers as it does for an id no insight has
+      And no seen event is recorded for them
+
+    @integration
+    Scenario: An owner who lost analytics:view reads nothing
+      Given a member filed an insight and then lost analytics:view on the project
+      When they ask for their insights, or act on the one they filed
+      Then each request is refused before the handler runs
+
+    @integration
+    Scenario: A single insight is read by its owner alone
+      Given a member owns an insight
+      When the owner and another member each read it by its id
+      Then the owner reads it with their own seen, done and kept state
+      And the other member is refused as for an id no insight has
+
+    @integration
+    Scenario: A read's limit counts the owner's insights only
+      Given two members who each filed insights in the project
+      When one of them reads their inbox with a limit of 2
+      Then they read their own 2 newest, whatever the other filed since
 
   Rule: Where an insight came from
     An insight may point at the board and the widget it came from. It is only a pointer:
@@ -44,12 +115,12 @@ Feature: The insights inbox
       Given a member saves a Langy answer that was about a widget on a board
       When the insight is filed
       Then it keeps the ids and the names of the board and the widget as they were
-      And every reader of the project reads the same pointer
+      And its owner reads that pointer in their inbox
 
     @unit
     Scenario: A member's filing is recorded as saved from a chat
       Given a member files an insight
-      When a reader reads their inbox
+      When they read their inbox
       Then the insight is recorded as filed from a chat, not by a run
 
     @unit
@@ -132,7 +203,7 @@ Feature: The insights inbox
     @unit
     Scenario: An insight keeps its query, the fixed window and the values it was filed with
       Given a member files an insight with a query, a window and parameter values
-      When a reader reads their inbox
+      When they read their inbox
       Then the insight carries that query, that window and those values unchanged
 
     @unit
@@ -225,14 +296,7 @@ Feature: The insights inbox
       When the badge is derived
       Then the count is 3
 
-  Rule: Reader state is personal
-
-    @unit
-    Scenario: One member marking an insight done does not move it for another
-      Given two members of the project and one insight
-      When the first member marks it done
-      Then it is archived for the first member
-      And it is still in the inbox for the second member
+  Rule: Seen is marked once
 
     @unit
     Scenario: Opening a folder marks what it shows as seen, once
@@ -246,7 +310,7 @@ Feature: The insights inbox
     @integration
     Scenario: Insights are refused when the flag is off
       Given the release_insights flag is off for the project
-      When a member asks for the project's insights
+      When a member asks for their insights
       Then the request is refused with insights_not_enabled
 
     @integration
@@ -264,7 +328,7 @@ Feature: The insights inbox
     @integration
     Scenario: A member without analytics:view cannot read insights
       Given a member without analytics:view on the project
-      When they ask for the project's insights
+      When they ask for their insights
       Then the request is refused before the handler runs
 
   Rule: The inbox page
@@ -274,6 +338,7 @@ Feature: The insights inbox
       Given a project with no insights
       When a member opens Insights
       Then they see "Langy writes your brief here"
+      And that the brief is theirs alone
       And an action that opens Langy
 
     @e2e
@@ -282,6 +347,12 @@ Feature: The insights inbox
       When a member opens the bell in the top bar
       Then it shows the 4 newest
       And a link that opens the inbox
+
+    @integration
+    Scenario: The page says only you see your insights
+      Given a member opens Insights
+      When the page draws
+      Then it reads "Only you see your insights."
 
     @integration
     Scenario: An archived insight offers Restore
@@ -309,3 +380,34 @@ Feature: The insights inbox
       Given an insight the reader kept
       When the line under its title is written
       Then it reads "Kept as still relevant"
+
+  Rule: Copying an insight
+    Copy puts a plain-text version on the clipboard, to paste into Slack or an email. It is
+    the only way an insight leaves its owner.
+
+    @unit
+    Scenario: The copied text carries the title, the body, the fixed period and the board
+      Given an insight from a widget on a board, with a window from Jul 5 to Aug 3 2026, the period "Last 30 days" and a model parameter
+      When its plain text is written
+      Then it reads the title, then the body with its numbers as Langy wrote them and its headers as plain lines
+      And a line with the first and the last day, the year, the period and the parameter with its value
+      And a line with the board and the widget as they were filed
+
+    @unit
+    Scenario: The copied text of an insight with no board and no window is its title and body
+      Given an insight filed with no board and no window
+      When its plain text is written
+      Then it reads the title and the body, and names no period and no board
+
+    @integration
+    Scenario: Copy puts the insight on the clipboard and says so
+      Given an insight in the inbox
+      When the reader chooses Copy
+      Then its plain text is written to the clipboard
+      And they read "Copied. Paste it anywhere."
+
+    @integration
+    Scenario: A clipboard that refuses says the copy failed
+      Given a browser that refuses the clipboard
+      When the reader chooses Copy
+      Then they are told the insight could not be copied

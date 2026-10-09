@@ -1,7 +1,7 @@
 /**
  * What an insight test mounts instead of an application: a double for `InsightHostApi`, the
  * design system, and the real tRPC hooks over a transport whose network the test answers.
- * Notices, navigations, query writes and Langy asks are RECORDED, not performed.
+ * Notices, navigations, query and clipboard writes and Langy asks are RECORDED, not performed.
  */
 
 import { UiHostServicesContextProvider } from "@langwatch/browser-host/capabilities";
@@ -29,8 +29,11 @@ export type StubInsightHostOptions = {
   project?: InsightHostProject | undefined;
   /** `release_insights`; on unless a test says otherwise. */
   enabled?: boolean | undefined;
+  /** A viewer unless a test says otherwise: `analytics:view` is all insight asks for. */
   permissions?: readonly string[];
   query?: Readonly<Record<string, string | undefined>>;
+  /** A browser with no clipboard, or one that refuses the write. */
+  clipboardRefuses?: boolean;
 };
 
 /** A host that answers from fixtures and records everything it is told. */
@@ -40,6 +43,8 @@ export class StubInsightHost extends InsightHostApi {
   readonly navigations: string[] = [];
   readonly queries: Readonly<Record<string, string | undefined>>[] = [];
   readonly langyAsks: LangyAskRequest[] = [];
+  /** Every text written to the clipboard, oldest first. */
+  readonly clipboard: string[] = [];
 
   constructor(private readonly options: StubInsightHostOptions = {}) {
     super();
@@ -54,9 +59,7 @@ export class StubInsightHost extends InsightHostApi {
   }
 
   hasPermission(permission: string): boolean {
-    return (this.options.permissions ?? ["analytics:view", "analytics:manage"]).includes(
-      permission,
-    );
+    return (this.options.permissions ?? ["analytics:view"]).includes(permission);
   }
 
   query(): Readonly<Record<string, string | undefined>> {
@@ -77,6 +80,12 @@ export class StubInsightHost extends InsightHostApi {
 
   failed(failure: InsightFailureNotice): void {
     this.failures.push(failure);
+  }
+
+  copyToClipboard(text: string): Promise<boolean> {
+    if (this.options.clipboardRefuses) return Promise.resolve(false);
+    this.clipboard.push(text);
+    return Promise.resolve(true);
   }
 
   askLangy(request: LangyAskRequest): void {
@@ -137,6 +146,7 @@ export function insightEntry(overrides: Partial<InsightEntry> = {}): InsightEntr
     source: null,
     board: null,
     filedVia: "chat",
+    ownerUserId: "user-filer",
     filedByUserId: "user-filer",
     filedAt: nowInstant().epochMilliseconds,
     renewedAt: null,

@@ -34,6 +34,39 @@ const REPLAY = {
   parameters: { model: "gpt-5", minimum: 5 },
 };
 
+/** What the additive migrations leave on a row folded before them: NULLs and the `chat` default. */
+const ROW_BEFORE_COLUMNS: InsightRow = {
+  id: "insight-1",
+  projectId: "project-1",
+  title: "Checkout errors doubled",
+  body: "Checkout errors doubled overnight.",
+  tone: "bad",
+  topic: null,
+  validDays: 7,
+  lwql: "SELECT count() FROM traces",
+  sourceConversationId: null,
+  sourceMessageId: null,
+  filedByUserId: "user-filer",
+  filedAt: FILED_AT,
+  renewedAt: null,
+  createdAt: FILED_AT,
+  updatedAt: FILED_AT,
+  occurredAt: FILED_AT,
+  acceptedAt: FILED_AT,
+  lastEventId: "event-1",
+  projectionVersion: "2026-10-09",
+  boardId: null,
+  boardName: null,
+  widgetId: null,
+  widgetName: null,
+  filedVia: "chat",
+  replayStart: null,
+  replayEnd: null,
+  replayGranularitySeconds: null,
+  replayContext: null,
+  ownerUserId: null,
+};
+
 function folded(state: Partial<InsightState> = {}): StoredProjection<InsightState> {
   return {
     state: {
@@ -47,6 +80,7 @@ function folded(state: Partial<InsightState> = {}): StoredProjection<InsightStat
       source: null,
       board: null,
       filedVia: "chat",
+      ownerUserId: "user-filer",
       filedByUserId: "user-filer",
       filedAt: FILED_AT,
       renewedAt: null,
@@ -138,43 +172,37 @@ describe("given an insight with a query, a window and parameter values", () => {
   });
 });
 
-describe("given an insight row written before the pointer and window columns existed", () => {
+describe("given an insight a run filed for a person", () => {
+  describe("when its row is written", () => {
+    it("holds the owner in a column of its own, beside nobody who filed it", async () => {
+      const { repository, written } = repositoryOverOneRow();
+
+      await repository.store(
+        folded({ filedVia: "run", ownerUserId: "user-owner", filedByUserId: null }),
+        CONTEXT,
+      );
+
+      expect(written.row).toMatchObject({ ownerUserId: "user-owner", filedByUserId: null });
+      const read = await repository.get("insight-1", CONTEXT);
+      expect(read.kind === "folded" && read.projection.state.ownerUserId).toBe("user-owner");
+    });
+  });
+});
+
+describe("given an insight row written before the pointer, window and owner columns existed", () => {
   describe("when the row is read", () => {
+    /** @scenario "An insight stored before owners existed belongs to whoever filed it" */
+    it("gives the insight to the person who filed it", () => {
+      expect(
+        insightEntryFromRows({ insight: ROW_BEFORE_COLUMNS, reader: undefined }),
+      ).toMatchObject({ ownerUserId: "user-filer", filedByUserId: "user-filer" });
+    });
+
     /** @scenario "An insight stored before pointers existed still reads" */
     it("gives an insight with no pointer and no window, filed from a chat", () => {
-      // What the additive migration leaves on an existing row: NULLs and the `chat` default.
-      const row: InsightRow = {
-        id: "insight-1",
-        projectId: "project-1",
-        title: "Checkout errors doubled",
-        body: "Checkout errors doubled overnight.",
-        tone: "bad",
-        topic: null,
-        validDays: 7,
-        lwql: "SELECT count() FROM traces",
-        sourceConversationId: null,
-        sourceMessageId: null,
-        filedByUserId: "user-filer",
-        filedAt: FILED_AT,
-        renewedAt: null,
-        createdAt: FILED_AT,
-        updatedAt: FILED_AT,
-        occurredAt: FILED_AT,
-        acceptedAt: FILED_AT,
-        lastEventId: "event-1",
-        projectionVersion: "2026-10-09",
-        boardId: null,
-        boardName: null,
-        widgetId: null,
-        widgetName: null,
-        filedVia: "chat",
-        replayStart: null,
-        replayEnd: null,
-        replayGranularitySeconds: null,
-        replayContext: null,
-      };
-
-      expect(insightEntryFromRows({ insight: row, reader: undefined })).toMatchObject({
+      expect(
+        insightEntryFromRows({ insight: ROW_BEFORE_COLUMNS, reader: undefined }),
+      ).toMatchObject({
         lwql: "SELECT count() FROM traces",
         board: null,
         replay: null,

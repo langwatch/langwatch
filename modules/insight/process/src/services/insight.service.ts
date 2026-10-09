@@ -5,12 +5,13 @@ import { nowInstant } from "@langwatch/time";
 import type { InsightRepository } from "../repositories/insight.repository.ts";
 import type { InsightCommandsService } from "./insight-commands.service.ts";
 
-/** How many of a project's newest insights one inbox read carries. */
+/** How many of one person's newest insights in a project one inbox read carries. */
 const INBOX_READ_LIMIT = 500;
 
 /**
- * The inbox's behaviour: reads come from the projections, writes go out as commands. A write
- * answers before the worker folds it, so a filing answers the entry it will become.
+ * One person's inbox: reads come from the projections and answer only what the reader owns,
+ * writes go out as commands. A write answers before the worker folds it, so a filing answers
+ * the entry it will become.
  */
 export class InsightService {
   private constructor(
@@ -51,13 +52,15 @@ export class InsightService {
       replay: input.replay ?? null,
       source: input.source ?? null,
       board: input.board ?? null,
-      // A member's own filing; the scheduled run will be the one to say "run".
+      // A member's own filing; the scheduled run will be the one to say "run", and to name an
+      // owner who filed nothing.
       filedVia: "chat" as const,
+      ownerUserId: userId,
       filedByUserId: userId,
     };
     const { insightId, ...entry } = filed;
     await this.commands.fileInsight({ tenantId: input.projectId, occurredAt, ...filed });
-    // The one who filed it has seen it: it must not light their own bell.
+    // The owner filed it themselves, so they have seen it: it must not light their own bell.
     await this.commands.markInsightSeen({
       tenantId: input.projectId,
       occurredAt,
@@ -75,7 +78,10 @@ export class InsightService {
     };
   }
 
-  /** Only what this reader has not seen yet goes out; seen is once per reader anyway. */
+  /**
+   * Only what this reader owns and has not seen yet goes out, so an id they do not own is
+   * skipped like an id no insight has.
+   */
   async markSeen({
     projectId,
     userId,
@@ -102,6 +108,7 @@ export class InsightService {
     );
   }
 
+  /** Owner only: `getForReader` refuses another person's insight as it does an unknown id. */
   async archive(scope: { projectId: string; insightId: string; userId: string }): Promise<void> {
     await this.insights.getForReader(scope);
     await this.commands.archiveInsight(this.readerAct(scope));

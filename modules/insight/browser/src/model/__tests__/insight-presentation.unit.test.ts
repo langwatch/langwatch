@@ -1,12 +1,12 @@
 /**
- * The line under an insight's title, as the page prints it.
+ * The line under an insight's title as the page prints it, and the plain text Copy writes.
  * @see modules/insight/specs/insight-inbox.feature
  */
 
 import { describe, expect, it } from "vitest";
 
 import { insightEntry } from "../../testing.tsx";
-import { insightValidity, replayCaption } from "../insight-presentation.ts";
+import { insightPlainText, insightValidity, replayCaption } from "../insight-presentation.ts";
 
 const DAY_MS = 86_400_000;
 /** Midday, so a day in any time zone the suite runs in is the same calendar day. */
@@ -89,6 +89,65 @@ describe("given a window from Jul 5 to Aug 3 with the period Last 30 days and a 
       };
 
       expect(replayCaption({ replay: oneDay, fromBoard: false })).toBe("Replayed with: Jul 5.");
+    });
+  });
+});
+
+describe("given an insight from a widget on a board, with a window from Jul 5 to Aug 3 2026", () => {
+  const entry = insightEntry({
+    title: "Checkout errors doubled",
+    body:
+      "Checkout errors doubled overnight: 240 failed against 118 the day before.\n\n" +
+      "**What to do**\n\n" +
+      "Roll back the gateway change.",
+    board: {
+      id: "board-1",
+      name: "Checkout health",
+      widget: { id: "widget-1", name: "Errors by day" },
+    },
+    lwql: "SELECT count() FROM traces WHERE model = {model:String}",
+    replay: {
+      start: new Date(2026, 6, 5).getTime(),
+      end: new Date(2026, 7, 4).getTime(),
+      granularitySeconds: 86_400,
+      period: "Last 30 days",
+      parameters: { model: "gpt-5" },
+    },
+  });
+
+  describe("when its plain text is written", () => {
+    /** @scenario "The copied text carries the title, the body, the fixed period and the board" */
+    it("reads the title, the body as Langy wrote it, the period with its year and values, and the board", () => {
+      expect(insightPlainText(entry)).toBe(
+        [
+          "Checkout errors doubled",
+          "",
+          "Checkout errors doubled overnight: 240 failed against 118 the day before.",
+          "",
+          "What to do",
+          "",
+          "Roll back the gateway change.",
+          "",
+          "Period: Jul 5 to Aug 3, 2026 · Last 30 days · model: gpt-5",
+          "From: Checkout health › Errors by day",
+        ].join("\n"),
+      );
+    });
+  });
+});
+
+describe("given an insight filed with no board and no window", () => {
+  describe("when its plain text is written", () => {
+    /** @scenario "The copied text of an insight with no board and no window is its title and body" */
+    it("reads the title and the body, and names no period and no board", () => {
+      const entry = insightEntry({
+        title: "Checkout errors doubled",
+        body: "Checkout errors doubled overnight.",
+      });
+
+      expect(insightPlainText(entry)).toBe(
+        "Checkout errors doubled\n\nCheckout errors doubled overnight.",
+      );
     });
   });
 });

@@ -1,7 +1,7 @@
 /**
- * The topbar bell, lent through `InsightsBellToken` (§10.1): what you have not seen, from the
- * same derivation as the page and the sidebar. Draws nothing without a project, the flag or
- * the grant.
+ * The topbar bell, lent through `InsightsBellToken` (§10.1): your own insights you have not
+ * seen, from the same derivation as the page and the sidebar. Draws nothing without a project,
+ * the flag or the grant.
  */
 
 import { Popover } from "@langwatch/design-system/popover";
@@ -56,7 +56,7 @@ export function InsightsBell(_props: InsightsBellProps) {
       <Popover.Content width="400px" padding={0}>
         <Box borderBottomWidth="1px" borderColor="border" paddingX={4} paddingY={2.5}>
           <Text fontSize="12.5px" fontWeight="semibold">
-            Inbox{" "}
+            Your inbox{" "}
             <Text as="span" fontWeight="normal" color="fg.subtle">
               · this project
             </Text>

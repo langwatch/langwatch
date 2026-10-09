@@ -23,8 +23,8 @@ name with "(deleted)" once it is gone.
 
 **How it was filed is stored.** `filedVia` is `chat` (a member saved a Langy
 answer) or `run` (a scheduled run). Only `chat` is written today. The row says
-"Saved from a chat with Langy" or "Daily run". It says nothing about who else
-sees the insight; that decision is open.
+"Saved from a chat with Langy" or "Daily run". Nobody but its owner sees the
+insight either way ([ADR-003](./003-personal-insights.md)).
 
 **Evidence is what to run, never a result.** An insight keeps its query
 (`lwql`), a fixed window (`replay.start`, `replay.end`, `replay.granularitySeconds`)
