@@ -18,6 +18,7 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import type { Plan as PlanInfo } from "@langwatch/entitlement-contract";
+import { FrontendFlags } from "@langwatch/feature-flag-contract";
 import { InviteMemberDrawerToken, PersonDrawerToken } from "@langwatch/organization-client";
 import { Ban, MoreVertical, Plus, Trash2, Undo2 } from "lucide-react";
 import { useEffect, useMemo, useState, type ComponentProps } from "react";
@@ -130,7 +131,7 @@ function usePeopleListState({
   const canManage = hasPermission("organization:manage");
 
   const host = useOrganizationHost();
-  const governanceEnabled = host.isFeatureEnabled("release_ui_ai_governance_enabled");
+  const governanceEnabled = host.isFeatureEnabled(FrontendFlags.release_ui_ai_governance_enabled);
   const department = useDepartmentColumn(organization.id, governanceEnabled);
   const showDepartment = department.show && canManage;
   const departmentNameById = useMemo(

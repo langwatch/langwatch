@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /** Governance's departments, named on the card once AI governance is on and any exist. */
+import { FrontendFlags } from "@langwatch/feature-flag-contract";
+
 import { departmentsApi } from "./scim-api.ts";
 
-export const GOVERNANCE_FLAG = "release_ui_ai_governance_enabled";
+export const GOVERNANCE_FLAG = FrontendFlags.release_ui_ai_governance_enabled;
 
 export function useDirectoryDepartments({
   organizationId,

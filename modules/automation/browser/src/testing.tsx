@@ -201,11 +201,6 @@ export class FakeAutomationHost extends AutomationHost {
     return permissionSatisfiedBy({ granted: this.granted, requested: permission });
   }
 
-  isFeatureEnabled(flag: string): boolean {
-    const flags = this.options.enabledFlags ?? "all";
-    return flags === "all" || flags.includes(flag);
-  }
-
   appBaseUrl(): string {
     return this.options.appBaseUrl ?? DEFAULT_APP_BASE_URL;
   }

@@ -1,5 +1,6 @@
 /** Renders the voice editor under a test host for agent's own port. */
 
+import type { ReleaseFlagToken } from "@langwatch/browser-host/declarations";
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { screen } from "@testing-library/react";
 import { vi } from "vitest";
@@ -40,8 +41,8 @@ export class VoiceTestHost implements AgentManagementHost {
   project(): AgentHostProject {
     return { id: "test-project", slug: "test-project" };
   }
-  isFeatureEnabled(flag: string): boolean {
-    return flag === "release_voice_agents_enabled" && voiceState.flagOn;
+  isFeatureEnabled({ name }: ReleaseFlagToken): boolean {
+    return name === "release_voice_agents_enabled" && voiceState.flagOn;
   }
   failed(failure: AgentFailureNotice): void {
     this.failures.push(failure);

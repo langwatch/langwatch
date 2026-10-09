@@ -6,6 +6,7 @@ import { PageLayout } from "@langwatch/design-system/page-layout";
  */
 import { Tabs, Text, VStack } from "@langwatch/design-system/primitives";
 import { TabCount } from "@langwatch/design-system/tab-count";
+import { FrontendFlags } from "@langwatch/feature-flag-contract";
 import { Suspense } from "react";
 
 import { useDepartmentColumn } from "../../../behavior/use-department-column.ts";
@@ -46,7 +47,7 @@ function Directory({
   const route = host.route();
   const department = useDepartmentColumn(
     organizationId,
-    host.isFeatureEnabled("release_ui_ai_governance_enabled"),
+    host.isFeatureEnabled(FrontendFlags.release_ui_ai_governance_enabled),
   );
   const departmentsShown = department.show && host.hasOrganizationPermission("governance:view");
   const tab = parseDirectoryTab({

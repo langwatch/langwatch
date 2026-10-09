@@ -115,10 +115,6 @@ class CapabilityAutomationHost extends AutomationHost {
     return this.members.session.hasPermission(permission);
   }
 
-  isFeatureEnabled(flag: string): boolean {
-    return this.members.session.isFeatureEnabled(flag);
-  }
-
   route(): AutomationRouteReading {
     const { params, query } = this.members.uiRoute.reading();
     return { params, query };

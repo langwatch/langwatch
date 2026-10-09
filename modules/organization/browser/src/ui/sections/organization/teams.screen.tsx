@@ -21,6 +21,7 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
+import { FrontendFlags } from "@langwatch/feature-flag-contract";
 import {
   CreateProjectDrawerToken,
   CreateTeamDrawerToken,
@@ -778,7 +779,7 @@ function TeamCard({
   const { hasPermission } = useOrganizationTeamProject();
   const queryClient = api.useUtils();
   const governanceEnabled = useOrganizationHost().isFeatureEnabled(
-    "release_ui_ai_governance_enabled",
+    FrontendFlags.release_ui_ai_governance_enabled,
   );
   const department = useDepartmentColumn(organizationId, governanceEnabled);
 

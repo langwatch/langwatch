@@ -3112,6 +3112,9 @@ importers:
       '@langwatch/error-views':
         specifier: workspace:*
         version: link:../../../../packages/error-views
+      '@langwatch/feature-flag-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/feature-flag/contract
       '@langwatch/gateway-contract':
         specifier: workspace:*
         version: link:../../../../modules/gateway/contract
@@ -4044,6 +4047,9 @@ importers:
       '@langwatch/error-views':
         specifier: workspace:*
         version: link:../../../../packages/error-views
+      '@langwatch/feature-flag-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/feature-flag/contract
       '@langwatch/identity-client':
         specifier: workspace:*
         version: link:../../../../modules/identity/client
@@ -4560,6 +4566,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
+      '@langwatch/feature-flag-contract':
+        specifier: workspace:*
+        version: link:../../feature-flag/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
@@ -6280,6 +6289,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
+      '@langwatch/feature-flag-contract':
+        specifier: workspace:*
+        version: link:../../feature-flag/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
@@ -11965,6 +11977,9 @@ importers:
       '@langwatch/entitlement-contract':
         specifier: workspace:*
         version: link:../../entitlement/contract
+      '@langwatch/feature-flag-contract':
+        specifier: workspace:*
+        version: link:../../feature-flag/contract
       '@langwatch/identity-client':
         specifier: workspace:*
         version: link:../../identity/client

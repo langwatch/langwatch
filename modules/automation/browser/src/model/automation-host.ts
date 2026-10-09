@@ -85,9 +85,6 @@ export abstract class AutomationHost {
   /** Fails closed: an answer that has not arrived reads as no. */
   abstract hasPermission(permission: string): boolean;
 
-  /** Fails closed the same way. */
-  abstract isFeatureEnabled(flag: string): boolean;
-
   abstract route(): AutomationRouteReading;
 
   /** Replaces the whole query string; a key left out is a key removed. */
