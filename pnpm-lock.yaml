@@ -1866,6 +1866,9 @@ importers:
       '@langwatch/prompt-contract':
         specifier: workspace:*
         version: link:../../modules/prompt/contract
+      '@langwatch/seedgen-runner':
+        specifier: workspace:*
+        version: link:../../tools/seedgen/runner
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../packages/test-harness
@@ -7005,6 +7008,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/automation-contract':
         specifier: workspace:*
         version: link:../../automation/contract
@@ -7042,9 +7048,6 @@ importers:
       '@langwatch/analytics-process':
         specifier: workspace:*
         version: link:../../analytics/process
-      '@langwatch/authorization':
-        specifier: workspace:*
-        version: link:../../../packages/authorization
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness
@@ -15420,6 +15423,9 @@ importers:
       '@langwatch/api-key-contract':
         specifier: workspace:*
         version: link:../../api-key/contract
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
@@ -15586,9 +15592,6 @@ importers:
       '@clickhouse/client':
         specifier: 'catalog:'
         version: 1.23.0
-      '@langwatch/authorization':
-        specifier: workspace:*
-        version: link:../../../packages/authorization
       '@langwatch/clickhouse-migrations':
         specifier: workspace:*
         version: link:../../../packages/clickhouse-migrations

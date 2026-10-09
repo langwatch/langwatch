@@ -33,3 +33,6 @@ sdks/python/.pytest_cache
 sdks/python/.chainlit
 sdks/python/.files
 sdks/python/examples
+# Local worktrees and agent scratch: never build context.
+.worktrees
+.claude
