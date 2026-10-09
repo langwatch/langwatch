@@ -50,7 +50,6 @@ describe("GroupQueueProcessor — decode-drop durability (#5538)", () => {
   });
 
   beforeEach(() => {
-    vi.stubEnv("GROUP_QUEUE_ENVELOPE_WRITES_ENABLED", "true");
     queues = [];
   });
 

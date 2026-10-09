@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   decodeJobEnvelope,
@@ -50,9 +50,6 @@ async function encodeGq2(
 }
 
 describe("job envelope retry attempt", () => {
-  beforeEach(() => {
-    vi.stubEnv("GROUP_QUEUE_ENVELOPE_WRITES_ENABLED", "true");
-  });
 
   afterEach(() => {
     vi.unstubAllEnvs();

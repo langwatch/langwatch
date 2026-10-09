@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { MAX_BLOB_BYTES } from "../blobConstants.ts";
 import {
@@ -19,9 +19,6 @@ import { InMemoryJobBlobStore, InMemoryObjectStore, mintTestUri } from "./blob-t
 describe("jobEnvelope decode failures", () => {
   const projectId = createTenantId("project_5538");
 
-  beforeEach(() => {
-    vi.stubEnv("GROUP_QUEUE_ENVELOPE_WRITES_ENABLED", "true");
-  });
   afterEach(() => {
     vi.unstubAllEnvs();
   });

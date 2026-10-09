@@ -34,7 +34,6 @@ describe("GroupQueueProcessor — GQ2 offload", () => {
   });
 
   beforeEach(() => {
-    vi.stubEnv("GROUP_QUEUE_ENVELOPE_WRITES_ENABLED", "true");
     queues = [];
   });
 

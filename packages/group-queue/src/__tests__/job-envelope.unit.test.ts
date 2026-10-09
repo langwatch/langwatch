@@ -18,10 +18,6 @@ import { TieredBlobStore } from "../tieredBlobStore.ts";
 import { InMemoryJobBlobStore, InMemoryObjectStore, mintTestUri } from "./blob-test-doubles.ts";
 
 describe("jobEnvelope", () => {
-  // GROUP_QUEUE_ENVELOPE_WRITES_ENABLED (bare-JSON fallback for encode/decode)
-  // is retired: decodeJobEnvelope now unconditionally requires a version-2
-  // envelope. The describe blocks testing that dual-format path are dropped,
-  // not forced.
 
   describe("given a payload over the compression threshold", () => {
     const largePayload = {
