@@ -49,16 +49,20 @@ const json = (response: ServerResponse, value: unknown) => {
 };
 
 /**
- * An Okta-shaped identity provider on `port`. Its token endpoint signs ID
- * tokens with a key the JWKS does not publish, so a callback succeeds only if
- * the token is accepted without verification.
+ * An Okta-shaped identity provider on `port`. Unless `signWithPublishedKey`, its token endpoint
+ * signs ID tokens with a key the JWKS does not publish, so a callback succeeds only if the token
+ * is accepted without verification. `issuedAtOffsetSeconds` moves the token's `iat` from now.
  */
 const startIdentityProvider = async ({
   port,
   publishJwks,
+  signWithPublishedKey = false,
+  issuedAtOffsetSeconds = 0,
 }: {
   port: number;
   publishJwks: boolean;
+  signWithPublishedKey?: boolean;
+  issuedAtOffsetSeconds?: number;
 }) => {
   const published = generateKeyPairSync("rsa", { modulusLength: 2048 });
   const unpublished: KeyObject = generateKeyPairSync("rsa", {
@@ -106,8 +110,8 @@ const startIdentityProvider = async ({
         email: "sam@acme.test",
         email_verified: true,
         nonce: nonces.get(code) ?? "",
-        iat: now,
-        exp: now + 300,
+        iat: now + issuedAtOffsetSeconds,
+        exp: now + issuedAtOffsetSeconds + 300,
       })}`;
       const signer = createSign("RSA-SHA256");
       signer.update(input);
@@ -115,7 +119,7 @@ const startIdentityProvider = async ({
         access_token: `access-${code}`,
         token_type: "Bearer",
         expires_in: 300,
-        id_token: `${input}.${signer.sign(unpublished).toString("base64url")}`,
+        id_token: `${input}.${signer.sign(signWithPublishedKey ? published.privateKey : unpublished).toString("base64url")}`,
       });
       return;
     }
@@ -256,5 +260,54 @@ describe("given Okta requires verified ID tokens", () => {
       expect(context.socialProviders.map((p) => p.id)).not.toContain("okta");
       expect((await startOktaSignIn(auth)).status).toBe(404);
     });
+  });
+});
+
+describe("given Okta signs its ID tokens with the key its JWKS publishes", () => {
+  /** One sign-in through the callback, against a provider whose `iat` is offset from now. */
+  const signInIssuedAt = async ({ issuedAtOffsetSeconds }: { issuedAtOffsetSeconds: number }) => {
+    const port = await closedPort();
+    const idp = await startIdentityProvider({
+      port,
+      publishJwks: true,
+      signWithPublishedKey: true,
+      issuedAtOffsetSeconds,
+    });
+    const { auth, db } = buildAuth({ issuerPort: port });
+    const started = await startOktaSignIn(auth);
+    expect(started.status).toBe(200);
+    const authorizationUrl = new URL(authorizationResponseSchema.parse(await started.json()).url);
+    const code = `code-${randomUUID()}`;
+    idp.nonces.set(code, authorizationUrl.searchParams.get("nonce") ?? "");
+    const callback = new URL(`${BASE_URL}/api/auth/callback/okta`);
+    callback.searchParams.set("code", code);
+    callback.searchParams.set("state", authorizationUrl.searchParams.get("state") ?? "");
+    const cookie = started.headers
+      .getSetCookie()
+      .map((value) => value.split(";", 1)[0])
+      .join("; ");
+    const response = await auth.handler(
+      new Request(callback, { headers: { cookie }, redirect: "manual" }),
+    );
+    expect(response.status).toBe(302);
+    const location = new URL(response.headers.get("location") ?? "", BASE_URL);
+    return { error: location.searchParams.get("error"), db };
+  };
+
+  /** @scenario "An ID token issued up to 120 seconds in the future is admitted" */
+  it("admits a token issued one minute in the future", async () => {
+    const { error, db } = await signInIssuedAt({ issuedAtOffsetSeconds: 60 });
+
+    expect(error).toBeNull();
+    expect(db.session ?? []).toHaveLength(1);
+  });
+
+  /** @scenario "An ID token issued in the future beyond the clock skew allowance is refused" */
+  it("refuses a token issued three minutes in the future before any account or session write", async () => {
+    const { error, db } = await signInIssuedAt({ issuedAtOffsetSeconds: 180 });
+
+    expect(error).not.toBeNull();
+    expect(db.account ?? []).toHaveLength(0);
+    expect(db.session ?? []).toHaveLength(0);
   });
 });

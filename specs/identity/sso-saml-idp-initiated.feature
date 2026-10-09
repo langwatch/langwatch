@@ -67,6 +67,13 @@ Feature: Signing in from the identity provider's own portal through a SAML conne
       And the person sees the sign-in error screen without the reason
 
     @integration
+    Scenario: An unsolicited response with nobody signed in signs the person in
+      Given "acme-okta" is opted in
+      And the browser holds no session
+      When the identity provider posts a valid signed response for "carol@acme.com" that answers no request
+      Then "carol@acme.com" is signed in through "acme-okta"
+
+    @integration
     Scenario: A sign-in LangWatch started is unaffected by the opt-in
       Given "acme-okta" is not opted in
       When "carol@acme.com" starts single sign-on from LangWatch and the provider answers that request
@@ -133,3 +140,22 @@ Feature: Signing in from the identity provider's own portal through a SAML conne
         | destination                                      |
         | signature                                        |
         | expiry, beyond the allowed clock difference      |
+
+  Rule: a response nobody asked for never changes who the browser is signed in as
+
+    @integration
+    Scenario: An unsolicited response for another person is refused while somebody is signed in
+      Given "acme-okta" is opted in
+      And the browser is signed in as "carol@acme.com"
+      When the identity provider posts a valid signed response for "dave@acme.com" that answers no request
+      Then the person sees the sign-in error screen asking them to sign out first
+      And the browser is still signed in as "carol@acme.com" with the same session
+      And no session is created for "dave@acme.com"
+      And the log names "acme-okta" and the refusal, and holds nothing from the assertion
+
+    @integration
+    Scenario: An unsolicited response for the person already signed in signs them in
+      Given "acme-okta" is opted in
+      And the browser is signed in as "carol@acme.com"
+      When the identity provider posts a valid signed response for "carol@acme.com" that answers no request
+      Then "carol@acme.com" is signed in through "acme-okta"

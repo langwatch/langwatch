@@ -26,6 +26,7 @@ const IDP_ENTITY_ID = "https://idp.acme.test/entity";
 const SP_ENTITY_ID = "https://app.langwatch.test/sso/acme";
 const ACS_URL = `${BASE_URL}/api/auth/sso/saml2/sp/acs/${PROVIDER_ID}`;
 const EMAIL = "carol@acme.com";
+const OTHER_EMAIL = "dave@acme.com";
 
 type IdpInitiated = z.infer<typeof ssoSamlIdpConfigSchema>["idpInitiated"];
 const OFF: IdpInitiated = { enabled: false, landingTargets: [] };
@@ -133,17 +134,23 @@ async function postAssertion({
   auth,
   samlResponse,
   relayState,
+  cookie,
 }: {
   auth: Auth;
   samlResponse: string;
   relayState?: string;
+  cookie?: string;
 }) {
   const body = new URLSearchParams({ SAMLResponse: samlResponse });
   if (relayState !== undefined) body.set("RelayState", relayState);
   return auth.handler(
     new Request(ACS_URL, {
       method: "POST",
-      headers: { "content-type": "application/x-www-form-urlencoded", origin: BASE_URL },
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        origin: BASE_URL,
+        ...(cookie === undefined ? {} : { cookie }),
+      },
       body,
       redirect: "manual",
     }),
@@ -209,6 +216,7 @@ describe("given a SAML connection that is not opted in", () => {
 
 describe("given a SAML connection opted in with /acme/messages listed", () => {
   /** @scenario "An unsolicited response for an opted-in connection signs the person in" */
+  /** @scenario "An unsolicited response with nobody signed in signs the person in" */
   it("signs the person in through the connection", async () => {
     const { auth, database } = deployment(OPTED_IN);
 
@@ -283,5 +291,65 @@ describe("given a SAML connection opted in with /acme/messages listed", () => {
 
     expect(asked.error !== null || asked.status >= 400).toBe(true);
     expect(unasked).toEqual(asked);
+  });
+});
+
+describe("given a SAML connection opted in, and a browser already signed in as carol", () => {
+  /** Signs carol in through an unsolicited response and returns the browser's cookies. */
+  async function signedInAsCarol(auth: Auth) {
+    const response = await postAssertion({ auth, samlResponse: unsolicited() });
+    expect(outcomeOf(response)).toMatchObject({ status: 302, error: null });
+    return response.headers
+      .getSetCookie()
+      .map((value) => value.split(";", 1)[0])
+      .join("; ");
+  }
+
+  /** @scenario "An unsolicited response for another person is refused while somebody is signed in" */
+  it("refuses a response for dave, keeps carol's session and mints none", async () => {
+    const { auth, database, logged } = deployment(OPTED_IN);
+    const cookie = await signedInAsCarol(auth);
+    const sessionsBefore = [...database.session];
+
+    const response = await postAssertion({
+      auth,
+      samlResponse: unsolicited({ nameId: OTHER_EMAIL, email: OTHER_EMAIL }),
+      cookie,
+    });
+
+    expect(outcomeOf(response)).toMatchObject({ status: 302, error: "signed_in_as_another_user" });
+    expect(response.headers.get("set-cookie") ?? "").not.toContain("session_token=");
+    expect(database.session).toEqual(sessionsBefore);
+    expect(logged).toContainEqual({ level: "warn", args: [{ providerId: PROVIDER_ID }] });
+  });
+
+  /** @scenario "An unsolicited response for the person already signed in signs them in" */
+  it("signs carol in again", async () => {
+    const { auth, database } = deployment(OPTED_IN);
+    const cookie = await signedInAsCarol(auth);
+
+    const outcome = outcomeOf(await postAssertion({ auth, samlResponse: unsolicited(), cookie }));
+
+    expect(outcome).toMatchObject({ status: 302, error: null });
+    expect(database.session).toHaveLength(2);
+  });
+});
+
+describe("given a SAML connection opted in, and an identity provider whose clock is off", () => {
+  // The signer opens the window a minute before its clock and closes it five minutes after.
+  /** @scenario "A SAML assertion whose <boundary> is <gap> <side> our clock is <outcome>" */
+  it.each([
+    { window: "NotBefore is 90 seconds ahead of", clockSkewSeconds: 150, error: null },
+    { window: "NotBefore is 180 seconds ahead of", clockSkewSeconds: 240, error: "saml_error" },
+    { window: "NotOnOrAfter is 90 seconds behind", clockSkewSeconds: -390, error: null },
+    { window: "NotOnOrAfter is 180 seconds behind", clockSkewSeconds: -480, error: "saml_error" },
+  ])("answers an assertion whose $window our clock", async ({ clockSkewSeconds, error }) => {
+    const { auth, database } = deployment(OPTED_IN);
+    const samlResponse = signSamlResponse({ identity: idp, claims: claims(), clockSkewSeconds });
+
+    const outcome = outcomeOf(await postAssertion({ auth, samlResponse }));
+
+    expect(outcome).toMatchObject({ status: 302, error });
+    expect(database.session).toHaveLength(error === null ? 1 : 0);
   });
 });

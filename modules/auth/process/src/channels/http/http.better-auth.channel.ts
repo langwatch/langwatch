@@ -39,6 +39,10 @@ import { twoFactor } from "better-auth/plugins/two-factor";
 import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";
 import { findRegisteredRefusals } from "../../rules/better-auth-error-code.rules.ts";
 import {
+  ID_TOKEN_MAX_AGE_SECONDS,
+  SIGN_IN_CLOCK_TOLERANCE_SECONDS,
+} from "../../rules/sign-in-clock.rules.ts";
+import {
   findSubmittedAddresses,
   isLockoutCountedPath,
 } from "../../rules/sign-in-identifier-hash.rules.ts";
@@ -750,6 +754,8 @@ function genericOAuthPlugins(
  * specs/identity/sso-saml-idp-initiated.feature
  */
 export const ssoSamlOptions: NonNullable<SSOOptions["saml"]> = {
+  // samlify and the plugin read this allowance in milliseconds.
+  clockSkew: SIGN_IN_CLOCK_TOLERANCE_SECONDS * 1_000,
   // Pinned: the per-connection opt-in lives inside this check; off would admit every connection.
   enableInResponseToValidation: true,
   resolveIdpInitiatedLanding: ({ relayState, samlConfig, appOrigin }) => {
@@ -792,6 +798,11 @@ function ssoPlugin({
      *  provider gets one; where they land is the arrival policy's business. */
     disableImplicitSignUp: false,
     saml: ssoSamlOptions,
+    // Seconds, as jose reads them; `maxTokenAge` is what makes jose refuse an `iat` in the future.
+    oidc: {
+      clockTolerance: SIGN_IN_CLOCK_TOLERANCE_SECONDS,
+      maxTokenAge: ID_TOKEN_MAX_AGE_SECONDS,
+    },
     resolveUser: async (input, context) => {
       const resolution = await resolveSsoUser({ assertions, input, context });
       // The exact account admitted here is the one the session it mints is attributed to.
