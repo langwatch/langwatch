@@ -15,9 +15,6 @@ if TYPE_CHECKING:
     from ..models.delete_api_gateway_v1_budgets_by_id_response_400_meta import (
         DeleteApiGatewayV1BudgetsByIdResponse400Meta,
     )
-    from ..models.delete_api_gateway_v1_budgets_by_id_response_400_trace import (
-        DeleteApiGatewayV1BudgetsByIdResponse400Trace,
-    )
 
 
 T = TypeVar("T", bound="DeleteApiGatewayV1BudgetsByIdResponse400")
@@ -34,7 +31,6 @@ class DeleteApiGatewayV1BudgetsByIdResponse400:
         meta (DeleteApiGatewayV1BudgetsByIdResponse400Meta | Unset):
         trace_id (str | Unset):
         span_id (str | Unset):
-        trace (DeleteApiGatewayV1BudgetsByIdResponse400Trace | Unset):
         tips (list[str] | Unset):
         docs_url (str | Unset):
         fault (DeleteApiGatewayV1BudgetsByIdResponse400Fault | Unset):
@@ -48,7 +44,6 @@ class DeleteApiGatewayV1BudgetsByIdResponse400:
     meta: DeleteApiGatewayV1BudgetsByIdResponse400Meta | Unset = UNSET
     trace_id: str | Unset = UNSET
     span_id: str | Unset = UNSET
-    trace: DeleteApiGatewayV1BudgetsByIdResponse400Trace | Unset = UNSET
     tips: list[str] | Unset = UNSET
     docs_url: str | Unset = UNSET
     fault: DeleteApiGatewayV1BudgetsByIdResponse400Fault | Unset = UNSET
@@ -71,10 +66,6 @@ class DeleteApiGatewayV1BudgetsByIdResponse400:
         trace_id = self.trace_id
 
         span_id = self.span_id
-
-        trace: dict[str, Any] | Unset = UNSET
-        if not isinstance(self.trace, Unset):
-            trace = self.trace.to_dict()
 
         tips: list[str] | Unset = UNSET
         if not isinstance(self.tips, Unset):
@@ -106,8 +97,6 @@ class DeleteApiGatewayV1BudgetsByIdResponse400:
             field_dict["trace_id"] = trace_id
         if span_id is not UNSET:
             field_dict["span_id"] = span_id
-        if trace is not UNSET:
-            field_dict["trace"] = trace
         if tips is not UNSET:
             field_dict["tips"] = tips
         if docs_url is not UNSET:
@@ -123,9 +112,6 @@ class DeleteApiGatewayV1BudgetsByIdResponse400:
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.delete_api_gateway_v1_budgets_by_id_response_400_meta import (
             DeleteApiGatewayV1BudgetsByIdResponse400Meta,
-        )
-        from ..models.delete_api_gateway_v1_budgets_by_id_response_400_trace import (
-            DeleteApiGatewayV1BudgetsByIdResponse400Trace,
         )
 
         d = dict(src_dict)
@@ -148,13 +134,6 @@ class DeleteApiGatewayV1BudgetsByIdResponse400:
 
         span_id = d.pop("span_id", UNSET)
 
-        _trace = d.pop("trace", UNSET)
-        trace: DeleteApiGatewayV1BudgetsByIdResponse400Trace | Unset
-        if isinstance(_trace, Unset):
-            trace = UNSET
-        else:
-            trace = DeleteApiGatewayV1BudgetsByIdResponse400Trace.from_dict(_trace)
-
         tips = cast(list[str], d.pop("tips", UNSET))
 
         docs_url = d.pop("docs_url", UNSET)
@@ -176,7 +155,6 @@ class DeleteApiGatewayV1BudgetsByIdResponse400:
             meta=meta,
             trace_id=trace_id,
             span_id=span_id,
-            trace=trace,
             tips=tips,
             docs_url=docs_url,
             fault=fault,

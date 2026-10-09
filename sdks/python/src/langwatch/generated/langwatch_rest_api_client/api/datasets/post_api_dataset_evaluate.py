@@ -1,4 +1,4 @@
-from typing import Any, cast
+from typing import Any
 
 import httpx
 
@@ -37,14 +37,14 @@ def _get_kwargs(
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
 ) -> (
-    Any
-    | PostApiDatasetEvaluateResponse200Type0
+    PostApiDatasetEvaluateResponse200Type0
     | PostApiDatasetEvaluateResponse200Type1
     | PostApiDatasetEvaluateResponse200Type2
     | PostApiDatasetEvaluateResponse400
     | PostApiDatasetEvaluateResponse401
     | PostApiDatasetEvaluateResponse403
     | PostApiDatasetEvaluateResponse404
+    | str
     | None
 ):
     if response.status_code == 200:
@@ -103,7 +103,7 @@ def _parse_response(
         return response_404
 
     if response.status_code == 413:
-        response_413 = cast(Any, None)
+        response_413 = response.text
         return response_413
 
     if client.raise_on_unexpected_status:
@@ -115,14 +115,14 @@ def _parse_response(
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
 ) -> Response[
-    Any
-    | PostApiDatasetEvaluateResponse200Type0
+    PostApiDatasetEvaluateResponse200Type0
     | PostApiDatasetEvaluateResponse200Type1
     | PostApiDatasetEvaluateResponse200Type2
     | PostApiDatasetEvaluateResponse400
     | PostApiDatasetEvaluateResponse401
     | PostApiDatasetEvaluateResponse403
     | PostApiDatasetEvaluateResponse404
+    | str
 ]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
@@ -140,14 +140,14 @@ def sync_detailed(
     client: AuthenticatedClient,
     body: PostApiDatasetEvaluateBody,
 ) -> Response[
-    Any
-    | PostApiDatasetEvaluateResponse200Type0
+    PostApiDatasetEvaluateResponse200Type0
     | PostApiDatasetEvaluateResponse200Type1
     | PostApiDatasetEvaluateResponse200Type2
     | PostApiDatasetEvaluateResponse400
     | PostApiDatasetEvaluateResponse401
     | PostApiDatasetEvaluateResponse403
     | PostApiDatasetEvaluateResponse404
+    | str
 ]:
     """Evaluate a dataset
 
@@ -163,7 +163,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any | PostApiDatasetEvaluateResponse200Type0 | PostApiDatasetEvaluateResponse200Type1 | PostApiDatasetEvaluateResponse200Type2 | PostApiDatasetEvaluateResponse400 | PostApiDatasetEvaluateResponse401 | PostApiDatasetEvaluateResponse403 | PostApiDatasetEvaluateResponse404]
+        Response[PostApiDatasetEvaluateResponse200Type0 | PostApiDatasetEvaluateResponse200Type1 | PostApiDatasetEvaluateResponse200Type2 | PostApiDatasetEvaluateResponse400 | PostApiDatasetEvaluateResponse401 | PostApiDatasetEvaluateResponse403 | PostApiDatasetEvaluateResponse404 | str]
     """
 
     kwargs = _get_kwargs(
@@ -182,14 +182,14 @@ def sync(
     client: AuthenticatedClient,
     body: PostApiDatasetEvaluateBody,
 ) -> (
-    Any
-    | PostApiDatasetEvaluateResponse200Type0
+    PostApiDatasetEvaluateResponse200Type0
     | PostApiDatasetEvaluateResponse200Type1
     | PostApiDatasetEvaluateResponse200Type2
     | PostApiDatasetEvaluateResponse400
     | PostApiDatasetEvaluateResponse401
     | PostApiDatasetEvaluateResponse403
     | PostApiDatasetEvaluateResponse404
+    | str
     | None
 ):
     """Evaluate a dataset
@@ -206,7 +206,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Any | PostApiDatasetEvaluateResponse200Type0 | PostApiDatasetEvaluateResponse200Type1 | PostApiDatasetEvaluateResponse200Type2 | PostApiDatasetEvaluateResponse400 | PostApiDatasetEvaluateResponse401 | PostApiDatasetEvaluateResponse403 | PostApiDatasetEvaluateResponse404
+        PostApiDatasetEvaluateResponse200Type0 | PostApiDatasetEvaluateResponse200Type1 | PostApiDatasetEvaluateResponse200Type2 | PostApiDatasetEvaluateResponse400 | PostApiDatasetEvaluateResponse401 | PostApiDatasetEvaluateResponse403 | PostApiDatasetEvaluateResponse404 | str
     """
 
     return sync_detailed(
@@ -220,14 +220,14 @@ async def asyncio_detailed(
     client: AuthenticatedClient,
     body: PostApiDatasetEvaluateBody,
 ) -> Response[
-    Any
-    | PostApiDatasetEvaluateResponse200Type0
+    PostApiDatasetEvaluateResponse200Type0
     | PostApiDatasetEvaluateResponse200Type1
     | PostApiDatasetEvaluateResponse200Type2
     | PostApiDatasetEvaluateResponse400
     | PostApiDatasetEvaluateResponse401
     | PostApiDatasetEvaluateResponse403
     | PostApiDatasetEvaluateResponse404
+    | str
 ]:
     """Evaluate a dataset
 
@@ -243,7 +243,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any | PostApiDatasetEvaluateResponse200Type0 | PostApiDatasetEvaluateResponse200Type1 | PostApiDatasetEvaluateResponse200Type2 | PostApiDatasetEvaluateResponse400 | PostApiDatasetEvaluateResponse401 | PostApiDatasetEvaluateResponse403 | PostApiDatasetEvaluateResponse404]
+        Response[PostApiDatasetEvaluateResponse200Type0 | PostApiDatasetEvaluateResponse200Type1 | PostApiDatasetEvaluateResponse200Type2 | PostApiDatasetEvaluateResponse400 | PostApiDatasetEvaluateResponse401 | PostApiDatasetEvaluateResponse403 | PostApiDatasetEvaluateResponse404 | str]
     """
 
     kwargs = _get_kwargs(
@@ -260,14 +260,14 @@ async def asyncio(
     client: AuthenticatedClient,
     body: PostApiDatasetEvaluateBody,
 ) -> (
-    Any
-    | PostApiDatasetEvaluateResponse200Type0
+    PostApiDatasetEvaluateResponse200Type0
     | PostApiDatasetEvaluateResponse200Type1
     | PostApiDatasetEvaluateResponse200Type2
     | PostApiDatasetEvaluateResponse400
     | PostApiDatasetEvaluateResponse401
     | PostApiDatasetEvaluateResponse403
     | PostApiDatasetEvaluateResponse404
+    | str
     | None
 ):
     """Evaluate a dataset
@@ -284,7 +284,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Any | PostApiDatasetEvaluateResponse200Type0 | PostApiDatasetEvaluateResponse200Type1 | PostApiDatasetEvaluateResponse200Type2 | PostApiDatasetEvaluateResponse400 | PostApiDatasetEvaluateResponse401 | PostApiDatasetEvaluateResponse403 | PostApiDatasetEvaluateResponse404
+        PostApiDatasetEvaluateResponse200Type0 | PostApiDatasetEvaluateResponse200Type1 | PostApiDatasetEvaluateResponse200Type2 | PostApiDatasetEvaluateResponse400 | PostApiDatasetEvaluateResponse401 | PostApiDatasetEvaluateResponse403 | PostApiDatasetEvaluateResponse404 | str
     """
 
     return (

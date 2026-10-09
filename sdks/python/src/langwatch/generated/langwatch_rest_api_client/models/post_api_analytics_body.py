@@ -32,7 +32,6 @@ class PostApiAnalyticsBody:
         group_by (str | Unset):
         group_by_key (str | Unset):
         time_scale (int | Literal['full'] | Unset):
-        should_skip_previous_period (bool | Unset):
     """
 
     start_date: float | str
@@ -47,7 +46,6 @@ class PostApiAnalyticsBody:
     group_by: str | Unset = UNSET
     group_by_key: str | Unset = UNSET
     time_scale: int | Literal["full"] | Unset = UNSET
-    should_skip_previous_period: bool | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -90,8 +88,6 @@ class PostApiAnalyticsBody:
         else:
             time_scale = self.time_scale
 
-        should_skip_previous_period = self.should_skip_previous_period
-
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -118,8 +114,6 @@ class PostApiAnalyticsBody:
             field_dict["groupByKey"] = group_by_key
         if time_scale is not UNSET:
             field_dict["timeScale"] = time_scale
-        if should_skip_previous_period is not UNSET:
-            field_dict["shouldSkipPreviousPeriod"] = should_skip_previous_period
 
         return field_dict
 
@@ -179,8 +173,6 @@ class PostApiAnalyticsBody:
 
         time_scale = _parse_time_scale(d.pop("timeScale", UNSET))
 
-        should_skip_previous_period = d.pop("shouldSkipPreviousPeriod", UNSET)
-
         post_api_analytics_body = cls(
             start_date=start_date,
             end_date=end_date,
@@ -194,7 +186,6 @@ class PostApiAnalyticsBody:
             group_by=group_by,
             group_by_key=group_by_key,
             time_scale=time_scale,
-            should_skip_previous_period=should_skip_previous_period,
         )
 
         post_api_analytics_body.additional_properties = d

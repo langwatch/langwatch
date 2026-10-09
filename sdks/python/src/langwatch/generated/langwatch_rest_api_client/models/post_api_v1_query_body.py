@@ -24,15 +24,12 @@ class PostApiV1QueryBody:
         parameters (PostApiV1QueryBodyParameters | Unset):
         time_window (PostApiV1QueryBodyTimeWindow | Unset):
         granularity_seconds (Literal[1] | Literal[3600] | Literal[60] | Unset):
-        project_id (str | Unset): Narrows the run to this one project, which the key must hold analytics:view on.
-            Without it the run spans every project the key can read.
     """
 
     sql: str
     parameters: PostApiV1QueryBodyParameters | Unset = UNSET
     time_window: PostApiV1QueryBodyTimeWindow | Unset = UNSET
     granularity_seconds: Literal[1] | Literal[3600] | Literal[60] | Unset = UNSET
-    project_id: str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -52,8 +49,6 @@ class PostApiV1QueryBody:
         else:
             granularity_seconds = self.granularity_seconds
 
-        project_id = self.project_id
-
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -67,8 +62,6 @@ class PostApiV1QueryBody:
             field_dict["timeWindow"] = time_window
         if granularity_seconds is not UNSET:
             field_dict["granularitySeconds"] = granularity_seconds
-        if project_id is not UNSET:
-            field_dict["projectId"] = project_id
 
         return field_dict
 
@@ -112,14 +105,11 @@ class PostApiV1QueryBody:
 
         granularity_seconds = _parse_granularity_seconds(d.pop("granularitySeconds", UNSET))
 
-        project_id = d.pop("projectId", UNSET)
-
         post_api_v1_query_body = cls(
             sql=sql,
             parameters=parameters,
             time_window=time_window,
             granularity_seconds=granularity_seconds,
-            project_id=project_id,
         )
 
         post_api_v1_query_body.additional_properties = d

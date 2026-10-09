@@ -11,7 +11,6 @@ from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.put_api_agent_cache_by_name_response_400_meta import PutApiAgentCacheByNameResponse400Meta
-    from ..models.put_api_agent_cache_by_name_response_400_trace import PutApiAgentCacheByNameResponse400Trace
 
 
 T = TypeVar("T", bound="PutApiAgentCacheByNameResponse400")
@@ -28,7 +27,6 @@ class PutApiAgentCacheByNameResponse400:
         meta (PutApiAgentCacheByNameResponse400Meta | Unset):
         trace_id (str | Unset):
         span_id (str | Unset):
-        trace (PutApiAgentCacheByNameResponse400Trace | Unset):
         tips (list[str] | Unset):
         docs_url (str | Unset):
         fault (PutApiAgentCacheByNameResponse400Fault | Unset):
@@ -42,7 +40,6 @@ class PutApiAgentCacheByNameResponse400:
     meta: PutApiAgentCacheByNameResponse400Meta | Unset = UNSET
     trace_id: str | Unset = UNSET
     span_id: str | Unset = UNSET
-    trace: PutApiAgentCacheByNameResponse400Trace | Unset = UNSET
     tips: list[str] | Unset = UNSET
     docs_url: str | Unset = UNSET
     fault: PutApiAgentCacheByNameResponse400Fault | Unset = UNSET
@@ -65,10 +62,6 @@ class PutApiAgentCacheByNameResponse400:
         trace_id = self.trace_id
 
         span_id = self.span_id
-
-        trace: dict[str, Any] | Unset = UNSET
-        if not isinstance(self.trace, Unset):
-            trace = self.trace.to_dict()
 
         tips: list[str] | Unset = UNSET
         if not isinstance(self.tips, Unset):
@@ -100,8 +93,6 @@ class PutApiAgentCacheByNameResponse400:
             field_dict["trace_id"] = trace_id
         if span_id is not UNSET:
             field_dict["span_id"] = span_id
-        if trace is not UNSET:
-            field_dict["trace"] = trace
         if tips is not UNSET:
             field_dict["tips"] = tips
         if docs_url is not UNSET:
@@ -116,7 +107,6 @@ class PutApiAgentCacheByNameResponse400:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.put_api_agent_cache_by_name_response_400_meta import PutApiAgentCacheByNameResponse400Meta
-        from ..models.put_api_agent_cache_by_name_response_400_trace import PutApiAgentCacheByNameResponse400Trace
 
         d = dict(src_dict)
         type_ = d.pop("type")
@@ -137,13 +127,6 @@ class PutApiAgentCacheByNameResponse400:
         trace_id = d.pop("trace_id", UNSET)
 
         span_id = d.pop("span_id", UNSET)
-
-        _trace = d.pop("trace", UNSET)
-        trace: PutApiAgentCacheByNameResponse400Trace | Unset
-        if isinstance(_trace, Unset):
-            trace = UNSET
-        else:
-            trace = PutApiAgentCacheByNameResponse400Trace.from_dict(_trace)
 
         tips = cast(list[str], d.pop("tips", UNSET))
 
@@ -166,7 +149,6 @@ class PutApiAgentCacheByNameResponse400:
             meta=meta,
             trace_id=trace_id,
             span_id=span_id,
-            trace=trace,
             tips=tips,
             docs_url=docs_url,
             fault=fault,

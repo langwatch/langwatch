@@ -23,7 +23,6 @@ class GetOrganizationMemberAccessResponse200DirectBindingsItem:
         scope_id (str):
         scope_name (None | str):
         permissions (list[str]):
-        capped_by_seat (bool):
     """
 
     id: str
@@ -33,7 +32,6 @@ class GetOrganizationMemberAccessResponse200DirectBindingsItem:
     scope_id: str
     scope_name: None | str
     permissions: list[str]
-    capped_by_seat: bool
 
     def to_dict(self) -> dict[str, Any]:
         id = self.id
@@ -52,8 +50,6 @@ class GetOrganizationMemberAccessResponse200DirectBindingsItem:
 
         permissions = self.permissions
 
-        capped_by_seat = self.capped_by_seat
-
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
@@ -65,7 +61,6 @@ class GetOrganizationMemberAccessResponse200DirectBindingsItem:
                 "scopeId": scope_id,
                 "scopeName": scope_name,
                 "permissions": permissions,
-                "cappedBySeat": capped_by_seat,
             }
         )
 
@@ -98,8 +93,6 @@ class GetOrganizationMemberAccessResponse200DirectBindingsItem:
 
         permissions = cast(list[str], d.pop("permissions"))
 
-        capped_by_seat = d.pop("cappedBySeat")
-
         get_organization_member_access_response_200_direct_bindings_item = cls(
             id=id,
             role=role,
@@ -108,7 +101,6 @@ class GetOrganizationMemberAccessResponse200DirectBindingsItem:
             scope_id=scope_id,
             scope_name=scope_name,
             permissions=permissions,
-            capped_by_seat=capped_by_seat,
         )
 
         return get_organization_member_access_response_200_direct_bindings_item

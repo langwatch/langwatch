@@ -12037,9 +12037,6 @@
                   },
                   "timeZone": {
                     "type": "string"
-                  },
-                  "shouldSkipPreviousPeriod": {
-                    "type": "boolean"
                   }
                 },
                 "required": [
@@ -14662,9 +14659,6 @@
                   },
                   "timeZone": {
                     "type": "string"
-                  },
-                  "shouldSkipPreviousPeriod": {
-                    "type": "boolean"
                   }
                 },
                 "required": [
@@ -14698,7 +14692,7 @@
         "operationId": "postApiV1Query",
         "responses": {
           "200": {
-            "description": "The query ran. Columns, rows, execution statistics and diagnostics, scoped to the projects the key can read, or to the one project `projectId` names.",
+            "description": "The query ran. Columns, rows, execution statistics and diagnostics, scoped to the projects the key can read.",
             "content": {
               "application/json": {
                 "schema": {
@@ -14855,23 +14849,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -14936,23 +14913,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -15019,105 +14979,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
-                    "tips": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    },
-                    "docs_url": {
-                      "type": "string"
-                    },
-                    "fault": {
-                      "type": "string",
-                      "enum": [
-                        "customer",
-                        "platform",
-                        "provider",
-                        "presumed_platform"
-                      ]
-                    },
-                    "reasons": {
-                      "type": "array",
-                      "items": {}
-                    }
-                  },
-                  "required": [
-                    "type",
-                    "code",
-                    "message",
-                    "retryable"
-                  ]
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "type": {
-                      "type": "string"
-                    },
-                    "code": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "retryable": {
-                      "type": "boolean"
-                    },
-                    "meta": {
-                      "type": "object",
-                      "propertyNames": {
-                        "type": "string"
-                      },
-                      "additionalProperties": {}
-                    },
-                    "trace_id": {
-                      "type": "string"
-                    },
-                    "span_id": {
-                      "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -15182,23 +15043,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -15265,23 +15109,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -15316,7 +15143,7 @@
             }
           }
         },
-        "description": "Executes one read-only LangWatchQL SELECT over the analytics views and returns typed columns, rows, execution statistics and diagnostics. The query runs as a restricted database identity scoped to the projects this key can read.\n\nDiagnostics are advisory and never reject a query. An empty diagnostics list means no known issue was detected. It is not proof that the answer is the one you meant.\n\nA projection may call the app functions the schema endpoint lists (`conversation`, `llm_readable_trace`, `llm_messages`, and so on). Those are computed by the application after the query, so they are allowed only as aliased entries in the top-level SELECT list; a call in WHERE, GROUP BY, ORDER BY, a join, a subquery or a nested expression is refused, and a UNION disqualifies both of its branches even where each reads as a top-level projection. A projection may also call the eval functions, which judge a text with a model and are charged for; their key is the text itself. A run that would need more distinct conversations, traces, spans or texts than the published cap answers 422 rather than a partial result, and a run whose texts would exceed the per-query token budget answers 422 before anything is sent.\n\nAny LangWatch API key — project, organization or personal — reaches every project it can read `analytics:view` on: an organization or personal key spans its projects, a project key its one. Rows from more than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic — to read a single project, filter inside the statement with `WHERE TenantId = '<project id>'`.\n\nTo run over one project only, send its id as `projectId` in the body: the run then reads that project's rows alone, redacted by that project's own protections. A `projectId` the key cannot read `analytics:view` on, in its own organization, is refused with `project_not_found` (404), the same answer as a project that does not exist. Without `projectId` the run spans every project the key can read.\n\nA statement that names no `LIMIT` is capped at 10,000 rows: that `LIMIT` is appended before the query runs. A statement whose own `LIMIT` asks for more is refused with `LIMIT_TOO_HIGH` — lower it and page the rest with `LIMIT`/`OFFSET` and an `ORDER BY`. When using `UNION`, every top-level branch must carry its own `LIMIT` clause of 10,000 rows or fewer, or the query is refused with `LIMIT_REQUIRED_PER_BRANCH`. A result whose body exceeds about 8,000,000 bytes is refused outright with `lwql_result_too_large`, never cut — select fewer columns or a smaller `LIMIT`.\n\nFailures answer with their real HTTP status (a refused query is 403, not 200) and this API's canonical error envelope — the same `code` and `meta` every other REST family publishes.",
+        "description": "Executes one read-only LangWatchQL SELECT over the analytics views and returns typed columns, rows, execution statistics and diagnostics. The query runs as a restricted database identity scoped to the projects this key can read.\n\nDiagnostics are advisory and never reject a query. An empty diagnostics list means no known issue was detected. It is not proof that the answer is the one you meant.\n\nA projection may call the app functions the schema endpoint lists (`conversation`, `llm_readable_trace`, `llm_messages`, and so on). Those are computed by the application after the query, so they are allowed only as aliased entries in the top-level SELECT list; a call in WHERE, GROUP BY, ORDER BY, a join, a subquery or a nested expression is refused, and a UNION disqualifies both of its branches even where each reads as a top-level projection. A projection may also call the eval functions, which judge a text with a model and are charged for; their key is the text itself. A run that would need more distinct conversations, traces, spans or texts than the published cap answers 422 rather than a partial result, and a run whose texts would exceed the per-query token budget answers 422 before anything is sent.\n\nAny LangWatch API key — project, organization or personal — reaches every project it can read `analytics:view` on: an organization or personal key spans its projects, a project key its one. Rows from more than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic — to read a single project, filter inside the statement with `WHERE TenantId = '<project id>'`.\n\nA statement that names no `LIMIT` is capped at 10,000 rows: that `LIMIT` is appended before the query runs. A statement whose own `LIMIT` asks for more is refused with `LIMIT_TOO_HIGH` — lower it and page the rest with `LIMIT`/`OFFSET` and an `ORDER BY`. When using `UNION`, every top-level branch must carry its own `LIMIT` clause of 10,000 rows or fewer, or the query is refused with `LIMIT_REQUIRED_PER_BRANCH`. A result whose body exceeds about 8,000,000 bytes is refused outright with `lwql_result_too_large`, never cut — select fewer columns or a smaller `LIMIT`.\n\nFailures answer with their real HTTP status (a refused query is 403, not 200) and this API's canonical error envelope — the same `code` and `meta` every other REST family publishes.",
         "summary": "Run a LangWatchQL query",
         "tags": [
           "Query"
@@ -15412,11 +15239,6 @@
                         "const": 3600
                       }
                     ]
-                  },
-                  "projectId": {
-                    "description": "Narrows the run to this one project, which the key must hold analytics:view on. Without it the run spans every project the key can read.",
-                    "type": "string",
-                    "minLength": 1
                   }
                 },
                 "required": [
@@ -15942,23 +15764,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -16023,23 +15828,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -16106,23 +15894,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -16187,23 +15958,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -17263,23 +17017,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -17344,23 +17081,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -17427,23 +17147,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -17508,23 +17211,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -19432,204 +19118,6 @@
               }
             }
           }
-        }
-      }
-    },
-    "/api/v1/organizations": {
-      "post": {
-        "operationId": "provisionOrganization",
-        "responses": {
-          "201": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "organization": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        "name": {
-                          "type": "string"
-                        },
-                        "slug": {
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "id",
-                        "name",
-                        "slug"
-                      ],
-                      "additionalProperties": false
-                    },
-                    "team": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        "name": {
-                          "type": "string"
-                        },
-                        "slug": {
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "id",
-                        "name",
-                        "slug"
-                      ],
-                      "additionalProperties": false
-                    },
-                    "adminApiKey": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        "token": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "required": [
-                        "id",
-                        "token"
-                      ],
-                      "additionalProperties": false
-                    }
-                  },
-                  "required": [
-                    "organization",
-                    "team",
-                    "adminApiKey"
-                  ],
-                  "additionalProperties": false
-                }
-              }
-            }
-          }
-        },
-        "description": "Provision a new organization with its first team and a bootstrap admin service key, self-hosted instance administrators only.",
-        "tags": [
-          "Organizations (Self-Hosted)"
-        ],
-        "security": [
-          {
-            "instance_admin_key": []
-          }
-        ],
-        "x-access-policy": {
-          "kind": "handlerManaged",
-          "credential": [
-            "instance_admin_api_key"
-          ],
-          "permissions": []
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 255
-                  },
-                  "slug": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 255,
-                    "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
-                  },
-                  "adminApiKeyName": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 100
-                  }
-                },
-                "required": [
-                  "name"
-                ]
-              }
-            }
-          }
-        }
-      },
-      "get": {
-        "operationId": "listOrganizations",
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "organizations": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string",
-                            "minLength": 1
-                          },
-                          "name": {
-                            "type": "string"
-                          },
-                          "slug": {
-                            "type": "string"
-                          },
-                          "createdAt": {
-                            "type": "string",
-                            "format": "date-time"
-                          }
-                        },
-                        "required": [
-                          "id",
-                          "name",
-                          "slug",
-                          "createdAt"
-                        ],
-                        "additionalProperties": false
-                      }
-                    }
-                  },
-                  "required": [
-                    "organizations"
-                  ],
-                  "additionalProperties": false
-                }
-              }
-            }
-          }
-        },
-        "description": "List every organization this instance hosts, self-hosted instance administrators only.",
-        "tags": [
-          "Organizations (Self-Hosted)"
-        ],
-        "security": [
-          {
-            "instance_admin_key": []
-          }
-        ],
-        "x-access-policy": {
-          "kind": "handlerManaged",
-          "credential": [
-            "instance_admin_api_key"
-          ],
-          "permissions": []
         }
       }
     },
@@ -29717,23 +29205,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -29798,23 +29269,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -29881,23 +29335,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -29962,23 +29399,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -30230,23 +29650,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -30311,23 +29714,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -30394,23 +29780,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -30475,23 +29844,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -30837,23 +30189,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -30918,23 +30253,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -31001,23 +30319,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -31083,23 +30384,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -31164,23 +30448,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -31441,23 +30708,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -31522,23 +30772,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -31605,23 +30838,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -31687,23 +30903,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -31768,23 +30967,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -31995,23 +31177,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -32076,23 +31241,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -32159,23 +31307,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -32241,23 +31372,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -32322,23 +31436,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -32601,23 +31698,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -32682,23 +31762,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -32765,23 +31828,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -32847,23 +31893,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -32928,23 +31957,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -33764,23 +32776,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -33845,23 +32840,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -33928,23 +32906,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -34009,23 +32970,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -34223,23 +33167,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -34304,23 +33231,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -34387,23 +33297,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -34468,23 +33361,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -34705,23 +33581,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -34786,23 +33645,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -34869,23 +33711,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -34951,23 +33776,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -35032,23 +33840,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -35255,23 +34046,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -35336,23 +34110,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -35419,23 +34176,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -35501,23 +34241,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -35582,23 +34305,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -35740,23 +34446,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -35821,23 +34510,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -35904,23 +34576,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -35986,23 +34641,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -36067,23 +34705,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -36292,23 +34913,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -36373,23 +34977,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -36456,23 +35043,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -36538,23 +35108,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -36619,23 +35172,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -36797,23 +35333,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -36878,23 +35397,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -36961,23 +35463,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -37043,23 +35528,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -37124,23 +35592,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -44505,8 +42956,14 @@
             }
           },
           "413": {
-            "description": "The body is larger than 30MB; refused before it is read with the `payload_too_large` HandledError",
-            "content": {}
+            "description": "The body is larger than 30MB. Refused before it is read, so the response is the plain sentence `Payload Too Large` rather than a JSON error",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           }
         },
         "description": "Run one evaluator across a saved dataset and record the result against an experiment. Name the dataset by slug and the evaluator the same way the evaluate endpoints do; results are grouped under `experimentSlug`, or under a generated batch id when you omit it. Bodies up to 30MB are accepted.",
@@ -44782,23 +43239,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -44863,23 +43303,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -44946,23 +43369,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -45027,23 +43433,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -45167,23 +43556,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -45248,23 +43620,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -45331,23 +43686,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -45412,23 +43750,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -45576,23 +43897,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -45657,23 +43961,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -45740,23 +44027,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -45821,23 +44091,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -45967,23 +44220,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -46048,23 +44284,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -46131,23 +44350,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -46212,23 +44414,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -46602,23 +44787,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -46683,23 +44851,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -46766,23 +44917,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -46847,23 +44981,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -47192,23 +45309,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -47273,23 +45373,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -47356,23 +45439,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -47438,23 +45504,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -47519,23 +45568,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -48178,23 +46210,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -48259,23 +46274,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -48342,23 +46340,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -48423,23 +46404,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -48737,23 +46701,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -48818,23 +46765,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -48901,23 +46831,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -48982,23 +46895,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -49480,23 +47376,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -49561,23 +47440,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -49644,23 +47506,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -49725,23 +47570,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -50064,23 +47892,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -50145,23 +47956,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -50228,23 +48022,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -50309,23 +48086,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -50637,23 +48397,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -50718,23 +48461,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -50801,23 +48527,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -50882,23 +48591,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -51215,23 +48907,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -51296,23 +48971,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -51379,23 +49037,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -51460,23 +49101,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -51777,23 +49401,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -51858,23 +49465,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -51941,23 +49531,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -52022,23 +49595,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -52359,23 +49915,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -52440,23 +49979,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -52523,23 +50045,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -52604,23 +50109,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -52950,23 +50438,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -53031,23 +50502,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -53114,23 +50568,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -53196,23 +50633,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -53277,23 +50697,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -53824,23 +51227,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -53905,23 +51291,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -53988,23 +51357,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -54069,23 +51421,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -54389,23 +51724,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -54470,23 +51788,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -54553,23 +51854,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -54634,23 +51918,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -55026,23 +52293,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -55107,23 +52357,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -55190,23 +52423,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -55271,23 +52487,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -55593,23 +52792,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -55674,23 +52856,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -55757,23 +52922,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -55838,23 +52986,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -56101,23 +53232,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -56182,23 +53296,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -56265,23 +53362,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -56346,23 +53426,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -56581,23 +53644,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -56662,23 +53708,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -56745,23 +53774,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -56827,23 +53839,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -56908,23 +53903,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -57238,23 +54216,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -57319,23 +54280,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -57402,23 +54346,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -57483,23 +54410,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -57709,23 +54619,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -57790,23 +54683,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -57873,23 +54749,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -57954,23 +54813,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -58275,23 +55117,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -58356,23 +55181,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -58439,23 +55247,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -58520,23 +55311,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -58645,23 +55419,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -58726,23 +55483,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -58809,23 +55549,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -58891,23 +55614,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -58972,23 +55678,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -59084,23 +55773,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -59165,23 +55837,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -59248,23 +55903,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -59330,23 +55968,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -59411,23 +56032,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -59525,23 +56129,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -59606,23 +56193,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -59689,23 +56259,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -59771,23 +56324,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -59852,23 +56388,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -59975,23 +56494,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -60056,23 +56558,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -60139,23 +56624,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -60221,23 +56689,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -60302,23 +56753,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -60567,23 +57001,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -60648,23 +57065,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -60731,23 +57131,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -60812,23 +57195,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -61520,23 +57886,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -61601,23 +57950,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -61684,23 +58016,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -61765,23 +58080,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -62348,23 +58646,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -62429,23 +58710,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -62512,23 +58776,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -62593,23 +58840,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -70178,23 +66408,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -78168,9 +74381,6 @@
                                   "items": {
                                     "type": "string"
                                   }
-                                },
-                                "cappedBySeat": {
-                                  "type": "boolean"
                                 }
                               },
                               "required": [
@@ -78180,8 +74390,7 @@
                                 "scopeType",
                                 "scopeId",
                                 "scopeName",
-                                "permissions",
-                                "cappedBySeat"
+                                "permissions"
                               ],
                               "additionalProperties": false
                             }
@@ -78236,9 +74445,6 @@
                             "items": {
                               "type": "string"
                             }
-                          },
-                          "cappedBySeat": {
-                            "type": "boolean"
                           }
                         },
                         "required": [
@@ -78248,8 +74454,7 @@
                           "scopeType",
                           "scopeId",
                           "scopeName",
-                          "permissions",
-                          "cappedBySeat"
+                          "permissions"
                         ],
                         "additionalProperties": false
                       }
@@ -78678,6 +74883,204 @@
             "required": true
           }
         ]
+      }
+    },
+    "/api/v1/organizations": {
+      "post": {
+        "operationId": "provisionOrganization",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "organization": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "slug": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "slug"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "team": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "slug": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "slug"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "adminApiKey": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "token": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "token"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "organization",
+                    "team",
+                    "adminApiKey"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "description": "Provision a new organization with its first team and a bootstrap admin service key, self-hosted instance administrators only.",
+        "tags": [
+          "Organizations (Self-Hosted)"
+        ],
+        "security": [
+          {
+            "instance_admin_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "instance_admin_api_key"
+          ],
+          "permissions": []
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  },
+                  "slug": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255,
+                    "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+                  },
+                  "adminApiKeyName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "listOrganizations",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "organizations": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "slug": {
+                            "type": "string"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "slug",
+                          "createdAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "organizations"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "description": "List every organization this instance hosts, self-hosted instance administrators only.",
+        "tags": [
+          "Organizations (Self-Hosted)"
+        ],
+        "security": [
+          {
+            "instance_admin_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "instance_admin_api_key"
+          ],
+          "permissions": []
+        }
       }
     },
     "/api/v1/organizations/{organizationId}": {
@@ -112398,23 +108801,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -112479,23 +108865,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",
@@ -112562,23 +108931,6 @@
                     "span_id": {
                       "type": "string"
                     },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
-                    },
                     "tips": {
                       "type": "array",
                       "items": {
@@ -112643,23 +108995,6 @@
                     },
                     "span_id": {
                       "type": "string"
-                    },
-                    "trace": {
-                      "type": "object",
-                      "properties": {
-                        "traceId": {
-                          "type": "string"
-                        },
-                        "spanId": {
-                          "type": "string"
-                        },
-                        "traceUrl": {
-                          "type": "string"
-                        },
-                        "logsUrl": {
-                          "type": "string"
-                        }
-                      }
                     },
                     "tips": {
                       "type": "array",

@@ -15,9 +15,6 @@ if TYPE_CHECKING:
     from ..models.delete_api_v1_projects_by_project_id_analytics_charts_by_chart_id_placement_response_403_meta import (
         DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse403Meta,
     )
-    from ..models.delete_api_v1_projects_by_project_id_analytics_charts_by_chart_id_placement_response_403_trace import (
-        DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse403Trace,
-    )
 
 
 T = TypeVar("T", bound="DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse403")
@@ -34,7 +31,6 @@ class DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse403
         meta (DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse403Meta | Unset):
         trace_id (str | Unset):
         span_id (str | Unset):
-        trace (DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse403Trace | Unset):
         tips (list[str] | Unset):
         docs_url (str | Unset):
         fault (DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse403Fault | Unset):
@@ -48,7 +44,6 @@ class DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse403
     meta: DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse403Meta | Unset = UNSET
     trace_id: str | Unset = UNSET
     span_id: str | Unset = UNSET
-    trace: DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse403Trace | Unset = UNSET
     tips: list[str] | Unset = UNSET
     docs_url: str | Unset = UNSET
     fault: DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse403Fault | Unset = UNSET
@@ -71,10 +66,6 @@ class DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse403
         trace_id = self.trace_id
 
         span_id = self.span_id
-
-        trace: dict[str, Any] | Unset = UNSET
-        if not isinstance(self.trace, Unset):
-            trace = self.trace.to_dict()
 
         tips: list[str] | Unset = UNSET
         if not isinstance(self.tips, Unset):
@@ -106,8 +97,6 @@ class DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse403
             field_dict["trace_id"] = trace_id
         if span_id is not UNSET:
             field_dict["span_id"] = span_id
-        if trace is not UNSET:
-            field_dict["trace"] = trace
         if tips is not UNSET:
             field_dict["tips"] = tips
         if docs_url is not UNSET:
@@ -123,9 +112,6 @@ class DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse403
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.delete_api_v1_projects_by_project_id_analytics_charts_by_chart_id_placement_response_403_meta import (
             DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse403Meta,
-        )
-        from ..models.delete_api_v1_projects_by_project_id_analytics_charts_by_chart_id_placement_response_403_trace import (
-            DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse403Trace,
         )
 
         d = dict(src_dict)
@@ -148,13 +134,6 @@ class DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse403
 
         span_id = d.pop("span_id", UNSET)
 
-        _trace = d.pop("trace", UNSET)
-        trace: DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse403Trace | Unset
-        if isinstance(_trace, Unset):
-            trace = UNSET
-        else:
-            trace = DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse403Trace.from_dict(_trace)
-
         tips = cast(list[str], d.pop("tips", UNSET))
 
         docs_url = d.pop("docs_url", UNSET)
@@ -176,7 +155,6 @@ class DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse403
             meta=meta,
             trace_id=trace_id,
             span_id=span_id,
-            trace=trace,
             tips=tips,
             docs_url=docs_url,
             fault=fault,
