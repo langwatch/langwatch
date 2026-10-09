@@ -5,6 +5,7 @@
  */
 import { ProjectInvalidCredentialsError, ProjectMissingCredentialsError } from "@langwatch/api";
 import { BearerIdentity, RestHost } from "@langwatch/api/rest";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 
 import type { AuthSessionPoll } from "../../rules/auth-session-poll.rules.ts";
@@ -39,6 +40,7 @@ function authWorld(overrides: Partial<AuthDoorApi> = {}) {
   };
   const closed = BearerIdentity.create({ name: "unconfigured", token: void 0 });
   const host = RestHost.create({
+    authz: restTestAuthorization().forRequest(),
     identities: {
       project: closed,
       organization: closed,

@@ -23,6 +23,7 @@ import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
  * @vitest-environment node
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import type { WebhookApi } from "@langwatch/webhook-contract";
@@ -53,6 +54,7 @@ const MAIN_CLI_ROUTES = [
 function restHost() {
   const closed = BearerIdentity.create({ name: "unconfigured", token: void 0 });
   return RestHost.create({
+    authz: restTestAuthorization().forRequest(),
     identities: {
       project: closed,
       organization: closed,

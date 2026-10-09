@@ -80,7 +80,7 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
     /** The plans a route declaring an entitlement asks; absent, it is refused at mount. */
     entitlements?: Entitlements | undefined;
     /** The SAME decisions tRPC authorizes through: lineage, kind reads and route proofs. */
-    authz?: Authorize | undefined;
+    authz: Authorize;
   }): RestHost {
     return new RestHost(options);
   }
@@ -136,7 +136,7 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
       ...(this.options.idempotency ? { idempotency: this.options.idempotency } : {}),
       ...(this.options.rateLimiter ? { rateLimiter: this.options.rateLimiter } : {}),
       ...(this.options.entitlements ? { entitlements: this.options.entitlements } : {}),
-      ...(authz ? { authorization: { forRequest: () => authz } } : {}),
+      authorization: { forRequest: () => authz },
       audit: this.options.audit,
       deprecationLog: restDeprecationLog,
     }).mount(declaration, {

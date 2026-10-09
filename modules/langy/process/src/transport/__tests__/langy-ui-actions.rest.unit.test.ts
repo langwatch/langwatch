@@ -10,6 +10,7 @@ import type {
 } from "@langwatch/langy-contract";
 /** @see specs/langy/langy-ui-actions.feature */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
 import { langyProcessModule } from "../../langy.module.ts";
@@ -55,10 +56,13 @@ function buildDoor(options: { dark?: boolean } = {}) {
         : { dark: false, outcome: { executedVia: "browser", result: { ok: true } } };
     },
   });
-  const hono = createRestRuntime({ identity: { authenticate, identify } }).mount(
-    langyUiActionsRest.router(),
-    { app: () => app, onError: (error, context) => canonicalErrorResponse(error, context) },
-  );
+  const hono = createRestRuntime({
+    authorization: restTestAuthorization(),
+    identity: { authenticate, identify },
+  }).mount(langyUiActionsRest.router(), {
+    app: () => app,
+    onError: (error, context) => canonicalErrorResponse(error, context),
+  });
   const url = "http://api.test/api/langy/ui/actions";
   return {
     dispatched,

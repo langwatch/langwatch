@@ -13,6 +13,7 @@ import {
   LangyLocalRecordNotFoundError,
 } from "@langwatch/langy-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 
 import { langyLocalRest } from "../langy-local.rest.ts";
@@ -75,13 +76,13 @@ function buildApi(options: { keyed?: boolean; own?: boolean; actor?: RestCaller[
     getLocalWaitAnswer: vi.fn<LangyApi["getLocalWaitAnswer"]>(async () => WAIT_ANSWER),
   };
 
-  const hono = createRestRuntime({ identity: { authenticate, identify } }).mount(
-    langyLocalRest.router(),
-    {
-      app: () => createApiFixture<LangyApi>(ops),
-      onError: (error, context) => canonicalErrorResponse(error, context),
-    },
-  );
+  const hono = createRestRuntime({
+    authorization: restTestAuthorization(),
+    identity: { authenticate, identify },
+  }).mount(langyLocalRest.router(), {
+    app: () => createApiFixture<LangyApi>(ops),
+    onError: (error, context) => canonicalErrorResponse(error, context),
+  });
   const send = (path: string, init?: { method: "POST"; body?: unknown; raw?: string }) => {
     const raw = init?.raw ?? (init?.body === undefined ? undefined : JSON.stringify(init.body));
     return hono.request(`http://api.test${path}`, {

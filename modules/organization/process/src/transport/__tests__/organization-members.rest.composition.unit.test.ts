@@ -14,6 +14,7 @@ import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import type { RoleApi } from "@langwatch/role-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
 import { organizationModuleSetup } from "../../app/__tests__/support/organization-module-setup.ts";
@@ -133,6 +134,7 @@ async function application({ plan = {} }: { plan?: Partial<Plan> } = {}) {
   });
 
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       identify: ({ request }) => {
         if (request.headers.get("Authorization") !== `Bearer ${CREDENTIAL}`) {

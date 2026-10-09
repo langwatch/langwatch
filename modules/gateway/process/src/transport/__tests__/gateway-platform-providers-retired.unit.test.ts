@@ -15,6 +15,7 @@ import type {
   GatewayRequestCredential,
 } from "@langwatch/gateway-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -47,6 +48,7 @@ const keyDoor = () => ({
 function mountedPlatform() {
   const app = createApiFixture<GatewayApi>({});
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     // Unrelated creates on this family declare themselves replayable, so the
     // whole family refuses to mount without the port. It runs and keeps no
     // receipt: no test here replays anything.

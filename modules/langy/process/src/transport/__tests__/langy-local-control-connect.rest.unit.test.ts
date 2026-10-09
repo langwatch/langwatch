@@ -16,6 +16,7 @@ import {
   LOCAL_CONTROL_PROTOCOL_VERSION,
 } from "@langwatch/langy-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -89,6 +90,7 @@ function family(router = langyLocalControlConnectRest, mount = "") {
   const app = createApiFixture<LangyApi>(ops);
   const closed = BearerIdentity.create({ name: "unconfigured", token: void 0 });
   const host = RestHost.create({
+    authz: restTestAuthorization().forRequest(),
     identities: {
       project: closed,
       organization: closed,

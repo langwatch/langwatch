@@ -2,6 +2,7 @@ import { moduleApi } from "@langwatch/module";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { authorizationPort } from "../../__tests__/api-double.ts";
 import { anyAuthenticated } from "../../access/access.ts";
 import { OrganizationInvalidCredentialsError } from "../../errors.ts";
 import type { RestAuditRow } from "../../hosting/api-door.ts";
@@ -50,6 +51,7 @@ const SESSIONS = new Map([
 function hostWith(presented: CliTokenPresented[], audited: RestAuditRow[] = []) {
   const closed = BearerIdentity.create({ name: "unconfigured", token: void 0 });
   const host = RestHost.create({
+    authz: authorizationPort.forRequest(),
     identities: {
       project: closed,
       organization: closed,
@@ -176,6 +178,7 @@ describe("the CLI token door", () => {
     it("lets nobody in", async () => {
       const closed = BearerIdentity.create({ name: "unconfigured", token: void 0 });
       const host = RestHost.create({
+        authz: authorizationPort.forRequest(),
         identities: {
           project: closed,
           organization: closed,

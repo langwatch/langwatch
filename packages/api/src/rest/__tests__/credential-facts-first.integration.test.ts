@@ -10,7 +10,7 @@ import type { Context } from "hono";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import { createApiDouble } from "../../__tests__/api-double.ts";
+import { createApiDouble, authorizationPort } from "../../__tests__/api-double.ts";
 import { publicRoute } from "../../access/access.ts";
 import { createErrorHandler } from "../../errors.ts";
 import { defineRestRouter } from "../declaration.ts";
@@ -60,6 +60,7 @@ function deskApp() {
   const readTitle = vi.fn((context: Context) => context.req.valid("json" as never));
 
   const hono = createRestRuntime({
+    authorization: authorizationPort,
     identity: { authenticate: () => Promise.reject(new Error("public routes open no door")) },
   }).mount(desk.router(), {
     app: () => createApiDouble<DeskApi>({ open }),

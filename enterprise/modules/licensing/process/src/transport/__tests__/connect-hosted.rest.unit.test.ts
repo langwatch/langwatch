@@ -16,6 +16,7 @@ import { GatewayInternalAuthenticationError } from "@langwatch/gateway-contract"
  * sends it beside the caller's own JSON, which never names the key or tenant.
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 
 import { connectHostedRest } from "../connect-hosted.rest.ts";
@@ -66,6 +67,7 @@ const signedDoor: RestIdentity = {
 
 function mount(app: Partial<LicensingApi>, door: RestIdentity = gatewayDoor) {
   const hono = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: door,
     doors: { internal_secret: door },
   }).mount(connectHostedRest.router(), {

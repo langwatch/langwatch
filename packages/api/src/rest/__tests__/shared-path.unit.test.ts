@@ -6,6 +6,7 @@ import { moduleApi } from "@langwatch/module";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { authorizationPort } from "../../__tests__/api-double.ts";
 import { anyAuthenticated } from "../../access/access.ts";
 import { createErrorHandler } from "../../errors.ts";
 import type { RestIdentity } from "../../hosting/api-door.ts";
@@ -46,7 +47,10 @@ function literalFamily({ path, sharedPath }: { path: string; sharedPath?: RestSh
 }
 
 function mount(declaration: ReturnType<typeof literalFamily>) {
-  return createRestRuntime({ identity }).mount(declaration, {
+  return createRestRuntime({
+    authorization: authorizationPort,
+    identity,
+  }).mount(declaration, {
     app: () => app,
     onError: createErrorHandler(),
   });

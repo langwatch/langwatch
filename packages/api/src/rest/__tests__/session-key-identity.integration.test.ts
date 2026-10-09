@@ -3,6 +3,7 @@ import { moduleApi } from "@langwatch/module";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { authorizationPort } from "../../__tests__/api-double.ts";
 import { anyAuthenticated } from "../../access/access.ts";
 import { ProjectInvalidCredentialsError } from "../../errors.ts";
 import { MANAGEMENT_API_VERSION } from "../addressing.ts";
@@ -44,6 +45,7 @@ const MINTED = new Map([
 function hostWith(presented: SessionKeyPresented[]) {
   const closed = BearerIdentity.create({ name: "unconfigured", token: void 0 });
   const host = RestHost.create({
+    authz: authorizationPort.forRequest(),
     identities: {
       project: closed,
       organization: closed,
@@ -176,6 +178,7 @@ describe("the session key door", () => {
     it("lets nobody in", async () => {
       const closed = BearerIdentity.create({ name: "unconfigured", token: void 0 });
       const host = RestHost.create({
+        authz: authorizationPort.forRequest(),
         identities: {
           project: closed,
           organization: closed,
@@ -219,6 +222,7 @@ describe("a route that declares the session key door's session", () => {
   it("hands the handler what the minting module said of the key, parsed by its schema", async () => {
     const closed = BearerIdentity.create({ name: "unconfigured", token: void 0 });
     const host = RestHost.create({
+      authz: authorizationPort.forRequest(),
       identities: {
         project: closed,
         organization: closed,

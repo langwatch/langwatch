@@ -6,6 +6,7 @@
 import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
 import type * as observabilityModule from "@langwatch/observability";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { CollectorIngestInput } from "../../features/ingestion/rules/trace-collector-body.rules.ts";
@@ -48,6 +49,7 @@ const reportedErrors: { message: string; context: unknown }[] = [];
 let ingestedSpanCount = 0;
 
 const runtime = createRestRuntime({
+  authorization: restTestAuthorization(),
   identity: {
     authenticate: () => {
       throw new Error("The collector resolves its own credential.");

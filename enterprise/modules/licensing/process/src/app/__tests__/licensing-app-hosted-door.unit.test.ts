@@ -10,6 +10,7 @@ import { ScopedSecrets } from "@langwatch/secrets";
  * @see enterprise/modules/licensing/specs/licensing.feature
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
@@ -105,6 +106,7 @@ async function hostedFamily(
   });
   const closed = BearerIdentity.create({ name: "unconfigured", token: undefined });
   const runtime = RestHost.create({
+    authz: restTestAuthorization().forRequest(),
     identities: {
       project: closed,
       organization: closed,

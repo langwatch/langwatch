@@ -9,6 +9,7 @@ import { moduleApi } from "@langwatch/module";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { authorizationPort } from "../../__tests__/api-double.ts";
 import type { Entitlements } from "../../access/access.ts";
 import { createErrorHandler } from "../../errors.ts";
 import { CliTokenIdentity } from "../cli-token-identity.ts";
@@ -98,10 +99,15 @@ function mount(
   routes: ReturnType<typeof router>,
   { door, entitlements }: Pick<ReturnType<typeof world>, "door" | "entitlements">,
 ) {
-  return createRestRuntime({ identity: door, doors: { cli_token: door }, entitlements }).mount(
-    routes,
-    { app: () => ({ list: async () => ({ sources: [] }) }), onError: createErrorHandler() },
-  );
+  return createRestRuntime({
+    authorization: authorizationPort,
+    identity: door,
+    doors: { cli_token: door },
+    entitlements,
+  }).mount(routes, {
+    app: () => ({ list: async () => ({ sources: [] }) }),
+    onError: createErrorHandler(),
+  });
 }
 
 describe("a route that asks its plan before its permission", () => {

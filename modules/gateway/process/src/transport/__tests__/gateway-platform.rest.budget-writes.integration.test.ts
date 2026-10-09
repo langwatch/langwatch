@@ -10,6 +10,7 @@ import { ResourceScope } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -189,6 +190,7 @@ async function mountedBudgets() {
     scope: { tier: "organization" as const, id: ORGANIZATION_ID },
   });
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: { authenticate: door, identify: door },
     doors: { api_key: { authenticate: door, identify: door } },
     idempotency: passthroughIdempotency,

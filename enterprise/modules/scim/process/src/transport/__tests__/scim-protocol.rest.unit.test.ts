@@ -23,6 +23,7 @@ import {
 } from "@langwatch/enterprise-scim-contract";
 import { ENTERPRISE_FEATURE_ERRORS } from "@langwatch/entitlement-contract";
 import type { OrganizationSsoConnection } from "@langwatch/identity-contract";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { generateSpecs } from "hono-openapi";
 import { describe, expect, it, vi } from "vitest";
 
@@ -124,6 +125,7 @@ function mount(
   };
 
   const host = RestHost.create({
+    authz: restTestAuthorization().forRequest(),
     identities: {
       project: closed,
       organization: closed,

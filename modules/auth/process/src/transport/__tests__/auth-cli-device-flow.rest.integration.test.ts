@@ -11,6 +11,7 @@ import { createRestRuntime } from "@langwatch/api/rest";
 import { CliSessionRecordNotFoundError, cliRefreshTokenKey } from "@langwatch/auth-contract";
 import { OrganizationNotFoundError } from "@langwatch/organization-contract";
 import { ProjectNotFoundError } from "@langwatch/project-contract";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { UserNotFoundError } from "@langwatch/user-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -1624,6 +1625,7 @@ async function personSession(world: ReturnType<typeof deviceFlowWorld>) {
 
 function mount(world: ReturnType<typeof deviceFlowWorld>) {
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => {
         throw new Error("the device grant resolves its own credential.");

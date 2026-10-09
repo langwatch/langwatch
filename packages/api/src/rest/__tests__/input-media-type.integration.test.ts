@@ -7,7 +7,7 @@ import { moduleApi } from "@langwatch/module";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import { createApiDouble } from "../../__tests__/api-double.ts";
+import { createApiDouble, authorizationPort } from "../../__tests__/api-double.ts";
 import { createErrorHandler } from "../../errors.ts";
 import type { RestCaller } from "../../hosting/api-door.ts";
 import { defineRestRouter } from "../declaration.ts";
@@ -54,6 +54,7 @@ function notesApp() {
   const record = vi.fn(async ({ text }: { text: string }) => ({ text }));
   const api = createApiDouble<NoteApi>({ record });
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: () => CALLER,
       authorize: () => ({ permitted: true, organizationRole: null }),

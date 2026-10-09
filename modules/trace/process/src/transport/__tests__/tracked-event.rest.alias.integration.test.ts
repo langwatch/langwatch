@@ -5,6 +5,7 @@
  */
 import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { TrackedEventInvalidError } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -33,6 +34,7 @@ function mounted(family: typeof trackedEventRest, options: { rejects: boolean })
     },
   });
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({
         actor: { type: "api_key", id: "api-key-1" },

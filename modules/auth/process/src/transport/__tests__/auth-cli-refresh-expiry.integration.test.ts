@@ -11,6 +11,7 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { OrganizationNotFoundError } from "@langwatch/organization-contract";
 import { ProjectNotFoundError } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { MemoryCliDeviceSettlementChannel } from "../../channels/memory/memory.cli-device-settlement.channel.ts";
@@ -196,6 +197,7 @@ function refreshWorld() {
     watchCliDeviceApproval: (input) => flow.watchDeviceApproval(input),
   };
   const hono = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => {
         throw new Error("the device grant resolves its own credential.");

@@ -5,6 +5,7 @@
  * @vitest-environment node
  */
 import { bindRestMiddleware, canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
 import { createDashboardTestApp } from "../../app/__tests__/dashboard.fixture.ts";
@@ -24,6 +25,7 @@ function mountKey() {
     scope: { tier: "project" as const, id: "project-1" },
   };
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: { authenticate: () => caller, identify: () => caller },
   });
   const hono = runtime.mount(dashboardWidgetRest.router(), {

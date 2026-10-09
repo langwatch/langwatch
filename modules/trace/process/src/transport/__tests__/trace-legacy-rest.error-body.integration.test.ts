@@ -4,6 +4,7 @@
  */
 import { bindRestMiddleware, createRestRuntime } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -18,6 +19,7 @@ const project = { id: "project-123" };
 const INTERNAL_MESSAGE = "TraceService requires EvaluationService for evaluation reads";
 
 const runtime = createRestRuntime({
+  authorization: restTestAuthorization(),
   identity: {
     authenticate: () => ({
       actor: { type: "user" as const, id: "user-1" },

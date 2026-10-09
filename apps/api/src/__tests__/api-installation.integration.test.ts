@@ -13,6 +13,7 @@ import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { ModuleApiToken } from "@langwatch/module";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { PromptApi } from "@langwatch/prompt-contract";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
 import { processModules } from "../process-modules.generated.ts";
@@ -188,6 +189,7 @@ describe("the api process installation", () => {
         },
       };
       const host = RestHost.create({
+        authz: restTestAuthorization().forRequest(),
         identities: {
           project: closed,
           organization: closed,
@@ -260,6 +262,7 @@ describe("the api process installation", () => {
           ? { actor: { type: "user" as const, id: "user-1" }, scope: null }
           : null;
       const host = RestHost.create({
+        authz: restTestAuthorization().forRequest(),
         identities: {
           project: closed,
           organization: closed,
@@ -320,6 +323,7 @@ describe("the api process installation", () => {
         },
       };
       const host = RestHost.create({
+        authz: restTestAuthorization().forRequest(),
         identities: {
           project: closed,
           organization: closed,
@@ -383,6 +387,7 @@ describe("the api process installation", () => {
         },
       };
       const host = RestHost.create({
+        authz: restTestAuthorization().forRequest(),
         identities: {
           project: closed,
           organization: closed,

@@ -2,6 +2,7 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { createRestRuntime } from "@langwatch/api/rest";
 import type { SpendEventRow } from "@langwatch/gateway-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 /**
  * @vitest-environment node
  * Real ClickHouse + real Postgres. Pins insert-order paging, the tenant fence, and
@@ -83,6 +84,7 @@ function testEnvelope(row: SpendEventRow) {
 /** The organization door the process's credential chain would have opened. */
 function mountSpendFamily(spend: GatewaySpendApp) {
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({
         actor: { type: "api_key", id: `key-${ORG_ID}` },

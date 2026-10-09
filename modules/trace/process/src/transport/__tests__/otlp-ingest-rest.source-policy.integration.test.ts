@@ -9,6 +9,7 @@ import { PlanLimitExceededError } from "@langwatch/entitlement-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { LocalFeatureApis } from "@langwatch/process";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { TraceApi, type OtlpIngestCredential } from "@langwatch/trace-contract";
 import type { ErrorHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
@@ -71,6 +72,7 @@ function ingestionSourceDeployment({
   );
   apis.ready();
   const family = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: { authenticate: () => ({ authenticated: false }) as never },
   }).mount(otlpIngestRest.router(), {
     app: () => apis.reference(TraceApi),

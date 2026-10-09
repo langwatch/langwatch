@@ -13,6 +13,7 @@ import {
   UnauthorizedError,
 } from "@langwatch/api/rest";
 import type { PrincipalRef } from "@langwatch/authorization";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 
 import { IngestionKeyMintService } from "../../services/ingestion-key-mint.service.ts";
 import { apiKeyIngestionCaller, apiKeyRest, apiKeyRestCredential } from "../api-key.rest.ts";
@@ -90,6 +91,7 @@ export function mountApiKeyRest(
   };
 
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     audit: {
       record: (row) => {
         audit.push(row);
