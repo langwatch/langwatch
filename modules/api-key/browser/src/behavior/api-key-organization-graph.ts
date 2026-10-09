@@ -4,7 +4,7 @@
  * same `apiKeyApi` provider and cache entry.
  */
 
-import { useUiCapabilities } from "@langwatch/browser-host/capabilities";
+import { useUiHostServices } from "@langwatch/browser-host/capabilities";
 import { useMemo } from "react";
 
 import type {
@@ -80,7 +80,7 @@ export function useApiKeyOrganizationGraph(input: {
   organizationId: string | undefined;
   projectId: string | undefined;
 }): ApiKeyOrganizationGraph {
-  const { session } = useUiCapabilities();
+  const { session } = useUiHostServices();
   const graphQuery = apiKeyApi.organization.getAll.useQuery(
     { isDemo: false },
     { enabled: !!session.currentUser() },

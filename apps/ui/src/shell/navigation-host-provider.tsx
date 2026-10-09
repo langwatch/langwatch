@@ -6,7 +6,7 @@
 
 import { useUiAddress } from "@langwatch/browser-host/address";
 import {
-  useUiCapabilities,
+  useUiHostServices,
   useUiDeployment,
   useUiRpc,
   useUiScope,
@@ -42,7 +42,7 @@ import {
   toNavigationOrganizations,
   type NavigationGraphRead,
 } from "./navigation-host-graph";
-import type { UiRootCapabilities } from "./ui-root-capabilities";
+import type { UiRootHostServices } from "./ui-root-host-services";
 import { useUiShellFailure } from "./ui-shell-failure";
 
 /** The gradient the palette's own Langy mark paints with. */
@@ -50,11 +50,11 @@ const COMMAND_BAR_LANGY_GRADIENT_ID = "command-bar-langy-mark-gradient";
 
 /** The shell's host class over navigation's port class, built once per loaded port. */
 const browserHostClasses = new WeakMap<
-  UiRootCapabilities["navigationHost"]["NavigationHost"],
+  UiRootHostServices["navigationHost"]["NavigationHost"],
   ReturnType<typeof browserNavigationHosts>
 >();
 
-function browserNavigationHostOf(port: UiRootCapabilities["navigationHost"]["NavigationHost"]) {
+function browserNavigationHostOf(port: UiRootHostServices["navigationHost"]["NavigationHost"]) {
   const known = browserHostClasses.get(port);
   if (known) return known;
   const built = browserNavigationHosts(port);
@@ -68,7 +68,7 @@ function rememberScope({
   remember,
 }: {
   write: NavigationScopeWrite;
-  remember: UiRootCapabilities["scope"]["rememberUiScopeSelection"];
+  remember: UiRootHostServices["scope"]["rememberUiScopeSelection"];
 }): void {
   remember({
     writes: [
@@ -107,7 +107,7 @@ export function UiNavigationHost({
   /** The process owner's slice, handed down by the chrome. */
   process: ProcessWebConfig;
   /** Auth's session and organization's scope, loaded before the shell rendered. */
-  capabilities: UiRootCapabilities;
+  capabilities: UiRootHostServices;
   /**
    * Whether this mount carries the search palette — a singleton (one
    * document, one Cmd+K), so only the chrome layout route asks for it.
@@ -150,10 +150,10 @@ function useNavigationHostReading({
   process,
 }: {
   commandBar: boolean;
-  capabilities: UiRootCapabilities;
+  capabilities: UiRootHostServices;
   process: ProcessWebConfig;
 }) {
-  const { session, navigation, documentTitle, route } = useUiCapabilities();
+  const { session, navigation, documentTitle, route } = useUiHostServices();
   const activeScope = useUiScope().activeScope();
   const memory = scopeCapability.useUiScopeMemory();
   const facts = organizationFacts.useUiOrganizationFacts();

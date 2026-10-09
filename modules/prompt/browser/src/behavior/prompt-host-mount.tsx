@@ -4,7 +4,7 @@
  */
 
 import {
-  useUiCapabilities,
+  useUiHostServices,
   useUiCopyTargets,
   useUiScope,
   type UiCopyTargets,
@@ -176,7 +176,7 @@ class CapabilityPromptHost extends PromptHostApi {
  * is what `mounts.load` resolves.
  */
 export default function PromptHostMount({ children }: { children?: ReactNode }) {
-  const { session, navigation, route, feedback } = useUiCapabilities();
+  const { session, navigation, route, feedback } = useUiHostServices();
   const lent = useUiCopyTargets();
   const { organizationId, projectId } = useUiScope().activeScope();
   const scopeHost: UiScopeHost | undefined = useUiScope().scopeHost();

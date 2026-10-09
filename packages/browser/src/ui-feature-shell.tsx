@@ -5,14 +5,14 @@
 import { cachePlanFor, type UiQueryVersions } from "@langwatch/browser-host/cache-tiers";
 import {
   BrowserUiDocumentTitle,
-  resolveUiCapabilities,
-  UiCapabilityContextProvider,
+  resolveUiHostServices,
+  UiHostServicesContextProvider,
   UNAVAILABLE_UI_FEEDBACK,
   UNAVAILABLE_UI_SCOPE,
   UNAVAILABLE_UI_SESSION,
-  type UiCapabilityInstall,
+  type UiHostServiceInstall,
   type UiRpc,
-  type UiSessionCapabilities,
+  type UiSessionHostServices,
   type UiSessionSource,
   UiHostServiceProvider,
 } from "@langwatch/browser-host/capabilities";
@@ -77,7 +77,7 @@ export type UiFeatureShellInstall = {
   /** One entry per feature package whose hooks this application serves. */
   apis: readonly UiFeatureApiBinding[];
   /** The capability ports the composing application answers itself. */
-  capabilities: UiCapabilityInstall;
+  capabilities: UiHostServiceInstall;
   /** Every installed module's drawers, as one registry. */
   drawers?: UiDrawerRegistry;
   /**
@@ -268,7 +268,7 @@ export function createUiFeatureShell({
   // The version each mirrored read was last stored under, shared by the mirror and the tab sync.
   const versions: UiQueryVersions = new Map();
 
-  function UiCapabilities({
+  function UiHostServices({
     transport: sessionTransport,
     rpc,
     watch,
@@ -286,7 +286,7 @@ export function createUiFeatureShell({
     // read back out of the resolution: a refused session read is told through
     // it, and it is the only failure with nobody else to tell.
     const feedback = capabilities.feedback ?? UNAVAILABLE_UI_FEEDBACK;
-    const live: UiSessionCapabilities = useSessionCapability({
+    const live: UiSessionHostServices = useSessionCapability({
       transport: sessionTransport,
       feedback,
     });
@@ -329,7 +329,7 @@ export function createUiFeatureShell({
     }, [queryClient, userId, cacheKey, previousCacheKey, watch]);
     const resolved = useMemo(
       () =>
-        resolveUiCapabilities({
+        resolveUiHostServices({
           install: capabilities,
           documentTitle,
           navigation,
@@ -362,7 +362,7 @@ export function createUiFeatureShell({
     // The one scope host every feature's shared hook reads, on every route; a
     // session with nothing resolved publishes none and the hook reads unresolved.
     return (
-      <UiCapabilityContextProvider value={resolved}>
+      <UiHostServicesContextProvider value={resolved}>
         <UiHostServiceProvider value={hostServiceValues}>
           <UiScopeHostProvider value={resolved.scope?.scopeHost()}>
             {/* Nothing is answering on the API's address, so the reader waits
@@ -376,7 +376,7 @@ export function createUiFeatureShell({
             </UiApiWaitingGate>
           </UiScopeHostProvider>
         </UiHostServiceProvider>
-      </UiCapabilityContextProvider>
+      </UiHostServicesContextProvider>
     );
   }
 
@@ -423,9 +423,9 @@ export function createUiFeatureShell({
           {inner}
         </Provider>
       ),
-      <UiCapabilities transport={ownTransport} rpc={rpc} watch={watch}>
+      <UiHostServices transport={ownTransport} rpc={rpc} watch={watch}>
         {children}
-      </UiCapabilities>,
+      </UiHostServices>,
     );
 
     // Always mounted, host client or own: a Provider that appears only in one

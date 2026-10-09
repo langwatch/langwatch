@@ -4,7 +4,7 @@
  * application. ARCHITECTURE.md §10.1.
  */
 
-import { useUiCapabilities } from "@langwatch/browser-host/capabilities";
+import { useUiHostServices } from "@langwatch/browser-host/capabilities";
 import { useMemo, type ReactNode } from "react";
 
 import { traceApi } from "./trace-api.ts";
@@ -209,7 +209,7 @@ function organizationReading(input: {
  * is what `mounts.load` resolves.
  */
 export default function TraceHostMount({ children }: { children?: ReactNode }) {
-  const { session, navigation, route, feedback } = useUiCapabilities();
+  const { session, navigation, route, feedback } = useUiHostServices();
   const { organization, team, project } = session.snapshot().scope;
   const actor = session.currentUser();
   const isSettled = session.isSettled();

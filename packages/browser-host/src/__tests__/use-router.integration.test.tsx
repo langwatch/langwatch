@@ -4,12 +4,12 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   BrowserUiDocumentTitle,
-  UiCapabilityContextProvider,
+  UiHostServicesContextProvider,
   UiNavigation,
   UiRoute,
   UNAVAILABLE_UI_FEEDBACK,
   UNAVAILABLE_UI_SESSION,
-  type UiCapabilities,
+  type UiHostServices,
   type UiRouteReadingValues,
 } from "../capabilities.ts";
 import { useRouter } from "../use-router.ts";
@@ -49,7 +49,7 @@ class RecordingRoute extends UiRoute {
   }
 }
 
-function capabilities(values: UiRouteReadingValues): UiCapabilities {
+function capabilities(values: UiRouteReadingValues): UiHostServices {
   return {
     documentTitle: BrowserUiDocumentTitle.create(),
     feedback: UNAVAILABLE_UI_FEEDBACK,
@@ -61,9 +61,9 @@ function capabilities(values: UiRouteReadingValues): UiCapabilities {
 
 function mounted(values: UiRouteReadingValues) {
   return ({ children }: { children: ReactNode }) => (
-    <UiCapabilityContextProvider value={capabilities(values)}>
+    <UiHostServicesContextProvider value={capabilities(values)}>
       {children}
-    </UiCapabilityContextProvider>
+    </UiHostServicesContextProvider>
   );
 }
 

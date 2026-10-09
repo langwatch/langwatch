@@ -4,13 +4,13 @@
  * Spec: specs/ui/module-host-mounting.feature
  */
 import {
-  UiCapabilityContextProvider,
+  UiHostServicesContextProvider,
   UiScope,
   UiSession,
   type UiActiveScope,
-  type UiCapabilities,
+  type UiHostServices,
 } from "@langwatch/browser-host/capabilities";
-import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
 import { render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -68,8 +68,8 @@ class GrantedSession extends UiSession {
 }
 
 function harness({ grants }: { grants: readonly string[] }) {
-  const capabilities: UiCapabilities = {
-    ...createUiCapabilitiesFromHost(
+  const capabilities: UiHostServices = {
+    ...createUiHostServicesFromHost(
       { route: () => ({ params: {}, query: {} }), navigate: () => void 0 },
       new GrantedSession(grants),
     ),
@@ -78,9 +78,9 @@ function harness({ grants }: { grants: readonly string[] }) {
 
   return function Harness({ children }: { children: ReactNode }) {
     return (
-      <UiCapabilityContextProvider value={capabilities}>
+      <UiHostServicesContextProvider value={capabilities}>
         <AuthzHostMount>{children}</AuthzHostMount>
-      </UiCapabilityContextProvider>
+      </UiHostServicesContextProvider>
     );
   };
 }

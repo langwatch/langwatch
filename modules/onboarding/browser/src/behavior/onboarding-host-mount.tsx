@@ -5,7 +5,7 @@
  */
 
 import { useUiAddress } from "@langwatch/browser-host/address";
-import { useUiCapabilities, useUiScope } from "@langwatch/browser-host/capabilities";
+import { useUiHostServices, useUiScope } from "@langwatch/browser-host/capabilities";
 import type { ReleaseFlagToken } from "@langwatch/browser-host/declarations";
 import { useUiFlags } from "@langwatch/browser-host/feature-flag";
 import { useLent, useLentHooks } from "@langwatch/browser-host/lent";
@@ -206,7 +206,7 @@ class CapabilityOnboardingHost extends OnboardingHostApi {
 }
 
 export default function OnboardingHostMount({ children }: { children?: ReactNode }) {
-  const { session, route, feedback, navigation } = useUiCapabilities();
+  const { session, route, feedback, navigation } = useUiHostServices();
   const activeScope = useUiScope().activeScope();
   const location = useLocation();
   const asPath = useUiAddress();

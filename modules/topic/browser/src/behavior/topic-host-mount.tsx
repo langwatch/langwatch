@@ -5,7 +5,7 @@
  */
 
 import {
-  useUiCapabilities,
+  useUiHostServices,
   useUiScope,
   type UiFeedback,
 } from "@langwatch/browser-host/capabilities";
@@ -43,7 +43,7 @@ class CapabilityTopicHost extends TopicHostApi {
  * is what `mounts.load` resolves.
  */
 export default function TopicHostMount({ children }: { children?: ReactNode }) {
-  const { feedback } = useUiCapabilities();
+  const { feedback } = useUiHostServices();
   const { projectId } = useUiScope().activeScope();
   const host = useMemo(
     () => new CapabilityTopicHost({ projectId: projectId ?? void 0, feedback }),

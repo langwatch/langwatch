@@ -4,7 +4,7 @@
  */
 
 import {
-  useUiCapabilities,
+  useUiHostServices,
   useUiDeployment,
   useUiScope,
   type UiFeedback,
@@ -104,7 +104,7 @@ class CapabilityScimHost extends ScimHostApi {
  * is what `mounts.load` resolves.
  */
 export default function ScimHostMount({ children }: { children?: ReactNode }) {
-  const { feedback, route, session } = useUiCapabilities();
+  const { feedback, route, session } = useUiHostServices();
   const flags = useUiFlags();
   const { organizationId } = useUiScope().activeScope();
   const { appBaseUrl } = useUiDeployment();

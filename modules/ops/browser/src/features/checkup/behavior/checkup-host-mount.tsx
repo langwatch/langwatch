@@ -5,7 +5,7 @@
  */
 
 import {
-  useUiCapabilities,
+  useUiHostServices,
   useUiDeployment,
   useUiScope,
   type UiFeedback,
@@ -54,7 +54,7 @@ class CapabilityCheckupHost extends CheckupHostApi {
 
 /** One provider above the routed tree; default-exported because `mounts.load` resolves that. */
 export default function CheckupHostMount({ children }: { children?: ReactNode }) {
-  const { session, feedback } = useUiCapabilities();
+  const { session, feedback } = useUiHostServices();
   const { isSaaS } = useUiDeployment();
   const { organizationId } = useUiScope().activeScope();
   const mayManageOrganization = session.hasPermission("organization:manage");

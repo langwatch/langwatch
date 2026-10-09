@@ -20,7 +20,7 @@ const navigation = navigationWeb.installation.capabilities;
 const trace = traceWeb.installation.capabilities;
 const ops = opsWeb.installation.capabilities;
 
-export type UiRootCapabilities = {
+export type UiRootHostServices = {
   session: Awaited<ReturnType<typeof auth.session.load>>;
   frontDoorTheme: Awaited<ReturnType<typeof auth.frontDoorTheme.load>>;
   authHost: Awaited<ReturnType<typeof auth.host.load>>;
@@ -36,7 +36,7 @@ export type UiRootCapabilities = {
   upgradeBanner: Awaited<ReturnType<typeof ops.upgradeBanner.load>>;
 };
 
-export async function loadUiRootCapabilities(): Promise<UiRootCapabilities> {
+export async function loadUiRootHostServices(): Promise<UiRootHostServices> {
   const [
     session,
     frontDoorTheme,
@@ -86,6 +86,6 @@ export async function loadUiRootCapabilities(): Promise<UiRootCapabilities> {
 /** The application-composed system: shared foundations plus installed features. */
 export function composeUiDesignSystem({
   frontDoorTheme,
-}: Pick<UiRootCapabilities, "frontDoorTheme">) {
+}: Pick<UiRootHostServices, "frontDoorTheme">) {
   return createDesignSystem(langyThemeConfig, frontDoorTheme.frontDoorThemeConfig);
 }

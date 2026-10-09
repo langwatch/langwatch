@@ -5,7 +5,7 @@
  */
 
 import type {
-  UiCapabilityInstall,
+  UiHostServiceInstall,
   UiRpc,
   UiSessionSource,
 } from "@langwatch/browser-host/capabilities";
@@ -55,7 +55,7 @@ export type UiFeatureInstall = {
   /** Every feature's reader of a failed mutation, in install order. */
   failures?: readonly UiFailureInterceptor[];
   /** Capability ports the composing application answers itself. */
-  capabilities?: UiCapabilityInstall;
+  capabilities?: UiHostServiceInstall;
   /** The transport those hooks run on. Built same-origin when absent. */
   transport?: UiFeatureApiTransport;
   /** The watch that transport's fetch reports session versions to (ADR-170). */
@@ -141,7 +141,7 @@ export function installUiFeatures<const F extends readonly UiFeature[]>({
   transport,
 }: {
   features: F;
-  capabilities?: UiCapabilityInstall;
+  capabilities?: UiHostServiceInstall;
   session?: UiSessionSource;
   transport?: UiFeatureApiTransport;
 }): UiFeatureInstallResult<F> {

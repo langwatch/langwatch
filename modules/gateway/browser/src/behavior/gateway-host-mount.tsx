@@ -4,7 +4,7 @@
  */
 
 import {
-  useUiCapabilities,
+  useUiHostServices,
   useUiDeployment,
   useUiScope,
   type UiFeedback,
@@ -212,7 +212,7 @@ class CapabilityGatewayHost extends GatewayHostApi {
  * is what `mounts.load` resolves.
  */
 export default function GatewayHostMount({ children }: { children?: ReactNode }) {
-  const { session, navigation, route, feedback } = useUiCapabilities();
+  const { session, navigation, route, feedback } = useUiHostServices();
   const { organizationId, projectId } = useUiScope().activeScope();
   const scopeHost = useUiScope().scopeHost();
   const { isSaaS, appBaseUrl, gatewayBaseUrl } = useUiDeployment();

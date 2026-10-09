@@ -5,7 +5,7 @@
  */
 
 import {
-  useUiCapabilities,
+  useUiHostServices,
   useUiCopyTargets,
   useUiRpc,
   useUiScope,
@@ -138,7 +138,7 @@ class CapabilityAgentManagementHost implements AgentManagementHost {
  * is what `mounts.load` resolves.
  */
 export default function AgentManagementHostMount({ children }: { children?: ReactNode }) {
-  const { navigation, route, feedback } = useUiCapabilities();
+  const { navigation, route, feedback } = useUiHostServices();
   const flags = useUiFlags();
   const rpc = useUiRpc();
   const lent = useUiCopyTargets();

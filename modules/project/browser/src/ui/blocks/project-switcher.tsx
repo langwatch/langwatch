@@ -4,7 +4,7 @@
  * every project grouped by organization and team, as the graph arrives.
  */
 
-import { useUiCapabilities, useUiScope } from "@langwatch/browser-host/capabilities";
+import { useUiHostServices, useUiScope } from "@langwatch/browser-host/capabilities";
 import { Link } from "@langwatch/browser-host/link";
 import { Menu } from "@langwatch/design-system/menu";
 import { Button, HStack, Text } from "@langwatch/design-system/primitives";
@@ -16,7 +16,7 @@ import { projectSwitchGroups, projectSwitchHref } from "../../model/project-swit
 import { ProjectAvatar } from "../elements/project-avatar.tsx";
 
 export default function ProjectSwitcher() {
-  const { navigation, route } = useUiCapabilities();
+  const { navigation, route } = useUiHostServices();
   const { projectId } = useUiScope().activeScope();
   const [isOpen, setIsOpen] = useState(false);
   const organizations = projectApi.organization.getScopeGraph.useQuery({});

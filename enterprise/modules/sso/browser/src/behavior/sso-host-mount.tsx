@@ -9,16 +9,16 @@ import {
   type SsoTestSignInOperations,
 } from "@langwatch/auth-contract";
 import {
-  UiCapabilityUnavailableError,
-  useUiCapabilities,
+  UiHostServiceUnavailableError,
+  useUiHostServices,
   useUiScope,
   type UiFeedback,
   type UiRoute,
   type UiSession,
 } from "@langwatch/browser-host/capabilities";
 import type { UiDrawerToken } from "@langwatch/browser-host/declarations";
-import { useLentOperations } from "@langwatch/browser-host/lent";
 import { useDrawer } from "@langwatch/browser-host/drawer";
+import { useLentOperations } from "@langwatch/browser-host/lent";
 import { useMemo, type ReactNode } from "react";
 
 import {
@@ -34,7 +34,7 @@ import {
 type SsoTestSignIn = SsoTestSignInOperations["testSignIn"];
 
 const INERT_TEST_SIGN_IN: SsoTestSignIn = () => {
-  throw new UiCapabilityUnavailableError("sso test sign-in");
+  throw new UiHostServiceUnavailableError("sso test sign-in");
 };
 
 /** Every control on the page, as ADR-122 gates them. */
@@ -104,7 +104,7 @@ class CapabilitySsoHost extends SsoHostApi {
  * Default-exported because that is what `mounts.load` resolves.
  */
 export default function SsoHostMount({ children }: { children?: ReactNode }) {
-  const { feedback, route, session } = useUiCapabilities();
+  const { feedback, route, session } = useUiHostServices();
   const { organizationId } = useUiScope().activeScope();
   const loadSignIn = useLentOperations(SsoTestSignInToken);
   const { openDrawer } = useDrawer();

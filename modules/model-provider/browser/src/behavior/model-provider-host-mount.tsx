@@ -5,7 +5,7 @@
  */
 
 import {
-  useUiCapabilities,
+  useUiHostServices,
   useUiScope,
   type UiFeedback,
   type UiRoute,
@@ -169,7 +169,7 @@ class CapabilityModelProviderHost extends ModelProviderHostApi {
  * is what `mounts.load` resolves.
  */
 export default function ModelProviderHostMount({ children }: { children?: ReactNode }) {
-  const { session, route, feedback } = useUiCapabilities();
+  const { session, route, feedback } = useUiHostServices();
   const { organizationId, projectId } = useUiScope().activeScope();
   const scopeHost = useUiScope().scopeHost();
 
