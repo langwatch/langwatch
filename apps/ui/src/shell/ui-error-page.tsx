@@ -5,9 +5,12 @@
 
 import { resolveUiFailureCopy } from "@langwatch/browser-host/feedback";
 import { BrandedCard, BrandedCardPage } from "@langwatch/design-system/branded-card";
-import { Button, Center, HStack, Text } from "@langwatch/design-system/primitives";
+import { Button, Center, Collapsible, HStack, Text } from "@langwatch/design-system/primitives";
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
-import { useEffect, type ComponentType, type ReactNode } from "react";
+import { useCopyToClipboard } from "@langwatch/design-system/use-copy-to-clipboard";
+import { nowInstant } from "@langwatch/time";
+import { Check, ChevronRight, Copy } from "lucide-react";
+import { useEffect, useState, type ComponentType, type ReactNode } from "react";
 import { ErrorBoundary, type FallbackProps } from "react-error-boundary";
 import { useLocation, useRouteError } from "react-router";
 
@@ -51,6 +54,9 @@ export function UiScreenErrorBoundary({
 /** The words come from the presentation registry; an unknown error's message is never shown. */
 function UiErrorCard({ error, isDevelopment }: UiErrorProps) {
   const copy = resolveUiFailureCopy({ error, fallbackTitle: "Something went wrong" });
+  const [occurredAt] = useState(() => nowInstant().toString());
+  const clipboard = useCopyToClipboard();
+  const stack = error instanceof Error ? (error.stack ?? error.message) : String(error);
 
   useEffect(() => {
     console.error("[UiErrorPage]", error);
@@ -63,7 +69,7 @@ function UiErrorCard({ error, isDevelopment }: UiErrorProps) {
       cardAttributes={{ "data-testid": "app-error-page" }}
       footer={
         copy.traceId ? (
-          <Text fontSize="xs" color="fg.muted" fontFamily="mono">
+          <Text fontSize="xs" color="fg.muted" fontFamily="mono" userSelect="all">
             Trace id: {copy.traceId}
           </Text>
         ) : null
@@ -77,23 +83,85 @@ function UiErrorCard({ error, isDevelopment }: UiErrorProps) {
           <a href="/">Go home</a>
         </Button>
       </HStack>
-      {isDevelopment ? (
-        <Text
-          as="pre"
-          fontSize="xs"
-          fontFamily="mono"
-          color="fg.muted"
-          maxHeight="240px"
-          overflow="auto"
-          whiteSpace="pre-wrap"
-          wordBreak="break-word"
-          data-testid="app-error-stack"
-        >
-          {error instanceof Error ? (error.stack ?? error.message) : String(error)}
-        </Text>
-      ) : null}
+      <Collapsible.Root width="full" minWidth={0}>
+        <HStack justify={isDevelopment ? "space-between" : "center"} gap={2}>
+          {isDevelopment ? (
+            <Collapsible.Trigger asChild>
+              <Button size="xs" variant="ghost" color="fg.muted">
+                <ChevronRight size={12} />
+                Error details
+              </Button>
+            </Collapsible.Trigger>
+          ) : null}
+          {typeof navigator !== "undefined" && navigator.clipboard ? (
+            <Button
+              size="xs"
+              variant="ghost"
+              color="fg.muted"
+              onClick={() =>
+                clipboard.copy(
+                  uiErrorReport({
+                    error,
+                    traceId: copy.traceId,
+                    url: window.location.href,
+                    occurredAt,
+                  }),
+                )
+              }
+            >
+              {clipboard.copied ? <Check size={12} /> : <Copy size={12} />}
+              {clipboard.copied ? "Copied" : "Copy error details"}
+            </Button>
+          ) : null}
+        </HStack>
+        {isDevelopment ? (
+          <Collapsible.Content>
+            <Text
+              as="pre"
+              marginTop={2}
+              padding={3}
+              borderRadius="md"
+              backgroundColor="bg.subtle"
+              fontSize="xs"
+              fontFamily="mono"
+              color="fg.muted"
+              textAlign="left"
+              maxHeight="240px"
+              overflow="auto"
+              whiteSpace="pre-wrap"
+              overflowWrap="anywhere"
+              data-testid="app-error-stack"
+            >
+              {stack}
+            </Text>
+          </Collapsible.Content>
+        ) : null}
+      </Collapsible.Root>
     </BrandedCard>
   );
+}
+
+/** What a reader pastes to support: the error, where and when it happened, and its trace id. */
+export function uiErrorReport({
+  error,
+  traceId,
+  url,
+  occurredAt,
+}: {
+  error: unknown;
+  traceId: string | undefined;
+  url: string;
+  occurredAt: string;
+}): string {
+  const message = error instanceof Error ? error.message : String(error);
+  const stack = error instanceof Error ? error.stack : undefined;
+  return [
+    `Error: ${message}`,
+    ...(traceId ? [`Trace id: ${traceId}`] : []),
+    `URL: ${url}`,
+    `Time: ${occurredAt}`,
+    ...(stack ? ["", stack] : []),
+  ].join("\n");
 }
 
 export type UiErrorPages = {
