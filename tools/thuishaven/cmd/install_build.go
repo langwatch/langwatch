@@ -8,7 +8,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/havenui"
@@ -17,26 +20,32 @@ import (
 // buildStep is one quiet step of `haven install --build`: its output goes to a
 // log file, and the screen gets one progress line instead.
 type buildStep struct {
-	label string
-	argv  []string
+	running string // "building haven consoles", shown while it runs
+	done    string // "haven consoles built", shown with ✓ when it ends
+	log     string // the log file's name under the install log directory
+	argv    []string
 	// optional: a failure is reported and the run carries on. A console that
 	// fails to build serves a page naming `make haven-web` instead.
 	optional bool
-	at       string // "(3/8)", set when the run numbers its steps
+	// nx: argv is an nx run-many whose task lines feed the progress count.
+	nx bool
 }
 
 // havenBuildSteps are what `make haven install` builds before it asks anything:
-// the consoles the binary embeds (ADR-160), then the binary itself.
+// the consoles the binary embeds (ADR-160), selected by nx's haven-console tag
+// (dev/nx/go-plugin.mjs) and cached by nx, then the binary itself.
 func havenBuildSteps() []buildStep {
-	var steps []buildStep
-	for _, web := range []string{"haven-web", "mailsim-web", "idpsim-web", "storagesim-web", "voicesim-web", "llmsim-web", "analyticssim-web"} {
-		steps = append(steps, buildStep{
-			label:    "building " + web,
-			argv:     []string{"pnpm", "exec", "nx", "run", "@langwatch/" + web + ":build", "--outputStyle=static"},
+	return []buildStep{
+		{
+			running:  "building haven consoles",
+			done:     "haven consoles built",
+			log:      "haven-web.log",
+			argv:     []string{"pnpm", "exec", "nx", "run-many", "-t", "build", "--projects", "tag:haven-console", "--outputStyle=static"},
 			optional: true,
-		})
+			nx:       true,
+		},
+		{running: "installing the haven binary", done: "haven binary installed", log: "go-install.log", argv: []string{"go", "install", "./cmd/haven"}},
 	}
-	return append(steps, buildStep{label: "installing the haven binary", argv: []string{"go", "install", "./cmd/haven"}})
 }
 
 // runInstallBuild is `haven install --build`, run from the repository root.
@@ -58,9 +67,8 @@ type buildRun struct {
 }
 
 func runBuildSteps(ctx context.Context, run buildRun) error {
-	var failed []string
-	for i, step := range run.steps {
-		step.at = fmt.Sprintf("(%d/%d)", i+1, len(run.steps))
+	failed := false
+	for _, step := range run.steps {
 		err := runBuildStep(ctx, run, step)
 		if err == nil {
 			continue
@@ -68,10 +76,10 @@ func runBuildSteps(ctx context.Context, run buildRun) error {
 		if !step.optional {
 			return err
 		}
-		failed = append(failed, strings.TrimPrefix(step.label, "building "))
+		failed = true
 	}
-	if len(failed) > 0 {
-		fmt.Fprintf(run.w, "%s not built: %s; their pages name 'make haven-web' until they are\n", havenui.Skip, strings.Join(failed, ", "))
+	if failed {
+		fmt.Fprintf(run.w, "%s a failed console's page names 'make haven-web' until it is built\n", havenui.Skip)
 	}
 	return nil
 }
@@ -79,29 +87,94 @@ func runBuildSteps(ctx context.Context, run buildRun) error {
 // runBuildStep runs one step into its log, drawing a spinner and the elapsed
 // time while it runs, then ✓ or ✗; a failure prints the log's last 30 lines.
 func runBuildStep(ctx context.Context, run buildRun, step buildStep) error {
-	logPath := filepath.Join(run.logDir, strings.ReplaceAll(step.label, " ", "-")+".log")
+	logPath := filepath.Join(run.logDir, step.log)
 	logFile, err := os.Create(logPath)
 	if err != nil {
 		return err
 	}
 	defer logFile.Close()
+	progress := &nxProgress{}
+	var sink io.Writer = logFile
+	if step.nx {
+		sink = io.MultiWriter(logFile, progress)
+	}
 	c := exec.CommandContext(ctx, step.argv[0], step.argv[1:]...) //nolint:gosec // a fixed argv from havenBuildSteps
-	c.Stdout, c.Stderr = logFile, logFile
+	c.Stdout, c.Stderr = sink, sink
 	start := time.Now()
 	done := make(chan error, 1)
 	go func() { done <- c.Run() }()
 	runErr := waitDrawing(run, done, func(frame string) string {
-		return fmt.Sprintf("%s %s %s  %s", frame, step.label, step.at, time.Since(start).Round(time.Second))
+		count := ""
+		if finished, total, _ := progress.counts(); total > 0 {
+			count = fmt.Sprintf(" %d/%d", finished, total)
+		}
+		return fmt.Sprintf("%s %s%s · %s", frame, step.running, count, took(time.Since(start)))
 	})
-	took := time.Since(start).Round(time.Second)
+	elapsed := took(time.Since(start))
 	if runErr == nil {
-		fmt.Fprintf(run.w, "%s %s %s  %s\n", havenui.Good.Render(havenui.Yes), step.label, step.at, took)
+		detail := ""
+		if finished, total, cached := progress.counts(); total > 0 {
+			detail = fmt.Sprintf(" (%d, %d cached)", finished, cached)
+		}
+		fmt.Fprintf(run.w, "%s %s%s %s\n", havenui.Good.Render(havenui.Yes), step.done, detail, elapsed)
 		return nil
 	}
-	fmt.Fprintf(run.w, "%s %s %s  %s\n", havenui.Warn.Render(havenui.No), step.label, step.at, took)
+	fmt.Fprintf(run.w, "%s %s failed %s\n", havenui.Warn.Render(havenui.No), step.running, elapsed)
 	fmt.Fprint(run.w, logTail(logPath, 30))
 	fmt.Fprintf(run.w, "  full log: %s\n", logPath)
-	return fmt.Errorf("%s failed (%w); log: %s", step.label, runErr, logPath)
+	return fmt.Errorf("%s failed (%w); log: %s", step.running, runErr, logPath)
+}
+
+// took is an elapsed time that keeps a cached run's 130ms visible.
+func took(d time.Duration) string {
+	if d < 10*time.Second {
+		return d.Round(100 * time.Millisecond).String()
+	}
+	return d.Round(time.Second).String()
+}
+
+var (
+	nxTaskLine  = regexp.MustCompile(`^> nx run \S+-web:build(?:\s+\[(.*)\])?\s*$`)
+	nxTotalLine = regexp.MustCompile(`Running target build for (\d+) projects`)
+)
+
+// nxProgress counts nx's per-task lines as the log is written: static output
+// prints "> nx run <project>:build [local cache]" as each task finishes.
+type nxProgress struct {
+	mu                   sync.Mutex
+	partial              string
+	finished, total, hit int
+}
+
+func (p *nxProgress) Write(b []byte) (int, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.partial += string(b)
+	for {
+		i := strings.IndexByte(p.partial, '\n')
+		if i < 0 {
+			return len(b), nil
+		}
+		p.line(p.partial[:i])
+		p.partial = p.partial[i+1:]
+	}
+}
+
+func (p *nxProgress) line(text string) {
+	if m := nxTaskLine.FindStringSubmatch(text); m != nil {
+		p.finished++
+		if strings.Contains(m[1], "cache") {
+			p.hit++
+		}
+	} else if m := nxTotalLine.FindStringSubmatch(text); m != nil {
+		p.total, _ = strconv.Atoi(m[1])
+	}
+}
+
+func (p *nxProgress) counts() (finished, total, cached int) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.finished, p.total, p.hit
 }
 
 var spinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
