@@ -7,7 +7,7 @@ import { z } from "zod";
  * batch-only model is left out. Cache prices are multipliers of the input rate.
  */
 
-export const DOUBLEWORD_PROVIDER = "doubleword";
+const DOUBLEWORD_PROVIDER = "doubleword";
 
 const doublewordTariffSchema = z.object({
   name: z.string().optional(),
