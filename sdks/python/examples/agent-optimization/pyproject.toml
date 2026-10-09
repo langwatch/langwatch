@@ -13,3 +13,12 @@ dependencies = [
 
 [tool.uv]
 package = false
+
+# Transitive-dependency security pins, so a re-resolution can't pull a
+# vulnerable version back in.
+constraint-dependencies = [
+    "pyjwt>=2.15.0",  # security: PyJWT advisories covering <=2.14.0 (#2492, #2632)
+    "urllib3>=2.8.0",  # security: urllib3 advisories covering <2.8.0 (#2597, #2598, #2610)
+    "mako>=1.4.2",  # security: Mako advisory covering <=1.4.1
+    "multidict>=6.9.1",  # security: multidict advisory covering 6.7.0-6.9.0
+]
