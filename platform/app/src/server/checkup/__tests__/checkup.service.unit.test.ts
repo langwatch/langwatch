@@ -56,7 +56,7 @@ function healthyDeps(overrides: Partial<CheckupDeps> = {}): CheckupDeps {
     redis: { target: "redis://redis:6379", ready: async () => undefined },
     gateway: {
       baseUrl: "http://gateway:5563",
-      expectedControlPlaneUrl: "http://app:5560",
+      controlPlaneUrls: ["http://app:5560"],
       health: async () => undefined,
       probeControlPlane: async () => ({
         kind: "ok",
@@ -90,14 +90,24 @@ function healthyDeps(overrides: Partial<CheckupDeps> = {}): CheckupDeps {
     email: {
       provider: "smtp",
       smtpConfigured: true,
+      smtpSendsCredentials: true,
       verifySmtp: async () => undefined,
     },
     modelProviders: async () => [
-      { id: "mp_1", provider: "openai", customKeys: { OPENAI_API_KEY: "sk" } },
+      {
+        id: "mp_1",
+        provider: "openai",
+        customKeys: { OPENAI_API_KEY: "sk" },
+        hasUnreadableKeys: false,
+      },
     ],
     modelProviderBudget: async () => undefined,
     testModelProvider: async () => ({ outcome: "verified" }),
     canary: async () => ({ status: 200, body: { status: 200 } }),
+    langyCanary: async () => ({
+      kind: "answered",
+      answer: { status: 200, body: { status: "ok" } },
+    }),
     ...overrides,
   };
 }
@@ -430,6 +440,32 @@ describe("CheckupService", () => {
     });
   });
 
+  describe("when the deployment sets LANGWATCH_CONNECT_DISABLED and the reach checks are asked for", () => {
+    /** @scenario "Connect switched off by the deployment probes no LangWatch host" */
+    it("opens no connection and names the variable", async () => {
+      const reach = vi.fn(async () => undefined);
+      const { rows } = await new CheckupService(
+        healthyDeps({
+          reach,
+          connect: async () => ({
+            ...CONNECTED,
+            deployment: "off",
+            licensed: false,
+            entitledServices: null,
+            lastSyncAt: null,
+          }),
+        }),
+      ).explicit({ checks: ["reach_connect_host", "reach_gateway_host"] });
+
+      expect(reach).not.toHaveBeenCalled();
+      for (const id of ["reach_connect_host", "reach_gateway_host"] as const) {
+        const verdict = rowOf(rows, id);
+        expect(verdict.outcome).toBe("unchecked");
+        expect(verdict.detail).toContain("LANGWATCH_CONNECT_DISABLED");
+      }
+    });
+  });
+
   describe("when the model provider test budget is used up", () => {
     /** @scenario "The model provider test respects the organization's egress budget" */
     it("leaves the row not checked and names when to try again", async () => {
@@ -452,6 +488,40 @@ describe("CheckupService", () => {
       expect(verdict.outcome).toBe("unchecked");
       expect(verdict.detail).toContain("42 seconds");
       expect(testModelProvider).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the SMTP relay accepts the connection", () => {
+    const smtpRow = async (smtpSendsCredentials: boolean) => {
+      const { rows } = await new CheckupService(
+        healthyDeps({
+          email: {
+            provider: "smtp",
+            smtpConfigured: true,
+            smtpSendsCredentials,
+            verifySmtp: async () => undefined,
+          },
+        }),
+      ).explicit({ checks: ["smtp_verify"] });
+      return rowOf(rows, "smtp_verify");
+    };
+
+    /** @scenario "The SMTP check mentions credentials only when it sent some" */
+    it("names the credentials when an SMTP user is configured", async () => {
+      const verdict = await smtpRow(true);
+
+      expect(verdict.outcome).toBe("verified");
+      expect(verdict.detail).toBe(
+        "The SMTP server accepted a connection and the credentials.",
+      );
+    });
+
+    /** @scenario "The SMTP check mentions credentials only when it sent some" */
+    it("mentions no credentials when no SMTP user is configured", async () => {
+      const verdict = await smtpRow(false);
+
+      expect(verdict.outcome).toBe("verified");
+      expect(verdict.detail).toBe("The SMTP server accepted a connection.");
     });
   });
 
@@ -484,6 +554,110 @@ describe("CheckupService", () => {
       expect(canary).toHaveBeenCalledTimes(1);
       expect(canary).toHaveBeenCalledWith("collector", {});
       expect(rowOf(rows, "canary_collector").outcome).toBe("verified");
+    });
+  });
+
+  describe("given the app is reached publicly and by its in-cluster Service", () => {
+    const gatewayReporting = (controlPlaneBaseUrl: string) =>
+      healthyDeps({
+        gateway: {
+          baseUrl: "http://langwatch-gateway:80",
+          controlPlaneUrls: [
+            "http://localhost:5560",
+            "http://langwatch-app:5560",
+          ],
+          health: async () => undefined,
+          probeControlPlane: async () => ({ kind: "ok", controlPlaneBaseUrl }),
+        },
+      });
+
+    describe("when the gateway reports the in-cluster address", () => {
+      /** @scenario "A gateway that reaches this app by its in-cluster address passes the control plane check" */
+      it("passes the control plane row", async () => {
+        const { rows } = await new CheckupService(
+          gatewayReporting("http://langwatch-app:5560/"),
+        ).explicit({ checks: ["gateway_control_plane"] });
+
+        expect(rowOf(rows, "gateway_control_plane").outcome).toBe("verified");
+      });
+    });
+
+    describe("when the gateway reports an address of another install", () => {
+      /** @scenario "A gateway that reports another install as its control plane fails the check" */
+      it("fails the control plane row with the mismatch code", async () => {
+        const { rows } = await new CheckupService(
+          gatewayReporting("http://other-app:5560"),
+        ).explicit({ checks: ["gateway_control_plane"] });
+        const verdict = rowOf(rows, "gateway_control_plane");
+
+        expect(verdict.outcome).toBe("refused");
+        expect(verdict.code).toBe("checkup_gateway_control_plane_mismatch");
+        expect(verdict.detail).toContain("http://localhost:5560");
+      });
+    });
+  });
+
+  describe("when Langy is not open to the administrator who asked", () => {
+    /** @scenario "The Langy canary is not checked for someone Langy is not open to" */
+    it("leaves the Langy row not checked", async () => {
+      const { rows } = await new CheckupService(
+        healthyDeps({ langyCanary: async () => ({ kind: "no_access" }) }),
+      ).explicit({ checks: ["canary_langy"] });
+
+      expect(rowOf(rows, "canary_langy").outcome).toBe("unchecked");
+    });
+  });
+
+  describe("when the only provider stores no key", () => {
+    /** @scenario "A provider that cannot be tested says why" */
+    it("leaves the row not checked and names the missing key", async () => {
+      const { rows } = await new CheckupService(
+        healthyDeps({
+          testModelProvider: async () => ({
+            outcome: "unchecked",
+            reason: "no_credential",
+          }),
+        }),
+      ).explicit({ checks: ["model_provider_test"] });
+      const verdict = rowOf(rows, "model_provider_test");
+
+      expect(verdict.outcome).toBe("unchecked");
+      expect(verdict.detail).toContain("openai (no key stored)");
+    });
+  });
+
+  describe("when a provider's stored keys will not decrypt", () => {
+    /** @scenario "A provider whose keys will not decrypt fails the checkup" */
+    it("fails both provider rows naming the decryption failure, and tests nothing", async () => {
+      const testModelProvider = vi.fn();
+      const service = new CheckupService(
+        healthyDeps({
+          modelProviders: async () => [
+            {
+              id: "mp_1",
+              provider: "openai",
+              customKeys: {},
+              hasUnreadableKeys: true,
+            },
+          ],
+          testModelProvider,
+        }),
+      );
+      const [cheap, explicit] = await Promise.all([
+        service.cheap(),
+        service.explicit({ checks: ["model_provider_test"] }),
+      ]);
+
+      for (const verdict of [
+        rowOf(cheap.rows, "model_providers"),
+        rowOf(explicit.rows, "model_provider_test"),
+      ]) {
+        expect(verdict.outcome).toBe("refused");
+        expect(verdict.code).toBe("checkup_model_provider_keys_unreadable");
+        expect(verdict.detail).toContain("openai");
+        expect(verdict.detail).not.toContain("no key stored");
+      }
+      expect(testModelProvider).not.toHaveBeenCalled();
     });
   });
 });

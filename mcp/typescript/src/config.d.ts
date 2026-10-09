@@ -8,6 +8,8 @@ export declare function initConfig(args: {
   endpoint?: string;
 }): void;
 
+export declare function hasConfig(): boolean;
+
 export declare function getConfig(): McpConfig;
 
 export declare function requireApiKey(): string;

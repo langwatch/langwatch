@@ -1,3 +1,4 @@
+import type { TenantScopeTimeColumn } from "~/server/app-layer/clients/clickhouse/authorized-reads";
 import {
   deriveTraceOrigin,
   TRACE_ORIGIN_CLICKHOUSE_EXPRESSION,
@@ -32,7 +33,6 @@ export type FacetGroup =
   | "prompt";
 
 export interface FacetQueryContext {
-  tenantId: string;
   timeRange: { from: number; to: number };
   limit: number;
   offset: number;
@@ -111,7 +111,7 @@ export type FacetDefinition =
   | RangeFacetDef
   | DynamicKeysDef;
 
-export const TABLE_TIME_COLUMNS: Record<FacetTable, string> = {
+export const TABLE_TIME_COLUMNS: Record<FacetTable, TenantScopeTimeColumn> = {
   trace_summaries: "OccurredAt",
   evaluation_runs: "ScheduledAt",
   stored_spans: "StartTime",

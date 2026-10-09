@@ -130,6 +130,13 @@ secrets:
     # Key for AI Gateway virtual-key pepper (used by app only)
     ## @param secrets.secretKeys.virtualKeyPepper [string] Key name for AI Gateway virtual-key pepper.
     virtualKeyPepper: "virtualKeyPepper"
+    # LangWatchQL passwords, read from secrets.existingSecret (or the app Secret
+    # you create with autogen off). Remap them when your secret store cannot use
+    # these names, for example Azure Key Vault through ExternalSecret dataFrom.
+    ## @param secrets.secretKeys.lwqlClickhousePassword [string] Key name for the LangWatchQL ClickHouse password.
+    lwqlClickhousePassword: "LWQL_CLICKHOUSE_PASSWORD"
+    ## @param secrets.secretKeys.lwqlPostgresReaderPassword [string] Key name for the LangWatchQL PostgreSQL reader password.
+    lwqlPostgresReaderPassword: "LWQL_POSTGRES_READER_PASSWORD"
 
 # =============================================================================
 # Container Image Configurations
@@ -143,21 +150,21 @@ images:
   ## @param images.app.pullPolicy [string] App image pull policy.
   app:
     repository: langwatch/langwatch
-    tag: 3.18.0 # x-release-please-version
+    tag: 3.20.1 # x-release-please-version
     pullPolicy: IfNotPresent
   ## @param images.langwatch_nlp.repository [string] NLP image repository (Go nlpgo binary, published as langwatch_nlp).
   ## @param images.langwatch_nlp.tag [string] NLP image tag.
   ## @param images.langwatch_nlp.pullPolicy [string] NLP image pull policy.
   langwatch_nlp:
     repository: langwatch/langwatch_nlp
-    tag: 3.18.0 # x-release-please-version
+    tag: 3.20.1 # x-release-please-version
     pullPolicy: IfNotPresent
   ## @param images.langevals.repository [string] Langevals image repository.
   ## @param images.langevals.tag [string] Langevals image tag.
   ## @param images.langevals.pullPolicy [string] Langevals image pull policy.
   langevals:
     repository: langwatch/langevals
-    tag: 3.18.0 # x-release-please-version
+    tag: 3.20.1 # x-release-please-version
     pullPolicy: IfNotPresent
 
 # =============================================================================
@@ -600,12 +607,18 @@ app:
   # security surface (SSO, SCIM provisioning, audit logs) and support.
   # See https://docs.langwatch.ai/self-hosting/licensing
   #
-  # The alternative to setting it here is activating the same key per
+  # app.license.key takes either form LangWatch issues, detected by shape:
+  # an activation code (LW-XXXX-XXXX-XXXX-XXXX), redeemed once at startup over
+  # outbound HTTPS to connect.langwatch.ai and stored on the oldest
+  # organization, or a signed license key, which works offline and applies to
+  # the whole instance.
+  #
+  # The alternative to setting it here is entering the same code or key per
   # organization in Settings > License, which suits a single-tenant install
   # but has to be repeated for every organization the instance hosts.
   ## @extra app.license Enterprise license configuration.
-  ## @param app.license.key.value [string] License key issued by LangWatch.
-  ## @param app.license.key.secretKeyRef [object] Secret ref holding the license key.
+  ## @param app.license.key.value [string] Signed license key or activation code issued by LangWatch.
+  ## @param app.license.key.secretKeyRef [object] Secret ref holding the signed license key or activation code.
   ## @param app.license.publicKey.value [string] Verification key, only for a private signing chain.
   ## @param app.license.publicKey.secretKeyRef [object] Secret ref holding the verification key.
   license:
@@ -647,6 +660,17 @@ app:
     # restarts, backups and hostname changes; a second install with a database
     # of its own presents another id and is refused as the wrong instance.
     instanceId: ""
+
+  # Who can create an account and who can create an organization.
+  ## @extra app.signUp Self sign-up restrictions.
+  ## @param app.signUp.mode [string, default: open] `open` lets anybody who reaches the install sign up; `invite_only` admits only invited addresses, ADMIN_EMAILS, and the first account on an install with no users when ADMIN_EMAILS is empty (still subject to allowedDomains).
+  ## @param app.signUp.allowedDomains [array] Email domains allowed to sign up. Empty means any. Invited addresses and ADMIN_EMAILS are admitted whatever their domain.
+  signUp:
+    # Rendered as SIGN_UP_MODE. With invite_only, only an instance administrator
+    # (ADMIN_EMAILS) can create an organization once the first one exists.
+    mode: open
+    # Rendered as SIGN_UP_ALLOWED_DOMAINS, comma-separated.
+    allowedDomains: []
 
   # NextAuth.js authentication configuration
   # Handles user authentication and session management
@@ -1157,6 +1181,22 @@ langwatch_nlp:
     blockLocalHTTPCalls: false
     allowedProxyHosts: []
 
+  # Shared credential the app, the workers and this service authenticate the
+  # app -> NLP hop with. All three read the key below from the app Secret
+  # (secrets.existingSecret when you supply one, the chart-generated Secret
+  # otherwise), so they always hold the same value. With autogen on, the chart
+  # generates it and keeps it stable across upgrades.
+  #
+  # The env var name is fixed at LANGWATCH_NLP_INTERNAL_SECRET on all three.
+  # Only the Secret key is configurable, for installs whose app Secret is
+  # written by external-secrets or terraform under another name. A Secret with
+  # no such key leaves the variable unset, the NLP service then accepts
+  # unauthenticated requests, and the install keeps working.
+  ## @extra langwatch_nlp.secrets Where the app <-> NLP service credential comes from.
+  ## @param langwatch_nlp.secrets.internalSecretKey [string, default: LANGWATCH_NLP_INTERNAL_SECRET] Key of the app Secret holding the shared value the app, the workers and the NLP service authenticate with. Rename it only when you supply the app Secret yourself and it stores the value under another key.
+  secrets:
+    internalSecretKey: LANGWATCH_NLP_INTERNAL_SECRET
+
   # Ceiling on how long a workflow code block may run inside the sandboxed
   # Python subprocess before nlpgo kills it. Held at or below 710 on purpose:
   # 710 is the engine's stream idle timeout (NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_SECONDS,
@@ -1649,6 +1689,26 @@ ingress:
   ## @param ingress.tls [array] TLS configuration for HTTPS.
   tls: []
 
+  # AI Gateway host on the same Ingress settings. When `host` is set, the chart
+  # renders a second Ingress, `<release>-gateway-ingress`, with this
+  # ingress's className, labels and annotations, routing /v1 (Prefix) and
+  # /health (Exact) on that host to the `<release>-gateway` Service. It is a
+  # separate object because controllers such as ingress-nginx apply
+  # annotations per Ingress, and the gateway needs streaming settings the app
+  # does not. With className nginx the chart adds proxy buffering off,
+  # 3600s read/send timeouts and a 32m body size to it. The match is on the
+  # value of className: an empty className on a cluster whose default
+  # IngressClass is ingress-nginx gets none of them, so set nginx explicitly
+  # (or put the annotations in ingress.gateway.annotations).
+  gateway:
+    ## @param ingress.gateway.host [string, default: ""] Hostname for the AI Gateway, e.g. gateway.your-corp.com. Empty renders no gateway Ingress. Requires ingress.enabled.
+    host: ""
+    tls:
+      ## @param ingress.gateway.tls.secretName [string, default: ""] TLS Secret for the gateway host. Empty serves the host without a tls entry.
+      secretName: ""
+    ## @param ingress.gateway.annotations [object] Annotations for the gateway Ingress only, applied over ingress.annotations and the nginx defaults.
+    annotations: {}
+
 # =============================================================================
 # System Dependencies Configuration
 # =============================================================================
@@ -2063,7 +2123,7 @@ clickhouse:
   # ClickHouse; rotate a live secret with `kubectl rollout restart statefulset`.
   ## @param clickhouse.podAnnotations [object] Annotations on the ClickHouse pod template (carries the LWQL catalog version so upgrades re-mount the access Secret).
   podAnnotations:
-    langwatch.com/lwql-access-catalog: "3.18.0" # x-release-please-version
+    langwatch.com/lwql-access-catalog: "3.20.1" # x-release-please-version
 
 # =============================================================================
 # LangWatchQL (LWQL) Configuration
@@ -2212,11 +2272,11 @@ gateway:
   ## @param gateway.internalUrl [string, default: ""] URL the control plane itself uses to reach the gateway, from inside the cluster. Distinct from publicUrl, which is for browsers and laptops: an install with no gateway ingress still needs this, and Langy refuses every turn without it. Empty derives the Service this chart renders, so set it only for a gateway that lives outside this release or behind a mesh address.
   internalUrl: ""
 
-  # The gateway needs its OWN externally-reachable endpoint, separate from
-  # the main app — point a second ingress / load balancer at gateway.ingress
-  # below (the LLM clients hit the gateway, the browser hits the app). The
-  # gateway subchart ships ingress.enabled=true with a SaaS placeholder host;
-  # override gateway.ingress.host with your domain.
+  # The gateway needs its OWN externally-reachable hostname, separate from
+  # the main app: LLM clients hit the gateway, the browser hits the app.
+  # Publish it with ingress.gateway.host on the app Ingress, or route to the
+  # `<release>-gateway` Service (port 80) yourself and set gateway.publicUrl.
+  # Routes, timeouts and body size: docs/self-hosting/deployment/routing.
 
   # The gateway subchart defaults (image, probes, HPA, NetworkPolicy,
   # PDB, SecurityContext) live in charts/gateway/values.yaml. Common
@@ -2227,8 +2287,12 @@ gateway:
     baseUrl: ""
 
   ## @param gateway.secrets.existingSecretName [string, default: langwatch-app-secrets] Name of the Secret the gateway pod mounts for LW_GATEWAY_INTERNAL_SECRET + LW_GATEWAY_JWT_SECRET. this release collapsed gateway-auth into the umbrella's app Secret so both langwatch-app and the gateway pod mount the SAME Secret. Default matches the autogen app-secret name when release name is `langwatch`. If you override the release name OR set `autogen.secretNames.app` / `secrets.existingSecret`, set this to the same Secret name so the gateway subchart bridges to it.
+  ## @param gateway.secrets.internalSecretKey [string, default: LW_GATEWAY_INTERNAL_SECRET] Key in that Secret holding the gateway internal secret. The app and the gateway pod both read this key.
+  ## @param gateway.secrets.jwtSecretKey [string, default: LW_GATEWAY_JWT_SECRET] Key in that Secret holding the gateway JWT secret. The app and the gateway pod both read this key.
   secrets:
     existingSecretName: langwatch-app-secrets
+    internalSecretKey: LW_GATEWAY_INTERNAL_SECRET
+    jwtSecretKey: LW_GATEWAY_JWT_SECRET
 
   ## @param gateway.security.blockLocalHTTPCalls [default: false] Reject tenant-supplied provider endpoints resolving to local/private networks. Keep false for local/self-hosted installs that intentionally use private services; set true for SaaS together with a restrictive gateway NetworkPolicy.
   ## @param gateway.security.requireHTTPSCustomEndpoints [default: false] Require HTTPS for customer-configured provider endpoints. Hosted-cloud hardening; disabled by default for self-hosted compatibility.

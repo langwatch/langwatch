@@ -5,7 +5,8 @@ import { useAutomationStore } from "../state/automationStore";
 import { useDraft } from "../state/selectors";
 import { type FacetAccordionProps, FacetSection } from "./FacetSection";
 
-/** Alerts carry a severity; automations and reports don't (ADR-043). */
+/** Graph-watching automations carry a severity; trace-watching ones and
+ *  schedules don't (ADR-043). */
 const SEVERITY_OPTIONS = [
   { value: AlertType.INFO, label: "Info" },
   { value: AlertType.WARNING, label: "Warning" },
@@ -21,9 +22,9 @@ const SEVERITY_LABEL: Record<AlertType, string> = {
 const SEVERITY_COLLECTION = createListCollection({ items: SEVERITY_OPTIONS });
 
 /**
- * The Severity facet (ADR-043 facet 5) — alerts only. How urgent the alert
- * is when it fires; the render path colours the notification and decides
- * whether to `@channel` by it. Self-gates to `customGraph` so the main pane
+ * The Severity facet (ADR-043 facet 5) — graph-watching automations only.
+ * How urgent it is when it fires; the render path colours the notification and
+ * decides whether to `@channel` by it. Self-gates to `customGraph` so a caller
  * can drop it in unconditionally.
  */
 export function SeveritySection({
@@ -39,7 +40,7 @@ export function SeveritySection({
   return (
     <FacetSection
       title="Severity"
-      help="How urgent this alert is when it fires. Higher severities stand out in the notification and can page the whole channel."
+      help="How urgent this automation is when it fires. Higher severities stand out in the notification and can page the whole channel."
       accordion={accordion}
       complete={draft.alertType !== null}
       summary={

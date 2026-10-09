@@ -34,6 +34,8 @@ interface CodeToIssue {
   email: string;
   planType: Plan;
   maxMembers: number;
+  /** Left off, the plan template's lite seats apply. */
+  maxMembersLite?: number;
   licenseTermDays: number;
   services: Service[];
   expiresAt: Date;
@@ -102,6 +104,7 @@ interface Draft {
   email: string;
   planType: Plan;
   maxMembers: string;
+  maxMembersLite: string;
   licenseTermDays: string;
   services: Service[];
   expiresOn: string;
@@ -116,6 +119,7 @@ const EMPTY_DRAFT: Draft = {
   email: "",
   planType: "ENTERPRISE",
   maxMembers: "25",
+  maxMembersLite: "",
   licenseTermDays: String(DEFAULT_TERM_DAYS),
   services: [...SERVICES],
   expiresOn: isoDaysFromNow(DEFAULT_CODE_DAYS),
@@ -141,6 +145,9 @@ function issuedFrom(draft: Draft): CodeToIssue | null {
     email: draft.email.trim(),
     planType: draft.planType,
     maxMembers: Number(draft.maxMembers),
+    ...(draft.maxMembersLite.trim() === ""
+      ? {}
+      : { maxMembersLite: Number(draft.maxMembersLite) }),
     licenseTermDays: Number(draft.licenseTermDays),
     services: draft.services,
     expiresAt: new Date(expiresAt),
@@ -252,6 +259,18 @@ function TermsFields({ draft, set }: { draft: Draft; set: SetField }) {
             onChange={(e) => set("maxMembers", e.target.value)}
           />
         </Field.Root>
+        <Field.Root>
+          <Field.Label>Lite member seats</Field.Label>
+          <Input
+            type="number"
+            min={0}
+            value={draft.maxMembersLite}
+            onChange={(e) => set("maxMembersLite", e.target.value)}
+            placeholder="Plan default"
+          />
+        </Field.Root>
+      </HStack>
+      <HStack gap={4} width="full" align="start">
         <Field.Root>
           <Field.Label>License term, in days</Field.Label>
           <Input

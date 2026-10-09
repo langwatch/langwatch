@@ -25,7 +25,6 @@ class PostApiV1QueryResponse200:
         columns (list[PostApiV1QueryResponse200ColumnsItem]):
         rows (list[PostApiV1QueryResponse200RowsItem]):
         statistics (PostApiV1QueryResponse200Statistics):
-        truncated (bool):
         follows_time_window (bool):
         follows_granularity (bool):
         diagnostics (list[PostApiV1QueryResponse200DiagnosticsItem]):
@@ -36,7 +35,6 @@ class PostApiV1QueryResponse200:
     columns: list[PostApiV1QueryResponse200ColumnsItem]
     rows: list[PostApiV1QueryResponse200RowsItem]
     statistics: PostApiV1QueryResponse200Statistics
-    truncated: bool
     follows_time_window: bool
     follows_granularity: bool
     diagnostics: list[PostApiV1QueryResponse200DiagnosticsItem]
@@ -56,8 +54,6 @@ class PostApiV1QueryResponse200:
             rows.append(rows_item)
 
         statistics = self.statistics.to_dict()
-
-        truncated = self.truncated
 
         follows_time_window = self.follows_time_window
 
@@ -79,7 +75,6 @@ class PostApiV1QueryResponse200:
                 "columns": columns,
                 "rows": rows,
                 "statistics": statistics,
-                "truncated": truncated,
                 "followsTimeWindow": follows_time_window,
                 "followsGranularity": follows_granularity,
                 "diagnostics": diagnostics,
@@ -116,8 +111,6 @@ class PostApiV1QueryResponse200:
 
         statistics = PostApiV1QueryResponse200Statistics.from_dict(d.pop("statistics"))
 
-        truncated = d.pop("truncated")
-
         follows_time_window = d.pop("followsTimeWindow")
 
         follows_granularity = d.pop("followsGranularity")
@@ -137,7 +130,6 @@ class PostApiV1QueryResponse200:
             columns=columns,
             rows=rows,
             statistics=statistics,
-            truncated=truncated,
             follows_time_window=follows_time_window,
             follows_granularity=follows_granularity,
             diagnostics=diagnostics,

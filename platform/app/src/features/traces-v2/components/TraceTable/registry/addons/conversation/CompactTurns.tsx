@@ -305,7 +305,11 @@ const TurnPreviewCell: React.FC<{
     <Badge size="xs" variant="outline" flexShrink={0}>
       T{turnIndex + 1}
     </Badge>
-    <TraceIdPeek traceId={trace.traceId} occurredAtMs={trace.timestamp} />
+    <TraceIdPeek
+      traceId={trace.traceId}
+      occurredAtMs={trace.timestamp}
+      ownerProjectId={trace.projectId}
+    />
     {trace.status === "error" && <StatusDot status="error" size="6px" />}
     {trace.input && (
       <InlineMessage

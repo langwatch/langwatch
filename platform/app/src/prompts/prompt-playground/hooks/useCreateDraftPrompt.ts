@@ -29,15 +29,33 @@ export function useCreateDraftPrompt() {
     projectId: project?.id,
   });
   const { addTab } = useDraggableTabsBrowserStore(({ addTab }) => ({ addTab }));
+  const utils = api.useUtils();
 
   // Cascade-resolved model for "new prompt" surfaces. Returns null when
-  // nothing is configured at any scope (post system-tier removal) — the
-  // form falls back to an empty string and the MissingModelToast picks
-  // it up at the first send. No client-side system fallback.
+  // nothing is configured at any scope; the form then starts with no model.
   const resolvedDefault = api.modelProvider.getResolvedDefault.useQuery(
     { projectId: project?.id ?? "", featureKey: "prompt.create_default" },
     { enabled: !!project?.id },
   );
+  const projectId = project?.id;
+
+  // A click can land before the query above answers, so a missing answer is
+  // fetched here rather than read as "nothing configured": an empty model
+  // would otherwise be replaced by the platform fallback when the form
+  // parses it, silently ignoring the configured default.
+  const readDefaultModel = useCallback(async (): Promise<string> => {
+    if (resolvedDefault.data) return resolvedDefault.data.model;
+    if (!projectId) return "";
+    try {
+      const fetched = await utils.modelProvider.getResolvedDefault.fetch({
+        projectId,
+        featureKey: "prompt.create_default",
+      });
+      return fetched?.model ?? "";
+    } catch {
+      return "";
+    }
+  }, [projectId, resolvedDefault.data, utils.modelProvider.getResolvedDefault]);
 
   /**
    * createDraftPrompt
@@ -46,7 +64,7 @@ export function useCreateDraftPrompt() {
    * @returns Promise resolving to object with defaultValues
    */
   const createDraftPrompt = useCallback(async () => {
-    const defaultModel = resolvedDefault.data?.model ?? "";
+    const defaultModel = await readDefaultModel();
     const defaultModelMetadata = defaultModel
       ? modelMetadata?.[defaultModel]
       : undefined;
@@ -91,7 +109,7 @@ export function useCreateDraftPrompt() {
     }, 100);
 
     return { defaultValues };
-  }, [addTab, modelMetadata, resolvedDefault.data?.model]);
+  }, [addTab, modelMetadata, readDefaultModel]);
 
   return { createDraftPrompt };
 }

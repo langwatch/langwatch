@@ -25,6 +25,7 @@ import {
 } from "../authz/authz-engine.migration";
 import { authzGrantsCommands } from "../authz/ledger";
 import { PrismaAuthzMigrationRepository } from "../authz/repositories/authz-migration.prisma.repository";
+import { SlackConnectionMigration } from "../automations/slack-integration/migration/slack-connection.migration";
 import type { ProcessRole } from "../config";
 import {
   connectionGrandfatherMigration,
@@ -142,6 +143,7 @@ export function registeredMigrations(): SystemMigration[] {
     // string as ownership evidence. Existing sign-in remains compatible, but
     // activation, linking, and new-person trust still require qualified proof.
     connectionGrandfatherMigration(),
+    new SlackConnectionMigration(),
   ];
 }
 

@@ -15,9 +15,22 @@ import type { OnboardingVariant } from "~/server/schemas/sign-up-data.schema";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 import { generateApiKey } from "~/server/utils/apiKeyGenerator";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { slugify } from "~/utils/slugify";
+import type {
+  AggregateReconcileResult,
+  AggregateReconciler,
+} from "./aggregate-reconciler.service";
+import { AGGREGATE_DEFAULT_RULE, type AggregateRule } from "./aggregate-rule";
+import type { AggregateRuleService } from "./aggregate-rule.service";
+import {
+  AGGREGATE_PROJECT_KIND,
+  type APPLICATION_PROJECT_KIND,
+  INTERNAL_GOVERNANCE_PROJECT_KIND,
+  isAggregateProjectKind,
+} from "./project-kinds";
 import { mintProjectSlug } from "./projectSlug";
+import type { AggregateMemberCandidate } from "./repositories/aggregate-rule.repository";
 import type {
   PaginatedResult,
   PresenceConfig,
@@ -149,16 +162,6 @@ export const GOVERNANCE_PROJECT_ROUTE_REFUSAL =
   "This project is an internal governance record, not a workspace. It cannot be renamed, moved, archived, or re-keyed through the projects API.";
 
 /**
- * The one `Project.kind` value that generic project routes must refuse.
- *
- * Spelled here rather than imported from the governance service so this module
- * — reached by ingest, the REST API and tRPC — carries no dependency on the
- * enterprise tree. The two are pinned together by
- * `governanceProjectKindGuard.unit.test.ts`.
- */
-export const INTERNAL_GOVERNANCE_PROJECT_KIND = "internal_governance";
-
-/**
  * Whether this project is the organization's hidden governance record, and the
  * reason to refuse the operation if it is.
  *
@@ -232,9 +235,54 @@ export interface CreateProjectParams {
   name: string;
   language: string;
   framework: string;
+  /**
+   * ADR-144: `"aggregate"` creates a project that reads its members through
+   * grants and owns no traces. The caller has already decided the actor may
+   * (organisation admins only); this service validates the rule.
+   */
+  kind?: typeof APPLICATION_PROJECT_KIND | typeof AGGREGATE_PROJECT_KIND;
+  /** Only read for an aggregate; defaults to {@link AGGREGATE_DEFAULT_RULE}. */
+  aggregateRule?: AggregateRule;
+}
+
+/**
+ * The kind and rule columns a new project is written with. One function so the
+ * tRPC router, which writes Prisma directly, and {@link ProjectService.create}
+ * cannot disagree on what an aggregate is stored as: a non-aggregate never
+ * carries a rule, and an aggregate never lands without a validated one.
+ */
+async function aggregateProjectCreateFields({
+  kind,
+  aggregateRule,
+  organizationId,
+  aggregateRules,
+}: {
+  kind: CreateProjectParams["kind"];
+  aggregateRule: AggregateRule | undefined;
+  organizationId: string;
+  aggregateRules: AggregateRuleService | undefined;
+}): Promise<{ kind?: string; aggregateRule?: AggregateRule }> {
+  if (!isAggregateProjectKind(kind)) return {};
+  if (!aggregateRules) {
+    throw new Error(
+      "No aggregate rule service is wired; an aggregate project cannot be created here",
+    );
+  }
+  const rule = aggregateRule ?? AGGREGATE_DEFAULT_RULE;
+  await aggregateRules.assertValid({ rule, organizationId });
+  return { kind: AGGREGATE_PROJECT_KIND, aggregateRule: rule };
 }
 
 export class ProjectService {
+  private readonly aggregateRules?: AggregateRuleService;
+
+  /**
+   * Public because its other triggers (a personal workspace joining, a
+   * department move) live outside this service and reach it through the
+   * App's project service.
+   */
+  readonly aggregateReconciler?: AggregateReconciler;
+
   constructor(
     readonly repo: ProjectRepository,
     /**
@@ -243,10 +291,39 @@ export class ProjectService {
      * same way a failed write is.
      */
     private readonly lwqlKeyMap?: LwqlKeyMapRepository,
-  ) {}
+    /**
+     * ADR-144. `rules` validates an aggregate's rule; absent, creating one is
+     * refused. `reconciler` (block E) keeps aggregates' shared reads in line
+     * with their rules; absent, nothing reconciles.
+     */
+    aggregates: {
+      rules?: AggregateRuleService;
+      reconciler?: AggregateReconciler;
+    } = {},
+  ) {
+    this.aggregateRules = aggregates.rules;
+    this.aggregateReconciler = aggregates.reconciler;
+  }
 
   async getById(id: string): Promise<Project | null> {
     return this.repo.getById(id);
+  }
+
+  /**
+   * The kind fields a new project is stored with, checked before anything is
+   * written: none for an ordinary project, the kind and its validated rule
+   * for an aggregate. The tRPC create writes its row itself and asks this,
+   * so both create paths check the rule through the one wired rule service.
+   */
+  async createKindFields(params: {
+    kind: CreateProjectParams["kind"];
+    aggregateRule: AggregateRule | undefined;
+    organizationId: string;
+  }): Promise<{ kind?: string; aggregateRule?: AggregateRule }> {
+    return aggregateProjectCreateFields({
+      ...params,
+      aggregateRules: this.aggregateRules,
+    });
   }
 
   /**
@@ -303,6 +380,14 @@ export class ProjectService {
     if (!params.teamId && !params.newTeamName) {
       throw new Error("Either teamId or newTeamName must be provided");
     }
+
+    // Validated before the team is created, so a refused rule writes nothing.
+    const kindFields = await aggregateProjectCreateFields({
+      kind: params.kind,
+      aggregateRule: params.aggregateRule,
+      organizationId: params.organizationId,
+      aggregateRules: this.aggregateRules,
+    });
 
     let teamId: string;
 
@@ -361,21 +446,114 @@ export class ProjectService {
       framework: params.framework,
       teamId,
       apiKey: generateApiKey(),
+      ...kindFields,
     });
 
     await this.syncLwqlKeyMapRow(project);
+
+    if (isAggregateProjectKind(project.kind)) {
+      await this.startAggregate({ aggregateProjectId: project.id });
+    }
 
     return project;
   }
 
   /**
-   * Best-effort: inserts this project's key-map row immediately, so it can
-   * authenticate to LangWatchQL without waiting for the next scheduled
-   * provisioning backfill (`src/tasks/provisionLwql.ts`). Never throws — a
-   * failure here must not block project creation; the backfill task picks up
-   * any row this misses on its next run. No-ops when LWQL is not configured.
+   * ADR-144 block E, trigger "rule created": a new aggregate gets its nightly
+   * sweep and its members' shared reads. Awaited, so the creator opens an
+   * aggregate that already reads its members, but it never fails the create:
+   * the row exists, a failed reconcile is retried by the sweep tonight, and a
+   * sweep that failed to schedule is put back by the next reconcile or boot.
+   * Both create paths call this, the tRPC router included.
    */
-  private async syncLwqlKeyMapRow(project: Project): Promise<void> {
+  async startAggregate({
+    aggregateProjectId,
+  }: {
+    aggregateProjectId: string;
+  }): Promise<void> {
+    if (!this.aggregateReconciler) {
+      logger.warn(
+        { projectId: aggregateProjectId },
+        "no aggregate reconciler is wired; the new aggregate reads no members until one runs",
+      );
+      return;
+    }
+    await this.aggregateReconciler.start({ aggregateProjectId });
+  }
+
+  /**
+   * ADR-144: the projects an organisation admin may pick for an aggregate's
+   * explicit rule, every member's personal workspace included. The caller has
+   * decided the actor is an organisation admin.
+   */
+  async aggregateMemberCandidates({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<AggregateMemberCandidate[]> {
+    if (!this.aggregateRules) {
+      throw new Error(
+        "No aggregate rule service is wired; aggregate members cannot be listed here",
+      );
+    }
+    return this.aggregateRules.candidateMembers({ organizationId });
+  }
+
+  /**
+   * ADR-144 block E, trigger "rule edited": replace a live aggregate's rule
+   * and reconcile its members before answering. Unlike creation, a failed
+   * reconcile fails the request: the admin asked for a change in who is read,
+   * a removed project must stop being read now rather than tonight, and
+   * submitting the same rule again is safe. The caller has decided the actor
+   * is an organisation admin.
+   */
+  async updateAggregateRule({
+    projectId,
+    organizationId,
+    aggregateRule,
+  }: {
+    projectId: string;
+    organizationId: string;
+    aggregateRule: AggregateRule;
+  }): Promise<{ project: Project; members: AggregateReconcileResult }> {
+    if (!this.aggregateRules || !this.aggregateReconciler) {
+      throw new Error(
+        "No aggregate rule service or reconciler is wired; an aggregate rule cannot be edited here",
+      );
+    }
+    await this.aggregateRules.assertValid({
+      rule: aggregateRule,
+      organizationId,
+    });
+    const project = await this.repo.updateAggregateRule({
+      id: projectId,
+      organizationId,
+      aggregateRule,
+    });
+    if (!project) throw new ProjectNotFoundError("Project not found");
+    const members = await this.aggregateReconciler.reconcile({
+      aggregateProjectId: project.id,
+    });
+    return { project, members };
+  }
+
+  /**
+   * Best-effort: inserts this project's key-map row immediately, so it can
+   * authenticate to LangWatchQL at once. Every LangWatchQL view's row policy
+   * resolves the tenant through this table, so a project without a row reads
+   * zero rows.
+   *
+   * The only other writer is the provisioning backfill
+   * (`src/tasks/provisionLwql.ts`), which runs once per deploy at boot, not on
+   * a schedule. So every path that creates a project calls this: `create`
+   * above, the tRPC project router (onboarding included) and the personal
+   * workspace provisioning. Never throws: a failure here must not block
+   * project creation, and the next deploy's backfill writes any row this
+   * misses. No-ops when LangWatchQL is not configured.
+   */
+  async syncLwqlKeyMapRow(
+    project: Pick<Project, "id" | "lwqlKey">,
+  ): Promise<void> {
     const connection = lwqlConnectionFromEnv();
     if (!connection) return;
 
@@ -413,7 +591,7 @@ export class ProjectService {
     } catch (error) {
       logger.error(
         { projectId: project.id, error },
-        "failed to sync lwql key-map row for new project; continuing — the scheduled provisioning backfill will pick it up",
+        "failed to sync lwql key-map row for new project; continuing, the next deploy's provisioning backfill writes it",
       );
       captureException(new Error("Failed to sync lwql key-map row"), {
         extra: { projectId: project.id, error },
@@ -504,7 +682,112 @@ export class ProjectService {
 
     const project = await this.repo.archive({ id, organizationId });
     if (!project) throw new ProjectNotFoundError("Project not found");
+    await this.afterArchive({ project, organizationId });
     return project;
+  }
+
+  /**
+   * ADR-144 block E, what archiving a project means for aggregates. Both
+   * archive paths call this once the row is archived, the tRPC router
+   * included. An archived aggregate stops; any other project may have been
+   * an aggregate's member, which an archived project never is, so the
+   * organisation is reconciled. Never throws: the archive stands.
+   */
+  async afterArchive({
+    project,
+    organizationId,
+  }: {
+    project: Pick<Project, "id" | "kind">;
+    organizationId: string;
+  }): Promise<void> {
+    if (isAggregateProjectKind(project.kind)) {
+      await this.stopAggregate({ aggregateProjectId: project.id });
+      return;
+    }
+    await this.aggregateReconciler?.reconcileOrganizationOrLog({
+      organizationId,
+      trigger: "member-project-archived",
+    });
+  }
+
+  /**
+   * What archiving a team means for aggregates, the team-wide form of
+   * {@link afterArchive}. Every aggregate on the team stops, as if archived
+   * itself, and once any other project of the team may have been a member,
+   * the organisation is reconciled once, which drops them: a project on an
+   * archived team is never a member. Both team archive paths call this once
+   * the team row is archived. Never throws: the archive stands.
+   */
+  async afterTeamArchive({
+    teamId,
+    organizationId,
+  }: {
+    teamId: string;
+    organizationId: string;
+  }): Promise<void> {
+    let projects: Pick<Project, "id" | "kind">[];
+    try {
+      projects = await this.repo.findLiveKindsByTeam({
+        teamId,
+        organizationId,
+      });
+    } catch (error) {
+      logger.error(
+        { teamId, organizationId, error },
+        "failed to read an archived team's projects; their aggregate reads stay until the nightly sweep",
+      );
+      captureException(toError(error), { extra: { teamId, organizationId } });
+      return;
+    }
+    for (const project of projects) {
+      if (isAggregateProjectKind(project.kind)) {
+        await this.stopAggregate({ aggregateProjectId: project.id });
+      }
+    }
+    if (projects.some((project) => !isAggregateProjectKind(project.kind))) {
+      await this.aggregateReconciler?.reconcileOrganizationOrLog({
+        organizationId,
+        trigger: "team-archived",
+      });
+    }
+  }
+
+  /**
+   * An archived aggregate reads nothing: its nightly sweep is switched off
+   * and its shared reads are revoked with the reason "aggregate_archived".
+   * Bringing one back is then a matter of one reconcile, which attaches its
+   * members afresh. Never throws: the archive stands, a sweep left running on
+   * an archived aggregate reconciles nothing, and no route opens an archived
+   * project to read through a grant left behind.
+   */
+  private async stopAggregate({
+    aggregateProjectId,
+  }: {
+    aggregateProjectId: string;
+  }): Promise<void> {
+    try {
+      await this.aggregateReconciler?.retire({ aggregateProjectId });
+    } catch (error) {
+      logger.error(
+        { projectId: aggregateProjectId, error },
+        "failed to retire an archived aggregate's sweep and shared reads; they stay until it is retried",
+      );
+      captureException(toError(error), {
+        extra: { projectId: aggregateProjectId },
+      });
+    }
+  }
+
+  /**
+   * The slug of the project the app lands a member on when they chose none;
+   * never an aggregate nor the governance project. See
+   * {@link ProjectRepository.findLandingProjectSlug}.
+   */
+  async getLandingProjectSlug(params: {
+    organizationId: string;
+    userId: string;
+  }): Promise<string | null> {
+    return this.repo.findLandingProjectSlug(params);
   }
 
   async listByOrganization(params: {
@@ -513,6 +796,8 @@ export class ProjectService {
     limit: number;
     /** See {@link ProjectRepository.findAllByOrganization}. */
     projectIds?: string[];
+    /** Decides whether aggregate projects are listed (ADR-144 decision 5). */
+    callerOrganizationRole: string | null;
   }): Promise<PaginatedResult<Project>> {
     return this.repo.findAllByOrganization(params);
   }

@@ -41,7 +41,8 @@ export interface ConversationTurnSource {
   outputRedacted?: boolean | null;
   inputMediaRefs?: TraceMediaRef[];
   outputMediaRefs?: TraceMediaRef[];
-  error?: string;
+  /** Null when the list row read no error, as the trace list returns it. */
+  error?: string | null;
 }
 
 export interface ParsedTurn<

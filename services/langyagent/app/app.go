@@ -249,8 +249,19 @@ func (a *App) StartTurn(ctx context.Context, req ChatRequest) (func(context.Cont
 			a.atCapacity(ctx)
 			return nil, herr.NewLight(ctx, domain.ErrMaxWorkers, nil)
 		}
+		// A keyless dispatch that needs a spawn is the designed fallback of the
+		// probe-then-mint flow: the control plane mints a key on the 428 and
+		// re-sends, and the turn runs. It is logged as that outcome, without a
+		// stacktrace; any other acquire failure is a real error.
+		if errors.Is(err, domain.ErrCredentialsRequired) {
+			clog.Get(ctx).Info("worker needs a spawn but the dispatch carried no session key; the control plane mints one and re-sends",
+				zap.String("conversation_id", req.ConversationID),
+				zap.String("turn_id", req.TurnID),
+			)
+			return nil, err
+		}
 		clog.Get(ctx).Error("acquire worker failed", zap.Error(err))
-		return nil, err // already a herr from the pool (e.g. ErrCredentialsRequired)
+		return nil, err // already a herr from the pool
 	}
 	// Per-conversation in-flight guard, turnId-idempotent (review "F"). The
 	// worker's agent session is single-stream — two concurrent DIFFERENT turns

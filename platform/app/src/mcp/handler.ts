@@ -24,6 +24,7 @@ import { createHash, randomUUID } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import {
   getConfig,
+  hasConfig,
   initConfig,
   runWithConfig,
 } from "@langwatch/mcp-server/config";
@@ -34,6 +35,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import type { Redis } from "ioredis";
 import { tryGetApp } from "../server/app-layer/app";
+import { isAggregateProjectKind } from "../server/app-layer/projects/project-kinds";
 import { prisma } from "../server/db";
 import type { NextApiRequest } from "../types/next-stubs";
 import { decrypt, encrypt } from "../utils/encryption";
@@ -227,9 +229,7 @@ export function createMcpHandler(): McpHandler {
   const redis = tryGetApp()?.redis ?? null;
 
   // Ensure the MCP config is initialized with the app's endpoint
-  try {
-    getConfig();
-  } catch {
+  if (!hasConfig()) {
     initConfig({
       endpoint: process.env.BASE_HOST ?? "https://app.langwatch.ai",
     });
@@ -579,6 +579,8 @@ export function createMcpHandler(): McpHandler {
       const project = await prisma.project.findUnique({
         where: { apiKey, archivedAt: null },
       });
+      // ADR-144 decision 7: an aggregate accepts no key, its own included.
+      if (project && isAggregateProjectKind(project.kind)) return null;
       return project;
     } catch (err) {
       logger.error({ error: err }, "Database API key validation failed");

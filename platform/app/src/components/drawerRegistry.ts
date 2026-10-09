@@ -55,6 +55,13 @@ const AutomationDrawer = lazyDefault({
   factory: () => import("~/features/automations/AutomationDrawer"),
   key: "AutomationDrawer",
 });
+const SlackConnectionDrawer = lazyDefault({
+  factory: () =>
+    import(
+      "~/features/automations/components/slack-connection/SlackConnectionDrawer"
+    ),
+  key: "SlackConnectionDrawer",
+});
 const ViewAutomationDrawer = lazyDefault({
   factory: () => import("~/features/automations/ViewAutomationDrawer"),
   key: "ViewAutomationDrawer",
@@ -305,6 +312,9 @@ export const drawers = {
   traceV2Details: TraceV2DrawerNoop,
   automation: AutomationDrawer,
   viewAutomation: ViewAutomationDrawer,
+  // One named Slack connection (ADR-093 §5a), from settings or from the
+  // automation's Slack step, which returns with it selected.
+  slackConnection: SlackConnectionDrawer,
   editModelProvider: EditModelProviderDrawer,
   defaultModelOverride: DefaultModelOverrideDrawer,
   addOrEditAnnotationScore: AddOrEditAnnotationScoreDrawer,

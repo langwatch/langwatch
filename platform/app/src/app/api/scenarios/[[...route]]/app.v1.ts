@@ -6,6 +6,7 @@ import type { Scenario } from "~/generated/prisma/client";
 import { requires, type SecuredApp } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { prisma } from "~/server/db";
+import { enforceCreationLimit } from "~/server/license-enforcement";
 import { modelOverrideSchema } from "~/server/modelProviders/modelOverrideSchema";
 import { ScenarioNotFoundError } from "~/server/scenarios/errors";
 import {
@@ -223,39 +224,46 @@ const createScenarioSchema = z.object({
   fields: scenarioFieldValuesSchema.optional().describe(fieldsDescription),
 });
 
-const updateScenarioSchema = z.object({
-  name: z.string().min(1).optional(),
-  situation: z.string().optional(),
-  criteria: z.array(z.string()).optional(),
-  labels: z.array(z.string()).optional(),
-  parameters: scenarioParameterDefinitionsSchema
-    .optional()
-    .describe(parametersDescription),
-  simulatorModel: modelOverrideSchema
-    .nullish()
-    .describe(simulatorModelDescription),
-  judgeModel: modelOverrideSchema.nullish().describe(judgeModelDescription),
-  maxTurns: z
-    .number()
-    .int()
-    .min(1)
-    .max(100)
-    .nullish()
-    .describe(maxTurnsDescription),
-  minTurns: z
-    .number()
-    .int()
-    .min(0)
-    .max(100)
-    .nullish()
-    .describe(minTurnsDescription),
-  testSuiteId: z.string().nullish().describe(testSuiteIdDescription),
-  fields: scenarioFieldValuesSchema
-    .optional()
-    .describe(
-      `${fieldsDescription} Send the full record; an empty record clears every value.`,
-    ),
-});
+/**
+ * Strict, so a field this endpoint does not have (`status`) is refused by name
+ * instead of dropped behind a 200: the caller must learn the write did not do
+ * what it asked.
+ */
+const updateScenarioSchema = z
+  .object({
+    name: z.string().min(1).optional(),
+    situation: z.string().optional(),
+    criteria: z.array(z.string()).optional(),
+    labels: z.array(z.string()).optional(),
+    parameters: scenarioParameterDefinitionsSchema
+      .optional()
+      .describe(parametersDescription),
+    simulatorModel: modelOverrideSchema
+      .nullish()
+      .describe(simulatorModelDescription),
+    judgeModel: modelOverrideSchema.nullish().describe(judgeModelDescription),
+    maxTurns: z
+      .number()
+      .int()
+      .min(1)
+      .max(100)
+      .nullish()
+      .describe(maxTurnsDescription),
+    minTurns: z
+      .number()
+      .int()
+      .min(0)
+      .max(100)
+      .nullish()
+      .describe(minTurnsDescription),
+    testSuiteId: z.string().nullish().describe(testSuiteIdDescription),
+    fields: scenarioFieldValuesSchema
+      .optional()
+      .describe(
+        `${fieldsDescription} Send the full record; an empty record clears every value.`,
+      ),
+  })
+  .strict();
 
 /**
  * The fields the caller named. The schema marks every field optional, and a
@@ -467,6 +475,12 @@ function registerCreateScenarioRoute(
       const body = c.req.valid("json");
 
       logger.info({ projectId: project.id }, "Creating scenario");
+
+      await enforceCreationLimit({
+        prisma,
+        projectId: project.id,
+        limitType: "scenarios",
+      });
 
       const service = getService();
       const scenario = await service.create(

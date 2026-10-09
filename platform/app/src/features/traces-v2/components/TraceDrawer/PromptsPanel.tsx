@@ -19,7 +19,6 @@ import {
 } from "react-icons/lu";
 import { Link } from "~/components/ui/link";
 import { useDrawer } from "~/hooks/useDrawer";
-import { useGoToSpanInPlaygroundTabUrlBuilder } from "~/prompts/prompt-playground/hooks/useLoadSpanIntoPromptPlayground";
 import type {
   SpanDetail,
   SpanTreeNode,
@@ -27,6 +26,7 @@ import type {
 } from "~/server/api/routers/tracesV2.schemas";
 import { formatDuration } from "~/shared/format/time";
 import { usePromptByHandle } from "../../hooks/usePromptByHandle";
+import { useSpanPlaygroundHref } from "../../hooks/useSpanPlaygroundHref";
 import { useSpansFull } from "../../hooks/useSpansFull";
 import {
   extractPromptReference,
@@ -382,13 +382,13 @@ function PromptUsageCard({
   const variableEntries = Object.entries(variables).sort(([a], [b]) =>
     a.localeCompare(b),
   );
-  const { buildUrl } = useGoToSpanInPlaygroundTabUrlBuilder();
+  const playgroundHrefFor = useSpanPlaygroundHref();
   // Prefer the first emitting span (Prompt.compile / PromptApiService.get)
   // — the server-side playground loader walks descendants/siblings to
   // find the actual llm call for it.
   const playgroundSpanId = spanIds[0] ?? null;
   const playgroundHref = playgroundSpanId
-    ? (buildUrl(playgroundSpanId)?.toString() ?? "")
+    ? playgroundHrefFor(playgroundSpanId)
     : "";
 
   return (

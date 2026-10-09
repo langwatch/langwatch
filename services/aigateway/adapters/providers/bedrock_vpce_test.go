@@ -193,6 +193,59 @@ func TestBedrockVPCEEndpoint_Gate(t *testing.T) {
 	}
 }
 
+// given a Bedrock credential with no runtime endpoint and plain
+// bedrock:InvokeModel access keys
+// when the Converse endpoint is resolved for an OpenAI model (the global.openai.*
+// inference profiles, gpt-oss, or a deployment mapped onto one)
+// then it resolves to the public regional runtime host, so the request never
+// reaches the bedrock-mantle endpoint bifrost would pick (which needs a separate
+// bedrock-mantle permission and answered 403 access_denied), while other Bedrock
+// models stay on bifrost.
+/** @scenario "OpenAI models on Bedrock are served through Converse with InvokeModel access" */
+func TestBedrockConverseEndpoint_OpenAIModelsUseRegionalRuntime(t *testing.T) {
+	cred := domain.Credential{
+		ProviderID: domain.ProviderBedrock,
+		Extra:      map[string]string{"access_key": "AKIAEXAMPLE", "secret_key": "secretexample", "region": "eu-central-1"},
+	}
+	const want = "https://bedrock-runtime.eu-central-1.amazonaws.com"
+	for _, model := range []string{"global.openai.gpt-5.5", "global.openai.gpt-6-luna", "openai.gpt-oss-120b-1:0"} {
+		if ep, err := bedrockConverseEndpoint(cred, model); ep != want || err != nil {
+			t.Errorf("%s: got (%q, %v), want (%q, nil)", model, ep, err, want)
+		}
+	}
+
+	mapped := cred
+	mapped.DeploymentMap = map[string]string{"helpdesk": "global.openai.gpt-5.5"}
+	if ep, err := bedrockConverseEndpoint(mapped, "helpdesk"); ep != want || err != nil {
+		t.Errorf("mapped deployment: got (%q, %v), want (%q, nil)", ep, err, want)
+	}
+
+	if ep, err := bedrockConverseEndpoint(cred, "eu.anthropic.claude-haiku-4-5-20251001-v1:0"); ep != "" || err != nil {
+		t.Errorf("anthropic model: got (%q, %v), want (\"\", nil)", ep, err)
+	}
+
+	noRegion := domain.Credential{ProviderID: domain.ProviderBedrock}
+	if ep, _ := bedrockConverseEndpoint(noRegion, "global.openai.gpt-5.5"); ep != "https://bedrock-runtime.us-east-1.amazonaws.com" {
+		t.Errorf("region-less credential: got %q, want the us-east-1 runtime host", ep)
+	}
+
+	vpce := "http://vpce-abc.vpce-svc.eu-central-1.vpce.amazonaws.com:80"
+	withVPCE := domain.Credential{ProviderID: domain.ProviderBedrock, Extra: map[string]string{"bedrock_runtime_endpoint": vpce, "region": "eu-central-1"}}
+	if ep, err := bedrockConverseEndpoint(withVPCE, "global.openai.gpt-5.5"); ep != vpce || err != nil {
+		t.Errorf("vpce credential: got (%q, %v), want the VPC endpoint", ep, err)
+	}
+
+	hostile := domain.Credential{ProviderID: domain.ProviderBedrock, Extra: map[string]string{"region": "evil.example/x"}}
+	if ep, err := bedrockConverseEndpoint(hostile, "global.openai.gpt-5.5"); ep != "" || err == nil {
+		t.Errorf("hostile region: got (%q, %v), want (\"\", error)", ep, err)
+	}
+
+	openai := domain.Credential{ProviderID: domain.ProviderOpenAI}
+	if ep, err := bedrockConverseEndpoint(openai, "gpt-5.5"); ep != "" || err != nil {
+		t.Errorf("non-bedrock credential: got (%q, %v), want (\"\", nil)", ep, err)
+	}
+}
+
 // given a credential carrying the litellm aws_* key names (the shape the
 // gatewayproxy /go/proxy route produces, as opposed to the canonical names
 // the dispatcheradapter produces)

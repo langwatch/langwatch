@@ -129,6 +129,18 @@ export interface ViewSlice {
    * keep the store in lockstep with the SavedView table.
    */
   setUserLenses: (lenses: LensConfig[]) => void;
+  /**
+   * Take back a new lens the server refused to save. The lens leaves the
+   * strip, and when it is still the active one the user returns to
+   * `fallbackLensId`, the lens they were on before creating it. Explicit,
+   * because the reload alone cannot be trusted to do it: an empty lens list
+   * reloaded as an empty list keeps its reference, so `setUserLenses` never
+   * runs on a project's first lens.
+   */
+  discardRefusedLens: (args: {
+    lensId: string;
+    fallbackLensId: string;
+  }) => void;
 }
 
 /**
@@ -139,8 +151,21 @@ export interface ViewSlice {
  * refetch + error reporting.
  */
 export interface LensSyncBridge {
+  /**
+   * Whether the project behind the bridge accepts lens writes. An aggregate
+   * project is read only (ADR-144), so its server refuses every one. The store
+   * asks before creating, renaming or deleting a saved lens, so no entry point
+   * (a toolbar control, an AI search, anything added later) can add a lens
+   * locally that the server will never keep.
+   */
+  acceptsWrites: () => boolean;
+  /**
+   * `fallbackLensId` is the lens the user was on before this one, so a
+   * refusal can return them to it (`discardRefusedLens`).
+   */
   create: (
     lens: LensConfig & { /** Optional client-suggested id. */ id: string },
+    rollback: { fallbackLensId: string },
   ) => void;
   rename: (lensId: string, name: string) => void;
   delete: (lensId: string) => void;
@@ -150,6 +175,14 @@ let lensSyncBridge: LensSyncBridge | null = null;
 
 export function setLensSyncBridge(bridge: LensSyncBridge | null): void {
   lensSyncBridge = bridge;
+}
+
+/**
+ * True when the bridged project refuses lens writes. With no bridge there is
+ * no server to refuse, so the store keeps its local behaviour.
+ */
+function lensWritesRefused(): boolean {
+  return lensSyncBridge !== null && !lensSyncBridge.acceptsWrites();
 }
 
 const DISMISSED_BUILTINS_KEY = "langwatch:traces-v2:dismissed-builtins:v1";
@@ -213,8 +246,8 @@ function migrateGrouping(value: unknown): GroupingMode | undefined {
 // the server (SavedView table, kind="v2-traces-lens") and `useLensSync`
 // pushes them into the store via `setUserLenses` whenever the tRPC
 // query resolves. Drift between tabs is handled by React Query's
-// `refetchOnWindowFocus`; failed mutations roll back via the same
-// invalidate-on-error path. Keeping a localStorage shadow would just
+// `refetchOnWindowFocus`; a refused rename or delete rolls back via the
+// invalidate-on-error path, and a refused create through `discardRefusedLens`. Keeping a localStorage shadow would just
 // be another source of inconsistency.
 
 function isSortConfig(value: unknown): value is SortConfig {
@@ -574,6 +607,16 @@ function setDraft(
   return next;
 }
 
+/** What a lens shows, its unsaved changes applied. */
+function lensView(lens: LensConfig, draft: DraftLensState | undefined) {
+  return {
+    filterText: draft?.filter ?? lens.filterText,
+    sort: draft?.sort ?? lens.sort,
+    grouping: draft?.grouping ?? lens.grouping,
+    columnOrder: draft?.columns ?? lens.columns,
+  };
+}
+
 function clearDraftFor(
   drafts: Map<string, DraftLensState>,
   lensId: string,
@@ -828,8 +871,11 @@ export const createViewSlice: StateCreator<ExplorerStore, [], [], ViewSlice> = (
   // every field is explicit; the popover fast-path omits them and we
   // snapshot live `viewStore` state.
   createLens: (name, overrides) => {
-    const id = generateId();
     const state = get();
+    // A refused create changes nothing, so the caller stays on the lens it
+    // was already on.
+    if (lensWritesRefused()) return state.activeLensId;
+    const id = generateId();
     const newLens: LensConfig = {
       id,
       name,
@@ -843,7 +889,7 @@ export const createViewSlice: StateCreator<ExplorerStore, [], [], ViewSlice> = (
       filterText: overrides?.filterText ?? get().queryText,
     };
     const allLenses = [...state.allLenses, newLens];
-    lensSyncBridge?.create(newLens);
+    lensSyncBridge?.create(newLens, { fallbackLensId: state.activeLensId });
     // Adopt the new lens as the active one. When overrides are present we
     // also push the saved values into live state so the table immediately
     // reflects the configured shape (otherwise the user sees the old grouping
@@ -884,7 +930,7 @@ export const createViewSlice: StateCreator<ExplorerStore, [], [], ViewSlice> = (
   renameLens: (lensId, name) =>
     set((s) => {
       const lens = s.allLenses.find((l) => l.id === lensId);
-      if (!lens || lens.isBuiltIn) return s;
+      if (!lens || lens.isBuiltIn || lensWritesRefused()) return s;
       const allLenses = s.allLenses.map((l) =>
         l.id === lensId ? { ...l, name } : l,
       );
@@ -895,7 +941,7 @@ export const createViewSlice: StateCreator<ExplorerStore, [], [], ViewSlice> = (
   duplicateLens: (lensId) => {
     const state = get();
     const lens = state.allLenses.find((l) => l.id === lensId);
-    if (!lens) return lensId;
+    if (!lens || lensWritesRefused()) return lensId;
     const id = generateId();
     // Duplicate the SAVED lens — never the live draft. The
     // "Save as new lens" action handles the draft-capture case.
@@ -906,7 +952,7 @@ export const createViewSlice: StateCreator<ExplorerStore, [], [], ViewSlice> = (
       isBuiltIn: false,
     };
     const allLenses = [...state.allLenses, newLens];
-    lensSyncBridge?.create(newLens);
+    lensSyncBridge?.create(newLens, { fallbackLensId: state.activeLensId });
     get().setFilterFromLens(newLens.filterText);
     set({
       allLenses,
@@ -927,6 +973,8 @@ export const createViewSlice: StateCreator<ExplorerStore, [], [], ViewSlice> = (
     // lens can be deleted/dismissed, but the strip must always offer a
     // way back to the unfiltered table.
     if (lensId === "all-traces") return;
+    // Dismissing a built-in is local only; deleting a saved lens is a write.
+    if (!lens.isBuiltIn && lensWritesRefused()) return;
     const allLenses = s.allLenses.filter((l) => l.id !== lensId);
     const nextDraft = clearDraftFor(s.draftState, lensId);
     if (lens.isBuiltIn) {
@@ -1005,5 +1053,22 @@ export const createViewSlice: StateCreator<ExplorerStore, [], [], ViewSlice> = (
         columnOrder: next.columns,
       };
     });
+  },
+
+  discardRefusedLens: ({ lensId, fallbackLensId }) => {
+    const s = get();
+    if (!s.allLenses.some((l) => l.id === lensId && !l.isBuiltIn)) return;
+    const allLenses = s.allLenses.filter((l) => l.id !== lensId);
+    const draftState = clearDraftFor(s.draftState, lensId);
+    const next = allLenses.find((l) => l.id === fallbackLensId) ?? allLenses[0];
+    // The user moved on while the save was in flight: leave them there.
+    if (s.activeLensId !== lensId || !next) {
+      set({ allLenses, draftState });
+      return;
+    }
+    // Back to the lens as the user left it, unsaved changes included.
+    const { filterText, ...view } = lensView(next, draftState.get(next.id));
+    get().setFilterFromLens(filterText);
+    set({ allLenses, draftState, activeLensId: next.id, ...view });
   },
 });

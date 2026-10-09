@@ -346,6 +346,43 @@ func TestApplyChange_ModelProviderUpdatedEvictsMatchingModelProvider(t *testing.
 	}
 }
 
+/** @scenario "A provider added to the organization reaches keys already cached" */
+func TestApplyChange_ModelProviderCreatedEvictsItsOrganization(t *testing.T) {
+	resolver := &fakeResolver{}
+	svc, _ := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver})
+
+	// The key was resolved while the organization had Bedrock only; the new
+	// OpenAI provider id is in no cached bundle yet.
+	sameOrgKey := hashKey(domain.PresentedKey{Token: "vk-lw-langy-same-org"})
+	otherOrgKey := hashKey(domain.PresentedKey{Token: "vk-lw-other-org"})
+	svc.storeL1(sameOrgKey, &domain.Bundle{
+		VirtualKeyID:   "vk-langy",
+		OrganizationID: "org-acme",
+		Config: domain.BundleConfig{Credentials: []domain.Credential{{
+			ID:         "model-provider-bedrock",
+			ProviderID: domain.ProviderBedrock,
+		}}},
+	}, "")
+	svc.storeL1(otherOrgKey, &domain.Bundle{
+		VirtualKeyID:   "vk-other",
+		OrganizationID: "org-other",
+		Config: domain.BundleConfig{Credentials: []domain.Credential{{
+			ID:         "model-provider-other",
+			ProviderID: domain.ProviderOpenAI,
+		}}},
+	}, "")
+
+	svc.applyChange("org-acme", CacheChange{
+		Kind:            ChangeKindProviderBindingUpdated,
+		ModelProviderID: "model-provider-openai-new",
+	})
+
+	_, isSameOrgPresent := svc.l1.Get(sameOrgKey)
+	_, isOtherOrgPresent := svc.l1.Get(otherOrgKey)
+	assert.False(t, isSameOrgPresent, "a key in the provider's organization must re-resolve to see the new provider")
+	assert.True(t, isOtherOrgPresent, "keys of other organizations must stay cached")
+}
+
 func TestApplyChange_BudgetMutationWithoutProjectIDEvictsOrganization(t *testing.T) {
 	resolver := &fakeResolver{}
 	svc, _ := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver})

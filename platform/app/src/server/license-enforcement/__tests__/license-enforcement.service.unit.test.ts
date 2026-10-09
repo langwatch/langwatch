@@ -40,6 +40,9 @@ describe("LicenseEnforcementService", () => {
     mockRepository = {
       getMemberCount: vi.fn().mockResolvedValue(0),
       getMembersLiteCount: vi.fn().mockResolvedValue(0),
+      getMembersDeveloperCount: vi.fn().mockResolvedValue(0),
+      getActiveScenarioCount: vi.fn().mockResolvedValue(0),
+      getEvaluatorCount: vi.fn().mockResolvedValue(0),
       getCurrentMonthCost: vi.fn().mockResolvedValue(0),
       getCurrentMonthCostForProjects: vi.fn().mockResolvedValue(0),
     };
@@ -48,7 +51,11 @@ describe("LicenseEnforcementService", () => {
       getActivePlan: vi.fn().mockResolvedValue(basePlan),
     };
 
-    service = new LicenseEnforcementService(mockRepository, mockPlanProvider);
+    service = new LicenseEnforcementService(
+      mockRepository,
+      mockPlanProvider,
+      vi.fn().mockResolvedValue(0),
+    );
   });
 
   describe("checkLimit", () => {

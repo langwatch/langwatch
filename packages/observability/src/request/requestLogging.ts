@@ -1,5 +1,6 @@
 import { REQUEST_CAUSE_FIELD } from "../constants";
-import type { Logger } from "../logger";
+import { type Logger } from "../logger";
+import { summarizeError } from "./errorSummary";
 
 /**
  * Common request logging data structure.
@@ -101,6 +102,10 @@ const UNCAUSED_SERVER_ERROR = "UncausedServerError";
  * 5xx dashboard slices on the `error_*` metadata the serializer derives from
  * it. Only the levels where that name would misrepresent the record are
  * re-keyed.
+ *
+ * The cause is stored as a {@link summarizeError} summary, never the error
+ * itself: a wide error (validation issues, database metadata) would otherwise
+ * exceed Loki's 128 structured-metadata keys and the record would be dropped.
  */
 function attachCause({
   logData,
@@ -112,9 +117,9 @@ function attachCause({
   level: "info" | "warn" | "error";
 }): void {
   if (level === "error") {
-    logData.error = error;
+    logData.error = summarizeError(error);
   } else {
-    logData[REQUEST_CAUSE_FIELD] = error;
+    logData[REQUEST_CAUSE_FIELD] = summarizeError(error);
     // Re-keying costs the derived `error_type`, which is how these records
     // were grouped. Restated flat so the grouping survives the move.
     const name = (error as { name?: unknown }).name;
