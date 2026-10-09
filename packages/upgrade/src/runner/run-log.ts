@@ -32,7 +32,7 @@ const WAITING_ON: Readonly<Record<UpgradePhaseName, string>> = {
   preflight: "the ledger and _prisma_migrations (DATABASE_URL)",
   "postgres-schema": "prisma migrate deploy on Postgres (DATABASE_URL)",
   "clickhouse-schema": "goose on every ClickHouse target (CLICKHOUSE_URL)",
-  reconcile: "the reconcilers: ClickHouse TTL and LangWatchQL",
+  reconcile: "the reconcilers: ClickHouse TTL, LangWatchQL and the system-migrations pass request",
 };
 
 const URL_CREDENTIALS = /([a-z][a-z0-9+.-]*:\/\/[^\s:/@]*):[^\s@/]*@/gi;

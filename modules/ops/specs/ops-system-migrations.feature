@@ -29,6 +29,13 @@ Feature: Ops runs the system migration passes and names their cohorts
     And once a later pass leaves no tenant held, the row is settled
 
   @unit
+  Scenario: Finishing an upgrade requests one system-migrations pass
+    Given an upgrade run that has applied its schema and blocking steps
+    When the upgrade finishes
+    Then it asks a worker for one system-migrations pass and does not wait for it
+    And the tenant steps that pass drives settle without waiting for the hourly re-drive
+
+  @unit
   Scenario: The worker's re-drive discovers a tenant migration no pass has run
     Given an installation where no parked or held tenant exists
     And an automatic tenant migration, registered or declared, that no tenant has met yet
