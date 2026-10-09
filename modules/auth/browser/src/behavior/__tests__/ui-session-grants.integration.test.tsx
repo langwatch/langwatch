@@ -7,11 +7,6 @@
 
 import { trpcQueryKey } from "@langwatch/api/web";
 import type { UiActiveScopeReading, UiSessionReading } from "@langwatch/browser-host/session";
-import {
-  createUiScopeHost,
-  UiScopeHostProvider,
-  useOrganizationTeamProject,
-} from "@langwatch/browser-host/use-organization-team-project";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
@@ -55,11 +50,6 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
-function LegacyReader() {
-  const { hasPermission } = useOrganizationTeamProject();
-  return <span data-testid="legacy-can">{String(hasPermission("annotations:update"))}</span>;
-}
-
 function GrantProbe({
   transport,
   scope,
@@ -69,24 +59,12 @@ function GrantProbe({
 }) {
   const session = useBrowserUiSession({ transport, session: JANE, scope, isPublicRoute: false });
   const { permissions } = session.snapshot();
-  const legacyHost = createUiScopeHost({
-    project: () => scope.project,
-    organization: () => scope.organization,
-    team: () => scope.team,
-    organizationRole: () => void 0,
-    hasPermission: permissions.can,
-    hasOrganizationPermission: permissions.canInOrganization,
-    isLoading: () => permissions.isLoading,
-  });
   return (
     <div>
       <span data-testid="can-project">{String(permissions.can("annotations:update"))}</span>
       <span data-testid="can-org">
         {String(permissions.canInOrganization("annotations:update"))}
       </span>
-      <UiScopeHostProvider value={legacyHost}>
-        <LegacyReader />
-      </UiScopeHostProvider>
     </div>
   );
 }
@@ -199,7 +177,6 @@ describe("given grants answered for the scope the reader is standing in", () => 
       });
       await waitFor(() => expect(view.getByTestId("can-project").textContent).toBe("true"));
       await waitFor(() => expect(view.getByTestId("can-org").textContent).toBe("true"));
-      expect(view.getByTestId("legacy-can").textContent).toBe("true");
 
       refuse = true;
       await view.client.refetchQueries({
@@ -208,7 +185,6 @@ describe("given grants answered for the scope the reader is standing in", () => 
 
       await waitFor(() => expect(view.getByTestId("can-project").textContent).toBe("false"));
       expect(view.getByTestId("can-org").textContent).toBe("false");
-      expect(view.getByTestId("legacy-can").textContent).toBe("false");
     });
   });
 });

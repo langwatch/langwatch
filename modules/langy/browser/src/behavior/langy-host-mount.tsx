@@ -100,7 +100,7 @@ class CapabilityLangyHost extends LangyHostApi {
   }
 
   isLoading(): boolean {
-    return this.session.snapshot().scope.status === "loading";
+    return !this.session.isSettled();
   }
 
   isDemoProject(): boolean {

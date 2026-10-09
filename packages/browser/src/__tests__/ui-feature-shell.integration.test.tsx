@@ -62,7 +62,6 @@ class ResolvedScope extends StubScope {
       project: () => ({ id: "project_1", slug: "ada-project", name: "Ada's project" }),
       organization: () => ({ id: "org_1", name: "Ada Ltd" }),
       team: () => void 0,
-      hasPermission: (permission) => permission === "traces:read",
     });
   }
 }
@@ -156,6 +155,25 @@ describe("given the shell apps/ui mounts around every routed page", () => {
       const view = renderShell(shell, <div />, void 0, "/?drawer.open=probe");
 
       await waitFor(() => expect(view.getByTestId("drawer-host").textContent).toBe("mounted"));
+    });
+  });
+
+  describe("when the composition installs a footer", () => {
+    /** @scenario "The composition's footer reads the capabilities a screen does" */
+    it("draws it inside the capabilities, so it reads them as a screen does", () => {
+      function Footer() {
+        return <div data-testid="footer">{useUiCapabilities().session.currentUser()?.id}</div>;
+      }
+      const shell = createUiFeatureShell({
+        sessionQueryKey: TEST_SESSION_QUERY_KEY,
+        apis: [],
+        capabilities: { session: new StubSession(), scope: new StubScope() },
+        footer: Footer,
+      });
+
+      const view = renderShell(shell, <div />);
+
+      expect(view.getByTestId("footer").textContent).toBe("user_1");
     });
   });
 
@@ -262,7 +280,7 @@ describe("given the shell apps/ui mounts around every routed page", () => {
 
   describe("when a screen from any feature reads the shared organization, team and project hook", () => {
     /** @scenario "The application session publishes the scope every feature reads" */
-    it("sees the project, the organization and the grants the session resolved", () => {
+    it("sees the project and the organization the scope resolved", () => {
       const shell = createUiFeatureShell({
         sessionQueryKey: TEST_SESSION_QUERY_KEY,
         apis: [],
@@ -274,20 +292,18 @@ describe("given the shell apps/ui mounts around every routed page", () => {
         const scope = useOrganizationTeamProject();
         return (
           <div data-testid="scope">
-            {scope.project?.slug}|{scope.organization?.id}|
-            {String(scope.hasPermission("traces:read"))}|
-            {String(scope.hasPermission("traces:delete"))}
+            {scope.project?.slug}|{scope.organization?.id}
           </div>
         );
       }
 
       const view = renderShell(shell, <Page />);
 
-      expect(view.getByTestId("scope").textContent).toBe("ada-project|org_1|true|false");
+      expect(view.getByTestId("scope").textContent).toBe("ada-project|org_1");
     });
 
     /** @scenario "A session with no resolved scope leaves the shared hook unresolved rather than throwing" */
-    it("reads unresolved with no project and no grants when the session publishes no scope", () => {
+    it("reads unresolved with no project when the session publishes no scope", () => {
       const shell = createUiFeatureShell({
         sessionQueryKey: TEST_SESSION_QUERY_KEY,
         apis: [],
@@ -299,15 +315,14 @@ describe("given the shell apps/ui mounts around every routed page", () => {
         const scope = useOrganizationTeamProject();
         return (
           <div data-testid="scope">
-            {String(scope.isResolved)}|{JSON.stringify(scope.project) ?? "undefined"}|
-            {String(scope.hasPermission("traces:read"))}
+            {String(scope.isResolved)}|{JSON.stringify(scope.project) ?? "undefined"}
           </div>
         );
       }
 
       const view = renderShell(shell, <Page />);
 
-      expect(view.getByTestId("scope").textContent).toBe("false|undefined|false");
+      expect(view.getByTestId("scope").textContent).toBe("false|undefined");
     });
   });
 

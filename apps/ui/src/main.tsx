@@ -140,7 +140,7 @@ function browserUiCapabilitiesHook({
       userId: sessionReading.user?.id,
     });
 
-    const scope = organization.createBrowserUiScope({ reading: scopeReading, session });
+    const scope = organization.createBrowserUiScope({ reading: scopeReading });
     const traceFilters = filtering.useUiTraceFiltersReading({
       search,
       projectId: scope.activeScope().projectId ?? void 0,

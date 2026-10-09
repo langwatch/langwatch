@@ -2586,6 +2586,8 @@ invented:
   and its own scenarios, not a side effect of a file move. **The knot is untied as its own specced
   change** (Alex, 2026-10-05): permission reads move to the session capability, public shared pages
   get an explicit no-session host, and then the 506 call sites migrate.
+  A host's scope loading means the scope alone: the scope host answers no permission, and a screen
+  that gates on a grant waits for its own host's loading flag over the session (Alex, 2026-10-09).
 
 - **State defaults to server state**: react-query over the derived tRPC
   client is the normal answer, so cross-module client state is rare and ruled

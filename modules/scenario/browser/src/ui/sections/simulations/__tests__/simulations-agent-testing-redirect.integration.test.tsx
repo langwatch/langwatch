@@ -83,7 +83,6 @@ function TestScenarioHost({ children }: { children: React.ReactNode }) {
     project: () => host.project(),
     organization: () => host.organization(),
     team: () => host.team(),
-    hasPermission: () => true,
   });
 
   return (

@@ -25,12 +25,7 @@ export interface LangyVisibility {
 /** The gate, with its own uncertainty exposed. See {@link LangyVisibility}. */
 export function useLangyVisibility(): LangyVisibility {
   const { status: sessionStatus } = useRequiredSession();
-  const {
-    project,
-    organization,
-    isDemoProject,
-    isLoading: contextLoading,
-  } = useOrganizationTeamProject({
+  const { project, organization, isDemoProject } = useOrganizationTeamProject({
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
   });
@@ -52,7 +47,7 @@ export function useLangyVisibility(): LangyVisibility {
   // Deliberately never waits on something that may never arrive: a reader with
   // no project at all is DECIDED (they cannot have Langy), not pending.
   const isResolving =
-    sessionStatus === "loading" || contextLoading || (mayReadLangy && flagLoading);
+    sessionStatus === "loading" || langyHost.isLoading() || (mayReadLangy && flagLoading);
 
   return { show: mayReadLangy && releaseLangy, isResolving };
 }

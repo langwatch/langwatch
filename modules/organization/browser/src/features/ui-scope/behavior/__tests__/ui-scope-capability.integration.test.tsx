@@ -4,8 +4,7 @@
  * @vitest-environment jsdom
  */
 
-import { UiSession } from "@langwatch/browser-host/capabilities";
-import type { UiSessionReading, UiSessionSnapshot } from "@langwatch/browser-host/session";
+import type { UiSessionReading } from "@langwatch/browser-host/session";
 import type { UiScopeTeam } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -87,14 +86,12 @@ afterEach(() => {
 function ScopeProbe({
   transport,
   session,
-  grants = [],
 }: {
   transport: UiFeatureApiTransport;
   session: UiSessionReading;
-  grants?: readonly string[];
 }) {
   const reading: UiScopeReading = useUiScopeReading({ transport, session });
-  const scope = createBrowserUiScope({ reading, session: new NoGrants(session, reading, grants) });
+  const scope = createBrowserUiScope({ reading });
   const active = scope.activeScope();
   return (
     <div>
@@ -102,62 +99,18 @@ function ScopeProbe({
       <span data-testid="organization">{active.organizationId ?? "none"}</span>
       <span data-testid="project">{active.projectId ?? "none"}</span>
       <span data-testid="host">{scope.scopeHost() ? "published" : "none"}</span>
-      <span data-testid="legacy-can">
-        {String(scope.scopeHost()?.hasPermission("annotations:update") ?? false)}
-      </span>
     </div>
   );
-}
-
-/**
- * The session port beside the scope, answering no grants — the scope port
- * takes the whole session, and these tests are about where, not what-may.
- */
-class NoGrants extends UiSession {
-  constructor(
-    private readonly reading: UiSessionReading,
-    private readonly resolved: UiScopeReading,
-    private readonly grants: readonly string[] = [],
-  ) {
-    super();
-  }
-
-  currentUser() {
-    return this.reading.user;
-  }
-
-  hasPermission(): boolean {
-    return false;
-  }
-
-  isSettled(): boolean {
-    return true;
-  }
-
-  override snapshot(): UiSessionSnapshot {
-    return {
-      session: this.reading,
-      scope: this.resolved.scope,
-      permissions: {
-        status: "ready",
-        isLoading: false,
-        can: (permission) => this.grants.includes(permission),
-        canInOrganization: () => false,
-      },
-    };
-  }
 }
 
 function renderScope({
   path,
   transport,
   session = SIGNED_IN,
-  grants,
 }: {
   path: string;
   transport: UiFeatureApiTransport;
   session?: UiSessionReading;
-  grants?: readonly string[];
 }) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const router = createMemoryRouter(
@@ -165,7 +118,7 @@ function renderScope({
       path: routePath,
       element: (
         <QueryClientProvider client={queryClient}>
-          <ScopeProbe transport={transport} session={session} grants={grants} />
+          <ScopeProbe transport={transport} session={session} />
         </QueryClientProvider>
       ),
     })),
@@ -374,20 +327,5 @@ describe("given the first user has resolved an organization and project", () => 
     expect(view.getByTestId("organization").textContent).toBe("none");
     expect(view.getByTestId("project").textContent).toBe("none");
     expect(view.getByTestId("host").textContent).toBe("none");
-  });
-});
-
-describe("given the session holds a grant once the scope has resolved", () => {
-  it("answers the legacy host's permission reader from that same grant", async () => {
-    const { transport } = recordingTransport();
-
-    const view = renderScope({
-      path: "/acme-app/traces",
-      transport,
-      grants: ["annotations:update"],
-    });
-
-    await waitFor(() => expect(view.getByTestId("project").textContent).toBe("proj-app"));
-    expect(view.getByTestId("legacy-can").textContent).toBe("true");
   });
 });

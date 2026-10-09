@@ -196,7 +196,7 @@ function renderShell({
       });
       return {
         session,
-        scope: root.scope.createBrowserUiScope({ reading: scopeReading, session }),
+        scope: root.scope.createBrowserUiScope({ reading: scopeReading }),
       };
     },
   });

@@ -89,7 +89,7 @@ export abstract class ScenarioHostApi {
 
   abstract hasPermission(permission: string): boolean;
 
-  /** Whether the scope answer is still arriving. */
+  /** Whether the session, the scope or the grants are still arriving. */
   abstract isLoading(): boolean;
 
   abstract route(): ScenarioRouteReading;

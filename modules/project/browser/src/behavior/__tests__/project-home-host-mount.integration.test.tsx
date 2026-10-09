@@ -88,7 +88,6 @@ function renderGate({ organizationRole }: { organizationRole: string }) {
     organization: () => void 0,
     team: () => reading.team,
     organizationRole: () => organizationRole,
-    hasPermission: () => reading.granted,
   });
   render(
     <UiHostServiceProvider value={new Map([[UiFlagsService.name, { flag: () => reading.flag }]])}>

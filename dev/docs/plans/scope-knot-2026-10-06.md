@@ -153,3 +153,10 @@ and Q2, both back to main; Q2 also drops the branch's second `authz.effectivePer
 
 Every scenario in the spec is bound and none `@unimplemented`; the scope port is built without the
 session; `UiScopeHost` names no permission; record 10.1's knot paragraph records it untied.
+
+- Batch 5 (SK-SCOPE-LOADING, Alex 2026-10-09): `UiScopeHost`, `UiScopeHostReadings` and
+  `UiScopeReading` carry no permission; `createBrowserUiScope({ reading })`; the scope's `isLoading`
+  is the scope's alone. The gates that waited on grants (langy's and trace's `useLangyVisibility`,
+  scenario's `useAgentTestingGate`, workflow's `isResolved`) wait on their host's `isLoading()`,
+  which now answers `!session.isSettled()`. The organization-permission-under-every-host scenario
+  lost its subject: see the sk-batch5b handoff.

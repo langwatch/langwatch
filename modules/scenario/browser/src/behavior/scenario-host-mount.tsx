@@ -111,8 +111,9 @@ class CapabilityScenarioHost extends ScenarioHostApi {
  */
 export default function ScenarioHostMount({ children }: { children?: ReactNode }) {
   const { session, navigation, route, feedback } = useUiCapabilities();
-  const { organization, team, project, status } = session.snapshot().scope;
+  const { organization, team, project } = session.snapshot().scope;
   const actor = session.currentUser();
+  const isSettled = session.isSettled();
 
   // Primitive dependencies only, so the host stays the SAME object across
   // renders carrying the same reading: `lazy()` resolved this mount once, and
@@ -147,7 +148,7 @@ export default function ScenarioHostMount({ children }: { children?: ReactNode }
             actorId === void 0
               ? void 0
               : { id: actorId, name: actorName, email: actorEmail, image: actorImage },
-          isLoading: status === "loading",
+          isLoading: !isSettled,
         },
         {
           hasPermission: (permission) => session.hasPermission(permission),
@@ -178,7 +179,7 @@ export default function ScenarioHostMount({ children }: { children?: ReactNode }
       actorName,
       actorEmail,
       actorImage,
-      status,
+      isSettled,
       session,
       navigation,
       route,

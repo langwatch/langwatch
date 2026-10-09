@@ -21,6 +21,7 @@ const session = {
   currentUser: () => ({ id: "user_1", name: "Member", email: "m@example.com", image: null }),
   hasPermission: (permission: string) => granted.includes(permission),
   hasOrganizationPermission: (permission: string) => organizationGranted.includes(permission),
+  isSettled: () => true,
 };
 
 vi.mock("@langwatch/feature-flag-client", () => ({
