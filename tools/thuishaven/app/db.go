@@ -197,7 +197,8 @@ func (o *Orchestrator) managedStackEnv(ctx context.Context, slug string) ([]stri
 		// database endpoints are whatever its last `up` recorded (a native server
 		// since swapped for the container, say). The reset dropped on the servers
 		// just ensured, so the child migrates and seeds exactly those.
-		return devNodeEnv(append(withDatabasesOf(reg, st).OverlayEnv(), o.credentialEnv(slug, reg.WorktreeDir)...)), nil
+		env := append(withDatabasesOf(reg, st).OverlayEnv(), o.credentialEnv(slug, reg.WorktreeDir)...)
+		return devNodeEnv(append(env, simulatorsEnv(domain.SelectionFromStack(reg), reg, reg.WorktreeDir)...)), nil
 	}
 	// No running stack: name the app origin `up` would, or sign-in refuses to load.
 	proxyScheme, proxyPort := o.proxy.Endpoint()
@@ -262,6 +263,7 @@ func (o *Orchestrator) seedEnv(p UpParams) []string {
 	if slug, err := o.resolveSlug(p); err == nil {
 		if st, ok := o.stackBySlug(slug); ok {
 			env = append(st.OverlayEnv(), o.credentialEnv(slug, st.WorktreeDir)...)
+			env = append(env, simulatorsEnv(domain.SelectionFromStack(st), st, st.WorktreeDir)...)
 		}
 	}
 	if o.cfg.LocalAPIKey != "" && !hasEnvKey(env, "HAVEN_SEED_LANGWATCH_API_KEY") {

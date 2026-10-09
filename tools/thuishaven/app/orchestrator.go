@@ -625,7 +625,8 @@ func (o *Orchestrator) prepareWorktree(ctx context.Context, p UpParams, st domai
 	// DOTENV_CONFIG_QUIET drops dotenv v17's promo line for any one-shot script
 	// that loads it via `import "dotenv/config"`; `pnpm -s` drops the lifecycle
 	// banner. Keeps the codegen/prepare/seed lanes as quiet as the services.
-	env := append(append(st.OverlayEnv(), o.credentialEnv(st.Slug, p.WorktreeDir)...), "DOTENV_CONFIG_QUIET=true", o.compileCacheEnv(st.Slug))
+	env := append(append(st.OverlayEnv(), o.credentialEnv(st.Slug, p.WorktreeDir)...), simulatorsEnv(domain.SelectionFromStack(st), st, p.WorktreeDir)...)
+	env = append(env, "DOTENV_CONFIG_QUIET=true", o.compileCacheEnv(st.Slug))
 	sayPhase(p.StartedAt, "dependencies")
 	if err := o.ensureDeps(ctx, p.WorktreeDir, depsInstall{WithLifecycleScripts: !p.UntrustedCheckout, Env: nxEnv(st)}); err != nil {
 		return nil, err
