@@ -53,16 +53,18 @@ export function AutomationsLayout({
   const active = AUTOMATION_SECTIONS.find((item) => item.section === section);
 
   return (
-    <Box width="full" paddingX={4} paddingBottom={16} data-testid="section-navigation-layout">
+    <Box width="full" data-testid="section-navigation-layout">
       <SectionNavigationFrame
         label="Automations"
+        header={
+          <PageLayout.Header>
+            <PageLayout.Heading>{title}</PageLayout.Heading>
+          </PageLayout.Header>
+        }
         links={links}
         activeHref={`${basePath}${active?.suffix ?? ""}`}
         onNavigate={(href) => host.navigate(href)}
       >
-        <PageLayout.Header height="auto" paddingX={0} paddingBottom={3} marginBottom={4}>
-          <PageLayout.Heading>{title}</PageLayout.Heading>
-        </PageLayout.Header>
         <Box data-testid="section-navigation-content">{children}</Box>
       </SectionNavigationFrame>
     </Box>

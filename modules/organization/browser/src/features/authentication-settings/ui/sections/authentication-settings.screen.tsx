@@ -41,11 +41,14 @@ export default function AuthenticationSettingsScreen() {
 
   return (
     <>
-      <PageLayout.Header>
-        <PageLayout.Heading>Authentication</PageLayout.Heading>
-      </PageLayout.Header>
       <SectionNavigationFrame
         label="Authentication"
+        hideTitle
+        header={
+          <PageLayout.Header>
+            <PageLayout.Heading>Authentication</PageLayout.Heading>
+          </PageLayout.Header>
+        }
         links={AUTHENTICATION_LINKS}
         activeHref="/settings/authentication"
         onNavigate={(href) => host.navigate(href)}
@@ -68,7 +71,7 @@ export function AuthenticationSettings({
   const organizationName = host.organization()?.name;
 
   return (
-    <VStack align="stretch" gap={5} width="full" paddingTop={4}>
+    <VStack align="stretch" gap={6} width="full" paddingTop={4}>
       <Text color="fg.muted">
         {organizationName
           ? `Manage sign-in, provisioning, and security policies for ${organizationName}.`
@@ -93,7 +96,7 @@ export function AuthenticationSettings({
         </VStack>
       )}
 
-      <VStack align="stretch" gap={4} paddingTop={2}>
+      <VStack align="stretch" gap={4}>
         <VStack align="stretch" gap={1}>
           <Heading size="sm">Organization policies</Heading>
           <Text color="fg.muted" fontSize="sm">

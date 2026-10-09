@@ -95,7 +95,7 @@ describe("the directory's status band", () => {
       renderWithScimHost(<DirectorySummary organizationId="org-1" canReadMembership />);
 
       expect(screen.getByTestId("members-outside-directory")).toHaveTextContent("1 of 4");
-      expect(screen.getByText(/removing them there will not remove them here/)).toBeInTheDocument();
+      expect(screen.getByLabelText(/removing them there will not remove them here/)).toBeInTheDocument();
     });
   });
 
@@ -105,7 +105,7 @@ describe("the directory's status band", () => {
       state.connections = [];
       renderWithScimHost(<DirectorySummary organizationId="org-1" canReadMembership />);
 
-      expect(screen.getByTestId("directory-source-chip")).toHaveTextContent("Not set up yet");
+      expect(screen.getByTestId("directory-source-chip")).toHaveTextContent("Not set up");
       expect(screen.getByTestId("directory-source-chip")).toHaveAttribute(
         "title",
         "No identity provider is connected, so nothing is provisioned here automatically.",

@@ -49,7 +49,7 @@ export function SsoOverviewCard({ organizationId }: { organizationId: string }) 
   const canOffer = canManage && refusal === null;
 
   return (
-    <>
+    <VStack align="stretch" gap={3} width="full" height="full">
       {refusal && <AvailabilityRefusalNotice refusal={refusal} />}
       {view && connection?.state === "ACTIVE" ? (
         <SingleSignOnCard view={view} connection={connection} canManage={canOffer} />
@@ -64,7 +64,7 @@ export function SsoOverviewCard({ organizationId }: { organizationId: string }) 
           domains={view ? <DomainsDetail view={view} canManage={canOffer} /> : void 0}
         />
       )}
-    </>
+    </VStack>
   );
 }
 

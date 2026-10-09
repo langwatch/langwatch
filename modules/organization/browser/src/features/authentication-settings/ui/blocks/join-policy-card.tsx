@@ -92,7 +92,7 @@ function JoinerSeatOptions({
               background="bg.panel"
               _checked={{
                 borderColor: "colorPalette.solid",
-                background: "colorPalette.subtle",
+                background: "bg.muted",
               }}
             >
               <RadioGroup.ItemHiddenInput data-testid={`joiner-seat-${option.value}`} />
@@ -225,7 +225,7 @@ export function JoinPolicyCard({
                   transition="background 0.15s ease, border-color 0.15s ease"
                   _checked={{
                     borderColor: "colorPalette.solid",
-                    background: "colorPalette.subtle",
+                    background: "bg.muted",
                   }}
                   _hover={{ borderColor: "border.emphasized" }}
                 >
