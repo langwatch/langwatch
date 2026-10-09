@@ -210,7 +210,8 @@ export abstract class OrganizationRepository {
     teamId?: string;
     limit?: number;
   }): Promise<OrganizationTeamProject[]>;
-  abstract setPersonalWorkspaceFeaturesWithAudit(input: {
+  /** Audits the owner's feature switch; project stores the switches on organization's fact. */
+  abstract appendPersonalWorkspaceFeaturesAudit(input: {
     projectId: string;
     callerUserId: string;
     organizationId: string | null;

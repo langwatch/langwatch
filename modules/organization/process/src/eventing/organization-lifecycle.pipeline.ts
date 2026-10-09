@@ -29,6 +29,9 @@ import {
   RecordMemberDisabledCommand,
   RecordPersonalWorkspaceProvisionedCommand,
   RecordPersonalTeamCreatedCommand,
+  RecordPersonalWorkspaceArchivedCommand,
+  RecordPersonalWorkspaceRevivedCommand,
+  RecordPersonalWorkspaceFeaturesChangedCommand,
   RecordPresenceSettingChangedCommand,
   RecordSignedUpCommand,
   RecordTraceSharingDisabledCommand,
@@ -46,6 +49,9 @@ import {
   organizationTraceSharingDisabledEventSchema,
   personalWorkspaceProvisionedEventSchema,
   personalTeamCreatedEventSchema,
+  personalWorkspaceArchivedEventSchema,
+  personalWorkspaceRevivedEventSchema,
+  personalWorkspaceFeaturesChangedEventSchema,
 } from "./organization-lifecycle.events.ts";
 
 /** Where billing's organisation-row facts land: organization's own writers (R42). */
@@ -79,6 +85,9 @@ function lifecycleCommands() {
       integrationMethodChosenEventSchema,
       personalWorkspaceProvisionedEventSchema,
       personalTeamCreatedEventSchema,
+      personalWorkspaceArchivedEventSchema,
+      personalWorkspaceRevivedEventSchema,
+      personalWorkspaceFeaturesChangedEventSchema,
       organizationPresenceSettingChangedEventSchema,
       organizationTraceSharingDisabledEventSchema,
       organizationMemberDisabledEventSchema,
@@ -90,6 +99,12 @@ function lifecycleCommands() {
     .withCommand("recordIntegrationMethodChosen", RecordIntegrationMethodChosenCommand)
     .withCommand("recordPersonalWorkspaceProvisioned", RecordPersonalWorkspaceProvisionedCommand)
     .withCommand("recordPersonalTeamCreated", RecordPersonalTeamCreatedCommand)
+    .withCommand("recordPersonalWorkspaceArchived", RecordPersonalWorkspaceArchivedCommand)
+    .withCommand("recordPersonalWorkspaceRevived", RecordPersonalWorkspaceRevivedCommand)
+    .withCommand(
+      "recordPersonalWorkspaceFeaturesChanged",
+      RecordPersonalWorkspaceFeaturesChangedCommand,
+    )
     .withCommand("recordPresenceSettingChanged", RecordPresenceSettingChangedCommand)
     .withCommand("recordTraceSharingDisabled", RecordTraceSharingDisabledCommand)
     .withCommand("recordMemberDisabled", RecordMemberDisabledCommand)

@@ -24,6 +24,12 @@ import {
   PERSONAL_TEAM_CREATED_EVENT_TYPE,
   personalWorkspaceProvisionedEventDataSchema,
   personalTeamCreatedEventDataSchema,
+  PERSONAL_WORKSPACE_ARCHIVED_EVENT_TYPE,
+  personalWorkspaceArchivedEventDataSchema,
+  PERSONAL_WORKSPACE_REVIVED_EVENT_TYPE,
+  personalWorkspaceRevivedEventDataSchema,
+  PERSONAL_WORKSPACE_FEATURES_CHANGED_EVENT_TYPE,
+  personalWorkspaceFeaturesChangedEventDataSchema,
 } from "@langwatch/organization-contract";
 import { z } from "zod";
 
@@ -43,6 +49,12 @@ export const RECORD_PERSONAL_WORKSPACE_PROVISIONED_COMMAND_TYPE =
   "lw.organization.record_personal_workspace_provisioned" as const;
 export const RECORD_PERSONAL_TEAM_CREATED_COMMAND_TYPE =
   "lw.organization.record_personal_team_created" as const;
+export const RECORD_PERSONAL_WORKSPACE_ARCHIVED_COMMAND_TYPE =
+  "lw.organization.record_personal_workspace_archived" as const;
+export const RECORD_PERSONAL_WORKSPACE_REVIVED_COMMAND_TYPE =
+  "lw.organization.record_personal_workspace_revived" as const;
+export const RECORD_PERSONAL_WORKSPACE_FEATURES_CHANGED_COMMAND_TYPE =
+  "lw.organization.record_personal_workspace_features_changed" as const;
 export const RECORD_PRESENCE_SETTING_CHANGED_COMMAND_TYPE =
   "lw.organization.record_presence_setting_changed" as const;
 export const RECORD_TRACE_SHARING_DISABLED_COMMAND_TYPE =
@@ -83,6 +95,23 @@ export type RecordPersonalTeamCreatedCommandData = z.infer<
   typeof recordPersonalTeamCreatedCommandDataSchema
 >;
 
+/** A personal workspace archived, revived or switched; project applies it to its project. */
+export const recordPersonalWorkspaceArchivedCommandDataSchema =
+  personalWorkspaceArchivedEventDataSchema;
+export type RecordPersonalWorkspaceArchivedCommandData = z.infer<
+  typeof recordPersonalWorkspaceArchivedCommandDataSchema
+>;
+export const recordPersonalWorkspaceRevivedCommandDataSchema =
+  personalWorkspaceRevivedEventDataSchema;
+export type RecordPersonalWorkspaceRevivedCommandData = z.infer<
+  typeof recordPersonalWorkspaceRevivedCommandDataSchema
+>;
+export const recordPersonalWorkspaceFeaturesChangedCommandDataSchema =
+  personalWorkspaceFeaturesChangedEventDataSchema;
+export type RecordPersonalWorkspaceFeaturesChangedCommandData = z.infer<
+  typeof recordPersonalWorkspaceFeaturesChangedCommandDataSchema
+>;
+
 const event = <Type extends string, Data extends z.ZodTypeAny>(type: Type, data: Data) =>
   z.object({
     ...EventSchema.shape,
@@ -115,6 +144,18 @@ export const personalTeamCreatedEventSchema = event(
   PERSONAL_TEAM_CREATED_EVENT_TYPE,
   recordPersonalTeamCreatedCommandDataSchema,
 );
+export const personalWorkspaceArchivedEventSchema = event(
+  PERSONAL_WORKSPACE_ARCHIVED_EVENT_TYPE,
+  recordPersonalWorkspaceArchivedCommandDataSchema,
+);
+export const personalWorkspaceRevivedEventSchema = event(
+  PERSONAL_WORKSPACE_REVIVED_EVENT_TYPE,
+  recordPersonalWorkspaceRevivedCommandDataSchema,
+);
+export const personalWorkspaceFeaturesChangedEventSchema = event(
+  PERSONAL_WORKSPACE_FEATURES_CHANGED_EVENT_TYPE,
+  recordPersonalWorkspaceFeaturesChangedCommandDataSchema,
+);
 export type OrganizationSignedUpEvent = z.infer<typeof organizationSignedUpEventSchema>;
 export type MembersInvitedEvent = z.infer<typeof membersInvitedEventSchema>;
 export type InviteAcceptedEvent = z.infer<typeof inviteAcceptedEventSchema>;
@@ -123,6 +164,11 @@ export type PersonalWorkspaceProvisionedEvent = z.infer<
   typeof personalWorkspaceProvisionedEventSchema
 >;
 export type PersonalTeamCreatedEvent = z.infer<typeof personalTeamCreatedEventSchema>;
+export type PersonalWorkspaceArchivedEvent = z.infer<typeof personalWorkspaceArchivedEventSchema>;
+export type PersonalWorkspaceRevivedEvent = z.infer<typeof personalWorkspaceRevivedEventSchema>;
+export type PersonalWorkspaceFeaturesChangedEvent = z.infer<
+  typeof personalWorkspaceFeaturesChangedEventSchema
+>;
 /** The organization's presence switch; versioned on its own, born after the lifecycle's facts. */
 export const recordPresenceSettingChangedCommandDataSchema =
   organizationPresenceSettingChangedEventDataSchema;

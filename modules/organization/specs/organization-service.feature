@@ -322,6 +322,27 @@ Feature: Shared organization service
     Then it refuses with "personal_workspace_pending", a retryable handled error, and changes nothing
 
   @unit
+  Scenario: Removing a member records their archived personal teams for project
+    Given a member who owns a personal team in an organization
+    When an administrator removes the member
+    Then organization archives the personal team and writes no project row
+    And it records "lw.organization.personal_workspace_archived" with the archived team ids, awaited, so an unrecorded removal fails loudly
+
+  @unit
+  Scenario: Ensuring a returning member's workspace records its revival for project
+    Given a returning member whose archived personal team organization has revived
+    When the user's personal workspace is ensured and answers pending
+    Then it records "lw.organization.personal_workspace_revived" with the team id, awaited
+    And project revives the archived personal project, while a brand-new team's record changes nothing
+
+  @unit
+  Scenario: Switching personal workspace features records them for project
+    Given the owner of a personal workspace
+    When the owner enables or disables all its features
+    Then organization audits the switch and writes no project row
+    And it records "lw.organization.personal_workspace_features_changed" with the project id and the new switches, awaited
+
+  @unit
   Scenario: Every way an organization is created records lw.organization.created
     Given an organization is created by sign-up, by instance provisioning or for a self-hosted customer
     When the organization and its first team are committed

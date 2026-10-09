@@ -13,6 +13,9 @@ import type {
   RecordMembersInvitedCommandData,
   RecordPersonalWorkspaceProvisionedCommandData,
   RecordPersonalTeamCreatedCommandData,
+  RecordPersonalWorkspaceArchivedCommandData,
+  RecordPersonalWorkspaceRevivedCommandData,
+  RecordPersonalWorkspaceFeaturesChangedCommandData,
   RecordPresenceSettingChangedCommandData,
   RecordSignedUpCommandData,
   RecordTraceSharingDisabledCommandData,
@@ -28,6 +31,9 @@ export type OrganizationLifecycleSenders = Readonly<{
   recordIntegrationMethodChosen: Sender<RecordIntegrationMethodChosenCommandData>;
   recordPersonalWorkspaceProvisioned: Sender<RecordPersonalWorkspaceProvisionedCommandData>;
   recordPersonalTeamCreated: Sender<RecordPersonalTeamCreatedCommandData>;
+  recordPersonalWorkspaceArchived: Sender<RecordPersonalWorkspaceArchivedCommandData>;
+  recordPersonalWorkspaceRevived: Sender<RecordPersonalWorkspaceRevivedCommandData>;
+  recordPersonalWorkspaceFeaturesChanged: Sender<RecordPersonalWorkspaceFeaturesChangedCommandData>;
   recordPresenceSettingChanged: Sender<RecordPresenceSettingChangedCommandData>;
   recordTraceSharingDisabled: Sender<RecordTraceSharingDisabledCommandData>;
   recordMemberDisabled: Sender<RecordMemberDisabledCommandData>;
@@ -153,6 +159,33 @@ export class OrganizationLifecycleNoticeService {
     const sender = this.#senders?.recordCreated;
     if (!sender) throw new Error("organization_lifecycle is not registered in this process");
     await sender.send({ ...this.#envelope(input.organizationId), ...input });
+  }
+
+  /** A member's personal teams archived; awaited and loud, since project archives only on this. */
+  async personalWorkspaceArchived(
+    input: Recorded<RecordPersonalWorkspaceArchivedCommandData>,
+  ): Promise<void> {
+    const sender = this.#senders?.recordPersonalWorkspaceArchived;
+    if (!sender) throw new Error("organization_lifecycle is not registered in this process");
+    await sender.send({ ...this.#envelope(input.organizationId), ...input });
+  }
+
+  /** A personal team revived; awaited and loud, since project revives only on this record. */
+  async personalWorkspaceRevived(
+    input: Recorded<RecordPersonalWorkspaceRevivedCommandData>,
+  ): Promise<void> {
+    const sender = this.#senders?.recordPersonalWorkspaceRevived;
+    if (!sender) throw new Error("organization_lifecycle is not registered in this process");
+    await sender.send({ ...this.#envelope(input.organizationId), ...input });
+  }
+
+  /** Feature switches changed; awaited and loud, since project stores them only on this. */
+  async personalWorkspaceFeaturesChanged(
+    input: Recorded<RecordPersonalWorkspaceFeaturesChangedCommandData>,
+  ): Promise<void> {
+    const sender = this.#senders?.recordPersonalWorkspaceFeaturesChanged;
+    if (!sender) throw new Error("organization_lifecycle is not registered in this process");
+    await sender.send({ ...this.#envelope(input.organizationId ?? input.projectId), ...input });
   }
 
   /** Reports a failure its caller must not raise over the error it is already throwing. */

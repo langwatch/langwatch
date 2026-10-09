@@ -522,7 +522,7 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
       }));
   }
 
-  async setPersonalWorkspaceFeaturesWithAudit(input: {
+  async appendPersonalWorkspaceFeaturesAudit(input: {
     projectId: string;
     callerUserId: string;
     organizationId: string | null;
@@ -530,9 +530,10 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     before: PersonalFeatures;
     after: PersonalFeatures;
   }): Promise<void> {
-    const project = this.memory.projects.get(input.projectId);
-    if (!project) throw new PersonalProjectNotFoundError(input.projectId);
-    project.personalFeatures = input.after;
+    // No audit store in memory; the switches are project's, set on organization's fact.
+    if (!this.memory.projects.has(input.projectId)) {
+      throw new PersonalProjectNotFoundError(input.projectId);
+    }
   }
 
   private teamsOf(organizationId: string): MemoryTeamRow[] {

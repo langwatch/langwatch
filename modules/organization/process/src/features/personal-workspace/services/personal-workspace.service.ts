@@ -40,7 +40,7 @@ const ALL_PERSONAL_FEATURES_ENABLED: PersonalFeatures = {
   automations: true,
 };
 
-/** Where a personal team is recorded as organization's fact for project (§9); never throws. */
+/** Organization's personal-workspace facts for project (§9); the awaited ones throw unrecorded. */
 export type PersonalWorkspaceNotices = Readonly<{
   personalTeamCreated(
     input: Readonly<{
@@ -51,6 +51,17 @@ export type PersonalWorkspaceNotices = Readonly<{
       projectSlug: string;
     }>,
   ): void;
+  personalWorkspaceRevived(
+    input: Readonly<{ organizationId: string; userId: string; teamId: string }>,
+  ): Promise<void>;
+  personalWorkspaceFeaturesChanged(
+    input: Readonly<{
+      organizationId: string | null;
+      userId: string;
+      projectId: string;
+      features: PersonalFeatures;
+    }>,
+  ): Promise<void>;
 }>;
 
 type PersonalWorkspaceOptions = {
@@ -78,6 +89,7 @@ export class PersonalWorkspaceService {
     const team = result.kind === "ready" ? result.workspace.team : result.team;
     // After the commit and before the grant (main's order). Recorded on every pending answer:
     // keyed by the team, so project creates once (the first id wins) and a lost record heals.
+    // Revived too: project revives only an archived personal project, so a new team is a no-op.
     if (result.kind === "pending") {
       this.deps.notices?.personalTeamCreated({
         organizationId: parsed.organizationId,
@@ -85,6 +97,11 @@ export class PersonalWorkspaceService {
         teamId: team.id,
         projectId: this.deps.identities.newProjectId(),
         projectSlug: resources.projectSlug,
+      });
+      await this.deps.notices?.personalWorkspaceRevived({
+        organizationId: parsed.organizationId,
+        userId: parsed.userId,
+        teamId: team.id,
       });
     }
     const grant = { userId: parsed.userId, organizationId: parsed.organizationId, teamId: team.id };
@@ -160,13 +177,19 @@ export class PersonalWorkspaceService {
     action: string,
   ): Promise<PersonalFeatures> {
     const project = await this.getOwnedPersonalWorkspaceProject(input);
-    await this.deps.repository.setPersonalWorkspaceFeaturesWithAudit({
+    await this.deps.repository.appendPersonalWorkspaceFeaturesAudit({
       projectId: project.id,
       callerUserId: input.callerUserId,
       organizationId: project.organizationId,
       action,
       before: readPersonalFeatures(project.personalFeatures),
       after: next,
+    });
+    await this.deps.notices?.personalWorkspaceFeaturesChanged({
+      organizationId: project.organizationId,
+      userId: input.callerUserId,
+      projectId: project.id,
+      features: next,
     });
 
     return next;

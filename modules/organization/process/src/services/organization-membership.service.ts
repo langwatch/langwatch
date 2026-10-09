@@ -29,6 +29,7 @@ import type { OrganizationGrantCeilingService } from "./organization-grant-ceili
 import {
   OrganizationMemberAdmissionService,
   type OrganizationAdmissions,
+  type PersonalWorkspaceArchiveNotice,
 } from "./organization-member-admission.service.ts";
 import type {
   OrganizationGrantCache,
@@ -68,6 +69,7 @@ export class OrganizationMembershipService {
     grantCache: OrganizationGrantCache;
     testArrivals: OrganizationTestArrivals;
     admissions: OrganizationAdmissions;
+    workspaceNotices: PersonalWorkspaceArchiveNotice;
     /** Authz's escalation rule, asked before a role change writes anything. */
     ceiling: Pick<OrganizationGrantCeilingService, "assertWithinCaller">;
   }): OrganizationMembershipService {
@@ -83,6 +85,7 @@ export class OrganizationMembershipService {
       grantCache: OrganizationGrantCache;
       testArrivals: OrganizationTestArrivals;
       admissions: OrganizationAdmissions;
+      workspaceNotices: PersonalWorkspaceArchiveNotice;
       /** Authz's escalation rule, asked before a role change writes anything. */
       ceiling: Pick<OrganizationGrantCeilingService, "assertWithinCaller">;
     },

@@ -1784,7 +1784,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     return this.prisma.organizationUser.count({ where: { userId } });
   }
 
-  async deleteMember(input: DeleteMemberInput): Promise<void> {
+  async deleteMember(input: DeleteMemberInput): Promise<string[]> {
     const { organizationId, userId, actingUserId } = input;
     const actor = ledgerActorFor({
       userId: actingUserId,
@@ -1819,11 +1819,12 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     // write and no check can cache access the removal is about to take away. A
     // crash between the two leaves orphaned grants, which the no-member branch
     // above revokes on retry; a refusal inside the transaction revokes nothing.
-    await this.prisma.$transaction(async (tx) => {
+    const archivedTeamIds = await this.prisma.$transaction(async (tx) => {
       await this.deleteMembershipRow({ tx, organizationId, userId });
-      await this.archivePersonalWorkspaces({ tx, organizationId, userId });
+      return this.archivePersonalWorkspaces({ tx, organizationId, userId });
     });
     await revokeTheirGrants();
+    return archivedTeamIds;
   }
 
   /**
@@ -1894,8 +1895,8 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
   }
 
   /**
-   * Archives the removed member's personal team and project, on the same
-   * terms `PersonalWorkspaceService.ensure()` reactivates them.
+   * Archives the removed member's personal teams and answers their ids; project archives
+   * their personal projects on organization's fact (ruling C).
    */
   private async archivePersonalWorkspaces({
     tx,
@@ -1905,7 +1906,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     tx: Prisma.TransactionClient;
     organizationId: string;
     userId: string;
-  }): Promise<void> {
+  }): Promise<string[]> {
     const archivedAt = new Date();
     const personalTeams = await tx.team.findMany({
       where: {
@@ -1916,26 +1917,14 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
       },
       select: { id: true },
     });
-    if (personalTeams.length === 0) return;
+    if (personalTeams.length === 0) return [];
 
     const personalTeamIds = personalTeams.map((team) => team.id);
-    // `isPersonal` on the same terms the reactivation reads it, so the two sides move the same
-    // rows. A personal team holds nothing else today (creating a project in one, or moving one
-    // into it, is refused), and the flag mirrors the team's, so this narrows nothing away; it
-    // keeps the pair symmetric if that ever slips, since archiving what the revival would not
-    // return is the failure with no way back.
-    await tx.project.updateMany({
-      where: {
-        teamId: { in: personalTeamIds },
-        isPersonal: true,
-        archivedAt: null,
-      },
-      data: { archivedAt },
-    });
     await tx.team.updateMany({
       where: { id: { in: personalTeamIds } },
       data: { archivedAt },
     });
+    return personalTeamIds;
   }
 
   async setMemberDisabled(input: SetMemberDisabledInput): Promise<void> {

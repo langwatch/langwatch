@@ -102,6 +102,7 @@ describe.skipIf(!DB_URL)("OrganizationMembershipService.createForProvisioning", 
     it("leaves no organization or team behind, and the slug provisions afterwards", async () => {
       const attempted: string[] = [];
       const failing = OrganizationMembershipService.create({
+        workspaceNotices: { personalWorkspaceArchived: () => Promise.resolve() },
         repository: repo,
         creations: buildFailingPrompts(attempted),
         seats,
@@ -127,6 +128,7 @@ describe.skipIf(!DB_URL)("OrganizationMembershipService.createForProvisioning", 
       expect(await prisma!.organization.findFirst({ where: { slug } })).toBeNull();
 
       const retried = await OrganizationMembershipService.create({
+        workspaceNotices: { personalWorkspaceArchived: () => Promise.resolve() },
         repository: repo,
         creations: buildWorkingPrompts(),
         seats,

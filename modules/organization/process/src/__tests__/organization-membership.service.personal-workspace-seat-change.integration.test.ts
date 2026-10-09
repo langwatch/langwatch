@@ -71,6 +71,7 @@ describe.skipIf(!DB_URL)(
     }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
     const prisma = connection.client as PrismaClient;
     const memberships = OrganizationMembershipService.create({
+      workspaceNotices: { personalWorkspaceArchived: () => Promise.resolve() },
       repository: PrismaOrganizationMembershipRepository.create({
         database: prisma,
         cipher: { encrypt: (value: string) => value, decrypt: (value: string) => value },

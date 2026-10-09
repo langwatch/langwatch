@@ -33,6 +33,7 @@ function installed() {
   };
   const grantCache: OrganizationGrantCache = { invalidateOrganization: refuse("a grant cache") };
   const service = OrganizationMembershipService.create({
+    workspaceNotices: { personalWorkspaceArchived: () => Promise.resolve() },
     repository: MemoryOrganizationMembershipRepository.create({ memory }),
     creations,
     seats,

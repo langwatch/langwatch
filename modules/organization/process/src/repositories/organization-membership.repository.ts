@@ -406,7 +406,8 @@ export abstract class OrganizationMembershipRepository {
   /** Every membership row the person holds, disabled ones included. */
   abstract countMembershipsForUser: (input: { userId: string }) => Promise<number>;
 
-  abstract deleteMember: (input: DeleteMemberInput) => Promise<void>;
+  /** Answers the personal team ids it archived; project archives their projects on the fact. */
+  abstract deleteMember: (input: DeleteMemberInput) => Promise<string[]>;
 
   abstract setMemberDisabled: (input: SetMemberDisabledInput) => Promise<void>;
 

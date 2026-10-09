@@ -584,7 +584,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     return this.memory.organizationUsers.filter((row) => row.userId === userId).length;
   }
 
-  async deleteMember(input: DeleteMemberInput): Promise<void> {
+  async deleteMember(input: DeleteMemberInput): Promise<string[]> {
     const { organizationId, userId } = input;
     const row = this.membershipRow({ organizationId, userId });
     if (!row) throw new MemberNotFoundError(userId);
@@ -605,13 +605,13 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     );
 
     const archivedAt = nowInstant();
+    const archivedTeamIds: string[] = [];
     for (const team of this.teamsOf(organizationId)) {
       if (team.ownerUserId !== userId || !team.isPersonal || team.archivedAt) continue;
       team.archivedAt = archivedAt;
-      for (const project of this.memory.projects.values()) {
-        if (project.teamId === team.id && project.isPersonal) project.archivedAt = archivedAt;
-      }
+      archivedTeamIds.push(team.id);
     }
+    return archivedTeamIds;
   }
 
   async setMemberDisabled(input: SetMemberDisabledInput): Promise<void> {

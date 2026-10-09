@@ -13,11 +13,21 @@ import type { DeveloperAdmissionVia } from "../rules/admission-audit.rules.ts";
 /** The grant half of an admission, answered by the authorization peer. */
 export type OrganizationAdmissions = Pick<AuthzApi, "attachBindings" | "completeAdmission">;
 
+/** Records a removed member's archived personal teams; project archives their projects (§9). */
+export interface PersonalWorkspaceArchiveNotice {
+  personalWorkspaceArchived(input: {
+    organizationId: string;
+    userId: string;
+    teamIds: string[];
+  }): Promise<void>;
+}
+
 /** Admitting a member on the joiner seat, and removing one without orphaning the organization. */
 export class OrganizationMemberAdmissionService {
   static create(dependencies: {
     repository: OrganizationMembershipRepository;
     admissions: OrganizationAdmissions;
+    workspaceNotices: PersonalWorkspaceArchiveNotice;
   }): OrganizationMemberAdmissionService {
     return new OrganizationMemberAdmissionService(dependencies);
   }
@@ -26,6 +36,7 @@ export class OrganizationMemberAdmissionService {
     private readonly dependencies: {
       repository: OrganizationMembershipRepository;
       admissions: OrganizationAdmissions;
+      workspaceNotices: PersonalWorkspaceArchiveNotice;
     },
   ) {}
 
@@ -50,10 +61,16 @@ export class OrganizationMemberAdmissionService {
       userId: params.userId,
     });
 
-    return this.repo.deleteMember({
+    const teamIds = await this.repo.deleteMember({
       organizationId: params.organizationId,
       userId: params.userId,
       actingUserId: params.actingUserId ?? null,
+    });
+    if (teamIds.length === 0) return;
+    await this.dependencies.workspaceNotices.personalWorkspaceArchived({
+      organizationId: params.organizationId,
+      userId: params.userId,
+      teamIds,
     });
   }
 

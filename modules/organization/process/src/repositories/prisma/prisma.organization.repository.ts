@@ -547,8 +547,8 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
         const existing = await this.tryFindPersonalTeam(transaction, input.workspace);
         if (existing) return existing;
 
-        const reactivated = await this.tryReactivateWorkspace(transaction, input.workspace);
-        if (reactivated) return { kind: "ready", workspace: reactivated };
+        const revived = await this.tryReactivateWorkspace(transaction, input.workspace);
+        if (revived) return { kind: "pending", team: revived };
 
         const team = await this.createPersonalTeam(transaction, input.workspace, input.resources);
         return { kind: "pending", team };
@@ -618,7 +618,7 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
     });
   }
 
-  async setPersonalWorkspaceFeaturesWithAudit(input: {
+  async appendPersonalWorkspaceFeaturesAudit(input: {
     projectId: string;
     callerUserId: string;
     organizationId: string | null;
@@ -627,10 +627,6 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
     after: PersonalFeatures;
   }): Promise<void> {
     await this.database.$transaction(async (transaction) => {
-      await transaction.project.update({
-        where: { id: input.projectId },
-        data: { personalFeatures: input.after },
-      });
       await this.audit.append({
         transaction,
         fact: {
@@ -679,7 +675,7 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
   private async tryReactivateWorkspace(
     transaction: Prisma.TransactionClient,
     input: { userId: string; organizationId: string },
-  ): Promise<PersonalWorkspace | null> {
+  ): Promise<PersonalWorkspace["team"] | null> {
     const archived = await transaction.team.findFirst({
       where: {
         organizationId: input.organizationId,
@@ -697,15 +693,12 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
       },
     });
     if (!archived || archived.projects.length === 0) return null;
-    await transaction.team.update({
+    // Project revives the personal project on organization's fact; pending until it has.
+    const revived = await transaction.team.update({
       where: { id: archived.id },
       data: { archivedAt: null },
     });
-    await transaction.project.updateMany({
-      where: { teamId: archived.id, isPersonal: true },
-      data: { archivedAt: null },
-    });
-    return this.tryFindWorkspace(transaction, input);
+    return mapPersonalTeam(revived);
   }
 
   private async tryFindWorkspace(

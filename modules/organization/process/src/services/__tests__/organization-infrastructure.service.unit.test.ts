@@ -205,7 +205,7 @@ class StubRepository extends OrganizationRepository {
     throw new Error("not used by this test");
   }
 
-  setPersonalWorkspaceFeaturesWithAudit(_input: {
+  appendPersonalWorkspaceFeaturesAudit(_input: {
     projectId: string;
     callerUserId: string;
     organizationId: string | null;

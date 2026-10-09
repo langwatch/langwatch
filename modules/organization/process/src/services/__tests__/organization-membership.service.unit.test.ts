@@ -29,6 +29,8 @@ const mockStandingFor = vi.fn<OrganizationTestArrivals["standingFor"]>(async () 
   testing: false,
 }));
 
+const personalWorkspaceArchived = vi.fn(() => Promise.resolve());
+
 describe("OrganizationMembershipService", () => {
   const mockRepo: OrganizationMembershipRepository = {
     createMembership: vi.fn(),
@@ -113,7 +115,9 @@ describe("OrganizationMembershipService", () => {
     vi.mocked(mockRepo.findSharedTeamIds).mockResolvedValue([]);
     vi.mocked(mockRepo.findTeamGrants).mockResolvedValue([]);
     vi.mocked(mockRepo.findCustomRolePermissions).mockResolvedValue([]);
+    vi.mocked(mockRepo.deleteMember).mockResolvedValue([]);
     service = OrganizationMembershipService.create({
+      workspaceNotices: { personalWorkspaceArchived },
       repository: mockRepo,
       creations: mockCreations,
       seats,
@@ -361,6 +365,7 @@ describe("OrganizationMembershipService", () => {
     });
     const refusing = () =>
       OrganizationMembershipService.create({
+        workspaceNotices: { personalWorkspaceArchived },
         repository: mockRepo,
         creations: mockCreations,
         seats,
@@ -522,6 +527,22 @@ describe("OrganizationMembershipService", () => {
       });
     });
 
+    describe("when the removed member owned a personal workspace", () => {
+      /** @scenario "Removing a member records their archived personal teams for project" */
+      it("records the archived personal teams for project", async () => {
+        vi.mocked(mockRepo.getMembership).mockResolvedValue(membership);
+        vi.mocked(mockRepo.deleteMember).mockResolvedValueOnce(["team_personal"]);
+
+        await service.deleteMember({ organizationId: "org-123", userId: "user-456" });
+
+        expect(personalWorkspaceArchived).toHaveBeenCalledWith({
+          organizationId: "org-123",
+          userId: "user-456",
+          teamIds: ["team_personal"],
+        });
+      });
+    });
+
     describe("when the credential acts as nobody", () => {
       it("cannot trip the self-removal guard", async () => {
         vi.mocked(mockRepo.getMembership).mockResolvedValue(membership);
@@ -659,6 +680,7 @@ describe("OrganizationMembershipService", () => {
       /** @scenario "A process that cannot record the seat revocation refuses the disable" */
       it("refuses the disable when the revocation cannot be recorded", async () => {
         const unrecorded = OrganizationMembershipService.create({
+          workspaceNotices: { personalWorkspaceArchived },
           repository: mockRepo,
           creations: mockCreations,
           seats,

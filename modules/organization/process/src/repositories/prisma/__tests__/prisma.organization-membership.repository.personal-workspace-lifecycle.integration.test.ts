@@ -115,8 +115,12 @@ describe.skipIf(!DB_URL)("given a member with a personal workspace in an organiz
   });
 
   describe("when an admin removes that member from the organization", () => {
+    let archivedTeamIds: string[] = [];
     beforeAll(async () => {
-      await membershipRepository.deleteMember({ organizationId, userId: leaverUserId });
+      archivedTeamIds = await membershipRepository.deleteMember({
+        organizationId,
+        userId: leaverUserId,
+      });
     });
 
     /** @scenario Removing a member takes their personal workspace with them */
@@ -125,9 +129,10 @@ describe.skipIf(!DB_URL)("given a member with a personal workspace in an organiz
     });
 
     /** @scenario Removing a member takes their personal workspace with them */
-    it("archives its project with it", async () => {
+    it("answers the archived team and leaves the project to project", async () => {
+      expect(archivedTeamIds).toEqual([personalTeamId]);
       const rows = await workspaceRows();
-      expect(rows?.projects).toEqual([{ id: personalProjectId, archivedAt: expect.any(Date) }]);
+      expect(rows?.projects).toEqual([{ id: personalProjectId, archivedAt: null }]);
     });
 
     /** @scenario Removing a member takes their personal workspace with them */
@@ -155,10 +160,8 @@ describe.skipIf(!DB_URL)("given a member with a personal workspace in an organiz
       it("hands back the same workspace rather than a new one", async () => {
         const result = await ensureLeaverWorkspace();
 
-        expect(result).toMatchObject({
-          kind: "ready",
-          workspace: { team: { id: personalTeamId }, project: { id: personalProjectId } },
-        });
+        // Pending until project revives the personal project on organization's fact.
+        expect(result).toMatchObject({ kind: "pending", team: { id: personalTeamId } });
       });
 
       /** @scenario Inviting a removed member back gives them their workspace again */

@@ -38,6 +38,7 @@ function serviceWhere(found: EnsuredPersonalTeam) {
     ensurePersonalWorkspace: async () => found,
   });
   const personalTeamCreated = vi.fn();
+  const personalWorkspaceRevived = vi.fn(() => Promise.resolve());
   const service = PersonalWorkspaceService.create({
     repository,
     identities: IDENTITIES,
@@ -45,9 +46,12 @@ function serviceWhere(found: EnsuredPersonalTeam) {
       attachBindings: async () => ({ attached: ["binding"], duplicates: [] }),
     }),
     diagnostics: undefined,
-    notices: createApiFixture<PersonalWorkspaceNotices>({ personalTeamCreated }),
+    notices: createApiFixture<PersonalWorkspaceNotices>({
+      personalTeamCreated,
+      personalWorkspaceRevived,
+    }),
   });
-  return { service, personalTeamCreated };
+  return { service, personalTeamCreated, personalWorkspaceRevived };
 }
 
 const INPUT = { userId: "user_1", organizationId: "org_acme" };
@@ -155,6 +159,71 @@ describe("reading a personal workspace's features", () => {
       expect(refusal).toMatchObject({
         code: "personal_project_owner_mismatch",
         httpStatus: 404,
+      });
+    });
+  });
+});
+
+describe("ensuring a returning member's personal workspace", () => {
+  describe("when the ensure answers pending", () => {
+    /** @scenario "Ensuring a returning member's workspace records its revival for project" */
+    it("records the revival for project to revive an archived personal project", async () => {
+      const { service, personalWorkspaceRevived } = serviceWhere({ kind: "pending", team: TEAM });
+
+      await service.ensurePersonalWorkspace(INPUT);
+
+      expect(personalWorkspaceRevived).toHaveBeenCalledWith({
+        organizationId: "org_acme",
+        userId: "user_1",
+        teamId: "team_personal",
+      });
+    });
+  });
+});
+
+describe("switching a personal workspace's features", () => {
+  describe("when the owner disables them all", () => {
+    /** @scenario "Switching personal workspace features records them for project" */
+    it("audits the switch and records the new switches for project", async () => {
+      const disabled = {
+        evaluations: false,
+        datasets: false,
+        annotations: false,
+        automations: false,
+      };
+      const appendPersonalWorkspaceFeaturesAudit = vi.fn(() => Promise.resolve());
+      const personalWorkspaceFeaturesChanged = vi.fn(() => Promise.resolve());
+      const service = PersonalWorkspaceService.create({
+        repository: createApiFixture<OrganizationRepository>({
+          getPersonalWorkspaceFeatureProject: async () => ({
+            id: "project_personal",
+            organizationId: "org_acme",
+            isPersonal: true,
+            ownerUserId: "user_1",
+            personalFeatures: null,
+          }),
+          appendPersonalWorkspaceFeaturesAudit,
+        }),
+        identities: IDENTITIES,
+        grants: createApiFixture<AuthzApi>({}),
+        diagnostics: undefined,
+        notices: createApiFixture<PersonalWorkspaceNotices>({ personalWorkspaceFeaturesChanged }),
+      });
+
+      const answer = await service.disableAllPersonalWorkspaceFeatures({
+        projectId: "project_personal",
+        callerUserId: "user_1",
+      });
+
+      expect(answer).toEqual(disabled);
+      expect(appendPersonalWorkspaceFeaturesAudit).toHaveBeenCalledWith(
+        expect.objectContaining({ projectId: "project_personal", after: disabled }),
+      );
+      expect(personalWorkspaceFeaturesChanged).toHaveBeenCalledWith({
+        organizationId: "org_acme",
+        userId: "user_1",
+        projectId: "project_personal",
+        features: disabled,
       });
     });
   });

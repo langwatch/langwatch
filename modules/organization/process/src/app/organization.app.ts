@@ -333,6 +333,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     const membership = OrganizationMembershipService.create({
       repository: membershipRepository,
       creations: infrastructure.lifecycle,
+      workspaceNotices: infrastructure.lifecycle,
       seats: infrastructure.seats,
       seatNotices: infrastructure.lifecycle,
       grantCache: AuthzApiOrganizationGrantCache.create(setup.dependencies.permissions),

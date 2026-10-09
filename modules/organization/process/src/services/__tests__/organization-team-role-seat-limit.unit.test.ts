@@ -24,6 +24,7 @@ function serviceWhere(options: {
   const findCustomRolePermissions = vi.fn(async () => options.customRolePermissions);
   const assertRoleChangeAllowed = vi.fn(options.assertRoleChangeAllowed);
   const service = OrganizationMembershipService.create({
+    workspaceNotices: { personalWorkspaceArchived: () => Promise.resolve() },
     repository: createApiFixture<OrganizationMembershipRepository>({
       findTeamGrants,
       findCustomRolePermissions,

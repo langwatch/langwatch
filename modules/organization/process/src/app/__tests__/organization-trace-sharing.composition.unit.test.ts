@@ -34,6 +34,9 @@ function lifecycleSenders({
     recordIntegrationMethodChosen: accepts,
     recordPersonalWorkspaceProvisioned: accepts,
     recordPersonalTeamCreated: accepts,
+    recordPersonalWorkspaceArchived: accepts,
+    recordPersonalWorkspaceRevived: accepts,
+    recordPersonalWorkspaceFeaturesChanged: accepts,
     recordPresenceSettingChanged: accepts,
     recordMemberDisabled: accepts,
     recordTraceSharingDisabled: {

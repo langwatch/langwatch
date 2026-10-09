@@ -15,6 +15,9 @@ import {
   ORGANIZATION_TRACE_SHARING_DISABLED_EVENT_VERSION,
   PERSONAL_WORKSPACE_PROVISIONED_EVENT_TYPE,
   PERSONAL_TEAM_CREATED_EVENT_TYPE,
+  PERSONAL_WORKSPACE_ARCHIVED_EVENT_TYPE,
+  PERSONAL_WORKSPACE_REVIVED_EVENT_TYPE,
+  PERSONAL_WORKSPACE_FEATURES_CHANGED_EVENT_TYPE,
 } from "@langwatch/organization-contract";
 
 import {
@@ -30,6 +33,9 @@ import {
   type OrganizationTraceSharingDisabledEvent,
   type PersonalWorkspaceProvisionedEvent,
   type PersonalTeamCreatedEvent,
+  type PersonalWorkspaceArchivedEvent,
+  type PersonalWorkspaceRevivedEvent,
+  type PersonalWorkspaceFeaturesChangedEvent,
   RECORD_INTEGRATION_METHOD_CHOSEN_COMMAND_TYPE,
   RECORD_CREATED_COMMAND_TYPE,
   RECORD_MEMBER_DISABLED_COMMAND_TYPE,
@@ -37,6 +43,9 @@ import {
   RECORD_MEMBERS_INVITED_COMMAND_TYPE,
   RECORD_PERSONAL_WORKSPACE_PROVISIONED_COMMAND_TYPE,
   RECORD_PERSONAL_TEAM_CREATED_COMMAND_TYPE,
+  RECORD_PERSONAL_WORKSPACE_ARCHIVED_COMMAND_TYPE,
+  RECORD_PERSONAL_WORKSPACE_REVIVED_COMMAND_TYPE,
+  RECORD_PERSONAL_WORKSPACE_FEATURES_CHANGED_COMMAND_TYPE,
   RECORD_PRESENCE_SETTING_CHANGED_COMMAND_TYPE,
   RECORD_SIGNED_UP_COMMAND_TYPE,
   RECORD_TRACE_SHARING_DISABLED_COMMAND_TYPE,
@@ -54,6 +63,12 @@ import {
   type RecordPersonalTeamCreatedCommandData,
   recordPersonalWorkspaceProvisionedCommandDataSchema,
   recordPersonalTeamCreatedCommandDataSchema,
+  type RecordPersonalWorkspaceArchivedCommandData,
+  recordPersonalWorkspaceArchivedCommandDataSchema,
+  type RecordPersonalWorkspaceRevivedCommandData,
+  recordPersonalWorkspaceRevivedCommandDataSchema,
+  type RecordPersonalWorkspaceFeaturesChangedCommandData,
+  recordPersonalWorkspaceFeaturesChangedCommandDataSchema,
   type RecordPresenceSettingChangedCommandData,
   recordPresenceSettingChangedCommandDataSchema,
   type RecordSignedUpCommandData,
@@ -257,6 +272,108 @@ export class RecordPersonalTeamCreatedCommand implements CommandHandler<
 
   static getAggregateId(payload: RecordPersonalTeamCreatedCommandData): string {
     return payload.organizationId;
+  }
+}
+
+/** Records a removed member's archived personal teams; project archives their personal projects. */
+export class RecordPersonalWorkspaceArchivedCommand implements CommandHandler<
+  Command<RecordPersonalWorkspaceArchivedCommandData>,
+  PersonalWorkspaceArchivedEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_PERSONAL_WORKSPACE_ARCHIVED_COMMAND_TYPE,
+    recordPersonalWorkspaceArchivedCommandDataSchema,
+    "Record that a member's personal teams were archived, for project to archive their projects",
+  );
+
+  handle(
+    command: Command<RecordPersonalWorkspaceArchivedCommandData>,
+  ): PersonalWorkspaceArchivedEvent[] {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<PersonalWorkspaceArchivedEvent>({
+        aggregateType: ORGANIZATION_AGGREGATE_TYPE,
+        aggregateId: data.organizationId,
+        tenantId: createTenantId(command.tenantId),
+        type: PERSONAL_WORKSPACE_ARCHIVED_EVENT_TYPE,
+        version: ORGANIZATION_LIFECYCLE_EVENT_VERSION,
+        data,
+        occurredAt: data.occurredAt,
+        idempotencyKey: `${data.userId}:personal_workspace_archived:${data.occurredAt}`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: RecordPersonalWorkspaceArchivedCommandData): string {
+    return payload.organizationId;
+  }
+}
+
+/** Records a returning member's revived personal team; project revives its personal project. */
+export class RecordPersonalWorkspaceRevivedCommand implements CommandHandler<
+  Command<RecordPersonalWorkspaceRevivedCommandData>,
+  PersonalWorkspaceRevivedEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_PERSONAL_WORKSPACE_REVIVED_COMMAND_TYPE,
+    recordPersonalWorkspaceRevivedCommandDataSchema,
+    "Record that a personal team was revived, for project to revive its personal project",
+  );
+
+  handle(
+    command: Command<RecordPersonalWorkspaceRevivedCommandData>,
+  ): PersonalWorkspaceRevivedEvent[] {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<PersonalWorkspaceRevivedEvent>({
+        aggregateType: ORGANIZATION_AGGREGATE_TYPE,
+        aggregateId: data.organizationId,
+        tenantId: createTenantId(command.tenantId),
+        type: PERSONAL_WORKSPACE_REVIVED_EVENT_TYPE,
+        version: ORGANIZATION_LIFECYCLE_EVENT_VERSION,
+        data,
+        occurredAt: data.occurredAt,
+        idempotencyKey: `${data.teamId}:personal_workspace_revived:${data.occurredAt}`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: RecordPersonalWorkspaceRevivedCommandData): string {
+    return payload.organizationId;
+  }
+}
+
+/** Records the owner's feature switches; project stores them on its personal project. */
+export class RecordPersonalWorkspaceFeaturesChangedCommand implements CommandHandler<
+  Command<RecordPersonalWorkspaceFeaturesChangedCommandData>,
+  PersonalWorkspaceFeaturesChangedEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_PERSONAL_WORKSPACE_FEATURES_CHANGED_COMMAND_TYPE,
+    recordPersonalWorkspaceFeaturesChangedCommandDataSchema,
+    "Record a personal workspace's feature switches, for project to store them",
+  );
+
+  handle(
+    command: Command<RecordPersonalWorkspaceFeaturesChangedCommandData>,
+  ): PersonalWorkspaceFeaturesChangedEvent[] {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<PersonalWorkspaceFeaturesChangedEvent>({
+        aggregateType: ORGANIZATION_AGGREGATE_TYPE,
+        aggregateId: data.organizationId ?? data.projectId,
+        tenantId: createTenantId(command.tenantId),
+        type: PERSONAL_WORKSPACE_FEATURES_CHANGED_EVENT_TYPE,
+        version: ORGANIZATION_LIFECYCLE_EVENT_VERSION,
+        data,
+        occurredAt: data.occurredAt,
+        idempotencyKey: `${data.projectId}:personal_workspace_features_changed:${data.occurredAt}`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: RecordPersonalWorkspaceFeaturesChangedCommandData): string {
+    return payload.organizationId ?? payload.projectId;
   }
 }
 
