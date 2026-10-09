@@ -53,5 +53,11 @@ export function openingSsoProviderConfigs({
       const rows = await adapter.findMany<Row>(data);
       return rows.map((row) => openedRow(row, data.model, cipher));
     },
+    // The engine locks a provider by updating it, then compares the row that
+    // update returns against the one it read.
+    async update<Row>(data: Parameters<DBAdapter["update"]>[0]): Promise<Row | null> {
+      const row = await adapter.update<Row>(data);
+      return row === null ? null : openedRow(row, data.model, cipher);
+    },
   };
 }
