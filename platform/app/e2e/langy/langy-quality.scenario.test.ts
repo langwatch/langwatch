@@ -123,8 +123,8 @@ function withTurnTimings(adapter: ReturnType<typeof makeLangyAdapter>): {
 
 describe("Langy quality bar", () => {
   // A fresh local project holds only Langy's own mirrored runs (origin:
-  // langy), which AGENTS.md's trace-origins rule makes Langy exclude
-  // ("exclude them unless the user asks about you") — so every data question would
+  // langy), which AGENTS.md's "Trace origins" paragraph makes Langy exclude
+  // ("all but your `langy` runs") — so every data question would
   // truthfully answer "no traces". Seed real application-origin traffic so
   // the data scenarios have a non-zero ground truth to find.
   // The seed waits for the traces to become QUERYABLE, which can take most of a
@@ -157,8 +157,8 @@ describe("Langy quality bar", () => {
    * #1097 — 27 of 260 completed turns have no answer text and made no tool
    * call. The turn is written as `completed`, so it carries no error and never
    * reaches remediation: from every dashboard the platform has, a blank reply
-   * looks healthy. AGENTS.md forbids it outright: "Every turn ends with at
-   * least one visible line of text, never one that only restates the cards."
+   * looks healthy. AGENTS.md forbids it outright: "an empty reply is never
+   * correct, nor one that only restates the cards."
    *
    * Asserted structurally, not by the judge. A judge grading an empty string
    * can rationalise it as terse; `length === 0` cannot.
@@ -243,7 +243,7 @@ describe("Langy quality bar", () => {
   });
 
   /**
-   * #1099 — AGENTS.md line 149 tells the model that its own working
+   * #1099 — an earlier AGENTS.md told the model that its own working
    * `langwatch.*` tools are hallucinations. This scenario asks for exactly
    * what `langwatch.trace.search` and `langwatch.analytics.query` serve, and
    * fails if Langy talks itself out of the capability.
@@ -286,7 +286,7 @@ describe("Langy quality bar", () => {
 
   /**
    * #1100 — the stock coding-agent persona leaks back in through the model's
-   * priors, while AGENTS.md rule 24 restricts bash to the `langwatch` CLI.
+   * priors, while AGENTS.md makes the `langwatch` CLI the only LangWatch interface.
    * Prod shows the coding persona winning sometimes: 144 `read` calls across 7
    * projects, 68 `edit` calls — against a workspace that was never cloned.
    *
