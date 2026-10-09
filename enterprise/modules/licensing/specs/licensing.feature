@@ -134,6 +134,12 @@ Feature: Enterprise licensing lifecycle
       Then the copy leaves the row licensing wrote
 
     @unit
+    Scenario: The licence copy keeps a licence written to both sides between its reads
+      Given a licence copy that has read organization's columns but not yet licensing's row
+      When a live write puts the same licence on both sides before the copy reads licensing's row
+      Then the copy leaves both sides holding the licence that write put there
+
+    @unit
     Scenario: A dry run of the licence copy writes nothing
       Given organizations whose licences are only on organization's columns
       When the licence copy runs as a dry run
