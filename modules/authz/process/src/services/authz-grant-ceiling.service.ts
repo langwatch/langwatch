@@ -1,9 +1,8 @@
 import {
-  bindingScopeCanGrantPermission,
+  assertBindingScopeCanGrantPermissions,
   CustomRoleIdRequiredError,
   CustomRoleNotAssignableError,
   GrantExceedsCallerPermissionsError,
-  OrgExclusivePermissionScopeError,
   permissionsConferred,
   RoleBindingNotFoundError,
   type AuthzBindingWrite,
@@ -40,19 +39,10 @@ function assertScopeCanGrantRole({
     return;
   }
 
-  const permissions = rolesById.get(binding.customRoleId) ?? [];
-  // A legacy `ops:*` entry is inert at every tier (the platform fence), so it refuses nothing here.
-  const exclusivePermission = permissions.find(
-    (permission) =>
-      bindingScopeCanGrantPermission({ scopeType: "ORGANIZATION", permission }) &&
-      !bindingScopeCanGrantPermission({
-        scopeType: binding.scopeType,
-        permission,
-      }),
-  );
-  if (exclusivePermission) {
-    throw new OrgExclusivePermissionScopeError(exclusivePermission, binding.scopeType);
-  }
+  assertBindingScopeCanGrantPermissions({
+    scopeType: binding.scopeType,
+    permissions: rolesById.get(binding.customRoleId) ?? [],
+  });
 }
 
 /** The escalation ceiling: a binding never confers what the caller lacks at its scope. */

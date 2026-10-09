@@ -5,13 +5,12 @@
  */
 import { ledgerActorFor, type LedgerActor, PermissionDeniedError } from "@langwatch/authorization";
 import {
+  assertBindingScopeCanGrantPermissions,
   AuthzApi,
   AuthzScopeNotFoundError,
-  bindingScopeCanGrantPermission,
   builtInRoleIdSchema,
   builtinRolePermissions,
   newAuthzGrantId,
-  OrgExclusivePermissionScopeError,
   type AuthzPrincipalRef,
   type AuthzScopeRef,
   type BuiltInRoleId,
@@ -219,13 +218,7 @@ export class RoleModule implements RoleApi {
     const role = await this.#roles.getById({ roleId: input.customRoleId });
     if (role.organizationId !== organizationId) throw new RoleNotAssignableError();
 
-    // A legacy `ops:*` entry is inert at every tier (the platform fence), so it refuses nothing.
-    const exclusive = role.permissions.find(
-      (permission) =>
-        bindingScopeCanGrantPermission({ scopeType: "ORGANIZATION", permission }) &&
-        !bindingScopeCanGrantPermission({ scopeType: "TEAM", permission }),
-    );
-    if (exclusive) throw new OrgExclusivePermissionScopeError(exclusive, "TEAM");
+    assertBindingScopeCanGrantPermissions({ scopeType: "TEAM", permissions: role.permissions });
 
     if (!(await this.#isOnTeam({ ...input, organizationId }))) {
       throw new RoleUserNotTeamMemberError();
