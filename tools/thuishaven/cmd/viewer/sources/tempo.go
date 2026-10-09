@@ -3,6 +3,7 @@ package sources
 import (
 	"fmt"
 	"net/url"
+	"regexp"
 	"sort"
 	"strconv"
 	"time"
@@ -62,7 +63,7 @@ func (t *Tempo) Roots(errorsOnly bool) ([]RootSpan, error) {
 	if !t.Up() {
 		return nil, ErrStackDown
 	}
-	rows, err := t.search(t.traceQL(errorsOnly))
+	rows, err := t.search(t.traceQL(errorsOnly), ProfileWindow)
 	if err != nil {
 		return nil, err
 	}
@@ -76,11 +77,11 @@ func (t *Tempo) Roots(errorsOnly bool) ([]RootSpan, error) {
 }
 
 // search runs one TraceQL query and maps it onto the list's rows.
-func (t *Tempo) search(query string) ([]RootSpan, error) {
+func (t *Tempo) search(query string, window time.Duration) ([]RootSpan, error) {
 	params := url.Values{}
 	params.Set("q", query)
 	params.Set("limit", "50")
-	params.Set("start", strconv.FormatInt(time.Now().Add(-ProfileWindow).Unix(), 10))
+	params.Set("start", strconv.FormatInt(time.Now().Add(-window).Unix(), 10))
 	params.Set("end", strconv.FormatInt(time.Now().Unix(), 10))
 	var body tempoSearch
 	path := "/api/datasources/proxy/uid/" + t.datasource + "/api/search"
@@ -108,7 +109,7 @@ func (t *Tempo) search(query string) ([]RootSpan, error) {
 // traces but not which failed is better served than one shown an error where a
 // list should be.
 func (t *Tempo) failedIDs() map[string]bool {
-	failed, err := t.search(t.traceQL(true))
+	failed, err := t.search(t.traceQL(true), ProfileWindow)
 	if err != nil {
 		return nil
 	}
@@ -235,8 +236,66 @@ func buildTree(spans []flatSpan) []Span {
 }
 
 // GrafanaURL opens one trace in the bundle's Grafana.
-func (t *Tempo) GrafanaURL(traceID string) string {
+func (t *Tempo) GrafanaURL(traceID string) string { return t.exploreURL(traceID) }
+
+// FilterURL opens a filtered search in the bundle's Grafana.
+func (t *Tempo) FilterURL(f TraceFilter) string { return t.exploreURL(t.filterQL(f)) }
+
+func (t *Tempo) exploreURL(query string) string {
 	pane := fmt.Sprintf(`{"t":{"datasource":%q,"queries":[{"query":%q,"queryType":"traceql"}]}}`,
-		t.datasource, traceID)
+		t.datasource, query)
 	return t.grafana + "/explore?schemaVersion=1&panes=" + url.QueryEscape(pane) + "&orgId=1"
+}
+
+// TraceFilter narrows the trace search `haven traces` runs. A zero field asks
+// for nothing, and a zero Since looks back as far as the tab does.
+type TraceFilter struct {
+	Service     string
+	Name        string
+	MinDuration time.Duration
+	ErrorsOnly  bool
+	Since       time.Duration
+}
+
+// Active reports whether any field narrows the search.
+func (f TraceFilter) Active() bool { return f != TraceFilter{} }
+
+// filterQL is this worktree's selector with the filter's conditions added.
+func (t *Tempo) filterQL(f TraceFilter) string {
+	q := fmt.Sprintf("{ resource.langwatch.worktree = %q", t.worktree)
+	if f.Service != "" {
+		q += fmt.Sprintf(" && resource.service.name = %q", f.Service)
+	}
+	if f.Name != "" {
+		q += fmt.Sprintf(" && name =~ %q", ".*"+regexp.QuoteMeta(f.Name)+".*")
+	}
+	if f.MinDuration > 0 {
+		q += " && traceDuration >= " + f.MinDuration.String()
+	}
+	if f.ErrorsOnly {
+		q += " && status = error"
+	}
+	return q + " }"
+}
+
+// Find lists this worktree's root spans matching the filter, newest first.
+func (t *Tempo) Find(f TraceFilter) ([]RootSpan, error) {
+	if !t.Up() {
+		return nil, ErrStackDown
+	}
+	window := f.Since
+	if window <= 0 {
+		window = ProfileWindow
+	}
+	rows, err := t.search(t.filterQL(f), window)
+	if err != nil {
+		return nil, err
+	}
+	if f.ErrorsOnly {
+		for i := range rows {
+			rows[i].Error = true
+		}
+		return rows, nil
+	}
+	return markFailed(rows, t.failedIDs()), nil
 }
