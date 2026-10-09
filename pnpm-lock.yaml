@@ -872,6 +872,9 @@ importers:
       '@langwatch/data-privacy-process':
         specifier: workspace:*
         version: link:../../modules/data-privacy/process
+      '@langwatch/data-retention-contract':
+        specifier: workspace:*
+        version: link:../../modules/data-retention/contract
       '@langwatch/data-retention-process':
         specifier: workspace:*
         version: link:../../modules/data-retention/process
@@ -2394,6 +2397,9 @@ importers:
       '@langwatch/data-privacy-process':
         specifier: workspace:*
         version: link:../../modules/data-privacy/process
+      '@langwatch/data-retention-contract':
+        specifier: workspace:*
+        version: link:../../modules/data-retention/contract
       '@langwatch/data-retention-process':
         specifier: workspace:*
         version: link:../../modules/data-retention/process
@@ -3415,6 +3421,9 @@ importers:
       '@langwatch/aws-client':
         specifier: workspace:*
         version: link:../../../../packages/aws-client
+      '@langwatch/data-retention-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/data-retention/contract
       '@langwatch/egress':
         specifier: workspace:*
         version: link:../../../../packages/egress
@@ -6588,6 +6597,9 @@ importers:
       '@langwatch/dashboard-contract':
         specifier: workspace:*
         version: link:../../dashboard/contract
+      '@langwatch/data-retention-contract':
+        specifier: workspace:*
+        version: link:../../data-retention/contract
       '@langwatch/dataset-contract':
         specifier: workspace:*
         version: link:../../dataset/contract
@@ -14939,6 +14951,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/data-retention-contract':
+        specifier: workspace:*
+        version: link:../../data-retention/contract
       '@langwatch/evaluation-contract':
         specifier: workspace:*
         version: link:../../evaluation/contract
@@ -15933,6 +15948,9 @@ importers:
       '@langwatch/aws-client':
         specifier: workspace:*
         version: link:../../../packages/aws-client
+      '@langwatch/data-retention-contract':
+        specifier: workspace:*
+        version: link:../../data-retention/contract
       '@langwatch/egress':
         specifier: workspace:*
         version: link:../../../packages/egress

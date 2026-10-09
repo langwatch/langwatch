@@ -247,9 +247,9 @@ Answers at `/api/evaluations/:evaluator/evaluate`, `/api/v1/evaluations/:evaluat
 interface Params {
   evaluator: string;
 }
-// Body: inline, src/transport/evaluations-legacy.rest.ts:187
+// Body: inline, src/transport/evaluations-legacy.rest.ts:186
 type Body = Record<string, unknown>;
-// Response: inline, src/transport/evaluations-legacy.rest.ts:190
+// Response: inline, src/transport/evaluations-legacy.rest.ts:189
 type Response = unknown;
 ```
 
@@ -257,7 +257,7 @@ type Response = unknown;
 
 Run a namespaced evaluator
 
-Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:214`.
+Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:213`.
 
 Answers at `/api/evaluations/:evaluator/:subpath/evaluate`, `/api/v1/evaluations/:evaluator/:subpath/evaluate`.
 
@@ -267,9 +267,9 @@ interface Params {
   evaluator: string;
   subpath: string;
 }
-// Body: inline, src/transport/evaluations-legacy.rest.ts:221
+// Body: inline, src/transport/evaluations-legacy.rest.ts:219
 type Body = Record<string, unknown>;
-// Response: inline, src/transport/evaluations-legacy.rest.ts:224
+// Response: inline, src/transport/evaluations-legacy.rest.ts:222
 type Response = unknown;
 ```
 
@@ -277,15 +277,15 @@ type Response = unknown;
 
 Run an evaluator as a guardrail
 
-Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:248`.
+Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:246`.
 
 Answers at `/api/guardrails/:evaluator/evaluate`, `/api/v1/guardrails/:evaluator/evaluate`.
 
 ```typescript
 type Params = z.infer<typeof evaluatorParamsSchema>; // ../contract/src/evaluation-legacy.schemas.ts:8
-// Body: inline, src/transport/evaluations-legacy.rest.ts:251
+// Body: inline, src/transport/evaluations-legacy.rest.ts:248
 type Body = Record<string, unknown>;
-// Response: inline, src/transport/evaluations-legacy.rest.ts:254
+// Response: inline, src/transport/evaluations-legacy.rest.ts:251
 type Response = unknown;
 ```
 
@@ -372,12 +372,13 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `evaluation_lifecycle` (aggregate `evaluation_lifecycle`)
 
-Declared at `src/eventing/evaluation-lifecycle.pipeline.ts:39`. Events: `evaluationRanEventSchema`, `evaluationLifecycleCompletedEventSchema`.
+Declared at `src/eventing/evaluation-lifecycle.pipeline.ts:42`. Events: `evaluationRanEventSchema`, `evaluationLifecycleCompletedEventSchema`.
 
-| Kind    | Name                                 | Handles | Declared at                                        |
-| ------- | ------------------------------------ | ------- | -------------------------------------------------- |
-| command | `recordEvaluationRan`                | –       | `src/eventing/evaluation-lifecycle.pipeline.ts:44` |
-| command | `recordEvaluationLifecycleCompleted` | –       | `src/eventing/evaluation-lifecycle.pipeline.ts:45` |
+| Kind      | Name                                 | Handles | Declared at                                        |
+| --------- | ------------------------------------ | ------- | -------------------------------------------------- |
+| command   | `recordEvaluationRan`                | –       | `src/eventing/evaluation-lifecycle.pipeline.ts:47` |
+| command   | `recordEvaluationLifecycleCompleted` | –       | `src/eventing/evaluation-lifecycle.pipeline.ts:48` |
+| retention | `≈ retention`                        | –       | `src/eventing/evaluation-lifecycle.pipeline.ts:49` |
 
 ### Pipeline `evaluation_processing` (aggregate `evaluation`)
 

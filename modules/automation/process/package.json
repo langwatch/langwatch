@@ -33,6 +33,7 @@
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/automation-contract": "workspace:*",
     "@langwatch/dashboard-contract": "workspace:*",
+    "@langwatch/data-retention-contract": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/entitlement-contract": "workspace:*",
     "@langwatch/evaluation-contract": "workspace:*",

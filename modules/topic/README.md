@@ -34,6 +34,7 @@ Anything else topic needs belongs to another module and is reached through its `
 | ---------------- | ------------------ | --------------------------------------------- |
 | `evaluations`    | `EvaluationApi`    | [evaluation](../evaluation/README.md)         |
 | `modelProviders` | `ModelProviderApi` | [model-provider](../model-provider/README.md) |
+| `retention`      | `DataRetentionApi` | [data-retention](../data-retention/README.md) |
 | `traces`         | `TraceApi`         | [trace](../trace/README.md)                   |
 
 ## Who depends on topic

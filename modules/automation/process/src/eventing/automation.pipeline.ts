@@ -20,6 +20,7 @@ import {
   type Event,
   EventSchema,
   type LaneAlias,
+  type RetentionPolicyResolver,
 } from "@langwatch/eventing";
 import {
   ORIGIN_RESOLVED_EVENT_TYPE,
@@ -138,6 +139,8 @@ export interface AutomationsPipelineDeps {
   retention: AutomationIntentRetentionRepository;
   reports: ReportDispatcher;
   reportRuns: ReportRunSettlement;
+  /** Each tenant's retention, stamped on the trigger event rows. */
+  tenantRetention?: RetentionPolicyResolver | undefined;
   /** Trigger matching and graph sweeps, woken by trace's and evaluation's own events (§9). */
   peerReactions: Pick<
     AutomationEvaluationSubscriberService,
@@ -175,7 +178,7 @@ const GRAPH_ACTIVITY_OPTIONS = {
 
 /** The whole process-manager topology, factored out so its inferred return type can be named. */
 const buildAutomationsPipeline = (deps: AutomationsPipelineDeps) => {
-  return definePipeline({
+  const pipeline = definePipeline({
     name: "automations",
     aggregate: defineAggregate({
       type: "trigger",
@@ -444,8 +447,8 @@ const buildAutomationsPipeline = (deps: AutomationsPipelineDeps) => {
           { tenantId: context.tenantId },
         ),
     })
-    .withLaneAliases(MAIN_TRIGGER_LANE_ALIASES)
-    .build();
+    .withLaneAliases(MAIN_TRIGGER_LANE_ALIASES);
+  return (deps.tenantRetention ? pipeline.withRetention(deps.tenantRetention) : pipeline).build();
 };
 
 /** The `automations` pipeline definition, as its eventing module registers it. */

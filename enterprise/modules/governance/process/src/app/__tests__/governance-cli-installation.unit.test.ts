@@ -5,6 +5,7 @@ import { BearerIdentity, RestHost } from "@langwatch/api/rest";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
 import type { ScimApi } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
@@ -78,6 +79,7 @@ async function boot(rest: RestHost) {
     .withStores(memoryStores())
     .expose(() => ({ hosts: { rest, trpc: { mount: () => ({}) } }, serve: () => undefined }))
     .provide({
+      "data-retention": createApiFixture<DataRetentionApi>({}),
       webhook: createApiFixture<WebhookApi>(),
       agent: createApiFixture<AgentApi>(),
       project: createApiFixture<ProjectApi>(),

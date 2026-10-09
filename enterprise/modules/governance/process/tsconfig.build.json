@@ -48,6 +48,9 @@
       "path": "../../../../packages/aws-client/tsconfig.build.json"
     },
     {
+      "path": "../../../../modules/data-retention/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../../packages/egress/tsconfig.build.json"
     },
     {

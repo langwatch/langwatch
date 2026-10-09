@@ -25,6 +25,7 @@ import {
   type EventingParticipation,
   type FoldProjectionStore,
   type FoldReadAuthorizer,
+  type RetentionPolicyResolver,
   createTenantId,
 } from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
@@ -958,6 +959,10 @@ export class TraceModule implements TraceApi, CollectorApp {
     setup.resources.own("Trace tokenizer", () => tokenizer.close());
     const milestones = TraceProjectMilestonesService.create({ role });
     app.#milestones = milestones;
+    app.#retention = {
+      resolve: (tenantId) =>
+        setup.dependencies.dataRetention.getResolvedForProject({ projectId: tenantId }),
+    };
     app.#collectorEvaluations = TraceCollectorEvaluationsService.create({ role });
     app.#processing = TraceProcessingRuntimeAdapter.create({
       role,
@@ -1241,6 +1246,7 @@ export class TraceModule implements TraceApi, CollectorApp {
 
   #processing: TraceProcessingRuntimeAdapter | null = null;
   #milestones: TraceProjectMilestonesService | null = null;
+  #retention: RetentionPolicyResolver | null = null;
   #collectorEvaluations: TraceCollectorEvaluationsService | null = null;
   #processingCommands: TraceProcessingCommandsService | null = null;
   #usageCounts: TraceUsageCountService | null = null;
@@ -1288,7 +1294,7 @@ export class TraceModule implements TraceApi, CollectorApp {
 
   /** trace_project_milestones: the same in every role; nurturing reacts from its own side (§9). */
   projectMilestonesPipeline(): TraceProjectMilestonesDefinition {
-    return buildTraceProjectMilestonesPipeline();
+    return buildTraceProjectMilestonesPipeline(this.#retention ?? undefined);
   }
 
   /** Binds the milestone senders the worker's project-metadata subscriber records through. */
@@ -1298,7 +1304,7 @@ export class TraceModule implements TraceApi, CollectorApp {
 
   /** trace_collector_evaluations: the same in every role; evaluation reports from its side (§9). */
   collectorEvaluationsPipeline(): TraceCollectorEvaluationsDefinition {
-    return buildTraceCollectorEvaluationsPipeline();
+    return buildTraceCollectorEvaluationsPipeline(this.#retention ?? undefined);
   }
 
   /** Binds the sender the collector door records each body's evaluations through. */

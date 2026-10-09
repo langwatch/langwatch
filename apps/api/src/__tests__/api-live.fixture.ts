@@ -5,6 +5,7 @@
  */
 import { createServer } from "node:net";
 
+import { classifyEventLogRowRetention } from "@langwatch/data-retention-contract/event-log-retention-policy";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import {
@@ -119,9 +120,10 @@ async function bootWorkerBeside(environment: Readonly<Record<string, string>>) {
     .withProcessOwnership(false)
     .withSecrets((_config, secrets) => secrets.withEnv())
     .start();
-  // Stand-in until apps/api depends on @langwatch/data-retention-contract; no api suite reads it.
   await server.run(
-    await server.container("worker").boot({ classifyEventLogRetention: () => "indefinite" }),
+    await server
+      .container("worker")
+      .boot({ classifyEventLogRetention: classifyEventLogRowRetention }),
   );
 
   return server;
