@@ -10,8 +10,8 @@ import {
   defineBrowserModule,
   UiFacilitiesSupply,
   UiShellSupply,
-  hostServiceFakes,
 } from "../src/index.ts";
+import { hostServiceFakes } from "../src/module/ui-host-service-fakes.ts";
 import type { UiSupplyName } from "../src/web-module.ts";
 import {
   browserUiTransport,

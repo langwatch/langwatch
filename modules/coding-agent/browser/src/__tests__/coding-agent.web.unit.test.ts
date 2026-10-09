@@ -1,6 +1,7 @@
 /** @vitest-environment jsdom */
 
-import { createUi, hostServiceFakes } from "@langwatch/browser";
+import { createUi } from "@langwatch/browser";
+import { hostServiceFakes } from "@langwatch/browser/testing";
 import {
   CodingAgentPullRequestsTableToken,
   CodingAgentSessionsTableToken,

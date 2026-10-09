@@ -1,6 +1,7 @@
 /** @vitest-environment jsdom */
 
-import { createUi, installedDrawerLoaders, hostServiceFakes } from "@langwatch/browser";
+import { createUi, installedDrawerLoaders } from "@langwatch/browser";
+import { hostServiceFakes } from "@langwatch/browser/testing";
 import { describe, expect, it } from "vitest";
 
 import { automationWeb } from "../automation.web.ts";

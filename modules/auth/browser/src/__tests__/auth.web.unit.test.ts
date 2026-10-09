@@ -1,7 +1,8 @@
 /** @vitest-environment jsdom */
 
 import { SsoTestSignInToken } from "@langwatch/auth-contract";
-import { createUi, hostServiceFakes } from "@langwatch/browser";
+import { createUi } from "@langwatch/browser";
+import { hostServiceFakes } from "@langwatch/browser/testing";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { authWeb } from "../auth.web.ts";

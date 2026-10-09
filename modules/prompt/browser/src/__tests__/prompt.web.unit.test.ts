@@ -1,7 +1,8 @@
 /** @vitest-environment jsdom */
 
-import { createUi, hostServiceFakes } from "@langwatch/browser";
+import { createUi } from "@langwatch/browser";
 import { resolveUiPageAccess } from "@langwatch/browser/page-guard";
+import { hostServiceFakes } from "@langwatch/browser/testing";
 import { describe, expect, it } from "vitest";
 
 import { promptWeb } from "../prompt.web.ts";

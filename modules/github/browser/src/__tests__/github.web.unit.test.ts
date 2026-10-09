@@ -1,6 +1,7 @@
 /** @vitest-environment jsdom */
 
-import { createUi, hostServiceFakes } from "@langwatch/browser";
+import { createUi } from "@langwatch/browser";
+import { hostServiceFakes } from "@langwatch/browser/testing";
 import { GithubConnectPopupToken } from "@langwatch/github-client";
 import { describe, expect, it } from "vitest";
 

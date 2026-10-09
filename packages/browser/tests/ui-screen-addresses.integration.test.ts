@@ -5,7 +5,8 @@
 
 import { describe, expect, it } from "vitest";
 
-import { BrowserPageClaimedTwiceError, createUi, defineBrowserModule, hostServiceFakes } from "../src/index.ts";
+import { BrowserPageClaimedTwiceError, createUi, defineBrowserModule } from "../src/index.ts";
+import { hostServiceFakes } from "../src/module/ui-host-service-fakes.ts";
 import { browserUiTransport, documentRoot } from "./ui-supply.fixtures.ts";
 
 const page = { default: () => null };

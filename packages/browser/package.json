@@ -19,6 +19,10 @@
       "types": "./dist/ui-supply.d.ts",
       "default": "./src/ui-supply.ts"
     },
+    "./testing": {
+      "types": "./dist/module/ui-host-service-fakes.d.ts",
+      "default": "./src/module/ui-host-service-fakes.ts"
+    },
     "./application": {
       "types": "./dist/ui-application.d.ts",
       "default": "./src/ui-application.tsx"
@@ -154,6 +158,7 @@
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/design-system": "workspace:*",
+    "@langwatch/error-views": "workspace:*",
     "@tanstack/react-query": "catalog:",
     "@trpc/client": "catalog:",
     "@trpc/server": "catalog:",
