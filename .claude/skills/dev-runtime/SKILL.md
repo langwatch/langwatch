@@ -49,7 +49,7 @@ as shipped"). The open questions at the foot of the ADR that remain are Alex's, 
   (`pnpm start`, and the `LANGWATCH_DEV_RELOAD=process` fallback's boot shape).
 - `backend.reload.ts`: finds the loaded modules a changed file reaches
   (`staleModuleIds`) and drops only those; reloads are debounced, never held.
-- `backend.process.ts`: `startBackend` boots the worker first, then the api;
+- `backend.process.ts`: `startBackend` boots the api and the worker together (the api never waits on the upgrade);
   `drainBackend` stops the worker first, then the api.
 
 A backend edit that touches a loaded file re-links, drains the old generation and boots the
