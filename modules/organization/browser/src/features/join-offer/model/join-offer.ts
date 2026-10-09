@@ -2,8 +2,6 @@
  * What the post-login offer shows, decided from the two answers the server
  * gives: the offer itself and the requests this person is already waiting on.
  */
-import { shouldRetryQuery } from "@langwatch/browser-host/query-retry";
-import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import type { JoinLookupDecision, JoinOffer } from "@langwatch/identity-contract";
 
 /** An invitation already waiting on one of the person's proven addresses (ADR-171 v6). */
@@ -89,16 +87,4 @@ function organizationNameFor({
   return (
     decision.organizations.find((offer) => offer.organizationId === organizationId)?.name ?? null
   );
-}
-
-/** A throttled offer stays throttled for its window; each retry spends the lookup budget again. */
-export function shouldRetryOffer({
-  failureCount,
-  error,
-}: {
-  failureCount: number;
-  error: unknown;
-}): boolean {
-  if (readHandledError(error)?.code === "join_request_throttled") return false;
-  return shouldRetryQuery(failureCount, error);
 }

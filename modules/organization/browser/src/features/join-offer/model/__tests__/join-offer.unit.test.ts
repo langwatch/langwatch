@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { joinOfferView, shouldRetryOffer } from "../join-offer.ts";
+import { joinOfferView } from "../join-offer.ts";
 
 /** Spec: specs/identity/join-before-create.feature, specs/identity/join-requests.feature */
 
@@ -60,26 +60,5 @@ describe("joinOfferView", () => {
         }),
       ).toEqual({ kind: "nothing" });
     });
-  });
-});
-
-describe("shouldRetryOffer", () => {
-  const failed = ({ code, httpStatus }: { code: string; httpStatus: number }) => ({
-    data: { httpStatus, error: { code, httpStatus, fault: "customer", meta: {} } },
-  });
-
-  it("does not retry a throttled offer, but retries a transient failure", () => {
-    expect(
-      shouldRetryOffer({
-        failureCount: 0,
-        error: failed({ code: "join_request_throttled", httpStatus: 429 }),
-      }),
-    ).toBe(false);
-    expect(
-      shouldRetryOffer({
-        failureCount: 0,
-        error: failed({ code: "internal_error", httpStatus: 500 }),
-      }),
-    ).toBe(true);
   });
 });
