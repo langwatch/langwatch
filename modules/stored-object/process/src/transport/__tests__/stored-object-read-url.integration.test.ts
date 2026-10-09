@@ -21,6 +21,7 @@ import {
 import { MemoryStoredObjectSealRepository } from "../../repositories/memory/memory.stored-object-seal.repository.ts";
 import { storedObjectRest } from "../stored-object.rest.ts";
 import { storedObjectTrpcTransport } from "../stored-object.trpc.ts";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 
 const PROJECT = "project_1";
 const OTHER_PROJECT = "project_2";
@@ -56,6 +57,7 @@ function installed() {
     },
     authorization: {
       forRequest: () => ({
+        ...testAuthorizeDefaults,
         getDecision: async () => ({ permitted: true, organizationRole: "MEMBER" }),
         getProjectAnyDecision: async (input): Promise<PermissionDecision> =>
           input.projectId === PROJECT && input.permissions.includes("traces:view")

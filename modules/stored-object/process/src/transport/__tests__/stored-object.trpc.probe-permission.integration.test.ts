@@ -24,6 +24,7 @@ import type {
 } from "../../rules/stored-object-file-access.rules.ts";
 import type { StoredObjectFileReader } from "../../services/stored-objects.service.ts";
 import { storedObjectTrpcTransport } from "../stored-object.trpc.ts";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 
 const PROJECT = "project_1";
 
@@ -65,6 +66,7 @@ function viewer(granted: readonly AuthzPermission[], denialReason: AuthzDenialRe
     identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
     authorization: {
       forRequest: () => ({
+        ...testAuthorizeDefaults,
         getDecision: (input) => permissions.getDecision(input),
         getProjectAnyDecision: anyOf,
         checkScopeLineage: async () => ({ kind: "consistent" }),
