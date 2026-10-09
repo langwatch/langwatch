@@ -2394,6 +2394,9 @@ importers:
       '@langwatch/data-privacy-process':
         specifier: workspace:*
         version: link:../../modules/data-privacy/process
+      '@langwatch/data-retention-contract':
+        specifier: workspace:*
+        version: link:../../modules/data-retention/contract
       '@langwatch/data-retention-process':
         specifier: workspace:*
         version: link:../../modules/data-retention/process

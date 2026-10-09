@@ -30,7 +30,11 @@ vi.mock("@langwatch/identity-client", () => {
   const invalidating = { invalidate: () => {} };
   return {
     identityClient: {
-      useUtils: () => ({ identity: { joinRequests: { mine: invalidating, offer: invalidating } } }),
+      useUtils: () => ({
+        identity: {
+          joinRequests: { lookup: invalidating, mine: invalidating, offer: invalidating },
+        },
+      }),
       identity: {
         joinRequests: {
           lookup: read(() => state.lookup),

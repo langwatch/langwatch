@@ -33,6 +33,7 @@ export function useJoinInstead({ origin }: { origin: "web" | "cli" }): {
     void utils.organization.getAll.invalidate();
     void joinUtils.identity.joinRequests.mine.invalidate();
     void joinUtils.identity.joinRequests.offer.invalidate();
+    void joinUtils.identity.joinRequests.lookup.invalidate();
   }, [utils, joinUtils]);
 
   const join = useCallback(
