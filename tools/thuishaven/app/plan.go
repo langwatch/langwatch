@@ -155,6 +155,9 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir s
 	if opts.Selection.Langevals {
 		out = append(out, p.langevalsChild())
 	}
+	if opts.Selection.DesignSystem && !st.Layout.IsMonolith() && p.port(domain.DesignSystemService) != 0 {
+		out = append(out, p.designSystemChild())
+	}
 	if opts.Selection.Langy {
 		langy := o.langyChild(st, opts, p.base, p.port("langyagent"), opts.langyDockerHost)
 		langy.LogPath = p.logPath("langyagent")

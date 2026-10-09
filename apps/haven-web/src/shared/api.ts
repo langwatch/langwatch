@@ -114,6 +114,9 @@ export const startServicePath = ({ slug, service }: { slug: string; service: str
 export const resetDatabasesPath = ({ slug }: { slug: string }) =>
   `/api/stacks/${encodeURIComponent(slug)}/reset-databases`;
 
+export const seedPath = ({ slug }: { slug: string }) =>
+  `/api/stacks/${encodeURIComponent(slug)}/seed`;
+
 export const LIMITS_PATH = "/api/limits";
 
 export const limitPath = ({ name }: { name: string }) =>

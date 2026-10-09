@@ -145,6 +145,29 @@ trusts a pid only together with its process start time, holds its claim as a flo
 life, and writes stack records atomically, so a recycled pid or a second daemon cannot be mistaken
 for ours (`tools/thuishaven/app/identity.go`).
 
+## The consoles: always built, never a dev server
+
+Every haven web console is a build served by Go; none runs Vite, Storybook dev or HMR.
+
+| Console | Where | Served by |
+|---|---|---|
+| Hub, stack home, seed console | `hub.langwatch.localhost`, `<slug>.langwatch.localhost` | the haven daemon (`apps/haven-web`, embedded) |
+| Simulators: idp, mail, storage, voice, llm, analytics, outbound, payment, telemetry | `<sim>.<slug>.langwatch.localhost` | the sim's Go binary in the `go` lane (`apps/<sim>sim-web`, embedded) |
+| Design system Storybook (`+design-system`) | `design-system.<slug>` (or `ds.<slug>`), and `/design-system` in the app | the `design-system` lane: `storybook build`, then `haven static` |
+| Mail studio (`+mail-room`) | `mail-room.<slug>` | still the ui lane's dev server, started on first visit; nothing serves it under `--ui=built` |
+
+- `haven install --build` builds the hub and every simulator console (nx tag `haven-console`); each
+  simulator lane rebuilds its console through the nx cache on start. A console missing its build
+  serves a page naming the build command.
+- The design-system lane rebuilds the Storybook only when `packages/design-system/storybook-static`
+  is missing or older than its sources (about 10 s, 1.6 GB peak), then serves it at about 30 MB.
+  `haven restart design-system` rebuilds after a change; `haven logs design-system` shows the build.
+- The stack home's Seed panel runs `haven seed --size <tiny|small|medium|large> --persona <all|...>`
+  for a running stack and shows the last seed's status and the run's latest log lines.
+- Every simulator has a CLI too: `haven payment customers|subscriptions|checkouts|invoices|complete <id>|retry <id>|clear-failures`,
+  `haven mail`, `haven idp`, `haven storage`, `haven voice`, `haven llm`, `haven analytics`, `haven outbound`,
+  `haven telemetry` (`haven help <name>`).
+
 ## The env, without leaking it
 
 - `haven env` prints this stack's resolved environment with every secret masked

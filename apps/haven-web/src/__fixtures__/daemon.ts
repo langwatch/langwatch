@@ -143,6 +143,13 @@ export const liveHome = ({ now, surfaces }: { now: number; surfaces?: Surface[] 
     canResetDatabases: true,
   },
   belowFloor: "",
+  seed: {
+    canSeed: true,
+    sizes: ["tiny", "small", "medium", "large"],
+    personas: ["all", "startup", "enterprise", "gateway", "agent-eval"],
+    status: "seed: done in 42s (exit 0) [--size tiny --persona all]",
+    log: [],
+  },
 });
 
 export const stoppedHome = ({ now }: { now: number }): StackHome => {
@@ -170,6 +177,7 @@ export const stoppedHome = ({ now }: { now: number }): StackHome => {
       canResetDatabases: true,
     },
     belowFloor: "",
+    seed: { canSeed: false, sizes: ["tiny"], personas: ["all"], status: "", log: [] },
   };
 };
 

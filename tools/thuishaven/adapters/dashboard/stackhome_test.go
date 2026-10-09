@@ -267,7 +267,8 @@ func TestStackHomeCarriesFactsSurfacesErrorsAndCredentials(t *testing.T) {
 func TestStackHomeJSONFieldNames(t *testing.T) {
 	f := newHomeFixture(t)
 	body := decode[map[string]any](t, f.get("feat-x.langwatch.localhost", "/api/stacks/feat-x"))
-	pinKeys(t, "stack home", body, "slug", "registered", "live", "hubUrl", "homeUrl", "facts", "surfaces", "errors", "credentials", "actions", "belowFloor")
+	pinKeys(t, "stack home", body, "slug", "registered", "live", "hubUrl", "homeUrl", "facts", "surfaces", "errors", "credentials", "actions", "belowFloor", "seed")
+	pinKeys(t, "seed", body["seed"], "canSeed", "sizes", "personas", "status", "log")
 	facts := body["facts"].(map[string]any)
 	pinKeys(t, "facts", facts, "branch", "worktreeDir", "layout", "baseline", "uptimeSeconds", "rssBytes", "heartbeatAt", "databases")
 	databases := facts["databases"].(map[string]any)

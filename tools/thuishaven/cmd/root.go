@@ -82,7 +82,7 @@ func Root(ctx context.Context, logger *zap.Logger, version string, args []string
 	defer stop()
 
 	// Simulator children need no registry, git checkout or infrastructure setup.
-	if len(args) > 0 && args[0] == "simulator" {
+	if len(args) > 0 && (args[0] == "simulator" || args[0] == "static") {
 		ctx = contexts.SetServiceInfo(ctx, contexts.ServiceInfo{
 			Version: version, Environment: "development",
 		})
@@ -283,6 +283,8 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 				// Add one service to a live stack; reset a stack's databases.
 				StartService:   orch.StartStackService,
 				ResetDatabases: orch.ResetStackDatabases,
+				Seed:           orch.SeedStack,
+				SeedReport:     orch.SeedReport,
 				// The up's hand-over: the daemon is the one place keepers start.
 				StartKeeper: orch.StartKeeper,
 			},

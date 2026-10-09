@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/langwatch/langwatch/tools/seedgen"
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 	"github.com/langwatch/langwatch/tools/thuishaven/domain/logfmt"
 )
@@ -40,7 +41,18 @@ type stackHomeJSON struct {
 	Credentials credentialsJSON  `json:"credentials"`
 	Actions     stackActionsJSON `json:"actions"`
 	// BelowFloor is the upgrade gate's refusal while it holds the api, else "".
-	BelowFloor string `json:"belowFloor"`
+	BelowFloor string   `json:"belowFloor"`
+	Seed       seedJSON `json:"seed"`
+}
+
+// seedJSON is the seed console: the sizes and personas `haven seed` takes, the
+// last seed's status line and the log tail of a seed started here.
+type seedJSON struct {
+	CanSeed  bool     `json:"canSeed"`
+	Sizes    []string `json:"sizes"`
+	Personas []string `json:"personas"`
+	Status   string   `json:"status"`
+	Log      []string `json:"log"`
 }
 
 type factsJSON struct {
@@ -253,7 +265,23 @@ func (s *Server) handleStackHome(w http.ResponseWriter, r *http.Request) {
 			CanResetDatabases: registered && s.config.Actions.ResetDatabases != nil,
 		},
 		BelowFloor: floorRefusal(surfaces, tails, st.Layout),
+		Seed:       s.seed(slug, h.live),
 	})
+}
+
+func (s *Server) seed(slug string, live bool) seedJSON {
+	out := seedJSON{CanSeed: live && s.config.Actions.Seed != nil, Sizes: []string{}, Personas: append([]string{"all"}, seedgen.Personas...), Log: []string{}}
+	for _, tier := range seedgen.Tiers {
+		out.Sizes = append(out.Sizes, tier.Name)
+	}
+	if s.config.Actions.SeedReport != nil {
+		status, log := s.config.Actions.SeedReport(slug)
+		out.Status = status
+		if log != nil {
+			out.Log = log
+		}
+	}
+	return out
 }
 
 // floorRefusal is the upgrade gate's refusal (code refused_below_floor) from

@@ -88,6 +88,14 @@ export const stackHomeSchema = z.object({
   }),
   /** The upgrade gate's refusal while it holds the api, "" otherwise. */
   belowFloor: z.string(),
+  /** The seed console: what `haven seed` takes, its last status line and log tail. */
+  seed: z.object({
+    canSeed: z.boolean(),
+    sizes: z.array(z.string()),
+    personas: z.array(z.string()),
+    status: z.string(),
+    log: z.array(z.string()),
+  }),
 });
 export type StackHome = z.infer<typeof stackHomeSchema>;
 

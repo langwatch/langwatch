@@ -723,10 +723,11 @@ The daemon's JSON, which the console reads:
   the mail studio stay in their own packages (`@langwatch/design-system`,
   `@langwatch/mail`); haven only offers to run them, off by default, the way it
   offers langy. Nothing in the application degrades without either, and neither
-  is ever counted among the three Node lanes. Selecting the Storybook also tells
-  the ui lane which port it is on (`LANGWATCH_STORYBOOK_PORT`), so opening
-  `/design-system` in the app frames the Storybook the stack is already running
-  instead of starting a second one.
+  is ever counted among the three Node lanes. The Storybook is never a dev
+  server: the `design-system` lane runs `storybook build` when its output is
+  missing or stale and serves the files with `haven static`. The ui lane is told
+  its routed URL (`LANGWATCH_STORYBOOK_URL`), so `/design-system` in the app frames
+  that build; a worktree that did not select it gets `LANGWATCH_SKIP_STORYBOOK=1`.
 - **Langy worker isolation (sandboxed off macOS, host on macOS).** The langyagent
   worker runs the Langy agent, so off macOS haven isolates it like production
   rather than letting a test model run as your own user. On macOS haven wants no

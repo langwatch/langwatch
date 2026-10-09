@@ -365,3 +365,21 @@ Feature: The local development process topology
     Then the new bundle is built beside the served one
     And the old assets stay loadable by open pages
     And the bundles swap only once the build succeeded
+
+  # --- Every haven console is built, never a dev server (2026-10-10) ---
+
+  # The simulator consoles and haven's own hub are Vite builds embedded in the Go
+  # binary that serves them; `haven install --build` and each simulator lane build
+  # them through nx (tag haven-console). The design system's Storybook is built
+  # with `storybook build` and served by haven's own binary on the design-system
+  # lane. The mail studio is the one exception until its live renderer is ruled on.
+  @unit
+  Scenario: Every haven console is served built, never by a dev server
+    Given a stack that selected every simulator and the design system
+    When haven plans its lanes
+    Then every simulator console is the built bundle its Go binary embeds
+    And the design-system lane builds the Storybook when its output is missing or stale
+    And serves the built files with haven's own static server
+    And no lane runs "storybook dev", "vite" or HMR for a console
+    And the ui lane frames that built Storybook at "/design-system" instead of starting one
+

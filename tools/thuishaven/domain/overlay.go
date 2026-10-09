@@ -143,12 +143,15 @@ func (s Stack) OverlayEnv() []string {
 			env = append(env, fmt.Sprintf("SSO_DOMAIN_PROOF_DNS_SERVERS=127.0.0.1:%d", idp.DNSPort))
 		}
 	}
-	// The ui lane holds each developer tool's port and starts the tool on the first
-	// visit (apps/ui/vite/dormant-dev-tool.ts). Naming haven's ports here puts that
-	// listener behind design-system.<slug> and mail-room.<slug>.
-	if sb := s.svc(DesignSystemService); sb.Port != 0 {
-		env = append(env, fmt.Sprintf("LANGWATCH_STORYBOOK_PORT=%d", sb.Port))
+	// Haven serves the built Storybook itself (the design-system lane), so the ui
+	// lane only frames it at /design-system and never starts `storybook dev`.
+	if sb := s.svc(DesignSystemService); sb.Port != 0 && sb.URL != "" {
+		env = append(env, "LANGWATCH_STORYBOOK_URL="+sb.URL)
+	} else {
+		env = append(env, "LANGWATCH_SKIP_STORYBOOK=1")
 	}
+	// The ui lane holds the mail studio's port and starts it on the first visit
+	// (apps/ui/vite/dormant-dev-tool.ts), behind mail-room.<slug>.
 	if mr := s.svc(MailRoomService); mr.Port != 0 {
 		env = append(env, fmt.Sprintf("LANGWATCH_MAIL_PREVIEW_PORT=%d", mr.Port))
 	}

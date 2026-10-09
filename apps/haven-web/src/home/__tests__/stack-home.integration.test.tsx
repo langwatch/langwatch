@@ -317,6 +317,43 @@ describe("StackHome", () => {
     });
   });
 
+  describe("when a seed is started from the seed panel", () => {
+    /** @scenario "The stack home seeds a stack at a chosen size and shows its progress" */
+    it("starts haven seed at the chosen size and persona and shows the run's log", async () => {
+      const running = {
+        ...liveHome({ now: NOW }),
+        seed: {
+          ...liveHome({ now: NOW }).seed,
+          status: "seed: running for 12s [--size small --persona startup]",
+          log: ["planning run r1", "orgs 3/6"],
+        },
+      };
+      let seeded = false;
+      const daemon = serve({
+        home: () => (seeded ? running : liveHome({ now: NOW })),
+        others: (path) => {
+          if (path !== "/api/stacks/feat-x/seed") return undefined;
+          seeded = true;
+          return { body: { message: "seeding feat-x at the small size" } };
+        },
+      });
+      await openHome({ slug: "feat-x" });
+
+      fireEvent.change(screen.getByLabelText("Size"), { target: { value: "small" } });
+      fireEvent.change(screen.getByLabelText("Persona"), { target: { value: "startup" } });
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Seed" }));
+      });
+      expect(daemon.calls).toContainEqual({
+        method: "POST",
+        path: "/api/stacks/feat-x/seed",
+        body: { size: "small", persona: "startup" },
+      });
+      expect(await screen.findByText("orgs 3/6", { exact: false })).toBeDefined();
+      expect(screen.getByRole("button", { name: "Seed" }).hasAttribute("disabled")).toBe(true);
+    });
+  });
+
   describe("when the slug is unknown", () => {
     it("says no stack is registered and links the hub", async () => {
       serve({ home: () => liveHome({ now: NOW }) });

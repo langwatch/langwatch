@@ -38,21 +38,31 @@ func TestDeveloperToolLanesAreNotPlannedByDefault(t *testing.T) {
 	}
 }
 
-// The UI's dev server, not haven, starts each tool on its first visit and stops
-// it once idle (apps/ui/vite/dormant-dev-tool.ts), so `pnpm dev` gets the same
-// behaviour. Selecting a tool only routes its hostname to the port the ui lane
-// is told to hold.
+// The design system is haven's own lane: its Storybook built to static files and
+// served by this binary, never `storybook dev`. The mail studio still lives in the
+// ui lane's dev server (apps/ui/vite/mail-preview.ts), so haven plans no lane for it.
 //
 // @scenario "Adding both developer tools is one command and it sticks"
-func TestSelectedDeveloperToolsAreNotHavenLanes(t *testing.T) {
+// @scenario "Every haven console is served built, never by a dev server"
+func TestSelectedStorybookIsServedBuiltByHaven(t *testing.T) {
 	sel := domain.DefaultSelection()
 	sel.DesignSystem, sel.MailRoom = true, true
 	children := devToolsPlan(t, sel)
 
-	for _, lane := range []string{"design-system", "mail-room"} {
-		if child, ok := findChild(children, lane); ok {
-			t.Errorf("haven planned a %q lane running %q; the ui lane's dev server owns the tool", lane, child.Shell)
+	ds, ok := findChild(children, "design-system")
+	if !ok {
+		t.Fatal("no design-system lane was planned for a worktree that selected it")
+	}
+	for _, want := range []string{"build:storybook", "storybook-static", " static design-system ", "46006"} {
+		if !strings.Contains(ds.Shell, want) {
+			t.Errorf("design-system lane runs %q, want it to contain %q", ds.Shell, want)
 		}
+	}
+	if strings.Contains(ds.Shell, "storybook dev") || strings.Contains(ds.Shell, " storybook --port") {
+		t.Errorf("design-system lane runs a dev server: %q", ds.Shell)
+	}
+	if child, ok := findChild(children, "mail-room"); ok {
+		t.Errorf("haven planned a mail-room lane running %q; the ui lane's dev server owns the studio", child.Shell)
 	}
 }
 

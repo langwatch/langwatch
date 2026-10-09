@@ -9,7 +9,13 @@ import {
 } from "@langwatch/design-system-internal";
 import { useState } from "react";
 
-import { START_PATH, resetDatabasesPath, restartPath, startServicePath } from "../shared/api.ts";
+import {
+  START_PATH,
+  resetDatabasesPath,
+  restartPath,
+  seedPath,
+  startServicePath,
+} from "../shared/api.ts";
 import type { StackHome as StackHomeData, Surface } from "../shared/contract.ts";
 import { HavenTopBar } from "../shared/haven-top-bar.tsx";
 import { useLifecycle } from "../shared/use-lifecycle.ts";
@@ -17,6 +23,7 @@ import { CredentialsPanel } from "./credentials-panel.tsx";
 import { FactsPanel } from "./facts-panel.tsx";
 import { RecentErrors } from "./recent-errors.tsx";
 import { ResetDialog } from "./reset-dialog.tsx";
+import { SeedPanel } from "./seed-panel.tsx";
 import { SurfacesPanel } from "./surfaces-panel.tsx";
 
 const StackState = ({ home }: { home: StackHomeData }) => {
@@ -63,6 +70,13 @@ export const StackHome = ({ home, now, refresh, stale }: StackHomeProps) => {
       path: resetDatabasesPath({ slug: home.slug }),
       body: { confirm: database },
       doing: `reset ${home.slug}'s databases`,
+    });
+  const seed = ({ size, persona }: { size: string; persona: string }) =>
+    void act({
+      key: "seed",
+      path: seedPath({ slug: home.slug }),
+      body: { size, persona },
+      doing: `seed ${home.slug}`,
     });
   const start = () =>
     void act({
@@ -155,6 +169,7 @@ export const StackHome = ({ home, now, refresh, stale }: StackHomeProps) => {
         <FactsPanel facts={home.facts} now={now} />
         <CredentialsPanel credentials={home.credentials} />
       </Grid>
+      <SeedPanel seed={home.seed} busy={busy === "seed"} onSeed={seed} />
       <RecentErrors errors={home.errors} />
     </Page>
   );

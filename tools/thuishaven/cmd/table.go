@@ -212,6 +212,13 @@ var baseTable = []commandSpec{
 		run:     runBundledSimulator,
 	},
 	{
+		name:    "static",
+		args:    "<lane> <dir> <port>",
+		maxArgs: 3,
+		hidden:  true,
+		run:     runStatic,
+	},
+	{
 		name:    "go-watch",
 		args:    "<binary> <service>…",
 		maxArgs: -1,
@@ -436,9 +443,9 @@ var baseTable = []commandSpec{
 	},
 	{
 		name:    "payment",
-		summary: "paymentsim, the Stripe stand-in: status | events | usage | advance | fail | deliver | hold | release | reset",
-		args:    "<status|events|usage|advance|fail|deliver|hold|release|reset>",
-		maxArgs: 1,
+		summary: "paymentsim, the Stripe stand-in: status | customers | subscriptions | checkouts | invoices | events | usage | complete | retry | advance | fail | clear-failures | deliver | hold | release | reset",
+		args:    "<status|customers|subscriptions|checkouts|invoices|events|usage|complete|retry|advance|fail|clear-failures|deliver|hold|release|reset> [id]",
+		maxArgs: 2,
 		flags: simFlags(
 			flagSpec{long: "--type", takesValue: true, value: "<event type>", summary: "events: only this type"},
 			flagSpec{long: "--customer", takesValue: true, value: "<id>", summary: "usage/fail: the customer"},

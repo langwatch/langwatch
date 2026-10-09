@@ -94,6 +94,7 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("/api/stacks/{slug}/destroy", s.handleDestroy)
 	mux.HandleFunc("/api/stacks/{slug}/start-service", s.handleStartService)
 	mux.HandleFunc("/api/stacks/{slug}/reset-databases", s.handleResetDatabases)
+	mux.HandleFunc("/api/stacks/{slug}/seed", s.handleSeed)
 	mux.HandleFunc("/api/worktrees/start", s.handleStart)
 	mux.HandleFunc("GET /api/limits", s.handleLimits)
 	mux.HandleFunc("PUT /api/limits/{name}", s.handleSetLimit)

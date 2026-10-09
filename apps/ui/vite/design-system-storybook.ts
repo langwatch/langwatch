@@ -29,6 +29,19 @@ export function designSystemStorybook(options: { appPort: number }): Plugin {
         logger.info(`  ✓ storybook: skipped (LANGWATCH_SKIP_STORYBOOK=1)`);
         return;
       }
+      const builtUrl = process.env.LANGWATCH_STORYBOOK_URL;
+      if (builtUrl !== undefined && builtUrl !== "") {
+        logger.info(`  ✓ storybook: ${ROUTE} frames ${builtUrl} (built, served by haven)`);
+        const tool: DormantTool = {
+          state: () => "external",
+          wake: () => undefined,
+          close: () => undefined,
+        };
+        server.middlewares.use(ROUTE, (req, res, next) =>
+          serveRoute({ req, res, next, tool, storybookUrl: builtUrl }),
+        );
+        return;
+      }
       const port = await devToolPort({
         explicit: process.env.LANGWATCH_STORYBOOK_PORT,
         appPort: options.appPort,

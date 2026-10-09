@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-const paymentUsage = "usage: haven payment <status|events|usage|advance --seconds <n>|fail --customer <id> [--times <n>]|deliver --ids <a,b> [--secret <s>]|hold|release|reset> [--json]"
+const paymentUsage = "usage: haven payment <status|customers|subscriptions|checkouts|invoices|events|usage|complete <checkout id>|retry <invoice id>|advance --seconds <n>|fail --customer <id> [--times <n>]|clear-failures|deliver --ids <a,b> [--secret <s>]|hold|release|reset> [--json]"
 
 // runPayment is `haven payment <verb>`: paymentsim's control API from a terminal.
 func runPayment(_ context.Context, d deps, inv invocation) error {
@@ -29,9 +29,36 @@ func runPayment(_ context.Context, d deps, inv invocation) error {
 		}
 		return printSimRaw(raw)
 	}
+	id := func(what string) (string, error) {
+		if len(inv.args) < 2 || inv.args[1] == "" {
+			return "", fmt.Errorf("%s needs the %s id", inv.args[0], what)
+		}
+		return url.PathEscape(inv.args[1]), nil
+	}
 	switch inv.args[0] {
 	case "status":
 		return simGet(api, "/_sim/api/status", nil, asJSON, printOutboundDoc)
+	case "customers", "subscriptions", "invoices":
+		return simGet(api, "/_sim/api/"+inv.args[0], nil, asJSON, printOutboundDoc)
+	case "checkouts":
+		return simGet(api, "/_sim/api/checkout", nil, asJSON, printOutboundDoc)
+	case "complete":
+		session, err := id("checkout session")
+		if err != nil {
+			return err
+		}
+		return post("/_sim/api/checkout/"+session+"/complete", nil)
+	case "retry":
+		invoice, err := id("invoice")
+		if err != nil {
+			return err
+		}
+		return post("/_sim/api/invoices/"+invoice+"/retry", nil)
+	case "clear-failures":
+		if err := api.Delete("/_sim/api/payment-failures"); err != nil {
+			return err
+		}
+		return simDone(asJSON, "cleared", "no charge is set to decline any more")
 	case "events":
 		return simGet(api, "/_sim/api/events", url.Values{"type": {inv.value("--type")}}, asJSON, printOutboundDoc)
 	case "usage":
