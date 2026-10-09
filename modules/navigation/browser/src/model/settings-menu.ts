@@ -12,7 +12,6 @@ import {
   Building2,
   Coins,
   CreditCard,
-  DatabaseZap,
   EyeOff,
   Server,
   Fingerprint,
@@ -324,7 +323,6 @@ export function opsGroup({
       // Flags are the cloud's gradual-rollout switch; the env override still applies everywhere.
       ...(hasCloudOps ? [{ label: "Feature Flags", href: "/ops/feature-flags", icon: Flag }] : []),
       { label: "Upgrades", href: "/ops/upgrades", icon: RefreshCw },
-      { label: "Migrations", href: "/ops/migrations", icon: DatabaseZap },
     ],
   };
 }
