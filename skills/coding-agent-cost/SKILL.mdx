@@ -131,11 +131,13 @@ GROUP BY QuerySource, Model ORDER BY cost_usd DESC
 
 **Saving:** reprice those calls at Sonnet 5.5. Estimated median 4% of spend (p90 19%) where it fires (73% of organisations). Overlaps with check 1 when the sub-agents run an old Opus, so do not add the two. Searching and reading code rarely needs the top model, but say that the user should watch the quality of the sub-agents' reports for a week.
 
-**Setting:** `settings.json`, which a `model:` line in a custom agent's frontmatter still overrides:
+**Setting:** there is no top-level settings key for this. Set the `CLAUDE_CODE_SUBAGENT_MODEL` variable in the `env` block of `settings.json`. On its own it moves general-purpose and any custom agent without a `model:` line; Explore and Plan stay on the main conversation's model:
 
 ```json
-{ "subagentModel": "sonnet" }
+{ "env": { "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet" } }
 ```
+
+To move Explore and Plan too, add `"CLAUDE_CODE_SUBAGENT_MODEL_FORCE": "1"` to the same block (Claude Code v2.1.257 or later). It also overrides custom agents' `model:` lines and the model Claude picks for a single call, so suggest it only when no custom agent needs a stronger model. To move only Explore, the user can define an agent named `Explore` with `model: sonnet` in `~/.claude/agents/`.
 
 ### 5. API key: the five-minute cache is rebuilt after pauses
 

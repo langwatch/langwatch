@@ -20,7 +20,7 @@ Feature: Coding agent cost and context skill
     Given the rendered skill
     Then the model upgrade names the "model" setting with the "opus" alias
     And the compaction recommendation names the "autoCompactWindow" setting at 400000
-    And the sub-agent model recommendation names the "subagentModel" setting
+    And the sub-agent model recommendation names the CLAUDE_CODE_SUBAGENT_MODEL variable in the settings.json env block
     And the API-key cache recommendation names the "promptCacheTtl" setting at "1h"
 
   @unit

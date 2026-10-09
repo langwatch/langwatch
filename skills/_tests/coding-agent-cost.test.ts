@@ -51,7 +51,8 @@ describe("the coding-agent-cost skill", () => {
       const rendered = costSkill();
       expect(rendered).toContain('{ "model": "opus" }');
       expect(rendered).toContain('{ "autoCompactWindow": 400000 }');
-      expect(rendered).toContain('{ "subagentModel": "sonnet" }');
+      expect(rendered).toContain('{ "env": { "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet" } }');
+      expect(rendered).not.toContain("subagentModel");
       expect(rendered).toContain('{ "promptCacheTtl": "1h" }');
     });
 

@@ -89,7 +89,7 @@ Opus 5.5 cost 63% less per fix (95% CI 56 to 69%) at the same quality. Its lower
 
 **Question:** do built-in sub-agents on Sonnet cost less without hurting the result?
 
-**Arms:** default against `{"subagentModel": "sonnet"}`.
+**Arms:** default against `{"env": {"CLAUDE_CODE_SUBAGENT_MODEL": "sonnet"}}`. Explore and Plan keep the main model unless you also set `"CLAUDE_CODE_SUBAGENT_MODEL_FORCE": "1"`, so decide whether they belong in the test.
 
 **Task:** work that makes the agent search and read code through sub-agents, such as "find every place that reads this config value and change it", with a test that checks the change.
 

@@ -201,11 +201,13 @@ GROUP BY QuerySource, Model ORDER BY cost_usd DESC
 
 **Saving:** reprice those calls at Sonnet 5.5. Estimated median 4% of spend (p90 19%) where it fires (73% of organisations). Overlaps with check 1 when the sub-agents run an old Opus, so do not add the two. Searching and reading code rarely needs the top model, but say that the user should watch the quality of the sub-agents' reports for a week.
 
-**Setting:** `settings.json`, which a `model:` line in a custom agent's frontmatter still overrides:
+**Setting:** there is no top-level settings key for this. Set the `CLAUDE_CODE_SUBAGENT_MODEL` variable in the `env` block of `settings.json`. On its own it moves general-purpose and any custom agent without a `model:` line; Explore and Plan stay on the main conversation's model:
 
 ```json
-{ "subagentModel": "sonnet" }
+{ "env": { "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet" } }
 ```
+
+To move Explore and Plan too, add `"CLAUDE_CODE_SUBAGENT_MODEL_FORCE": "1"` to the same block (Claude Code v2.1.257 or later). It also overrides custom agents' `model:` lines and the model Claude picks for a single call, so suggest it only when no custom agent needs a stronger model. To move only Explore, the user can define an agent named `Explore` with `model: sonnet` in `~/.claude/agents/`.
 
 ### 5. API key: the five-minute cache is rebuilt after pauses
 
@@ -301,9 +303,9 @@ Measured means a controlled A/B run on the same tasks, described in [Run your ow
 | Use the current model version | `"model": "opus"` (not a pinned older id) | 88% of organisations | Estimated median 24%, p90 42%. Measured 63% on our bug-fix runs |
 | Compact the main conversation at 400k | `"autoCompactWindow": 400000` | 79% | Estimated median 7%, p90 23%; about 29% on threads past 800k. Measured 51% at 150k on a long reading session, with lost recall |
 | Compact sub-agents past 600k | same `autoCompactWindow`, and narrower sub-agent tasks | 18% of those with sub-agents | Estimated 35% of those sub-agents' cost, median 2% of the total |
-| Run built-in sub-agents on Sonnet | `"subagentModel": "sonnet"` | 73% | Estimated median 4%, p90 19% |
+| Run built-in sub-agents on Sonnet | `"env": { "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet" }`, plus `"CLAUDE_CODE_SUBAGENT_MODEL_FORCE": "1"` to include Explore and Plan | 73% | Estimated median 4%, p90 19% |
 | API key: one-hour cache on the main conversation | `"promptCacheTtl": "1h"` | pay-per-token users whose cache is rebuilt after pauses | Estimated median 11%, p90 25% |
-| Subscription: keep the one-hour main cache | do not set `promptCacheTtl` to `"5m"` | subscription users | A five-minute main cache uses more for 84 of 101 organisations |
+| Subscription: keep the one-hour main cache | do not set `promptCacheTtl` to `"5m"` | subscription users | Estimated: a five-minute main cache would cost more for 84 of 101 organisations |
 | Split long sessions | `/compact` before a break, `/clear` for a new task | 93% | Estimated median 5% |
 
 The savings overlap. An old Opus running your sub-agents counts in the first and fourth rows, and a long session counts in the compaction and split rows, so the rows do not add up.
@@ -318,13 +320,15 @@ To see which lifetime your main conversation uses, run `claude -p "hello" --outp
 
 ## Put settings in settings.json
 
-A value in the `env` block of any `settings.json` wins over a shell `export`, so the export can be silently ignored. Put each setting in `~/.claude/settings.json`, in the project's `.claude/settings.json`, or in managed settings for a team. Check every level for a conflicting value first, including `CLAUDE_CODE_AUTO_COMPACT_WINDOW`, `CLAUDE_CODE_SUBAGENT_MODEL` and `CLAUDE_CODE_PROMPT_CACHE_TTL` in an `env` block, because each environment variable overrides the setting of the same purpose.
+A value in the `env` block of any `settings.json` wins over a shell `export`, so the export can be silently ignored. Put each setting in `~/.claude/settings.json`, in the project's `.claude/settings.json`, or in managed settings for a team. Check every level for a conflicting value first, including `ANTHROPIC_MODEL`, `CLAUDE_CODE_AUTO_COMPACT_WINDOW` and `CLAUDE_CODE_PROMPT_CACHE_TTL` in an `env` block, because each environment variable overrides the setting of the same purpose. The sub-agent model has no setting of its own, so it goes in `env`.
 
 ```json ~/.claude/settings.json
 {
   "model": "opus",
   "autoCompactWindow": 400000,
-  "subagentModel": "sonnet"
+  "env": {
+    "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet"
+  }
 }
 ```
 

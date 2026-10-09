@@ -17249,7 +17249,7 @@ Two Claude Code sessions started 15 seconds apart on 2026-09-08 on the same mach
 
 The task was a full feature: an upload button for image cells in datasets and the evaluation workbench, a file column type, files delivered to prompts and agents as attachments, browser testing with screenshots, then a pull request driven through review. One session ran on the old layout and opened [langwatch#7964](https://github.com/langwatch/langwatch/pull/7964); the other ran on the new one and opened [langwatch#7972](https://github.com/langwatch/langwatch/pull/7972).
 
-| | Old layout | New layout |
+| | Old layout ([#7964](https://github.com/langwatch/langwatch/pull/7964)) | New layout ([#7972](https://github.com/langwatch/langwatch/pull/7972)) |
 |---|---|---|
 | Wall clock, raw | 3h 52m | 3h 26m |
 | Wall clock, confounds removed | 3h 13m | 3h 08m |
@@ -17259,8 +17259,8 @@ The task was a full feature: an upload button for image cells in datasets and th
 | Tool calls | 1,480 | 1,310 |
 | Mean context of a sub-agent call | 156k tokens | 202k tokens |
 | Typecheck runs | 19 whole-repository, median 78 s | 38 scoped, median 5 s |
-| Review threads | 33 over 5 passes | 11 over 1 pass |
-| Severe defects found when reading the diff | 0 | 3 |
+| Review bot threads on the pull request | 33, over 5 review passes | 11, over 1 review pass |
+| Severe defects found by reading the final diff | 0 | 3 |
 
 Each run hit one problem unrelated to the layout, and the adjusted rows remove both. The old-layout machine restarted mid-run (about 102 tool calls and 15 USD of repeated work). The new layout's base branch was missing two files, so the app would not boot until a sub-agent rebuilt them (about 25 minutes and 11 USD).
 
@@ -17270,9 +17270,13 @@ Speed: about the same. The new layout finished 5 minutes earlier once the confou
 
 Cost: about 7% higher on the new layout. It made fewer calls, but each sub-agent carried 29% more context, because one feature now spans several packages and a sub-agent keeps all of them in view. In both runs, the final reports sub-agents write back to the coordinator were about 20% of the cost.
 
-Defects: the new layout placed every file where its rules said, and avoided the duplication and one wrong-direction import found in the old run.
+Review: the old-layout pull request drew 33 review bot threads across 5 passes before it merged, about 7 per pass. The new-layout pull request drew 11 threads in its one pass and was closed, so the totals measure how long each stayed in review, not which layout drew fewer findings.
 
-It still left three severe defects on the run path: a missing attachment fell back silently and the run succeeded, connected agents received a 27 MB base64 string as message text, and the upload endpoint had no request size cap. The old run's findings were all minor: a size limit stated in three places, double buffering, a stray results row, and that import. We merged the old-layout pull request.
+Defects: we read both final diffs and rated each problem. A severe defect is wrong behaviour on a main path of the feature: data lost or delivered wrong, or a request the server should refuse that it accepts. A minor defect is duplication, misplaced code or an inefficiency that does not change what the user gets.
+
+The new layout placed every file where its rules said, and avoided the duplication and one wrong-direction import found in the old run.
+
+The new layout still left the three severe defects, all on the run path: a missing attachment fell back silently and the run succeeded, connected agents received a 27 MB base64 string as message text, and the upload endpoint had no request size cap. The old layout left no severe defect; its findings were all minor: a size limit stated in three places, double buffering, a stray results row, and that import. We merged the old-layout pull request.
 
 With one run per layout, this is a diagnosis, not proof. Agent behaviour varies a lot between runs of the same prompt. The run did show where to look: the layout steered file placement and loop speed, but neither codebase named the connected-agent path or a size cap as required, so the agent skipped them on both. Those belong in a written spec for the feature.
 
@@ -17602,7 +17606,7 @@ Opus 5.5 cost 63% less per fix (95% CI 56 to 69%) at the same quality. Its lower
 
 **Question:** do built-in sub-agents on Sonnet cost less without hurting the result?
 
-**Arms:** default against `{"subagentModel": "sonnet"}`.
+**Arms:** default against `{"env": {"CLAUDE_CODE_SUBAGENT_MODEL": "sonnet"}}`. Explore and Plan keep the main model unless you also set `"CLAUDE_CODE_SUBAGENT_MODEL_FORCE": "1"`, so decide whether they belong in the test.
 
 **Task:** work that makes the agent search and read code through sub-agents, such as "find every place that reads this config value and change it", with a test that checks the change.
 
@@ -19394,11 +19398,13 @@ GROUP BY QuerySource, Model ORDER BY cost_usd DESC
 
 **Saving:** reprice those calls at Sonnet 5.5. Estimated median 4% of spend (p90 19%) where it fires (73% of organisations). Overlaps with check 1 when the sub-agents run an old Opus, so do not add the two. Searching and reading code rarely needs the top model, but say that the user should watch the quality of the sub-agents' reports for a week.
 
-**Setting:** `settings.json`, which a `model:` line in a custom agent's frontmatter still overrides:
+**Setting:** there is no top-level settings key for this. Set the `CLAUDE_CODE_SUBAGENT_MODEL` variable in the `env` block of `settings.json`. On its own it moves general-purpose and any custom agent without a `model:` line; Explore and Plan stay on the main conversation's model:
 
 ```json
-{ "subagentModel": "sonnet" }
+{ "env": { "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet" } }
 ```
+
+To move Explore and Plan too, add `"CLAUDE_CODE_SUBAGENT_MODEL_FORCE": "1"` to the same block (Claude Code v2.1.257 or later). It also overrides custom agents' `model:` lines and the model Claude picks for a single call, so suggest it only when no custom agent needs a stronger model. To move only Explore, the user can define an agent named `Explore` with `model: sonnet` in `~/.claude/agents/`.
 
 ### 5. API key: the five-minute cache is rebuilt after pauses
 
@@ -19494,9 +19500,9 @@ Measured means a controlled A/B run on the same tasks, described in [Run your ow
 | Use the current model version | `"model": "opus"` (not a pinned older id) | 88% of organisations | Estimated median 24%, p90 42%. Measured 63% on our bug-fix runs |
 | Compact the main conversation at 400k | `"autoCompactWindow": 400000` | 79% | Estimated median 7%, p90 23%; about 29% on threads past 800k. Measured 51% at 150k on a long reading session, with lost recall |
 | Compact sub-agents past 600k | same `autoCompactWindow`, and narrower sub-agent tasks | 18% of those with sub-agents | Estimated 35% of those sub-agents' cost, median 2% of the total |
-| Run built-in sub-agents on Sonnet | `"subagentModel": "sonnet"` | 73% | Estimated median 4%, p90 19% |
+| Run built-in sub-agents on Sonnet | `"env": { "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet" }`, plus `"CLAUDE_CODE_SUBAGENT_MODEL_FORCE": "1"` to include Explore and Plan | 73% | Estimated median 4%, p90 19% |
 | API key: one-hour cache on the main conversation | `"promptCacheTtl": "1h"` | pay-per-token users whose cache is rebuilt after pauses | Estimated median 11%, p90 25% |
-| Subscription: keep the one-hour main cache | do not set `promptCacheTtl` to `"5m"` | subscription users | A five-minute main cache uses more for 84 of 101 organisations |
+| Subscription: keep the one-hour main cache | do not set `promptCacheTtl` to `"5m"` | subscription users | Estimated: a five-minute main cache would cost more for 84 of 101 organisations |
 | Split long sessions | `/compact` before a break, `/clear` for a new task | 93% | Estimated median 5% |
 
 The savings overlap. An old Opus running your sub-agents counts in the first and fourth rows, and a long session counts in the compaction and split rows, so the rows do not add up.
@@ -19511,13 +19517,15 @@ To see which lifetime your main conversation uses, run `claude -p "hello" --outp
 
 ## Put settings in settings.json
 
-A value in the `env` block of any `settings.json` wins over a shell `export`, so the export can be silently ignored. Put each setting in `~/.claude/settings.json`, in the project's `.claude/settings.json`, or in managed settings for a team. Check every level for a conflicting value first, including `CLAUDE_CODE_AUTO_COMPACT_WINDOW`, `CLAUDE_CODE_SUBAGENT_MODEL` and `CLAUDE_CODE_PROMPT_CACHE_TTL` in an `env` block, because each environment variable overrides the setting of the same purpose.
+A value in the `env` block of any `settings.json` wins over a shell `export`, so the export can be silently ignored. Put each setting in `~/.claude/settings.json`, in the project's `.claude/settings.json`, or in managed settings for a team. Check every level for a conflicting value first, including `ANTHROPIC_MODEL`, `CLAUDE_CODE_AUTO_COMPACT_WINDOW` and `CLAUDE_CODE_PROMPT_CACHE_TTL` in an `env` block, because each environment variable overrides the setting of the same purpose. The sub-agent model has no setting of its own, so it goes in `env`.
 
 ```json ~/.claude/settings.json
 {
   "model": "opus",
   "autoCompactWindow": 400000,
-  "subagentModel": "sonnet"
+  "env": {
+    "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet"
+  }
 }
 ```
 
@@ -55563,11 +55571,13 @@ GROUP BY QuerySource, Model ORDER BY cost_usd DESC
 
 **Saving:** reprice those calls at Sonnet 5.5. Estimated median 4% of spend (p90 19%) where it fires (73% of organisations). Overlaps with check 1 when the sub-agents run an old Opus, so do not add the two. Searching and reading code rarely needs the top model, but say that the user should watch the quality of the sub-agents' reports for a week.
 
-**Setting:** `settings.json`, which a `model:` line in a custom agent's frontmatter still overrides:
+**Setting:** there is no top-level settings key for this. Set the `CLAUDE_CODE_SUBAGENT_MODEL` variable in the `env` block of `settings.json`. On its own it moves general-purpose and any custom agent without a `model:` line; Explore and Plan stay on the main conversation's model:
 
 ```json
-{ "subagentModel": "sonnet" }
+{ "env": { "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet" } }
 ```
+
+To move Explore and Plan too, add `"CLAUDE_CODE_SUBAGENT_MODEL_FORCE": "1"` to the same block (Claude Code v2.1.257 or later). It also overrides custom agents' `model:` lines and the model Claude picks for a single call, so suggest it only when no custom agent needs a stronger model. To move only Explore, the user can define an agent named `Explore` with `model: sonnet` in `~/.claude/agents/`.
 
 ### 5. API key: the five-minute cache is rebuilt after pauses
 
@@ -70556,7 +70566,7 @@ Sent with every report. `DISABLE_USAGE_STATS=true` stops the report as a whole.
 | `auth_method` | at the time of the report | Which sign-in method is configured, so an authentication problem can be reproduced rather than guessed at. | AUTH_PROVIDER, else the deprecated NEXTAUTH_PROVIDER |
 | `sso_provider` | at the time of the report | The name of the identity provider in use, never its configuration or its secrets, so an SSO problem names the product it is about. | Organization.ssoProvider |
 | `connected` | at the time of the report | Whether this install's license names a hosted service, which decides what it may call and which host answers it. | the signed license |
-| `license_key_source` | at the time of the report | Whether licenses are verified against the key LangWatch builds into the release or one a development build was given instead. Release builds verify against the embedded key only, so they always report `embedded`. | the build, then LANGWATCH_LICENSE_PUBLIC_KEY on a development build |
+| `license_key_source` | at the time of the report | Whether licenses are verified against the key LangWatch builds into the release or one the operator named instead, so an install trusting its own signer is not mistaken for a licensed one. | LANGWATCH_LICENSE_PUBLIC_KEY, set or not |
 | `license_key_fingerprint` | at the time of the report | The first 16 hex characters of the SHA-256 of the verifying public key, which tells a development key from a self-made one. Never the key. | the verifying public key |
 | `license_id` | at the time of the report | The license this install runs on, so a report can be matched to the license it claims. Null on an install holding none. | LANGWATCH_LICENSE_KEY, else the first organization's license |
 | `license_verified` | at the time of the report | Whether that license's signature verified against the key, so a license that does not verify is told apart from one that does. Null on an install holding none. | the signed license |

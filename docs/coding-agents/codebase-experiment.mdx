@@ -22,7 +22,7 @@ Two Claude Code sessions started 15 seconds apart on 2026-09-08 on the same mach
 
 The task was a full feature: an upload button for image cells in datasets and the evaluation workbench, a file column type, files delivered to prompts and agents as attachments, browser testing with screenshots, then a pull request driven through review. One session ran on the old layout and opened [langwatch#7964](https://github.com/langwatch/langwatch/pull/7964); the other ran on the new one and opened [langwatch#7972](https://github.com/langwatch/langwatch/pull/7972).
 
-| | Old layout | New layout |
+| | Old layout ([#7964](https://github.com/langwatch/langwatch/pull/7964)) | New layout ([#7972](https://github.com/langwatch/langwatch/pull/7972)) |
 |---|---|---|
 | Wall clock, raw | 3h 52m | 3h 26m |
 | Wall clock, confounds removed | 3h 13m | 3h 08m |
@@ -32,8 +32,8 @@ The task was a full feature: an upload button for image cells in datasets and th
 | Tool calls | 1,480 | 1,310 |
 | Mean context of a sub-agent call | 156k tokens | 202k tokens |
 | Typecheck runs | 19 whole-repository, median 78 s | 38 scoped, median 5 s |
-| Review threads | 33 over 5 passes | 11 over 1 pass |
-| Severe defects found when reading the diff | 0 | 3 |
+| Review bot threads on the pull request | 33, over 5 review passes | 11, over 1 review pass |
+| Severe defects found by reading the final diff | 0 | 3 |
 
 Each run hit one problem unrelated to the layout, and the adjusted rows remove both. The old-layout machine restarted mid-run (about 102 tool calls and 15 USD of repeated work). The new layout's base branch was missing two files, so the app would not boot until a sub-agent rebuilt them (about 25 minutes and 11 USD).
 
@@ -43,9 +43,13 @@ Speed: about the same. The new layout finished 5 minutes earlier once the confou
 
 Cost: about 7% higher on the new layout. It made fewer calls, but each sub-agent carried 29% more context, because one feature now spans several packages and a sub-agent keeps all of them in view. In both runs, the final reports sub-agents write back to the coordinator were about 20% of the cost.
 
-Defects: the new layout placed every file where its rules said, and avoided the duplication and one wrong-direction import found in the old run.
+Review: the old-layout pull request drew 33 review bot threads across 5 passes before it merged, about 7 per pass. The new-layout pull request drew 11 threads in its one pass and was closed, so the totals measure how long each stayed in review, not which layout drew fewer findings.
 
-It still left three severe defects on the run path: a missing attachment fell back silently and the run succeeded, connected agents received a 27 MB base64 string as message text, and the upload endpoint had no request size cap. The old run's findings were all minor: a size limit stated in three places, double buffering, a stray results row, and that import. We merged the old-layout pull request.
+Defects: we read both final diffs and rated each problem. A severe defect is wrong behaviour on a main path of the feature: data lost or delivered wrong, or a request the server should refuse that it accepts. A minor defect is duplication, misplaced code or an inefficiency that does not change what the user gets.
+
+The new layout placed every file where its rules said, and avoided the duplication and one wrong-direction import found in the old run.
+
+The new layout still left the three severe defects, all on the run path: a missing attachment fell back silently and the run succeeded, connected agents received a 27 MB base64 string as message text, and the upload endpoint had no request size cap. The old layout left no severe defect; its findings were all minor: a size limit stated in three places, double buffering, a stray results row, and that import. We merged the old-layout pull request.
 
 With one run per layout, this is a diagnosis, not proof. Agent behaviour varies a lot between runs of the same prompt. The run did show where to look: the layout steered file placement and loop speed, but neither codebase named the connected-agent path or a size cap as required, so the agent skipped them on both. Those belong in a written spec for the feature.
 
