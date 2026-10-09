@@ -60,3 +60,46 @@ describe("a live subscription whose store has no connection to give", () => {
     });
   });
 });
+
+describe("a live subscription the client closed", () => {
+  /** @scenario "A live subscription the client closed is not logged as a failure" */
+  it("logs nothing when the stream rejects with the client's abort", async () => {
+    const records: LogRecord[] = [];
+    const client = new AbortController();
+    let rejected!: () => void;
+    const settled = new Promise<void>((resolve) => (rejected = resolve));
+
+    const lane = SseLane.create({
+      members: {
+        createCaller: async ({ signal }) => ({
+          presence: {
+            onPresenceUpdate: async function* () {
+              await new Promise((_resolve, reject) =>
+                signal?.addEventListener("abort", () => {
+                  reject(new DOMException("The operation was aborted", "AbortError"));
+                  setTimeout(rejected, 0);
+                }),
+              );
+              yield undefined;
+            },
+          },
+        }),
+        procedureTypeAt: () => "subscription",
+      },
+      logger: recordingLogger(records),
+    });
+
+    const response = await lane.answer(
+      new Request("http://api.test/api/sse/presence/onPresenceUpdate", {
+        headers: { "sec-fetch-site": "same-origin" },
+        signal: client.signal,
+      }),
+      new Headers(),
+    );
+    client.abort();
+    await response.text();
+    await settled;
+
+    expect(records.filter((record) => record.level === "error")).toEqual([]);
+  });
+});

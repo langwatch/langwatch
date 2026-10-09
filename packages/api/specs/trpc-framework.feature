@@ -85,6 +85,12 @@ Feature: tRPC framework boundary
     And the failure is logged with that handled code as a platform fault
 
   @unit
+  Scenario: A live subscription the client closed is not logged as a failure
+    Given a subscription whose stream rejects with an abort once its client disconnects
+    When the client closes the stream
+    Then nothing is logged as an SSE handler error
+
+  @unit
   Scenario: A slow call is raised without burying the log
     Given a call succeeds slower than its budget
     When it is recorded
