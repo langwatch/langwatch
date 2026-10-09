@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -163,6 +164,12 @@ func langyWorkerBinaryPath(repoRoot string) string {
 // still comes up) and names the command and the log.
 func (o *Orchestrator) ensureLangyWorkerBinary(ctx context.Context, st domain.Stack, opts *PlanOptions) {
 	if !opts.Selection.Langy || st.LangyTier.RunsInContainer() || isExecutableFile(langyWorkerBinaryPath(opts.RepoRoot)) {
+		return
+	}
+	if _, err := exec.LookPath("bun"); err != nil {
+		fmt.Println("  langyagent: bun is missing: run `haven install`. Langy is off for this run.")
+		o.log.Warn("bun is missing — skipping langyagent", zap.Error(err))
+		opts.Selection.Langy = false
 		return
 	}
 	dir, _ := domain.StackLogPaths(st.WorktreeDir, st.Slug)
