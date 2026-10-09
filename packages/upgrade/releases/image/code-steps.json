@@ -35,6 +35,13 @@
     "description": "Seeds entitlement's trace meter from trace's span log at deploy."
   },
   {
+    "id": "governance:migrate-anomaly-webhook-destinations",
+    "kind": "data",
+    "mode": "background",
+    "owner": "governance",
+    "description": "Moves each anomaly rule's inline webhook destinations onto legacy-scheme webhook endpoints."
+  },
+  {
     "id": "governance:record-coding-assistant-billing",
     "kind": "data",
     "mode": "background",

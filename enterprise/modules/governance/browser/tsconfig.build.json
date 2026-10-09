@@ -76,6 +76,9 @@
     },
     {
       "path": "../../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/webhook/client/tsconfig.build.json"
     }
   ]
 }

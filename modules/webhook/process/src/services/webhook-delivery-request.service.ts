@@ -15,7 +15,7 @@ import type { WebhookDeliveryProcessDeps } from "./webhook-delivery.service.ts";
 import type { WebhookEndpointStreamService } from "./webhook-endpoint-stream.service.ts";
 
 interface WebhookDeliveryRequestDeps {
-  endpoints: Pick<WebhookEndpointRepository, "getById">;
+  endpoints: Pick<WebhookEndpointRepository, "getById" | "getDestinationConfig">;
   getPlan: WebhookDeliveryProcessDeps["getPlan"];
   stream: Pick<WebhookEndpointStreamService, "flush">;
   now?: () => number;
@@ -63,7 +63,12 @@ export class WebhookDeliveryRequestService {
       return { deliveryId };
     }
     const plan = await this.deps.getPlan(organizationId);
-    if (plan.webhookEndpointsEnabled !== true) return { deliveryId };
+    if (
+      plan.webhookEndpointsEnabled !== true &&
+      !(await this.isMigratedLegacyEndpoint({ organizationId, endpointId: endpoint.id }))
+    ) {
+      return { deliveryId };
+    }
 
     const envelope: SendBatchPayload["envelopes"][number] = {
       id: deliveryId,
@@ -81,5 +86,14 @@ export class WebhookDeliveryRequestService {
       sourceEventId: `request:${endpoint.id}:${deliveryId}`,
     });
     return { deliveryId };
+  }
+
+  /** W11-D1 (b): an endpoint governance migrated from an inline alert keeps main's delivery. */
+  private async isMigratedLegacyEndpoint(input: {
+    organizationId: string;
+    endpointId: string;
+  }): Promise<boolean> {
+    const destination = await this.deps.endpoints.getDestinationConfig(input);
+    return destination.kind === "http" && destination.signatureScheme === "legacy_sha256";
   }
 }

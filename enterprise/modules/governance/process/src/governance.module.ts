@@ -135,6 +135,25 @@ export const governanceProcessModule: PublishedProcessModule<"governance", Gover
           return { ...report, dryRun };
         },
       }),
+      // W11-D1 (b): migrated endpoints keep the legacy scheme, so the plan gate passes them.
+      defineMigrationStep({
+        id: "governance:migrate-anomaly-webhook-destinations",
+        kind: "data",
+        mode: "background",
+        description:
+          "Moves each anomaly rule's inline webhook destinations onto legacy-scheme webhook endpoints.",
+        needsOldWritersGone: true,
+        run: async ({ checkpoint, dryRun, signal }) => {
+          const resumed = checkpoint.resumeFrom?.afterOrganizationId;
+          const report = await app.anomalyWebhookMigration.migrate({
+            after: typeof resumed === "string" ? resumed : undefined,
+            dryRun,
+            signal,
+            onPage: (page) => (dryRun ? Promise.resolve() : checkpoint.save({ report: page })),
+          });
+          return { ...report, dryRun };
+        },
+      }),
       defineProjectionReplayStep({
         id: "governance:replay-cost-charges",
         description:

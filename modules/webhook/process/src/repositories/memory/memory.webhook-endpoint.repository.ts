@@ -219,10 +219,11 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRepositor
     maxBatchDelayMs?: number;
     maxInFlight?: number;
     signatureScheme?: WebhookSignatureScheme;
+    sharedSecret?: string;
   }): Promise<{ endpoint: WebhookEndpointView; secret: string }> {
     const destinationKind = params.destinationKind ?? "http";
     const destination = storedDestination(params, this.#options.secrets);
-    const secret = newSecret();
+    const secret = params.sharedSecret ?? newSecret();
     const now = nowInstant();
     const row: MemoryWebhookEndpointRow = {
       id: this.#options.ids.newEndpointId(),

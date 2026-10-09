@@ -187,13 +187,14 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRepositor
     maxBatchDelayMs?: number;
     maxInFlight?: number;
     signatureScheme?: WebhookSignatureScheme;
+    sharedSecret?: string;
   }): Promise<{ endpoint: WebhookEndpointView; secret: string }> {
     const destinationKind = params.destinationKind ?? "http";
     const destination = PrismaWebhookEndpointRepository.storedDestination(
       params,
       this.deps.secrets,
     );
-    const secret = PrismaWebhookEndpointRepository.newSecret();
+    const secret = params.sharedSecret ?? PrismaWebhookEndpointRepository.newSecret();
     const data: Prisma.WebhookEndpointUncheckedCreateInput = {
       id: this.deps.ids.newEndpointId(),
       organizationId: params.organizationId,

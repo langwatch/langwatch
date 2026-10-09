@@ -185,7 +185,10 @@ import {
   OutboxAnomalyAlertDelivery,
   requestAnomalyAlertDelivery,
 } from "../eventing/anomaly-alert-delivery.intent.ts";
-import type { AnomalyAlertDeliveryIntent } from "../eventing/anomaly-alert-delivery.process.ts";
+import {
+  ANOMALY_ALERT_EVENT_TYPE,
+  type AnomalyAlertDeliveryIntent,
+} from "../eventing/anomaly-alert-delivery.process.ts";
 import { CostRollupWatchProcess } from "../eventing/cost-rollup-watch.process.ts";
 import { GovernanceCostChargeMapProjection } from "../eventing/governance-cost-charge.projection.ts";
 import { GovernanceCostRollupFoldProjection } from "../eventing/governance-cost-rollup.projection.ts";
@@ -286,6 +289,7 @@ import { AiToolProviderReachService } from "../services/ai-tool-provider-reach.s
 import { GovernanceAiToolSlugService } from "../services/ai-tool-slug.service.ts";
 import { AnomalyAlertDispatcherService } from "../services/anomaly-alert-dispatcher.service.ts";
 import { AnomalyRuleService } from "../services/anomaly-rule.service.ts";
+import { AnomalyWebhookDestinationMigrationService } from "../services/anomaly-webhook-destination-migration.service.ts";
 import { GovernanceMcpToolsService } from "../services/governance-mcp-tools.service.ts";
 import { GovernancePlanGateService } from "../services/governance-plan-gate.service.ts";
 import { PostgresGovernancePolicyService } from "../services/governance-policy.service.ts";
@@ -306,8 +310,8 @@ type EventingSenders = Readonly<Record<string, EventingCommandSender<unknown>>>;
 
 /** The peers this application reads, resolved from {@link GovernanceModule.dependencies}. */
 interface GovernanceAppDependencies {
-  /** Anomaly alerts to a rule's registered webhook endpoints, from the delivery intent only. */
-  webhooks: Pick<WebhookApi, "requestDelivery">;
+  /** Anomaly alerts to a rule's registered endpoints, and the endpoints W-11's step creates. */
+  webhooks: Pick<WebhookApi, "requestDelivery" | "create">;
   /**
    * The organization a project belongs to, for the project-scoped REST family,
    * and the organization's hidden governance project, which is the tenant an
@@ -562,6 +566,12 @@ export class GovernanceModule implements GovernanceRestApi {
     });
     this.tenantHistory = tenantHistory;
     this.anomalyRules = AnomalyRuleService.create({ repository: repositories.anomalyRules });
+    this.anomalyWebhookMigration = AnomalyWebhookDestinationMigrationService.create({
+      rules: repositories.anomalyRules,
+      organizationIds: (input) => dependencies.organizations.listAllIds(input),
+      createEndpoint: (command) => dependencies.webhooks.create(command),
+      alertEventType: ANOMALY_ALERT_EVENT_TYPE,
+    });
     this.activityMonitor = ActivityMonitorService.create({
       repository: repositories.activityMonitor,
       projects: dependencies.projects,
@@ -903,6 +913,8 @@ export class GovernanceModule implements GovernanceRestApi {
   private readonly costAttributionPolicy: PostgresGovernancePolicyService;
   /** Q82: the billed facts trace folds; the backfill task records them for existing configs. */
   readonly codingAssistantBilling: CodingAssistantBillingFactService;
+  /** W-11: the deploy step moving inline anomaly webhooks onto endpoints. */
+  readonly anomalyWebhookMigration: AnomalyWebhookDestinationMigrationService;
   private readonly people: GovernancePeopleScreenService;
   private readonly agentsScreen: GovernanceAgentsScreenService;
   private readonly costBreakdown: GovernanceCostBreakdownService;
