@@ -130,13 +130,13 @@ Feature: Single sign-on believes an assertion or ID token only inside its own co
       Then the sign-in is refused as unverifiable
       And no account or session is written
 
-    @integration @unimplemented
+    @integration
     Scenario: An ID token that expired up to 120 seconds ago is admitted
       Given an ID token whose expiry passed one minute ago
       When the callback exchanges the code for it
       Then the sign-in succeeds
 
-    @integration @unimplemented
+    @integration
     Scenario: An ID token whose not-before time is up to 120 seconds away is admitted
       Given an ID token whose not-before time is one minute from now
       When the callback exchanges the code for it

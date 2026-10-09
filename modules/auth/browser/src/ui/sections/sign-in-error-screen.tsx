@@ -294,6 +294,22 @@ function SignInErrorDescription({
     );
   }
 
+  if (error === "signed_in_as_another_user") {
+    return (
+      <Alert.Description>
+        <VStack gap={1} align="start">
+          <Text>
+            You are already signed in as someone else. Sign out, then sign in again from your
+            identity provider.
+          </Text>
+          <Button {...FRONT_DOOR_PRIMARY_STYLE} asChild marginTop={4}>
+            <a href={FEDERATED_LOGOUT_PATH}>Sign out</a>
+          </Button>
+        </VStack>
+      </Alert.Description>
+    );
+  }
+
   if (error === "LINK_NEEDS_APPROVAL") {
     return (
       <Alert.Description>

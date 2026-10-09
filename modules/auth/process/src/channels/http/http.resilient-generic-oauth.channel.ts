@@ -2,7 +2,10 @@ import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import { type GenericOAuthConfig, genericOAuth } from "better-auth/plugins/generic-oauth";
 
-import { isIssuedAtWithinTolerance } from "../../rules/sign-in-clock.rules.ts";
+import {
+  isIssuedAtWithinTolerance,
+  SIGN_IN_CLOCK_TOLERANCE_SECONDS,
+} from "../../rules/sign-in-clock.rules.ts";
 
 const logger = createLogger("langwatch:better-auth:generic-oauth");
 
@@ -105,14 +108,15 @@ async function initProvider({
 }
 
 /**
- * The real plugin verifies an ID token's `iat` only with a maximum age it never sets, so the
- * claim is checked here: one issued beyond the clock tolerance in the future is refused.
+ * The real plugin checks `iat` only under a maximum age it never sets, so the claim is checked
+ * here; `exp` and `nbf` get the same clock tolerance (patches/@better-auth__core@1.7.1.patch).
  */
 function withIssuedAtCheck(provider: GenericProvider): GenericProvider {
   const idToken = provider.idToken;
   if (!idToken || "verify" in idToken) return provider;
   provider.idToken = {
     ...idToken,
+    clockTolerance: SIGN_IN_CLOCK_TOLERANCE_SECONDS,
     verifyClaims: (claims) =>
       isIssuedAtWithinTolerance({
         issuedAt: claims.iat,

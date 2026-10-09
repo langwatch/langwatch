@@ -159,3 +159,33 @@ Feature: Signing in from the identity provider's own portal through a SAML conne
       And the browser is signed in as "carol@acme.com"
       When the identity provider posts a valid signed response for "carol@acme.com" that answers no request
       Then "carol@acme.com" is signed in through "acme-okta"
+
+  Rule: a response nobody asked for, posted from another site, is posted again from LangWatch first
+
+    # A post from the identity provider's page arrives without LangWatch's cookies; posting it
+    # again from LangWatch carries them, so the rule above applies to it.
+
+    @integration
+    Scenario: An unsolicited response posted from another site is posted again once from LangWatch
+      Given "acme-okta" is opted in
+      When the identity provider's page posts a valid signed response for "carol@acme.com" that answers no request
+      Then the browser gets a page that posts the same response to the same address from LangWatch
+      And that page sets no cookie and runs no script but its own
+      And the assertion is not yet used
+      When the browser posts it from LangWatch
+      Then "carol@acme.com" is signed in through "acme-okta" and the response is not posted again
+
+    @integration
+    Scenario: The response posted again from LangWatch is refused for another person while somebody is signed in
+      Given "acme-okta" is opted in
+      And the browser is signed in as "carol@acme.com"
+      When the identity provider's page posts a valid signed response for "dave@acme.com" that answers no request
+      And the browser posts it again from LangWatch with its session
+      Then the person sees the sign-in error screen asking them to sign out first
+      And the browser is still signed in as "carol@acme.com" with the same session
+
+    @integration
+    Scenario: A response to a sign-in LangWatch started is never posted again
+      Given "acme-okta" is opted in
+      When "carol@acme.com" starts single sign-on from LangWatch and the identity provider's page posts the answer
+      Then "carol@acme.com" is signed in through "acme-okta" without a page in between

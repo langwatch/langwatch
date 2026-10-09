@@ -19,6 +19,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { ssoSamlOptions } from "../http.better-auth.channel.ts";
+import { samlOwnOriginRepost } from "../http.saml-own-origin-repost.channel.ts";
 
 const BASE_URL = "http://localhost:5624";
 const PROVIDER_ID = "acme-okta";
@@ -92,6 +93,7 @@ function deployment(idpInitiated: IdpInitiated | undefined) {
         saml: ssoSamlOptions,
         resolveUser: async () => ({ action: "continue" }),
       }),
+      samlOwnOriginRepost,
     ],
   });
   return { auth, database, logged };
@@ -135,11 +137,13 @@ async function postAssertion({
   samlResponse,
   relayState,
   cookie,
+  fetchSite,
 }: {
   auth: Auth;
   samlResponse: string;
   relayState?: string;
   cookie?: string;
+  fetchSite?: string;
 }) {
   const body = new URLSearchParams({ SAMLResponse: samlResponse });
   if (relayState !== undefined) body.set("RelayState", relayState);
@@ -150,6 +154,7 @@ async function postAssertion({
         "content-type": "application/x-www-form-urlencoded",
         origin: BASE_URL,
         ...(cookie === undefined ? {} : { cookie }),
+        ...(fetchSite === undefined ? {} : { "sec-fetch-site": fetchSite }),
       },
       body,
       redirect: "manual",
@@ -169,6 +174,13 @@ function outcomeOf(response: Response) {
 
 const unsolicited = (over: Partial<SamlAssertionClaims> = {}) =>
   signSamlResponse({ identity: idp, claims: claims(over) });
+
+/** The fields the re-post page carries, as the browser submits them back. */
+async function repostedFields(response: Response) {
+  const page = await response.text();
+  const field = (name: string) => new RegExp(`name="${name}" value="([^"]*)"`).exec(page)?.[1];
+  return { samlResponse: field("SAMLResponse") ?? "", relayState: field("RelayState") };
+}
 
 afterEach(() => {
   vi.useRealTimers();
@@ -332,6 +344,70 @@ describe("given a SAML connection opted in, and a browser already signed in as c
 
     expect(outcome).toMatchObject({ status: 302, error: null });
     expect(database.session).toHaveLength(2);
+  });
+
+  /** @scenario "The response posted again from LangWatch is refused for another person while somebody is signed in" */
+  it("posts a cross-site response for dave again from LangWatch, where carol's session refuses it", async () => {
+    const { auth, database } = deployment(OPTED_IN);
+    const cookie = await signedInAsCarol(auth);
+    const sessionsBefore = [...database.session];
+    const samlResponse = unsolicited({ nameId: OTHER_EMAIL, email: OTHER_EMAIL });
+
+    const page = await postAssertion({ auth, samlResponse, fetchSite: "cross-site" });
+    const reposted = await repostedFields(page);
+    const response = await postAssertion({ auth, ...reposted, cookie, fetchSite: "same-origin" });
+
+    expect(page.status).toBe(200);
+    expect(outcomeOf(response)).toMatchObject({ status: 302, error: "signed_in_as_another_user" });
+    expect(database.session).toEqual(sessionsBefore);
+  });
+});
+
+describe("given a SAML connection opted in, and an identity provider posting from its own site", () => {
+  /** @scenario "An unsolicited response posted from another site is posted again once from LangWatch" */
+  it("answers with a page that posts the response again unchanged, then signs the person in", async () => {
+    const { auth, database } = deployment(OPTED_IN);
+    const samlResponse = unsolicited();
+
+    const page = await postAssertion({
+      auth,
+      samlResponse,
+      relayState: "/acme/messages",
+      fetchSite: "cross-site",
+    });
+
+    expect(page.status).toBe(200);
+    expect(page.headers.get("content-type")).toContain("text/html");
+    expect(page.headers.get("content-security-policy")).toMatch(
+      /default-src 'none'; script-src 'sha256-[^']+'; form-action 'self'/,
+    );
+    expect(page.headers.getSetCookie()).toEqual([]);
+    expect(database.session).toEqual([]);
+    expect(database.verification).toEqual([]);
+    const reposted = await repostedFields(page);
+    expect(reposted).toEqual({ samlResponse, relayState: "/acme/messages" });
+
+    const outcome = outcomeOf(await postAssertion({ auth, ...reposted, fetchSite: "same-origin" }));
+
+    expect(outcome).toMatchObject({ status: 302, error: null, path: "/acme/messages" });
+    expect(database.session).toHaveLength(1);
+  });
+
+  /** @scenario "A response to a sign-in LangWatch started is never posted again" */
+  it("signs in a person whose sign-in LangWatch started, with no page in between", async () => {
+    const { auth, database } = deployment(OPTED_IN);
+    const { requestId, relayState } = await startSignIn(auth);
+    const samlResponse = unsolicited({ inResponseTo: requestId });
+
+    const response = await postAssertion({
+      auth,
+      samlResponse,
+      relayState,
+      fetchSite: "cross-site",
+    });
+
+    expect(outcomeOf(response)).toMatchObject({ status: 302, error: null });
+    expect(database.session).toHaveLength(1);
   });
 });
 

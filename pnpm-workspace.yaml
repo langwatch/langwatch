@@ -335,3 +335,4 @@ packageExtensions:
 # Local fixes carried until upstream releases them (dev/docs/ARCHITECTURE.md, patched dependencies).
 patchedDependencies:
   '@better-auth/sso@1.7.1': patches/@better-auth__sso@1.7.1.patch
+  '@better-auth/core@1.7.1': patches/@better-auth__core@1.7.1.patch
