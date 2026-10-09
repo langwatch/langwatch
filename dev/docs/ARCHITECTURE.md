@@ -1174,7 +1174,14 @@ there — nothing else to configure. **The preflight is part of start()**
 (approved 2026-09-18): the moment the chain exists, every required handle
 declared anywhere in the module array is checked answerable — env set, or
 key present in the vault — and a miss fails the boot immediately, naming
-every missing key at once, values never held. **Global concerns declare the
+every missing key at once. **1Password is best effort** (Alex, 2026-10-09):
+one cheap probe per boot (`op whoami --account <acct>`); a failed probe (no
+`op`, locked, signed out, timed out) logs one warning naming why and 1Password
+sits out that boot, so optional handles stay unset and a required one fails
+with the ordinary missing-key refusal. After a good probe the preflight reads
+every single handle env and `.env` leave unanswered in parallel (capped, each
+read timed out), and a field absent from the item is an ordinary miss.
+**Global concerns declare the
 same way at their framework owner** — logging and telemetry are
 everyone-sends-to-one-place concerns, so `@langwatch/process` and
 observability packages declare their config slices and secret handles
@@ -1185,9 +1192,11 @@ telemetry initializes. The app builds only the READER — a fluent adapter chain
 .withOnePassword(...))` — installed on the Server preamble AFTER
 `withConfig`, so config can feed secrets (the 1Password vault key is a
 config fact); the builder is never imported and chains directly. **The
-chain is a lookup order, not a store**: it holds no values, pre-fetches
-nothing, enumerates no vault — each declared handle is fetched singly, at
-its owner's construction site, and handed straight to its closure. `boot()`
+chain is a lookup order, not a store**: it enumerates no vault, and env and
+`.env` hold no values — each declared handle is fetched singly, at its
+owner's construction site, and handed straight to its closure. The one
+exception is 1Password's parallel preflight answers, held only until the
+resolver seals and then dropped. `boot()`
 scopes the resolver per module: a `create()` can resolve only the handles
 its own module declared, each resolve validates against the handle's
 schema and hands the value to a closure —

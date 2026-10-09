@@ -54,9 +54,13 @@ literally.
 4. `haven down && haven up` (a restart keeps the old env), then
    `haven env --agent | grep -E 'STRIPE|LANGWATCH_OP'` shows only the account.
 
-With the account set, every handle missing from env and `.env` asks `op`, so a
-locked or signed-out 1Password fails the boot with `one_password_unavailable`.
-Production refuses the account by name.
+With the account set, each boot probes once with `op whoami`, then reads every
+handle missing from env and `.env` in parallel. 1Password is best effort: when
+`op` is missing, locked, signed out or times out, the boot logs one
+`[secrets] 1Password skipped` warning with the reason and carries on without
+it, so optional secrets stay unset and a missing required one fails by name.
+Unlock 1Password and restart to pick the values up. Production refuses the
+account by name.
 
 ## haven (thuishaven)
 
