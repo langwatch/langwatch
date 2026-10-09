@@ -172,7 +172,13 @@ export const modelProviders = {
     endpointKey: "CUSTOM_BASE_URL",
     keysSchema: z.object({
       CUSTOM_API_KEY: z.string().nullable().optional(),
-      CUSTOM_BASE_URL: z.string().nullable().optional(),
+      CUSTOM_BASE_URL: z
+        .string()
+        .nullable()
+        .optional()
+        .refine((value) => !value?.trim() || URL.canParse(value.trim()), {
+          message: "must be a full URL, for example https://inference.acme.internal/v1",
+        }),
     }),
     optionalKeys: ["CUSTOM_API_KEY"],
     enabledSince: Temporal.Instant.from("2023-01-01T00:00:00Z"),
