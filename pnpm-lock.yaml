@@ -1494,6 +1494,9 @@ importers:
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../packages/observability
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../packages/process
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../packages/time
