@@ -122,3 +122,12 @@ func TestOrbFactsLinkTheHubAndTheStackLogs(t *testing.T) {
 		t.Fatalf("facts miss the mail console or branch: %s", rec.Body)
 	}
 }
+
+// @scenario "the orb shows each service's health"
+func TestOrbFactsCarryEachServiceStatus(t *testing.T) {
+	server, _ := orbServer(t)
+	rec := orbCall{http.MethodGet, "/api/stacks/feat-x/orb", orbAppOrigin, ""}.on(server)
+	if !strings.Contains(rec.Body.String(), `"label":"mail","href":"https://mail.feat-x.langwatch.localhost:1355","status":"not-selected"`) {
+		t.Fatalf("mail carries no status: %s", rec.Body)
+	}
+}

@@ -21,6 +21,8 @@ const orbMaxBody = 4 << 20
 type orbLink struct {
 	Label string `json:"label"`
 	Href  string `json:"href"`
+	// Status is a service's stack-home status (live, starting, down, not-selected); empty for pages.
+	Status string `json:"status,omitempty"`
 }
 
 // orbFacts is what the orb's panel shows about its stack.
@@ -41,7 +43,7 @@ func (s *Server) handleOrbFacts(w http.ResponseWriter, r *http.Request) {
 		Slug:   st.Slug,
 		Branch: st.Branch,
 		Commit: orbHeadCommit(r.Context(), st.WorktreeDir),
-		Links:  s.orbLinks(st),
+		Links:  s.orbLinks(st, s.orbStatuses(st)),
 	})
 }
 
@@ -140,8 +142,18 @@ func (s *Server) orbStackBySlug(slug string) (domain.Stack, bool) {
 	return domain.Stack{}, false
 }
 
+// orbStatuses is each surface's status by name, read the way the stack home reads it.
+func (s *Server) orbStatuses(st domain.Stack) map[string]string {
+	statuses := map[string]string{}
+	surfaces := s.surfaces(homeState{stack: st, registered: true, live: s.isLive(st)})
+	for i := range surfaces {
+		statuses[surfaces[i].Name] = surfaces[i].Status
+	}
+	return statuses
+}
+
 // orbLinks are the hub, this stack's logs page and every service haven routes for it.
-func (s *Server) orbLinks(st domain.Stack) []orbLink {
+func (s *Server) orbLinks(st domain.Stack, statuses map[string]string) []orbLink {
 	hub := strings.TrimRight(s.hubURL(), "/")
 	links := []orbLink{
 		{Label: "Hub", Href: hub},
@@ -149,7 +161,7 @@ func (s *Server) orbLinks(st domain.Stack) []orbLink {
 	}
 	for _, svc := range st.Services {
 		if svc.URL != "" {
-			links = append(links, orbLink{Label: svc.Name, Href: svc.URL})
+			links = append(links, orbLink{Label: svc.Name, Href: svc.URL, Status: statuses[svc.Name]})
 		}
 	}
 	return links
