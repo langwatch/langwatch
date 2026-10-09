@@ -163,20 +163,22 @@ refuses and prints two ready-to-paste options (a free slot via
 `PORT=5570 pnpm dev`, or a port-scoped kill). Paste one; don't hunt processes by
 hand. `dev/scripts/kill-dev-tree.sh` already does it correctly.
 
-Locally there are two Node processes: the `api` lane runs the api and the worker
-in one process. It is a launcher, not a process role: each still resolves its
+Locally there is one Node process by default: the `app` lane runs the ui's Vite
+server, the api and the worker together (see "One process" below). It is a
+launcher, not a process role: each still resolves its
 own secrets, config and graph; boot is worker then api, and shutdown drains the
 worker first. Production runs three Node deployments.
 
 | Script                                   | What runs                                                                                |
 | ---------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `pnpm dev`                               | ui + backend + go (+ langy when selected)                                                |
+| `pnpm dev`                               | app (ui + api + worker) + go (+ langy when selected)                                     |
 | `pnpm dev:ui` / `dev:backend` / `dev:go` | one lane alone                                                                           |
-| `pnpm dev:one`                           | ui + api + worker in one Node process (see "One process" below)                          |
+| `pnpm dev:one`                           | the app lane alone: ui + api + worker in one Node process                                |
 | `pnpm dev:api` + `pnpm dev:worker`       | the production process shape; use when a blocked worker job must not read as API latency |
 
-Both Node lanes restart on change, debounced by
-`LANGWATCH_DEV_WATCH_DEBOUNCE_MS` (default 2000 ms); the Go lane restarts through
+The backend reloads on change, debounced by `LANGWATCH_DEV_WATCH_DEBOUNCE_MS`
+(default 2000 ms, never more than `LANGWATCH_DEV_WATCH_MAX_WAIT_MS`, 30 s, after
+the first change), one reload at a time; the Go lane restarts through
 `air` on successful builds only. The Go services auto-start when the toolchain is
 on PATH and reuse an existing listener from another worktree. Opt out per
 service with `LANGWATCH_SKIP_AIGATEWAY=1`, `LANGWATCH_SKIP_NLP=1` or
@@ -186,18 +188,20 @@ or `make service-watch svc=nlpgo`. The gateway needs the "AI GATEWAY" block
 from `.env.example`; langyagent writes its own `.env` block on first run and
 needs the worker binary (`pnpm --filter @langwatch/langyworker build:binary`).
 
-### One process (trial, ADR-168 B1)
+### One process (the default, ADR-168 B1)
 
-`LANGWATCH_DEV_ONE_PROCESS=1` (plain `pnpm dev`, or `haven up -f` with it
-exported or in `.env`) replaces the ui and backend lanes with one `app` lane:
-`tools/dev-runtime` hosts the UI's Vite server (`apps/ui/vite.config.ts`,
+Plain `pnpm dev` and `haven up` run one `app` lane: `tools/dev-runtime` hosts the UI's Vite server (`apps/ui/vite.config.ts`,
 unchanged, still proxying `/api`) and loads the api and worker through a Vite
-module runner. `pnpm dev:one` runs that process alone. Ports are unchanged.
+module runner, under the same `dev-supervisor.mjs --watch` as the split backend
+lane. `LANGWATCH_DEV_ONE_PROCESS=0` (plain `pnpm dev`, or `haven up -f` with it
+exported or in `.env`) splits it back into a `ui` lane and a `backend` lane
+(haven: `api`). Ports are the same either way.
 
 A backend edit that touches a loaded file re-links only what it reaches, then
 drains the old generation (worker, then api) and boots the new one; the browser
 keeps its HMR socket. A change that does not link leaves the old generation
-serving; a failed boot waits for the next change. Each generation logs one
+serving; a failed boot waits for the next change. An edit that lands during a
+boot, the first one included, is answered by one follow-up reload. Each generation logs one
 `backend ready` line with its number, changed files, `drainMs`, `readyMs` and
 `rssMiB`. Under haven, `haven logs ui|api|worker` read the `app` capture;
 `haven restart ui` or `api` restarts the whole process.
@@ -224,8 +228,8 @@ pnpm --filter @langwatch/tasks task upgrade status     # what the ledger says
 pnpm --filter @langwatch/tasks task upgrade plan       # what an upgrade would apply
 ```
 
-`pnpm prisma:migrate` and `pnpm clickhouse:migrate` still exist but bypass the ledger, so the gate
-keeps refusing until `upgrade` records them. ClickHouse is required: a stack without it refuses to
+`pnpm prisma:migrate` and `pnpm clickhouse:migrate` are aliases of `pnpm task upgrade`: each runs
+the whole upgrade (Postgres and every ClickHouse target) through the ledger. ClickHouse is required: a stack without it refuses to
 serve. Live api and worker suites run `upgrade` once per test process on the test stores
 (`specs/upgrade/live-test-fixtures.feature`). Writing a migration: the `migration` skill.
 

@@ -109,7 +109,7 @@ Feature: The local development process topology
   # second into five restarts — five reconnects to Postgres/ClickHouse/Redis.
   # dev/scripts/dev-supervisor.mjs's `--watch` mode wraps the command with a
   # debounced quiet window instead (LANGWATCH_DEV_WATCH_DEBOUNCE_MS, default
-  # 750 ms), coalescing a burst into one restart. See
+  # 2 s, at most 30 s after the first change), coalescing a burst into one restart. See
   # dev/scripts/__tests__/dev-supervisor-watch.unit.test.mjs.
 
   # Hundreds of files over several seconds, in bursts with gaps between them,
@@ -235,6 +235,27 @@ Feature: The local development process topology
     When the old generation's drain fails during a reload
     Then the host does not boot the next generation beside it
     And it logs "backend recycling" and exits non-zero, so the supervisor starts a fresh process
+
+  # --- One process is the default (ADR-168, amendment 2026-10-09) ---
+
+  # Plain `pnpm dev` and `haven up` run the ui's Vite server, the api and the
+  # worker as one `app` lane; LANGWATCH_DEV_ONE_PROCESS=0 is the opt-out.
+  # Bind: dev/scripts/dev-stack.sh and haven's optionsFromEnv have no test yet.
+  @unimplemented
+  Scenario: A local stack runs the ui, the api and the worker in one process unless split
+    Given a contributor starts a stack with plain pnpm dev or haven up
+    When LANGWATCH_DEV_ONE_PROCESS is unset
+    Then one app lane hosts the ui's Vite server, the api and the worker
+    And setting LANGWATCH_DEV_ONE_PROCESS=0 runs a ui lane and a backend lane instead
+
+  # The one-process host debounces exactly as the split backend lane does: its
+  # watch is live before the first boot, and that boot is a reload too.
+  @unit
+  Scenario: A change during the one-process host's boot is answered by one follow-up reload
+    Given the one-process host watching backend source
+    When files it loaded change while a boot, the first one included, is still running
+    Then no second reload starts on top of the boot
+    And once the boot settles one follow-up reload carries every changed file
 
   # Only the packages the backend can load matter. pnpm resolves declared
   # dependencies only, so a workspace package that no backend dependency reaches

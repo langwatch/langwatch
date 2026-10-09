@@ -5,7 +5,8 @@
 # as its own deployment (see the image's CMD); nothing here is on that path, so
 # there is no production branch to keep in step.
 #
-# Lanes (ADR-004, amendment 2026-09-07 — the local topology):
+# Lanes (ADR-004, amendment 2026-09-07 — the local topology; ui and backend
+# only with LANGWATCH_DEV_ONE_PROCESS=0, else the app lane below hosts both):
 #   ui       apps/ui           — Vite on PORT (default 5560), proxying /api to
 #                                the backend lane
 #   backend  tools/dev-runtime — the API application AND the worker application
@@ -20,12 +21,13 @@
 #                                worker subprocesses, so it must not be
 #                                restarted with the rest of the Go code.
 #
-#   app      tools/dev-runtime — with LANGWATCH_DEV_ONE_PROCESS=1, the ui and
-#                                backend lanes as ONE Node process: Vite on
-#                                PORT, api + worker re-linked in-process on a
-#                                backend change (ADR-168, B1). Same ports.
+#   app      tools/dev-runtime — the default: the ui and backend lanes as ONE
+#                                Node process: Vite on PORT, api + worker
+#                                re-linked in-process on a backend change
+#                                (ADR-168, B1). Same ports, same debounce.
+#                                LANGWATCH_DEV_ONE_PROCESS=0 runs ui + backend.
 #
-# The ui and backend lanes (or the app lane) always run. The go lane is a convenience: it is
+# The app lane (or, split, the ui and backend lanes) always runs. The go lane is a convenience: it is
 # skipped, with a line saying so, when the toolchain is absent, when its ports
 # are already held, or when both opt-out variables are set. Production is
 # unchanged — three Node deployments and separate Go services.
@@ -280,8 +282,9 @@ add_lane() {
   COMMANDS+=("bash $(shell_quote "$HERE/lane.sh") $1 $(shell_quote "$2")")
 }
 
-ONE_PROCESS="${LANGWATCH_DEV_ONE_PROCESS:-}"
-if [ "$ONE_PROCESS" != "1" ]; then
+# One process is the default (ADR-168); LANGWATCH_DEV_ONE_PROCESS=0 splits ui from backend.
+ONE_PROCESS="${LANGWATCH_DEV_ONE_PROCESS:-1}"
+if [ "$ONE_PROCESS" = "0" ]; then
   add_lane ui "$RUNTIME_ENV pnpm --silent --filter @langwatch/ui dev"
 fi
 
@@ -296,7 +299,7 @@ fi
 # process. It boots the worker first, so the queue consumers are attached
 # before anything can enqueue. It does not migrate: the step above did, once,
 # and this lane restarts.
-if [ "$ONE_PROCESS" = "1" ]; then
+if [ "$ONE_PROCESS" != "0" ]; then
   add_lane app "$RUNTIME_ENV pnpm --silent --filter @langwatch/dev-runtime dev:one"
 else
   add_lane backend "$RUNTIME_ENV pnpm --silent --filter @langwatch/dev-runtime dev"

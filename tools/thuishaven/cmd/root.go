@@ -404,7 +404,7 @@ func observabilityLimits(ram uint64, cpus int) domain.ObservabilityLimits {
 func optionsFromEnv(repoRoot string) app.PlanOptions {
 	return app.PlanOptions{
 		ShouldGoWatch:           devEnv("LANGWATCH_GO_WATCH") == "1",
-		ShouldRunOneProcess:     devEnv("LANGWATCH_DEV_ONE_PROCESS") == "1",
+		ShouldRunOneProcess:     devEnv("LANGWATCH_DEV_ONE_PROCESS") != "0",
 		ShouldRunGoAsOneProcess: devEnv("LANGWATCH_GO_ONE_PROCESS") == "1",
 		ShouldSeed:              os.Getenv("LANGWATCH_SEED") == "1",
 		// What the langyagent worker's local isolation posture is resolved from;
