@@ -205,7 +205,7 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
         FROM system.mutations
         WHERE database = currentDatabase()
           AND table IN {tables:Array(String)}
-          AND position(command, '_retention_days') > 0
+          AND position(command, '_retention_days = 0') > 0
         ORDER BY create_time DESC
       `,
       params: { tables: this.eventLogRetention.tables },
