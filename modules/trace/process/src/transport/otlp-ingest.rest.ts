@@ -19,6 +19,7 @@ import {
   logCorrectedOtlpPath,
   OTLP_CORRECTED_PATH_HEADER,
   otlpBodyForensics,
+  otlpDoorFailureAnswer,
   otlpProtobufRoot,
   parseOtlpTraces,
   readCorrectedPath,
@@ -272,6 +273,16 @@ async function handleTracesRequest({
   });
 
   const result = await ports.otlpTraces({ tenantId: project.id, traceRequest: parsed.request });
+
+  // Any failed handoff answers 503 so the sender resends the whole batch: taken
+  // spans dedupe (claim held an hour), failed ones had their claim released.
+  if ((result?.ingestionFailures ?? 0) > 0) {
+    const failure = otlpDoorFailureAnswer({
+      result: { outcome: "unavailable", errorMessage: result.ingestionFailureMessage ?? "" },
+      signal: "traces",
+    });
+    return jsonAnswer(failure.body, failure.status);
+  }
 
   return jsonAnswer(
     {

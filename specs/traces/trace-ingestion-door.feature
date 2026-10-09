@@ -76,16 +76,34 @@ Feature: The trace ingestion doors are served
     When it exports a trace batch to the OpenTelemetry receiver
     Then the key is marked as used
 
-  # Characterises today's answer, which main shares: OTLP senders treat a partial
-  # rejection as permanent, so these spans are not re-sent. A retryable answer is
-  # a pending decision; the log and metric receivers already answer 503 here.
+  # Ruled 2026-10-09, a deliberate difference from main's 200 partial success:
+  # OTLP senders never resend a partial rejection, so a failed handoff answers
+  # 503 and the sender resends the whole batch. Safe because a taken span's
+  # claim outlives every exporter's retry window (an hour against minutes).
   @integration
-  Scenario: A failed pipeline handoff answers the OTLP export as a partial rejection
+  Scenario: A failed pipeline handoff answers the OTLP export as retryable
     Given an exporter holds a key that may create traces in its project
     And the trace pipeline cannot take the batch's spans
     When it exports a trace batch to the OpenTelemetry receiver
-    Then the batch is answered 200 with every span counted as rejected
+    Then the batch is answered 503 so the exporter retries it
     And no span is recorded
+
+  @integration
+  Scenario: A batch where only some handoffs fail is still answered as retryable
+    Given an exporter holds a key that may create traces in its project
+    And the trace pipeline takes every span of a batch but one
+    When it exports that trace batch to the OpenTelemetry receiver
+    Then the batch is answered 503 so the exporter retries it
+    And the spans the pipeline took are recorded once
+
+  @integration
+  Scenario: Resending a partly failed batch records each span exactly once
+    Given an exporter's trace batch was answered 503 after one span's handoff failed
+    And the trace pipeline has recovered
+    When the exporter resends the same batch
+    Then the batch is accepted
+    And the spans taken the first time are not recorded again
+    And the span that failed is recorded
 
   @integration
   Scenario: The OTLP receiver refuses an unauthenticated exporter
@@ -107,4 +125,13 @@ Feature: The trace ingestion doors are served
     When it exports a trace batch to the OpenTelemetry receiver
     Then the batch is accepted
     And the span is recorded
+
+  # An exporter retries a batch it never saw answered; the span claim makes the
+  # resend harmless.
+  @integration
+  Scenario: A span exported twice is recorded once
+    Given an exporter holds a key that may create traces in its project
+    When it exports the same span to the OpenTelemetry receiver twice
+    Then both exports are accepted
+    And the span is recorded once
 

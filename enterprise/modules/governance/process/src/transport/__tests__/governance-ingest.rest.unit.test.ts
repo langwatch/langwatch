@@ -322,6 +322,26 @@ describe("the ingestion-source receivers", () => {
     });
   });
 
+  describe("when the trace pipeline fails to take one span of a batch", () => {
+    /** @scenario "A span batch whose pipeline handoff fails is answered as retryable" */
+    it("answers a retryable 503 and records no source event, so the resend counts once", async () => {
+      const traceCollection = vi.fn<GovernanceIngestTraceCollection>().mockResolvedValue({
+        rejectedSpans: 1,
+        ingestionFailures: 1,
+      });
+      const api = mountIngest({ traceCollection });
+
+      const response = await api.post(`/api/ingest/otel/${SOURCE_ID}`, traceBody);
+
+      expect(response.status).toBe(503);
+      await expect(response.json()).resolves.toMatchObject({
+        code: "internal_error",
+        retryable: true,
+      });
+      expect(api.ingestionSourceRecordEventReceived).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when a webhook envelope arrives for a source that serves it", () => {
     it("hands ONE log record to the log pipeline and acknowledges the envelope", async () => {
       const logCollection = vi.fn().mockResolvedValue(void 0);
