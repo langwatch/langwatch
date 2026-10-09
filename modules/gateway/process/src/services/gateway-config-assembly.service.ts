@@ -34,6 +34,7 @@ const HOSTED_CATALOG_PREFIXES: Record<string, string> = {
   anthropic: "anthropic",
   gemini: "gemini",
   deepseek: "deepseek",
+  doubleword: "doubleword",
   xai: "xai",
   voyage: "voyageai",
 };
@@ -207,6 +208,8 @@ export class GatewayConfigAssemblyService implements GatewayConfigAssembly {
         return { api_key: pick("XAI_API_KEY") };
       case "cerebras":
         return { api_key: pick("CEREBRAS_API_KEY") };
+      case "doubleword":
+        return { api_key: pick("DOUBLEWORD_API_KEY") };
       case "groq":
         return { api_key: pick("GROQ_API_KEY") };
       case "cloudflare":

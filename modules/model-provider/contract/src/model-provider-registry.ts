@@ -375,6 +375,14 @@ export const modelProviders = {
     keysSchema: z.object({ CEREBRAS_API_KEY: z.string().min(1) }),
     enabledSince: Temporal.Instant.from("2024-06-01T00:00:00Z"),
   },
+  doubleword: {
+    name: "Doubleword",
+    type: "llm",
+    langySkipPermissionsModels: NO_SKIP_PERMISSIONS_MODELS,
+    apiKey: "DOUBLEWORD_API_KEY",
+    keysSchema: z.object({ DOUBLEWORD_API_KEY: z.string().min(1) }),
+    enabledSince: Temporal.Instant.from("2026-10-01T00:00:00Z"),
+  },
   groq: {
     name: "Groq",
     type: "llm",

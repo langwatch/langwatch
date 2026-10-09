@@ -1,6 +1,7 @@
 import type { ModelCostRate } from "../model-provider.ts";
 import { isCodexModel } from "./codex-restrictions.ts";
 import { llmModels } from "./model-catalog.ts";
+import type { LLMModelPricing } from "./model-catalog.types.ts";
 
 const ANTHROPIC_MODEL_ID = /^~?anthropic\//;
 const OPENAI_AUDIO_MODEL_ID = /^~?openai\/(gpt-audio|gpt-realtime)/;
@@ -44,6 +45,23 @@ export function deriveAudioOutputRate(
   return pricing.audioCostPerToken * 2;
 }
 
+/**
+ * A router picks another model per request and has no rate of its own. The
+ * upstream catalog marks that with a rate of -1 per token, which read as a
+ * price would bill every routed token at minus one dollar. A negative rate is
+ * therefore dropped here, treated as no rate: a router whose rates are all
+ * negative gets no registry entry, so it is costed like any model the
+ * catalog cannot price (zero, or no cost at all) and never below zero.
+ *
+ * Partial because the dropped keys include the two the catalog type marks as
+ * required, so every read after this has to allow for a missing rate.
+ */
+export function withoutNegativeRates(pricing: LLMModelPricing): Partial<LLMModelPricing> {
+  return Object.fromEntries(
+    Object.entries(pricing).filter(([, rate]) => !(typeof rate === "number" && rate < 0)),
+  );
+}
+
 let cachedRates: readonly ModelCostRate[] | null = null;
 
 export function getStaticModelCostRates(): readonly ModelCostRate[] {
@@ -52,7 +70,8 @@ export function getStaticModelCostRates(): readonly ModelCostRate[] {
   }
 
   const rates = Object.entries(llmModels.models)
-    .flatMap(([modelId, model]): ModelCostRate[] => {
+    .flatMap(([modelId, catalogModel]): ModelCostRate[] => {
+      const model = { pricing: withoutNegativeRates(catalogModel.pricing) };
       if (isCodexModel(modelId) || !hasPrice(model.pricing)) {
         return [];
       }

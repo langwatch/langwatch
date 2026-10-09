@@ -67,6 +67,13 @@ export const GUIDED_PROVIDERS: readonly GuidedProvider[] = [
     name: "DeepSeek",
     hint: "Platform API key",
   },
+  {
+    id: "doubleword",
+    kind: "api-key",
+    registryKey: "doubleword",
+    name: "Doubleword",
+    hint: "Platform API key",
+  },
   { id: "groq", kind: "api-key", registryKey: "groq", name: "Groq", hint: "Console API key" },
   {
     id: "custom",
