@@ -4,8 +4,10 @@ import {
   EvaluatorInputTooLargeError,
 } from "@langwatch/evaluation-contract";
 import {
+  AVAILABLE_EVALUATORS,
   batchEvaluationResultSchema,
   type BatchEvaluationResult,
+  type EvaluatorTypes,
   type SingleEvaluationResult,
 } from "@langwatch/evaluator-contract";
 import { createLogger } from "@langwatch/observability";
@@ -115,7 +117,7 @@ export class LangevalsEvaluatorService {
         staging: this.staging,
         headers: idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {},
         signal: withCallerSignal({ own: controller.signal, caller: signal }),
-        body: evaluationBody({ data, settings, env }),
+        body: evaluationBody({ evaluatorType, data, settings, env }),
       });
     } catch (error) {
       throwFetchFailure({
@@ -198,14 +200,41 @@ export class LangevalsEvaluatorService {
   }
 }
 
+const CANONICAL_KEYS: ReadonlySet<string> = new Set([
+  "input",
+  "output",
+  "contexts",
+  "expected_contexts",
+  "expected_output",
+  "conversation",
+]);
+
+/** The non-canonical fields the evaluator declares (a comparison's `candidates`), as sent. */
+function declaredExtras({
+  evaluatorType,
+  data,
+}: Pick<LangevalsEvaluateParams, "evaluatorType" | "data">): Record<string, unknown> {
+  const declared = AVAILABLE_EVALUATORS[evaluatorType as EvaluatorTypes];
+  const allowed = new Set([
+    ...(declared?.requiredFields ?? []),
+    ...(declared?.optionalFields ?? []),
+  ]);
+
+  return Object.fromEntries(
+    Object.entries(data).filter(([key]) => allowed.has(key) && !CANONICAL_KEYS.has(key)),
+  );
+}
+
 function evaluationBody({
+  evaluatorType,
   data,
   settings,
   env,
-}: Pick<LangevalsEvaluateParams, "data" | "settings" | "env">) {
+}: Pick<LangevalsEvaluateParams, "evaluatorType" | "data" | "settings" | "env">) {
   return {
     data: [
       {
+        ...declaredExtras({ evaluatorType, data }),
         input: convertTo(data.input, "string"),
         output: convertTo(data.output, "string"),
         contexts: toLangevalsContexts(data.contexts),

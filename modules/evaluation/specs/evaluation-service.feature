@@ -292,6 +292,13 @@ Feature: Evaluation service boundary
     Then the result is skipped with its details and a null cost
 
   @unit
+  Scenario: An evaluator's declared extra fields reach langevals as sent
+    Given a comparison evaluator run over data carrying its candidates and a field it does not declare
+    When the evaluator is run over the data
+    Then langevals receives the candidates and the row index as sent
+    And the undeclared field is not sent
+
+  @unit
   Scenario: A langevals answer that is not an evaluation result fails the run naming the evaluator
     Given langevals answers an evaluation with a result whose score is not a number
     When an evaluator is run over the data
