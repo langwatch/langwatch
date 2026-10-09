@@ -11,7 +11,7 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/cmd/viewer/sources"
 )
 
-const storageUsage = "usage: haven storage <buckets|objects [bucket]|object <bucket> <key> [--raw]|delete <bucket> <key>|clear [bucket]|requests> [--json]"
+const storageUsage = "usage: haven storage <buckets|objects [bucket]|object <bucket> <key> [--raw]|presign <bucket> <key> [--put] [--expires=<s>]|delete <bucket> <key>|clear [bucket]|seed|requests> [--json]"
 
 type storageObject struct {
 	Bucket       string    `json:"bucket"`
@@ -19,6 +19,16 @@ type storageObject struct {
 	Size         int64     `json:"size"`
 	ContentType  string    `json:"contentType"`
 	LastModified time.Time `json:"lastModified"`
+}
+
+type storageRequest struct {
+	Method    string    `json:"method"`
+	Bucket    string    `json:"bucket"`
+	Key       string    `json:"key"`
+	Status    int       `json:"status"`
+	At        time.Time `json:"at"`
+	Auth      string    `json:"auth"`
+	RequestID string    `json:"requestId"`
 }
 
 // runStorage is `haven storage <buckets|objects|object|delete|clear|requests>`.
@@ -63,14 +73,47 @@ func storageCommand(api sources.SimAPI, inv invocation, asJSON bool) error {
 		return storageDelete(api, inv, asJSON)
 	case "clear":
 		return storageClear(api, inv, asJSON)
+	case "presign":
+		return storagePresign(api, inv, asJSON)
+	case "seed":
+		return storageSeed(api, asJSON)
 	case "requests":
-		return simGet(api, "/_sim/api/requests", nil, asJSON, func(v struct{ Requests []map[string]any }) {
+		return simGet(api, "/_sim/api/requests", nil, asJSON, func(v struct{ Requests []storageRequest }) {
 			for _, r := range v.Requests {
-				fmt.Println(r)
+				fmt.Printf("%s %-6s %3d %-9s %s /%s/%s\n", r.At.Format(time.RFC3339), r.Method, r.Status, r.Auth, r.RequestID, r.Bucket, r.Key)
 			}
 		})
 	}
 	return fmt.Errorf("unknown `haven storage` subcommand %q; %s", inv.args[0], storageUsage)
+}
+
+// storagePresign mints a presigned GET (or with --put a PUT) URL for one object.
+func storagePresign(api sources.SimAPI, inv invocation, asJSON bool) error {
+	if err := needArgs(inv, 3, "haven storage presign <bucket> <key> [--put] [--expires=<seconds>]"); err != nil {
+		return err
+	}
+	params := url.Values{"bucket": {inv.args[1]}, "key": {inv.args[2]}}
+	if inv.has("--put") {
+		params.Set("method", "PUT")
+	}
+	if expires := inv.value("--expires"); expires != "" {
+		params.Set("expires", expires)
+	}
+	return simGet(api, "/_sim/api/presign", params, asJSON, func(v struct {
+		URL       string    `json:"url"`
+		Method    string    `json:"method"`
+		ExpiresAt time.Time `json:"expiresAt"`
+	}) {
+		fmt.Printf("%s %s\n(expires %s)\n", v.Method, v.URL, v.ExpiresAt.Format(time.RFC3339))
+	})
+}
+
+// storageSeed writes the demo objects, leaving any that already exist.
+func storageSeed(api sources.SimAPI, asJSON bool) error {
+	if err := api.Post("/_sim/api/seed", nil, nil); err != nil {
+		return err
+	}
+	return simDone(asJSON, "seeded", "seeded the demo objects into bucket langwatch")
 }
 
 // storageDelete removes one object.

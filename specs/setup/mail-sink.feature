@@ -115,6 +115,18 @@ Feature: Local mail sink (mailsim)
     Then the inbox reads back empty
 
   @unit
+  Scenario: An agent can read the inbox's own facts from the CLI
+    When the developer runs `haven mail inbox`
+    Then it prints the stack, its own inbox address, the SMTP listener, the console URL and whether mail survives a restart
+    # The same facts the console's "This inbox" panel shows, from GET /api/inbox.
+
+  @unit
+  Scenario: A test can wait only for mail newer than one it has seen
+    Given the inbox already holds a matching message
+    When the developer runs `haven mail wait --after <id>`
+    Then only a message caught after that id answers the wait
+
+  @unit
   Scenario: Every mail command has a machine-readable form
     When any `haven mail` command is run with `--json` or under agent mode
     Then the output is plain and parseable, with no tables, color or spinner
@@ -162,6 +174,13 @@ Feature: Local mail sink (mailsim)
   # preview was inert — and following the link is the reason the mail was
   # caught. The plain-text tab had the same problem for a different reason:
   # a URL printed as characters is one you have to select and paste.
+
+  @integration
+  Scenario: The console shows the stack's own inbox address
+    Given the sink runs for a stack
+    When the developer opens the inbox console
+    Then the "This inbox" panel shows the address `haven mail address` prints for that stack
+    And a standalone sink, with no stack, shows an example address instead
 
   @unit
   Scenario: A link in a caught message can be opened

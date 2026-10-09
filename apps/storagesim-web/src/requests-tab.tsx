@@ -11,7 +11,9 @@ export const RequestsTab = ({ requests }: { requests: RequestEntry[] }) => (
     <Table
       caption="S3 requests"
       rows={requests}
-      rowKey={(entry) => `${entry.at.toISOString()} ${entry.method} ${pathOf(entry)}`}
+      rowKey={(entry) =>
+        entry.requestId || `${entry.at.toISOString()} ${entry.method} ${pathOf(entry)}`
+      }
       empty={<SimEmpty title="No requests yet" hint="The last 500 S3 requests are listed here." />}
       columns={[
         {
@@ -27,6 +29,14 @@ export const RequestsTab = ({ requests }: { requests: RequestEntry[] }) => (
           header: "Status",
           cell: (entry) => <Badge tone={statusTone(entry)}>{entry.status}</Badge>,
           width: "6rem",
+        },
+        {
+          key: "auth",
+          header: "Auth",
+          cell: (entry) => entry.auth,
+          mono: true,
+          width: "7rem",
+          hideOnNarrow: true,
         },
         {
           key: "at",

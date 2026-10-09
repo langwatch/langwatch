@@ -7,7 +7,7 @@ Feature: voicesim, a local stand-in for the voice providers a scenario call uses
   agent, one fixed caller transcript. It checks no key: it is a dev shim.
 
   # Bound by Go tests in services/voicesim/voicesim_test.go and
-  # tools/thuishaven/domain/overlay_voice_test.go, by their `// @scenario`
+  # tools/thuishaven/domain/overlay_voice_test.go and tools/thuishaven/cmd/sim_voice_test.go, by their `// @scenario`
   # annotations, by apps/voicesim-web/src/__tests__/calls-console.integration.test.tsx,
   # and by the product's loopback-rule tests in model-provider, gateway and scenario.
   # The Twilio phone transport is not faked: the scenario SDK dials api.twilio.com
@@ -46,6 +46,19 @@ Feature: voicesim, a local stand-in for the voice providers a scenario call uses
     Given more calls than VOICESIM_MAX_CALLS (default 200) have been made
     Then the console keeps only that many of the most recent
     And one call keeps at most VOICESIM_MAX_EVENTS_PER_CALL (default 500) protocol events, counting the rest
+
+  Scenario: An agent clears the call log between runs
+    Given voicesim has logged two calls
+    When the agent runs "haven voice clear", which sends DELETE /_sim/api/calls
+    Then voicesim answers 204 and /_sim/api/calls lists no calls
+    And the next call's id keeps counting, so an id is never reused
+
+  @integration
+  Scenario: An operator clears the call log from the console
+    Given the console lists two calls
+    When the operator confirms "Clear calls"
+    Then the console sends DELETE /_sim/api/calls and reads the calls again
+    And the status line names both the ElevenLabs and the OpenAI base URL
 
   Scenario: A seeded voicesim starts with a sample call
     Given voicesim starts with VOICESIM_SEED=1

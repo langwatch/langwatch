@@ -145,3 +145,20 @@ func TestIdPSignInPrintsOnlyTheNamedUser(t *testing.T) {
 		t.Fatalf("printed %q", got)
 	}
 }
+
+// @scenario "haven idp verification sets and clears the well-known verification file"
+func TestIdPVerificationSetsAndClearsTheWellKnownToken(t *testing.T) {
+	api, seen := recordIdP(t)
+	if err := runIdPStub(t, api, simInv("verification", "set", "acme1.test", "tok-1")); err != nil {
+		t.Fatal(err)
+	}
+	if seen.method != "PUT" || seen.path != "/control/verification" || seen.body != `{"domain":"acme1.test","token":"tok-1"}` {
+		t.Fatalf("set sent %s %s %s", seen.method, seen.path, seen.body)
+	}
+	if err := runIdPStub(t, api, simInv("verification", "clear", "acme1.test")); err != nil {
+		t.Fatal(err)
+	}
+	if seen.method != "PUT" || seen.body != `{"domain":"acme1.test"}` {
+		t.Fatalf("clear sent %s %s", seen.method, seen.body)
+	}
+}

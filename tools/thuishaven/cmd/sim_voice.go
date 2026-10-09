@@ -10,7 +10,7 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/cmd/viewer/sources"
 )
 
-const voiceUsage = "usage: haven voice <status|calls|call <id>> [--json]"
+const voiceUsage = "usage: haven voice <status|calls|call <id>|clear> [--json]"
 
 type voiceCall struct {
 	ID        string     `json:"id"`
@@ -23,7 +23,7 @@ type voiceCall struct {
 	} `json:"turns"`
 }
 
-// runVoice is `haven voice <status|calls|call>`.
+// runVoice is `haven voice <status|calls|call|clear>`.
 func runVoice(_ context.Context, d deps, inv invocation) error {
 	if len(inv.args) == 0 {
 		return errors.New(voiceUsage)
@@ -57,6 +57,11 @@ func voiceCommand(api sources.SimAPI, inv invocation, asJSON bool) error {
 		})
 	case "call":
 		return voiceOneCall(api, inv, asJSON)
+	case "clear":
+		if err := api.Delete("/_sim/api/calls"); err != nil {
+			return err
+		}
+		return simDone(asJSON, "cleared", "calls cleared")
 	}
 	return fmt.Errorf("unknown `haven voice` subcommand %q; %s", inv.args[0], voiceUsage)
 }

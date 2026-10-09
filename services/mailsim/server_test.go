@@ -171,7 +171,7 @@ func TestMailPageScopeAndIsolation(t *testing.T) {
 	require.NoError(t, deliverRaw(t, first, "sender@example.test", []string{"same@example.test"}, simpleMessage, nil))
 
 	info := decodeJSON[inboxInfo](t, doHTTP(first, "GET", "/api/inbox"))
-	assert.Equal(t, inboxInfo{Stack: "feature-one", SMTPAddr: "127.0.0.1:5581", BaseURL: "https://mail.feature-one.langwatch.localhost:1355", Persistent: true}, info)
+	assert.Equal(t, inboxInfo{Stack: "feature-one", SMTPAddr: "127.0.0.1:5581", BaseURL: "https://mail.feature-one.langwatch.localhost:1355", Persistent: true, Address: "dev@feature-one.mail.langwatch.localhost"}, info)
 	assert.Contains(t, doHTTP(first, "GET", "/api/messages").Body.String(), "same@example.test")
 
 	other := decodeJSON[inboxInfo](t, doHTTP(second, "GET", "/api/inbox"))
@@ -181,4 +181,5 @@ func TestMailPageScopeAndIsolation(t *testing.T) {
 
 	standalone := decodeJSON[inboxInfo](t, doHTTP(newTestServer(t, Config{BaseURL: "http://localhost:5580"}), "GET", "/api/inbox"))
 	assert.Empty(t, standalone.Stack)
+	assert.Empty(t, standalone.Address)
 }

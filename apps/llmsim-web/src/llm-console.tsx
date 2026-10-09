@@ -1,11 +1,14 @@
 import {
   Badge,
   Code,
+  ConfirmButton,
   EmptyState,
+  Input,
   List,
   ListItem,
   Panel,
   Section,
+  Stack,
 } from "@langwatch/design-system-internal";
 import {
   SimConsole,
@@ -18,7 +21,7 @@ import {
 import { type ReactNode, useState } from "react";
 
 import { CallDetailPane } from "./call-detail.tsx";
-import { type Call, fetchCalls, fetchInfo } from "./llm-api.ts";
+import { type Call, callMatches, clearCalls, fetchCalls, fetchInfo } from "./llm-api.ts";
 import { SettingsPanel } from "./settings-panel.tsx";
 
 const CALLS_TAB = "calls";
@@ -55,7 +58,7 @@ const CallList = ({
           current={call.id === selectedId}
           onSelect={() => onSelect(call.id)}
           title={call.model || call.path}
-          description={`${call.dialect} · ${call.inputTokens} in, ${call.outputTokens} out · ${Math.round(call.latencyMs)} ms`}
+          description={`${call.dialect} · ${call.mode}${call.stream ? " · stream" : ""} · ${call.inputTokens} in, ${call.outputTokens} out · ${Math.round(call.latencyMs)} ms`}
           meta={
             <>
               <Badge tone={call.status === 200 ? "ok" : "error"}>{call.status}</Badge>{" "}
@@ -74,7 +77,9 @@ export const LlmConsole = () => {
   const calls = useSimPoll({ fetch: fetchCalls });
   const [tab, setTab] = useState(CALLS_TAB);
   const [selectedId, setSelectedId] = useState("");
-  const items = calls.data ?? [];
+  const [filter, setFilter] = useState("");
+  const all = calls.data ?? [];
+  const items = all.filter((call) => callMatches({ call, filter }));
   const selected = items.find((call) => call.id === selectedId) ?? items[0];
   const failure = info.error ?? calls.error;
   const forced = info.data?.settings.forcedError ?? 0;
@@ -100,7 +105,8 @@ export const LlmConsole = () => {
   } else {
     let content: ReactNode;
     if (calls.error) content = <SimRefusal message={calls.error.message} />;
-    else if (items.length === 0) content = <NoCalls />;
+    else if (all.length === 0) content = <NoCalls />;
+    else if (items.length === 0) content = <SimEmpty title="No calls match the filter" />;
     else
       content = (
         <SimSplit
@@ -108,12 +114,38 @@ export const LlmConsole = () => {
           detail={selected ? <CallDetailPane id={selected.id} /> : undefined}
         />
       );
+    const clear = async () => {
+      await clearCalls().catch(() => undefined);
+      setSelectedId("");
+      await calls.refresh();
+    };
     body = (
       <Section
         title="Calls"
         description="Every model call this stack makes is answered here, free and repeatable. Nothing reaches a real provider."
+        actions={
+          <ConfirmButton
+            label="Clear calls"
+            confirmLabel="Clear all"
+            disabled={all.length === 0}
+            onConfirm={() => void clear()}
+          />
+        }
       >
-        {content}
+        <Stack gap={4}>
+          <div className="llm-search">
+            <Input
+              label="Filter calls"
+              hideLabel
+              type="search"
+              placeholder="Model, path, mode or status"
+              autoComplete="off"
+              value={filter}
+              onChange={setFilter}
+            />
+          </div>
+          {content}
+        </Stack>
       </Section>
     );
   }
@@ -124,7 +156,7 @@ export const LlmConsole = () => {
       title="LLM"
       stackSlug={info.data?.stack ?? ""}
       tabs={[
-        { id: CALLS_TAB, label: "Calls", count: items.length },
+        { id: CALLS_TAB, label: "Calls", count: all.length },
         { id: SETTINGS_TAB, label: "Settings" },
       ]}
       activeTab={tab}

@@ -69,6 +69,7 @@ type tenantView struct {
 	Provisioning     provisioningView     `json:"provisioning"`
 	LastProvisioning *ProvisioningOutcome `json:"lastProvisioning"`
 	Scale            scaleView            `json:"scale"`
+	Signing          signingView          `json:"signing"`
 }
 
 func (s *Server) handleAPITenant(w http.ResponseWriter, r *http.Request) {
@@ -92,6 +93,7 @@ func (s *Server) handleAPITenant(w http.ResponseWriter, r *http.Request) {
 		},
 		LastProvisioning: t.LastProvisioning(),
 		Scale:            scaleViewOf(t),
+		Signing:          signingViewOf(t),
 	})
 }
 

@@ -22,6 +22,20 @@ type requestEntry struct {
 	Key    string    `json:"key"`
 	Status int       `json:"status"`
 	At     time.Time `json:"at"`
+	// Auth is how the request was signed: presigned, header or none.
+	Auth      string `json:"auth"`
+	RequestID string `json:"requestId"`
+}
+
+// authKind names how r carries its SigV4 signature.
+func authKind(r *http.Request) string {
+	switch {
+	case r.URL.Query().Has("X-Amz-Signature"):
+		return "presigned"
+	case r.Header.Get("Authorization") != "":
+		return "header"
+	}
+	return "none"
 }
 
 // requestLog keeps the newest requestLogSize entries.
@@ -95,6 +109,10 @@ func (s *Server) consoleAPI(urlPath string) (http.HandlerFunc, bool) {
 		return s.handleRaw, true
 	case "/_sim/api/requests":
 		return s.handleRequests, true
+	case "/_sim/api/presign":
+		return s.handlePresign, true
+	case "/_sim/api/seed":
+		return s.handleSeed, true
 	}
 	return nil, false
 }

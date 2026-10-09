@@ -78,3 +78,21 @@ export const saveSettings = async ({ settings }: { settings: Settings }) => {
   }
   return settingsSchema.parse(body);
 };
+
+export const clearCalls = async () => {
+  const response = await fetch("/_sim/api/calls", { method: "DELETE" });
+  if (!response.ok) {
+    throw new SimFetchError({
+      status: response.status,
+      message: `Clearing failed (${response.status}).`,
+    });
+  }
+};
+
+/** Whether a call's model, path, mode, dialect or status contains the filter text. */
+export const callMatches = ({ call, filter }: { call: Call; filter: string }) => {
+  const needle = filter.trim().toLowerCase();
+  return [call.model, call.path, call.mode, call.dialect, String(call.status)].some((field) =>
+    field.toLowerCase().includes(needle),
+  );
+};

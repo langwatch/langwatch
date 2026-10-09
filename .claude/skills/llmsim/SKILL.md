@@ -15,6 +15,8 @@ seeded Markov chain: the same prompt gets the same answer, at no cost. Code:
 - Opt-in: `haven up +llm` (sticky). Hosted in the `sims` lane.
 - Console: `https://llm.<slug>.langwatch.localhost`; `haven status` shows the loopback
   port for drivers (`POST /v1/chat/completions`, `/v1/messages`, `/v1/embeddings`).
+  Calls tab: filter, per-call detail, Clear calls. Settings tab: forced error, seed and the
+  per-call override headers.
 - Overlay sets `OPENAI_BASE_URL`, `ANTHROPIC_BASE_URL` and dummy keys, so the seeded
   providers, playground, evaluators, scenarios and Langy reach it. A base URL `.env`
   names wins. Standalone: `make service svc=llmsim` (:5595).
@@ -49,5 +51,6 @@ GET|PUT /_sim/api/settings      {"forcedError": 0|4xx|5xx, "seed": ""|"random"|"
 
 ```
 haven llm info | calls | call <id> | clear
+haven llm calls [--model <text>] [--failed]                     # model contains text; 4xx/5xx only
 haven llm set [--error <0|4xx|5xx>] [--seed <value|random>]    # only the flags given change
 ```

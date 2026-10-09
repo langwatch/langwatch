@@ -47,6 +47,9 @@ type inboxInfo struct {
 	SMTPAddr   string `json:"smtpAddr"`
 	BaseURL    string `json:"baseUrl"`
 	Persistent bool   `json:"persistent"`
+	// Address is the stack's own inbox address, as `haven mail address` prints
+	// it; a standalone sink has none and answers "".
+	Address string `json:"address"`
 }
 
 func (s *Server) handleInbox(w http.ResponseWriter, _ *http.Request) {
@@ -68,5 +71,9 @@ func (s *Server) inboxInfo() inboxInfo {
 	if strings.HasPrefix(smtpAddr, ":") {
 		smtpAddr = "127.0.0.1" + smtpAddr
 	}
-	return inboxInfo{Stack: stack, SMTPAddr: smtpAddr, BaseURL: s.cfg.BaseURL, Persistent: s.cfg.DataDir != ""}
+	address := ""
+	if stack != "" {
+		address = "dev@" + stack + ".mail.langwatch.localhost"
+	}
+	return inboxInfo{Stack: stack, SMTPAddr: smtpAddr, BaseURL: s.cfg.BaseURL, Persistent: s.cfg.DataDir != "", Address: address}
 }

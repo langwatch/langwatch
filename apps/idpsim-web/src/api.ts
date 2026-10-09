@@ -65,6 +65,14 @@ export type ProvisioningOutcome = z.infer<typeof outcomeSchema>;
 export const scaleSchema = z.object({ users: z.number(), groups: z.number(), last: z.string() });
 export type Scale = z.infer<typeof scaleSchema>;
 
+/** The keys a tenant publishes (current first), its clock skew and the break armed for next. */
+export const signingSchema = z.object({
+  keys: listOf(z.string()),
+  skewSeconds: z.number(),
+  armed: z.string(),
+});
+export type Signing = z.infer<typeof signingSchema>;
+
 export const tenantSchema = z.object({
   id: z.number(),
   domain: z.string(),
@@ -84,6 +92,7 @@ export const tenantSchema = z.object({
   provisioning: z.object({ configured: z.boolean(), baseUrl: z.string(), token: z.string() }),
   lastProvisioning: outcomeSchema.nullable(),
   scale: scaleSchema,
+  signing: signingSchema.optional(),
 });
 export type TenantView = z.infer<typeof tenantSchema>;
 
@@ -161,12 +170,17 @@ export const request = async <Data>({
     };
   }
   const text = await response.text();
-  const json: unknown = text === "" ? null : safeParse({ text });
+  /* A control route answers plain text (env lines, or an http.Error): it reads as a string. */
+  const json: unknown = text === "" ? null : (safeParse({ text }) ?? text);
   if (!response.ok) {
     const refusal = refusalSchema.safeParse(json);
+    if (refusal.success) return { ok: false, refusal: refusal.data };
     return {
       ok: false,
-      refusal: refusal.success ? refusal.data : unreadable({ status: response.status }),
+      refusal:
+        typeof json === "string"
+          ? { ...unreadable({ status: response.status }), detail: json.trim() }
+          : unreadable({ status: response.status }),
     };
   }
   const parsed = schema.safeParse(json);

@@ -74,7 +74,7 @@ Every console action has a verb (`--json` on reads, non-zero exit on failure, `-
 | llm       | `haven llm info\|calls\|call <id>\|clear\|set --error --seed`                                                         |
 | analytics | `haven analytics status\|records\|clear\|wait --event`                                                                |
 | storage   | `haven storage buckets\|objects [bucket]\|object <bucket> <key> [--raw]\|requests`                                    |
-| voice     | `haven voice status\|calls\|call <id>` (no clear: voicesim has no DELETE endpoint yet)                                |
+| voice     | `haven voice status\|calls\|call <id>\|clear`                                                                         |
 | telemetry | `haven telemetry send\|load\|fuzz\|status\|stop`                                                                      |
 | outbound  | `haven outbound status\|records\|deliveries\|wait --channel\|fault add\|list\|clear\|receiver set\|urls\|clear`       |
 | idp       | `haven idp tenants\|tenant show\|apps add\|populate\|churn\|scim ...\|signin\|reset` (full list: `haven sims --json`) |

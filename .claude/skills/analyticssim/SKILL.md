@@ -47,6 +47,11 @@ Newest first. Assert: trigger the action, then filter by `id` and `name`.
 `--json` on every read; non-zero exit on failure; `--stack <slug>` reads another worktree.
 
 ```
-haven analytics status | records [--provider] [--kind] [--event] [--id] | clear
+haven analytics status        # record count + activity (last 5 min, distinct ids, last call)
+haven analytics records [--provider] [--kind] [--event|--name] [--id] | clear
+haven analytics record <id>   # one record: facts, properties, raw call
 haven analytics wait --event <name> [--provider] [--kind] [--id] [--timeout 30s]   # exit 1 on timeout
 ```
+
+The console shows the same: an Activity panel, provider tabs, kind and search filters, and
+"Records for this id" on a record narrows the list to that distinct id.
