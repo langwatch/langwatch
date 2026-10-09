@@ -30,6 +30,8 @@ interface HttpWebhookDestinationServiceOptions {
    * it rather than a module reading the environment for itself.
    */
   allowInsecureLocal: boolean;
+  /** The endpoint opted in to a receiver with a self-signed certificate. */
+  allowSelfSignedCertificate: boolean;
 }
 
 /**
@@ -42,12 +44,14 @@ export class HttpWebhookDestinationService implements WebhookDestination {
   private readonly signatureScheme: WebhookSignatureScheme | undefined;
   private readonly egress: Pick<WebhookEgressService, "send">;
   private readonly allowInsecureLocal: boolean;
+  private readonly allowSelfSignedCertificate: boolean;
 
   private constructor(options: HttpWebhookDestinationServiceOptions) {
     this.url = options.url;
     this.signatureScheme = options.signatureScheme;
     this.egress = options.egress;
     this.allowInsecureLocal = options.allowInsecureLocal;
+    this.allowSelfSignedCertificate = options.allowSelfSignedCertificate;
   }
 
   static create(options: HttpWebhookDestinationServiceOptions): HttpWebhookDestinationService {
@@ -70,6 +74,7 @@ export class HttpWebhookDestinationService implements WebhookDestination {
       ...(this.signatureScheme ? { signatureScheme: this.signatureScheme } : {}),
       attempt: request.attempt,
       allowInsecureLocal: this.allowInsecureLocal,
+      allowSelfSignedCertificate: this.allowSelfSignedCertificate,
     });
 
     const verdict = classifyWebhookStatus(result.status);

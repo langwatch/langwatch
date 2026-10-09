@@ -107,6 +107,7 @@ function toView(row: MemoryWebhookEndpointRow): WebhookEndpointView {
     maxBatchSize: row.maxBatchSize,
     maxBatchDelayMs: row.maxBatchDelayMs,
     maxInFlight: row.maxInFlight,
+    allowSelfSignedCertificate: row.allowSelfSignedCertificate ?? false,
     createdAt: toDate(row.createdAt),
     updatedAt: toDate(row.updatedAt),
   };
@@ -218,6 +219,7 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRepositor
     maxBatchSize?: number;
     maxBatchDelayMs?: number;
     maxInFlight?: number;
+    allowSelfSignedCertificate?: boolean;
     signatureScheme?: WebhookSignatureScheme;
     sharedSecret?: string;
     idempotencyKey?: string;
@@ -260,6 +262,7 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRepositor
       maxBatchSize: params.signatureScheme !== undefined ? 1 : (params.maxBatchSize ?? 100),
       maxBatchDelayMs: params.maxBatchDelayMs ?? 250,
       maxInFlight: params.maxInFlight ?? 4,
+      allowSelfSignedCertificate: params.allowSelfSignedCertificate ?? false,
       archivedAt: null,
       createdAt: now,
       updatedAt: now,
@@ -296,6 +299,7 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRepositor
     maxBatchSize?: number;
     maxBatchDelayMs?: number;
     maxInFlight?: number;
+    allowSelfSignedCertificate?: boolean;
   }): Promise<WebhookEndpointView> {
     const endpoint = this.#live(params);
     const sqsUpdate =
@@ -322,6 +326,9 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRepositor
         : {}),
       ...(params.maxBatchDelayMs !== undefined ? { maxBatchDelayMs: params.maxBatchDelayMs } : {}),
       ...(params.maxInFlight !== undefined ? { maxInFlight: params.maxInFlight } : {}),
+      ...(params.allowSelfSignedCertificate !== undefined
+        ? { allowSelfSignedCertificate: params.allowSelfSignedCertificate }
+        : {}),
       updatedAt: nowInstant(),
     };
 
@@ -447,6 +454,7 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRepositor
     return httpDestinationConfig({
       url: endpoint.url ?? "",
       signatureScheme: endpoint.signatureScheme,
+      allowSelfSignedCertificate: endpoint.allowSelfSignedCertificate ?? false,
     });
   }
 
