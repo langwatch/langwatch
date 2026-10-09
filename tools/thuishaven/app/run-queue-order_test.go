@@ -118,7 +118,7 @@ func TestUpRunsNoMigrationBeforeTheServicesBoot(t *testing.T) {
 	o := &Orchestrator{sup: sup, sys: &fakeSystem{now: time.Now()}, store: &fakeStore{}, log: zap.NewNop()}
 
 	st := domain.Stack{Slug: "feat-x", WorktreeDir: root, Layout: domain.LayoutModular, APIPort: 6560, PostgresPort: 5432, PostgresDatabase: "feat_x"}
-	seed, err := o.prepareWorktree(context.Background(), UpParams{WorktreeDir: root}, st, time.Now())
+	seed, err := o.prepareWorktree(context.Background(), UpParams{WorktreeDir: root}, st)
 	if err != nil {
 		t.Fatalf("prepareWorktree: %v", err)
 	}

@@ -135,6 +135,8 @@ type UpParams struct {
 	// which would otherwise run fork-authored code with the developer's
 	// environment before a single service starts.
 	UntrustedCheckout bool
+	// StartedAt is when this up began; its progress lines count from it.
+	StartedAt time.Time
 }
 
 // resolveSlug applies the precedence: explicit > cache > derived (then cached).
@@ -490,7 +492,7 @@ func (o *Orchestrator) serviceEndpoint(proxyScheme string, proxyPort, ownPort in
 
 // Up is the launcher hook `make haven up` runs, in either routing mode.
 func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) error {
-	since := time.Now()
+	p.StartedAt = time.Now()
 	if err := o.ensurePortlessProxy(); err != nil {
 		return err
 	}
@@ -549,7 +551,7 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 	endRegistration()
 	fmt.Printf("  %s\n\n", opts.Selection.DescribeForLayout(st.Layout))
 
-	seed, err := o.prepareWorktree(ctx, p, st, since)
+	seed, err := o.prepareWorktree(ctx, p, st)
 	if err != nil {
 		return err
 	}
@@ -561,7 +563,7 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 	stopBeat()
 	plan := o.keeperPlan(children, opts.IsForegroundClient)
 	plan.Seed = seed
-	sayPhase(since, "services starting")
+	sayPhase(p.StartedAt, "services starting")
 	if err := o.handOver(ctx, st, plan); err != nil {
 		return err
 	}
@@ -613,7 +615,7 @@ func (o *Orchestrator) resolveLangyImageTag(opts *PlanOptions) {
 // (ARCHITECTURE.md, "Migrations are not the api's job"), so its seed comes back
 // for the keeper to run once the api reports ready. A monolith still migrates
 // and seeds here, before its services boot; a migration failure stops the up.
-func (o *Orchestrator) prepareWorktree(ctx context.Context, p UpParams, st domain.Stack, since time.Time) (*KeeperSeed, error) {
+func (o *Orchestrator) prepareWorktree(ctx context.Context, p UpParams, st domain.Stack) (*KeeperSeed, error) {
 	// Stale dependencies install themselves before anything needs them. Lifecycle
 	// scripts (the repo's postinstall) run for the developer's own worktree and
 	// are suppressed for an untrusted one — `haven pr` sanitises the fork install
@@ -623,41 +625,49 @@ func (o *Orchestrator) prepareWorktree(ctx context.Context, p UpParams, st domai
 	// that loads it via `import "dotenv/config"`; `pnpm -s` drops the lifecycle
 	// banner. Keeps the codegen/prepare/seed lanes as quiet as the services.
 	env := append(append(st.OverlayEnv(), o.credentialEnv(st.Slug, p.WorktreeDir)...), "DOTENV_CONFIG_QUIET=true", o.compileCacheEnv(st.Slug))
-	sayPhase(since, "dependencies")
+	sayPhase(p.StartedAt, "dependencies")
 	if err := o.ensureDeps(ctx, p.WorktreeDir, depsInstall{WithLifecycleScripts: !p.UntrustedCheckout, Env: nxEnv(st)}); err != nil {
 		return nil, err
 	}
+	run := prepRun{UpParams: p, Stack: st, Env: env}
 	jobs := prepShellsFor(st.Layout)
-	if err := o.runBuildJobs(ctx, p, st, jobs, env, since); err != nil {
+	if err := o.runBuildJobs(ctx, run, jobs); err != nil {
 		return nil, err
 	}
-	seed := seedRun{Slug: st.Slug, Env: env, Shell: jobs.Seed}
 	if jobs.Prepare != "" {
-		return nil, o.migrateThenSeed(ctx, p, st, jobs.Prepare, seed, since)
+		return nil, o.migrateThenSeed(ctx, run, jobs)
 	}
-	job, ok := o.seedJob(p, seed)
+	job, ok := o.seedJob(p, seedRun{Slug: st.Slug, Env: env, Shell: jobs.Seed})
 	if !ok {
 		return nil, nil
 	}
-	return &KeeperSeed{Job: job, ReadyURL: st.ReadinessURL(), Since: since}, nil
+	return &KeeperSeed{Job: job, ReadyURL: st.ReadinessURL(), Since: p.StartedAt}, nil
+}
+
+// prepRun is one up's preparation: what was asked, the stack, the jobs' env.
+type prepRun struct {
+	UpParams
+	Stack domain.Stack
+	Env   []string
 }
 
 // runBuildJobs runs codegen, which may fail without stopping the up, then the
 // workspace build, which stops it: a lane cannot import a package never built.
-func (o *Orchestrator) runBuildJobs(ctx context.Context, p UpParams, st domain.Stack, jobs prepShells, env []string, since time.Time) error {
+func (o *Orchestrator) runBuildJobs(ctx context.Context, run prepRun, jobs prepShells) error {
+	st := run.Stack
 	if jobs.Codegen == "" {
 		fmt.Println("  codegen: left to the app lane, which runs it on its way up")
 	} else {
-		sayPhase(since, "codegen")
-		if err := o.runOnceJob(ctx, onceJob{Slug: st.Slug, WorktreeDir: st.WorktreeDir, Name: "codegen", Dir: p.WorktreeDir, Shell: jobs.Codegen, Env: append(o.nxParallelEnv(), env...)}); err != nil {
+		sayPhase(run.StartedAt, "codegen")
+		if err := o.runOnceJob(ctx, onceJob{Slug: st.Slug, WorktreeDir: st.WorktreeDir, Name: "codegen", Dir: run.WorktreeDir, Shell: jobs.Codegen, Env: append(o.nxParallelEnv(), run.Env...)}); err != nil {
 			o.log.Warn("codegen (start:prepare:files) failed (continuing)", zap.Error(err))
 		}
 	}
 	if jobs.Build == "" {
 		return nil
 	}
-	sayPhase(since, "build")
-	if err := o.runOnceJob(ctx, onceJob{Slug: st.Slug, WorktreeDir: st.WorktreeDir, Name: "build", Dir: p.WorktreeDir, Shell: jobs.Build, Env: env}); err != nil {
+	sayPhase(run.StartedAt, "build")
+	if err := o.runOnceJob(ctx, onceJob{Slug: st.Slug, WorktreeDir: st.WorktreeDir, Name: "build", Dir: run.WorktreeDir, Shell: jobs.Build, Env: run.Env}); err != nil {
 		return fmt.Errorf("building the workspace packages the services import failed: %w", err)
 	}
 	return nil
@@ -666,13 +676,14 @@ func (o *Orchestrator) runBuildJobs(ctx context.Context, p UpParams, st domain.S
 // migrateThenSeed is a monolith's blocking migration, then its seed. Migrations
 // failing on an existing database STOP the up: continuing would boot the app onto
 // a half-migrated schema, and silently dropping the data is never haven's call.
-func (o *Orchestrator) migrateThenSeed(ctx context.Context, p UpParams, st domain.Stack, shell string, seed seedRun, since time.Time) error {
-	sayPhase(since, "migrations")
-	if err := o.runOnceJob(ctx, onceJob{Slug: st.Slug, WorktreeDir: st.WorktreeDir, Name: "prepare", Dir: p.WorktreeDir, Shell: shell, Env: seed.Env}); err != nil {
+func (o *Orchestrator) migrateThenSeed(ctx context.Context, run prepRun, jobs prepShells) error {
+	st := run.Stack
+	sayPhase(run.StartedAt, "migrations")
+	if err := o.runOnceJob(ctx, onceJob{Slug: st.Slug, WorktreeDir: st.WorktreeDir, Name: "prepare", Dir: run.WorktreeDir, Shell: jobs.Prepare, Env: run.Env}); err != nil {
 		return fmt.Errorf("migrations failed — nothing was dropped; fix the migration, or run `haven db reset` for a fresh database: %w", err)
 	}
-	if job, ok := o.seedJob(p, seed); ok {
-		sayPhase(since, "seed")
+	if job, ok := o.seedJob(run.UpParams, seedRun{Slug: st.Slug, Env: run.Env, Shell: jobs.Seed}); ok {
+		sayPhase(run.StartedAt, "seed")
 		o.runSeedJob(ctx, job)
 	}
 	return nil

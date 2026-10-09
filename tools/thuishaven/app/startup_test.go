@@ -84,7 +84,7 @@ func TestPrepareJobsShareTheStackCompileCache(t *testing.T) {
 	o := &Orchestrator{cfg: Config{Home: home, Naming: domain.DefaultNaming("")}, sup: sup, sys: &fakeSystem{}, log: zap.NewNop()}
 
 	st := domain.Stack{Slug: "feat-x", WorktreeDir: wt, PostgresPort: 5432, PostgresDatabase: "feat_x"}
-	seed, err := o.prepareWorktree(context.Background(), UpParams{WorktreeDir: wt}, st, time.Now())
+	seed, err := o.prepareWorktree(context.Background(), UpParams{WorktreeDir: wt}, st)
 	if err != nil {
 		t.Fatalf("prepareWorktree: %v", err)
 	}
