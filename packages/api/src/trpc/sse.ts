@@ -177,6 +177,8 @@ export class SseLane {
       channel.writeData(result);
       channel.complete();
     } catch (error) {
+      // The client went away first: the abort it caused is the stream closing, not a fault.
+      if (channel.ended) return;
       // No `input` here: it is the raw request payload, which may carry
       // PII — same contract as the observable error path.
       logStreamFailure({
@@ -195,6 +197,7 @@ export class SseLane {
       next: (data: unknown) => channel.writeData(data),
       complete: () => channel.complete(),
       error: (err: unknown) => {
+        if (channel.ended) return;
         logStreamFailure({
           logger: this.logger,
           err,
