@@ -88,9 +88,12 @@ function scopeOver(input: {
   const service = LangWatchQLQueryScopeService.create({
     projects: createApiFixture<ProjectApi>({
       findById: (id) => Promise.resolve(input.projects.find((p) => p.id === id) ?? null),
-      listByOrganization: ({ organizationId, limit }) => {
+      listByOrganization: ({ organizationId, limit, projectIds }) => {
         const data = input.projects.filter(
-          (p) => organizationId === ORGANIZATION_ID && !p.archivedAt,
+          (p) =>
+            organizationId === ORGANIZATION_ID &&
+            !p.archivedAt &&
+            (!projectIds || projectIds.includes(p.id)),
         );
         return Promise.resolve({ data, pagination: { page: 1, limit, total: data.length } });
       },
@@ -235,5 +238,103 @@ describe("given a legacy project key", () => {
     await expect(
       service.resolve({ reach: { kind: "project", projectId: "gone" } }),
     ).rejects.toMatchObject({ code: "project_not_found" });
+  });
+});
+
+describe("given a run that names one project", () => {
+  describe("when the key reads that project among others", () => {
+    /** @scenario "A run naming a project reads only that project, under its own protections" */
+    it("reads that project alone and redacts by its protections only", async () => {
+      const { service, asked } = scopeOver({
+        projects: [project("a"), project("b")],
+        grants: { a: ["analytics:view", "cost:view"], b: ["analytics:view", "cost:view"] },
+        privacy: { b: INPUT_HIDDEN_FROM_THE_PUBLIC },
+      });
+
+      const scope = await service.resolve({ reach: KEY, projectId: "a" });
+
+      expect(scope.projects).toEqual([{ id: "a", lwqlKey: "lwql-a" }]);
+      expect(scope.protections.canSeeCapturedInput).toBe(true);
+      expect(scope.protections.canSeeCosts).toBe(true);
+      expect(asked.some(({ projectId }) => projectId === "b")).toBe(false);
+    });
+  });
+
+  describe("when no project is named", () => {
+    /** @scenario "A run naming no project keeps the key's whole readable scope" */
+    it("spans every readable project, the strictest protection across them", async () => {
+      const { service } = scopeOver({
+        projects: [project("a"), project("b")],
+        grants: { a: ["analytics:view"], b: ["analytics:view"] },
+        privacy: { b: INPUT_HIDDEN_FROM_THE_PUBLIC },
+      });
+
+      const scope = await service.resolve({ reach: KEY });
+
+      expect(scope.projects.map((p) => p.id)).toEqual(["a", "b"]);
+      expect(scope.protections.canSeeCapturedInput).toBe(false);
+    });
+  });
+
+  describe("when the key cannot read the named project", () => {
+    /** @scenario "A run naming a project the key cannot read is refused as not found" */
+    it("refuses a project of its organization it lacks analytics:view on", async () => {
+      const { service } = scopeOver({
+        projects: [project("a"), project("b")],
+        grants: { a: ["analytics:view"], b: ["cost:view"] },
+      });
+
+      await expect(service.resolve({ reach: KEY, projectId: "b" })).rejects.toMatchObject({
+        code: "project_not_found",
+      });
+    });
+
+    it("refuses a project outside its organization exactly like one that does not exist", async () => {
+      const { service } = scopeOver({
+        projects: [project("a")],
+        grants: { a: ["analytics:view"] },
+      });
+      const otherOrganization = service.resolve({
+        reach: { ...KEY, organizationId: "org-2" },
+        projectId: "a",
+      });
+      const missing = service.resolve({ reach: KEY, projectId: "nope" });
+
+      await expect(otherOrganization).rejects.toMatchObject({ code: "project_not_found" });
+      await expect(missing).rejects.toMatchObject({ code: "project_not_found" });
+    });
+
+    it("refuses the organization's internal governance project", async () => {
+      const { service } = scopeOver({
+        projects: [project("gov", { kind: "internal_governance" })],
+        grants: { gov: ["analytics:view"] },
+      });
+
+      await expect(service.resolve({ reach: KEY, projectId: "gov" })).rejects.toMatchObject({
+        code: "project_not_found",
+      });
+    });
+  });
+
+  describe("when a legacy project key names a project", () => {
+    it("reads its own project when it names it", async () => {
+      const { service } = scopeOver({ projects: [project("a")], grants: {} });
+
+      const scope = await service.resolve({
+        reach: { kind: "project", projectId: "a" },
+        projectId: "a",
+      });
+
+      expect(scope.projects).toEqual([{ id: "a", lwqlKey: "lwql-a" }]);
+    });
+
+    /** @scenario "A run naming a project the key cannot read is refused as not found" */
+    it("refuses any other project, existing or not", async () => {
+      const { service } = scopeOver({ projects: [project("a"), project("b")], grants: {} });
+
+      await expect(
+        service.resolve({ reach: { kind: "project", projectId: "a" }, projectId: "b" }),
+      ).rejects.toMatchObject({ code: "project_not_found" });
+    });
   });
 });

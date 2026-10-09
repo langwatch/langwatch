@@ -28,6 +28,7 @@ import {
   commandPath,
   PROJECT_FLAG_HELP,
   projectSelectorOf,
+  QUERY_PROJECT_FLAG_HELP,
 } from "./utils/projectOption";
 
 declare const __CLI_VERSION__: string;
@@ -2957,7 +2958,7 @@ function registerQueryCommands(program: Command): void {
         "keyset: walk every page by rebinding the statement's {after_ts} and {after_id} parameters, without rewriting the statement",
       )
       .option("--out <file>", "Write the result to a file instead of stdout")
-      .option("--project <idOrSlug>", PROJECT_FLAG_HELP),
+      .option("--project <idOrSlug>", QUERY_PROJECT_FLAG_HELP),
     async (sql: string | undefined, options: Record<string, string>) => {
       const { runQueryCommand: impl } = await import("./commands/query/run.js");
       return impl(sql, options);

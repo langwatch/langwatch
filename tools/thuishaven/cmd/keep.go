@@ -6,8 +6,9 @@ import (
 	"io"
 	"os"
 	"strings"
-	"syscall"
 	"time"
+
+	"golang.org/x/sys/unix"
 )
 
 // runKeep is the hidden `haven keep <slug>`, the stack's keeper (section 11.1
@@ -34,7 +35,7 @@ func runKeep(ctx context.Context, d deps, inv invocation) error {
 // isSessionLeader is true for an up started under Setsid (`-d`, the terminal
 // viewer's child, the hub): it hands over and exits, owning nothing.
 func isSessionLeader() bool {
-	sid, err := syscall.Getsid(0)
+	sid, err := unix.Getsid(0)
 	return err == nil && sid == os.Getpid()
 }
 

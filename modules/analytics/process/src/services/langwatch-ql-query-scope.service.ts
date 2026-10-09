@@ -44,12 +44,21 @@ export class LangWatchQLQueryScopeService {
     this.protections = WorkbenchProtectionsService.create(dependencies);
   }
 
-  /** The readable set and the strictest protections across it. */
-  async resolve({ reach }: { reach: LangWatchQLKeyReach }): Promise<LangWatchQLQueryScope> {
+  /**
+   * The readable set and the strictest protections across it. A `projectId` narrows the set to
+   * that one project before any protection is read, and refuses one the key cannot read.
+   */
+  async resolve({
+    reach,
+    projectId,
+  }: {
+    reach: LangWatchQLKeyReach;
+    projectId?: string;
+  }): Promise<LangWatchQLQueryScope> {
     const readable =
       reach.kind === "project"
-        ? [await this.ownProject(reach.projectId)]
-        : await this.readableProjects(reach);
+        ? [await this.ownProject({ projectId: reach.projectId, requested: projectId })]
+        : await this.readableProjects({ reach, only: projectId });
     // One project at a time: each answer is several grant reads, and fanning an organization's
     // worth out at once is what exhausts the connection pool.
     const protections: LangWatchQLProtections[] = [];
@@ -87,10 +96,16 @@ export class LangWatchQLQueryScopeService {
   }
 
   /** A legacy project key reaches exactly its own project, with no RBAC fan-out. */
-  private async ownProject(projectId: string): Promise<ReadableProject> {
+  private async ownProject({
+    projectId,
+    requested,
+  }: {
+    projectId: string;
+    requested?: string;
+  }): Promise<ReadableProject> {
+    if (requested !== undefined && requested !== projectId) throw projectNotReadable(requested);
     const project = await this.dependencies.projects.findById(projectId);
-    if (!project)
-      throw new NotFoundError("project_not_found", { resource: "Project", id: projectId });
+    if (!project) throw projectNotReadable(projectId);
 
     return { project, credential: { kind: "legacyProjectKey" } };
   }
@@ -99,13 +114,18 @@ export class LangWatchQLQueryScopeService {
    * Every live application project in the key's organization it holds `analytics:view` on,
    * decided as `key ∩ owning user` at each project's own scope.
    */
-  private async readableProjects(
-    reach: Extract<LangWatchQLKeyReach, { kind: "apiKey" }>,
-  ): Promise<ReadableProject[]> {
+  private async readableProjects({
+    reach,
+    only,
+  }: {
+    reach: Extract<LangWatchQLKeyReach, { kind: "apiKey" }>;
+    only?: string;
+  }): Promise<ReadableProject[]> {
     const listed = await this.dependencies.projects.listByOrganization({
       organizationId: reach.organizationId,
       page: 1,
       limit: LWQL_TENANT_CAPABILITY_MAX_PROJECTS,
+      ...(only === undefined ? {} : { projectIds: [only] }),
     });
     if (listed.pagination.total > listed.data.length) {
       throw new Error(
@@ -131,7 +151,13 @@ export class LangWatchQLQueryScopeService {
       });
       if (viewable) readable.push({ project, credential });
     }
+    if (only !== undefined && readable.length === 0) throw projectNotReadable(only);
 
     return readable;
   }
+}
+
+/** One answer for a project that is missing and one the key cannot read, so neither leaks. */
+function projectNotReadable(projectId: string): NotFoundError {
+  return new NotFoundError("project_not_found", { resource: "Project", id: projectId });
 }
