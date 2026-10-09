@@ -55,6 +55,15 @@ Feature: haven CLI surface
     And "--yes" replaces the prompt for scripts and agents
     And a preset name after "reset" seeds that preset, as in "haven db reset demo"
 
+  # A registered stack's recorded database endpoints can be stale (a native
+  # server since swapped for the container); the reset's children must not
+  # follow them. Bound by tools/thuishaven app/db_test.go.
+  Scenario: A reset migrates and seeds exactly the databases it dropped
+    Given the worktree's stack is registered or not
+    When the developer runs "haven db reset"
+    Then the migrations and the seed run against the ClickHouse and Postgres databases it just dropped
+    And they carry the same app origin "haven up" would give, so sign-in configuration loads
+
   # The shared database is what every worktree that never asked for its own
   # falls back to, so resetting it from the primary checkout takes data the
   # developer has no reason to think of as "this stack's". Bound by cmd/db_test.go.

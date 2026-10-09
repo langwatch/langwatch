@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 
@@ -311,6 +312,49 @@ func TestDBReset(t *testing.T) {
 			}
 			if len(sup.shells) != 0 {
 				t.Errorf("nothing may run, got %v", sup.shells)
+			}
+		})
+	})
+}
+
+// @scenario "A reset migrates and seeds exactly the databases it dropped"
+func TestDBResetChildEnvNamesTheDroppedDatabases(t *testing.T) {
+	params := UpParams{ExplicitSlug: "feat-x", WorktreeDir: "/wt/feat-x"}
+	wantCH := "CLICKHOUSE_URL=http://" + domain.ClickHouseUser + ":" + domain.ClickHousePassword + "@127.0.0.1:1/lw_feat_x"
+	wantPG := "DATABASE_URL=postgresql://" + domain.PostgresRole + ":" + domain.PostgresRolePassword + "@127.0.0.1:1/lw_feat_x"
+
+	t.Run("given a stack registered against a ClickHouse server haven no longer runs", func(t *testing.T) {
+		store := liveStackStore()
+		store.stacks[0].ClickHouseHTTPPort, store.stacks[0].ClickHouseDatabase = 64561, "lw_feat_x"
+		store.stacks[0].PostgresPort = 5999
+		sup := &fakeSupervisor{}
+		o := dbOrchestrator(sup, store, &fakeSystem{}, &fakeDBServer{}, &fakeDBServer{})
+
+		t.Run("when resetting, prepare and seed dial the servers it dropped on", func(t *testing.T) {
+			if err := o.DBReset(context.Background(), params, ""); err != nil {
+				t.Fatalf("DBReset: %v", err)
+			}
+			for i, env := range sup.envs {
+				if !slices.Contains(env, wantCH) || !slices.Contains(env, wantPG) {
+					t.Errorf("child %d env = %v, want %q and %q", i, env, wantCH, wantPG)
+				}
+			}
+		})
+	})
+
+	t.Run("given no stack is registered", func(t *testing.T) {
+		sup := &fakeSupervisor{}
+		o := dbOrchestrator(sup, &fakeStore{}, &fakeSystem{}, &fakeDBServer{}, &fakeDBServer{})
+
+		t.Run("when resetting, the children carry the app origin up would give", func(t *testing.T) {
+			if err := o.DBReset(context.Background(), params, ""); err != nil {
+				t.Fatalf("DBReset: %v", err)
+			}
+			wantAuth := "NEXTAUTH_URL=" + o.cfg.Naming.URL("app", "feat-x", "https", 443)
+			for i, env := range sup.envs {
+				if !slices.Contains(env, wantAuth) || !slices.Contains(env, wantCH) || !slices.Contains(env, wantPG) {
+					t.Errorf("child %d env = %v, want %q, %q and %q", i, env, wantAuth, wantCH, wantPG)
+				}
 			}
 		})
 	})
