@@ -401,3 +401,52 @@ Feature: Instant Evals inside the Trace Explorer
       When the Explorer receives an Instant Eval payload
       Then the phrase search is applied
       And the refusal's copy is shown from the presentation registry
+
+  Rule: Interrupted reporting never presents healthy progress or final counts
+
+    @unit
+    Scenario: Equal counters retain newly observed reporting interruption
+      Given a registered running run with unchanged counters
+      When its next read reports a disabled processing step
+      Then its presentation is interrupted and retains the run identity
+
+    @unit
+    Scenario: Reporting interruption survives stale reads and settlement
+      Given a run with observed reporting interruption
+      When a stale healthy read or a terminal write arrives and a pending settlement completes
+      Then the warning stays and the counts are not declared final
+      And opening an old terminal run with the same interruption also keeps the warning
+
+    @integration
+    Scenario: An interrupted run shows actionable uncertainty without judging animation
+      Given a run whose progress reporting was interrupted
+      When the progress notice renders
+      Then it names the interruption, the possibly incomplete last counts and the run ID
+      And it does not animate normal judging or offer automatic recovery
+
+    @integration
+    Scenario: Manual Stop remains available for interrupted active execution
+      Given reporting is interrupted while the run is still active
+      When the reader requests Stop
+      Then the existing cancel request is sent once
+      And the interruption warning stays while Stop becomes unavailable
+
+    @integration
+    Scenario: A failed status read marks stale counts until a successful read
+      Given a registered run with a previously healthy snapshot
+      When its status read fails
+      Then the page says the run status is unavailable and its last counts may be outdated
+      And a successful read clears this transient warning without erasing a known interruption
+
+    @integration
+    Scenario: Interrupted chips and counts never imply normal judging or completion
+      Given an interrupted run behind an eval chip
+      When the chip, count and empty table are displayed
+      Then the chip retains its identity with an interruption mark and no judging sweep
+      And the count and empty state warn that reported results may be incomplete
+
+    @integration
+    Scenario: A persistent interruption notice leaves the traces readable
+      Given an interrupted run and trace rows to inspect
+      When the notice stays visible
+      Then it occupies space above the table instead of covering the rows

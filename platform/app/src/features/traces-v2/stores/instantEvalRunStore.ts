@@ -16,12 +16,16 @@ import {
  *  - `stopping`: the run is active and this page asked it to stop.
  *  - `settling`: the status is terminal, the counters may still move.
  *  - `settled`: terminal, the counters held still and the table read them.
+ *  - `interrupted`: observed reporting impairment, independent of execution.
+ *  - `unavailable`: a status read failed; last counters may be outdated.
  */
 export type InstantEvalRunPhase =
   | "judging"
   | "stopping"
   | "settling"
-  | "settled";
+  | "settled"
+  | "interrupted"
+  | "unavailable";
 
 /**
  * A run read for the first time this long after it ended is taken as settled:
@@ -33,11 +37,15 @@ export function instantEvalRunPhase({
   run,
   isStopRequested,
   isSettled,
+  isReadUnavailable = false,
 }: {
-  run: Pick<InstantEvalExplorerRun, "status">;
+  run: Pick<InstantEvalExplorerRun, "status" | "processingBlock">;
   isStopRequested: boolean;
   isSettled: boolean;
+  isReadUnavailable?: boolean;
 }): InstantEvalRunPhase {
+  if (run.processingBlock) return "interrupted";
+  if (isReadUnavailable) return "unavailable";
   if (isInstantEvalRunActive(run.status)) {
     return isStopRequested ? "stopping" : "judging";
   }
@@ -70,6 +78,8 @@ interface InstantEvalRunState {
   quiet: Record<string, true>;
   /** Quiet runs whose final numbers the table and the sidebar have read. */
   settled: Record<string, true>;
+  readUnavailable: Record<string, true>;
+  markReadUnavailable: (runId: string) => void;
   setRun: (run: InstantEvalExplorerRun, now?: number) => void;
   markStopped: (runId: string) => void;
   markSettled: (runId: string) => void;
@@ -89,6 +99,7 @@ function withFirstRead({
 }): Partial<InstantEvalRunState> {
   const runs = { ...state.runs, [run.id]: run };
   const endedLongAgo =
+    !run.processingBlock &&
     !isInstantEvalRunActive(run.status) &&
     run.finishedAtMs !== null &&
     now - run.finishedAtMs > INSTANT_EVAL_SETTLE_GRACE_MS;
@@ -109,23 +120,55 @@ function only<T>(
   );
 }
 
+function without<T>(record: Record<string, T>, id: string): Record<string, T> {
+  return Object.fromEntries(
+    Object.entries(record).filter(([key]) => key !== id),
+  );
+}
+
 export const useInstantEvalRunStore = create<InstantEvalRunState>((set) => ({
   runs: {},
   stoppedByUser: {},
   quiet: {},
   settled: {},
-  setRun: (run, now = Date.now()) =>
+  readUnavailable: {},
+  markReadUnavailable: (runId) =>
+    set((state) =>
+      state.readUnavailable[runId]
+        ? state
+        : {
+            readUnavailable: { ...state.readUnavailable, [runId]: true },
+            quiet: without(state.quiet, runId),
+            settled: without(state.settled, runId),
+          },
+    ),
+  setRun: (incoming, now = Date.now()) =>
     set((state) => {
-      const previous = state.runs[run.id];
-      if (!previous) return withFirstRead({ state, run, now });
-      if (!hasSameCounters(previous, run)) {
-        return { runs: { ...state.runs, [run.id]: run } };
+      const previous = state.runs[incoming.id];
+      const run =
+        previous?.processingBlock && !incoming.processingBlock
+          ? { ...incoming, processingBlock: previous.processingBlock }
+          : incoming;
+      const readUnavailable = without(state.readUnavailable, run.id);
+      if (run.processingBlock) {
+        return {
+          runs: { ...state.runs, [run.id]: run },
+          quiet: without(state.quiet, run.id),
+          settled: without(state.settled, run.id),
+          readUnavailable,
+        };
       }
-      const isEnded = !isInstantEvalRunActive(run.status);
-      if (isEnded && !state.quiet[run.id]) {
-        return { quiet: { ...state.quiet, [run.id]: true } };
-      }
-      return state;
+      if (!previous)
+        return { ...withFirstRead({ state, run, now }), readUnavailable };
+      const isQuiet =
+        !state.readUnavailable[run.id] &&
+        hasSameCounters(previous, run) &&
+        !isInstantEvalRunActive(run.status);
+      return {
+        runs: { ...state.runs, [run.id]: run },
+        readUnavailable,
+        ...(isQuiet ? { quiet: { ...state.quiet, [run.id]: true } } : {}),
+      };
     }),
   markStopped: (runId) =>
     set((state) => ({
@@ -133,6 +176,9 @@ export const useInstantEvalRunStore = create<InstantEvalRunState>((set) => ({
     })),
   markSettled: (runId) =>
     set((state) =>
+      !state.runs[runId] ||
+      state.runs[runId]?.processingBlock ||
+      state.readUnavailable[runId] ||
       state.settled[runId]
         ? state
         : { settled: { ...state.settled, [runId]: true } },
@@ -141,11 +187,15 @@ export const useInstantEvalRunStore = create<InstantEvalRunState>((set) => ({
     set((state) => {
       const keep = new Set(runIds);
       const runs = only(state.runs, keep);
-      if (Object.keys(runs).length === Object.keys(state.runs).length) {
+      if (
+        Object.keys(runs).length === Object.keys(state.runs).length &&
+        Object.keys(state.readUnavailable).every((id) => keep.has(id))
+      ) {
         return state;
       }
       return {
         runs,
+        readUnavailable: only(state.readUnavailable, keep),
         stoppedByUser: only(state.stoppedByUser, keep),
         quiet: only(state.quiet, keep),
         settled: only(state.settled, keep),
@@ -155,14 +205,16 @@ export const useInstantEvalRunStore = create<InstantEvalRunState>((set) => ({
 
 /** The phase of one run in the store, or null when the store has no such run. */
 export function selectInstantEvalRunPhase(
-  state: Pick<InstantEvalRunState, "runs" | "stoppedByUser" | "settled">,
+  state: Pick<InstantEvalRunState, "runs" | "stoppedByUser" | "settled"> &
+    Partial<Pick<InstantEvalRunState, "readUnavailable">>,
   runId: string,
 ): InstantEvalRunPhase | null {
   const run = state.runs[runId];
-  if (!run) return null;
+  if (!run) return state.readUnavailable?.[runId] ? "unavailable" : null;
   return instantEvalRunPhase({
     run,
     isStopRequested: state.stoppedByUser[runId] === true,
     isSettled: state.settled[runId] === true,
+    isReadUnavailable: state.readUnavailable?.[runId] === true,
   });
 }

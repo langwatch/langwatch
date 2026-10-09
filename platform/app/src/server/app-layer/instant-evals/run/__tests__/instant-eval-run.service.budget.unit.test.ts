@@ -20,6 +20,15 @@ const { acceptInstantEvalStatement, estimateInstantEvalRun, createRun } =
     createRun: vi.fn(),
   }));
 
+vi.mock("../instant-eval-reads", () => ({
+  readInstantEvalResults: vi.fn(),
+  readInstantEvalSample: vi.fn(),
+}));
+
+vi.mock("../input", () => ({
+  resolveInstantEvalStatement: async ({ input }: { input: unknown }) => input,
+}));
+
 vi.mock("../statement", () => ({ acceptInstantEvalStatement }));
 vi.mock("../instant-eval-estimate", () => ({ estimateInstantEvalRun }));
 vi.mock("../instant-eval-create", () => ({
@@ -49,11 +58,13 @@ async function serviceWith({
   standing,
   exhausted = false,
   isHoldRefused = false,
+  isRequestRunDisabled = false,
 }: {
   standing: InstantEvalFreeBudgetStanding;
   exhausted?: boolean;
   /** Whether the run's estimated price fits beside the other holds. */
   isHoldRefused?: boolean;
+  isRequestRunDisabled?: boolean;
 }) {
   const { InstantEvalRunService } = await import("../instant-eval-run.service");
   const assertWithinBudget = vi.fn(async () => {
@@ -75,6 +86,10 @@ async function serviceWith({
   const release = vi.fn(async () => undefined);
   const service = new InstantEvalRunService({
     runs: {} as never,
+    interruptions: {
+      record: async () => undefined,
+      blocksForRuns: async () => ({}),
+    },
     judgments: {} as never,
     rowSource: {} as never,
     query: {} as never,
@@ -82,6 +97,7 @@ async function serviceWith({
     commands: () => ({}) as never,
     cancellations: {} as never,
     isEnabled: async () => true,
+    isRequestRunDisabled: async () => isRequestRunDisabled,
     caller: async () => ({ id: "proj_1", lwqlKey: "key" }) as never,
     plan: async () => ({ name: "free", isFree: standing.isFree }),
     budget: {
@@ -303,5 +319,28 @@ describe("given an organization on a paid plan", () => {
       expect(estimate).toEqual({ rows: 10, priceUsd: 0.5 });
       expect("freeBudgetRemainingUsd" in estimate).toBe(false);
     });
+  });
+});
+
+describe("given requestRun is disabled", () => {
+  /** @scenario A disabled request refuses admission without a run or budget hold */
+  it("refuses before any budget or acceptance work", async () => {
+    const { service, assertWithinBudget, reserve } = await serviceWith({
+      standing: PAID,
+      isRequestRunDisabled: true,
+    });
+    const acceptedBefore = acceptInstantEvalStatement.mock.calls.length;
+    const createdBefore = createRun.mock.calls.length;
+    await expect(
+      service.create({
+        projectId: "proj_1",
+        protections: PROTECTIONS,
+        input: INPUT,
+      }),
+    ).rejects.toMatchObject({ code: "instant_eval_processing_disabled" });
+    expect(assertWithinBudget).not.toHaveBeenCalled();
+    expect(reserve).not.toHaveBeenCalled();
+    expect(acceptInstantEvalStatement.mock.calls.length).toBe(acceptedBefore);
+    expect(createRun.mock.calls.length).toBe(createdBefore);
   });
 });

@@ -35,6 +35,9 @@ export function useInstantEvalRunWatch(): void {
   const settled = useInstantEvalRunStore((s) => s.settled);
   const setRun = useInstantEvalRunStore((s) => s.setRun);
   const keepOnly = useInstantEvalRunStore((s) => s.keepOnly);
+  const markReadUnavailable = useInstantEvalRunStore(
+    (s) => s.markReadUnavailable,
+  );
   useEffect(() => {
     keepOnly(runIds);
   }, [runIds, keepOnly]);
@@ -58,7 +61,9 @@ export function useInstantEvalRunWatch(): void {
   // Every poll answer lands in the store, which also notes an ended run whose
   // counters came back unchanged. `dataUpdatedAt` is what tells two equal
   // answers apart, so the second one is counted once and not on every render.
-  const answers = results.map((result) => ({
+  const answers = results.map((result, index) => ({
+    runId: runIds[index],
+    failed: result.isError,
     run: result.data,
     at: result.dataUpdatedAt ?? 0,
   }));
@@ -66,10 +71,20 @@ export function useInstantEvalRunWatch(): void {
     Record<string, { run: InstantEvalExplorerRun; at: number }>
   >({});
   useEffect(() => {
-    for (const { run, at } of answers) {
+    for (const { runId, failed, run, at } of answers) {
+      if (failed) {
+        if (runId) markReadUnavailable(runId);
+        continue;
+      }
       if (!run) continue;
       const last = lastAnswer.current[run.id];
-      if (last && last.at === at && last.run === run) continue;
+      if (
+        last &&
+        last.at === at &&
+        last.run === run &&
+        !useInstantEvalRunStore.getState().readUnavailable[run.id]
+      )
+        continue;
       lastAnswer.current[run.id] = { run, at };
       setRun(run);
     }

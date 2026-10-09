@@ -9,6 +9,11 @@
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.hoisted(() => vi.resetModules());
+vi.unmock("../../stores/explorerStore");
+vi.unmock("../../stores/instantEvalRunStore");
+vi.unmock("../useInstantEvalRuns");
+
 const mockList = {
   data: [{ traceId: "t-1" }, { traceId: "t-2" }],
   totalHits: 1234,

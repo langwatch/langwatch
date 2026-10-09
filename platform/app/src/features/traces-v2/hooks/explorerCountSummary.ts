@@ -16,6 +16,8 @@ export interface InstantEvalCounters {
   judged: number;
   total: number | null;
   matched: number;
+  phase?: "judging" | "stopping" | "settling" | "interrupted" | "unavailable";
+  hasReportedCounts?: boolean;
 }
 
 /** The singular of each noun the Explorer counts in. */
@@ -48,10 +50,17 @@ export function explorerCountSummary({
   instantEval: InstantEvalCounters | null;
 }): string {
   if (instantEval) {
+    if (instantEval.hasReportedCounts === false)
+      return "Run status unavailable · counts unavailable";
     const judged = instantEval.judged.toLocaleString();
     const total =
       instantEval.total === null ? "?" : instantEval.total.toLocaleString();
-    return `${instantEval.matched.toLocaleString()} matched so far · ${judged} of ${total} judged`;
+    const counters = `${instantEval.matched.toLocaleString()} matched so far · ${judged} of ${total} judged`;
+    if (instantEval.phase === "interrupted")
+      return `Last reported: ${counters} · may be incomplete`;
+    if (instantEval.phase === "unavailable")
+      return `Last reported: ${counters} · may be outdated`;
+    return counters;
   }
   return `${totalHits.toLocaleString()} ${explorerItemNoun({ totalHits, itemNoun })}`;
 }

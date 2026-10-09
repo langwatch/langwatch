@@ -368,6 +368,7 @@ describe("ttlReconciler", () => {
         // and nothing to meter as storage. The run's row follows them.
         "instant_eval_judgments",
         "instant_eval_runs",
+        "instant_eval_run_interruptions",
       ]);
     });
 

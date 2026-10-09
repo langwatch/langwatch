@@ -72,11 +72,21 @@ export interface CommandSerializationOptions<Payload = any> {
   coalesceMaxBytes?: number;
 }
 
-/**
- * Options for configuring a command handler in a static pipeline definition.
+/** Awaited before a disabled command can be acknowledged as skipped.
+ * A failing observer retries the command job, never the producer's paid work.
  */
+export type CommandKillSwitchSkipObserver<Payload = Record<string, unknown>> =
+  (input: {
+    payload: Payload;
+    tenantId: string;
+    aggregateId: string;
+    componentName: string;
+  }) => Promise<void>;
+
+/** Options for configuring a command handler in a static pipeline definition. */
 export interface CommandHandlerOptions<Payload = any>
   extends CommandSerializationOptions<Payload> {
+  onKillSwitchSkip?: CommandKillSwitchSkipObserver<Payload>;
   getAggregateId?: (payload: Payload) => string;
   getGroupKey?: (payload: Payload) => string;
   makeJobId?: (payload: Payload) => string;

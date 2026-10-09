@@ -13,13 +13,25 @@ import { renderHook } from "@testing-library/react";
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.hoisted(() => vi.resetModules());
+vi.unmock("../useTraceListQuery");
+vi.unmock("../useSessionGroups");
+vi.unmock("../useInstantEvalRuns");
+vi.unmock("../../stores/explorerStore");
+vi.unmock("../../stores/instantEvalRunStore");
+
 const harness = vi.hoisted(() => ({
   list: vi.fn(),
   facets: vi.fn(),
   newCount: vi.fn(),
   sessions: vi.fn(),
   invalidate: { list: vi.fn(), sessions: vi.fn(), facets: vi.fn() },
-  getResults: [] as { data: unknown }[],
+  getResults: [] as {
+    data: unknown;
+    isError?: boolean;
+    dataUpdatedAt?: number;
+  }[],
+  getQuery: vi.fn(),
 }));
 
 vi.mock("~/utils/api", () => ({
@@ -37,7 +49,14 @@ vi.mock("~/utils/api", () => ({
         facets: { invalidate: harness.invalidate.facets },
       },
     }),
-    useQueries: () => harness.getResults,
+    useQueries: (
+      queries: (t: {
+        tracesV2: { instantEval: { get: typeof harness.getQuery } };
+      }) => unknown,
+    ) => {
+      queries({ tracesV2: { instantEval: { get: harness.getQuery } } });
+      return harness.getResults;
+    },
   },
 }));
 
@@ -64,6 +83,7 @@ import {
   isInstantEvalBusy,
 } from "../../components/SearchBar/SearchBar";
 import { instantEvalProgressCopy } from "../../components/TracesPage/InstantEvalProgressBar";
+import { emptyContent } from "../../components/TraceTable/EmptyFilterState";
 import { useExplorerStore } from "../../stores/explorerStore";
 import { useInstantEvalRunStore } from "../../stores/instantEvalRunStore";
 import { useExplorerCounts } from "../useExplorerCounts";
@@ -108,6 +128,7 @@ beforeEach(() => {
   useInstantEvalRunStore.setState({
     runs: {},
     stoppedByUser: {},
+    readUnavailable: {},
     quiet: {},
     settled: {},
   });
@@ -472,6 +493,135 @@ describe("given a run stopped short of its total", () => {
           hasRun: true,
         }),
       ).toBeNull();
+    });
+  });
+});
+
+describe("given a run with interrupted reporting", () => {
+  const run = {
+    id: "run-1",
+    status: "running" as const,
+    total: 100,
+    progress: 20,
+    matched: 4,
+    failed: 0,
+    skipped: 0,
+    error: null,
+    priceUsd: 0.1,
+    finishedAtMs: null,
+  };
+  const processingBlock = {
+    code: "instant_eval_processing_disabled" as const,
+    observedAtMs: 10,
+    stages: [
+      { componentType: "command" as const, componentName: "recordPageJudged" },
+    ],
+  };
+
+  describe("when a status read fails and recovers", () => {
+    /** @scenario "A failed status read marks stale counts until a successful read" */
+    it("marks stale data unavailable and clears only the transient warning", () => {
+      harness.getResults = [{ data: run, dataUpdatedAt: 1 }];
+      const watch = renderHook(() => useInstantEvalRunWatch());
+      const counts = renderHook(() => useExplorerCounts());
+      harness.getResults = [{ data: run, dataUpdatedAt: 1, isError: true }];
+      watch.rerender();
+      expect(counts.result.current.summary).toContain("may be outdated");
+      expect(useInstantEvalRunStore.getState().readUnavailable[run.id]).toBe(
+        true,
+      );
+      harness.getResults = [{ data: run, dataUpdatedAt: 1, isError: false }];
+      watch.rerender();
+      expect(counts.result.current.summary).toBe(
+        "4 matched so far · 20 of 100 judged",
+      );
+      harness.getResults = [
+        { data: { ...run, processingBlock }, dataUpdatedAt: 2 },
+      ];
+      watch.rerender();
+      harness.getResults = [{ data: run, dataUpdatedAt: 1, isError: true }];
+      watch.rerender();
+      harness.getResults = [{ data: run, dataUpdatedAt: 3, isError: false }];
+      watch.rerender();
+      expect(counts.result.current.summary).toContain("may be incomplete");
+      expect(harness.getQuery).toHaveBeenLastCalledWith(
+        { projectId: "project-1", runId: "run-1" },
+        expect.objectContaining({ refetchInterval: 1000 }),
+      );
+    });
+
+    /** @scenario "A failed status read marks stale counts until a successful read" */
+    it("does not invent counts when the first read fails", () => {
+      harness.getResults = [{ data: undefined, isError: true }];
+      renderHook(() => useInstantEvalRunWatch());
+      const counts = renderHook(() => useExplorerCounts());
+      expect(counts.result.current.summary).toBe(
+        "Run status unavailable · counts unavailable",
+      );
+    });
+  });
+
+  describe("when a final table read is already in flight", () => {
+    /** @scenario "Reporting interruption survives stale reads and settlement" */
+    it("does not settle a newly interrupted run after that read completes", async () => {
+      let finish: (() => void) | undefined;
+      harness.invalidate.list.mockReturnValue(
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+      );
+      const terminal = {
+        ...run,
+        status: "finished" as const,
+        finishedAtMs: Date.now(),
+      };
+      harness.getResults = [{ data: terminal, dataUpdatedAt: 1 }];
+      const watch = renderHook(() => useInstantEvalRunWatch());
+      harness.getResults = [{ data: { ...terminal }, dataUpdatedAt: 2 }];
+      watch.rerender();
+      expect(useInstantEvalRunStore.getState().quiet[run.id]).toBe(true);
+      harness.getResults = [
+        { data: { ...terminal, processingBlock }, dataUpdatedAt: 3 },
+      ];
+      watch.rerender();
+      await act(async () => {
+        finish?.();
+        await Promise.resolve();
+      });
+      expect(useInstantEvalRunStore.getState().settled[run.id]).toBeUndefined();
+      expect(
+        useInstantEvalRunStore.getState().runs[run.id]?.processingBlock,
+      ).toEqual(processingBlock);
+    });
+  });
+
+  describe("when chip, counts and empty content are resolved", () => {
+    /** @scenario "Interrupted chips and counts never imply normal judging or completion" */
+    it("keeps the chip identity and shows uncertain counts without a busy chip", () => {
+      const interrupted = { ...run, processingBlock };
+      act(() => useInstantEvalRunStore.getState().setRun(interrupted));
+      const counts = renderHook(() => useExplorerCounts());
+      expect(counts.result.current.summary).toContain("may be incomplete");
+      expect(instantEvalChipMark({ run: interrupted, hasRun: true })).toBe(
+        "(reporting interrupted)",
+      );
+      expect(
+        emptyContent({
+          activeLensId: "all-traces",
+          hasFilters: true,
+          rangeHours: 24,
+          isJudging: false,
+          reportingPhase: "interrupted",
+        }).description,
+      ).toContain("may be incomplete");
+      expect(
+        isInstantEvalBusy({
+          isEstimating: false,
+          isStarting: false,
+          chips: [{ runId: run.id }, { runId: "healthy-run" }],
+          runs: { [run.id]: interrupted, "healthy-run": { status: "running" } },
+        }),
+      ).toBe(false);
     });
   });
 });

@@ -16,10 +16,11 @@
 import type { ResolvedInstantEvalRun } from "~/server/app-layer/traces/filter-to-clickhouse/instant-eval-field";
 import type { InstantEvalRunReference } from "~/server/app-layer/traces/query-language/instantEvalChips";
 import type { InstantEvalRunProjectedStatus } from "~/server/event-sourcing/pipelines/instant-eval-processing/projections/instantEvalRun.stateProjection";
+import type { InstantEvalRunRepository } from "./instant-eval-run.repository";
 import type {
-  InstantEvalRunRepository,
-  InstantEvalRunRow,
-} from "./instant-eval-run.repository";
+  InstantEvalProcessingBlock,
+  InstantEvalRunView,
+} from "./processing-block";
 
 /**
  * How far past its last write a run's judgements may still land, and how far
@@ -90,6 +91,7 @@ const EXPLORER_STATUS = {
 /** A run's counters, which is all the progress bar and the chip read. */
 export interface InstantEvalExplorerRun {
   id: string;
+  processingBlock?: InstantEvalProcessingBlock;
   status: InstantEvalExplorerStatus;
   total: number | null;
   progress: number;
@@ -104,10 +106,11 @@ export interface InstantEvalExplorerRun {
 }
 
 export function toInstantEvalExplorerRun(
-  row: InstantEvalRunRow,
+  row: InstantEvalRunView,
 ): InstantEvalExplorerRun {
   return {
     id: row.id,
+    ...(row.processingBlock ? { processingBlock: row.processingBlock } : {}),
     status: EXPLORER_STATUS[row.status],
     total: row.total,
     progress: row.progress,

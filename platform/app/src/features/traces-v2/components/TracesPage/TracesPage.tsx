@@ -517,7 +517,14 @@ const ResultsPane: React.FC = React.memo(() => {
           );
         }}
       />
-      <Box flex={1} minHeight={0} position="relative">
+      <Box
+        flex={1}
+        minHeight={0}
+        position="relative"
+        display="flex"
+        flexDirection="column"
+      >
+        <InstantEvalProgressMount />
         {/*
           Light mode: the table sits on a pure-white surface so the eye
           anchors on the gray sticky header row above it (DevTools
@@ -525,7 +532,8 @@ const ResultsPane: React.FC = React.memo(() => {
           background that operators already approved.
         */}
         <Box
-          height="full"
+          flex={1}
+          minHeight={0}
           overflow="auto"
           bg={{ base: "bg.surface", _dark: "bg.muted" }}
         >
@@ -537,9 +545,6 @@ const ResultsPane: React.FC = React.memo(() => {
             triggered by the toolbar "See sample data" toggle instead of an
             auto-play state machine. */}
         {showAurora && <AuroraOverlay />}
-        {/* A judging run replaces the aurora with a determinate bar: what has
-            been judged, what matched, and a Stop. */}
-        <InstantEvalProgressMount />
         <FindBar />
         <Box
           position="absolute"

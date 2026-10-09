@@ -13,6 +13,8 @@ import "@testing-library/jest-dom/vitest";
 import { useSearchSubmitRequestStore } from "../../../stores/searchSubmitRequestStore";
 import { EmptyFilterState } from "../EmptyFilterState";
 
+vi.hoisted(() => vi.resetModules());
+
 const QUERY = 'status:error AND eval:"is the user annoyed"';
 const NOW = 1_700_000_000_000;
 

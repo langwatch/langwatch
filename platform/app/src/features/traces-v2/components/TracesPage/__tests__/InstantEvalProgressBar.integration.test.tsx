@@ -16,6 +16,8 @@ import {
   instantEvalProgressPercent,
 } from "../InstantEvalProgressBar";
 
+vi.hoisted(() => vi.resetModules());
+
 const wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
@@ -82,5 +84,60 @@ describe("given a run with total 10,000, progress 3,200 and 412 matched", () => 
       ).toBe("Judging 0 / … · 0 matched");
       expect(instantEvalProgressPercent({ judged: 0, total: null })).toBeNull();
     });
+  });
+});
+
+describe("given interrupted progress reporting", () => {
+  describe("when the progress notice renders", () => {
+    /** @scenario "An interrupted run shows actionable uncertainty without judging animation" */
+    it("shows incomplete last counts and the run ID without a progress animation", () => {
+      render(
+        <InstantEvalProgressBar
+          judged={20}
+          total={100}
+          matched={4}
+          question="annoyed user"
+          phase="interrupted"
+          runId="run-interrupted"
+          canStop={true}
+          onStop={vi.fn()}
+        />,
+        { wrapper },
+      );
+      expect(
+        screen.getByText("Progress reporting was interrupted."),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          /Work may still be running and these counts may be incomplete/,
+        ),
+      ).toBeInTheDocument();
+      expect(screen.getByText("run-interrupted")).toBeInTheDocument();
+      expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+      expect(screen.queryByText(/^Judging /)).not.toBeInTheDocument();
+    });
+  });
+});
+
+describe("given an unavailable first status read", () => {
+  /** @scenario "A failed status read marks stale counts until a successful read" */
+  it("shows unavailable status without inventing initial counts", () => {
+    render(
+      <InstantEvalProgressBar
+        judged={0}
+        total={null}
+        matched={0}
+        question="annoyed user"
+        phase="unavailable"
+        runId="run-unavailable"
+        hasReportedCounts={false}
+        canStop={false}
+        onStop={vi.fn()}
+      />,
+      { wrapper },
+    );
+    expect(screen.getByText("Run status unavailable.")).toBeInTheDocument();
+    expect(screen.queryByText(/^Last reported:/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
   });
 });

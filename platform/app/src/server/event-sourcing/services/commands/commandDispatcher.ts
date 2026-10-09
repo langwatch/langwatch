@@ -16,6 +16,7 @@ import { createTenantId } from "../../domain/tenantId";
 import type { Event } from "../../domain/types";
 import { EventSchema } from "../../domain/types";
 import type {
+  CommandKillSwitchSkipObserver,
   CommandSerializationOptions,
   KillSwitchOptions,
 } from "../../pipeline/staticBuilder.types";
@@ -49,6 +50,7 @@ export interface ProcessCommandParams<EventType extends Event> {
   pipelineName: string;
   featureFlagService?: FeatureFlagServiceInterface;
   killSwitchOptions?: KillSwitchOptions;
+  onKillSwitchSkip?: CommandKillSwitchSkipObserver;
   logger?: ReturnType<typeof createLogger>;
 }
 
@@ -169,6 +171,12 @@ export async function processCommand<EventType extends Event>(
     logger: log,
   });
   if (disabled) {
+    await params.onKillSwitchSkip?.({
+      payload: validated,
+      tenantId: String(tenantId),
+      aggregateId,
+      componentName: commandName,
+    });
     return;
   }
 
@@ -322,8 +330,13 @@ async function handleBatchCommands<EventType extends Event>(args: {
       logger: log,
     });
     if (disabled) {
-      // Mirror the single path's silent return: no events, no metrics — but
-      // the rest of the batch still runs.
+      await params.onKillSwitchSkip?.({
+        payload: validated,
+        tenantId: String(payloadTenantId),
+        aggregateId,
+        componentName: commandName,
+      });
+      // The rest of the batch still runs, after the optional receipt is durable.
       continue;
     }
 
@@ -492,4 +505,5 @@ export interface CommandHandlerOptions<Payload>
     payload: Payload,
   ) => Record<string, string | number | boolean>;
   killSwitch?: KillSwitchOptions;
+  onKillSwitchSkip?: CommandKillSwitchSkipObserver<Payload>;
 }

@@ -255,6 +255,12 @@ const registry = {
     ],
     docsPath: "/features/instant-evals/limits-and-cost",
   },
+  instant_eval_processing_disabled: {
+    tips: [
+      "Contact your administrator or support with the run ID, if one was already accepted. Work may still be running and reported counts may be incomplete.",
+    ],
+    docsPath: "/features/instant-evals/limits-and-cost",
+  },
   instant_eval_not_found: {
     tips: [
       "Read `meta.runId`; no run of the authenticated project carries that id",

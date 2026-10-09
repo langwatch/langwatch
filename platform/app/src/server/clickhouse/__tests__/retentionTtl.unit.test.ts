@@ -430,3 +430,22 @@ describe("governance cost tables keep data indefinitely by default", () => {
     });
   });
 });
+
+describe("Instant Eval refusal evidence retention", () => {
+  it("keeps indefinite receipts outside the customer cascade and meter", () => {
+    const table = "instant_eval_run_interruptions";
+    expect(INDEFINITE_DEFAULT_RETENTION_TABLES).toContain(table);
+    expect(RETENTION_MANAGED_TABLES).not.toContain(table);
+    expect(PRODUCTION_STORAGE_METER_TABLES).not.toContain(table);
+    const migration = readFileSync(
+      migrationEndingIn("_create_instant_eval_run_interruptions.sql"),
+      "utf8",
+    );
+    expect(migration).toContain("`_retention_days` UInt16 DEFAULT 0");
+    expect(migration).toContain(
+      buildRetentionTTLExpression(
+        TABLE_TTL_CONFIG.find((config) => config.table === table)!,
+      ),
+    );
+  });
+});

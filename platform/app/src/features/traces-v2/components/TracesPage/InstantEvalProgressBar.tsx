@@ -15,6 +15,10 @@ interface InstantEvalProgressBarProps {
   /** The question, so the bar says what is being judged. */
   question: string;
   phase: InstantEvalBarPhase;
+  runId?: string;
+  canStop?: boolean;
+  hasReportedCounts?: boolean;
+  isReadUnavailable?: boolean;
   onStop: () => void;
 }
 
@@ -32,6 +36,10 @@ export function instantEvalProgressCopy({
 }): string {
   const totalText = total === null ? "…" : total.toLocaleString();
   const counters = `${judged.toLocaleString()} / ${totalText} · ${matched.toLocaleString()} matched`;
+  if (phase === "interrupted")
+    return `Last reported: ${counters} · may be incomplete`;
+  if (phase === "unavailable")
+    return `Last reported: ${counters} · may be outdated`;
   if (phase === "judging") return `Judging ${counters}`;
   // A stop waits for the classifications already in flight, and an ended run
   // for its last verdicts: both say so, with counters that still move.
@@ -67,15 +75,21 @@ export const InstantEvalProgressBar: React.FC<InstantEvalProgressBarProps> = ({
   matched,
   question,
   phase,
+  runId,
+  canStop = phase === "judging",
+  hasReportedCounts = true,
+  isReadUnavailable = false,
   onStop,
 }) => {
+  const impaired = phase === "interrupted" || phase === "unavailable";
   const percent = instantEvalProgressPercent({ judged, total });
   return (
     <Box
       role="status"
       aria-label="Instant Eval progress"
       data-testid="instant-eval-progress"
-      position="absolute"
+      position={impaired ? "relative" : "absolute"}
+      flexShrink={0}
       top={0}
       left={0}
       right={0}
@@ -89,9 +103,11 @@ export const InstantEvalProgressBar: React.FC<InstantEvalProgressBarProps> = ({
     >
       <HStack justify="space-between" gap={3} marginBottom={1.5}>
         <HStack gap={2} minWidth={0}>
-          <Text textStyle="sm" color="fg" fontVariantNumeric="tabular-nums">
-            {instantEvalProgressCopy({ judged, total, matched, phase })}
-          </Text>
+          {hasReportedCounts && (
+            <Text textStyle="sm" color="fg" fontVariantNumeric="tabular-nums">
+              {instantEvalProgressCopy({ judged, total, matched, phase })}
+            </Text>
+          )}
           <Text textStyle="xs" color="fg.muted" truncate title={question}>
             {question}
           </Text>
@@ -100,25 +116,55 @@ export const InstantEvalProgressBar: React.FC<InstantEvalProgressBarProps> = ({
           variant="ghost"
           size="xs"
           onClick={onStop}
-          disabled={phase !== "judging"}
+          disabled={!canStop}
           aria-label="Stop judging"
         >
           <Square size={12} />
           Stop
         </Button>
       </HStack>
-      <Progress.Root
-        value={percent}
-        min={0}
-        max={100}
-        colorPalette="orange"
-        size="xs"
-        aria-label="Rows judged"
-      >
-        <Progress.Track>
-          <Progress.Range css={{ transition: "width 0.5s ease-in-out" }} />
-        </Progress.Track>
-      </Progress.Root>
+      {impaired && (
+        <Box role="alert" color="fg.warning" textStyle="sm">
+          <Text fontWeight="medium">
+            {phase === "interrupted"
+              ? "Progress reporting was interrupted."
+              : "Run status unavailable."}
+          </Text>
+          <Text>
+            {phase === "interrupted"
+              ? "A processing step was disabled. Work may still be running and these counts may be incomplete. Contact your administrator or support with this run ID."
+              : "Work may still be running. Last reported counts may be outdated. Run status will be checked again."}
+          </Text>
+          {phase === "interrupted" && isReadUnavailable && (
+            <Text>
+              Run status is also unavailable. Last reported counts may be
+              outdated.
+            </Text>
+          )}
+          {runId && (
+            <Text>
+              Run ID:{" "}
+              <Text as="code" display="inline" userSelect="all">
+                {runId}
+              </Text>
+            </Text>
+          )}
+        </Box>
+      )}
+      {!impaired && (
+        <Progress.Root
+          value={percent}
+          min={0}
+          max={100}
+          colorPalette="orange"
+          size="xs"
+          aria-label="Rows judged"
+        >
+          <Progress.Track>
+            <Progress.Range css={{ transition: "width 0.5s ease-in-out" }} />
+          </Progress.Track>
+        </Progress.Root>
+      )}
     </Box>
   );
 };

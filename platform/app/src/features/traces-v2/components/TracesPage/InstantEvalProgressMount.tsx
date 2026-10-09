@@ -1,6 +1,7 @@
 import type React from "react";
 import { useCallback } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { isInstantEvalRunActive } from "~/server/app-layer/instant-evals/run/instant-eval-explorer";
 import { api } from "~/utils/api";
 import { useInstantEvalRuns } from "../../hooks/useInstantEvalRuns";
 import {
@@ -22,15 +23,15 @@ export const InstantEvalProgressMount: React.FC = () => {
   const { runs, markStopped } = runState;
   const cancel = api.tracesV2.instantEval.cancel.useMutation();
 
-  const active = chips
-    .map((chip) => ({
-      chip,
-      run: chip.runId ? runs[chip.runId] : undefined,
-      phase: chip.runId
-        ? selectInstantEvalRunPhase(runState, chip.runId)
-        : null,
-    }))
-    .find(({ phase }) => phase !== null && phase !== "settled");
+  const candidates = chips.map((chip) => ({
+    chip,
+    run: chip.runId ? runs[chip.runId] : undefined,
+    phase: chip.runId ? selectInstantEvalRunPhase(runState, chip.runId) : null,
+  }));
+  const active =
+    candidates.find(({ phase }) => phase === "interrupted") ??
+    candidates.find(({ phase }) => phase === "unavailable") ??
+    candidates.find(({ phase }) => phase !== null && phase !== "settled");
 
   // The answer to a cancel is the run as it was when asked, so it is not
   // written to the store: the poll reads what the run does next.
@@ -41,14 +42,24 @@ export const InstantEvalProgressMount: React.FC = () => {
     cancel.mutate({ projectId: project.id, runId });
   }, [active, cancel, markStopped, project?.id]);
 
-  if (!active?.run || !active.phase || active.phase === "settled") return null;
+  if (!active?.phase || active.phase === "settled") return null;
   return (
     <InstantEvalProgressBar
-      judged={active.run.progress}
-      total={active.run.total}
-      matched={active.run.matched ?? 0}
+      judged={active.run?.progress ?? 0}
+      total={active.run?.total ?? null}
+      matched={active.run?.matched ?? 0}
       question={active.chip.question}
       phase={active.phase}
+      runId={active.chip.runId ?? undefined}
+      hasReportedCounts={Boolean(active.run)}
+      isReadUnavailable={Boolean(
+        active.chip.runId && runState.readUnavailable[active.chip.runId],
+      )}
+      canStop={Boolean(
+        active.run &&
+          isInstantEvalRunActive(active.run.status) &&
+          !runState.stoppedByUser[active.run.id],
+      )}
       onStop={onStop}
     />
   );
