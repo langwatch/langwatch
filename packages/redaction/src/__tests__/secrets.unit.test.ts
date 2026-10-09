@@ -281,6 +281,18 @@ describe("redactSecretsInText, beyond the known-vendor list", () => {
     });
   });
 
+  describe("given a random key body that happens to hold several separators", () => {
+    /** @scenario "An open-weight model id is not mistaken for a key" */
+    it.each([
+      ["hyphens between long random parts", "acme_Zk3fQ9xLm2Tv-7Rb1Yw8Hd4Ns-6Jc0Pg5Ue-Xa2Bq9"],
+      ["short random groups with no word among them", "acme_x7Kq2-Lm9Tv-4Rb1Y-w8Hd4-Ns6Jc-0Pg5U"],
+      ["a standard base64 body", "acme_Nemo-Super-12+B/A12B-Zk3fQ9xLm2Tv7Rb1"],
+    ])("still redacts %s", (_label, key) => {
+      const { text } = redactSecretsInText({ text: `token ${key} sent` });
+      expect(text).toBe("token [SECRET] sent");
+    });
+  });
+
   describe("given a key minted by LangWatch itself", () => {
     // Our own tokens are `{prefix}{lookupId}_{secret}`. Matching on the prefix
     // rather than the body means a truncated one still redacts; `ik-lw-` used
@@ -440,6 +452,18 @@ describe("redactSecretsInText, given text that only looks like secrets", () => {
     ],
     ["model names", "compared claude-opus-5 with gpt-5-mini and claude-3-5-sonnet-20241022"],
     ["a bedrock model id", "us.anthropic.claude-opus-4-20250514-v1:0"],
+    [
+      "an open-weight model id with size and quantisation tags",
+      "doubleword/nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4",
+    ],
+    [
+      "an open-weight model id in a JSON payload",
+      '{"model":"nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4"}',
+    ],
+    [
+      "a hugging face style model id",
+      "Qwen/Qwen3-VL-235B-A22B-Instruct-FP8-dottxt and Meta-Llama-4-Maverick-17B-128E-Instruct-FP8",
+    ],
     ["semver bumps", "bumped langwatch from 1.2.1 to 2.6.0 and web to 3.9.0"],
     [
       "a subresource integrity hash",
