@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import type { Dataset, DatasetRecord, Prisma } from "~/generated/prisma/client";
@@ -17,6 +18,8 @@ import { stripNullBytes } from "../../datasets/sanitize";
 import type { DatasetRecordInput } from "../../datasets/types";
 import { prisma } from "../../db";
 import { StorageService } from "../../storage";
+
+const logger = createLogger("langwatch:api:datasetRecord");
 
 const storageService = new StorageService();
 
@@ -90,12 +93,62 @@ const createDatasetRecords = ({
   });
 };
 
+const appendLegacyS3Records = async ({
+  db,
+  datasetId,
+  projectId,
+  datasetRecords,
+}: {
+  db: Prisma.TransactionClient | typeof prisma;
+  datasetId: string;
+  projectId: string;
+  datasetRecords: DatasetRecordInput[];
+}) => {
+  const recordData = createDatasetRecords({
+    entries: datasetRecords,
+    datasetId,
+    projectId,
+    useS3: true,
+  });
+
+  let existingRecords: any[] = [];
+  try {
+    const { records: fetchedRecords } = await storageService.getObject(
+      projectId,
+      datasetId,
+    );
+    existingRecords = fetchedRecords;
+  } catch (error) {
+    if ((error as any).name !== "NoSuchKey") {
+      captureException(toError(error));
+      throw error;
+    }
+  }
+
+  // Combine existing and new records
+  const allRecords = [...existingRecords, ...recordData];
+
+  await storageService.putObject(
+    projectId,
+    datasetId,
+    JSON.stringify(allRecords),
+  );
+
+  await db.dataset.update({
+    where: { id: datasetId, projectId },
+    data: { s3RecordCount: allRecords.length },
+  });
+
+  return { success: true };
+};
+
 export const createManyDatasetRecords = async ({
   datasetId,
   projectId,
   datasetRecords,
   tx,
   dataset: providedDataset,
+  shouldSkipDuplicates,
 }: {
   datasetId: string;
   projectId: string;
@@ -110,6 +163,13 @@ export const createManyDatasetRecords = async ({
   // Only used for the initial layout routing; the s3_jsonl path re-reads the
   // authoritative state under the advisory lock regardless.
   dataset?: Dataset | null;
+  // For callers supplying deterministic ids: an id that already exists means
+  // the row was already added, so it is skipped instead of failing the batch
+  // (P2002). Only the postgres layout honors it; the s3_jsonl and legacy
+  // useS3 layouts append and do not dedupe against stored rows. Tracked in
+  // https://github.com/langwatch/langwatch/issues/8544. The record id
+  // is a global primary key, so an id existing in ANY dataset is skipped.
+  shouldSkipDuplicates?: boolean;
 }) => {
   const db = tx ?? prisma;
   const dataset =
@@ -123,6 +183,21 @@ export const createManyDatasetRecords = async ({
       code: "NOT_FOUND",
       message: "Dataset not found",
     });
+  }
+
+  if (
+    shouldSkipDuplicates &&
+    (dataset.contentLayout === "s3_jsonl" || dataset.useS3)
+  ) {
+    logger.debug(
+      {
+        datasetId,
+        projectId,
+        contentLayout: dataset.contentLayout,
+        useS3: dataset.useS3,
+      },
+      "shouldSkipDuplicates is not supported on this dataset layout; existing rows may be duplicated",
+    );
   }
 
   // ADR-032 rung 6b: an s3_jsonl dataset appends to chunk objects (new chunks
@@ -150,53 +225,32 @@ export const createManyDatasetRecords = async ({
   }
 
   if (dataset.useS3) {
-    const recordData = createDatasetRecords({
-      entries: datasetRecords,
-      datasetId,
-      projectId,
-      useS3: true,
-    });
-
-    let existingRecords: any[] = [];
-    try {
-      const { records: fetchedRecords } = await storageService.getObject(
-        projectId,
-        datasetId,
-      );
-      existingRecords = fetchedRecords;
-    } catch (error) {
-      if ((error as any).name !== "NoSuchKey") {
-        captureException(toError(error));
-        throw error;
-      }
-    }
-
-    // Combine existing and new records
-    const allRecords = [...existingRecords, ...recordData];
-
-    await storageService.putObject(
-      projectId,
-      datasetId,
-      JSON.stringify(allRecords),
-    );
-
-    await db.dataset.update({
-      where: { id: datasetId, projectId },
-      data: { s3RecordCount: allRecords.length },
-    });
-
-    return { success: true };
-  } else {
-    const recordData = createDatasetRecords({
-      entries: datasetRecords,
-      datasetId,
-      projectId,
-    });
-
-    return db.datasetRecord.createMany({
-      data: recordData as (DatasetRecord & { entry: any })[],
-    });
+    return appendLegacyS3Records({ db, datasetId, projectId, datasetRecords });
   }
+
+  const recordData = createDatasetRecords({
+    entries: datasetRecords,
+    datasetId,
+    projectId,
+  });
+
+  const result = await db.datasetRecord.createMany({
+    data: recordData as (DatasetRecord & { entry: any })[],
+    skipDuplicates: shouldSkipDuplicates,
+  });
+
+  if (shouldSkipDuplicates && result.count < recordData.length) {
+    logger.info(
+      {
+        datasetId,
+        projectId,
+        skipped: recordData.length - result.count,
+      },
+      "skipped dataset records that already exist",
+    );
+  }
+
+  return result;
 };
 
 const processBatchedRecords = ({

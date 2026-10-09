@@ -16,7 +16,30 @@ vi.mock("../../../datasets/dataset-storage", () => ({
   getDatasetStorage: (...a: unknown[]) => getDatasetStorage(...a),
 }));
 
-import { getFullDataset, readDatasetHeadS3Jsonl } from "../datasetRecord.utils";
+const loggerDebug = vi.hoisted(() => vi.fn());
+vi.mock("@langwatch/observability", () => ({
+  createLogger: () => ({ info: vi.fn(), error: vi.fn(), debug: loggerDebug }),
+}));
+
+const appendS3JsonlRecords = vi.fn();
+vi.mock("../../../datasets/dataset-mutations", () => ({
+  appendS3JsonlRecords: (...a: unknown[]) => appendS3JsonlRecords(...a),
+}));
+
+const storageGetObject = vi.fn();
+const storagePutObject = vi.fn();
+vi.mock("../../../storage", () => ({
+  StorageService: class {
+    getObject = (...a: unknown[]) => storageGetObject(...a);
+    putObject = (...a: unknown[]) => storagePutObject(...a);
+  },
+}));
+
+import {
+  createManyDatasetRecords,
+  getFullDataset,
+  readDatasetHeadS3Jsonl,
+} from "../datasetRecord.utils";
 
 const baseDataset = {
   id: "dataset_1",
@@ -596,6 +619,72 @@ describe("readDatasetHeadS3Jsonl()", () => {
         status: "failed",
       });
       expect(readChunk).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("createManyDatasetRecords()", () => {
+  const createMany = vi.fn();
+  const datasetUpdate = vi.fn();
+  const db = {
+    datasetRecord: { createMany },
+    dataset: { update: datasetUpdate },
+  } as never;
+  const unsupportedMessage =
+    "shouldSkipDuplicates is not supported on this dataset layout; existing rows may be duplicated";
+
+  const addWithFlag = (dataset: Record<string, unknown>) =>
+    createManyDatasetRecords({
+      datasetId: "dataset_1",
+      projectId: "p1",
+      datasetRecords: [{ id: "r1", a: 1 }],
+      dataset: { ...baseDataset, ...dataset } as never,
+      shouldSkipDuplicates: true,
+      tx: db,
+    });
+
+  beforeEach(() => {
+    createMany.mockResolvedValue({ count: 1 });
+    appendS3JsonlRecords.mockResolvedValue(undefined);
+    storageGetObject.mockResolvedValue({ records: [] });
+    storagePutObject.mockResolvedValue(undefined);
+    datasetUpdate.mockResolvedValue(undefined);
+  });
+
+  describe("when shouldSkipDuplicates is requested on an s3_jsonl dataset", () => {
+    it("logs that duplicates are not skipped", async () => {
+      await addWithFlag({ contentLayout: "s3_jsonl", useS3: false });
+
+      expect(loggerDebug).toHaveBeenCalledWith(
+        expect.objectContaining({ contentLayout: "s3_jsonl" }),
+        unsupportedMessage,
+      );
+    });
+  });
+
+  describe("when shouldSkipDuplicates is requested on a legacy useS3 dataset", () => {
+    it("logs that duplicates are not skipped", async () => {
+      const result = await addWithFlag({
+        contentLayout: "postgres",
+        useS3: true,
+      });
+
+      expect(result).toEqual({ success: true });
+      expect(loggerDebug).toHaveBeenCalledWith(
+        expect.objectContaining({ useS3: true }),
+        unsupportedMessage,
+      );
+    });
+  });
+
+  describe("when shouldSkipDuplicates is requested on a postgres dataset", () => {
+    it("does not log that duplicates are not skipped", async () => {
+      await addWithFlag({ contentLayout: "postgres", useS3: false });
+
+      expect(loggerDebug).not.toHaveBeenCalledWith(
+        expect.anything(),
+        unsupportedMessage,
+      );
     });
   });
 });
