@@ -1064,13 +1064,14 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 # Telemetry - Usage analytics collection
 - name: DISABLE_USAGE_STATS
   value: {{ (not (ternary .Values.app.telemetry.usage.enabled true (hasKey .Values.app.telemetry.usage "enabled"))) | quote }}
-# Telemetry - Prometheus metrics collection. The processes push over OTLP
-# unless told to mount a /metrics scrape door; in production that door needs
-# its bearer, so an install with no key serves no /metrics at all.
+# Telemetry - Prometheus metrics collection. The processes open their own
+# scrape listener only with a prometheus exporter and METRICS_API_KEY (ADR-175).
 {{- if .Values.app.telemetry.metrics.enabled }}
-- name: LANGWATCH_METRICS_MODE
+- name: OTEL_METRICS_EXPORTER
   value: "prometheus"
-{{- include "langwatch.secretOrValue" (dict "envName" "LANGWATCH_METRICS_TOKEN" "fieldValues" .Values.app.telemetry.metrics.apiKey) }}
+- name: OTEL_EXPORTER_PROMETHEUS_PORT
+  value: {{ include "langwatch.metricsPort" . | quote }}
+{{- include "langwatch.secretOrValue" (dict "envName" "METRICS_API_KEY" "fieldValues" .Values.app.telemetry.metrics.apiKey) }}
 {{- end }}
 
 # Dataplane Object Storage (shared between datasets and stored-objects;
@@ -1310,6 +1311,9 @@ app.kubernetes.io/instance: {{ .Release.Name }}
      NOTE: Only .value is supported here because Prometheus bearer_token is a static
      config field in a ConfigMap, not a pod env var. secretKeyRef for the metrics API
      key is handled separately via sharedEnv for the app/worker containers. */}}
+{{/* The port the Node processes serve the Prometheus scrape on. */}}
+{{- define "langwatch.metricsPort" -}}9464{{- end -}}
+
 {{- define "langwatch.metricsApiKey" -}}
   {{- if .Values.app.telemetry.metrics.apiKey.value -}}
     {{- .Values.app.telemetry.metrics.apiKey.value -}}

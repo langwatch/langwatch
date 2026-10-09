@@ -1143,8 +1143,8 @@ test_overlay_stacking() {
 # ways, and both are default-ish configurations:
 #
 #   1. Stock install — app.telemetry.metrics.enabled is false, so
-#      LANGWATCH_METRICS_TOKEN is never emitted; with NODE_ENV=production the
-#      process mounts no scrape door and /metrics answers 404.
+#      METRICS_API_KEY is never emitted, so the process mounts no scrape door
+#      and /metrics answers 404.
 #   2. secretKeyRef install — a kubelet httpGet probe cannot read a Secret, so
 #      no rendered Authorization header can carry the key and the probe gets 401.
 #

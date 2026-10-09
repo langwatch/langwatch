@@ -80,10 +80,9 @@ spec:
         {{- end }}
         {{- if .Values.app.telemetry.metrics.enabled }}
         {{- /* What the langwatch-workers scrape job keeps on. The port is the
-               worker's health and metrics listener, the one the probes below
-               use. */}}
+               worker's own scrape listener, not the probes' health port. */}}
         prometheus.io/scrape: "true"
-        prometheus.io/port: "2999"
+        prometheus.io/port: {{ include "langwatch.metricsPort" . | quote }}
         {{- end }}
     spec:
       # Workers do not call the Kubernetes API, so don't mount the SA token.
@@ -182,11 +181,10 @@ spec:
           # rather than just PID 1 liveness — an answered request proves the
           # event loop is turning, which `kill -0 1` cannot tell us.
           #
-          # The probe targets /healthz, NOT /metrics. /metrics is fail-closed in
-          # production: with no LANGWATCH_METRICS_TOKEN (the default,
-          # app.telemetry.metrics.enabled is false) the process mounts no scrape
-          # door and /metrics answers 404, which would crash-loop the workers
-          # on a stock install. And an httpGet probe cannot read a
+          # The probe targets /healthz, NOT /metrics. The scrape door is on its
+          # own port and opens only with METRICS_API_KEY (the default,
+          # app.telemetry.metrics.enabled is false, sets none), so a /metrics
+          # probe would fail and crash-loop the workers on a stock install. And an httpGet probe cannot read a
           # Secret, so a key delivered via secretKeyRef could never be put in a
           # rendered Authorization header anyway — that install would 401.
           # /healthz is unauthenticated by design and carries no telemetry, so

@@ -70,7 +70,7 @@ spec:
         {{- end }}
         {{- if .Values.app.telemetry.metrics.enabled }}
         prometheus.io/scrape: "true"
-        prometheus.io/port: "{{ .Values.app.service.port }}"
+        prometheus.io/port: {{ include "langwatch.metricsPort" . | quote }}
         {{- end }}
     spec:
       {{- with (include "langwatch.serviceAccountName" .) }}
