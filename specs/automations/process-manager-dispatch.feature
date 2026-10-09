@@ -191,7 +191,7 @@ Feature: Automation dispatch on the process-manager substrate
     Then the request goes through the SSRF-fenced sender with a stable event id
     And the delivery is recorded in the webhook delivery log
 
-  @integration
+  @regression @integration
   Scenario: A dataset row that already exists counts as added
     Given an automation that adds matching traces to a dataset stored in Postgres
     And a trace whose rows were already added to the dataset by an earlier attempt
@@ -199,7 +199,7 @@ Feature: Automation dispatch on the process-manager substrate
     Then the dataset holds one copy of each row
     And the add does not fail
 
-  @unit
+  @regression @unit
   Scenario: A page whose dataset rows already exist retries only the failing trace
     Given a page of two matched traces for a dataset automation
     And the rows of one trace already exist in the dataset

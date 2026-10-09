@@ -189,7 +189,7 @@ export const createManyDatasetRecords = async ({
     shouldSkipDuplicates &&
     (dataset.contentLayout === "s3_jsonl" || dataset.useS3)
   ) {
-    logger.warn(
+    logger.debug(
       {
         datasetId,
         projectId,

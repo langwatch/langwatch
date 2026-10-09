@@ -16,9 +16,9 @@ vi.mock("../../../datasets/dataset-storage", () => ({
   getDatasetStorage: (...a: unknown[]) => getDatasetStorage(...a),
 }));
 
-const loggerWarn = vi.hoisted(() => vi.fn());
+const loggerDebug = vi.hoisted(() => vi.fn());
 vi.mock("@langwatch/observability", () => ({
-  createLogger: () => ({ info: vi.fn(), error: vi.fn(), warn: loggerWarn }),
+  createLogger: () => ({ info: vi.fn(), error: vi.fn(), debug: loggerDebug }),
 }));
 
 const appendS3JsonlRecords = vi.fn();
@@ -630,7 +630,7 @@ describe("createManyDatasetRecords()", () => {
     datasetRecord: { createMany },
     dataset: { update: datasetUpdate },
   } as never;
-  const unsupportedWarning =
+  const unsupportedMessage =
     "shouldSkipDuplicates is not supported on this dataset layout; existing rows may be duplicated";
 
   const addWithFlag = (dataset: Record<string, unknown>) =>
@@ -652,36 +652,39 @@ describe("createManyDatasetRecords()", () => {
   });
 
   describe("when shouldSkipDuplicates is requested on an s3_jsonl dataset", () => {
-    it("warns that the layout does not support it", async () => {
+    it("logs that duplicates are not skipped", async () => {
       await addWithFlag({ contentLayout: "s3_jsonl", useS3: false });
 
-      expect(loggerWarn).toHaveBeenCalledWith(
+      expect(loggerDebug).toHaveBeenCalledWith(
         expect.objectContaining({ contentLayout: "s3_jsonl" }),
-        unsupportedWarning,
+        unsupportedMessage,
       );
     });
   });
 
   describe("when shouldSkipDuplicates is requested on a legacy useS3 dataset", () => {
-    it("warns that the layout does not support it", async () => {
+    it("logs that duplicates are not skipped", async () => {
       const result = await addWithFlag({
         contentLayout: "postgres",
         useS3: true,
       });
 
       expect(result).toEqual({ success: true });
-      expect(loggerWarn).toHaveBeenCalledWith(
+      expect(loggerDebug).toHaveBeenCalledWith(
         expect.objectContaining({ useS3: true }),
-        unsupportedWarning,
+        unsupportedMessage,
       );
     });
   });
 
   describe("when shouldSkipDuplicates is requested on a postgres dataset", () => {
-    it("does not warn", async () => {
+    it("does not log that duplicates are not skipped", async () => {
       await addWithFlag({ contentLayout: "postgres", useS3: false });
 
-      expect(loggerWarn).not.toHaveBeenCalled();
+      expect(loggerDebug).not.toHaveBeenCalledWith(
+        expect.anything(),
+        unsupportedMessage,
+      );
     });
   });
 });
