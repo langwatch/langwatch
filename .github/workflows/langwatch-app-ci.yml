@@ -970,6 +970,11 @@ jobs:
             !/docs/images/
           sparse-checkout-cone-mode: false
 
+      # The migration-safety suites read the released cutoff from the newest
+      # langwatch@v* tag and fail without one; this shallow clone has no tags.
+      - name: Fetch release tags
+        run: git fetch --no-tags --depth=1 --filter=blob:none origin '+refs/tags/langwatch@v*:refs/tags/langwatch@v*'
+
       - uses: ./.github/actions/setup-pnpm-node
         with:
           install: "all"

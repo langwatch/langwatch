@@ -61,31 +61,16 @@ describe("classifyEventLogRowRetention", () => {
     ).toBe("indefinite");
   });
 
-  /** @scenario "Non-security event families remain policy-bound" */
-  it("does not extend indefinite retention to other events on the same shared aggregate", () => {
-    // Budget crossings and other governance_subject events are not the
-    // vk_lifecycle exception, so they age with the traces category like the
-    // rest of that aggregate.
-    expect(
-      classifyEventLogRowRetention({
-        AggregateType: "governance_subject",
-        EventType: "lw.governance.budget_crossed",
-      }),
-    ).toBe("traces");
-  });
-
-  describe("given a row on a non-security aggregate", () => {
-    /** @scenario "Non-security event families remain policy-bound" */
+  describe("given a row of customer telemetry", () => {
+    /** @scenario "Customer telemetry event families remain policy-bound" */
     it.each([
       ["trace", "traces"],
       ["log", "traces"],
       ["metric", "traces"],
       ["evaluation", "traces"],
+      ["trace_collector_evaluation", "traces"],
       ["langy_conversation", "traces"],
       ["topic_clustering", "traces"],
-      ["ingestion_pull", "traces"],
-      ["pulled_usage", "traces"],
-      ["billing_report", "traces"],
       ["gateway_request", "traces"],
       ["coding_agent_session", "traces"],
       ["trigger", "traces"],
@@ -100,6 +85,38 @@ describe("classifyEventLogRowRetention", () => {
         ).toBe(expected);
       },
     );
+  });
+
+  describe("given a row that is not customer telemetry", () => {
+    /** @scenario "Every other event family is retained indefinitely" */
+    it.each([
+      ["organization", "lw.organization.signed_up"],
+      ["project", "lw.project.created"],
+      ["user_account", "lw.user.created"],
+      ["prompt", "lw.prompt.created"],
+      ["workflow", "lw.workflow.version_saved"],
+      ["billing_lifecycle", "lw.billing.subscription_started"],
+      ["entitlement_organization", "lw.entitlement.month_counted"],
+      ["governance_subject", "lw.governance.budget_crossing"],
+      ["pulled_usage", "lw.obs.pulled_usage.observed"],
+      ["ingestion_pull", "lw.obs.ingestion_pull.configured"],
+      ["billing_report", "some.ordinary.event"],
+      ["trigger", "lw.automation.report_schedule.configured"],
+    ])("classifies %s (%s) as indefinite", (aggregateType, eventType) => {
+      expect(
+        classifyEventLogRowRetention({ AggregateType: aggregateType, EventType: eventType }),
+      ).toBe("indefinite");
+    });
+
+    /** @scenario "Customer telemetry event families remain policy-bound" */
+    it("keeps a trigger's per-trace matches with the traces category", () => {
+      expect(
+        classifyEventLogRowRetention({
+          AggregateType: "trigger",
+          EventType: "lw.automation.trigger.match_recorded",
+        }),
+      ).toBe("traces");
+    });
   });
 
   describe("given a row on a scenario or experiment aggregate", () => {
@@ -122,13 +139,13 @@ describe("classifyEventLogRowRetention", () => {
     );
   });
 
-  /** @scenario "Non-security event families remain policy-bound" */
-  it("falls back to traces for an aggregate type it does not recognise", () => {
+  /** @scenario "An aggregate type the policy does not list is retained indefinitely" */
+  it("keeps an aggregate type it does not recognise forever", () => {
     expect(
       classifyEventLogRowRetention({
         AggregateType: "some_future_aggregate_nobody_registered_yet",
         EventType: "some.future.event",
       }),
-    ).toBe("traces");
+    ).toBe("indefinite");
   });
 });

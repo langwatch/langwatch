@@ -137,6 +137,26 @@ describe("EventStoreClickHouse retention stamping", () => {
       expect(values[0]!._retention_days).toBe(0);
     });
 
+    /** @scenario "A row that never expires is kept forever even where no tenant policy is wired" */
+    it("stamps an indefinite row with _retention_days = 0 when no resolver is wired", async () => {
+      const retention = createEventingRetentionConfiguration({
+        defaultRetentionDays: INJECTED_DEFAULT_RETENTION_DAYS,
+      });
+      const store = EventingClickHouseEventStore.create({
+        repository: EventingClickHouseEventRepository.create({
+          resolveClient: async () => mockClient,
+          retention,
+        }),
+        retention,
+        classifyEventLogRetention: () => "indefinite",
+      });
+
+      await store.storeEvents([makeEvent()], { tenantId }, aggregateType);
+
+      const values = insertSpy.mock.calls[0]![0]!.values as { _retention_days: number }[];
+      expect(values[0]!._retention_days).toBe(0);
+    });
+
     it("resolves the policy under the key the classifier returns", async () => {
       const resolver: RetentionPolicyResolver = {
         resolve: vi.fn().mockResolvedValue({ traces: 30, scenarios: 63, experiments: 91 }),

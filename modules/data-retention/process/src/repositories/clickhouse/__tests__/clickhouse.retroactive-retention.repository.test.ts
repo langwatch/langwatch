@@ -91,13 +91,13 @@ describe("ClickHouseRetroactiveRetentionRepository", () => {
     expect(commands.some((command) => command.sql.includes("TraceId"))).toBe(false);
     expect(commands.some((command) => command.sql.includes("'project-1'"))).toBe(false);
 
-    // event_log carries every category's rows plus a durable security slice,
-    // so its own command additionally excludes indefinite rows and the other
-    // finite categories' aggregates. No other table's rows need that filter.
+    // event_log carries every category's rows plus rows kept forever, so its own
+    // command names only this category's aggregates, never an unlisted one.
     const eventLogCommand = required(
       commands.find((candidate) => candidate.sql.includes("ALTER TABLE event_log")),
     );
-    expect(eventLogCommand.sql).toContain("AggregateType NOT IN");
+    expect(eventLogCommand.sql).toContain("AggregateType IN ('coding_agent_session'");
+    expect(eventLogCommand.sql).not.toContain("AggregateType NOT IN");
     expect(eventLogCommand.sql).toContain("langwatch:event-log-retention-category:traces");
     expect(
       commands

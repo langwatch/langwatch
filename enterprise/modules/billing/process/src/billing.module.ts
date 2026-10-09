@@ -13,6 +13,7 @@ import { composeHttpBillingStripe } from "./channels/http/http.billing-stripe.ch
 import { billingLifecycleEventing } from "./eventing/billing-lifecycle.pipeline.ts";
 import { billingReportingEventing } from "./eventing/billing-reporting.pipeline.ts";
 import { connectedBillingEventing } from "./eventing/connected-billing.pipeline.ts";
+import { SeatChangeOrganizationBackfillService } from "./features/connected-billing/services/seat-change-organization-backfill.service.ts";
 import type { BillingOrganizationCacheRepository } from "./repositories/billing-organization-cache.repository.ts";
 import { billingRepositories } from "./repositories/billing-repositories.registry.ts";
 import {
@@ -74,6 +75,27 @@ export const billingProcessModule: PublishedProcessModule<
           dryRun,
           signal,
           onPage: (page) => checkpoint.save({ report: page }),
+        });
+        return { ...report, dryRun };
+      },
+    }),
+    // After old writers are gone: an older image stores seat changes with no organization.
+    defineMigrationStep({
+      id: "billing:fill-seat-change-organizations",
+      kind: "data",
+      mode: "background",
+      description:
+        "Names the organization on each connected seat change recorded before seat changes stored it, from its billing account.",
+      needsOldWritersGone: true,
+      run: async ({ checkpoint, dryRun, signal }) => {
+        const resumed = checkpoint.resumeFrom?.afterLicenseRowId;
+        const report = await SeatChangeOrganizationBackfillService.create({
+          repository: repositories.connectedBilling,
+        }).backfill({
+          after: typeof resumed === "string" ? resumed : null,
+          dryRun,
+          signal,
+          onBatch: (batch) => checkpoint.save({ report: batch }),
         });
         return { ...report, dryRun };
       },

@@ -324,20 +324,19 @@ Feature: Migration safety
 
   @unit
   Scenario: Floor history answers only to the older rules
-    Given Postgres migrations shipped in the LTS floor's tag
+    Given Postgres migrations shipped in the newest langwatch@v* release tag
     When the graceful rules scan them
-    Then they report findings, and the tree scan skips them up to a marker that names a migration on disk
-    # Floor history is never rewritten.
+    Then they report findings, and the tree scan skips them up to that tag's newest migration, which is on disk
+    # Released history is never rewritten; the cutoff is read from git, never a constant.
 
   @unit
   Scenario: ClickHouse floor history answers only to the older rules
-    Given goose files shipped in the LTS floor's tag
+    Given goose files shipped in the newest langwatch@v* release tag
     When the graceful rules scan them
-    Then the tree scan skips them up to a marker that names a file on disk
-    And every listed open finding is still reported
+    Then the tree scan skips them up to that tag's newest file, which is on disk
 
   @unit
-  Scenario: Every open finding still occurs, so a fixed one leaves the list
-    Given graceful-rule findings above the floor listed for a fix
-    When one is no longer reported
-    Then the test fails and names the entry
+  Scenario: A clone without release tags fails the guard with the command that fetches them
+    Given a checkout where no langwatch@v* release tag is readable, as in a shallow CI clone
+    When the Postgres or ClickHouse migration-safety test reads the released cutoff
+    Then it fails, never passes silently, and names the git fetch that brings the tags

@@ -1,4 +1,6 @@
 import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { hostname } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -273,12 +275,42 @@ async function migrateClickHouse({
   return reports;
 }
 
+/**
+ * Unreleased migrations rewritten in place (Alex, 2026-10-09). A local dev database that applied
+ * the old text gets the new checksum so `prisma migrate dev` does not ask for a reset.
+ * ponytail: delete this list once the next release ships; never extend it to a released migration.
+ */
+const REWRITTEN_UNRELEASED_MIGRATIONS = [
+  "20261006170507_virtual_key_license_facts",
+  "20261006170511_connected_seat_change_not_onboarded",
+] as const;
+
+/** Development only: production never rewrites a recorded checksum. */
+async function realignRewrittenChecksums({ input }: { input: TaskInput }): Promise<void> {
+  const sql = input.connections.database?.sql;
+  if (input.config.nodeEnvironment !== "development" || !sql) return;
+  const { rows } = await sql.query<{ present: boolean }>(
+    `SELECT to_regclass('_prisma_migrations') IS NOT NULL AS present`,
+  );
+  if (!rows[0]?.present) return;
+  for (const name of REWRITTEN_UNRELEASED_MIGRATIONS) {
+    const text = readFileSync(join(IMAGE_MIGRATION_DIRECTORIES.prisma, name, "migration.sql"));
+    const checksum = createHash("sha256").update(text).digest("hex");
+    await sql.query(
+      `UPDATE "_prisma_migrations" SET "checksum" = $1
+        WHERE "migration_name" = $2 AND "checksum" <> $1 AND "finished_at" IS NOT NULL`,
+      [checksum, name],
+    );
+  }
+}
+
 /** Today's applier: `prisma migrate deploy` and goose `up` apply everything at once. */
 function oneReleaseApplier({ input }: { input: TaskInput }): UpgradeSchemaApplier {
   let applied: readonly SchemaTargetReport[] | null = null;
   return {
     async apply({ lockTimeoutMs, signal }) {
       if (applied?.every((report) => report.ok)) return applied;
+      await realignRewrittenChecksums({ input });
       applied = [
         await deployPrisma({ input, lockTimeoutMs, signal }),
         ...(await migrateClickHouse({ input })),

@@ -14,44 +14,90 @@ export type EventLogRetentionClass = RetentionCategory | "indefinite";
  */
 export const INDEFINITE_EVENT_TYPE_PREFIXES = ["lw.identity.", "lw.authz."] as const;
 
-/** Security events that share an aggregate with policy-bound operational events. */
-export const INDEFINITE_EVENT_TYPES = ["lw.governance.vk_lifecycle"] as const;
+/**
+ * Never-expiring events on an aggregate that otherwise expires: virtual-key lifecycle (security)
+ * and a report schedule's configuration, beside the per-trace trigger matches.
+ */
+export const INDEFINITE_EVENT_TYPES = [
+  "lw.governance.vk_lifecycle",
+  "lw.automation.report_schedule.configured",
+  "lw.automation.report_schedule.paused",
+  "lw.automation.report_schedule.resumed",
+] as const;
 
 /**
- * Every aggregate type this deployment's event-sourcing runtime registers,
- * assigned to its retention class. An unlisted aggregate falls back to
- * `"traces"` — the conservative choice, never `"indefinite"` by omission.
+ * Every aggregate type this deployment's event-sourcing runtime registers, assigned its class.
+ * Only customer telemetry expires (Alex, 2026-10-09); an unlisted aggregate is kept forever, and
+ * the worker's installation test refuses one missing here, so telemetry must opt in.
  */
 export const RETENTION_CLASS_BY_AGGREGATE_TYPE: Record<string, EventLogRetentionClass> = {
-  authz_grant: "indefinite",
-  user_identity: "indefinite",
-  sso_connection: "indefinite",
-  join_request: "indefinite",
-  scim_sync: "indefinite",
-  trigger: "traces",
+  // Customer telemetry: span, log and metric content, LLM inputs and outputs, judged results.
   trace: "traces",
-  metric: "traces",
   log: "traces",
+  metric: "traces",
   coding_agent_session: "traces",
   evaluation: "traces",
+  trace_collector_evaluation: "traces",
+  langy_conversation: "traces",
+  topic_clustering: "traces",
+  gateway_request: "traces",
+  trigger: "traces",
   experiment_run: "experiments",
   simulation_run: "scenarios",
   simulation_set: "scenarios",
   suite_run: "scenarios",
-  langy_conversation: "traces",
-  topic_clustering: "traces",
-  ingestion_pull: "traces",
-  pulled_usage: "traces",
-  billing_report: "traces",
-  gateway_request: "traces",
-  governance_subject: "traces",
-  global: "traces",
+  // Everything else: lifecycle, configuration, billing, authz, identity, governance, meters.
+  agent: "indefinite",
+  annotation: "indefinite",
+  authz_aggregate_read: "indefinite",
+  authz_grant: "indefinite",
+  authz_member_offboarded: "indefinite",
+  billing_lifecycle: "indefinite",
+  billing_report: "indefinite",
+  coding_assistant_billing: "indefinite",
+  dataset: "indefinite",
+  entitlement_organization: "indefinite",
+  evaluation_lifecycle: "indefinite",
+  evaluator: "indefinite",
+  experiment_lifecycle: "indefinite",
+  gateway_connect_managed_key: "indefinite",
+  github_installation: "indefinite",
+  global: "indefinite",
+  governance_subject: "indefinite",
+  guided_onboarding: "indefinite",
+  ingestion_pull: "indefinite",
+  instant_eval_judge_spend: "indefinite",
+  instant_eval_run: "indefinite",
+  join_request: "indefinite",
+  langy_guided_onboarding: "indefinite",
+  licensing_customer: "indefinite",
+  nurturing_signal: "indefinite",
+  organization: "indefinite",
+  organization_audit: "indefinite",
+  organization_seat_limit: "indefinite",
+  platform_operator_seed: "indefinite",
+  project: "indefinite",
+  projection_replay: "indefinite",
+  prompt: "indefinite",
+  pulled_usage: "indefinite",
+  scenario: "indefinite",
+  scim_directory_move: "indefinite",
+  scim_member: "indefinite",
+  scim_sso_connection_view: "indefinite",
+  scim_sync: "indefinite",
+  sso_connection: "indefinite",
+  system_migration_pass: "indefinite",
+  trace_project_milestone: "indefinite",
+  user: "indefinite",
+  user_account: "indefinite",
+  user_identity: "indefinite",
+  webhook_spend_delivery: "indefinite",
+  workflow: "indefinite",
 };
 
 /**
- * Classifies one `event_log` row for retention, checked in order: event-type
- * prefix, virtual-key-lifecycle exception, then the aggregate map. An
- * unrecognised aggregate is `"traces"`, never `"indefinite"` by default.
+ * Classifies one `event_log` row for retention, checked in order: event-type prefix, the
+ * never-expiring event types, then the aggregate map. An unlisted aggregate is `"indefinite"`.
  */
 export function classifyEventLogRowRetention(row: {
   AggregateType: string;
@@ -65,9 +111,7 @@ export function classifyEventLogRowRetention(row: {
     return "indefinite";
   }
 
-  if (!Object.prototype.hasOwnProperty.call(RETENTION_CLASS_BY_AGGREGATE_TYPE, row.AggregateType)) {
-    return "traces";
-  }
-
-  return RETENTION_CLASS_BY_AGGREGATE_TYPE[row.AggregateType]!;
+  return Object.hasOwn(RETENTION_CLASS_BY_AGGREGATE_TYPE, row.AggregateType)
+    ? RETENTION_CLASS_BY_AGGREGATE_TYPE[row.AggregateType]!
+    : "indefinite";
 }

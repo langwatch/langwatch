@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -33,8 +34,10 @@ const OLDER_TABLE_FIX =
   "A blocking data step may touch only tables created in its own release; ship it as a background step, ordered with `after:` (Alex, 2026-10-09).";
 const PRISMA_MIGRATIONS = "packages/prisma-client/prisma/migrations";
 const RELEASES = "packages/upgrade/releases";
-// The newest Prisma migration in langwatch@v3.20.1; release manifests carry later ones.
-const RELEASED_THROUGH = "20261001120000_sso_provider_entra_issuer_trailing_slash";
+const NO_RELEASE_TAG =
+  "No langwatch@v* release tag with Prisma migrations in this clone, so released tables cannot be " +
+  "told from new ones. Fetch the tags: git fetch --tags origin (CI: " +
+  "git fetch --depth=1 origin '+refs/tags/langwatch@v*:refs/tags/langwatch@v*').";
 // Real findings listed for a fix (2026-10-09); never add to it.
 const OPEN_STEPS: ReadonlySet<string> = new Set(["ops:copy-automation-migration-state"]);
 const CREATE_TABLE = /\bCREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:"?public"?\.)?"?(\w+)"?/gi;
@@ -113,7 +116,39 @@ function ownersTouched({
   return touched;
 }
 
-/** The newest released Prisma migration: the floor tag's, or a later one a manifest names. */
+/** The newest migration in the newest `langwatch@v*` tag; throws when no tag is readable. */
+function newestTaggedMigration({ root }: { root: string }): string {
+  const git = (args: string[]) =>
+    execFileSync("git", args, {
+      cwd: root,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      // A release tag lists every file it holds: about 2 MB today.
+      maxBuffer: 64 * 1024 * 1024,
+    });
+  let cause: unknown;
+  try {
+    const tag = git(["tag", "--list", "langwatch@v*", "--sort=-v:refname"])
+      .split("\n")
+      .find((name) => /^langwatch@v\d+\.\d+\.\d+$/.test(name));
+    const paths = tag ? git(["ls-tree", "-r", "--full-tree", "--name-only", tag]) : "";
+    const newest = paths
+      .split("\n")
+      .flatMap(
+        (path) =>
+          /(?:^|\/)prisma\/migrations\/(\d{14}_[^/]+)\/migration\.sql$/.exec(path)?.[1] ?? [],
+      )
+      .toSorted()
+      .at(-1);
+    if (newest) return newest;
+  } catch (error) {
+    // Not a clone, or git is missing: the same answer as a clone without tags, cause kept.
+    cause = error;
+  }
+  throw new Error(NO_RELEASE_TAG, { cause });
+}
+
+/** The newest released Prisma migration: the newest tag's, or a later one a manifest names. */
 export function releasedThrough({ root }: { root: string }): string {
   const named = filesIn({
     directory: join(root, RELEASES),
@@ -122,7 +157,7 @@ export function releasedThrough({ root }: { root: string }): string {
     .flatMap((file) => [...readFileSync(file, "utf8").matchAll(/"id":\s*"prisma:(\w+)"/g)])
     .map((match) => match[1] ?? "");
 
-  return [RELEASED_THROUGH, ...named].toSorted().at(-1)!;
+  return [newestTaggedMigration({ root }), ...named].toSorted().at(-1)!;
 }
 
 /** Each table a Prisma migration creates, with the first migration that creates it. */
@@ -166,13 +201,15 @@ function olderTables({
 export function lintUpgradeSignInTablesAt({
   root,
   catalogue,
+  released = releasedThrough({ root }),
 }: {
   root: string;
   catalogue: readonly FeatureCatalogueEntry[];
+  /** The newest released Prisma migration; a fixture outside a clone names it. */
+  released?: string;
 }): ArchitectureViolation[] {
   const tables = signInTables({ root, catalogue });
   const created = tableCreations({ root });
-  const released = releasedThrough({ root });
 
   return catalogue.flatMap((feature) => {
     const source = join(root, feature.root, "process", "src");

@@ -11,7 +11,12 @@ import { EventLogRetention } from "@langwatch/eventing/server";
 import { z } from "zod";
 
 import { EVENT_LOG_RETENTION_CLASSIFICATION } from "../../rules/event-log-retention.rules.ts";
-import type { RetroactiveRetentionRepository } from "../retroactive-retention.repository.ts";
+import {
+  keepForeverRewriteSchema,
+  type ClickHouseTarget,
+  type KeepForeverRewrite,
+  type RetroactiveRetentionRepository,
+} from "../retroactive-retention.repository.ts";
 
 const mutationRowSchema = z
   .object({
@@ -27,6 +32,26 @@ const mutationRowSchema = z
   .strict();
 
 const mutationRowsSchema = z.array(mutationRowSchema);
+
+const keepForeverRowsSchema = z.array(
+  z
+    .object({
+      mutationId: z.string(),
+      isDone: z.number(),
+      partsToDo: z.number(),
+      latestFailReason: z.string(),
+      table: z.string(),
+      command: z.string(),
+    })
+    .transform(({ table, command, ...row }) => ({
+      table,
+      command,
+      rewrite: { ...row, isDone: row.isDone === 1 },
+    })),
+);
+
+const KEEP_FOREVER_UNSCOPED_REASON =
+  "the event log's keep-forever rewrite spans every tenant on a target, so its mutation does too";
 
 const tenantFilterSql = "position(command, {tenantFilterNeedle:String}) > 0";
 
@@ -154,6 +179,50 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
           "KILL MUTATION reads system.mutations, which carries no tenant column: the project is matched inside the recorded mutation command instead, which is what tenantFilterSql does.",
       },
     });
+  }
+
+  keepForeverTargets(): readonly ClickHouseTarget[] {
+    return [
+      {},
+      ...[...this.clickhouse.privateRoutes().keys()].map((organizationId) => ({ organizationId })),
+    ];
+  }
+
+  async findKeepForeverRewrites(input: ClickHouseTarget): Promise<KeepForeverRewrite[]> {
+    const { rows } = await this.clickhouse.query<unknown>({
+      tenantId: "",
+      ...input,
+      table: "system.mutations",
+      kind: "read",
+      sql: `
+        SELECT
+          mutation_id AS mutationId,
+          is_done AS isDone,
+          toUInt32(parts_to_do) AS partsToDo,
+          latest_fail_reason AS latestFailReason,
+          table AS table,
+          command AS command
+        FROM system.mutations
+        WHERE database = currentDatabase()
+          AND table IN {tables:Array(String)}
+          AND position(command, '_retention_days') > 0
+        ORDER BY create_time DESC
+      `,
+      params: { tables: this.eventLogRetention.tables },
+      unscoped: { reason: KEEP_FOREVER_UNSCOPED_REASON },
+    });
+    return keepForeverRowsSchema
+      .parse(rows)
+      .filter(
+        ({ table, command }) =>
+          this.eventLogRetention.categoryOfMutation({ table, command }) ===
+          EVENT_LOG_RETENTION_CLASSIFICATION.indefiniteClass,
+      )
+      .map(({ rewrite }) => keepForeverRewriteSchema.parse(rewrite));
+  }
+
+  async startKeepForeverRewrite(input: ClickHouseTarget): Promise<void> {
+    await this.eventLogRetention.keepIndefiniteRows(input);
   }
 
   private async getActiveMutations(input: {

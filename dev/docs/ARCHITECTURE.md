@@ -1379,17 +1379,20 @@ task upgrade` stays a runner under the same lease for development, CI and an ope
 with `serializeUpgrades`, and the compose `migrate` service is gone. The api never runs a step,
 and it is up from boot (Alex, 2026-10-09, API-UP-DURING-UPGRADE: "anything important can get stuck
 on the queue for a few mins while upgrades happen, that's fine. Worker can be down, but api must be
-up"); dev starts it beside the worker, never after it. While a Postgres schema step of its image is
-outstanding the door holds each request up to the hold window (30 s) for the hold to lift; after
-that, until the ledger is current, it serves the routes declared to serve while upgrading (a
-`packages/api` route declaration the door enforces): sign-in, the Ops Upgrades page and ingestion
-(OTLP traces, logs and metrics, the collector, tracked events, RUM, evaluator and guardrail calls,
-batch result logs, governance sources). Ingestion only enqueues for the worker, which drains the
-queue once the ledger is current, so nothing is dropped. A request still held when its window ends
-answers the holding page or 503 with Retry-After, and the api reports not ready. Alex's direction
-(2026-10-09: "ideally no dropped api calls either; eventually consistent is fine") is that every
-route serves while upgrading, with an opt-out naming its reason; until that lands the declared set
-is what serves. A blocking step never touches a table the sign-in or ingest doors read or write
+up"); dev starts it beside the worker, never after it. **No holds** (Alex, 2026-10-09, NO-HOLDS):
+while the ledger is behind, the api serves every REST, tRPC and SSE route at once and reports not
+ready until it is current. ClickHouse reads are defensive: a repository reading a column a pending
+ClickHouse step adds selects it through `ClickHouseColumns` (`@langwatch/clickhouse-client`), a
+per-target column list refreshed every 30 s, which answers the column's typed default until the
+column exists. A Postgres query the schema is not ready for (Prisma P2021/P2022, SQLSTATE
+42P01/42703) fails and says retry: `promoteStoreFailure` in `packages/api` maps it, once for every
+transport, to the handled `upgrade_in_progress` (503, Retry-After 10 s on REST, the same code over
+tRPC and SSE), and the browser's query client keeps retrying it with backoff. Ingestion is
+unaffected: it only enqueues for the worker, and a blocking step never touches a sign-in or ingest
+table. Cloud's rolling deploys keep the old pods serving through expand steps, since a new pod is
+not ready until the ledger is current. A failed step of either store shows on Ops > Upgrades with
+Retry; only a failed first install, which nobody can sign in to follow, opens the api's token
+console. A blocking step never touches a table the sign-in or ingest doors read or write
 (auth, user, organization, authz, identity, api-key, project, evaluation, evaluator,
 model-provider, monitor, experiment, governance); `lint:architecture` refuses one that does
 (UIW-1..11). A blocking data step touches only tables created in its own release; anything older
@@ -1407,7 +1410,9 @@ through them (Alex, 2026-10-09): the runner sets `lock_timeout` 2 s with a bound
 migration-safety scanners refuse a Postgres `UPDATE`/`DELETE` on an existing table, a volatile
 `DEFAULT` on an added column, two `ALTER`s on one existing table and a longer `lock_timeout`, and a
 ClickHouse mutation without that note, `MODIFY TTL` that materialises, `MODIFY ORDER BY`,
-`OPTIMIZE ... FINAL` and `POPULATE`. Migrations in the LTS floor's tag are history and never rewritten.
+`OPTIMIZE ... FINAL` and `POPULATE`; the note excuses only a mutation, never the last three. Migrations
+in the newest `langwatch@v*` tag, read from git, are history and never rewritten; a clone without the
+tags fails the guards rather than passing (Alex, 2026-10-09).
 Because they run before any module boots, apps/tasks' migration-runner files (`src/*migrat*.ts`) may
 name process packages (Alex, 2026-09-27), and so may `lwql-provision.ts` and
 `lwql-render-access-config.ts`: LangWatchQL provisioning reads both schemas under the same migration
@@ -2080,6 +2085,16 @@ A pipeline whose projections write tenant rows declares each tenant's retention 
 The eventing member is built before any module, so it holds no late-bound resolver; a pipeline
 declaring none leaves each store to stamp the platform default.
 Spec: `packages/eventing/specs/pipeline-retention.feature`.
+**Only customer telemetry expires** (Alex, 2026-10-09). The default retention applies to customer
+telemetry alone: traces, evaluations, experiments, scenarios, logs and metrics, meaning span content,
+model inputs and outputs, gateway requests, Langy conversations, coding-agent sessions and topic
+clusters. Every other event (lifecycle, configuration, billing, authz, identity, governance facts and
+usage meters) is stamped 0 days and kept forever. The event-log classification is opt-out:
+data-retention's `RETENTION_CLASS_BY_AGGREGATE_TYPE` names each aggregate type's class, an unlisted
+aggregate type is kept forever, and the worker's installation test refuses a registered aggregate
+type missing from it, so a telemetry pipeline must name its category. Rows stamped before the ruling
+are re-stamped by data-retention's background step `data-retention:keep-control-plane-events-forever`
+through eventing's retention operation. Spec: `specs/data-retention/ingestion-stamping.feature`.
 
 A module may host several pipelines: it calls `.withEventing(...)` once per
 pipeline, each a `defineEventingModule` declaration over the same app and

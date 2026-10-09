@@ -110,24 +110,35 @@ export class EventingClickHouseEventStore<
     // no-op: removed verbose per-store logging
   }
 
-  // event_log is not one category: with a classifier wired, durable auth/SSO/
-  // SCIM/virtual-key history never expires; everything else ages with its
-  // aggregate's customer category. Without one, every row stamps "traces" as
-  // before. Retention is default-on: no override uses the process-injected
-  // default, not the column migration default.
+  // With a classifier wired, a row it calls indefinite stamps 0 (kept forever) with or without
+  // a tenant policy, as on main; any other row ages with its category, or the process default.
+  // Without one, every row stamps "traces".
+  // Spec: packages/eventing/specs/pipeline-retention.feature.
   protected override async enrichRecordsForStorage(
     records: EventRecord[],
     context: EventStoreReadContext<EventType>,
   ): Promise<EventRecord[]> {
-    if (!this.retentionPolicyResolver || records.length === 0) return records;
-    const policy = await this.retentionPolicyResolver.resolve(String(context.tenantId));
-    return records.map((r) => {
-      const retentionClass = this.classifyEventLogRetention?.(r) ?? "traces";
-      const retentionDays =
-        retentionClass === EVENT_LOG_INDEFINITE_RETENTION_CLASS
-          ? 0
-          : (policy?.[retentionClass] ?? this.retention.defaultRetentionDays);
-      return { ...r, _retention_days: retentionDays };
+    if (records.length === 0) return records;
+    const classified = records.map((record) => ({
+      record,
+      retentionClass: this.classifyEventLogRetention?.(record) ?? "traces",
+    }));
+    const finite = classified.some(
+      ({ retentionClass }) => retentionClass !== EVENT_LOG_INDEFINITE_RETENTION_CLASS,
+    );
+    const policy =
+      finite && this.retentionPolicyResolver
+        ? await this.retentionPolicyResolver.resolve(String(context.tenantId))
+        : undefined;
+    return classified.map(({ record, retentionClass }) => {
+      if (retentionClass === EVENT_LOG_INDEFINITE_RETENTION_CLASS) {
+        return { ...record, _retention_days: 0 };
+      }
+      if (!this.retentionPolicyResolver) return record;
+      return {
+        ...record,
+        _retention_days: policy?.[retentionClass] ?? this.retention.defaultRetentionDays,
+      };
     });
   }
 }

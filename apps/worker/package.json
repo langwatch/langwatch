@@ -42,6 +42,7 @@
     "@langwatch/dashboard-process": "workspace:*",
     "@langwatch/data-privacy-contract": "workspace:*",
     "@langwatch/data-privacy-process": "workspace:*",
+    "@langwatch/data-retention-contract": "workspace:*",
     "@langwatch/data-retention-process": "workspace:*",
     "@langwatch/dataset-process": "workspace:*",
     "@langwatch/enterprise-billing-process": "workspace:*",

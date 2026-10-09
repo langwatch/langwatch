@@ -22,7 +22,7 @@
     {
       "id": 4,
       "prompt": "Rename the column Monitor.name to Monitor.displayName. Prisma generated RENAME COLUMN, so just commit that.",
-      "expected_output": "Refuses the generated SQL (rename-in-place) and generates with prisma migrate dev --create-only to edit it. Expand: ADD COLUMN IF NOT EXISTS \"displayName\" beside the old; migrate: dual-write from release A and copy (inline UPDATE ... WHERE \"displayName\" IS NULL for a small table, a background step for a large one), readers switch or read coalesce(new, old); contract: drop \"name\" only when the floor is at or above A, with `-- contract: retired in <release>`.",
+      "expected_output": "Refuses the generated SQL (rename-in-place) and generates with prisma migrate dev --create-only to edit it. Expand: ADD COLUMN IF NOT EXISTS \"displayName\" beside the old; migrate: dual-write from release A and copy with a background .withMigrations step (never an inline UPDATE on an existing table), readers switch or read coalesce(new, old); contract: drop \"name\" only when the floor is at or above A, with `-- contract: retired in <release>`.",
       "files": []
     },
     {

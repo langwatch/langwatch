@@ -3,3 +3,4 @@
 # migration name, the git blob sha of its migration.sql, then main's PR number.
 # The test refuses any entry whose file no longer hashes to that sha. ADR-155.
 20260924160000_instance_identity_drop_startup_notice 078ee64a0c3d699267f689d086b0d28f8c891218 # #8305
+20261001120001_organization_instant_evals_opt_in 24876667f9cad0a04d7cd13aa941cbbbcb5622e9 # #8348

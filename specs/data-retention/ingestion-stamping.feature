@@ -51,10 +51,27 @@ Feature: Retention stamping at ingestion time
     Then identity, credential, SSO, SCIM, membership, and authorization projection stores are absent
     And explicit revocation, teardown, erasure, session expiry, and proof expiry remain unchanged
 
+  # Only customer telemetry expires (Alex, 2026-10-09); every other event is kept forever.
   @unit
-  Scenario: Non-security event families remain policy-bound
-    When trace, log, metric, evaluation, Langy-conversation, topic-model, governance budget-crossing, gateway-spend, pulled-usage, ingestion-pull, automation-trigger, or coding-agent-fact events are recorded
+  Scenario: Customer telemetry event families remain policy-bound
+    When trace, log, metric, evaluation, collector-evaluation, Langy-conversation, topic-model, gateway-spend, automation-trigger-match, or coding-agent-fact events are recorded
     Then their event_log records use the traces retention category
+
+  @unit
+  Scenario: Every other event family is retained indefinitely
+    When organization, project, user, prompt, workflow, billing, entitlement, governance, pulled-usage, ingestion-pull, or report-schedule configuration events are recorded
+    Then their event_log records have _retention_days = 0
+
+  @unit
+  Scenario: An aggregate type the policy does not list is retained indefinitely
+    When an event of an aggregate type the policy does not list is recorded
+    Then its event_log record has _retention_days = 0
+
+  @integration
+  Scenario: Every aggregate type the worker registers is classified
+    When the worker boots every installed module
+    Then each registered pipeline's aggregate type is listed in the event-log retention policy
+    And a new telemetry pipeline cannot reach the event log without naming its category
 
   Scenario: No retention policy defaults to the platform default
     Given the project has no retention policy

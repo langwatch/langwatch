@@ -1,4 +1,6 @@
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -30,13 +32,41 @@ const treeFloor: string = existsSync(FLOOR_FILE)
  */
 const BASELINE_FROZEN_AT = "00099_coding_agent_sessions_usage_by_context.sql";
 
-/** The newest goose file in langwatch@v3.20.1, the LTS floor: history the graceful rules skip. */
-const FLOOR_HISTORY_THROUGH = "00100_add_simulation_runs_inconclusive_criteria.sql";
+/** The newest goose file in the newest `langwatch@v*` tag: history the graceful rules skip. */
+function newestReleasedMigration({ cwd }: { cwd: string }): string {
+  const git = (args: string[]) =>
+    execFileSync("git", args, {
+      cwd,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      // A release tag lists every file it holds: about 2 MB today.
+      maxBuffer: 64 * 1024 * 1024,
+    });
+  let cause: unknown;
+  try {
+    const tag = git(["tag", "--list", "langwatch@v*", "--sort=-v:refname"])
+      .split("\n")
+      .find((name) => /^langwatch@v\d+\.\d+\.\d+$/.test(name));
+    const paths = tag ? git(["ls-tree", "-r", "--full-tree", "--name-only", tag]) : "";
+    const newest = paths
+      .split("\n")
+      .flatMap((path) => /clickhouse[^/]*\/migrations\/(\d{5}_[^/]+\.sql)$/.exec(path)?.[1] ?? [])
+      .toSorted()
+      .at(-1);
+    if (newest) return newest;
+  } catch (error) {
+    // Not a clone, or git is missing: the same answer as a clone without tags, cause kept.
+    cause = error;
+  }
+  throw new Error(
+    "No langwatch@v* release tag with goose files in this clone, so released migrations " +
+      "cannot be told from new ones. Fetch the tags: git fetch --tags origin (CI: " +
+      "git fetch --depth=1 origin '+refs/tags/langwatch@v*:refs/tags/langwatch@v*').",
+    { cause },
+  );
+}
 
-/** Graceful-rule findings above the floor, listed for a fix (2026-10-09); never add to it. */
-const OPEN_FINDINGS: readonly string[] = [
-  "00106_usage_trace_meter_retention.sql untracked-mutation",
-];
+const RELEASED_THROUGH = newestReleasedMigration({ cwd: import.meta.dirname });
 
 /** The code-step ids a `-- background step:` note may name. */
 const STEPS: ReadonlySet<string> = new Set(
@@ -63,11 +93,9 @@ const unshipped = migrations.filter((migration) => !baseline.includes(migration.
 
 /** What the tree scan reports for one file, with the graceful rules only above the floor. */
 function scanTree(migration: MigrationSource) {
-  return scanClickHouseMigration({ ...migration, floor: treeFloor, steps: STEPS })
-    .filter(
-      (finding) => migration.name > FLOOR_HISTORY_THROUGH || !GRACEFUL_RULES.has(finding.rule),
-    )
-    .filter((finding) => !OPEN_FINDINGS.includes(`${finding.migration} ${finding.rule}`));
+  return scanClickHouseMigration({ ...migration, floor: treeFloor, steps: STEPS }).filter(
+    (finding) => migration.name > RELEASED_THROUGH || !GRACEFUL_RULES.has(finding.rule),
+  );
 }
 
 const FIXTURE_STEPS: ReadonlySet<string> = new Set(["trace:track-index"]);
@@ -337,9 +365,9 @@ describe("ClickHouse migration safety", () => {
     });
 
     /** @scenario "ClickHouse floor history answers only to the older rules" */
-    it("skips the graceful rules up to the floor's newest file, and every open finding still occurs", () => {
-      expect(migrations.map((migration) => migration.name)).toContain(FLOOR_HISTORY_THROUGH);
-      const history = migrations.filter((migration) => migration.name <= FLOOR_HISTORY_THROUGH);
+    it("skips the graceful rules up to the newest release tag's newest file, which is on disk", () => {
+      expect(migrations.map((migration) => migration.name)).toContain(RELEASED_THROUGH);
+      const history = migrations.filter((migration) => migration.name <= RELEASED_THROUGH);
       const graceful = history.flatMap((migration) =>
         scanClickHouseMigration({ ...migration, floor: treeFloor, steps: STEPS }).filter(
           (finding) => GRACEFUL_RULES.has(finding.rule),
@@ -349,12 +377,16 @@ describe("ClickHouse migration safety", () => {
       expect(
         history.flatMap(scanTree).filter((finding) => GRACEFUL_RULES.has(finding.rule)),
       ).toEqual([]);
-      const found = migrations.flatMap((migration) =>
-        scanClickHouseMigration({ ...migration, floor: treeFloor, steps: STEPS }).map(
-          (finding) => `${finding.migration} ${finding.rule}`,
-        ),
-      );
-      expect(OPEN_FINDINGS.filter((entry) => !found.includes(entry))).toEqual([]);
+    });
+
+    /** @scenario "A clone without release tags fails the guard with the command that fetches them" */
+    it("refuses to guess the released history where no release tag is readable", () => {
+      const bare = mkdtempSync(resolve(tmpdir(), "goose-safety-no-tags-"));
+      try {
+        expect(() => newestReleasedMigration({ cwd: bare })).toThrow(/git fetch --tags origin/);
+      } finally {
+        rmSync(bare, { recursive: true, force: true });
+      }
     });
   });
 

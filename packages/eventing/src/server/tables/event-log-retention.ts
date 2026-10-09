@@ -9,21 +9,22 @@ const MAX_RETENTION_DAYS = 65_535;
 export interface EventLogRetentionClient {
   command(request: {
     tenantId: string;
+    organizationId?: string;
     table: string;
     kind: "write";
     sql: string;
-    params: Record<string, unknown>;
+    params?: Record<string, unknown>;
+    unscoped?: { reason: string };
   }): Promise<void>;
 }
 
 /**
- * Which event_log rows each retention category owns, supplied by the retention owner since
- * eventing may not import a product module. A row of a never-expiring event type, prefix or
- * aggregate class is in no category; an unlisted aggregate type is in `fallbackCategory`.
+ * Which event_log rows each retention category owns, from the retention owner (eventing may not
+ * import a product module). Only customer telemetry expires (Alex, 2026-10-09): a never-expiring
+ * event type or prefix, or an aggregate type mapped to no category, is kept forever.
  */
 export interface EventLogRetentionClassification {
   readonly categories: readonly string[];
-  readonly fallbackCategory: string;
   /** Each aggregate type's class: a category, or `indefiniteClass`. */
   readonly classByAggregateType: Readonly<Record<string, string>>;
   readonly indefiniteClass: string;
@@ -80,8 +81,9 @@ export class EventLogRetention {
         value: retentionDays,
       });
     }
-    const predicate = this.categoryPredicate(category);
-    if (predicate === null) return;
+    const own = this.aggregateTypesWhere((candidate) => candidate === category);
+    if (own.length === 0) return;
+    const predicate = `${this.finiteEventTypeGuard()}AggregateType IN (${sqlList(own)})`;
 
     await this.client.command({
       tenantId,
@@ -99,8 +101,30 @@ export class EventLogRetention {
   }
 
   /**
-   * The category a recorded rewrite of one of {@link tables} carries on its marker; null for
-   * another table, an unmarked (legacy) rewrite, or a command naming more than one category.
+   * Re-stamps every never-expiring row on one ClickHouse target, every tenant at once, to 0 days;
+   * `organizationId` routes to that organization's private target, none to the shared one.
+   */
+  async keepIndefiniteRows({ organizationId }: { organizationId?: string }): Promise<void> {
+    await this.client.command({
+      tenantId: "",
+      ...(organizationId === undefined ? {} : { organizationId }),
+      table: EVENT_LOG_TABLE,
+      kind: "write",
+      sql:
+        `ALTER TABLE ${EVENT_LOG_TABLE} UPDATE _retention_days = 0 ` +
+        `WHERE _retention_days != 0 AND ${this.indefinitePredicate()}` +
+        ` AND length(${sqlString(markerOf(this.classification.indefiniteClass))}) > 0`,
+      unscoped: {
+        reason:
+          "keeping never-expiring rows forever is one rewrite per ClickHouse target, across every tenant on it",
+      },
+    });
+  }
+
+  /**
+   * The category a recorded rewrite of one of {@link tables} carries on its marker, or the
+   * indefinite class for {@link keepIndefiniteRows}; null for another table, an unmarked (legacy)
+   * rewrite, or a command naming more than one class.
    */
   categoryOfMutation({
     table,
@@ -110,43 +134,37 @@ export class EventLogRetention {
     command: string | null | undefined;
   }): string | null {
     if (table !== EVENT_LOG_TABLE || !command) return null;
-    const marked = this.classification.categories.filter((category) =>
-      command.includes(sqlString(markerOf(category))),
-    );
+    const classes = [...this.classification.categories, this.classification.indefiniteClass];
+    const marked = classes.filter((category) => command.includes(sqlString(markerOf(category))));
     return marked.length === 1 ? marked[0]! : null;
   }
 
-  /** The finite rows of `category`, or null when no aggregate type is in it. */
-  private categoryPredicate(category: string): string | null {
-    const finiteGuard = `NOT ${this.indefinitePredicate()}`;
-    if (category === this.classification.fallbackCategory) {
-      const others = this.aggregateTypesWhere(
-        (candidate) => candidate !== category && candidate !== this.classification.indefiniteClass,
-      );
-      return others.length === 0
-        ? finiteGuard
-        : `${finiteGuard} AND AggregateType NOT IN (${sqlList(others)})`;
-    }
-    const own = this.aggregateTypesWhere((candidate) => candidate === category);
-    return own.length === 0 ? null : `${finiteGuard} AND AggregateType IN (${sqlList(own)})`;
+  /** `NOT (<never-expiring event types>) AND `, or nothing when none is declared. */
+  private finiteEventTypeGuard(): string {
+    const terms = this.indefiniteEventTypeTerms();
+    return terms.length === 0 ? "" : `NOT (${terms.join(" OR ")}) AND `;
   }
 
+  /** A never-expiring event type or prefix, or an aggregate type mapped to no category. */
   private indefinitePredicate(): string {
-    const { indefiniteEventTypePrefixes, indefiniteEventTypes, indefiniteClass } =
-      this.classification;
+    const finite = this.aggregateTypesWhere((candidate) =>
+      this.classification.categories.includes(candidate),
+    );
     const terms = [
+      ...this.indefiniteEventTypeTerms(),
+      ...(finite.length === 0 ? ["1"] : [`AggregateType NOT IN (${sqlList(finite)})`]),
+    ];
+    return `(${terms.join(" OR ")})`;
+  }
+
+  private indefiniteEventTypeTerms(): string[] {
+    const { indefiniteEventTypePrefixes, indefiniteEventTypes } = this.classification;
+    return [
       ...indefiniteEventTypePrefixes.map((prefix) => `startsWith(EventType, ${sqlString(prefix)})`),
       ...(indefiniteEventTypes.length === 0
         ? []
         : [`EventType IN (${sqlList(indefiniteEventTypes)})`]),
-      ...this.aggregateTypesWhereOrNone(indefiniteClass),
     ];
-    return terms.length === 0 ? "0" : `(${terms.join(" OR ")})`;
-  }
-
-  private aggregateTypesWhereOrNone(retentionClass: string): string[] {
-    const types = this.aggregateTypesWhere((candidate) => candidate === retentionClass);
-    return types.length === 0 ? [] : [`AggregateType IN (${sqlList(types)})`];
   }
 
   private aggregateTypesWhere(accepts: (retentionClass: string) => boolean): string[] {
