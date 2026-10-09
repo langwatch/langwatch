@@ -11,7 +11,6 @@
     "governance:migrate-anomaly-webhook-destinations": { "status": "pending", "seed": "tenancy-sql:governance", "cells": ["C2"], "note": "no headless door on the old image: SQL, flagged" },
     "governance:record-coding-assistant-billing": { "status": "pending", "seed": "tenancy-sql:governance", "cells": ["C2"], "note": "codingAgents router only reads on the old image: SQL, flagged" },
     "governance:replay-cost-charges": { "status": "pending", "seed": "tenancy-sql:governance", "cells": ["C2"], "note": "pulled usage has no headless door: SQL, flagged" },
-    "identity:reopen-unproven-accounts": { "status": "seeded", "seed": "tenancy-sql:unconfirmed-users", "cells": ["C1", "C2", "C3", "C4"] },
     "identity:reopen-unproven-accounts-after-rollout": { "status": "seeded", "seed": "tenancy-sql:unconfirmed-users", "cells": ["C1", "C2", "C3", "C4"] },
     "instant-eval:copy-judge-spend": { "status": "seeded", "seed": "traffic:evaluation", "cells": ["C3"], "note": "not in plan 3.4; confirm judge spend is written by the old evaluation path" },
     "licensing:copy-organization-licenses": { "status": "pending", "seed": "product-seeds:license", "cells": ["C2"], "note": "license.upload with the test licence; product.mjs marks it unseedable without one" },
