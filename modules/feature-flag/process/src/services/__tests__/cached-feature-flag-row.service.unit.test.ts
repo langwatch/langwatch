@@ -78,6 +78,21 @@ describe("CachedFeatureFlagRowService", () => {
     await expect(harness.store.findRow("flag")).resolves.toBeNull();
   });
 
+  it("rests the repository for the local window after a failed read, for every key", async () => {
+    const harness = createHarness();
+    await writeRow(harness.repository, "other", true);
+    const find = vi
+      .spyOn(harness.repository, "findByKey")
+      .mockRejectedValueOnce(new Error("The table `public.FeatureFlag` does not exist"));
+
+    await expect(harness.store.findRow("flag")).resolves.toBeNull();
+    await expect(harness.store.findRow("other")).resolves.toBeNull();
+    expect(find).toHaveBeenCalledOnce();
+
+    harness.advanceBy(5_000);
+    await expect(harness.store.findRow("other")).resolves.toMatchObject({ enabled: true });
+  });
+
   /** @scenario "An operator write is visible to the next resolution" */
   it("invalidates both cache tiers before the next read", async () => {
     const harness = createHarness();
