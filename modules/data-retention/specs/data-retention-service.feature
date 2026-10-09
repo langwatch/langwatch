@@ -130,3 +130,10 @@ Feature: Data Retention service boundary
     Given the same retention policies and trace pins written to each backend
     When the same reads and writes run against every backend
     Then each answers the same rows, the same absences, and never a row belonging to another organization or project
+
+  @unit
+  Scenario: Retention settings show in-flight rewrites as ClickHouse reports them
+    Given a retroactive retention rewrite is still running for the project
+    And ClickHouse reports its remaining parts as a 64-bit integer in text
+    When the retention settings read the rewrite's progress
+    Then the progress lists the rewrite with its remaining parts as a number
