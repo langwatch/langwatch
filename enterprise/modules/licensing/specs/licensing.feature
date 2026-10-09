@@ -317,11 +317,13 @@ Feature: Enterprise licensing lifecycle
       Then licensing records a licence-stored fact with the key's fingerprint and its dates, never the key, then a licence-cleared fact
       And it writes organization's licence columns through no organization operation
 
+    @unit
     Scenario: Organization mirrors the licence licensing stored and clears it when licensing does
       Given organization subscribes to licensing's licence facts
       When licensing records a licence stored and then cleared
       Then organization's licence columns hold the key read from licensing's row and the fact's dates, then hold none
 
+    @unit
     Scenario: Licensing records a hosted-service switch as a fact for organization to apply
       Given an administrator switches a hosted service off for their organisation
       When licensing records the switch
