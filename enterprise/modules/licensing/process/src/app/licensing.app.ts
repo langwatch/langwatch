@@ -70,7 +70,6 @@ import { GatewayApi } from "@langwatch/gateway-contract";
 import { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import { createLogger } from "@langwatch/observability";
 import { optionalUsageReportKeys } from "@langwatch/ops-contract";
-import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { nowInstant, Temporal } from "@langwatch/time";
 
@@ -88,6 +87,7 @@ import type { ConnectOrganizationRepository } from "../repositories/connect-orga
 import type { InstanceIdentityRepository } from "../repositories/instance-identity.repository.ts";
 import type { IssuedLicenseRepository } from "../repositories/issued-license.repository.ts";
 import type { LicensingRepositories } from "../repositories/licensing.repositories.ts";
+import type { MemberSeatRepository } from "../repositories/member-seat.repository.ts";
 import type { SelfHostedInstanceRepository } from "../repositories/self-hosted-instance.repository.ts";
 import { ACTIVATION_ATTEMPTS_LIMIT } from "../rules/activation-code.rules.ts";
 import { LICENSE_SYNCS_LIMIT } from "../rules/issued-license.rules.ts";
@@ -126,9 +126,9 @@ import { SelfHostedCrmService } from "../services/self-hosted-crm.service.ts";
 import type { SelfHostedLeadsInfrastructure } from "../services/self-hosted-crm.service.ts";
 import { SelfHostedInstanceService } from "../services/self-hosted-instance.service.ts";
 
-/** Seat counts are organization's: one peer read, the same count its own seat checks use. */
+/** Seat counts over organization's membership rows, read through its shares (R-C1f, Q9). */
 function seatCountsOver(
-  organizations: Pick<OrganizationApi, "countMemberSeats">,
+  organizations: Pick<MemberSeatRepository, "countMemberSeats">,
 ): Pick<LicensingInfrastructure["repository"], "getMemberCount" | "getMembersLiteCount"> {
   return {
     getMemberCount: async (organizationId) =>
@@ -170,8 +170,6 @@ export class LicensingModule implements LicensingApiContract {
   static readonly dependencies = {
     /** Where an install's hosted provider slot is kept: a gateway fact licensing writes. */
     gateway: GatewayApi,
-    /** Whose memberships a licence's seats are counted from. */
-    organizations: OrganizationApi,
     /** The judge a hosted classify call reaches, its price, and where its spend is recorded. */
     instantEval: InstantEvalApi,
     /** Whose team a hosted caller's project belongs to, for the budgets that apply to it. */
@@ -307,7 +305,7 @@ export class LicensingModule implements LicensingApiContract {
     const { repository, ...runtime } = LicensingInfrastructureService.create({ role }).withStorage({
       licenses: repositories.organizationLicenses,
       facts: customerFacts,
-      ...seatCountsOver(dependencies.organizations),
+      ...seatCountsOver(repositories.memberSeats),
     });
     const registryParts = licenseRegistryParts({
       infrastructure: licenseRegistryOver({
@@ -361,7 +359,7 @@ export class LicensingModule implements LicensingApiContract {
       domainClaims: DomainClaimAuthorityService.create({
         isSaas: config.isSaas,
         licenses: service,
-        organizations: dependencies.organizations,
+        organizations: repositories.connectOrganizations,
       }),
     });
     // Hosted spend a gateway reported but the buffer has not written yet is written at shutdown.

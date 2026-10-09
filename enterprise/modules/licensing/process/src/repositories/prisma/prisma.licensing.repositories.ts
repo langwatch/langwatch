@@ -8,6 +8,7 @@ import {
   type IssuedLicenseCipher,
   PrismaIssuedLicenseRepository,
 } from "./prisma.issued-license.repository.ts";
+import { PrismaMemberSeatRepository } from "./prisma.member-seat.repository.ts";
 import { PrismaOrganizationLicenseRepository } from "./prisma.organization-license.repository.ts";
 import { PrismaSelfHostedInstanceRepository } from "./prisma.self-hosted-instance.repository.ts";
 
@@ -27,6 +28,7 @@ export class PostgresLicensingRepositories {
       selfHostedInstances: PrismaSelfHostedInstanceRepository.create(prisma),
       connectOrganizations: PrismaConnectOrganizationRepository.create(prisma),
       instanceIdentity: PrismaInstanceIdentityRepository.create(prisma),
+      memberSeats: PrismaMemberSeatRepository.create(prisma),
     };
   }
 }

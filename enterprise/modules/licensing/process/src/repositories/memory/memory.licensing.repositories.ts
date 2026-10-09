@@ -4,6 +4,7 @@ import { MemoryConnectOrganizationRepository } from "./memory.connect-organizati
 import { MemoryInstanceIdentityRepository } from "./memory.instance-identity.repository.ts";
 import { MemoryIssuedLicenseRepository } from "./memory.issued-license.repository.ts";
 import { MemoryLicensingRateLimitRepository } from "./memory.licensing-rate-limit.repository.ts";
+import { MemoryMemberSeatRepository } from "./memory.member-seat.repository.ts";
 import { MemoryOrganizationLicenseRepository } from "./memory.organization-license.repository.ts";
 import { MemorySelfHostedInstanceRepository } from "./memory.self-hosted-instance.repository.ts";
 
@@ -20,6 +21,7 @@ export class MemoryLicensingRepositories {
       connectOrganizations: MemoryConnectOrganizationRepository.create(),
       instanceIdentity: MemoryInstanceIdentityRepository.create(),
       rateLimits: MemoryLicensingRateLimitRepository.create(),
+      memberSeats: MemoryMemberSeatRepository.create(),
     };
   }
 }

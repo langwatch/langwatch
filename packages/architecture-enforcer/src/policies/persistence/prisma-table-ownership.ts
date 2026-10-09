@@ -53,16 +53,17 @@ export const SHARED_PRISMA_TABLES: readonly SharedPrismaTable[] = [
       "user",
       "entitlement",
       "scim",
+      "licensing",
     ],
     reason:
-      "data retention and data privacy read a team's organisation to place a project or a team-level rule, never a fold (round 46 E1, R40); the Instant Evals judge and nurturing read a project's organisation through its team and an organisation's teams for its earliest project (round 46 E1, R40); user reads the caller's personal team to find the personal-workspace project an avatar is stored under, never OrganizationApi (U1-AVATAR a, R40); entitlement reads an organisation's team ids to merge Lite Members' custom-role permissions when counting seats, never OrganizationApi (R-C1f, R40); scim counts the same seats to place a provisioned person (PC-SCIM-SEAT, R40)",
+      "data retention and data privacy read a team's organisation to place a project or a team-level rule, never a fold (round 46 E1, R40); the Instant Evals judge and nurturing read a project's organisation through its team and an organisation's teams for its earliest project (round 46 E1, R40); user reads the caller's personal team to find the personal-workspace project an avatar is stored under, never OrganizationApi (U1-AVATAR a, R40); entitlement reads an organisation's team ids to merge Lite Members' custom-role permissions when counting seats, never OrganizationApi (R-C1f, R40); scim counts the same seats to place a provisioned person (PC-SCIM-SEAT, R40); licensing counts them for a licence's seat limits, never OrganizationApi (R-C1f, Q9, R40)",
   },
   {
     table: "OrganizationUser",
     owner: "organization",
-    readers: ["authz", "data-privacy", "billing", "entitlement"],
+    readers: ["authz", "data-privacy", "billing", "entitlement", "licensing"],
     reason:
-      "authz reads memberships for every decision and answers its active administrators from them (R41, R42); data privacy reads a personal project owner's department from the membership, as main did (round 53); billing reads an organisation's administrators and active members for its alerts and lifecycle facts (C2 B, R40); entitlement counts an organisation's member seats for usage stats, never OrganizationApi (R-C1f, R40)",
+      "authz reads memberships for every decision and answers its active administrators from them (R41, R42); data privacy reads a personal project owner's department from the membership, as main did (round 53); billing reads an organisation's administrators and active members for its alerts and lifecycle facts (C2 B, R40); entitlement counts an organisation's member seats for usage stats, never OrganizationApi (R-C1f, R40); licensing counts the same seats for a licence's seat limits (R-C1f, Q9, R40)",
     writes: [
       {
         reader: "authz",
@@ -83,7 +84,7 @@ export const SHARED_PRISMA_TABLES: readonly SharedPrismaTable[] = [
     owner: "organization",
     readers: ["scim", "entitlement", "billing", "licensing"],
     reason:
-      "scim resolves an organisation by its SSO domain and reads names for its oversight screen (R37 S1 R2, R40, R42); entitlement reads the currency and dataset limit it prices and bounds by (C1, R40); billing reads the name, Stripe customer, pricing model and licence it bills by, its other writes being facts organization applies (R42, round 46 D-b); licensing reads a licence customer's name and slug, never through OrganizationApi (C3c, R40)",
+      "scim resolves an organisation by its SSO domain and reads names for its oversight screen (R37 S1 R2, R40, R42); entitlement reads the currency and dataset limit it prices and bounds by (C1, R40); billing reads the name, Stripe customer, pricing model and licence it bills by, its other writes being facts organization applies (R42, round 46 D-b); licensing reads a licence customer's name and slug, never through OrganizationApi (C3c, R40), and how many organisations an install holds for a domain claim (Q9, R40)",
     writes: [
       {
         reader: "billing",

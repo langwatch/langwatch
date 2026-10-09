@@ -3,6 +3,7 @@ import type { ConnectOrganizationRepository } from "./connect-organization.repos
 import type { InstanceIdentityRepository } from "./instance-identity.repository.ts";
 import type { IssuedLicenseRepository } from "./issued-license.repository.ts";
 import type { LicensingRateLimitRepository } from "./licensing-rate-limit.repository.ts";
+import type { MemberSeatRepository } from "./member-seat.repository.ts";
 import type { OrganizationLicenseRepository } from "./organization-license.repository.ts";
 import type { SelfHostedInstanceRepository } from "./self-hosted-instance.repository.ts";
 
@@ -18,4 +19,6 @@ export interface LicensingRepositories {
   readonly connectOrganizations: ConnectOrganizationRepository;
   readonly instanceIdentity: InstanceIdentityRepository;
   readonly rateLimits: LicensingRateLimitRepository;
+  /** Read through organization's shares, never OrganizationApi (R-C1f, Q9). */
+  readonly memberSeats: MemberSeatRepository;
 }
