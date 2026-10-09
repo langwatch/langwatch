@@ -155,3 +155,11 @@ Feature: Invitation acceptance and role recomputation
     When its link is opened
     Then it is refused as expired
     And asking for a fresh one tells the organization's admins with a link to the members settings
+
+  # Main renders the invite landing for a visitor with no session; the shell must not
+  # send that visitor to sign-in first (WEB-860).
+  @unit
+  Scenario: The invite landing renders for a visitor with no session
+    Given a visitor with no session
+    When they open the invitation link at "/invite/accept"
+    Then the address is one that renders without a session
