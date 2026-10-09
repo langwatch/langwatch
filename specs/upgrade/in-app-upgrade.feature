@@ -149,6 +149,12 @@ Feature: The new image's worker runs its blocking upgrade while the api holds, t
     When the shell reads the caller's permissions and the organization's scope graph and lists
     Then each read passes the holding door
 
+  @integration
+  Scenario: The Upgrades page opens once its grant read settles, even when no feature flag answers
+    Given the api is in upgrading mode and a platform operator holds ops:view
+    When the shell opens Ops > Upgrades before any feature flag read has answered
+    Then the page opens on the grant read alone
+
   @unimplemented
   Scenario: A failed blocking step is retried from the Upgrades page
     Given the worker's run failed on a blocking data step while the api is in upgrading mode
