@@ -7,8 +7,7 @@ import type { TenantStepLedger, TenantStepSettleState } from "@langwatch/upgrade
 
 import type { AnomalyRateTrackerRepository, AnomalyStateRepository } from "./anomaly.repository.ts";
 import type { BlobStoreRepository } from "./blob-store.repository.ts";
-import type { BugReportRateLimitRepository } from "./bug-report-rate-limit.repository.ts";
-import type { BugReportRepository } from "./bug-report.repository.ts";
+import type { BugReportRateLimitRepository, BugReportRepository } from "./bug-report.repository.ts";
 import type { ClickHouseRoutesRepository } from "./clickhouse.routes.repository.ts";
 import type { CredentialsResealRepository } from "./credentials-reseal.repository.ts";
 import type {
@@ -24,23 +23,25 @@ import type { MigrationMembershipRepository } from "./migration-membership.repos
 import type { OpsMetricsRepository } from "./ops-metrics.repository.ts";
 import type { OpsMigrationRepository } from "./ops-migration.repository.ts";
 import type { OpsSnapshotRepository } from "./ops-snapshot.repository.ts";
-import type { OrganizationTenantSourceRepository } from "./organization-tenant-source.repository.ts";
 import type { PipelineDefinitionsRepository } from "./pipeline-definitions.repository.ts";
 import type { ProcessManagerPurgeRepository } from "./process-manager-purge.repository.ts";
 import type { ProcessOpsRepository } from "./process-ops.repository.ts";
-import type { ProjectTenantSourceRepository } from "./project-tenant-source.repository.ts";
 import type { QueueRepository } from "./queue.repository.ts";
 import type { ReplayRuntimeRepository } from "./replay-runtime.repository.ts";
 import type { ReplayRepository } from "./replay.repository.ts";
 import type { StorageFootprintRepository } from "./storage-footprint.repository.ts";
 import type { StorageStatsReadingsRepository } from "./storage-stats-readings.repository.ts";
-import type { SystemMigrationEnrollmentRepository } from "./system-migration-enrollment.repository.ts";
-import type { SystemMigrationStateRepository } from "./system-migration-state.repository.ts";
-import type { UpgradeLedgerRepository } from "./upgrade-ledger.repository.ts";
+import type {
+  SystemMigrationEnrollmentRepository,
+  SystemMigrationStateRepository,
+} from "./system-migration.repository.ts";
 import type {
   OrganizationMemberTenantSourceRepository,
+  OrganizationTenantSourceRepository,
+  ProjectTenantSourceRepository,
   UserTenantSourceRepository,
-} from "./user-tenant-source.repository.ts";
+} from "./tenant-source.repository.ts";
+import type { UpgradeLedgerRepository } from "./upgrade-ledger.repository.ts";
 
 /**
  * The rows this module owns in the platform's own database (the support inbox and the system

@@ -16,9 +16,8 @@ import { useFeatureFlag } from "../use-feature-flag.ts";
 
 const reads = vi.hoisted(() => ({ enabled: [] as boolean[] }));
 
-vi.mock("../feature-flag-client.ts", () => ({
-  CLIENT_FLAG_STALE_TIME_MS: 0,
-  featureFlagClient: {
+vi.mock("@langwatch/api/web", () => ({
+  createModuleApi: () => ({
     featureFlag: {
       isEnabled: {
         useQuery: (_input: unknown, options: { enabled: boolean }) => {
@@ -27,7 +26,7 @@ vi.mock("../feature-flag-client.ts", () => ({
         },
       },
     },
-  },
+  }),
 }));
 
 afterEach(() => {
