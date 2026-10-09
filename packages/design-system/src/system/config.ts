@@ -1295,10 +1295,20 @@ export const designSystemConfig = defineConfig({
               animation: "toast-sink 220ms cubic-bezier(0.4, 0, 1, 1) both",
             },
             _motionReduce: { transition: "none", animation: "none" },
-            // A hairline around a solid fill reads as an outline; the fill is
-            // already the edge.
-            "&:is([data-type=error], [data-type=warning], [data-type=success])": {
-              borderColor: "transparent",
+            // Light mode: a plain surface with dark text and a status accent on
+            // the start edge, as the alert's surface variant; white on a solid
+            // orange or yellow fill fails contrast.
+            _light: {
+              "&:is([data-type=error], [data-type=warning], [data-type=success])": {
+                bg: "bg.surface",
+                color: "fg",
+                borderColor: "border.muted",
+                borderInlineStartWidth: "3px",
+                "--toast-trigger-bg": "colors.bg.muted",
+              },
+              "&[data-type=error]": { borderInlineStartColor: "red.fg" },
+              "&[data-type=warning]": { borderInlineStartColor: "orange.fg" },
+              "&[data-type=success]": { borderInlineStartColor: "green.fg" },
             },
             _dark: {
               ...toastPanel,

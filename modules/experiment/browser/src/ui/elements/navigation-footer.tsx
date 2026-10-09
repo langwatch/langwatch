@@ -1,5 +1,5 @@
 import { useRouter } from "@langwatch/browser-host/use-router";
-import { Button, Field, HStack, NativeSelect, Text } from "@langwatch/design-system/primitives";
+import { HStack, IconButton, NativeSelect, Text } from "@langwatch/design-system/primitives";
 import { ChevronLeft, ChevronRight } from "lucide-react"; // Changed from react-feather
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -351,17 +351,22 @@ export function MessagesNavigationFooter({
   // past page one. An offset list is out when the window reaches the total.
   const isNextDisabled = isCursorMode ? !scrollId : pageOffset + pageSize >= totalHits;
 
+  const isSinglePage = !isCursorMode && !isPastFirstPage && totalHits <= pageSize;
+  const showPageSize = !isSinglePage || totalHits > PAGE_SIZE_OPTIONS[0];
+
   return (
-    <HStack padding={6} gap={2}>
-      <Field.Root>
-        <HStack gap={3}>
-          <Field.Label flexShrink={0}>Items per page</Field.Label>
-          <NativeSelect.Root size="sm">
+    <HStack paddingX={6} paddingY={3} gap={4} justify="space-between" flexWrap="wrap">
+      {showPageSize ? (
+        <HStack gap={2}>
+          <Text as="label" htmlFor="page-size" textStyle="sm" color="fg.muted" flexShrink={0}>
+            Items per page
+          </Text>
+          <NativeSelect.Root size="xs" width="auto">
             <NativeSelect.Field
+              id="page-size"
               value={pageSize.toString()}
               onChange={(e) => changePageSize(parseInt(e.target.value, 10))}
-              borderColor="black"
-              borderRadius="lg"
+              style={{ fontVariantNumeric: "tabular-nums" }}
             >
               {PAGE_SIZE_OPTIONS.map((size) => (
                 <option key={size} value={size.toString()}>
@@ -372,10 +377,12 @@ export function MessagesNavigationFooter({
             <NativeSelect.Indicator />
           </NativeSelect.Root>
         </HStack>
-      </Field.Root>
+      ) : (
+        <span />
+      )}
 
-      <HStack gap={3} paddingRight={3}>
-        <Text flexShrink={0}>
+      <HStack gap={3}>
+        <Text textStyle="sm" color="fg.muted" flexShrink={0} fontVariantNumeric="tabular-nums">
           {pageRangeLabel({
             isCursorPage: isCursorMode && isPastFirstPage,
             isPositionUnknown,
@@ -386,28 +393,30 @@ export function MessagesNavigationFooter({
             pageSize,
           })}
         </Text>
-        <HStack gap={0}>
-          <Button
-            variant="ghost"
-            padding={0}
-            onClick={prevPage}
-            disabled={isPrevDisabled}
-            aria-label="Go to previous page"
-            title="Go to previous page"
-          >
-            <ChevronLeft />
-          </Button>
-          <Button
-            variant="ghost"
-            padding={0}
-            disabled={isNextDisabled}
-            onClick={() => nextPage(scrollId)}
-            aria-label="Go to next page"
-            title="Go to next page"
-          >
-            <ChevronRight />
-          </Button>
-        </HStack>
+        {!isSinglePage && (
+          <HStack gap={1}>
+            <IconButton
+              variant="outline"
+              size="xs"
+              onClick={prevPage}
+              disabled={isPrevDisabled}
+              aria-label="Go to previous page"
+              title="Go to previous page"
+            >
+              <ChevronLeft />
+            </IconButton>
+            <IconButton
+              variant="outline"
+              size="xs"
+              disabled={isNextDisabled}
+              onClick={() => nextPage(scrollId)}
+              aria-label="Go to next page"
+              title="Go to next page"
+            >
+              <ChevronRight />
+            </IconButton>
+          </HStack>
+        )}
       </HStack>
     </HStack>
   );

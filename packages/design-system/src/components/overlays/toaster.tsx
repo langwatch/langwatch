@@ -43,18 +43,16 @@ export const toaster: Omit<CreateToasterReturn, "create"> & {
 };
 
 const STATUS = {
-  error: { fg: "red.fg", filled: true },
-  warning: { fg: "yellow.fg", filled: true },
-  success: { fg: "green.fg", filled: true },
-  info: { fg: "fg.muted", filled: false },
-  loading: { fg: "fg.muted", filled: false },
+  error: { fg: "red.fg" },
+  warning: { fg: "orange.fg" },
+  success: { fg: "green.fg" },
+  info: { fg: "fg.muted" },
+  loading: { fg: "fg.muted" },
 } as const;
 
 type ToastStatus = keyof typeof STATUS;
 const statusOf = (type: string | undefined): ToastStatus =>
   type && type in STATUS ? (type as ToastStatus) : "info";
-const onPanelOnly = (status: ToastStatus, color: string) =>
-  STATUS[status].filled ? { _light: "inherit", _dark: color } : color;
 
 /** Secondary actions wear the toast's own foreground, quieter than its title, in both modes. */
 export const toastActionStyle = {
@@ -75,13 +73,7 @@ function StatusGlyph({ status }: { status: ToastStatus }) {
 
 function StatusIcon({ status }: { status: ToastStatus }) {
   return (
-    <Box
-      color={onPanelOnly(status, STATUS[status].fg)}
-      display="flex"
-      alignItems="center"
-      height="5"
-      flexShrink={0}
-    >
+    <Box color={STATUS[status].fg} display="flex" alignItems="center" height="5" flexShrink={0}>
       <StatusGlyph status={status} />
     </Box>
   );
