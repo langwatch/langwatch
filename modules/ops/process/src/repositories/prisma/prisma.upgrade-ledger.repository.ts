@@ -83,7 +83,7 @@ export class PrismaUpgradeLedgerRepository implements UpgradeLedgerRepository {
     return this.reader.getRun(input);
   }
 
-  async reopenStep({ id, runId }: { id: string; runId: string }): Promise<void> {
-    await this.runner.setStatus({ ids: [id], status: "pending", runId });
+  reopenFailedStep({ id }: { id: string }): Promise<boolean> {
+    return this.runner.retryFailedStep({ id });
   }
 }

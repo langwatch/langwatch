@@ -245,6 +245,20 @@ describe("ops.upgrade.retryStep", () => {
       expect(answer).toMatchObject({ status: "pending", report: FAILED_STEP.report });
       expect((await ledger.getStep({ id: FAILED_STEP.id })).status).toBe("pending");
     });
+
+    it("lets one of two concurrent retries through and refuses the other as not failed", async () => {
+      const { manager } = mount({ ledger: ledgerHolding(FAILED_STEP) });
+
+      const answers = await Promise.allSettled([
+        manager.retryStep({ id: FAILED_STEP.id }),
+        manager.retryStep({ id: FAILED_STEP.id }),
+      ]);
+
+      expect(answers.filter((answer) => answer.status === "fulfilled")).toHaveLength(1);
+      expect(answers.find((answer) => answer.status === "rejected")).toMatchObject({
+        reason: { cause: { code: "upgrade_step_not_failed", meta: { status: "pending" } } },
+      });
+    });
   });
 
   describe("given a background step that is running", () => {

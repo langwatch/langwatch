@@ -153,12 +153,10 @@ export class OpsUpgradeService {
 
   /** Reopens a failed step for the worker's next sweep, its checkpoint kept (D6). */
   async retryStep({ id }: OpsUpgradeIdInput): Promise<OpsUpgradeStepDetail> {
-    const step = await this.ledger.getStep({ id });
-    if (step.status !== "failed") {
-      throw new UpgradeStepNotFailedError({ stepId: id, status: step.status });
+    if (!(await this.ledger.reopenFailedStep({ id }))) {
+      const { status } = await this.ledger.getStep({ id });
+      throw new UpgradeStepNotFailedError({ stepId: id, status });
     }
-    if (step.runId === null) throw new Error(`Failed upgrade step "${id}" names no run.`);
-    await this.ledger.reopenStep({ id, runId: step.runId });
     return stepDetailOf(await this.ledger.getStep({ id }));
   }
 }

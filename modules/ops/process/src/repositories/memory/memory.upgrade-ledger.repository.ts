@@ -71,7 +71,11 @@ export class MemoryUpgradeLedgerRepository implements UpgradeLedgerRepository {
     return this.reader.getRun(input);
   }
 
-  async reopenStep({ id }: { id: string; runId: string }): Promise<void> {
+  /** Checks and records with no await between them, so concurrent retries reopen it once. */
+  async reopenFailedStep({ id }: { id: string }): Promise<boolean> {
+    const { status } = await this.getStep({ id });
+    if (status !== "failed" || this.reopened.has(id)) return false;
     this.reopened.add(id);
+    return true;
   }
 }
