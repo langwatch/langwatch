@@ -14,7 +14,7 @@ Analytics reads: timeseries, feedback and most-used documents over trace and eva
 | Api token      | `AnalyticsApi` = `moduleApi<AnalyticsApi>()("analytics")`, `contract/src/analytics.api.ts:202` (29 operations) |
 | Other token    | `AnalyticsLegacyApi`, `process/src/transport/analytics-legacy.rest.ts:34`                                      |
 | Other token    | `AnalyticsLwqlApi`, `process/src/transport/analytics-lwql.trpc.ts:56`                                          |
-| Other token    | `AnalyticsQueryApi`, `process/src/transport/query.rest.ts:53`                                                  |
+| Other token    | `AnalyticsQueryApi`, `process/src/transport/query.rest.ts:54`                                                  |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                                     |
 
 ## What analytics owns

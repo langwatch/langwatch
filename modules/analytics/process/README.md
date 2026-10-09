@@ -280,7 +280,7 @@ interface Response {
 
 |             |                                   |
 | ----------- | --------------------------------- |
-| Declared at | `src/transport/query.rest.ts:106` |
+| Declared at | `src/transport/query.rest.ts:112` |
 | Base URL    | `/api/v1/query`                   |
 | Addressing  | v1-only                           |
 | Credential  | api_key                           |
@@ -289,12 +289,12 @@ interface Response {
 
 Run a LangWatchQL query
 
-Authenticated: Any API key reaches the projects it holds analytics:view on: the fan-out and the row policy enforce the scope, and a key that reads no project is a valid empty scope rather than a refusal. Declared at `src/transport/query.rest.ts:113`.
+Authenticated: Any API key reaches the projects it holds analytics:view on: the fan-out and the row policy enforce the scope, and a key that reads no project is a valid empty scope rather than a refusal. Declared at `src/transport/query.rest.ts:119`.
 
 Answers at `/api/v1/query`.
 
 ```typescript
-// Body: lwqlStatementSchema, ../contract/src/features/lwql/analytics-lwql.schemas.ts:92
+// Body: lwqlKeyStatementSchema, ../contract/src/features/lwql/analytics-lwql.schemas.ts:117
 interface Body {
   sql: string;
   parameters?: Record<string, string | number | boolean | null>;
@@ -303,6 +303,7 @@ interface Body {
     end: string | number | unknown;
   };
   granularitySeconds?: 1 | 60 | 3600;
+  projectId?: string;
 }
 type Response = z.infer<typeof lwqlResultSchema>; // ../contract/src/analytics.input-schemas.ts:180
 ```
@@ -311,7 +312,7 @@ type Response = z.infer<typeof lwqlResultSchema>; // ../contract/src/analytics.i
 
 Discover the queryable LangWatchQL schema
 
-Authenticated: Any API key reaches the projects it holds analytics:view on: the fan-out and the row policy enforce the scope, and a key that reads no project is a valid empty scope rather than a refusal. Declared at `src/transport/query.rest.ts:143`.
+Authenticated: Any API key reaches the projects it holds analytics:view on: the fan-out and the row policy enforce the scope, and a key that reads no project is a valid empty scope rather than a refusal. Declared at `src/transport/query.rest.ts:151`.
 
 Answers at `/api/v1/query/schema`.
 
@@ -323,7 +324,7 @@ type Response = z.infer<typeof lwqlSchemaSchema>; // ../contract/src/analytics.i
 
 Discover both query languages
 
-Authenticated: Any credential for the project may read the reference: half of what it describes is the traces family's own filter vocabulary, so a key without analytics:view is answered with the LangWatchQL half withheld rather than refused. Declared at `src/transport/query.rest.ts:167`.
+Authenticated: Any credential for the project may read the reference: half of what it describes is the traces family's own filter vocabulary, so a key without analytics:view is answered with the LangWatchQL half withheld rather than refused. Declared at `src/transport/query.rest.ts:175`.
 
 Answers at `/api/v1/query/reference`.
 
