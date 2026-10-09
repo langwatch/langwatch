@@ -44,9 +44,9 @@ Public: browser telemetry ingest; the browser has no credential to present and t
 Answers at `/api/rum/v1/traces`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/rum.rest.ts:26)
+// Rawbody: "text" (inline, src/transport/rum.rest.ts:25)
 type Headers = z.infer<typeof rumReportHeadersSchema>; // ../contract/src/rum.api.ts:6
-// Response: inline, src/transport/rum.rest.ts:39
+// Response: inline, src/transport/rum.rest.ts:38
 type Response = unknown;
 ```
 

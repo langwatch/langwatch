@@ -474,9 +474,9 @@ Permission `evaluations:manage`. Declared at `src/transport/experiment-batch-log
 Answers at `/api/evaluations/batch/log_results`, `/api/v1/evaluations/batch/log_results`.
 
 ```typescript
-// Body: inline, src/transport/experiment-batch-log.rest.ts:75
+// Body: inline, src/transport/experiment-batch-log.rest.ts:74
 type Body = Record<string, unknown>;
-// Response: inline, src/transport/experiment-batch-log.rest.ts:78
+// Response: inline, src/transport/experiment-batch-log.rest.ts:77
 type Response = unknown;
 ```
 
