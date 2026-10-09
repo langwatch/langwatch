@@ -49,4 +49,26 @@ describe("a table row with 300-character names", () => {
     for (const element of text) expect(element.scrollWidth).toBeGreaterThan(element.clientWidth);
     await page.screenshot({ path: `${SHOTS}/badge-chip-table.png` });
   });
+
+  it("truncates a name wrapped in a span inside a badge, and names it on hover", () => {
+    const { container } = renderWithDesignSystem(
+      <Table.Root width="full">
+        <Table.Body>
+          <Table.Row>
+            <Table.Cell maxWidth="240px">
+              <Badge>
+                <Text as="span" truncate title={LONG_NAME}>
+                  {LONG_NAME}
+                </Text>
+              </Badge>
+            </Table.Cell>
+          </Table.Row>
+        </Table.Body>
+      </Table.Root>,
+    );
+
+    const span = container.querySelector(`span[title="${LONG_NAME}"]`);
+    expect(span).not.toBeNull();
+    expect(span!.scrollWidth).toBeGreaterThan(span!.clientWidth);
+  });
 });
