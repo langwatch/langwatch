@@ -154,4 +154,8 @@ constraint-dependencies = [
     "accelerate>=1.15.0",  # security: accelerate advisory covers <=1.14.0 (#2307)
     "pyjwt>=2.15.0",  # security: PyJWT advisories covering <=2.14.0 (#2493, #2633)
     "urllib3>=2.8.0",  # security: urllib3 advisories covering <2.8.0 (#2600, #2601, #2611)
+    "fsspec>=2026.6.0",  # security: fsspec advisory covering <2026.6.0
+    "langgraph-sdk>=0.4.4",  # security: langgraph-sdk advisory covering <=0.4.3
+    "jupyterlab>=4.6.4",  # security: jupyterlab advisories covering 4.6.0-4.6.3
+    "notebook>=7.6.3",  # security: notebook advisory covering 7.5.0-7.6.2
 ]

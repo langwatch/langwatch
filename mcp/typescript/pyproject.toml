@@ -27,6 +27,7 @@ constraint-dependencies = [
     "httpx2>=2.12.0",  # security: httpx2 advisories (#2312, #2313, #2329)
     "pyjwt>=2.15.0",  # security: PyJWT advisories covering <=2.14.0 (#2479, #2615)
     "urllib3>=2.8.0",  # security: urllib3 advisories covering <2.8.0 (#2591, #2592, #2608)
+    "fsspec>=2026.6.0",  # security: fsspec advisory covering <2026.6.0
     "litellm>=1.96.2",  # security: litellm advisory covering 1.96.0-1.96.1 (#2648)
 ]
 
