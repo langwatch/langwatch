@@ -36,10 +36,9 @@ vi.mock("@langwatch/observability", () => ({
   }),
 }));
 
-import { BlobNotFoundError } from "~/server/app-layer/traces/blob-store.service";
+import { makeBlobStore } from "~/server/traces/__tests__/fixtures/prompt-studio-offload-fixtures";
 import {
   AGGREGATE,
-  blobStoreReturning,
   eventRefKeys,
   FULL_INPUT,
   holdsFullInput,
@@ -48,8 +47,8 @@ import {
   PREVIEW_INPUT,
   PROJECT,
   plainSpan,
-  serviceWith,
   STARTED_AT,
+  serviceWith,
   TRACE_ID,
 } from "./fixtures/stored-span-restore-fixtures";
 
@@ -61,9 +60,13 @@ describe("SpanStorageService.restoreStoredSpanAttributes", () => {
         const blobStore = holdsFullInput();
         const span = plainSpan();
 
-        const restored = await serviceWith(blobStore).restoreStoredSpanAttributes(
-          { authorization: ownProof({ projectId: PROJECT }), span },
-        );
+        const restored = await serviceWith(
+          blobStore,
+        ).restoreStoredSpanAttributes({
+          authorization: ownProof({ projectId: PROJECT }),
+          span,
+          visibilityCutoffMs: null,
+        });
 
         expect(restored).toEqual(span.spanAttributes);
         expect(blobStore.getFromEventLog).not.toHaveBeenCalled();
@@ -77,12 +80,13 @@ describe("SpanStorageService.restoreStoredSpanAttributes", () => {
       it("returns the full value under the proof's project and trace", async () => {
         const blobStore = holdsFullInput();
 
-        const restored = await serviceWith(blobStore).restoreStoredSpanAttributes(
-          {
-            authorization: ownProof({ projectId: PROJECT }),
-            span: offloadedSpan(),
-          },
-        );
+        const restored = await serviceWith(
+          blobStore,
+        ).restoreStoredSpanAttributes({
+          authorization: ownProof({ projectId: PROJECT }),
+          span: offloadedSpan(),
+          visibilityCutoffMs: null,
+        });
 
         expect(restored["langwatch.input"]).toBe(FULL_INPUT);
         expect(blobStore.getFromEventLog).toHaveBeenCalledWith(
@@ -102,6 +106,7 @@ describe("SpanStorageService.restoreStoredSpanAttributes", () => {
         ).restoreStoredSpanAttributes({
           authorization: ownProof({ projectId: PROJECT }),
           span: offloadedSpan(),
+          visibilityCutoffMs: null,
         });
 
         expect(eventRefKeys(restored)).toEqual([]);
@@ -124,6 +129,7 @@ describe("SpanStorageService.restoreStoredSpanAttributes", () => {
         await serviceWith(blobStore).restoreStoredSpanAttributes({
           authorization: aggregateReadsMember(),
           span: offloadedSpan(),
+          visibilityCutoffMs: null,
         });
 
         expect(blobStore.getFromEventLog).not.toHaveBeenCalled();
@@ -136,6 +142,7 @@ describe("SpanStorageService.restoreStoredSpanAttributes", () => {
         ).restoreStoredSpanAttributes({
           authorization: aggregateReadsMember(),
           span: offloadedSpan(),
+          visibilityCutoffMs: null,
         });
 
         expect({
@@ -154,9 +161,13 @@ describe("SpanStorageService.restoreStoredSpanAttributes", () => {
           projectId: MEMBER,
         })!;
 
-        const restored = await serviceWith(blobStore).restoreStoredSpanAttributes(
-          { authorization: narrowed, span: offloadedSpan() },
-        );
+        const restored = await serviceWith(
+          blobStore,
+        ).restoreStoredSpanAttributes({
+          authorization: narrowed,
+          span: offloadedSpan(),
+          visibilityCutoffMs: null,
+        });
 
         expect(blobStore.getFromEventLog).toHaveBeenCalledWith(
           expect.objectContaining({ tenantId: MEMBER }),
@@ -175,6 +186,7 @@ describe("SpanStorageService.restoreStoredSpanAttributes", () => {
         await serviceWith(blobStore).restoreStoredSpanAttributes({
           authorization: narrowed,
           span: offloadedSpan(),
+          visibilityCutoffMs: null,
         });
 
         expect(blobStore.getFromEventLog).not.toHaveBeenCalledWith(
@@ -190,13 +202,13 @@ describe("SpanStorageService.restoreStoredSpanAttributes", () => {
       it("reads no event_log and keeps the preview without pointers", async () => {
         const blobStore = holdsFullInput();
 
-        const restored = await serviceWith(blobStore).restoreStoredSpanAttributes(
-          {
-            authorization: ownProof({ projectId: PROJECT }),
-            span: offloadedSpan(),
-            visibilityCutoffMs: STARTED_AT + 1,
-          },
-        );
+        const restored = await serviceWith(
+          blobStore,
+        ).restoreStoredSpanAttributes({
+          authorization: ownProof({ projectId: PROJECT }),
+          span: offloadedSpan(),
+          visibilityCutoffMs: STARTED_AT + 1,
+        });
 
         expect(blobStore.getFromEventLog).not.toHaveBeenCalled();
         expect({
@@ -225,16 +237,15 @@ describe("SpanStorageService.restoreStoredSpanAttributes", () => {
     describe("when the event_log read rejects", () => {
       /** @scenario "Unavailable content keeps the preview" */
       it("does not throw and keeps the preview without pointers", async () => {
-        const blobStore = blobStoreReturning(async () => {
-          throw new BlobNotFoundError("evt-1", "langwatch.input", PROJECT);
-        });
+        const { blobStore } = makeBlobStore({});
 
-        const restored = await serviceWith(blobStore).restoreStoredSpanAttributes(
-          {
-            authorization: ownProof({ projectId: PROJECT }),
-            span: offloadedSpan(),
-          },
-        );
+        const restored = await serviceWith(
+          blobStore,
+        ).restoreStoredSpanAttributes({
+          authorization: ownProof({ projectId: PROJECT }),
+          span: offloadedSpan(),
+          visibilityCutoffMs: null,
+        });
 
         expect({
           input: restored["langwatch.input"],
@@ -251,6 +262,7 @@ describe("SpanStorageService.restoreStoredSpanAttributes", () => {
         const restored = await serviceWith().restoreStoredSpanAttributes({
           authorization: ownProof({ projectId: PROJECT }),
           span: offloadedSpan(),
+          visibilityCutoffMs: null,
         });
 
         expect({

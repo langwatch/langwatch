@@ -259,9 +259,10 @@ export class SpanStorageService {
    * outside ClickHouse under one project id, so they are read only for the
    * one project the proof reads. The caller must pass the SAME proof that
    * read the span, because that is what ties the span to the project. A proof
-   * that still spans several projects, and a span outside the visibility
-   * window, keep the stored preview. Reserved pointers never leave this
-   * method.
+   * that still spans several projects keeps the stored preview. A span outside
+   * the visibility window only has its offloaded remainder withheld: the
+   * stored preview is still returned, and redacting the preview is the
+   * caller's concern. Reserved pointers never leave this method.
    */
   async restoreStoredSpanAttributes({
     authorization,
@@ -270,43 +271,33 @@ export class SpanStorageService {
   }: {
     authorization: Authorization;
     span: StoredTraceSpan;
-  } & VisibilityGate): Promise<StoredTraceSpan["spanAttributes"]> {
+    /** Null means the plan has no window; a caller must say so explicitly. */
+    visibilityCutoffMs: number | null;
+  }): Promise<StoredTraceSpan["spanAttributes"]> {
     if (!hasEventRefs(span.spanAttributes)) return span.spanAttributes;
 
-    // Outside the try/catch below: an ungranted proof must propagate.
+    // Throws for a proof that is not granted; that must reach the caller.
     const projectId = singleTenantOf({ authorization, reads: "traces" });
-    // The resolver only ever rewrites string previews, so the cleaned map is
-    // still string-valued; its declared type is the wider normalized one.
+    // The resolver only ever rewrites string previews, so both results below
+    // are still string-valued; their declared type is the wider normalized one.
     const preview = parseSpanEventRefs(span.spanAttributes)
       .cleanedAttrs as StoredTraceSpan["spanAttributes"];
     const deps = this.blobResolutionDeps;
     const outsideWindow =
-      typeof visibilityCutoffMs === "number" &&
-      span.startTimeUnixMs < visibilityCutoffMs;
+      visibilityCutoffMs !== null && span.startTimeUnixMs < visibilityCutoffMs;
     if (!deps || projectId === undefined || outsideWindow) return preview;
 
-    try {
-      const { attributes } = await resolveOffloadedSpanAttributes({
-        projectId,
-        traceId: span.traceId,
-        spanId: span.spanId,
-        attributes: span.spanAttributes,
-        blobStore: deps.blobStore,
-        logger: this.logger,
-      });
-      return attributes as StoredTraceSpan["spanAttributes"];
-    } catch (error) {
-      this.logger.warn(
-        {
-          projectId,
-          traceId: span.traceId,
-          spanId: span.spanId,
-          error: error instanceof Error ? error.message : error,
-        },
-        "Failed to restore offloaded span attributes, keeping preview value",
-      );
-      return preview;
-    }
+    // The resolver settles every field itself and keeps the preview of one it
+    // cannot read, so there is nothing to catch here.
+    const { attributes } = await resolveOffloadedSpanAttributes({
+      projectId,
+      traceId: span.traceId,
+      spanId: span.spanId,
+      attributes: span.spanAttributes,
+      blobStore: deps.blobStore,
+      logger: this.logger,
+    });
+    return attributes as StoredTraceSpan["spanAttributes"];
   }
 
   async getTraceEventsByTraceId(

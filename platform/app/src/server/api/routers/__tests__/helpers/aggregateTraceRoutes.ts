@@ -25,7 +25,10 @@ import { NullTopicRepository } from "~/server/app-layer/topic-clustering/reposit
 import { TopicService } from "~/server/app-layer/topic-clustering/topic.service";
 import { SpanStorageClickHouseRepository } from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
 import { TraceListClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-list.clickhouse.repository";
-import { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
+import {
+  type SpanReadBlobResolutionDeps,
+  SpanStorageService,
+} from "~/server/app-layer/traces/span-storage.service";
 import { TraceListService } from "~/server/app-layer/traces/trace-list.service";
 import { TraceSummaryService } from "~/server/app-layer/traces/trace-summary.service";
 import { prisma } from "~/server/db";
@@ -40,9 +43,12 @@ import { traceSummaryRepositoryFor } from "~/test-utils/traceSummaryRepository";
 export function installAggregateTraceApp({
   ch,
   overrides = {},
+  blobResolution,
 }: {
   ch: ClickHouseClient;
   overrides?: TestAppOverrides;
+  /** Lets the span store restore offloaded content; absent keeps previews. */
+  blobResolution?: SpanReadBlobResolutionDeps;
 }): void {
   const resolveClient = async () => ch;
   const clickhouse = new AuthorizedClickHouse({ resolveClient });
@@ -68,6 +74,7 @@ export function installAggregateTraceApp({
       ),
       spans: new SpanStorageService(
         new SpanStorageClickHouseRepository({ resolveClient, clickhouse }),
+        blobResolution,
       ),
     },
     evaluations: {

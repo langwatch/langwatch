@@ -11,7 +11,8 @@
  * BDD structure: given/when nested describes, action-based it() names.
  */
 
-import { TRPCError } from "@trpc/server";
+import { AccessNotGrantedError } from "@langwatch/actor";
+import type { TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { createInnerTRPCContext } from "../../trpc";
@@ -175,14 +176,20 @@ describe("spans router, prompt-studio trace read restores offloaded content (#57
       });
 
       /** @scenario "A trace-named link opens the full prompt" */
-      it("restores under the same proof the stored-span read used", async () => {
+      it("restores under the very proof the route minted", async () => {
         await openPromptStudio("span-llm");
 
-        expect(mockRestore).toHaveBeenCalledWith(
-          expect.objectContaining({ authorization: TRACE_AUTHORIZATION }),
+        expect(mockRestore.mock.calls[0]?.[0].authorization).toBe(
+          TRACE_AUTHORIZATION,
         );
-        expect(mockGetStoredSpans).toHaveBeenCalledWith(
-          expect.objectContaining({ authorization: TRACE_AUTHORIZATION }),
+      });
+
+      /** @scenario "A trace-named link opens the full prompt" */
+      it("restores under the very proof the stored-span read used", async () => {
+        await openPromptStudio("span-llm");
+
+        expect(mockRestore.mock.calls[0]?.[0].authorization).toBe(
+          mockGetStoredSpans.mock.calls[0]?.[0].authorization,
         );
       });
 
@@ -209,6 +216,30 @@ describe("spans router, prompt-studio trace read restores offloaded content (#57
             span: expect.objectContaining({ spanId: "span-llm" }),
           }),
         );
+      });
+    });
+  });
+
+  describe("given a proof that is not granted", () => {
+    describe("when the restore rejects", () => {
+      beforeEach(() => {
+        mockRestore.mockRejectedValue(new AccessNotGrantedError("traces:view"));
+      });
+
+      /** @scenario "A proof that is not granted is refused, not answered with a preview" */
+      it("rejects getForPromptStudio too", async () => {
+        await expect(openPromptStudio("span-llm")).rejects.toMatchObject({
+          cause: { code: "access_not_granted" },
+        });
+      });
+
+      /** @scenario "A proof that is not granted is refused, not answered with a preview" */
+      it("returns no content", async () => {
+        const result = await openPromptStudio("span-llm").catch(
+          () => undefined,
+        );
+
+        expect(result).toBeUndefined();
       });
     });
   });

@@ -12,7 +12,9 @@ import type { PromptStudioSpanResult } from "./types";
  * rows, the legacy one straight from `stored_spans` and the one fenced by the
  * proof from the span store's stored read, so the playground sees the same
  * values whichever read loaded the trace. Both reads restore the llm row's
- * offloaded content before extraction.
+ * offloaded content before extraction, except that the read fenced by the
+ * proof keeps the preview for a proof that reads several projects and for a
+ * span outside the visibility window.
  */
 export interface PromptStudioSpanRow {
   SpanId: string;
@@ -51,28 +53,11 @@ export function promptStudioRowFromStoredSpan(
 }
 
 /**
- * The playground's view of one span in a trace, given every span of that
- * trace. Returns null when the span is not in the trace, or when it is not
- * an llm span and the trace holds no llm span to load in its place.
- */
-export function promptStudioSpanFromTrace({
-  rows,
-  spanId,
-}: {
-  rows: PromptStudioSpanRow[];
-  spanId: string;
-}): PromptStudioSpanResult | null {
-  const row = promptStudioLlmRowFromTrace({ rows, spanId });
-  if (!row) {
-    return null;
-  }
-  return promptStudioSpanFromLlmRow({ row, rows });
-}
-
-/**
  * The llm row the playground loads for a requested span: the span itself when
  * it is an llm span, else the nearest llm span in the trace. Returns null when
- * the span is not in the trace, or when no llm row can be loaded in its place.
+ * the span is not in the trace, or when it is not an llm span and the trace
+ * holds no llm span to load in its place. Pair it with
+ * `promptStudioSpanFromLlmRow` to get the playground's view of a span.
  */
 export function promptStudioLlmRowFromTrace({
   rows,

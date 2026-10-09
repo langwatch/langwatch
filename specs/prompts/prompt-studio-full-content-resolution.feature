@@ -135,6 +135,14 @@ Feature: Prompt studio opens the full offloaded prompt, not the preview
     And the returned messages fall back to the stored preview
 
   @unit
+  Scenario: A proof that is not granted is refused, not answered with a preview
+    Given the caller's proof carries no read grant for traces
+    When the prompt studio read fetches the llm span
+    Then the read is refused
+    And no offloaded content is read
+    And the playground receives no content, not the stored preview
+
+  @unit
   Scenario: A trace-named link restores the span the playground opens
     Given the link names a non-llm span, so the read resolves to the nearest llm span
     When the prompt studio read fetches it through the caller's proof
@@ -144,5 +152,24 @@ Feature: Prompt studio opens the full offloaded prompt, not the preview
   Scenario: A span that is not in the trace restores nothing
     Given the link names a span the trace does not hold
     When the prompt studio read fetches it through the caller's proof
+    Then the span is reported as not found
+    And no offloaded content is read
+
+  # The two scenarios below run against real ClickHouse: the full content is
+  # seeded into event_log under the member only, so a read under the aggregate
+  # could only ever find the preview.
+
+  @integration
+  Scenario: An aggregate opens a member's offloaded prompt in full
+    Given an aggregate project that reads a member project
+    And the member holds a trace whose llm span input was offloaded to event_log
+    When the aggregate opens that span through a trace-named link
+    Then the returned messages carry the full original value
+    And the offloaded content is read under the member's project and never the aggregate's
+
+  @integration
+  Scenario: A trace the aggregate does not read restores nothing
+    Given an aggregate project and a trace of a project it does not read
+    When the aggregate opens a span of that trace through a trace-named link
     Then the span is reported as not found
     And no offloaded content is read

@@ -4,8 +4,8 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import {
-  promptStudioRowFromStoredSpan,
   promptStudioLlmRowFromTrace,
+  promptStudioRowFromStoredSpan,
   promptStudioSpanFromLlmRow,
 } from "~/server/traces/prompt-studio-span";
 import { TraceService } from "~/server/traces/trace.service";
@@ -140,8 +140,9 @@ async function readProjectSpanForPromptStudio({
 /**
  * The playground's read through the proof: every span of the named trace,
  * from the tenants the proof reads, resolved to the llm span to load. That
- * span's offloaded IO is restored under the one project the proof reads,
- * inside the plan's visibility window; otherwise the stored preview loads.
+ * span's offloaded IO is restored only when the proof reads one project and
+ * the span is inside the plan's visibility window; otherwise the stored
+ * preview loads.
  */
 async function readTraceSpanForPromptStudio({
   authorization,
@@ -164,14 +165,14 @@ async function readTraceSpanForPromptStudio({
   const rows = spans.map(promptStudioRowFromStoredSpan);
   const row = promptStudioLlmRowFromTrace({ rows, spanId });
   if (!row) return null;
-  const stored = spans.find((s) => s.spanId === row.SpanId);
-  if (!stored) return null;
-  const SpanAttributes = await getApp().traces.spans.restoreStoredSpanAttributes(
-    {
+  // rows is index-aligned with spans, and the llm row is one of rows.
+  const stored = spans[rows.indexOf(row)];
+  if (!stored) throw new Error("llm row has no stored span");
+  const SpanAttributes =
+    await getApp().traces.spans.restoreStoredSpanAttributes({
       authorization,
       span: stored,
       visibilityCutoffMs: await getVisibilityCutoffMsForProject(projectId),
-    },
-  );
+    });
   return promptStudioSpanFromLlmRow({ row: { ...row, SpanAttributes }, rows });
 }
