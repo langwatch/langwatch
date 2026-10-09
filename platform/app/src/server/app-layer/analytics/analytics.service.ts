@@ -132,7 +132,12 @@ export class AnalyticsService {
         const cached = await this.timeseriesCache.get(cacheKey);
         if (cached) return cached;
 
-        const table = this.resolveAnalyticsTable(input);
+        // An empty series key ("") means "every evaluator / event", exactly
+        // like an absent one, and the legacy builder already reads it that
+        // way. Routing must too: counted as keyed, it sent the dashboard's
+        // evaluations summary past the evaluation rollup to `evaluation_runs`.
+        const routedInput = withoutEmptySeriesKeys(input);
+        const table = this.resolveAnalyticsTable(routedInput);
 
         // Routed → a legacy table: single call, no overhead. Both
         // `trace_summaries` and `evaluation_runs` dispatch through the same
@@ -149,7 +154,7 @@ export class AnalyticsService {
         );
 
         if (!tripwireEnabled) {
-          const result = await this.runRouted(table, input, options);
+          const result = await this.runRouted(table, routedInput, options);
           await this.timeseriesCache.set(cacheKey, result);
           return result;
         }
@@ -160,7 +165,7 @@ export class AnalyticsService {
         // eval-routed query is compared against `evaluation_runs`, not
         // `trace_summaries`.
         const [routedResult, legacyResult] = await Promise.all([
-          this.runRouted(table, input, options),
+          this.runRouted(table, routedInput, options),
           // The comparison read carries the caller's ceiling too. Without it a
           // tripwire-enabled project would still materialise the unbounded
           // legacy result alongside the bounded routed one — the bound would
@@ -373,6 +378,20 @@ export class AnalyticsService {
       `Unhandled analytics table in routed dispatch: ${String(_exhaustive)}`,
     );
   }
+}
+
+function withoutEmptySeriesKeys(
+  input: TimeseriesInputType,
+): TimeseriesInputType {
+  if (!input.series.some((s) => s.key === "" || s.subkey === "")) return input;
+  return {
+    ...input,
+    series: input.series.map((s) => ({
+      ...s,
+      key: s.key === "" ? undefined : s.key,
+      subkey: s.subkey === "" ? undefined : s.subkey,
+    })),
+  };
 }
 
 async function isTripwireEnabled(projectId: string): Promise<boolean> {

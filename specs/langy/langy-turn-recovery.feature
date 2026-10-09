@@ -273,6 +273,17 @@ Feature: Langy recovers from a failed turn without making the user re-ask
     Then the conversation holds exactly one copy of the user's message
     And the retried turn runs against the message already on record
 
+  # The retried turn continues the same agent session, so the plan the failed
+  # turn wrote and the calls it ran are still the context it works in. The
+  # retry used to drop the failed reply from the panel, and the plan card went
+  # with it.
+  @unit
+  Scenario: Trying again keeps the plan the failed turn wrote
+    Given a Langy turn wrote a plan and then failed
+    When the user tries again from the error card
+    Then the failed reply stays on screen with its plan
+    And the retried turn's answer appears below it
+
   # ---------------------------------------------------------------------------
   # The control plane must never fail a turn that already finished
   # ---------------------------------------------------------------------------

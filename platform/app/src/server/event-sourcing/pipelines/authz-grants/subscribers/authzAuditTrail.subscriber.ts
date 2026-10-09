@@ -147,6 +147,9 @@ const AUDIT_METADATA_FIELDS: Record<AuditableEventType, readonly string[]> = {
     "scope",
     "source",
     "legacyRole",
+    // ADR-144: a shared read's window. Only the store type, the empty `where`
+    // slot and two instants, so an admin can see from when a project was read.
+    "condition",
   ],
   [GRANT_ROLE_CHANGED_EVENT_TYPE]: ["grantId", "from", "to"],
   [GRANT_REVOKED_EVENT_TYPE]: ["grantId", "selector", "reason"],

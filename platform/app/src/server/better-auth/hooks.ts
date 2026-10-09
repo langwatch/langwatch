@@ -172,11 +172,25 @@ export interface DatabaseHookSsoArrivalPort {
  * BOUNCE — the connection is what made the refusal, and carrying it is the
  * difference between sending somebody to their own provider and showing them
  * a page about why they cannot have Google.
+ *
+ * It answers the METHOD beside the connection because the bounce can only be
+ * made when the two are the same string: the error route dials a connection
+ * by its id, and a connection the router reaches through the broker has no
+ * door under that id to dial.
  */
 export interface DatabaseHookConnectionRoutingPort {
   connectionGoverning(args: {
     email: string;
-  }): Promise<{ connectionId: string } | null>;
+  }): Promise<{ connectionId: string; methodId: string } | null>;
+}
+
+/**
+ * Whether the installation admits a new account at this address
+ * (`SIGN_UP_MODE`, `SIGN_UP_ALLOWED_DOMAINS`). Named here for the same reason
+ * as the ports above.
+ */
+export interface DatabaseHookSignUpPolicyPort {
+  checkSignUp(args: { email: string }): Promise<{ allowed: boolean }>;
 }
 
 export interface BetterAuthDatabaseHooksDeps {
@@ -195,6 +209,8 @@ export interface BetterAuthDatabaseHooksDeps {
   federationAllowed: () => Promise<boolean>;
   /** ADR-117 §3. Optional so a hook can be driven without the rule. */
   signInEvidence?: DatabaseHookSignInEvidencePort;
+  /** Optional so a hook can be driven without the rule. */
+  signUpPolicy?: DatabaseHookSignUpPolicyPort;
   analytics: DatabaseHookAnalyticsPort;
   nurturing: DatabaseHookNurturingPort;
 }
@@ -251,6 +267,40 @@ export class BetterAuthDatabaseHooks {
     // Otherwise a no-op: org auto-assignment happens in the after-create hook so
     // that we have a real user id to link with.
     return undefined;
+  }
+
+  /**
+   * Refuses an account the installation's sign-up policy does not admit, on
+   * every path that creates one through better-auth: the social and generic
+   * OAuth callbacks and the single sign-on plugin.
+   *
+   * An address an organization's own connection governs is that
+   * organization's to admit, so the policy is not asked about it: the
+   * organization set its connection up for exactly these people.
+   *
+   * Thrown as an `APIError` so the OAuth callback carries the code to
+   * `/auth/error`, which renders the registry's copy for it.
+   */
+  async refuseRestrictedSignUp({
+    user,
+  }: {
+    user: { email: string };
+  }): Promise<void> {
+    const policy = this.deps.signUpPolicy;
+    if (!policy || !user.email) return;
+    if ((await policy.checkSignUp({ email: user.email })).allowed) return;
+    const governing = await this.deps.connectionRouting.connectionGoverning({
+      email: user.email,
+    });
+    if (governing) return;
+
+    logger.info(
+      "Refused a new account: the installation's sign-up policy does not admit the address",
+    );
+    throw APIError.from("FORBIDDEN", {
+      code: "auth_sign_up_restricted",
+      message: "auth_sign_up_restricted",
+    });
   }
 
   /**
@@ -406,6 +456,16 @@ export class BetterAuthDatabaseHooks {
    * itself arrives under its own id, and a brokered sign-in mid-migration is
    * the population `pendingSsoSetup` exists for. Refusing either would turn
    * somebody away from the door they are supposed to be walking through.
+   *
+   * ONLY A CONNECTION THAT DIALS ITSELF. The error route dials the connection
+   * by the id this refusal carries, through the engine. A grandfathered
+   * connection is routed through the broker instead — the router names it but
+   * the method it dials is `auth0` — and the engine registers nothing under
+   * its id, so a bounce there would name a door that does not open: the
+   * person would wait on a spinner for a provider that never answers. That
+   * connection's organization set the legacy columns, so the guard below
+   * refuses them with the page that says to type their address, and the
+   * address routes through the broker exactly as it always has.
    */
   private async bounceNativeProviderToConnection({
     email,
@@ -420,6 +480,18 @@ export class BetterAuthDatabaseHooks {
       email,
     });
     if (!governing) return;
+    if (governing.methodId !== governing.connectionId) {
+      logger.info(
+        {
+          userId: account.userId,
+          attemptedProvider: account.providerId,
+          connectionId: governing.connectionId,
+          methodId: governing.methodId,
+        },
+        "Left a native social sign-in to the legacy guard: the organization's connection is reached through the broker, not by its own id",
+      );
+      return;
+    }
 
     logger.info(
       {

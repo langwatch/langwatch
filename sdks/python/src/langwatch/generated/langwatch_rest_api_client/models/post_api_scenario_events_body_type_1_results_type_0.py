@@ -28,6 +28,7 @@ class PostApiScenarioEventsBodyType1ResultsType0:
         met_criteria (list[str]):
         unmet_criteria (list[str]):
         reasoning (str | Unset):
+        inconclusive_criteria (list[str] | Unset):
         error (str | Unset):
         evaluations (list[PostApiScenarioEventsBodyType1ResultsType0EvaluationsItem] | Unset):
     """
@@ -36,6 +37,7 @@ class PostApiScenarioEventsBodyType1ResultsType0:
     met_criteria: list[str]
     unmet_criteria: list[str]
     reasoning: str | Unset = UNSET
+    inconclusive_criteria: list[str] | Unset = UNSET
     error: str | Unset = UNSET
     evaluations: list[PostApiScenarioEventsBodyType1ResultsType0EvaluationsItem] | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
@@ -48,6 +50,10 @@ class PostApiScenarioEventsBodyType1ResultsType0:
         unmet_criteria = self.unmet_criteria
 
         reasoning = self.reasoning
+
+        inconclusive_criteria: list[str] | Unset = UNSET
+        if not isinstance(self.inconclusive_criteria, Unset):
+            inconclusive_criteria = self.inconclusive_criteria
 
         error = self.error
 
@@ -69,6 +75,8 @@ class PostApiScenarioEventsBodyType1ResultsType0:
         )
         if reasoning is not UNSET:
             field_dict["reasoning"] = reasoning
+        if inconclusive_criteria is not UNSET:
+            field_dict["inconclusiveCriteria"] = inconclusive_criteria
         if error is not UNSET:
             field_dict["error"] = error
         if evaluations is not UNSET:
@@ -91,6 +99,8 @@ class PostApiScenarioEventsBodyType1ResultsType0:
 
         reasoning = d.pop("reasoning", UNSET)
 
+        inconclusive_criteria = cast(list[str], d.pop("inconclusiveCriteria", UNSET))
+
         error = d.pop("error", UNSET)
 
         _evaluations = d.pop("evaluations", UNSET)
@@ -109,6 +119,7 @@ class PostApiScenarioEventsBodyType1ResultsType0:
             met_criteria=met_criteria,
             unmet_criteria=unmet_criteria,
             reasoning=reasoning,
+            inconclusive_criteria=inconclusive_criteria,
             error=error,
             evaluations=evaluations,
         )

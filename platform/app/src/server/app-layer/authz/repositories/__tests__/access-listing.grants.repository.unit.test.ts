@@ -51,6 +51,7 @@ const prismaWith = (data: {
   apiKeys?: Array<Record<string, unknown>>;
   roles?: Array<Record<string, unknown>>;
   groupMemberships?: Array<Record<string, unknown>>;
+  memberships?: Array<Record<string, unknown>>;
 }) => {
   const prisma = {
     grant: { findMany: vi.fn().mockResolvedValue(data.grants ?? []) },
@@ -60,6 +61,9 @@ const prismaWith = (data: {
     role: { findMany: vi.fn().mockResolvedValue(data.roles ?? []) },
     groupMembership: {
       findMany: vi.fn().mockResolvedValue(data.groupMemberships ?? []),
+    },
+    organizationUser: {
+      findMany: vi.fn().mockResolvedValue(data.memberships ?? []),
     },
   };
   return {
@@ -499,6 +503,64 @@ describe("GrantsAccessListingRepository", () => {
       expect(
         rows.map((row) => `${row.organizationId}:${row.scopeId}:${row.role}`),
       ).toEqual([`${ORG}:team-1:MEMBER`, `${ORG}:team-1:VIEWER`]);
+    });
+
+    describe("when the user holds a Developer seat in that organization", () => {
+      it("keeps only their direct team and project grants, as the engine does", async () => {
+        const { repository } = prismaWith({
+          memberships: [{ organizationId: ORG, role: "DEVELOPER" }],
+          groupMemberships: [
+            { groupId: "group-mine", group: { organizationId: ORG } },
+            { groupId: "group-other", group: { organizationId: "org-other" } },
+          ],
+          grants: [
+            grantRow({
+              id: "g-personal",
+              principalType: "USER",
+              principalId: "alice",
+              roleKey: "admin",
+              scopeId: "team-personal",
+            }),
+            grantRow({
+              id: "g-shared-via-group",
+              principalType: "GROUP",
+              principalId: "group-mine",
+              roleKey: "member",
+              scopeId: "team-shared",
+            }),
+            grantRow({
+              id: "g-org",
+              principalType: "USER",
+              principalId: "alice",
+              roleKey: "admin",
+              scopeType: "ORGANIZATION",
+              scopeId: ORG,
+            }),
+            {
+              ...grantRow({
+                id: "g-other-org-group",
+                principalType: "GROUP",
+                principalId: "group-other",
+                roleKey: "viewer",
+                scopeId: "team-elsewhere",
+              }),
+              organizationId: "org-other",
+            },
+          ],
+        });
+
+        const rows = await repository.findBindingsForSynthesis({
+          orgIds: [ORG, "org-other"],
+          userId: "alice",
+        });
+
+        expect(
+          rows.map((row) => `${row.organizationId}:${row.scopeId}:${row.role}`),
+        ).toEqual([
+          `${ORG}:team-personal:ADMIN`,
+          "org-other:team-elsewhere:VIEWER",
+        ]);
+      });
     });
   });
 

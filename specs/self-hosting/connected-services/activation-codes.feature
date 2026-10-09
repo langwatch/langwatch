@@ -40,6 +40,25 @@ Feature: Activating a self-hosted install with a code
     Then every hosted service is included unless the operator unticks it
     And the license the code mints names those services, so the install syncs and refreshes on its own
 
+  @unit
+  Scenario: A code issued with no lite seats mints the plan's lite seats
+    Given an operator issuing an enterprise activation code with no lite seats given
+    When an install redeems it
+    Then the license carries the enterprise plan's lite seats, the same as a license issued directly
+
+  @unit
+  Scenario: A code issued with lite seats mints exactly those
+    Given an operator issuing an activation code with 3 lite seats
+    When an install redeems it
+    Then the license carries 3 lite seats
+
+  @integration
+  Scenario: The activation code form offers lite seats with the plan default
+    Given an operator issuing an activation code in the backoffice
+    When the operator leaves lite seats empty, or types a number
+    Then an empty field sends no lite seats, so the plan default applies
+    And a typed number is sent as the lite seats
+
   @integration
   Scenario: A list of codes that cannot be read says so
     Given an operator on the activation-code list in the backoffice

@@ -1,5 +1,5 @@
 import { buildMintedPlan } from "./mintedPlan";
-import { getPlanTemplate } from "./planTemplates";
+import { getPlanTemplate, resolveMembersLite } from "./planTemplates";
 import { encodeLicenseKey, generateLicenseId, signLicense } from "./signing";
 import type { LicenseData } from "./types";
 
@@ -84,7 +84,7 @@ export function generateLicenseKey({
     type: template.type,
     name: template.name,
     maxMembers: seats,
-    maxMembersLite: maxMembersLite ?? template.maxMembersLite,
+    maxMembersLite: resolveMembersLite({ planType, maxMembersLite }),
     maxMessagesPerMonth: maxMessagesPerMonth ?? template.maxMessagesPerMonth,
     canPublish: template.canPublish,
     webhookEndpointsEnabled: template.webhookEndpointsEnabled,

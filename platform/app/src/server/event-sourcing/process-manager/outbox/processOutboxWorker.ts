@@ -1,11 +1,16 @@
 import type { Logger } from "@langwatch/observability";
 
 import { incrementEsProcessOutboxStuckDrains } from "~/server/metrics";
-import type { OutboxDispatcherService } from "./outboxDispatcherService";
+import type {
+  DispatchReport,
+  OutboxDispatcherService,
+} from "./outboxDispatcherService";
 
 const DEFAULT_INTERVAL_MS = 1_000;
 const DEFAULT_BATCH_SIZE = 10;
 const DEFAULT_STUCK_DRAIN_TIMEOUT_MS = 300_000;
+/** Ceiling for the idle backoff; notify() or a drain with work resets it. */
+const DEFAULT_MAX_IDLE_INTERVAL_MS = 30_000;
 /**
  * How many abandoned drains may still be pending before the worker stops
  * starting new ones. Abandonment frees the polling loop but cannot cancel the
@@ -16,12 +21,38 @@ const DEFAULT_STUCK_DRAIN_TIMEOUT_MS = 300_000;
  */
 const MAX_ABANDONED_DRAINS = 5;
 
+/** A drain that leased nothing, or failed: neither earns a sooner poll, and
+ *  resetting on failure would hammer the database while it is failing. */
+function madeNoProgress(report: DispatchReport | undefined): boolean {
+  if (!report) return true;
+  const { dispatched, retried, dead, released, fenced } = report;
+  return [dispatched, retried, dead, released, fenced].every(
+    (keys) => keys.length === 0,
+  );
+}
+
+/** A drain that leased a full batch likely left a backlog: drain again at once. */
+function leasedFullBatch(
+  report: DispatchReport | undefined,
+  batchSize: number,
+): boolean {
+  if (!report) return false;
+  const { dispatched, retried, dead, released, fenced } = report;
+  const leased = [dispatched, retried, dead, released, fenced].reduce(
+    (total, keys) => total + keys.length,
+    0,
+  );
+  return leased >= batchSize;
+}
+
 export interface ProcessOutboxWorkerOptions {
   dispatcher: Pick<OutboxDispatcherService, "runOnce">;
   logger: Logger;
   /** Process-manager name, used to label stuck-drain metrics and logs. */
   name?: string;
   intervalMs?: number;
+  /** Each poll that leases nothing or fails doubles the interval up to this. */
+  maxIdleIntervalMs?: number;
   batchSize?: number;
   /**
    * How long one drain may run before the worker declares it stuck,
@@ -49,12 +80,16 @@ export class ProcessOutboxWorker {
   private readonly logger: Logger;
   private readonly name: string;
   private readonly intervalMs: number;
+  private readonly maxIdleIntervalMs: number;
   private readonly batchSize: number;
   private readonly stuckDrainTimeoutMs: number;
   private readonly now: () => number;
 
+  /** Armed only while no drain is in flight: a drain arms it as it ends. */
   private timer: NodeJS.Timeout | null = null;
-  private inFlight: Promise<void> | null = null;
+  /** The delay the next recovery poll is armed with. */
+  private pollIntervalMs: number;
+  private inFlight: Promise<DispatchReport | undefined> | null = null;
   /** A producer notified while the current lease/drain was already running. */
   private drainRequested = false;
   private started = false;
@@ -67,6 +102,11 @@ export class ProcessOutboxWorker {
     this.logger = options.logger;
     this.name = options.name ?? "unknown";
     this.intervalMs = Math.max(1, options.intervalMs ?? DEFAULT_INTERVAL_MS);
+    this.maxIdleIntervalMs = Math.max(
+      this.intervalMs,
+      options.maxIdleIntervalMs ?? DEFAULT_MAX_IDLE_INTERVAL_MS,
+    );
+    this.pollIntervalMs = this.intervalMs;
     this.batchSize = options.batchSize ?? DEFAULT_BATCH_SIZE;
     this.stuckDrainTimeoutMs = Math.max(
       1,
@@ -79,11 +119,14 @@ export class ProcessOutboxWorker {
   start(): void {
     if (this.started) return;
     this.started = true;
-    this.timer = setInterval(() => this.triggerDrain(), this.intervalMs);
-    this.timer.unref();
-    this.triggerDrain();
+    this.pollIntervalMs = this.intervalMs;
+    this.poll();
     this.logger.info(
-      { intervalMs: this.intervalMs, batchSize: this.batchSize },
+      {
+        intervalMs: this.intervalMs,
+        maxIdleIntervalMs: this.maxIdleIntervalMs,
+        batchSize: this.batchSize,
+      },
       "ProcessOutboxWorker started",
     );
   }
@@ -91,9 +134,10 @@ export class ProcessOutboxWorker {
   /**
    * Nudges the worker after a producer commits new outbox work. The periodic
    * poll remains the crash/restart recovery path; notifications only remove
-   * avoidable latency from the healthy path.
+   * avoidable latency from the healthy path, and end any idle backoff.
    */
   notify(): void {
+    this.pollIntervalMs = this.intervalMs;
     this.triggerDrain();
   }
 
@@ -106,10 +150,43 @@ export class ProcessOutboxWorker {
     if (!this.started) return;
     this.started = false;
     this.drainRequested = false;
-    if (this.timer) clearInterval(this.timer);
-    this.timer = null;
+    this.clearPoll();
     await this.inFlight;
     this.logger.info({}, "ProcessOutboxWorker stopped");
+  }
+
+  /** One recovery poll. A drain it starts arms the next poll as it ends, so
+   *  the delay is the one that drain's own result chose. */
+  private poll(): void {
+    this.triggerDrain();
+    if (this.started && this.inFlight === null) {
+      this.armPoll(this.pollIntervalMs);
+    }
+  }
+
+  private armPoll(delayMs: number): void {
+    this.clearPoll();
+    this.timer = setTimeout(() => {
+      this.timer = null;
+      if (this.started) this.poll();
+    }, delayMs);
+    this.timer.unref();
+  }
+
+  private clearPoll(): void {
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = null;
+  }
+
+  /** The current drain settled or was abandoned: run the drain a producer
+   *  asked for meanwhile, else arm the next poll. */
+  private resume(): void {
+    if (!this.started) return;
+    if (this.drainRequested) {
+      this.drainRequested = false;
+      this.triggerDrain();
+    }
+    if (this.inFlight === null) this.armPoll(this.pollIntervalMs);
   }
 
   private triggerDrain(): void {
@@ -137,6 +214,7 @@ export class ProcessOutboxWorker {
     }
     const drain = this.runDrain();
     this.inFlight = drain;
+    this.clearPoll();
     // The watchdog belongs to THIS drain, so an abandoned drain settling
     // late can never disarm its successor's watchdog.
     const watchdog = setTimeout(() => {
@@ -147,6 +225,7 @@ export class ProcessOutboxWorker {
       // fenced by its lapsed lease (and counted as such).
       this.inFlight = null;
       this.abandonedDrains += 1;
+      this.pollIntervalMs = this.intervalMs;
       incrementEsProcessOutboxStuckDrains({ processName: this.name });
       this.logger.error(
         {
@@ -158,13 +237,10 @@ export class ProcessOutboxWorker {
           "threshold — abandoning it and resuming polling. A delivery in " +
           "this domain is not settling.",
       );
-      if (this.drainRequested) {
-        this.drainRequested = false;
-        this.triggerDrain();
-      }
+      this.resume();
     }, this.stuckDrainTimeoutMs);
     watchdog.unref();
-    void drain.finally(() => {
+    void drain.then((report) => {
       clearTimeout(watchdog);
       if (this.inFlight !== drain) {
         // An abandoned drain settled after all: it no longer retains its
@@ -176,16 +252,17 @@ export class ProcessOutboxWorker {
         return;
       }
       this.inFlight = null;
-      if (this.drainRequested) {
-        this.drainRequested = false;
-        this.triggerDrain();
-      }
+      this.pollIntervalMs = madeNoProgress(report)
+        ? Math.min(this.pollIntervalMs * 2, this.maxIdleIntervalMs)
+        : this.intervalMs;
+      if (leasedFullBatch(report, this.batchSize)) this.drainRequested = true;
+      this.resume();
     });
   }
 
-  private async runDrain(): Promise<void> {
+  private async runDrain(): Promise<DispatchReport | undefined> {
     try {
-      await this.dispatcher.runOnce({
+      return await this.dispatcher.runOnce({
         now: this.now(),
         limit: this.batchSize,
       });
@@ -194,6 +271,7 @@ export class ProcessOutboxWorker {
         { error },
         "ProcessOutboxWorker drain failed; the next poll will retry",
       );
+      return undefined;
     }
   }
 }

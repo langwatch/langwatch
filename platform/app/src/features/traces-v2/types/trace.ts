@@ -1,5 +1,6 @@
 import type { AnnotationByTrace } from "~/hooks/useAnnotationsByTraceIds";
 import type { TraceMediaRef } from "~/shared/traces/media-refs";
+import type { RouterOutputs } from "~/utils/api";
 
 export type TraceStatus = "ok" | "error" | "warning";
 
@@ -25,18 +26,18 @@ export interface EvalSummary {
   status: "pass" | "warning" | "fail" | "processed" | "skipped" | "error";
 }
 
+/** One row of the `tracesV2.list` payload, exactly as the router returns it. */
+export type TraceListRow = RouterOutputs["tracesV2"]["list"]["items"][number];
+
 /**
- * Compact eval result attached to a trace list item.
- * Mapped from the server-side EvalSummary in the useTraceList hook.
+ * Compact eval result attached to a trace list item: the fields a cell
+ * renders of the evaluation the list row carries, derived from the router so
+ * the two cannot drift.
  */
-export interface TraceEvalResult {
-  evaluatorId: string;
-  evaluatorName: string | null;
-  status: "scheduled" | "in_progress" | "processed" | "error" | "skipped";
-  score: number | null;
-  passed: boolean | null;
-  label: string | null;
-}
+export type TraceEvalResult = Pick<
+  TraceListRow["evaluations"][number],
+  "evaluatorId" | "evaluatorName" | "status" | "score" | "passed" | "label"
+>;
 
 /**
  * One event name a trace recorded, with how often it fired. Rows show one
@@ -80,6 +81,9 @@ export const NO_TRACE_EVENTS: TraceListEvents = {
  */
 export interface TraceListItem {
   traceId: string;
+  /** The project that owns the trace; on an aggregate, the member it was
+   *  listed from. Absent on sample rows. */
+  projectId?: string;
   timestamp: number;
   name: string;
   serviceName: string;
@@ -89,8 +93,8 @@ export interface TraceListItem {
   totalCost: number;
   nonBilledCost: number;
   totalTokens: number;
-  inputTokens?: number;
-  outputTokens?: number;
+  inputTokens?: number | null;
+  outputTokens?: number | null;
   /** Cache + reasoning token sums (null when the model never reported them).
    *  The Tokens cell shows input+output; these drive the hover breakdown. */
   cacheReadTokens?: number | null;
@@ -129,10 +133,10 @@ export interface TraceListItem {
   outputRedacted?: boolean | null;
   inputVisibleTo?: string | null;
   outputVisibleTo?: string | null;
-  error?: string;
+  error?: string | null;
   errorSpanName?: string;
-  conversationId?: string;
-  userId?: string;
+  conversationId?: string | null;
+  userId?: string | null;
   origin:
     | "application"
     | "simulation"
@@ -147,7 +151,7 @@ export interface TraceListItem {
     // autocomplete/exhaustiveness while still accepting future values.
     | (string & {});
   tokensEstimated?: boolean;
-  ttft?: number;
+  ttft?: number | null;
   traceName?: string;
   rootSpanType?: string | null;
   evaluations: TraceEvalResult[];

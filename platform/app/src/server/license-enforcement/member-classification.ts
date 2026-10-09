@@ -1,6 +1,10 @@
 import { OrganizationUserRole } from "~/generated/prisma/client";
 
-export type MemberType = "FullMember" | "LiteMember";
+/**
+ * The three kinds of seat. Full and Lite are metered by the plan; Developer
+ * (ADR-143) is counted so the plan page can show it and never capped.
+ */
+export type MemberType = "FullMember" | "LiteMember" | "Developer";
 
 /**
  * Checks if a permission string represents a view-only action.
@@ -30,12 +34,14 @@ export function isViewOnlyCustomRole(permissions: string[]): boolean {
  *
  * Classification rules:
  * - ADMIN or MEMBER roles are always FullMember
+ * - DEVELOPER is always Developer; permissions never move it, because a
+ *   Developer holds no custom role anywhere (ADR-143)
  * - EXTERNAL role with non-view permissions is FullMember (elevated to full access)
  * - EXTERNAL role with no permissions or view-only permissions is Lite Member
  *
  * Note: The EXTERNAL enum value corresponds to "Lite Member" in user-facing terminology.
  *
- * @param role - Organization user role (ADMIN, MEMBER, or EXTERNAL)
+ * @param role - Organization user role (ADMIN, MEMBER, EXTERNAL or DEVELOPER)
  * @param permissions - Optional array of permission strings from custom role
  * @returns MemberType classification
  */
@@ -49,6 +55,10 @@ export function classifyMemberType(
     role === OrganizationUserRole.MEMBER
   ) {
     return "FullMember";
+  }
+
+  if (role === OrganizationUserRole.DEVELOPER) {
+    return "Developer";
   }
 
   // EXTERNAL role with non-view custom permissions is elevated to FullMember
@@ -94,10 +104,28 @@ export function isLiteMember(
   return classifyMemberType(role, permissions) === "LiteMember";
 }
 
+/**
+ * Whether a member holds a Developer seat (ADR-143). Permissions are
+ * accepted for symmetry with the other predicates and never change the answer.
+ */
+export function isDeveloper(
+  role: OrganizationUserRole,
+  permissions: string[] | undefined,
+): boolean {
+  return classifyMemberType(role, permissions) === "Developer";
+}
+
+/**
+ * Named after the seat pool the change ENTERS, because that is the pool the
+ * licence guard has to check: "lite-to-full" enters the Full pool,
+ * "full-to-lite" enters the Lite pool, and "to-developer" enters a pool the
+ * plan does not meter, so the guard has nothing to check.
+ */
 export type RoleChangeType =
   | "no-change" // Same member type
-  | "lite-to-full" // Lite Member → Full Member
-  | "full-to-lite"; // Full Member → Lite Member
+  | "lite-to-full" // Enters the Full Member pool
+  | "full-to-lite" // Enters the Lite Member pool
+  | "to-developer"; // Enters the Developer pool, never capped
 
 /**
  * Determines if a role change would change the member type.
@@ -115,9 +143,10 @@ export function getRoleChangeType(
   newRole: OrganizationUserRole,
   newPermissions: string[] | undefined,
 ): RoleChangeType {
-  const wasFull = isFullMember(oldRole, oldPermissions);
-  const willBeFull = isFullMember(newRole, newPermissions);
+  const was = classifyMemberType(oldRole, oldPermissions);
+  const willBe = classifyMemberType(newRole, newPermissions);
 
-  if (wasFull === willBeFull) return "no-change";
-  return wasFull ? "full-to-lite" : "lite-to-full";
+  if (was === willBe) return "no-change";
+  if (willBe === "Developer") return "to-developer";
+  return willBe === "FullMember" ? "lite-to-full" : "full-to-lite";
 }

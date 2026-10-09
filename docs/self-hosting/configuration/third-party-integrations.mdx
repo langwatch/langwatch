@@ -36,28 +36,11 @@ LangWatch evaluators use external LLM providers for model-based evaluations (LLM
 
 ### Azure OpenAI
 
-Used for jailbreak detection and content safety evaluators.
+Configure Azure OpenAI for evaluators in **Settings > Model Providers**. The chart still accepts `app.evaluators.azureOpenAI`, which sets `AZURE_OPENAI_ENDPOINT` and `AZURE_OPENAI_KEY` on the app and workers, but the app does not read them.
 
-```yaml
-app:
-  evaluators:
-    azureOpenAI:
-      enabled: true
-      endpoint:
-        secretKeyRef: { name: langwatch-evaluators, key: azureEndpoint }
-      apiKey:
-        secretKeyRef: { name: langwatch-evaluators, key: azureApiKey }
-```
+### Google Cloud DLP
 
-| Variable | Description |
-|----------|-------------|
-| `AZURE_OPENAI_EVALUATOR_ENABLED` | `true` to enable |
-| `AZURE_OPENAI_EVALUATOR_ENDPOINT` | Azure OpenAI endpoint URL |
-| `AZURE_OPENAI_EVALUATOR_API_KEY` | Azure OpenAI API key |
-
-### Google AI
-
-Used for PII detection evaluators.
+Used for PII redaction of incoming traces.
 
 ```yaml
 app:
@@ -70,8 +53,7 @@ app:
 
 | Variable | Description |
 |----------|-------------|
-| `GOOGLE_EVALUATOR_ENABLED` | `true` to enable |
-| `GOOGLE_CREDENTIALS_JSON` | Service account credentials JSON |
+| `GOOGLE_APPLICATION_CREDENTIALS` | The contents of a Google service account JSON key (the JSON itself, not a file path), with a `project_id`. Set on the app and workers when `app.evaluators.google.enabled` is on |
 
 <Note>
 You don't need to configure evaluator providers to use LangWatch. They're only required if you want to use built-in evaluators that rely on specific LLM providers. You can always configure your own LLM provider API keys in the LangWatch UI for evaluations.

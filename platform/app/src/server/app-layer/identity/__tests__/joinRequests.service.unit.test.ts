@@ -1,6 +1,7 @@
 import type {
   DomainJoinSetting,
   JoinCandidateOrganization,
+  JoinerRole,
   JoinRequestAggregateState,
 } from "@langwatch/identity";
 import {
@@ -70,7 +71,11 @@ function harness({
   isMember = false,
   memberOf,
   dismissedDomains = [],
-  setting = { domainJoin: "request" as DomainJoinSetting, joinDomains: [] },
+  setting = {
+    domainJoin: "request" as DomainJoinSetting,
+    joinDomains: [] as string[],
+    joinerRole: "MEMBER" as JoinerRole,
+  },
 }: {
   candidates?: JoinCandidateOrganization[];
   held?: JoinRequestAggregateState | null;
@@ -84,7 +89,11 @@ function harness({
    *  "not in the other" is the whole point. Overrides `isMember`. */
   memberOf?: string[];
   dismissedDomains?: string[];
-  setting?: { domainJoin: DomainJoinSetting; joinDomains: string[] };
+  setting?: {
+    domainJoin: DomainJoinSetting;
+    joinDomains: string[];
+    joinerRole?: JoinerRole;
+  };
 } = {}) {
   const requests = {
     requestJoin: vi.fn(async (_command: Record<string, unknown>) => []),
@@ -106,7 +115,12 @@ function harness({
     joinedAutomatically: vi.fn(async () => undefined),
   } satisfies JoinRequestNotifier;
   const settings: JoinSettingPort = {
-    read: vi.fn(async () => setting),
+    // A case that names no seat models an organization that never changed
+    // it, which is a Full member seat (ADR-143).
+    read: vi.fn(async () => ({
+      joinerRole: "MEMBER" as JoinerRole,
+      ...setting,
+    })),
     write: vi.fn(async () => undefined),
   };
   const reads = {
@@ -343,6 +357,8 @@ describe("given an administrator approving a request", () => {
         joinRequestId: "jreq_1",
         commandId: "join-approve:jreq_1:user:user_ana",
         approvedByUserId: "user_ana",
+        role: "MEMBER",
+        origin: "web",
       });
     });
   });
@@ -541,6 +557,7 @@ describe("given an organization whose plan does not carry the joining control", 
         organizationId: "org_acme",
         domainJoin: "off",
         joinDomains: [],
+        joinerRole: "MEMBER",
       });
       expect(joinPolicyEntitled).not.toHaveBeenCalled();
     });
@@ -673,6 +690,7 @@ describe("given an administrator turning automatic joining on", () => {
         organizationId: "org_acme",
         domainJoin: "auto",
         joinDomains: ["acme.com"],
+        joinerRole: "MEMBER",
       });
       // Both values and both domain lists, because the audit row the caller
       // writes has to say what it was as well as what it became.
@@ -681,6 +699,8 @@ describe("given an administrator turning automatic joining on", () => {
         next: "auto",
         previousDomains: [],
         nextDomains: ["acme.com"],
+        previousJoinerRole: "MEMBER",
+        nextJoinerRole: "MEMBER",
       });
     });
   });
@@ -704,6 +724,7 @@ describe("given an administrator turning automatic joining on", () => {
         organizationId: "org_acme",
         domainJoin: "request",
         joinDomains: [],
+        joinerRole: "MEMBER",
       });
     });
   });
@@ -849,8 +870,10 @@ describe("given an organization that admits its domain automatically", () => {
         verifiedEmail: "sam@acme.com",
       });
 
-      // No role on the call and never will be: an approval — by an admin or
-      // by the policy — grants the organization's default and nothing more.
+      // No role is CHOSEN on the call and never will be: the seat is the
+      // organization's joiner seat for an arrival from the web, decided by
+      // the service from the request in hand (ADR-143 v6), and nothing an
+      // approver or the policy could pick differently.
       const attach = membership.attachDefaultMembership as unknown as {
         mock: { calls: [Record<string, unknown>][] };
       };
@@ -860,8 +883,11 @@ describe("given an organization that admits its domain automatically", () => {
         "commandId",
         "joinRequestId",
         "organizationId",
+        "origin",
+        "role",
         "userId",
       ]);
+      expect(attached).toMatchObject({ role: "MEMBER", origin: "web" });
     });
   });
 
@@ -1039,6 +1065,8 @@ describe("given somebody who asked rather than creating an organization", () => 
         joinRequestId: "jreq_1",
         commandId: "join-approve:jreq_1:user:user_ana",
         approvedByUserId: "user_ana",
+        role: "MEMBER",
+        origin: "web",
       });
     });
   });
@@ -1225,5 +1253,230 @@ describe("given somebody who has dismissed an offer", () => {
     // Dismissal is per domain. A person who said "not this one" has said
     // nothing about the next.
     expect(other).not.toEqual({ outcome: "none" });
+  });
+});
+
+describe("given the seat newcomers receive (ADR-143)", () => {
+  describe("when the administrator picks the Developer seat", () => {
+    /** @scenario The joiner seat setting lands email joiners as Developers */
+    it("saves it beside the door setting and reports both halves", async () => {
+      const { service, settings } = harness({
+        policyEntitled: true,
+        setting: { domainJoin: "request", joinDomains: [] },
+      });
+
+      const change = await service.setJoining({
+        organizationId: "org_acme",
+        domainJoin: "request",
+        domains: [],
+        joinerRole: "DEVELOPER",
+      });
+
+      expect(settings.write).toHaveBeenCalledWith({
+        organizationId: "org_acme",
+        domainJoin: "request",
+        joinDomains: [],
+        joinerRole: "DEVELOPER",
+      });
+      expect(change).toMatchObject({
+        previousJoinerRole: "MEMBER",
+        nextJoinerRole: "DEVELOPER",
+      });
+    });
+  });
+
+  describe("when a save names no seat", () => {
+    /** @scenario The joiner seat setting is Full by default */
+    it("keeps the seat already saved", async () => {
+      const { service, settings } = harness({
+        policyEntitled: true,
+        setting: {
+          domainJoin: "request",
+          joinDomains: [],
+          joinerRole: "DEVELOPER",
+        },
+      });
+
+      await service.setJoining({
+        organizationId: "org_acme",
+        domainJoin: "off",
+        domains: [],
+      });
+
+      expect(settings.write).toHaveBeenCalledWith(
+        expect.objectContaining({ joinerRole: "DEVELOPER" }),
+      );
+    });
+  });
+});
+
+describe("given a request made from the terminal (langwatch login)", () => {
+  describe("when a colleague asks to join from the welcome screen the device page sent them to", () => {
+    /** @scenario A request made from the terminal lands as a Developer when approved */
+    it("stamps the origin on the request it makes", async () => {
+      const { service, requests } = harness();
+
+      await service.request({
+        userId: "user_sam",
+        verifiedEmail: "sam@acme.com",
+        organizationId: "org_acme",
+        origin: "cli",
+      });
+
+      expect(requests.requestJoin).toHaveBeenCalledWith(
+        expect.objectContaining({ origin: "cli" }),
+      );
+    });
+
+    /** @scenario A request made on the web keeps the organisation's joiner seat */
+    it("stamps a web origin when none is named, so every older caller is a web one", async () => {
+      const { service, requests } = harness();
+
+      await service.request({
+        userId: "user_sam",
+        verifiedEmail: "sam@acme.com",
+        organizationId: "org_acme",
+      });
+
+      expect(requests.requestJoin).toHaveBeenCalledWith(
+        expect.objectContaining({ origin: "web" }),
+      );
+    });
+  });
+
+  describe("when an administrator approves it with one click", () => {
+    /** @scenario A request made from the terminal lands as a Developer when approved */
+    it("lands a Developer although the joiner seat is Full, and says where the request came from", async () => {
+      const { service, membership } = harness({
+        held: pendingState({ origin: "cli" }),
+        setting: {
+          domainJoin: "request",
+          joinDomains: [],
+          joinerRole: "MEMBER",
+        },
+      });
+
+      await service.approve({
+        joinRequestId: "jreq_1",
+        organizationId: "org_acme",
+        adminUserId: "user_ana",
+      });
+
+      expect(membership.attachDefaultMembership).toHaveBeenCalledWith(
+        expect.objectContaining({
+          role: "DEVELOPER",
+          origin: "cli",
+          approvedByUserId: "user_ana",
+        }),
+      );
+    });
+
+    /** @scenario A request made on the web keeps the organisation's joiner seat */
+    it("lands the joiner seat for a request made on the web", async () => {
+      const { service, membership } = harness({
+        held: pendingState({ origin: "web" }),
+        setting: {
+          domainJoin: "request",
+          joinDomains: [],
+          joinerRole: "DEVELOPER",
+        },
+      });
+
+      await service.approve({
+        joinRequestId: "jreq_1",
+        organizationId: "org_acme",
+        adminUserId: "user_ana",
+      });
+
+      expect(membership.attachDefaultMembership).toHaveBeenCalledWith(
+        expect.objectContaining({ role: "DEVELOPER", origin: "web" }),
+      );
+    });
+  });
+
+  describe("when the door is automatic", () => {
+    /** @scenario A request made from the terminal walks in as a Developer where the door is automatic */
+    it("walks in as a Developer, deciding the seat from the request in hand rather than a row read back", async () => {
+      const { service, requests, membership, reads } = harness({
+        candidates: [
+          {
+            ...acme,
+            domainJoin: "auto",
+            autoJoinDomains: ["acme.com"],
+            domainProved: true,
+          },
+        ],
+        setting: {
+          domainJoin: "auto",
+          joinDomains: ["acme.com"],
+          joinerRole: "MEMBER",
+        },
+      });
+
+      const joined = await service.joinAutomaticallyIfAdmitted({
+        userId: "user_sam",
+        verifiedEmail: "sam@acme.com",
+        origin: "cli",
+      });
+
+      expect(joined?.organization.organizationId).toBe("org_acme");
+      expect(requests.requestJoin).toHaveBeenCalledWith(
+        expect.objectContaining({ origin: "cli" }),
+      );
+      // The projection row may not exist yet when the approval follows the
+      // request in the same breath, so the seat is never read back from it.
+      expect(reads.findRequest).not.toHaveBeenCalled();
+      expect(membership.attachDefaultMembership).toHaveBeenCalledWith(
+        expect.objectContaining({
+          role: "DEVELOPER",
+          origin: "cli",
+          approvedByUserId: null,
+        }),
+      );
+    });
+
+    /** @scenario Walking in still grants only the default role */
+    it("keeps the joiner seat for an arrival from the web", async () => {
+      const { service, membership } = harness({
+        candidates: [
+          {
+            ...acme,
+            domainJoin: "auto",
+            autoJoinDomains: ["acme.com"],
+            domainProved: true,
+          },
+        ],
+        setting: {
+          domainJoin: "auto",
+          joinDomains: ["acme.com"],
+          joinerRole: "MEMBER",
+        },
+      });
+
+      await service.joinAutomaticallyIfAdmitted({
+        userId: "user_sam",
+        verifiedEmail: "sam@acme.com",
+      });
+
+      expect(membership.attachDefaultMembership).toHaveBeenCalledWith(
+        expect.objectContaining({ role: "MEMBER", origin: "web" }),
+      );
+    });
+  });
+
+  describe("when an identity provider queued the arrival", () => {
+    it("records the request as a web one, because no terminal made it", async () => {
+      const { service, requests } = harness();
+
+      await service.requestFromSsoArrival({
+        userId: "user_sam",
+        organizationId: "org_acme",
+        domain: "acme.com",
+      });
+
+      expect(requests.requestJoin).toHaveBeenCalledWith(
+        expect.objectContaining({ origin: "web" }),
+      );
+    });
   });
 });

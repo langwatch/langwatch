@@ -1,4 +1,8 @@
-import { type Prisma, RoleBindingScopeType } from "~/generated/prisma/client";
+import {
+  OrganizationUserRole,
+  type Prisma,
+  RoleBindingScopeType,
+} from "~/generated/prisma/client";
 
 /**
  * Who effectively administers a team.
@@ -56,14 +60,29 @@ async function readTeamAdminPrincipals({
  */
 async function groupMemberUserIds({
   tx,
+  organizationId,
   groupIds,
 }: {
   tx: TxClient;
+  organizationId: string;
   groupIds: string[];
 }): Promise<string[]> {
   if (groupIds.length === 0) return [];
   const memberships = await tx.groupMembership.findMany({
-    where: { groupId: { in: groupIds } },
+    where: {
+      groupId: { in: groupIds },
+      // A Developer seat gets nothing through a group (ADR-143), so a
+      // Developer in an admin group administers nothing and must not count
+      // as the admin a team is left with.
+      user: {
+        orgMemberships: {
+          some: {
+            organizationId,
+            role: { not: OrganizationUserRole.DEVELOPER },
+          },
+        },
+      },
+    },
     select: { userId: true },
   });
   return memberships.map((m) => m.userId);
@@ -85,7 +104,11 @@ export async function computeEffectiveAdminUserIds({
   });
 
   const userIds = new Set<string>(directUserIds);
-  for (const id of await groupMemberUserIds({ tx, groupIds })) {
+  for (const id of await groupMemberUserIds({
+    tx,
+    organizationId,
+    groupIds,
+  })) {
     userIds.add(id);
   }
   return userIds;
@@ -119,7 +142,11 @@ export async function projectAdminUserIdsAfterDirectEdit({
     organizationId,
     teamId,
   });
-  for (const id of await groupMemberUserIds({ tx, groupIds })) {
+  for (const id of await groupMemberUserIds({
+    tx,
+    organizationId,
+    groupIds,
+  })) {
     userIds.add(id);
   }
   return userIds;
@@ -144,7 +171,18 @@ export async function isUserAdminViaGroup({
   if (groupIds.length === 0) return false;
 
   const count = await tx.groupMembership.count({
-    where: { userId, groupId: { in: groupIds } },
+    where: {
+      userId,
+      groupId: { in: groupIds },
+      user: {
+        orgMemberships: {
+          some: {
+            organizationId,
+            role: { not: OrganizationUserRole.DEVELOPER },
+          },
+        },
+      },
+    },
   });
   return count > 0;
 }

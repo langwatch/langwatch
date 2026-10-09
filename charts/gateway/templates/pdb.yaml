@@ -1,11 +1,42 @@
-{{- if .Values.podDisruptionBudget.enabled -}}
+{{- /*
+  The fewest pods the gateway runs: the HPA floor when autoscaling is on,
+  replicaCount otherwise. A budget over one pod can never let a drain evict
+  it, so node upgrades and autoscaler scale-downs hang; none is rendered
+  there. A budget that leaves no pod evictable at that floor is refused for
+  the same reason (admission policies reject it too).
+*/ -}}
+{{- $pdb := .Values.podDisruptionBudget | default dict }}
+{{- $replicas := int .Values.replicaCount }}
+{{- if .Values.autoscaling.enabled }}
+{{- $replicas = int .Values.autoscaling.minReplicas }}
+{{- end }}
+{{- if and $pdb.enabled (gt $replicas 1) }}
+{{- $minAvailable := $pdb.minAvailable }}
+{{- $maxUnavailable := 1 }}
+{{- if not (or (kindIs "invalid" $pdb.maxUnavailable) (eq (toString $pdb.maxUnavailable) "")) }}
+{{- $maxUnavailable = $pdb.maxUnavailable }}
+{{- end }}
+{{- $useMin := not (or (kindIs "invalid" $minAvailable) (eq (toString $minAvailable) "")) }}
+{{- if $useMin }}
+{{- if ge (include "gateway.pdbPods" (dict "value" $minAvailable "replicas" $replicas) | int) $replicas }}
+{{- fail (printf "podDisruptionBudget.minAvailable is %v with %d gateway pods, so no pod may ever be evicted and every node drain hangs. Use a value that keeps fewer than %d pods required, or podDisruptionBudget.maxUnavailable." $minAvailable $replicas $replicas) }}
+{{- end }}
+{{- else }}
+{{- if lt (include "gateway.pdbPods" (dict "value" $maxUnavailable "replicas" $replicas) | int) 1 }}
+{{- fail (printf "podDisruptionBudget.maxUnavailable is %v, so no pod may ever be evicted and every node drain hangs. Use 1 or more." $maxUnavailable) }}
+{{- end }}
+{{- end }}
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: {{ include "gateway.fullname" . }}
   labels: {{- include "gateway.labels" . | nindent 4 }}
 spec:
-  minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
+  {{- if $useMin }}
+  minAvailable: {{ $minAvailable }}
+  {{- else }}
+  maxUnavailable: {{ $maxUnavailable }}
+  {{- end }}
   selector:
     matchLabels: {{- include "gateway.selectorLabels" . | nindent 6 }}
 {{- end }}

@@ -141,7 +141,8 @@ Governance views are keyed by the organization's hidden `internal_governance` pr
 | `governance_daily_cost_rollup` | Daily cost rollups per tenant, provider and model, keyed by the org's internal_governance project; visible only to a caller whose project set includes it. | `costs`, `output` | one row per (TenantId, Day, CostSource, IngestionSourceId, Provider, Model, AgentId, CurrencyCode, RawActorId) | `Day` |
 | `governance_hourly_kpis` | Hourly spend and token KPIs per source, keyed by the org's internal_governance project; visible only to a caller whose project set includes it. | `costs` | one row per (TenantId, SourceId, HourBucket, TraceId) | `HourBucket` |
 | `governance_security_events` | Raw OCSF-shaped security events, keyed by the org's internal_governance project; visible only to a caller whose project set includes it. | `output` | one row per (TenantId, EventId) | `EventTime` |
-| `automation_events` | Audit log of automation trigger executions and actions | None | one row per EventId | `OccurredAt` |
+
+Automation firing history is not an analytics view. Read it per automation with [`GET /api/triggers/{id}/fires`](/api-reference/triggers/get-fires), `langwatch trigger fires <id>`, or the MCP tool `platform_list_trigger_fires`, each paged by cursor.
 
 #### Legacy
 

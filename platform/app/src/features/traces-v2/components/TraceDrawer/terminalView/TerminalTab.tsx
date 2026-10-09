@@ -2,6 +2,7 @@ import { Text, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
 import type { TranscriptEntry } from "~/server/app-layer/traces/coding-agent-transcript.derivation";
 import { api } from "~/utils/api";
+import { useTraceQueryArgs } from "../../../hooks/useTraceQueryArgs";
 import { TERMINAL_TOKENS } from "./palette";
 import { deriveSessionBanner } from "./sessionBanner";
 import { TerminalSkeleton } from "./TerminalSkeleton";
@@ -52,26 +53,11 @@ export function TerminalTab({
   sessionName,
   conversationId,
 }: TerminalTabProps) {
-  const transcriptQuery = api.tracesV2.codingAgentTranscript.useQuery(
-    { projectId, traceId, occurredAtMs },
-    { refetchOnWindowFocus: false, staleTime: 60_000 },
-  );
-
-  const spansQuery = api.tracesV2.spansFull.useQuery(
-    { projectId, traceId, occurredAtMs },
-    { refetchOnWindowFocus: false, staleTime: 60_000 },
-  );
-  const eventsQuery = api.tracesV2.traceEvents.useQuery(
-    { projectId, traceId, occurredAtMs },
-    { refetchOnWindowFocus: false, staleTime: 60_000 },
-  );
-  // The version/model/repo Claude Code itself would print above the prompt,
-  // off the resource attributes (the session fold deliberately carries no
-  // identity strings, ADR-041).
-  const resourceQuery = api.tracesV2.resourceInfo.useQuery(
-    { projectId, traceId, occurredAtMs },
-    { refetchOnWindowFocus: false, staleTime: 60_000 },
-  );
+  // On an aggregate, the member the drawer is on: the opened turn and the
+  // session's earlier turns are both read from it.
+  const { tenantId } = useTraceQueryArgs();
+  const { transcriptQuery, spansQuery, eventsQuery, resourceQuery } =
+    useTurnReads({ projectId, traceId, occurredAtMs, tenantId });
   const sessionCostUsd = useSessionCostUsd({ projectId, traceId });
 
   const toolSpans = useMemo(
@@ -94,6 +80,7 @@ export function TerminalTab({
 
   const session = useSessionScrollback({
     projectId,
+    tenantId,
     traceId,
     occurredAtMs,
     conversationId,
@@ -157,6 +144,41 @@ function TranscriptError() {
  * — stating this total beside it is what keeps a position-scoped number from
  * passing for the session total.
  */
+/**
+ * The opened turn's reads: its transcript, the spans and events that carry
+ * what its tools did, and the resource attributes behind the banner. On an
+ * aggregate every one names the member the drawer is on, so all of them come
+ * from the same member as the header (ADR-144 block F).
+ */
+function useTurnReads({
+  projectId,
+  traceId,
+  occurredAtMs,
+  tenantId,
+}: Pick<TerminalTabProps, "projectId" | "traceId" | "occurredAtMs"> & {
+  tenantId: string | null;
+}) {
+  const input = {
+    projectId,
+    traceId,
+    occurredAtMs,
+    ...(tenantId !== null ? { tenantId } : {}),
+  };
+  const options = { refetchOnWindowFocus: false, staleTime: 60_000 };
+  return {
+    transcriptQuery: api.tracesV2.codingAgentTranscript.useQuery(
+      input,
+      options,
+    ),
+    spansQuery: api.tracesV2.spansFull.useQuery(input, options),
+    eventsQuery: api.tracesV2.traceEvents.useQuery(input, options),
+    // The version/model/repo Claude Code itself would print above the
+    // prompt, off the resource attributes (the session fold deliberately
+    // carries no identity strings, ADR-041).
+    resourceQuery: api.tracesV2.resourceInfo.useQuery(input, options),
+  };
+}
+
 function useSessionCostUsd({
   projectId,
   traceId,

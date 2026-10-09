@@ -145,6 +145,7 @@ describe("the PR1 migration registry", () => {
     expect(migrationNames).toEqual([
       AUTHZ_ENGINE_MIGRATION_NAME,
       IDENTITY_CONNECTION_GRANDFATHER_MIGRATION_NAME,
+      "automations-slack-connections",
     ]);
   });
 });

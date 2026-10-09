@@ -92,6 +92,9 @@ export class App {
   readonly organizations: AppDependencies["organizations"];
   readonly projects: AppDependencies["projects"];
   readonly permissions: AppDependencies["permissions"];
+  readonly authorization: AppDependencies["authorization"];
+  readonly aggregateReadAudit: AppDependencies["aggregateReadAudit"];
+  readonly projectKinds: AppDependencies["projectKinds"];
   readonly tokenizer: AppDependencies["tokenizer"];
   readonly usage: AppDependencies["usage"];
   readonly planProvider: AppDependencies["planProvider"];
@@ -127,6 +130,9 @@ export class App {
     this.organizations = deps.organizations;
     this.projects = deps.projects;
     this.permissions = deps.permissions;
+    this.authorization = deps.authorization;
+    this.aggregateReadAudit = deps.aggregateReadAudit;
+    this.projectKinds = deps.projectKinds;
     this.tokenizer = deps.tokenizer;
     this.usage = deps.usage;
     this.planProvider = deps.planProvider;

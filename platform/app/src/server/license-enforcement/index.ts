@@ -1,7 +1,12 @@
 import type { PrismaClient } from "~/generated/prisma/client";
 import { getApp } from "../app-layer/app";
 import { LicenseEnforcementRepository } from "./license-enforcement.repository";
-import { LicenseEnforcementService } from "./license-enforcement.service";
+import {
+  LicenseEnforcementService,
+  type MinimalUser,
+} from "./license-enforcement.service";
+import type { LimitType } from "./types";
+import { getOrganizationIdForProject } from "./utils";
 
 export type { PlanProvider } from "../app-layer/subscription/plan-provider";
 export { LIMIT_TYPE_DISPLAY_LABELS, LIMIT_TYPE_LABELS } from "./constants";
@@ -36,5 +41,32 @@ export function createLicenseEnforcementService(
   return new LicenseEnforcementService(
     new LicenseEnforcementRepository(prisma),
     getApp().planProvider,
+    (organizationId) => getApp().usage.countScenarioSets(organizationId),
+  );
+}
+
+/**
+ * Refuses creating one more resource in a project when its organization's
+ * plan caps that resource type and the cap is reached. Plans that set no cap
+ * pass without counting.
+ *
+ * @throws LimitExceededError when the cap is reached
+ */
+export async function enforceCreationLimit({
+  prisma,
+  projectId,
+  limitType,
+  user,
+}: {
+  prisma: PrismaClient;
+  projectId: string;
+  limitType: LimitType;
+  user?: MinimalUser;
+}): Promise<void> {
+  const organizationId = await getOrganizationIdForProject(prisma, projectId);
+  await createLicenseEnforcementService(prisma).enforceLimit(
+    organizationId,
+    limitType,
+    user,
   );
 }

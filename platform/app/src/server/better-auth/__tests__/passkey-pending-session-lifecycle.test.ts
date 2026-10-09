@@ -158,7 +158,10 @@ describe("real BetterAuth proof-first passkey enrollment", () => {
     };
     let proofIsLive = false;
     const registration = new PasskeySignUpRegistration({
-      eligibility: { isAllowed: async () => true },
+      eligibility: {
+        isAllowed: async () => true,
+        policyAdmits: async () => true,
+      },
       directory: { findAddressHolder: async () => null },
       accounts: {
         createPasskeyUser: async () => ({ id: userId, created: true }),
@@ -289,7 +292,10 @@ describe("the taken-address guard, through the real plugin", () => {
       passkey: [],
     };
     const registration = new PasskeySignUpRegistration({
-      eligibility: { isAllowed: async () => true },
+      eligibility: {
+        isAllowed: async () => true,
+        policyAdmits: async () => true,
+      },
       directory: { findAddressHolder: async () => holder },
       accounts: {
         createPasskeyUser: async () => ({ id: "unused", created: true }),

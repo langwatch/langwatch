@@ -26,7 +26,8 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
  */
 interface AlertActionParams {
   members?: string[];
-  slackWebhook?: string;
+  slackIntegrationId?: string;
+  slackChannelId?: string;
   seriesName?: string;
 }
 
@@ -291,7 +292,8 @@ export const graphsRouter = createTRPCRouter({
           action: trigger.action,
           actionParams: {
             members: actionParams.members,
-            slackWebhook: actionParams.slackWebhook,
+            slackIntegrationId: actionParams.slackIntegrationId,
+            slackChannelId: actionParams.slackChannelId,
             seriesName: actionParams.seriesName,
           },
           triggerId: trigger.id,

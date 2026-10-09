@@ -8,7 +8,7 @@ import {
   type AgentParameterSpec,
 } from "@/client-sdk/services/agents/agents-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
+import { failSpinnerFromResponse } from "../../utils/failFromResponse";
 import { failSpinner } from "../../utils/spinnerError";
 import { buildAuthHeaders } from "@/internal/api/auth";
 import { parseRunParameterFlags } from "../../utils/keyValueFlags";
@@ -223,8 +223,7 @@ export const runAgentCommand = async (
       );
 
       if (!response.ok) {
-        const message = await formatFetchError(response);
-        failSpinner({ spinner: runSpinner, error: new Error(message), action: "run agent" });
+        await failSpinnerFromResponse({ spinner: runSpinner, response, action: "run agent" });
         process.exit(1);
       }
 

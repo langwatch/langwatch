@@ -9,6 +9,7 @@ import {
   getComplexProps,
   getDrawerPropsVersion,
   getFlowCallbacks,
+  splitAsPath,
   subscribeDrawerProps,
 } from "../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
@@ -44,7 +45,8 @@ export function CurrentDrawer({ marginTop }: { marginTop?: number }) {
     getDrawerPropsVersion,
   );
   const { organizationRole } = useOrganizationTeamProject();
-  const queryString = router.asPath.split("?")[1] ?? "";
+  // A `#fragment` after the query is not part of any drawer prop.
+  const { queryString } = splitAsPath(router.asPath);
   // qs.parse + the `drawer.*` slice is recomputed on every render otherwise,
   // handing the rendered drawer a fresh props object each time and cascading
   // a re-render through its subtree even when nothing drawer-relevant changed.

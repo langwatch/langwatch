@@ -8,6 +8,7 @@ import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
+import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 
 export type AnnotationResponse = components["schemas"]["Annotation"];
 
@@ -37,6 +38,7 @@ export class AnnotationsApiService {
     const message = formatApiErrorForOperation({ operation: operation, error: error, options: {
       status: extractStatusFromResponse(error),
     } });
+    throwIfHandledError({ operation, error, message });
     throw new AnnotationsApiError(message, operation, error);
   }
 

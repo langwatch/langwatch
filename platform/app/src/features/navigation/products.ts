@@ -6,6 +6,7 @@ import {
   UserRound,
   Waypoints,
 } from "lucide-react";
+import type { OrganizationUserRole } from "~/generated/prisma/client";
 import type { FrontendFeatureFlag } from "~/server/featureFlag/frontendFeatureFlags";
 
 /**
@@ -88,6 +89,31 @@ export const PRODUCTS: readonly ProductDefinition[] = [
     ],
   },
 ];
+
+/**
+ * Whether a seat may open a product at all, before any flag or permission
+ * is asked. A Developer (ADR-143) owns a personal project and nothing
+ * shared, and an organization-wide product is shared by definition:
+ * Gateway lists the organization's keys and Governance its people. The
+ * permission gates alone do not keep a Developer out, because the
+ * permissions are evaluated on the project in view, and inside their own
+ * project a Developer holds everything a member holds. So the seat is a
+ * gate of its own, read off the registry's scope, and every surface that
+ * offers or opens a product asks it: the switcher, the rail, the landing
+ * resolver and the page guard.
+ *
+ * Spec: specs/members/developer-seat.feature
+ */
+export function seatReachesProduct({
+  product,
+  organizationRole,
+}: {
+  product: Pick<ProductDefinition, "scopeKind">;
+  organizationRole: OrganizationUserRole | null | undefined;
+}): boolean {
+  if (organizationRole !== "DEVELOPER") return true;
+  return product.scopeKind !== "organization";
+}
 
 export function productById(id: ProductId): ProductDefinition {
   const product = PRODUCTS.find((candidate) => candidate.id === id);

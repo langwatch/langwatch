@@ -1,3 +1,4 @@
+import type { Authorization } from "@langwatch/actor";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { generateObject, generateText, type ModelMessage } from "ai";
@@ -13,6 +14,8 @@ const logger = createLogger("langwatch:ai-query");
 const MAX_ATTEMPTS = 3;
 export interface AiQueryInput {
   projectId: string;
+  /** The route's proof; the field catalogue's facet reads apply it. */
+  authorization: Authorization;
   prompt: string;
   timeRange: { from: number; to: number };
 }
@@ -658,6 +661,8 @@ export type SearchRouteDecision =
 
 export interface SearchRouteInput {
   projectId: string;
+  /** The route's proof; the field catalogue's facet reads apply it. */
+  authorization: Authorization;
   /** The sentence the user typed, bare words only. */
   text: string;
   timeRange: { from: number; to: number };
