@@ -4,6 +4,7 @@ import { fromDate, type Instant, toDate } from "@langwatch/time";
 import type {
   ConnectOrganizationRecord,
   ConnectOrganizationRepository,
+  OrganizationCustomerRecord,
 } from "../connect-organization.repository.ts";
 
 /**
@@ -37,6 +38,13 @@ export class PrismaConnectOrganizationRepository implements ConnectOrganizationR
       lastSyncAt: row.connectLastSyncAt === null ? null : fromDate(row.connectLastSyncAt),
       lastSyncError: row.connectLastSyncError,
     };
+  }
+
+  findCustomer(organizationId: string): Promise<OrganizationCustomerRecord | null> {
+    return this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { id: true, name: true, slug: true },
+    });
   }
 
   async findLicensedOrganizationIds(): Promise<string[]> {

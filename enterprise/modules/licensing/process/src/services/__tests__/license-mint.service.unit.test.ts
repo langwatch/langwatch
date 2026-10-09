@@ -35,10 +35,7 @@ function untouched<T extends object>(): T {
 }
 
 /** Organizations as a store: a write to one that is gone fails as the real one does. */
-class OrganizationStore implements Pick<
-  OrganizationApi,
-  "findProvisioningSummary" | "setLicense" | "clearLicense"
-> {
+class OrganizationStore implements Pick<OrganizationApi, "setLicense" | "clearLicense"> {
   readonly licenses = new Map<string, { licenseKey: string; expiresAt: Instant }>();
   readonly #rows = new Map<string, OrganizationProvisioningSummary>();
 
@@ -51,9 +48,7 @@ class OrganizationStore implements Pick<
     });
   }
 
-  async findProvisioningSummary(
-    organizationId: string,
-  ): Promise<OrganizationProvisioningSummary | null> {
+  async findCustomer(organizationId: string): Promise<OrganizationProvisioningSummary | null> {
     const row = this.#rows.get(organizationId) ?? null;
     if (this.goneBeforeWrite) this.#rows.delete(organizationId);
     return row;

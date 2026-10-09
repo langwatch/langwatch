@@ -14,8 +14,17 @@ export interface ConnectOrganizationRecord {
   readonly lastSyncError: string | null;
 }
 
+/** A licence customer as organization's table names it, read through its share (C3c, R40). */
+export interface OrganizationCustomerRecord {
+  readonly id: string;
+  readonly name: string;
+  readonly slug: string;
+}
+
 export interface ConnectOrganizationRepository {
   findById(organizationId: string): Promise<ConnectOrganizationRecord | null>;
+
+  findCustomer(organizationId: string): Promise<OrganizationCustomerRecord | null>;
 
   /** Every organization on this install that holds a license, of any kind. */
   findLicensedOrganizationIds(): Promise<string[]>;

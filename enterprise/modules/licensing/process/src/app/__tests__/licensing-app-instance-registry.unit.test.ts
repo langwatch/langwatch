@@ -4,17 +4,17 @@
  * The instance list names each install's customer through its own collaborators, not through
  * the licence registry.
  */
-import type { OrganizationApi } from "@langwatch/organization-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { nowInstant, Temporal } from "@langwatch/time";
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import { createTestLicensingApp } from "../../__tests__/testing.ts";
+import { MemoryConnectOrganizationRepository } from "../../repositories/memory/memory.connect-organization.repository.ts";
 import { MemorySelfHostedInstanceRepository } from "../../repositories/memory/memory.self-hosted-instance.repository.ts";
 import type { LicensingModule } from "../licensing.app.ts";
 
 const SEEN_AT = Temporal.Instant.from("2026-09-22T12:00:00Z");
-const KNOWN_ORGANIZATIONS = new Map([["org_acme", "Acme"]]);
+/** Customers as organization's shared table holds them: only Acme is known. */
+const KNOWN_ORGANIZATIONS = new Map([["org_acme", { id: "org_acme", name: "Acme", slug: "acme" }]]);
 
 async function installAttributedTo(
   organizationId: string,
@@ -42,18 +42,14 @@ async function installAttributedTo(
   return repository;
 }
 
-/** Customers as the organization feature answers them: only Acme is known. */
-const organizations = createApiFixture<OrganizationApi>({
-  findProvisioningSummary: async (id) => {
-    const name = KNOWN_ORGANIZATIONS.get(id);
-    return name === undefined ? null : { id, name, slug: id, createdAt: nowInstant() };
-  },
-});
-
 async function licensingListing(organizationId: string): Promise<LicensingModule> {
   return createTestLicensingApp({
-    repositories: { selfHostedInstances: await installAttributedTo(organizationId) },
-    dependencies: { organizations },
+    repositories: {
+      selfHostedInstances: await installAttributedTo(organizationId),
+      connectOrganizations: MemoryConnectOrganizationRepository.create({
+        customers: KNOWN_ORGANIZATIONS,
+      }),
+    },
     config: { isSaas: true },
     role: "worker",
   });
