@@ -140,7 +140,7 @@ func TestCheckPrereqsNeedsEveryBinaryOfACandidate(t *testing.T) {
 func TestInstallPrereqsRunsInDependencyOrder(t *testing.T) {
 	tools := &fakeTools{}
 	o := installOrchestrator(tools, &fakeStore{}, &fakeProxy{})
-	err := o.installPrereqsTo(context.Background(), &bytes.Buffer{}, []domain.Chosen{
+	_, err := o.installPrereqsTo(context.Background(), &bytes.Buffer{}, []domain.Chosen{
 		{Key: "redis", Candidate: "redis"},
 		{Key: "node", Candidate: "node"},
 	})
@@ -157,14 +157,15 @@ func TestInstallPrereqsExplainsTheManualEntryInsteadOfRunningIt(t *testing.T) {
 	tools := &fakeTools{}
 	o := installOrchestrator(tools, &fakeStore{}, &fakeProxy{})
 	var out bytes.Buffer
-	if err := o.installPrereqsTo(context.Background(), &out, []domain.Chosen{{Key: "brew", Candidate: "brew"}}); err != nil {
+	manual, err := o.installPrereqsTo(context.Background(), &out, []domain.Chosen{{Key: "brew", Candidate: "brew"}})
+	if err != nil {
 		t.Fatalf("a manual entry must not be an error: %v", err)
 	}
 	if len(tools.ran) != 0 {
 		t.Errorf("ran %v, want nothing — haven does not run the Homebrew installer", tools.ran)
 	}
-	if !strings.Contains(out.String(), "install.sh") {
-		t.Errorf("output must print the command to run by hand, got %q", out.String())
+	if len(manual) != 1 || !strings.Contains(manual[0].Command, "install.sh") {
+		t.Errorf("the command to run by hand must be handed back, got %+v", manual)
 	}
 }
 
@@ -172,7 +173,7 @@ func TestInstallPrereqsExplainsTheManualEntryInsteadOfRunningIt(t *testing.T) {
 func TestInstallPrereqsStopsAtTheFirstFailure(t *testing.T) {
 	tools := &fakeTools{failOn: "pnpm"}
 	o := installOrchestrator(tools, &fakeStore{}, &fakeProxy{})
-	err := o.installPrereqsTo(context.Background(), &bytes.Buffer{}, []domain.Chosen{
+	_, err := o.installPrereqsTo(context.Background(), &bytes.Buffer{}, []domain.Chosen{
 		{Key: "node", Candidate: "node"},
 		{Key: "pnpm", Candidate: "pnpm"},
 		{Key: "redis", Candidate: "redis"},
@@ -198,7 +199,7 @@ func TestInstallPortlessGoesThroughTheProxyAdapter(t *testing.T) {
 	proxy := &missingPortlessProxy{}
 	tools := &fakeTools{}
 	o := installOrchestrator(tools, &fakeStore{}, proxy)
-	if err := o.installPrereqsTo(context.Background(), &bytes.Buffer{}, []domain.Chosen{{Key: "portless", Candidate: "portless"}}); err != nil {
+	if _, err := o.installPrereqsTo(context.Background(), &bytes.Buffer{}, []domain.Chosen{{Key: "portless", Candidate: "portless"}}); err != nil {
 		t.Fatalf("InstallPrereqs: %v", err)
 	}
 	if proxy.installs != 1 {
@@ -250,7 +251,7 @@ func TestInstallingASkippedPrerequisiteClearsTheSkip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ResolvePrereqNames: %v", err)
 	}
-	if err := o.installPrereqsTo(context.Background(), &bytes.Buffer{}, chosen); err != nil {
+	if _, err := o.installPrereqsTo(context.Background(), &bytes.Buffer{}, chosen); err != nil {
 		t.Fatalf("InstallPrereqs: %v", err)
 	}
 	if o.PrereqSkips()["clickhouse-client"] {
@@ -333,7 +334,7 @@ func TestInstallPrereqsWithNothingChosenInstallsNothing(t *testing.T) {
 	tools := &fakeTools{}
 	o := installOrchestrator(tools, &fakeStore{}, &fakeProxy{})
 	var out bytes.Buffer
-	if err := o.installPrereqsTo(context.Background(), &out, nil); err != nil {
+	if _, err := o.installPrereqsTo(context.Background(), &out, nil); err != nil {
 		t.Fatalf("InstallPrereqs: %v", err)
 	}
 	if len(tools.ran) != 0 {
@@ -473,7 +474,7 @@ func reportEntry(t *testing.T, report []domain.PrereqStatus, key string) domain.
 	return domain.PrereqStatus{}
 }
 
-// @scenario "A small macOS accept queue is reported with the sysctl fix"
+// @scenario "A small macOS accept queue is reported and haven install sets it"
 func TestSomaxconnBelowTheFloorIsMissingWithTheSysctlFix(t *testing.T) {
 	cases := []struct {
 		value       string
@@ -496,8 +497,10 @@ func TestSomaxconnBelowTheFloorIsMissingWithTheSysctlFix(t *testing.T) {
 		}
 	}
 	c, _ := domain.LookupCandidate(prereqByKey(t, "somaxconn"), "somaxconn")
-	if !strings.Contains(c.Manual, "sudo sysctl kern.ipc.somaxconn=1024") {
-		t.Errorf("manual fix = %q, want the sysctl command", c.Manual)
+	for _, want := range []string{"sudo sysctl -w kern.ipc.somaxconn=1024", "/etc/sysctl.conf"} {
+		if !strings.Contains(c.Install, want) {
+			t.Errorf("install = %q, want it to contain %q", c.Install, want)
+		}
 	}
 }
 
@@ -528,7 +531,7 @@ func TestInstallPrereqsCarriesOnPastAFailedRecommendedRow(t *testing.T) {
 	tools := &fakeTools{failOn: "loki"}
 	o := installOrchestrator(tools, &fakeStore{}, &fakeProxy{})
 	var out bytes.Buffer
-	err := o.installPrereqsTo(context.Background(), &out, []domain.Chosen{
+	_, err := o.installPrereqsTo(context.Background(), &out, []domain.Chosen{
 		{Key: "observability", Candidate: "observability"},
 		{Key: "runtime", Candidate: "colima"},
 	})

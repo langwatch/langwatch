@@ -132,12 +132,13 @@ Feature: haven install checks the machine's prerequisites
       # a v1.64.8 binary satisfied nothing and refused the repo's v2 config,
       # so the report has to say so rather than reading as installed
 
-    Scenario: A small macOS accept queue is reported with the sysctl fix
+    Scenario: A small macOS accept queue is reported and haven install sets it
       Given the machine is macOS and kern.ipc.somaxconn is 128
       When the prerequisites are planned
       Then the accept queue is reported missing
-      And it prints `sudo sysctl kern.ipc.somaxconn=1024` and how to persist it
-      # vite cold loads through the proxy can 502 under bursts; haven never runs sudo
+      And installing it runs `sudo sysctl -w kern.ipc.somaxconn=1024` in the developer's terminal
+      And it writes the setting to /etc/sysctl.conf so it survives a reboot
+      # vite cold loads through the proxy can 502 under bursts
 
     Scenario: The accept queue is not checked off macOS
       Given the machine is not macOS

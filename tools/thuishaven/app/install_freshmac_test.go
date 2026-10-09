@@ -21,7 +21,7 @@ func TestAMissingHomebrewStopsTheRunItWouldHaveBrokenAnyway(t *testing.T) {
 	o := installOrchestrator(tools, &fakeStore{}, &fakeProxy{})
 	var out bytes.Buffer
 
-	err := o.installPrereqsTo(context.Background(), &out, []domain.Chosen{
+	manual, err := o.installPrereqsTo(context.Background(), &out, []domain.Chosen{
 		{Key: "brew", Candidate: "brew"},
 		{Key: "node", Candidate: "node"},
 		{Key: "redis", Candidate: "redis"},
@@ -36,8 +36,8 @@ func TestAMissingHomebrewStopsTheRunItWouldHaveBrokenAnyway(t *testing.T) {
 	if len(tools.ran) != 0 {
 		t.Errorf("ran %v; nothing below Homebrew can succeed until it exists", tools.ran)
 	}
-	if !strings.Contains(out.String(), "install.sh") {
-		t.Errorf("the official command must still be printed, got:\n%s", out.String())
+	if len(manual) != 1 || !strings.Contains(manual[0].Command, "install.sh") {
+		t.Errorf("the official command must still be handed back, got %+v", manual)
 	}
 }
 
@@ -47,11 +47,12 @@ func TestAMissingHomebrewStopsTheRunItWouldHaveBrokenAnyway(t *testing.T) {
 func TestAManualEntryOnItsOwnIsNotAFailure(t *testing.T) {
 	o := installOrchestrator(&fakeTools{}, &fakeStore{}, &fakeProxy{})
 	var out bytes.Buffer
-	if err := o.installPrereqsTo(context.Background(), &out, []domain.Chosen{{Key: "brew", Candidate: "brew"}}); err != nil {
+	manual, err := o.installPrereqsTo(context.Background(), &out, []domain.Chosen{{Key: "brew", Candidate: "brew"}})
+	if err != nil {
 		t.Fatalf("nothing depends on it here, so this is a clean run: %v", err)
 	}
-	if !strings.Contains(out.String(), "install.sh") {
-		t.Errorf("the command must be printed, got:\n%s", out.String())
+	if len(manual) != 1 || manual[0].Name != "Homebrew" || !strings.Contains(manual[0].Command, "install.sh") {
+		t.Errorf("the step must name Homebrew and its command, got %+v", manual)
 	}
 }
 

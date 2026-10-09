@@ -273,8 +273,8 @@ var Prereqs = []Prereq{{
 		Install: "npm install -g " + PortlessPackage(),
 	}},
 }, {
-	// A machine setting, not a tool: haven never runs sudo, so it prints the
-	// command. Cause traced in .claude/handoffs/haven-vite-502.md.
+	// A machine setting, not a tool. Installing it runs sudo in the
+	// developer's terminal, so the password prompt is their consent.
 	Key:         "somaxconn",
 	Name:        "Accept queue",
 	Summary:     fmt.Sprintf("at least %d, so vite cold loads through the proxy do not 502", SomaxconnFloor),
@@ -287,9 +287,10 @@ var Prereqs = []Prereq{{
 	Candidates: []Candidate{{
 		Key:   "somaxconn",
 		Label: "kern.ipc.somaxconn",
-		Manual: fmt.Sprintf("vite cold loads through the proxy can 502 under bursts: "+
-			"sudo sysctl kern.ipc.somaxconn=%d (lasts until reboot; to persist, "+
-			"add kern.ipc.somaxconn=%d to /etc/sysctl.conf)", SomaxconnFloor, SomaxconnFloor),
+		// Sets it now, and replaces any older line in /etc/sysctl.conf so it survives a reboot.
+		Install: fmt.Sprintf("sudo sysctl -w kern.ipc.somaxconn=%[1]d && "+
+			"{ sudo sed -i '' '/^kern\\.ipc\\.somaxconn/d' /etc/sysctl.conf 2>/dev/null; "+
+			"echo kern.ipc.somaxconn=%[1]d | sudo tee -a /etc/sysctl.conf >/dev/null; }", SomaxconnFloor),
 	}},
 }, {
 	Key:         "postgres",
