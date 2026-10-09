@@ -29,6 +29,8 @@ type exitCode int
 func (code exitCode) Error() string { return "exit status " + strconv.Itoa(int(code)) }
 func (code exitCode) ExitCode() int { return int(code) }
 
+var fixedPorts = Ports{App: "15560", Postgres: "15432", Redis: "16379", ClickHouse: "18123", Private: "18124"}
+
 func newTestDoors(t *testing.T, shape string, runner Runner) (*ComposeDoors, Plan) {
 	t.Helper()
 	release := "3.20.1"
@@ -36,7 +38,7 @@ func newTestDoors(t *testing.T, shape string, runner Runner) (*ComposeDoors, Pla
 		release = "main@abcdef1"
 	}
 	plan := mustBuild(t, shape, release, 1)
-	doors, err := NewComposeDoors(plan, DoorsOptions{Root: "/repo", Out: filepath.Join(t.TempDir(), "out"), Image: "old:image", Runner: runner})
+	doors, err := NewComposeDoors(plan, DoorsOptions{Root: "/repo", Out: filepath.Join(t.TempDir(), "out"), Image: "old:image", Runner: runner, Ports: fixedPorts})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,7 +99,7 @@ func TestDoorsAssembleTheEnvironment(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := string(data)
-	for _, want := range []string{"BASE_HOST=" + appURL + "\n", "IS_SAAS=true\n", "NEXTAUTH_SECRET=" + doors.env.Secrets["NEXTAUTH_SECRET"] + "\n"} {
+	for _, want := range []string{"BASE_HOST=" + fixedPorts.appURL() + "\n", "IS_SAAS=true\n", "NEXTAUTH_SECRET=" + doors.env.Secrets["NEXTAUTH_SECRET"] + "\n"} {
 		if !strings.Contains(text, want) {
 			t.Errorf("env file lacks %q", want)
 		}
@@ -177,9 +179,42 @@ func TestCaptureMetaNamesSecretsWithoutValues(t *testing.T) {
 			t.Errorf("scrub allow list lacks a test value")
 		}
 	}
-	targets := clickHouseTargets(doors.env)
+	targets := clickHouseTargets(doors.env, fixedPorts)
 	if len(targets) != 2 || targets["shared"] == "" || targets["private-snap"] == "" {
 		t.Errorf("clickhouse targets: %v", slices.Sorted(maps.Keys(targets)))
+	}
+}
+
+func TestDoorsPublishTheirPortsInTheOverride(t *testing.T) {
+	doors, _ := newTestDoors(t, "saas", &fakeRunner{})
+	data, err := os.ReadFile(filepath.Join(doors.runDir, "ports.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{`"15432:5432"`, `"16379:6379"`, `"18123:8123"`, `"18124:8123"`} {
+		if !strings.Contains(string(data), want) {
+			t.Errorf("ports.yml lacks %s:\n%s", want, data)
+		}
+	}
+}
+
+// @scenario "A generation run publishes its stores on ports no other run holds"
+func TestTwoRunsPickDisjointPorts(t *testing.T) {
+	plan := mustBuild(t, "sh-free", "3.20.1", 1)
+	seen := map[string]bool{}
+	for range 2 {
+		doors, err := NewComposeDoors(plan, DoorsOptions{Root: "/repo", Out: filepath.Join(t.TempDir(), "out"), Runner: &fakeRunner{}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = os.RemoveAll(doors.runDir) })
+		ports := doors.options.Ports
+		for _, port := range []string{ports.App, ports.Postgres, ports.Redis, ports.ClickHouse, ports.Private} {
+			if port == "" || seen[port] {
+				t.Errorf("port %q is empty or already held by another run: %+v", port, ports)
+			}
+			seen[port] = true
+		}
 	}
 }
 

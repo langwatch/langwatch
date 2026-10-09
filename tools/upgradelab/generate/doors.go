@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"maps"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -21,26 +22,47 @@ import (
 	"github.com/langwatch/langwatch/tools/upgradelab/snapshot"
 )
 
-// Host ports the compose override publishes; the doors and the capture reach the stack through them.
 const (
-	appPort        = "15560"
-	postgresPort   = "15432"
-	redisPort      = "16379"
-	clickHousePort = "18123"
-	privatePort    = "18124"
-	appURL         = "http://localhost:" + appPort
-	composeFile    = "dev/scripts/upgrade-rehearsal/compose.yml"
-	productSeeds   = "dev/scripts/upgrade-rehearsal/seed/product.mjs"
-	healthTimeout  = 10 * time.Minute
-	stderrTail     = 4096
+	composeFile   = "dev/scripts/upgrade-rehearsal/compose.yml"
+	productSeeds  = "dev/scripts/upgrade-rehearsal/seed/product.mjs"
+	healthTimeout = 10 * time.Minute
+	stderrTail    = 4096
 )
 
-const portsOverride = `services:
-  postgres: {ports: ["` + postgresPort + `:5432"]}
-  redis: {ports: ["` + redisPort + `:6379"]}
-  clickhouse: {ports: ["` + clickHousePort + `:8123"]}
-  clickhouse-private: {ports: ["` + privatePort + `:8123"]}
+// Ports are the host ports the compose override publishes; the doors and the capture reach the stack through them.
+type Ports struct{ App, Postgres, Redis, ClickHouse, Private string }
+
+// freePorts asks the OS for five distinct free loopback ports, holding all open until every one is read.
+// shortcut: a port can be taken between close and docker's bind; retry the run if compose reports it.
+func freePorts() (Ports, error) {
+	var found [5]string
+	listeners := make([]net.Listener, 0, len(found))
+	defer func() {
+		for _, listener := range listeners {
+			_ = listener.Close()
+		}
+	}()
+	for index := range found {
+		listener, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "127.0.0.1:0")
+		if err != nil {
+			return Ports{}, err
+		}
+		listeners = append(listeners, listener)
+		_, found[index], _ = net.SplitHostPort(listener.Addr().String())
+	}
+	return Ports{App: found[0], Postgres: found[1], Redis: found[2], ClickHouse: found[3], Private: found[4]}, nil
+}
+
+func (ports Ports) appURL() string { return "http://localhost:" + ports.App }
+
+func (ports Ports) override() string {
+	return `services:
+  postgres: {ports: ["` + ports.Postgres + `:5432"]}
+  redis: {ports: ["` + ports.Redis + `:6379"]}
+  clickhouse: {ports: ["` + ports.ClickHouse + `:8123"]}
+  clickhouse-private: {ports: ["` + ports.Private + `:8123"]}
 `
+}
 
 // Invocation is one child process: its argv, extra environment, stdin and working directory.
 type Invocation struct {
@@ -75,9 +97,11 @@ func (runner ExecRunner) Run(ctx context.Context, invocation Invocation) error {
 
 // DoorsOptions configures the compose doors. Root defaults to the working directory, Runner to an
 // ExecRunner logging to stderr; Out is the empty snapshot directory; Image is required for main@<sha>.
+// A zero Ports means free ports are picked per run; tests set it to fixed values.
 type DoorsOptions struct {
 	Root, Out, Image, Commit string
 	Runner                   Runner
+	Ports                    Ports
 }
 
 // ComposeDoors runs each step against dev/scripts/upgrade-rehearsal/compose.yml (profile old).
@@ -118,14 +142,18 @@ func NewComposeDoors(plan Plan, options DoorsOptions) (*ComposeDoors, error) {
 }
 
 func withDefaults(options DoorsOptions) (DoorsOptions, error) {
+	var err error
 	if options.Runner == nil {
 		options.Runner = ExecRunner{Log: os.Stderr}
 	}
-	if options.Root != "" {
-		return options, nil
+	if options.Ports == (Ports{}) {
+		if options.Ports, err = freePorts(); err != nil {
+			return options, err
+		}
 	}
-	root, err := os.Getwd()
-	options.Root = root
+	if options.Root == "" {
+		options.Root, err = os.Getwd()
+	}
 	return options, err
 }
 
@@ -141,14 +169,14 @@ func imageFor(release, override string) (string, error) {
 }
 
 func (doors *ComposeDoors) writeFiles() error {
-	if err := os.WriteFile(filepath.Join(doors.runDir, "shape.env"), []byte(envFileText(doors.env)), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(doors.runDir, "shape.env"), []byte(envFileText(doors.env, doors.options.Ports.appURL())), 0o600); err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(doors.runDir, "ports.yml"), []byte(portsOverride), 0o600)
+	return os.WriteFile(filepath.Join(doors.runDir, "ports.yml"), []byte(doors.options.Ports.override()), 0o600)
 }
 
 // envFileText is the shape's values and test secrets, its own origin pointed at the published app port.
-func envFileText(env seed.ShapeEnv) string {
+func envFileText(env seed.ShapeEnv, appURL string) string {
 	all := maps.Clone(env.Values)
 	maps.Copy(all, env.Secrets)
 	all["BASE_HOST"], all["NEXTAUTH_URL"] = appURL, appURL
@@ -174,7 +202,7 @@ func (doors *ComposeDoors) Run(ctx context.Context, plan Plan, step Step) error 
 		}
 	}
 	if step.Name == "old-release-up" {
-		return waitHealthy(ctx, appURL+"/api/health")
+		return waitHealthy(ctx, doors.options.Ports.appURL()+"/api/health")
 	}
 	return nil
 }
@@ -206,7 +234,7 @@ func (doors *ComposeDoors) compose(args ...string) Invocation {
 		"HEAD_IMAGE=" + doors.image, // the head profile never starts; compose still interpolates it
 		"REHEARSAL_ENV_FILE=" + filepath.Join(doors.runDir, "shape.env"),
 		"REHEARSAL_PROJECT=" + doors.project,
-		"OLD_APP_PORT=" + appPort,
+		"OLD_APP_PORT=" + doors.options.Ports.App,
 	}}
 }
 
@@ -221,7 +249,7 @@ func (doors *ComposeDoors) psql(sql string) Invocation {
 func (doors *ComposeDoors) productSeeds() []Invocation {
 	email, password := seedAccount(doors.seed)
 	node := Invocation{Args: []string{"node", filepath.Join(doors.options.Root, productSeeds), "seed"}, Dir: doors.options.Root, Env: []string{
-		"APP_BASE=" + appURL, "SEED_EMAIL=" + email, "SEED_PASSWORD=" + password, "SEED_LABEL=" + doors.project,
+		"APP_BASE=" + doors.options.Ports.appURL(), "SEED_EMAIL=" + email, "SEED_PASSWORD=" + password, "SEED_LABEL=" + doors.project,
 		"OUT=" + filepath.Join(doors.runDir, "product-seeds.json"),
 	}}
 	return []Invocation{doors.psql(accountSQL(doors.seed)), node}
@@ -248,7 +276,7 @@ func accountSQL(seedValue int64) string {
 func sqlString(value string) string { return "'" + strings.ReplaceAll(value, "'", "''") + "'" }
 
 func (doors *ComposeDoors) traffic(step Step) Invocation {
-	args := []string{"go", "run", "./cmd/workerrun", "-url", appURL, "-families", step.Args["families"],
+	args := []string{"go", "run", "./cmd/workerrun", "-url", doors.options.Ports.appURL(), "-families", step.Args["families"],
 		"-n", step.Args["n"], "-seed", step.Args["seed"], "-run-dir", filepath.Join(doors.runDir, step.Name)}
 	if step.Name == "traffic-at-cut" {
 		args = append(args, "-deadline", "20s", "-drain", "1s")
@@ -302,13 +330,13 @@ func (doors *ComposeDoors) capture(ctx context.Context, plan Plan) error {
 func (doors *ComposeDoors) stores() (snapshot.Stores, error) {
 	stores := snapshot.Stores{ClickHouse: map[string]snapshot.ClickHouse{}}
 	var err error
-	if stores.Postgres, err = snapshot.NewPostgresCLI("postgresql://prisma:prisma@localhost:" + postgresPort + "/mydb?schema=mydb"); err != nil {
+	if stores.Postgres, err = snapshot.NewPostgresCLI("postgresql://prisma:prisma@localhost:" + doors.options.Ports.Postgres + "/mydb?schema=mydb"); err != nil {
 		return stores, err
 	}
-	if stores.Redis, err = snapshot.NewRedisRESP("redis://localhost:" + redisPort + "/0"); err != nil {
+	if stores.Redis, err = snapshot.NewRedisRESP("redis://localhost:" + doors.options.Ports.Redis + "/0"); err != nil {
 		return stores, err
 	}
-	for target, raw := range clickHouseTargets(doors.env) {
+	for target, raw := range clickHouseTargets(doors.env, doors.options.Ports) {
 		if stores.ClickHouse[target], err = snapshot.NewClickHouseHTTP(raw); err != nil {
 			return stores, err
 		}
@@ -318,12 +346,12 @@ func (doors *ComposeDoors) stores() (snapshot.Stores, error) {
 
 // clickHouseTargets is shared plus one private-<label> per CLICKHOUSE_URL__<label>__<org> route.
 // shortcut: every label maps to the one clickhouse-private container; add containers when a shape routes two.
-func clickHouseTargets(env seed.ShapeEnv) map[string]string {
-	targets := map[string]string{"shared": "http://default:langwatch@localhost:" + clickHousePort + "/langwatch"}
+func clickHouseTargets(env seed.ShapeEnv, ports Ports) map[string]string {
+	targets := map[string]string{"shared": "http://default:langwatch@localhost:" + ports.ClickHouse + "/langwatch"}
 	for _, name := range env.SecretNames {
 		if rest, ok := strings.CutPrefix(name, "CLICKHOUSE_URL__"); ok {
 			label, _, _ := strings.Cut(rest, "__")
-			targets["private-"+label] = "http://default:langwatch@localhost:" + privatePort + "/langwatch"
+			targets["private-"+label] = "http://default:langwatch@localhost:" + ports.Private + "/langwatch"
 		}
 	}
 	return targets

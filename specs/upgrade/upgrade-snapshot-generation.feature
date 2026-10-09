@@ -79,3 +79,9 @@ Feature: Generating a typical upgrade snapshot from an old release
     When I execute a plan
     Then the run stops with an error naming "product-seeds"
     And no later door ran
+
+  @unit
+  Scenario: A generation run publishes its stores on ports no other run holds
+    Given two generation runs planned at the same time
+    When each builds its doors
+    Then the app and the four store ports are all different across both runs
