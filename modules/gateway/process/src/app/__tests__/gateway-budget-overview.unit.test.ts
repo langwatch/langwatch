@@ -1,8 +1,3 @@
-/**
- * @vitest-environment node
- * `GatewayModule.budgetOverviewForUser`: delegates to `BudgetOverviewService`
- * and proves it stays scoped to the caller's own organization.
- */
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { type OrganizationApi, TeamNotFoundError } from "@langwatch/organization-contract";
 import { ResourceScope } from "@langwatch/process";
@@ -10,6 +5,12 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+/**
+ * @vitest-environment node
+ * `GatewayModule.budgetOverviewForUser`: delegates to `BudgetOverviewService`
+ * and proves it stays scoped to the caller's own organization.
+ */
+import { MemoryGatewayChannels } from "../../channels/memory/memory.gateway.channels.ts";
 import { MemoryGatewayRepositories } from "../../repositories/memory/memory.gateway.repositories.ts";
 import { GatewayModule } from "../gateway.app.ts";
 
@@ -56,6 +57,7 @@ async function gatewayAppStub() {
   const virtualKeyReads = vi.spyOn(repositories.virtualKeys, "findAllInOrganization");
   const budgetReads = vi.spyOn(repositories.budgets, "resolveApplicableBudgets");
   const app = await GatewayModule.create({
+    channels: MemoryGatewayChannels.create(),
     dependencies: {
       authz: peer("authz"),
       projects: projectsStub({}),

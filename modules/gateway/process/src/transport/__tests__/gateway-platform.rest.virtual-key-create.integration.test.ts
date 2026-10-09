@@ -1,10 +1,3 @@
-/**
- * The platform family's virtual-key create over the real application on its memory twins: the
- * route declares the wire, the service the mint and the authorization asks what the credential
- * holds, so each refusal is the production one.
- * @vitest-environment node
- * @see specs/ai-gateway/public-rest-api.feature
- */
 import { ProjectMissingCredentialsError } from "@langwatch/api";
 import {
   bindRestMiddleware,
@@ -23,6 +16,14 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { GatewayModule } from "../../app/gateway.app.ts";
+/**
+ * The platform family's virtual-key create over the real application on its memory twins: the
+ * route declares the wire, the service the mint and the authorization asks what the credential
+ * holds, so each refusal is the production one.
+ * @vitest-environment node
+ * @see specs/ai-gateway/public-rest-api.feature
+ */
+import { MemoryGatewayChannels } from "../../channels/memory/memory.gateway.channels.ts";
 import { MemoryGatewayRepositories } from "../../repositories/memory/memory.gateway.repositories.ts";
 import { MemoryGatewayStore } from "../../repositories/memory/memory.gateway.store.ts";
 import {
@@ -103,6 +104,7 @@ async function mountedCreate(
         };
   };
   const app = await GatewayModule.create({
+    channels: MemoryGatewayChannels.create(),
     dependencies: {
       authz: createApiFixture<AuthzApi>({
         hasApiKeyPermission: async (input) =>

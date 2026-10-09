@@ -8,6 +8,7 @@ import { defineProcessModule, type PublishedProcessModule } from "@langwatch/pro
 import type { ScenarioApi, ScenarioServerConfig } from "@langwatch/scenario-contract";
 
 import { ScenarioModule } from "./app/scenario.app.ts";
+import { scenarioChannels } from "./channels/scenario-channels.registry.ts";
 import { scenarioLifecycleEventing } from "./eventing/scenario-lifecycle.pipeline.ts";
 import { simulationProcessingEventing } from "./eventing/simulation-processing.pipeline.ts";
 import { scenarioRepositories } from "./repositories/scenario-repositories.registry.ts";
@@ -29,6 +30,7 @@ export const scenarioProcessModule: PublishedProcessModule<
   ScenarioServerConfig
 > = defineProcessModule("scenario")
   .withRepositories(scenarioRepositories)
+  .withChannels(scenarioChannels)
   .withApi(ScenarioModule)
   .withTransports(
     createScenarioRest(),

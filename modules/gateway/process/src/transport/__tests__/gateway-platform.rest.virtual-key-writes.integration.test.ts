@@ -1,9 +1,3 @@
-/**
- * The platform family's virtual-key writes over the real application on its memory twins: the
- * route declares the wire, the service the write, and the stored row answers what was changed.
- * @vitest-environment node
- * @see specs/ai-gateway/public-rest-api.feature
- */
 import {
   bindRestMiddleware,
   canonicalErrorResponse,
@@ -21,6 +15,13 @@ import { z } from "zod";
 
 import { memoryVirtualKeySeed } from "../../__tests__/support/gateway-memory-seeds.fixture.ts";
 import { GatewayModule } from "../../app/gateway.app.ts";
+/**
+ * The platform family's virtual-key writes over the real application on its memory twins: the
+ * route declares the wire, the service the write, and the stored row answers what was changed.
+ * @vitest-environment node
+ * @see specs/ai-gateway/public-rest-api.feature
+ */
+import { MemoryGatewayChannels } from "../../channels/memory/memory.gateway.channels.ts";
 import { MemoryGatewayRepositories } from "../../repositories/memory/memory.gateway.repositories.ts";
 import { MemoryGatewayStore } from "../../repositories/memory/memory.gateway.store.ts";
 import {
@@ -66,6 +67,7 @@ async function mountedKeyWrites() {
     traceProjectId: PROJECT_ID,
   });
   const real = await GatewayModule.create({
+    channels: MemoryGatewayChannels.create(),
     dependencies: {
       authz: createApiFixture<AuthzApi>({}),
       projects: createApiFixture<ProjectApi>({

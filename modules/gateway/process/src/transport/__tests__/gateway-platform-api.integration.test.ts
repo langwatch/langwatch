@@ -18,6 +18,7 @@ import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis"
 import { describe, expect, it } from "vitest";
 
 import { GatewayModule } from "../../app/gateway.app.ts";
+import { MemoryGatewayChannels } from "../../channels/memory/memory.gateway.channels.ts";
 import { LiveGatewayRepositories } from "../../repositories/live/live.gateway.repositories.ts";
 import {
   gatewayKeyCaller,
@@ -56,6 +57,7 @@ async function mount() {
     virtualKey: { findFirst: async () => null },
   });
   const app = await GatewayModule.create({
+    channels: MemoryGatewayChannels.create(),
     dependencies: {
       authz: createApiFixture<AuthzApi>({}),
       projects: createApiFixture<ProjectApi>({

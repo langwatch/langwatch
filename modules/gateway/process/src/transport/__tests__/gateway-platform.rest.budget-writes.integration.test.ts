@@ -1,9 +1,3 @@
-/**
- * The platform family's budget routes over the real application on its memory twins: what a
- * create writes is what the list reads, and an archive keeps the ledger it was charged against.
- * @vitest-environment node
- * @see specs/ai-gateway/public-rest-api.feature
- */
 import {
   bindRestMiddleware,
   canonicalErrorResponse,
@@ -25,6 +19,13 @@ import {
   memoryVirtualKeySeed,
 } from "../../__tests__/support/gateway-memory-seeds.fixture.ts";
 import { GatewayModule } from "../../app/gateway.app.ts";
+/**
+ * The platform family's budget routes over the real application on its memory twins: what a
+ * create writes is what the list reads, and an archive keeps the ledger it was charged against.
+ * @vitest-environment node
+ * @see specs/ai-gateway/public-rest-api.feature
+ */
+import { MemoryGatewayChannels } from "../../channels/memory/memory.gateway.channels.ts";
 import { MemoryGatewayRepositories } from "../../repositories/memory/memory.gateway.repositories.ts";
 import {
   MemoryGatewayStore,
@@ -107,6 +108,7 @@ async function mountedBudgets() {
     memoryVirtualKeySeed({ id: KEY_ID, name: "demo", organizationId: ORGANIZATION_ID }),
   );
   const real = await GatewayModule.create({
+    channels: MemoryGatewayChannels.create(),
     dependencies: {
       authz: createApiFixture<AuthzApi>({}),
       projects: createApiFixture<ProjectApi>({

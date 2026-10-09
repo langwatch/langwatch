@@ -16,6 +16,7 @@ import { initTRPC } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 
 import { GatewayModule } from "../../app/gateway.app.ts";
+import { MemoryGatewayChannels } from "../../channels/memory/memory.gateway.channels.ts";
 import { MemoryGatewayRepositories } from "../../repositories/memory/memory.gateway.repositories.ts";
 import { MemoryGatewayStore } from "../../repositories/memory/memory.gateway.store.ts";
 import { gatewaySessionFact, virtualKeyTrpcTransport } from "../virtual-key.trpc.ts";
@@ -41,6 +42,7 @@ async function mountedCreate({ stashed }: { stashed: StashRevealInput[] }) {
     archivedAt: null,
   };
   const app = await GatewayModule.create({
+    channels: MemoryGatewayChannels.create(),
     dependencies: {
       authz: createApiFixture<AuthzApi>({ hasPermission: async () => true }),
       projects: createApiFixture<ProjectApi>({

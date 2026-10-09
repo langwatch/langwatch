@@ -10,6 +10,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { memoryVirtualKeySeed } from "../../__tests__/support/gateway-memory-seeds.fixture.ts";
+import { MemoryGatewayChannels } from "../../channels/memory/memory.gateway.channels.ts";
 import { MemoryGatewayRepositories } from "../../repositories/memory/memory.gateway.repositories.ts";
 import { MemoryGatewayStore } from "../../repositories/memory/memory.gateway.store.ts";
 import { GatewayModule } from "../gateway.app.ts";
@@ -38,6 +39,7 @@ async function gatewayHolding({ updateAt }: { updateAt: string[] }) {
       updateAt.includes(input.projectId),
   );
   const app = await GatewayModule.create({
+    channels: MemoryGatewayChannels.create(),
     dependencies: {
       authz: createApiFixture<AuthzApi>({ hasPermission }),
       projects: createApiFixture<ProjectApi>({

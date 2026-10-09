@@ -14,6 +14,7 @@ import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { MemoryGatewayChannels } from "../../channels/memory/memory.gateway.channels.ts";
 import { MemoryGatewayRepositories } from "../../repositories/memory/memory.gateway.repositories.ts";
 import { GatewayModule } from "../gateway.app.ts";
 
@@ -42,6 +43,7 @@ const noSecrets = new ScopedSecrets(async (_handle, build) => build(undefined));
 
 async function gatewayApp(): Promise<GatewayModule> {
   return GatewayModule.create({
+    channels: MemoryGatewayChannels.create(),
     dependencies: {
       authz: createApiFixture<AuthzApi>({ hasApiKeyPermission, hasPermission }),
       projects: createApiFixture<ProjectApi>({ findOrganizationId, findIdentity: findProject }),
