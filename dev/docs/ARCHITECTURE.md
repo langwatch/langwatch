@@ -800,6 +800,11 @@ dependency; `main.ts` never touches lifecycle:
   phase.
 - Eventing consumers (role worker) register drain-first — which makes "the
   worker drains before the api's graph closes under it" a structural fact.
+  The consumers service's stop calls `EventingHost.stopConsumers()`, so
+  in-flight batches finish before feature Apis close (Alex, 2026-10-09).
+- An api process calls `server.expectApplication()` before it opens liveness:
+  until its routes mount, a product path answers 503 with `Retry-After`, never
+  an empty 404 (Alex, 2026-10-09).
 - Module services start in dependency order; teardown registers in reverse.
 
 |                    | knows about                                                 |
