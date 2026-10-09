@@ -25,6 +25,12 @@ export type JoinOfferProps = {
   origin?: "web" | "cli";
 };
 
+/** What the organization form hands the way back to the team, below the form (onboarding). */
+export type JoinInsteadProps = {
+  /** Where a request made from here comes from, as for the join offer. */
+  origin?: "web" | "cli";
+};
+
 /** What organization's Authentication overview hands each card a peer lends it. */
 export type AuthenticationOverviewCardProps = {
   organizationId: string;
@@ -55,6 +61,7 @@ export const PersonDrawerToken = organization.drawer<UiPersonDrawerProps>("perso
 export const AuthenticationOverviewCardToken =
   organization.extension<AuthenticationOverviewCardProps>("authenticationOverviewCard");
 export const JoinOfferToken = organization.component<JoinOfferProps>("joinOffer");
+export const JoinInsteadToken = organization.component<JoinInsteadProps>("joinInstead");
 export const ProjectDepartmentFieldToken =
   organization.component<ProjectDepartmentFieldProps>("projectDepartmentField");
 export const PendingJoinRequestsToken =

@@ -25,6 +25,7 @@ export type JoinOfferView =
  */
 export function joinOfferView({
   decision,
+  lookup,
   waitingOn,
   currentOrganizationId,
   invitation = null,
@@ -32,6 +33,8 @@ export function joinOfferView({
   admitting = false,
 }: {
   decision: JoinLookupDecision | undefined;
+  /** Sign-up's lookup, which a decline does not close: it still names what is waited on. */
+  lookup?: JoinLookupDecision;
   waitingOn: readonly { organizationId: string }[];
   currentOrganizationId: string | null;
   /** Only the welcome screen is handed one; it leads even over an open request. */
@@ -50,7 +53,9 @@ export function joinOfferView({
   if (waiting) {
     return {
       kind: "waiting",
-      organizationName: organizationNameFor({ decision, organizationId: waiting.organizationId }),
+      organizationName:
+        organizationNameFor({ decision, organizationId: waiting.organizationId }) ??
+        organizationNameFor({ decision: lookup, organizationId: waiting.organizationId }),
     };
   }
 
@@ -83,6 +88,11 @@ function organizationNameFor({
   decision: JoinLookupDecision | undefined;
   organizationId: string;
 }): string | null {
+  if (decision?.outcome === "auto") {
+    return decision.organization.organizationId === organizationId
+      ? decision.organization.name
+      : null;
+  }
   if (decision?.outcome !== "ask") return null;
   return (
     decision.organizations.find((offer) => offer.organizationId === organizationId)?.name ?? null

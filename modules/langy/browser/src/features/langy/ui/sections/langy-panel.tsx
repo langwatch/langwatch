@@ -714,7 +714,6 @@ function LangyPanel({
                   closePanel();
                 }}
                 // Beside a drawer, the drawer owns the only close affordance on screen.
-                hideClose={placement.isDrawerCompanion}
                 historyOpen={historyOpen}
                 onToggleHistory={() => setHistoryOpen((open) => !open)}
                 devMode={inspector.devMode}
@@ -840,7 +839,6 @@ function PanelHeader({
   workspaceChip,
   onNewChat,
   onClose,
-  hideClose,
   historyOpen,
   onToggleHistory,
   devMode: _devMode,
@@ -853,8 +851,6 @@ function PanelHeader({
   workspaceChip?: ReactNode;
   onNewChat: () => void;
   onClose: () => void;
-  /** Hide the Minimise control (drawer companion: the drawer owns the only X). */
-  hideClose: boolean;
   /** The recents list has taken over the panel body. */
   historyOpen: boolean;
   onToggleHistory: () => void;
@@ -960,42 +956,33 @@ function PanelHeader({
 
           <LangyOverflowMenu devDrawerOpen={devDrawerOpen} onToggleDevDrawer={onToggleDevDrawer} />
 
-          {/* Hidden beside a drawer, whose own X is the single close. Says "minimise" since the
-              panel stays mounted and just sinks to a header sliver. */}
-          {hideClose ? null : (
-            <>
-              <Box
-                width="1px"
-                alignSelf="stretch"
-                marginY="4px"
-                marginX="3px"
-                background="border"
-              />
+          {/* Says "minimise" since the panel stays mounted and sinks to a header sliver. */}
+          <>
+            <Box width="1px" alignSelf="stretch" marginY="4px" marginX="3px" background="border" />
 
-              <Tooltip
-                content={
-                  <HStack gap={2}>
-                    <Text>Minimise</Text>
-                    <HStack gap={1}>
-                      <Kbd>⌘</Kbd>
-                      <Kbd>I</Kbd>
-                    </HStack>
+            <Tooltip
+              content={
+                <HStack gap={2}>
+                  <Text>Minimise</Text>
+                  <HStack gap={1}>
+                    <Kbd>⌘</Kbd>
+                    <Kbd>I</Kbd>
                   </HStack>
-                }
-                positioning={{ placement: "bottom" }}
+                </HStack>
+              }
+              positioning={{ placement: "bottom" }}
+            >
+              <IconButton
+                size="xs"
+                variant="ghost"
+                aria-label="Minimise Langy"
+                color="fg.muted"
+                onClick={onClose}
               >
-                <IconButton
-                  size="xs"
-                  variant="ghost"
-                  aria-label="Minimise Langy"
-                  color="fg.muted"
-                  onClick={onClose}
-                >
-                  <Minus size={15} />
-                </IconButton>
-              </Tooltip>
-            </>
-          )}
+                <Minus size={15} />
+              </IconButton>
+            </Tooltip>
+          </>
         </HStack>
       </HStack>
       <Separator />
