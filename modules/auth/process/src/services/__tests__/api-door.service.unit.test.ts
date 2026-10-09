@@ -23,6 +23,7 @@ const PROJECT = {
   organizationId: "org-1",
   isPersonal: false,
   ownerUserId: null,
+  kind: "application",
 };
 
 function projectKey(

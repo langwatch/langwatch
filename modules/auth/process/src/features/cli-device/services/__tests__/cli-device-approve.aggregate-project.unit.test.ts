@@ -30,6 +30,7 @@ describe("CliDeviceFlowService.approveDeviceCode", () => {
                 id: "project-1",
                 slug: "rollup",
                 name: "Rollup",
+                teamId: "team-1",
                 isPersonal: false,
                 ownerUserId: null,
                 kind: "aggregate",
