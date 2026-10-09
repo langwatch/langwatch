@@ -65,8 +65,8 @@ peer fixtures.
 
 The Prisma repository claims Agent and keeps generated Prisma types private.
 Workflow owns graph queries and copying, Project owns project paths, User owns
-profiles, and AuditLog owns history queries and its historical system migration.
-Agent never joins their tables through its repository.
+profiles, and AuditLog owns history queries (its agent audit-id repair task retired
+with R6, 2026-10-08). Agent never joins their tables through its repository.
 
 Connected identity registration converges on the project/identity unique key,
 preserves the original ID and revives archived rows. The repository handles a
