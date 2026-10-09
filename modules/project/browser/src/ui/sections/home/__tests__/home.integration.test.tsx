@@ -88,7 +88,6 @@ import {
   ProjectHomeHostProvider,
   ProjectHomeHost,
   type ProjectHomeDeployment,
-  type ProjectHomeFlagReading,
   type ProjectHomeLangyVisibility,
   type ProjectHomeOrganization,
   type ProjectHomeProject,
@@ -116,9 +115,6 @@ class StubProjectHomeHost extends ProjectHomeHost {
   }
   hasPermission(): boolean {
     return false;
-  }
-  featureFlag(): ProjectHomeFlagReading {
-    return { enabled: false, isLoading: false };
   }
   langyVisibility(): ProjectHomeLangyVisibility {
     return { show: gates.langy, isResolving: false };
