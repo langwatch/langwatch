@@ -28,7 +28,7 @@ Shapes: self-hosted · cloud · cloud hybrid (tenants on their own ClickHouse an
 | Monitor evaluations | Dated at the evaluated trace's end; alerts judge staleness by processing time |
 | Seed | Q1 optional in-process trace backdate · Q2 span time for monitor evaluations · Q3 fixed-id private orgs before boot · Q4 per-org plan and a higher haven default · Q5 branch then main · Q6 tracking issue if one exists, else summary · Q7 every kind on `haven up` |
 | Secrets | 1Password is best effort: one probe, parallel reads, skip with a warning |
-| Stripe | Local and CI billing run against paymentsim. A failed renewal (`past_due`) cancels the plan at once, as on main; kept for now |
+| Stripe | Local and CI billing run against paymentsim; a developer's own Stripe keys, when set, are used instead. A failed renewal (`past_due`) cancels the plan at once, as on main; kept for now |
 | Keys from main | Legacy project keys and ownerless keys keep the full project access they had on main; new projects no longer get a legacy project key |
 | Retention loop | Gateway and Instant Eval get tenant retention by cutting licensing's calls into them over to events (no peer cycle) |
 | SaaS image | Migration is the upgrade system's (the worker upgrades under its lease); the image lane's other defaults stand in the draft SaaS PR |
@@ -61,7 +61,7 @@ Shapes: self-hosted · cloud · cloud hybrid (tenants on their own ClickHouse an
 | Upgrade e2e harness | First proven cell (cloud, no hybrid, small) with overlap; verdicts per invariant into #8553 |
 | UPG-003 | Legacy and ownerless main keys keep main's access; no legacy key for new projects |
 | Retention loop | C3 cuts licensing's edges: C3a-S1 (connect module, lane running) removes licensing → Instant Eval; C3b-3 (after S1; fingerprint fact, ruled) and C3a-S2/S3 remove licensing → gateway. Then apply the saved retention patch (local handoff `gw-ie-retention.patch`) |
-| Haven | Paymentsim is Stripe on every stack (opt-out only); `haven seed` returns logins and made-up credentials; skills updated |
+| Haven | Stripe is paymentsim unless the developer sets their own Stripe keys, which are then used; `haven seed` returns logins and made-up credentials; skills updated |
 | Upgrade cells 2 | Hybrid small (UP-04), self-hosted small (UP-06), drills |
 
 ## 5. Next, in order
