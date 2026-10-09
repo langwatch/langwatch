@@ -701,9 +701,12 @@ var baseTable = []commandSpec{
 		run:     runUpgrade,
 	},
 	{
-		name:   "daemon",
-		hidden: true,
-		run:    func(ctx context.Context, d deps, _ invocation) error { return d.orch.RunDaemon(ctx, d.dash) },
+		name:    "daemon",
+		args:    "[restart]",
+		maxArgs: 1,
+		flags:   []flagSpec{{long: "--after", takesValue: true, value: "<pid>", summary: "wait for this daemon to exit, then take over"}},
+		hidden:  true,
+		run:     runDaemon,
 	},
 }
 
