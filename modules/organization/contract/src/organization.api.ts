@@ -384,8 +384,6 @@ export interface OrganizationApi {
   /** The self-hosted provisioning door's read: one organization's summary, or `not_found`. */
   getProvisioningSummary(organizationId: string): Promise<OrganizationProvisioningSummary>;
   deleteProvisionedOrganization(input: { organizationId: string }): Promise<void>;
-  /** A self-hosted licence customer: the organization and its first team, marked. */
-  createSelfHostedCustomer(input: { name: string }): Promise<{ id: string; name: string }>;
   markSelfHostedCustomer(input: { organizationId: string }): Promise<void>;
   /** Every organization an operator marked as a self-hosted licence customer. */
   findSelfHostedCustomers(): Promise<{ organizationId: string; organizationName: string }[]>;

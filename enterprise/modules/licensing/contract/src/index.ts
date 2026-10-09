@@ -31,3 +31,4 @@ export * from "./license-registry.ts";
 export * from "./license-registry.errors.ts";
 export * from "./license-sync.ts";
 export * from "./self-hosted-instance.ts";
+export * from "./licensing-customer.events.ts";

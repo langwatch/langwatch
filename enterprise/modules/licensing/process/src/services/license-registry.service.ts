@@ -27,6 +27,8 @@ import {
   type SignedIssuedLicense,
   type ConnectService,
 } from "@langwatch/enterprise-licensing-contract";
+import { generate } from "@langwatch/ksuid";
+import { ORGANIZATION_KSUID_RESOURCE } from "@langwatch/organization-contract";
 import { licenseSeats } from "@langwatch/plans";
 import { Temporal, toDate, type Instant } from "@langwatch/time";
 
@@ -91,7 +93,10 @@ export class LicenseRegistryService {
     // Marked before the row exists. A license is handed over once, so the row
     // must be the last write that can fail: the other order loses the signed
     // license to a failure here and leaves a row no caller ever saw.
-    await this.options.organizations.markSelfHostedCustomer(organization.id);
+    // A requested customer is marked by organization as it creates the row.
+    if (!("newOrganizationName" in input.customer)) {
+      await this.options.organizations.markSelfHostedCustomer(organization.id);
+    }
     const row = await this.writer.createRow({
       licenseKey,
       organizationId: organization.id,
@@ -385,9 +390,13 @@ export class LicenseRegistryService {
 
   private async resolveCustomer(customer: LicenseCustomer): Promise<IssuedLicenseCustomerRecord> {
     if ("newOrganizationName" in customer) {
-      return this.options.organizations.createSelfHostedCustomer({
+      // Licensing mints the id; organization creates the row from the fact (C3c, R42).
+      const requested = {
+        id: generate(ORGANIZATION_KSUID_RESOURCE).toString(),
         name: customer.newOrganizationName,
-      });
+      };
+      await this.options.organizations.requestSelfHostedCustomer(requested);
+      return requested;
     }
     const organization = await this.options.organizations.findById(customer.organizationId);
     if (!organization) throw new OrganizationNotFoundError();
@@ -471,6 +480,6 @@ export interface ConnectManagedKeys {
 /** The customer a license is issued to, as the organization feature answers it. */
 export interface LicenseCustomers {
   findById(id: string): Promise<{ id: string; name: string } | null>;
-  createSelfHostedCustomer(params: { name: string }): Promise<{ id: string; name: string }>;
+  requestSelfHostedCustomer(params: { id: string; name: string }): Promise<void>;
   markSelfHostedCustomer(id: string): Promise<void>;
 }

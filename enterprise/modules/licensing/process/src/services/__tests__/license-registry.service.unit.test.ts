@@ -35,9 +35,8 @@ class RecordingCustomers {
     return id === "missing" ? null : { id, name: "ACME" };
   }
 
-  async createSelfHostedCustomer({ name }: { name: string }): Promise<IssuedLicenseCustomerRecord> {
+  async requestSelfHostedCustomer({ name }: { id: string; name: string }): Promise<void> {
     this.created.push(name);
-    return { id: `org-${this.created.length}`, name };
   }
 
   async markSelfHostedCustomer(id: string): Promise<void> {

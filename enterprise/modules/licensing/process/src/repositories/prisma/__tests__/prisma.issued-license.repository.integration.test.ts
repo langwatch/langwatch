@@ -44,9 +44,7 @@ describe.skipIf(!TEST_DATABASE_URL)("the license registry on Postgres", () => {
     repository,
     organizations: {
       findById: async (id) => ({ id, name: organizationNames.get(id) ?? "" }),
-      createSelfHostedCustomer: async () => {
-        throw new Error("these suites issue to organizations they created");
-      },
+      requestSelfHostedCustomer: async () => undefined,
       markSelfHostedCustomer: async () => undefined,
     },
     managedKeys: {

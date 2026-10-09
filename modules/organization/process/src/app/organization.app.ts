@@ -853,7 +853,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     }
   }
 
-  createSelfHostedCustomer(input: { name: string }): Promise<{ id: string; name: string }> {
+  createSelfHostedCustomer(input: { organizationId: string; name: string }): Promise<void> {
     return this.#dependencies.membership.createSelfHostedCustomer(input);
   }
 
@@ -1566,7 +1566,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
 
   /** organization_lifecycle: the same in every role, since its peers react from their side (§9). */
   lifecyclePipeline(): OrganizationLifecycleDefinition {
-    return buildOrganizationLifecyclePipeline({ billingFacts: this });
+    return buildOrganizationLifecyclePipeline({ billingFacts: this, licensingFacts: this });
   }
 
   /** Records one organization's stored presence switch, for the backfill task. */

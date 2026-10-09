@@ -11,6 +11,10 @@ import {
   seatCheckoutsAbandonedEventDataSchema,
 } from "@langwatch/enterprise-billing-contract";
 import {
+  SELF_HOSTED_CUSTOMER_LICENSED_EVENT_TYPE,
+  selfHostedCustomerLicensedEventDataSchema,
+} from "@langwatch/enterprise-licensing-contract";
+import {
   defineAggregate,
   defineEventingModule,
   definePipeline,
@@ -63,6 +67,9 @@ export type BillingFactsApplier = Pick<
   | "approvePaymentPendingInvites"
   | "cancelPaymentPendingInvites"
 >;
+
+/** Where licensing's customer facts land: organization creates the rows (C3c, R42). */
+export type LicensingFactsApplier = Pick<OrganizationModule, "createSelfHostedCustomer">;
 
 /** An organisation gone before its fact arrived has no row to apply it to. */
 async function onLiveOrganization(apply: () => Promise<void>): Promise<void> {
@@ -117,14 +124,22 @@ export type OrganizationLifecycleDefinition = ReturnType<
 
 /**
  * organization_lifecycle records; peers (nurturing, governance) react from their own side (§9).
- * It applies billing's writes to organisation rows from billing's facts (R42, round 46 D-b).
+ * It applies billing's and licensing's writes to organisation rows from their facts (R42, C3c).
  */
 export function buildOrganizationLifecyclePipeline({
   billingFacts,
+  licensingFacts,
 }: {
   billingFacts: BillingFactsApplier;
+  licensingFacts: LicensingFactsApplier;
 }): OrganizationLifecycleDefinition {
   return lifecycleCommands()
+    .withPeerSubscriber("organizationLicensingSelfHostedCustomerLicensed", {
+      eventType: SELF_HOSTED_CUSTOMER_LICENSED_EVENT_TYPE,
+      data: selfHostedCustomerLicensedEventDataSchema,
+      handle: ({ organizationId, name }) =>
+        licensingFacts.createSelfHostedCustomer({ organizationId, name }),
+    })
     .withPeerSubscriber("organizationBillingPlanLimitAlertSent", {
       eventType: PLAN_LIMIT_ALERT_SENT_EVENT_TYPE,
       data: planLimitAlertSentEventDataSchema,

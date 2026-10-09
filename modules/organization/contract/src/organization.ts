@@ -3,6 +3,9 @@ import { z } from "zod";
 
 export const organizationIdSchema = z.string().min(1);
 
+/** The KSUID resource every organization id is born under, whichever module mints it. */
+export const ORGANIZATION_KSUID_RESOURCE = "organization";
+
 export const organizationIntentSchema = z.enum(["AGENT_GOVERNANCE", "LLM_OPS"]);
 export type OrganizationIntent = z.infer<typeof organizationIntentSchema>;
 
