@@ -241,3 +241,19 @@ Feature: Ops shows an installation's release upgrades, read-only
     When a batched call names the eight upgrade reads and Retry
     Then it passes the holding door to the door that asks ops:view or ops:manage at the platform
     And a call naming any system-migration procedure answers 503 before the door
+
+  # --- Tenant and operator steps on the Upgrades page (U4, U5) ---
+
+  @integration
+  Scenario: Each tenant step shows its tenants' progress on the Upgrades page
+    Given a tenant step with tenants finalized, held and parked
+    When an operator opens the Upgrades page
+    Then the step lists how many tenants are finalized, held and parked
+    And opening the row opens the step
+
+  @integration
+  Scenario: An unfinished operator step shows its state and a failed one offers Retry to a manager
+    Given an operator step that failed and one still pending
+    When an operator holding ops:manage opens the Upgrades page
+    Then both operator steps show their status
+    And only the failed one offers Retry
