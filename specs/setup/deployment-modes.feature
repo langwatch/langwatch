@@ -29,6 +29,15 @@ Feature: Deployment modes for a local stack and an e2e run
     Then the stack's env ends with the sh-free values
     And the mode sticks for the next haven up without --mode
 
+  Scenario: haven up --mode on a running stack restarts it only when the mode differs
+    Given a stack running with --mode saas
+    When haven up --mode sh-free runs
+    Then haven restarts the stack with the sh-free values
+    When haven up --mode none runs on a stack running a mode
+    Then haven restarts the stack without a mode
+    When haven up --mode saas runs on a stack already running saas with the same values
+    Then haven reports nothing to do
+
   Scenario: haven status names the effective mode
     Given a stack started with --mode saas
     Then haven status prints "mode saas"

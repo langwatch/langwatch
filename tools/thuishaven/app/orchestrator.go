@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -789,7 +790,12 @@ func (o *Orchestrator) reconcileRunningStack(p UpParams, opts PlanOptions) (proc
 	// Everything that makes the running stack differ from what was asked for.
 	// A term missing here becomes a silent no-op: `up` reports "nothing to do"
 	// while the stack keeps running under the old settings.
-	selectionMatches := domain.SelectionFromStack(st) == opts.Selection
+	// The mode rides on Selection but a stack record derives none from its
+	// services, so it is compared on its own below.
+	requested := opts.Selection
+	requested.Mode = ""
+	selectionMatches := domain.SelectionFromStack(st) == requested
+	modeMatches := st.Mode == opts.DeploymentMode.Name && slices.Equal(st.ModeEnv, opts.DeploymentMode.Env)
 	imageMatches := st.LangyImage == opts.langyImageTag
 	// The langy isolation posture is a security property, not a preference:
 	// re-running `up` after unsetting LANGY_UNSAFE_CONTAINER must actually put
@@ -801,7 +807,7 @@ func (o *Orchestrator) reconcileRunningStack(p UpParams, opts PlanOptions) (proc
 	// a proxy the operator just asked to bypass, defeating the whole escape
 	// hatch — see #7117).
 	portlessMatches := st.PortlessDisabled == o.cfg.PortlessDisabled
-	if !opts.ShouldForce && !opts.ShouldRebuildImages && selectionMatches && imageMatches && tierMatches && portlessMatches {
+	if !opts.ShouldForce && !opts.ShouldRebuildImages && selectionMatches && modeMatches && imageMatches && tierMatches && portlessMatches {
 		fmt.Printf("stack %q is already running (launcher pid %d) and matches the selection — nothing to do\n", slug, st.LauncherPID)
 		fmt.Printf("  bounce a service: haven restart [service] · restart everything: haven up -f · stop: haven down\n")
 		return false, nil
@@ -813,6 +819,8 @@ func (o *Orchestrator) reconcileRunningStack(p UpParams, opts PlanOptions) (proc
 		fmt.Printf("stack %q is running — replacing it to rebuild its images (--rebuild)\n", slug)
 	case !portlessMatches:
 		fmt.Printf("stack %q is running with a different PORTLESS setting — restarting it to match\n", slug)
+	case !modeMatches:
+		fmt.Printf("stack %q is running a different deployment mode — restarting it with the requested one\n", slug)
 	case !tierMatches:
 		fmt.Printf("stack %q is running under a different langy isolation tier — restarting it with the requested one\n", slug)
 	case !imageMatches:
