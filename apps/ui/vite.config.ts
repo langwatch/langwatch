@@ -218,7 +218,8 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
     // proxy's failures are collapsed to one line — see ./vite/dev-logging.
     customLogger: devLogger,
     plugins: [
-      react(),
+      // Oxc's Rust React Compiler, not the Babel one: auto-memoisation without slowing HMR.
+      react({ compiler: { logDiagnostics: true } }),
       patchObjectInspectBrowserStub(),
       // The api renders the page's public config; the dev server lifts it from the api's shell.
       ...(command === "serve" ? [injectDevelopmentPublicConfig({ apiUrl: API_TARGET })] : []),
