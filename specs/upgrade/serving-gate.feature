@@ -84,11 +84,20 @@ Feature: Serving processes refuse to start when the installation is behind their
     When the api's serving gate checks the image
     Then the verdict is holding, naming step "prisma:20261006180000_add_column"
 
+  # API-UP-CLICKHOUSE (recommended, pending Alex's ruling): ClickHouse additive DDL is metadata-only,
+  # so the api holds for it as it does for Postgres, and no reader tolerates a missing column.
   @unit
-  Scenario: An api whose schema steps are done while a blocking step is outstanding is upgrading
+  Scenario: An api whose image has a ClickHouse schema step outstanding holds
     Given the ledger records "prisma:20261006180000_add_column" as done and "clickhouse:00042" as pending
     When the api's serving gate checks the image
-    Then the verdict is upgrading, naming step "clickhouse:00042"
+    Then the verdict is holding, naming step "clickhouse:00042"
+
+  @unit
+  Scenario: An api whose schema steps are done while a blocking step is outstanding is upgrading
+    Given an image declaring the blocking data step "trace:fill-cost" beside its schema steps
+    And the ledger records both schema steps as done and "trace:fill-cost" as pending
+    When the api's serving gate checks the image
+    Then the verdict is upgrading, naming step "trace:fill-cost"
 
   @unit
   Scenario: A worker on an installation behind its image is told to run the upgrade
