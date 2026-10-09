@@ -27,7 +27,7 @@ import (
 // re-signs a lane in when its page lands on sign-in and exits once no lane
 // is left; every command waits on page events, never a fixed sleep.
 
-const browserUsage = "usage: haven browser <open|goto|snapshot|click|fill|select|type|press|screenshot|eval|state-load|close|status|stop> [args] --lane <name> [--as admin|email]"
+const browserUsage = "usage: haven browser <open|goto|snapshot|click|fill|select|type|press|screenshot|eval|state-load|record|replay|close|status|stop> [args] --lane <name> [--as admin|email]"
 
 // browserStartTimeout bounds the daemon's first line: a cold browser on a loaded machine.
 const browserStartTimeout = 90 * time.Second
@@ -35,14 +35,15 @@ const browserStartTimeout = 90 * time.Second
 func browserSpec() commandSpec {
 	return commandSpec{
 		name:    "browser",
-		summary: "one shared headless browser per stack, a signed-in context per --lane, playwright-cli's verbs: open | goto | snapshot | click | fill | select | type | press | screenshot | eval | state-load | close | status | stop",
+		summary: "one shared headless browser per stack, a signed-in context per --lane, playwright-cli's verbs: open | goto | snapshot | click | fill | select | type | press | screenshot | eval | state-load | record | replay | close | status | stop",
 		args:    "<verb> [ref|selector|url|text|key|expression|file] [text]",
 		maxArgs: 3,
 		flags: []flagSpec{
 			{long: "--lane", takesValue: true, value: "<name>", summary: "the caller's own context; lanes never share one"},
 			{long: "--as", takesValue: true, value: "<admin|email>", summary: "sign the lane in as this login (haven auth); omit to stay signed out"},
 			{long: "--wait-for", takesValue: true, value: "<selector>", summary: "also wait for this CSS or text= selector before answering"},
-			{long: "--out", takesValue: true, value: "<file>", summary: "screenshot: where to write the PNG"},
+			{long: "--out", takesValue: true, value: "<file>", summary: "screenshot: where to write the PNG; record stop: where to write the script"},
+			{long: "--playwright", takesValue: true, value: "<file>", summary: "record export: where to write the Playwright test"},
 			{long: "--timeout", takesValue: true, value: "<dur>", summary: "how long a command may wait on the page (default 30s)"},
 			{long: "--json", summary: "machine-readable"},
 			{long: "--stack", takesValue: true, value: "<slug>", summary: "another worktree's stack by slug"},
@@ -66,6 +67,15 @@ func runBrowser(ctx context.Context, d deps, inv invocation) error {
 		return errors.New(browserUsage)
 	}
 	verb := inv.args[0]
+	if verb == "record" {
+		var err error
+		if verb, inv, err = recordVerb(inv); err != nil {
+			return err
+		}
+		if verb == "export" {
+			return exportScript(inv)
+		}
+	}
 	slug, err := d.orch.ResolveSlug(authParams(d, inv))
 	if err != nil {
 		return err
@@ -82,9 +92,22 @@ func runBrowser(ctx context.Context, d deps, inv invocation) error {
 	if err != nil {
 		return err
 	}
+	if verb == "replay" {
+		script, err := readScript(inv.args[1])
+		if err != nil {
+			return err
+		}
+		req["script"] = script
+	}
 	var reply map[string]any
 	if err := daemon.call(ctx, verb, req, &reply); err != nil {
 		return err
+	}
+	if verb == "record-stop" {
+		return writeScript(reply, req["out"], inv.has("--json") || d.isAgent)
+	}
+	if verb == "replay" {
+		return printReplay(reply, inv.has("--json") || d.isAgent)
 	}
 	return printBrowserReply(verb, reply, inv.has("--json") || d.isAgent)
 }
@@ -132,10 +155,14 @@ func browserRequest(verb string, inv invocation) (map[string]any, error) {
 			req[field] = abs
 		}
 	}
-	if verb == "screenshot" {
+	if verb == "screenshot" || verb == "record-stop" {
 		out := inv.value("--out")
 		if out == "" {
-			out = filepath.Join(".claude", "tmp", "haven-browser", lane+"-"+time.Now().Format("150405")+".png")
+			ext := ".png"
+			if verb == "record-stop" {
+				ext = ".json"
+			}
+			out = filepath.Join(".claude", "tmp", "haven-browser", lane+"-"+time.Now().Format("150405")+ext)
 		}
 		abs, err := filepath.Abs(out)
 		if err != nil {
@@ -151,6 +178,7 @@ var browserVerbArgs = map[string][]string{
 	"open": {"url?"}, "goto": {"url"}, "snapshot": nil, "screenshot": nil, "close": nil,
 	"click": {"ref"}, "fill": {"ref", "text"}, "select": {"ref", "text"}, "type": {"text"}, "press": {"key"},
 	"eval": {"expression"}, "state-load": {"file"},
+	"record-start": nil, "record-stop": nil, "replay": {"file"},
 }
 
 func printBrowserReply(verb string, reply map[string]any, asJSON bool) error {

@@ -99,3 +99,19 @@ Feature: haven CLI surface
     And mail is running with its console URL
     And llm is not running and names "haven up +llm" to start it
     And every row lists the verbs its "haven <name>" command takes and its skill path
+
+  # Bound by cmd/browser_record_test.go; the daemon half is browser-record.test.ts.
+  Scenario: A browser lane's actions are recorded as a script and replayed
+    Given a lane is recording with "haven browser record start --lane qa-1"
+    When the lane fills a field, picks an option and clicks a button
+    And "haven browser record stop --lane qa-1 --out flow.json" runs
+    Then the script holds each action with a role, label or text locator, never a snapshot ref
+    And each step holds the page path after it and the app queries it caused, without bodies
+    And a password field's value is stored as "<redacted>"
+    And "haven browser replay flow.json --lane qa-1" exits non-zero at the first step whose path or queries differ
+
+  # Bound by cmd/browser_record_test.go.
+  Scenario: A recorded script exports as a Playwright test in the repo's e2e style
+    Given a recorded script
+    When the agent runs "haven browser record export flow.json --playwright flow.spec.ts"
+    Then the spec imports "expect" and "test" from "../test.ts" and asserts each step's path

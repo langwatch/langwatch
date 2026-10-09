@@ -192,6 +192,18 @@ haven auth admin --out state.json                          # just the Playwright
 - Never write a key, token or password to a file, even scratch. The safety check refuses it as credential materialisation. Let haven hold the credential.
 - One shared browser costs about 230 MB, plus about 0.7 GB per signed-in dev page (about 0.4 GB with `--ui=built`). Close your lane when done.
 
+**Record and replay** (build e2e tests from a manual walk):
+
+```bash
+haven browser record start --lane qa-1 --as admin           # then drive the lane as usual
+haven browser record stop --lane qa-1 --out flow.json       # JSON script; prints its path
+haven browser replay flow.json --lane qa-1 --as admin [--json]  # exits non-zero at the first divergence
+haven browser record export flow.json --playwright flow.spec.ts  # a test for dev/tests/agentic-e2e
+```
+
+- Steps hold stable locators (role and name, label, test id, text), the path after each step and the app queries it caused (tRPC procedure names, method, status). Never bodies, headers or secrets; password values are `<redacted>` and a replay stops there until you edit them.
+- A replay needs each recorded query back with its status and each step at its recorded path; it reports the first step that differs.
+
 ## Other commands you will want
 
 | Need                                       | Command                                             |

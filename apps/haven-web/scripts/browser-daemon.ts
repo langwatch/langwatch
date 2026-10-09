@@ -20,6 +20,20 @@ import { promisify } from "node:util";
 
 import { chromium, type BrowserContext, type Page } from "playwright";
 
+import {
+  REDACTED,
+  dedupe,
+  describeElement,
+  locatorOf,
+  missingQuery,
+  queriesOf,
+  recordLocator,
+  type LocatorSpec,
+  type Query,
+  type Script,
+  type Step,
+} from "./browser-record.ts";
+
 const env = (name: string) => {
   const value = process.env[name];
   if (!value) throw new Error(`${name} is not set: haven browser starts this daemon`);
@@ -63,6 +77,10 @@ type Lane = {
   page: Page;
   signedOut: boolean;
   idle?: NodeJS.Timeout;
+  /** App queries seen since the last action began; `recording` keeps the steps so far. */
+  seen: Query[];
+  inflight: number;
+  recording?: Script;
 };
 const lanes = new Map<string, Lane>();
 
@@ -171,8 +189,22 @@ function watchLane({ lane }: { lane: Lane }) {
     const path = new URL(frame.url()).pathname;
     if (path.startsWith("/auth/signin")) lane.signedOut = Boolean(as);
   });
+  const done = () => void (lane.inflight = Math.max(0, lane.inflight - 1));
+  page.on("request", () => void (lane.inflight += 1));
+  page.on("requestfinished", done);
+  page.on("requestfailed", done);
   page.on("response", (response) => {
     const status = response.status();
+    const type = response.request().resourceType();
+    if (type === "fetch" || type === "xhr")
+      lane.seen.push(
+        ...queriesOf({
+          method: response.request().method(),
+          url: response.url(),
+          status,
+          appHost: APP.host,
+        }),
+      );
     if (status < 502 || status > 504) return;
     const { host, pathname } = new URL(response.url());
     if (host === APP.host && pathname.startsWith("/api/")) closeGate();
@@ -210,7 +242,7 @@ async function laneFor({
     viewport: { width: 1280, height: 800 },
   });
   const page = await context.newPage();
-  const lane: Lane = { name, as, context, page, signedOut: false };
+  const lane: Lane = { name, as, context, page, signedOut: false, seen: [], inflight: 0 };
   watchLane({ lane });
   lanes.set(name, lane);
   return lane;
@@ -306,6 +338,8 @@ type Request = {
   text?: string;
   key?: string;
   file?: string;
+  locator?: LocatorSpec;
+  script?: Script;
 };
 
 type Act = (args: { page: Page; body: Request; timeout: number }) => Promise<unknown>;
@@ -327,15 +361,15 @@ const actions: Record<string, Act> = {
     return { url: page.url(), file };
   },
   click: async ({ page, body, timeout }) => {
-    await page.locator(`aria-ref=${body.ref}`).click({ timeout });
+    await targetOf({ page, body }).click({ timeout });
     return afterInput({ page, timeout });
   },
   fill: async ({ page, body, timeout }) => {
-    await page.locator(`aria-ref=${body.ref}`).fill(body.text ?? "", { timeout });
+    await targetOf({ page, body }).fill(body.text ?? "", { timeout });
     return afterInput({ page, timeout });
   },
   select: async ({ page, body, timeout }) => {
-    const target = locatorFor({ page, ref: body.ref ?? "" });
+    const target = targetOf({ page, body });
     const text = body.text ?? "";
     const native = await target.evaluate((el) => el.tagName === "SELECT", undefined, { timeout });
     if (native) await target.selectOption([{ label: text }], { timeout });
@@ -364,12 +398,183 @@ function locatorFor({ page, ref }: { page: Page; ref: string }) {
   return /^(f\d+)?e\d+$/.test(ref) ? page.locator(`aria-ref=${ref}`) : page.locator(ref).first();
 }
 
+/** A recorded locator when the step has one (replay), else the caller's ref or selector. */
+function targetOf({ page, body }: { page: Page; body: Request }) {
+  return body.locator
+    ? locatorOf({ page, spec: body.locator })
+    : locatorFor({ page, ref: body.ref ?? "" });
+}
+
+const pathOf = (url: string) => new URL(url).pathname;
+
+/** The step a recorded verb stands for, described before the action changes the page. */
+async function describeStep({
+  page,
+  verb,
+  body,
+  url,
+}: {
+  page: Page;
+  verb: string;
+  body: Request;
+  url: string;
+}): Promise<Omit<Step, "expect"> | undefined> {
+  if ((verb === "goto" || verb === "open") && url) {
+    const target = new URL(url, APP);
+    return { verb: "goto", url: target.pathname + target.search };
+  }
+  if (verb === "press") return { verb: "press", key: body.key };
+  if (verb === "type") {
+    const focus = await page
+      .locator(":focus")
+      .evaluate(describeElement)
+      .catch(() => undefined);
+    return { verb: "type", text: focus?.secret ? REDACTED : body.text };
+  }
+  if (verb === "click" || verb === "fill" || verb === "select")
+    return describeTarget({ page, verb, body });
+  return undefined;
+}
+
+async function describeTarget({
+  page,
+  verb,
+  body,
+}: {
+  page: Page;
+  verb: "click" | "fill" | "select";
+  body: Request;
+}): Promise<Omit<Step, "expect">> {
+  const { spec, described } = await recordLocator({ page, target: targetOf({ page, body }) });
+  return {
+    verb,
+    locator: spec,
+    ...(verb !== "click" && { text: described.secret ? REDACTED : body.text }),
+    ...(verb === "select" && { native: described.tag === "select" }),
+  };
+}
+
+/** Runs one verb on the lane's page, appending a step when the lane is recording. */
+async function perform({
+  lane,
+  verb,
+  body,
+  timeout,
+  observe = false,
+}: {
+  lane: Lane;
+  verb: string;
+  body: Request;
+  timeout: number;
+  observe?: boolean;
+}) {
+  const act = actions[verb];
+  if (!act) throw new Error(`unknown verb ${verb}`);
+  lane.seen = [];
+  const blank = lane.page.url() === "about:blank";
+  const url = body.url || (blank ? "/" : "");
+  await visit({ lane, url, waitFor: body.waitFor ?? "", timeout });
+  const step = lane.recording
+    ? await describeStep({ page: lane.page, verb, body, url })
+    : undefined;
+  const result = await act({ page: lane.page, body, timeout });
+  if (observe || lane.recording) await quiet({ lane, timeout });
+  if (step && lane.recording)
+    lane.recording.steps.push({
+      ...step,
+      expect: { url: pathOf(lane.page.url()), queries: dedupe(lane.seen) },
+    });
+  return result;
+}
+
+/** Resolves once no request has been in flight for 150 ms (capped): a step's queries are seen. */
+async function quiet({ lane, timeout }: { lane: Lane; timeout: number }) {
+  const until = Date.now() + Math.min(timeout, 5_000);
+  for (let calm = 0; calm < 150 && Date.now() < until;) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    calm = lane.inflight === 0 ? calm + 50 : 0;
+  }
+}
+
+const describe = (step: Step) =>
+  `${step.verb} ${step.url ?? step.key ?? step.locator?.name ?? step.locator?.value ?? ""}`.trim();
+
+/** Replays a script; the first step whose action, URL or recorded queries differ ends it. */
+async function replay({ lane, script, timeout }: { lane: Lane; script: Script; timeout: number }) {
+  if (script.startUrl)
+    await perform({ lane, verb: "goto", body: { url: script.startUrl }, timeout });
+  for (const [index, step] of script.steps.entries()) {
+    const diverged = (expected: string, got: string) => ({
+      ok: false,
+      steps: script.steps.length,
+      divergence: { step: index + 1, action: describe(step), expected, got },
+    });
+    if (step.text === REDACTED)
+      return diverged("a value", `${REDACTED}: edit the script to supply this secret`);
+    try {
+      await perform({
+        lane,
+        verb: step.verb,
+        body: { ...step, timeoutMs: timeout },
+        timeout,
+        observe: true,
+      });
+    } catch (error) {
+      return diverged("the step to run", error instanceof Error ? error.message : String(error));
+    }
+    const url = pathOf(lane.page.url());
+    if (url !== step.expect.url) return diverged(`url ${step.expect.url}`, `url ${url}`);
+    const missing = missingQuery({ expected: step.expect.queries, got: lane.seen });
+    if (missing)
+      return diverged(
+        `${missing.method} ${missing.path} ${missing.status}`,
+        lane.seen.map((q) => `${q.method} ${q.path} ${q.status}`).join(", ") || "no queries",
+      );
+  }
+  return { ok: true, steps: script.steps.length };
+}
+
 /** After input the page's own requests settle (capped), as playwright-cli waits after an action. */
 async function afterInput({ page, timeout }: { page: Page; timeout: number }) {
   await page
     .waitForLoadState("networkidle", { timeout: Math.min(timeout, 5_000) })
     .catch(() => undefined);
   return { url: page.url(), title: await page.title() };
+}
+
+async function recordCommand({
+  lane,
+  verb,
+  body,
+  timeout,
+}: {
+  lane: Lane;
+  verb: string;
+  body: Request;
+  timeout: number;
+}) {
+  if (verb === "record-start") {
+    const here = lane.page.url();
+    const start = here === "about:blank" ? undefined : new URL(here);
+    lane.recording = {
+      version: 1,
+      ...(start && { startUrl: start.pathname + start.search }),
+      steps: [],
+    };
+    return { recording: lane.name };
+  }
+  if (verb === "record-stop") {
+    if (!lane.recording) throw new Error(`lane ${lane.name} is not recording (record start first)`);
+    const script = lane.recording;
+    lane.recording = undefined;
+    return { script };
+  }
+  if (verb === "replay") {
+    if (!body.script) throw new Error("replay needs a script");
+    const script = body.script;
+    return withSlot({ run: () => replay({ lane, script, timeout }) });
+  }
+  throw new Error(`unknown verb ${verb}`);
 }
 
 async function handle({ verb, body }: { verb: string; body: Request }): Promise<unknown> {
@@ -385,20 +590,15 @@ async function handle({ verb, body }: { verb: string; body: Request }): Promise<
     await closeLane({ name });
     return { closed: name };
   }
-  const act = actions[verb];
-  if (!act) throw new Error(`unknown verb ${verb}`);
+  if (!actions[verb] && !["record-start", "record-stop", "replay"].includes(verb))
+    throw new Error(`unknown verb ${verb}`);
   const timeout = body.timeoutMs ?? 30_000;
   const stateFile = verb === "state-load" ? body.file : undefined;
   const lane = await laneFor({ name, as: body.as ?? "", timeout, stateFile });
   touch({ lane });
-  return withSlot({
-    run: async () => {
-      const blank = lane.page.url() === "about:blank";
-      const url = body.url || (blank ? "/" : "");
-      await visit({ lane, url, waitFor: body.waitFor ?? "", timeout });
-      return act({ page: lane.page, body, timeout });
-    },
-  });
+  if (verb === "record-start" || verb === "record-stop" || verb === "replay")
+    return recordCommand({ lane, verb, body, timeout });
+  return withSlot({ run: () => perform({ lane, verb, body, timeout }) });
 }
 
 async function readBody({ req }: { req: IncomingMessage }): Promise<Request> {
