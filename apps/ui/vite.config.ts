@@ -168,8 +168,12 @@ function injectDevelopmentPublicConfig(config: PublicAppConfig): Plugin {
   return {
     name: "inject-development-public-config",
     apply: "serve",
-    transformIndexHtml(html) {
-      return injectPublicAppConfigIntoHtml({ html, config });
+    async transformIndexHtml(html) {
+      // The api reloads on its own; reading per page keeps its config changes off a ui restart.
+      const current = await fetchPublicConfigFromApi({ apiUrl: API_TARGET, waitMs: 0 }).catch(
+        () => config,
+      );
+      return injectPublicAppConfigIntoHtml({ html, config: current });
     },
     configurePreviewServer(server) {
       const shellPath = path.resolve(server.config.root, server.config.build.outDir, "index.html");
