@@ -15,6 +15,15 @@ Load the `frontend` skill for module browser work and `design-system` for
 component choice (`chakra-ui-*` only for raw Chakra v3). Authority:
 `dev/docs/ARCHITECTURE.md` §10.
 
+- **No hand memoisation.** The React Compiler (Oxc, `apps/ui/vite.config.ts`)
+  memoises every component and hook it can compile. Don't write `useMemo`,
+  `useCallback` or `React.memo`; delete them when you touch a file. A component it
+  skips (reads a ref during render, an `eslint-disable` of a hooks rule) is
+  logged by the dev server: fix the cause rather than memoising by hand.
+- **Design system first.** Before building a component, look in
+  `packages/design-system/src/components/` (or `/design-system` on the dev
+  server). Use what is there; a piece two modules would reuse is built there, not
+  in a module.
 - **Layer order:** flat public entries → `model/` (pure) → `behavior/` (hooks,
   API bindings, stores) → `ui/elements|blocks|sections`. Elements and blocks
   can't fetch. A package that outgrows this nests `features/<name>/` repeating

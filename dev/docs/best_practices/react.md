@@ -18,6 +18,15 @@ there is no `src/pages/` file-based routing, and no server components.
   browser package's `ui/` folders. Nothing is shared between browser packages
   except through the design system, a contract, or a `<name>-client` package.
 
+## Memoisation
+
+The React Compiler (Oxc's Rust implementation, enabled in
+`apps/ui/vite.config.ts`) memoises components and hooks automatically. Don't
+write `useMemo`, `useCallback` or `React.memo`, and remove them from code you
+touch. The dev server logs each component the compiler skipped and why (a ref
+read during render, a suppressed `react-hooks` rule); fix the cause instead of
+memoising by hand.
+
 ## File Organization
 
 A browser package layers `model/` (pure) → `behavior/` (hooks, API bindings,
