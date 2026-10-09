@@ -356,22 +356,6 @@ Raises the prepaid commit a renewal or top-up invoice agreed.
 raiseContractCommit(input: { organizationId: string; byUsdCents: number; operatorId: string; }): Promise<IssuedLicenseView>;
 ```
 
-#### `syncContractBudget`
-
-Re-derives the contract budget's cap from the license terms.
-
-```typescript
-syncContractBudget(input: { organizationId: string; operatorId: string }): Promise<void>;
-```
-
-#### `resetContractBudget`
-
-Starts a new budget window: spend so far no longer counts.
-
-```typescript
-resetContractBudget(input: { organizationId: string; operatorId: string }): Promise<void>;
-```
-
 #### `findConnectServicesForManagedKey`
 
 The hosted services the active license behind one managed key is entitled to, empty when no active license names that key. The gateway resolves a CONNECT key's scope through this and never reads `IssuedLicense` itself.
@@ -648,8 +632,8 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                     | Environment variable                 | Declared at                              |
 | ------ | ------------------------ | ------------------------------------ | ---------------------------------------- |
-| secret | `instanceLicenseKey`     | `LANGWATCH_LICENSE_KEY`              | `src/app/licensing.app.ts:176`           |
-| secret | `licensePrivateKey`      | `LANGWATCH_LICENSE_PRIVATE_KEY`      | `src/app/licensing.app.ts:177`           |
+| secret | `instanceLicenseKey`     | `LANGWATCH_LICENSE_KEY`              | `src/app/licensing.app.ts:175`           |
+| secret | `licensePrivateKey`      | `LANGWATCH_LICENSE_PRIVATE_KEY`      | `src/app/licensing.app.ts:176`           |
 | config | `publicKey`              | `LANGWATCH_LICENSE_PUBLIC_KEY`       | `../contract/src/licensing.config.ts:45` |
 | config | `connectDisabled`        | `LANGWATCH_CONNECT_DISABLED`         | `../contract/src/licensing.config.ts:52` |
 | config | `connectGatewayEndpoint` | `LANGWATCH_CONNECT_GATEWAY_ENDPOINT` | `../contract/src/licensing.config.ts:53` |

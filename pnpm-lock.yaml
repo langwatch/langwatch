@@ -2980,6 +2980,9 @@ importers:
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../../../modules/authz/contract
+      '@langwatch/enterprise-billing-contract':
+        specifier: workspace:*
+        version: link:../../billing/contract
       '@langwatch/enterprise-connect-contract':
         specifier: workspace:*
         version: link:../contract

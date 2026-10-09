@@ -2,7 +2,6 @@ import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import type { IssuedLicenseRecord } from "../../repositories/issued-license.repository.ts";
-import type { ContractBudget, ContractBudgetStore } from "../contract-budget.service.ts";
 import { ContractBudgetService } from "../contract-budget.service.ts";
 
 const NOW: Instant = Temporal.Instant.from("2026-01-01T00:00:00.000Z");
@@ -48,28 +47,12 @@ function licenseFor(overrides: Partial<IssuedLicenseRecord> = {}): IssuedLicense
   };
 }
 
-class RecordingStore implements ContractBudgetStore {
-  readonly resets: string[] = [];
-
-  constructor(private readonly budget: ContractBudget | null) {}
-
-  async findForOrganization(): Promise<ContractBudget | null> {
-    return this.budget;
-  }
-
-  async reset(params: { organizationId: string; id: string; actorId: string }): Promise<void> {
-    this.resets.push(params.id);
-  }
-}
-
-function harness(options: { licenses?: IssuedLicenseRecord[]; budget?: ContractBudget | null }) {
-  const store = new RecordingStore(options.budget ?? null);
+function harness(options: { licenses?: IssuedLicenseRecord[] }) {
   const service = ContractBudgetService.create({
-    store,
     licensesOf: async () => options.licenses ?? [licenseFor()],
     now: () => NOW,
   });
-  return { service, store };
+  return { service };
 }
 
 describe("ContractBudgetService.termsOf", () => {
@@ -85,25 +68,5 @@ describe("ContractBudgetService.termsOf", () => {
       commitUsdCents: 250_000,
       maximumUsdCents: 250_000,
     });
-  });
-});
-
-describe("ContractBudgetService.reset", () => {
-  it("starts a new window on the budget the customer has", async () => {
-    const { service, store } = harness({
-      budget: { id: "budget-1", limitUsdCents: 100_000, capSetByCustomer: false },
-    });
-
-    await service.reset({ organizationId: "org-acme", operatorId: "operator-1" });
-
-    expect(store.resets).toEqual(["budget-1"]);
-  });
-
-  it("does nothing where nothing was agreed yet", async () => {
-    const { service, store } = harness({ budget: null });
-
-    await service.reset({ organizationId: "org-acme", operatorId: "operator-1" });
-
-    expect(store.resets).toEqual([]);
   });
 });

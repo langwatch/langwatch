@@ -10,12 +10,14 @@ const CENTS = 100;
 
 const contractBudgetMetadataSchema = z.object({ [CAP_SET_BY]: z.string().optional() });
 
-type GatewayBudgets = Pick<GatewayApi, "listBudgetsWithHealth" | "createBudget" | "updateBudget">;
+type GatewayBudgets = Pick<
+  GatewayApi,
+  "listBudgetsWithHealth" | "createBudget" | "updateBudget" | "resetBudget"
+>;
 
 /**
  * The contract budget kept in the gateway's own budget table, reached through the gateway's
- * operations, as main's `PrismaContractBudgetStore` kept it. Licensing still starts its windows
- * (S3).
+ * operations, as main's `PrismaContractBudgetStore` kept it.
  */
 export class ContractBudgetStoreService implements ContractBudgetStore {
   static create({ gateway }: { gateway: GatewayBudgets }): ContractBudgetStoreService {
@@ -36,6 +38,7 @@ export class ContractBudgetStoreService implements ContractBudgetStore {
       id: budget.id,
       limitUsdCents: Math.round(Number(budget.limitUsd.toString()) * CENTS),
       capSetByCustomer: metadata.success && metadata.data[CAP_SET_BY] === "customer",
+      lastResetAt: budget.lastResetAt,
     };
   }
 
@@ -86,5 +89,17 @@ export class ContractBudgetStoreService implements ContractBudgetStore {
       metadata: { [CAP_SET_BY]: capSetByCustomer ? "customer" : "langwatch" },
       actorUserId: actorId,
     });
+  }
+
+  async reset({
+    organizationId,
+    id,
+    actorId,
+  }: {
+    organizationId: string;
+    id: string;
+    actorId: string;
+  }): Promise<void> {
+    await this.gateway.resetBudget({ id, organizationId, actorUserId: actorId });
   }
 }

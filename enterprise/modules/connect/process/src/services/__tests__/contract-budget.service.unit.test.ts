@@ -6,6 +6,7 @@ import {
 } from "@langwatch/enterprise-licensing-contract";
 import { ValidationError } from "@langwatch/handled-error";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import type { ContractBudget, ContractBudgetStore } from "../contract-budget.service.ts";
@@ -23,6 +24,7 @@ const TERMS: ContractTerms = {
 class RecordingStore implements ContractBudgetStore {
   readonly created: { organizationId: string; limitUsdCents: number; operatorId: string }[] = [];
   readonly limits: { id: string; limitUsdCents: number; capSetByCustomer: boolean }[] = [];
+  readonly resets: string[] = [];
 
   constructor(private budget: ContractBudget | null) {}
 
@@ -36,7 +38,12 @@ class RecordingStore implements ContractBudgetStore {
     operatorId: string;
   }): Promise<void> {
     this.created.push(params);
-    this.budget = { id: "budget-1", limitUsdCents: params.limitUsdCents, capSetByCustomer: false };
+    this.budget = {
+      id: "budget-1",
+      limitUsdCents: params.limitUsdCents,
+      capSetByCustomer: false,
+      lastResetAt: null,
+    };
   }
 
   async setLimit(params: {
@@ -53,11 +60,21 @@ class RecordingStore implements ContractBudgetStore {
       id: params.id,
       limitUsdCents: params.limitUsdCents,
       capSetByCustomer: params.capSetByCustomer,
+      lastResetAt: null,
     };
+  }
+
+  async reset(params: { organizationId: string; id: string; actorId: string }): Promise<void> {
+    this.resets.push(params.id);
   }
 }
 
-const BUDGET: ContractBudget = { id: "budget-1", limitUsdCents: 100_000, capSetByCustomer: false };
+const BUDGET: ContractBudget = {
+  id: "budget-1",
+  limitUsdCents: 100_000,
+  capSetByCustomer: false,
+  lastResetAt: null,
+};
 
 function harness(options: { terms?: ContractTerms; budget?: ContractBudget | null }) {
   const store = new RecordingStore(options.budget === undefined ? BUDGET : options.budget);
@@ -70,6 +87,8 @@ function harness(options: { terms?: ContractTerms; budget?: ContractBudget | nul
   });
   return { service, store };
 }
+
+const RENEWED_MS = Date.UTC(2026, 0, 1);
 
 const WITH_OVERAGE: ContractTerms = { ...TERMS, overageEnabled: true, maximumUsdCents: 150_000 };
 
@@ -103,7 +122,7 @@ describe("ContractBudgetService.sync", () => {
   /** @scenario "A contract_terms_changed fact syncs the contract budget" */
   it("follows the commit where the cap was never the customer's own", async () => {
     const { service, store } = harness({
-      budget: { id: "budget-1", limitUsdCents: 50_000, capSetByCustomer: false },
+      budget: { id: "budget-1", limitUsdCents: 50_000, capSetByCustomer: false, lastResetAt: null },
     });
 
     await service.sync(SYNC);
@@ -116,14 +135,14 @@ describe("ContractBudgetService.sync", () => {
   /** @scenario "A contract_terms_changed fact syncs the contract budget" */
   it("keeps a cap the customer chose, lowering it only past the new maximum", async () => {
     const kept = harness({
-      budget: { id: "budget-1", limitUsdCents: 80_000, capSetByCustomer: true },
+      budget: { id: "budget-1", limitUsdCents: 80_000, capSetByCustomer: true, lastResetAt: null },
     });
     await kept.service.sync(SYNC);
     expect(kept.store.limits).toEqual([]);
 
     const lowered = harness({
       terms: { ...TERMS, commitUsdCents: 20_000, maximumUsdCents: 20_000 },
-      budget: { id: "budget-1", limitUsdCents: 80_000, capSetByCustomer: true },
+      budget: { id: "budget-1", limitUsdCents: 80_000, capSetByCustomer: true, lastResetAt: null },
     });
     await lowered.service.sync(SYNC);
     expect(lowered.store.limits).toEqual([
@@ -197,5 +216,47 @@ describe("ContractBudgetService.setCap", () => {
     await service.setCap({ organizationId: "org-acme", capUsdCents: 1 });
 
     expect(store.limits).toEqual([{ id: "budget-1", limitUsdCents: 1, capSetByCustomer: true }]);
+  });
+});
+
+describe("ContractBudgetService.reset", () => {
+  it("starts a new window on the budget the customer has", async () => {
+    const { service, store } = harness({});
+
+    await service.reset({
+      organizationId: "org-acme",
+      operatorId: "operator-1",
+      renewedAtMs: RENEWED_MS,
+    });
+
+    expect(store.resets).toEqual(["budget-1"]);
+  });
+
+  /** @scenario "A reset with no contract budget does nothing" */
+  it("does nothing where no contract budget exists yet", async () => {
+    const { service, store } = harness({ budget: null });
+
+    await service.reset({
+      organizationId: "org-acme",
+      operatorId: "operator-1",
+      renewedAtMs: RENEWED_MS,
+    });
+
+    expect(store.resets).toEqual([]);
+  });
+
+  /** @scenario "A redelivered renewal fact starts the window once" */
+  it("leaves a window already restarted at or after the renewal alone", async () => {
+    const { service, store } = harness({
+      budget: { ...BUDGET, lastResetAt: Temporal.Instant.fromEpochMilliseconds(RENEWED_MS) },
+    });
+
+    await service.reset({
+      organizationId: "org-acme",
+      operatorId: "operator-1",
+      renewedAtMs: RENEWED_MS,
+    });
+
+    expect(store.resets).toEqual([]);
   });
 });

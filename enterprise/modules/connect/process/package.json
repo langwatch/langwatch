@@ -24,6 +24,7 @@
     "@langwatch/api": "workspace:*",
     "@langwatch/authorization": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/enterprise-billing-contract": "workspace:*",
     "@langwatch/enterprise-connect-contract": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
