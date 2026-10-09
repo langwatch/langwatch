@@ -128,7 +128,7 @@ function mount({
         },
       }),
     },
-    config: undefined,
+    config: { foldCacheTtlSeconds: 300 },
     repositories,
     resources: new ResourceScope(),
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),

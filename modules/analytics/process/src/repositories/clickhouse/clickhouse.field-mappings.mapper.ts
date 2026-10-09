@@ -595,11 +595,17 @@ export function extractReferencedSpanColumns(expressions: string[]): ReadonlySet
 }
 
 /**
- * A projection that rebuilds a `Map` column from only the given keys, under the
- * column's own name, so outer `alias.Column['key']` reads are unchanged while the
- * multi-megabyte values of other keys are never buffered.
+ * A projection that materializes only the given keys of a `Map` column as a
+ * narrow reconstructed map under the column's own name, e.g.
+ * `map('langwatch.span.type', SpanAttributes['langwatch.span.type']) AS SpanAttributes`.
+ *
+ * Map values can be multi-megabyte (RAG contexts, full input/output IO).
+ * Selecting the whole column into a JOIN or dedup subquery buffers every value
+ * even when the outer query only reads one small key, which drove a per-query
+ * 3.5 GiB MEMORY_LIMIT_EXCEEDED in prod. The reconstructed map keeps the column
+ * name and type identical, so outer `alias.Column['key']` accesses are unchanged.
  */
-function mapNarrowProjection({
+export function mapNarrowProjection({
   column,
   keys,
 }: {
@@ -611,13 +617,21 @@ function mapNarrowProjection({
 }
 
 /** {@link mapNarrowProjection} for stored_spans `SpanAttributes`. */
-export function spanAttributesNarrowProjection(keys: readonly string[]): string {
+export function spanAttributesNarrowProjection(
+  keys: readonly string[],
+): string {
   return mapNarrowProjection({ column: "SpanAttributes", keys });
 }
 
 /**
- * A `Map` column narrowed to the keys a query reads when every mention is a literal
- * key access (`Column['key']`); otherwise the bare column, as a generic use needs it whole.
+ * Narrow a `Map` column to a reconstructed map of the keys a query reads, when
+ * it is safe to do so.
+ *
+ * Safe means every mention of the column in the expressions, under any table
+ * alias, is a plain single-quoted key access (`Column['key']`). A generic use of
+ * the whole map (`mapKeys(Column)`, a parameterised key `Column[{p:String}]`)
+ * means the keys a query needs cannot be known, so this returns `null` and the
+ * caller keeps the whole map.
  */
 export function narrowMapColumnProjection({
   column,
@@ -625,23 +639,27 @@ export function narrowMapColumnProjection({
 }: {
   column: string;
   expressions: readonly string[];
-}): string {
+}): string | null {
   const joined = expressions.join(" ");
   const escaped = column.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const allRefs = joined.match(new RegExp(`(?<!\\w)${escaped}\\b`, "g")) ?? [];
   const keyMatches = [
-    ...joined.matchAll(new RegExp(`(?<!\\w)${escaped}\\['([^'\\]\\\\]+)'\\]`, "g")),
+    ...joined.matchAll(
+      new RegExp(`(?<!\\w)${escaped}\\['([^'\\]\\\\]+)'\\]`, "g"),
+    ),
   ];
   if (keyMatches.length === 0 || keyMatches.length !== allRefs.length) {
-    return column;
+    return null;
   }
   const keys = [...new Set(keyMatches.map((match) => match[1]!))];
   return mapNarrowProjection({ column, keys });
 }
 
 /**
- * Narrow the `SpanAttributes` entry of a stored_spans required-column set to the
- * referenced keys (see {@link narrowMapColumnProjection}).
+ * Narrow the `SpanAttributes` entry of a stored_spans required-column set to a
+ * reconstructed map of only the referenced keys, when it is safe to do so (see
+ * {@link narrowMapColumnProjection}). Returns the input set unchanged when
+ * SpanAttributes is not selected or cannot be narrowed.
  */
 export function narrowSpanAttributesColumns({
   columns,
@@ -657,7 +675,7 @@ export function narrowSpanAttributesColumns({
     column: "SpanAttributes",
     expressions,
   });
-  if (projection === "SpanAttributes") return columns;
+  if (!projection) return columns;
   const narrowed = new Set(columns);
   narrowed.delete("SpanAttributes");
   narrowed.add(projection);

@@ -19,11 +19,13 @@ import {
   logCorrectedOtlpPath,
   OTLP_CORRECTED_PATH_HEADER,
   otlpBodyForensics,
+  otlpDoorFailureAnswer,
   otlpProtobufRoot,
   parseOtlpTraces,
   readCorrectedPath,
   readOtlpBody,
   stampCorrectedPath,
+  OTLP_REFUSED_MEDIA_TYPES,
 } from "@langwatch/otlp";
 import { resolveRequestBound } from "@langwatch/plans";
 import {
@@ -273,6 +275,16 @@ async function handleTracesRequest({
 
   const result = await ports.otlpTraces({ tenantId: project.id, traceRequest: parsed.request });
 
+  // Any failed handoff answers 503 so the sender resends the whole batch: taken
+  // spans dedupe (claim held an hour), failed ones had their claim released.
+  if ((result?.ingestionFailures ?? 0) > 0) {
+    const failure = otlpDoorFailureAnswer({
+      result: { outcome: "unavailable", errorMessage: result.ingestionFailureMessage ?? "" },
+      signal: "traces",
+    });
+    return jsonAnswer(failure.body, failure.status);
+  }
+
   return jsonAnswer(
     {
       message: "Trace received successfully.",
@@ -326,7 +338,7 @@ export const otlpIngestRest = defineRestRouter(TraceApi)
   .withAddressing("literal", { v1Twin: false })
 
   .post("/api/otel/v1/traces", "ingestOtlpTraces")
-  .withRawBody("bytes")
+  .withRawBody("bytes", { refuses: OTLP_REFUSED_MEDIA_TYPES })
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
   .withAccess(PUBLIC_ACCESS)
   .withResponse("protocol", {
@@ -349,7 +361,7 @@ export const otlpIngestRest = defineRestRouter(TraceApi)
   // against the allow-list in `canonicalOtlpPath` before it is served.
   .post("/:otlpBase{.+}/v1/traces", "ingestOtlpTracesAlias")
   .withParams(otlpTraceAliasParamsSchema)
-  .withRawBody("bytes")
+  .withRawBody("bytes", { refuses: OTLP_REFUSED_MEDIA_TYPES })
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
   .withAccess(PUBLIC_ACCESS)
   .withResponse("protocol", {
@@ -364,7 +376,7 @@ export const otlpIngestRest = defineRestRouter(TraceApi)
 
   .post("/:otlpBase{.+}/v1/traces/", "ingestOtlpTracesAliasSlash")
   .withParams(otlpTraceAliasParamsSchema)
-  .withRawBody("bytes")
+  .withRawBody("bytes", { refuses: OTLP_REFUSED_MEDIA_TYPES })
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
   .withAccess(PUBLIC_ACCESS)
   .withResponse("protocol", {
@@ -378,7 +390,7 @@ export const otlpIngestRest = defineRestRouter(TraceApi)
   )
 
   .post("/v1/traces", "ingestOtlpTracesRootV1")
-  .withRawBody("bytes")
+  .withRawBody("bytes", { refuses: OTLP_REFUSED_MEDIA_TYPES })
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
   .withAccess(PUBLIC_ACCESS)
   .withResponse("protocol", {
@@ -392,7 +404,7 @@ export const otlpIngestRest = defineRestRouter(TraceApi)
   )
 
   .post("/v1/traces/", "ingestOtlpTracesRootV1Slash")
-  .withRawBody("bytes")
+  .withRawBody("bytes", { refuses: OTLP_REFUSED_MEDIA_TYPES })
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
   .withAccess(PUBLIC_ACCESS)
   .withResponse("protocol", {

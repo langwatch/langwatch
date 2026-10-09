@@ -110,7 +110,7 @@ export class MemoryUserRepository implements UserRepository {
 
   async create(input: CreateUserInput): Promise<UserProfile> {
     const row = this.#insertUser({ name: input.name, email: input.email, emailVerified: false });
-    this.#appendMintFacts({ row });
+    await this.#appendMintFacts({ row });
 
     return userProfileSchema.parse(profileOf(row));
   }
@@ -127,7 +127,7 @@ export class MemoryUserRepository implements UserRepository {
       password: input.passwordHash,
     });
     const accountCreatedAtMs = nowInstant().epochMilliseconds;
-    this.#appendMintFacts({
+    await this.#appendMintFacts({
       row,
       ...(input.selfRegistered
         ? { registration: { accountId, createdAtMs: accountCreatedAtMs, email: input.email } }
@@ -144,7 +144,7 @@ export class MemoryUserRepository implements UserRepository {
       emailVerified: input.emailVerified,
     });
     this.#insertCredentialAccount({ userId: row.id, issuer: input.issuer, password: null });
-    this.#appendMintFacts({ row });
+    await this.#appendMintFacts({ row });
 
     return createdUserSchema.parse({ id: row.id });
   }
@@ -355,20 +355,23 @@ export class MemoryUserRepository implements UserRepository {
   }
 
   /** As the Prisma twin's transaction: the created fact, and registered for a self-sign-up. */
-  #appendMintFacts({
+  async #appendMintFacts({
     row,
     registration,
   }: {
     row: MemoryUserRow;
     registration?: { accountId: string; createdAtMs: number; email: string };
-  }): void {
+  }): Promise<void> {
     const fact = { tenantId: row.id, userId: row.id, occurredAt: row.createdAt.epochMilliseconds };
-    this.#database.appendFacts([
-      { type: "recordCreated", data: fact },
-      ...(registration
-        ? [{ type: "recordRegistered" as const, data: { ...fact, ...registration } }]
-        : []),
-    ]);
+    await this.#database.appendFacts({
+      userId: row.id,
+      intents: [
+        { type: "recordCreated", data: fact },
+        ...(registration
+          ? [{ type: "recordRegistered" as const, data: { ...fact, ...registration } }]
+          : []),
+      ],
+    });
   }
 
   #insertUser(input: {

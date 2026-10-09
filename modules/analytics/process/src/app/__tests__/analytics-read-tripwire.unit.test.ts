@@ -85,10 +85,7 @@ async function harness(tripwireOn: boolean) {
       }),
     },
     channels: { judge: createApiFixture<InstantEvalApi>() },
-    repositories: {
-      ...MemoryAnalyticsRepositories.create(),
-      analytics: { open: () => repository },
-    },
+    repositories: { ...MemoryAnalyticsRepositories.create(), analytics: repository },
     config: {
       langwatchQl: {
         url: void 0,

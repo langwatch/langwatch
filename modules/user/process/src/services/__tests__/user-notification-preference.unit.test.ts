@@ -1,5 +1,6 @@
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import { InMemoryProcessStore } from "@langwatch/eventing";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 /**
  * The per-person notification choice, over the memory repository.
@@ -32,7 +33,9 @@ function lifecyclePeers() {
 }
 
 async function createPerson() {
-  const { users } = MemoryUserRepositories.create();
+  const { users } = MemoryUserRepositories.create({
+    processStore: InMemoryProcessStore.createForTesting(),
+  });
   const service = UserService.create({
     repository: users,
     organizations: createApiFixture<OrganizationApi>({}),

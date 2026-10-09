@@ -4,12 +4,7 @@
  * @see specs/monitors/guardrails-api-compatibility.feature
  */
 import { publicRoute } from "@langwatch/api/access";
-import {
-  defineRestRouter,
-  MANAGEMENT_API_VERSION,
-  resolver,
-  type RestProtocolRefusal,
-} from "@langwatch/api/rest";
+import { defineRestRouter, MANAGEMENT_API_VERSION, resolver } from "@langwatch/api/rest";
 import { mapZodIssuesToLogContext } from "@langwatch/config";
 import {
   EvaluationApi,
@@ -51,7 +46,7 @@ import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import { getWorkflowsRequiredFields } from "@langwatch/workflow-contract";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { ZodError as ZodErrorClass } from "zod";
+import { z, ZodError as ZodErrorClass } from "zod";
 import { fromZodError } from "zod-validation-error";
 
 import {
@@ -89,20 +84,6 @@ const PRODUCES_JSON = "application/json";
 
 const LEGACY_PROTOCOL_REASON =
   "Released SDKs parse these doors' own statuses and bodies, refusals included";
-
-/**
- * Main's 400 for a body not sent as JSON, in the sentence each door has always written;
- * every other refusal (401, 403, 413) stays on the family's boundary, as before.
- */
-function malformedBodyAnswers(body: unknown): RestProtocolRefusal {
-  return ({ failure, response }) =>
-    HandledError.isHandled(failure) && failure.code === "malformed_request"
-      ? response.write({ status: 400, mediaType: PRODUCES_JSON, body: JSON.stringify(body) })
-      : response.decline();
-}
-
-/** The evaluate doors' sentence for a body that is not JSON. */
-const EVALUATE_MALFORMED = malformedBodyAnswers({ message: "Bad request" });
 
 /** One protocol answer, in the shape `c.json(body, status)` used to write. */
 type LegacyAnswer = Readonly<{
@@ -202,13 +183,12 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
   .post("/api/evaluations/:evaluator/evaluate", "postApiEvaluationsByEvaluatorEvaluate")
   .withSharedPath(EXPERIMENT_NAMESPACE)
   .withParams(evaluatorParamsSchema)
-  .withRawBody("text", { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })
+  .withInput(z.looseObject({}), { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })
   .withPermission("evaluations:manage")
   .withBodyLimit({ maxBytes: EVALUATE_MAX_BYTES })
   .withResponse("protocol", {
     produces: PRODUCES_JSON,
     because: LEGACY_PROTOCOL_REASON,
-    refusal: EVALUATE_MALFORMED,
   })
   .withDocs({
     summary: "Run an evaluator",
@@ -218,13 +198,13 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
     tags: ["Evaluations"],
     responses: EVALUATE_RESPONSES,
   })
-  .handle(async ({ app, raw, input, scope, response }) =>
+  .handle(async ({ app, input: { evaluator, ...body }, scope, response }) =>
     response.write(
       await handleEvaluatorCall({
         app,
-        raw,
+        body,
         projectId: scope.id,
-        evaluatorSlug: input.evaluator,
+        evaluatorSlug: evaluator,
         asGuardrail: false,
       }),
     ),
@@ -236,13 +216,12 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
   )
   .withSharedPath(EXPERIMENT_NAMESPACE)
   .withParams(namespacedEvaluatorParamsSchema)
-  .withRawBody("text", { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })
+  .withInput(z.looseObject({}), { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })
   .withPermission("evaluations:manage")
   .withBodyLimit({ maxBytes: EVALUATE_MAX_BYTES })
   .withResponse("protocol", {
     produces: PRODUCES_JSON,
     because: LEGACY_PROTOCOL_REASON,
-    refusal: EVALUATE_MALFORMED,
   })
   .withDocs({
     summary: "Run a namespaced evaluator",
@@ -252,13 +231,13 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
     tags: ["Evaluations"],
     responses: EVALUATE_RESPONSES,
   })
-  .handle(async ({ app, raw, input, scope, response }) =>
+  .handle(async ({ app, input: { evaluator, subpath, ...body }, scope, response }) =>
     response.write(
       await handleEvaluatorCall({
         app,
-        raw,
+        body,
         projectId: scope.id,
-        evaluatorSlug: `${input.evaluator}/${input.subpath}`,
+        evaluatorSlug: `${evaluator}/${subpath}`,
         asGuardrail: false,
       }),
     ),
@@ -266,13 +245,12 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
 
   .post("/api/guardrails/:evaluator/evaluate", "postApiGuardrailsByEvaluatorEvaluate")
   .withParams(evaluatorParamsSchema)
-  .withRawBody("text", { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })
+  .withInput(z.looseObject({}), { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })
   .withPermission("evaluations:manage")
   .withBodyLimit({ maxBytes: EVALUATE_MAX_BYTES })
   .withResponse("protocol", {
     produces: PRODUCES_JSON,
     because: LEGACY_PROTOCOL_REASON,
-    refusal: EVALUATE_MALFORMED,
   })
   .withDocs({
     summary: "Run an evaluator as a guardrail",
@@ -282,13 +260,13 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
     tags: ["Evaluations"],
     responses: EVALUATE_RESPONSES,
   })
-  .handle(async ({ app, raw, input, scope, response }) =>
+  .handle(async ({ app, input: { evaluator, ...body }, scope, response }) =>
     response.write(
       await handleEvaluatorCall({
         app,
-        raw,
+        body,
         projectId: scope.id,
-        evaluatorSlug: input.evaluator,
+        evaluatorSlug: evaluator,
         asGuardrail: true,
       }),
     ),
@@ -314,21 +292,17 @@ type ResolvedEvaluator = Readonly<{
 
 async function handleEvaluatorCall({
   app,
-  raw,
+  body,
   projectId,
   evaluatorSlug,
   asGuardrail,
 }: {
   app: EvaluationApi;
-  raw: string;
+  body: Record<string, unknown>;
   projectId: string;
   evaluatorSlug: string;
   asGuardrail: boolean;
 }): Promise<LegacyAnswer> {
-  const body = parseJson(raw);
-
-  if (!body) return answer({ message: "Bad request" }, 400);
-
   const saved = evaluatorSlug.startsWith("evaluators/")
     ? await resolveSavedEvaluator(app, projectId, evaluatorSlug)
     : await resolveMonitorEvaluator(app, projectId, evaluatorSlug);
@@ -804,17 +778,6 @@ async function resolveEvaluatorDefinition({
 }
 
 // ============ Shared helpers ============
-
-/** The document, or nothing where the body was not a JSON object. */
-function parseJson(raw: string): Record<string, unknown> | null {
-  try {
-    const parsed: unknown = JSON.parse(raw);
-
-    return isJsonObject(parsed) ? parsed : null;
-  } catch {
-    return null;
-  }
-}
 
 function isJsonObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;

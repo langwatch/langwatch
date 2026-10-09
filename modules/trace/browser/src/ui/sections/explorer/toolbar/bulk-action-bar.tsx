@@ -11,7 +11,7 @@ import { traceContextChip } from "../../../../behavior/langy/langy-context-chips
 import { useLangyStore } from "../../../../behavior/langy/langy.store.ts";
 import { useCanAskLangy } from "../../../../behavior/langy/use-can-ask-langy.ts";
 import { SELECT_ALL_MATCHING_CAP } from "../../../../behavior/selection.slice.ts";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { useTraceHost } from "../../../../behavior/trace-host.ts";
 import { PersonalFeatureGateDialog } from "../../me/personal-feature-gate-dialog.tsx";
 import { usePersonalFeatureGate } from "../../me/use-personal-feature-gate.ts";
 import { AddToAnnotationQueueDialog } from "../add-to-annotation-queue-dialog.tsx";
@@ -38,11 +38,11 @@ export const BulkActionBar: React.FC<BulkActionBarProps> = ({
   const enableAllMatching = useSelectionStore((s) => s.selectAllMatching);
   const clear = useSelectionStore((s) => s.clearSelection);
   const { openDrawer } = useDrawer();
-  const { hasPermission } = useOrganizationTeamProject();
+  const traceHost = useTraceHost();
   const datasetGate = usePersonalFeatureGate("datasets");
   const annotationGate = usePersonalFeatureGate("annotations");
   const [annotationQueueOpen, setAnnotationQueueOpen] = useState(false);
-  const canQueueForAnnotation = hasPermission("annotations:create");
+  const canQueueForAnnotation = traceHost.hasPermission("annotations:create");
   // `langy:create`, not `langy:view`. This control exists to prime a question —
   // filling a composer that cannot send is a dead end that looks like a feature.
   const showLangy = useCanAskLangy();

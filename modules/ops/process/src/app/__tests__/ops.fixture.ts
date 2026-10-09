@@ -9,6 +9,7 @@ import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { AutomationApi } from "@langwatch/automation-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
+import { InMemoryProcessStore } from "@langwatch/eventing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import type { OpsOperatorPermission } from "@langwatch/ops-contract";
@@ -125,7 +126,11 @@ export function createOpsTestInfrastructure(
 
 export function createOpsTestApp(options: OpsTestAppOptions = {}): OpsTestApp {
   const repositories =
-    options.repositories ?? MemoryOpsRepositories.create({ eventing: { definitions: [] } });
+    options.repositories ??
+    MemoryOpsRepositories.create({
+      eventing: { definitions: [] },
+      processStore: InMemoryProcessStore.createForTesting(),
+    });
 
   const app = OpsModule.fromInfrastructure({
     infrastructure: createOpsTestInfrastructure(options.members, options.capability),

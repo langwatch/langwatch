@@ -3,7 +3,8 @@
  * flag or the organization's own opt-in releases it (ADR-174 decision 11).
  * @see modules/instant-eval/specs/instant-eval-judge-model.feature
  */
-import { useFeatureFlag } from "@langwatch/browser-host/feature-flag";
+import { useFeatureFlag } from "@langwatch/feature-flag-client";
+import { FrontendFlags } from "@langwatch/feature-flag-contract";
 import { INSTANT_EVALS_FLAG } from "@langwatch/instant-eval-contract";
 import { INSTANT_EVAL_JUDGE_MODEL_ID } from "@langwatch/instant-eval-judge-contract";
 import type { BuiltInModel } from "@langwatch/model-provider-contract";
@@ -26,7 +27,7 @@ export function useInstantEvalJudgeModels({
   projectId: string | undefined;
   organizationId: string | undefined;
 }): { builtInModels: readonly BuiltInModel[]; isLoading: boolean } {
-  const flag = useFeatureFlag(INSTANT_EVALS_FLAG, {
+  const flag = useFeatureFlag(FrontendFlags[INSTANT_EVALS_FLAG], {
     projectId,
     organizationId,
     enabled: !!projectId && !!organizationId,

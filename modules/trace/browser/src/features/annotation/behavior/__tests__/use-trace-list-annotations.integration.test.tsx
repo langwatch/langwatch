@@ -13,6 +13,13 @@ const harness = vi.hoisted(() => ({
   view: { columnOrder: ["time", "trace", "annotations"] },
 }));
 
+vi.mock("../../../../behavior/trace-host.ts", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useTraceHost: () => ({
+    hasPermission: (permission: string) =>
+      permission === "annotations:view" ? harness.permissions.annotationsView : true,
+  }),
+}));
 vi.mock("../../../../behavior/use-annotations-by-trace-ids.ts", () => ({
   useAnnotationsByTraceIds: harness.useAnnotationsByTraceIds,
 }));
@@ -20,8 +27,6 @@ vi.mock("../../../../behavior/use-annotations-by-trace-ids.ts", () => ({
 vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: harness.projectId.value ? { id: harness.projectId.value } : undefined,
-    hasPermission: (permission: string) =>
-      permission === "annotations:view" ? harness.permissions.annotationsView : true,
   }),
 }));
 

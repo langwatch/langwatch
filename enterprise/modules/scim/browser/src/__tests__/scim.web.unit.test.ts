@@ -1,6 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { createUi } from "@langwatch/browser";
+import { hostServiceFakes } from "@langwatch/browser/testing";
 import { describe, expect, it } from "vitest";
 
 import { scimWeb } from "../scim.web.ts";
@@ -17,7 +18,7 @@ describe("given a browser that installs scim", () => {
   describe("when the kernel renders with only a transport supplied", () => {
     it("installs the module", async () => {
       const installed = await createUi({ document: browserDocument(), mount: "root" })
-        .withModules([scimWeb] as const)
+        .withModules([hostServiceFakes(), scimWeb] as const)
         .withTransport({ query: () => Promise.resolve(null) })
         .render();
 

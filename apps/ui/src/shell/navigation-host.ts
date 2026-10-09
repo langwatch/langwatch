@@ -4,7 +4,7 @@
  * mount's readings, extending the port class the caller hands in.
  */
 
-import type { UiDrawerToken } from "@langwatch/browser-host/declarations";
+import type { ReleaseFlagToken, UiDrawerToken } from "@langwatch/browser-host/declarations";
 import type {
   NavigationDeployment,
   NavigationFlagReading,
@@ -56,7 +56,7 @@ export type BrowserNavigationReading = {
   notFound: ReactNode;
   hasPermission: (permission: string) => boolean;
   /** Tri-state at the source: `undefined` is "not answered yet". */
-  featureFlag: (flag: string) => boolean | undefined;
+  featureFlag: (flag: ReleaseFlagToken) => boolean | undefined;
 };
 
 /** Everything the chrome asks the shell to DO. */
@@ -134,7 +134,7 @@ export function browserNavigationHosts(port: NavigationHostClass): BrowserNaviga
     }
 
     /** The port's own tri-state: unanswered is neither on nor off. */
-    featureFlag(flag: string): NavigationFlagReading {
+    featureFlag(flag: ReleaseFlagToken): NavigationFlagReading {
       const answer = this.reading.featureFlag(flag);
       return { enabled: answer === true, isLoading: answer === void 0 };
     }

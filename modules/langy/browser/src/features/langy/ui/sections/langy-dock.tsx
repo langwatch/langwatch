@@ -1,7 +1,7 @@
-import { useFeatureFlag } from "@langwatch/browser-host/feature-flag";
 import { lazyChunk } from "@langwatch/browser-host/navigation";
 import { LangyMarkGradientDefs } from "@langwatch/design-system/langy-mark";
-import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
+import { useFeatureFlag } from "@langwatch/feature-flag-client";
+import { FrontendFlags, NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import { Suspense, useState } from "react";
 
 import { useLangyStore } from "../../../../behavior/langy.store.ts";
@@ -27,7 +27,7 @@ export function LangyDock(props: LangySidecarProps) {
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
   });
-  const peekDock = useFeatureFlag("release_ui_langy_peek_dock_enabled", {
+  const peekDock = useFeatureFlag(FrontendFlags.release_ui_langy_peek_dock_enabled, {
     projectId: project?.id ?? NOT_TARGETED,
     organizationId: organization?.id ?? NOT_TARGETED,
   });

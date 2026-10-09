@@ -384,9 +384,6 @@ export interface OrganizationApi {
   /** The self-hosted provisioning door's read: one organization's summary, or `not_found`. */
   getProvisioningSummary(organizationId: string): Promise<OrganizationProvisioningSummary>;
   deleteProvisionedOrganization(input: { organizationId: string }): Promise<void>;
-  /** A self-hosted licence customer: the organization and its first team, marked. */
-  createSelfHostedCustomer(input: { name: string }): Promise<{ id: string; name: string }>;
-  markSelfHostedCustomer(input: { organizationId: string }): Promise<void>;
   /** Every organization an operator marked as a self-hosted licence customer. */
   findSelfHostedCustomers(): Promise<{ organizationId: string; organizationName: string }[]>;
   /** Organizations founded in [fromMs, toMs], each with its founder and the founder's
@@ -403,20 +400,6 @@ export interface OrganizationApi {
   findRepresentatives(input: {
     organizationId: string;
   }): Promise<{ userId: string; organizationName: string }[]>;
-  /**
-   * Provisions an organization end to end: it, its first team, a bootstrap
-   * admin key, the summary. A failure past creation deletes the organization
-   * and reports a failed compensation rather than raising it over the cause.
-   */
-  createForProvisioningWithAdminKey(input: {
-    name: string;
-    slug?: string;
-    adminApiKeyName?: string;
-  }): Promise<{
-    organization: { id: string; name: string; slug: string };
-    team: { id: string; slug: string; name: string };
-    adminApiKey: { id: string; token: string };
-  }>;
   /** The authorization feature's per-member access breakdown, organization's own door onto it. */
   getMemberAccessBreakdown(
     input: Readonly<{

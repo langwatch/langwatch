@@ -413,7 +413,7 @@ func New(ctx context.Context, opts Options) (*Provider, error) {
 	logger := clog.Get(ctx)
 	reporter := newCollectorErrorReporter(logger)
 	startupFilter := newStartupErrorHandler(reporter, startupGraceWindow)
-	otelapi.SetErrorHandler(startupFilter)
+	installErrorHandler(serviceName, startupFilter)
 
 	// The internal-origin marker goes on every single-tenant resource: those
 	// providers carry exclusively LangWatch's own telemetry. Multi-tenant
@@ -561,6 +561,9 @@ func New(ctx context.Context, opts Options) (*Provider, error) {
 	if err := installMetrics(ctx, opts, res, provider); err != nil {
 		return nil, err
 	}
+	if provider.mp != nil {
+		installMeterProvider(serviceName, provider.mp)
+	}
 
 	return provider, nil
 }
@@ -602,31 +605,9 @@ func installMetrics(ctx context.Context, opts Options, res *resource.Resource, p
 	if opts.MetricsDisabled {
 		return nil
 	}
-	var readers []sdkmetric.Reader
-	if opts.OTLPEndpoint != "" && !opts.MultiTenant {
-		metricsURL := opts.MetricsEndpoint
-		if metricsURL == "" {
-			metricsURL = metricsEndpointFromTraces(opts.OTLPEndpoint)
-		}
-		r, err := newMetricReader(ctx, metricsURL, opts.OTLPHeaders)
-		if err != nil {
-			return err
-		}
-		readers = append(readers, r)
-	}
-	if opts.DebugCollectorEndpoint != "" {
-		// When the primary reader above already targets the same collector,
-		// a debug reader would double every metric. Multi-tenant services
-		// install no primary reader, so their debug reader always survives.
-		primaryCoversDebug := len(readers) > 0 &&
-			sameCollectorBase(opts.OTLPEndpoint, opts.DebugCollectorEndpoint)
-		if !primaryCoversDebug {
-			r, err := newMetricReader(ctx, withSignalPath(opts.DebugCollectorEndpoint, "/v1/metrics"), opts.DebugCollectorHeaders)
-			if err != nil {
-				return err
-			}
-			readers = append(readers, r)
-		}
+	readers, err := metricReaders(ctx, opts)
+	if err != nil {
+		return err
 	}
 	if len(readers) == 0 {
 		return nil
@@ -637,7 +618,6 @@ func installMetrics(ctx context.Context, opts Options, res *resource.Resource, p
 		mpOpts = append(mpOpts, sdkmetric.WithReader(r))
 	}
 	mp := sdkmetric.NewMeterProvider(mpOpts...)
-	otelapi.SetMeterProvider(mp)
 	// Runtime metrics (GC, goroutines, mem) are the first cut — a start failure
 	// must not sink service init, so warn and carry on.
 	if err := startRuntimeMetrics(mp); err != nil {
@@ -645,6 +625,33 @@ func installMetrics(ctx context.Context, opts Options, res *resource.Resource, p
 	}
 	provider.mp = mp
 	return nil
+}
+
+// metricReaders are the primary and debug collector readers opts names.
+func metricReaders(ctx context.Context, opts Options) ([]sdkmetric.Reader, error) {
+	var readers []sdkmetric.Reader
+	if opts.OTLPEndpoint != "" && !opts.MultiTenant {
+		metricsURL := opts.MetricsEndpoint
+		if metricsURL == "" {
+			metricsURL = metricsEndpointFromTraces(opts.OTLPEndpoint)
+		}
+		r, err := newMetricReader(ctx, metricsURL, opts.OTLPHeaders)
+		if err != nil {
+			return nil, err
+		}
+		readers = append(readers, r)
+	}
+	// When the primary reader already targets the debug collector, a debug
+	// reader would double every metric. Multi-tenant services install no
+	// primary reader, so their debug reader always survives.
+	if opts.DebugCollectorEndpoint == "" || (len(readers) > 0 && sameCollectorBase(opts.OTLPEndpoint, opts.DebugCollectorEndpoint)) {
+		return readers, nil
+	}
+	r, err := newMetricReader(ctx, withSignalPath(opts.DebugCollectorEndpoint, "/v1/metrics"), opts.DebugCollectorHeaders)
+	if err != nil {
+		return nil, err
+	}
+	return append(readers, r), nil
 }
 
 // Shutdown flushes pending telemetry across every configured signal

@@ -477,6 +477,39 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
     if (count === 0) throw new OrganizationNotFoundError();
   }
 
+  async findConnectServicesDisabled(organizationId: string): Promise<string[]> {
+    const row = await this.database.organization.findUnique({
+      where: { id: organizationId },
+      select: { connectServicesDisabled: true },
+    });
+    return row?.connectServicesDisabled ?? [];
+  }
+
+  async updateConnectServicesDisabled(input: {
+    organizationId: string;
+    servicesDisabled: readonly string[];
+  }): Promise<void> {
+    const { count } = await this.database.organization.updateMany({
+      where: { id: input.organizationId },
+      data: { connectServicesDisabled: [...input.servicesDisabled] },
+    });
+    if (count === 0) throw new OrganizationNotFoundError();
+  }
+
+  async updateConnectSyncOutcome(input: {
+    organizationId: string;
+    at: Instant;
+    error: string | null;
+  }): Promise<void> {
+    const { count } = await this.database.organization.updateMany({
+      where: { id: input.organizationId },
+      data: input.error
+        ? { connectLastSyncError: input.error }
+        : { connectLastSyncAt: toDate(input.at), connectLastSyncError: null },
+    });
+    if (count === 0) throw new OrganizationNotFoundError();
+  }
+
   async setLicense(input: {
     organizationId: string;
     licenseKey: string;

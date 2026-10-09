@@ -2,12 +2,19 @@ import { setTimeout as sleep } from "node:timers/promises";
 
 import { generate } from "@langwatch/ksuid";
 
+import { BackgroundStepsService } from "../background/background-steps.service.ts";
+import { imageContractSteps } from "../gate/image-tree.ts";
 import { UpgradeLedgerSeedService } from "../ledger-seed.service.ts";
 import { UpgradeLedgerRepository } from "../ledger.repository.ts";
 import type { UpgradeRun, UpgradeStep, UpgradeStepStatus } from "../ledger.ts";
 import { compareReleases } from "../manifest/manifest.ts";
 import type { LtsFloor, ManifestStep, ReleaseManifest } from "../manifest/manifest.ts";
-import { type PlannedRelease, planUpgrade, type UpgradePlan } from "../plan/plan-upgrade.ts";
+import {
+  inlineBeforeContracts,
+  type PlannedRelease,
+  planUpgrade,
+  type UpgradePlan,
+} from "../plan/plan-upgrade.ts";
 import type { UpgradeClickHouse, UpgradePostgres } from "../ports.ts";
 import type { UpgradeStatus } from "../reader/reader.schema.ts";
 import { createUpgradeReader } from "../reader/reader.service.ts";
@@ -46,6 +53,8 @@ export interface UpgradeRunnerOptions {
   releases: { manifests: readonly ReleaseManifest[]; floor: LtsFloor };
   applier: UpgradeSchemaApplier;
   codeSteps?: readonly MigrationStep[];
+  /** Contract ids, each with the steps its SQL names `after`; read from the image if not given. */
+  contracts?: ReadonlyMap<string, readonly string[]>;
   reconcilers?: readonly UpgradeReconciler[];
   identity: { image: string; host: string };
   log: UpgradeRunnerLog;
@@ -455,8 +464,13 @@ export class UpgradeRunnerService {
     await phases.end({ name: "preflight", outcome: "succeeded" });
     const recorded = new Map(before.steps.map((step) => [step.id, step]));
     const applied: string[] = [];
-    for (const release of plan.releases) {
+    const inline = await this.inlineBeforeContracts({ plan });
+    for (const [index, release] of plan.releases.entries()) {
       signal.throwIfAborted();
+      for (const id of inline[index] ?? []) {
+        await this.runBeforeContract({ id, signal, runId });
+        applied.push(id);
+      }
       if (release.schema.length > 0) {
         await this.applySchema({ release, signal, runId, phases });
         applied.push(...release.schema);
@@ -730,6 +744,80 @@ export class UpgradeRunnerService {
       throw new UpgradeRunFailure("step_failed", `blocking step ${id} failed: ${lastError}`, {
         step: id,
       });
+    }
+  }
+
+  /** Per planned release, the unfinished background steps its contract steps wait for. */
+  private async inlineBeforeContracts({
+    plan,
+  }: {
+    plan: Extract<UpgradePlan, { outcome: "planned" }>;
+  }): Promise<string[][]> {
+    const settled = (await this.ledger.findSteps())
+      .filter((step) => step.status === "done" || step.status === "not-needed")
+      .map((step) => step.id);
+    return inlineBeforeContracts({
+      releases: plan.releases,
+      contracts: this.options.contracts ?? imageContractSteps(),
+      background: this.shipped
+        .filter((step) => step.mode === "background" && this.codeSteps.has(step.id))
+        .map((step) => ({ ...step, after: this.codeSteps.get(step.id)?.after })),
+      settled: new Set(settled),
+    });
+  }
+
+  /**
+   * Runs one background step to its end before a contract step (Alex, 2026-10-09): forced and
+   * blocking, under the step's own lease, waiting while a worker holds it; a failure fails the run.
+   */
+  private async runBeforeContract({
+    id,
+    signal,
+    runId,
+  }: {
+    id: string;
+    signal: AbortSignal;
+    runId: string;
+  }): Promise<void> {
+    const steps = BackgroundStepsService.create({
+      ledger: {
+        findSteps: () => this.ledger.findSteps(),
+        acquireLease: (input) => this.ledger.acquireLease(input),
+        renewLease: (input) => this.ledger.renewLease(input),
+        releaseLease: (input) => this.ledger.releaseLease(input),
+        markRunning: (input) => this.runner.markRunning(input),
+        setStatus: (input) => this.runner.setStatus(input),
+        saveReport: (input) => this.runner.saveReport(input),
+      },
+      steps: [...this.codeSteps.values()],
+      serving: () => true,
+      oldWritersGoneFor: async () => true,
+      identity: { ...this.options.identity, owner: `upgrade:${runId}` },
+      log: (level, message, fields) =>
+        level === "warn" ? this.narrate.warn(message, fields) : undefined,
+      retry: { attempts: 1, firstBackoffMs: 0, maxBackoffMs: 0 },
+    });
+    const description = this.codeSteps.get(id)?.description ?? id;
+    this.narrate.stepStarted({ id, description, resuming: false });
+    for (;;) {
+      const outcome = await steps.runNow({ id, signal });
+      signal.throwIfAborted();
+      if (outcome === "held") {
+        await sleep(this.timing.pollMs, undefined, { signal });
+        continue;
+      }
+      const row = (await this.ledger.findSteps()).find((step) => step.id === id);
+      if (row?.status === "done" || row?.status === "not-needed") {
+        this.narrate.stepEnded({ id, error: null });
+        return;
+      }
+      const lastError = row?.lastError ?? `it is ${row?.status ?? "unrecorded"}`;
+      this.narrate.stepEnded({ id, error: lastError });
+      throw new UpgradeRunFailure(
+        "step_failed",
+        `background step ${id} must finish before a contract step: ${lastError}`,
+        { step: id },
+      );
     }
   }
 

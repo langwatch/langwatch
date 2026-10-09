@@ -104,8 +104,8 @@ func selectCombinedServices(names []string) ([]combinedService, error) {
 //
 // Every service keeps its own configuration, its own dependencies and its own
 // telemetry identity — the only thing they share is the process, its signal
-// handling and its stdout. The first service to fail cancels the group, so a
-// half-running combined process is not a state this can reach.
+// handling and its stdout. The first service to fail cancels the group; one
+// that panics is reported and stops alone (runCombinedService).
 func combinedRoot(ctx context.Context, args []string) error {
 	selected, err := selectCombinedServices(args)
 	if err != nil {
@@ -129,12 +129,26 @@ func combinedRoot(ctx context.Context, args []string) error {
 			zap.String("service", svc.Name),
 			zap.String("addr", addr),
 		)
-		group.Go(func() error {
-			if err := svc.Run(serviceCtx, addr); err != nil {
-				return fmt.Errorf("%s: %w", svc.Name, err)
-			}
-			return nil
-		})
+		group.Go(func() error { return runCombinedService(serviceCtx, svc, addr) })
 	}
 	return group.Wait()
+}
+
+// runCombinedService runs one hosted service. A panic in its Run goroutine is
+// reported and stops only that service: a simulator's bug must not take the
+// gateway down with it. Goroutines the service spawns itself stay its own.
+func runCombinedService(ctx context.Context, svc combinedService, addr string) error {
+	defer func() {
+		if v := recover(); v != nil {
+			clog.LogPanic(ctx, v)
+			clog.Get(ctx).Error("combined_service_stopped_after_panic",
+				zap.String("service", svc.Name),
+				zap.String("hint", "the other services keep running; restart the go lane to bring it back"),
+			)
+		}
+	}()
+	if err := svc.Run(ctx, addr); err != nil {
+		return fmt.Errorf("%s: %w", svc.Name, err)
+	}
+	return nil
 }

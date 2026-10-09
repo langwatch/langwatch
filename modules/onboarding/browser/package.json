@@ -26,6 +26,7 @@
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/enterprise-governance-client": "workspace:*",
+    "@langwatch/feature-flag-client": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/identity-client": "workspace:*",
     "@langwatch/langy-client": "workspace:*",

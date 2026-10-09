@@ -19,7 +19,6 @@ const COLORS: Record<string, (s: string) => string> = {
   "prepare:langwatch": chalk.green,
   "prepare:langevals": chalk.magenta,
   "migrate:upgrade": chalk.dim,
-  "migrate:system-migrations": chalk.dim,
 };
 
 // Wide enough to fit `prepare:langevals` without breaking alignment when

@@ -23,8 +23,27 @@ const BIND_HANDOVER_MS = 10_000;
 /** How long a caller held off by an upgrade waits before trying again; the page refreshes on it. */
 export const UPGRADE_RETRY_AFTER_SECONDS = 10;
 
+/** The failure console's forms (UPGRADE-CONSOLE, 2026-10-09); answered only while it shows. */
+export const UPGRADE_CONSOLE_PATH = "/_upgrade/console";
+export const UPGRADE_RETRY_PATH = "/_upgrade/retry";
+/** D3: the token is swapped once for this cookie, void when the hold lifts or the process exits. */
+export const UPGRADE_CONSOLE_COOKIE = "langwatch_upgrade_console";
+/** D2: a console token opens the console once, within this long of being printed. */
+export const UPGRADE_CONSOLE_TOKEN_TTL_MS = 30 * 60_000;
+/** D4: wrong tokens a process takes in a minute before every submission answers 429. */
+export const UPGRADE_CONSOLE_WRONG_TOKENS_PER_MINUTE = 5;
+
 /** All the unauthenticated holding page may say (Q-U4): the phase and outstanding step ids. */
 export type UpgradeHolding = Readonly<{ phase: string; outstandingStepIds: readonly string[] }>;
+
+/** A failed upgrade run, shown only to a console session. D1: the thread gets the token's hash. */
+export type UpgradeConsole = Readonly<{
+  failedSteps: readonly Readonly<{ id: string; error: string | null }>[];
+  logTail: readonly string[];
+  tokenSha256: string;
+  /** The thread starts the token's clock on its own, so no time crosses threads. */
+  tokenTtlMs: number;
+}>;
 
 const escapeHtml = (value: string): string =>
   value.replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`);
@@ -44,12 +63,51 @@ export function renderUpgradeHoldingPage({ phase, outstandingStepIds }: UpgradeH
   ].join("");
 }
 
+const consolePage = (body: readonly string[]): string =>
+  [
+    "<!doctype html>",
+    `<html lang="en"><head><meta charset="utf-8"><title>LangWatch's upgrade needs an operator</title>`,
+    "<style>body{font-family:system-ui,sans-serif;max-width:48rem;margin:10vh auto;padding:0 1rem;color:#1a1a1a}pre{overflow:auto;background:#f4f4f4;padding:.5rem}</style>",
+    "</head><body>",
+    ...body,
+    "</body></html>",
+  ].join("");
+
+/** A failed upgrade's page to anyone without a console session: no step, error, host or version. */
+export function renderUpgradeConsoleLogin({ refused }: { refused: boolean }): string {
+  return consolePage([
+    "<h1>LangWatch's upgrade needs an operator</h1>",
+    refused
+      ? `<p><strong>That token was not accepted.</strong> A token opens the console once, within ${UPGRADE_CONSOLE_TOKEN_TTL_MS / 60_000} minutes; restart the api to print a new one.</p>`
+      : "",
+    "<p>Enter the console token this api printed in its log when the upgrade failed.</p>",
+    `<form method="post" action="${UPGRADE_CONSOLE_PATH}"><input type="password" name="token" autocomplete="off" required aria-label="Console token"> <button type="submit">Open the console</button></form>`,
+  ]);
+}
+
+/** The console a session sees: the failed steps, the run's last lines, Retry. */
+export function renderUpgradeConsole({
+  failedSteps,
+  logTail,
+}: Pick<UpgradeConsole, "failedSteps" | "logTail">): string {
+  const steps = failedSteps
+    .map(({ id, error }) => `<li><code>${escapeHtml(id)}</code>: ${escapeHtml(error ?? "")}</li>`)
+    .join("");
+  return consolePage([
+    "<h1>The upgrade failed</h1>",
+    steps === "" ? "" : `<p>Failed steps:</p><ul>${steps}</ul>`,
+    `<p>The last ${logTail.length} lines of the run's log:</p><pre>${escapeHtml(logTail.join("\n"))}</pre>`,
+    `<form method="post" action="${UPGRADE_RETRY_PATH}"><button type="submit">Retry</button></form>`,
+  ]);
+}
+
 /**
  * Plain CommonJS, Node built-ins only, evaluated with `eval: true` so no file has to resolve
  * under any bundler. It owns the public port: the liveness path from the heartbeat, anything
  * else (upgrades included) proxied to the main thread's loopback listener.
  */
 const LIVENESS_THREAD_SOURCE = `
+const crypto = require("node:crypto");
 const http = require("node:http");
 const net = require("node:net");
 const { parentPort, workerData } = require("node:worker_threads");
@@ -67,6 +125,10 @@ const stalledMs = () => {
 };
 const target = { host: "127.0.0.1", port: workerData.proxyPort };
 let holdingPage = null;
+let consoleHold = null;
+const sessions = [];
+let wrongTokensAt = [];
+const sha256 = (value) => crypto.createHash("sha256").update(value).digest();
 const answerHolding = (req, res) => {
   const html = String(req.headers.accept || "").includes("text/html");
   req.resume();
@@ -76,6 +138,80 @@ const answerHolding = (req, res) => {
     "Cache-Control": "no-store",
     "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'",
   }).end(html ? holdingPage : "LangWatch is upgrading");
+};
+const answerConsole = (res, status, page, headers) => {
+  res.writeHead(status, {
+    "Content-Type": "text/html; charset=utf-8",
+    "Cache-Control": "no-store",
+    "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'",
+    ...headers,
+  }).end(page);
+};
+const hasSession = (req) => {
+  const prefix = workerData.consoleCookie + "=";
+  const pair = String(req.headers.cookie || "").split(";").map((part) => part.trim()).find((part) => part.startsWith(prefix));
+  if (pair === undefined) return false;
+  const hashed = sha256(pair.slice(prefix.length));
+  return sessions.some((session) => crypto.timingSafeEqual(session, hashed));
+};
+// CONSOLE-FOLLOWUPS: the browser's Sec-Fetch-Site decides; without it, Origin's host must be Host.
+const crossSite = (req) => {
+  const site = req.headers["sec-fetch-site"];
+  if (site !== undefined) return site !== "same-origin";
+  if (req.headers.origin === undefined) return false;
+  try {
+    return new URL(req.headers.origin).host !== req.headers.host;
+  } catch {
+    return true;
+  }
+};
+const openConsole = (req, res, token) => {
+  const held = consoleHold;
+  if (held === null) return answerHolding(req, res);
+  const now = Date.now();
+  wrongTokensAt = wrongTokensAt.filter((at) => now - at < 60000);
+  if (wrongTokensAt.length >= workerData.wrongTokensPerMinute) {
+    res.writeHead(429, { "Content-Type": "text/plain", "Retry-After": "60", "Cache-Control": "no-store" }).end("Too many wrong console tokens; wait a minute");
+    return;
+  }
+  const matches = crypto.timingSafeEqual(sha256(token), held.tokenSha256);
+  if (!matches || held.used || now >= held.expiresAt) {
+    wrongTokensAt.push(now);
+    answerConsole(res, 403, held.refusedPage);
+    return;
+  }
+  held.used = true;
+  const session = crypto.randomBytes(32).toString("base64url");
+  sessions.push(sha256(session));
+  const secure = req.socket.encrypted || req.headers["x-forwarded-proto"] === "https" ? "; Secure" : "";
+  res.writeHead(303, {
+    Location: "/",
+    "Cache-Control": "no-store",
+    "Set-Cookie": workerData.consoleCookie + "=" + session + "; HttpOnly; SameSite=Strict; Path=/" + secure,
+  }).end();
+};
+const answerFailed = (req, res) => {
+  const path = String(req.url).split("?")[0];
+  if (req.method === "POST" && path === workerData.consolePath) {
+    let body = "";
+    req.setEncoding("utf8");
+    req.on("data", (chunk) => {
+      body += chunk;
+      if (body.length > 4096) req.destroy();
+    });
+    req.on("end", () => openConsole(req, res, new URLSearchParams(body).get("token") || ""));
+    return;
+  }
+  req.resume();
+  if (req.method === "POST" && path === workerData.retryPath) {
+    if (crossSite(req) || !hasSession(req)) return answerConsole(res, 403, consoleHold.loginPage);
+    consoleHold = null;
+    parentPort.postMessage({ type: "retry" });
+    res.writeHead(303, { Location: "/", "Cache-Control": "no-store" }).end();
+    return;
+  }
+  if (!String(req.headers.accept || "").includes("text/html")) return answerHolding(req, res);
+  answerConsole(res, 503, hasSession(req) ? consoleHold.consolePage : consoleHold.loginPage);
 };
 const unavailable = (res, body) => {
   if (res.destroyed || res.writableEnded) return;
@@ -94,6 +230,10 @@ const server = http.createServer((req, res) => {
   }
   if (req.url === workerData.readinessPath && Atomics.load(readiness, 0) === 1) {
     res.writeHead(200, { "Content-Type": "text/plain" }).end("ready");
+    return;
+  }
+  if (consoleHold !== null) {
+    answerFailed(req, res);
     return;
   }
   if (holdingPage !== null) {
@@ -153,7 +293,23 @@ server.on("error", (error) => {
 parentPort.on("message", (message) => {
   if (message.type === "hold") {
     holdingPage = message.page;
+    consoleHold = null;
+    if (message.page === null) sessions.length = 0;
     parentPort.postMessage({ type: "held" });
+    return;
+  }
+  if (message.type === "console") {
+    // CONSOLE-FOLLOWUPS: a session opened one failed run's console, never the next run's.
+    sessions.length = 0;
+    holdingPage = message.loginPage;
+    consoleHold = {
+      loginPage: message.loginPage,
+      refusedPage: message.refusedPage,
+      consolePage: message.consolePage,
+      tokenSha256: Buffer.from(message.tokenSha256, "hex"),
+      expiresAt: Date.now() + message.tokenTtlMs,
+      used: false,
+    };
     return;
   }
   if (message.type !== "close") return;
@@ -188,6 +344,7 @@ type ThreadMessage =
   | { type: "failed"; code?: string; message: string }
   | { type: "closed" }
   | { type: "held" }
+  | { type: "retry" }
   | { type: "stragglers" };
 
 export type LivenessLogger = Readonly<{
@@ -202,6 +359,8 @@ export type LivenessThread = Readonly<{
   close: (options: { graceMs: number }) => Promise<void>;
   /** Serves the holding page in place of the main thread until called with `undefined`. */
   hold: (holding: UpgradeHolding | undefined) => Promise<void>;
+  /** Shows the failure console; true once a console session pressed Retry, false if it ended. */
+  holdConsole: (upgradeConsole: UpgradeConsole) => Promise<boolean>;
 }>;
 
 /** Starts the thread and resolves once it is listening; rejects when it cannot bind or start. */
@@ -238,6 +397,10 @@ export async function startLivenessThread({
       readinessPath: READINESS_PATH,
       handoverMs: BIND_HANDOVER_MS,
       retryAfterSeconds: UPGRADE_RETRY_AFTER_SECONDS,
+      consolePath: UPGRADE_CONSOLE_PATH,
+      retryPath: UPGRADE_RETRY_PATH,
+      consoleCookie: UPGRADE_CONSOLE_COOKIE,
+      wrongTokensPerMinute: UPGRADE_CONSOLE_WRONG_TOKENS_PER_MINUTE,
     },
   });
   // The main loop keeps its own loopback listener, which is what holds the process open.
@@ -254,17 +417,22 @@ export async function startLivenessThread({
   return {
     address,
     hold: async (holding) => {
-      const held = new Promise<void>((resolve) => {
-        const onMessage = (message: ThreadMessage): void => {
-          if (message.type !== "held") return;
-          thread.off("message", onMessage);
-          resolve();
-        };
-        thread.on("message", onMessage);
-      });
+      const held = nextMessage({ thread, type: "held" });
       const page = holding === undefined ? null : renderUpgradeHoldingPage(holding);
       thread.postMessage({ type: "hold", page });
       await Promise.race([held, exited]);
+    },
+    holdConsole: async (upgradeConsole) => {
+      const retried = nextMessage({ thread, type: "retry" }).then(() => true);
+      thread.postMessage({
+        type: "console",
+        loginPage: renderUpgradeConsoleLogin({ refused: false }),
+        refusedPage: renderUpgradeConsoleLogin({ refused: true }),
+        consolePage: renderUpgradeConsole(upgradeConsole),
+        tokenSha256: upgradeConsole.tokenSha256,
+        tokenTtlMs: upgradeConsole.tokenTtlMs,
+      });
+      return Promise.race([retried, exited.then(() => false)]);
     },
     close: async ({ graceMs }) => {
       const closed = new Promise<void>((resolve) => {
@@ -283,6 +451,18 @@ export async function startLivenessThread({
       await thread.terminate();
     },
   };
+}
+
+/** Resolves on the thread's next message of `type`. */
+function nextMessage({ thread, type }: { thread: Worker; type: ThreadMessage["type"] }) {
+  return new Promise<void>((resolve) => {
+    const onMessage = (message: ThreadMessage): void => {
+      if (message.type !== type) return;
+      thread.off("message", onMessage);
+      resolve();
+    };
+    thread.on("message", onMessage);
+  });
 }
 
 function listeningAddress(thread: Worker): Promise<AddressInfo> {

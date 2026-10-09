@@ -6,7 +6,11 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { UiAnalytics } from "@langwatch/browser-host/analytics";
 import { UiCapabilityContextProvider } from "@langwatch/browser-host/capabilities";
-import { uiDeclarations, type UiDrawerToken } from "@langwatch/browser-host/declarations";
+import {
+  uiDeclarations,
+  type ReleaseFlagToken,
+  type UiDrawerToken,
+} from "@langwatch/browser-host/declarations";
 import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
 import { ContactSalesToken } from "@langwatch/enterprise-billing-client";
 import { render } from "@testing-library/react";
@@ -125,8 +129,8 @@ export class FakeOrganizationHost extends OrganizationHostApi {
     return this.options.hasEmailProvider ?? true;
   }
 
-  isFeatureEnabled(flag: string): boolean {
-    return (this.options.flags ?? new Set<string>()).has(flag);
+  isFeatureEnabled({ name }: ReleaseFlagToken): boolean {
+    return (this.options.flags ?? new Set<string>()).has(name);
   }
 
   openOverlay<Props>(drawer: UiDrawerToken<Props>, props?: Partial<Props>): void {

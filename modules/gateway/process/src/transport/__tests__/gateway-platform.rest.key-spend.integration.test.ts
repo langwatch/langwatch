@@ -1,9 +1,3 @@
-/**
- * A key's spend read over REST on the real application and its memory twins, with the trace
- * module answering from the traces it holds: the route and the keys table take one figure.
- * @vitest-environment node
- * @see specs/ai-gateway/public-rest-api.feature
- */
 import {
   bindRestMiddleware,
   canonicalErrorResponse,
@@ -24,6 +18,13 @@ import { z } from "zod";
 
 import { memoryVirtualKeySeed } from "../../__tests__/support/gateway-memory-seeds.fixture.ts";
 import { GatewayModule } from "../../app/gateway.app.ts";
+/**
+ * A key's spend read over REST on the real application and its memory twins, with the trace
+ * module answering from the traces it holds: the route and the keys table take one figure.
+ * @vitest-environment node
+ * @see specs/ai-gateway/public-rest-api.feature
+ */
+import { MemoryGatewayChannels } from "../../channels/memory/memory.gateway.channels.ts";
 import { MemoryGatewayRepositories } from "../../repositories/memory/memory.gateway.repositories.ts";
 import { MemoryGatewayStore } from "../../repositories/memory/memory.gateway.store.ts";
 import {
@@ -88,6 +89,7 @@ async function mountedSpendRead({
     memoryVirtualKeySeed({ id: KEY_ID, name: "demo", organizationId: ORGANIZATION_ID }),
   );
   const real = await GatewayModule.create({
+    channels: MemoryGatewayChannels.create(),
     dependencies: {
       authz: createApiFixture<AuthzApi>({}),
       projects: createApiFixture<ProjectApi>({
@@ -117,6 +119,7 @@ async function mountedSpendRead({
     },
     repositories,
     config: {
+      foldCacheTtlSeconds: 300,
       spendSettlementGraceMs: void 0,
       internalUrl: void 0,
       controlPlaneUrl: void 0,

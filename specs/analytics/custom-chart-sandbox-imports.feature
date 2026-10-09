@@ -90,6 +90,11 @@ Feature: Custom chart widgets import any module and run under their own CSP
     Then the "@langwatch/charts" module in the import map exports exactly its members
 
   @unit
+  Scenario: The bundled charts library matches a fresh build of its source
+    When the charts library generator is run again
+    Then its output is identical to the charts library the frame bundles
+
+  @unit
   Scenario: A widget's own built-in import loads even where the import map was ignored
     When a widget imports "recharts", "react" or "@langwatch/charts"
     Then the compiled module imports the module URL the import map names for that specifier

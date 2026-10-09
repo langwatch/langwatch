@@ -34,11 +34,12 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({ closeDrawer: vi.fn(), openDrawer: vi.fn() }),
 }));
 
-vi.mock("@langwatch/browser-host/feature-flag", () => ({
+vi.mock("@langwatch/feature-flag-client", () => ({
   useFeatureFlag: (...args: unknown[]) => mockUseFeatureFlag(...args),
 }));
 
-vi.mock("../../../behavior/use-model-providers-settings.ts", () => ({
+vi.mock("@langwatch/model-provider-client", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   useModelProvidersSettings: () => ({
     providers: { openai: EXISTING_PROVIDER },
     modelMetadata: {},
@@ -90,7 +91,7 @@ function renderForm() {
 }
 
 function primeFlag({ gatewayEnabled }: { gatewayEnabled: boolean }) {
-  mockUseFeatureFlag.mockImplementation((flag: string) =>
+  mockUseFeatureFlag.mockImplementation(({ name: flag }: { name: string }) =>
     flag === "release_ui_ai_gateway_menu_enabled"
       ? { enabled: gatewayEnabled, isLoading: false }
       : { enabled: false, isLoading: false },

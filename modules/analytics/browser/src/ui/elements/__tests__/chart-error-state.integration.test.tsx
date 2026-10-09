@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
-import { cleanup, screen, within } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -11,21 +11,11 @@ import { ChartErrorIndicator, ChartErrorState } from "../chart-error-state.tsx";
 
 afterEach(cleanup);
 
-const TRACE_ID = "0af7651916cd43dd8448eb211c80319c";
-
 /** A tRPC error envelope carrying a handled payload, as the boundary sends it. */
 function handledError(code: string) {
   return {
     message: code,
-    data: {
-      error: {
-        code,
-        httpStatus: 422,
-        fault: "customer",
-        traceId: TRACE_ID,
-        tips: ["Add filters to reduce the amount of data scanned"],
-      },
-    },
+    data: { error: { code, httpStatus: 500, fault: "platform", tips: [] } },
   };
 }
 
@@ -69,43 +59,39 @@ describe("<ChartErrorState />", () => {
     });
   });
 
-  describe("when the failure is a handled error the registry knows", () => {
-    /** @scenario "A failed chart panel shows a compact message and a Retry" */
-    it("shows the registry headline and advice, never the code slug or the tips", () => {
-      renderChartErrorState({ error: handledError("query_memory_exceeded") });
+  describe("when the failure is a handled error", () => {
+    it("shows the registry's copy, never the code slug", () => {
+      renderChartErrorState({ error: handledError("query_timeout") });
 
-      const alert = screen.getByRole("alert");
-      expect(within(alert).getByText("This search was too large")).toBeInTheDocument();
+      expect(screen.getByText("This search took too long")).toBeInTheDocument();
       expect(
-        within(alert).getByText("Narrow the time range, add a filter, or select fewer fields."),
+        screen.getByText("Narrow the time range or add a filter, then try again."),
       ).toBeInTheDocument();
-      expect(screen.queryByText("query_memory_exceeded")).not.toBeInTheDocument();
-      expect(
-        screen.queryByText("Add filters to reduce the amount of data scanned"),
-      ).not.toBeInTheDocument();
-    });
-
-    /** @scenario "A failed chart panel shows a compact message and a Retry" */
-    it("keeps the error id reachable", () => {
-      renderChartErrorState({ error: handledError("query_memory_exceeded") });
-
-      expect(
-        within(screen.getByRole("alert")).getByTitle(`Error ID: ${TRACE_ID}`),
-      ).toBeInTheDocument();
+      expect(screen.queryByText("query_timeout")).not.toBeInTheDocument();
     });
   });
-});
 
-describe("<ChartErrorIndicator />", () => {
-  describe("when the query has failed", () => {
-    it("says it could not load, holds no button, and carries the copy for assistive technology", () => {
+  describe("when the panel has no room for the full state", () => {
+    it("renders a compact indicator with no button in it", () => {
       renderWithDesignSystem(<ChartErrorIndicator error={handledError("query_memory_exceeded")} />);
 
-      const indicator = screen.getByTestId("chart-error-indicator");
-      expect(within(indicator).getByText("Couldn't load")).toBeInTheDocument();
-      expect(indicator).toHaveTextContent("This search was too large");
-      expect(indicator).not.toHaveTextContent("query_memory_exceeded");
+      expect(screen.getByText("Couldn't load")).toBeInTheDocument();
       expect(screen.queryByRole("button")).not.toBeInTheDocument();
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    });
+
+    describe("when the failure is unhandled", () => {
+      it("names what failed with the caller's fallback title", () => {
+        renderWithDesignSystem(
+          <ChartErrorIndicator
+            error={new Error("boom")}
+            fallbackTitle="Couldn't load the documents count"
+          />,
+        );
+
+        expect(screen.getByText(/^Couldn't load the documents count/)).toBeInTheDocument();
+        expect(screen.queryByText("boom")).not.toBeInTheDocument();
+      });
     });
   });
 });

@@ -6,6 +6,7 @@ import type {
   AnalyticsTimeseriesResult,
   SharedFiltersInput,
 } from "@langwatch/analytics-contract";
+import { InProcessTenantStatementLimiter } from "@langwatch/limiter";
 import { clickHouseClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { addDays, differenceInCalendarDays, Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
@@ -18,24 +19,30 @@ import {
   type EvaluationAnalyticsClickHouseClient,
 } from "../clickhouse/clickhouse.analytics-persistence.repository.ts";
 import { pickAnalyticsTable } from "../clickhouse/clickhouse.analytics-route-table.mapper.ts";
-import { ClickHouseAnalyticsStatementLimitRepository } from "../clickhouse/clickhouse.analytics-statement-limit.repository.ts";
 import { ClickHouseAnalyticsRepository } from "../clickhouse/clickhouse.analytics.repository.ts";
+
+const tenantLimiter = ({ maxConcurrent = 4 }: { maxConcurrent?: number } = {}) =>
+  new InProcessTenantStatementLimiter({
+    maxConcurrent,
+    maxQueued: 64,
+    waitTimeoutMs: 45_000,
+    metricsInstance: "tenant-analytics-test",
+    overloadErrorFactory: { create: ({ cause }: { cause: unknown }) => cause },
+  });
 
 const serviceOver = (options: {
   resolveClient: (tenantId: string) => Promise<EvaluationAnalyticsClickHouseClient | null>;
   clickhouseEnabled: boolean;
 }): AnalyticsService =>
   AnalyticsService.create({
-    repository: ClickHouseAnalyticsRepository.create({
-      resolveClient: options.resolveClient,
-      statementLimiter: ClickHouseAnalyticsStatementLimitRepository.create({ maxConcurrent: 4 }),
-    }),
+    repository: ClickHouseAnalyticsRepository.create({ resolveClient: options.resolveClient }),
     evaluationRepository: options.clickhouseEnabled
       ? ClickHouseAnalyticsEvaluationRepository.create({
           resolveClient: options.resolveClient,
           defaultRetentionDays: () => 30,
         })
       : NullAnalyticsEvaluationRepository.create(),
+    tenantLimiter: tenantLimiter(),
   });
 
 const input = (overrides: Partial<AnalyticsTimeseriesInput> = {}): AnalyticsTimeseriesInput => ({
@@ -108,10 +115,14 @@ class RecordingRepository extends AnalyticsRepository {
   }
 }
 
-function createService(repository: AnalyticsRepository): AnalyticsService {
+function createService(
+  repository: AnalyticsRepository,
+  limiter: InProcessTenantStatementLimiter = tenantLimiter(),
+): AnalyticsService {
   return AnalyticsService.create({
     repository,
     evaluationRepository: NullAnalyticsEvaluationRepository.create(),
+    tenantLimiter: limiter,
   });
 }
 
@@ -126,6 +137,55 @@ describe("AnalyticsService", () => {
     expect(repository.lastQuery?.table).toBe("trace_analytics_rollup");
     expect(repository.lastQuery?.tenantId).toBe("project-1");
     expect(repository.lastQuery?.input.timeZone).toBe("Europe/Amsterdam");
+  });
+
+  /** @scenario The evaluations summary reads the slim evaluation table */
+  it("sends the evaluations summary, whose evaluator key is empty, to the slim evaluation table", async () => {
+    const repository = new RecordingRepository();
+    const service = createService(repository);
+
+    await service.getTimeseries(
+      input({
+        series: [{ metric: "evaluations.evaluation_runs", aggregation: "cardinality", key: "" }],
+        groupBy: "evaluations.evaluation_passed",
+        timeScale: "full",
+      }),
+    );
+
+    expect(repository.lastQuery?.table).toBe("evaluation_analytics");
+    expect(repository.lastQuery?.input.series[0]?.key).toBeUndefined();
+  });
+
+  it("sends the error trend, grouped by error state, to the slim trace table", async () => {
+    const repository = new RecordingRepository();
+    const service = createService(repository);
+
+    await service.getTimeseries(input({ groupBy: "error.has_error" }));
+
+    expect(repository.lastQuery?.table).toBe("trace_analytics");
+  });
+
+  /** @scenario A panel that hides the previous period does not scan it */
+  it("collapses the previous window to an empty range at the current start when skipping it", async () => {
+    const repository = new RecordingRepository();
+    const service = createService(repository);
+
+    await service.getTimeseries(input({ shouldSkipPreviousPeriod: true }));
+
+    expect(repository.lastQuery?.previousPeriodStartDate.epochMilliseconds).toBe(
+      Date.UTC(2026, 0, 1),
+    );
+  });
+
+  it("reads a timeseries through its tenant's share of the analytics gate", async () => {
+    const limiter = tenantLimiter({ maxConcurrent: 1 });
+    const run = vi.spyOn(limiter, "run");
+    const service = createService(new RecordingRepository(), limiter);
+
+    await service.getTimeseries(input());
+    await service.getTopUsedDocuments({ projectId: "project-1", startDate: 0, endDate: 1 });
+
+    expect(run.mock.calls.map(([call]) => call.tenantId)).toEqual(["project-1", "project-1"]);
   });
 
   /** @scenario "Unsafe query shapes use the legacy trace table" */
@@ -152,56 +212,6 @@ describe("AnalyticsService", () => {
     );
 
     expect(repository.lastQuery?.adjustedTimeScale).toBe(24 * 60);
-  });
-
-  describe("when the panel skips the previous period", () => {
-    /** @scenario A panel that hides the previous period does not scan it */
-    it("collapses the previous window to an empty range at the current start", async () => {
-      const repository = new RecordingRepository();
-      const service = createService(repository);
-
-      await service.getTimeseries(input({ timeScale: 60, shouldSkipPreviousPeriod: true }));
-
-      expect(repository.lastQuery?.previousPeriodStartDate.epochMilliseconds).toBe(
-        repository.lastQuery?.startDate.epochMilliseconds,
-      );
-    });
-  });
-
-  describe("when the evaluations summary sends an empty evaluator key", () => {
-    /** @scenario The evaluations summary reads the slim evaluation table */
-    it("routes it to the slim evaluation table with the key dropped", async () => {
-      const repository = new RecordingRepository();
-      const service = createService(repository);
-
-      await service.getTimeseries(
-        input({
-          series: [{ metric: "evaluations.evaluation_runs", aggregation: "cardinality", key: "" }],
-          groupBy: "evaluations.evaluation_passed",
-          timeScale: "full",
-        }),
-      );
-
-      expect(repository.lastQuery?.table).toBe("evaluation_analytics");
-      expect(repository.lastQuery?.input.series[0]?.key).toBeUndefined();
-    });
-  });
-
-  describe("when the error trend groups traces by error state", () => {
-    it("routes it to the slim trace table", async () => {
-      const repository = new RecordingRepository();
-      const service = createService(repository);
-
-      await service.getTimeseries(
-        input({
-          series: [{ metric: "metadata.trace_id", aggregation: "cardinality" }],
-          groupBy: "error.has_error",
-          timeScale: 1440,
-        }),
-      );
-
-      expect(repository.lastQuery?.table).toBe("trace_analytics");
-    });
   });
 
   it("keeps the legacy calendar-day previous-period envelope and row ceiling", async () => {

@@ -3,6 +3,8 @@
  */
 
 import { useUiCapabilities } from "@langwatch/browser-host/capabilities";
+import { useUiFlags } from "@langwatch/browser-host/feature-flag";
+import type { ReleaseFlagToken } from "@langwatch/module";
 import type { ComponentType } from "react";
 
 export type UiPageGuardFallbacks = {
@@ -16,7 +18,7 @@ export type UiPageGuardFallbacks = {
 
 export type UiPageGuardInstall = {
   /** Every flag that must be on for the page to exist. */
-  flags?: readonly string[];
+  flags?: readonly ReleaseFlagToken[];
   /** The grant the page needs once it exists. */
   permission?: string;
   fallbacks: UiPageGuardFallbacks;
@@ -38,9 +40,9 @@ export function resolveUiPageAccess({
   hasPermission,
   isSettled,
 }: {
-  flags?: readonly string[];
+  flags?: readonly ReleaseFlagToken[];
   permission?: string;
-  featureFlag: (flag: string) => boolean | undefined;
+  featureFlag: (flag: ReleaseFlagToken) => boolean | undefined;
   hasPermission: (permission: string) => boolean;
   isSettled: () => boolean;
 }): UiPageAccess {
@@ -64,10 +66,11 @@ export function withUiPageGuard({ flags, permission, fallbacks }: UiPageGuardIns
   return function guard<P extends object>(Page: ComponentType<P>): ComponentType<P> {
     const Guarded = (props: P) => {
       const { session } = useUiCapabilities();
+      const uiFlags = useUiFlags();
       const access = resolveUiPageAccess({
         ...(flags ? { flags } : {}),
         ...(permission !== void 0 ? { permission } : {}),
-        featureFlag: (flag) => session.featureFlag(flag),
+        featureFlag: (flag) => uiFlags.flag(flag),
         hasPermission: (needed) => session.hasPermission(needed),
         isSettled: () => session.isSettled(),
       });

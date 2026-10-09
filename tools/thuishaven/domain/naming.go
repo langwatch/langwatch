@@ -71,6 +71,11 @@ const LLMService = "llm"
 // analytics.<slug>.langwatch.localhost. Opt-in like voice and llm.
 const AnalyticsService = "analytics"
 
+// TelemetryService is the OTLP sender (services/telemetrysim) that drives
+// seeded telemetry at the stack's OTLP door, routed at
+// telemetry.<slug>.langwatch.localhost. Opt-in like voice and llm.
+const TelemetryService = "telemetry"
+
 // APIService is the Hono API's own routed hostname
 // (api.<slug>.langwatch.localhost). It is additive, not a replacement: the
 // same-origin app.<slug>.../api path (Vite's own proxy to Stack.APIPort)

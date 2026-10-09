@@ -119,11 +119,7 @@ export const timeseriesInputSchema = z.object({
   groupByKey: z.optional(z.string()),
   timeScale: z.optional(z.union([z.literal("full"), z.number().int()])),
   timeZone: z.string(),
-  /**
-   * Leave the previous period out of the scan: a chart that draws no comparison
-   * reads one window instead of two and gets an empty `previousPeriod`. Absent
-   * means the previous period is computed.
-   */
+  /** Leave the previous period out of the scan; `previousPeriod` then comes back empty. */
   shouldSkipPreviousPeriod: z.optional(z.boolean()),
 });
 

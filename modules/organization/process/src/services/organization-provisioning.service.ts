@@ -2,6 +2,7 @@ import { HandledError, NotFoundError } from "@langwatch/handled-error";
 import { SsoTestArrivalCannotCreateOrganizationError } from "@langwatch/identity-contract";
 import { generate } from "@langwatch/ksuid";
 import {
+  ORGANIZATION_KSUID_RESOURCE,
   PricingModel,
   type OrganizationFounding,
   type OrganizationIntent,
@@ -16,8 +17,7 @@ import type {
 import type { OrganizationLifecycleNoticeService } from "./organization-lifecycle-notice.service.ts";
 import type { OrganizationTestArrivals } from "./organization-membership.service.ts";
 
-/** The KSUID resources an organization and its first team are born under. */
-const ORGANIZATION_KSUID_RESOURCE = "organization";
+/** The KSUID resource an organization's first team is born under. */
 const TEAM_KSUID_RESOURCE = "team";
 
 /** Where every new organization is recorded as `lw.organization.created`; prompt seeds on it. */
@@ -113,8 +113,9 @@ export class OrganizationProvisioningService {
   async createForProvisioning(params: {
     name: string;
     slug?: string;
+    id?: string;
   }): Promise<CreateAndAssignResult> {
-    const orgId = generate(ORGANIZATION_KSUID_RESOURCE).toString();
+    const orgId = params.id ?? generate(ORGANIZATION_KSUID_RESOURCE).toString();
     const orgSlug =
       params.slug ??
       slugify(params.name, { lower: true, strict: true }) + "-" + orgId.substring(orgId.length - 6);
@@ -159,23 +160,21 @@ export class OrganizationProvisioningService {
   }
 
   /**
-   * The organization a self-hosted licence is issued to, created with its
-   * first team exactly as provisioning creates one, then marked as a customer.
+   * The organization a self-hosted licence is issued to, under the id licensing minted, created
+   * with its first team exactly as provisioning creates one, then marked as a customer. A
+   * redelivered fact finds the row already there and only marks it again.
    */
   async createSelfHostedCustomer({
+    organizationId,
     name,
   }: {
+    organizationId: string;
     name: string;
-  }): Promise<{ id: string; name: string }> {
-    const { organization } = await this.createForProvisioning({ name });
-    await this.repo.markSelfHostedCustomer(organization.id);
-
-    return organization;
-  }
-
-  /** Marks an existing organization as a self-hosted licence customer. */
-  markSelfHostedCustomer({ organizationId }: { organizationId: string }): Promise<void> {
-    return this.repo.markSelfHostedCustomer(organizationId);
+  }): Promise<void> {
+    if (!(await this.findProvisioningSummary(organizationId))) {
+      await this.createForProvisioning({ id: organizationId, name });
+    }
+    await this.repo.markSelfHostedCustomer(organizationId);
   }
 
   findSelfHostedCustomers(): Promise<{ organizationId: string; organizationName: string }[]> {

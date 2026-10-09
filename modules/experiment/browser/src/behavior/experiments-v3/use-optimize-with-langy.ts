@@ -1,5 +1,6 @@
-import { useFeatureFlag } from "@langwatch/browser-host/feature-flag";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { useFeatureFlag } from "@langwatch/feature-flag-client";
+import { FrontendFlags } from "@langwatch/feature-flag-contract";
 import { useCallback } from "react";
 
 import type { TargetConfig } from "../../model/experiments-v3/types.ts";
@@ -19,7 +20,7 @@ export const useOptimizeWithLangy = (): OptimizeHandler | undefined => {
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
   });
-  const uiActionsEnabled = useFeatureFlag("release_langy_ui_actions", {
+  const uiActionsEnabled = useFeatureFlag(FrontendFlags.release_langy_ui_actions, {
     projectId: project?.id,
     organizationId: organization?.id,
     enabled: !!project?.id,

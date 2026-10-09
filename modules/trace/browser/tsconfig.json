@@ -51,6 +51,9 @@
       "path": "../../../packages/design-system/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/error-views/tsconfig.build.json"
+    },
+    {
       "path": "../../evaluation/contract/tsconfig.build.json"
     },
     {
@@ -58,6 +61,9 @@
     },
     {
       "path": "../../evaluator/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../feature-flag/client/tsconfig.build.json"
     },
     {
       "path": "../../feature-flag/contract/tsconfig.build.json"

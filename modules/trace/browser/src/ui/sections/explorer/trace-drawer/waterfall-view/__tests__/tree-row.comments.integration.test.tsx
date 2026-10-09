@@ -15,6 +15,13 @@ const mocks = vi.hoisted(() => ({
   create: vi.fn(),
 }));
 
+vi.mock("../../../../../../behavior/trace-host.ts", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useTraceHost: () => ({
+    hasPermission: (permission: string) =>
+      permission === "annotations:manage" ? mocks.canManage : true,
+  }),
+}));
 vi.mock(
   "../../../../../../features/annotation/behavior/lent-annotation-form.tsx",
   () => import("../../../../__tests__/lent-annotation-form.stand-in.tsx"),
@@ -23,8 +30,6 @@ vi.mock(
 vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1" },
-    hasPermission: (permission: string) =>
-      permission === "annotations:manage" ? mocks.canManage : true,
   }),
 }));
 

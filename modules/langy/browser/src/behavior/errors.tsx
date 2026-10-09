@@ -2,7 +2,7 @@
  * The failure surfaces this package renders INTO a page.
  */
 
-import { Alert, Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { Alert, Box, Button, Text, VStack } from "@langwatch/design-system/primitives";
 import { explainAnyError } from "@langwatch/handled-error/presentation";
 import type { ReactNode } from "react";
 export { readHandledError } from "@langwatch/handled-error/read-handled-error";
@@ -46,29 +46,6 @@ export function FormServerError({ form }: { form: MinimalForm }) {
         <Alert.Description>{message}</Alert.Description>
       </Alert.Content>
     </Alert.Root>
-  );
-}
-
-/**
- * The two ways out a failed panel offers.
- */
-export function ErrorActions({
-  onRetry,
-  children,
-}: {
-  onRetry?: () => void;
-  children?: ReactNode;
-}) {
-  if (!onRetry && !children) return null;
-  return (
-    <HStack gap={2}>
-      {onRetry && (
-        <Button size="sm" variant="outline" onClick={onRetry}>
-          Try again
-        </Button>
-      )}
-      {children}
-    </HStack>
   );
 }
 

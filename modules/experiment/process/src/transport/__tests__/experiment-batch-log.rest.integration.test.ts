@@ -4,7 +4,7 @@
  * fails. ADR-045 makes an unhandled cause generic.
  * @see modules/experiment/specs/experiment-batch-log.feature
  */
-import { createRestRuntime } from "@langwatch/api/rest";
+import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import { EvaluationLogResultsTooLargeError } from "@langwatch/evaluation-contract";
 import type { ExperimentApi } from "@langwatch/experiment-contract";
 import { HandledError } from "@langwatch/handled-error";
@@ -54,6 +54,7 @@ function mount(
     app: () => createApiFixture<ExperimentApi>({ logBatchEvaluation, assertBatchLogWithinLimit }),
     onError: (error, context) => {
       options.refused?.push(error);
+      if (HandledError.isHandled(error)) return canonicalErrorResponse(error, context);
 
       return context.json({ error: String(error) }, 500);
     },
@@ -68,9 +69,6 @@ function mount(
       }),
     );
 }
-
-/** Main's `c.json({ message: "Invalid body, expecting json" }, 400)`, byte for byte. */
-const MAIN_NOT_JSON_BODY = '{"message":"Invalid body, expecting json"}';
 
 describe("given the legacy evaluation batch log", () => {
   describe("when the body is larger than the organization accepts", () => {
@@ -173,25 +171,24 @@ describe("given the legacy evaluation batch log", () => {
   });
 
   describe("when the body is not sent as json", () => {
-    it("answers main's 400 body byte for byte", async () => {
+    it("answers the framework's 400 malformed_request", async () => {
       const post = mount(() => Promise.reject(new Error("the write must not be reached")));
 
       const response = await post(undefined, { contentType: "text/plain", raw: "{}" });
 
       expect(response.status).toBe(400);
-      expect(response.headers.get("content-type")).toMatch(/^application\/json/);
-      await expect(response.text()).resolves.toBe(MAIN_NOT_JSON_BODY);
+      await expect(response.json()).resolves.toMatchObject({ code: "malformed_request" });
     });
   });
 
   describe("when the body does not parse as json", () => {
-    it("answers main's 400 body byte for byte", async () => {
+    it("answers the framework's 400 malformed_request", async () => {
       const post = mount(() => Promise.reject(new Error("the write must not be reached")));
 
       const response = await post(undefined, { raw: "{not json" });
 
       expect(response.status).toBe(400);
-      await expect(response.text()).resolves.toBe(MAIN_NOT_JSON_BODY);
+      await expect(response.json()).resolves.toMatchObject({ code: "malformed_request" });
     });
   });
 });

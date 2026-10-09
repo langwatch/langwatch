@@ -162,6 +162,13 @@ sets them through new `OrganizationApi` operations. Monitor reads an evaluator's
 new `EvaluationApi` read operation. Billing's Slack channel is renamed `billing-alert` (`BillingAlertChannel`),
 ownership unchanged (Alex, 2026-10-05).
 
+**Patched dependencies** (Alex, 2026-10-09). A third-party package is patched only when the behaviour
+cannot be reached through its options, and the upstream change is proposed at the same time. The patch
+is `patches/<name>@<version>.patch`, a diff against the published files as `pnpm patch-commit` writes it,
+registered under `patchedDependencies` in `pnpm-workspace.yaml` for one exact version; an upgrade re-cuts
+or drops it. Each patch has one owning module and a test there that runs the patched path. First:
+`@better-auth/sso@1.7.1`, per-connection IdP-initiated SAML, owned by auth.
+
 ---
 
 ## 3. A module
@@ -293,7 +300,8 @@ document, is the authority on filenames):
   a client itself, and never declares a peer — only the module class does.
 - `repositories/` — interfaces at the top; `prisma/` and `memory/` backends
   below; the registry offers both via `defineRepositories({ live, memory })`.
-  Only `repositories/prisma/**` names Prisma, through
+  A tier's `create` receives the stores it `requires` and, like a channel tier,
+  the module's parsed `config` (Alex, 2026-10-09, FOLD-TTL). Only `repositories/prisma/**` names Prisma, through
   `PrismaRepository.for("Model")`; every project-model query carries
   `projectId`. Every ClickHouse query filters `TenantId` first.
 - `channels/` — messages to or from anything the module does not own (bus,
@@ -806,12 +814,11 @@ OTel export variant can sit beside it without any main changing shape).
 2026-09-18): one named call, `initializeTelemetry(process.observability)`,
 wires traces, logs and metrics from config alone — no `instrumentation.node`
 preload file, and anything requiring preload is out of scope by design.
-**Metrics transport is a binary knob**, `process.observability.metrics.mode:
-"prometheus" | "otlp"` — absent means `prometheus` so no self-hosted scrape
-setup breaks on upgrade; LangWatch production sets `otlp` (a push is
-cheaper than a scrape at our cardinality). Under `otlp` the scrape endpoint
-is NOT mounted, and composing `prometheusMetrics` refuses by name — an
-unmounted endpoint is honest, a mounted-but-empty one lies to a prober.
+**Metrics are pushed and may also be pulled** (ADR-175): every process pushes over OTLP when
+`OTEL_EXPORTER_OTLP_ENDPOINT` is set (`OTEL_METRICS_EXPORTER=none` turns it off). A Prometheus
+`/metrics` door is off by default; `OTEL_METRICS_EXPORTER=otlp,prometheus` adds a pull reader to the
+same provider and serves it on its own port (`OTEL_EXPORTER_PROMETHEUS_PORT`, default 9464), never
+the public one, behind `METRICS_API_KEY`; production with no key leaves it unmounted.
 **Telemetry is recorded, never passed** (Alex, 2026-09-23): any package or module records counters,
 histograms and gauges through `@langwatch/observability`'s instruments directly — no `*Api` operation,
 channel or member carries a metric. Telemetry is write-only: a decision the app makes at runtime (an
@@ -1347,8 +1354,12 @@ repositories whose tier nobody stated refuses boot by name (Alex, 2026-10-05). P
 live stores; a test or dev harness hands `memoryStores()` directly and never touches env.
 
 **Migrations are not the api's job.** They run through `pnpm task upgrade` (apps/api
-`start:prepare:db`: upgrade, then the system-migrations pass), before serve, from every entry
-point (ADR-173). Prisma migrations
+`start:prepare:db`: upgrade alone; the system-migrations pass is not part of api start), before serve, from every entry
+point (ADR-173). On a self-hosted install the new image's api runs that same `upgrade` itself,
+under the runner's lease, whenever the ledger is behind it, behind the holding page; the worker
+never does (Alex, 2026-10-09, UPGRADE-FIXES). A background step names the background steps
+it runs after by their step values (`after: [step]`, STEP-AFTER); the worker waits on them, the
+upgrade inlines them before a contract, and an unknown id or a cycle refuses the plan. Prisma migrations
 live with the schema; ClickHouse migrations are goose SQL files. A serving
 process holding DDL locks is how deploys die. Because they run before any module boots, apps/tasks'
 migration-runner files (`src/*migrat*.ts`) may name process packages (Alex, 2026-09-27), and
@@ -1378,10 +1389,22 @@ level-triggered background steps (Alex, 2026-10-06, round 9). The runner writes 
 its run report and raises a read hint the api relays, so the Upgrades page refreshes on it and never
 polls (Alex, 2026-10-06, rounds 8 and 9).
 
+**An LTS is an upgrade stop, never a maintained line** (Alex, 2026-10-09, LTS-SCHEDULE). An LTS is
+named every April and October; the first is 3.20.1 (2026-10-06), the next April 2027. Only the
+latest release gets fixes: no LTS or older line is ever patched. Naming an LTS moves the floor
+(`packages/upgrade/releases/lts-floor.json`) to the previous LTS, so the newest LTS always upgrades
+straight to head, a stale installation stops at most once a year, and dead schema lives about 12
+months before its contract step (ADR-173 D8) may ship.
+
 **A framework package takes module values by injection, never by import** (Alex, 2026-10-06, rounds 5
 and 6, Q211). `packages/group-queue` takes a `mintUri` function and a generic destination type for its
 tiered blob store and imports no module contract; `ClickHouseMigrateTask` takes the managed-table list
 through its constructor from apps/tasks, and its data-retention dependency goes.
+
+**Concurrency limiting is a store-neutral service** (Alex, 2026-10-09, LIMITER-SERVICE):
+`@langwatch/limiter` holds the bounded limiter, the statement wait bound and the
+`TenantStatementLimiter` service with its `InProcessTenantStatementLimiter` implementation;
+clickhouse-client imports it and holds no limiter of its own.
 
 **Clients appear in exactly one place: the chain.** From there only registry
 and channel factories touch them. There is no second path. Two named, linted exceptions hold raw

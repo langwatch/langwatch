@@ -5,7 +5,10 @@ import {
 } from "@langwatch/evaluation-contract";
 import { batchEvaluationResultSchema } from "@langwatch/evaluator-contract";
 
-import type { LangevalsChannel } from "../../../channels/langevals.channel.ts";
+import type {
+  LangevalsChannel,
+  LangevalsPayloadStaging,
+} from "../../../channels/langevals.channel.ts";
 
 const PII_DETECTION_PATH = "/presidio/pii_detection/evaluate";
 const PII_DETECTION_MIN_THRESHOLD = 0.5;
@@ -15,13 +18,15 @@ export class LangevalsPiiDetectionService {
   static create(input: {
     endpoint: string | undefined;
     langevals: LangevalsChannel;
+    staging: LangevalsPayloadStaging;
   }): LangevalsPiiDetectionService {
-    return new LangevalsPiiDetectionService(input.endpoint, input.langevals);
+    return new LangevalsPiiDetectionService(input.endpoint, input.langevals, input.staging);
   }
 
   private constructor(
     private readonly endpoint: string | undefined,
     private readonly langevals: LangevalsChannel,
+    private readonly staging: LangevalsPayloadStaging,
   ) {}
 
   async detect(input: PiiDetectionRequest): Promise<PiiDetectionOutcome> {
@@ -44,6 +49,7 @@ export class LangevalsPiiDetectionService {
       },
       ...(input.projectId ? { projectId: input.projectId } : {}),
       kind: "evaluation",
+      staging: this.staging,
       signal: input.signal,
     });
 

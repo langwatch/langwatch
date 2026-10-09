@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-
 import { narrowMapColumnProjection } from "../clickhouse.field-mappings.mapper.ts";
 import {
   latestVersionSubquery,
@@ -17,10 +16,9 @@ describe("parseLatestVersionColumn", () => {
 
   describe("when the entry is an aliased expression", () => {
     it("splits the expression from the alias", () => {
-      expect(parseLatestVersionColumn("CAST(TotalCost AS String) AS CostText")).toEqual({
-        name: "CostText",
-        expression: "CAST(TotalCost AS String)",
-      });
+      expect(
+        parseLatestVersionColumn("CAST(TotalCost AS String) AS CostText"),
+      ).toEqual({ name: "CostText", expression: "CAST(TotalCost AS String)" });
     });
   });
 });
@@ -84,24 +82,27 @@ describe("narrowMapColumnProjection", () => {
   });
 
   describe("when the map is used as a whole", () => {
-    it("keeps the whole map", () => {
+    it("returns null so the caller keeps the whole map", () => {
       expect(
         narrowMapColumnProjection({
           column: "Attributes",
-          expressions: ["ts.Attributes['langwatch.user_id']", "mapKeys(ts.Attributes)"],
+          expressions: [
+            "ts.Attributes['langwatch.user_id']",
+            "mapKeys(ts.Attributes)",
+          ],
         }),
-      ).toBe("Attributes");
+      ).toBeNull();
     });
   });
 
   describe("when a key is a query parameter", () => {
-    it("keeps the whole map", () => {
+    it("returns null so the caller keeps the whole map", () => {
       expect(
         narrowMapColumnProjection({
           column: "Attributes",
           expressions: ["ts.Attributes[{p_key:String}] IN ({p:Array(String)})"],
         }),
-      ).toBe("Attributes");
+      ).toBeNull();
     });
   });
 

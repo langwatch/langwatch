@@ -35,8 +35,11 @@ type ProviderRequirements<Provider> =
     ? Key
     : never;
 
+/** What the container hands a repository tier beside its stores, as it does a channel tier. */
+type RepositoryContext = "config";
+
 type MemberKeysMatch<Provider, Members> =
-  | Exclude<keyof Members, ProviderRequirements<Provider>>
+  | Exclude<keyof Members, ProviderRequirements<Provider> | RepositoryContext>
   | Exclude<ProviderRequirements<Provider>, keyof Members>;
 
 type ValidMembers<Provider, Members> = Members extends object
@@ -46,9 +49,9 @@ type ValidMembers<Provider, Members> = Members extends object
   : never;
 
 /**
- * A provider whose `create` takes either nothing or exactly one record, whose
- * keys are exactly the members it declared. A mismatch resolves to `never`,
- * making a factory reaching for an undeclared member a compile error, not `undefined`.
+ * A provider whose `create` takes nothing or one record: exactly the members it declared
+ * plus, optionally, the module's `config`. A mismatch resolves to `never`, making a
+ * factory reaching for an undeclared member a compile error, not `undefined`.
  */
 type ValidProvider<Provider> =
   ProviderArguments<Provider> extends []
@@ -59,10 +62,11 @@ type ValidProvider<Provider> =
       ? ValidMembers<Provider, Members>
       : never;
 
-/** Which tier a process asked for, and the members that tier may read. */
+/** Which tier a process asked for, the members that tier may read, and the module's config. */
 export type RepositorySelection = Readonly<{
   readonly tier: Tier;
   readonly members: Readonly<Record<string, unknown>>;
+  readonly config?: unknown;
 }>;
 
 type ProviderResult<Provider> =
@@ -132,7 +136,7 @@ export function instantiateRepositories<
 ): RepositoriesFor<RepositoryRegistry<Live, Memory>, Selected> {
   validateRepositorySelection(registry, selection);
   const provider = registry.definitions[selection.tier];
-  const members: Record<string, unknown> = {};
+  const members: Record<string, unknown> = { config: selection.config };
   for (const key of provider.requires) members[key] = selection.members[key];
   return Reflect.apply(provider.create, provider, [members]) as RepositoriesFor<
     RepositoryRegistry<Live, Memory>,

@@ -21,11 +21,11 @@ import {
   type ClickHouseClientCreationInput,
   type ClickHouseLaneStats,
   type ClickHouseStatementOperation,
-  type LimiterStats,
   type TenantDirectory,
 } from "@langwatch/clickhouse-client";
 import { CLICKHOUSE_STATEMENT_RETRY_MESSAGE_FRAGMENTS } from "@langwatch/eventing";
 import { HandledError, remediation } from "@langwatch/handled-error";
+import type { LimiterStats } from "@langwatch/limiter";
 import { createLogger } from "@langwatch/observability";
 import { counter, histogram, observableGauge } from "@langwatch/observability/metrics";
 
@@ -108,7 +108,7 @@ class ClickHouseOverloadedError extends HandledError {
   }
 }
 
-class OverloadedRefusal extends ClickHouseOverloadErrorFactory {
+export class OverloadedRefusal extends ClickHouseOverloadErrorFactory {
   create({ cause }: { cause: unknown }): unknown {
     return new ClickHouseOverloadedError({ reasons: cause instanceof Error ? [cause] : [] });
   }
@@ -142,7 +142,7 @@ observableGauge(
 );
 
 /** Slot waits, refusals and the queue, under main's names (origin/main clickhouse/metrics.ts). */
-class StatementBoundTelemetry extends ClickHouseManagedClientTelemetry {
+export class StatementBoundTelemetry extends ClickHouseManagedClientTelemetry {
   private readonly wait = histogram({
     name: "clickhouse_statement_wait_seconds",
     description: "Time a ClickHouse statement waited for a concurrency slot",
@@ -249,7 +249,6 @@ export function buildClickHouse(options: {
     driver: routingDriver(connection),
     tenantGuard: new TenantGuard(),
     retries: new RetryPolicy({
-      // A memory-limit refusal fails the same way within seconds; only the group queue retries it.
       transientMessageFragments: CLICKHOUSE_STATEMENT_RETRY_MESSAGE_FRAGMENTS,
       onRetry: ({ request, attempt, maxAttempts, delayMs, error, level }) =>
         reporter.retryNotice({

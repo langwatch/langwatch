@@ -248,7 +248,8 @@ backend for you:
 
   • Upgrades: the app and workers never migrate. They refuse to start, naming
     the outstanding steps, until `pnpm task upgrade` has run on the new image.
-    The pre-roll Job runs it on every helm upgrade; with
+    The pre-roll Job runs it on every helm upgrade (pass --timeout 45m: the Job
+    may run for 35 minutes and Helm's default hook timeout is 5); with
     app.migrations.preRoll=false you run it yourself first:
       kubectl run langwatch-upgrade --rm -it --restart=Never \
         --image={{ .Values.images.app.repository }}:{{ .Values.images.app.tag }} \

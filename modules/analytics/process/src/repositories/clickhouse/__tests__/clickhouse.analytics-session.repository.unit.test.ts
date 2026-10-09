@@ -7,7 +7,6 @@ import { ClickHouseQueryClient, type QueryDriver } from "@langwatch/clickhouse-c
 import { describe, expect, it } from "vitest";
 
 import { ClickHouseAnalyticsSessionsRepository } from "../clickhouse.analytics-sessions.repository.ts";
-import { ClickHouseAnalyticsStatementLimitRepository } from "../clickhouse.analytics-statement-limit.repository.ts";
 import { ClickHouseAnalyticsRepository } from "../clickhouse.analytics.repository.ts";
 
 /** The error `@clickhouse/client` raises when a statement passes its memory limit. */
@@ -26,7 +25,6 @@ function repositoryOver(driver: QueryDriver) {
   );
   return ClickHouseAnalyticsRepository.create({
     resolveClient: (tenantId) => sessions.resolve(tenantId),
-    statementLimiter: ClickHouseAnalyticsStatementLimitRepository.create({ maxConcurrent: 4 }),
   });
 }
 

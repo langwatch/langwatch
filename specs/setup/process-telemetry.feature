@@ -8,66 +8,89 @@ Feature: One OpenTelemetry setup every process uses
   # Telemetry is an everyone-sends-to-one-place concern, so it declares its
   # config slice and its one credential at its framework owner exactly as a
   # module does, and the preamble wires it between the secrets chain and boot.
-  # Metrics have two transports and the choice is a single knob: OTLP push (the
-  # default — cheaper than a scrape at our cardinality) or a Prometheus scrape
-  # door. Under OTLP the scrape door is NOT mounted: an unmounted endpoint is
-  # honest, a mounted-but-empty one lies to a prober.
+  # Metrics are pushed and may also be pulled (ADR-175): one MeterProvider
+  # carries the OTLP push and, when OTEL_METRICS_EXPORTER lists prometheus, a
+  # pull reader served on its own port (OTEL_EXPORTER_PROMETHEUS_PORT, default
+  # 9464), never the public one, behind METRICS_API_KEY. Nothing is mounted
+  # that reads nothing: an unmounted endpoint is honest, an empty one lies.
 
-  Rule: The metrics transport is one declared knob, defaulting to OTLP
+  Rule: The exporter list decides push and pull, defaulting to push alone
 
     @unit
     Scenario: No metrics mode is configured
-      Given a process whose observability config names no metrics mode
+      Given a process whose observability config names no metrics exporter
       When its configuration is parsed
-      Then the metrics mode is "otlp"
+      Then metrics are pushed and no pull reader is asked for
 
     @unit
     Scenario: A deployment asks for a Prometheus scrape instead
-      Given a process configured with metrics mode "prometheus"
+      Given a process configured with OTEL_METRICS_EXPORTER "otlp,prometheus"
       When its configuration is parsed
-      Then the metrics mode is "prometheus"
+      Then a pull reader is asked for beside the push
 
   Rule: OTLP push mounts no scrape door
 
     @unit
     Scenario: Metrics push over OTLP
-      Given a process whose metrics mode is "otlp"
+      Given a process whose metrics exporter is "otlp"
       When its metrics are composed
-      Then no route is contributed at "/metrics"
+      Then no route is contributed at "/metrics" and no pull port is opened
       And a lifecycle component is hosted so shutdown flushes the push
 
-  Rule: The Prometheus mode mounts a door that reads real numbers
+  Rule: The pull door reads the same provider the push does, on its own port
+
+    @unit
+    Scenario: Push and pull read one provider
+      Given a process whose metrics exporter is "otlp,prometheus" and a collector is set
+      When an instrument records and the pull port is scraped
+      Then the exposition carries the recording
+      And the collector still receives the push
 
     @unit
     Scenario: A scrape reads the process's own instruments
-      Given a process whose metrics mode is "prometheus"
-      When its metrics are composed and "/metrics" is scraped
+      Given a process outside production whose metrics exporter lists "prometheus" and no METRICS_API_KEY
+      When its pull port is scraped at "/metrics"
       Then the exposition names the instruments this process records
 
     @unit
     Scenario: The scrape door is gated by the configured token
-      Given a process whose metrics mode is "prometheus" and a scrape token is configured
-      When a caller scrapes "/metrics" without that token
+      Given a process whose metrics exporter lists "prometheus" and METRICS_API_KEY is set
+      When a caller scrapes the pull port without that bearer, or with the wrong one
       Then the response is 401
 
     @unit
     Scenario: In production an unset scrape token mounts no door
-      Given a production process whose metrics mode is "prometheus" and no scrape token is configured
+      Given a production process whose metrics exporter lists "prometheus" and no METRICS_API_KEY
       When its metrics are composed
-      Then no route is contributed at "/metrics"
-      # Fail-closed: an unset token is a misconfiguration, not an invitation.
+      Then no pull port is opened and the boot log names METRICS_API_KEY
+      # Fail-closed: an unset key is a misconfiguration, not an invitation. LANGWATCH_METRICS_TOKEN never shipped and opens nothing.
 
     @unit
     Scenario: An authenticated scrape in production reads the process's instruments
-      Given a production process whose metrics mode is "prometheus" and a scrape token is configured
-      When a caller scrapes "/metrics" with that token
+      Given a production process whose metrics exporter lists "prometheus" and METRICS_API_KEY is set
+      When a caller scrapes the pull port with that bearer
       Then the exposition names the instruments this process records
 
     @unit
     Scenario: Metrics are switched off entirely
-      Given a process whose metrics are disabled
+      Given a process whose metrics exporter is "none"
       When its metrics are composed
-      Then no route is contributed at "/metrics"
+      Then no route is contributed at "/metrics" and no pull port is opened
+
+  Rule: main's health-door /metrics stays only during the alias window
+
+    @unit
+    Scenario: main's health-door /metrics stays while the key is set
+      Given a process with METRICS_API_KEY set and no OTEL_METRICS_EXPORTER written
+      When its metrics are composed
+      Then "/metrics" is a route on the health door behind that bearer
+      And the boot log warns that it is deprecated and names OTEL_METRICS_EXPORTER=otlp,prometheus
+
+    @unit
+    Scenario: Naming the exporter list retires the health-door /metrics
+      Given a process with no METRICS_API_KEY, or one whose OTEL_METRICS_EXPORTER is written
+      When its metrics are composed
+      Then no route is contributed at "/metrics" on the health door
 
   Rule: A blank optional value is absent, not a value
 

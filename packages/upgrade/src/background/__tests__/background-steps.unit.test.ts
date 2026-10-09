@@ -56,6 +56,53 @@ describe("BackgroundStepsService", () => {
     });
   });
 
+  describe("given a step that runs after a step not yet done", () => {
+    /** @scenario "A worker holds a background step until every step it runs after is done" */
+    it("waits on it and runs nothing until the named step is done", async () => {
+      const copy = defineMigrationStep({
+        id: "evaluation:copy-inputs",
+        kind: "data",
+        mode: "background",
+        description: "Copies evaluation inputs.",
+        run: refuse,
+      });
+      const ledger: BackgroundStepsLedger = {
+        findSteps: async () => [
+          { id: "evaluation:copy-inputs", status: "running", report: null },
+          { id: "evaluation:purge-inputs", status: "pending", report: null },
+        ],
+        acquireLease: async () => null,
+        renewLease: refuse,
+        releaseLease: refuse,
+        markRunning: refuse,
+        setStatus: refuse,
+        saveReport: refuse,
+      };
+      const service = BackgroundStepsService.create({
+        ledger,
+        steps: [
+          defineMigrationStep({
+            id: "evaluation:purge-inputs",
+            kind: "data",
+            mode: "background",
+            description: "Purges copied evaluation inputs.",
+            after: [copy],
+            run: refuse,
+          }),
+        ],
+        serving: () => true,
+        oldWritersGoneFor: async () => true,
+        identity: { owner: "worker-1", image: "3.21.0", host: "host" },
+        log: () => undefined,
+      });
+
+      const sweep = await service.sweep({ signal: new AbortController().signal });
+
+      expect(sweep.waiting).toEqual(["evaluation:purge-inputs"]);
+      expect(sweep.ran).toEqual([]);
+    });
+  });
+
   describe("given a step another worker finished between the read and the lease", () => {
     /** @scenario "A step another worker finished while this one took the lease does not run again" */
     it("does not run it, mark it running or keep its lease", async () => {
@@ -343,6 +390,81 @@ describe("BackgroundStepsService runs", () => {
       expect(saves).toEqual(["refused"]);
       expect(ledger.row).toMatchObject({ status: "running", report: { cursor: "project_1" } });
       expect(ledger.leaseOwner).toBe("worker-2");
+    });
+  });
+});
+
+describe("BackgroundStepsService.runNow()", () => {
+  const id = "identity:reopen-unproven-accounts";
+  const reopen = (run: MigrationStepRun) =>
+    defineMigrationStep({
+      id,
+      kind: "data",
+      mode: "background",
+      description: "Reopens accounts that never proved their address.",
+      needsOldWritersGone: true,
+      run,
+    });
+
+  describe("given a pending step that waits for old writers, on a process that does not serve", () => {
+    /** @scenario "A background step run before a contract runs even while old writers still serve" */
+    it("runs it and records it done without asking the serving roster", async () => {
+      let runs = 0;
+      let asked = 0;
+      const statuses: string[] = [];
+      const service = BackgroundStepsService.create({
+        ledger: {
+          findSteps: async () => [{ id, status: "pending", report: null }],
+          acquireLease: async () => ({}),
+          renewLease: async () => ({}),
+          releaseLease: async () => true,
+          markRunning: async () => undefined,
+          setStatus: async ({ status }) => {
+            statuses.push(status);
+          },
+          saveReport: async () => undefined,
+        },
+        steps: [reopen(async () => ({ runs: ++runs }))],
+        serving: () => false,
+        oldWritersGoneFor: async () => (asked++, false),
+        identity: { owner: "upgrade:run-1", image: "3.21.0", host: "host" },
+        log: () => undefined,
+      });
+
+      const outcome = await service.runNow({ id, signal: new AbortController().signal });
+
+      expect(outcome).toBe("done");
+      expect(runs).toBe(1);
+      expect(asked).toBe(0);
+      expect(statuses).toEqual(["done"]);
+    });
+  });
+
+  describe("given a step a worker already finished", () => {
+    /** @scenario "A background step already done is not run again before a contract" */
+    it("skips it without taking its lease", async () => {
+      let runs = 0;
+      const service = BackgroundStepsService.create({
+        ledger: {
+          findSteps: async () => [{ id, status: "done", report: null }],
+          acquireLease: refuse,
+          renewLease: refuse,
+          releaseLease: refuse,
+          markRunning: refuse,
+          setStatus: refuse,
+          saveReport: refuse,
+        },
+        steps: [reopen(async () => ({ runs: ++runs }))],
+        serving: () => true,
+        oldWritersGoneFor: async () => true,
+        identity: { owner: "upgrade:run-1", image: "3.21.0", host: "host" },
+        log: () => undefined,
+      });
+
+      const outcome = await service.runNow({ id, signal: new AbortController().signal });
+
+      expect(outcome).toBe("skipped");
+      expect(runs).toBe(0);
     });
   });
 });

@@ -213,6 +213,7 @@ describe("given an administrator registering their identity provider", () => {
           entityId: "urn:acme",
           metadataXml: null,
           certificate: CERTIFICATE,
+          idpInitiated: { enabled: false, landingTargets: [] },
         },
       });
 
@@ -234,6 +235,7 @@ describe("given an administrator registering their identity provider", () => {
             entityId: null,
             metadataXml: null,
             certificate: null,
+            idpInitiated: { enabled: false, landingTargets: [] },
           },
         }),
       ).rejects.toMatchObject({ code: "sso_credentials_required" });

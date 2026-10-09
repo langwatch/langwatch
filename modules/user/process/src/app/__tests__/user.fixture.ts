@@ -1,5 +1,6 @@
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import { InMemoryProcessStore } from "@langwatch/eventing";
 import type { RoutingDecision } from "@langwatch/identity-contract";
 import {
   type OrganizationApi,
@@ -17,6 +18,7 @@ import type { UserBudgetRequestMailChannel } from "../../channels/user-budget-re
 import type { RecordUserLifecycleCommandData } from "../../eventing/user-lifecycle.events.ts";
 import { MemoryUserRepositories } from "../../repositories/memory/memory.user.repositories.ts";
 import type { UserRepositories } from "../../repositories/user.repositories.ts";
+import { userFactsAppend } from "../../rules/user-lifecycle-outbox.rules.ts";
 import type { UserLifecycleSenders } from "../../services/user-lifecycle-notice.service.ts";
 import { UserModule, type UserFacts } from "../user.app.ts";
 
@@ -205,7 +207,9 @@ export function createUserTestApp(
 ): UserModule {
   const auth = input.dependencies?.auth ?? createUserTestAuth();
   const app = UserModule.createForTesting({
-    repositories: input.repositories ?? MemoryUserRepositories.create(),
+    repositories:
+      input.repositories ??
+      MemoryUserRepositories.create({ processStore: InMemoryProcessStore.createForTesting() }),
     channels: { authReads: auth },
     facts: { ...TEST_USER_CONFIG, ...input.facts },
     budgetRequests: input.budgetRequests ?? MemoryUserBudgetRequestMailChannel.create(),
@@ -220,4 +224,17 @@ export function createUserTestApp(
   app.connectLifecycle(input.lifecycle ?? createUserTestLifecycle().senders);
 
   return app;
+}
+
+/** User's facts the shared process store's outbox holds for these users, in append order. */
+export async function userFactsIn({
+  processStore,
+  userIds,
+}: Readonly<{ processStore: InMemoryProcessStore; userIds: readonly string[] }>) {
+  const messages = await Promise.all(
+    userIds.map((userId) =>
+      processStore.findMessagesByRef({ ref: userFactsAppend({ userId, intents: [], now: 0 }).ref }),
+    ),
+  );
+  return messages.flat().map(({ intentType, payload }) => ({ type: intentType, data: payload }));
 }

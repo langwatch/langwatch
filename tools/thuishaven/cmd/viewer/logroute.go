@@ -135,6 +135,8 @@ func appFromServiceName(service string) (string, bool) {
 		return "llm", true
 	case strings.Contains(service, "analyticssim"):
 		return "analytics", true
+	case strings.Contains(service, "telemetrysim"):
+		return "telemetry", true
 	}
 	return "", false
 }

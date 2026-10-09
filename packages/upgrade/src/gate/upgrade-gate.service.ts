@@ -40,7 +40,7 @@ export type ServingGateImage = ServingImage & {
 export interface UpgradeGate {
   admit(): Promise<ServingVerdict>;
   release(): Promise<void>;
-  /** Admitted and its roster entry not lapsed; false once it lapses, true after a good write. */
+  /** Admitted and not released; a failing roster write never changes it (Alex, 2026-10-09). */
   serving(): boolean;
 }
 
@@ -99,7 +99,7 @@ export function createUpgradeGate({
       admitted = false;
       await roster.stop();
     },
-    serving: () => admitted && !roster.lapsed(),
+    serving: () => admitted,
   };
 }
 

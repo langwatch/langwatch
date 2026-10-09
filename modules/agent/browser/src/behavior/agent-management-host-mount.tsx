@@ -12,10 +12,11 @@ import {
   type UiCopyTargets,
   type UiFeedback,
   type UiNavigation,
-  type UiSession,
 } from "@langwatch/browser-host/capabilities";
-import { resolveUiFailureCopy } from "@langwatch/browser-host/feedback";
+import type { ReleaseFlagToken } from "@langwatch/browser-host/declarations";
 import { useDrawer } from "@langwatch/browser-host/drawer";
+import { useUiFlags, type UiFlags } from "@langwatch/browser-host/feature-flag";
+import { resolveUiFailureCopy } from "@langwatch/browser-host/feedback";
 import { useMemo, type ReactNode } from "react";
 
 import type { AgentClient } from "../model/agent-client.ts";
@@ -43,7 +44,7 @@ class CapabilityAgentManagementHost implements AgentManagementHost {
       ) => void;
       navigation: UiNavigation;
       feedback: UiFeedback;
-      session: UiSession;
+      flags: UiFlags;
       lent: UiCopyTargets;
       openDrawer: (drawer: string, props?: Record<string, unknown>) => void;
       refreshAgentLimit: () => Promise<void>;
@@ -96,8 +97,8 @@ class CapabilityAgentManagementHost implements AgentManagementHost {
       .title;
   }
 
-  isFeatureEnabled(flag: string): boolean {
-    return this.deps.session.isFeatureEnabled(flag);
+  isFeatureEnabled(flag: ReleaseFlagToken): boolean {
+    return this.deps.flags.flag(flag) === true;
   }
 
   openAgentEditor({
@@ -137,7 +138,8 @@ class CapabilityAgentManagementHost implements AgentManagementHost {
  * is what `mounts.load` resolves.
  */
 export default function AgentManagementHostMount({ children }: { children?: ReactNode }) {
-  const { navigation, route, feedback, session } = useUiCapabilities();
+  const { navigation, route, feedback } = useUiCapabilities();
+  const flags = useUiFlags();
   const rpc = useUiRpc();
   const lent = useUiCopyTargets();
   const scopeHost = useUiScope().scopeHost();
@@ -158,12 +160,12 @@ export default function AgentManagementHostMount({ children }: { children?: Reac
         setQuery: (next, options) => route.setQuery(next, options),
         navigation,
         feedback,
-        session,
+        flags,
         lent,
         openDrawer: (drawer, props) => openDrawer(drawer, props),
         refreshAgentLimit: () => Promise.resolve(),
       }),
-    [hostProject, agents, reading, route, navigation, feedback, session, lent, openDrawer],
+    [hostProject, agents, reading, route, navigation, feedback, flags, lent, openDrawer],
   );
 
   return <AgentManagementHostProvider value={host}>{children}</AgentManagementHostProvider>;

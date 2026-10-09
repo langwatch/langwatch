@@ -56,6 +56,7 @@
     "@langwatch/experiment-browser": "workspace:*",
     "@langwatch/experiment-contract": "workspace:*",
     "@langwatch/feature-flag-browser": "workspace:*",
+    "@langwatch/feature-flag-client": "workspace:*",
     "@langwatch/gateway-browser": "workspace:*",
     "@langwatch/gateway-contract": "workspace:*",
     "@langwatch/github-browser": "workspace:*",

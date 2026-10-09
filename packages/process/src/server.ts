@@ -13,6 +13,7 @@ import {
   startLivenessThread,
   type Heartbeat,
   type LivenessThread,
+  type UpgradeConsole,
   type UpgradeHolding,
 } from "./lifecycle/liveness-thread.ts";
 import { HTTP_CLOSE_PHASE_MS, HTTP_DRAIN_GRACE_MS } from "./lifecycle/shutdown-deadline.ts";
@@ -21,6 +22,8 @@ import { ResourceScope } from "./resource-scope.ts";
 /** What this package needs of a logger, so it depends on no logging implementation. */
 export interface ServerLogger {
   info: (obj: object, msg: string) => void;
+  /** Absent, a warn line prints at info (the upgrade console's token line, CONSOLE-FOLLOWUPS). */
+  warn?: (obj: object, msg: string) => void;
   error: (obj: object, msg: string) => void;
 }
 
@@ -216,6 +219,11 @@ export class Server {
     await this.livenessThread?.hold(holding);
   }
 
+  /** Shows a failed upgrade's console; true on Retry, false with no thread to show it. */
+  async consoleForUpgrade(upgradeConsole: UpgradeConsole): Promise<boolean> {
+    return (await this.livenessThread?.holdConsole(upgradeConsole)) ?? false;
+  }
+
   private openHealth(): Promise<void> {
     this.healthOpening ??= Promise.resolve(this.health?.start?.());
     return this.healthOpening;
@@ -335,7 +343,7 @@ export class Server {
       .end(ready ? "ready" : `${this.name} is not ready`);
   }
 
-  /** Latches once passed until `recheckReadiness`; one check in flight however many probes ask. */
+  /** Latches once passed; one check in flight however many probes ask. */
   private checkReadiness(): Promise<boolean> {
     if (this.draining || !this.started) return Promise.resolve(false);
     if (Atomics.load(this.readiness, 0) === 1) return Promise.resolve(true);
@@ -358,12 +366,6 @@ export class Server {
         this.readinessCheck = undefined;
       });
     return this.readinessCheck;
-  }
-
-  /** Drops the readiness latch so the next probe asks every component again (round 22). */
-  recheckReadiness(): void {
-    if (this.draining) return;
-    Atomics.store(this.readiness, 0, 0);
   }
 
   /** A draining door takes no new work and is no longer ready, on and off the loop. */

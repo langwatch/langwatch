@@ -6,7 +6,7 @@ The server half of [coding-agent](../README.md). Coding-agent observability: ses
 
 ## Installation
 
-`defineProcessModule("coding-agent").withRepositories(codingAgentRepositories).withApi(CodingAgentModule).withTransports(codingAgentRest, codingAgentRollupRest, codingAgentV1Rest, codingAgentTrpcTransport).withEventing(codingAgentEventing).withTransportFacts(…)`, `src/coding-agent.module.ts:22`.
+`defineProcessModule("coding-agent").withRepositories(codingAgentRepositories).withApi(CodingAgentModule).withTransports(codingAgentRest, codingAgentRollupRest, codingAgentV1Rest, codingAgentTrpcTransport).withEventing(codingAgentEventing).withTransportFacts(…)`, `src/coding-agent.module.ts:25`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -317,8 +317,8 @@ interface Input {
 type Output = z.infer<typeof codingAgentTranscriptSchema>; // ../contract/src/coding-agent-transcript.ts:81
 
 // codingAgents.sessionGroups
-type Input = z.infer<typeof traceSessionGroupsInputSchema>; // ../../trace/contract/src/traces.trpc.ts:132
-type Output = z.infer<typeof tracesSessionsPageSchema>; // ../../trace/contract/src/trace.responses.ts:108
+type Input = z.infer<typeof traceSessionGroupsInputSchema>; // ../../trace/contract/src/traces.trpc.ts:135
+type Output = z.infer<typeof tracesSessionsPageSchema>; // ../../trace/contract/src/trace.responses.ts:111
 ```
 
 ## Sockets
@@ -349,6 +349,8 @@ Declared at `src/eventing/coding-agent-processing.pipeline.ts:142`. Events: `spa
 
 ## Configuration
 
-None: no `static secrets` or `static config` leaf.
+| Kind   | Leaf                  | Environment variable               | Declared at                                |
+| ------ | --------------------- | ---------------------------------- | ------------------------------------------ |
+| config | `foldCacheTtlSeconds` | `LANGWATCH_FOLD_CACHE_TTL_SECONDS` | `../contract/src/coding-agent.config.ts:4` |
 
 <!-- readme:generated:end -->

@@ -151,6 +151,9 @@ func (o *Orchestrator) printStacks(r statusReport) {
 			ram = "  ~" + domain.HumanBytes(int64(treeRSS))
 		}
 		fmt.Printf("%-18s %-6s %s  (%s)%s\n", s.Slug, o.liveness(s), s.Branch, s.WorktreeDir, ram)
+		if s.Mode != "" {
+			fmt.Printf("  mode %s\n", s.EffectiveMode)
+		}
 		for _, svc := range s.Services {
 			dot := "·"
 			if o.sys.PortInUse(svc.Port) {

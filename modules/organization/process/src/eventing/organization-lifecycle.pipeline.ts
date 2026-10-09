@@ -11,6 +11,14 @@ import {
   seatCheckoutsAbandonedEventDataSchema,
 } from "@langwatch/enterprise-billing-contract";
 import {
+  CONNECT_SERVICE_SWITCHED_EVENT_TYPE,
+  connectServiceSwitchedEventDataSchema,
+  LICENSE_SYNC_FINISHED_EVENT_TYPE,
+  licenseSyncFinishedEventDataSchema,
+  SELF_HOSTED_CUSTOMER_LICENSED_EVENT_TYPE,
+  selfHostedCustomerLicensedEventDataSchema,
+} from "@langwatch/enterprise-licensing-contract";
+import {
   defineAggregate,
   defineEventingModule,
   definePipeline,
@@ -62,6 +70,12 @@ export type BillingFactsApplier = Pick<
   | "updatePricingModel"
   | "approvePaymentPendingInvites"
   | "cancelPaymentPendingInvites"
+>;
+
+/** Where licensing's facts land: organization creates and writes the rows (C3c, R42). */
+export type LicensingFactsApplier = Pick<
+  OrganizationModule,
+  "createSelfHostedCustomer" | "switchConnectService" | "updateConnectSyncOutcome"
 >;
 
 /** An organisation gone before its fact arrived has no row to apply it to. */
@@ -117,14 +131,42 @@ export type OrganizationLifecycleDefinition = ReturnType<
 
 /**
  * organization_lifecycle records; peers (nurturing, governance) react from their own side (§9).
- * It applies billing's writes to organisation rows from billing's facts (R42, round 46 D-b).
+ * It applies billing's and licensing's writes to organisation rows from their facts (R42, C3c).
  */
 export function buildOrganizationLifecyclePipeline({
   billingFacts,
+  licensingFacts,
 }: {
   billingFacts: BillingFactsApplier;
+  licensingFacts: LicensingFactsApplier;
 }): OrganizationLifecycleDefinition {
   return lifecycleCommands()
+    .withPeerSubscriber("organizationLicensingSelfHostedCustomerLicensed", {
+      eventType: SELF_HOSTED_CUSTOMER_LICENSED_EVENT_TYPE,
+      data: selfHostedCustomerLicensedEventDataSchema,
+      handle: ({ organizationId, name }) =>
+        licensingFacts.createSelfHostedCustomer({ organizationId, name }),
+    })
+    .withPeerSubscriber("organizationLicensingConnectServiceSwitched", {
+      eventType: CONNECT_SERVICE_SWITCHED_EVENT_TYPE,
+      data: connectServiceSwitchedEventDataSchema,
+      handle: ({ organizationId, service, enabled }) =>
+        onLiveOrganization(() =>
+          licensingFacts.switchConnectService({ organizationId, service, enabled }),
+        ),
+    })
+    .withPeerSubscriber("organizationLicensingLicenseSyncFinished", {
+      eventType: LICENSE_SYNC_FINISHED_EVENT_TYPE,
+      data: licenseSyncFinishedEventDataSchema,
+      handle: ({ organizationId, occurredAt, error }) =>
+        onLiveOrganization(() =>
+          licensingFacts.updateConnectSyncOutcome({
+            organizationId,
+            at: Temporal.Instant.fromEpochMilliseconds(occurredAt),
+            error,
+          }),
+        ),
+    })
     .withPeerSubscriber("organizationBillingPlanLimitAlertSent", {
       eventType: PLAN_LIMIT_ALERT_SENT_EVENT_TYPE,
       data: planLimitAlertSentEventDataSchema,

@@ -50,26 +50,26 @@ recordCanonicalMetricDataPoints(points: readonly CanonicalMetricDataPoint[]): Pr
 
 |             |                                         |
 | ----------- | --------------------------------------- |
-| Declared at | `src/transport/otlp-metrics.rest.ts:25` |
+| Declared at | `src/transport/otlp-metrics.rest.ts:26` |
 | Base URL    | none: each route's path is its address  |
 | Addressing  | literal                                 |
 | Credential  | project                                 |
 
 #### `POST /api/otel/v1/metrics` · `ingestOtlpMetrics`
 
-Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-metrics.rest.ts:30`.
+Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-metrics.rest.ts:31`.
 
 Answers at `/api/otel/v1/metrics`.
 
 ```typescript
-// Rawbody: "bytes" (inline, src/transport/otlp-metrics.rest.ts:31)
-// Response: inline, src/transport/otlp-metrics.rest.ts:34
+// Rawbody: "bytes" (inline, src/transport/otlp-metrics.rest.ts:32)
+// Response: inline, src/transport/otlp-metrics.rest.ts:35
 type Response = unknown;
 ```
 
 #### `POST /:otlpBase{.+}/v1/metrics` · `ingestOtlpMetricsAlias`
 
-Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-metrics.rest.ts:50`.
+Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-metrics.rest.ts:51`.
 
 Answers at `/:otlpBase{.+}/v1/metrics`.
 
@@ -78,58 +78,58 @@ Answers at `/:otlpBase{.+}/v1/metrics`.
 interface Params {
   otlpBase: string;
 }
-// Rawbody: "bytes" (inline, src/transport/otlp-metrics.rest.ts:52)
-// Response: inline, src/transport/otlp-metrics.rest.ts:55
+// Rawbody: "bytes" (inline, src/transport/otlp-metrics.rest.ts:53)
+// Response: inline, src/transport/otlp-metrics.rest.ts:56
 type Response = unknown;
 ```
 
 #### `POST /:otlpBase{.+}/v1/metrics/` · `ingestOtlpMetricsAliasSlash`
 
-Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-metrics.rest.ts:69`.
+Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-metrics.rest.ts:70`.
 
 Answers at `/:otlpBase{.+}/v1/metrics/`.
 
 ```typescript
 type Params = z.infer<typeof otlpMetricAliasParamsSchema>; // ../contract/src/metric.api.ts:41
-// Rawbody: "bytes" (inline, src/transport/otlp-metrics.rest.ts:71)
-// Response: inline, src/transport/otlp-metrics.rest.ts:74
+// Rawbody: "bytes" (inline, src/transport/otlp-metrics.rest.ts:72)
+// Response: inline, src/transport/otlp-metrics.rest.ts:75
 type Response = unknown;
 ```
 
 #### `POST /:otlpBase{.+}/v1//metrics` · `ingestOtlpMetricsAliasDoubled`
 
-Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-metrics.rest.ts:89`.
+Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-metrics.rest.ts:90`.
 
 Answers at `/:otlpBase{.+}/v1//metrics`.
 
 ```typescript
 type Params = z.infer<typeof otlpMetricAliasParamsSchema>; // ../contract/src/metric.api.ts:41
-// Rawbody: "bytes" (inline, src/transport/otlp-metrics.rest.ts:91)
-// Response: inline, src/transport/otlp-metrics.rest.ts:94
+// Rawbody: "bytes" (inline, src/transport/otlp-metrics.rest.ts:92)
+// Response: inline, src/transport/otlp-metrics.rest.ts:95
 type Response = unknown;
 ```
 
 #### `POST /v1/metrics` · `ingestOtlpMetricsRootV1`
 
-Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-metrics.rest.ts:108`.
+Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-metrics.rest.ts:109`.
 
 Answers at `/v1/metrics`.
 
 ```typescript
-// Rawbody: "bytes" (inline, src/transport/otlp-metrics.rest.ts:109)
-// Response: inline, src/transport/otlp-metrics.rest.ts:112
+// Rawbody: "bytes" (inline, src/transport/otlp-metrics.rest.ts:110)
+// Response: inline, src/transport/otlp-metrics.rest.ts:113
 type Response = unknown;
 ```
 
 #### `POST /v1/metrics/` · `ingestOtlpMetricsRootV1Slash`
 
-Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-metrics.rest.ts:126`.
+Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-metrics.rest.ts:127`.
 
 Answers at `/v1/metrics/`.
 
 ```typescript
-// Rawbody: "bytes" (inline, src/transport/otlp-metrics.rest.ts:127)
-// Response: inline, src/transport/otlp-metrics.rest.ts:130
+// Rawbody: "bytes" (inline, src/transport/otlp-metrics.rest.ts:128)
+// Response: inline, src/transport/otlp-metrics.rest.ts:131
 type Response = unknown;
 ```
 

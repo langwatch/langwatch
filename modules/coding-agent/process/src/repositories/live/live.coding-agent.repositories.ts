@@ -1,4 +1,5 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import type { CodingAgentServerConfig } from "@langwatch/coding-agent-contract";
 import type { Cluster, Redis } from "ioredis";
 
 import { ClickHouseCodingAgentRepositories } from "../clickhouse/clickhouse.coding-agent.repositories.ts";
@@ -13,14 +14,19 @@ export class LiveCodingAgentRepositories {
   static create({
     clickhouse,
     redis,
+    config,
   }: {
     clickhouse: ClickHouseQueryClient;
     redis: Redis | Cluster;
+    config: Pick<CodingAgentServerConfig, "foldCacheTtlSeconds">;
   }): CodingAgentRepositories {
     return {
       ...ClickHouseCodingAgentRepositories.create({ clickhouse }),
       sessionContextMemo: RedisSessionContextMemoRepository.create(redis),
-      sessionFoldCache: RedisCodingAgentSessionFoldCacheRepository.create(redis),
+      sessionFoldCache: RedisCodingAgentSessionFoldCacheRepository.create({
+        redis,
+        ttlSeconds: config.foldCacheTtlSeconds,
+      }),
     };
   }
 }

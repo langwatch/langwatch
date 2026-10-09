@@ -42,6 +42,14 @@ Feature: The REST runtime renders what a transport may not hand-roll
       Then the handler is handed the fields of both sides
       And malformed JSON is refused with 400 malformed_request and a body missing a side with 422 validation_error
 
+    # Alex, 2026-10-09 (G3B-PATHKEYS): every route, before the handler.
+    @unit
+    Scenario: A body field that repeats a path parameter is refused as a handled 400
+      Given a route with a path parameter whose JSON input passes undeclared fields through
+      When it is called with a body carrying a key named like that path parameter
+      Then it is refused with 400 and the code malformed_request, never a 500
+      And the handler is not reached, while a body without such a key reaches it unchanged
+
   Rule: A protocol route renders every refusal in its protocol's own document
 
     @integration
@@ -253,6 +261,14 @@ Feature: The REST runtime renders what a transport may not hand-roll
       When it is called with a body under any media type
       Then the handler is handed the body as sent
       And a route that declares a refusal for a media type it never named, or names a media type with parameters or a wildcard, refuses to build
+
+    @integration
+    Scenario: A raw body route refuses the media types it names and reads any other
+      Given a raw-body route that reads any media type and refuses application/grpc by name, as the OTLP doors do (Alex, 2026-10-09)
+      When it is called with a body under application/grpc, under that type with a +suffix, or in another letter case
+      Then it is refused with 415 and the code unsupported_media_type after the credential door, and the handler is not reached
+      And a body under any other media type, or with no Content-Type at all, reaches the handler as sent
+      And a route that refuses by name beside a media type it enforces, or names a wildcard, refuses to build
 
   Rule: A JSON body that names its media type is read only under it (Alex, G3b)
 

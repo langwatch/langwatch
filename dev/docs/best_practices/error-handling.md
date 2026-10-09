@@ -229,7 +229,7 @@ instanceof Error ? e.message : "…"` taints `message`, and so does a second
    every error, and `clickhouse_unavailable`'s "check the status page or
    contact support" never once reached a customer.
 
-   `resolveErrorCopy` (`modules/trace/browser/src/behavior/errors/logic/resolve-error-copy.ts`) applies that comparison
+   `resolveErrorCopy` (`packages/error-views/src/resolve-error-copy.ts`) applies that comparison
    once, on a normalised form, and both surfaces render its output:
    `<HandledErrorAlert>` lists every remaining tip, `showErrorToast` folds in
    the first. Pinned by `logic/__tests__/showErrorToast.unit.test.ts` and

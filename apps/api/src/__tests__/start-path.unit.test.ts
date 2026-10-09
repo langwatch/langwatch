@@ -34,10 +34,8 @@ describe("the API start path", () => {
 
   describe("given the preparation script", () => {
     /** @scenario "A failed upgrade stops the preparation" */
-    it("chains the system-migrations pass behind the upgrade with &&", () => {
-      expect(scripts["start:prepare:db"]).toBe(
-        "cd ../tasks && pnpm --silent task upgrade && pnpm --silent task system-migrations-pass",
-      );
+    it("is the upgrade alone, so a failure fails the preparation", () => {
+      expect(scripts["start:prepare:db"]).toBe("cd ../tasks && pnpm --silent task upgrade");
     });
   });
 

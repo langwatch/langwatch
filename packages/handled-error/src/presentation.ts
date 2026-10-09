@@ -4859,6 +4859,15 @@ const presentations = {
     title: "That page of upgrade runs couldn't be read",
     describe: () => "Reload the upgrades page to start from the newest run.",
   },
+  upgrade_step_not_failed: {
+    title: "Only a failed step can be retried",
+    describe: (error) => {
+      const status = str(error, "status", "");
+      return status
+        ? `This step is ${status}, not failed. Reload the upgrades page to see where it stands.`
+        : "This step is not failed. Reload the upgrades page to see where it stands.";
+    },
+  },
   // ==========================================================================
   // Codes raised by the Go services (generated into `goErrorCodes` by
   // cmd/herrgen). They reach the browser whenever the control plane proxies a

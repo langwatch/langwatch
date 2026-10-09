@@ -15,6 +15,7 @@ import { identityProviderFormFrom } from "../../model/identity-provider-edit.ts"
 import { identityProviderPreset } from "../../model/identity-providers.ts";
 import type { RegisterForm } from "../../model/registration-form.ts";
 import { OidcFields, SamlFields, type UpdateField } from "../elements/identity-provider-fields.tsx";
+import { IdpInitiatedFields } from "../elements/idp-initiated-fields.tsx";
 import { InlineRefusal, LoadFailure } from "../elements/refusals.tsx";
 
 export function EditIdentityProviderSection({
@@ -97,7 +98,13 @@ function EditIdentityProviderForm({
           secretHint={keepsSecret ? "Leave blank to keep the current secret." : void 0}
         />
       ) : (
-        <SamlFields preset={preset} form={form} update={update} />
+        <>
+          <SamlFields preset={preset} form={form} update={update} />
+          <IdpInitiatedFields
+            value={form.idpInitiated}
+            onChange={(idpInitiated) => setForm((previous) => ({ ...previous, idpInitiated }))}
+          />
+        </>
       )}
       <InlineRefusal error={edit.refusal} what="Saving the identity provider settings" />
       <HStack gap={2}>

@@ -3,8 +3,8 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Temporal } from "@langwatch/time";
 import { ExternalLink } from "react-feather";
 
-import { useRetryFailedAnalytics } from "../../behavior/analytics-feedback.ts";
 import { useAnalyticsFeedbacks } from "../../behavior/use-analytics-documents.ts";
+import { useRetryFailedAnalytics } from "../../behavior/use-retry-failed-analytics.ts";
 import { useAnalyticsHost } from "../../model/analytics-host.ts";
 import { traceDetailsAddress } from "../../model/analytics-overlay-address.ts";
 import { ChartErrorState } from "../elements/chart-error-state.tsx";

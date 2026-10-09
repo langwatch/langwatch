@@ -32,7 +32,7 @@ vi.mock("../../../../behavior/use-langy-automation-data.ts", () => ({
   useLangyAutomationNow: () => ({ fresh: undefined, nextFiring: undefined }),
 }));
 
-vi.mock("@langwatch/browser-host/feature-flag", () => ({
+vi.mock("@langwatch/feature-flag-client", () => ({
   useFeatureFlag: () => ({ enabled: true, isLoading: false }),
 }));
 

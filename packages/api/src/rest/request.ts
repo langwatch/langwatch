@@ -441,6 +441,8 @@ export type RestRawBody = Readonly<{
   mediaType: string;
   /** Present exactly when the route named its media type: what any other type is refused with. */
   mismatch?: RestMediaTypeMismatch;
+  /** Media types refused with 415 while any other is read; each covers its `+suffix` forms too. */
+  refuses?: readonly string[];
 }>;
 
 /**

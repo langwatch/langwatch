@@ -78,9 +78,8 @@ export function withGroupedPipeline(input: CustomGraphInput): CustomGraphInput {
 }
 
 /**
- * Whether the query can skip the previous period: summary, pie and donut charts always draw
- * the comparison, every other type only with `includePrevious` on. Skipping it scans one
- * window instead of two.
+ * Whether the graph leaves the previous period out of its query. Summary, pie and donut
+ * charts always compare; every other type only when the author turned `includePrevious` on.
  */
 export function shouldSkipPreviousPeriod({
   graphType,

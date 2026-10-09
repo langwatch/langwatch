@@ -14,6 +14,7 @@ import { defineProcessModule, type PublishedProcessModule } from "@langwatch/pro
 import type { RedisConnection } from "@langwatch/redis-client";
 
 import { GatewayModule } from "./app/gateway.app.ts";
+import { gatewayChannels } from "./channels/gateway-channels.registry.ts";
 import { gatewayGovernanceEventsEventing } from "./eventing/gateway-governance-events.pipeline.ts";
 import { gatewayInstantEvalJudgeSpendEventing } from "./eventing/gateway-instant-eval-judge-spend.pipeline.ts";
 import { gatewayPulledUsageLedgerEventing } from "./eventing/gateway-pulled-usage-ledger.pipeline.ts";
@@ -50,6 +51,7 @@ export const gatewayProcessModule: PublishedProcessModule<
   GatewayServerConfig
 > = defineProcessModule("gateway")
   .withRepositories(gatewayRepositories)
+  .withChannels(gatewayChannels)
   .withApi(GatewayModule)
   .withTransports(
     agentCacheRest,

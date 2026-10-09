@@ -331,3 +331,7 @@ packageExtensions:
   '@google-cloud/dlp':
     dependencies:
       protobufjs: ^7.5.4
+
+# Local fixes carried until upstream releases them (dev/docs/ARCHITECTURE.md, patched dependencies).
+patchedDependencies:
+  '@better-auth/sso@1.7.1': patches/@better-auth__sso@1.7.1.patch

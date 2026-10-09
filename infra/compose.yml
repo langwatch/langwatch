@@ -1,6 +1,6 @@
 services:
-  # One-shot: applies what this release needs (`pnpm task upgrade`, then the
-  # system-migrations pass) and exits. The app and the workers never migrate;
+  # One-shot: applies what this release needs (`pnpm task upgrade`) and
+  # exits. The app and the workers never migrate;
   # they wait for this to succeed, and refuse by name if it has not run. It
   # runs again on every `up`, where a current installation makes it a no-op.
   migrate:
@@ -55,6 +55,7 @@ services:
         condition: service_healthy
       clickhouse:
         condition: service_healthy
+    restart: unless-stopped
 
   workers:
     image: langwatch/langwatch:latest

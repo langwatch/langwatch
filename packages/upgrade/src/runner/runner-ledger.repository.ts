@@ -197,6 +197,22 @@ export class UpgradeRunnerRepository {
     return rows.map((row) => row.id).toSorted();
   }
 
+  /**
+   * Sets one failed step pending in a single conditional write, error cleared and checkpoint kept.
+   * Answers false when the step is not failed, so of two concurrent retries only one wins.
+   */
+  async retryFailedStep({ id }: { id: string }): Promise<boolean> {
+    const { rows } = await this.query<{ id: string }>(
+      (t) => `UPDATE ${t.step}
+          SET "status" = 'pending', "last_error" = NULL, "inferred" = false, "finished_at" = NULL,
+              "updated_at" = ${NOW_UTC}
+        WHERE "id" = $1 AND "status" = 'failed'
+       RETURNING "id"`,
+      [id],
+    );
+    return rows.length > 0;
+  }
+
   /** Sets failed steps of one mode pending again, error and checkpoint kept; answers their ids. */
   async resetFailedSteps({
     mode,

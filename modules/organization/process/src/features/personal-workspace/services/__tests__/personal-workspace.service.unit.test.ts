@@ -68,6 +68,7 @@ describe("ensuring a personal workspace", () => {
       });
     });
 
+    /** @scenario "A personal workspace records its new project" */
     /** @scenario "Ensuring again while the personal project is pending creates no second team" */
     it("records the personal team fact on every pending answer, so a lost record heals", async () => {
       const { service, personalTeamCreated } = serviceWhere({ kind: "pending", team: TEAM });

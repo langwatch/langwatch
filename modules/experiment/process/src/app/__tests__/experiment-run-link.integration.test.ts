@@ -46,6 +46,7 @@ async function bootWith({
     )
     .withConfig({
       experiment: {
+        foldCacheTtlSeconds: 300,
         blockLocalHttpCalls: false,
         allowedProxyHosts: [],
         runConcurrency: 10,

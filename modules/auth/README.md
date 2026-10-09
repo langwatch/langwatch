@@ -50,6 +50,6 @@ Anything else auth needs belongs to another module and is reached through its `*
 
 ## Who depends on auth
 
-[github](../github/README.md), [governance](../../enterprise/modules/governance/README.md), [hosted-mcp](../hosted-mcp/README.md), [identity](../identity/README.md), [ops](../ops/README.md) (as a peer).
+[github](../github/README.md), [governance](../../enterprise/modules/governance/README.md), [hosted-mcp](../hosted-mcp/README.md), [ops](../ops/README.md) (as a peer).
 
 <!-- readme:generated:end -->

@@ -29,18 +29,12 @@ const TERM_END: Instant = Temporal.Instant.from("2027-01-01T00:00:00.000Z");
 
 class RecordingCustomers {
   readonly marked: string[] = [];
-  readonly created: string[] = [];
 
   async findById(id: string): Promise<IssuedLicenseCustomerRecord | null> {
     return id === "missing" ? null : { id, name: "ACME" };
   }
 
-  async createSelfHostedCustomer({ name }: { name: string }): Promise<IssuedLicenseCustomerRecord> {
-    this.created.push(name);
-    return { id: `org-${this.created.length}`, name };
-  }
-
-  async markSelfHostedCustomer(id: string): Promise<void> {
+  async recordSelfHostedCustomerLicensed({ id }: { id: string; name: string }): Promise<void> {
     this.marked.push(id);
   }
 }
@@ -167,9 +161,12 @@ describe("the license registry", () => {
     class FailingCustomers extends RecordingCustomers {
       failing = true;
 
-      override async markSelfHostedCustomer(id: string): Promise<void> {
+      override async recordSelfHostedCustomerLicensed(customer: {
+        id: string;
+        name: string;
+      }): Promise<void> {
         if (this.failing) throw new Error("the organization store is down");
-        await super.markSelfHostedCustomer(id);
+        await super.recordSelfHostedCustomerLicensed(customer);
       }
     }
     const organizations = new FailingCustomers();

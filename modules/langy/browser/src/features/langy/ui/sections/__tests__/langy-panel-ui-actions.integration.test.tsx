@@ -194,8 +194,8 @@ const flagsRef = {
   current: { release_langy_ui_actions: true } as Record<string, boolean>,
 };
 
-vi.mock("@langwatch/browser-host/feature-flag", () => ({
-  useFeatureFlag: (flag: string) => ({
+vi.mock("@langwatch/feature-flag-client", () => ({
+  useFeatureFlag: ({ name: flag }: { name: string }) => ({
     enabled: flagsRef.current[flag] ?? false,
     isLoading: false,
   }),

@@ -114,6 +114,7 @@ export { opsOperatorsTrpc } from "./ops-operators.trpc.ts";
 export { opsProcessTrpc } from "./features/process/ops-process.trpc.ts";
 export { opsQueueTrpc } from "./features/queue/ops-queue.trpc.ts";
 export * from "./features/migrations/ops-upgrade.ts";
+export * from "./features/migrations/ops-upgrade.errors.ts";
 export * from "./ops.config.ts";
 export * from "./usage-report.ts";
 export * from "./usage-report-docs.ts";

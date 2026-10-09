@@ -4,9 +4,6 @@
  * package stays below configuration — the rule `otlp-metrics.ts` already follows.
  */
 
-/** A push to the collector, or a scrape door the collector pulls. */
-export type MetricsMode = "otlp" | "prometheus";
-
 export type TelemetrySettings = Readonly<{
   /** The collector's base URL; absent means this process exports nothing. */
   otlpEndpoint: string | undefined;
@@ -16,16 +13,32 @@ export type TelemetrySettings = Readonly<{
   serviceVersion: string | undefined;
   /** `OTEL_RESOURCE_ATTRIBUTES`, still in its environment encoding. */
   resourceAttributes: string | undefined;
+  /** `PYROSCOPE_SERVER_ADDRESS`; absent means this process does not profile. */
+  profilingServerAddress?: string | undefined;
+  /** `OTEL_SERVICE_NAME`; absent keeps the process's own name. */
+  serviceName: string | undefined;
+  /** `OTEL_SDK_DISABLED=true`: no signal leaves the process. */
+  sdkDisabled: boolean;
   /** Share of root traces kept, in [0, 1]. Absent keeps the SDK default. */
   tracesSampleRatio: number | undefined;
+  /** Each `exporter` is its `OTEL_*_EXPORTER` list as written; `resolveTelemetry` reads them. */
+  traces: Readonly<{ exporter: string | undefined }>;
   logs: Readonly<{
     format: "pretty" | "json" | undefined;
     level: string | undefined;
     consoleLevel: string | undefined;
     otelLevel: string | undefined;
-    otelExport: boolean;
+    exporter: string | undefined;
   }>;
-  metrics: Readonly<{ mode: MetricsMode; enabled: boolean }>;
+  metrics: Readonly<{
+    exporter: string | undefined;
+    /** `OTEL_EXPORTER_PROMETHEUS_HOST`; absent listens on every interface. */
+    prometheusHost?: string | undefined;
+    /** `OTEL_EXPORTER_PROMETHEUS_PORT`; absent is the OTel default, 9464. */
+    prometheusPort?: number | undefined;
+  }>;
+  /** main's names keyed by env name, as `telemetryAliases` lists them. */
+  deprecated?: Readonly<Record<string, string | undefined>>;
 }>;
 
 /**
@@ -48,9 +61,12 @@ export const otlpHeadersSecret: TelemetrySecret = {
   resolvesTo: void 0,
 };
 
-/** The bearer a Prometheus scrape presents. Absent leaves the door open. */
+/**
+ * The bearer a Prometheus scrape presents, main's name (ADR-175). Absent
+ * leaves the door open outside production.
+ */
 export const metricsScrapeTokenSecret: TelemetrySecret = {
-  id: "LANGWATCH_METRICS_TOKEN",
+  id: "METRICS_API_KEY",
   optional: true,
   schema: void 0,
   resolvesTo: void 0,

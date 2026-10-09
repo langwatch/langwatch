@@ -1,4 +1,5 @@
 import { buildGraphAlertTemplateContext } from "@langwatch/automation-contract";
+import { InMemoryProcessStore } from "@langwatch/eventing";
 import { ReactEmailMailRenderer } from "@langwatch/mail";
 import type { SendEmailCommand } from "@langwatch/notification-contract";
 import { frozenAt } from "@langwatch/test-harness";
@@ -23,7 +24,9 @@ function composeNotifier(publicBaseUrl: string | undefined) {
   const mail = { sent, sendEmail: async (command: SendEmailCommand) => void sent.push(command) };
   const notifier = AutomationGraphAlertNotifierService.create({
     publicBaseUrl,
-    repositories: MemoryAutomationRepositories.create(),
+    repositories: MemoryAutomationRepositories.create({
+      processStore: InMemoryProcessStore.createForTesting(),
+    }),
     caps: { emailHourlyCap: 10, tenantDailyCap: 100 },
     providers: AutomationProviderRegistryService.create(
       sealWith({ encrypt: (value) => value, decrypt: (value) => value }),

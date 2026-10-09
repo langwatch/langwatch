@@ -284,6 +284,13 @@ func (s *Stack) Stop(ctx context.Context) error {
 			return fmt.Errorf("pkill: %w", err)
 		}
 	}
+	// A restart starts at once, so wait for every component to exit and free its ports.
+	for deadline := time.Now().Add(15 * time.Second); time.Now().Before(deadline); time.Sleep(250 * time.Millisecond) {
+		pgrep := exec.CommandContext(ctx, "pgrep", "-f", "--", s.plan.ConfigDir()) // #nosec G204 -- same fixed pattern as pkill
+		if pgrep.Run() != nil {
+			break
+		}
+	}
 	return os.RemoveAll(s.plan.DataDir())
 }
 

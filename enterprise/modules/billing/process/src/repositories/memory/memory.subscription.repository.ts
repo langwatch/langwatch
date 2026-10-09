@@ -53,6 +53,12 @@ export class MemoryBillingSubscriptionRepository extends BillingSubscriptionRepo
     );
   }
 
+  async hasAnyForOrganization(organizationId: string): Promise<boolean> {
+    return this.store.subscriptions.some(
+      (subscription) => subscription.organizationId === organizationId,
+    );
+  }
+
   async createPending(input: {
     organizationId: string;
     plan: string;

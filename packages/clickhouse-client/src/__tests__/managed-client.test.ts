@@ -1,3 +1,4 @@
+import { QueueFullError } from "@langwatch/limiter";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ClickHouseClientCreationInput } from "../connection.ts";
@@ -9,7 +10,6 @@ import {
   type ClickHouseVendorClient,
   type ClickHouseVendorClientOptions,
 } from "../managed-client.ts";
-import { QueueFullError } from "../rateLimit.ts";
 import { VendorClientResiliencePolicy } from "../vendorClient.ts";
 
 interface TestVendorClient extends ClickHouseVendorClient {

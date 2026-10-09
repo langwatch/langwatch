@@ -3,6 +3,7 @@ import { useMemo } from "react";
 
 import { useIsReadOnlyTrace } from "../../../behavior/explorer/context/trace-viewer-context.tsx";
 import { useTraceQueryArgs } from "../../../behavior/explorer/use-trace-query-args.ts";
+import { useTraceHost } from "../../../behavior/trace-host.ts";
 import {
   type AnnotationByTrace,
   useAnnotationsByTraceIds,
@@ -45,7 +46,8 @@ interface AnchoredAnnotations {
  * about.
  */
 export function useAnchoredAnnotations(): AnchoredAnnotations {
-  const { project, hasPermission } = useOrganizationTeamProject();
+  const { project } = useOrganizationTeamProject();
+  const traceHost = useTraceHost();
   const { traceId } = useTraceQueryArgs();
   const isReadOnly = useIsReadOnlyTrace();
 
@@ -54,7 +56,8 @@ export function useAnchoredAnnotations(): AnchoredAnnotations {
   const query = useAnnotationsByTraceIds({
     projectId: project?.id ?? "",
     traceIds,
-    enabled: !!project?.id && !!traceId && !isReadOnly && hasPermission("annotations:view"),
+    enabled:
+      !!project?.id && !!traceId && !isReadOnly && traceHost.hasPermission("annotations:view"),
     anchor: "all",
   });
 

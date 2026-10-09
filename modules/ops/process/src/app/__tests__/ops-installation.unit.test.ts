@@ -69,7 +69,6 @@ function process(
     .withConfig({
       ops: {
         apiKey: undefined,
-        metricsApiKey: undefined,
         clickhouseOpsUrl: undefined,
         usageStats: {
           disabled: false,

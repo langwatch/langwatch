@@ -114,6 +114,7 @@
   "devDependencies": {
     "@langwatch/clickhouse-migrations": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
+    "@langwatch/user-contract": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"

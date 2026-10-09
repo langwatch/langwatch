@@ -4,6 +4,7 @@
  * registries build them: live over the process's members, memory over eventing alone.
  * @see modules/ops/specs/ops-store-seams.feature
  */
+import { InMemoryProcessStore } from "@langwatch/eventing";
 import type { RetentionPolicyResolver } from "@langwatch/eventing";
 import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
@@ -41,7 +42,10 @@ describe("given ops' replay runtime repository", () => {
   describe("when the memory registry is asked for an engine", () => {
     /** @scenario "A memory process refuses a replay run rather than invent an event log" */
     it("refuses the run", () => {
-      const repositories = MemoryOpsRepositories.create({ eventing: { definitions: [] } });
+      const repositories = MemoryOpsRepositories.create({
+        eventing: { definitions: [] },
+        processStore: InMemoryProcessStore.createForTesting(),
+      });
 
       expect(() => repositories.replayRuntimes.create({ retention })).toThrow(/memory process/);
     });
@@ -53,7 +57,10 @@ describe("given ops' pipeline definitions and ClickHouse routes repositories", (
     /** @scenario "Introspection and the migration pass's private routes are read from ops' registry" */
     it("lists eventing's own definitions and holds no private route", () => {
       const eventing = { definitions: [] };
-      const repositories = MemoryOpsRepositories.create({ eventing });
+      const repositories = MemoryOpsRepositories.create({
+        eventing,
+        processStore: InMemoryProcessStore.createForTesting(),
+      });
 
       expect(repositories.pipelineDefinitions.findAll()).toBe(eventing.definitions);
       expect(repositories.clickhouseRoutes.findPrivateRoutes().size).toBe(0);

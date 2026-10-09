@@ -80,3 +80,10 @@ Feature: visualdiff judge keeps only agreed regressions between main and branch 
       Given a run whose judge.json judged a screen's diff with no regression
       When verdict.md is written
       Then the screen is marked judged-harmless
+
+    @unit
+    Scenario: A judged regression is counted in the summary, works.json and verdict.md alike
+      Given a run whose judge.json names a regression for a diff triage had called noise
+      When the run finishes
+      Then the row is a regression and the summary counts it as a finding
+      And verdict.md names the screen as a regression with the judge's reason

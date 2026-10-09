@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/langwatch/langwatch/tools/upgradelab/snapshot/snapshot.schema.json",
+  "title": "upgradelab snapshot manifest (snapshot.json)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "formatVersion",
+    "id",
+    "recipe",
+    "release",
+    "image",
+    "shape",
+    "overlays",
+    "seed",
+    "anchor",
+    "createdAt",
+    "generatorCommit",
+    "postgresSchema",
+    "serverVersions",
+    "prismaMigrations",
+    "gooseVersions",
+    "fingerprint",
+    "eventHistogram",
+    "redisKeysByPrefix",
+    "objectCount",
+    "expect",
+    "sizeBytes"
+  ],
+  "properties": {
+    "formatVersion": { "const": 1 },
+    "id": { "type": "string", "pattern": "^[a-z0-9-]+\\.[0-9a-z.-]+\\.[a-z0-9-]+\\.(S|L)\\.r[0-9]+$" },
+    "recipe": {
+      "type": "object",
+      "required": ["version", "hash"],
+      "properties": { "version": { "type": "integer" }, "hash": { "type": "string" } }
+    },
+    "release": { "type": "string", "minLength": 1 },
+    "image": { "type": "string", "minLength": 1, "description": "image digest, or the git sha for main" },
+    "shape": {
+      "type": "object",
+      "required": ["name", "env", "secretNames"],
+      "properties": {
+        "name": { "type": "string" },
+        "env": { "type": "object", "additionalProperties": { "type": "string" }, "description": "non-secret keys and values only" },
+        "secretNames": { "type": "array", "items": { "type": "string" }, "description": "names of the test secrets, never values" }
+      }
+    },
+    "overlays": { "type": "array", "items": { "type": "string" } },
+    "seed": { "type": "integer" },
+    "anchor": { "type": "string", "format": "date-time" },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "generatorCommit": { "type": "string" },
+    "postgresSchema": { "type": "string", "description": "the app schema the dump was taken from; its ledger is <schema>_upgrade_ledger" },
+    "serverVersions": { "type": "object", "additionalProperties": { "type": "string" } },
+    "prismaMigrations": { "type": "array", "items": { "type": "string" } },
+    "gooseVersions": { "type": "object", "additionalProperties": { "type": "integer" }, "description": "per ClickHouse target" },
+    "fingerprint": {
+      "type": "object",
+      "description": "store/target -> table -> count and order-independent hash; also the row counts",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "object",
+          "required": ["count", "hash"],
+          "properties": { "count": { "type": "integer" }, "hash": { "type": "string" } }
+        }
+      }
+    },
+    "eventHistogram": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["aggregateType", "eventType", "eventVersion", "count"],
+        "properties": {
+          "aggregateType": { "type": "string" },
+          "eventType": { "type": "string" },
+          "eventVersion": { "type": "string" },
+          "count": { "type": "integer" }
+        }
+      }
+    },
+    "redisKeysByPrefix": { "type": "object", "additionalProperties": { "type": "integer" } },
+    "objectCount": { "type": "integer" },
+    "expect": {
+      "type": "object",
+      "required": ["exitCode", "outcome", "steps"],
+      "properties": {
+        "exitCode": { "type": "integer" },
+        "outcome": { "type": "string" },
+        "steps": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "sizeBytes": { "type": "integer" }
+  }
+}

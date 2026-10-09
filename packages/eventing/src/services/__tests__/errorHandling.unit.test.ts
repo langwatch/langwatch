@@ -669,8 +669,8 @@ describe("CLICKHOUSE_STATEMENT_RETRY_MESSAGE_FRAGMENTS", () => {
       "Code: 241. DB::Exception: Query memory limit exceeded: would use 2.01 GiB, maximum: 1.86 GiB. (MEMORY_LIMIT_EXCEEDED)",
     );
 
-    /** @scenario "A query over the memory limit is not retried in place" */
-    it("matches no fragment, so the statement client does not retry it", () => {
+    /** @scenario A query over the memory limit is not retried in place */
+    it("matches no fragment, so the resilient client does not retry it", () => {
       expect(
         CLICKHOUSE_STATEMENT_RETRY_MESSAGE_FRAGMENTS.some((fragment) =>
           memoryError.message.includes(fragment),
@@ -679,7 +679,9 @@ describe("CLICKHOUSE_STATEMENT_RETRY_MESSAGE_FRAGMENTS", () => {
     });
 
     it("stays RECOVERABLE for the group queue, which re-stages the job later", () => {
-      expect(classifyClickHouseError(memoryError)).toBe(ErrorCategory.RECOVERABLE);
+      expect(classifyClickHouseError(memoryError)).toBe(
+        ErrorCategory.RECOVERABLE,
+      );
     });
   });
 

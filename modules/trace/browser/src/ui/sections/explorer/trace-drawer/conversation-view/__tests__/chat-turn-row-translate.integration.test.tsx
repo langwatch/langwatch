@@ -9,6 +9,10 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
+vi.mock("../../../../../../behavior/trace-host.ts", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useTraceHost: () => ({ hasPermission: () => false }),
+}));
 vi.mock("../../../../../../features/trace-drawer/behavior/scenario-role.store.tsx", async () => {
   const actual = await vi.importActual<typeof scenarioRolesModule>(
     "../../../../../../features/trace-drawer/behavior/scenario-role.store.tsx",
@@ -41,7 +45,6 @@ vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
     project: { id: "proj-1" },
     // Viewer without annotations:manage — the Translate action must
     // still show (it is not an annotation capability).
-    hasPermission: () => false,
   }),
 }));
 

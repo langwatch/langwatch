@@ -5,6 +5,7 @@
  * `user:record-created-facts` step records it for accounts minted before the fact existed.
  * @see modules/user/specs/user.feature
  */
+import { InMemoryProcessStore } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 
 import { MemoryUserDatabase } from "../../repositories/memory/memory.user.database.ts";
@@ -12,13 +13,14 @@ import {
   MemoryUserRepositories,
   memoryUserRepositoriesOver,
 } from "../../repositories/memory/memory.user.repositories.ts";
-import { createUserTestApp, createUserTestLifecycle } from "./user.fixture.ts";
+import { createUserTestApp, createUserTestLifecycle, userFactsIn } from "./user.fixture.ts";
 
 const never = new AbortController().signal;
 
 /** An app over a memory store whose fact outbox the test reads, its bus optionally down. */
 function appOverStore({ busDown = false }: { busDown?: boolean } = {}) {
-  const database = MemoryUserDatabase.create();
+  const processStore = InMemoryProcessStore.createForTesting();
+  const database = MemoryUserDatabase.create({ processStore });
   const { senders } = createUserTestLifecycle();
   const down = {
     send: async () => {
@@ -31,14 +33,14 @@ function appOverStore({ busDown = false }: { busDown?: boolean } = {}) {
       ? { ...senders, recordUserCreated: down, recordUserRegistered: down, recordUserErased: down }
       : senders,
   });
-  return { app, database };
+  return { app, database, processStore };
 }
 
 describe("user's created fact", () => {
   describe("when an account is minted", () => {
     /** @scenario "Every account mint records user's created fact" */
     it("commits one created fact to the outbox for each mint path", async () => {
-      const { app, database } = appOverStore();
+      const { app, database, processStore } = appOverStore();
 
       const directory = await app.create({ name: "Dir", email: "dir@example.com" });
       const credential = await app.registerCredentialAccount({
@@ -49,7 +51,11 @@ describe("user's created fact", () => {
       });
       const passkey = await app.createPasskeyUser({ email: "key@example.com" });
 
-      expect(database.factOutbox().filter(({ type }) => type === "recordCreated")).toEqual(
+      expect(
+        (await userFactsIn({ processStore, userIds: database.rows().map(({ id }) => id) })).filter(
+          ({ type }) => type === "recordCreated",
+        ),
+      ).toEqual(
         [directory.id, credential.id, passkey.id].map((userId) => ({
           type: "recordCreated",
           data: { tenantId: userId, userId, occurredAt: expect.any(Number) },
@@ -61,14 +67,18 @@ describe("user's created fact", () => {
   describe("when the event bus is down", () => {
     /** @scenario "A mint answers while the event bus is down" */
     it("still mints the account, its fact waiting in the outbox", async () => {
-      const { app, database } = appOverStore({ busDown: true });
+      const { app, database, processStore } = appOverStore({ busDown: true });
 
       const created = await app.create({ name: "Dir", email: "dir@example.com" });
 
       await expect(app.findById({ id: created.id })).resolves.toMatchObject({
         email: "dir@example.com",
       });
-      expect(database.factOutbox().map(({ type }) => type)).toEqual(["recordCreated"]);
+      expect(
+        (await userFactsIn({ processStore, userIds: database.rows().map(({ id }) => id) })).map(
+          ({ type }) => type,
+        ),
+      ).toEqual(["recordCreated"]);
     });
   });
 
@@ -103,7 +113,9 @@ describe("user's created fact", () => {
 
   describe("given accounts stored before the created fact existed", () => {
     async function storedAccounts() {
-      const repositories = MemoryUserRepositories.create();
+      const repositories = MemoryUserRepositories.create({
+        processStore: InMemoryProcessStore.createForTesting(),
+      });
       const minting = createUserTestApp({ repositories });
       const ids: string[] = [];
       for (const email of ["a@example.com", "b@example.com", "c@example.com"]) {

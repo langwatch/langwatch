@@ -9,6 +9,10 @@ import { cleanup, fireEvent, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("../../../../../../behavior/trace-host.ts", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useTraceHost: () => ({ hasPermission: () => true }),
+}));
 vi.mock("react-router", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   ...(await import("../../../../../../__tests__/window-location-router.ts")).windowLocationRouter,
@@ -17,7 +21,6 @@ vi.mock("react-router", async (importOriginal) => ({
 vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1", slug: "acme" },
-    hasPermission: () => true,
   }),
 }));
 

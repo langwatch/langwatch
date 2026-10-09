@@ -1,5 +1,12 @@
 [
   {
+    "id": "analytics:fill-lwql-project-keys",
+    "kind": "data",
+    "mode": "background",
+    "owner": "analytics",
+    "description": "Fills LangWatchQL's key map with every project's key that it lacks."
+  },
+  {
     "id": "automation:reconcile-report-schedules",
     "kind": "data",
     "mode": "background",
@@ -21,6 +28,13 @@
     "description": "Claims each active Slack automation's connection and releases claims no active automation holds."
   },
   {
+    "id": "billing:record-usage-billing-catch-up",
+    "kind": "data",
+    "mode": "background",
+    "owner": "billing",
+    "description": "Records whether the meter bills each organisation, the fact the Instant Evals judge folds."
+  },
+  {
     "id": "dataset:move-content-to-object-storage",
     "kind": "data",
     "mode": "background",
@@ -35,18 +49,18 @@
     "description": "Seeds entitlement's trace meter from trace's span log at deploy."
   },
   {
-    "id": "governance:migrate-anomaly-webhook-destinations",
-    "kind": "data",
-    "mode": "background",
-    "owner": "governance",
-    "description": "Moves each anomaly rule's inline webhook destinations onto legacy-scheme webhook endpoints."
-  },
-  {
     "id": "governance:record-coding-assistant-billing",
     "kind": "data",
     "mode": "background",
     "owner": "governance",
     "description": "Records each organisation's coding-assistant billed facts, which trace folds at ingest."
+  },
+  {
+    "id": "governance:migrate-anomaly-webhook-destinations",
+    "kind": "data",
+    "mode": "background",
+    "owner": "governance",
+    "description": "Moves each anomaly rule's inline webhook destinations onto legacy-scheme webhook endpoints."
   },
   {
     "id": "governance:replay-cost-charges",
@@ -61,6 +75,20 @@
     "mode": "blocking",
     "owner": "identity",
     "description": "Returns accounts never confirmed and never signed into to the legacy sign-in path."
+  },
+  {
+    "id": "identity:reopen-unproven-accounts-after-rollout",
+    "kind": "data",
+    "mode": "background",
+    "owner": "identity",
+    "description": "Returns accounts an older image finalized during the rollout to the legacy sign-in path."
+  },
+  {
+    "id": "instant-eval:copy-judge-spend",
+    "kind": "data",
+    "mode": "background",
+    "owner": "instant-eval",
+    "description": "Copies each organisation's confirmed Instant Evals ledger spend into the judge's own spend, once per request."
   },
   {
     "id": "licensing:copy-organization-licenses",

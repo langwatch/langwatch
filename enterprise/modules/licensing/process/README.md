@@ -6,7 +6,7 @@ The server half of [licensing](../README.md). Licences: validating and storing a
 
 ## Installation
 
-`defineProcessModule("licensing").withRepositories(licensingRepositories).withApi(LicensingModule).withTransports(licenseTrpcTransport, connectTrpcTransport, connectHostedRest, connectHostRest).withTransportFacts(…).withEventing(licenseSyncEventing).withTasks(…).withMigrations(…)`, `src/licensing.module.ts:17`.
+`defineProcessModule("licensing").withRepositories(licensingRepositories).withApi(LicensingModule).withTransports(licenseTrpcTransport, connectTrpcTransport, connectHostedRest, connectHostRest).withTransportFacts(…).withEventing(licenseSyncEventing).withEventing(licensingCustomerEventing).withTasks(…).withMigrations(…)`, `src/licensing.module.ts:23`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -462,7 +462,7 @@ Public: a self-hosted install presents its license token or activation code as t
 Answers at `/api/connect/v1/license/sync`.
 
 ```typescript
-// Body: licenseSyncBodySchema, ../contract/src/license-sync.ts:17
+// Body: licenseSyncBodySchema, ../contract/src/license-sync.ts:16
 interface Body {
   version: string;
   seats: {
@@ -470,7 +470,7 @@ interface Body {
     liteMembers: number;
   };
 }
-type Headers = z.infer<typeof connectHostHeadersSchema>; // ../contract/src/license-sync.ts:32
+type Headers = z.infer<typeof connectHostHeadersSchema>; // ../contract/src/license-sync.ts:31
 // Response: connectSyncAnswerSchema, ../contract/src/connect-install.ts:25
 interface Response {
   services: string[];
@@ -485,9 +485,9 @@ Public: a self-hosted install presents its license token or activation code as t
 Answers at `/api/connect/v1/license/activate`.
 
 ```typescript
-// Body: connectActivationRequestSchema, ../contract/src/license-sync.ts:38
+// Body: connectActivationRequestSchema, ../contract/src/license-sync.ts:37
 type Body = Record<string, unknown>;
-type Headers = z.infer<typeof connectHostHeadersSchema>; // ../contract/src/license-sync.ts:32
+type Headers = z.infer<typeof connectHostHeadersSchema>; // ../contract/src/license-sync.ts:31
 // Response: connectActivationAnswerSchema, ../contract/src/connect-install.ts:34
 interface Response {
   license: string;
@@ -597,7 +597,7 @@ interface Output {
 
 ### `license`
 
-Contract `../contract/src/licensing.trpc.ts:18`, router `src/transport/licensing.trpc.ts:14`.
+Contract `../contract/src/licensing.trpc.ts:22`, router `src/transport/licensing.trpc.ts:14`.
 
 | Procedure                  | Kind     | Gate                                                                                                                                                                                                                                          | Input                            | Output                        |
 | -------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- | ----------------------------- |
@@ -610,16 +610,16 @@ Contract `../contract/src/licensing.trpc.ts:18`, router `src/transport/licensing
 
 ```typescript
 // license.getStatus
-// Input: licenseOrganizationQuerySchema, ../contract/src/license.queries.ts:3
+// Input: licenseOrganizationQuerySchema, ../contract/src/licensing.trpc.ts:17
 interface Input {
   organizationId: string;
 }
-type Output = z.infer<typeof licenseStatusSchema>; // ../contract/src/license.ts:220
+type Output = z.infer<typeof licenseStatusSchema>; // ../contract/src/license.ts:219
 
 // license.getSsoGateStatus
-// Input: inline, ../contract/src/licensing.trpc.ts:27
+// Input: inline, ../contract/src/licensing.trpc.ts:31
 type Input = Record<string, unknown>;
-// Output: ssoGateStatusSchema, ../contract/src/license.ts:251
+// Output: ssoGateStatusSchema, ../contract/src/license.ts:250
 interface Output {
   configuredProvider: string | null;
   licensed: boolean;
@@ -632,26 +632,26 @@ interface Input {
   organizationId: string;
   licenseKey: string;
 }
-type Output = z.infer<typeof licenseUploadedSchema>; // ../contract/src/license.ts:267
+type Output = z.infer<typeof licenseUploadedSchema>; // ../contract/src/license.ts:266
 
 // license.activate
-// Input: inline, ../contract/src/licensing.trpc.ts:36
+// Input: inline, ../contract/src/licensing.trpc.ts:40
 interface Input {
   organizationId: string;
   code: string;
 }
-type Output = z.infer<typeof licenseUploadedSchema>; // ../contract/src/license.ts:267
+type Output = z.infer<typeof licenseUploadedSchema>; // ../contract/src/license.ts:266
 
 // license.remove
-type Input = z.infer<typeof licenseOrganizationQuerySchema>; // ../contract/src/license.queries.ts:3
-// Output: licenseRemovedSchema, ../contract/src/license.ts:272
+type Input = z.infer<typeof licenseOrganizationQuerySchema>; // ../contract/src/licensing.trpc.ts:17
+// Output: licenseRemovedSchema, ../contract/src/license.ts:271
 interface Output {
   success: true;
   removed: true;
 }
 
 // license.refresh
-type Input = z.infer<typeof licenseOrganizationQuerySchema>; // ../contract/src/license.queries.ts:3
+type Input = z.infer<typeof licenseOrganizationQuerySchema>; // ../contract/src/licensing.trpc.ts:17
 // Output: licenseRefreshOutcomeSchema, ../contract/src/connect-install.ts:201
 type Output =
   | {
@@ -679,6 +679,16 @@ Declared at `src/eventing/license-sync.pipeline.ts:57`.
 | process manager | `licenseSync`               | every 2 min (`LICENSE_SYNC_FIRST_DELAY_MS = 2 * 60 * 1000`); intents `sync` (outbox)        | `src/eventing/license-sync.pipeline.ts:63` |
 | peer subscriber | `configuredLicenseOnSignUp` | `lw.organization.signed_up` from [organization](../../../../modules/organization/README.md) | `src/eventing/license-sync.pipeline.ts:62` |
 
+### Pipeline `licensing_customer` (aggregate `licensing_customer`)
+
+Declared at `src/eventing/licensing-customer.pipeline.ts:41`. Events: `selfHostedCustomerLicensedEventSchema`, `connectServiceSwitchedEventSchema`, `licenseSyncFinishedEventSchema`.
+
+| Kind    | Name                               | Handles | Declared at                                      |
+| ------- | ---------------------------------- | ------- | ------------------------------------------------ |
+| command | `recordSelfHostedCustomerLicensed` | –       | `src/eventing/licensing-customer.pipeline.ts:50` |
+| command | `recordConnectServiceSwitched`     | –       | `src/eventing/licensing-customer.pipeline.ts:51` |
+| command | `recordLicenseSyncFinished`        | –       | `src/eventing/licensing-customer.pipeline.ts:52` |
+
 ### Tasks
 
 Run by the tasks process, before serve.
@@ -691,8 +701,8 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                     | Environment variable                 | Declared at                              |
 | ------ | ------------------------ | ------------------------------------ | ---------------------------------------- |
-| secret | `instanceLicenseKey`     | `LANGWATCH_LICENSE_KEY`              | `src/app/licensing.app.ts:179`           |
-| secret | `licensePrivateKey`      | `LANGWATCH_LICENSE_PRIVATE_KEY`      | `src/app/licensing.app.ts:180`           |
+| secret | `instanceLicenseKey`     | `LANGWATCH_LICENSE_KEY`              | `src/app/licensing.app.ts:185`           |
+| secret | `licensePrivateKey`      | `LANGWATCH_LICENSE_PRIVATE_KEY`      | `src/app/licensing.app.ts:186`           |
 | config | `publicKey`              | `LANGWATCH_LICENSE_PUBLIC_KEY`       | `../contract/src/licensing.config.ts:45` |
 | config | `connectDisabled`        | `LANGWATCH_CONNECT_DISABLED`         | `../contract/src/licensing.config.ts:52` |
 | config | `connectGatewayEndpoint` | `LANGWATCH_CONNECT_GATEWAY_ENDPOINT` | `../contract/src/licensing.config.ts:53` |

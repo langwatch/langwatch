@@ -33,11 +33,10 @@ export class MemoryAnalyticsRepositories {
     // The evaluation twin writes this table; the recency twin reads it.
     const evaluationRows: MemoryEvaluationAnalyticsTable = new Map();
     const evaluations = MemoryAnalyticsEvaluationRepository.create({ table: evaluationRows });
-    const analytics = MemoryAnalyticsRepository.create();
 
     return {
       sessions: MemoryAnalyticsSessionsRepository.create(),
-      analytics: { open: () => analytics },
+      analytics: MemoryAnalyticsRepository.create(),
       evaluations: { open: () => evaluations },
       appFunctionStore: MemoryLangWatchQLAppFunctionStoreRepository.create(),
       recency: MemoryAnalyticsRecencyRepository.create({ evaluations: evaluationRows }),

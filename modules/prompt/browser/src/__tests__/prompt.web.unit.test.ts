@@ -2,6 +2,7 @@
 
 import { createUi } from "@langwatch/browser";
 import { resolveUiPageAccess } from "@langwatch/browser/page-guard";
+import { hostServiceFakes } from "@langwatch/browser/testing";
 import { describe, expect, it } from "vitest";
 
 import { promptWeb } from "../prompt.web.ts";
@@ -18,7 +19,7 @@ describe("given a browser that installs prompt", () => {
   describe("when the kernel renders with only a transport supplied", () => {
     it("installs the module", async () => {
       const installed = await createUi({ document: browserDocument(), mount: "root" })
-        .withModules([promptWeb] as const)
+        .withModules([hostServiceFakes(), promptWeb] as const)
         .withTransport({ query: () => Promise.resolve(null) })
         .render();
 

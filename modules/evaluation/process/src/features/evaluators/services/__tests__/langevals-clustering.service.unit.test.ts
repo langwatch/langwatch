@@ -1,7 +1,9 @@
 import { LangevalsClusteringError } from "@langwatch/evaluation-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { BatchClusteringParams, IncrementalClusteringParams } from "@langwatch/topic-contract";
 import { describe, expect, it } from "vitest";
 
+import type { LangevalsPayloadStaging } from "../../../../channels/langevals.channel.ts";
 import { MemoryLangevalsChannel } from "../../../../channels/memory/memory.langevals.channel.ts";
 import { LangevalsClusteringService } from "../langevals-clustering.service.ts";
 
@@ -23,9 +25,14 @@ const CLUSTERED = {
   cost: { amount: 0.01, currency: "USD" },
 };
 
+const staging = createApiFixture<LangevalsPayloadStaging>();
+
 function setup(endpoint: string | undefined) {
   const langevals = MemoryLangevalsChannel.create();
-  return { langevals, service: LangevalsClusteringService.create({ endpoint, langevals }) };
+  return {
+    langevals,
+    service: LangevalsClusteringService.create({ endpoint, langevals, staging }),
+  };
 }
 
 describe("LangevalsClusteringService", () => {
@@ -67,6 +74,7 @@ describe("LangevalsClusteringService", () => {
           body: BATCH,
           projectId: "project-1",
           kind: "topic_clustering_batch",
+          staging,
           signal,
         },
       ]);

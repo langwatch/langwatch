@@ -19,6 +19,7 @@ import {
 } from "../organization-lifecycle.commands.ts";
 import {
   type BillingFactsApplier,
+  type LicensingFactsApplier,
   buildOrganizationLifecyclePipeline,
 } from "../organization-lifecycle.pipeline.ts";
 
@@ -96,7 +97,10 @@ describe("organization's lifecycle pipeline", () => {
 
   it("declares no subscriber of its own: its peers react from their side", () => {
     const billingFacts = createApiFixture<BillingFactsApplier>({}, "BillingFactsApplier");
-    expect(buildOrganizationLifecyclePipeline({ billingFacts }).eventSubscribers.size).toBe(0);
+    const licensingFacts = createApiFixture<LicensingFactsApplier>({}, "LicensingFactsApplier");
+    expect(
+      buildOrganizationLifecyclePipeline({ billingFacts, licensingFacts }).eventSubscribers.size,
+    ).toBe(0);
   });
 
   describe("when the organization's presence setting is recorded", () => {

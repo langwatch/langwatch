@@ -19,6 +19,10 @@ export interface MemoryOrganizationRow {
   ssoProvider?: string | null;
   /** The licence a mint or an upload wrote; absent reads as unlicensed. */
   license?: string | null;
+  /** Licensing's Connect facts, as organization keeps them (ORG-CONNECT-WRITES). */
+  connectServicesDisabled?: string[];
+  connectLastSyncAt?: Instant | null;
+  connectLastSyncError?: string | null;
   licenseExpiresAt?: Instant | null;
   licenseLastValidatedAt?: Instant | null;
   id: string;

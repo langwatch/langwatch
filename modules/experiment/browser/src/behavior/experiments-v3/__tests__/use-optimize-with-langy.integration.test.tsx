@@ -43,7 +43,7 @@ vi.mock("@langwatch/evaluator-client", () => ({
 }));
 
 const flagEnabled = vi.hoisted(() => ({ value: true }));
-vi.mock("@langwatch/browser-host/feature-flag", () => ({
+vi.mock("@langwatch/feature-flag-client", () => ({
   useFeatureFlag: () => ({ enabled: flagEnabled.value }),
 }));
 

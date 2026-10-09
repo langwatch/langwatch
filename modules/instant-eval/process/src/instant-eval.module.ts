@@ -35,7 +35,7 @@ export const instantEvalProcessModule: PublishedProcessModule<
     ),
   ])
   .withEventing(instantEvalEventing)
-  // Background, after old writers are gone, after billing's usage-billing catch-up.
+  // Background, after old writers are gone and after billing's usage-billing catch-up.
   .withMigrations(({ app, dependencies }) => [
     defineMigrationStep({
       id: "instant-eval:copy-judge-spend",
@@ -44,6 +44,7 @@ export const instantEvalProcessModule: PublishedProcessModule<
       description:
         "Copies each organisation's confirmed Instant Evals ledger spend into the judge's own spend, once per request.",
       needsOldWritersGone: true,
+      after: ["billing:record-usage-billing-catch-up"],
       run: async ({ checkpoint, dryRun, signal }) => {
         const resumed = checkpoint.resumeFrom?.afterOrganizationId;
         const backfill = InstantEvalJudgeSpendBackfillService.create({

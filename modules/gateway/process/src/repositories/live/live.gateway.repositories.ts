@@ -1,4 +1,5 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import type { GatewayServerConfig } from "@langwatch/gateway-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 
 import { GatewayBudgetClickHouseRepository } from "../clickhouse/clickhouse.gateway-budget.repository.ts";
@@ -49,12 +50,14 @@ export class LiveGatewayRepositories {
     clickhouse,
     encryption,
     redis,
+    config,
   }: Readonly<{
     prisma: Parameters<typeof PostgresGatewayRepositories.create>[0]["prisma"];
     /** The process's ONE routing client, resolved per tenant rather than a second pool. */
     clickhouse: ClickHouseQueryClient;
     encryption: GatewayCipher;
     redis: RedisConnection;
+    config: Pick<GatewayServerConfig, "foldCacheTtlSeconds">;
   }>): GatewayRepositories {
     // `Promise.resolve`: there is nothing to open, the routing client already exists.
     const resolveClickHouse: GatewayClickHouseResolver = (tenantId) =>
@@ -70,7 +73,10 @@ export class LiveGatewayRepositories {
         Promise.resolve(everyClickHouseServer(clickhouse)),
       ),
       agentCache: RedisGatewayAgentCacheEntryRepository.create({ redis, cipher: encryption }),
-      spendFoldCache: RedisGatewaySpendFoldCacheRepository.create(redis),
+      spendFoldCache: RedisGatewaySpendFoldCacheRepository.create({
+        redis,
+        ttlSeconds: config.foldCacheTtlSeconds,
+      }),
       budgetChangeDedupe: RedisGatewayBudgetChangeDedupeRepository.create(redis),
     };
   }

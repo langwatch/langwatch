@@ -5,10 +5,13 @@ import { cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
+vi.mock("../../../../../../behavior/trace-host.ts", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useTraceHost: () => ({ hasPermission: () => true }),
+}));
 vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1", slug: "acme" },
-    hasPermission: () => true,
   }),
 }));
 
@@ -17,7 +20,6 @@ vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
 vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1", slug: "acme" },
-    hasPermission: () => true,
   }),
 }));
 

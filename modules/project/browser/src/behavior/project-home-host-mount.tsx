@@ -5,8 +5,11 @@
  */
 
 import { useUiCapabilities, useUiDeployment } from "@langwatch/browser-host/capabilities";
+import type { ReleaseFlagToken } from "@langwatch/browser-host/declarations";
+import { useUiFlags } from "@langwatch/browser-host/feature-flag";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useReducedMotion } from "@langwatch/design-system/use-reduced-motion";
+import { FrontendFlags } from "@langwatch/feature-flag-contract";
 import { useMemo, type ReactNode } from "react";
 
 import { isLangyDemoProject } from "../model/langy/langy-demo-project.ts";
@@ -14,7 +17,6 @@ import {
   ProjectHomeHost,
   ProjectHomeHostProvider,
   type ProjectHomeDeployment,
-  type ProjectHomeFlagReading,
   type ProjectHomeLangyVisibility,
   type ProjectHomeOrganization,
   type ProjectHomeProject,
@@ -25,7 +27,7 @@ import { homeApi } from "./home-api.ts";
 /** The two Langy grants, and the rollout that reveals it at all. */
 const LANGY_VIEW_PERMISSION = "langy:view";
 const LANGY_CREATE_PERMISSION = "langy:create";
-const LANGY_RELEASE_FLAG = "release_langy_enabled";
+const LANGY_RELEASE_FLAG = FrontendFlags.release_langy_enabled;
 /** Main's `OrganizationUserRole.ADMIN`, as team-visibility.rules.ts:2 spells it. */
 const ORGANIZATION_ADMIN_ROLE = "ADMIN";
 
@@ -37,7 +39,7 @@ class CapabilityProjectHomeHost extends ProjectHomeHost {
   private readonly isSettled: boolean;
   private readonly isPartOfTeam: boolean;
   private readonly hasPermissionOf: (permission: string) => boolean;
-  private readonly featureFlagOf: (flag: string) => boolean | undefined;
+  private readonly featureFlagOf: (flag: ReleaseFlagToken) => boolean | undefined;
   private readonly isDemoProject: boolean;
   private readonly deployment_: ProjectHomeDeployment;
   private readonly reducedMotion_: boolean;
@@ -52,7 +54,7 @@ class CapabilityProjectHomeHost extends ProjectHomeHost {
     isSettled: boolean;
     isPartOfTeam: boolean;
     hasPermissionOf: (permission: string) => boolean;
-    featureFlagOf: (flag: string) => boolean | undefined;
+    featureFlagOf: (flag: ReleaseFlagToken) => boolean | undefined;
     isDemoProject: boolean;
     deployment: ProjectHomeDeployment;
     reducedMotion: boolean;
@@ -96,11 +98,6 @@ class CapabilityProjectHomeHost extends ProjectHomeHost {
   }
 
   /** Main's useShowLangy gate: the flag is asked only of a reader it could reveal Langy to. */
-  featureFlag(flag: string): ProjectHomeFlagReading {
-    const answer = this.featureFlagOf(flag);
-    return { enabled: answer === true, isLoading: answer === void 0 };
-  }
-
   langyVisibility(): ProjectHomeLangyVisibility {
     const mayRead = this.mayUseLangy(LANGY_VIEW_PERMISSION);
     const flag = mayRead ? this.featureFlagOf(LANGY_RELEASE_FLAG) : false;
@@ -147,6 +144,7 @@ export default function ProjectHomeHostMount({ children }: { children?: ReactNod
   const returnTo = route.reading().query.return_to;
   const deployment = useUiDeployment();
   const reducedMotion = useReducedMotion();
+  const flags = useUiFlags();
   const {
     organization: scopeOrg,
     team: scopeTeam,
@@ -195,7 +193,7 @@ export default function ProjectHomeHostMount({ children }: { children?: ReactNod
         isSettled,
         isPartOfTeam,
         hasPermissionOf: (permission) => session.hasPermission(permission),
-        featureFlagOf: (flag) => session.featureFlag(flag),
+        featureFlagOf: (flag) => flags.flag(flag),
         isDemoProject: isLangyDemoProject({
           projectSlug,
           demoProjectSlug: deployment.demoProjectSlug,
@@ -223,6 +221,7 @@ export default function ProjectHomeHostMount({ children }: { children?: ReactNod
       isSettled,
       isPartOfTeam,
       session,
+      flags,
       deployment.isSaaS,
       deployment.isDevelopment,
       deployment.demoProjectSlug,

@@ -22,11 +22,12 @@ async function freePort(): Promise<number> {
   return port;
 }
 
-/** A process on its own health door, scraped over HTTP the way a kubelet or Prometheus does. */
+/** A process with its health door and pull port, scraped as a kubelet or Prometheus does. */
 async function serve(environment: Readonly<Record<string, string>>) {
   const port = await freePort();
+  const pullPort = await freePort();
   const server = await Server.create("metrics-door-test")
-    .withEnvironment(environment)
+    .withEnvironment({ OTEL_EXPORTER_PROMETHEUS_PORT: String(pullPort), ...environment })
     .withConfig(processConfig([], "worker"))
     .withHealthPort(port)
     .withProcessOwnership(false)
@@ -43,21 +44,22 @@ async function serve(environment: Readonly<Record<string, string>>) {
       response.writeHead(404).end();
     },
   });
-  return (path: string, authorization?: string) =>
-    fetch(`http://127.0.0.1:${port}${path}`, {
+  const at = (doorPort: number) => (path: string, authorization?: string) =>
+    fetch(`http://127.0.0.1:${doorPort}${path}`, {
       headers: authorization === undefined ? {} : { authorization },
     });
+  return { health: at(port), pull: at(pullPort) };
 }
 
-const prometheus = { LANGWATCH_METRICS_MODE: "prometheus" };
+const prometheus = { OTEL_METRICS_EXPORTER: "otlp,prometheus" };
 
-describe("a process scraped through its health door", () => {
-  describe("given a metrics key is configured", () => {
-    const keyed = { ...prometheus, LANGWATCH_METRICS_TOKEN: "scrape-me" };
+describe("a process scraped through its health door or its pull port", () => {
+  describe("given METRICS_API_KEY and no exporter list (main's health-door /metrics)", () => {
+    const keyed = { METRICS_API_KEY: "scrape-me" };
 
     /** @scenario "Key configured, probe still sends nothing" */
     it("answers the liveness probe with no credential", async () => {
-      const request = await serve(keyed);
+      const { health: request } = await serve(keyed);
 
       expect((await request("/healthz")).status).toBe(200);
     });
@@ -67,7 +69,7 @@ describe("a process scraped through its health door", () => {
      * @scenario "A scrape with no credential or the wrong one is rejected"
      */
     it("rejects a scrape with no credential or the wrong one, returning no samples", async () => {
-      const request = await serve(keyed);
+      const { health: request } = await serve(keyed);
 
       for (const authorization of [undefined, "Bearer wrong"]) {
         const response = await request("/metrics", authorization);
@@ -81,7 +83,7 @@ describe("a process scraped through its health door", () => {
      * @scenario "An authenticated scrape renders what this process recorded"
      */
     it("serves the samples the process recorded to the matching bearer", async () => {
-      const request = await serve(keyed);
+      const { health: request } = await serve(keyed);
       counter({ name: "scenario_probe_total", description: "Recorded by the scrape test" }).inc({});
 
       const response = await request("/metrics", "Bearer scrape-me");
@@ -94,19 +96,20 @@ describe("a process scraped through its health door", () => {
   describe("given no metrics key and a production environment", () => {
     /** @scenario "In production an unset key leaves the process with no metrics endpoint" */
     it("mounts no metrics endpoint rather than an open one", async () => {
-      const request = await serve({ ...prometheus, NODE_ENV: "production" });
+      const { health, pull } = await serve({ ...prometheus, NODE_ENV: "production" });
 
-      expect((await request("/metrics")).status).toBe(404);
-      expect((await request("/healthz")).status).toBe(200);
+      await expect(pull("/metrics")).rejects.toThrow("fetch failed");
+      expect((await health("/metrics")).status).toBe(404);
+      expect((await health("/healthz")).status).toBe(200);
     });
   });
 
   describe("given no metrics key outside production", () => {
     /** @scenario "Outside production an unset key leaves the endpoint open" */
     it("serves a scrape that carries no credential", async () => {
-      const request = await serve(prometheus);
+      const { pull } = await serve(prometheus);
 
-      expect((await request("/metrics")).status).toBe(200);
+      expect((await pull("/metrics")).status).toBe(200);
     });
   });
 });

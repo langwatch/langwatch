@@ -720,6 +720,11 @@ function routeStack<Api>({
   const mismatch = named?.mismatch;
   const media =
     named && mismatch !== undefined && mismatch !== "accepted" ? [mediaTypeMiddleware(named)] : [];
+  const refuses = route.rawBody?.refuses;
+  const refused =
+    route.rawBody && refuses
+      ? [refusedMediaTypeMiddleware({ refuses, expected: route.rawBody.mediaType })]
+      : [];
 
   return [
     ...legacyErrorScopes(route),
@@ -743,8 +748,8 @@ function routeStack<Api>({
     // body: then the capped bytes are read once, exactly as sent, and it verifies those.
     // The media type is asked after the door either way (E9): a missing credential answers 401.
     ...(doorReadsBody(route)
-      ? [...cap, ...raw, door, ...media]
-      : [door, ...credentialFacts({ route, facts }), ...media, ...cap, ...raw]),
+      ? [...cap, ...raw, door, ...media, ...refused]
+      : [door, ...credentialFacts({ route, facts }), ...media, ...refused, ...cap, ...raw]),
     ...(route.multipart
       ? [
           multipartMiddleware({
@@ -895,6 +900,28 @@ function mediaTypeMiddleware(declared: RestRawBody | RestInputMediaType): Middle
       throw declared.mismatch === "malformed_request"
         ? new MediaTypeMalformedRequestError(refusal)
         : new UnsupportedMediaTypeError(refusal);
+    }
+
+    await next();
+  };
+}
+
+/** Refuses a body sent under a media type its route names, or that type with a `+suffix`. */
+function refusedMediaTypeMiddleware({
+  refuses,
+  expected,
+}: {
+  refuses: readonly string[];
+  expected: string;
+}): MiddlewareHandler {
+  return async (context, next) => {
+    const received = mediaTypeEssence(context.req.header("content-type"));
+    const isRefused = refuses.some(
+      (refused) => received === refused || received?.startsWith(`${refused}+`),
+    );
+
+    if (received !== null && isRefused) {
+      throw new UnsupportedMediaTypeError({ received, expected });
     }
 
     await next();
@@ -1118,7 +1145,9 @@ function inputMiddleware({
     const sent = route.arrayBody ? { [route.arrayBody.as]: json } : json;
     const body = route.multipart ? context.get(ROUTE_FORM_FIELDS) : sent;
 
-    context.set(ROUTE_INPUT, mergeInput({ params, query, body }));
+    const bodyTarget = route.multipart ? "form" : "json";
+
+    context.set(ROUTE_INPUT, mergeInput({ params, query, body, bodyTarget }));
     await next();
   };
 }
@@ -1127,10 +1156,12 @@ function mergeInput({
   params,
   query,
   body,
+  bodyTarget,
 }: {
   params: unknown;
   query: unknown;
   body: unknown;
+  bodyTarget: "form" | "json";
 }): Record<string, unknown> | undefined {
   if (params === undefined && query === undefined && body === undefined) return undefined;
 
@@ -1147,16 +1178,36 @@ function mergeInput({
       throw new TypeError(`REST ${source} schemas must produce an object`);
     }
 
-    for (const [key, value] of Object.entries(part)) {
-      if (Object.hasOwn(input, key)) {
-        throw new TypeError(`REST input field "${key}" is declared by multiple sources`);
-      }
+    for (const key of Object.keys(part)) refuseRepeatedKey({ input, key, source, bodyTarget });
 
-      input[key] = value;
-    }
+    Object.assign(input, part);
   }
 
   return input;
+}
+
+/** Declared sources never overlap (declaration.ts), so a body key that does was sent. */
+function refuseRepeatedKey({
+  input,
+  key,
+  source,
+  bodyTarget,
+}: {
+  input: Record<string, unknown>;
+  key: string;
+  source: "path" | "query" | "body";
+  bodyTarget: "form" | "json";
+}): void {
+  if (!Object.hasOwn(input, key)) return;
+
+  if (source === "body") {
+    throw new MalformedRequestError({
+      target: bodyTarget,
+      detail: `The body field "${key}" repeats a path or query field of the same name`,
+    });
+  }
+
+  throw new TypeError(`REST input field "${key}" is declared by multiple sources`);
 }
 
 /** Authenticate, decide, handle, check the answer, respond. */

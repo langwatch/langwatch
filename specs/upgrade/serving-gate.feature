@@ -118,22 +118,15 @@ Feature: Serving processes refuse to start when the installation is behind their
     When the serving gate checks the image
     Then no roster entry is written
 
-  # Lapsed gate (round 9): a process whose own roster entry lapses stops serving, so it cannot
-  # serve unseen while a step waits on old writers being gone (ADR-173, Consequences).
+  # A roster outage never takes a process out of service (Alex, 2026-10-09): a database blip must
+  # not become fleet-wide 503s. The stale bound is generous (10 minutes), so a process whose
+  # writes fail is only late to be counted, and "old writers gone" errs towards waiting.
   @unit
-  Scenario: A process whose roster writes keep failing stops serving past the stale bound
+  Scenario: A process whose roster writes keep failing keeps serving
     Given a worker was admitted and recorded its roster entry
     And the ledger refuses every later roster write
-    When more than 60 seconds pass since its last good roster write
-    Then the gate says the worker is not serving
-    And the change is reported once
-
-  @unit
-  Scenario: A process that stopped serving on a lapsed roster entry serves again after a good write
-    Given a worker stopped serving because its roster entry lapsed
-    When the next roster write succeeds
-    Then the gate says the worker is serving
-    And the change is reported once
+    When thirty minutes pass since its last good roster write
+    Then the gate says the worker is serving throughout
 
   @unit
   Scenario: A healthy process never stops serving
@@ -146,29 +139,6 @@ Feature: Serving processes refuse to start when the installation is behind their
     Given the ledger records "clickhouse:00042" as pending
     When the serving gate checks the image
     Then the gate says the worker is not serving
-
-
-  # Stop serving (round 22): a lapse turns /readyz 503 so the load balancer drains the process,
-  # and a worker pauses taking jobs; both resume after a good roster write.
-  @unit
-  Scenario: Readiness fails while the roster entry is lapsed and passes again after a good write
-    Given an admitted process whose readiness passed and latched
-    When its gate stops serving
-    Then the next readiness probe answers 503 naming the lapsed roster entry
-    And when its gate serves again the next readiness probe answers 200
-
-  @unit
-  Scenario: A worker pauses taking jobs while its roster entry is lapsed and resumes after a good write
-    Given an admitted worker running its application
-    When its gate stops serving
-    Then every runtime service that can pause is paused
-    And when its gate serves again every paused service resumes
-
-  @unit
-  Scenario: The worker's runtime pauses and resumes its eventing consumers
-    Given a booted runtime whose eventing host can pause its consumers
-    When the runtime is told to hold its work, then to release it
-    Then the eventing host pauses its consumers, then resumes them
 
   @unit
   Scenario: Roster entries dead for longer than the prune bound are deleted when a process records its own

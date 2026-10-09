@@ -33,6 +33,7 @@ import {
   simulationSendersOver,
 } from "../../__tests__/support/simulation-service-fake.fixture.ts";
 import { ScenarioModule, type ScenarioTabStore } from "../../app/scenario.app.ts";
+import { MemoryScenarioChannels } from "../../channels/memory/memory.scenario.channels.ts";
 import { MemoryScenarioRepositories } from "../../repositories/memory/memory.scenario.repositories.ts";
 
 const UNCAPPED_PLAN: Plan = {
@@ -65,6 +66,7 @@ export async function createScenarioRestTestApp(
   const simulations = options.simulations ?? {};
 
   const app = await ScenarioModule.create({
+    channels: MemoryScenarioChannels.create(),
     repositories: {
       ...MemoryScenarioRepositories.create(),
       simulations: simulationRepositoryOver(simulations),

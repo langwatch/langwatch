@@ -22,6 +22,7 @@ import { resetGraphicsQualityOverrideForTests } from "@langwatch/browser-host/fa
 import type { UiSessionSnapshot } from "@langwatch/browser-host/session";
 import { UiDesignSystemShell } from "@langwatch/browser/outer-providers";
 import type { ProcessWebConfig } from "@langwatch/config/public-app-config";
+import { FrontendFlags } from "@langwatch/feature-flag-contract";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
@@ -163,7 +164,7 @@ function HostProbe() {
       data-presence={host.accountMenu()?.presence ? "offered" : "absent"}
       data-graphics={host.accountMenu()?.graphicsQuality?.label ?? "absent"}
       data-langy={host.langy() ? "offered" : "absent"}
-      data-flag={JSON.stringify(host.featureFlag("release_langy_enabled"))}
+      data-flag={JSON.stringify(host.featureFlag(FrontendFlags.release_langy_enabled))}
     >
       <button type="button" onClick={() => host.accountMenu()?.graphicsQuality?.set("on")}>
         reduce graphics

@@ -10,7 +10,7 @@ Webhook endpoints: creating and managing them, signing secrets, and delivering e
 | -------------- | ----------------------------------------------------------------------------------------------------- |
 | Classification | core (`modules/catalogue.json`)                                                                       |
 | Subjects       | webhook                                                                                               |
-| Halves         | [contract](contract) · [process](process/README.md)                                                   |
+| Halves         | [contract](contract) · [process](process/README.md) · [client](client)                                |
 | Api token      | `WebhookApi` = `moduleApi<WebhookApi>()("webhook")`, `contract/src/webhook.api.ts:89` (21 operations) |
 | Other token    | `WebhookSpendReplayApi`, `process/src/transport/webhook-spend-replay.rest.ts:27`                      |
 | Installed by   | api, worker, tasks (process)                                                                          |

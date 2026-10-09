@@ -3,12 +3,7 @@
  * released SDK has always called, plus its `/api/v1` twin.
  * @see modules/experiment/specs/experiment-dataset-evaluation.feature
  */
-import {
-  defineRestRouter,
-  MANAGEMENT_API_VERSION,
-  resolver,
-  type RestProtocolRefusal,
-} from "@langwatch/api/rest";
+import { defineRestRouter, MANAGEMENT_API_VERSION, resolver } from "@langwatch/api/rest";
 import {
   batchEvaluationInputSchema,
   evaluateErrorSchema,
@@ -17,9 +12,9 @@ import {
   type BatchEvaluationRESTParams,
 } from "@langwatch/evaluation-contract";
 import { ExperimentApi, type DatasetEvaluationOutcome } from "@langwatch/experiment-contract";
-import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
+import { z } from "zod";
 import { fromZodError, isZodErrorLike } from "zod-validation-error";
 
 const logger = createLogger("langwatch:experiment-dataset-evaluation");
@@ -38,19 +33,6 @@ const DATASET_NAMESPACE = {
   reason: "released SDKs call the dataset evaluation door at its original path",
   deprecate: "move under a namespace experiment owns in the next API version",
 } as const;
-
-/**
- * Main's 400 for a body not sent as JSON, in the sentence the door has always written;
- * every other refusal (401, 403, 413) stays on the family's boundary, as before.
- */
-const EVALUATE_MALFORMED: RestProtocolRefusal = ({ failure, response }) =>
-  HandledError.isHandled(failure) && failure.code === "malformed_request"
-    ? response.write({
-        status: 400,
-        mediaType: PRODUCES_JSON,
-        body: JSON.stringify({ message: "Bad request" }),
-      })
-    : response.decline();
 
 /** One protocol answer, in the shape `c.json(body, status)` used to write. */
 type LegacyAnswer = Readonly<{
@@ -79,13 +61,12 @@ export const experimentDatasetEvaluationRest = defineRestRouter(ExperimentApi)
 
   .post("/api/dataset/evaluate", "postApiDatasetEvaluate")
   .withSharedPath(DATASET_NAMESPACE)
-  .withRawBody("text", { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })
+  .withInput(z.looseObject({}), { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })
   .withPermission("evaluations:manage")
   .withBodyLimit({ maxBytes: EVALUATE_MAX_BYTES })
   .withResponse("protocol", {
     produces: PRODUCES_JSON,
     because: LEGACY_PROTOCOL_REASON,
-    refusal: EVALUATE_MALFORMED,
   })
   .withDocs({
     summary: "Evaluate a dataset",
@@ -121,24 +102,20 @@ export const experimentDatasetEvaluationRest = defineRestRouter(ExperimentApi)
       },
     },
   })
-  .handle(async ({ app, raw, scope, response }) =>
-    response.write(await evaluateDataset({ app, raw, projectId: scope.id })),
+  .handle(async ({ app, input, scope, response }) =>
+    response.write(await evaluateDataset({ app, body: input, projectId: scope.id })),
   )
   .build();
 
 async function evaluateDataset({
   app,
-  raw,
+  body,
   projectId,
 }: {
   app: ExperimentApi;
-  raw: string;
+  body: Record<string, unknown>;
   projectId: string;
 }): Promise<LegacyAnswer> {
-  const body = parseJson(raw);
-
-  if (!body) return answer({ message: "Bad request" }, 400);
-
   let params: BatchEvaluationRESTParams;
 
   try {
@@ -179,19 +156,6 @@ function answerFor(outcome: DatasetEvaluationOutcome): LegacyAnswer {
       return answer({ error: outcome.sentence }, 400);
     case "dataset_not_found":
       return answer({ error: "Dataset not found" }, 404);
-  }
-}
-
-/** The document, or nothing where the body was not a JSON object. */
-function parseJson(raw: string): Record<string, unknown> | null {
-  try {
-    const parsed: unknown = JSON.parse(raw);
-
-    return typeof parsed === "object" && parsed !== null
-      ? (parsed as Record<string, unknown>)
-      : null;
-  } catch {
-    return null;
   }
 }
 

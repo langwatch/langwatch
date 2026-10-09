@@ -36,7 +36,7 @@ function buildProductionApp(
       featureFlags: createApiFixture<FeatureFlagApi>({}),
       modelProviders: createApiFixture<ModelProviderApi>({}),
     },
-    config: { publicBaseUrl },
+    config: { publicBaseUrl, foldCacheTtlSeconds: 300 },
     resources: new ResourceScope(),
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
   });

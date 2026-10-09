@@ -169,6 +169,42 @@ describe("dormant developer tool", () => {
     expect(tool.state()).toBe("dormant");
   }, 15_000);
 
+  /** @scenario "A hosted developer tool runs inside the dev server's own process" */
+  it("starts a hosted tool in this process, closes it once idle and starts it again", async () => {
+    const port = await freeLoopbackPort();
+    let starts = 0;
+    let closes = 0;
+    const tool = startDormantTool({
+      name: "hosted",
+      port,
+      idleAfterMs: 200,
+      log: () => undefined,
+      start: async ({ port: inner }) => {
+        starts++;
+        const server = http.createServer((_q, s) => s.end("hosted"));
+        await new Promise((resolve) => server.listen(inner, "127.0.0.1", () => resolve(undefined)));
+        return {
+          close: () =>
+            new Promise<void>((resolve) => {
+              closes++;
+              server.close(() => resolve());
+            }),
+        };
+      },
+    });
+    tools.push(tool);
+    await eventually({ check: () => isListening({ port }) });
+    const url = `http://127.0.0.1:${port}/`;
+
+    expect(await (await fetch(url)).text()).toBe("hosted");
+    expect(starts).toBe(1);
+
+    await eventually({ check: () => tool.state() === "dormant" && closes === 1 });
+
+    expect(await (await fetch(url)).text()).toBe("hosted");
+    expect(starts).toBe(2);
+  }, 15_000);
+
   describe("when the developer pins the tools open", () => {
     /** @scenario "A pinned developer tool stays running when idle" */
     it("reads off and 0 as pinned, and a duration as the bound", () => {

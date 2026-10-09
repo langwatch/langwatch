@@ -4,8 +4,8 @@ import { describe, expect, it } from "vitest";
 
 /**
  * The api and the worker never migrate: production `start` runs only the entry point, whose upgrade
- * gate refuses until the ledger is current. The api's preparation script runs the upgrade, then
- * the system-migrations pass (specs/upgrade/entry-points.feature).
+ * gate refuses until the ledger is current. The api's preparation script runs the upgrade alone;
+ * the system-migrations pass is not part of api start (specs/upgrade/entry-points.feature).
  */
 describe("system migration start ordering", () => {
   const read = (rel: string): { start: string; prepare: string } => {
@@ -31,10 +31,8 @@ describe("system migration start ordering", () => {
   describe("when the api's preparation script runs", () => {
     const scripts = read("../../../apps/api/package.json");
 
-    it("runs the system-migrations pass after the upgrade", () => {
-      expect(scripts.prepare).toBe(
-        "cd ../tasks && pnpm --silent task upgrade && pnpm --silent task system-migrations-pass",
-      );
+    it("runs the upgrade and no system-migrations pass", () => {
+      expect(scripts.prepare).toBe("cd ../tasks && pnpm --silent task upgrade");
     });
   });
 });

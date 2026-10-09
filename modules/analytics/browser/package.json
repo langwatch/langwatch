@@ -36,6 +36,8 @@
     "@langwatch/design-system": "workspace:*",
     "@langwatch/error-views": "workspace:*",
     "@langwatch/evaluator-contract": "workspace:*",
+    "@langwatch/feature-flag-client": "workspace:*",
+    "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/langy-client": "workspace:*",
     "@langwatch/langy-contract": "workspace:*",

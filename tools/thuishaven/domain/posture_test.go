@@ -148,7 +148,7 @@ func TestOnlyARuntimePostureUsesContainers(t *testing.T) {
 
 // The line has to say what the posture COSTS, not just name it — "none" is
 // the one where something is genuinely unavailable.
-// @scenario "The developer is told once, where they will see it"
+// @scenario "The posture line says what the posture costs"
 func TestThePostureLineSaysWhatItMeans(t *testing.T) {
 	line := PostureLine(PostureNone, PostureRecorded)
 	for _, want := range []string{"none", "natively", "recorded"} {

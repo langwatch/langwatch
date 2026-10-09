@@ -1,4 +1,3 @@
-import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { BillingApi } from "@langwatch/enterprise-billing-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
@@ -34,7 +33,6 @@ export function organizationModuleSetup(
     dependencies: {
       permissions: peers.permissions ?? createApiFixture<AuthzApi>({}, "AuthzApi"),
       users: peers.users ?? createApiFixture<UserApi>({}, "UserApi"),
-      apiKeys: peers.apiKeys ?? createApiFixture<ApiKeyApi>({}, "ApiKeyApi"),
       identity: peers.identity ?? createApiFixture<IdentityApi>({}, "IdentityApi"),
       entitlement: peers.entitlement ?? createApiFixture<EntitlementApi>({}, "EntitlementApi"),
       roles: peers.roles ?? createApiFixture<RoleApi>({}, "RoleApi"),

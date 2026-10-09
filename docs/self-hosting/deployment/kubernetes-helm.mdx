@@ -518,7 +518,7 @@ helm repo update
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
   -f values-production.yaml \
-  --wait --timeout 10m
+  --wait --timeout 45m
 ```
 
 A pre-upgrade Job runs `pnpm task upgrade` on the new image before any pod rolls; on a first install the app runs it once on its first boot. If the upgrade fails, the Job fails the `helm upgrade` and the previous version keeps serving.

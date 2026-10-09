@@ -166,10 +166,6 @@ class CapabilityGatewayHost extends GatewayHostApi {
     return this.session.hasPermission(permission);
   }
 
-  isFeatureEnabled(flag: string): boolean {
-    return this.session.isFeatureEnabled(flag);
-  }
-
   plan(): GatewayPlan {
     return this.plan_;
   }

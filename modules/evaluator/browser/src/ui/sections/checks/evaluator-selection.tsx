@@ -1,4 +1,3 @@
-import { useFeatureFlag } from "@langwatch/browser-host/feature-flag";
 import { Link } from "@langwatch/browser-host/link";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
@@ -23,6 +22,8 @@ import {
   type EvaluatorDefinition,
   type EvaluatorTypes,
 } from "@langwatch/evaluator-contract";
+import { useFeatureFlag } from "@langwatch/feature-flag-client";
+import { FrontendFlags } from "@langwatch/feature-flag-contract";
 import { AlertTriangle, Plus, Shield } from "react-feather";
 import type { UseFormReturn } from "react-hook-form";
 
@@ -60,14 +61,17 @@ export function EvaluatorSelection({
 }) {
   const router = useRouter();
   const { project, organization } = useOrganizationTeamProject();
-  const betaAnnotationsTrained = useFeatureFlag("release_ui_beta_annotations_trained_enabled", {
-    projectId: project?.id,
-    organizationId: organization?.id,
-    // Both ids come from the same workspace query, so an
-    // organization-targeted rule cannot resolve until the organization is
-    // known.
-    enabled: !!project?.id && !!organization?.id,
-  });
+  const betaAnnotationsTrained = useFeatureFlag(
+    FrontendFlags.release_ui_beta_annotations_trained_enabled,
+    {
+      projectId: project?.id,
+      organizationId: organization?.id,
+      // Both ids come from the same workspace query, so an
+      // organization-targeted rule cannot resolve until the organization is
+      // known.
+      enabled: !!project?.id && !!organization?.id,
+    },
+  );
   const betaAnnotationsQueryValue = router.query.NEXT_PUBLIC_FEATURE_BETA_ANNOTATIONS_TRAINED;
   const betaAnnotationsQueryEnabled = Array.isArray(betaAnnotationsQueryValue)
     ? betaAnnotationsQueryValue[0] === "1"

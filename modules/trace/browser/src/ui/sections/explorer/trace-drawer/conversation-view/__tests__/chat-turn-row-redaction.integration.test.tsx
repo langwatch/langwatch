@@ -6,6 +6,10 @@ import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
+vi.mock("../../../../../../behavior/trace-host.ts", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useTraceHost: () => ({ hasPermission: () => false }),
+}));
 vi.mock("../../../../../../features/trace-drawer/behavior/scenario-role.store.tsx", async () => {
   const actual = await vi.importActual<typeof scenarioRolesModule>(
     "../../../../../../features/trace-drawer/behavior/scenario-role.store.tsx",
@@ -55,7 +59,6 @@ vi.mock("../../../../markdown.tsx", () => ({
 vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1" },
-    hasPermission: () => false,
   }),
 }));
 
@@ -64,7 +67,6 @@ vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
 vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1" },
-    hasPermission: () => false,
   }),
 }));
 

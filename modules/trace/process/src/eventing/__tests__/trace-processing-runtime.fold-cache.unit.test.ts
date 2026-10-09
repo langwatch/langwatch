@@ -7,10 +7,10 @@ import type { RedisConnection } from "@langwatch/redis-client";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
+import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
 import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
 import { RedisTraceAnalyticsFoldCacheRepository } from "../../repositories/redis/redis.trace-analytics-fold-cache.repository.ts";
 import { RedisTraceSummaryFoldCacheRepository } from "../../repositories/redis/redis.trace-summary-fold-cache.repository.ts";
-import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
 import {
   type TraceProcessingPipelineInput,
   TraceProcessingRuntimeAdapter,
@@ -30,8 +30,8 @@ function compose() {
     }),
     repositories: {
       ...MemoryTraceRepositories.create(),
-      summaryFoldCache: RedisTraceSummaryFoldCacheRepository.create(redis),
-      analyticsFoldCache: RedisTraceAnalyticsFoldCacheRepository.create(redis),
+      summaryFoldCache: RedisTraceSummaryFoldCacheRepository.create({ redis, ttlSeconds: 300 }),
+      analyticsFoldCache: RedisTraceAnalyticsFoldCacheRepository.create({ redis, ttlSeconds: 300 }),
     },
     canonicalisation: TraceCanonicalisationService.create(),
     commands: createApiFixture<TraceProcessingPipelineInput["commands"]>(),

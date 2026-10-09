@@ -3,7 +3,12 @@
  * @unit
  * @see modules/topic/specs/event-sourced-scheduling.feature
  */
-import { createTenantId, type Event, type EventSubscriberDefinition } from "@langwatch/eventing";
+import {
+  createTenantId,
+  type Event,
+  type EventSubscriberDefinition,
+  InMemoryProcessStore,
+} from "@langwatch/eventing";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
   FIRST_TRACE_RECORDED_EVENT_TYPE,
@@ -67,7 +72,9 @@ function bootstrapLanes(): {
   lanes: Map<string, EventSubscriberDefinition>;
   requests: ClusteringRequest[];
 } {
-  const repositories = MemoryTopicRepositories.create();
+  const repositories = MemoryTopicRepositories.create({
+    processStore: InMemoryProcessStore.createForTesting(),
+  });
   const requests: ClusteringRequest[] = [];
   const pipeline = createTopicClusteringProcessingPipeline({
     topicClusteringRunStatusStore: repositories.runStatus,

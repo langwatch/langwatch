@@ -1,7 +1,7 @@
 import { Link as RoutedLink } from "@langwatch/browser-host/link";
 import { Alert, Button } from "@langwatch/design-system/primitives";
 
-import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
+import { useTraceHost } from "../../behavior/trace-host.ts";
 
 /**
  * Banner shown when a trace is missing content because a `drop` privacy policy stripped
@@ -22,7 +22,7 @@ function describeCategories(categories: string[]): string {
 }
 
 export function PrivacyDroppedNotice({ categories }: { categories?: string[] | null }) {
-  const { hasPermission } = useOrganizationTeamProject();
+  const traceHost = useTraceHost();
   if (!categories || categories.length === 0) return null;
 
   const single = categories.length === 1;
@@ -39,7 +39,7 @@ export function PrivacyDroppedNotice({ categories }: { categories?: string[] | n
           The {list} {wasWere} dropped by this project's privacy settings before {itTheyWere}{" "}
           stored, so {itThey} not shown here and cannot be recovered.
         </Alert.Description>
-        {hasPermission("project:view") && (
+        {traceHost.hasPermission("project:view") && (
           <Button asChild size="xs" variant="outline" marginTop={1} alignSelf="start">
             <RoutedLink href="/settings/data-privacy" target="_blank" rel="noopener noreferrer">
               Privacy settings

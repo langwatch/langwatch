@@ -143,7 +143,7 @@ import { TraceApi } from "@langwatch/trace-contract";
 import { UserApi, type UserFullProfile, type UserProfilesInput } from "@langwatch/user-contract";
 import { WorkflowApi } from "@langwatch/workflow-contract";
 
-import { voiceRecordingChannels } from "../channels/voice-recording-channels.registry.ts";
+import type { ScenarioChannels } from "../channels/scenario.channels.ts";
 import {
   buildScenarioLifecyclePipeline,
   type ScenarioLifecyclePipeline,
@@ -279,7 +279,8 @@ export class ScenarioModule implements ScenarioApi {
     setup: FeatureSetup<
       typeof scenarioAppDependencyTokens,
       ScenarioServerConfig,
-      ScenarioRepositories
+      ScenarioRepositories,
+      ScenarioChannels
     >,
   ): Promise<ScenarioModule> {
     const { secrets, repositories } = setup;
@@ -449,7 +450,7 @@ export class ScenarioModule implements ScenarioApi {
         voicePublicBaseUrl: config.voicePublicBaseUrl,
         voiceCallMaxSeconds: config.voiceCallMaxSeconds,
         allowLoopbackVoiceProviders: config.allowLoopbackVoiceProviders,
-        recordings: voiceRecordingChannels.live.create(),
+        recordings: setup.channels.recordings,
       }),
       lifecycle: buildScenarioLifecyclePipeline(),
       simulationCommands,

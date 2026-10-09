@@ -4,13 +4,18 @@
  * reachable backend — the memory tier always, Postgres joining as a second
  * row when this package declares that datastore.
  */
+import { InMemoryProcessStore } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 
 import { MemoryTopicRepositories } from "../memory/memory.topic.repositories.ts";
 import type { TopicRepositories } from "../topic.repositories.ts";
 
 const backends: readonly { name: string; create: () => TopicRepositories }[] = [
-  { name: "memory", create: () => MemoryTopicRepositories.create() },
+  {
+    name: "memory",
+    create: () =>
+      MemoryTopicRepositories.create({ processStore: InMemoryProcessStore.createForTesting() }),
+  },
 ];
 
 const PROJECT_ID = "project-1";

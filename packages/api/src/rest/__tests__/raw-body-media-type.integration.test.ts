@@ -102,6 +102,12 @@ const notes = defineRestRouter(NoteApi)
   .withPermission("organization:manage")
   .withOutput(answer)
   .handle(async ({ app, raw }) => app.record({ raw }))
+
+  .post("/refusing", "recordRefusingNote")
+  .withRawBody("text", { refuses: ["application/grpc"] })
+  .withPermission("organization:manage")
+  .withOutput(answer)
+  .handle(async ({ app, raw }) => app.record({ raw }))
   .build();
 
 /** A key door: nothing presented is missing, anything but the key is invalid. */
@@ -339,4 +345,76 @@ describe("a raw-body route that names no media type of its own", () => {
       });
     },
   );
+});
+
+describe("a raw-body route that refuses media types by name and reads any other", () => {
+  describe.each(["application/grpc", "application/grpc+proto", "Application/GRPC; charset=x"])(
+    "when the body is sent under %s",
+    (contentType) => {
+      /** @scenario "A raw body route refuses the media types it names and reads any other" */
+      it("refuses it with 415 unsupported_media_type and never reaches the handler", async () => {
+        const { hono, record } = notesApp();
+
+        const response = await hono.request(
+          "/api/v1/notes/refusing",
+          post({ body: "as sent", contentType }),
+        );
+
+        expect(response.status).toBe(415);
+        await expect(response.json()).resolves.toMatchObject({ code: "unsupported_media_type" });
+        expect(record).not.toHaveBeenCalled();
+      });
+    },
+  );
+
+  describe.each(["application/x-protobuf", "application/json", "application/grpc-web", undefined])(
+    "when the body is sent under %s",
+    (contentType) => {
+      /** @scenario "A raw body route refuses the media types it names and reads any other" */
+      it("hands the handler the body as sent", async () => {
+        const { hono, record } = notesApp();
+
+        const response = await hono.request(
+          "/api/v1/notes/refusing",
+          post({ body: "as sent", contentType }),
+        );
+
+        expect(response.status).toBe(200);
+        expect(record).toHaveBeenCalledWith({ raw: "as sent" });
+      });
+    },
+  );
+
+  describe("when a caller presents no credential under a refused type", () => {
+    /** @scenario "A raw body route refuses the media types it names and reads any other" */
+    it("answers 401 before the media type is asked", async () => {
+      const { hono, record } = notesApp();
+
+      const response = await hono.request(
+        "/api/v1/notes/refusing",
+        post({ body: "as sent", contentType: "application/grpc", headers: {} }),
+      );
+
+      expect(response.status).toBe(401);
+      expect(record).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a route refuses by name beside a media type it enforces, or names a wildcard", () => {
+    /** @scenario "A raw body route refuses the media types it names and reads any other" */
+    it("refuses to build", () => {
+      const route = () =>
+        defineRestRouter(NoteApi)
+          .withNamespace("notes")
+          .withVersion(VERSION)
+          .post("/", "recordNote");
+
+      expect(() =>
+        route().withRawBody("text", { mediaType: JSON_TYPE, refuses: ["application/grpc"] }),
+      ).toThrow(/beside the one it enforces/);
+      expect(() => route().withRawBody("text", { refuses: ["application/*"] })).toThrow(
+        /names no single media type/,
+      );
+    });
+  });
 });

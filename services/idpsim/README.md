@@ -153,6 +153,17 @@ ADR-096) over plain OIDC:
 curl -X POST localhost:5565/control/t/1/config -d '{"samlpSubjects":true}'
 ```
 
+### Azure AD (Entra) as a legacy provider
+
+`legacy provider <t> azure` makes the tenant an Entra v2.0 directory: issuer
+`<host>/<tenant-guid>/v2.0`, ID tokens with `oid`, `tid`, `ver: "2.0"`, an
+opaque `sub`, and no `email_verified`, `groups` or `picture` (the way a work
+account's token arrives). The authority paths (`/<guid>/oauth2/v2.0/authorize`,
+`/token`, `/discovery/v2.0/keys`, `/v2.0/.well-known/openid-configuration`) are
+served from the host root. The product's `AUTH_PROVIDER=azure-ad` hard-wires
+`https://login.microsoftonline.com`, so resolve that host to idpsim over https;
+`legacy env <t>` prints `AZURE_AD_TENANT_ID` (the GUID) instead of an issuer.
+
 ## Provisioning into LangWatch
 
 SCIM runs one way: the identity provider sends its directory to the
@@ -281,6 +292,37 @@ not produce a response longer than the directory.
 
 `population` caps at 50,000 users and 500 groups. Resetting a tenant puts the
 seeded two back.
+
+## From the command line
+
+Every console action has a `haven idp <verb>` twin that talks to the running
+simulator's control API. Tenants are numbers (`1`, `2`, ...). Reads take `--json`
+(agent mode implies it); `--stack <slug>` aims at another worktree's stack. A
+stopped simulator says `start it with haven up +idp`. Bare `haven idp` is
+unchanged: it runs the standalone simulator.
+
+| Verb | Does |
+| --- | --- |
+| `tenant show <t>` | domain, issuer, SCIM token, users and applications |
+| `apps add <t> --name <n> [--redirect a,b] [--entity-id --acs-url]` / `apps remove <t> <client-id>` | register or drop an OIDC or SAML application |
+| `populate <t> --users <n> [--groups <n>] [--domain] [--seed]` / `churn <t> --join <n> --leave <n> ...` | directory size and change; each user gets `department`, `costCenter` and `manager` from the seed, pushed under the SCIM enterprise extension (the first user has no manager) |
+| `user add <t> --email <e> [--given-name] [--family-name] [--groups a,b]` | one user |
+| `scim target set <t> --url <base> --token-env <VAR>` / `scim target clear <t>` | where the tenant provisions |
+| `scim push\|pull\|sync <t>` | sync takes `--mode`, `--with-groups`, `--dry-run`, `--concurrency`; all three take `--target <url> --token-env <VAR>` instead of the connection |
+| `scim-event <t> <kind> [--style okta\|entra] [--user] [--group] [--set k=v]...` | one SCIM event on demand; kinds: `user.lookup\|create\|replace\|patch\|deactivate\|reactivate\|delete`, `group.lookup\|create\|add-member\|remove-member\|rename\|delete` |
+| `dns add <domain> <txt>...` / `dns remove <domain>` | TXT records (global, not per tenant) |
+| `activity <t>` / `signin <t> [--user <email>] [--client <id> --redirect <uri>]` | the feed; the IdP-initiated sign-in URL |
+| `reset <t>` / `samlp <t> on\|off` | seeded state; Auth0-broker `samlp\|` subjects |
+| `legacy provider <t> <generic\|auth0\|okta\|cognito\|onelogin\|azure\|show>` / `legacy env <t>` | the legacy provider and the env lines that point a stack at it |
+| `tamper <t> <mode>` | break the next ID token (`bad-signature`, `wrong-audience`, `expired`, `replayed-nonce`) or SAML response (`saml-bad-signature`, `saml-unsigned`, `saml-wrong-audience`, `saml-wrong-recipient`, `saml-expired`, `saml-not-yet-valid`, `saml-replayed-assertion`, `saml-wrong-in-response-to`), once; `none` disarms |
+| `skew <t> <seconds>` | run the tenant's clock ahead (positive) or behind (negative) for every token and assertion |
+| `rotate-key <t> [--drop-previous]` | make a fresh signing key current while JWKS and SAML metadata still publish the previous one; `--drop-previous` then stops publishing it |
+| `user disable <t> <email>` / `user enable <t> <email>` | refuse (or allow again) that user's sign-in at the IdP, over OIDC and SAML |
+| `saml unsolicited <t> --acs-url <url> --email <e> [--entity-id <id>] [--relay-state <s>]` | an IdP-initiated response (no InResponseTo): prints the URL, SAMLResponse and RelayState to post |
+| `auth0-webhook <t> --event create\|deactivate --user <u> --target <stack-url> --secret-env <VAR>` | send one signed Auth0 SCIM event |
+
+Secrets are never flag values. `--token-env` and `--secret-env` name a variable in
+your shell; the value is sent to the simulator and not printed or recorded.
 
 ## Domain verification
 

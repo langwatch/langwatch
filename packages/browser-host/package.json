@@ -26,10 +26,6 @@
       "types": "./dist/capabilities.d.ts",
       "default": "./src/capabilities.ts"
     },
-    "./feature-flag-overrides": {
-      "types": "./dist/feature-flag-overrides.d.ts",
-      "default": "./src/feature-flag-overrides.ts"
-    },
     "./analytics": {
       "types": "./dist/telemetry/analytics.d.ts",
       "default": "./src/telemetry/analytics.ts"
@@ -196,7 +192,6 @@
     "@langwatch/api": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/design-system": "workspace:*",
-    "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/module": "workspace:*",
     "@langwatch/observability": "workspace:*",

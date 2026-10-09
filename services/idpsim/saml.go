@@ -1,11 +1,11 @@
 package idpsim
 
 import (
+	"encoding/base64"
 	"encoding/xml"
 	"fmt"
 	"net/http"
 	"net/url"
-	"time"
 
 	"github.com/crewjam/saml"
 )
@@ -14,16 +14,18 @@ import (
 // rebuilt per request: it is cheap, and the SSO handler customizes the
 // service-provider registry per request.
 func (s *Server) samlIDP(t *Tenant) saml.IdentityProvider {
+	current := t.currentKey()
 	return saml.IdentityProvider{
-		Key:         t.Key,
-		Certificate: t.Cert,
+		Key:         current.Key,
+		Certificate: current.Cert,
 		MetadataURL: mustParseURL(t.BaseURL + "/saml/metadata"),
 		SSOURL:      mustParseURL(t.BaseURL + "/saml/sso"),
 	}
 }
 
 // handleSAMLMetadata publishes the tenant's IdP metadata: entity id, SSO
-// endpoint and the signing certificate service providers pin.
+// endpoint and the signing certificates service providers pin, the previous
+// one too while a rotation has not dropped it.
 func (s *Server) handleSAMLMetadata(w http.ResponseWriter, r *http.Request) {
 	t, ok := s.tenantFor(r)
 	if !ok {
@@ -31,13 +33,27 @@ func (s *Server) handleSAMLMetadata(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	idp := s.samlIDP(t)
-	buf, err := xml.MarshalIndent(idp.Metadata(), "", "  ")
+	buf, err := xml.MarshalIndent(withRetiredCertificates(idp.Metadata(), t), "", "  ")
 	if err != nil {
 		http.Error(w, "rendering metadata failed", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/samlmetadata+xml")
 	_, _ = w.Write(buf)
+}
+
+// withRetiredCertificates adds a signing KeyDescriptor for each published key past the current one.
+func withRetiredCertificates(md *saml.EntityDescriptor, t *Tenant) *saml.EntityDescriptor {
+	sso := &md.IDPSSODescriptors[0]
+	for _, k := range t.SigningKeys()[1:] {
+		sso.KeyDescriptors = append(sso.KeyDescriptors, saml.KeyDescriptor{
+			Use: "signing",
+			KeyInfo: saml.KeyInfo{X509Data: saml.X509Data{X509Certificates: []saml.X509Certificate{
+				{Data: base64.StdEncoding.EncodeToString(k.Cert.Raw)},
+			}}},
+		})
+	}
+	return md
 }
 
 // permissiveSPProvider fabricates service-provider metadata from the incoming
@@ -97,19 +113,8 @@ func (s *Server) handleSAMLSSO(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "the tenant has no active user to assert", http.StatusBadRequest)
 		return
 	}
-	session := &saml.Session{
-		ID:            randomToken(),
-		CreateTime:    s.now().UTC(),
-		ExpireTime:    s.now().UTC().Add(time.Hour),
-		Index:         randomToken(),
-		NameID:        user.Email,
-		UserName:      user.UserName,
-		UserEmail:     user.Email,
-		UserGivenName: user.GivenName,
-		UserSurname:   user.FamilyName,
-		Groups:        user.Groups,
-	}
-	if err := (saml.DefaultAssertionMaker{}).MakeAssertion(req, session); err != nil {
+	mode, err := issueSAML(samlIssue{Tenant: t, Req: req, User: user})
+	if err != nil {
 		http.Error(w, fmt.Sprintf("building the assertion failed: %v", err), http.StatusInternalServerError)
 		return
 	}
@@ -118,7 +123,7 @@ func (s *Server) handleSAMLSSO(w http.ResponseWriter, r *http.Request) {
 		Outcome: OutcomeOK,
 		Client:  sp.entityID,
 		Subject: user.Email,
-		Detail:  "signed an assertion for " + user.Email + ", posting it to " + sp.acsURL,
+		Detail:  faultDetail("signed an assertion for "+user.Email+", posting it to "+sp.acsURL, mode, t),
 	})
 	if err := req.WriteResponse(w); err != nil {
 		http.Error(w, fmt.Sprintf("writing the response failed: %v", err), http.StatusInternalServerError)
@@ -167,7 +172,7 @@ func (s *Server) readAuthnRequest(w http.ResponseWriter, t *Tenant, r *http.Requ
 func (s *Server) samlUser(t *Tenant, r *http.Request) (*User, bool) {
 	if hint := r.URL.Query().Get("login_hint"); hint != "" {
 		u, ok := t.FindUser(hint)
-		return u, ok
+		return u, ok && u.Active // a user disabled at the IdP is refused here
 	}
 	for _, u := range t.Users() {
 		if u.Active {

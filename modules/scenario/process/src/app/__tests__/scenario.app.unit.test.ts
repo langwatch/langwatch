@@ -37,6 +37,7 @@ import {
 } from "../../__tests__/support/scenario-app-setup.fixture.ts";
 import { simulationRunState } from "../../__tests__/support/simulation-run-state.fixture.ts";
 import { simulationSendersOver } from "../../__tests__/support/simulation-service-fake.fixture.ts";
+import { MemoryScenarioChannels } from "../../channels/memory/memory.scenario.channels.ts";
 import { LiveScenarioRepositories } from "../../repositories/live/live.scenario.repositories.ts";
 import { MemoryScenarioRepositories } from "../../repositories/memory/memory.scenario.repositories.ts";
 import { ScenarioModule, type ScenarioSecretCipher } from "../scenario.app.ts";
@@ -52,6 +53,7 @@ async function harness() {
   };
 
   const app = await ScenarioModule.create({
+    channels: MemoryScenarioChannels.create(),
     repositories: MemoryScenarioRepositories.create(),
     dependencies: {
       agents: createApiFixture<AgentApi>(),
@@ -374,6 +376,7 @@ describe("ScenarioModule.getRunDataForAllSuites", () => {
         aggregateId: "run-1",
       });
       const app = await ScenarioModule.create({
+        channels: MemoryScenarioChannels.create(),
         repositories,
         dependencies: {
           agents: createApiFixture<AgentApi>(),
@@ -416,6 +419,7 @@ describe("given a live process whose scenario registry reads ClickHouse", () => 
       },
     });
     const app = await ScenarioModule.create({
+      channels: MemoryScenarioChannels.create(),
       repositories: LiveScenarioRepositories.create({
         prisma: createApiFixture<PrismaClient>(),
         clickhouse,

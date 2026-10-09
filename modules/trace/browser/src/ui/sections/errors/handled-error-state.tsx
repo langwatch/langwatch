@@ -1,9 +1,7 @@
 import { Box, Heading, List, Stack, Text, VStack } from "@langwatch/design-system/primitives";
+import { ErrorActions, resolveErrorCopy } from "@langwatch/error-views";
 import { AlertCircle } from "lucide-react";
 import type { ReactNode } from "react";
-
-import { resolveErrorCopy } from "../../../behavior/errors/logic/resolve-error-copy.ts";
-import { ErrorActions } from "../../elements/errors/error-actions.tsx";
 
 export interface HandledErrorStateProps {
   /** Any error — handled or not. */

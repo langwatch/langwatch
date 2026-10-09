@@ -61,7 +61,6 @@ function checkupService(): OpsCheckupService {
     },
     config: {
       apiKey: undefined,
-      metricsApiKey: undefined,
       clickhouseOpsUrl: undefined,
       usageStats: { disabled: false, installMethod: undefined, chartVersion: undefined },
       collectClickHouseBackupMetrics: true,

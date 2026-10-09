@@ -47,8 +47,7 @@ import { nowInstant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
 import { WorkflowApi } from "@langwatch/workflow-contract";
 
-import { langevalsChannels } from "../channels/langevals-channels.registry.ts";
-import { NullLangevalsChannel } from "../channels/null.langevals.channel.ts";
+import type { EvaluationChannels } from "../channels/evaluation.channels.ts";
 import { ExecuteEvaluationCommand } from "../eventing/evaluation-execution.intent.ts";
 import type { EvaluationLifecyclePipeline } from "../eventing/evaluation-lifecycle.pipeline.ts";
 import {
@@ -213,7 +212,8 @@ interface EvaluationRunner {
 type EvaluationSetup = FeatureSetup<
   typeof EvaluationModule.dependencies,
   EvaluationServerConfig,
-  EvaluationRepositories
+  EvaluationRepositories,
+  EvaluationChannels
 >;
 
 /**
@@ -382,17 +382,13 @@ export class EvaluationModule implements EvaluationApiContract {
   }
 
   private static withEnvironment(
-    { dependencies, repositories, config }: EvaluationSetup,
+    { dependencies, repositories, config, channels }: EvaluationSetup,
     environment: EvaluatorEnvironmentService,
   ): EvaluationModule {
     const commands = EvaluationCommandDispatcherService.create();
     const lifecycle = EvaluationLifecycleService.create();
-    const langevals = config.langevalsEndpoint
-      ? langevalsChannels.live.create({
-          config,
-          staging: repositories.langevalsStaging,
-        })
-      : NullLangevalsChannel.create();
+    const { langevals } = channels;
+    const staging = repositories.langevalsStaging;
     const telemetry = EvaluationExecutionMetricsService.create();
     const unavailable = createUnavailableEvaluationInfrastructure(EVALUATION_PROCESS_NAME);
     const monitorLookup = EvaluationMonitorLookupService.create(dependencies.monitors);
@@ -418,6 +414,7 @@ export class EvaluationModule implements EvaluationApiContract {
       }),
       langevalsClient: LangevalsEvaluatorService.create({
         langevals,
+        staging,
         config: {
           endpoint: config.langevalsEndpoint,
           maxRetries: LANGEVALS_MAX_RETRIES,
@@ -481,10 +478,12 @@ export class EvaluationModule implements EvaluationApiContract {
       clustering: LangevalsClusteringService.create({
         endpoint: config.langevalsEndpoint,
         langevals,
+        staging,
       }),
       piiDetection: LangevalsPiiDetectionService.create({
         endpoint: config.langevalsEndpoint,
         langevals,
+        staging,
       }),
       executionIntent: EvaluationExecutionIntentService.create({
         monitors: dependencies.monitors,

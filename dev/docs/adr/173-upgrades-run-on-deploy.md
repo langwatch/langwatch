@@ -130,8 +130,8 @@ Source: `.claude/coordinator/rulings-2026-10-06-rounds.md`. Each line is Alex's 
   `packages/upgrade` taking that dependency (U1-c); a refused upgrade is a failed run with
   `report.refused` (S3-REFUSED-RUN).
 - **The run itself** (round 9): phases are written into the run report in a fixed shape the reader
-  parses, with no new table (U2-PHASES); a serving process stops serving once its last good roster
-  write is older than the stale bound, 60 s; a rollback is detected from the serving roster, an
+  parses, with no new table (U2-PHASES); a serving process never stops serving over its own roster
+  writes (the stale bound is 10 min; amended 2026-10-09); a rollback is detected from the serving roster, an
   older image's live row after the last run reopening level-triggered background steps (S3-ROLLBACK).
 - **Names and storage** (rounds 19 and 21): presence is renamed the serving roster
   (`_langwatch_serving_roster`, `ServingRoster*`), since presence names another product feature,
@@ -188,9 +188,9 @@ scenarios in `specs/upgrade/cloud-automatic.feature` and `specs/upgrade/upgrade-
 - A crashed process looks live until its row is stale, so "old writers gone" is
   late by at most the stale bound. A graceful stop clears its row at once.
 - A process whose refresh keeps failing drops out of the serving roster while still
-  serving, and could release a step early. The serving gate stops serving once
-  its last good roster write is older than the stale bound, 60 s (Alex,
-  2026-10-06, round 9).
+  serving, and could release a step early. Ruled 2026-10-09 (Alex): it keeps serving.
+  A database blip must not become fleet-wide 503s, so the stale bound is generous (10 min)
+  and the earlier round 9 behaviour (stop serving past 60 s) is withdrawn.
 - Each process start adds one row and each interval one write. Dead rows stay
   until pruned; they never count as live.
 - Dead columns live up to one LTS cycle on cloud (D8).

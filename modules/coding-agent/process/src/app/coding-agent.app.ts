@@ -28,6 +28,8 @@ import {
   type ContributeSpanFactsCommandData,
   type CodingAgentSessionEventsPage,
   type CodingAgentSessionEventsPageInput,
+  type CodingAgentServerConfig,
+  codingAgentConfig,
 } from "@langwatch/coding-agent-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
@@ -130,10 +132,16 @@ type CodingAgentDependencies = {
   auditLog: typeof AuditLogApi;
   governance: typeof GovernanceRestApi;
 };
-type CodingAgentSetup = FeatureSetup<CodingAgentDependencies, undefined, CodingAgentRepositories>;
+type CodingAgentSetup = FeatureSetup<
+  CodingAgentDependencies,
+  CodingAgentServerConfig,
+  CodingAgentRepositories
+>;
 
 export class CodingAgentModule implements CodingAgentApi {
   static readonly contract = CodingAgentApiToken;
+  /** The shared fold-cache TTL the session fold cache keeps. */
+  static readonly config = codingAgentConfig;
   static readonly dependencies: CodingAgentDependencies = {
     projects: ProjectApi,
     github: GithubApi,

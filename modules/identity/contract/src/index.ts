@@ -169,6 +169,10 @@ export {
   ssoSamlRegistrationSchema,
 } from "./features/sso-connection/sso-idp-registration.ts";
 export {
+  idpInitiatedLanding,
+  ssoSamlIdpInitiatedSchema,
+} from "./features/sso-connection/sso-idp-initiated-landing.ts";
+export {
   isSealedProviderConfig,
   sealedProviderConfigCipher,
   type SsoProviderConfigCipher,

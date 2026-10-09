@@ -34,7 +34,7 @@ Opened from lists the other modules (and `ui`, the app) whose browser source nam
 
 ## Calls
 
-- Client packages (package.json): `@langwatch/evaluator-client`, `@langwatch/model-provider-client`, `@langwatch/prompt-client`, `@langwatch/scenario-client`, `@langwatch/trace-client`.
+- Client packages (package.json): `@langwatch/evaluator-client`, `@langwatch/feature-flag-client`, `@langwatch/model-provider-client`, `@langwatch/prompt-client`, `@langwatch/scenario-client`, `@langwatch/trace-client`.
 - Lends: `MediaPartToken`, `ParameterLineFieldToken`, `TalkToItPanelToken`.
 - Host APIs it requires: `ScenarioHostApi`.
 

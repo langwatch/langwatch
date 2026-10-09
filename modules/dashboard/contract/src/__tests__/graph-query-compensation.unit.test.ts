@@ -230,7 +230,6 @@ describe("withGroupedPipeline", () => {
 
 describe("shouldSkipPreviousPeriod", () => {
   describe("given a chart that draws the previous period only when asked", () => {
-    /** @scenario "A panel that hides the previous period does not scan it" */
     it("skips it when includePrevious is off", () => {
       expect(shouldSkipPreviousPeriod({ graphType: "line", includePrevious: false })).toBe(true);
     });

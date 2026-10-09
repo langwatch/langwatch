@@ -1,10 +1,11 @@
+import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
+import { LogApi, otlpLogAliasParamsSchema } from "@langwatch/log-contract";
 /**
  * The OTLP logs receiver: `POST /api/otel/v1/logs` and the misconfigured
  * exporter bases main serves it under (otel-path-aliases.ts). Public: the
  * receiver resolves its own key through Trace, and answers in OTLP's wire.
  */
-import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
-import { LogApi, otlpLogAliasParamsSchema } from "@langwatch/log-contract";
+import { OTLP_REFUSED_MEDIA_TYPES } from "@langwatch/otlp";
 import { resolveRequestBound } from "@langwatch/plans";
 
 import { otlpLogAnswer } from "../rules/otlp-log-answer.rules.ts";
@@ -28,7 +29,7 @@ export const otlpLogsRest = defineRestRouter(LogApi)
   .withAddressing("literal", { v1Twin: false })
 
   .post("/api/otel/v1/logs", "ingestOtlpLogs")
-  .withRawBody("bytes")
+  .withRawBody("bytes", { refuses: OTLP_REFUSED_MEDIA_TYPES })
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
   .withAccess(PUBLIC_ACCESS)
   .withResponse("protocol", { produces: PRODUCES_JSON, because: OTLP_PROTOCOL_REASON })
@@ -49,7 +50,7 @@ export const otlpLogsRest = defineRestRouter(LogApi)
   // only the bases `canonicalOtlpPath` allows, and answers 404 to the rest.
   .post("/:otlpBase{.+}/v1/logs", "ingestOtlpLogsAlias")
   .withParams(otlpLogAliasParamsSchema)
-  .withRawBody("bytes")
+  .withRawBody("bytes", { refuses: OTLP_REFUSED_MEDIA_TYPES })
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
   .withAccess(PUBLIC_ACCESS)
   .withResponse("protocol", { produces: PRODUCES_JSON, because: OTLP_PROTOCOL_REASON })
@@ -68,7 +69,7 @@ export const otlpLogsRest = defineRestRouter(LogApi)
 
   .post("/:otlpBase{.+}/v1/logs/", "ingestOtlpLogsAliasSlash")
   .withParams(otlpLogAliasParamsSchema)
-  .withRawBody("bytes")
+  .withRawBody("bytes", { refuses: OTLP_REFUSED_MEDIA_TYPES })
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
   .withAccess(PUBLIC_ACCESS)
   .withResponse("protocol", { produces: PRODUCES_JSON, because: OTLP_PROTOCOL_REASON })
@@ -86,7 +87,7 @@ export const otlpLogsRest = defineRestRouter(LogApi)
   })
 
   .post("/v1/logs", "ingestOtlpLogsRootV1")
-  .withRawBody("bytes")
+  .withRawBody("bytes", { refuses: OTLP_REFUSED_MEDIA_TYPES })
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
   .withAccess(PUBLIC_ACCESS)
   .withResponse("protocol", { produces: PRODUCES_JSON, because: OTLP_PROTOCOL_REASON })
@@ -104,7 +105,7 @@ export const otlpLogsRest = defineRestRouter(LogApi)
   })
 
   .post("/v1/logs/", "ingestOtlpLogsRootV1Slash")
-  .withRawBody("bytes")
+  .withRawBody("bytes", { refuses: OTLP_REFUSED_MEDIA_TYPES })
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
   .withAccess(PUBLIC_ACCESS)
   .withResponse("protocol", { produces: PRODUCES_JSON, because: OTLP_PROTOCOL_REASON })

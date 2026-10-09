@@ -1,5 +1,4 @@
 import { useUiDeployment } from "@langwatch/browser-host/capabilities";
-import { useFeatureFlag } from "@langwatch/browser-host/feature-flag";
 import { IsolatedErrorBoundary } from "@langwatch/browser-host/isolated-error-boundary";
 import { Kbd } from "@langwatch/design-system/kbd";
 import { LangyMarkGradientDefs } from "@langwatch/design-system/langy-mark";
@@ -14,7 +13,8 @@ import {
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
-import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
+import { useFeatureFlag } from "@langwatch/feature-flag-client";
+import { FrontendFlags, NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import { findGuidedKickoffParts } from "@langwatch/onboarding-contract";
 import {
   AppWindow,
@@ -180,7 +180,7 @@ export function LangySidecar({ proposalHandlersRef, actionHandlersRef }: LangySi
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
   });
-  const peekDock = useFeatureFlag("release_ui_langy_peek_dock_enabled", {
+  const peekDock = useFeatureFlag(FrontendFlags.release_ui_langy_peek_dock_enabled, {
     projectId: project?.id ?? NOT_TARGETED,
     organizationId: organization?.id ?? NOT_TARGETED,
   });

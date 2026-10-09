@@ -1,10 +1,11 @@
+import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
+import { MetricApi, otlpMetricAliasParamsSchema } from "@langwatch/metric-contract";
 /**
  * The OTLP metrics receiver: `POST /api/otel/v1/metrics` and the misconfigured
  * exporter bases main serves it under (otel-path-aliases.ts). Public: the
  * receiver resolves its own key through Trace, and answers in OTLP's wire.
  */
-import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
-import { MetricApi, otlpMetricAliasParamsSchema } from "@langwatch/metric-contract";
+import { OTLP_REFUSED_MEDIA_TYPES } from "@langwatch/otlp";
 import { resolveRequestBound } from "@langwatch/plans";
 
 import { otlpMetricAnswer } from "../rules/otlp-metric-answer.rules.ts";
@@ -28,7 +29,7 @@ export const otlpMetricsRest = defineRestRouter(MetricApi)
   .withAddressing("literal", { v1Twin: false })
 
   .post("/api/otel/v1/metrics", "ingestOtlpMetrics")
-  .withRawBody("bytes")
+  .withRawBody("bytes", { refuses: OTLP_REFUSED_MEDIA_TYPES })
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
   .withAccess(PUBLIC_ACCESS)
   .withResponse("protocol", { produces: PRODUCES_JSON, because: OTLP_PROTOCOL_REASON })
@@ -49,7 +50,7 @@ export const otlpMetricsRest = defineRestRouter(MetricApi)
   // only the bases `canonicalOtlpPath` allows, and answers 404 to the rest.
   .post("/:otlpBase{.+}/v1/metrics", "ingestOtlpMetricsAlias")
   .withParams(otlpMetricAliasParamsSchema)
-  .withRawBody("bytes")
+  .withRawBody("bytes", { refuses: OTLP_REFUSED_MEDIA_TYPES })
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
   .withAccess(PUBLIC_ACCESS)
   .withResponse("protocol", { produces: PRODUCES_JSON, because: OTLP_PROTOCOL_REASON })
@@ -68,7 +69,7 @@ export const otlpMetricsRest = defineRestRouter(MetricApi)
 
   .post("/:otlpBase{.+}/v1/metrics/", "ingestOtlpMetricsAliasSlash")
   .withParams(otlpMetricAliasParamsSchema)
-  .withRawBody("bytes")
+  .withRawBody("bytes", { refuses: OTLP_REFUSED_MEDIA_TYPES })
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
   .withAccess(PUBLIC_ACCESS)
   .withResponse("protocol", { produces: PRODUCES_JSON, because: OTLP_PROTOCOL_REASON })
@@ -88,7 +89,7 @@ export const otlpMetricsRest = defineRestRouter(MetricApi)
   // A stray double slash before the signal: the receiver canonicalises the path itself.
   .post("/:otlpBase{.+}/v1//metrics", "ingestOtlpMetricsAliasDoubled")
   .withParams(otlpMetricAliasParamsSchema)
-  .withRawBody("bytes")
+  .withRawBody("bytes", { refuses: OTLP_REFUSED_MEDIA_TYPES })
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
   .withAccess(PUBLIC_ACCESS)
   .withResponse("protocol", { produces: PRODUCES_JSON, because: OTLP_PROTOCOL_REASON })
@@ -106,7 +107,7 @@ export const otlpMetricsRest = defineRestRouter(MetricApi)
   })
 
   .post("/v1/metrics", "ingestOtlpMetricsRootV1")
-  .withRawBody("bytes")
+  .withRawBody("bytes", { refuses: OTLP_REFUSED_MEDIA_TYPES })
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
   .withAccess(PUBLIC_ACCESS)
   .withResponse("protocol", { produces: PRODUCES_JSON, because: OTLP_PROTOCOL_REASON })
@@ -124,7 +125,7 @@ export const otlpMetricsRest = defineRestRouter(MetricApi)
   })
 
   .post("/v1/metrics/", "ingestOtlpMetricsRootV1Slash")
-  .withRawBody("bytes")
+  .withRawBody("bytes", { refuses: OTLP_REFUSED_MEDIA_TYPES })
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
   .withAccess(PUBLIC_ACCESS)
   .withResponse("protocol", { produces: PRODUCES_JSON, because: OTLP_PROTOCOL_REASON })

@@ -6,7 +6,7 @@ The server half of [data-privacy](../README.md). Data privacy: per-scope rules a
 
 ## Installation
 
-`defineProcessModule("data-privacy").withRepositories(dataPrivacyRepositories).withChannels(dataPrivacyChannels).withApi(DataPrivacyModule).withTransports(dataPrivacyTrpcTransport)`, `src/data-privacy.module.ts:8`.
+`defineProcessModule("data-privacy").withRepositories(dataPrivacyRepositories).withChannels(dataPrivacyChannels).withApi(DataPrivacyModule).withTransports(dataPrivacyTrpcTransport)`, `src/data-privacy.module.ts:13`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 

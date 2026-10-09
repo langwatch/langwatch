@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/dashboard"
@@ -217,6 +216,7 @@ var baseTable = []commandSpec{
 			{long: "--detach", short: "-d", summary: "run in the background without the log view"},
 			{long: "--force", short: "-f", summary: "restart the stack even when it already matches"},
 			{long: "--rebuild", summary: "rebuild container images even when unchanged"},
+			{long: "--mode", takesValue: true, value: "<mode>", summary: "deployment mode from dev/tests/modes; sticks, none clears"},
 		},
 		run: func(ctx context.Context, d deps, inv invocation) error {
 			if err := rejectRemovedSelectionEnv(); err != nil {
@@ -224,6 +224,13 @@ var baseTable = []commandSpec{
 			}
 			sel, err := d.orch.ResolveSelection(d.worktree, inv.args)
 			if err != nil {
+				return err
+			}
+			sel, mode, err := d.orch.ResolveMode(d.worktree, sel, inv.value("--mode"))
+			if err != nil {
+				return err
+			}
+			if err := applyDeploymentMode(&d.opts, mode, d.worktree); err != nil {
 				return err
 			}
 			d.opts.Selection = sel
@@ -290,29 +297,11 @@ var baseTable = []commandSpec{
 	},
 	{
 		name:    "idp",
-		summary: "run the standalone IdP simulator; --json inspects this stack's identity providers",
-		flags: []flagSpec{
-			{long: "--tenants", takesValue: true, value: "<n>", summary: "tenant range size (default 3)"},
-			{long: "--json", summary: "read this stack's identity provider summaries"},
-			{long: "--stack", takesValue: true, value: "<slug>", summary: "with --json: inspect another stack"},
-		},
-		run: func(ctx context.Context, d deps, inv invocation) error {
-			if inv.has("--json") {
-				return printSimulator(d, inv, "idp")
-			}
-			if inv.value("--stack") != "" {
-				return fmt.Errorf("--stack requires --json")
-			}
-			tenants := 0
-			if raw := inv.value("--tenants"); raw != "" {
-				n, err := strconv.Atoi(raw)
-				if err != nil || n < 1 {
-					return fmt.Errorf("--tenants needs a positive integer, got %q", raw)
-				}
-				tenants = n
-			}
-			return d.orch.RunIdPSolo(ctx, tenants)
-		},
+		summary: "idpsim: bare runs the standalone IdP simulator; with a verb it drives this stack's (tenant show | apps | populate | churn | user add | scim ... | dns | activity | signin | reset | samlp | legacy | tamper | auth0-webhook | scim-event)",
+		args:    "[verb] [tenant] [args]",
+		maxArgs: -1,
+		flags:   simFlags(idpFlags...),
+		run:     runIdP,
 	},
 	{
 		name:    "limits",
@@ -397,6 +386,8 @@ var baseTable = []commandSpec{
 		},
 		run: runLogsCmd,
 	},
+	querySpec(),
+	telemetrySpec(),
 	{
 		name:    "status",
 		summary: "one-shot report: every stack, service health, shared servers, RAM",

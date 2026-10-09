@@ -10,7 +10,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AnalyticsTimeseriesQuery } from "../../analytics.repository.ts";
 import { buildTimeseriesQuery } from "../clickhouse.aggregation-builder.mapper.ts";
-import { ClickHouseAnalyticsStatementLimitRepository } from "../clickhouse.analytics-statement-limit.repository.ts";
 import { ClickHouseAnalyticsRepository } from "../clickhouse.analytics.repository.ts";
 
 vi.mock("../clickhouse.aggregation-builder.mapper.ts", () => ({
@@ -55,7 +54,6 @@ function makeQuery(overrides: Partial<AnalyticsTimeseriesInput> = {}): Analytics
 describe("ClickHouseAnalyticsRepository", () => {
   const repository = ClickHouseAnalyticsRepository.create({
     resolveClient: async () => fakeClient as any,
-    statementLimiter: ClickHouseAnalyticsStatementLimitRepository.create({ maxConcurrent: 4 }),
   });
 
   beforeEach(() => {

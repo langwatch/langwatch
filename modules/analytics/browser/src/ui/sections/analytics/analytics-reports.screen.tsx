@@ -1,4 +1,3 @@
-import { useFeatureFlag } from "@langwatch/browser-host/feature-flag";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import {
   Alert,
@@ -9,6 +8,8 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { useFeatureFlag } from "@langwatch/feature-flag-client";
+import { FrontendFlags } from "@langwatch/feature-flag-contract";
 import { Plus } from "lucide-react";
 import { useState } from "react";
 
@@ -57,7 +58,7 @@ function ReportsContent() {
   // (enforceCustomChartPlaygroundEnabled): `enabled` defaults false while
   // loading, so the button starts as the legacy link, never flashing open.
   const { enabled: customChartPlaygroundEnabled } = useFeatureFlag(
-    "release_custom_chart_playground",
+    FrontendFlags.release_custom_chart_playground,
     {
       projectId: project?.id,
       organizationId: organization?.id,

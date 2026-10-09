@@ -35,7 +35,7 @@ const descriptor = resolveCapability("langwatch.trace.search")!;
  * A minimal host: the deep-link chip and the row links both resolve through
  * `useRouter`, which throws outside a `LangyHostProvider`.
  */
-vi.mock("@langwatch/browser-host/feature-flag", () => ({
+vi.mock("@langwatch/feature-flag-client", () => ({
   useFeatureFlag: () => ({ enabled: true, isLoading: false }),
 }));
 

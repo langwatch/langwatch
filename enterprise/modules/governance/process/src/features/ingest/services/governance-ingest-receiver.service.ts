@@ -5,9 +5,10 @@
  * the batch under the organization's hidden governance project, and the cost
  * events inside a log batch priced into the spend ledger.
  */
-import type {
-  GovernanceIngestionSource,
-  GovernanceOttlGateway,
+import {
+  IngestionReceiverUnavailableError,
+  type GovernanceIngestionSource,
+  type GovernanceOttlGateway,
 } from "@langwatch/enterprise-governance-contract";
 import { type GatewayApi } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
@@ -43,7 +44,7 @@ const logger = createLogger("langwatch:ingest");
 export type GovernanceIngestTraceCollection = (input: {
   tenantId: string;
   traceRequest: IExportTraceServiceRequest;
-}) => Promise<{ rejectedSpans?: number } | undefined>;
+}) => Promise<{ rejectedSpans?: number; ingestionFailures?: number } | undefined>;
 
 /** The log pipeline the webhook and `/v1/logs` receivers hand records to. */
 export type GovernanceIngestLogCollectionChannel = (input: {
@@ -207,6 +208,7 @@ export class GovernanceIngestReceiverService implements GovernanceIngestReceiver
     let eventCount = 0;
     let rejectedSpans = 0;
     let parseHint: string | undefined;
+    let handoffFailed = false;
 
     try {
       const body = await batch.read();
@@ -232,6 +234,7 @@ export class GovernanceIngestReceiverService implements GovernanceIngestReceiver
           });
 
           rejectedSpans = result?.rejectedSpans ?? 0;
+          handoffFailed = (result?.ingestionFailures ?? 0) > 0;
         }
       }
     } catch (err) {
@@ -241,6 +244,9 @@ export class GovernanceIngestReceiverService implements GovernanceIngestReceiver
         "otel ingest receive failed (still ack'ing)",
       );
     }
+
+    // A failed handoff is retryable: the resend dedupes the taken spans, as the trace door.
+    if (handoffFailed) throw new IngestionReceiverUnavailableError();
 
     await this.landing.recordEvent(source);
     logger.info(

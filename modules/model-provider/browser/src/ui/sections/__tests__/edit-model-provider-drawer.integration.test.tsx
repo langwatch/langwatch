@@ -22,7 +22,7 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({ closeDrawer: mockCloseDrawer }),
 }));
 
-vi.mock("@langwatch/browser-host/feature-flag", () => ({
+vi.mock("@langwatch/feature-flag-client", () => ({
   useFeatureFlag: () => ({ enabled: false, isLoading: false }),
 }));
 
@@ -31,7 +31,8 @@ vi.mock("@langwatch/browser-host/feature-flag", () => ({
  * provider type, whichever row currently owns it. An organization adding its
  * first OpenAI key has an entry with nothing in it, which is what this is.
  */
-vi.mock("../../../behavior/use-model-providers-settings.ts", () => ({
+vi.mock("@langwatch/model-provider-client", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   useModelProvidersSettings: () => ({
     providers: {
       openai: {

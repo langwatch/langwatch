@@ -87,6 +87,21 @@ export const opsUpgradeReleaseSchema = z.object({
 });
 export type OpsUpgradeRelease = z.infer<typeof opsUpgradeReleaseSchema>;
 
+/** A step's `done` of `total` from its checkpoint report (STEP-PROGRESS, Alex 2026-10-09). */
+export const opsUpgradeStepProgressSchema = z.object({
+  done: z.number().int().nonnegative(),
+  total: z.number().int().positive(),
+});
+
+/** A live serving process a step waits on: its image does not know the step (STEP-WAITINGON). */
+export const opsUpgradeWaitingWriterSchema = z.object({
+  role: z.string(),
+  image: z.string(),
+  release: z.string().nullable(),
+  lastSeenAt: isoInstant.nullable(),
+});
+export type OpsUpgradeWaitingWriter = z.infer<typeof opsUpgradeWaitingWriterSchema>;
+
 export const opsUpgradeStepSchema = z.object({
   id: z.string(),
   kind: z.string(),
@@ -101,6 +116,8 @@ export const opsUpgradeStepSchema = z.object({
   attempt: z.number().int(),
   lastError: z.string().nullable(),
   report: reportSchema,
+  progress: opsUpgradeStepProgressSchema.nullable(),
+  waitingOn: z.array(opsUpgradeWaitingWriterSchema),
   runId: z.string().nullable(),
   startedAt: isoInstant.nullable(),
   finishedAt: isoInstant.nullable(),
@@ -196,6 +213,11 @@ export const opsUpgradeTrpc = defineTrpcContract("ops.upgrade")
   .query("getRun")
   .withInput(opsUpgradeIdInputSchema)
   .withOutput(opsUpgradeRunSchema)
+
+  /** Sets a failed step pending for the worker; `upgrade_step_not_failed` when it is not failed. */
+  .mutation("retryStep")
+  .withInput(opsUpgradeIdInputSchema)
+  .withOutput(opsUpgradeStepDetailSchema)
 
   /**
    * The in-place system migrations, per migration: the status rollup plus the

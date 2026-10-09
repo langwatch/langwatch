@@ -335,7 +335,7 @@ import { LangySidecar } from "../langy-panel.tsx";
 // Helpers
 // ---------------------------------------------------------------------------
 
-vi.mock("@langwatch/browser-host/feature-flag", () => ({
+vi.mock("@langwatch/feature-flag-client", () => ({
   useFeatureFlag: () => ({ enabled: false, isLoading: false }),
 }));
 

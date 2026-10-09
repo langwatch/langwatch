@@ -90,12 +90,6 @@ const DEFAULT_DEPLOYMENT: PersonalDeployment = {
 export type FakePersonalHostOptions = {
   /** The grants the viewer holds, read through the authz hierarchy rule. */
   permissions?: readonly string[];
-  /**
-   * The frontend flags that are on. `"all"` is the default because the platform
-   * suites mocked `useFeatureFlag` to answer yes; name a list when the flag
-   * itself is what a test is about.
-   */
-  enabledFlags?: readonly string[] | "all";
   /** `null` means the scope has not resolved, which several screens gate on. */
   organization?: PersonalOrganization | null;
   /** `null` means no project is in scope, which the project screens gate on. */
@@ -230,11 +224,6 @@ export class FakePersonalWorkspaceHost extends PersonalWorkspaceHostApi {
 
   hasPermission(permission: string): boolean {
     return permissionSatisfiedBy({ granted: this.granted, requested: permission });
-  }
-
-  isFeatureEnabled(flag: string): boolean {
-    const flags = this.options.enabledFlags ?? "all";
-    return flags === "all" || flags.includes(flag);
   }
 
   deployment(): PersonalDeployment {

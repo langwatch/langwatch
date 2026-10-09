@@ -40,10 +40,8 @@ export type LangWatchQlSupply = Readonly<{
 export interface AnalyticsRepositories {
   /** A raw tenant session, for the ClickHouse reads not yet behind a named repository. */
   readonly sessions: AnalyticsSessionsRepository;
-  /** The timeseries and legacy reads, opened with how many one project may run at once. */
-  readonly analytics: Readonly<{
-    open(input: { tenantConcurrency: number }): AnalyticsRepository;
-  }>;
+  /** The timeseries and legacy reads over the analytics tables. */
+  readonly analytics: AnalyticsRepository;
   /** The evaluation tables, opened with the retention peer's default, which no registry reads. */
   readonly evaluations: Readonly<{
     open(input: { defaultRetentionDays: () => number }): AnalyticsEvaluationRepository;

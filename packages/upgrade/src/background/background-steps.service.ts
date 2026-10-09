@@ -65,6 +65,7 @@ export const BACKGROUND_SWEEP_EVERY_MS = 30_000;
 
 /** Pending or left running by a dead worker: what a pass may pick up. */
 const RUNNABLE = new Set<UpgradeStep["status"]>(["pending", "running"]);
+const SETTLED = new Set<UpgradeStep["status"] | undefined>(["done", "not-needed"]);
 
 const moduleOf = (id: string) => id.slice(0, id.indexOf(":"));
 const messageOf = (error: unknown) => (error instanceof Error ? error.message : String(error));
@@ -111,10 +112,21 @@ export class BackgroundStepsService {
     for (const step of declared) {
       if (signal.aborted) break;
       if (!this.options.serving()) return { paused: true, ...sweep, retrying };
-      const outcome = await this.sweepOne({ step, row: rows.get(step.id), signal });
+      const outcome = await this.sweepOne({ step, row: rows.get(step.id), rows, signal });
       if (outcome !== "skipped" && outcome !== "held") by[outcome].push(step.id);
     }
     return { paused: false, ...sweep, retrying };
+  }
+
+  /**
+   * Runs one step now, as `upgrade` does before a contract step (Alex, 2026-10-09): forced, so
+   * neither serving nor the serving roster is asked. A step not pending or running is skipped.
+   */
+  async runNow({ id, signal }: { id: string; signal: AbortSignal }): Promise<StepOutcome> {
+    const step = this.options.steps.find((each) => each.id === id);
+    const row = (await this.options.ledger.findSteps()).find((each) => each.id === id);
+    if (!step || !row || !RUNNABLE.has(row.status)) return "skipped";
+    return this.runLeased({ step, resumeFrom: row.report ?? null, signal });
   }
 
   private now(): number {
@@ -124,13 +136,17 @@ export class BackgroundStepsService {
   private async sweepOne({
     step,
     row,
+    rows,
     signal,
   }: {
     step: MigrationStep;
     row: Pick<UpgradeStep, "status" | "report"> | undefined;
+    rows: ReadonlyMap<string, Pick<UpgradeStep, "status">>;
     signal: AbortSignal;
   }): Promise<StepOutcome> {
     if (!row || !RUNNABLE.has(row.status)) return "skipped";
+    const unsettled = (step.after ?? []).filter((id) => !SETTLED.has(rows.get(id)?.status));
+    if (unsettled.length > 0) return "waiting";
     const backoff = this.failures.get(step.id);
     if (backoff && this.now() < backoff.retryAt) return "skipped";
     const gone =

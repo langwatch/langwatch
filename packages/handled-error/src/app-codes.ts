@@ -811,6 +811,7 @@ export const APP_ERROR_CODES = [
   "unsupported_media_type",
   "upgrade_invalid_cursor",
   "upgrade_not_found",
+  "upgrade_step_not_failed",
   "usage_report_failed",
   "user_email_ambiguous",
   "user_last_platform_operator",

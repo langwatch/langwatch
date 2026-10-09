@@ -39,6 +39,12 @@ Feature: The observability stack runs natively on macOS
       Then the LGTM container is used
       And a value that names no tier is reported and the platform default is used
 
+    Scenario: The posture line says what the posture costs
+      Given a container posture of "none" that the developer recorded
+      When haven reports the posture
+      Then the line names the posture, says what runs natively and that it was recorded
+      And a docker posture's line says haven does not size that daemon
+
     # Unbound: the switch lives in app/observability.go and cmd/root.go, proven live.
     @unimplemented
     Scenario: Turning observability off still turns it off

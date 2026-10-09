@@ -3,15 +3,16 @@
  */
 
 import { Toaster } from "@langwatch/design-system/toaster";
+import { ErrorActions } from "@langwatch/error-views";
 
-import { readUiErrorActions, UiErrorActions } from "./ui-error-actions";
+import { readUiErrorActions } from "./ui-error-actions";
 
 export function UiErrorToaster() {
   return (
     <Toaster
       renderMeta={(meta) => {
         const actions = readUiErrorActions(meta);
-        return <UiErrorActions {...actions} />;
+        return <ErrorActions {...actions} />;
       }}
     />
   );

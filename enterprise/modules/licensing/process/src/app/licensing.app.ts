@@ -65,6 +65,7 @@ import {
   detectLicenseInputForm,
 } from "@langwatch/enterprise-licensing-contract";
 import type { EntitlementGrant, ResolvePlanInput } from "@langwatch/entitlement-contract";
+import type { EventingCommands } from "@langwatch/eventing";
 import { GatewayApi } from "@langwatch/gateway-contract";
 import { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import { createLogger } from "@langwatch/observability";
@@ -78,6 +79,10 @@ import type { ConnectLicenseChannel } from "../channels/connect-license.channel.
 import { HttpConnectGatewayChannel } from "../channels/http/http.connect-gateway.channel.ts";
 import { connectTransportFor, dispatcherOf } from "../channels/http/http.connect-host.channel.ts";
 import { HttpConnectLicenseChannel } from "../channels/http/http.connect-license.channel.ts";
+import {
+  buildLicensingCustomerPipeline,
+  type LicensingCustomerPipeline,
+} from "../eventing/licensing-customer.pipeline.ts";
 import type { ActivationCodeRepository } from "../repositories/activation-code.repository.ts";
 import type { ConnectOrganizationRepository } from "../repositories/connect-organization.repository.ts";
 import type { InstanceIdentityRepository } from "../repositories/instance-identity.repository.ts";
@@ -113,6 +118,7 @@ import { LicenseSyncService } from "../services/license-sync.service.ts";
 import type { LicenseSyncRateLimit } from "../services/license-sync.service.ts";
 import { LicenseService, LicenseServiceConfiguration } from "../services/license.service.ts";
 import type { LicenseLogger, LicenseStorage } from "../services/license.service.ts";
+import { LicensingCustomerFactsService } from "../services/licensing-customer-facts.service.ts";
 import { LicensingEntitlementSourceService } from "../services/licensing-entitlement-source.service.ts";
 import { LicensingInfrastructureService } from "../services/licensing-infrastructure.service.ts";
 import { SelfHostedCrmService } from "../services/self-hosted-crm.service.ts";
@@ -194,11 +200,22 @@ export class LicensingModule implements LicensingApiContract {
   readonly #instances: SelfHostedInstanceService;
   readonly #install: ConnectInstallService;
   readonly #identity: InstanceIdentityService;
+  readonly #customerFacts: LicensingCustomerFactsService;
   readonly #refresh: LicenseRefreshService;
   readonly #isSaas: boolean;
   readonly #signingKey: string | undefined;
   readonly #domainClaims: DomainClaimAuthorityService;
   #configuredActivation: ConfiguredActivationService | undefined;
+
+  /** The licensing_customer pipeline, whose facts organization applies (R42). */
+  customerPipeline(): LicensingCustomerPipeline {
+    return buildLicensingCustomerPipeline();
+  }
+
+  /** Binds the licensing_customer pipeline's senders into the facts service. */
+  connectCustomerCommands(commands: EventingCommands<LicensingCustomerPipeline>): void {
+    this.#customerFacts.connect(commands);
+  }
 
   private constructor({
     service,
@@ -210,7 +227,9 @@ export class LicensingModule implements LicensingApiContract {
     generation,
     signingKey,
     domainClaims,
+    customerFacts,
   }: {
+    customerFacts: LicensingCustomerFactsService;
     generation: LicenseGenerationService;
     domainClaims: DomainClaimAuthorityService;
     service: LicenseService;
@@ -238,6 +257,7 @@ export class LicensingModule implements LicensingApiContract {
     this.#instances = registry.instances;
     this.#install = install.install;
     this.#identity = install.identity;
+    this.#customerFacts = customerFacts;
     this.#refresh = install.refresh;
   }
 
@@ -272,18 +292,16 @@ export class LicensingModule implements LicensingApiContract {
       organizations: dependencies.organizations,
       ...seatCountsOver(dependencies.organizations),
     });
+    const customerFacts = LicensingCustomerFactsService.create();
     const registryParts = licenseRegistryParts({
       infrastructure: licenseRegistryOver({
         repositories,
-        organizations: dependencies.organizations,
+        customerFacts,
         gateway: dependencies.gateway,
         signingKey: licensePrivateKey,
       }),
       hosted: hostedServicesOverPeers(dependencies),
-      instances: selfHostedInstancesOver({
-        repositories,
-        organizations: dependencies.organizations,
-      }),
+      instances: selfHostedInstancesOver({ repositories }),
       cryptography,
       logger,
     });
@@ -303,6 +321,7 @@ export class LicensingModule implements LicensingApiContract {
       instanceLicenseKey: signedInstanceKey,
     });
     const app = new LicensingModule({
+      customerFacts,
       generation: LicenseGenerationService.create(cryptography),
       service,
       runtime,
@@ -313,6 +332,7 @@ export class LicensingModule implements LicensingApiContract {
       registry: registryParts,
       install: connectInstallParts({
         infrastructure: connectInfrastructure,
+        customerFacts,
         cryptography,
         seats: repository,
         licenses: service,
@@ -867,15 +887,15 @@ function licenseRegistryParts({
  */
 function licenseRegistryOver({
   repositories,
-  organizations,
   gateway,
   signingKey,
+  customerFacts,
 }: {
-  repositories: Pick<LicensingRepositories, "issuedLicenses" | "activationCodes" | "rateLimits">;
-  organizations: Pick<
-    OrganizationApi,
-    "findProvisioningSummary" | "createSelfHostedCustomer" | "markSelfHostedCustomer"
+  repositories: Pick<
+    LicensingRepositories,
+    "issuedLicenses" | "activationCodes" | "rateLimits" | "connectOrganizations"
   >;
+  customerFacts: Pick<LicensingCustomerFactsService, "selfHostedCustomerLicensed">;
   gateway: Pick<
     GatewayApi,
     | "provisionConnectManagedKey"
@@ -892,10 +912,9 @@ function licenseRegistryOver({
   return {
     repository: repositories.issuedLicenses,
     organizations: {
-      findById: customerLookup(organizations),
-      createSelfHostedCustomer: ({ name }) => organizations.createSelfHostedCustomer({ name }),
-      markSelfHostedCustomer: (organizationId) =>
-        organizations.markSelfHostedCustomer({ organizationId }),
+      findById: customerLookup(repositories.connectOrganizations),
+      recordSelfHostedCustomerLicensed: ({ id, name }) =>
+        customerFacts.selfHostedCustomerLicensed({ organizationId: id, name }),
     },
     managedKeys: {
       provision: ({ organizationId, licenseId }) =>
@@ -955,13 +974,13 @@ function hostedServicesOverPeers({
   };
 }
 
-/** The customer's id and name, as the organization feature answers it. */
+/** The customer's id and name, read from organization's table through its share (R40). */
 function customerLookup(
-  organizations: Pick<OrganizationApi, "findProvisioningSummary">,
+  organizations: Pick<ConnectOrganizationRepository, "findCustomer">,
 ): LicenseCustomers["findById"] {
   return async (organizationId) => {
-    const summary = await organizations.findProvisioningSummary(organizationId);
-    return summary ? { id: summary.id, name: summary.name } : null;
+    const customer = await organizations.findCustomer(organizationId);
+    return customer ? { id: customer.id, name: customer.name } : null;
   };
 }
 
@@ -971,16 +990,17 @@ function customerLookup(
  */
 function selfHostedInstancesOver({
   repositories,
-  organizations,
 }: {
-  repositories: Pick<LicensingRepositories, "selfHostedInstances" | "issuedLicenses">;
-  organizations: Pick<OrganizationApi, "findProvisioningSummary">;
+  repositories: Pick<
+    LicensingRepositories,
+    "selfHostedInstances" | "issuedLicenses" | "connectOrganizations"
+  >;
 }): SelfHostedInstancesInfrastructure {
   return {
     repository: repositories.selfHostedInstances,
     licenses: repositories.issuedLicenses,
     organizations: {
-      findById: customerLookup(organizations),
+      findById: customerLookup(repositories.connectOrganizations),
     },
     optionalReportKeys: new Set(optionalUsageReportKeys()),
   };
@@ -1045,6 +1065,7 @@ function connectInstallOver({
 
 function connectInstallParts({
   infrastructure,
+  customerFacts,
   cryptography,
   seats,
   licenses,
@@ -1052,6 +1073,7 @@ function connectInstallParts({
   logger,
 }: {
   infrastructure: ConnectInstallInfrastructure;
+  customerFacts: LicensingCustomerFactsService;
   cryptography: LicenseCryptography;
   seats: LicenseStorage;
   licenses: LicenseService;
@@ -1067,6 +1089,7 @@ function connectInstallParts({
   });
   const install = ConnectInstallService.create({
     organizations: infrastructure.organizations,
+    facts: customerFacts,
     identity,
     cryptography,
     deployment: {
@@ -1086,7 +1109,7 @@ function connectInstallParts({
     refresh: LicenseRefreshService.create({
       instanceId: () => identity.getInstanceId(),
       install,
-      organizations: infrastructure.organizations,
+      facts: customerFacts,
       seats,
       licenses,
       cryptography,

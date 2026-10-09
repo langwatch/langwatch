@@ -1,4 +1,6 @@
 /** Spec: specs/self-hosting/connected-services/license-registry.feature */
+import { generate } from "@langwatch/ksuid";
+import { ORGANIZATION_KSUID_RESOURCE } from "@langwatch/organization-contract";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
@@ -54,15 +56,30 @@ function installed() {
   };
 }
 
+/** A customer created as licensing's fact asks: under an id licensing minted. */
+async function customerOf({
+  service,
+  name,
+}: {
+  service: ReturnType<typeof installed>["service"];
+  name: string;
+}): Promise<{ id: string }> {
+  const id = generate(ORGANIZATION_KSUID_RESOURCE).toString();
+  await service.createSelfHostedCustomer({ organizationId: id, name });
+  return { id };
+}
+
 describe("OrganizationMembershipService.createSelfHostedCustomer", () => {
   describe("when a licence is issued to a customer with no organization yet", () => {
     /** @scenario "Every way an organization is created records lw.organization.created" */
     it("creates the organization with its first team, exactly as provisioning does", async () => {
       const { service, organizations, seeded } = installed();
 
-      const customer = await service.createSelfHostedCustomer({ name: "Acme Corp" });
+      const customer = await customerOf({ service, name: "Acme Corp" });
 
-      expect(customer.name).toBe("Acme Corp");
+      await expect(service.getProvisioningSummary(customer.id)).resolves.toMatchObject({
+        name: "Acme Corp",
+      });
       // What `ProjectApi.ensureInternal` reads: an organization with no team
       // would refuse there, long after the licence was issued.
       await expect(organizations.getOldestTeamId(customer.id)).resolves.toEqual(expect.any(String));
@@ -70,40 +87,36 @@ describe("OrganizationMembershipService.createSelfHostedCustomer", () => {
     });
 
     /** @scenario "A customer organization gets the same kind of id as any other organization" */
-    it("gives the organization an organization_ id", async () => {
+    it("creates the organization under the organization_ id licensing minted", async () => {
       const { service } = installed();
 
-      const customer = await service.createSelfHostedCustomer({ name: "ACME" });
+      const customer = await customerOf({ service, name: "ACME" });
 
       expect(customer.id).toMatch(/^organization_/);
+      await expect(service.getProvisioningSummary(customer.id)).resolves.toMatchObject({
+        id: customer.id,
+      });
     });
 
     it("marks the organization as a self-hosted customer", async () => {
       const { service, memory } = installed();
 
-      const customer = await service.createSelfHostedCustomer({ name: "Acme Corp" });
+      const customer = await customerOf({ service, name: "Acme Corp" });
 
       expect(memory.selfHostedCustomers.has(customer.id)).toBe(true);
     });
   });
 
-  describe("when an existing organization becomes a customer", () => {
-    it("marks it, and marking twice changes nothing", async () => {
-      const { service, memory } = installed();
-      const { organization } = await service.createForProvisioning({ name: "Globex" });
+  describe("when licensing's fact is delivered twice", () => {
+    it("creates the organization once and leaves it marked", async () => {
+      const { service, memory, seeded } = installed();
+      const organizationId = generate(ORGANIZATION_KSUID_RESOURCE).toString();
 
-      await service.markSelfHostedCustomer({ organizationId: organization.id });
-      await service.markSelfHostedCustomer({ organizationId: organization.id });
+      await service.createSelfHostedCustomer({ organizationId, name: "Acme Corp" });
+      await service.createSelfHostedCustomer({ organizationId, name: "Acme Corp" });
 
-      expect([...memory.selfHostedCustomers]).toEqual([organization.id]);
-    });
-
-    it("refuses an organization that does not exist", async () => {
-      const { service } = installed();
-
-      await expect(
-        service.markSelfHostedCustomer({ organizationId: "org_missing" }),
-      ).rejects.toThrow(/org_missing/);
+      expect(seeded).toEqual([organizationId]);
+      expect([...memory.selfHostedCustomers]).toEqual([organizationId]);
     });
   });
 });
@@ -112,7 +125,7 @@ describe("OrganizationMembershipService.findSelfHostedCustomers", () => {
   describe("when some organizations are customers and some are not", () => {
     it("names only the customers, each with its organization name", async () => {
       const { service } = installed();
-      const acme = await service.createSelfHostedCustomer({ name: "Acme Corp" });
+      const acme = await customerOf({ service, name: "Acme Corp" });
       await service.createForProvisioning({ name: "Not a customer" });
 
       await expect(service.findSelfHostedCustomers()).resolves.toEqual([
@@ -134,7 +147,7 @@ describe("OrganizationMembershipService.findRepresentatives", () => {
   describe("when the organization has members", () => {
     it("names its longest-standing member, the same one every time", async () => {
       const { service, memory } = installed();
-      const acme = await service.createSelfHostedCustomer({ name: "Acme Corp" });
+      const acme = await customerOf({ service, name: "Acme Corp" });
       const joined = (userId: string, at: string) => ({
         userId,
         organizationId: acme.id,
@@ -157,7 +170,7 @@ describe("OrganizationMembershipService.findRepresentatives", () => {
   describe("when the organization has no member", () => {
     it("answers an empty list", async () => {
       const { service } = installed();
-      const acme = await service.createSelfHostedCustomer({ name: "Acme Corp" });
+      const acme = await customerOf({ service, name: "Acme Corp" });
 
       await expect(service.findRepresentatives({ organizationId: acme.id })).resolves.toEqual([]);
     });

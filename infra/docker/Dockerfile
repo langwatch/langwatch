@@ -304,8 +304,8 @@ SHELL ["/bin/bash", "-c"]
 #
 # The upgrade is a one-shot step BEFORE the serving containers, run on this image:
 #   cd /app/apps/api && pnpm --silent run start:prepare:db
-# which is `pnpm task upgrade` (Postgres, ClickHouse, LangWatchQL, under one lease)
-# and then the system-migrations pass. The chart's pre-roll Job, the compose
+# which is `pnpm task upgrade` (Postgres, ClickHouse, LangWatchQL, under one lease).
+# The chart's pre-roll Job, the compose
 # `migrate` service and the npx server run it; it is written once, in apps/api,
 # so this file holds no copy of it.
 #

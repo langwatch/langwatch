@@ -8,6 +8,9 @@ import { Alert, Box, Button, Text, VStack } from "@langwatch/design-system/primi
 import { explainAnyError } from "@langwatch/handled-error/presentation";
 import type { ReactNode } from "react";
 
+export { ErrorActions } from "./error-actions.tsx";
+export { resolveErrorCopy, type ResolvedErrorCopy } from "./resolve-error-copy.ts";
+
 /**
  * As much of a react-hook-form as {@link FormServerError} reads — the whole-form
  * slot `applyHandledErrorToForm` writes into.

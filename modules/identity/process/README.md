@@ -703,7 +703,7 @@ Declared at `src/features/sso-connection/eventing/sso-connection.pipeline.ts:188
 
 | Kind   | Leaf                          | Environment variable           | Declared at                             |
 | ------ | ----------------------------- | ------------------------------ | --------------------------------------- |
-| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`        | `src/app/identity.app.ts:472`           |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`        | `src/app/identity.app.ts:468`           |
 | config | `ssoDomainProofDnsServers`    | `SSO_DOMAIN_PROOF_DNS_SERVERS` | `../contract/src/identity.config.ts:28` |
 | config | `isSaas`                      | `IS_SAAS`                      | `../contract/src/identity.config.ts:30` |
 | config | `publicBaseUrl`               | `BASE_HOST`                    | `../contract/src/identity.config.ts:32` |

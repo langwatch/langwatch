@@ -51,6 +51,9 @@
       "path": "../../evaluator/client/tsconfig.build.json"
     },
     {
+      "path": "../../feature-flag/client/tsconfig.build.json"
+    },
+    {
       "path": "../../feature-flag/contract/tsconfig.build.json"
     },
     {

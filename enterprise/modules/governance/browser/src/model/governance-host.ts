@@ -1,5 +1,6 @@
 /** Port providing governance screens with auth, routing, toasts, and plan context. */
 
+import type { ReleaseFlagToken } from "@langwatch/browser-host/declarations";
 import { createContext, useContext } from "react";
 
 /** One organization as the section reads it: its own row plus its teams. */
@@ -84,10 +85,10 @@ export abstract class GovernanceHostApi {
   abstract hasPermission(permission: string): boolean;
 
   /** Fails closed the same way. */
-  abstract isFeatureEnabled(flag: string): boolean;
+  abstract isFeatureEnabled(flag: ReleaseFlagToken): boolean;
 
   /** On, off, or `undefined` while the flag has not answered yet. */
-  abstract featureFlag(flag: string): boolean | undefined;
+  abstract featureFlag(flag: ReleaseFlagToken): boolean | undefined;
 
   /** Whether the session's grants have arrived, so a "no" is a real no. */
   abstract isSettled(): boolean;

@@ -247,11 +247,6 @@ export class BootedRuntime<Members, Rest = never, Trpc = never> {
   stop(): Promise<void> {
     return this.lifecycle.stop();
   }
-
-  /** Pauses or resumes every service that can stop taking work (round 22: lapsed roster entry). */
-  async holdWork(held: boolean): Promise<void> {
-    for (const service of this.services) await (held ? service.pause?.() : service.resume?.());
-  }
 }
 
 /** One feature declared on an application, before boot looks at it. */

@@ -17,6 +17,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { memoryVirtualKeySeed } from "../../__tests__/support/gateway-memory-seeds.fixture.ts";
 import { GatewayModule } from "../../app/gateway.app.ts";
+import { MemoryGatewayChannels } from "../../channels/memory/memory.gateway.channels.ts";
 import { MemoryGatewayRepositories } from "../../repositories/memory/memory.gateway.repositories.ts";
 import {
   MemoryGatewayStore,
@@ -125,6 +126,7 @@ const noSecrets = new ScopedSecrets(async (_handle, build) => build(undefined));
 async function callerFor(budgets: GatewayBudget[], debits: GatewayBudgetDebitRow[] = []) {
   const repositories = await seededRepositories({ budgets, debits });
   const app = await GatewayModule.create({
+    channels: MemoryGatewayChannels.create(),
     dependencies: {
       authz: peer("authz"),
       projects: projectsStub({
@@ -166,6 +168,7 @@ async function callerFor(budgets: GatewayBudget[], debits: GatewayBudgetDebitRow
     },
     repositories,
     config: {
+      foldCacheTtlSeconds: 300,
       spendSettlementGraceMs: void 0,
       internalUrl: void 0,
       controlPlaneUrl: void 0,

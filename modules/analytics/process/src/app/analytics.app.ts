@@ -51,7 +51,9 @@ import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { NotFoundError, ValidationError } from "@langwatch/handled-error";
+import { InProcessTenantStatementLimiter } from "@langwatch/limiter";
 import type { FeatureSetup } from "@langwatch/process";
+import { OverloadedRefusal, StatementBoundTelemetry } from "@langwatch/process-stores";
 import { ProjectApi } from "@langwatch/project-contract";
 import { Secret } from "@langwatch/secrets";
 import { toEpochMs, type Instant } from "@langwatch/time";
@@ -113,7 +115,11 @@ import {
   LangWatchQLService as LangWatchQLServiceClass,
 } from "../services/langwatch-ql.service.ts";
 import { WorkbenchProtectionsService } from "../services/workbench-protections.service.ts";
-import { convergeLwqlAccessModel } from "../tasks/lwql-provision.task.ts";
+import {
+  convergeLwqlAccessModel,
+  fillLwqlProjectKeys,
+  type LwqlProjectKeyFillReport,
+} from "../tasks/lwql-provision.task.ts";
 import type {
   AnalyticsLegacyApi,
   AnalyticsLegacyTimeseriesAnswer,
@@ -122,6 +128,15 @@ import type { AnalyticsQueryApi } from "../transport/query.rest.ts";
 
 /** ADR-034: runs the legacy read beside the routed one and logs a divergence. */
 const ANALYTICS_READ_TRIPWIRE_FLAG = "release_event_sourced_analytics_read_tripwire";
+
+/** Waiting analytics reads per tenant; only a tenant flooding the process is refused. */
+const TENANT_ANALYTICS_MAX_QUEUED = 64;
+
+/** Under the 100s proxy cut: 45s here, 20s for a process slot, 30s on the wire. */
+const TENANT_ANALYTICS_WAIT_TIMEOUT_MS = 45_000;
+
+/** The label the tenant gate's gauges, wait histogram and shed counter carry. */
+const TENANT_ANALYTICS_METRICS_INSTANCE = "tenant-analytics";
 
 /**
  * The filter-value read this feature makes on the host's filter registry — declared
@@ -201,14 +216,16 @@ type AnalyticsDependencies = Readonly<{
 type LwqlProvisioningOperations = Readonly<{
   probeOwner: () => Promise<LwqlAccessModelOwner>;
   converge: () => Promise<void>;
+  fillProjectKeys: (input: { dryRun: boolean }) => Promise<LwqlProjectKeyFillReport>;
 }>;
 
 const LWQL_UNAVAILABLE: LwqlProvisioningOperations = {
   probeOwner: () => Promise.resolve("none"),
   converge: () => Promise.resolve(),
+  fillProjectKeys: () => Promise.resolve({ inserted: 0, blankKeys: 0 }),
 };
 
-/** The reconvergence watch's two operations over the stores' admin seam (ADR-159). */
+/** The reconvergence watch's operations and the key-map fill, over the admin seam (ADR-159). */
 function lwqlProvisioningOperations({
   admin,
   postgres,
@@ -216,6 +233,7 @@ function lwqlProvisioningOperations({
   connection,
   readerPassword,
   settings,
+  projectKeys,
 }: {
   admin: Extract<LangWatchQlSupply["admin"], { configured: true }>;
   postgres: Extract<LangWatchQlSupply["postgres"], { configured: true }>;
@@ -223,6 +241,7 @@ function lwqlProvisioningOperations({
   connection: LangWatchQLConnection;
   readerPassword: string | undefined;
   settings: AnalyticsServerConfig["langwatchQl"];
+  projectKeys: ProjectApi;
 }): LwqlProvisioningOperations {
   const names = LangWatchQLProductionProvisioningService.create().names({ connection });
   const openRepository = () =>
@@ -260,6 +279,14 @@ function lwqlProvisioningOperations({
         },
       });
     },
+    fillProjectKeys: ({ dryRun }) =>
+      fillLwqlProjectKeys({
+        openRepository,
+        projectKeys,
+        names,
+        sourceDatabase: admin.target.database,
+        dryRun,
+      }),
   };
 }
 
@@ -332,11 +359,17 @@ export class AnalyticsModule
       sessions.resolve(tenantId);
     // Data retention owns the default retention days; a second claim refuses the process.
     const analytics = AnalyticsServiceClass.create({
-      repository: setup.repositories.analytics.open({
-        tenantConcurrency: setup.config.tenantAnalyticsConcurrency,
-      }),
+      repository: setup.repositories.analytics,
       evaluationRepository: evaluations.open({
         defaultRetentionDays: () => setup.dependencies.retention.getPlatformDefaultRetentionDays(),
+      }),
+      tenantLimiter: new InProcessTenantStatementLimiter({
+        maxConcurrent: setup.config.tenantAnalyticsConcurrency,
+        maxQueued: TENANT_ANALYTICS_MAX_QUEUED,
+        waitTimeoutMs: TENANT_ANALYTICS_WAIT_TIMEOUT_MS,
+        metricsInstance: TENANT_ANALYTICS_METRICS_INSTANCE,
+        telemetry: new StatementBoundTelemetry(),
+        overloadErrorFactory: new OverloadedRefusal(),
       }),
       tripwire: LoggingAnalyticsTripwireService.create({
         isEnabled: (projectId) =>
@@ -380,6 +413,7 @@ export class AnalyticsModule
                 connection,
                 readerPassword: typeof readerPassword === "string" ? readerPassword : undefined,
                 settings: lwqlConfig,
+                projectKeys: setup.dependencies.projects,
               }),
           )
         : LWQL_UNAVAILABLE;
@@ -462,6 +496,11 @@ export class AnalyticsModule
   /** Re-provisions the access model once a config store released it (SQL mode only). */
   convergeLwqlAccessModel(): Promise<void> {
     return this.#dependencies.lwqlProvisioning.converge();
+  }
+
+  /** The `analytics:fill-lwql-project-keys` step's body: each project's missing key-map row. */
+  fillLwqlProjectKeys(input: { dryRun: boolean }): Promise<LwqlProjectKeyFillReport> {
+    return this.#dependencies.lwqlProvisioning.fillProjectKeys(input);
   }
 
   /** Writes a created project's key-map row; throws on a failed insert so the queue retries. */

@@ -14,6 +14,7 @@ import {
   type UpgradeStepDetail,
   type UpgradeStepPage,
 } from "@langwatch/upgrade/reader";
+import { UpgradeRunnerRepository } from "@langwatch/upgrade/runner";
 
 import type { UpgradeLedgerRepository } from "../upgrade-ledger.repository.ts";
 
@@ -26,7 +27,10 @@ const LEDGER_TENANCY =
  * the ledger has not recorded reads as outstanding (Q-U8, default taken).
  */
 export class PrismaUpgradeLedgerRepository implements UpgradeLedgerRepository {
-  private constructor(private readonly reader: UpgradeReader) {}
+  private constructor(
+    private readonly reader: UpgradeReader,
+    private readonly runner: UpgradeRunnerRepository,
+  ) {}
 
   static create({
     prisma,
@@ -37,19 +41,21 @@ export class PrismaUpgradeLedgerRepository implements UpgradeLedgerRepository {
   }): PrismaUpgradeLedgerRepository {
     const { manifests, floor } = loadReleases();
     const release = manifests.at(-1)?.release;
+    const postgres = {
+      query: async <Row extends object>(text: string, values: unknown[] = []) => ({
+        rows: await prisma.$queryRawUnsafe<Row[]>(`${LEDGER_TENANCY}${text}`, ...values),
+      }),
+    };
     return new PrismaUpgradeLedgerRepository(
       createUpgradeReader({
-        postgres: {
-          query: async <Row extends object>(text: string, values: unknown[] = []) => ({
-            rows: await prisma.$queryRawUnsafe<Row[]>(`${LEDGER_TENANCY}${text}`, ...values),
-          }),
-        },
+        postgres,
         image: {
           release: release ?? "unreleased",
           steps: steps ?? imageSteps({ release: release ?? "0.0.0" }),
         },
         floor,
       }),
+      UpgradeRunnerRepository.create({ postgres }),
     );
   }
 
@@ -75,5 +81,9 @@ export class PrismaUpgradeLedgerRepository implements UpgradeLedgerRepository {
 
   getRun(input: { id: string }): Promise<UpgradeRunDetail> {
     return this.reader.getRun(input);
+  }
+
+  reopenFailedStep({ id }: { id: string }): Promise<boolean> {
+    return this.runner.retryFailedStep({ id });
   }
 }

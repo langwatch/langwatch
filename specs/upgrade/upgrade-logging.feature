@@ -82,13 +82,6 @@ Feature: An upgrade tells the operator what it is doing and what to do next
     Then the refusal names "DATABASE_URL" and the line carries the next action
 
   @unit
-  Scenario: A lapsed roster entry is logged with what to check, and the recovery says how long serving stopped
-    Given an admitted worker
-    When its roster entry lapses and is later written again
-    Then the lapse line says readiness answers 503 and names the roster write it waits on
-    And the recovery line carries how many milliseconds serving stopped
-
-  @unit
   Scenario: The api's first install says it runs the upgrade once before serving
     Given an api on an empty ledger and an empty schema
     When its upgrade gate admits it

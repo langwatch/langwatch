@@ -27,7 +27,7 @@ func (s *Server) handleDiscovery(w http.ResponseWriter, r *http.Request) {
 
 // discoveryDocument is the metadata; a provider-shaped tenant's issuer has its provider's shape.
 func discoveryDocument(t *Tenant) map[string]any {
-	return map[string]any{
+	doc := map[string]any{
 		"issuer":                                t.Issuer(),
 		"authorization_endpoint":                t.BaseURL + "/oauth/authorize",
 		"token_endpoint":                        t.BaseURL + "/oauth/token",
@@ -45,25 +45,33 @@ func discoveryDocument(t *Tenant) map[string]any {
 			"nickname", "preferred_username", "picture", "groups",
 		},
 	}
+	if t.LegacyProvider() == LegacyProviderAzure {
+		azureDiscovery(t, doc)
+	}
+	return doc
 }
 
-// handleJWKS publishes the tenant's signing key.
+// handleJWKS publishes the tenant's signing keys: the current one, and the
+// previous one while a rotation has not dropped it.
 func (s *Server) handleJWKS(w http.ResponseWriter, r *http.Request) {
 	t, ok := s.tenantFor(r)
 	if !ok {
 		http.NotFound(w, r)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"keys": []map[string]any{{
+	signing := t.SigningKeys()
+	keys := make([]map[string]any, 0, len(signing))
+	for _, k := range signing {
+		keys = append(keys, map[string]any{
 			"kty": "RSA",
 			"use": "sig",
 			"alg": "RS256",
-			"kid": t.KeyID(),
-			"n":   base64.RawURLEncoding.EncodeToString(t.Key.N.Bytes()),
-			"e":   base64.RawURLEncoding.EncodeToString(big.NewInt(int64(t.Key.E)).Bytes()),
-		}},
-	})
+			"kid": k.KID,
+			"n":   base64.RawURLEncoding.EncodeToString(k.Key.N.Bytes()),
+			"e":   base64.RawURLEncoding.EncodeToString(big.NewInt(int64(k.Key.E)).Bytes()),
+		})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"keys": keys})
 }
 
 // handleAuthorize implements the authorization endpoint. With a login hint
@@ -418,7 +426,7 @@ type audience struct{ ClientID, Nonce string }
 // mintIDToken signs the tenant's ID token with the standard claims the app's
 // profile mapping reads (email, picture, and the name-fallback family).
 func (s *Server) mintIDToken(t *Tenant, user *User, aud audience) (string, error) {
-	now := s.now()
+	now := s.now().Add(t.Skew())
 	claims := t.profileClaims(user, now)
 	claims["iss"] = t.Issuer()
 	claims["aud"] = aud.ClientID
@@ -430,8 +438,9 @@ func (s *Server) mintIDToken(t *Tenant, user *User, aud audience) (string, error
 	tamper, previousNonce := t.takeTamper(aud.Nonce)
 	breakClaims(claims, tokenBreak{Mode: tamper, PreviousNonce: previousNonce, Now: now})
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
-	token.Header["kid"] = t.KeyID()
-	signed, err := token.SignedString(t.Key)
+	current := t.currentKey()
+	token.Header["kid"] = current.KID
+	signed, err := token.SignedString(current.Key)
 	if err != nil || tamper == TamperNone {
 		return signed, err
 	}

@@ -6,7 +6,7 @@ The server half of [automation](../README.md). Automations: triggers and their f
 
 ## Installation
 
-`defineProcessModule("automation").withRepositories(automationRepositories).withChannels(automationChannels).withApi(AutomationModule).withTransports(…, automationTrpcTransport, emailSuppressionTrpcTransport, slackAutomationRest, unsubscribeRest).withTasks(…).withMigrations(…).withEventing(automationsEventing)`, `src/automation.module.ts:35`.
+`defineProcessModule("automation").withRepositories(automationRepositories).withChannels(automationChannels).withApi(AutomationModule).withTransports(…, automationTrpcTransport, emailSuppressionTrpcTransport, slackAutomationRest, unsubscribeRest).withTasks(…).withMigrations(…).withEventing(automationsEventing)`, `src/automation.module.ts:22`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -688,7 +688,7 @@ interface Input {
   projectId: string;
   triggerId: string;
 }
-// Output: automationDeletedSchema, ../contract/src/automation.responses.ts:35
+// Output: automationDeletedSchema, ../contract/src/automation.responses.ts:46
 interface Output {
   success: boolean;
 }
@@ -702,14 +702,14 @@ interface Input {
 
 // automation.getDailyCap
 type Input = z.infer<typeof automationApiProjectScopeSchema>; // ../contract/src/automation.trpc-schemas.ts:22
-// Output: automationDailyCapSchema, ../contract/src/automation.responses.ts:25
+// Output: automationDailyCapSchema, ../contract/src/automation.responses.ts:36
 interface Output {
   cap: number;
 }
 
 // automation.getDailyCapStatus
 type Input = z.infer<typeof automationApiProjectScopeSchema>; // ../contract/src/automation.trpc-schemas.ts:22
-// Output: automationDailyCapStatusSchema, ../contract/src/automation.responses.ts:28
+// Output: automationDailyCapStatusSchema, ../contract/src/automation.responses.ts:39
 interface Output {
   cap: number;
   counts: Record<
@@ -832,7 +832,7 @@ interface Input {
   projectId: string;
   slackIntegrationId: string;
 }
-// Output: slackChannelListingSchema, ../contract/src/automation.responses.ts:52
+// Output: slackChannelListingSchema, ../contract/src/automation.responses.ts:63
 interface Output {
   channels: {
     id: string;
@@ -976,7 +976,7 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                        | Environment variable                   | Declared at                               |
 | ------ | --------------------------- | -------------------------------------- | ----------------------------------------- |
-| secret | `unsubscribe`               | `NEXTAUTH_SECRET`                      | `src/app/automation.app.ts:403`           |
+| secret | `unsubscribe`               | `NEXTAUTH_SECRET`                      | `src/app/automation.app.ts:404`           |
 | config | `emailHourlyCap`            | `TRIGGER_EMAIL_HOURLY_CAP`             | `../contract/src/automation.config.ts:11` |
 | config | `tenantDailyCap`            | `TRIGGER_EMAIL_TENANT_DAILY_CAP`       | `../contract/src/automation.config.ts:12` |
 | config | `persistDailyCapFree`       | `TRIGGER_PERSIST_DAILY_CAP_FREE`       | `../contract/src/automation.config.ts:13` |

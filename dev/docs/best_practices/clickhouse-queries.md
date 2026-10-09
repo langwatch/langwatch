@@ -107,12 +107,11 @@ WHERE ...
 
 Rules for this form:
 
-- **Use `latestVersionSubquery`** (`modules/analytics/process/src/repositories/clickhouse/clickhouse.latest-version-dedup.mapper.ts`). It emits the shape above.
+- **Use `latestVersionSubquery`** (`src/server/analytics/clickhouse/latest-version-dedup.ts`). It emits the shape above.
 - **Carry the row as a tuple.** `argMax` on a `Nullable` column skips NULLs and returns an older version's value. `argMax(tuple(x), v).1` keeps the NULL.
 - **Rename inside the inner subquery.** An outer `argMax(OccurredAt, UpdatedAt) AS OccurredAt` shadows the column the WHERE filters on and fails with `ILLEGAL_AGGREGATION`. The `__latest_row` / `__version` names avoid it.
-- **Carry only narrow columns.** The newest row is buffered per key. Never carry a whole `Map`: narrow it to the keys the query reads (`narrowMapColumnProjection` in `clickhouse.field-mappings.mapper.ts`), or keep the IN-tuple form.
+- **Carry only narrow columns.** The newest row is buffered per key. Never carry a whole `Map`: narrow it to the keys the query reads (`narrowMapColumnProjection` in `field-mappings.ts`), or keep the IN-tuple form.
 - **Evaluate predicates on the newest version.** A predicate that must hold for the newest row (a filter, a has-signal check) is carried as a boolean column and checked in the outer WHERE, the same place the IN-tuple form checked it.
-- **Keep ORs out of the tenant guard's reach.** The collapse puts the tenant predicate two subqueries deep, and the tenant guard refuses an `OR` at or above that depth unless a group holding a tenant predicate encloses it. A disjunction in the outer SELECT list or in a joined subquery's WHERE is written as a negated conjunction or bracketed one level deeper.
 
 The two forms pick the same row. They differ only on two versions tied on `UpdatedAt`: the collapse keeps one, the IN-tuple form keeps both.
 
@@ -120,7 +119,7 @@ The same reasoning applies to the rest of a whole-range query. Prefer aggregatio
 
 When a whole-range query cannot avoid a join whose hash side has one row per trace, return `join_algorithm: "grace_hash"` with a `max_bytes_in_join` budget and a lower `max_threads` in the builder's `settings` (see `SPAN_MODEL_PARTITION_SETTINGS`). The join then spills, and the merge of spilled aggregations, which takes memory per thread, stays bounded.
 
-Analytics panel reads also run through a per-tenant `TenantStatementLimiter` (`packages/clickhouse-client/src/tenantStatementLimit.ts`, built for analytics in `clickhouse.analytics-statement-limit.repository.ts`), which lets one project run `CLICKHOUSE_TENANT_ANALYTICS_CONCURRENCY` (default 4) of them at once per process, so a dashboard load queues its panels instead of running all of them together.
+Analytics panel reads also run through the analytics module's `TenantStatementLimiter` service (`packages/limiter/src/tenantStatementLimit.ts`; the in-process implementation is built in `modules/analytics/process/src/app/analytics.app.ts`), which lets one project run `CLICKHOUSE_TENANT_ANALYTICS_CONCURRENCY` (default 4) of them at once per process, so a dashboard load queues its panels instead of running all of them together.
 
 ## Version Columns per Table
 

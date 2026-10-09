@@ -9,6 +9,7 @@ import type {
   SsoSetupIdentityProviderView,
   SsoSetupPageView,
 } from "@langwatch/enterprise-sso-contract";
+import { ssoSamlIdpInitiatedSchema } from "@langwatch/identity-contract";
 
 import { EMPTY_REGISTER_FORM, type RegisterForm } from "./registration-form.ts";
 
@@ -61,6 +62,8 @@ export function identityProviderFormFrom(current: SsoSetupIdentityProviderView):
     entityId: current.entityId ?? "",
     metadataXml: current.metadataXml ?? "",
     certificate: current.certificate ?? "",
+    // A connection saved before the opt-in existed reads as off.
+    idpInitiated: ssoSamlIdpInitiatedSchema.parse(current.idpInitiated),
   };
 }
 
@@ -88,5 +91,6 @@ export function identityProviderUpdateFromForm({
     entityId: form.entityId || null,
     metadataXml: form.metadataXml || null,
     certificate: form.certificate || null,
+    idpInitiated: form.idpInitiated,
   };
 }

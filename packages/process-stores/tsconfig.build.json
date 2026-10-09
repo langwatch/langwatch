@@ -27,6 +27,9 @@
       "path": "../handled-error/tsconfig.build.json"
     },
     {
+      "path": "../limiter/tsconfig.build.json"
+    },
+    {
       "path": "../module/tsconfig.build.json"
     },
     {

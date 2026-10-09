@@ -128,10 +128,8 @@ line names the UI's address from `BASE_HOST` and `pnpm task upgrade status`.
 Exit codes are unchanged.
 
 An api or worker logs that it is checking the ledger, then that it serves and how
-long the check took. If its roster entry lapses, it logs that readiness answers 503;
-a worker also takes no new jobs while in-flight ones finish. When a roster
-write succeeds again it logs how long serving stopped, and the worker takes jobs
-again.
+long the check took. A failing roster write is logged and retried; it never takes the
+process out of service.
 
 ## How long a roster entry takes to clear
 
@@ -140,7 +138,7 @@ again.
 - **Crash, kill or lost node**: the row counts until it has not been refreshed
   for the stale bound, then never again. "Old writers gone" can therefore be late
   by at most that bound, never early.
-- **The bound itself** (and the refresh interval below it) is held for Alex; the
+- **The bound itself** is 10 minutes and the refresh interval 15 seconds; the
   serving gate sets both when it records its roster entry.
 
 ## Long blocking steps: pre-build and mutations

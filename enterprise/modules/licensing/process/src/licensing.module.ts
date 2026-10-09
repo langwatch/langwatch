@@ -5,6 +5,7 @@ import { defineMigrationStep } from "@langwatch/upgrade/step";
 
 import { LicensingModule } from "./app/licensing.app.ts";
 import { licenseSyncEventing } from "./eventing/license-sync.pipeline.ts";
+import { licensingCustomerEventing } from "./eventing/licensing-customer.pipeline.ts";
 import { licensingRepositories } from "./repositories/licensing-repositories.registry.ts";
 import { LicenseMintService } from "./services/license-mint.service.ts";
 import { OrganizationLicenseCopyService } from "./services/organization-license-copy.service.ts";
@@ -29,11 +30,12 @@ export const licensingProcessModule: PublishedProcessModule<
     bindRestCredential("internal_secret", () => dependencies.gateway.internalDoor()),
   ])
   .withEventing(licenseSyncEventing)
+  .withEventing(licensingCustomerEventing)
   .withTasks(({ app, dependencies, repositories }) => [
     GenerateLicenseTask.create({
       mint: LicenseMintService.create({
         licenses: app,
-        organizations: dependencies.organizations,
+        organizations: repositories.connectOrganizations,
         storage: OrganizationLicenseWriterService.create({
           licenses: repositories.organizationLicenses,
           organizations: dependencies.organizations,

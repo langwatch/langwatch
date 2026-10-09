@@ -34,6 +34,7 @@ EXAMPLES
     haven up +langevals          # run the evaluators monitors and evaluations call
     haven up +llm                # answer every model call from llmsim, at no cost
     haven up +analytics          # catch PostHog and Customer.io calls in analyticssim
+    haven up +telemetry          # send, load or fuzz OTLP traffic with telemetrysim
     haven                        # the hub: the whole machine + actions (git/cleanup/down/destroy)
     haven status                 # every stack + shared-server health, one shot
     haven logs nlp -t            # tail one service live
@@ -64,6 +65,7 @@ The six simulators each have a console at <name>.<slug>.langwatch.localhost: mai
 idp and storage run by default; llm, voice and analytics come with "haven up +llm
 +voice +analytics". Read one's output with "haven logs <name>". Drive one from a
 terminal with "haven mail|llm|analytics|storage|voice <verb>" (--json on every read).
+telemetrysim ("haven up +telemetry") has no console: "haven telemetry send|load|fuzz|status|stop".
 
     mail|idp|storage|llm|voice|analytics.portless.langwatch.localhost
 

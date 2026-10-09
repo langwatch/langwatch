@@ -78,6 +78,8 @@ All derive from `PORT` (default 5560) in `dev/scripts/lib/derive-dev-ports.sh`: 
 api `PORT+1000`, gateway `PORT+3`, worker metrics `PORT-2561`; `dev/scripts/dev-stack.sh`
 adds the Redis DB index `(PORT-5560)/10`. An explicit `API_PORT` or `WORKER_METRICS_PORT` wins. Two stacks need
 two `PORT`s (5570, 5580, ...). A held port stops the launcher with a line saying which.
+The mail preview runs inside the ui dev process on `PORT+6`, started on first visit and closed
+after idle; `LANGWATCH_MAIL_PREVIEW_SPAWN=1` runs it as its own process instead.
 
 ## Failure shapes
 

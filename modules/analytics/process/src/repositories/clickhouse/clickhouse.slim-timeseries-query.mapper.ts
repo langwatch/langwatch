@@ -126,8 +126,7 @@ function buildSlimGroupByExpression(groupBy?: string): string | null {
   }
   switch (groupBy) {
     case "error.has_error":
-      // Trace-level error flag, the slim twin of the legacy builder's
-      // `ContainsErrorStatus` bucket (same labels, so the two paths agree).
+      // Same labels as the legacy builder's `ContainsErrorStatus` bucket.
       return `if(${ta}.HasError, 'with error', 'without error')`;
     case "topics.topics":
       return `${ta}.TopicId`;
@@ -162,8 +161,9 @@ function slimGroupByHandlesUnknown(groupBy?: string): boolean {
 // via ~/analytics/query-builders/_shared.
 
 /**
- * Slim aggregation expression. Percentiles use `quantileTDigest`, bounded memory
- * per group, where `quantileExact` keeps every value of the range in memory.
+ * Slim aggregation expression. Percentiles use `quantileTDigest`, the legacy
+ * builder's estimator for `performance.*` metrics: bounded memory per group,
+ * where `quantileExact` keeps every value of the range in memory.
  */
 function slimAggExpression(agg: AnalyticsAggregation, column: string): string {
   if (isPercentile(agg)) {
@@ -186,10 +186,12 @@ function slimAggExpression(agg: AnalyticsAggregation, column: string): string {
   }
 }
 
+const SLIM_HAS_SIGNAL = "HasSignal";
+const SLIM_MATCHES_FILTERS = "MatchesFilters";
+
 /**
- * Latest version of each trace ({@link latestVersionSubquery}) with the read columns,
- * `HasSignal` (dimension-only states are not traces) and `MatchesFilters` (so the
- * `Attributes` map the filters read is never carried), both from the latest version.
+ * The latest version of each trace via the spillable `argMax` of {@link latestVersionSubquery}:
+ * the read columns plus `HasSignal` (dimension-only rows are not A TRACE) and `MatchesFilters`.
  */
 function dedupedSlim({
   alias,
@@ -203,10 +205,7 @@ function dedupedSlim({
   filterPredicates: readonly string[];
 }): string {
   const carried: LatestVersionColumn[] = columns.map((name) => ({ name }));
-  carried.push({
-    name: SLIM_HAS_SIGNAL,
-    expression: `(${TRACE_ANALYTICS_HAS_SIGNAL_SQL})`,
-  });
+  carried.push({ name: SLIM_HAS_SIGNAL, expression: `(${TRACE_ANALYTICS_HAS_SIGNAL_SQL})` });
   if (filterPredicates.length > 0) {
     carried.push({
       name: SLIM_MATCHES_FILTERS,
@@ -222,9 +221,6 @@ function dedupedSlim({
     where: `TenantId = {tenantId:String} ${dateClause}`,
   });
 }
-
-const SLIM_HAS_SIGNAL = "HasSignal";
-const SLIM_MATCHES_FILTERS = "MatchesFilters";
 
 const SLIM_DATE_FILTER_BOTH_PERIODS = `AND ((OccurredAt >= {currentStart:DateTime64(3)} AND OccurredAt < {currentEnd:DateTime64(3)}) OR (OccurredAt >= {previousStart:DateTime64(3)} AND OccurredAt < {previousEnd:DateTime64(3)}))`;
 

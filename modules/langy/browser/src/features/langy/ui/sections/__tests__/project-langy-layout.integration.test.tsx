@@ -81,9 +81,9 @@ function LangySidecarStub() {
   );
 }
 
-vi.mock("@langwatch/browser-host/feature-flag", () => ({
-  useFeatureFlag: (flag: string) => ({
-    enabled: flag === "release_ui_langy_peek_dock_enabled" ? gate.peekDock : gate.flagEnabled,
+vi.mock("@langwatch/feature-flag-client", () => ({
+  useFeatureFlag: (flag: { name: string }) => ({
+    enabled: flag.name === "release_ui_langy_peek_dock_enabled" ? gate.peekDock : gate.flagEnabled,
     isLoading: false,
   }),
 }));

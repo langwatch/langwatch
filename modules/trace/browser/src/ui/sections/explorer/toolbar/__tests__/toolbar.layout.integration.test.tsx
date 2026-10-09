@@ -12,10 +12,13 @@ import "@testing-library/jest-dom/vitest";
 import { useExplorerStore } from "../../../../../behavior/explorer.store.ts";
 import { Toolbar } from "../toolbar.tsx";
 
+vi.mock("../../../../../behavior/trace-host.ts", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useTraceHost: () => ({ hasPermission: () => true }),
+}));
 vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1", slug: "acme" },
-    hasPermission: () => true,
   }),
 }));
 vi.mock("../../../../../behavior/explorer/use-project-has-traces.ts", () => ({

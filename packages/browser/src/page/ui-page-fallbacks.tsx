@@ -13,9 +13,8 @@ import {
   Stack,
   Text,
 } from "@langwatch/design-system/primitives";
+import { ErrorActions } from "@langwatch/error-views";
 import { Lock } from "lucide-react";
-
-import { UiErrorActions } from "../ui-error-actions.tsx";
 
 /** The words for code that did not arrive, so both boundaries say the same thing. */
 export const UI_CHUNK_LOAD_FAILURE_COPY = {
@@ -116,7 +115,7 @@ export function UiPageFailure({
             Try again
           </Button>
         )}
-        <UiErrorActions
+        <ErrorActions
           {...(copy.docsUrl ? { docsUrl: copy.docsUrl } : {})}
           {...(copy.traceId ? { traceId: copy.traceId } : {})}
         />

@@ -1,0 +1,51 @@
+---
+title: Releases and support
+description: "How LangWatch is versioned, when a long-term-support release is named, which releases get fixes and how far you can upgrade in one step."
+---
+
+## Versioning
+
+LangWatch is released from one line. Every release has a version number such as `3.20.1`, and the images and the Helm chart carry the same number. A higher number is always a newer release on that line. A patch number (the last digit) is a smaller release on the same line, not a fix to an older one.
+
+## Only the latest release gets fixes
+
+Fixes, security fixes included, ship in the next release and only there. No older release, long-term-support releases included, is ever patched. To get a fix, upgrade to the latest release.
+
+## Long-term-support releases
+
+A long-term-support (LTS) release is named every **April** and **October**. An LTS is an **upgrade stop**, not a maintained branch: it is the release an older installation upgrades to before it moves on to the latest one.
+
+| LTS release | Named | Oldest release the latest version upgrades from (the floor) |
+| --- | --- | --- |
+| `3.20.1` | October 2026 | `3.20.1` |
+| to be named | April 2027 | `3.20.1` |
+
+## The floor
+
+Every release names a **floor**: the oldest release it upgrades from. When a new LTS is named, the floor moves up to the LTS before it. So:
+
+- An installation on the newest LTS, or on any release at or above the floor, upgrades **straight to the latest release**.
+- An installation below the floor is refused before anything changes. The upgrade exits with code `2` and names the LTS to install first. See [Exit codes and what to do](/self-hosting/upgrade#exit-codes-and-what-to-do).
+- Because an LTS image accepts installations from two LTS releases back, an installation that upgrades at least once a year needs **at most one stop**.
+
+### Worked example
+
+Suppose an LTS is named each April and October as planned:
+
+| When | Newest LTS | Floor of the latest release |
+| --- | --- | --- |
+| October 2026 | `3.20.1` | `3.20.1` |
+| April 2027 | the April 2027 LTS | `3.20.1` |
+| October 2027 | the October 2027 LTS | the April 2027 LTS |
+
+You run `3.20.1` and leave it until December 2027. The latest release's floor is now the April 2027 LTS, so upgrading straight to it is refused, and the message names the April 2027 LTS. Upgrade to the April 2027 LTS first (its floor is `3.20.1`, so it accepts you), then to the latest release. That is one stop.
+
+Had you upgraded to the April 2027 LTS, or anything newer, in the summer of 2027, you would go straight to the latest release in December.
+
+## Which LTS you need
+
+1. Find the release you run now. **Ops > Upgrades** shows the installed release, the release of the image and the floor; `pnpm task upgrade status` shows the installed release in the terminal.
+2. If the release you run is at or above the floor of the release you want, upgrade straight to it.
+3. If it is below, run the upgrade anyway: it refuses before changing anything and names the LTS to install first. Upgrade to that LTS, then to the release you want.
+
+An installation that is below the floor shows as **Unsupported** on **Ops > Upgrades**. The [upgrade guide](/self-hosting/upgrade) covers how to run each upgrade.

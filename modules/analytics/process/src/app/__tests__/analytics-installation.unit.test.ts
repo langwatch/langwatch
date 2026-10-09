@@ -68,7 +68,6 @@ function boot(role: "api" | "worker") {
           accessModelMode: undefined,
           sqlSingleNode: undefined,
         },
-        tenantAnalyticsConcurrency: 4,
         publicBaseUrl: PUBLIC_BASE_URL,
       },
     },

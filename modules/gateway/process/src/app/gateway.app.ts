@@ -156,7 +156,7 @@ import {
 } from "@langwatch/webhook-contract";
 import type { z } from "zod";
 
-import { elevenLabsConversationChannels } from "../channels/elevenlabs-conversation-channels.registry.ts";
+import type { GatewayChannels } from "../channels/gateway.channels.ts";
 import {
   GATEWAY_DEBITS_PROCESS_NAME,
   GatewayDebitProcess,
@@ -1092,7 +1092,8 @@ function extractSessionActor(value: object): { user: { id: string } } | null {
 type GatewaySetup = FeatureSetup<
   typeof GatewayModule.dependencies,
   GatewayServerConfig,
-  GatewayRepositories
+  GatewayRepositories,
+  GatewayChannels
 >;
 
 export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, GatewaySpendDoorApi {
@@ -1271,7 +1272,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
         reconciliation: GatewayRealtimeSessionReconciliationService.create({
           repository: GatewayRealtimeSessionSweepService.create(realtimeSessions),
           credentials: elevenLabsCredential,
-          conversations: elevenLabsConversationChannels.live.create(),
+          conversations: setup.channels.conversations,
           logger: createLogger("langwatch:gateway:realtime-session-reconciliation"),
           config: realtimeSessionReconciliationConfig,
           clock: { now: () => nowInstant() },

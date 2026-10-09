@@ -8,6 +8,10 @@ import "@testing-library/jest-dom/vitest";
 
 const turns: TraceListItem[] = [];
 
+vi.mock("../../../../../../behavior/trace-host.ts", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useTraceHost: () => ({ hasPermission: () => false }),
+}));
 vi.mock("../../../../../../features/conversation/behavior/use-conversation-turns.ts", () => ({
   useConversationTurns: () => ({ data: { items: turns }, isLoading: false }),
 }));
@@ -56,7 +60,6 @@ vi.mock("../../../../markdown.tsx", () => ({
 vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1" },
-    hasPermission: () => false,
   }),
 }));
 

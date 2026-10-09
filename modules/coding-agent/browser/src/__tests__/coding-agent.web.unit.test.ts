@@ -1,6 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { createUi } from "@langwatch/browser";
+import { hostServiceFakes } from "@langwatch/browser/testing";
 import {
   CodingAgentPullRequestsTableToken,
   CodingAgentSessionsTableToken,
@@ -21,7 +22,7 @@ describe("given a browser that installs coding-agent", () => {
   describe("when the kernel renders with no screen requirement to satisfy", () => {
     it("installs the module", async () => {
       const installed = await createUi({ document: browserDocument(), mount: "root" })
-        .withModules([codingAgentWeb] as const)
+        .withModules([hostServiceFakes(), codingAgentWeb] as const)
         .render();
 
       expect(installed.modules).toContain(codingAgentWeb);

@@ -1,4 +1,4 @@
-import { InMemoryProcessStore } from "@langwatch/eventing";
+import type { InMemoryProcessStore } from "@langwatch/eventing";
 
 import type { TopicRepositories } from "../topic.repositories.ts";
 import { MemoryTopicClusteringClaimRepository } from "./memory.topic-clustering-claim.repository.ts";
@@ -11,9 +11,11 @@ import { TopicMemoryStore } from "./topic-memory.store.ts";
 
 /** The "memory" tier: every topic row the app is tested without a datastore. */
 export class MemoryTopicRepositories {
-  static readonly requires = [] as const;
+  static readonly requires = ["processStore"] as const;
 
-  static create(): TopicRepositories {
+  static create({
+    processStore,
+  }: Readonly<{ processStore: InMemoryProcessStore }>): TopicRepositories {
     // One store behind both rows, the way one Postgres connection serves
     // them: a project seeded for clustering is the project the read surface
     // answers about, and a recorded cost is read back from the same ledger.
@@ -22,7 +24,7 @@ export class MemoryTopicRepositories {
     return {
       topics: MemoryTopicRepository.create(store),
       clustering: MemoryTopicClusteringRepository.create(store),
-      processStore: InMemoryProcessStore.createForLocalDevelopment(),
+      processStore,
       runStatus: MemoryTopicClusteringRunProjectionRepository.create(),
       runHistory: MemoryTopicClusteringRunHistoryProjectionRepository.create(),
       topicModel: MemoryTopicModelProjectionRepository.create(),

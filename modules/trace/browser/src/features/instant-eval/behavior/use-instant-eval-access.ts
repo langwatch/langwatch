@@ -3,7 +3,8 @@
  * organization's own switch, either is enough (main #8348).
  * @see modules/instant-eval/specs/instant-eval-opt-in.feature
  */
-import { useFeatureFlag } from "@langwatch/browser-host/feature-flag";
+import { useFeatureFlag } from "@langwatch/feature-flag-client";
+import { FrontendFlags } from "@langwatch/feature-flag-contract";
 import type { ExplorerInstantEvalOptInAccess } from "@langwatch/trace-contract";
 
 import { api } from "../../../behavior/trace-api.ts";
@@ -25,7 +26,7 @@ export function useInstantEvalAccess({
   organizationId: string | undefined;
 }): InstantEvalAccess {
   const { enabled: flagReleased, isLoading: flagLoading } = useFeatureFlag(
-    "release_instant_evals",
+    FrontendFlags.release_instant_evals,
     { projectId, organizationId, enabled: !!projectId && !!organizationId },
   );
   const access = api.instantEval.access.useQuery(

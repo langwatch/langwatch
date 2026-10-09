@@ -89,6 +89,14 @@ export class PrismaBillingSubscriptionRepository extends BillingSubscriptionRepo
     return row ? subscriptionRecordOf(row) : null;
   }
 
+  async hasAnyForOrganization(organizationId: string): Promise<boolean> {
+    const row = await this.prisma.subscription.findFirst({
+      where: { organizationId },
+      select: { id: true },
+    });
+    return row !== null;
+  }
+
   async createPending(input: {
     organizationId: string;
     plan: string;

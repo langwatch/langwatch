@@ -38,13 +38,6 @@ vi.mock("../../../behavior/analytics-api.ts", () => ({
         }),
       },
     },
-    useUtils: () => ({
-      analytics: {
-        getTimeseries: { refetch: vi.fn() },
-        topUsedDocuments: { refetch: vi.fn() },
-        feedbacks: { refetch: vi.fn() },
-      },
-    }),
   },
 }));
 

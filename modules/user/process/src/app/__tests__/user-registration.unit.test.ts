@@ -4,12 +4,13 @@
  * user's registered fact, from which nurturing derives `signed_up`; a refusal records nothing.
  * @see specs/licensing/sso-license-gating.feature
  */
+import { InMemoryProcessStore } from "@langwatch/eventing";
 import { EmailAlreadyRegisteredError } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
 import { MemoryUserDatabase } from "../../repositories/memory/memory.user.database.ts";
 import { memoryUserRepositoriesOver } from "../../repositories/memory/memory.user.repositories.ts";
-import { createUserTestApp, createUserTestLifecycle } from "./user.fixture.ts";
+import { createUserTestApp, createUserTestLifecycle, userFactsIn } from "./user.fixture.ts";
 
 function register(
   app: ReturnType<typeof createUserTestApp>,
@@ -28,14 +29,17 @@ describe("registering a credential account", () => {
   describe("when registration succeeds", () => {
     /** @scenario "A self-service registration is recorded as user's fact" */
     it("commits the created fact, then one registered fact, with the new account", async () => {
-      const database = MemoryUserDatabase.create();
+      const processStore = InMemoryProcessStore.createForTesting();
+      const database = MemoryUserDatabase.create({ processStore });
       const app = createUserTestApp({ repositories: memoryUserRepositoriesOver({ database }) });
 
       const created = await register(app);
 
       expect(created).toEqual({ id: expect.any(String) });
       const fact = { tenantId: created.id, userId: created.id, occurredAt: expect.any(Number) };
-      expect(database.factOutbox()).toEqual([
+      expect(
+        await userFactsIn({ processStore, userIds: database.rows().map(({ id }) => id) }),
+      ).toEqual([
         { type: "recordCreated", data: fact },
         {
           type: "recordRegistered",
@@ -72,14 +76,19 @@ describe("registering a credential account", () => {
   describe("when the email is already registered", () => {
     /** @scenario "A refused registration records no registered fact" */
     it("refuses and records no second registered fact", async () => {
-      const database = MemoryUserDatabase.create();
+      const processStore = InMemoryProcessStore.createForTesting();
+      const database = MemoryUserDatabase.create({ processStore });
       const app = createUserTestApp({ repositories: memoryUserRepositoriesOver({ database }) });
 
       await register(app);
-      const committed = database.factOutbox().length;
+      const committed = (
+        await userFactsIn({ processStore, userIds: database.rows().map(({ id }) => id) })
+      ).length;
 
       await expect(register(app)).rejects.toBeInstanceOf(EmailAlreadyRegisteredError);
-      expect(database.factOutbox()).toHaveLength(committed);
+      expect(
+        await userFactsIn({ processStore, userIds: database.rows().map(({ id }) => id) }),
+      ).toHaveLength(committed);
     });
   });
 

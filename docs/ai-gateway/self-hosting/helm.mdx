@@ -102,7 +102,7 @@ helm repo update
 helm upgrade --install langwatch langwatch/langwatch \
   --namespace langwatch --create-namespace \
   -f values.yaml \
-  --wait --timeout 10m
+  --wait --timeout 45m
 ```
 
 The umbrella chart bundles the gateway sub-chart, so one `helm upgrade` rolls the app and the gateway together. The gateway Deployment uses a `RollingUpdate` with `maxSurge: 1` and `maxUnavailable: 0`.

@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Callable GitHub installation, webhook and pull-request capabilities.
 
-Peers call these through the token, declared at `../contract/src/github.api.ts:27`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/github.api.ts:23`; nothing else in this package is public.
 
 #### `getAppConfig`
 
@@ -88,18 +88,6 @@ popupResponseHtml(login: string): string;
 popupErrorHtml(message: string): string;
 ```
 
-#### `parsePullRequestEvent`
-
-```typescript
-parsePullRequestEvent(payload: unknown): GithubPullRequestEvent | null;
-```
-
-#### `applyWebhookPayload`
-
-```typescript
-applyWebhookPayload(input: { payload: GithubWebhookEnvelope; eventType: string | undefined; deliveryId: string | undefined; }): Promise<void>;
-```
-
 #### `getAllForOrganization`
 
 ```typescript
@@ -136,12 +124,6 @@ disconnect(input: { organizationId: string; installationId: string; }): Promise<
 recordInstallation(input: { installationId: string; organizationId: string; flowStartedAt: number; expectedAccountLogin?: string | undefined; expectedInstallationId?: string | undefined; }): Promise<{ accountLogin: string }>;
 ```
 
-#### `handleWebhookEvent`
-
-```typescript
-handleWebhookEvent(input: { action: "created" | "deleted" | "suspend" | "unsuspend" | "added" | "removed"; installationId: string; repositorySelection?: string; repositories?: GithubRepositoryRef[] | null; }): Promise<void>;
-```
-
 #### `listRepositoriesForOrganization`
 
 ```typescript
@@ -166,18 +148,6 @@ coversRepository(input: { organizationId: string; repositoryFullName: string }):
 
 ```typescript
 requestBranchMapping(input: { tenantId: string; repositoryHost: string; repositoryOwner: string; repositoryName: string; headBranch: string; }): Promise<void>;
-```
-
-#### `getLivePullRequestStatuses`
-
-```typescript
-getLivePullRequestStatuses(input: { organizationId: string; refs: readonly GithubPullRequestRef[]; }): Promise<readonly GithubPullRequestLiveStatus[]>;
-```
-
-#### `applyPullRequestEvent`
-
-```typescript
-applyPullRequestEvent(event: GithubPullRequestEvent): Promise<boolean>;
 ```
 
 #### `findForBranches`
@@ -222,16 +192,16 @@ countUsage(input: { organizationIds: readonly string[]; since?: number; }): Prom
 
 ### `githubInstallRest`
 
-|             |                                            |
-| ----------- | ------------------------------------------ |
-| Declared at | `src/transport/github-install.rest.ts:102` |
-| Base URL    | none: each route's path is its address     |
-| Addressing  | literal                                    |
-| Credential  | browser                                    |
+|             |                                           |
+| ----------- | ----------------------------------------- |
+| Declared at | `src/transport/github-install.rest.ts:97` |
+| Base URL    | none: each route's path is its address    |
+| Addressing  | literal                                   |
+| Credential  | browser                                   |
 
 #### `GET /api/github/install` · `startGithubInstallation`
 
-Permission `organization:manage`. Declared at `src/transport/github-install.rest.ts:110`.
+Permission `organization:manage`. Declared at `src/transport/github-install.rest.ts:105`.
 
 Answers at `/api/github/install`, `/api/v1/github/install`.
 
@@ -244,53 +214,53 @@ interface Query {
   mode?: string;
   return?: string;
 }
-// Response: inline, src/transport/github-install.rest.ts:113
+// Response: inline, src/transport/github-install.rest.ts:108
 type Response = unknown;
 ```
 
 #### `GET /api/github/setup` · `completeGithubInstallation`
 
-Public: GitHub App Setup URL — protocol-mandated public endpoint; all sensitive state is HMAC-signed and bound to the session that started the flow. Declared at `src/transport/github-install.rest.ts:118`.
+Public: GitHub App Setup URL: protocol-mandated public endpoint; all sensitive state is HMAC-signed and bound to the session that started the flow. Declared at `src/transport/github-install.rest.ts:113`.
 
 Answers at `/api/github/setup`, `/api/v1/github/setup`.
 
 ```typescript
-// Response: inline, src/transport/github-install.rest.ts:120
+// Response: inline, src/transport/github-install.rest.ts:115
 type Response = unknown;
 ```
 
 #### `POST /api/github/webhook` · `receiveGithubWebhook`
 
-Public: GitHub App webhook delivery URL — protocol-mandated public endpoint; every payload is verified in-handler by its X-Hub-Signature-256 HMAC. Declared at `src/transport/github-install.rest.ts:128`.
+Public: GitHub App webhook delivery URL: protocol-mandated public endpoint; every payload is verified in-handler by its X-Hub-Signature-256 HMAC. Declared at `src/transport/github-install.rest.ts:123`.
 
 Answers at `/api/github/webhook`, `/api/v1/github/webhook`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/github-install.rest.ts:131)
-// Response: inline, src/transport/github-install.rest.ts:134
+// Rawbody: "text" (inline, src/transport/github-install.rest.ts:126)
+// Response: inline, src/transport/github-install.rest.ts:129
 type Response = unknown;
 ```
 
 #### `GET /api/github-langy/setup` · `completeGithubInstallationOnLegacyPath`
 
-Public: GitHub App Setup URL — protocol-mandated public endpoint; all sensitive state is HMAC-signed and bound to the session that started the flow. Declared at `src/transport/github-install.rest.ts:144`.
+Public: GitHub App Setup URL: protocol-mandated public endpoint; all sensitive state is HMAC-signed and bound to the session that started the flow. Declared at `src/transport/github-install.rest.ts:139`.
 
 Answers at `/api/github-langy/setup`, `/api/v1/github-langy/setup`.
 
 ```typescript
-// Response: inline, src/transport/github-install.rest.ts:146
+// Response: inline, src/transport/github-install.rest.ts:141
 type Response = unknown;
 ```
 
 #### `POST /api/github-langy/webhook` · `receiveGithubWebhookOnLegacyPath`
 
-Public: GitHub App webhook delivery URL — protocol-mandated public endpoint; every payload is verified in-handler by its X-Hub-Signature-256 HMAC. Declared at `src/transport/github-install.rest.ts:154`.
+Public: GitHub App webhook delivery URL: protocol-mandated public endpoint; every payload is verified in-handler by its X-Hub-Signature-256 HMAC. Declared at `src/transport/github-install.rest.ts:149`.
 
 Answers at `/api/github-langy/webhook`, `/api/v1/github-langy/webhook`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/github-install.rest.ts:155)
-// Response: inline, src/transport/github-install.rest.ts:158
+// Rawbody: "text" (inline, src/transport/github-install.rest.ts:150)
+// Response: inline, src/transport/github-install.rest.ts:153
 type Response = unknown;
 ```
 
@@ -383,7 +353,7 @@ Declared at `src/eventing/github-maintenance.pipeline.ts:42`.
 
 | Kind   | Leaf      | Environment variable       | Declared at                           |
 | ------ | --------- | -------------------------- | ------------------------------------- |
-| secret | `–`       | `GITHUB_LANGY_PRIVATE_KEY` | `src/app/github.app.ts:219`           |
+| secret | `–`       | `GITHUB_LANGY_PRIVATE_KEY` | `src/app/github.app.ts:176`           |
 | config | `appId`   | `GITHUB_LANGY_APP_ID`      | `../contract/src/github.config.ts:11` |
 | config | `host`    | `GITHUB_LANGY_HOST`        | `../contract/src/github.config.ts:12` |
 | config | `appSlug` | `GITHUB_LANGY_APP_SLUG`    | `../contract/src/github.config.ts:13` |

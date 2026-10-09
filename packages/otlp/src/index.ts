@@ -36,6 +36,7 @@ export {
   isUnknownCredentialRefusal,
   logCorrectedOtlpPath,
   otlpBodyForensics,
+  OTLP_REFUSED_MEDIA_TYPES,
   otlpDoorFailureAnswer,
   type OtlpDoorAnswer,
   type OtlpDoorRefusal,

@@ -1,6 +1,6 @@
 /**
- * Every entry point runs the one preparation script (`pnpm task upgrade`, then the
- * system-migrations pass) once before anything serves, read from the files that define them.
+ * Every entry point runs the one preparation script (`pnpm task upgrade`) once
+ * before anything serves, read from the files that define them.
  * Spec: specs/upgrade/entry-points.feature.
  */
 import { readFileSync } from "node:fs";
@@ -39,11 +39,9 @@ describe("the entry points", () => {
   });
 
   describe("given the one preparation script", () => {
-    /** @scenario "The one preparation script runs the upgrade, then the system-migrations pass" */
-    it("runs upgrade, then the pass, each its own process and only on success", () => {
-      expect(scripts[PREPARE]).toBe(
-        "cd ../tasks && pnpm --silent task upgrade && pnpm --silent task system-migrations-pass",
-      );
+    /** @scenario "The one preparation script runs the upgrade and nothing else" */
+    it("runs upgrade alone, with no system-migrations pass behind it", () => {
+      expect(scripts[PREPARE]).toBe("cd ../tasks && pnpm --silent task upgrade");
     });
   });
 

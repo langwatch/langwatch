@@ -1,6 +1,7 @@
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { AutomationApi } from "@langwatch/automation-contract";
+import { InMemoryProcessStore } from "@langwatch/eventing";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { clickhouseRoutesOf } from "@langwatch/process-stores";
@@ -153,7 +154,10 @@ describe("SystemMigrationPassService.runner", () => {
       const routes = new Map(
         clickhouseRoutesOf(family).map((route) => [route.organizationId, route.url]),
       );
-      const repositories = MemoryOpsRepositories.create({ eventing: { definitions: [] } });
+      const repositories = MemoryOpsRepositories.create({
+        eventing: { definitions: [] },
+        processStore: InMemoryProcessStore.createForTesting(),
+      });
       vi.spyOn(repositories.migrationEnrollments, "getOrganizationById").mockImplementation(
         async ({ organizationId }) => ({ id: organizationId, name: organizationId }),
       );

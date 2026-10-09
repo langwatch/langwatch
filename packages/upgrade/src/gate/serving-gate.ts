@@ -19,6 +19,12 @@ export type ServingImage = z.infer<typeof servingImageSchema>;
 
 const SETTLED: ReadonlySet<UpgradeStepStatus> = new Set(["done", "not-needed"]);
 
+/** A failed `upgrade` run, for the api's console: the failed steps and the run's last lines. */
+export type UpgradeFailedRun = Readonly<{
+  failedSteps: readonly Readonly<{ id: string; error: string | null }>[];
+  logTail: readonly string[];
+}>;
+
 export type ServingVerdict =
   | Readonly<{ admitted: true; outcome: "current" }>
   | Readonly<{
@@ -27,6 +33,7 @@ export type ServingVerdict =
       outstanding: readonly string[];
       command: typeof UPGRADE_COMMAND;
       refusal: string;
+      failedRun?: UpgradeFailedRun;
     }>
   | Readonly<{
       admitted: false;
@@ -40,6 +47,7 @@ export type ServingVerdict =
       outcome: "first-install";
       command: typeof UPGRADE_COMMAND;
       refusal: string;
+      failedRun?: UpgradeFailedRun;
     }>
   | Readonly<{ admitted: false; outcome: "no-clickhouse"; refusal: string }>;
 

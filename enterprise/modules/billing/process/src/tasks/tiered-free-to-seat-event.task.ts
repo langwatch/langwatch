@@ -1,27 +1,18 @@
 import type { BillingPricingModel } from "@langwatch/enterprise-billing-contract";
 import { createLogger } from "@langwatch/observability";
+import { ORGANIZATION_ID_PAGE_LIMIT } from "@langwatch/organization-contract";
 import { Task } from "@langwatch/task";
+
+import type { BillingAccountFactsRepository } from "../repositories/billing-account-facts.repository.ts";
+import type { BillingSubscriptionRepository } from "../repositories/subscription.repository.ts";
 
 const logger = createLogger("langwatch:task:tiered-free-to-seat-event");
 
-/** Organisations read per page; the scan pages by id, never loading them all (round 49). */
-const TIERED_FREE_PAGE_SIZE = 500;
-
-/** The one read this migration makes, through organization's shared table (R40). */
-export type TieredFreeToSeatEventMigrationDatabase = {
-  organization: {
-    findMany: (args: {
-      where: {
-        pricingModel: "TIERED";
-        subscriptions: { none: object };
-        id?: { gt: string };
-      };
-      select: { id: true; name: true; slug: true };
-      orderBy: { id: "asc" };
-      take: number;
-    }) => Promise<{ id: string; name: string; slug: string }[]>;
-  };
-};
+/** The reads this migration makes: organisation ids through organization's share (C2 B). */
+export type TieredFreeToSeatEventMigrationPeers = Readonly<{
+  organizations: Pick<BillingAccountFactsRepository, "listIds" | "findPricingModel">;
+  subscriptions: Pick<BillingSubscriptionRepository, "hasAnyForOrganization">;
+}>;
 
 /** Where the move is recorded: billing's fact, which organization applies to its row (R42). */
 export type TieredFreeToSeatEventMigrationFacts = {
@@ -42,12 +33,12 @@ export type TieredFreeToSeatEventMigrationOutcome = {
  * lists the organizations that would move.
  */
 export async function runTieredFreeToSeatEventMigration({
-  database,
+  peers,
   facts,
   execute,
-  pageSize = TIERED_FREE_PAGE_SIZE,
+  pageSize = ORGANIZATION_ID_PAGE_LIMIT,
 }: {
-  database: TieredFreeToSeatEventMigrationDatabase;
+  peers: TieredFreeToSeatEventMigrationPeers;
   facts: TieredFreeToSeatEventMigrationFacts;
   execute: boolean;
   pageSize?: number;
@@ -59,30 +50,20 @@ export async function runTieredFreeToSeatEventMigration({
 
   let found = 0;
   let updated = 0;
-  let cursor: { after?: string } | null = {};
-  while (cursor) {
-    const { after }: { after?: string } = cursor;
-    const page = await database.organization.findMany({
-      where: {
-        pricingModel: "TIERED",
-        subscriptions: { none: {} },
-        ...(after ? { id: { gt: after } } : {}),
-      },
-      select: { id: true, name: true, slug: true },
-      orderBy: { id: "asc" },
-      take: pageSize,
-    });
-    found += page.length;
-    logger.info({ count: page.length, orgs: page }, `Found ${page.length} organization(s) to move`);
-    if (execute) {
-      for (const org of page) {
-        await facts.pricingModelChanged({ organizationId: org.id, pricingModel: "SEAT_EVENT" });
-        updated += 1;
-      }
+  let after: string | undefined;
+  do {
+    const page = await peers.organizations.listIds({ after, limit: pageSize });
+    for (const organizationId of page.ids) {
+      if ((await peers.organizations.findPricingModel(organizationId)) !== "TIERED") continue;
+      if (await peers.subscriptions.hasAnyForOrganization(organizationId)) continue;
+      found += 1;
+      logger.info({ organizationId }, "Found an organization to move");
+      if (!execute) continue;
+      await facts.pricingModelChanged({ organizationId, pricingModel: "SEAT_EVENT" });
+      updated += 1;
     }
-    const last = page.at(-1);
-    cursor = last && page.length === pageSize ? { after: last.id } : null;
-  }
+    after = page.next ?? undefined;
+  } while (after !== undefined);
 
   if (!execute && found > 0) {
     logger.info("This is a dry run. Re-run with --execute to apply changes.");
@@ -102,7 +83,7 @@ export class TieredFreeToSeatEventMigrateTask extends Task {
 
   private constructor(
     private readonly deps: {
-      database: () => TieredFreeToSeatEventMigrationDatabase;
+      peers: TieredFreeToSeatEventMigrationPeers;
       facts: TieredFreeToSeatEventMigrationFacts;
     },
   ) {
@@ -110,7 +91,7 @@ export class TieredFreeToSeatEventMigrateTask extends Task {
   }
 
   static create(deps: {
-    database: () => TieredFreeToSeatEventMigrationDatabase;
+    peers: TieredFreeToSeatEventMigrationPeers;
     facts: TieredFreeToSeatEventMigrationFacts;
   }): TieredFreeToSeatEventMigrateTask {
     return new TieredFreeToSeatEventMigrateTask(deps);
@@ -118,7 +99,7 @@ export class TieredFreeToSeatEventMigrateTask extends Task {
 
   async run({ args }: { args: readonly string[]; signal: AbortSignal }): Promise<void> {
     await runTieredFreeToSeatEventMigration({
-      database: this.deps.database(),
+      peers: this.deps.peers,
       facts: this.deps.facts,
       execute: args.includes("--execute"),
     });

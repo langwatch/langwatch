@@ -222,10 +222,12 @@ export function createEvaluationTestApp(
       LangevalsClusteringService.create({
         endpoint: undefined,
         langevals: MemoryLangevalsChannel.create(),
+        staging: repositories.langevalsStaging,
       }),
     piiDetection: LangevalsPiiDetectionService.create({
       endpoint: undefined,
       langevals: MemoryLangevalsChannel.create(),
+      staging: repositories.langevalsStaging,
     }),
     executionIntent: {
       execute: () => Promise.reject(new Error("this test composed no evaluation execution intent")),
@@ -255,6 +257,7 @@ export const installableEvaluation: typeof evaluationProcessModule = {
 
 /** The parsed config an installation test hands the module: main's defaults, no endpoint. */
 export const EVALUATION_TEST_CONFIG: EvaluationServerConfig = {
+  foldCacheTtlSeconds: 300,
   langevalsEndpoint: undefined,
   stagingThresholdBytes: undefined,
   stagingTtlSeconds: 600,

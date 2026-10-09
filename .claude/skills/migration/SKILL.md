@@ -12,10 +12,15 @@ and §9 (the upcast paragraph); `dev/docs/adr/173-upgrades-run-on-deploy.md`; AD
 window. Rulings: `.claude/coordinator/rulings-2026-10-06-rounds.md` rounds 8 to 23. This skill routes;
 the recipes are in the skills it names.
 
+- How the upgrade machinery itself works (ledger, gate, manifests, console, tests): the `upgrade` skill.
+- Naming an LTS each April and October and moving the floor: the `lts-release` skill.
+
 ## The one rule
 
 **Every change is expand/contract inside the supported window.** The window is every release from
-the **LTS floor** (`packages/upgrade/releases/lts-floor.json`, today `3.20.1`) to head. While
+the **LTS floor** (`packages/upgrade/releases/lts-floor.json`, today `3.20.1`) to head. An LTS is named every April
+and October and the floor then moves to the previous LTS; no LTS is ever patched (Alex,
+2026-10-09, LTS-SCHEDULE). While
 `upgrade` runs, and for the whole rollout after it, the previous image keeps serving on the new
 schema, and a rollback puts an older image back on it. So:
 
@@ -90,10 +95,23 @@ Kinds and modes are `upgradeStepKindSchema` and `upgradeStepModeSchema` in
   step of their image is not `done` or `not-needed`, or their release is below the floor. ClickHouse
   steps always count: an install with a database and no ClickHouse refuses, naming `CLICKHOUSE_URL`
   (round 20; `NO_CLICKHOUSE_REFUSAL`). Admitted, each writes a
-  roster entry, refreshed every 15 s, stale after 60 s; a process whose own row lapses stops serving.
+  roster entry, refreshed every 15 s, stale after 10 min. A roster blip never takes a process out
+  of service: once admitted it serves until stopped.
 - Background steps run on the worker after the last release. A step with `needsOldWritersGone`
   waits until the serving roster says every live process declares it. A rollback is seen from the serving roster and
   reopens level-triggered background steps, so a re-upgrade re-runs them.
+- A background step that must follow another names it with `after: [copyStep]`, the step value, or
+  across modules by its id, typed as the generated `CodeStepId` union, so a missing or mistyped step
+  fails typecheck (Alex, 2026-10-09, STEP-AFTER, STEP-AFTER-2). A new step's id joins the union when
+  you run `node --experimental-transform-types packages/upgrade/scripts/image-code-steps.ts`. The
+  worker holds it `waiting` until each named step is `done` or `not-needed`; before a contract the
+  upgrade runs the named steps inline first, released or not. Only a background step runs after
+  others (`after_not_background`). An unknown id or a cycle is refused at plan time
+  (`step_after_unknown`, `step_after_cycle`).
+- A contract step whose drop needs a background step finished first names it in its SQL, beside the
+  contract note: `-- after: <step id>`. The upgrade runs that step (and what it runs after) inline
+  before the contract's release, released or not; an id that is not a background code step of the
+  image refuses the plan (`step_after_unknown`).
 - A fresh install applies all schema at once and plans code and upcast steps by mode, so **a data
   step is never the only way new rows become correct**: writers write the new shape from the release
   that adds it.
@@ -117,7 +135,6 @@ Kinds and modes are `upgradeStepKindSchema` and `upgradeStepModeSchema` in
 | Re-runnable migration policy and the runner's auto-resolve                 | landed (`packages/upgrade/src/stepping/rerunnable-migrations.ts`)                                                     |
 | No new foreign key or `@relation` (W-01)                                   | landed (`new-foreign-key` scanner rule; `packages/architecture-enforcer/tests/baselines/prisma-relations.json`)       |
 | Projection replay steps and peer projections                               | landed (`packages/upgrade/src/step/projection-replay-step.ts`, `packages/eventing/src/projections/peerProjection.ts`) |
-| A lapsed roster entry: `/readyz` 503, background steps and consumers pause | landed (`packages/process/src/migration/upgrade-gate.ts`, `pauseConsumers` in `packages/process/src/module-eventing.ts`)        |
 
 ## Wrong first moves
 
@@ -171,5 +188,4 @@ migrations it applies before the api and worker serve, and ends with "first run 
 phase logs its start and its end with its time; each blocking step is named before it runs and timed
 after. A runner waiting for the lease names the holder every 30 s. The task's last line names the UI's
 address from `BASE_HOST` and `pnpm task upgrade status`. A serving process logs its ledger check and
-the time it took; a lapsed roster entry says readiness answers 503 and names the roster write it waits on (the worker's
-background steps pause too); recovery says how long serving stopped.
+the time it took.

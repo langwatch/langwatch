@@ -3,15 +3,25 @@
  * and before the application runs, an api or worker asks its gate and refuses to start by name.
  * `@langwatch/upgrade/gate` answers it. Spec: specs/upgrade/serving-gate.feature.
  */
+import { createHash, randomBytes } from "node:crypto";
+import { hostname } from "node:os";
+
 import type { ServerRole } from "../feature-installer.ts";
-import type { UpgradeHolding } from "../lifecycle/liveness-thread.ts";
+import {
+  UPGRADE_CONSOLE_TOKEN_TTL_MS,
+  type UpgradeConsole,
+  type UpgradeHolding,
+} from "../lifecycle/liveness-thread.ts";
 import type { ServerComponent, ServerLogger } from "../server.ts";
 
 /** Tasks runs `upgrade` itself and is never gated. */
 export type UpgradeGatedRole = Exclude<ServerRole, "tasks">;
 
+/** What the api's upgrade console shows of a run that failed (UPGRADE-CONSOLE, 2026-10-09). */
+export type UpgradeGateFailedRun = Pick<UpgradeConsole, "failedSteps" | "logTail">;
+
 export type UpgradeGateVerdict = Readonly<
-  { admitted: true } | { admitted: false; refusal: string }
+  { admitted: true } | { admitted: false; refusal: string; failedRun?: UpgradeGateFailedRun }
 >;
 
 /** A worker's declared background steps, run by the gate's package (round 14: framework runs). */
@@ -24,21 +34,16 @@ export type UpgradeGateBackgroundSteps = Readonly<{
 export type UpgradeGate = Readonly<{
   admit: () => Promise<UpgradeGateVerdict>;
   release: () => Promise<void>;
-  /** False once its roster entry lapsed, true after a good write (round 22); absent: true. */
-  serving?: () => boolean;
   backgroundSteps?: UpgradeGateBackgroundSteps;
 }>;
 
 /** What an operator reads on the gate's lines: the phase, what it waits on, what to do next. */
 const GATE_PHASE = "upgrade-gate";
+const CONSOLE_PHASE = "upgrade-console";
 const LEDGER = "the upgrade ledger (DATABASE_URL)";
-const ROSTER_WAIT = "a roster write to the upgrade ledger (DATABASE_URL)";
 const LEDGER_UNREADABLE_NEXT =
   "check DATABASE_URL reaches Postgres and `pnpm task upgrade status` answers, then start this process again";
 const REFUSED_NEXT = "do what the refusal names, then start this process again";
-
-/** How often an admitted gate is asked whether it still serves. */
-export const UPGRADE_GATE_SERVING_POLL_MS = 1_000;
 
 export class UpgradeGateRefusedError extends Error {
   readonly code = "upgrade_gate_refused";
@@ -70,29 +75,59 @@ export function assertGatedRole(role: string): asserts role is UpgradeGatedRole 
 
 /**
  * Hosted by the preamble: starts after boot and before the application runtime, stops after it.
- * A refusal, or an unanswering gate, throws; once admitted, a lapse fails readiness and
- * `onServingChange` hears each turn (round 22). `onHolding` holds the upgrading page (Q-U4).
+ * A refusal, or an unanswering gate, throws; once admitted it serves until stopped (2026-10-09).
+ * `onHolding` holds the upgrading page (Q-U4); `onFailed` shows a failed run's console (D5).
  */
 export function upgradeGateComponent({
   server,
   role,
   gate,
   logger,
-  onServingChange,
   onHolding,
-  pollEveryMs = UPGRADE_GATE_SERVING_POLL_MS,
+  onFailed,
 }: {
   server: string;
   role: UpgradeGatedRole;
   gate: UpgradeGate;
   logger: ServerLogger;
-  onServingChange?: (serving: boolean) => void | Promise<void>;
   onHolding?: (holding: UpgradeHolding | undefined) => Promise<void>;
-  pollEveryMs?: number;
+  onFailed?: (upgradeConsole: UpgradeConsole) => Promise<boolean>;
 }): ServerComponent {
   let admitted = false;
-  let poll: ReturnType<typeof setInterval> | undefined;
-  const watch = servingWatcher({ server, role, gate, logger, onServingChange });
+  /** D1, D2: a fresh token per failed run, printed on one log line; only its hash is kept. */
+  const issueConsoleToken = (): Pick<UpgradeConsole, "tokenSha256" | "tokenTtlMs"> => {
+    const token = randomBytes(32).toString("base64url");
+    const minutes = UPGRADE_CONSOLE_TOKEN_TTL_MS / 60_000;
+    logger.error(
+      { role, phase: CONSOLE_PHASE, waitingOn: "an operator", next: "open the console" },
+      `${server} (${role}): the upgrade failed; this api holds the door with the upgrade console`,
+    );
+    const fields = {
+      role,
+      phase: CONSOLE_PHASE,
+      waitingOn: "an operator",
+      next: "open the console",
+    };
+    const line = `${server} (${role}): open any page of this api in a browser and enter this console token. Only this pod shows the console and it reports not ready meanwhile, so on Kubernetes reach it with \`kubectl port-forward pod/${hostname()} 8080:<api port>\` and open http://localhost:8080. The token is valid once for ${minutes} minutes: ${token}`;
+    warnOrInfo({ logger, fields, line });
+    return {
+      tokenSha256: createHash("sha256").update(token).digest("hex"),
+      tokenTtlMs: UPGRADE_CONSOLE_TOKEN_TTL_MS,
+    };
+  };
+  /** D5: only the console's Retry runs the upgrade again; with no console to show, it refuses. */
+  const admitThroughConsole = async (): Promise<UpgradeGateVerdict> => {
+    for (;;) {
+      const verdict = await gate.admit();
+      if (verdict.admitted || !verdict.failedRun || !onFailed) return verdict;
+      const retried = await onFailed({
+        ...redactFailedRun(verdict.failedRun),
+        ...issueConsoleToken(),
+      });
+      if (!retried) return verdict;
+      await onHolding?.({ phase: GATE_PHASE, outstandingStepIds: [] });
+    }
+  };
   const refuse = (refusal: string, next: string): never => {
     const error = new UpgradeGateRefusedError({ server, role, refusal: redactUrls(refusal) });
     logger.error(
@@ -118,7 +153,7 @@ export function upgradeGateComponent({
       // Only the gate's phase: its steps are behind `admit`, and a refusal's text is never shown.
       await onHolding?.({ phase: GATE_PHASE, outstandingStepIds: [] });
       try {
-        verdict = await gate.admit();
+        verdict = await admitThroughConsole();
       } catch (error) {
         const cause = `the upgrade ledger could not be read (DATABASE_URL): ${messageOf(error)}`;
         return refuse(cause, LEDGER_UNREADABLE_NEXT);
@@ -138,63 +173,10 @@ export function upgradeGateComponent({
         },
         `${server} (${role}): the installation is current for this image; serving (checked in ${elapsedMs} ms)`,
       );
-      if (gate.serving) {
-        poll = setInterval(watch, pollEveryMs);
-        poll.unref?.();
-      }
-    },
-    ready: async () => {
-      if (admitted && gate.serving?.() === false) {
-        throw new Error(`${server} (${role}) stopped serving: its serving roster entry lapsed`);
-      }
     },
     stop: async () => {
-      clearInterval(poll);
       if (admitted) await gate.release();
     },
-  };
-}
-
-/** Asked on every poll: reports and hands on each turn of `serving`, never the same twice. */
-function servingWatcher({
-  server,
-  role,
-  gate,
-  logger,
-  onServingChange,
-}: {
-  server: string;
-  role: UpgradeGatedRole;
-  gate: UpgradeGate;
-  logger: ServerLogger;
-  onServingChange?: (serving: boolean) => void | Promise<void>;
-}): () => void {
-  let serving = true;
-  let stoppedAt = 0;
-  const pauses = role === "worker" ? "; the worker takes no new jobs (in-flight ones finish)" : "";
-  const resumes = role === "worker" ? "; the worker takes new jobs again" : "";
-  return () => {
-    const now = gate.serving?.() ?? true;
-    if (now === serving) return;
-    serving = now;
-    const phase = "roster";
-    if (now) {
-      const stoppedForMs = Math.round(performance.now() - stoppedAt);
-      logger.info(
-        { role, phase, waitingOn: "nothing", stoppedForMs, next: "nothing to do: it serves" },
-        `${server} (${role}) serves again: its roster entry was written after ${stoppedForMs} ms${resumes}`,
-      );
-    } else {
-      stoppedAt = performance.now();
-      logger.error(
-        { role, phase, waitingOn: ROSTER_WAIT, next: LEDGER_UNREADABLE_NEXT },
-        `${server} (${role}) stopped serving: its serving roster entry lapsed; readiness answers 503 ` +
-          `until a roster write succeeds${pauses}`,
-      );
-    }
-    void Promise.resolve(onServingChange?.(now)).catch((error: unknown) =>
-      logger.error({ role, error }, `${server}: a serving change was not applied`),
-    );
   };
 }
 
@@ -205,4 +187,29 @@ function messageOf(error: unknown): string {
 /** A connection URL's password never reaches a log line. */
 function redactUrls(text: string): string {
   return text.replace(/([a-z][a-z0-9+.-]*:\/\/[^\s:/@]*):[^\s@/]*@/gi, "$1:***@");
+}
+
+/** CONSOLE-FOLLOWUPS: the token line prints at warn, so a warn-level install still shows it. */
+function warnOrInfo({
+  logger,
+  fields,
+  line,
+}: {
+  logger: ServerLogger;
+  fields: object;
+  line: string;
+}): void {
+  if (logger.warn) logger.warn(fields, line);
+  else logger.info(fields, line);
+}
+
+/** CONSOLE-FOLLOWUPS: a connection URL's password never reaches the console page either. */
+function redactFailedRun({ failedSteps, logTail }: UpgradeGateFailedRun): UpgradeGateFailedRun {
+  return {
+    failedSteps: failedSteps.map(({ id, error }) => ({
+      id,
+      error: error === null ? null : redactUrls(error),
+    })),
+    logTail: logTail.map((logLine) => redactUrls(logLine)),
+  };
 }

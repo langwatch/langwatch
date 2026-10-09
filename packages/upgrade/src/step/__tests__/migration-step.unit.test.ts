@@ -49,7 +49,7 @@ describe("defineMigrationStep", () => {
       const refusal = refusalOf(() =>
         defineMigrationStep({
           id: "evaluation:enrol-tenants",
-          kind: "tenant",
+          kind: "procedure",
           mode: "blocking",
           description: "Enrols every organization in the new scorer.",
           run: noReport,
@@ -123,5 +123,82 @@ describe("isMigrationStep", () => {
     expect(isMigrationStep({ name: "dataset-backfill", run: noReport })).toBe(false);
     expect(isMigrationStep(withoutRun)).toBe(false);
     expect(isMigrationStep({ ...step, kind: "tenant" })).toBe(false);
+  });
+});
+
+describe("defineMigrationStep after", () => {
+  const copy = defineMigrationStep({
+    id: "evaluation:copy-inputs",
+    kind: "data",
+    mode: "background",
+    description: "Copies evaluation inputs.",
+    run: noReport,
+  });
+
+  describe("when a background step runs after another step value", () => {
+    /** @scenario "A step names the steps it runs after by their values and keeps their ids" */
+    it("keeps the named step's id", () => {
+      const purge = defineMigrationStep({
+        id: "evaluation:purge-inputs",
+        kind: "data",
+        mode: "background",
+        description: "Purges copied evaluation inputs.",
+        after: [copy],
+        run: noReport,
+      });
+
+      expect(purge.after).toEqual(["evaluation:copy-inputs"]);
+      expect(isMigrationStep(purge)).toBe(true);
+    });
+  });
+
+  describe("when a step names another module's step by its generated id", () => {
+    /** @scenario "A step names another module's step by its generated id" */
+    it("keeps the id", () => {
+      const spend = defineMigrationStep({
+        id: "instant-eval:copy-spend",
+        kind: "data",
+        mode: "background",
+        description: "Copies spend.",
+        after: ["billing:record-usage-billing-catch-up"],
+        run: noReport,
+      });
+
+      expect(spend.after).toEqual(["billing:record-usage-billing-catch-up"]);
+    });
+  });
+
+  describe("when a step names another by a mistyped id", () => {
+    /** @scenario "A step named by a mistyped id fails typecheck" */
+    it("fails typecheck; the plan refuses it as an unknown step", () => {
+      const purge = defineMigrationStep({
+        id: "evaluation:purge-inputs",
+        kind: "data",
+        mode: "background",
+        description: "Purges copied evaluation inputs.",
+        // @ts-expect-error a step names a step value or a generated CodeStepId, never a free string
+        after: ["evaluation:copy-inptus"],
+        run: noReport,
+      });
+
+      expect(purge.after).toEqual(["evaluation:copy-inptus"]);
+    });
+  });
+
+  describe("when a blocking step runs after a background step", () => {
+    /** @scenario "Only a background step runs after others, and only after background steps" */
+    it("refuses it as after_not_background", () => {
+      const refusal = refusalOf(() =>
+        defineMigrationStep({
+          id: "evaluation:copy-keys",
+          kind: "data",
+          mode: "blocking",
+          description: "Copies keys.",
+          after: [copy],
+          run: noReport,
+        }),
+      );
+      expect(refusal.refusal).toBe("after_not_background");
+    });
   });
 });

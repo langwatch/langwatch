@@ -12,44 +12,6 @@ export interface ServingRoster {
   stop(): Promise<void>;
   live(): Promise<ServingRosterEntry[]>;
   oldWritersGoneFor(input: { stepId: string }): Promise<boolean>;
-  /** True once this process's last good write is older than the stale bound (round 9). */
-  lapsed(): boolean;
-}
-
-/** The last good write against the stale bound; a good write ends a lapse and arms the next. */
-function watchLapse({
-  staleAfterMs,
-  onLapseChange,
-}: {
-  staleAfterMs: number;
-  onLapseChange?: (lapsed: boolean) => void;
-}) {
-  let lastGoodWriteAt: number | null = null;
-  let timer: ReturnType<typeof setTimeout> | null = null;
-  let reported = false;
-  const report = (next: boolean): void => {
-    if (next === reported) return;
-    reported = next;
-    onLapseChange?.(next);
-  };
-  const lapsed = () =>
-    lastGoodWriteAt !== null && performance.now() - lastGoodWriteAt > staleAfterMs;
-  return {
-    lapsed,
-    wrote(): void {
-      lastGoodWriteAt = performance.now();
-      report(false);
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => report(lapsed()), staleAfterMs + 1);
-      timer.unref?.();
-    },
-    reset(): void {
-      if (timer) clearTimeout(timer);
-      timer = null;
-      lastGoodWriteAt = null;
-      reported = false;
-    },
-  };
 }
 
 /** The refresh must beat the stale bound, and the prune bound must exceed it. */
@@ -111,7 +73,6 @@ export function createServingRoster({
   pruneDeadAfterMs,
   onRefreshError,
   onPruneError,
-  onLapseChange,
   preRosterGraceMs,
 }: {
   ledger: ServingRosterLedger;
@@ -121,7 +82,6 @@ export function createServingRoster({
   pruneDeadAfterMs?: number;
   onRefreshError?: (error: unknown) => void;
   onPruneError?: (error: unknown) => void;
-  onLapseChange?: (lapsed: boolean) => void;
   /** Required when the ledger reads writers before the roster (Round 47 E2). */
   preRosterGraceMs?: number;
 }): ServingRoster {
@@ -137,12 +97,10 @@ export function createServingRoster({
   let current: ServingRosterDeclaration | null = null;
   let timer: ReturnType<typeof setInterval> | null = null;
   let inFlight: Promise<unknown> = Promise.resolve();
-  const lapse = watchLapse({ staleAfterMs, onLapseChange });
 
   const clearTimer = (): void => {
     if (timer) clearInterval(timer);
     timer = null;
-    lapse.reset();
   };
 
   const refresh = async (): Promise<void> => {
@@ -150,7 +108,6 @@ export function createServingRoster({
     const write = ledger.writeRosterEntry(current);
     inFlight = write.catch(() => undefined);
     await write;
-    if (current) lapse.wrote();
   };
 
   const live = (): Promise<ServingRosterEntry[]> => ledger.findLiveRoster({ staleAfterMs });
@@ -161,7 +118,6 @@ export function createServingRoster({
       clearTimer();
       await ledger.writeRosterEntry(parsed);
       current = parsed;
-      lapse.wrote();
       timer = setInterval(() => {
         refresh().catch((error: unknown) => onRefreshError?.(error));
       }, refreshEveryMs);
@@ -185,6 +141,5 @@ export function createServingRoster({
       const rows = await live();
       return rows.every((row) => row.steps.includes(stepId));
     },
-    lapsed: () => current !== null && lapse.lapsed(),
   };
 }

@@ -6,7 +6,7 @@ The server half of [gateway](../README.md). The AI Gateway: virtual keys, gatewa
 
 ## Installation
 
-`defineProcessModule("gateway").withRepositories(gatewayRepositories).withApi(GatewayModule).withTransports(agentCacheRest, elevenLabsWebhookRest, gatewayInternalRest, gatewayBudgetTrpcTransport, gatewayCacheRuleTrpcTransport, gatewayGuardrailTrpcTransport, gatewayPlatformRest, gatewaySpendRest, gatewaySpendEventTrpcTransport, gatewayUsageTrpcTransport, virtualKeyTrpcTransport).withEventing(gatewayGovernanceEventsEventing).withEventing(gatewaySpendEventing).withEventing(gatewayRealtimeSessionEventing).withEventing(gatewayPulledUsageLedgerEventing).withEventing(gatewayInstantEvalJudgeSpendEventing).withTasks(…).withTransportFacts(…)`, `src/gateway.module.ts:51`.
+`defineProcessModule("gateway").withRepositories(gatewayRepositories).withChannels(gatewayChannels).withApi(GatewayModule).withTransports(agentCacheRest, elevenLabsWebhookRest, gatewayInternalRest, gatewayBudgetTrpcTransport, gatewayCacheRuleTrpcTransport, gatewayGuardrailTrpcTransport, gatewayPlatformRest, gatewaySpendRest, gatewaySpendEventTrpcTransport, gatewayUsageTrpcTransport, virtualKeyTrpcTransport).withEventing(gatewayGovernanceEventsEventing).withEventing(gatewaySpendEventing).withEventing(gatewayRealtimeSessionEventing).withEventing(gatewayPulledUsageLedgerEventing).withEventing(gatewayInstantEvalJudgeSpendEventing).withTasks(…).withTransportFacts(…)`, `src/gateway.module.ts:52`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -844,14 +844,14 @@ interface Response {
 
 |             |                                               |
 | ----------- | --------------------------------------------- |
-| Declared at | `src/transport/elevenlabs-webhook.rest.ts:28` |
+| Declared at | `src/transport/elevenlabs-webhook.rest.ts:23` |
 | Base URL    | none: each route's path is its address        |
 | Addressing  | literal                                       |
 | Credential  | project                                       |
 
 #### `POST /api/elevenlabs/webhook/:modelProviderId` · `receiveElevenLabsWebhook`
 
-Public: ElevenLabs delivers this callback publicly; the application verifies the raw bytes against the provider row's stored HMAC secret. Declared at `src/transport/elevenlabs-webhook.rest.ts:32`.
+Public: ElevenLabs delivers this callback publicly; the application verifies the raw bytes against the provider row's stored HMAC secret. Declared at `src/transport/elevenlabs-webhook.rest.ts:27`.
 
 Answers at `/api/elevenlabs/webhook/:modelProviderId`.
 
@@ -860,8 +860,8 @@ Answers at `/api/elevenlabs/webhook/:modelProviderId`.
 interface Params {
   modelProviderId: string;
 }
-// Rawbody: "text" (inline, src/transport/elevenlabs-webhook.rest.ts:34)
-// Response: inline, src/transport/elevenlabs-webhook.rest.ts:37
+// Rawbody: "text" (inline, src/transport/elevenlabs-webhook.rest.ts:29)
+// Response: inline, src/transport/elevenlabs-webhook.rest.ts:32
 type Response = unknown;
 ```
 
@@ -1794,11 +1794,11 @@ Declared at `src/eventing/gateway-governance-events.pipeline.ts:34`. Events: `ga
 
 ### Pipeline `gateway_instant_eval_judge_spend` (aggregate `global`)
 
-Declared at `src/eventing/gateway-instant-eval-judge-spend.pipeline.ts:33`.
+Declared at `src/eventing/gateway-instant-eval-judge-spend.pipeline.ts:32`.
 
 | Kind            | Name                              | Handles                                                                                            | Declared at                                                    |
 | --------------- | --------------------------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| peer subscriber | `gatewayInstantEvalJudgeSpendRow` | `lw.instant_eval_judge.spend_priced` from [instant-eval-judge](../../instant-eval-judge/README.md) | `src/eventing/gateway-instant-eval-judge-spend.pipeline.ts:40` |
+| peer subscriber | `gatewayInstantEvalJudgeSpendRow` | `lw.instant_eval_judge.spend_priced` from [instant-eval-judge](../../instant-eval-judge/README.md) | `src/eventing/gateway-instant-eval-judge-spend.pipeline.ts:39` |
 
 ### Pipeline `gateway_pulled_usage_ledger` (aggregate `global`)
 
@@ -1843,16 +1843,17 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                          | Environment variable                    | Declared at                            |
 | ------ | ----------------------------- | --------------------------------------- | -------------------------------------- |
-| secret | `internalSecret`              | `LW_GATEWAY_INTERNAL_SECRET`            | `src/app/gateway.app.ts:1142`          |
-| secret | `jwtSecret`                   | `LW_GATEWAY_JWT_SECRET`                 | `src/app/gateway.app.ts:1143`          |
-| secret | `virtualKeyPepper`            | `LW_VIRTUAL_KEY_PEPPER`                 | `src/app/gateway.app.ts:1144`          |
-| config | `spendSettlementGraceMs`      | `LW_SPEND_SETTLEMENT_GRACE_MS`          | `../contract/src/gateway.config.ts:25` |
-| config | `internalUrl`                 | `LW_GATEWAY_INTERNAL_URL`               | `../contract/src/gateway.config.ts:27` |
-| config | `controlPlaneUrl`             | `GATEWAY_CONTROL_PLANE_URL`             | `../contract/src/gateway.config.ts:29` |
-| config | `publicBaseUrl`               | `BASE_HOST`                             | `../contract/src/gateway.config.ts:31` |
-| config | `baseUrl`                     | `LW_GATEWAY_BASE_URL`                   | `../contract/src/gateway.config.ts:33` |
-| config | `publicUrl`                   | `LW_GATEWAY_PUBLIC_URL`                 | `../contract/src/gateway.config.ts:35` |
-| config | `isSaas`                      | `IS_SAAS`                               | `../contract/src/gateway.config.ts:37` |
-| config | `allowLoopbackVoiceProviders` | `VOICE_UNSAFE_ALLOW_LOOPBACK_PROVIDERS` | `../contract/src/gateway.config.ts:39` |
+| secret | `internalSecret`              | `LW_GATEWAY_INTERNAL_SECRET`            | `src/app/gateway.app.ts:1137`          |
+| secret | `jwtSecret`                   | `LW_GATEWAY_JWT_SECRET`                 | `src/app/gateway.app.ts:1138`          |
+| secret | `virtualKeyPepper`            | `LW_VIRTUAL_KEY_PEPPER`                 | `src/app/gateway.app.ts:1139`          |
+| config | `spendSettlementGraceMs`      | `LW_SPEND_SETTLEMENT_GRACE_MS`          | `../contract/src/gateway.config.ts:26` |
+| config | `internalUrl`                 | `LW_GATEWAY_INTERNAL_URL`               | `../contract/src/gateway.config.ts:28` |
+| config | `controlPlaneUrl`             | `GATEWAY_CONTROL_PLANE_URL`             | `../contract/src/gateway.config.ts:30` |
+| config | `publicBaseUrl`               | `BASE_HOST`                             | `../contract/src/gateway.config.ts:32` |
+| config | `baseUrl`                     | `LW_GATEWAY_BASE_URL`                   | `../contract/src/gateway.config.ts:34` |
+| config | `publicUrl`                   | `LW_GATEWAY_PUBLIC_URL`                 | `../contract/src/gateway.config.ts:36` |
+| config | `isSaas`                      | `IS_SAAS`                               | `../contract/src/gateway.config.ts:38` |
+| config | `allowLoopbackVoiceProviders` | `VOICE_UNSAFE_ALLOW_LOOPBACK_PROVIDERS` | `../contract/src/gateway.config.ts:40` |
+| config | `foldCacheTtlSeconds`         | `LANGWATCH_FOLD_CACHE_TTL_SECONDS`      | `../contract/src/gateway.config.ts:41` |
 
 <!-- readme:generated:end -->

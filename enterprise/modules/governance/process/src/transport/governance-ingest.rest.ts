@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-/** Push-mode IngestionSource receivers under `/api/ingest`. */
 import { publicRoute } from "@langwatch/api/access";
 import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
 import {
@@ -8,9 +6,18 @@ import {
   governanceIngestReceiptSchema,
   governanceIngestSourceParamsSchema,
 } from "@langwatch/enterprise-governance-contract";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+/** Push-mode IngestionSource receivers under `/api/ingest`. */
+import { OTLP_REFUSED_MEDIA_TYPES } from "@langwatch/otlp";
+import { resolveRequestBound } from "@langwatch/plans";
 
 /** The acknowledgement; every refusal is a thrown HandledError the runtime renders. */
 const ingestAnswers = { 202: governanceIngestReceiptSchema } as const;
+
+/** Wire-body caps, refused before the source is resolved; the decompressed cap is separate. */
+const BODY_LIMIT_BULK_BYTES = resolveRequestBound("bodyLimitBulkBytes", "ENTERPRISE");
+/** A webhook envelope lands as one log record, so it takes the JSON route cap. */
+const BODY_LIMIT_JSON_BYTES = resolveRequestBound("bodyLimitJsonBytes", "ENTERPRISE");
 
 const INGEST_DOOR = publicRoute({
   reason:
@@ -24,7 +31,8 @@ export const governanceIngestRest = defineRestRouter(GovernanceRestApi)
 
   .post("/api/ingest/otel/:sourceId", "ingestSourceOtlpTraces")
   .withParams(governanceIngestSourceParamsSchema)
-  .withRawBody("bytes")
+  .withRawBody("bytes", { refuses: OTLP_REFUSED_MEDIA_TYPES })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
   .withAccess(INGEST_DOOR)
   .withHeaders(governanceIngestHeadersSchema)
   .responds(ingestAnswers)
@@ -36,6 +44,7 @@ export const governanceIngestRest = defineRestRouter(GovernanceRestApi)
   .post("/api/ingest/webhook/:sourceId", "ingestSourceWebhook")
   .withParams(governanceIngestSourceParamsSchema)
   .withRawBody("text")
+  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
   .withAccess(INGEST_DOOR)
   .withHeaders(governanceIngestHeadersSchema)
   .responds(ingestAnswers)
@@ -46,7 +55,8 @@ export const governanceIngestRest = defineRestRouter(GovernanceRestApi)
 
   .post("/api/ingest/otel/:sourceId/v1/logs", "ingestSourceOtlpLogs")
   .withParams(governanceIngestSourceParamsSchema)
-  .withRawBody("bytes")
+  .withRawBody("bytes", { refuses: OTLP_REFUSED_MEDIA_TYPES })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
   .withAccess(INGEST_DOOR)
   .withHeaders(governanceIngestHeadersSchema)
   .responds(ingestAnswers)
@@ -57,7 +67,8 @@ export const governanceIngestRest = defineRestRouter(GovernanceRestApi)
 
   .post("/api/ingest/otel/:sourceId/v1/metrics", "ingestSourceOtlpMetrics")
   .withParams(governanceIngestSourceParamsSchema)
-  .withRawBody("bytes")
+  .withRawBody("bytes", { refuses: OTLP_REFUSED_MEDIA_TYPES })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
   .withAccess(INGEST_DOOR)
   .withHeaders(governanceIngestHeadersSchema)
   .responds(ingestAnswers)

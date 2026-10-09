@@ -34,6 +34,7 @@ import {
 import { licenseKeyFingerprint } from "../rules/license-key.rules.ts";
 import type { InstanceIdentityService } from "./instance-identity.service.ts";
 import type { LicenseLogger } from "./license.service.ts";
+import type { LicensingCustomerFactsService } from "./licensing-customer-facts.service.ts";
 
 /** How long the settings read waits for the hosted usage route before showing it unavailable. */
 const USAGE_READ_TIMEOUT_MS = 10_000;
@@ -57,6 +58,8 @@ interface ConnectDeployment {
 
 interface ConnectInstallServiceDependencies {
   readonly organizations: ConnectOrganizationRepository;
+  /** Where a switch is recorded; organization writes it to its own row (ORG-CONNECT-WRITES). */
+  readonly facts: Pick<LicensingCustomerFactsService, "connectServiceSwitched">;
   readonly identity: InstanceIdentityService;
   readonly cryptography: LicenseCryptography;
   readonly deployment: ConnectDeployment;
@@ -284,15 +287,18 @@ export class ConnectInstallService {
       service,
       enabled,
     });
-    await this.deps.organizations.setServicesDisabled({ organizationId, servicesDisabled });
-    await this.publishUpstream(organizationId);
+    await this.deps.facts.connectServiceSwitched({ organizationId, service, enabled });
+    const enabledServices = enabledConnectServices({
+      entitled: this.entitledOf(organization),
+      disabled: servicesDisabled,
+    });
+    // Organization applies the switch seconds later: the slot follows this answer, not a re-read.
+    await this.publishUpstreamWith({
+      organizationId,
+      enabled: enabledServices.includes(MANAGED_MODELS),
+    });
 
-    return {
-      enabledServices: enabledConnectServices({
-        entitled: this.entitledOf(organization),
-        disabled: servicesDisabled,
-      }),
-    };
+    return { enabledServices };
   }
 
   /**
@@ -330,10 +336,21 @@ export class ConnectInstallService {
    * are entitled and switched on, and a license yields a token; clears it otherwise.
    */
   async publishUpstream(organizationId: string): Promise<void> {
+    if (!this.deps.upstream) return;
+    const enabled = await this.isServiceEnabled({ organizationId, service: MANAGED_MODELS });
+    await this.publishUpstreamWith({ organizationId, enabled });
+  }
+
+  private async publishUpstreamWith({
+    organizationId,
+    enabled,
+  }: {
+    organizationId: string;
+    enabled: boolean;
+  }): Promise<void> {
     const { upstream } = this.deps;
     if (!upstream) return;
     const [credential] = await this.findCredential(organizationId);
-    const enabled = await this.isServiceEnabled({ organizationId, service: MANAGED_MODELS });
     if (!credential || !enabled) {
       await upstream.clear({ organizationId });
       return;

@@ -4,22 +4,26 @@ The browser half of [analytics](../README.md). What a browser installs when it i
 
 <!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
 
-Declared in `src/analytics.web.ts:26` (`defineBrowserModule("analytics")`), exported as `analyticsWeb` at `./declaration`.
+Declared in `src/analytics.web.ts:31` (`defineBrowserModule("analytics")`), exported as `analyticsWeb` at `./declaration`.
 
 Installed by ui, from the app's generated module list (`pnpm generate:modules`).
 
 ## Screens
 
-| Page key                                 | URL                                             | Within | Label | Permission       | Flags |
-| ---------------------------------------- | ----------------------------------------------- | ------ | ----- | ---------------- | ----- |
-| `pages/[project]/analytics/index`        | `/:project/analytics` (route table)             | –      | –     | `analytics:view` | –     |
-| `pages/[project]/analytics/evaluations`  | `/:project/analytics/evaluations` (route table) | –      | –     | `analytics:view` | –     |
-| `pages/[project]/analytics/metrics`      | `/:project/analytics/metrics` (route table)     | –      | –     | `analytics:view` | –     |
-| `pages/[project]/analytics/reports`      | `/:project/analytics/reports` (route table)     | –      | –     | `analytics:view` | –     |
-| `pages/[project]/analytics/topics`       | `/:project/analytics/topics` (route table)      | –      | –     | `analytics:view` | –     |
-| `pages/[project]/analytics/users`        | `/:project/analytics/users` (route table)       | –      | –     | `analytics:view` | –     |
-| `pages/[project]/analytics/custom/index` | `/:project/analytics/custom` (route table)      | –      | –     | `analytics:view` | –     |
-| `pages/[project]/analytics/custom/[id]`  | `/:project/analytics/custom/:id` (route table)  | –      | –     | `analytics:view` | –     |
+| Page key                                          | URL                                                      | Within | Label | Permission       | Flags |
+| ------------------------------------------------- | -------------------------------------------------------- | ------ | ----- | ---------------- | ----- |
+| `pages/[project]/analytics/index`                 | `/:project/analytics` (route table)                      | –      | –     | `analytics:view` | –     |
+| `pages/[project]/analytics/evaluations`           | `/:project/analytics/evaluations` (route table)          | –      | –     | `analytics:view` | –     |
+| `pages/[project]/analytics/metrics`               | `/:project/analytics/metrics` (route table)              | –      | –     | `analytics:view` | –     |
+| `pages/[project]/analytics/reports`               | `/:project/analytics/reports` (route table)              | –      | –     | `analytics:view` | –     |
+| `pages/[project]/analytics/topics`                | `/:project/analytics/topics` (route table)               | –      | –     | `analytics:view` | –     |
+| `pages/[project]/analytics/users`                 | `/:project/analytics/users` (route table)                | –      | –     | `analytics:view` | –     |
+| `pages/[project]/analytics/custom/index`          | `/:project/analytics/custom` (route table)               | –      | –     | `analytics:view` | –     |
+| `pages/[project]/analytics/custom/[id]`           | `/:project/analytics/custom/:id` (route table)           | –      | –     | `analytics:view` | –     |
+| `pages/[project]/dashboards/index`                | `/:project/dashboards` (route table)                     | –      | –     | –                | –     |
+| `pages/[project]/dashboards/templates`            | `/:project/dashboards/templates` (route table)           | –      | –     | –                | –     |
+| `pages/[project]/dashboards/curated/[templateId]` | `/:project/dashboards/curated/:templateId` (route table) | –      | –     | –                | –     |
+| `pages/[project]/dashboards/[dashboardId]`        | `/:project/dashboards/:dashboardId` (route table)        | –      | –     | –                | –     |
 
 A URL marked (route table) is joined from `apps/ui/src/shell/ui-route-table.ts`; the screen declares no `path`.
 
@@ -36,8 +40,8 @@ Opened from lists the other modules (and `ui`, the app) whose browser source nam
 ## Calls
 
 - `withApi(analyticsApi)`, tRPC contracts: `analytics.*`, `analytics.lwql.*`, `savedViews.*`.
-- Client packages (package.json): `@langwatch/analytics-client`.
-- Lends: `FilterSidebarToken`, `CustomGraphToken`.
+- Client packages (package.json): `@langwatch/analytics-client`, `@langwatch/feature-flag-client`, `@langwatch/langy-client`.
+- Lends: `SavedDashboardsToken`, `StarredDashboardsToken`, `FilterSidebarToken`, `CustomGraphToken`.
 - Host APIs it requires: `AnalyticsHostApi`.
 - Capabilities: `traceFilters`.
 

@@ -134,7 +134,7 @@ import {
 import { LangyProvider } from "../../../../tools/ui/sections/langy-page-context.tsx";
 import { LangySidecar } from "../langy-panel.tsx";
 
-vi.mock("@langwatch/browser-host/feature-flag", () => ({
+vi.mock("@langwatch/feature-flag-client", () => ({
   useFeatureFlag: () => ({ enabled: false, isLoading: false }),
 }));
 

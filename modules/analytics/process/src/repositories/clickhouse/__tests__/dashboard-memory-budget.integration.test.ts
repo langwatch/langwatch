@@ -1,11 +1,12 @@
 /**
- * Default-dashboard panels on about a million traces, run under a per-query cap
- * scaled down with the data (production: 1.5 to 2 GiB, spilling at 500 MB).
+ * Default-dashboard panels on about a million traces (half with a second version), run under a
+ * per-query memory cap scaled down with the data, routed the way the service routes them.
+ * The panels must answer, with the right counts.
  * @see specs/analytics/clickhouse-memory-safety.feature
- * @vitest-environment node
  */
+
 import type { ClickHouseClient } from "@clickhouse/client";
-import type { AnalyticsSeries } from "@langwatch/analytics-contract";
+import type { AnalyticsTimeseriesInput } from "@langwatch/analytics-contract";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -26,8 +27,6 @@ const TENANT_ID = `acme-dashboard-memory-${nanoid(8)}`;
 const TRACE_COUNT = 1_000_000;
 const DAY_MS = 86_400_000;
 const RANGE_DAYS = 30;
-/** Traces per seed insert. */
-const SEED_CHUNK = 200_000;
 
 /** Every 5th trace carries RAG contexts on its root span. */
 const RAG_TRACE_EVERY = 5;
@@ -37,9 +36,9 @@ const RAG_DOCUMENT_COUNT = 2_000;
 const SCALED_JOIN_BYTES = "30000000";
 
 /**
- * The model-grouped chart merges spilled aggregations at a cost per spilled part
- * that does not shrink with the data: at 100 MB spill it peaks near 145 MiB
- * (520 MiB without spilling), so a 200 MB cap still fails a query that stops spilling.
+ * Model-grouped chart: its span-model join stacks three aggregations, and merging spilled parts
+ * costs memory per part. At 100 MB spill (production: 500 MB) it peaks near 145 MiB on
+ * ClickHouse 25.10 against ~520 MiB unspilled, so this cap still fails a query that stops spilling.
  */
 const MODEL_GROUPED_SETTINGS = {
   max_memory_usage: "200000000",
@@ -56,38 +55,47 @@ const end = new Date(Math.floor(Date.now() / DAY_MS) * DAY_MS);
 const start = new Date(end.getTime() - RANGE_DAYS * DAY_MS);
 const seedSpanMs = 2 * RANGE_DAYS * DAY_MS;
 
-interface PanelInput {
-  series: AnalyticsSeries[];
-  groupBy?: string;
-  timeScale: number | "full";
-  /** The chart draws no comparison, so the previous window collapses to empty. */
-  shouldSkipPreviousPeriod?: boolean;
+type PanelInput = Omit<
+  AnalyticsTimeseriesInput,
+  "projectId" | "startDate" | "endDate" | "filters" | "timeZone"
+>;
+
+function panelInput(panel: PanelInput): AnalyticsTimeseriesInput {
+  return {
+    projectId: TENANT_ID,
+    startDate: start.getTime(),
+    endDate: end.getTime(),
+    filters: {},
+    timeZone: "UTC",
+    ...panel,
+  };
 }
 
-/**
- * The SQL the service sends for this panel, on the table it routes to. The
- * previous window is one inclusive range length before the start, the way
- * the service computes it for a 30-day range.
- */
-function buildPanelQuery(panel: PanelInput) {
+/** The service's previous window: as many whole days back as the range spans (31 here). */
+function previousPeriodStartFor(input: AnalyticsTimeseriesInput): Date {
+  if (input.shouldSkipPreviousPeriod) return start;
+  const days = Math.round((end.getTime() - start.getTime()) / DAY_MS) + 1;
+  return new Date(start.getTime() - days * DAY_MS);
+}
+
+/** The SQL the service sends for this panel, on the table it routes to. */
+function buildPanelQuery(input: AnalyticsTimeseriesInput) {
   const table = pickAnalyticsTable({
-    series: panel.series,
-    filters: {},
-    groupBy: panel.groupBy,
+    series: input.series,
+    filters: input.filters,
+    groupBy: input.groupBy,
   });
-  const previousPeriodStartDate = panel.shouldSkipPreviousPeriod
-    ? start
-    : new Date(start.getTime() - (RANGE_DAYS + 1) * DAY_MS);
+  // The 30-day range stays under the bucket cap, so the service keeps the scale (daily if unset).
   const builderInput = {
-    projectId: TENANT_ID,
+    projectId: input.projectId,
+    series: input.series,
+    groupBy: input.groupBy,
+    groupByKey: input.groupByKey,
+    timeZone: input.timeZone,
     startDate: start,
     endDate: end,
-    previousPeriodStartDate,
-    series: panel.series,
-    filters: {},
-    groupBy: panel.groupBy,
-    timeScale: panel.timeScale,
-    timeZone: "UTC",
+    previousPeriodStartDate: previousPeriodStartFor(input),
+    timeScale: input.timeScale ?? DAY_MS / 60_000,
   };
   resetParamCounter();
   switch (table) {
@@ -129,29 +137,6 @@ async function runCapped<T>(
   return result.json<T>();
 }
 
-/**
- * Inserts the seed in slices and small blocks: the test server caps its memory at
- * 1 GiB for every suite sharing it, and default insert blocks peak near 800 MiB on this seed.
- */
-async function seedInChunks(
-  ch: ClickHouseClient,
-  { query, query_params }: { query: string; query_params: Record<string, unknown> },
-): Promise<void> {
-  for (let offset = 0; offset < TRACE_COUNT; offset += SEED_CHUNK) {
-    await ch.exec({
-      query,
-      query_params: { ...query_params, offset, chunk: Math.min(SEED_CHUNK, TRACE_COUNT - offset) },
-      clickhouse_settings: {
-        max_threads: 1,
-        max_insert_threads: "1",
-        max_block_size: "2048",
-        min_insert_block_size_rows: "4096",
-        min_insert_block_size_bytes: "1000000",
-      },
-    });
-  }
-}
-
 /** The single series value of a result row, whatever its alias. */
 function seriesValue(row: Record<string, unknown>): unknown {
   return Object.entries(row).find(([key]) => !["period", "date", "group_key"].includes(key))?.[1];
@@ -175,11 +160,7 @@ describe("dashboard panels under a memory cap", () => {
   };
 
   beforeAll(async () => {
-    // Its own container with room for the seed: the 1 GiB default sits near its
-    // limit once the schema is migrated. The panel caps below are what the test checks.
-    ch = (
-      await startMigratedClickHouse({ name: "memory-budget", serverMemoryBytes: 4 * 1024 ** 3 })
-    ).client;
+    ch = (await startMigratedClickHouse()).client;
 
     // Trace t occurs t * 60d / N before `end`, so the traces fill both
     // windows evenly. Even traces get a second, newer version.
@@ -187,7 +168,7 @@ describe("dashboard panels under a memory cap", () => {
     const traceId = "lower(hex(MD5(concat({tenantId:String}, toString(t)))))";
     const params = { tenantId: TENANT_ID, end };
 
-    await seedInChunks(ch, {
+    await ch.exec({
       query: `
         INSERT INTO trace_analytics (TenantId, TraceId, Version, OccurredAt, UpdatedAt, TraceName, UserId, ConversationId, Origin, Models, TotalCost, TotalDurationMs, TimeToFirstTokenMs, PromptTokens, CompletionTokens, HasError, Attributes, SpanCount)
         SELECT {tenantId:String}, ${traceId}, '2026-09-01', ${occurredAt} AS occ,
@@ -197,13 +178,13 @@ describe("dashboard panels under a memory cap", () => {
           (t % 50) = 0,
           map('metadata.user_id', concat('user-', toString(t % 50000)), 'metadata.thread_id', concat('thread-', toString(intDiv(t, 4)))),
           2 + v
-        FROM (SELECT number AS t FROM numbers({offset:UInt64}, {chunk:UInt64})) ARRAY JOIN [0, 1] AS v
+        FROM (SELECT number AS t FROM numbers(${TRACE_COUNT})) ARRAY JOIN [0, 1] AS v
         WHERE v = 0 OR t % 2 = 0
       `,
       query_params: params,
     });
 
-    await seedInChunks(ch, {
+    await ch.exec({
       query: `
         INSERT INTO trace_summaries (ProjectionId, TenantId, TraceId, Version, Attributes, OccurredAt, UpdatedAt, TotalDurationMs, TimeToFirstTokenMs, SpanCount, ContainsErrorStatus, ContainsOKStatus, Models, TotalCost, TokensEstimated, TotalPromptTokenCount, TotalCompletionTokenCount, TraceName)
         SELECT tid, {tenantId:String}, tid, '2026-09-01',
@@ -211,12 +192,12 @@ describe("dashboard panels under a memory cap", () => {
           occ, occ, (t * 13) % 60000, (t * 7) % 3000, if(t % ${RAG_TRACE_EVERY} = 0, 2, 1), (t % 50) = 0, 1,
           [if(t % 3 = 0, 'gpt-5-mini', 'claude-sonnet-4')], 0.001 * (t % 7), 0, 1000 + t % 500, 200 + t % 300,
           concat('agent-', toString(t % 40))
-        FROM (SELECT number AS t, ${traceId} AS tid, ${occurredAt} AS occ FROM numbers({offset:UInt64}, {chunk:UInt64}))
+        FROM (SELECT number AS t, ${traceId} AS tid, ${occurredAt} AS occ FROM numbers(${TRACE_COUNT}))
       `,
       query_params: params,
     });
 
-    await seedInChunks(ch, {
+    await ch.exec({
       query: `
         INSERT INTO stored_spans (ProjectionId, TenantId, TraceId, SpanId, Sampled, StartTime, EndTime, DurationMs, SpanName, SpanKind, ServiceName, SpanAttributes, ScopeName)
         SELECT tid, {tenantId:String}, tid, concat(tid, '-root'), 1, occ, occ + toIntervalMillisecond(500), 500, 'agent', 1, 'agent-service',
@@ -224,13 +205,13 @@ describe("dashboard panels under a memory cap", () => {
               'langwatch.rag.contexts', concat('[{"document_id":"doc-', toString(intDiv(t, ${RAG_TRACE_EVERY}) % ${RAG_DOCUMENT_COUNT}), '","content":"', repeat('lorem ipsum ', 5), '"}]'),
               'gen_ai.input.messages', repeat('please refactor this module and run the tests ', 20)),
           ''
-        FROM (SELECT number AS t, ${traceId} AS tid, ${occurredAt} AS occ FROM numbers({offset:UInt64}, {chunk:UInt64}))
+        FROM (SELECT number AS t, ${traceId} AS tid, ${occurredAt} AS occ FROM numbers(${TRACE_COUNT}))
         WHERE t % ${RAG_TRACE_EVERY} = 0
       `,
       query_params: params,
     });
 
-    await seedInChunks(ch, {
+    await ch.exec({
       query: `
         INSERT INTO stored_spans (ProjectionId, TenantId, TraceId, SpanId, Sampled, StartTime, EndTime, DurationMs, SpanName, SpanKind, ServiceName, SpanAttributes, ScopeName, Cost)
         SELECT tid, {tenantId:String}, tid, concat(tid, '-llm'), 1, occ, occ + toIntervalMillisecond(400), 400, 'llm', 1, 'agent-service',
@@ -239,7 +220,7 @@ describe("dashboard panels under a memory cap", () => {
               'gen_ai.usage.input_tokens', toString(1000 + t % 500),
               'gen_ai.usage.output_tokens', toString(200 + t % 300)),
           '', 0.001 * (t % 7)
-        FROM (SELECT number AS t, ${traceId} AS tid, ${occurredAt} AS occ FROM numbers({offset:UInt64}, {chunk:UInt64}))
+        FROM (SELECT number AS t, ${traceId} AS tid, ${occurredAt} AS occ FROM numbers(${TRACE_COUNT}))
       `,
       query_params: params,
     });
@@ -267,9 +248,10 @@ describe("dashboard panels under a memory cap", () => {
         format: "JSONEachRow",
       })
     ).json<Record<keyof typeof expected, string>>();
-    for (const key of Object.keys(expected) as (keyof typeof expected)[]) {
-      expected[key] = Number(truth?.[key]);
-    }
+    expected.currentTraces = Number(truth?.currentTraces);
+    expected.previousTraces = Number(truth?.previousTraces);
+    expected.currentErrorTraces = Number(truth?.currentErrorTraces);
+    expected.currentUsers = Number(truth?.currentUsers);
     if (expected.currentTraces < 400_000) {
       throw new Error(`seed produced ${expected.currentTraces} traces in the current window`);
     }
@@ -285,14 +267,14 @@ describe("dashboard panels under a memory cap", () => {
   }, 120_000);
 
   describe("when the trace count summary compares against the previous period", () => {
-    /**
-     * @scenario Dashboard panels on a high-volume project answer under a memory cap
-     */
+    /** @scenario Dashboard panels on a high-volume project answer under a memory cap */
     it("returns the current and previous trace counts", async () => {
-      const query = buildPanelQuery({
-        series: [{ metric: "metadata.trace_id", aggregation: "cardinality" }],
-        timeScale: "full",
-      });
+      const query = buildPanelQuery(
+        panelInput({
+          series: [{ metric: "metadata.trace_id", aggregation: "cardinality" }],
+          timeScale: "full",
+        }),
+      );
       expect(query.table).toBe("trace_analytics");
 
       const rows = await runCapped<Record<string, unknown>>(ch, query);
@@ -304,14 +286,14 @@ describe("dashboard panels under a memory cap", () => {
   });
 
   describe("when the users summary counts distinct users", () => {
-    /**
-     * @scenario Dashboard panels on a high-volume project answer under a memory cap
-     */
+    /** @scenario Dashboard panels on a high-volume project answer under a memory cap */
     it("returns the distinct user count", async () => {
-      const query = buildPanelQuery({
-        series: [{ metric: "metadata.user_id", aggregation: "cardinality" }],
-        timeScale: "full",
-      });
+      const query = buildPanelQuery(
+        panelInput({
+          series: [{ metric: "metadata.user_id", aggregation: "cardinality" }],
+          timeScale: "full",
+        }),
+      );
       expect(query.table).toBe("trace_analytics");
 
       const rows = await runCapped<Record<string, unknown>>(ch, query);
@@ -321,16 +303,16 @@ describe("dashboard panels under a memory cap", () => {
   });
 
   describe("when the error trend groups traces by error state", () => {
-    /**
-     * @scenario Dashboard panels on a high-volume project answer under a memory cap
-     */
+    /** @scenario Dashboard panels on a high-volume project answer under a memory cap */
     it("routes to the slim table and counts the failed traces", async () => {
-      const query = buildPanelQuery({
-        series: [{ metric: "metadata.trace_id", aggregation: "cardinality" }],
-        timeScale: 1440,
-        groupBy: "error.has_error",
-        shouldSkipPreviousPeriod: true,
-      });
+      const query = buildPanelQuery(
+        panelInput({
+          series: [{ metric: "metadata.trace_id", aggregation: "cardinality" }],
+          timeScale: 1440,
+          groupBy: "error.has_error",
+          shouldSkipPreviousPeriod: true,
+        }),
+      );
       expect(query.table).toBe("trace_analytics");
 
       const rows = await runCapped<Record<string, unknown>>(ch, query);
@@ -343,18 +325,18 @@ describe("dashboard panels under a memory cap", () => {
   });
 
   describe("when the latency trend reads percentiles", () => {
-    /**
-     * @scenario Dashboard panels on a high-volume project answer under a memory cap
-     */
+    /** @scenario Dashboard panels on a high-volume project answer under a memory cap */
     it("answers within the cap", async () => {
-      const query = buildPanelQuery({
-        series: [
-          { metric: "performance.completion_time", aggregation: "median" },
-          { metric: "performance.first_token", aggregation: "median" },
-        ],
-        timeScale: 1440,
-        shouldSkipPreviousPeriod: true,
-      });
+      const query = buildPanelQuery(
+        panelInput({
+          series: [
+            { metric: "performance.completion_time", aggregation: "median" },
+            { metric: "performance.first_token", aggregation: "median" },
+          ],
+          timeScale: 1440,
+          shouldSkipPreviousPeriod: true,
+        }),
+      );
       expect(query.table).toBe("trace_analytics");
 
       const rows = await runCapped<Record<string, unknown>>(ch, query);
@@ -363,25 +345,25 @@ describe("dashboard panels under a memory cap", () => {
   });
 
   describe("when the thread metrics read the legacy trace table", () => {
-    /**
-     * @scenario Dashboard panels on a high-volume project answer under a memory cap
-     */
+    /** @scenario Dashboard panels on a high-volume project answer under a memory cap */
     it("answers within the cap", async () => {
-      const query = buildPanelQuery({
-        series: [
-          { metric: "metadata.thread_id", aggregation: "cardinality" },
-          {
-            metric: "metadata.trace_id",
-            aggregation: "cardinality",
-            pipeline: { field: "thread_id", aggregation: "avg" },
-          },
-          {
-            metric: "threads.average_duration_per_thread",
-            aggregation: "avg",
-          },
-        ],
-        timeScale: "full",
-      });
+      const query = buildPanelQuery(
+        panelInput({
+          series: [
+            { metric: "metadata.thread_id", aggregation: "cardinality" },
+            {
+              metric: "metadata.trace_id",
+              aggregation: "cardinality",
+              pipeline: { field: "thread_id", aggregation: "avg" },
+            },
+            {
+              metric: "threads.average_duration_per_thread",
+              aggregation: "avg",
+            },
+          ],
+          timeScale: "full",
+        }),
+      );
       expect(query.table).toBe("trace_summaries");
 
       const rows = await runCapped<Record<string, unknown>>(ch, query);
@@ -392,12 +374,14 @@ describe("dashboard panels under a memory cap", () => {
   describe("when the LLM calls chart groups traces by model", () => {
     /** @scenario The model-grouped chart answers under a memory cap */
     it("counts every current trace under its model within the cap", async () => {
-      const query = buildPanelQuery({
-        series: [{ metric: "metadata.trace_id", aggregation: "cardinality" }],
-        timeScale: 1440,
-        groupBy: "metadata.model",
-        shouldSkipPreviousPeriod: true,
-      });
+      const query = buildPanelQuery(
+        panelInput({
+          series: [{ metric: "metadata.trace_id", aggregation: "cardinality" }],
+          timeScale: 1440,
+          groupBy: "metadata.model",
+          shouldSkipPreviousPeriod: true,
+        }),
+      );
       expect(query.table).toBe("trace_summaries");
 
       const rows = await runCapped<Record<string, unknown>>(ch, query, MODEL_GROUPED_SETTINGS);

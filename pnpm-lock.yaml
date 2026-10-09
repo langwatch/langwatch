@@ -704,6 +704,9 @@ overrides:
 
 packageExtensionsChecksum: sha256-m/G/WH1yLdya4bNe65I9ulURa/FU76z3o30vd4qvq6M=
 
+patchedDependencies:
+  '@better-auth/sso@1.7.1': 6a813b2163395f82176956f6308564c83c69e8e8b0b36466f6624f05c699c5e2
+
 importers:
 
   .:
@@ -1939,6 +1942,9 @@ importers:
       '@langwatch/feature-flag-browser':
         specifier: workspace:*
         version: link:../../modules/feature-flag/browser
+      '@langwatch/feature-flag-client':
+        specifier: workspace:*
+        version: link:../../modules/feature-flag/client
       '@langwatch/gateway-browser':
         specifier: workspace:*
         version: link:../../modules/gateway/browser
@@ -2494,6 +2500,9 @@ importers:
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../packages/test-harness
+      '@langwatch/user-contract':
+        specifier: workspace:*
+        version: link:../../modules/user/contract
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../../packages/vitest-config
@@ -2515,6 +2524,9 @@ importers:
       '@langwatch/e2e-stack':
         specifier: workspace:*
         version: link:../e2e-stack
+      '@langwatch/enterprise-licensing-process':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/licensing/process
     devDependencies:
       '@playwright/test':
         specifier: 'catalog:'
@@ -3103,6 +3115,9 @@ importers:
       '@langwatch/error-views':
         specifier: workspace:*
         version: link:../../../../packages/error-views
+      '@langwatch/feature-flag-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/feature-flag/contract
       '@langwatch/gateway-contract':
         specifier: workspace:*
         version: link:../../../../modules/gateway/contract
@@ -3343,6 +3358,9 @@ importers:
       '@langwatch/otlp':
         specifier: workspace:*
         version: link:../../../../packages/otlp
+      '@langwatch/plans':
+        specifier: workspace:*
+        version: link:../../../../packages/plans
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../../packages/prisma-client
@@ -4032,6 +4050,9 @@ importers:
       '@langwatch/error-views':
         specifier: workspace:*
         version: link:../../../../packages/error-views
+      '@langwatch/feature-flag-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/feature-flag/contract
       '@langwatch/identity-client':
         specifier: workspace:*
         version: link:../../../../modules/identity/client
@@ -4325,6 +4346,9 @@ importers:
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../../packages/config
+      '@langwatch/identity-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/identity/contract
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../../packages/module
@@ -4395,7 +4419,7 @@ importers:
     devDependencies:
       '@better-auth/sso':
         specifier: 'catalog:'
-        version: 1.7.1(@better-auth/core@1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.6.5))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0))(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(better-auth@1.7.1(@opentelemetry/api@1.9.1)(@prisma/client@7.10.0(prisma@7.10.0(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(typescript@7.0.2))(mysql2@3.24.2(@types/node@26.2.0))(pg@8.22.0)(prisma@7.10.0(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@5.0.1))(better-call@1.4.0(zod@4.6.5))
+        version: 1.7.1(patch_hash=6a813b2163395f82176956f6308564c83c69e8e8b0b36466f6624f05c699c5e2)(@better-auth/core@1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.6.5))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0))(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(better-auth@1.7.1(@opentelemetry/api@1.9.1)(@prisma/client@7.10.0(prisma@7.10.0(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(typescript@7.0.2))(mysql2@3.24.2(@types/node@26.2.0))(pg@8.22.0)(prisma@7.10.0(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@5.0.1))(better-call@1.4.0(zod@4.6.5))
       '@langwatch/auth-contract':
         specifier: workspace:*
         version: link:../../../../modules/auth/contract
@@ -4545,6 +4569,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
+      '@langwatch/feature-flag-contract':
+        specifier: workspace:*
+        version: link:../../feature-flag/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
@@ -4819,6 +4846,12 @@ importers:
       '@langwatch/evaluator-contract':
         specifier: workspace:*
         version: link:../../evaluator/contract
+      '@langwatch/feature-flag-client':
+        specifier: workspace:*
+        version: link:../../feature-flag/client
+      '@langwatch/feature-flag-contract':
+        specifier: workspace:*
+        version: link:../../feature-flag/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
@@ -5093,6 +5126,9 @@ importers:
       '@langwatch/instant-eval-contract':
         specifier: workspace:*
         version: link:../../instant-eval/contract
+      '@langwatch/limiter':
+        specifier: workspace:*
+        version: link:../../../packages/limiter
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../model-provider/contract
@@ -5132,6 +5168,9 @@ importers:
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../trace/contract
+      '@langwatch/upgrade':
+        specifier: workspace:*
+        version: link:../../../packages/upgrade
       '@opentelemetry/api':
         specifier: 'catalog:'
         version: 1.9.1
@@ -5764,6 +5803,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
+      '@langwatch/feature-flag-client':
+        specifier: workspace:*
+        version: link:../../feature-flag/client
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
@@ -5894,7 +5936,7 @@ importers:
         version: 1.7.1(@better-auth/core@1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.6.5))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0))(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(better-auth@1.7.1(@opentelemetry/api@1.9.1)(@prisma/client@7.10.0(prisma@7.10.0(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(typescript@7.0.2))(mysql2@3.24.2(@types/node@26.2.0))(pg@8.22.0)(prisma@7.10.0(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@5.0.1))(better-call@1.4.0(zod@4.6.5))(nanostores@1.4.0)
       '@better-auth/sso':
         specifier: 'catalog:'
-        version: 1.7.1(@better-auth/core@1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.6.5))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0))(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(better-auth@1.7.1(@opentelemetry/api@1.9.1)(@prisma/client@7.10.0(prisma@7.10.0(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(typescript@7.0.2))(mysql2@3.24.2(@types/node@26.2.0))(pg@8.22.0)(prisma@7.10.0(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@5.0.1))(better-call@1.4.0(zod@4.6.5))
+        version: 1.7.1(patch_hash=6a813b2163395f82176956f6308564c83c69e8e8b0b36466f6624f05c699c5e2)(@better-auth/core@1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.6.5))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0))(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(better-auth@1.7.1(@opentelemetry/api@1.9.1)(@prisma/client@7.10.0(prisma@7.10.0(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(typescript@7.0.2))(mysql2@3.24.2(@types/node@26.2.0))(pg@8.22.0)(prisma@7.10.0(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@5.0.1))(better-call@1.4.0(zod@4.6.5))
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
@@ -6256,6 +6298,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
+      '@langwatch/feature-flag-contract':
+        specifier: workspace:*
+        version: link:../../feature-flag/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
@@ -6633,6 +6678,9 @@ importers:
 
   modules/coding-agent/contract:
     dependencies:
+      '@langwatch/config':
+        specifier: workspace:*
+        version: link:../../../packages/config
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
@@ -7863,6 +7911,12 @@ importers:
       '@langwatch/experiment-contract':
         specifier: workspace:*
         version: link:../../experiment/contract
+      '@langwatch/feature-flag-client':
+        specifier: workspace:*
+        version: link:../../feature-flag/client
+      '@langwatch/feature-flag-contract':
+        specifier: workspace:*
+        version: link:../../feature-flag/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
@@ -8212,6 +8266,9 @@ importers:
       '@langwatch/experiment-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/feature-flag-client':
+        specifier: workspace:*
+        version: link:../../feature-flag/client
       '@langwatch/feature-flag-contract':
         specifier: workspace:*
         version: link:../../feature-flag/contract
@@ -8597,9 +8654,15 @@ importers:
       '@langwatch/browser':
         specifier: workspace:*
         version: link:../../../packages/browser
+      '@langwatch/browser-host':
+        specifier: workspace:*
+        version: link:../../../packages/browser-host
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
+      '@langwatch/feature-flag-client':
+        specifier: workspace:*
+        version: link:../client
       '@langwatch/feature-flag-contract':
         specifier: workspace:*
         version: link:../contract
@@ -8640,6 +8703,46 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 5.0.1(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  modules/feature-flag/client:
+    dependencies:
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../packages/api
+      '@langwatch/browser-host':
+        specifier: workspace:*
+        version: link:../../../packages/browser-host
+      '@langwatch/feature-flag-contract':
+        specifier: workspace:*
+        version: link:../contract
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
+    devDependencies:
+      '@langwatch/vitest-config':
+        specifier: workspace:*
+        version: link:../../../packages/vitest-config
+      '@testing-library/react':
+        specifier: 'catalog:'
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.2.18
+      jsdom:
+        specifier: 'catalog:'
+        version: 30.0.1(@noble/hashes@2.4.0)
+      react:
+        specifier: ^19.2.7
+        version: 19.2.8
+      react-dom:
+        specifier: ^19.2.7
+        version: 19.2.8(react@19.2.8)
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.1(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.4.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
 
   modules/feature-flag/contract:
     dependencies:
@@ -8774,6 +8877,9 @@ importers:
       '@langwatch/error-views':
         specifier: workspace:*
         version: link:../../../packages/error-views
+      '@langwatch/feature-flag-contract':
+        specifier: workspace:*
+        version: link:../../feature-flag/contract
       '@langwatch/gateway-contract':
         specifier: workspace:*
         version: link:../contract
@@ -9050,6 +9156,9 @@ importers:
       '@langwatch/browser':
         specifier: workspace:*
         version: link:../../../packages/browser
+      '@langwatch/github-client':
+        specifier: workspace:*
+        version: link:../client
       react:
         specifier: ^19.2.7
         version: 19.2.8
@@ -9093,6 +9202,16 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 5.0.1(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  modules/github/client:
+    dependencies:
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
 
   modules/github/contract:
     dependencies:
@@ -9822,9 +9941,15 @@ importers:
       '@langwatch/experiment-contract':
         specifier: workspace:*
         version: link:../../experiment/contract
+      '@langwatch/feature-flag-client':
+        specifier: workspace:*
+        version: link:../../feature-flag/client
       '@langwatch/feature-flag-contract':
         specifier: workspace:*
         version: link:../../feature-flag/contract
+      '@langwatch/github-client':
+        specifier: workspace:*
+        version: link:../../github/client
       '@langwatch/github-contract':
         specifier: workspace:*
         version: link:../../github/contract
@@ -10415,6 +10540,9 @@ importers:
       '@langwatch/error-views':
         specifier: workspace:*
         version: link:../../../packages/error-views
+      '@langwatch/feature-flag-client':
+        specifier: workspace:*
+        version: link:../../feature-flag/client
       '@langwatch/feature-flag-contract':
         specifier: workspace:*
         version: link:../../feature-flag/contract
@@ -10506,10 +10634,22 @@ importers:
 
   modules/model-provider/client:
     dependencies:
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../packages/api
+      '@langwatch/model-provider-contract':
+        specifier: workspace:*
+        version: link:../contract
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
     devDependencies:
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.2.18
+      react:
+        specifier: ^19.2.7
+        version: 19.2.8
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -10882,6 +11022,9 @@ importers:
       '@langwatch/evaluator-client':
         specifier: workspace:*
         version: link:../../evaluator/client
+      '@langwatch/feature-flag-client':
+        specifier: workspace:*
+        version: link:../../feature-flag/client
       '@langwatch/feature-flag-contract':
         specifier: workspace:*
         version: link:../../feature-flag/contract
@@ -11188,6 +11331,9 @@ importers:
       '@langwatch/enterprise-governance-client':
         specifier: workspace:*
         version: link:../../../enterprise/modules/governance/client
+      '@langwatch/feature-flag-client':
+        specifier: workspace:*
+        version: link:../../feature-flag/client
       '@langwatch/feature-flag-contract':
         specifier: workspace:*
         version: link:../../feature-flag/contract
@@ -11852,6 +11998,9 @@ importers:
       '@langwatch/entitlement-contract':
         specifier: workspace:*
         version: link:../../entitlement/contract
+      '@langwatch/feature-flag-contract':
+        specifier: workspace:*
+        version: link:../../feature-flag/contract
       '@langwatch/identity-client':
         specifier: workspace:*
         version: link:../../identity/client
@@ -12011,9 +12160,6 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
-      '@langwatch/api-key-contract':
-        specifier: workspace:*
-        version: link:../../api-key/contract
       '@langwatch/authorization':
         specifier: workspace:*
         version: link:../../../packages/authorization
@@ -13279,6 +13425,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
+      '@langwatch/error-views':
+        specifier: workspace:*
+        version: link:../../../packages/error-views
       '@langwatch/evaluator-client':
         specifier: workspace:*
         version: link:../../evaluator/client
@@ -13288,6 +13437,9 @@ importers:
       '@langwatch/experiment-contract':
         specifier: workspace:*
         version: link:../../experiment/contract
+      '@langwatch/feature-flag-client':
+        specifier: workspace:*
+        version: link:../../feature-flag/client
       '@langwatch/feature-flag-contract':
         specifier: workspace:*
         version: link:../../feature-flag/contract
@@ -14692,6 +14844,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
+      '@langwatch/error-views':
+        specifier: workspace:*
+        version: link:../../../packages/error-views
       '@langwatch/evaluation-contract':
         specifier: workspace:*
         version: link:../../evaluation/contract
@@ -14701,6 +14856,9 @@ importers:
       '@langwatch/evaluator-contract':
         specifier: workspace:*
         version: link:../../evaluator/contract
+      '@langwatch/feature-flag-client':
+        specifier: workspace:*
+        version: link:../../feature-flag/client
       '@langwatch/feature-flag-contract':
         specifier: workspace:*
         version: link:../../feature-flag/contract
@@ -15251,6 +15409,9 @@ importers:
       '@langwatch/error-views':
         specifier: workspace:*
         version: link:../../../packages/error-views
+      '@langwatch/feature-flag-contract':
+        specifier: workspace:*
+        version: link:../../feature-flag/contract
       '@langwatch/gateway-contract':
         specifier: workspace:*
         version: link:../../gateway/contract
@@ -16207,6 +16368,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../design-system
+      '@langwatch/error-views':
+        specifier: workspace:*
+        version: link:../error-views
       '@tanstack/react-query':
         specifier: 'catalog:'
         version: 5.101.4(react@19.2.8)
@@ -16295,9 +16459,6 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../design-system
-      '@langwatch/feature-flag-contract':
-        specifier: workspace:*
-        version: link:../../modules/feature-flag/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../handled-error
@@ -16407,6 +16568,9 @@ importers:
       '@clickhouse/client':
         specifier: 'catalog:'
         version: 1.23.0
+      '@langwatch/limiter':
+        specifier: workspace:*
+        version: link:../limiter
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../observability
@@ -16683,6 +16847,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../handled-error
+      lucide-react:
+        specifier: 'catalog:'
+        version: 1.22.0(react@19.2.8)
       react:
         specifier: ^19.2.7
         version: 19.2.8
@@ -16690,9 +16857,24 @@ importers:
       '@emotion/react':
         specifier: 'catalog:'
         version: 11.14.0(@types/react@19.2.18)(react@19.2.8)(supports-color@10.2.2)
+      '@langwatch/vitest-config':
+        specifier: workspace:*
+        version: link:../vitest-config
+      '@testing-library/jest-dom':
+        specifier: 'catalog:'
+        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.0.1)
+      '@testing-library/react':
+        specifier: 'catalog:'
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@testing-library/user-event':
+        specifier: 'catalog:'
+        version: 14.6.1(@testing-library/dom@10.4.1)
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.18
+      jsdom:
+        specifier: 'catalog:'
+        version: 30.0.1(@noble/hashes@2.2.0)
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -16865,6 +17047,15 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 5.0.1(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@6.0.3))(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  packages/limiter:
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.1(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.4.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
 
   packages/mail:
     dependencies:
@@ -17221,6 +17412,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../handled-error
+      '@langwatch/limiter':
+        specifier: workspace:*
+        version: link:../limiter
       '@langwatch/module':
         specifier: workspace:*
         version: link:../module
@@ -17556,6 +17750,12 @@ importers:
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../secrets
+      '@langwatch/system-migrations':
+        specifier: workspace:*
+        version: link:../system-migrations
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../time
       pg:
         specifier: ^8.22.0
         version: 8.22.0
@@ -29369,7 +29569,7 @@ snapshots:
       '@prisma/client': 7.10.0(prisma@7.10.0(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(typescript@7.0.2)
       prisma: 7.10.0(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2)
 
-  '@better-auth/sso@1.7.1(@better-auth/core@1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.6.5))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0))(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(better-auth@1.7.1(@opentelemetry/api@1.9.1)(@prisma/client@7.10.0(prisma@7.10.0(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(typescript@7.0.2))(mysql2@3.24.2(@types/node@26.2.0))(pg@8.22.0)(prisma@7.10.0(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@5.0.1))(better-call@1.4.0(zod@4.6.5))':
+  '@better-auth/sso@1.7.1(patch_hash=6a813b2163395f82176956f6308564c83c69e8e8b0b36466f6624f05c699c5e2)(@better-auth/core@1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.6.5))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0))(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(better-auth@1.7.1(@opentelemetry/api@1.9.1)(@prisma/client@7.10.0(prisma@7.10.0(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(typescript@7.0.2))(mysql2@3.24.2(@types/node@26.2.0))(pg@8.22.0)(prisma@7.10.0(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@5.0.1))(better-call@1.4.0(zod@4.6.5))':
     dependencies:
       '@better-auth/core': 1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.6.5))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0)
       '@better-auth/utils': 0.5.0
@@ -29969,7 +30169,6 @@ snapshots:
   '@exodus/bytes@1.15.1(@noble/hashes@2.4.0)':
     optionalDependencies:
       '@noble/hashes': 2.4.0
-    optional: true
 
   '@fastify/busboy@3.2.0': {}
 
@@ -34915,7 +35114,6 @@ snapshots:
       whatwg-url: 16.0.1(@noble/hashes@2.4.0)
     transitivePeerDependencies:
       - '@noble/hashes'
-    optional: true
 
   dateformat@4.6.3: {}
 
@@ -35904,7 +36102,6 @@ snapshots:
       '@exodus/bytes': 1.15.1(@noble/hashes@2.4.0)
     transitivePeerDependencies:
       - '@noble/hashes'
-    optional: true
 
   html-to-text@9.0.5:
     dependencies:
@@ -36226,7 +36423,6 @@ snapshots:
       xml-name-validator: 5.0.0
     transitivePeerDependencies:
       - '@noble/hashes'
-    optional: true
 
   jsep@1.4.0: {}
 
@@ -40079,7 +40275,6 @@ snapshots:
       webidl-conversions: 8.0.1
     transitivePeerDependencies:
       - '@noble/hashes'
-    optional: true
 
   whatwg-url@17.1.0(@noble/hashes@2.2.0):
     dependencies:
@@ -40096,7 +40291,6 @@ snapshots:
       webidl-conversions: 8.0.1
     transitivePeerDependencies:
       - '@noble/hashes'
-    optional: true
 
   whatwg-url@5.0.0:
     dependencies:

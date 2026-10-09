@@ -30,10 +30,13 @@ export function HomeBriefingSection() {
   const openPanel = useLangyStore((s) => s.openPanel);
   const askLangy = useLangyStore((s) => s.askLangy);
   const attachContext = useLangyStore((s) => s.attachContext);
+  const setDraft = useLangyStore((s) => s.setDraft);
 
-  // Feedback goes through askLangy: the langy slice exposes no draft prefill.
+  // Feedback stays a draft, never auto-sent: the reader finishes the sentence,
+  // so it needs only `langy:view` (spec: specs/home/langy-home.feature).
   const handleSignalFeedback = () => {
-    askLangy("I want to give feedback on the anomalies feed: what signal am I missing?");
+    setDraft("Feedback on the anomalies feed: the signal I'm missing is ");
+    openPanel();
   };
 
   // "Investigate" is one click to an answer, not a loaded composer: askLangy
@@ -91,7 +94,7 @@ export function HomeBriefingSection() {
       data={data}
       onAsk={showLangy ? openPanel : undefined}
       onAskSubmit={canAsk ? handleAskSubmit : undefined}
-      onFeedback={canAsk ? handleSignalFeedback : undefined}
+      onFeedback={showLangy ? handleSignalFeedback : undefined}
       onInvestigateReceipt={canAsk ? handleInvestigateReceipt : undefined}
       status={
         <HomeOverviewCard

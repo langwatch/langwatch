@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
@@ -292,6 +293,20 @@ func (p *childPlan) goLanes(mono monolithPlan) []Child {
 	return append(out, sims.children...)
 }
 
+// retireStaleSimsCapture removes the sims capture an earlier split run left
+// when this run plans a go lane and no sims lane (LANGWATCH_GO_ONE_PROCESS):
+// `haven logs <sim>` reads sims.log first, so a dead one would hide go.log.
+func retireStaleSimsCapture(children []Child) {
+	if slices.ContainsFunc(children, func(c Child) bool { return c.Name == SimsLane }) {
+		return
+	}
+	for _, c := range children {
+		if c.Name == GoLane && c.LogPath != "" {
+			_ = os.Remove(filepath.Join(filepath.Dir(c.LogPath), SimsLane+".log"))
+		}
+	}
+}
+
 // goServices is the data-plane services the Go lane hosts, and its env.
 func (p *childPlan) goServices() ([]string, []string) {
 	var services []string
@@ -361,7 +376,7 @@ func (p *childPlan) planSimulators() simulatorPlan {
 	return sp
 }
 
-// hostBundledSimulators places storage, voice, LLM and analytics, in that order.
+// hostBundledSimulators places storage, voice, LLM, analytics and telemetry, in that order.
 func (p *childPlan) hostBundledSimulators(sp *simulatorPlan) {
 	o, st, sel, repoRoot, base := p.o, p.st, p.opts.Selection, p.opts.RepoRoot, p.base
 	for _, sim := range []struct {
@@ -374,6 +389,7 @@ func (p *childPlan) hostBundledSimulators(sp *simulatorPlan) {
 		{sel.Voice, "voicesim", func() []string { return voiceEnv(st) }, func() Child { return o.voiceChild(st, repoRoot, base) }},
 		{sel.LLM, "llmsim", func() []string { return llmEnv(st) }, func() Child { return o.llmChild(st, repoRoot, base) }},
 		{sel.Analytics, "analyticssim", func() []string { return analyticsEnv(st) }, func() Child { return o.analyticsChild(st, repoRoot, base) }},
+		{sel.Telemetry, "telemetrysim", func() []string { return telemetryEnv(st) }, func() Child { return o.telemetryChild(st, repoRoot, base) }},
 	} {
 		if sim.isSelected {
 			sp.host(sim.binary, sim.env, sim.child)

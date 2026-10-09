@@ -287,3 +287,45 @@ Feature: Enterprise licensing lifecycle
   Scenario: Import licensing without side effects
     When a runtime imports the licensing contract or server package
     Then it reads no environment and registers no route, job, or subscriber
+
+  Rule: Licensing records a newly licensed self-hosted customer as a fact; organization creates its row
+
+    Licensing mints the organisation id when it licenses a new self-hosted customer and records
+    lw.licensing.self_hosted_customer_licensed. Organization subscribes and creates the row under
+    that id, so licensing never writes organization's tables or calls it to create one.
+
+    @unit
+    Scenario: Organization creates a newly licensed customer's organisation under licensing's id
+      Given licensing has recorded that it licensed a new self-hosted customer under an id it minted
+      When organization receives the fact
+      Then an organisation with that id and the customer's name exists, marked as a self-hosted customer
+
+    @unit
+    Scenario: A redelivered self-hosted customer fact creates no second organisation
+      Given organization has applied licensing's self-hosted customer fact once
+      When the same fact is delivered again
+      Then there is still exactly one organisation, the one the first delivery created
+
+  Rule: Organization keeps licensing's Connect facts on its own row
+    Licensing records that an administrator switched a hosted service and how a
+    license sync ended; organization writes its own columns from those facts.
+
+    @unit
+    Scenario: Licensing records a hosted-service switch as a fact for organization to apply
+      Given an administrator switches a hosted service off for their organisation
+      When licensing records the switch
+      Then it records a fact naming the organisation, the service and the switch
+      And it writes nothing to organization's row
+
+    @unit
+    Scenario: Organization keeps a hosted service an administrator switched off
+      Given licensing has recorded that an administrator switched a hosted service off
+      When organization receives the fact, once or more than once
+      Then the organisation's switched-off services name it exactly once
+      And switching it back on removes it
+
+    @unit
+    Scenario: Organization keeps how the last license sync ended
+      Given licensing has recorded that a license sync landed and then that one failed
+      When organization receives each fact in order
+      Then the organisation keeps when the sync last landed and the code the latest one failed on

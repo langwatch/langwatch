@@ -12,6 +12,13 @@ const mocks = vi.hoisted(() => ({
   canUpdateAnnotations: true,
 }));
 
+vi.mock("../../../../../../behavior/trace-host.ts", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useTraceHost: () => ({
+    hasPermission: (permission: string) =>
+      permission === "annotations:update" ? mocks.canUpdateAnnotations : false,
+  }),
+}));
 vi.mock("../../../../../../features/trace-drawer/behavior/scenario-role.store.tsx", async () => {
   const actual = await vi.importActual<typeof scenarioRolesModule>(
     "../../../../../../features/trace-drawer/behavior/scenario-role.store.tsx",
@@ -26,8 +33,6 @@ vi.mock("../../../../markdown.tsx", () => ({
 vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1" },
-    hasPermission: (permission: string) =>
-      permission === "annotations:update" ? mocks.canUpdateAnnotations : false,
   }),
 }));
 

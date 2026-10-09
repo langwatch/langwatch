@@ -23,4 +23,6 @@ export interface UpgradeLedgerRepository {
   getStep(input: { id: string }): Promise<UpgradeStepDetail>;
   /** Refuses with `upgrade_not_found` when the ledger holds no such run. */
   getRun(input: { id: string }): Promise<UpgradeRunDetail>;
+  /** Sets a failed step pending in one conditional write; false when it was not failed. */
+  reopenFailedStep(input: { id: string }): Promise<boolean>;
 }

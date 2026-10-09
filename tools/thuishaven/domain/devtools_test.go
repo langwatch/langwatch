@@ -177,7 +177,7 @@ func TestDeveloperToolsAreNamedByTheirHostnameOnTheCLI(t *testing.T) {
 	}
 }
 
-// @scenario "The application frames the Storybook the stack is already running"
+// @scenario "The application frames the Storybook the stack routes to"
 func TestOverlayNamesTheStorybookPortOnlyWhenThereIsOne(t *testing.T) {
 	base := Stack{Slug: "happy-tiger", APIPort: 41001, Services: []Service{{Name: "app", Port: 44000}}}
 

@@ -1,9 +1,3 @@
-/**
- * @vitest-environment node
- * The Upgrades pages' six reads over the real runtime and a real `OpsModule`: the door asks
- * `ops:view` on the platform, and an operator gets the reader's answers unchanged.
- * Spec: modules/ops/specs/upgrades.feature
- */
 import {
   bindTrpcFact,
   createTrpcRuntime,
@@ -11,6 +5,13 @@ import {
   type TrpcProcedureFactory,
   type TrpcRouterMount,
 } from "@langwatch/api/trpc";
+/**
+ * @vitest-environment node
+ * The Upgrades pages' six reads over the real runtime and a real `OpsModule`: the door asks
+ * `ops:view` on the platform, and an operator gets the reader's answers unchanged.
+ * Spec: modules/ops/specs/upgrades.feature
+ */
+import { InMemoryProcessStore } from "@langwatch/eventing";
 import type { OpsOperator } from "@langwatch/ops-contract";
 import type { UpgradeReader, UpgradeRunDetail, UpgradeStepDetail } from "@langwatch/upgrade/reader";
 import { describe, expect, it, vi } from "vitest";
@@ -25,6 +26,7 @@ import { opsTrpcMembers, type OpsTrpcTestContext } from "./ops.trpc.harness.ts";
 
 const OPERATOR: OpsOperator = { id: "user_alex", email: OPS_STAFF_ADDRESS };
 const OUTSIDER: OpsOperator = { id: "user_sam", email: "sam@acme.com" };
+const MANAGER: OpsOperator = { id: "user_kim", email: OPS_STAFF_ADDRESS };
 
 const STEP = stepOf({ id: "prisma:20261006_add_owner", release: "3.23.0" });
 const STEP_DETAIL: UpgradeStepDetail = {
@@ -89,11 +91,20 @@ const MIGRATION_PROCEDURE_NAMES = [
   "rollBackSystemMigrationTenant",
 ].map((name) => `ops.upgrade.${name}`);
 
-function mount({ reader }: { reader?: UpgradeReader } = {}) {
-  const holders = { [OPERATOR.id]: ["ops:view"] } as const;
+function mount({
+  reader,
+  ledger,
+}: { reader?: UpgradeReader; ledger?: MemoryUpgradeLedgerRepository } = {}) {
+  const holders = {
+    [OPERATOR.id]: ["ops:view"],
+    [MANAGER.id]: ["ops:view", "ops:manage"],
+  } as const;
   const repositories = {
-    ...MemoryOpsRepositories.create({ eventing: { definitions: [] } }),
-    upgradeLedger: MemoryUpgradeLedgerRepository.create(reader ? { reader } : {}),
+    ...MemoryOpsRepositories.create({
+      eventing: { definitions: [] },
+      processStore: InMemoryProcessStore.createForTesting(),
+    }),
+    upgradeLedger: ledger ?? MemoryUpgradeLedgerRepository.create(reader ? { reader } : {}),
   };
   const { app } = createOpsTestApp({ repositories });
   const root = TrpcRootDefinition.forContext<OpsTrpcTestContext>().create();
@@ -108,6 +119,7 @@ function mount({ reader }: { reader?: UpgradeReader } = {}) {
   return {
     operator: router.createCaller({ actor: { id: OPERATOR.id }, operator: OPERATOR }),
     outsider: router.createCaller({ actor: { id: OUTSIDER.id }, operator: OUTSIDER }),
+    manager: router.createCaller({ actor: { id: MANAGER.id }, operator: MANAGER }),
   };
 }
 
@@ -132,7 +144,9 @@ describe("the ops.upgrade reads", () => {
   /** @scenario "Every upgrade read asks the operator view grant at the door" */
   it("declares each of the six reads behind ops:view at the platform scope", () => {
     const reads = Object.fromEntries(
-      Object.entries(boundAccess()).filter(([name]) => !MIGRATION_PROCEDURE_NAMES.includes(name)),
+      Object.entries(boundAccess()).filter(
+        ([name]) => !MIGRATION_PROCEDURE_NAMES.includes(name) && name !== "ops.upgrade.retryStep",
+      ),
     );
 
     expect(reads).toEqual({
@@ -184,6 +198,88 @@ describe("the ops.upgrade reads", () => {
         cause: { code: "upgrade_not_found" },
       });
       await expect(operator.getRun({ id: "run_missing" })).rejects.toMatchObject({
+        cause: { code: "upgrade_not_found" },
+      });
+    });
+  });
+});
+
+const FAILED_STEP: UpgradeStepDetail = {
+  ...STEP_DETAIL,
+  id: "ops:backfill-owner",
+  mode: "background",
+  status: "failed",
+  statusLabel: "Failed",
+  lastError: "connection reset",
+  runId: "run_1",
+  report: { resumeFrom: "org_63" },
+};
+
+function ledgerHolding(step: UpgradeStepDetail): MemoryUpgradeLedgerRepository {
+  return MemoryUpgradeLedgerRepository.create({
+    reader: { ...readerOfOneRelease(), getStep: vi.fn(async () => step) },
+  });
+}
+
+describe("ops.upgrade.retryStep", () => {
+  describe("given a background step that failed", () => {
+    /** @scenario "Retry without ops:manage is refused by the door" */
+    it("refuses a view-only operator at the door and the step stays failed", async () => {
+      const ledger = ledgerHolding(FAILED_STEP);
+      const { operator } = mount({ ledger });
+
+      expect(boundAccess()["ops.upgrade.retryStep"]).toBe("permission-platform:ops:manage");
+      await expect(operator.retryStep({ id: FAILED_STEP.id })).rejects.toMatchObject({
+        code: "FORBIDDEN",
+      });
+      expect((await ledger.getStep({ id: FAILED_STEP.id })).status).toBe("failed");
+    });
+
+    /** @scenario "Retry sets a failed step pending and the worker runs it again" */
+    it("records the step pending with its checkpoint kept", async () => {
+      const ledger = ledgerHolding(FAILED_STEP);
+      const { manager } = mount({ ledger });
+
+      const answer = await manager.retryStep({ id: FAILED_STEP.id });
+
+      expect(answer).toMatchObject({ status: "pending", report: FAILED_STEP.report });
+      expect((await ledger.getStep({ id: FAILED_STEP.id })).status).toBe("pending");
+    });
+
+    it("lets one of two concurrent retries through and refuses the other as not failed", async () => {
+      const { manager } = mount({ ledger: ledgerHolding(FAILED_STEP) });
+
+      const answers = await Promise.allSettled([
+        manager.retryStep({ id: FAILED_STEP.id }),
+        manager.retryStep({ id: FAILED_STEP.id }),
+      ]);
+
+      expect(answers.filter((answer) => answer.status === "fulfilled")).toHaveLength(1);
+      expect(answers.find((answer) => answer.status === "rejected")).toMatchObject({
+        reason: { cause: { code: "upgrade_step_not_failed", meta: { status: "pending" } } },
+      });
+    });
+  });
+
+  describe("given a background step that is running", () => {
+    /** @scenario "Retrying a step that is not failed is refused" */
+    it("answers upgrade_step_not_failed naming the status and leaves the step running", async () => {
+      const ledger = ledgerHolding({ ...FAILED_STEP, status: "running", lastError: null });
+      const { manager } = mount({ ledger });
+
+      await expect(manager.retryStep({ id: FAILED_STEP.id })).rejects.toMatchObject({
+        cause: { code: "upgrade_step_not_failed", meta: { status: "running" } },
+      });
+      expect((await ledger.getStep({ id: FAILED_STEP.id })).status).toBe("running");
+    });
+  });
+
+  describe("given no step with the id asked for", () => {
+    /** @scenario "Retrying a step the ledger does not hold says it was not found" */
+    it("answers upgrade_not_found", async () => {
+      const { manager } = mount();
+
+      await expect(manager.retryStep({ id: "ops:missing" })).rejects.toMatchObject({
         cause: { code: "upgrade_not_found" },
       });
     });

@@ -10,10 +10,13 @@ const annotations = vi.hoisted(() => ({
   askedFor: [] as unknown[],
 }));
 
+vi.mock("../../../../behavior/trace-host.ts", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useTraceHost: () => ({ hasPermission: () => true }),
+}));
 vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1" },
-    hasPermission: () => true,
   }),
 }));
 

@@ -121,22 +121,22 @@ Contract `../contract/src/presence.trpc.ts:26`, router `src/transport/presence.t
 
 ```typescript
 // presence.update
-type Input = z.infer<typeof presenceUpdateRequestSchema>; // ../contract/src/presence.ts:121
-// Output: presenceAcknowledgedSchema, ../contract/src/presence.ts:181
+type Input = z.infer<typeof presenceUpdateRequestSchema>; // ../contract/src/presence.ts:119
+// Output: presenceAcknowledgedSchema, ../contract/src/presence.ts:179
 interface Output {
   ok: true;
 }
 
 // presence.leave
-// Input: presenceLeaveRequestSchema, ../contract/src/presence.ts:130
+// Input: presenceLeaveRequestSchema, ../contract/src/presence.ts:128
 interface Input {
   projectId: string;
   sessionId: string;
 }
-type Output = z.infer<typeof presenceAcknowledgedSchema>; // ../contract/src/presence.ts:181
+type Output = z.infer<typeof presenceAcknowledgedSchema>; // ../contract/src/presence.ts:179
 
 // presence.cursor
-// Input: presenceCursorRequestSchema, ../contract/src/presence.ts:161
+// Input: presenceCursorRequestSchema, ../contract/src/presence.ts:159
 interface Input {
   projectId: string;
   sessionId: string;
@@ -146,23 +146,23 @@ interface Input {
     y: number;
   };
 }
-type Output = z.infer<typeof presenceAcknowledgedSchema>; // ../contract/src/presence.ts:181
+type Output = z.infer<typeof presenceAcknowledgedSchema>; // ../contract/src/presence.ts:179
 
 // presence.onPresenceUpdate
-// Input: presenceProjectInputSchema, ../contract/src/presence.ts:103
+// Input: presenceProjectInputSchema, ../contract/src/presence.ts:101
 interface Input {
   projectId: string;
 }
-type Output = z.infer<typeof presenceEventSchema>; // ../contract/src/presence.ts:72
+type Output = z.infer<typeof presenceEventSchema>; // ../contract/src/presence.ts:70
 
 // presence.onPresenceCursor
-// Input: presenceCursorSubscriptionSchema, ../contract/src/presence.ts:171
+// Input: presenceCursorSubscriptionSchema, ../contract/src/presence.ts:169
 interface Input {
   projectId: string;
   anchor: string;
   sessionId: string;
 }
-type Output = z.infer<typeof presenceCursorEventSchema>; // ../contract/src/presence.ts:95
+type Output = z.infer<typeof presenceCursorEventSchema>; // ../contract/src/presence.ts:93
 
 // presence.onOrganizationReadHints
 // Input: organizationReadHintsInputSchema, ../contract/src/read-hints.ts:16

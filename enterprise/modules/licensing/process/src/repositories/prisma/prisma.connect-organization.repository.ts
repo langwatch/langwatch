@@ -1,9 +1,10 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { fromDate, type Instant, toDate } from "@langwatch/time";
+import { fromDate } from "@langwatch/time";
 
 import type {
   ConnectOrganizationRecord,
   ConnectOrganizationRepository,
+  OrganizationCustomerRecord,
 } from "../connect-organization.repository.ts";
 
 /**
@@ -39,6 +40,13 @@ export class PrismaConnectOrganizationRepository implements ConnectOrganizationR
     };
   }
 
+  findCustomer(organizationId: string): Promise<OrganizationCustomerRecord | null> {
+    return this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { id: true, name: true, slug: true },
+    });
+  }
+
   async findLicensedOrganizationIds(): Promise<string[]> {
     const rows = await this.prisma.organization.findMany({
       where: { license: { not: null } },
@@ -53,35 +61,5 @@ export class PrismaConnectOrganizationRepository implements ConnectOrganizationR
       orderBy: { createdAt: "asc" },
     });
     return rows.map((row) => ({ organizationId: row.id, license: row.license }));
-  }
-
-  async setServicesDisabled({
-    organizationId,
-    servicesDisabled,
-  }: {
-    organizationId: string;
-    servicesDisabled: readonly string[];
-  }): Promise<void> {
-    await this.prisma.organization.update({
-      where: { id: organizationId },
-      data: { connectServicesDisabled: [...servicesDisabled] },
-    });
-  }
-
-  async recordSyncOutcome({
-    organizationId,
-    at,
-    error,
-  }: {
-    organizationId: string;
-    at: Instant;
-    error: string | null;
-  }): Promise<void> {
-    await this.prisma.organization.update({
-      where: { id: organizationId },
-      data: error
-        ? { connectLastSyncError: error }
-        : { connectLastSyncAt: toDate(at), connectLastSyncError: null },
-    });
   }
 }

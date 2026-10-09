@@ -11,7 +11,7 @@ Authorization: who may do what, answered from grants and effective permissions. 
 | Classification | core (`modules/catalogue.json`)                                                                |
 | Subjects       | authz, authz-grant                                                                             |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                       |
-| Api token      | `AuthzApi` = `moduleApi<AuthzApi>()("authz")`, `contract/src/authz.api.ts:254` (74 operations) |
+| Api token      | `AuthzApi` = `moduleApi<AuthzApi>()("authz")`, `contract/src/authz.api.ts:255` (74 operations) |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                     |
 
 ## What authz owns

@@ -24,6 +24,9 @@
   ],
   "references": [
     {
+      "path": "../limiter/tsconfig.build.json"
+    },
+    {
       "path": "../observability/tsconfig.build.json"
     },
     {

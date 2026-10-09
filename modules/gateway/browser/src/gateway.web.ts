@@ -5,6 +5,7 @@
  */
 
 import { defineBrowserModule } from "@langwatch/browser";
+import { FrontendFlags } from "@langwatch/feature-flag-contract";
 import { gatewayWebConfigSchema } from "@langwatch/gateway-contract";
 
 export const gatewayWeb = defineBrowserModule("gateway")
@@ -32,7 +33,7 @@ export const gatewayWeb = defineBrowserModule("gateway")
     },
     "pages/gateway/routing-policies": {
       requires: "routingPolicies:view",
-      flags: ["release_ui_ai_governance_enabled"],
+      flags: [FrontendFlags.release_ui_ai_governance_enabled],
       load: () => import("./ui/sections/gateway/gateway-routing-policies.screen.tsx"),
     },
     "pages/gateway/usage": {

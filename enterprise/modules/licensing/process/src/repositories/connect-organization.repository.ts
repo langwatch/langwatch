@@ -14,24 +14,21 @@ export interface ConnectOrganizationRecord {
   readonly lastSyncError: string | null;
 }
 
+/** A licence customer as organization's table names it, read through its share (C3c, R40). */
+export interface OrganizationCustomerRecord {
+  readonly id: string;
+  readonly name: string;
+  readonly slug: string;
+}
+
 export interface ConnectOrganizationRepository {
   findById(organizationId: string): Promise<ConnectOrganizationRecord | null>;
+
+  findCustomer(organizationId: string): Promise<OrganizationCustomerRecord | null>;
 
   /** Every organization on this install that holds a license, of any kind. */
   findLicensedOrganizationIds(): Promise<string[]>;
 
   /** Every organization on this install with its stored license, oldest first. */
   findAllOldestFirst(): Promise<{ organizationId: string; license: string | null }[]>;
-
-  setServicesDisabled(params: {
-    organizationId: string;
-    servicesDisabled: readonly string[];
-  }): Promise<void>;
-
-  /** What the last sync left behind: the moment it landed, or why it did not. */
-  recordSyncOutcome(params: {
-    organizationId: string;
-    at: Instant;
-    error: string | null;
-  }): Promise<void>;
 }

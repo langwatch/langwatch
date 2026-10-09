@@ -8,7 +8,7 @@ import { appOfflineEnv, FORCED_ENV } from "./offline-defaults.ts";
 
 /**
  * The npx server's one upgrade, before any service starts (specs/upgrade/entry-points.feature):
- * `upgrade` (Postgres, ClickHouse, LangWatchQL), then the system-migrations pass, from apps/tasks.
+ * `upgrade` alone (Postgres, ClickHouse, LangWatchQL), from apps/tasks, like api start.
  * The app and the workers it starts afterwards never migrate.
  */
 export async function runMigrations(
@@ -44,18 +44,13 @@ export async function runMigrations(
   // resolvePnpm(paths) prefers the bundled <bin>/pnpm, and the upgrade's own
   // Prisma and goose children find it and goose through the PATH set above.
   const pnpm = await resolvePnpm(ctx.paths);
-  for (const [service, task] of [
-    ["migrate:upgrade", "upgrade"],
-    ["migrate:system-migrations", "system-migrations-pass"],
-  ] as const) {
-    await execAndPipe({
-      bus,
-      service,
-      bin: pnpm.command,
-      args: [...pnpm.args, "run", "task", task],
-      options: { cwd: tasksDir, env },
-    });
-  }
+  await execAndPipe({
+    bus,
+    service: "migrate:upgrade",
+    bin: pnpm.command,
+    args: [...pnpm.args, "run", "task", "upgrade"],
+    options: { cwd: tasksDir, env },
+  });
 
   bus.emit({
     type: "healthy",

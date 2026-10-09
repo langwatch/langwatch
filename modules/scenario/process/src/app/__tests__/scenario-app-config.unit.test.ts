@@ -1,8 +1,3 @@
-/**
- * ScenarioModule reads `publicBaseUrl` from its config slice (the shared
- * leaf) - see specs/scenarios/scenario-api.feature.
- * @vitest-environment node
- */
 import { EventEmitter } from "node:events";
 
 import type { AgentApi } from "@langwatch/agent-contract";
@@ -27,11 +22,18 @@ import {
   scenarioVoicePeers,
   scenarioTestConfig,
 } from "../../__tests__/support/scenario-app-setup.fixture.ts";
+/**
+ * ScenarioModule reads `publicBaseUrl` from its config slice (the shared
+ * leaf) - see specs/scenarios/scenario-api.feature.
+ * @vitest-environment node
+ */
+import { MemoryScenarioChannels } from "../../channels/memory/memory.scenario.channels.ts";
 import { MemoryScenarioRepositories } from "../../repositories/memory/memory.scenario.repositories.ts";
 import { ScenarioModule } from "../scenario.app.ts";
 
 async function buildProductionApp(publicBaseUrl: string | undefined, emitter = new EventEmitter()) {
   return ScenarioModule.create({
+    channels: MemoryScenarioChannels.create(),
     repositories: MemoryScenarioRepositories.create(),
     dependencies: {
       agents: createApiFixture<AgentApi>(),

@@ -17,12 +17,14 @@ const NOW = Temporal.Instant.from("2026-01-01T00:00:00.000Z");
 function repositoryDouble(
   elapsed: { id: string; userId: string | null; organizationId: string }[] = [],
 ) {
-  const findElapsedLoginKeys = vi.fn<ApiKeyRepository["findElapsedLoginKeys"]>(async () => elapsed);
+  const sweepElapsedLoginKeys = vi.fn<ApiKeyRepository["sweepElapsedLoginKeys"]>(
+    async () => elapsed,
+  );
   const repository = Object.assign(
     MemoryApiKeyRepository.create({ memory: MemoryApiKeyDatabase.create() }),
-    { findElapsedLoginKeys },
+    { sweepElapsedLoginKeys },
   );
-  return { repository, findElapsedLoginKeys };
+  return { repository, sweepElapsedLoginKeys };
 }
 
 describe("the CLI login-key sweep", () => {
@@ -45,7 +47,7 @@ describe("the CLI login-key sweep", () => {
 
     /** @scenario "The CLI login-key sweep retires elapsed sessions and their ingest keys" */
     it("reads the same instant it compares against", async () => {
-      const { repository, findElapsedLoginKeys } = repositoryDouble([]);
+      const { repository, sweepElapsedLoginKeys } = repositoryDouble([]);
 
       await CliLoginKeyReapService.create({
         repository,
@@ -53,7 +55,7 @@ describe("the CLI login-key sweep", () => {
         now: () => NOW,
       }).reap();
 
-      expect(findElapsedLoginKeys).toHaveBeenCalledWith({ now: NOW });
+      expect(sweepElapsedLoginKeys).toHaveBeenCalledWith({ before: NOW });
     });
 
     it("answers how many keys it retired", async () => {
@@ -122,11 +124,11 @@ describe("the CLI login-key sweep", () => {
 
   describe("given no caller-supplied clock", () => {
     it("reads the wall clock at the moment it sweeps", async () => {
-      const { repository, findElapsedLoginKeys } = repositoryDouble([]);
+      const { repository, sweepElapsedLoginKeys } = repositoryDouble([]);
 
       await CliLoginKeyReapService.create({ repository, revoke: vi.fn() }).reap();
 
-      expect(findElapsedLoginKeys).toHaveBeenCalledTimes(1);
+      expect(sweepElapsedLoginKeys).toHaveBeenCalledTimes(1);
     });
   });
 });

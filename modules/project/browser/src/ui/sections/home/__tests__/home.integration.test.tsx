@@ -88,7 +88,6 @@ import {
   ProjectHomeHostProvider,
   ProjectHomeHost,
   type ProjectHomeDeployment,
-  type ProjectHomeFlagReading,
   type ProjectHomeLangyVisibility,
   type ProjectHomeOrganization,
   type ProjectHomeProject,
@@ -116,9 +115,6 @@ class StubProjectHomeHost extends ProjectHomeHost {
   }
   hasPermission(): boolean {
     return false;
-  }
-  featureFlag(): ProjectHomeFlagReading {
-    return { enabled: false, isLoading: false };
   }
   langyVisibility(): ProjectHomeLangyVisibility {
     return { show: gates.langy, isResolving: false };
@@ -210,7 +206,7 @@ describe("HomePage composition", () => {
   });
 
   describe("given the Langy home is the resolved composition", () => {
-    /** @scenario The Langy home renders when the signal-focused home is off */
+    /** @scenario The Langy home renders for a reader with Langy */
     it("leads with the lit block and keeps the spine underneath", () => {
       gates.composition = "langy";
       gates.langy = true;

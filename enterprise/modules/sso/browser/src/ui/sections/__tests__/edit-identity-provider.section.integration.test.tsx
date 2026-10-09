@@ -4,7 +4,9 @@
  * Spec: specs/identity/sso-connection-edit-identity-provider.feature.
  */
 
+import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 type SaveOptions = { onSuccess?: () => Promise<void> | void };
@@ -151,10 +153,66 @@ describe("editing the identity provider settings on the connection's card", () =
             entityId: "https://login.acme.example",
             metadataXml: null,
             certificate: "MIIC",
+            idpInitiated: { enabled: false, landingTargets: [] },
           },
         }),
         expect.anything(),
       );
+    });
+  });
+
+  describe("given a SAML connection saved before the opt-in existed", () => {
+    const SAML_VIEW = {
+      protocol: "saml",
+      entryPoint: "https://login.acme.example/sso",
+      entityId: "https://login.acme.example",
+      metadataXml: null,
+      certificate: "MIIC",
+    };
+    const optIn = () => screen.getByTestId("sso-idp-initiated");
+    const savedOptIn = (idpInitiated: unknown) =>
+      expect(saveMock).toHaveBeenCalledWith(
+        expect.objectContaining({ idp: expect.objectContaining({ idpInitiated }) }),
+        expect.anything(),
+      );
+
+    it("shows sign-in from the identity provider switched off", () => {
+      current.value = SAML_VIEW;
+      draw();
+
+      expect(optIn()).not.toBeChecked();
+      expect(screen.queryByLabelText("Landing page")).toBeNull();
+    });
+
+    /** @scenario "An administrator opts a connection in and lists where a sign-in may land" */
+    it("saves the opt-in with the landing pages the administrator listed", async () => {
+      current.value = SAML_VIEW;
+      draw();
+
+      await userEvent.click(optIn());
+      for (const target of ["/acme/messages", "/settings"]) {
+        fireEvent.change(field("Landing page"), { target: { value: target } });
+        fireEvent.click(screen.getByRole("button", { name: "Add" }));
+      }
+      fireEvent.click(screen.getByTestId("edit-identity-provider-save"));
+
+      expect(optIn()).toBeChecked();
+      expect(screen.getByText("/acme/messages")).toBeInTheDocument();
+      expect(screen.getByText("/settings")).toBeInTheDocument();
+      savedOptIn({ enabled: true, landingTargets: ["/acme/messages", "/settings"] });
+    });
+
+    it("refuses a landing page off LangWatch and does not save it", async () => {
+      current.value = SAML_VIEW;
+      draw();
+
+      await userEvent.click(optIn());
+      fireEvent.change(field("Landing page"), { target: { value: "//evil.example" } });
+      fireEvent.click(screen.getByRole("button", { name: "Add" }));
+
+      expect(screen.getByText(/must be a path on LangWatch itself/)).toBeTruthy();
+      fireEvent.click(screen.getByTestId("edit-identity-provider-save"));
+      savedOptIn({ enabled: true, landingTargets: [] });
     });
   });
 

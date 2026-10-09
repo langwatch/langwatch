@@ -369,6 +369,30 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     organization.pricingModel = input.pricingModel;
   }
 
+  async findConnectServicesDisabled(organizationId: string): Promise<string[]> {
+    return [...(this.memory.organizations.get(organizationId)?.connectServicesDisabled ?? [])];
+  }
+
+  async updateConnectServicesDisabled(input: {
+    organizationId: string;
+    servicesDisabled: readonly string[];
+  }): Promise<void> {
+    const organization = this.memory.organizations.get(input.organizationId);
+    if (!organization) throw new OrganizationNotFoundError();
+    organization.connectServicesDisabled = [...input.servicesDisabled];
+  }
+
+  async updateConnectSyncOutcome(input: {
+    organizationId: string;
+    at: Instant;
+    error: string | null;
+  }): Promise<void> {
+    const organization = this.memory.organizations.get(input.organizationId);
+    if (!organization) throw new OrganizationNotFoundError();
+    if (!input.error) organization.connectLastSyncAt = input.at;
+    organization.connectLastSyncError = input.error;
+  }
+
   async setLicense(input: {
     organizationId: string;
     licenseKey: string;

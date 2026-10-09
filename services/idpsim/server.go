@@ -98,7 +98,7 @@ func (s *Server) Handler() http.Handler {
 		writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "tenants": len(s.tenants)})
 	})
 	s.routeConsole(mux)
-	return s.persistChanges(mux)
+	return s.azureAuthority(s.persistChanges(mux))
 }
 
 // routeProtocols is what a tenant speaks to an application: OIDC, SAML and
@@ -141,6 +141,9 @@ func (s *Server) routeControl(mux *http.ServeMux) {
 	// Legacy SSO (legacy.go, webhook.go): provider, one-shot token breaks, env lines, Auth0 webhook.
 	mux.HandleFunc("POST /control/t/{tenant}/legacy-provider", s.handleControlLegacyProvider)
 	mux.HandleFunc("POST /control/t/{tenant}/tamper", s.handleControlTamper)
+	mux.HandleFunc("POST /control/t/{tenant}/user-active", s.handleControlUserActive)
+	mux.HandleFunc("POST /control/t/{tenant}/saml/unsolicited", s.handleControlSAMLUnsolicited)
+	mux.HandleFunc("POST /control/t/{tenant}/rotate-key", s.handleControlRotateKey)
 	mux.HandleFunc("GET /control/t/{tenant}/legacy-env", s.handleControlLegacyEnv)
 	mux.HandleFunc("POST /control/t/{tenant}/auth0-webhook", s.handleControlAuth0Webhook)
 	mux.HandleFunc("PUT /control/t/{tenant}/scim-target", s.handleControlSCIMTarget)

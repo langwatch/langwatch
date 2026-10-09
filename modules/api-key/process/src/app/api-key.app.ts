@@ -36,6 +36,8 @@ import {
   type CliKeyScopeSummary,
   type CliSessionKeyRevocation,
   type CliSessionRevocationCause,
+  type OrganizationProvisioningRequest,
+  type ProvisionedOrganization,
 } from "@langwatch/api-key-contract";
 import { PermissionDeniedError } from "@langwatch/authorization";
 import { AuthzApi, newAuthzGrantId } from "@langwatch/authz-contract";
@@ -58,6 +60,7 @@ import { ApiKeyTokenService } from "../services/api-key-token.service.ts";
 import { ApiKeyService } from "../services/api-key.service.ts";
 import { IngestionKeyMintService } from "../services/ingestion-key-mint.service.ts";
 import { LegacyApiKeyGrantService } from "../services/legacy-api-key-grant.service.ts";
+import { OrganizationProvisioningService } from "../services/organization-provisioning.service.ts";
 import {
   ProjectProvisioningService,
   type ProjectProvisioningRequest,
@@ -65,6 +68,7 @@ import {
   type VisibleProjectsQuery,
 } from "../services/project-provisioning.service.ts";
 import { RunKeyMintService } from "../services/run-key-mint.service.ts";
+import type { ApiKeyOrganizationsDoorApi } from "../transport/api-key-organizations.rest.ts";
 import type { ApiKeyProjectsDoorApi } from "../transport/api-key-projects.rest.ts";
 
 /** Who performs an operation, whose membership is proved, and any operator acting as them. */
@@ -156,7 +160,7 @@ async function apiKeyPeppers(
   return { pepper: answered.pepper, previousPepper: answered.previousPepper };
 }
 
-export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi {
+export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrganizationsDoorApi {
   static readonly contract = ApiKeyApi;
   static readonly dependencies: ApiKeyDependencies = {
     authorization: AuthzApi,
@@ -208,6 +212,10 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi {
       apiKeys: service,
       projects: setup.dependencies.projects,
     });
+    const organizationProvisioning = OrganizationProvisioningService.create({
+      apiKeys: service,
+      organizations: setup.dependencies.organizations,
+    });
 
     return new ApiKeyModule({
       service,
@@ -216,6 +224,7 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi {
       sandboxKeys,
       ingestionKeys,
       provisioning,
+      organizationProvisioning,
     });
   }
 
@@ -226,6 +235,7 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi {
     sandboxKeys: AgentSandboxKeyService;
     ingestionKeys: IngestionKeyMintService;
     provisioning: ProjectProvisioningService;
+    organizationProvisioning: OrganizationProvisioningService;
   }) {
     this.#service = deps.service;
     this.#authorization = deps.authorization;
@@ -233,6 +243,7 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi {
     this.#sandboxKeys = deps.sandboxKeys;
     this.#ingestionKeys = deps.ingestionKeys;
     this.#provisioning = deps.provisioning;
+    this.#organizationProvisioning = deps.organizationProvisioning;
   }
 
   readonly #service: ApiKeyService;
@@ -241,6 +252,7 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi {
   readonly #sandboxKeys: AgentSandboxKeyService;
   readonly #ingestionKeys: IngestionKeyMintService;
   readonly #provisioning: ProjectProvisioningService;
+  readonly #organizationProvisioning: OrganizationProvisioningService;
 
   /**
    * The service itself, for the one thing this application deliberately is not about: turning a
@@ -289,6 +301,10 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi {
   provisionProject(input: ProjectProvisioningRequest): Promise<ProvisionedProject> {
     return this.#provisioning.provisionProject(input);
   }
+  provisionOrganization(input: OrganizationProvisioningRequest): Promise<ProvisionedOrganization> {
+    return this.#organizationProvisioning.provisionOrganization(input);
+  }
+
   markUsed(input: { id: string }): void {
     this.#service.markUsed(input);
   }

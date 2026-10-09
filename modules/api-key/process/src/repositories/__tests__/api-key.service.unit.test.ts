@@ -215,12 +215,21 @@ class MemoryApiKeys extends ApiKeyRepository {
     );
   }
   findElapsedLoginKeys(input: {
+    organizationId: string;
     now: Instant;
+  }): Promise<{ id: string; userId: string | null; organizationId: string }[]> {
+    return this.sweepElapsedLoginKeys({ before: input.now }).then((keys) =>
+      keys.filter((key) => key.organizationId === input.organizationId),
+    );
+  }
+  sweepElapsedLoginKeys(input: {
+    before: Instant;
   }): Promise<{ id: string; userId: string | null; organizationId: string }[]> {
     return Promise.resolve(
       this.rows
         .filter(
-          (row) => row.expiresAt !== null && row.expiresAt.getTime() <= input.now.epochMilliseconds,
+          (row) =>
+            row.expiresAt !== null && row.expiresAt.getTime() <= input.before.epochMilliseconds,
         )
         .map(({ id, userId, organizationId }) => ({ id, userId, organizationId })),
     );

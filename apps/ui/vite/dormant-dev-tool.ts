@@ -7,7 +7,7 @@ import { setTimeout as delay } from "timers/promises";
 /**
  * A developer tool (Storybook, the mail preview) held dormant behind its port:
  * started on the first real visit on a loopback port of its own, proxied, and
- * stopped with its whole process group once idle. Haven only routes to the port.
+ * stopped once idle (with its process group, or closed if hosted here).
  */
 
 export const DEV_TOOLS_IDLE_ENV = "LANGWATCH_DEV_TOOLS_IDLE";
@@ -28,18 +28,36 @@ export interface DormantTool {
   close(): void;
 }
 
-export interface DormantToolOptions {
+/** A tool running inside this process: closing it is stopping it. */
+export interface HostedTool {
+  close(): Promise<void>;
+}
+
+interface DormantToolBase {
   name: string;
   port: number;
-  cwd: string;
-  command: (params: { port: number }) => { file: string; args: string[] };
   idleAfterMs: number;
   log: (line: string) => void;
 }
 
+/** Spawned as its own process group in `cwd`. */
+interface SpawnedToolOptions extends DormantToolBase {
+  cwd: string;
+  command: (params: { port: number }) => { file: string; args: string[] };
+  start?: undefined;
+}
+
+/** Started inside this process, so the dev stack stays one JS process (ADR-168). */
+interface HostedToolOptions extends DormantToolBase {
+  start: (params: { port: number }) => Promise<HostedTool>;
+}
+
+export type DormantToolOptions = SpawnedToolOptions | HostedToolOptions;
+
 interface Lane {
   options: DormantToolOptions;
   child?: ChildProcess;
+  hosted?: HostedTool;
   innerPort?: number;
   starting?: Promise<number>;
   isExternal: boolean;
@@ -155,30 +173,56 @@ function wake({ lane }: { lane: Lane }): Promise<number> {
 }
 
 async function launch({ lane }: { lane: Lane }): Promise<number> {
-  const { name, cwd, command, log } = lane.options;
+  const { options } = lane;
   const port = await freeLoopbackPort();
-  const { file, args } = command({ port });
-  log(`${name}: first visit, starting on :${port}`);
-  // detached: the tool leads its own process group, so pnpm wrappers and compiler
-  // helpers stop with it.
-  const child = spawn(file, args, {
-    cwd,
-    detached: true,
-    stdio: ["ignore", "ignore", "inherit"],
-    env: process.env,
-  });
-  lane.child = child;
-  child.once("exit", () => forgetChild({ lane, child }));
+  options.log(`${options.name}: first visit, starting on :${port}`);
   try {
-    await awaitListening({ port, child });
+    if (options.start !== undefined) await host({ lane, port, start: options.start });
+    else await spawnTool({ lane, port, options });
   } catch (error) {
-    log(`${name}: ${messageOf(error)}`);
+    options.log(`${options.name}: ${messageOf(error)}`);
     stopLane({ lane, reason: "failed to start" });
     throw error;
   }
   lane.innerPort = port;
   lane.lastSeen = Date.now();
   return port;
+}
+
+async function host({
+  lane,
+  port,
+  start,
+}: {
+  lane: Lane;
+  port: number;
+  start: HostedToolOptions["start"];
+}): Promise<void> {
+  lane.hosted = await start({ port });
+  if (lane.closed) throw new Error("the dev server stopped while it started");
+}
+
+async function spawnTool({
+  lane,
+  port,
+  options,
+}: {
+  lane: Lane;
+  port: number;
+  options: SpawnedToolOptions;
+}): Promise<void> {
+  const { file, args } = options.command({ port });
+  // detached: the tool leads its own process group, so pnpm wrappers and compiler
+  // helpers stop with it.
+  const child = spawn(file, args, {
+    cwd: options.cwd,
+    detached: true,
+    stdio: ["ignore", "ignore", "inherit"],
+    env: process.env,
+  });
+  lane.child = child;
+  child.once("exit", () => forgetChild({ lane, child }));
+  await awaitListening({ port, child });
 }
 
 function forgetChild({ lane, child }: { lane: Lane; child: ChildProcess }): void {
@@ -219,11 +263,19 @@ function reapIfIdle({ lane }: { lane: Lane }): void {
 }
 
 function stopLane({ lane, reason }: { lane: Lane; reason: string }): void {
-  const { child } = lane;
+  const { child, hosted, options } = lane;
   lane.child = undefined;
+  lane.hosted = undefined;
   lane.innerPort = undefined;
+  if (hosted) {
+    options.log(`${options.name}: ${reason}, stopped`);
+    void hosted
+      .close()
+      .catch((error: unknown) => options.log(`${options.name}: ${messageOf(error)}`));
+    return;
+  }
   if (child?.pid === undefined) return;
-  lane.options.log(`${lane.options.name}: ${reason}, stopped`);
+  options.log(`${options.name}: ${reason}, stopped`);
   const pid = child.pid;
   if (!signalGroup({ pid, signal: "SIGTERM" })) return;
   setTimeout(() => signalGroup({ pid, signal: "SIGKILL" }), KILL_GRACE_MS).unref();

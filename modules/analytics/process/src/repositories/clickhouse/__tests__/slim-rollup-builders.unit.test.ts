@@ -7,6 +7,7 @@
 import { describe, expect, it } from "vitest";
 
 import { TRACE_ANALYTICS_HAS_SIGNAL_SQL } from "../../../rules/trace-signal.rules.ts";
+import { buildEvalSlimTimeseriesQuery } from "../clickhouse.eval-slim-timeseries-query.mapper.ts";
 import { buildRollupTimeseriesQuery } from "../clickhouse.rollup-timeseries-query.mapper.ts";
 import { buildSlimTimeseriesQuery } from "../clickhouse.slim-timeseries-query.mapper.ts";
 
@@ -121,9 +122,7 @@ describe("buildSlimTimeseriesQuery", () => {
     filters: { "metadata.user_id": ["alice"] },
   });
 
-  /**
-   * @scenario Dashboard panels dedup traces with a collapse that can spill to disk
-   */
+  /** @scenario Dashboard panels dedup traces with a collapse that can spill to disk */
   it("dedups trace_analytics to the latest version with the spillable argMax collapse", () => {
     expect(sql).toContain("FROM trace_analytics AS ta");
     expect(sql).toContain("argMax(__latest_row, __version)");
@@ -247,5 +246,22 @@ describe("buildSlimTimeseriesQuery", () => {
         k.startsWith("slim_user_") && Array.isArray(v) && (v as string[]).includes("alice"),
     );
     expect(userParam).toBeDefined();
+  });
+});
+
+describe("buildEvalSlimTimeseriesQuery percentiles", () => {
+  describe("when serving a percentile of evaluation_score", () => {
+    const { sql } = buildEvalSlimTimeseriesQuery({
+      projectId: "tenant-eval-slim",
+      ...baseDates,
+      series: [{ metric: "evaluations.evaluation_score", aggregation: "p90" }],
+      timeScale: 60,
+    });
+
+    /** @scenario Dashboard percentiles use a bounded-memory estimator */
+    it("uses the bounded-memory t-digest estimator", () => {
+      expect(sql).toContain("quantileTDigest(0.9)(");
+      expect(sql).not.toContain("quantileExact");
+    });
   });
 });

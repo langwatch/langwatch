@@ -24,8 +24,8 @@ Feature: Schema migrations run before the API serves, never inside it
   I want both schemas brought up to date before the API accepts a request
   So that no process ever serves against a schema it was not built for
 
-  # The step is one script, apps/api's `start:prepare:db`: `pnpm task upgrade`,
-  # then the system-migrations pass, chained with `&&`. Who runs it:
+  # The step is one script, apps/api's `start:prepare:db`: `pnpm task upgrade`
+  # alone; the system-migrations pass is not part of api start. Who runs it:
   #
   #   the image           nobody at start: CMD -> apps/api `start` -> the api alone
   #   Helm / compose      the pre-roll Job, the compose `migrate` service
@@ -53,8 +53,7 @@ Feature: Schema migrations run before the API serves, never inside it
   Scenario: A failed upgrade stops the preparation
     Given the upgrade exits non-zero
     When an entry point runs the preparation script
-    Then the system-migrations pass does not run
-    And the preparation reports failure, so nothing that waits on it starts
+    Then the preparation reports failure, so nothing that waits on it starts
 
   @unit
   Scenario: An operator can skip a migration step that a deploy already applied

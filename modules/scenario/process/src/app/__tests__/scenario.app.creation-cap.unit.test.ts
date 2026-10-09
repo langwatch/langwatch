@@ -20,6 +20,7 @@ import {
   scenarioVoicePeers,
   scenarioTestConfig,
 } from "../../__tests__/support/scenario-app-setup.fixture.ts";
+import { MemoryScenarioChannels } from "../../channels/memory/memory.scenario.channels.ts";
 import { MemoryScenarioRepositories } from "../../repositories/memory/memory.scenario.repositories.ts";
 import { ScenarioModule } from "../scenario.app.ts";
 
@@ -57,6 +58,7 @@ async function organizationAtTheScenarioCap() {
   }
 
   const app = await ScenarioModule.create({
+    channels: MemoryScenarioChannels.create(),
     repositories,
     dependencies: {
       agents: createApiFixture<AgentApi>(),

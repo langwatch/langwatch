@@ -188,7 +188,7 @@ import { LangySidecar } from "../langy-panel.tsx";
 const PROJECT_ID = "project-demo";
 const navigateMock = vi.fn();
 
-vi.mock("@langwatch/browser-host/feature-flag", () => ({
+vi.mock("@langwatch/feature-flag-client", () => ({
   useFeatureFlag: () => ({ enabled: false, isLoading: false }),
 }));
 

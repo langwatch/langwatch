@@ -21,7 +21,7 @@ import {
   type LangyRouteReading,
 } from "../../../../../model/langy-host.ts";
 
-vi.mock("@langwatch/browser-host/feature-flag", () => ({
+vi.mock("@langwatch/feature-flag-client", () => ({
   useFeatureFlag: () => ({ enabled: true, isLoading: false }),
 }));
 

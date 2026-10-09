@@ -25,6 +25,7 @@
     "@langwatch/design-system": "workspace:*",
     "@langwatch/enterprise-managed-provider-client": "workspace:*",
     "@langwatch/error-views": "workspace:*",
+    "@langwatch/feature-flag-client": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/model-provider-client": "workspace:*",

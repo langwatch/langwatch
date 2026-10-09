@@ -1,0 +1,79 @@
+diff --git a/dist/index-CZytzKv6.d.mts b/dist/index-CZytzKv6.d.mts
+index 3ed18ca..cb351a8 100644
+--- a/dist/index-CZytzKv6.d.mts
++++ b/dist/index-CZytzKv6.d.mts
+@@ -156,6 +156,13 @@ interface SAMLConfig {
+    * responses when RelayState has no safe callback, including error redirects.
+    */
+   idpInitiatedCallbackUrl?: string | undefined;
++  /**
++   * Accept unsolicited (IdP-initiated) responses for this provider alone,
++   * as `saml.allowIdpInitiated` does for every provider.
++   *
++   * @default false
++   */
++  allowIdpInitiated?: boolean | undefined;
+   idpMetadata: SAMLIdentityProviderMetadata;
+   /**
+    * SP metadata configuration. All fields are optional; when omitted,
+@@ -584,6 +591,17 @@ interface SSOOptions {
+      * @default false
+      */
+     allowIdpInitiated?: boolean;
++    /**
++     * Where an admitted IdP-initiated response lands. Its RelayState is not
++     * parsed as engine state; this answers the landing, which still passes
++     * the safe-redirect check. Without it, the provider's fallbacks apply.
++     */
++    resolveIdpInitiatedLanding?: (input: {
++      providerId: string;
++      relayState: string | undefined;
++      samlConfig: SAMLConfig;
++      appOrigin: string;
++    }) => string | Promise<string>;
+     /**
+      * TTL for AuthnRequest records in milliseconds.
+      * Requests older than this will be rejected.
+diff --git a/dist/index.mjs b/dist/index.mjs
+index a97a99f..c275241 100644
+--- a/dist/index.mjs
++++ b/dist/index.mjs
+@@ -2850,11 +2850,11 @@ async function processSAMLResponse(ctx, params, options) {
+ 	if (!parsedSamlConfig) throw new APIError("BAD_REQUEST", { message: "Invalid SAML configuration" });
+ 	const sp = createSP(parsedSamlConfig, ctx.context.baseURL, providerId, { clockSkew: options?.saml?.clockSkew });
+ 	const idp = createIdP(parsedSamlConfig);
+-	const redirectCandidates = getSAMLRedirectCandidates(relayState?.callbackURL, parsedSamlConfig, options?.saml);
+-	const samlRedirectUrl = getSafeRedirectUrl(redirectCandidates, currentCallbackPath, appOrigin, (url, settings) => ctx.context.isTrustedOrigin(url, settings));
++	let redirectCandidates = getSAMLRedirectCandidates(relayState?.callbackURL, parsedSamlConfig, options?.saml);
++	let samlRedirectUrl = getSafeRedirectUrl(redirectCandidates, currentCallbackPath, appOrigin, (url, settings) => ctx.context.isTrustedOrigin(url, settings));
+ 	const samlErrorRedirectUrl = getSafeRedirectUrl([relayState?.errorURL, samlRedirectUrl], currentCallbackPath, appOrigin, (url, settings) => ctx.context.isTrustedOrigin(url, settings));
+ 	params.onErrorRedirectResolved?.(samlErrorRedirectUrl);
+-	const stateProviderReference = parseSSOProviderReference(relayState?.serverContext?.[SSO_PROVIDER_STATE_KEY]);
++	let stateProviderReference = parseSSOProviderReference(relayState?.serverContext?.[SSO_PROVIDER_STATE_KEY]);
+ 	validateSingleAssertion(SAMLResponse);
+ 	let parsedResponse;
+ 	try {
+@@ -2912,10 +2912,22 @@ async function processSAMLResponse(ctx, params, options) {
+ 		providerId,
+ 		options: {
+ 			enableInResponseToValidation: options?.saml?.enableInResponseToValidation,
+-			allowIdpInitiated: options?.saml?.allowIdpInitiated
++			allowIdpInitiated: options?.saml?.allowIdpInitiated || parsedSamlConfig.allowIdpInitiated === true
+ 		},
+ 		redirectUrl: samlErrorRedirectUrl
+ 	}))?.providerReference;
++	if (options?.saml?.enableInResponseToValidation !== false && !extract.response?.inResponseTo) {
++		relayState = null;
++		relayStateValidationFailed = false;
++		stateProviderReference = void 0;
++		redirectCandidates = options?.saml?.resolveIdpInitiatedLanding ? [await options.saml.resolveIdpInitiatedLanding({
++			providerId,
++			relayState: params.RelayState || void 0,
++			samlConfig: parsedSamlConfig,
++			appOrigin
++		})] : getSAMLRedirectCandidates(void 0, parsedSamlConfig, options?.saml);
++		samlRedirectUrl = getSafeRedirectUrl(redirectCandidates, currentCallbackPath, appOrigin, (url, settings) => ctx.context.isTrustedOrigin(url, settings));
++	}
+ 	if (relayStateValidationFailed) throw ctx.redirect(buildSAMLRedirectUrl(samlErrorRedirectUrl, {
+ 		error: "invalid_state",
+ 		error_description: "invalid_or_expired_relay_state"

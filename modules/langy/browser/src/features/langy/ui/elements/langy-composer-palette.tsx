@@ -1,4 +1,3 @@
-import { useFeatureFlag } from "@langwatch/browser-host/feature-flag";
 import {
   Box,
   Combobox,
@@ -8,7 +7,8 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
+import { useFeatureFlag } from "@langwatch/feature-flag-client";
+import { FrontendFlags, NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import { disabledLangySkillIds, LANGY_SKILL_GATE_FLAG } from "@langwatch/langy-contract";
 import { Cpu, Plus, Sparkles, Waypoints } from "lucide-react";
 import { useEffect, useMemo } from "react";
@@ -217,7 +217,7 @@ export function LangyComposerPalette({
   const setSpotlight = useLangyContextTargetStore((s) => s.setSpotlight);
   const chrome = MODE_CHROME[mode];
   const { project, organization } = useOrganizationTeamProject();
-  const { enabled: gateFlagOn } = useFeatureFlag(LANGY_SKILL_GATE_FLAG, {
+  const { enabled: gateFlagOn } = useFeatureFlag(FrontendFlags[LANGY_SKILL_GATE_FLAG], {
     projectId: project?.id ?? NOT_TARGETED,
     organizationId: organization?.id ?? NOT_TARGETED,
   });

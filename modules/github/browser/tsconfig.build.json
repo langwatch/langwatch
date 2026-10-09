@@ -1,12 +1,22 @@
 {
-  "extends": ["./tsconfig.json", "../../../tsconfig.emit.json"],
+  "extends": [
+    "./tsconfig.json",
+    "../../../tsconfig.emit.json"
+  ],
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": "src",
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
-  "files": ["./src/behavior/github-connect-popup.ts", "./src/github.web.ts"],
-  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
+  "files": [
+    "./src/behavior/github-connect-popup.ts",
+    "./src/github.web.ts"
+  ],
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "src/**/*.json"
+  ],
   "exclude": [
     "**/__tests__/**",
     "**/__mocks__/**",
@@ -22,6 +32,9 @@
   "references": [
     {
       "path": "../../../packages/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../client/tsconfig.build.json"
     }
   ]
 }

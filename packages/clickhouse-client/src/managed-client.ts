@@ -1,11 +1,16 @@
 import {
+  ConcurrencyLimiter,
+  type LimiterStats,
+  StatementWait,
+  statementRefusal,
+} from "@langwatch/limiter";
+
+import {
   ClickHouseClientFactory,
   type ClickHouseClientCreationInput,
   type ClickHouseCloseableClient,
 } from "./connection.ts";
 import type { AbortSignalLike } from "./query.ts";
-import { ConcurrencyLimiter, type LimiterStats } from "./rateLimit.ts";
-import { createStatementWait, statementRefusal, type StatementWait } from "./statementWait.ts";
 import {
   checkStatementTenantScope,
   describeTenantScopeViolation,
@@ -319,7 +324,7 @@ export class ClickHouseStatementAdmission {
     const lane = this.laneFor(operation);
     const startedAt = performance.now();
     let admitted = false;
-    const wait = createStatementWait({ signal, waitTimeoutMs: this.timeoutMs });
+    const wait = new StatementWait({ signal, timeoutMs: this.timeoutMs });
     const onDriver = async (): Promise<T> => {
       admitted = true;
       lane.running += 1;
@@ -338,19 +343,8 @@ export class ClickHouseStatementAdmission {
     try {
       return await this.acquire({ lane, wait, onDriver });
     } catch (error) {
-      const refused = statementRefusal({
-        error,
-        isAdmitted: admitted,
-        hasTimedOut: wait.hasTimedOut(),
-        startedAt,
-        waitTimeoutMs: this.timeoutMs,
-        logger: this.options.logger,
-        subject: "a ClickHouse statement",
-        logFields: { instance, operation },
-        createOverloadError: (cause) => this.options.overloadErrorFactory.create({ cause }),
-        onShed: () => telemetry.incrementStatementsShed({ instance, operation }),
-      });
-      throw refused === undefined ? error : refused.refusal;
+      if (admitted) throw error;
+      throw this.refusal({ error, timedOut: wait.hasTimedOut(), operation, startedAt });
     } finally {
       wait.dispose();
     }
@@ -376,12 +370,41 @@ export class ClickHouseStatementAdmission {
     onDriver: () => Promise<T>;
   }): Promise<T> {
     const runInTotal = () => {
-      wait.armIfSaturated(this.total.stats().inFlight >= this.options.maxConcurrent);
+      wait.armIf(this.total.stats().inFlight >= this.options.maxConcurrent);
       return this.total.run({ task: onDriver, signal: wait.signal });
     };
     if (lane.cap === null) return runInTotal();
-    wait.armIfSaturated(lane.cap.stats().inFlight >= lane.capMax);
+    wait.armIf(lane.cap.stats().inFlight >= lane.capMax);
     return lane.cap.run({ task: runInTotal, signal: wait.signal });
+  }
+
+  /**
+   * What a statement that never got a slot throws: an overload error, counted as
+   * shed, when the queue was full or the wait timed out; otherwise its own error.
+   */
+  private refusal({
+    error,
+    timedOut,
+    operation,
+    startedAt,
+  }: {
+    error: unknown;
+    timedOut: boolean;
+    operation: ClickHouseStatementOperation;
+    startedAt: number;
+  }): unknown {
+    const { instance, telemetry, overloadErrorFactory, logger } = this.options;
+    return statementRefusal({
+      error,
+      timedOut,
+      startedAt,
+      timeoutMs: this.timeoutMs,
+      subject: "a ClickHouse statement",
+      logFields: { instance, operation },
+      logger,
+      onShed: () => telemetry.incrementStatementsShed({ instance, operation }),
+      createOverload: (input) => overloadErrorFactory.create(input),
+    });
   }
 }
 

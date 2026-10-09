@@ -3,11 +3,9 @@ import {
   MANAGEMENT_API_VERSION,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
-/** `/api/organizations`: admin-only provisioning with instance bearer key. */
+/** `/api/organizations` reads, instance bearer key; api-key serves the POST (R3). */
 import {
   OrganizationApi,
-  organizationsProvisioningRestCreatedSchema,
-  organizationsProvisioningRestCreateSchema,
   organizationsProvisioningRestGotOneSchema,
   organizationsProvisioningRestListSchema,
   organizationsProvisioningRestParamsSchema,
@@ -22,30 +20,6 @@ export const organizationsProvisioningRest: Readonly<{
   .withNamespace("organizations")
   .withVersion(MANAGEMENT_API_VERSION)
   .withCredential("instance_admin")
-
-  .post("/", "provisionOrganization")
-  .withAccess({
-    kind: "authenticated",
-    reason:
-      "Holding the instance administrator bearer key is the only authority this door checks; there is no tenant to ask a permission of.",
-  })
-  .withInput(organizationsProvisioningRestCreateSchema)
-  .withOutput(organizationsProvisioningRestCreatedSchema)
-  .withStatus(201)
-  .withDocs({
-    tags: ["Organizations (Self-Hosted)"],
-    description:
-      "Provision a new organization with its first team and a bootstrap admin service key, self-hosted instance administrators only.",
-  })
-  .handle(async ({ app, input }) => {
-    const provisioned = await app.createForProvisioningWithAdminKey({
-      name: input.name,
-      ...(input.slug !== undefined ? { slug: input.slug } : {}),
-      ...(input.adminApiKeyName !== undefined ? { adminApiKeyName: input.adminApiKeyName } : {}),
-    });
-
-    return provisioned;
-  })
 
   .get("/", "listOrganizations")
   .withAccess({

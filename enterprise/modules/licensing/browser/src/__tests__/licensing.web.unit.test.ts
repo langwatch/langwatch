@@ -1,6 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { createUi } from "@langwatch/browser";
+import { hostServiceFakes } from "@langwatch/browser/testing";
 import {
   ResourceLimitRowToken,
   UpgradeModalToken,
@@ -23,7 +24,7 @@ describe("given a browser that installs licensing", () => {
   describe("when the kernel renders with only a transport supplied", () => {
     it("installs the module", async () => {
       const installed = await createUi({ document: browserDocument(), mount: "root" })
-        .withModules([licensingWeb] as const)
+        .withModules([hostServiceFakes(), licensingWeb] as const)
         .withTransport({ query: () => Promise.resolve(null) })
         .render();
 

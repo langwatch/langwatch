@@ -33,7 +33,7 @@ Opened from lists the other modules (and `ui`, the app) whose browser source nam
 ## Calls
 
 - `withApi(experimentApi)`, tRPC contracts: `experiments.*`, `agents.*`, `prompts.*`, `evaluators.*`, `evaluations.*`, `dataset.*`, `datasetRecord.*`, `batchRecord.*`, `ops.*`.
-- Client packages (package.json): `@langwatch/dataset-client`, `@langwatch/evaluator-client`, `@langwatch/experiment-client`, `@langwatch/prompt-client`, `@langwatch/trace-client`, `@langwatch/workflow-client`.
+- Client packages (package.json): `@langwatch/dataset-client`, `@langwatch/evaluator-client`, `@langwatch/experiment-client`, `@langwatch/feature-flag-client`, `@langwatch/prompt-client`, `@langwatch/trace-client`, `@langwatch/workflow-client`.
 - Lends: `ComparisonConfigFormToken`.
 - Host APIs it requires: `WorkflowHostApi`.
 

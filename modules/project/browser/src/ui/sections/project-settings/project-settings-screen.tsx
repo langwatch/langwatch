@@ -1,5 +1,6 @@
 /** Organization and project settings; personal workspaces cannot be the org's project (ADR-038). */
 
+import { useUiFlags } from "@langwatch/browser-host/feature-flag";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import { PageLayout } from "@langwatch/design-system/page-layout";
@@ -19,7 +20,7 @@ import {
 import { Select } from "@langwatch/design-system/select";
 import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
+import { FrontendFlags, NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import isEqual from "lodash-es/isEqual";
 import { Lock } from "lucide-react";
 import { useState } from "react";
@@ -248,7 +249,8 @@ function SettingsForm({
   // ADR-038: the flag is asked for the ORGANIZATION and for no project — the
   // page holds none of its own, which `NOT_TARGETED` is what says.
   void NOT_TARGETED;
-  const governanceEnabled = host.isFeatureEnabled("release_ui_ai_governance_enabled");
+  const governanceEnabled =
+    useUiFlags().flag(FrontendFlags.release_ui_ai_governance_enabled) === true;
   const [defaultValues, setDefaultValues] = useState<OrganizationFormData>({
     name: organization.name,
     s3Endpoint: organization.s3Endpoint ?? "",
@@ -559,6 +561,8 @@ type ProjectFormData = {
 
 function ProjectSettingsForm({ project }: { project: ProjectHostProject }) {
   const host = useProjectHost();
+  const governanceEnabled =
+    useUiFlags().flag(FrontendFlags.release_ui_ai_governance_enabled) === true;
   const organization = host.organization();
   const hasPermission = (permission: string) => host.hasPermission(permission);
   const userIsAdmin = hasPermission("project:manage");
@@ -675,7 +679,7 @@ function ProjectSettingsForm({ project }: { project: ProjectHostProject }) {
             <ProjectDepartmentField
               organizationId={organization?.id ?? ""}
               projectId={project.id}
-              governanceEnabled={host.isFeatureEnabled("release_ui_ai_governance_enabled")}
+              governanceEnabled={governanceEnabled}
             />
             <HorizontalFormControl
               label="Tech Stack"

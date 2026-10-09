@@ -19,7 +19,6 @@ import {
   deleteMigratedTenantRows,
   startMigratedClickHouse,
 } from "../../../__tests__/migrated-clickhouse.harness.ts";
-import { ClickHouseAnalyticsStatementLimitRepository } from "../clickhouse.analytics-statement-limit.repository.ts";
 import { ClickHouseAnalyticsRepository } from "../clickhouse.analytics.repository.ts";
 
 const tenantId = `test-monitor-rate-${randomUUID()}`;
@@ -152,10 +151,7 @@ function bucketFor(result: AnalyticsTimeseriesResult, day: string) {
 
 beforeAll(async () => {
   client = (await startMigratedClickHouse()).client;
-  repository = ClickHouseAnalyticsRepository.create({
-    resolveClient: async () => client,
-    statementLimiter: ClickHouseAnalyticsStatementLimitRepository.create({ maxConcurrent: 4 }),
-  });
+  repository = ClickHouseAnalyticsRepository.create({ resolveClient: async () => client });
 
   await deleteMigratedTenantRows({ client, tenantId, tables: SEEDED_TABLES });
 

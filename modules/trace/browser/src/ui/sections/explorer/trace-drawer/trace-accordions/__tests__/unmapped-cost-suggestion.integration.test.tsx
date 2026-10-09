@@ -14,10 +14,13 @@ const { mockDetailState } = vi.hoisted(() => ({
   mockDetailState: { current: null as SpanDetail | null },
 }));
 
+vi.mock("../../../../../../behavior/trace-host.ts", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useTraceHost: () => ({ hasPermission: () => true }),
+}));
 vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1", slug: "test-project" },
-    hasPermission: () => true,
   }),
 }));
 

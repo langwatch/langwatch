@@ -149,8 +149,10 @@ helm repo update
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
   -f values-production.yaml \
-  --wait --timeout 10m
+  --wait --timeout 45m
 ```
+
+The pre-upgrade Job can run for up to 35 minutes on a large installation. Helm's default hook timeout is 5 minutes, and a shorter `--timeout` fails the release part-way through a migration.
 
 ### Pin a Specific Version
 
@@ -195,7 +197,7 @@ To run it yourself, from the new image with the app's environment (`DATABASE_URL
 cd /app/apps/api && pnpm --silent run start:prepare:db
 ```
 
-That runs `pnpm task upgrade` (Postgres, ClickHouse and LangWatchQL, under one lease, so a second run waits for the first) and then the system-migrations pass. It is safe to run again: on a current installation it applies no step and leaves the schema as it is. To see what it would do first, run `cd /app/apps/tasks && pnpm task upgrade plan`; `pnpm task upgrade status` shows the ledger. Both take `--json`.
+That runs `pnpm task upgrade` (Postgres, ClickHouse and LangWatchQL, under one lease, so a second run waits for the first). It is safe to run again: on a current installation it applies no step and leaves the schema as it is. To see what it would do first, run `cd /app/apps/tasks && pnpm task upgrade plan`; `pnpm task upgrade status` shows the ledger. Both take `--json`.
 
 ### Exit codes and what to do
 
@@ -242,7 +244,7 @@ Two schema changes touch a whole large table while the upgrade runs.
 
   Migrations the image ships that no release lists yet are applied in one pass at the end. A ClickHouse target that fails is reported after the others have run, and fails the upgrade.
 - **Its own record first.** The upgrade keeps its ledger, its lease and the list of running processes in their own PostgreSQL schema, `<your schema>_upgrade_ledger` (`public_upgrade_ledger` by default), which it creates before anything else. The database user in `DATABASE_URL` needs `CREATE` on the database for that; if it has none, create the schema beforehand with that user as its owner.
-- **Never below the floor.** Each release names a long-term-support floor. An installation older than the floor is refused by name (exit code `2`): upgrade to the floor release first, then to this one.
+- **Never below the floor.** Each release names a long-term-support floor. An installation older than the floor is refused by name (exit code `2`): upgrade to the floor release first, then to this one. [Releases and support](/self-hosting/releases) explains the LTS schedule and which LTS to stop at.
 - **Short locks and retries.** PostgreSQL statements run with a 10 second `lock_timeout`. A statement that waits longer fails instead of blocking your traffic. The upgrade makes up to 3 attempts at a failed schema apply (waiting 2 seconds, then 4), then exits; the previous version keeps serving, and running it again resumes where it stopped.
 - **One run at a time.** The upgrade holds a lease in its ledger, renews it every 15 seconds and loses it after 60 seconds without a renewal. A second run waits up to 10 minutes for a live holder, saying so every 30 seconds, then exits `3`.
 - **Background steps.** Data copies that do not block the release run on the workers after the upgrade. A step that must not run while an older version still writes waits until every running app and worker is on a version that knows it.

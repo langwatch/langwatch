@@ -1,6 +1,6 @@
 /** Navigation feature port; synchronous and fail-closed, same contract as apps/ui session */
 
-import type { UiDrawerToken } from "@langwatch/browser-host/declarations";
+import type { ReleaseFlagToken, UiDrawerToken } from "@langwatch/browser-host/declarations";
 import type {
   NavigationDeployment,
   NavigationFlagReading,
@@ -117,7 +117,7 @@ export abstract class NavigationHost {
   abstract hasPermission(permission: string): boolean;
 
   /** Fail-closed flag check, with the pending state kept. */
-  abstract featureFlag(flag: string): NavigationFlagReading;
+  abstract featureFlag(flag: ReleaseFlagToken): NavigationFlagReading;
 
   /**
    * What the application shows while a navigation decision is still being

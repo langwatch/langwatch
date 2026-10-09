@@ -370,6 +370,9 @@
       "path": "modules/feature-flag/browser/tsconfig.json"
     },
     {
+      "path": "modules/feature-flag/client/tsconfig.json"
+    },
+    {
       "path": "modules/feature-flag/contract/tsconfig.json"
     },
     {
@@ -389,6 +392,9 @@
     },
     {
       "path": "modules/github/browser/tsconfig.json"
+    },
+    {
+      "path": "modules/github/client/tsconfig.json"
     },
     {
       "path": "modules/github/contract/tsconfig.json"
@@ -464,6 +470,9 @@
     },
     {
       "path": "services/langyworker/tsconfig.json"
+    },
+    {
+      "path": "packages/limiter/tsconfig.json"
     },
     {
       "path": "apps/llmsim-web/tsconfig.json"

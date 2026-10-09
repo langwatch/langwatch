@@ -1,5 +1,5 @@
 import { parseProcessConfig } from "@langwatch/config";
-import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
+import { EventSourcing } from "@langwatch/eventing";
 import {
   createBlobMaintenancePipeline,
   createProcessManagerMaintenancePipeline,
@@ -7,7 +7,7 @@ import {
   type ProcessRetentionSweepDeps,
 } from "@langwatch/eventing/server";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
-import { createApp, processConfig } from "@langwatch/process";
+import { type BootedRuntime, createApp, processConfig } from "@langwatch/process";
 import {
   aesEncryption,
   memoryStores,
@@ -50,7 +50,7 @@ interface WholeListSupply {
   withStores(stores: ReturnType<typeof memoryStores>): WholeListSupply;
   withMembers(members: Readonly<Record<string, unknown>>): WholeListSupply;
   withEventing(eventing: EventSourcing): WholeListSupply;
-  boot(): Promise<{ stop(): Promise<void> }>;
+  boot(): Promise<Pick<BootedRuntime<object>, "start" | "stop" | "service">>;
 }
 
 /** Boots every installed module in the worker role; its eventing is returned to inspect. */
@@ -66,10 +66,11 @@ export async function bootMemoryWorker({
   );
   await resolver.preflight(declared);
 
+  const stores = memoryStores();
   const eventing = new EventSourcing({
     eventStore: EventStoreMemory.createForTesting(),
     participation: "consume",
-    processStore: InMemoryProcessStore.createForTesting(),
+    processStore: stores.processStore,
     maintenance: () => [
       createBlobMaintenancePipeline({ cleanup: unreachable<BlobCleanupDeps>("blob sweep") }),
       createProcessManagerMaintenancePipeline({
@@ -84,7 +85,7 @@ export async function bootMemoryWorker({
   const runtime = await supply
     .withModules(processModules)
     .withConfig(config)
-    .withStores(memoryStores())
+    .withStores(stores)
     .withMembers({
       logger: createTestLogger().logger,
       clock: systemClock(),
@@ -126,5 +127,5 @@ export async function bootMemoryWorker({
     })
     .withEventing(eventing)
     .boot();
-  return { runtime, eventing };
+  return { runtime, eventing, stores };
 }

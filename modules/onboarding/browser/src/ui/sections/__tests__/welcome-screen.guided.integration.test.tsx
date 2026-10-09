@@ -4,12 +4,22 @@
  * a reload resumes from the organization's state.
  * Spec: specs/features/onboarding/guided-welcome-takeover.feature
  */
+import type { ReleaseFlagToken } from "@langwatch/browser-host/declarations";
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { type ComponentType, createElement, forwardRef, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
+
+const flags = vi.hoisted((): Record<string, boolean> => ({}));
+
+vi.mock("@langwatch/feature-flag-client", () => ({
+  useFeatureFlag: ({ name }: { name: string }) => ({
+    enabled: flags[name] ?? false,
+    isLoading: false,
+  }),
+}));
 
 vi.mock("react-contextual-analytics", () => ({
   AnalyticsBoundary: ({ children }: { children: ReactNode }) => children,
@@ -139,7 +149,6 @@ const SAAS_DEPLOYMENT: UiDeployment = {
   hasEmailProvider: true,
 };
 
-const flags: Record<string, boolean> = {};
 const failures: OnboardingFailureNotice[] = [];
 const hardRedirects: string[] = [];
 let organizations: OnboardingOrganization[] = [];
@@ -168,8 +177,8 @@ class WelcomeTestHost extends OnboardingHostApi {
     hardRedirects.push(to);
   }
   setQuery() {}
-  featureFlag(flag: string): OnboardingFlagReading {
-    return { enabled: flags[flag] ?? false, isLoading: false };
+  featureFlag({ name }: ReleaseFlagToken): OnboardingFlagReading {
+    return { enabled: flags[name] ?? false, isLoading: false };
   }
   signOut() {}
   succeeded() {}

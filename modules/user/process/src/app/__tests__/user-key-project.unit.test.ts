@@ -3,6 +3,7 @@
  * The `/api/me/project` door: the calling key's project, read through project's share (R40).
  * @see modules/user/specs/user.feature
  */
+import { InMemoryProcessStore } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 
 import { MemoryUserOrganizationDirectoryRepository } from "../../repositories/memory/memory.user-organization-directory.repository.ts";
@@ -14,7 +15,7 @@ const PROJECT = { id: "project-1", name: "Checkout", slug: "checkout", isPersona
 function keyProjectApp() {
   return createUserTestApp({
     repositories: {
-      ...MemoryUserRepositories.create(),
+      ...MemoryUserRepositories.create({ processStore: InMemoryProcessStore.createForTesting() }),
       organizationDirectory: MemoryUserOrganizationDirectoryRepository.create({
         "organization-1": { projects: [PROJECT] },
       }),

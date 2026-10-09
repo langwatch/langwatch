@@ -103,6 +103,7 @@ describe("the edit form", () => {
         entityId: null,
         metadataXml: null,
         certificate: "MIIC",
+        idpInitiated: { enabled: true, landingTargets: ["/acme/messages"] },
       });
 
       expect(identityProviderUpdateFromForm({ protocol: "saml", form })).toEqual({
@@ -111,6 +112,7 @@ describe("the edit form", () => {
         entityId: null,
         metadataXml: null,
         certificate: "MIIC",
+        idpInitiated: { enabled: true, landingTargets: ["/acme/messages"] },
       });
     });
   });
