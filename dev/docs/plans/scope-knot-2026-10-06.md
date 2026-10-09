@@ -115,6 +115,11 @@ does not rise); `pnpm lint:architecture --policies peer-cycles` (must not rise).
   host mounts (needs each module's api binding and a `getScopeGraph` answer). The demo scenario
   needs the provider change itself.
 
+- Batch 3 landed: `TraceHostProvider` and `ScenarioHostProvider` publish their host only; the
+  shell's scope host is the one scope reading. Bound in each module's host test: the organization
+  answer and the demo flag under the module host. The batch 2 outline stays `@unimplemented`: it
+  needs the real public-route session under each host mount, so it binds in an `apps/ui` test.
+
 ## Wire and data
 
 No route, procedure, input or output changes. Behaviour changes against the branch: defect 1

@@ -49,14 +49,14 @@ Feature: Permission reads come from the session, and a public page holds none
   # No module host shadows the shell's scope (plan batch 3)
   # ---------------------------------------------------------------------------
 
-  @integration @unimplemented
+  @integration
   Scenario: An organization permission reads the same under every module host
     Given the reader's grant in the active project lets them manage the project but not its organization
     And the trace and scenario module hosts are mounted around the page
     When a screen inside them asks whether the reader may manage the organization
     Then the answer is no, as the session answers it
 
-  @integration @unimplemented
+  @integration
   Scenario: The demo project is recognised under every module host
     Given the address names the deployment's demo project
     And the trace and scenario module hosts are mounted around the page

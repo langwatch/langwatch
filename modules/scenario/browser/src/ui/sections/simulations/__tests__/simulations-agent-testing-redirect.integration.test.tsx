@@ -1,5 +1,9 @@
 import { UiCapabilityContextProvider } from "@langwatch/browser-host/capabilities";
 import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import {
+  createUiScopeHost,
+  UiScopeHostProvider,
+} from "@langwatch/browser-host/use-organization-team-project";
 /**
  * @vitest-environment jsdom
  * @see specs/features/agent-testing/page-structure.feature
@@ -74,9 +78,19 @@ function TestScenarioHost({ children }: { children: React.ReactNode }) {
     }
   })();
 
+  // The shell publishes the one scope host on every route; the module host publishes none.
+  const shellScope = createUiScopeHost({
+    project: () => host.project(),
+    organization: () => host.organization(),
+    team: () => host.team(),
+    hasPermission: () => true,
+  });
+
   return (
     <UiCapabilityContextProvider value={createUiCapabilitiesFromHost(host)}>
-      <ScenarioHostProvider value={host}>{children}</ScenarioHostProvider>
+      <UiScopeHostProvider value={shellScope}>
+        <ScenarioHostProvider value={host}>{children}</ScenarioHostProvider>
+      </UiScopeHostProvider>
     </UiCapabilityContextProvider>
   );
 }

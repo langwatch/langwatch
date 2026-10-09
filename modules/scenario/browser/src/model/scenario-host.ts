@@ -3,12 +3,7 @@
  * application they are mounted in.
  */
 
-import {
-  createUiScopeHost,
-  UiScopeHostProvider,
-  type UiScopeHost,
-} from "@langwatch/browser-host/use-organization-team-project";
-import { createContext, createElement, useContext, useMemo } from "react";
+import { createContext, createElement, useContext } from "react";
 import type { ReactNode } from "react";
 
 /** The project every scenario read is scoped to. */
@@ -115,7 +110,8 @@ export abstract class ScenarioHostApi {
 const ScenarioHostContext = createContext<ScenarioHostApi | undefined>(void 0);
 
 /**
- * Publishes the host, and the CANONICAL SCOPE READING alongside it.
+ * Publishes the host only. The shell's scope host is the one scope reading on every route
+ * (record section 10.1); a module host republishing one would shadow it.
  */
 export function ScenarioHostProvider({
   value,
@@ -124,25 +120,7 @@ export function ScenarioHostProvider({
   value: ScenarioHostApi | undefined;
   children: ReactNode;
 }) {
-  const scope = useMemo<UiScopeHost | undefined>(
-    () =>
-      value
-        ? createUiScopeHost({
-            project: () => value.project(),
-            organization: () => value.organization(),
-            team: () => value.team(),
-            organizationRole: () => value.organizationRole(),
-            hasPermission: (permission) => value.hasPermission(permission),
-            isLoading: () => value.isLoading(),
-          })
-        : void 0,
-    [value],
-  );
-  return createElement(
-    ScenarioHostContext.Provider,
-    { value },
-    createElement(UiScopeHostProvider, { value: scope }, children),
-  );
+  return createElement(ScenarioHostContext.Provider, { value }, children);
 }
 
 /** The host the composing application mounted above this screen. */
