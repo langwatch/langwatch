@@ -163,6 +163,22 @@ func TestDBReset(t *testing.T) {
 		}
 	})
 
+	t.Run("given the seed run also grants the seeded admin the platform-operator role", func(t *testing.T) {
+		sup := &fakeSupervisor{}
+		o := dbOrchestrator(sup, &fakeStore{}, &fakeSystem{}, &fakeDBServer{}, &fakeDBServer{})
+		if err := o.DBReset(context.Background(), params, ""); err != nil {
+			t.Fatalf("DBReset: %v", err)
+		}
+		shell := sup.shells[1]
+		want := `task grant-platform-operator "${LANGWATCH_ADMIN_EMAIL:-` + domain.DefaultAdminEmail + `}"`
+		if !strings.Contains(shell, want) {
+			t.Errorf("shell = %q, want the recovery task for the seeded admin", shell)
+		}
+		if !strings.Contains(shell, `platform-operator grant skipped (continuing)"; }`) {
+			t.Errorf("shell = %q, want the grant to be best-effort", shell)
+		}
+	})
+
 	t.Run("given a database drop fails", func(t *testing.T) {
 		sup := &fakeSupervisor{}
 		ch := &fakeDBServer{dropErr: errors.New("ch boom")}

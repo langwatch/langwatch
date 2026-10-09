@@ -1069,17 +1069,23 @@ func (o *Orchestrator) ensureRedis(ctx context.Context, st *domain.Stack) {
 // out) and chained with `|| echo` so a missing psql or a transient hiccup never
 // fails the seed — enabling the dev feature set is a convenience, not a boot
 // requirement. `key` is the FeatureFlag primary key, so the write is idempotent.
+//
+// It then grants the seeded admin the platform-operator role through ops's
+// recovery task (ARCHITECTURE.md, "Operator bootstrap"): ADMIN_EMAILS only feeds
+// a one-time seed that never runs when IS_SAAS is on. Idempotent, best-effort.
 func seedShell(base string, env []string) string {
 	if !hasEnvKey(env, "DATABASE_URL") {
 		return base
 	}
-	sql := domain.FeatureFlagSeedSQL()
-	if sql == "" {
-		return base
+	shell := base
+	if sql := domain.FeatureFlagSeedSQL(); sql != "" {
+		shell += ` && if [ "$HAVEN_SEED_FEATURE_FLAGS" != "0" ]; then ` +
+			`psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -qtA -c ` + shellSingleQuoted(sql) +
+			` || echo "haven: feature-flag seed skipped (continuing)"; fi`
 	}
-	return base + ` && if [ "$HAVEN_SEED_FEATURE_FLAGS" != "0" ]; then ` +
-		`psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -qtA -c ` + shellSingleQuoted(sql) +
-		` || echo "haven: feature-flag seed skipped (continuing)"; fi`
+	return shell + ` && { pnpm --silent --filter @langwatch/tasks task grant-platform-operator ` +
+		`"${LANGWATCH_ADMIN_EMAIL:-` + domain.DefaultAdminEmail + `}"` +
+		` || echo "haven: platform-operator grant skipped (continuing)"; }`
 }
 
 // shellSingleQuoted wraps s in single quotes for safe embedding in a bash -lc
