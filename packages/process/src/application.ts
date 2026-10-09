@@ -512,6 +512,9 @@ export class ApplicationBuilder<
     const scope = new ResourceScope();
     const featureServices: RuntimeService[] = [];
     const installed = new Map<string, InstalledFeatureState>();
+    // Called, not handed: ops installs before the modules whose tenant steps it drives (S6-FEED).
+    const declaredMigrationSteps = () =>
+      [...installed.values()].flatMap((state) => state.migrationSteps ?? []);
     const provided = new Map<TokenIdentity, unknown>();
     const apis = new LocalFeatureApis();
     const declared: DeclaredTransports[] = [];
@@ -529,6 +532,7 @@ export class ApplicationBuilder<
           repositorySelection: selections.get(declaration.name),
           role,
           replayer,
+          declaredMigrationSteps,
           resolve: (token) => resolveInstallToken({ token, provided, apis }),
         });
         featureServices.push(...resources.sealServices());

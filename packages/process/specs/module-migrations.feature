@@ -2,7 +2,8 @@ Feature: A module declares its migration steps beside its tasks
 
   The owning module declares its code steps with `.withMigrations`, built over its own
   app, repositories and peers as `.withTasks` builds tasks; the tasks and worker roles
-  collect them over the installed list and the api never builds one. The step contract
+  collect them over the installed list; the api builds them only so ops can drive the tenant
+  steps among them (S6-FEED). The step contract
   is `@langwatch/upgrade/step`. Plan: dev/docs/plans/migrations-rethink-2026-10-06.md 6.1,
   6.2 and 6.5; dev/docs/plans/migrations-blitz-2026-10-06.md 5.3.
 
@@ -13,11 +14,11 @@ Feature: A module declares its migration steps beside its tasks
     Then the module's steps are built over the app it just installed
 
   @unit
-  Scenario: The tasks and worker roles build a module's migration steps and the api never does
+  Scenario: Every role builds a module's migration steps and only tasks and worker answer for them
     Given a module that declares two migration steps
     When it is installed in the tasks role, the worker role and the api role
-    Then the tasks and worker installs hold both steps, in declaration order
-    And the api install holds none and never runs the module's binder
+    Then each install holds both steps, in declaration order
+    And the api refuses to answer for them, naming its role
 
   @unit
   Scenario: Migration steps are collected over the installed list in installation order

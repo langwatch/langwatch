@@ -713,7 +713,9 @@ export class UpgradeRunnerService {
     signal: AbortSignal;
     runId: string;
   }): Promise<void> {
-    if (this.shipped.find((step) => step.id === id)?.kind === "event-upcast") return;
+    // An upcast settles by its drain, a tenant step by ops' pass (S6-WIRE); neither has code here.
+    const kind = this.shipped.find((step) => step.id === id)?.kind;
+    if (kind === "event-upcast" || kind === "tenant") return;
     const step = this.codeSteps.get(id);
     if (!step) {
       const lastError = `blocking step ${id} is in the plan but this image declares no such step`;

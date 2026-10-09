@@ -5,6 +5,7 @@ import {
 } from "@langwatch/eventing/server";
 import { prismaRepositories } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { TenantStepStateRepository } from "@langwatch/upgrade/step/tenant-state";
 
 import { PostgresHealthRepository } from "../datastore-health.repository.ts";
 import type { OpsRepositories } from "../ops.repositories.ts";
@@ -66,6 +67,10 @@ type NotPostgres =
   | "events"
   | "storageFootprint";
 
+/** Marks the tenant step table's SQL for the tenancy guard, as the ledger repository does. */
+const LEDGER_TENANCY =
+  "-- @tenancy: the upgrade ledger describes the installation, not a tenant.\n";
+
 /**
  * The claimed rows, eventing's own process store, the migration pass's Postgres reads, and the
  * operator's reads and edits across the platform's rows.
@@ -93,6 +98,13 @@ export const PostgresOpsRepositories = {
       processFleet: PrismaProcessAdmin.create({ database: prisma }),
       postgresHealth: PrismaPostgresHealthRepository.create(prisma),
       upgradeLedger: PrismaUpgradeLedgerRepository.create({ prisma }),
+      tenantStepState: TenantStepStateRepository.create({
+        postgres: {
+          query: async <Row extends object>(text: string, values: unknown[] = []) => ({
+            rows: await prisma.$queryRawUnsafe<Row[]>(`${LEDGER_TENANCY}${text}`, ...values),
+          }),
+        },
+      }),
     };
   },
 };

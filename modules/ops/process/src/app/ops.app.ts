@@ -257,6 +257,7 @@ import { StoredObjectApi } from "@langwatch/stored-object-contract";
 import type { MigrationPassSummary, SystemMigrationPass } from "@langwatch/system-migrations";
 import { type Instant, nowInstant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
+import { isTenantMigrationStep } from "@langwatch/upgrade/step";
 import { UserApi, type UserApi as UserApiContract } from "@langwatch/user-contract";
 import { WorkflowApi } from "@langwatch/workflow-contract";
 
@@ -795,6 +796,7 @@ export class OpsModule implements OpsApi {
     const logger = createLogger("langwatch:ops");
     const infrastructure = buildOpsInfrastructure({
       bugReportNotifier: setup.channels.bugReportNotifier,
+      declaredMigrationSteps: setup.declaredMigrationSteps,
       logger,
       config: setup.config,
       resources: setup.resources,
@@ -2270,6 +2272,8 @@ function buildOpsInfrastructure(input: {
   repositories: OpsRepositories;
   featureFlags: Pick<FeatureFlagApi, "isEnabled"> | undefined;
   cloudOps: boolean;
+  /** The kernel's feed (S6-FEED); ops keeps only the tenant steps. */
+  declaredMigrationSteps: (() => readonly unknown[]) | undefined;
 }): OpsAppInfrastructure {
   const { logger, config, resources, repositories } = input;
   const introspection = EventingIntrospectionService.create(() =>
@@ -2375,6 +2379,10 @@ function buildOpsInfrastructure(input: {
         routes: () => repositories.clickhouseRoutes.findPrivateRoutes(),
         dependencies,
         passRequests,
+        declared: {
+          steps: () => (input.declaredMigrationSteps?.() ?? []).filter(isTenantMigrationStep),
+          state: repositories.tenantStepState,
+        },
       }),
     bugReportNotifier: input.bugReportNotifier,
     explainClients: explainRuntime,

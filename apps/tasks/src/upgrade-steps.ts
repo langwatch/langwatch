@@ -1,7 +1,7 @@
 import { writeFileSync } from "node:fs";
 
 import { migrationStepsOverMemory } from "@langwatch/process";
-import { isMigrationStep } from "@langwatch/upgrade/step";
+import { isDeclaredMigrationStep } from "@langwatch/upgrade/step";
 
 import { processModules } from "./process-modules.generated.ts";
 import { codeStepOf, UpgradeArgumentError } from "./upgrade.ts";
@@ -38,7 +38,7 @@ export async function upgradeSteps({
     name: "langwatch-tasks",
     modules: processModules,
     environment: LISTING_ENVIRONMENT,
-    isMigrationStep,
+    isMigrationStep: isDeclaredMigrationStep,
   });
   const listed = steps.map(codeStepOf);
   const text = json

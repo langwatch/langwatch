@@ -1,5 +1,8 @@
 import type { ProcessStore } from "@langwatch/eventing";
-import type { MigrationLeaseRepository } from "@langwatch/system-migrations";
+import type {
+  MigrationLeaseRepository,
+  SystemMigrationStateRepository as RunnerStateRepository,
+} from "@langwatch/system-migrations";
 
 import type { AnomalyRateTrackerRepository, AnomalyStateRepository } from "./anomaly.repository.ts";
 import type { BlobStoreRepository } from "./blob-store.repository.ts";
@@ -83,4 +86,6 @@ export interface OpsRepositories {
   readonly events: EventExplorerRepository;
   readonly storageFootprint: StorageFootprintRepository;
   readonly upgradeLedger: UpgradeLedgerRepository;
+  /** Every declared tenant step's per-tenant state: the framework's table beside the ledger. */
+  readonly tenantStepState: RunnerStateRepository;
 }

@@ -40,7 +40,12 @@ import {
   upgradeReadHintMessage,
 } from "@langwatch/upgrade/runner";
 import { assertOldWritersGone, recordPreRosterRollback } from "@langwatch/upgrade/serving-roster";
-import { isMigrationStep, type MigrationStep } from "@langwatch/upgrade/step";
+import {
+  isDeclaredMigrationStep,
+  isMigrationStep,
+  type MigrationStep,
+  type TenantMigrationStep,
+} from "@langwatch/upgrade/step";
 import { applyRelease, SteppingError } from "@langwatch/upgrade/stepping";
 
 import type { TaskInput } from "./config.ts";
@@ -577,15 +582,15 @@ function writeLine({
 
 /** Hands `use` the steps the installed modules declare, then closes the process that built them. */
 export type DeclaredCodeSteps = <Result>(
-  use: (steps: readonly MigrationStep[]) => Promise<Result>,
+  use: (steps: readonly (MigrationStep | TenantMigrationStep)[]) => Promise<Result>,
 ) => Promise<Result>;
 
 /** The tasks process's `.withMigrations` steps (round 14: the framework runs them). */
 export const installedCodeSteps: DeclaredCodeSteps = (use) =>
-  withTasksApp({ use: (app) => use(app.migrationSteps(isMigrationStep)) });
+  withTasksApp({ use: (app) => use(app.migrationSteps(isDeclaredMigrationStep)) });
 
 /** A declared step as the image's tree names it: its owner is the module its id starts with. */
-export function codeStepOf(step: MigrationStep): ManifestStep {
+export function codeStepOf(step: MigrationStep | TenantMigrationStep): ManifestStep {
   const { id, kind, mode, description, finishBy } = step;
   const owner = id.slice(0, id.indexOf(":"));
   return { id, kind, mode, owner, description, ...(finishBy === undefined ? {} : { finishBy }) };
@@ -655,7 +660,7 @@ async function runWithCodeSteps({
   command: UpgradeCommand;
   input: TaskInput;
   write: (text: string) => void;
-  steps: readonly MigrationStep[];
+  steps: readonly (MigrationStep | TenantMigrationStep)[];
 }): Promise<number> {
   const database = input.connections.database;
   if (!database) throw new Error("DATABASE_URL is required to upgrade");
@@ -680,7 +685,8 @@ async function runWithCodeSteps({
           tree: readImageTree({ codeSteps: steps.map(codeStepOf) }),
         }),
       },
-      codeSteps: steps,
+      // Registered on the ledger, run only here: tenant steps are ops' pass (S6-WIRE).
+      codeSteps: steps.filter(isMigrationStep),
       releases,
       applier: releaseSteppingApplier({
         imageRelease: newest,

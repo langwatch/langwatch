@@ -24,7 +24,6 @@ import {
   type ChannelsFor,
 } from "./channel-registry.ts";
 /** One feature installer. A feature declares its config, the contract services */
-import { buildsMigrationSteps } from "./migration/migration-steps.ts";
 import { processProjectionReplayer } from "./migration/projection-replayer.ts";
 import { withAnotherPipeline } from "./module-eventing.ts";
 import { snapshotRepositories, type FeatureRepositories } from "./repository-ownership.ts";
@@ -73,6 +72,8 @@ export type FeatureSetup<
   readonly secrets: ScopedSecrets;
   /** Which process this install is in; absent only where a test builds the App by hand. */
   readonly role?: ServerRole;
+  /** Every installed module's built migration steps, read once all have installed (S6-FEED). */
+  readonly declaredMigrationSteps?: () => readonly unknown[];
 }> &
   ([Repositories] extends [never]
     ? object
@@ -182,7 +183,7 @@ export interface ModuleMigrationSetup<
   readonly replayer: ProjectionLaneReplayer;
 }
 
-/** Builds a module's migration steps over its booted App, at install in tasks and worker. */
+/** Builds a module's migration steps over its booted App, at install in every role. */
 export type ModuleMigrationBinder<
   Dependencies extends TokenMap,
   Repositories,
@@ -219,6 +220,7 @@ export interface FeatureSetupArguments<Config, Dependencies> {
    */
   readonly secrets: ScopedSecrets;
   readonly repositorySelection?: FeatureInstallArguments["repositorySelection"];
+  readonly declaredMigrationSteps?: FeatureInstallArguments["declaredMigrationSteps"];
   /**
    * What the module's registry answered on the selected backend, instantiated
    * once per install so the app and its eventing declaration read the same
@@ -282,7 +284,7 @@ export interface InstalledFeatureState {
   readonly facts?: readonly TransportFactBinding[];
   /** The tasks this module's binders built over its App, in the tasks role only. */
   readonly tasks?: readonly unknown[];
-  /** The migration steps this module's binders built over its App, in tasks and worker only. */
+  /** The migration steps this module's binders built over its App, in every role. */
   readonly migrationSteps?: readonly unknown[];
   /** Bound contribution readers; absent where the feature declared none. */
   readonly rest: (() => unknown) | undefined;
@@ -309,6 +311,11 @@ export interface FeatureInstallArguments {
   readonly secrets?: ScopedSecrets;
   /** The process's projection replayer; absent where none was composed, which then refuses. */
   readonly replayer?: ProjectionLaneReplayer;
+  /**
+   * Every installed module's built migration steps, collected when called: ops installs before
+   * the modules whose tenant steps it drives (S6-FEED). Absent where the root composed none.
+   */
+  readonly declaredMigrationSteps?: () => readonly unknown[];
   /** The instance the graph resolved for one token. */
   resolve: (token: TokenIdentity) => unknown;
 }
@@ -853,6 +860,7 @@ export class ServerFeatureAssembly<
           repositorySelection: args.repositorySelection,
           repositories: args.repositories,
           channels: args.channels,
+          declaredMigrationSteps: args.declaredMigrationSteps,
         };
         // A module resolving a secret does so in `create()`, so the whole
         // install awaits: only the constructed collaborator comes back.
@@ -1280,7 +1288,7 @@ class RepositoryAppBuilder<
     >({ declaration: this.build(), workers: [], tasks });
   }
 
-  /** Migration steps this module declares, built in the tasks and worker roles only. */
+  /** Migration steps this module declares, built in every role; tasks and worker run them. */
   withMigrations(...steps: readonly unknown[]) {
     return withContributions<
       ReturnType<
@@ -1331,6 +1339,7 @@ class RepositoryAppBuilder<
           repositories,
           repositorySelection,
           channels,
+          declaredMigrationSteps,
         }): App | Promise<App> => {
           return app.create({
             dependencies,
@@ -1341,6 +1350,7 @@ class RepositoryAppBuilder<
             repositories: repositories as ModuleRepositories<Live, Memory>,
             ...(repositorySelection ? { tier: repositorySelection.tier } : {}),
             ...(channels === undefined ? {} : { channels }),
+            ...(declaredMigrationSteps === undefined ? {} : { declaredMigrationSteps }),
           });
         },
       )
@@ -1521,7 +1531,7 @@ class ConfiguredAppBuilder<
     return withContributions({ declaration: this.build(), workers: [], tasks });
   }
 
-  /** Migration steps this module declares, built in the tasks and worker roles only. */
+  /** Migration steps this module declares, built in every role; tasks and worker run them. */
   withMigrations(...steps: readonly unknown[]) {
     return withContributions({
       declaration: bindingMigrations(this.build(), () => steps),
@@ -1556,15 +1566,17 @@ class ConfiguredAppBuilder<
     const declaration = serverFeature(this.name)
       .withConfigType<Config>()
       .withDependencies(app.dependencies)
-      .withSetup(({ dependencies, config, secrets, resources, role, channels }) =>
-        app.create({
-          dependencies,
-          config,
-          secrets,
-          resources,
-          role,
-          ...(channels === undefined ? {} : { channels }),
-        }),
+      .withSetup(
+        ({ dependencies, config, secrets, resources, role, channels, declaredMigrationSteps }) =>
+          app.create({
+            dependencies,
+            config,
+            secrets,
+            resources,
+            role,
+            ...(channels === undefined ? {} : { channels }),
+            ...(declaredMigrationSteps === undefined ? {} : { declaredMigrationSteps }),
+          }),
       )
       .provides(app.contract)
       .build();
@@ -1635,7 +1647,7 @@ class UnconfiguredAppBuilder<
     return withContributions({ declaration: this.build(), workers: [], tasks });
   }
 
-  /** Migration steps this module declares, built in the tasks and worker roles only. */
+  /** Migration steps this module declares, built in every role; tasks and worker run them. */
   withMigrations(...steps: readonly unknown[]) {
     return withContributions({
       declaration: bindingMigrations(this.build(), () => steps),
@@ -1670,15 +1682,17 @@ class UnconfiguredAppBuilder<
     const declaration = serverFeature(this.name)
       .withConfigType<undefined>()
       .withDependencies(app.dependencies)
-      .withSetup(({ dependencies, config, secrets, resources, role, channels }) =>
-        app.create({
-          dependencies,
-          config,
-          secrets,
-          resources,
-          role,
-          ...(channels === undefined ? {} : { channels }),
-        }),
+      .withSetup(
+        ({ dependencies, config, secrets, resources, role, channels, declaredMigrationSteps }) =>
+          app.create({
+            dependencies,
+            config,
+            secrets,
+            resources,
+            role,
+            ...(channels === undefined ? {} : { channels }),
+            ...(declaredMigrationSteps === undefined ? {} : { declaredMigrationSteps }),
+          }),
       )
       .provides(app.contract)
       .build();
@@ -1802,7 +1816,7 @@ function bindingTasks<Declaration extends object>(
   };
 }
 
-/** Build migration steps at install (tasks and worker roles), over the App just installed. */
+/** Build migration steps at install in every role (the api's feed ops, S6-FEED), over the App. */
 function bindingMigrations<Declaration extends object>(
   declaration: Declaration,
   bind: ModuleMigrationBinder<TokenMap, unknown, never>,
@@ -1813,8 +1827,6 @@ function bindingMigrations<Declaration extends object>(
     ...declaration,
     install: async (args: FeatureInstallArguments): Promise<InstalledFeatureState> => {
       const state = await installable.install(args);
-      if (!buildsMigrationSteps(args.role)) return state;
-
       const built = await bind({
         app: state.provided as never,
         repositories: state.repositories,
