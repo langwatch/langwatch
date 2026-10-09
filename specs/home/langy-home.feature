@@ -102,6 +102,16 @@ Feature: The Langy home
     And one quiet line tells me how to get access
     And the example asks are not shown
 
+  # Feedback is the reader's own sentence: it lands in the composer to be
+  # finished, so reading Langy is enough to be offered it.
+  @integration
+  Scenario: Feedback on the briefing opens Langy with a draft, not a question
+    Given the Langy home renders its attention inbox
+    And I may read Langy without starting conversations
+    When I choose "Missing a signal? Tell us"
+    Then Langy opens with a feedback sentence prefilled in its composer
+    And nothing is sent until I send it
+
   # The field starts conversations and the panel's composer continues them.
   # Offered together, a line typed here while the panel was open on a
   # conversation went into a new one.

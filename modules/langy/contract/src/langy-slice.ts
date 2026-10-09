@@ -171,6 +171,8 @@ export interface LangySliceSurface {
   pendingPrompt: string | null;
   /** Open Langy on a fresh conversation and queue `prompt` to auto-send. */
   askLangy: (prompt: string) => void;
+  /** Prefill the composer with `draft`, never sent; pair with `openPanel` to show it. */
+  setDraft: (draft: string) => void;
   panelMode: LangyPanelMode;
   /** The home page's ask field is in use right now. */
   setHomeAskOpen: (open: boolean) => void;
@@ -207,6 +209,7 @@ export const LANGY_ABSENT_SURFACE: LangySliceSurface = {
   openPanel: nothing,
   pendingPrompt: null,
   askLangy: nothing,
+  setDraft: nothing,
   panelMode: "sidebar",
   setHomeAskOpen: nothing,
   pageActivity: null,
