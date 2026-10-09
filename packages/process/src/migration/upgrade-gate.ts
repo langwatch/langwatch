@@ -5,6 +5,7 @@
  */
 import { createHash, randomBytes } from "node:crypto";
 import { hostname } from "node:os";
+import { setTimeout as sleep } from "node:timers/promises";
 
 import type { ServerRole } from "../feature-installer.ts";
 import {
@@ -20,9 +21,18 @@ export type UpgradeGatedRole = Exclude<ServerRole, "tasks">;
 /** What the api's upgrade console shows of a run that failed (UPGRADE-CONSOLE, 2026-10-09). */
 export type UpgradeGateFailedRun = Pick<UpgradeConsole, "failedSteps" | "logTail">;
 
-export type UpgradeGateVerdict = Readonly<
-  { admitted: true } | { admitted: false; refusal: string; failedRun?: UpgradeGateFailedRun }
->;
+/** The api holds (a Postgres schema step outstanding) or upgrades, and asks again (UIW-1). */
+export type UpgradeGateWaiting = Readonly<{
+  admitted: false;
+  outcome: "holding" | "upgrading";
+  outstanding: readonly string[];
+}>;
+
+export type UpgradeGateVerdict =
+  | Readonly<
+      { admitted: true } | { admitted: false; refusal: string; failedRun?: UpgradeGateFailedRun }
+    >
+  | UpgradeGateWaiting;
 
 /** A worker's declared background steps, run by the gate's package (round 14: framework runs). */
 export type UpgradeGateBackgroundSteps = Readonly<{
@@ -44,6 +54,11 @@ const LEDGER = "the upgrade ledger (DATABASE_URL)";
 const LEDGER_UNREADABLE_NEXT =
   "check DATABASE_URL reaches Postgres and `pnpm task upgrade status` answers, then start this process again";
 const REFUSED_NEXT = "do what the refusal names, then start this process again";
+/** How often a holding or upgrading api asks the ledger again (UPGRADE-IN-WORKER). */
+const RE_ASK_MS = 10_000;
+
+const isWaiting = (verdict: UpgradeGateVerdict): verdict is UpgradeGateWaiting =>
+  !verdict.admitted && "outcome" in verdict;
 
 export class UpgradeGateRefusedError extends Error {
   readonly code = "upgrade_gate_refused";
@@ -85,6 +100,7 @@ export function upgradeGateComponent({
   logger,
   onHolding,
   onFailed,
+  reAskMs = RE_ASK_MS,
 }: {
   server: string;
   role: UpgradeGatedRole;
@@ -92,6 +108,7 @@ export function upgradeGateComponent({
   logger: ServerLogger;
   onHolding?: (holding: UpgradeHolding | undefined) => Promise<void>;
   onFailed?: (upgradeConsole: UpgradeConsole) => Promise<boolean>;
+  reAskMs?: number;
 }): ServerComponent {
   let admitted = false;
   /** D1, D2: a fresh token per failed run, printed on one log line; only its hash is kept. */
@@ -119,7 +136,9 @@ export function upgradeGateComponent({
   const admitThroughConsole = async (): Promise<UpgradeGateVerdict> => {
     for (;;) {
       const verdict = await gate.admit();
-      if (verdict.admitted || !verdict.failedRun || !onFailed) return verdict;
+      if (verdict.admitted || !("failedRun" in verdict) || !verdict.failedRun || !onFailed) {
+        return verdict;
+      }
       const retried = await onFailed({
         ...redactFailedRun(verdict.failedRun),
         ...issueConsoleToken(),
@@ -149,18 +168,25 @@ export function upgradeGateComponent({
         },
         `${server} (${role}): checking the upgrade ledger before serving`,
       );
-      let verdict: UpgradeGateVerdict;
+      let verdict: Exclude<UpgradeGateVerdict, UpgradeGateWaiting>;
       // Only the gate's phase: its steps are behind `admit`, and a refusal's text is never shown.
       await onHolding?.({ phase: GATE_PHASE, outstandingStepIds: [] });
       try {
-        verdict = await admitThroughConsole();
+        verdict = await admitWhenCurrent({
+          admit: admitThroughConsole,
+          onHolding,
+          reAskMs,
+          say: (fields, line) => logger.info(fields, `${server} (${role}): ${line}`),
+        });
       } catch (error) {
         const cause = `the upgrade ledger could not be read (DATABASE_URL): ${messageOf(error)}`;
         return refuse(cause, LEDGER_UNREADABLE_NEXT);
       } finally {
         await onHolding?.(undefined);
       }
-      if (!verdict.admitted) return refuse(verdict.refusal, REFUSED_NEXT);
+      if (!verdict.admitted) {
+        return refuse(verdict.refusal, REFUSED_NEXT);
+      }
       admitted = true;
       const elapsedMs = Math.round(performance.now() - startedAt);
       logger.info(
@@ -178,6 +204,35 @@ export function upgradeGateComponent({
       if (admitted) await gate.release();
     },
   };
+}
+
+/** The worker runs the upgrade; the api re-asks every 10 s, holding the door meanwhile. */
+async function admitWhenCurrent({
+  admit,
+  onHolding,
+  reAskMs,
+  say,
+}: {
+  admit: () => Promise<UpgradeGateVerdict>;
+  onHolding: ((holding: UpgradeHolding | undefined) => Promise<void>) | undefined;
+  reAskMs: number;
+  say: (fields: object, line: string) => void;
+}): Promise<Exclude<UpgradeGateVerdict, UpgradeGateWaiting>> {
+  let phase = "";
+  for (;;) {
+    const verdict = await admit();
+    if (!isWaiting(verdict)) return verdict;
+    if (verdict.outcome !== phase) {
+      const next = "nothing to do: this api serves once the ledger is current";
+      say(
+        { phase: verdict.outcome, waitingOn: "the worker's upgrade run", next },
+        `the installation is ${verdict.outcome} (${verdict.outstanding.join(", ")}); asking again every ${reAskMs / 1000} s`,
+      );
+      phase = verdict.outcome;
+    }
+    await onHolding?.({ phase: verdict.outcome, outstandingStepIds: verdict.outstanding });
+    await sleep(reAskMs);
+  }
 }
 
 function messageOf(error: unknown): string {

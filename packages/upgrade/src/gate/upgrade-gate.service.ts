@@ -7,6 +7,7 @@ import {
   rollbackReason,
 } from "../serving-roster/rollback.ts";
 import {
+  apiPhaseVerdict,
   assertCurrent,
   firstInstallVerdict,
   ledgerFloor,
@@ -63,7 +64,7 @@ export function createUpgradeGate({
   image: ServingGateImage;
   ledger: ServingGateLedger;
   roster: ServingRoster;
-  /** True when the application schema holds nothing yet (Q10's first install). */
+  /** True when the application schema holds nothing yet (Q10's first install, the worker's). */
   schemaIsEmpty: () => Promise<boolean>;
   /** Round 9 (S3-ROLLBACK): absent, an admitted process reopens nothing. */
   rollback?: ServingGateRollback;
@@ -79,11 +80,12 @@ export function createUpgradeGate({
         image: { release, blockingSteps },
         floor: ledgerFloor({ runs }),
       });
-      if (!verdict.admitted) {
+      if (verdict.outcome === "behind") {
+        if (gatedRole === "api") return apiPhaseVerdict({ outstanding: verdict.outstanding });
         const empty = steps.length === 0 && runs.length === 0;
-        if (gatedRole === "api" && empty && (await schemaIsEmpty())) return firstInstallVerdict();
-        return verdict;
+        return empty && (await schemaIsEmpty()) ? firstInstallVerdict() : verdict;
       }
+      if (!verdict.admitted) return verdict;
       await roster.record({
         processId,
         role: gatedRole,

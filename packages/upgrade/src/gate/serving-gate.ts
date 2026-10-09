@@ -19,6 +19,9 @@ export type ServingImage = z.infer<typeof servingImageSchema>;
 
 const SETTLED: ReadonlySet<UpgradeStepStatus> = new Set(["done", "not-needed"]);
 
+/** How often a waiting worker or a holding api asks the ledger again (UPGRADE-IN-WORKER). */
+export const UPGRADE_RE_ASK_MS = 10_000;
+
 /** A failed `upgrade` run, for the api's console: the failed steps and the run's last lines. */
 export type UpgradeFailedRun = Readonly<{
   failedSteps: readonly Readonly<{ id: string; error: string | null }>[];
@@ -33,7 +36,12 @@ export type ServingVerdict =
       outstanding: readonly string[];
       command: typeof UPGRADE_COMMAND;
       refusal: string;
-      failedRun?: UpgradeFailedRun;
+    }>
+  | Readonly<{
+      admitted: false;
+      outcome: "holding" | "upgrading";
+      outstanding: readonly string[];
+      refusal: string;
     }>
   | Readonly<{
       admitted: false;
@@ -47,7 +55,6 @@ export type ServingVerdict =
       outcome: "first-install";
       command: typeof UPGRADE_COMMAND;
       refusal: string;
-      failedRun?: UpgradeFailedRun;
     }>
   | Readonly<{ admitted: false; outcome: "no-clickhouse"; refusal: string }>;
 
@@ -108,7 +115,7 @@ export function assertCurrent({
   };
 }
 
-/** Q10: a Helm first install is an empty ledger on an empty schema; the api runs `upgrade` once. */
+/** Q10: a first install is an empty ledger on an empty schema; the worker runs `upgrade` once. */
 export function firstInstallVerdict(): ServingVerdict {
   return {
     admitted: false,
@@ -116,4 +123,21 @@ export function firstInstallVerdict(): ServingVerdict {
     command: UPGRADE_COMMAND,
     refusal: `this is a first install (empty ledger, empty schema): run \`${UPGRADE_COMMAND}\` once.`,
   };
+}
+
+/**
+ * The api never runs a step (UIW-1): it holds while a Postgres schema step of its image is
+ * outstanding (step id grammar, blitz plan 5.3: `prisma:<folder>`), then upgrades until current.
+ */
+export function apiPhaseVerdict({
+  outstanding,
+}: {
+  outstanding: readonly string[];
+}): ServingVerdict {
+  const schema = outstanding.filter((id) => id.startsWith("prisma:"));
+  const left = schema.length > 0 ? schema : outstanding;
+  const refusal = `the worker's \`${UPGRADE_COMMAND}\` has not finished: ${left.join(", ")}`;
+  return schema.length > 0
+    ? { admitted: false, outcome: "holding", outstanding: schema, refusal }
+    : { admitted: false, outcome: "upgrading", outstanding, refusal };
 }

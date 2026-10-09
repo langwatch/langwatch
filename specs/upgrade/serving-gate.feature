@@ -64,33 +64,33 @@ Feature: Serving processes refuse to start when the installation is behind their
     When a serving gate is made for release "3.21"
     Then making it fails, naming the release
 
-  @unimplemented
+  @unit
   Scenario: A first install is detected by the worker
     Given the ledger has no steps and no runs
     And the application schema is empty
     When the worker's serving gate checks the image
     Then the verdict is a first install naming the command "pnpm task upgrade"
 
-  @unimplemented
+  @unit
   Scenario: An api on a first install holds
     Given the ledger has no steps and no runs
     And the application schema is empty
     When the api's serving gate checks the image
     Then the verdict is holding
 
-  @unimplemented
+  @unit
   Scenario: An api whose image has a Postgres schema step outstanding holds
     Given the ledger records "prisma:20261006180000_add_column" as pending
     When the api's serving gate checks the image
     Then the verdict is holding, naming step "prisma:20261006180000_add_column"
 
-  @unimplemented
+  @unit
   Scenario: An api whose schema steps are done while a blocking step is outstanding is upgrading
     Given the ledger records "prisma:20261006180000_add_column" as done and "clickhouse:00042" as pending
     When the api's serving gate checks the image
     Then the verdict is upgrading, naming step "clickhouse:00042"
 
-  @unimplemented
+  @unit
   Scenario: A worker on an installation behind its image is told to run the upgrade
     Given the ledger records "prisma:20261006180000_add_column" as done and "clickhouse:00042" as pending
     When the worker's serving gate checks the image

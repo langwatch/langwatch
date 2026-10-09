@@ -82,7 +82,7 @@ Feature: An upgrade tells the operator what it is doing and what to do next
     Then the refusal names "DATABASE_URL" and the line carries the next action
 
   @unit
-  Scenario: The api's first install says it runs the upgrade once before serving
-    Given an api on an empty ledger and an empty schema
+  Scenario: The worker's first install says it runs the upgrade once before taking jobs
+    Given a worker on an empty ledger and an empty schema
     When its upgrade gate admits it
-    Then it reports that this is a first install and that it runs "pnpm task upgrade" once
+    Then it reports that this is a first install and that it runs "pnpm task upgrade" before taking jobs

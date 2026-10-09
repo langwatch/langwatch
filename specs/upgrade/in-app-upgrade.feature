@@ -13,7 +13,7 @@ Feature: The new image's worker runs its blocking upgrade while the api holds, t
 
   # --- The blocking part runs in the worker, under the runner's lease ---
 
-  @unimplemented
+  @integration
   Scenario: The worker on an installation behind its image runs the upgrade once, then takes jobs
     Given an installation whose ledger records a blocking step of this image as pending
     When the worker's gate asks
@@ -21,7 +21,7 @@ Feature: The new image's worker runs its blocking upgrade while the api holds, t
     And it takes no job before the ledger is current
     And it is admitted and starts its background steps when the upgrade succeeded
 
-  @unimplemented
+  @unit
   Scenario: The worker says it runs the upgrade because the installation is behind, naming the steps
     Given a worker whose installation is behind its image on one blocking step
     When its upgrade gate admits it
@@ -35,14 +35,14 @@ Feature: The new image's worker runs its blocking upgrade while the api holds, t
     Then it runs no upgrade
     And it refuses, naming the floor
 
-  @unimplemented
+  @integration
   Scenario: The api never runs the upgrade when its installation is behind
     Given an installation whose ledger records a blocking step of this image as pending
     When the api's gate asks
     Then it runs nothing and takes no upgrade lease
     And it holds the door until the ledger is current
 
-  @unimplemented
+  @unit
   Scenario: A worker waits while another runner holds the upgrade lease
     Given another worker or a `pnpm task upgrade` run holds the upgrade lease
     When a worker's gate finds its installation behind
@@ -56,14 +56,14 @@ Feature: The new image's worker runs its blocking upgrade while the api holds, t
     Then one runs the upgrade and the other waits for it
     And both take jobs once the installation is current
 
-  @unimplemented
+  @unit
   Scenario: After a failed run the worker waits for a Retry
     Given the worker's upgrade run failed on a blocking step
     When its gate asks again
     Then the ledger records the step as failed and the worker runs nothing
     And once a Retry returns the step to pending the worker runs the upgrade again
 
-  @unimplemented
+  @unit
   Scenario: A restarted worker runs a failed upgrade once more
     Given the worker's upgrade run failed on a blocking step
     When the operator restarts the worker

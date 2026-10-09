@@ -1360,24 +1360,32 @@ the tier the value states: opened stores state `live`, `memoryStores()` states `
 repositories whose tier nobody stated refuses boot by name (Alex, 2026-10-05). Production and dev open
 live stores; a test or dev harness hands `memoryStores()` directly and never touches env.
 
-**Migrations are not the api's job.** They run through `pnpm task upgrade` (apps/api
-`start:prepare:db`: upgrade alone; the system-migrations pass is not part of api start), before serve, from every entry
-point (ADR-173). On a self-hosted install the new image's api runs that same `upgrade` itself,
-under the runner's lease, whenever the ledger is behind it, behind the holding page; the worker
-never does (Alex, 2026-10-09, UPGRADE-FIXES). A background step names the background steps
-it runs after by their step values (`after: [step]`, STEP-AFTER); the worker waits on them, the
-upgrade inlines them before a contract, and an unknown id or a cycle refuses the plan. Prisma migrations
-live with the schema; ClickHouse migrations are goose SQL files. A serving
-process holding DDL locks is how deploys die. Because they run before any module boots, apps/tasks'
-migration-runner files (`src/*migrat*.ts`) may name process packages (Alex, 2026-09-27), and
-so may `lwql-provision.ts` and `lwql-render-access-config.ts`: LangWatchQL provisioning reads
-both schemas under the same migration lock, before serve, and the access-config render runs from
-env alone in its Helm job (Alex, 2026-09-28).
-SQL migrations stay central, and each is attributed to the owner of the table it touches; a check
-refuses a migration touching two owners' tables (Alex, 2026-10-06, round 7, D3). A migration main
-has released keeps main's bytes even when it touches two owners: installs hold its checksum, so a
-later idempotent migration carries the split instead, and the check names it as released history
-(Alex, 2026-10-09).
+**Migrations are not the api's job.** The worker runs every upgrade step under the runner's lease:
+at boot, while the ledger is behind its image, its gate runs `pnpm task upgrade` (the tasks app's
+runner, in its own process), waits while another runner holds the lease, takes no job until the
+ledger is current, and after a failed run waits for a Retry that returns the step to `pending`
+(Alex, 2026-10-09, UPGRADE-IN-WORKER, superseding UPGRADE-FIXES' "the worker never does"). `pnpm
+task upgrade` stays a runner under the same lease for development, CI and an operator (apps/api
+`start:prepare:db`: upgrade alone; no system-migrations pass); the Helm pre-roll Job renders only
+with `serializeUpgrades`, and the compose `migrate` service is gone. The api never runs a step:
+while a Postgres schema step of its image is outstanding it serves the holding page; after that,
+until the ledger is current, it serves in upgrading mode, only sign-in and the Ops Upgrades page
+(the routes declared to serve while upgrading through a `packages/api` route declaration the door
+enforces; everything else answers the holding page), and reports not ready. A blocking step never
+touches a table owned by auth, user, organization, authz or identity; `lint:architecture` refuses
+one that does (UIW-1..11). A background step names the background steps it runs after by their step
+values (`after: [step]`, STEP-AFTER); the worker waits on them, the upgrade inlines them before a
+contract, and an unknown id or a cycle refuses the plan. Prisma migrations live with the schema;
+ClickHouse migrations are goose SQL files. A serving process holding DDL locks is how deploys die.
+Because they run before any module boots, apps/tasks' migration-runner files (`src/*migrat*.ts`) may
+name process packages (Alex, 2026-09-27), and so may `lwql-provision.ts` and
+`lwql-render-access-config.ts`: LangWatchQL provisioning reads both schemas under the same migration
+lock, before serve, and the access-config render runs from env alone in its Helm job (Alex,
+2026-09-28). SQL migrations stay central, and each is attributed to the owner of the table it
+touches; a check refuses a migration touching two owners' tables (Alex, 2026-10-06, round 7, D3). A
+migration main has released keeps main's bytes even when it touches two owners: installs hold its
+checksum, so a later idempotent migration carries the split instead, and the check names it as
+released history (Alex, 2026-10-09).
 
 **In-place system migrations belong to their subject; the framework runs, ops reads and requests**
 (Alex, 2026-10-06, round 14, Q-U8 and UP-3, amending "the runner belongs to ops"). The upgrade run

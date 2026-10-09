@@ -87,7 +87,7 @@ Feature: The worker runs the upgrade from every entry point; the api never migra
     When the api's gate asks
     Then it reads that schema's ledger and is admitted
 
-  @unimplemented
+  @integration
   Scenario: The worker's first boot on an empty installation runs the upgrade once
     Given an empty ledger on an empty schema
     When the worker's gate asks
@@ -101,7 +101,7 @@ Feature: The worker runs the upgrade from every entry point; the api never migra
     Then the worker names the command and the exit code and waits for a Retry
     And the api holds and offers the token console
 
-  @unimplemented
+  @integration
   Scenario: The api never runs the upgrade on a first install
     Given an empty ledger on an empty schema
     When the api's gate asks
