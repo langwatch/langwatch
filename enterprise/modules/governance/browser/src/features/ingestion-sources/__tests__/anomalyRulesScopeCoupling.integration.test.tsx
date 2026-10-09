@@ -50,6 +50,10 @@ const SOURCES = [
   },
 ];
 
+vi.mock("../../../behavior/use-webhook-endpoint-options.ts", () => ({
+  useWebhookEndpointOptions: () => ({ options: [], isLoading: false }),
+}));
+
 vi.mock("../../../behavior/governance-api.ts", () => {
   const mutation = (mutate = vi.fn()) => ({
     useMutation: () => ({
