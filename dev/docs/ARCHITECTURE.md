@@ -3065,6 +3065,7 @@ re-send blocked spend through the replay route, and governance is re-requested b
 Where the local stack lives; this record does not restate it.
 
 - **The stack** (haven, the one dev process, the no-container setup): `dev/docs/LOCAL_STACK.md`.
+- **VM-free macOS dev** (native ClickHouse and observability, pinned downloads, lazy tools): ADR-176.
 - **The sims** (llmsim, mailsim, storagesim, analyticssim, voicesim): the `.claude/skills/sims` skill.
 - **haven** (`make haven up`, the orchestrator that names each stack): `tools/thuishaven`.
 - **`apps/server`**: the published `npx @langwatch/server` CLI that runs the whole stack locally.
