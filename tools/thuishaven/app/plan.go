@@ -51,17 +51,35 @@ func (o *Orchestrator) simulatorShell(name string) string {
 // goCombinedShell runs the data-plane services in ONE Go process — the local
 // topology (ADR-004, amendment 2026-09-07). `services` names which of them this
 // stack selected, so a worktree that turned one off gets a process hosting only
-// the other rather than a second lane it has to reason about.
-//
-// Watching is air: it rebuilds the one binary on a Go change, restarts only
-// when the build succeeded, and waits out the same quiet window the Node lane
-// debounces on (LANGWATCH_DEV_WATCH_DEBOUNCE_MS).
-func goCombinedShell(repoRoot string, services []string, shouldWatch bool) string {
-	target := "service"
-	if shouldWatch {
-		target = "service-watch"
+// the other rather than a second lane it has to reason about. Watching is
+// haven's own `go-watch`; not watching runs `make service` once.
+func (p *childPlan) goCombinedShell(lane string, services []string) string {
+	repoRoot, watchArgv := p.opts.RepoRoot, p.goWatchArgv()
+	if len(watchArgv) == 0 {
+		return fmt.Sprintf("make -C %q service svc=combined args=%q", repoRoot, strings.Join(services, " "))
 	}
-	return fmt.Sprintf("make -C %q %s svc=combined args=%q", repoRoot, target, strings.Join(services, " "))
+	var b strings.Builder
+	b.WriteString("cd " + shQuote(repoRoot) + " && ")
+	// ponytail: consoles build once per lane start, as `make service-watch` did; slice 5 retires it for Vite.
+	for _, svc := range services {
+		if strings.HasSuffix(svc, "sim") {
+			fmt.Fprintf(&b, "{ pnpm exec nx run @langwatch/%s-web:build --outputStyle=static || echo '%s-web did not build; its console names the fix'; } && ", svc, svc)
+		}
+	}
+	b.WriteString(`_snap=$(export -p) && . dev/scripts/lib/load-dev-env.sh && { ! test -f .env || load_dev_env .env; } && eval "$_snap" && `)
+	b.WriteString(`. dev/scripts/lib/derive-gateway-base-url.sh && derive_gateway_base_url && export LOG_FORMAT=${LOG_FORMAT:-json} && exec`)
+	for _, arg := range append(append(append([]string{}, watchArgv...), filepath.Join(".bin", "combined", lane)), services...) {
+		b.WriteString(" " + shQuote(arg))
+	}
+	return b.String()
+}
+
+// goWatchArgv is the watch command for the go lanes, or nil when not watching.
+func (p *childPlan) goWatchArgv() []string {
+	if !p.opts.ShouldGoWatch {
+		return nil
+	}
+	return p.o.cfg.GoWatchArgv
 }
 
 // SimulatorsInGoFile is the dev-tagged file that links the simulators into the
@@ -281,14 +299,14 @@ func (p *childPlan) goLanes(mono monolithPlan) []Child {
 	} else if len(goServices) > 0 {
 		out = append(out, Child{
 			Name: GoLane, Dir: p.opts.RepoRoot, Color: palette[2], LogPath: p.logPath(GoLane),
-			Shell: goCombinedShell(p.opts.RepoRoot, goServices, p.opts.ShouldGoWatch),
+			Shell: p.goCombinedShell(GoLane, goServices),
 			Env:   goEnv,
 		})
 	}
 	if len(sims.services) > 0 {
 		out = append(out, Child{
 			Name: SimsLane, Dir: p.opts.RepoRoot, Color: palette[8], LogPath: p.logPath(SimsLane),
-			Shell: goCombinedShell(p.opts.RepoRoot, sims.services, p.opts.ShouldGoWatch),
+			Shell: p.goCombinedShell(SimsLane, sims.services),
 			Env:   append(append(append([]string{}, p.base...), domain.LaneEnv(SimsLane)), sims.env...),
 		})
 	}

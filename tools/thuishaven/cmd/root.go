@@ -212,6 +212,7 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 		HeartbeatEvery:          30 * time.Second,
 		DaemonArgv:              selfArgv(trustedRepoRoot(), "daemon"),
 		SimulatorArgv:           simulatorArgv(),
+		GoWatchArgv:             goWatchArgv(),
 		UpArgv:                  selfArgv(worktree, "up"),
 		IsAgent:                 isAgent,
 		PortlessDisabled:        devEnv("PORTLESS") == "0",

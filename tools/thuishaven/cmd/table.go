@@ -206,6 +206,13 @@ var baseTable = []commandSpec{
 		run:     runBundledSimulator,
 	},
 	{
+		name:    "go-watch",
+		args:    "<binary> <service>…",
+		maxArgs: -1,
+		hidden:  true,
+		run:     runGoWatch,
+	},
+	{
 		name:      "up",
 		summary:   "start or reconcile this worktree's stack; +svc/-svc picks services and sticks",
 		args:      "[+svc|-svc …]",
@@ -297,7 +304,7 @@ var baseTable = []commandSpec{
 	},
 	{
 		name:    "idp",
-		summary: "idpsim: bare runs the standalone IdP simulator; with a verb it drives this stack's (tenants | tenant show | apps | populate | churn | user add | scim ... | dns | activity | signin | reset | samlp | legacy | tamper | auth0-webhook | scim-event)",
+		summary: "idpsim: bare runs the standalone IdP simulator; with a verb it drives this stack's (tenants | tenant show | apps | populate | churn | user add | scim ... | dns | verification | activity | signin | reset | samlp | legacy | tamper | auth0-webhook | scim-event | rotate-key | skew | user disable/enable | saml unsolicited)",
 		args:    "[verb] [tenant] [args]",
 		maxArgs: -1,
 		flags:   simFlags(idpFlags...),
@@ -315,13 +322,14 @@ var baseTable = []commandSpec{
 	},
 	{
 		name:    "mail",
-		summary: "read this worktree's caught email: address | list | get <id> | links <id> | wait | delete <id> | clear",
-		args:    "<address|list|get|links|wait|delete|clear> [id]",
+		summary: "read this worktree's caught email: address | inbox | list | get <id> | links <id> | wait | delete <id> | clear",
+		args:    "<address|inbox|list|get|links|wait|delete|clear> [id]",
 		maxArgs: 2,
 		flags: []flagSpec{
 			{long: "--to", takesValue: true, value: "<addr>", summary: "list/wait: only messages to a matching recipient"},
 			{long: "--subject", takesValue: true, value: "<text>", summary: "list/wait: only messages with a matching subject"},
 			{long: "--timeout", takesValue: true, value: "<dur>", summary: "wait: how long to block for a match (default 30s)"},
+			{long: "--after", takesValue: true, value: "<id>", summary: "wait: only mail caught after this message"},
 			{long: "--html", summary: "get: the message's raw HTML body instead of its text"},
 			{long: "--json", summary: "machine-readable"},
 		},
@@ -329,12 +337,14 @@ var baseTable = []commandSpec{
 	},
 	{
 		name:    "llm",
-		summary: "llmsim's calls and settings: info | calls | call <id> | clear | set --error <status> --seed <value>",
+		summary: "llmsim's calls and settings: info | calls [--model <text>] [--failed] | call <id> | clear | set --error <status> --seed <value>",
 		args:    "<info|calls|call|clear|set> [id]",
 		maxArgs: 2,
 		flags: simFlags(
 			flagSpec{long: "--error", takesValue: true, value: "<status>", summary: "set: force this 4xx/5xx on generation calls (0 turns it off)"},
 			flagSpec{long: "--seed", takesValue: true, value: "<value>", summary: "set: seed for deterministic replies (\"random\" or empty to unseed)"},
+			flagSpec{long: "--model", takesValue: true, value: "<text>", summary: "calls: only calls whose model contains this text"},
+			flagSpec{long: "--failed", summary: "calls: only calls answered with a 4xx or 5xx"},
 		),
 		run: runLLM,
 	},
@@ -376,11 +386,15 @@ var baseTable = []commandSpec{
 	},
 	{
 		name:    "storage",
-		summary: "storagesim's S3: buckets | objects [bucket] | object <bucket> <key> [--raw] | requests",
-		args:    "<buckets|objects|object|requests> [bucket] [key]",
+		summary: "storagesim's S3: buckets | objects [bucket] | object <bucket> <key> [--raw] | presign <bucket> <key> | delete | clear [bucket] | seed | requests",
+		args:    "<buckets|objects|object|presign|delete|clear|seed|requests> [bucket] [key]",
 		maxArgs: 3,
-		flags:   simFlags(flagSpec{long: "--raw", summary: "object: the stored bytes instead of the metadata"}),
-		run:     runStorage,
+		flags: simFlags(
+			flagSpec{long: "--raw", summary: "object: the stored bytes instead of the metadata"},
+			flagSpec{long: "--put", summary: "presign: a PUT URL instead of a GET"},
+			flagSpec{long: "--expires", takesValue: true, value: "<seconds>", summary: "presign: lifetime, 1..604800 (default 3600)"},
+		),
+		run: runStorage,
 	},
 	{
 		name:    "sims",
@@ -390,8 +404,8 @@ var baseTable = []commandSpec{
 	},
 	{
 		name:    "voice",
-		summary: "voicesim's calls: status | calls | call <id>",
-		args:    "<status|calls|call> [id]",
+		summary: "voicesim's calls: status | calls | call <id> | clear",
+		args:    "<status|calls|call|clear> [id]",
 		maxArgs: 2,
 		flags:   simFlags(),
 		run:     runVoice,

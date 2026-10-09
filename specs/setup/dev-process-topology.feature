@@ -170,6 +170,37 @@ Feature: The local development process topology
     When files keep changing so the quiet window never elapses
     Then the restart fires once the max wait since the first change has passed
 
+  # --- haven rebuilds and swaps the stack's Go child (HAVEN-SWAP, HAVEN-REBUILD) ---
+
+  # haven's own watch replaced air: it builds ./cmd/service into
+  # .bin/combined/<lane> and runs `combined` from it. Tests are not watched.
+  @unit
+  Scenario: A watched go lane runs haven's own Go watch, not air
+    Given a stack started with LANGWATCH_GO_WATCH=1 or --watch
+    When haven plans the go lane
+    Then the lane runs "haven go-watch" with the lane's binary path and services
+    And no lane runs "make service-watch"
+
+  @unit
+  Scenario: A Go edit burst rebuilds the combined child once, after the quiet window
+    Given the go lane running under haven's Go watch
+    When several Go source files change less than LANGWATCH_DEV_WATCH_DEBOUNCE_MS (2000 by default) apart
+    Then one rebuild starts once that quiet window has passed since the last change
+    And the new child replaces the old one in sequence: the old one stops, then the new one starts
+
+  @unit
+  Scenario: A steady trickle of Go edits still rebuilds within the max wait
+    Given the go lane running under haven's Go watch
+    When Go files keep changing so the quiet window never elapses
+    Then the rebuild fires once LANGWATCH_DEV_WATCH_MAX_WAIT_MS (30000 by default) has passed since the first change
+
+  @unit
+  Scenario: A failed Go build keeps the running child
+    Given the go lane running under haven's Go watch
+    When a Go change does not compile
+    Then the compile error is written to the go lane's log
+    And the running child keeps serving until a later change builds
+
   # --- The api lane reloads in-process (ADR-168, B1) ---
 
   # Restarting the whole process for every edit left a shared checkout's api
