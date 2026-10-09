@@ -36,7 +36,9 @@ Shapes: self-hosted · cloud · cloud hybrid (tenants on their own ClickHouse an
 | --- | --- |
 | Upgrades | No holds; retryable `upgrade_in_progress`; defensive ClickHouse columns; graceful migration guards; runbook |
 | Authorization | Every authorize member required; REST mounts need an authorization port; `authz-members-required` lint rule |
-| Retention | Opt-out classes; worker classifies event rows on write again (as on main) |
+| Retention | Opt-out classes; worker classifies event rows on write again (as on main); ruled classes; per-pipeline tenant policy; classifier required at worker boot |
+| Billing | Five billing scenarios pass against paymentsim |
+| Upgrade cell UP-01 | Cloud, small, with overlap: 9 of 16 invariants; findings UPG-001..005 on #8553 |
 | Evaluations | Monitor evaluations dated by span end; alert staleness by processing time; peer subscribers get `createdAt` |
 | Seed | Plan core, protocol, checkpoint, CLI (SG1) · runner and `seed:apply` (SG3) · static coverage, 612 gaps (SG11) · telemetry backfill and chunker (SG2) · local identity grants through commands (SG4) · `haven seed` and auto-seed (SG12) |
 | Sims | paymentsim (Stripe stand-in), `haven up +payment` |
@@ -49,10 +51,11 @@ Shapes: self-hosted · cloud · cloud hybrid (tenants on their own ClickHouse an
 | --- | --- |
 | Tested-flow ledger | Missing area files, fold in the code sweep (3,103 rows), assemble the #8553 body; coordinator publishes |
 | Upgrade e2e harness | First proven cell (cloud, no hybrid, small) with overlap; verdicts per invariant into #8553 |
-| Retention rulings | Apply the class changes and the per-pipeline tenant resolver |
+| UPG-001..004 fixes | Gate tolerates a missing upgrade ledger; main-layout datasets read; main API keys keep trace reads; main-queued jobs (UPG-004 first decides local-only or real) |
+| Upgrade cells 2 | Hybrid small (UP-04), self-hosted small (UP-06), drills: retry a step, worker restart mid-upgrade, api before worker |
+| Retention pipelines | `.withRetention` on the 10 pipelines without it; real classifier in the api-live fixture |
 | Image + SaaS | One image booting as api/server or worker; draft PR in the SaaS repo (no deploy) |
 | SG5 | Memory guard, executors, preflight, resume; measured drain rate |
-| Billing binds | Five billing scenarios against paymentsim; billing test fakes |
 
 ## 5. Next, in order
 
@@ -89,4 +92,3 @@ Shapes: self-hosted · cloud · cloud hybrid (tenants on their own ClickHouse an
 - Topic clustering runs on Python langevals on this branch; the Go engine is on `feat/langevals-go`.
 - Authz read audits: confirm the emitter records each read once.
 - paymentsim gaps: no proration, no automatic webhook retries, unknown parameters accepted.
-- Make the worker's retention classifier required at boot.
