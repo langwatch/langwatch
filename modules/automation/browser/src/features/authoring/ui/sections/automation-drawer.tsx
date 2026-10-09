@@ -36,6 +36,7 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import type { NamedSlackConnection } from "@langwatch/slack-contract";
 import { nowInstant } from "@langwatch/time";
+import { findWebhookUrlProblemMessage } from "@langwatch/webhook-contract";
 import { Mail, Send } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
@@ -158,8 +159,13 @@ function deliveryTodo(draft: AutomationDraft): string {
       return draft.slices[TriggerAction.ADD_TO_DATASET].datasetId
         ? "map the dataset's columns"
         : "choose a dataset";
-    case TriggerAction.SEND_WEBHOOK:
-      return "enter a valid endpoint URL and content type";
+    case TriggerAction.SEND_WEBHOOK: {
+      const url = draft.slices[TriggerAction.SEND_WEBHOOK].url.trim();
+      const problem = url ? findWebhookUrlProblemMessage(url) : null;
+      return problem
+        ? problem.replace(/\.$/, "").replace(/^./, (first) => first.toLowerCase())
+        : "enter a valid endpoint URL and content type";
+    }
     case TriggerAction.SEND_SLACK_MESSAGE:
       return draft.slices[TriggerAction.SEND_SLACK_MESSAGE].slackIntegrationId
         ? "choose a Slack channel"
