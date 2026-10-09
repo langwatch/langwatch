@@ -6,6 +6,7 @@
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
+import { ownProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
 import { TraceTopicNamingService } from "../../../features/topic/services/trace-topic-naming.service.ts";
 import { PrismaTraceTopicNamesRepository } from "../prisma.trace-topic-names.repository.ts";
 
@@ -57,7 +58,7 @@ describe("given topic's shared Topic table", () => {
       const { repository } = repositoryOver([]);
       const naming = TraceTopicNamingService.create({ topicNames: repository });
 
-      const result = await naming.enrichTopicNames(PROJECT, {
+      const result = await naming.enrichTopicNames(ownProof({ projectId: PROJECT }), {
         values: [{ value: "t-unknown", count: 2 }],
         totalDistinct: 1,
       } as never);

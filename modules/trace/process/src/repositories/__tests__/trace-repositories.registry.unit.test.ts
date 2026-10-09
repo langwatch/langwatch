@@ -6,6 +6,7 @@
 import { instantiateRepositories } from "@langwatch/process";
 import { describe, expect, it } from "vitest";
 
+import { ownProof } from "../../__tests__/support/authorization-proofs.fixture.ts";
 import { createInitState } from "../../eventing/__tests__/trace-summary-test.fixtures.ts";
 import { traceRepositories } from "../trace-repositories.registry.ts";
 
@@ -86,7 +87,7 @@ describe("given the memory-backed trace repositories", () => {
 
       await expect(
         repositories.summaryProjection.findByTraceId({
-          tenantId: "project-1",
+          authorization: ownProof({ projectId: "project-1" }),
           traceId: "trace-1",
         }),
       ).resolves.toMatchObject({ traceId: "trace-1" });
