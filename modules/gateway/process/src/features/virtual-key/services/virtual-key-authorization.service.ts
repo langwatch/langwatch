@@ -67,7 +67,7 @@ function permissionDenied(permission: AuthzPermission, scope: Scope | undefined)
     scope: scope
       ? { type: AUTHZ_TIER[scope.scopeType], id: scope.scopeId }
       : { type: "organization", id: "" },
-    denialReason: "no-binding",
+    denialReason: "no-grant",
   });
 }
 
