@@ -16,7 +16,9 @@ import type {
   AutomationApiCreateInput,
   AutomationApiFireHistoryInput,
   AutomationApiListSlackChannelsInput,
+  AutomationApiPreviewEmailInput,
   AutomationApiTestFireInput,
+  AutomationEmailPreview,
   AutomationApiToggleTriggerInput,
   AutomationApiUpdateTriggerFiltersInput,
   AutomationApiTriggerScope,
@@ -188,6 +190,8 @@ export interface AutomationApi {
     input: AutomationApiTestFireInput,
     author: AutomationTestFireAuthor,
   ): Promise<TestFireResult>;
+  /** Renders the email an authoring draft would send, without delivering it. */
+  previewTriggerEmail(input: AutomationApiPreviewEmailInput): Promise<AutomationEmailPreview>;
   findUnsubscribeView(input: {
     token: string;
   }): Promise<{ projectName: string; triggerName: string | null; email: string } | null>;
