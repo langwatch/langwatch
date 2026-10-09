@@ -41,6 +41,14 @@ export class MemoryTenantStepStateRepository implements SystemMigrationStateRepo
       (record) => record.migrationName === migrationName && record.status === "finalized",
     );
   }
+
+  async hasUnsettledTenant({ migrationName }: { migrationName: string }): Promise<boolean> {
+    return [...this.records.values()].some(
+      (record) =>
+        record.migrationName === migrationName &&
+        (record.status === "parked" || record.heldReason !== undefined),
+    );
+  }
 }
 
 function keyOf({ migrationName, tenantId }: { migrationName: string; tenantId: string }): string {

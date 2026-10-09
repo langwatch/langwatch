@@ -1,6 +1,9 @@
 import { type EventSourcing, type InMemoryProcessStore } from "@langwatch/eventing";
 import type { TenantSource } from "@langwatch/system-migrations";
-import { MemoryTenantStepStateRepository } from "@langwatch/upgrade/step/tenant-state";
+import {
+  MemoryTenantStepLedgerRepository,
+  MemoryTenantStepStateRepository,
+} from "@langwatch/upgrade/step/tenant-state";
 
 import type { OpsReplayRuntime } from "../../app/ops.app.ts";
 import { NullBlobStoreRepository } from "../blob-store.repository.ts";
@@ -169,6 +172,7 @@ export class MemoryOpsRepositories {
       storageFootprint: MemoryStorageFootprintRepository.create(),
       upgradeLedger: MemoryUpgradeLedgerRepository.create(),
       tenantStepState: MemoryTenantStepStateRepository.create(),
+      tenantStepLedger: MemoryTenantStepLedgerRepository.create(),
     };
   }
 }

@@ -3,6 +3,7 @@ import type {
   MigrationLeaseRepository,
   SystemMigrationStateRepository as RunnerStateRepository,
 } from "@langwatch/system-migrations";
+import type { TenantStepLedger, TenantStepSettleState } from "@langwatch/upgrade/step/tenant-state";
 
 import type { AnomalyRateTrackerRepository, AnomalyStateRepository } from "./anomaly.repository.ts";
 import type { BlobStoreRepository } from "./blob-store.repository.ts";
@@ -87,5 +88,7 @@ export interface OpsRepositories {
   readonly storageFootprint: StorageFootprintRepository;
   readonly upgradeLedger: UpgradeLedgerRepository;
   /** Every declared tenant step's per-tenant state: the framework's table beside the ledger. */
-  readonly tenantStepState: RunnerStateRepository;
+  readonly tenantStepState: RunnerStateRepository & TenantStepSettleState;
+  /** The tenant steps' ledger rows, which settling after a pass level-triggers. */
+  readonly tenantStepLedger: TenantStepLedger;
 }

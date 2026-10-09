@@ -20,3 +20,10 @@ Feature: Ops runs the system migration passes and names their cohorts
     When the ops tRPC declarations are read
     Then each of the ten sits under ops.upgrade with its original kind and platform permission
     And none of them is declared under ops
+
+  @unit
+  Scenario: A migration pass settles the declared tenant steps it drove
+    Given a module declares a tenant step and the pass holds one of its tenants
+    When the pass runs
+    Then the step's ledger row is left pending
+    And once a later pass leaves no tenant held, the row is settled

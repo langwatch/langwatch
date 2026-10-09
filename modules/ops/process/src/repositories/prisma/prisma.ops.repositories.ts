@@ -5,6 +5,7 @@ import {
 } from "@langwatch/eventing/server";
 import { prismaRepositories } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { UpgradeRunnerRepository } from "@langwatch/upgrade/runner";
 import { TenantStepStateRepository } from "@langwatch/upgrade/step/tenant-state";
 
 import { PostgresHealthRepository } from "../datastore-health.repository.ts";
@@ -81,6 +82,11 @@ export const PostgresOpsRepositories = {
     members: Parameters<typeof claimedOpsRepositories.create>[0],
   ): Omit<OpsRepositories, NotPostgres> => {
     const { prisma } = members;
+    const ledgerPostgres = {
+      query: async <Row extends object>(text: string, values: unknown[] = []) => ({
+        rows: await prisma.$queryRawUnsafe<Row[]>(`${LEDGER_TENANCY}${text}`, ...values),
+      }),
+    };
     return {
       ...claimedOpsRepositories.create(members),
       processStore: PrismaProcessStore.create({ database: prisma }),
@@ -98,13 +104,8 @@ export const PostgresOpsRepositories = {
       processFleet: PrismaProcessAdmin.create({ database: prisma }),
       postgresHealth: PrismaPostgresHealthRepository.create(prisma),
       upgradeLedger: PrismaUpgradeLedgerRepository.create({ prisma }),
-      tenantStepState: TenantStepStateRepository.create({
-        postgres: {
-          query: async <Row extends object>(text: string, values: unknown[] = []) => ({
-            rows: await prisma.$queryRawUnsafe<Row[]>(`${LEDGER_TENANCY}${text}`, ...values),
-          }),
-        },
-      }),
+      tenantStepState: TenantStepStateRepository.create({ postgres: ledgerPostgres }),
+      tenantStepLedger: UpgradeRunnerRepository.create({ postgres: ledgerPostgres }),
     };
   },
 };

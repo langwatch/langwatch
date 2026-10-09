@@ -142,6 +142,23 @@ export class UpgradeRunnerRepository {
     );
   }
 
+  /**
+   * Level-triggers a tenant step's row: `done` once no tenant is held or parked, `pending` when one
+   * is again. Rows in any other status are the runner's or the operator's and stay as they are.
+   */
+  async settleTenantStep({ id, settled }: { id: string; settled: boolean }): Promise<void> {
+    const status: UpgradeStepStatus = settled ? "done" : "pending";
+    await this.query(
+      (t) => `UPDATE ${t.step}
+          SET "status" = $2, "inferred" = false,
+              "finished_at" = CASE WHEN $3::boolean THEN ${NOW_UTC} ELSE NULL END,
+              "updated_at" = ${NOW_UTC}
+        WHERE "id" = $1 AND "kind" = 'tenant' AND "status" IN ('pending', 'done')
+          AND "status" <> $2`,
+      [id, status, settled],
+    );
+  }
+
   /** Saves a running step's checkpoint report, so a resumed attempt starts from it. */
   async saveReport({ id, report }: { id: string; report: Record<string, unknown> }): Promise<void> {
     await this.query(

@@ -2,7 +2,12 @@ import { SystemMigrationRunnerService, type TenantSource } from "@langwatch/syst
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import { defineMigrationStep, isMigrationStep, isTenantMigrationStep } from "../migration-step.ts";
+import {
+  defineMigrationStep,
+  isMigrationStep,
+  isTenantMigrationStep,
+  MigrationStepDeclarationError,
+} from "../migration-step.ts";
 import { MemoryTenantStepStateRepository } from "../tenant-state/index.ts";
 
 const NOW = Temporal.Instant.from("2026-10-09T00:00:00Z");
@@ -125,6 +130,28 @@ describe("a tenant step", () => {
       expect(visits).toEqual(["org-0001"]);
       const pinned = await state.getRecord({ migrationName: step.id, tenantId: "org-0002" });
       expect(pinned.status).toBe("rolled_back");
+    });
+  });
+
+  describe("when a tenant step is declared blocking", () => {
+    /** @scenario "A blocking tenant step is refused by name" */
+    it("refuses, naming the step: the worker runs tenant steps, never the blocking leg", () => {
+      const declare = () =>
+        defineMigrationStep({
+          id: "prompt:seed-default-tags",
+          kind: "tenant",
+          mode: "blocking",
+          description: "Seeds the default prompt tags into every organization.",
+          tenants: "organization",
+          title: "Default prompt tags",
+          requiresOperatorConfirmation: false,
+          runsAutomaticallyOnSelfHosted: true,
+          enrolledAutomatically: true,
+          migrateTenant: async () => ({ status: "finalized" }),
+        });
+
+      expect(declare).toThrow(MigrationStepDeclarationError);
+      expect(declare).toThrow(/"prompt:seed-default-tags" of module "prompt" is refused/);
     });
   });
 });

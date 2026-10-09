@@ -9,6 +9,7 @@ import {
 } from "@langwatch/system-migrations";
 import { nowInstant } from "@langwatch/time";
 import { type TenantMigrationStep, tenantAxisSchema } from "@langwatch/upgrade/step";
+import type { TenantStepSettleService } from "@langwatch/upgrade/step/tenant-state";
 
 import type {
   OpsAppDependencies,
@@ -76,6 +77,8 @@ type SystemMigrationPassOptions = Readonly<{
   declared?: Readonly<{
     steps: () => readonly TenantMigrationStep[];
     state: SystemMigrationStateRepository;
+    /** Level-triggers each driven step's ledger row after the pass (S6-SETTLE). */
+    settle: Pick<TenantStepSettleService, "settle">;
   }>;
 }>;
 
@@ -143,6 +146,7 @@ export class SystemMigrationPassService {
       user: userTenants,
     };
     let merged = summary;
+    const driven: string[] = [];
     for (const axis of tenantAxisSchema.options) {
       const steps = declared.steps().filter((step) => step.tenants === axis);
       const migrations = this.released({
@@ -150,6 +154,7 @@ export class SystemMigrationPassService {
         isSaaS,
       });
       if (migrations.length === 0) continue;
+      driven.push(...migrations.map((migration) => migration.name));
       const cohort = await this.declaredCohort({ axis, isSaaS, migrations });
       for (const bucket of groupByTenantSource({ migrations, everyTenant: sources[axis] })) {
         const runner = new SystemMigrationRunnerService({
@@ -163,6 +168,7 @@ export class SystemMigrationPassService {
         merged = mergeSummaries(merged, await runner.runPass({ signal }));
       }
     }
+    await declared.settle.settle({ ids: driven });
     return merged;
   }
 

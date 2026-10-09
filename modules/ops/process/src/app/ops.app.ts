@@ -258,6 +258,7 @@ import type { MigrationPassSummary, SystemMigrationPass } from "@langwatch/syste
 import { type Instant, nowInstant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
 import { isTenantMigrationStep } from "@langwatch/upgrade/step";
+import { TenantStepSettleService } from "@langwatch/upgrade/step/tenant-state";
 import { UserApi, type UserApi as UserApiContract } from "@langwatch/user-contract";
 import { WorkflowApi } from "@langwatch/workflow-contract";
 
@@ -2382,6 +2383,10 @@ function buildOpsInfrastructure(input: {
         declared: {
           steps: () => (input.declaredMigrationSteps?.() ?? []).filter(isTenantMigrationStep),
           state: repositories.tenantStepState,
+          settle: TenantStepSettleService.create({
+            state: repositories.tenantStepState,
+            ledger: repositories.tenantStepLedger,
+          }),
         },
       }),
     bugReportNotifier: input.bugReportNotifier,
