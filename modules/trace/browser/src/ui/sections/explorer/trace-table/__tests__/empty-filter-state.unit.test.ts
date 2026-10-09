@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { emptyContent } from "../empty-filter-state.tsx";
+import { AGGREGATE_HISTORY_NOTE, emptyContent } from "../empty-filter-state.tsx";
 
 describe("emptyContent", () => {
   describe("given an Instant Eval that is still judging", () => {
@@ -65,6 +65,98 @@ describe("emptyContent", () => {
             isJudging: false,
           }).title,
         ).toBe("Nothing matches these filters");
+      });
+    });
+  });
+
+  describe("given an aggregate project", () => {
+    describe("when its trace list is empty", () => {
+      /** @scenario "An empty aggregate says only a department rule starts at the join date" */
+      it("adds a note that only a department aggregate starts at the join date", () => {
+        const content = emptyContent({
+          activeLensId: "all-traces",
+          hasFilters: false,
+          rangeHours: 24 * 30,
+          isJudging: false,
+          isAggregate: true,
+        });
+        expect(content.note).toBe(AGGREGATE_HISTORY_NOTE);
+        expect(content.note).toContain("built from a department");
+        expect(content.note).toContain("from the day that member joined it");
+        expect(content.note).toContain("Older traces stay in the member project");
+      });
+
+      /** @scenario "An empty aggregate says only a department rule starts at the join date" */
+      it("never claims every aggregate starts when it was created or joined", () => {
+        const content = emptyContent({
+          activeLensId: "all-traces",
+          hasFilters: false,
+          rangeHours: 24 * 30,
+          isJudging: false,
+          isAggregate: true,
+        });
+        const text = `${content.title} ${content.description} ${content.note}`;
+        expect(text).not.toMatch(/since this aggregate was created/i);
+        expect(text).not.toMatch(/this aggregate (only )?shows member traces from/i);
+      });
+
+      /** @scenario "An empty aggregate says only a department rule starts at the join date" */
+      it("gives the note on every lens, with or without filters", () => {
+        for (const activeLensId of ["errors", "conversations", "all-traces"]) {
+          for (const hasFilters of [true, false]) {
+            const content = emptyContent({
+              activeLensId,
+              hasFilters,
+              rangeHours: 24,
+              isJudging: false,
+              isAggregate: true,
+            });
+            expect(content.note).toBe(AGGREGATE_HISTORY_NOTE);
+          }
+        }
+      });
+
+      /** @scenario "An empty aggregate says only a department rule starts at the join date" */
+      it("keeps the lens's own title and the advice to widen the window", () => {
+        const content = emptyContent({
+          activeLensId: "all-traces",
+          hasFilters: true,
+          rangeHours: 24 * 7,
+          isJudging: false,
+          isAggregate: true,
+        });
+        expect(content.title).toBe("Nothing matches these filters");
+        expect(content.description).toContain("Try widening the window");
+      });
+    });
+
+    describe("when an Instant Eval is still judging", () => {
+      it("leaves the judging message alone, since the run explains the empty table", () => {
+        const content = emptyContent({
+          activeLensId: "all-traces",
+          hasFilters: true,
+          rangeHours: 24,
+          isJudging: true,
+          isAggregate: true,
+        });
+        expect(content.title).toBe("No matches yet");
+        expect(content.note).toBeUndefined();
+      });
+    });
+  });
+
+  describe("given a plain project", () => {
+    describe("when its trace list is empty", () => {
+      /** @scenario "An empty aggregate says only a department rule starts at the join date" */
+      it("says nothing about aggregates", () => {
+        const content = emptyContent({
+          activeLensId: "all-traces",
+          hasFilters: false,
+          rangeHours: 24 * 30,
+          isJudging: false,
+        });
+        expect(content.note).toBeUndefined();
+        expect(`${content.title} ${content.description}`).not.toMatch(/aggregate/i);
       });
     });
   });
