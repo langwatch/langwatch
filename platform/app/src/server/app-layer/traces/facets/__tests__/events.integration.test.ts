@@ -35,6 +35,9 @@ import { buildEventsFacetQuery } from "../events";
 import { baseParams, buildTimeWhere } from "../helpers";
 
 const TENANT_ID = "facet-events-metric-gate-test";
+// One instant for the seed and the query window, so the window holds the
+// seeded spans however long setup takes.
+const SEEDED_AT = Date.now();
 
 /** The facet query as the authorized reader would send it for this tenant. */
 function forTenant(query: { sql: string; params: Record<string, unknown> }) {
@@ -60,9 +63,13 @@ const VOTE_EVERY = 20;
 const UP_VOTE_EVERY = 60;
 
 const VOTE_EVENT = "thumbs_up_down";
+// Occurs only on spans that carry no metric key at all, so it never reaches
+// the metrics half and has no row on the right side of the join.
+const UNMEASURED_EVENT = "handoff";
 const VOTE_KEY = `${EVENT_METRICS_PREFIX}vote`;
 
 const VOTING_SPANS = SPAN_COUNT / VOTE_EVERY;
+const NON_VOTING_SPANS = SPAN_COUNT - VOTING_SPANS;
 const UP_VOTES = Math.ceil(SPAN_COUNT / UP_VOTE_EVERY);
 const DOWN_VOTES = VOTING_SPANS - UP_VOTES;
 
@@ -84,7 +91,7 @@ async function seedSpansWithEvents({
 }: {
   ch: ClickHouseClient;
 }): Promise<void> {
-  const now = Date.now();
+  const now = SEEDED_AT;
   const payload = Object.fromEntries(
     Array.from({ length: PAYLOAD_KEYS_PER_EVENT }, (_, k) => [
       `payload_${k}`,
@@ -95,12 +102,15 @@ async function seedSpansWithEvents({
   const rows: Array<Record<string, unknown>> = [];
   for (let i = 0; i < SPAN_COUNT; i++) {
     const votes = i % VOTE_EVERY === 0;
-    const names = votes ? [...PAYLOAD_EVENTS, VOTE_EVENT] : PAYLOAD_EVENTS;
-    const attributes = names.map((name) =>
-      name === VOTE_EVENT
-        ? { [VOTE_KEY]: i % UP_VOTE_EVERY === 0 ? "1" : "-1" }
-        : payload,
-    );
+    const names = votes
+      ? [...PAYLOAD_EVENTS, VOTE_EVENT]
+      : [...PAYLOAD_EVENTS, UNMEASURED_EVENT];
+    const attributes = names.map((name) => {
+      if (name === VOTE_EVENT) {
+        return { [VOTE_KEY]: i % UP_VOTE_EVERY === 0 ? "1" : "-1" };
+      }
+      return name === UNMEASURED_EVENT ? {} : payload;
+    });
     rows.push({
       ProjectionId: `proj-events-facet-${i}`,
       TenantId: TENANT_ID,
@@ -232,8 +242,8 @@ describe("events facet integration", () => {
   });
 
   const ctx = {
-    // Wide window: seeded spans land within a few minutes of now.
-    timeRange: { from: Date.now() - 60 * 60 * 1000, to: Date.now() + 60_000 },
+    // Wide window around the instant the seed is stamped with.
+    timeRange: { from: SEEDED_AT - 60 * 60 * 1000, to: SEEDED_AT + 60_000 },
     limit: 1000,
     offset: 0,
   };
@@ -264,8 +274,9 @@ describe("events facet integration", () => {
         expect(counts).toEqual({
           ...Object.fromEntries(PAYLOAD_EVENTS.map((n) => [n, SPAN_COUNT])),
           [VOTE_EVENT]: VOTING_SPANS,
+          [UNMEASURED_EVENT]: NON_VOTING_SPANS,
         });
-        expect(rows.every((r) => Number(r.total_distinct) === 4)).toBe(true);
+        expect(rows.every((r) => Number(r.total_distinct) === 5)).toBe(true);
       });
 
       /** @scenario Event rows carry exactly the metric values their events recorded */
@@ -284,6 +295,17 @@ describe("events facet integration", () => {
           expect(byName.get(name)?.metric_values).toEqual([]);
         }
       });
+
+      /** @scenario Event rows carry exactly the metric values their events recorded */
+      it("gives an event that never sits beside a metric an empty list, not a missing one", async () => {
+        const rows = await runFacet();
+        const unmeasured = rows.find((r) => r.facet_value === UNMEASURED_EVENT);
+
+        // This name has no row in the metrics half, so the join misses. It
+        // must still come back with a count and an empty list of values.
+        expect(Number(unmeasured?.cnt)).toBe(NON_VOTING_SPANS);
+        expect(unmeasured?.metric_values).toEqual([]);
+      });
     });
 
     describe("when the memory budget is too tight to read every payload value", () => {
@@ -291,7 +313,7 @@ describe("events facet integration", () => {
       it("still completes with the full answer", async () => {
         const rows = await runFacet({ max_memory_usage: MEMORY_CAP });
 
-        expect(rows).toHaveLength(4);
+        expect(rows).toHaveLength(5);
         expect(
           rows.find((r) => r.facet_value === VOTE_EVENT)?.metric_values,
         ).toHaveLength(2);

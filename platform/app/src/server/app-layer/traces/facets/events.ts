@@ -126,9 +126,11 @@ export function buildEventsFacetQuery(ctx: FacetQueryContext): FacetQuery {
       ...(ctx.prefix ? { prefix: ctx.prefix } : {}),
     },
     settings: {
-      // The gate above is what keeps this under the ceiling; the spill and
-      // cap stay as the backstop for a window where most spans do carry
-      // metrics.
+      // The gate above is what keeps this under the ceiling. The spill covers
+      // the two GROUP BYs and the cap bounds the whole query, for a window
+      // where most spans do carry metrics. The join itself cannot spill, and
+      // does not need to: its right side is one row per event name seen on a
+      // metric-bearing span, each holding that name's value buckets.
       ...KEY_DISCOVERY_SETTINGS,
       // An event name with no metric entries has no row on the right side.
       // With nulls off it reads as an empty bucket tuple, which is what the

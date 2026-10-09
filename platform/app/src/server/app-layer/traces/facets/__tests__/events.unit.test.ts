@@ -48,9 +48,9 @@ describe("buildEventsFacetQuery", () => {
       /** @scenario "Expanding the thumbs_up_down row shows its vote values with counts" */
       it("guards the scan with the key-discovery memory settings", () => {
         const { settings } = buildEventsFacetQuery(ctx());
-        // Same unbounded Events.Attributes flatten that tripped
-        // MEMORY_LIMIT_EXCEEDED for the key-discovery facets — the spill +
-        // cap guard is non-negotiable here.
+        // The metric-key gate is what keeps the read small; the spill and
+        // the cap stay as the backstop for a window where most spans do carry
+        // metrics.
         expect(settings?.max_bytes_before_external_group_by).toBeDefined();
         expect(settings?.max_memory_usage).toBeDefined();
       });
