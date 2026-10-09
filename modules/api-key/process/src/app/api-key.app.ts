@@ -618,7 +618,7 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
       throw new PermissionDeniedError({
         permission: "organization:view",
         scope: { type: "organization", id: input.organizationId },
-        denialReason: "no-binding",
+        denialReason: "no-grant",
       });
     }
     await this.#ensureMember(input.organizationId, by);
