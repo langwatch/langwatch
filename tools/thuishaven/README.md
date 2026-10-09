@@ -31,7 +31,12 @@ In a checkout whose dev build links the simulators (`cmd/service/combined_dev.go
 every selected simulator runs in the `sims` lane: a second `service combined`
 process beside the `go` lane, which keeps only the gateway and the NLP engine. A
 simulator under load can therefore not starve the gateway. `haven restart sims`
-bounces them together and `haven logs <name>` still reads each one. Load drivers
+bounces them together and `haven logs <name>` still reads each one.
+`LANGWATCH_GO_ONE_PROCESS=1` is a trial of one Go process instead: the `go` lane
+hosts the gateway, the NLP engine and every simulator, each on its own address
+and hostname, and no `sims` lane runs. A gateway edit then restarts the
+simulators too; keep the split for protocol load or reload-sensitive work.
+Langy always keeps its own lane. Load drivers
 hit `127.0.0.1:<port>` (see `haven status`). Mail, storage and analytics start with
 a little sample content (`MAILSIM_SEED`, `STORAGESIM_SEED`, `ANALYTICSSIM_SEED`,
 set to 1 by haven); each simulator's delete endpoint empties it.
@@ -158,7 +163,7 @@ haven git        embedded git TUI (moron) for any worktree — `haven git <slug>
 haven switch     print a worktree's dir by name; with `eval "$(haven shell-init)"`
                  it becomes a real cd, tab-completed
 haven shell-init emit that shell function + completion
-haven hmr        AI-gated HMR: `on [--ttl 30s]` defers Vite reloads, `off` resumes
+haven hmr        retired no-op (reloads are debounced, ADR-168)
 haven slot       run any command under the machine-wide check slot:
                  `slot run [--label <l>] -- <cmd> [args…]` waits for a slot,
                  runs with stdio passed through, releases; `slot explain`
@@ -807,9 +812,9 @@ refuse`. That one line is the whole point: a quieter isolation posture than the 
   shared `~/.nx` cache is what trusted worktrees replay (ADR-150). `destroy`
   removes that directory. `down` and `destroy` stop the worktree's Nx daemon, and
   the daemon stops any Nx daemon whose worktree has been deleted.
-- **AI-gated HMR.** `haven hmr on [--ttl 30s] | off` defers Vite reloads while an
-  agent edits, then fires one catch-up reload — a human's browser isn't thrashed
-  through broken intermediate states. Opt-in and always time-bounded.
+- **Debounced HMR.** The Vite plugin coalesces a burst of agent edits into one
+  catch-up reload, so a human's browser isn't thrashed through broken
+  intermediate states. `haven hmr` is a retired no-op (ADR-168, 2026-10-09).
 
 ## Optional agent hooks
 

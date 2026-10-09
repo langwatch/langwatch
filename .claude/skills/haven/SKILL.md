@@ -58,6 +58,8 @@ https://hub.langwatch.localhost               every stack on the machine
 `ui`, `api`, `go` (gateway and nlp), `sims`, `langy`. The api lane hosts the worker, so
 `haven logs api` and `haven logs worker` each show half of it. Under
 `LANGWATCH_DEV_ONE_PROCESS=1` ui, api and worker are one `app` lane: see `dev-runtime`.
+Under `LANGWATCH_GO_ONE_PROCESS=1` (a trial) the `go` lane also hosts the simulators
+and no `sims` lane runs; `haven logs <sim>` still reads each one. Langy stays its own lane.
 
 ```bash
 haven logs api -t                 # follow one service
@@ -92,7 +94,6 @@ not.
 | Evaluators (monitors, evaluations)         | `haven up +langevals`                               |
 | Zero-cost model answers                    | `haven up +llm`                                     |
 | Try a PR in its own worktree               | `haven pr <number>`                                 |
-| Hold Vite reloads during an agent turn     | `haven hmr on --ttl 60s`, `haven hmr off`           |
 | Run a heavy command under the machine slot | `haven run`, `haven slot run -- <cmd>`              |
 
 Seed presets are in `haven help db` (`demo`, `onboarding`, `post-onboarding` and more).

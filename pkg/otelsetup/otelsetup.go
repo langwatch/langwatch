@@ -552,7 +552,7 @@ func New(ctx context.Context, opts Options) (*Provider, error) {
 	}
 
 	tp := sdktrace.NewTracerProvider(tpOpts...)
-	otelapi.SetTracerProvider(tp)
+	installTracerProvider(serviceName, tp)
 	provider := &Provider{tp: tp, logger: logger}
 
 	if err := installDebugLogs(ctx, opts, res, provider); err != nil {

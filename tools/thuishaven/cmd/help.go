@@ -175,6 +175,8 @@ var envHelpText = `Environment variables.
     LANGWATCH_GO_WATCH=1         Hot-reload the Go services via air (else go run).
     LANGWATCH_DEV_ONE_PROCESS=1  Run ui + api + worker as one app lane (ADR-168);
                                  haven up -f switches a running stack.
+    LANGWATCH_GO_ONE_PROCESS=1   Host the simulators in the go lane: one Go process
+                                 for the data plane and sims (trial; Langy apart).
     HAVEN_WORKTREE_DIR=<dir>     Where haven pr creates PR worktrees (default: the
                                  sibling worktrees/ dir next to the checkout).
     LANGWATCH_LOCAL_API_KEY      Stable local dev API key haven seeds + injects
