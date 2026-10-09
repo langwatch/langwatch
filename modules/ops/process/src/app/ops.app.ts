@@ -272,6 +272,7 @@ import { OpsExplainService } from "#services/ops-clickhouse-explain.service";
 
 import type { OpsChannels } from "../channels/ops.channels.ts";
 import type { AnomalyDetectionTickResult } from "../eventing/ops-anomaly-detection.intent.ts";
+import { GROUP_QUEUE_REAPER_PIPELINE_NAME } from "../eventing/ops-group-queue-reaper.pipeline.ts";
 import { PLATFORM_OPERATOR_SEED_TENANT_ID } from "../eventing/ops-platform-operator-seed.process.ts";
 import type { ProjectionReplayRun } from "../eventing/ops-projection-replay.events.ts";
 import { OpsCheckupService } from "../features/checkup/services/ops-checkup.service.ts";
@@ -601,7 +602,8 @@ export type QueueControlAction =
   | "queue_move_group_to_dlq"
   | "queue_move_all_blocked_to_dlq"
   | "queue_unblock_group"
-  | "queue_unblock_all";
+  | "queue_unblock_all"
+  | "queue_reap_stranded";
 
 export interface QueueAuditSink {
   append(entry: {
@@ -940,6 +942,7 @@ export class OpsModule implements OpsApi {
       storageStats: setup.storageStats,
       groupQueueReaper: GroupQueueReaperService.create({
         repository: repositories.groupQueueReaper,
+        audit: QueueAuditService.create({ auditLog: dependencies.auditLog }),
       }),
       signUpHealth: setup.signUpHealth,
       platformOperators: setup.platformOperators,
@@ -2070,7 +2073,8 @@ export class OpsModule implements OpsApi {
   reapStrandedQueueGroups(
     input: ReapStrandedQueueGroupsInput,
   ): Promise<OpsQueueReapedStrandedGroups> {
-    return this.#dependencies.groupQueueReaper.reap(input);
+    const audited = input.requestedBy !== GROUP_QUEUE_REAPER_PIPELINE_NAME;
+    return this.#dependencies.groupQueueReaper.reap({ ...input, audited });
   }
 
   get #signUpHealth(): SignUpHealthService {

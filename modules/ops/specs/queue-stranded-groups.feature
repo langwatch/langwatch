@@ -30,6 +30,18 @@ Feature: Stuck queue groups are cleared by the app, not by a script
     Then the reap asks only for groups stranded six hours or more
     And the operator gets the stranded, deleted and failed counts and the pending total
 
+  @unit @queue @audit
+  Scenario: Clearing stuck groups writes an audit entry naming the operator
+    Given two groups have been stranded for more than six hours
+    When an operator clears stuck groups
+    Then a queue_reap_stranded audit entry names the operator and the counts
+
+  @unit @queue @audit
+  Scenario: A scheduled reap writes no audit entry
+    Given two groups have been stranded for more than six hours
+    When the scheduled reap clears them
+    Then no audit entry is written
+
   @unit @queue
   Scenario: Clearing stuck groups surfaces a Redis failure to the operator
     Given Redis refuses the reap
