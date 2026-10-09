@@ -203,7 +203,29 @@ func TestStackHomeCarriesFactsSurfacesErrorsAndCredentials(t *testing.T) {
 				if sf.Hint != "haven up +langy" {
 					t.Errorf("langyagent hint = %q, want the selector spelling", sf.Hint)
 				}
+				if sf.Reason != "not part of this stack; start it with haven up +langy" || sf.Restart != "" {
+					t.Errorf("langyagent reason = %q, restart = %q", sf.Reason, sf.Restart)
+				}
+			case "worker":
+				if sf.Reason != "waiting for :5101 to answer; api says: boom 29" || sf.Restart != "api" || !strings.Contains(sf.Detail, "boom 29") {
+					t.Errorf("worker reason = %q, detail = %q, restart = %q: want its port and its lane's newest error", sf.Reason, sf.Detail, sf.Restart)
+				}
+			case "gateway":
+				if sf.Restart != "go" {
+					t.Errorf("gateway restart = %q, want the go lane it runs in", sf.Restart)
+				}
+			case "observability":
+				if !strings.HasPrefix(sf.Reason, "shared by every stack") {
+					t.Errorf("observability reason = %q, want the shared-stack reason", sf.Reason)
+				}
+			case "app":
+				if sf.Reason != "" || sf.Restart != "ui" {
+					t.Errorf("a live app has no reason and restarts as ui, got %q / %q", sf.Reason, sf.Restart)
+				}
 			case "idp":
+				if sf.Restart != "" {
+					t.Errorf("a simulator's lane is the app layer's call, got restart %q", sf.Restart)
+				}
 				if sf.URL != "https://idp.feat-x.langwatch.localhost" || sf.Port != 5005 || sf.Hostname != "idp.feat-x.langwatch.localhost" {
 					t.Errorf("idp surface = %+v", sf)
 				}
@@ -252,7 +274,7 @@ func TestStackHomeJSONFieldNames(t *testing.T) {
 	pinKeys(t, "databases", databases, "postgres", "clickhouse", "redis")
 	pinKeys(t, "postgres", databases["postgres"], "name", "port")
 	pinKeys(t, "redis", databases["redis"], "db", "port")
-	pinKeys(t, "surface", body["surfaces"].([]any)[0], "name", "role", "hostname", "url", "port", "status", "hint", "fallback")
+	pinKeys(t, "surface", body["surfaces"].([]any)[0], "name", "role", "hostname", "url", "port", "status", "hint", "fallback", "reason", "detail", "restart")
 	credentials := body["credentials"].(map[string]any)
 	pinKeys(t, "credentials", credentials, "login", "mailAddress", "idpTenants", "apiKey")
 	pinKeys(t, "login", credentials["login"], "email")

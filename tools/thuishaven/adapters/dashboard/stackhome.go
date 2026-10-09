@@ -78,6 +78,11 @@ type surfaceJSON struct {
 	Status   string `json:"status"`
 	Hint     string `json:"hint"`
 	Fallback bool   `json:"fallback"`
+	// Reason is the one line saying why a surface is not live, Detail the lane
+	// line behind it, and Restart the `haven restart` name a row may bounce.
+	Reason  string `json:"reason"`
+	Detail  string `json:"detail"`
+	Restart string `json:"restart"`
 }
 
 type laneErrorsJSON struct {
@@ -213,6 +218,14 @@ func (s *Server) handleStackHome(w http.ResponseWriter, r *http.Request) {
 	}
 	h := homeState{stack: st, registered: registered, live: registered && s.isLive(st)}
 	surfaces := s.surfaces(h)
+	lanes, tails := s.laneTails(slug)
+	explain(h, surfaces, tails)
+	canRestart := h.live && s.config.Actions.Restart != nil
+	for i := range surfaces {
+		if !canRestart {
+			surfaces[i].Restart = ""
+		}
+	}
 	writeJSON(w, http.StatusOK, stackHomeJSON{
 		Slug:        slug,
 		Registered:  registered,
@@ -221,10 +234,10 @@ func (s *Server) handleStackHome(w http.ResponseWriter, r *http.Request) {
 		HomeURL:     s.homeURL(slug),
 		Facts:       s.facts(h, extras),
 		Surfaces:    surfaces,
-		Errors:      s.recentErrors(slug),
+		Errors:      s.recentErrors(slug, lanes, tails),
 		Credentials: s.credentials(r, h, surfaces),
 		Actions: stackActionsJSON{
-			CanRestart: h.live && s.config.Actions.Restart != nil,
+			CanRestart: canRestart,
 			CanStart:   !h.live && s.config.Actions.Start != nil && st.WorktreeDir != "",
 			StartDir:   st.WorktreeDir,
 		},
@@ -357,32 +370,154 @@ func (s *Server) laneStatus(live bool, port int) string {
 	}
 }
 
-// recentErrors is each lane's newest error and fatal lines, newest first.
-// Lanes with none are left out; a stack with no captured logs has none.
-func (s *Server) recentErrors(slug string) []laneErrorsJSON {
-	out := []laneErrorsJSON{}
+// laneTails is each captured lane's tail, read once per request for both the
+// recent errors and the surfaces' reasons.
+func (s *Server) laneTails(slug string) ([]string, map[string][]logLine) {
+	tails := map[string][]logLine{}
 	if s.config.LogDir == nil {
-		return out
+		return nil, tails
 	}
 	root, err := openStackLogs(s.config.LogDir(slug))
 	if err != nil {
-		return out
+		return nil, tails
 	}
 	defer func() { _ = root.Close() }()
 	lanes, err := captureNames(root)
 	if err != nil {
-		return out
+		return nil, tails
 	}
+	var read []string
 	for _, lane := range lanes {
-		lines, readErr := readServiceTail(root, lane)
-		if readErr != nil {
-			continue
+		if lines, readErr := readServiceTail(root, lane); readErr == nil {
+			read = append(read, lane)
+			tails[lane] = lines
 		}
-		if errs := newestErrors(lines); len(errs) > 0 {
+	}
+	return read, tails
+}
+
+// recentErrors is each lane's newest error and fatal lines, newest first.
+// Lanes with none are left out; a stack with no captured logs has none.
+func (s *Server) recentErrors(slug string, lanes []string, tails map[string][]logLine) []laneErrorsJSON {
+	out := []laneErrorsJSON{}
+	for _, lane := range lanes {
+		if errs := newestErrors(tails[lane]); len(errs) > 0 {
 			out = append(out, laneErrorsJSON{Lane: lane, LogsURL: s.logsURL(slug, lane), Lines: errs})
 		}
 	}
 	return out
+}
+
+// simulators run in the sims lane (or the go lane); app/restart.go decides
+// which from a checkout file, so a row offers no restart of its own for them.
+var simulators = map[string]bool{
+	domain.IdPService: true, domain.MailService: true, domain.StorageService: true, domain.VoiceService: true,
+	domain.LLMService: true, domain.AnalyticsService: true, domain.OutboundService: true, domain.TelemetryService: true,
+}
+
+// surfaceLanes are the captures a surface's process may write to: a
+// one-process stack writes ui, api and worker to one, its name by version.
+func surfaceLanes(name string, layout domain.Layout) []string {
+	switch {
+	case name == "app":
+		return []string{domain.MonolithAppLane, "ui"}
+	case name == domain.APIService || name == "worker":
+		return []string{"api", "backend", domain.MonolithAppLane}
+	case simulators[name]:
+		return []string{name, "sims", "go"}
+	case !layout.IsMonolith() && (name == "gateway" || name == "nlp"):
+		return []string{"go"}
+	}
+	return []string{name, domain.CLIServiceNameForLayout(name, layout)}
+}
+
+// restartName is the `haven restart` name that bounces a surface's process.
+func restartName(name string, layout domain.Layout) string {
+	switch {
+	case name == domain.ObservabilityService || simulators[name]:
+		return ""
+	case layout.IsMonolith():
+		return domain.CLIServiceNameForLayout(name, layout)
+	case name == domain.APIService || name == "worker":
+		return "api"
+	case name == "gateway" || name == "nlp":
+		return "go"
+	}
+	return domain.CLIServiceNameForLayout(name, layout)
+}
+
+// tellingLine is the newest warning or worse in whichever candidate lane
+// wrote last (a stale capture from an earlier layout loses), else its last line.
+func tellingLine(tails map[string][]logLine, lanes []string) (string, logLine, bool) {
+	lane, newest := "", []logLine(nil)
+	for _, l := range lanes {
+		if lines := tails[l]; len(lines) > 0 && (len(newest) == 0 || lines[len(lines)-1].At.After(newest[len(newest)-1].At)) {
+			lane, newest = l, lines
+		}
+	}
+	if len(newest) == 0 {
+		return "", logLine{}, false
+	}
+	for i := len(newest) - 1; i >= 0; i-- {
+		if level := logfmt.Level(newest[i].Level); level == logfmt.LevelWarn || level == logfmt.LevelError || level == logfmt.LevelFatal {
+			return lane, newest[i], true
+		}
+	}
+	return lane, newest[len(newest)-1], true
+}
+
+// explain fills each surface's reason from what the request already read:
+// its status, its port and its lane's capture. Nothing is probed again.
+func explain(h homeState, surfaces []surfaceJSON, tails map[string][]logLine) {
+	for i := range surfaces {
+		sf := &surfaces[i]
+		if sf.Status != statusNotSelected {
+			sf.Restart = restartName(sf.Name, h.stack.Layout)
+		}
+		reason, isWaiting := reasonFor(h, *sf)
+		sf.Reason = reason
+		if sf.Name == domain.ObservabilityService && reason != "" {
+			sf.Detail = "Grafana is machine-wide, not this stack's: `haven restart obs` brings it back"
+		}
+		if isWaiting {
+			addLaneLine(sf, tails, h.stack.Layout)
+		}
+	}
+}
+
+// addLaneLine appends what the surface's lane said last that matters.
+func addLaneLine(sf *surfaceJSON, tails map[string][]logLine, layout domain.Layout) {
+	lane, line, ok := tellingLine(tails, surfaceLanes(sf.Name, layout))
+	if !ok {
+		return
+	}
+	message := line.Text
+	if rec, parsed := logfmt.Parse(line.Text); parsed && rec.Message != "" {
+		message = rec.Message
+	}
+	sf.Reason += "; " + lane + " says: " + message
+	sf.Detail = line.At.Format(time.RFC3339) + " " + lane + ": " + line.Text
+}
+
+// reasonFor is a surface's one line, and whether its own lane's log can say more.
+func reasonFor(h homeState, sf surfaceJSON) (string, bool) {
+	switch {
+	case sf.Status == statusLive:
+		return "", false
+	case sf.Name == domain.ObservabilityService:
+		return fmt.Sprintf("shared by every stack; nothing answers on :%d", sf.Port), false
+	case sf.Status == statusNotSelected:
+		return "not part of this stack; start it with " + sf.Hint, false
+	case !h.registered:
+		return "the stack is stopped", false
+	case !h.live:
+		return "the stack's launcher is gone", false
+	case sf.Name == domain.APIService && sf.Status == statusStarting:
+		return "waiting for " + h.stack.HealthProbeURL(), true
+	case sf.Status == statusStarting:
+		return fmt.Sprintf("waiting for :%d to answer", sf.Port), true
+	}
+	return fmt.Sprintf("nothing answers on :%d", sf.Port), true
 }
 
 func newestErrors(lines []logLine) []logLine {

@@ -22,7 +22,11 @@ const GB = 1024 ** 3;
 const ago = ({ now, seconds }: { now: number; seconds: number }) =>
   isoOf({ ms: now - seconds * 1000 });
 
-type SurfaceSeed = Pick<Surface, "name" | "role" | "status"> & { port?: number; hint?: string };
+type SurfaceSeed = Pick<Surface, "name" | "role" | "status"> & {
+  port?: number;
+  hint?: string;
+  reason?: string;
+};
 
 const surface = ({ slug, seed }: { slug: string; seed: SurfaceSeed }): Surface => {
   const routed = seed.name !== "worker";
@@ -39,13 +43,16 @@ const surface = ({ slug, seed }: { slug: string; seed: SurfaceSeed }): Surface =
     status: seed.status,
     hint: seed.hint ?? "",
     fallback: false,
+    reason: seed.reason ?? (seed.hint ? `not part of this stack; start it with ${seed.hint}` : ""),
+    detail: "",
+    restart: "",
   };
 };
 
 const LIVE_SEEDS: SurfaceSeed[] = [
   { name: "app", role: "Browser app", status: "live", port: 5560 },
   { name: "api", role: "API", status: "live", port: 6560 },
-  { name: "worker", role: "Worker: queues, projections, subscribers", status: "starting", port: 9464 },
+  { name: "worker", role: "Worker: queues, projections, subscribers", status: "starting", port: 9464, reason: "waiting for :9464 to answer" },
   { name: "gateway", role: "AI gateway", status: "live", port: 7560 },
   { name: "nlp", role: "NLP service", status: "down", port: 7561 },
   { name: "langyagent", role: "Langy agent", status: "not-selected", hint: "haven up +langy" },

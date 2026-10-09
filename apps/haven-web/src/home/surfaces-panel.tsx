@@ -1,5 +1,5 @@
 import {
-  Code,
+  ConfirmButton,
   Link,
   Panel,
   StatusDot,
@@ -10,7 +10,13 @@ import {
 import type { Surface } from "../shared/contract.ts";
 import { surfaceState } from "../shared/surfaces.ts";
 
-const columns: TableColumn<Surface>[] = [
+export type RowRestart = {
+  /** Undefined when the stack is not running, so no row offers it. */
+  onRestart?: (surface: Surface) => void;
+  busy?: string;
+};
+
+const columnsFor = ({ onRestart, busy }: RowRestart): TableColumn<Surface>[] => [
   {
     key: "status",
     header: "Status",
@@ -49,23 +55,43 @@ const columns: TableColumn<Surface>[] = [
     cell: (surface) => (surface.port === 0 ? "—" : String(surface.port)),
   },
   {
-    key: "hint",
-    header: "To turn on",
-    width: "232px",
+    key: "reason",
+    header: "Why",
+    muted: true,
     hideOnNarrow: true,
-    title: (surface) => surface.hint,
-    cell: (surface) => (surface.hint === "" ? null : <Code>{surface.hint}</Code>),
+    title: (surface) => surface.detail || surface.reason,
+    cell: (surface) => surface.reason,
+  },
+  {
+    key: "restart",
+    header: "",
+    width: "112px",
+    align: "end",
+    cell: (surface) =>
+      onRestart === undefined || surface.restart === "" ? null : (
+        <ConfirmButton
+          variant="secondary"
+          label={busy === surface.name ? "Restarting" : "Restart"}
+          confirmLabel={`Restart ${surface.restart}?`}
+          disabled={busy !== undefined}
+          onConfirm={() => onRestart(surface)}
+        />
+      ),
   },
 ];
 
 /** Every surface the stack can have, in launch order, with its status and address. */
-export const SurfacesPanel = ({ surfaces }: { surfaces: Surface[] }) => {
+export const SurfacesPanel = ({
+  surfaces,
+  onRestart,
+  busy,
+}: RowRestart & { surfaces: Surface[] }) => {
   const selected = surfaces.filter((surface) => surface.status !== "not-selected");
   const live = selected.filter((surface) => surface.status === "live").length;
   return (
     <Panel title="Surfaces" meta={`${live} of ${selected.length} live`}>
       <Table
-        columns={columns}
+        columns={columnsFor({ onRestart, busy })}
         rows={surfaces}
         rowKey={(surface) => surface.name}
         caption="Surfaces of this stack"

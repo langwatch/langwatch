@@ -18,6 +18,11 @@ export const surfaceSchema = z.object({
   status: surfaceStatusSchema,
   hint: z.string(),
   fallback: z.boolean(),
+  /** Why a surface is not live, in one line; detail is the lane line behind it. */
+  reason: z.string(),
+  detail: z.string(),
+  /** The `haven restart` name that bounces this row, "" when it has none. */
+  restart: z.string(),
 });
 export type Surface = z.infer<typeof surfaceSchema>;
 

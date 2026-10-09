@@ -9,7 +9,7 @@ import {
 } from "@langwatch/design-system-internal";
 
 import { START_PATH, restartPath } from "../shared/api.ts";
-import type { StackHome as StackHomeData } from "../shared/contract.ts";
+import type { StackHome as StackHomeData, Surface } from "../shared/contract.ts";
 import { HavenTopBar } from "../shared/haven-top-bar.tsx";
 import { useLifecycle } from "../shared/use-lifecycle.ts";
 import { CredentialsPanel } from "./credentials-panel.tsx";
@@ -40,6 +40,12 @@ export const StackHome = ({ home, now, refresh, stale }: StackHomeProps) => {
       key: "restart",
       path: restartPath({ slug: home.slug }),
       doing: `restart ${home.slug}`,
+    });
+  const restartSurface = (surface: Surface) =>
+    void act({
+      key: surface.name,
+      path: `${restartPath({ slug: home.slug })}?service=${encodeURIComponent(surface.restart)}`,
+      doing: `restart ${surface.restart}`,
     });
   const start = () =>
     void act({
@@ -95,7 +101,11 @@ export const StackHome = ({ home, now, refresh, stale }: StackHomeProps) => {
           <Code>{home.facts.worktreeDir}</Code>.
         </Callout>
       )}
-      <SurfacesPanel surfaces={home.surfaces} />
+      <SurfacesPanel
+        surfaces={home.surfaces}
+        busy={busy}
+        onRestart={home.actions.canRestart ? restartSurface : undefined}
+      />
       <Grid columns={2}>
         <FactsPanel facts={home.facts} now={now} />
         <CredentialsPanel credentials={home.credentials} />

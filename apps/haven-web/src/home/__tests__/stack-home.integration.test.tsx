@@ -85,10 +85,15 @@ describe("StackHome", () => {
       ).toBeDefined();
       expect(within(surfaceRow({ name: "app" })).getByText("5560")).toBeDefined();
       expect(within(surfaceRow({ name: "worker" })).getByText("Starting")).toBeDefined();
+      expect(
+        within(surfaceRow({ name: "worker" })).getByText("waiting for :9464 to answer"),
+      ).toBeDefined();
       expect(within(surfaceRow({ name: "nlp" })).getByText("Down")).toBeDefined();
       const langy = surfaceRow({ name: "langyagent" });
       expect(within(langy).getByText("Not selected")).toBeDefined();
-      expect(within(langy).getByText("haven up +langy")).toBeDefined();
+      expect(
+        within(langy).getByText("not part of this stack; start it with haven up +langy"),
+      ).toBeDefined();
     });
   });
 
