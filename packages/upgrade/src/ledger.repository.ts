@@ -184,7 +184,8 @@ export class UpgradeLedgerRepository {
 
   /**
    * Records each declared upcast as an `event-upcast` background step, its status read from the
-   * stored events it still covers. A step a rewrite holds `running` keeps that status.
+   * stored events it still covers; a recount clears a stale error. A step a rewrite holds
+   * `running` keeps its status and error.
    */
   async recordUpcastSteps({
     runId,
@@ -202,6 +203,7 @@ export class UpgradeLedgerRepository {
          FROM unnest($1::text[], $2::text[], $3::jsonb[]) AS source(id, status, report)
        ON CONFLICT ("id") DO UPDATE
           SET "status" = CASE WHEN step."status" = 'running' THEN step."status" ELSE EXCLUDED."status" END,
+              "last_error" = CASE WHEN step."status" = 'running' THEN step."last_error" END,
               "report" = EXCLUDED."report",
               "run_id" = EXCLUDED."run_id",
               "updated_at" = EXCLUDED."updated_at"
