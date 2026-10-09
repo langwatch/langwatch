@@ -1,6 +1,5 @@
 {
   "name": "@langwatch/process-stores",
-  "langwatch": { "group": "framework" },
   "version": "0.1.0",
   "private": true,
   "description": "The members a process hands its modules: the closed list, and the one build from parsed config.",
@@ -43,6 +42,7 @@
     "@langwatch/eventing": "workspace:*",
     "@langwatch/group-queue": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/limiter": "workspace:*",
     "@langwatch/module": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
@@ -57,5 +57,8 @@
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "langwatch": {
+    "group": "framework"
   }
 }

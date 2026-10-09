@@ -59,6 +59,7 @@ async function appOver() {
         accessModelMode: void 0,
         sqlSingleNode: void 0,
       },
+      tenantAnalyticsConcurrency: 4,
       publicBaseUrl: "https://app.langwatch.test",
     },
     resources: { own: () => void 0, ownService: () => void 0 },

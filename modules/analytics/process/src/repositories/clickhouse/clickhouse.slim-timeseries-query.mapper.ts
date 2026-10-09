@@ -17,6 +17,10 @@ import {
   isSlimEligibleTraceMetricKey,
   type SlimTraceMetricKey,
 } from "./clickhouse.analytics-route-table.mapper.ts";
+import {
+  type LatestVersionColumn,
+  latestVersionSubquery,
+} from "./clickhouse.latest-version-dedup.mapper.ts";
 import { buildMetricAlias } from "./clickhouse.metric-translator.mapper.ts";
 import {
   appendMetadataValueFilterClauses,
@@ -25,6 +29,7 @@ import {
   hasFilterValues,
   isPercentile,
   percentileFor,
+  referencedAliasColumns,
 } from "./clickhouse.timeseries-query-shared.mapper.ts";
 
 const SLIM_TABLE = "trace_analytics" as const;
@@ -36,6 +41,7 @@ const ta = "ta";
  * the router sends them to `trace_summaries` (see route-table.ts).
  */
 type SlimGroupByKey =
+  | "error.has_error"
   | "topics.topics"
   | "traces.trace_name"
   | "metadata.user_id"
@@ -97,6 +103,7 @@ function slimColumnFor(metric: SlimTraceMetricKey): string {
 
 function isSlimGroupByKey(groupBy: string): groupBy is SlimGroupByKey {
   switch (groupBy) {
+    case "error.has_error":
     case "topics.topics":
     case "traces.trace_name":
     case "metadata.user_id":
@@ -118,6 +125,9 @@ function buildSlimGroupByExpression(groupBy?: string): string | null {
     throw new Error(`Slim builder cannot group by "${groupBy}".`);
   }
   switch (groupBy) {
+    case "error.has_error":
+      // Same labels as the legacy builder's `ContainsErrorStatus` bucket.
+      return `if(${ta}.HasError, 'with error', 'without error')`;
     case "topics.topics":
       return `${ta}.TopicId`;
     case "traces.trace_name":
@@ -144,20 +154,20 @@ function buildSlimGroupByExpression(groupBy?: string): string | null {
  * like legacy, these must NOT get a `HAVING group_key != ''` clause.
  */
 function slimGroupByHandlesUnknown(groupBy?: string): boolean {
-  return groupBy === "traces.trace_name";
+  return groupBy === "traces.trace_name" || groupBy === "error.has_error";
 }
 
 // isPercentile + percentileFor are shared with eval-slim-timeseries-query.ts
 // via ~/analytics/query-builders/_shared.
 
 /**
- * Slim aggregation expression. Slim has typed columns, so percentiles use
- * `quantileExact` directly (matches the legacy builder's behaviour to keep
- * parity).
+ * Slim aggregation expression. Percentiles use `quantileTDigest`, the legacy
+ * builder's estimator for `performance.*` metrics: bounded memory per group,
+ * where `quantileExact` keeps every value of the range in memory.
  */
 function slimAggExpression(agg: AnalyticsAggregation, column: string): string {
   if (isPercentile(agg)) {
-    return `quantileExact(${percentileFor(agg)})(${column})`;
+    return `quantileTDigest(${percentileFor(agg)})(${column})`;
   }
   switch (agg) {
     case "sum":
@@ -176,26 +186,40 @@ function slimAggExpression(agg: AnalyticsAggregation, column: string): string {
   }
 }
 
+const SLIM_HAS_SIGNAL = "HasSignal";
+const SLIM_MATCHES_FILTERS = "MatchesFilters";
+
 /**
- * Deduped FROM-clause for the slim table (IN-tuple dedup; see
- * clickhouse-queries.md). `TRACE_ANALYTICS_HAS_SIGNAL_SQL` keeps dimension-only
- * rows (a topic, annotation, no span) from counting as A TRACE by every aggregate.
+ * The latest version of each trace via the spillable `argMax` of {@link latestVersionSubquery}:
+ * the read columns plus `HasSignal` (dimension-only rows are not A TRACE) and `MatchesFilters`.
  */
-function dedupedSlim(alias: string, dateClause: string): string {
-  return `(
-    SELECT *
-    FROM ${SLIM_TABLE}
-    WHERE TenantId = {tenantId:String}
-      AND ${TRACE_ANALYTICS_HAS_SIGNAL_SQL}
-      ${dateClause}
-      AND (TenantId, TraceId, UpdatedAt) IN (
-        SELECT TenantId, TraceId, max(UpdatedAt)
-        FROM ${SLIM_TABLE}
-        WHERE TenantId = {tenantId:String}
-          ${dateClause}
-        GROUP BY TenantId, TraceId
-      )
-  ) ${alias}`;
+function dedupedSlim({
+  alias,
+  dateClause,
+  columns,
+  filterPredicates,
+}: {
+  alias: string;
+  dateClause: string;
+  columns: readonly string[];
+  filterPredicates: readonly string[];
+}): string {
+  const carried: LatestVersionColumn[] = columns.map((name) => ({ name }));
+  carried.push({ name: SLIM_HAS_SIGNAL, expression: `(${TRACE_ANALYTICS_HAS_SIGNAL_SQL})` });
+  if (filterPredicates.length > 0) {
+    carried.push({
+      name: SLIM_MATCHES_FILTERS,
+      expression: `(${filterPredicates.join(" AND ")})`,
+    });
+  }
+  return latestVersionSubquery({
+    table: SLIM_TABLE,
+    alias,
+    sourceAlias: alias,
+    keyColumns: ["TenantId", "TraceId"],
+    columns: carried,
+    where: `TenantId = {tenantId:String} ${dateClause}`,
+  });
 }
 
 const SLIM_DATE_FILTER_BOTH_PERIODS = `AND ((OccurredAt >= {currentStart:DateTime64(3)} AND OccurredAt < {currentEnd:DateTime64(3)}) OR (OccurredAt >= {previousStart:DateTime64(3)} AND OccurredAt < {previousEnd:DateTime64(3)}))`;
@@ -206,10 +230,10 @@ const SLIM_DATE_FILTER_BOTH_PERIODS = `AND ((OccurredAt >= {currentStart:DateTim
  * (anything else must have been rejected by `pickAnalyticsTable` already).
  */
 function buildSlimFilterClauses(filters: TimeseriesQueryInput["filters"]): {
-  whereClause: string;
+  clauses: string[];
   params: Record<string, unknown>;
 } {
-  if (!filters) return { whereClause: "", params: {} };
+  if (!filters) return { clauses: [], params: {} };
 
   const clauses: string[] = [];
   const params: Record<string, unknown> = {};
@@ -221,8 +245,7 @@ function buildSlimFilterClauses(filters: TimeseriesQueryInput["filters"]): {
     appendSlimFilterClause({ field, rawValue, clauses, params, next });
   }
 
-  const whereClause = clauses.length > 0 ? `AND ${clauses.join(" AND ")}` : "";
-  return { whereClause, params };
+  return { clauses, params };
 }
 
 function appendSlimFilterClause({
@@ -387,10 +410,11 @@ export function buildSlimTimeseriesQuery(input: TimeseriesQueryInput): BuiltAnal
   if (typeof input.timeScale === "number") groupByExprs.push("date");
   if (groupByColumn) groupByExprs.push("group_key");
 
-  const { whereClause: filterWhere, params: filterParams } = buildSlimFilterClauses(input.filters);
-  const { whereClause: excludeWhere, params: excludeParams } = buildSlimOriginExclusion(
+  const { clauses: filterClauses, params: filterParams } = buildSlimFilterClauses(input.filters);
+  const { clauses: excludeClauses, params: excludeParams } = buildSlimOriginExclusion(
     input.excludeOrigins,
   );
+  const filterPredicates = [...filterClauses, ...excludeClauses];
 
   // Mirror the legacy builder's `handlesUnknown` contract
   // (`aggregation-builder.ts` → `buildGroupKeyHavingClause`): a group-by whose
@@ -407,15 +431,24 @@ export function buildSlimTimeseriesQuery(input: TimeseriesQueryInput): BuiltAnal
   const sql = `
     SELECT
       ${selectExprs.join(",\n      ")}
-    FROM ${dedupedSlim(ta, SLIM_DATE_FILTER_BOTH_PERIODS)}
+    FROM ${dedupedSlim({
+      alias: ta,
+      dateClause: SLIM_DATE_FILTER_BOTH_PERIODS,
+      columns: referencedAliasColumns({
+        alias: ta,
+        expressions: selectExprs,
+        keyColumns: ["TenantId", "TraceId"],
+      }),
+      filterPredicates,
+    })}
     WHERE (${ta}.TenantId = {tenantId:String}
       AND (
         (${ta}.OccurredAt >= {currentStart:DateTime64(3)} AND ${ta}.OccurredAt < {currentEnd:DateTime64(3)})
         OR
         (${ta}.OccurredAt >= {previousStart:DateTime64(3)} AND ${ta}.OccurredAt < {previousEnd:DateTime64(3)})
       )
-      ${filterWhere}
-      ${excludeWhere})
+      AND ${ta}.${SLIM_HAS_SIGNAL}
+      ${filterPredicates.length > 0 ? `AND ${ta}.${SLIM_MATCHES_FILTERS}` : ""})
     GROUP BY ${groupByExprs.join(", ")}
     ${havingClause}
     ORDER BY period${typeof input.timeScale === "number" ? ", date" : ""}
@@ -440,14 +473,14 @@ export function buildSlimTimeseriesQuery(input: TimeseriesQueryInput): BuiltAnal
  * one of them: a negated filter selection never inverts it.
  */
 function buildSlimOriginExclusion(excludeOrigins: TimeseriesQueryInput["excludeOrigins"]): {
-  whereClause: string;
+  clauses: string[];
   params: Record<string, unknown>;
 } {
   if (!excludeOrigins || excludeOrigins.length === 0) {
-    return { whereClause: "", params: {} };
+    return { clauses: [], params: {} };
   }
   return {
-    whereClause: `AND ${ta}.Origin NOT IN ({slim_excludeOrigins:Array(String)})`,
+    clauses: [`${ta}.Origin NOT IN ({slim_excludeOrigins:Array(String)})`],
     params: { slim_excludeOrigins: excludeOrigins },
   };
 }

@@ -147,9 +147,11 @@ service:
 	@test -n "$(svc)" || (echo "usage: make service svc=<name>" && exit 1)
 	@$(BUILD_SIM_CONSOLES)
 	@_snap=$$(export -p) && \
-		{ test -f $(DEV_ENV_FILE) \
-			&& set -a && . $(DEV_ENV_FILE) && set +a \
-			|| echo "$(DEV_ENV_FILE) not found — using process environment"; } && \
+		{ if test -f "$(DEV_ENV_FILE)"; then \
+			. dev/scripts/lib/load-dev-env.sh && load_dev_env "$(DEV_ENV_FILE)"; \
+		else \
+			echo "$(DEV_ENV_FILE) not found — using process environment"; \
+		fi; } && \
 		eval "$$_snap" && \
 		. dev/scripts/lib/derive-gateway-base-url.sh && derive_gateway_base_url && \
 		export LOG_FORMAT=$${LOG_FORMAT:-json} && \
@@ -169,11 +171,11 @@ service:
 #        make service-watch svc=combined args="aigateway nlpgo"
 service-watch:
 	@test -n "$(svc)" || (echo "usage: make service-watch svc=<name>" && exit 1)
-	@test -f $(DEV_ENV_FILE) || (echo "$(DEV_ENV_FILE) not found — seed .env first" && exit 1)
+	@test -f "$(DEV_ENV_FILE)" || (echo "$(DEV_ENV_FILE) not found — seed .env first" && exit 1)
 	@which air > /dev/null 2>&1 || (echo "Installing air..." && go install github.com/air-verse/air@latest)
 	@$(BUILD_SIM_CONSOLES)
 	@_snap=$$(export -p) && \
-		set -a && . $(DEV_ENV_FILE) && set +a && \
+		. dev/scripts/lib/load-dev-env.sh && load_dev_env "$(DEV_ENV_FILE)" && \
 		eval "$$_snap" && \
 		. dev/scripts/lib/derive-gateway-base-url.sh && derive_gateway_base_url && \
 		export LOG_FORMAT=$${LOG_FORMAT:-json} && \

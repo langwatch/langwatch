@@ -7,7 +7,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-import { ChartErrorState } from "../chart-error-state.tsx";
+import { ChartErrorIndicator, ChartErrorState } from "../chart-error-state.tsx";
 
 afterEach(cleanup);
 
@@ -41,7 +41,7 @@ describe("<ChartErrorState />", () => {
 
       // An unhandled failure has no copy of its own, so the caller's
       // fallback names what the user was looking at.
-      expect(screen.getByText("Failed to load chart data")).toBeInTheDocument();
+      expect(screen.getByText("Couldn't load this chart")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument();
       expect(screen.queryByText(/no data/i)).not.toBeInTheDocument();
     });
@@ -60,16 +60,38 @@ describe("<ChartErrorState />", () => {
   });
 
   describe("when the failure is a handled error", () => {
-    /**
-     * THE CODE SLUG is the one thing a package can still pin here — the
-     * presentation registry is `platform/app`'s and doesn't travel, so this
-     * asserts only the failed action, never the slug (#5984).
-     */
-    it("names the action that failed and never the code slug", () => {
+    it("shows the registry's copy, never the code slug", () => {
       renderChartErrorState({ error: handledError("query_timeout") });
 
-      expect(screen.getByText("Failed to load chart data")).toBeInTheDocument();
+      expect(screen.getByText("This search took too long")).toBeInTheDocument();
+      expect(
+        screen.getByText("Narrow the time range or add a filter, then try again."),
+      ).toBeInTheDocument();
       expect(screen.queryByText("query_timeout")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when the panel has no room for the full state", () => {
+    it("renders a compact indicator with no button in it", () => {
+      renderWithDesignSystem(<ChartErrorIndicator error={handledError("query_memory_exceeded")} />);
+
+      expect(screen.getByText("Couldn't load")).toBeInTheDocument();
+      expect(screen.queryByRole("button")).not.toBeInTheDocument();
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    });
+
+    describe("when the failure is unhandled", () => {
+      it("names what failed with the caller's fallback title", () => {
+        renderWithDesignSystem(
+          <ChartErrorIndicator
+            error={new Error("boom")}
+            fallbackTitle="Couldn't load the documents count"
+          />,
+        );
+
+        expect(screen.getByText(/^Couldn't load the documents count/)).toBeInTheDocument();
+        expect(screen.queryByText("boom")).not.toBeInTheDocument();
+      });
     });
   });
 });

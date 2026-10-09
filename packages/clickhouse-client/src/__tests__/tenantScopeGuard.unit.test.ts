@@ -1,3 +1,4 @@
+import type { LimiterStats } from "@langwatch/limiter";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -9,7 +10,6 @@ import {
   withClickHouseTenantScope,
   type ClickHouseVendorClient,
   type ClickHouseVendorClientOptions,
-  type LimiterStats,
 } from "../index.ts";
 import { VendorClientResiliencePolicy } from "../vendorClient.ts";
 

@@ -2,6 +2,8 @@ import { HandledError } from "@langwatch/handled-error";
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  CLICKHOUSE_STATEMENT_RETRY_MESSAGE_FRAGMENTS,
+  CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS,
   ConfigurationError,
   categorizeError,
   classifyClickHouseError,
@@ -657,6 +659,42 @@ describe("classifyClickHouseError", () => {
         reasons: [new Error("Syntax error in SQL")],
       });
       expect(classifyClickHouseError(translated)).toBe(ErrorCategory.CRITICAL);
+    });
+  });
+});
+
+describe("CLICKHOUSE_STATEMENT_RETRY_MESSAGE_FRAGMENTS", () => {
+  describe("when a statement hits MEMORY_LIMIT_EXCEEDED", () => {
+    const memoryError = new Error(
+      "Code: 241. DB::Exception: Query memory limit exceeded: would use 2.01 GiB, maximum: 1.86 GiB. (MEMORY_LIMIT_EXCEEDED)",
+    );
+
+    /** @scenario A query over the memory limit is not retried in place */
+    it("matches no fragment, so the resilient client does not retry it", () => {
+      expect(
+        CLICKHOUSE_STATEMENT_RETRY_MESSAGE_FRAGMENTS.some((fragment) =>
+          memoryError.message.includes(fragment),
+        ),
+      ).toBe(false);
+    });
+
+    it("stays RECOVERABLE for the group queue, which re-stages the job later", () => {
+      expect(classifyClickHouseError(memoryError)).toBe(
+        ErrorCategory.RECOVERABLE,
+      );
+    });
+  });
+
+  describe("when a statement hits any other transient condition", () => {
+    it("keeps every other fragment the queue classifier retries on", () => {
+      expect([...CLICKHOUSE_STATEMENT_RETRY_MESSAGE_FRAGMENTS]).toEqual(
+        CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS.filter(
+          (fragment) => fragment !== "MEMORY_LIMIT_EXCEEDED",
+        ),
+      );
+      expect(CLICKHOUSE_STATEMENT_RETRY_MESSAGE_FRAGMENTS).toContain(
+        "Too many simultaneous queries",
+      );
     });
   });
 });

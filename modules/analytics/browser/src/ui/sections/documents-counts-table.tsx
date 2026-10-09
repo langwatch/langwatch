@@ -1,14 +1,30 @@
 import { Box, Table, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 
-import { useTopUsedDocuments } from "../../behavior/use-analytics-documents.ts";
+import {
+  type TopUsedDocumentsParams,
+  useTopUsedDocuments,
+} from "../../behavior/use-analytics-documents.ts";
+import { useRetryFailedAnalytics } from "../../behavior/use-retry-failed-analytics.ts";
+import { ChartErrorIndicator, ChartErrorState } from "../elements/chart-error-state.tsx";
 import { SummaryMetricValue } from "../elements/summary-metric.tsx";
 
-export const DocumentsCountsTable = () => {
-  const documents = useTopUsedDocuments();
+const DOCUMENTS_FALLBACK_TITLE = "Couldn't load documents";
+
+export const DocumentsCountsTable = ({ params }: { params?: TopUsedDocumentsParams } = {}) => {
+  const documents = useTopUsedDocuments(params);
+  const retryFailedAnalytics = useRetryFailedAnalytics();
 
   if (documents.isLoading) return <Box>Loading...</Box>;
-  if (documents.error) return <Box>An error occurred</Box>;
+  if (documents.error && !documents.data) {
+    return (
+      <ChartErrorState
+        error={documents.error}
+        onRetry={retryFailedAnalytics}
+        fallbackTitle={DOCUMENTS_FALLBACK_TITLE}
+      />
+    );
+  }
 
   return (
     <VStack align="start" gap={4}>
@@ -57,8 +73,12 @@ export const DocumentsCountsTable = () => {
   );
 };
 
-export const DocumentsCountsSummary = () => {
-  const documents = useTopUsedDocuments();
+export const DocumentsCountsSummary = ({ params }: { params?: TopUsedDocumentsParams } = {}) => {
+  const documents = useTopUsedDocuments(params);
+
+  if (documents.error && !documents.data) {
+    return <ChartErrorIndicator error={documents.error} fallbackTitle={DOCUMENTS_FALLBACK_TITLE} />;
+  }
 
   const count = documents.data?.totalUniqueDocuments;
 

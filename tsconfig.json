@@ -466,6 +466,9 @@
       "path": "services/langyworker/tsconfig.json"
     },
     {
+      "path": "packages/limiter/tsconfig.json"
+    },
+    {
       "path": "apps/llmsim-web/tsconfig.json"
     },
     {

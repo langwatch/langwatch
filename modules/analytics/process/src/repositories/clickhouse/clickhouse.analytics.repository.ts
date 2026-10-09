@@ -153,40 +153,22 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
       endDate: new Date(input.endDate),
       filters: input.filters,
     });
-    const parts = built.sql.split(";");
-    const [topDocsSql, totalSql] = parts;
-    const isTwoStatements =
-      parts.length === 2 && Boolean(topDocsSql?.trim()) && Boolean(totalSql?.trim());
-    if (!isTwoStatements || !topDocsSql || !totalSql) {
-      throw new Error(
-        `Expected topDocuments query to have exactly 2 non-empty statements separated by semicolon, got ${parts.length} parts`,
-      );
-    }
     try {
-      const [topDocsResult, totalResult] = await Promise.all([
-        client.query({
-          query: topDocsSql,
-          query_params: built.params,
-          format: "JSONEachRow",
-          clickhouse_settings: ANALYTICS_CLICKHOUSE_SETTINGS,
-        }),
-        client.query({
-          query: totalSql,
-          query_params: built.params,
-          format: "JSONEachRow",
-          clickhouse_settings: ANALYTICS_CLICKHOUSE_SETTINGS,
-        }),
-      ]);
-      const topDocs = (await topDocsResult.json()) as {
+      const result = await client.query({
+        query: built.sql,
+        query_params: built.params,
+        format: "JSONEachRow",
+        clickhouse_settings: ANALYTICS_CLICKHOUSE_SETTINGS,
+      });
+      const topDocs = (await result.json()) as {
         documentId: string;
         count: string | number;
         traceId: string;
         content?: string;
-      }[];
-      const totals = (await totalResult.json()) as {
         total: string | number;
       }[];
-      const total = totals[0]?.total ?? 0;
+      // Every row carries the distinct-document total; no rows means none.
+      const total = topDocs[0]?.total ?? 0;
       return {
         topDocuments: topDocs.map((doc) => ({
           documentId: doc.documentId,
