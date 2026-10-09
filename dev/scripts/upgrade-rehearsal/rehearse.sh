@@ -357,11 +357,12 @@ phase1_overlap() {
   fi
 }
 
-# One row per seeded project: its privacy and retention scope rows (Postgres) and a folded trace
+# One row per seeded project: whether its placement resolves (Project, Team, OrganizationUser; no rule
+# rows means the platform default, so privacy and retention both follow placement) and a folded trace
 # summary (ClickHouse trace_summaries, TenantId = project id), read-only.
 collect_resolution() {
   local projects folded
-  projects="$(psql_json "SELECT p.id AS \"projectId\", dp.\"projectId\" IS NOT NULL AS privacy, dr.\"projectId\" IS NOT NULL AS retention FROM mydb.\"Project\" p LEFT JOIN mydb.\"DataPrivacyProjectScope\" dp ON dp.\"projectId\" = p.id LEFT JOIN mydb.\"DataRetentionProjectScope\" dr ON dr.\"projectId\" = p.id WHERE p.id LIKE 'rh\\_${RUN_ID}\\_%' ORDER BY p.id")"
+  projects="$(psql_json "SELECT p.id AS \"projectId\", placed AS privacy, placed AS retention FROM (SELECT p.id, t.id IS NOT NULL AND (NOT t.\"isPersonal\" OR EXISTS (SELECT 1 FROM mydb.\"OrganizationUser\" ou WHERE ou.\"organizationId\" = t.\"organizationId\" AND ou.\"userId\" = t.\"ownerUserId\")) AS placed FROM mydb.\"Project\" p LEFT JOIN mydb.\"Team\" t ON t.id = p.\"teamId\" WHERE p.id LIKE 'rh\\_${RUN_ID}\\_%') p ORDER BY p.id")"
   folded="$(compose exec -T clickhouse clickhouse-client --password langwatch --database langwatch --query "SELECT DISTINCT TenantId FROM trace_summaries WHERE TenantId LIKE 'rh\\_${RUN_ID}\\_%' FORMAT JSONEachRow" 2>/dev/null || true)"
   node -e '
     const projects = JSON.parse(process.argv[1]);
