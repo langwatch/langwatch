@@ -24,9 +24,15 @@ import {
   SessionReader,
   type TransportSelection,
 } from "@langwatch/api/hosting";
-import { ClientAddress, SecurityHeaders, type StorageEndpoints } from "@langwatch/api/policy";
+import {
+  BrowserOriginGuard,
+  ClientAddress,
+  SecurityHeaders,
+  type StorageEndpoints,
+} from "@langwatch/api/policy";
 import {
   bindRestMiddleware,
+  BrowserOriginRefusedError,
   BrowserSessionIdentity,
   canonicalErrorAnswer,
   defineRestMiddleware,
@@ -454,6 +460,13 @@ function trpcLanes(trpc: TrpcHost): Hono {
     const path = pathname.slice(TrpcHost.path.length + 1);
     if (searchParams.has("batch") || /,|%2c/i.test(path)) {
       throw new BatchingNotSupportedError();
+    }
+
+    // As on the REST browser door: a signed-in write must come from our own pages.
+    const header = (name: string) => request.headers.get(name) ?? undefined;
+    const writes = !["GET", "HEAD", "OPTIONS"].includes(request.method);
+    if (writes && !BrowserOriginGuard.isFromOwnOrigin({ req: { header } })) {
+      if ((await createContext()).session) throw new BrowserOriginRefusedError();
     }
 
     // The session version and, on a query, the schema hash ride every answer.

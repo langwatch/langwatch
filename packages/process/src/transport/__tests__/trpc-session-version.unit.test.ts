@@ -94,6 +94,7 @@ describe("given a tRPC surface reading session versions from authz", () => {
       headers: {
         "x-test-user": user,
         "content-type": "application/json",
+        "sec-fetch-site": "same-origin",
       },
       ...(init.method === "POST" ? { body: "{}" } : {}),
     });

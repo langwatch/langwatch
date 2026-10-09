@@ -65,7 +65,7 @@ describe("given a tRPC surface mounting a contract", () => {
       const read = await app.request(`/api/trpc/profile.live?input=${input}`);
       const write = await app.request("/api/trpc/profile.rename", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", "sec-fetch-site": "same-origin" },
         body: "{}",
       });
 
