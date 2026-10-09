@@ -199,8 +199,7 @@ import {
 import type { ConversationView } from "@langwatch/trace-contract/conversation";
 import type { z } from "zod";
 
-import { tokenCounterChannels } from "../channels/token-counter-channels.registry.ts";
-import { traceLegacySpoolChannels } from "../channels/trace-legacy-spool-channels.registry.ts";
+import type { TraceChannels } from "../channels/trace.channels.ts";
 import type { TraceProcessingPipelineDefinition } from "../eventing/trace-processing-projections.pipeline.ts";
 import { TraceProcessingRuntimeAdapter } from "../eventing/trace-processing-runtime.pipeline.ts";
 import {
@@ -755,7 +754,8 @@ const TRACE_FALLBACK_VISIBILITY_DAYS = 14;
 type TraceSetup = FeatureSetup<
   typeof TraceModule.dependencies,
   TraceServerConfig,
-  TraceRepositories
+  TraceRepositories,
+  TraceChannels
 >;
 
 /** What one process composes Trace's read graph over: its registry, collaborators and peers. */
@@ -879,12 +879,7 @@ export class TraceModule implements TraceApi, CollectorApp {
       repositories.clickhouseClients.resolve(tenantId);
     const canonicalisation = TraceCanonicalisation.create();
     const blobStore = TraceBlobStoreService.create({
-      // A v1 spool ref predates the stored-object registry and reads back through S3 directly,
-      // which no process composes; `resolveOffloadedTraces` swallows the refusal per field.
-      legacySpool: traceLegacySpoolChannels.live.create({
-        resolveS3Client: () =>
-          Promise.reject(new TraceCapabilityUnavailableError(role, "a v1 spool object read")),
-      }),
+      legacySpool: setup.channels.legacySpool,
       payloads: repositories.eventPayloads,
       logger: createLogger("langwatch:trace:blob-store"),
     });
@@ -934,7 +929,7 @@ export class TraceModule implements TraceApi, CollectorApp {
       traces: app,
       evaluators: setup.dependencies.evaluators,
     });
-    const tokenizer = tokenCounterChannels.live.create(setup.config.tokenizer);
+    const { tokenizer } = setup.channels;
     setup.resources.own("Trace tokenizer", () => tokenizer.close());
     const milestones = TraceProjectMilestonesService.create({ role });
     app.#milestones = milestones;

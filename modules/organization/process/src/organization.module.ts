@@ -4,6 +4,7 @@ import { defineProcessModule, type PublishedProcessModule } from "@langwatch/pro
 import { defineMigrationStep } from "@langwatch/upgrade/step";
 
 import { OrganizationModule } from "./app/organization.app.ts";
+import { organizationChannels } from "./channels/organization-channels.registry.ts";
 import { organizationAuditEventing } from "./eventing/organization-audit.pipeline.ts";
 import { organizationLifecycleEventing } from "./eventing/organization-lifecycle.pipeline.ts";
 import { seatLimitEventing } from "./eventing/seat-limit.pipeline.ts";
@@ -30,6 +31,7 @@ export const organizationProcessModule: PublishedProcessModule<
   OrganizationServerConfig
 > = defineProcessModule("organization")
   .withRepositories(organizationRepositories)
+  .withChannels(organizationChannels)
   .withApi(OrganizationModule)
   .withTransports(
     organizationTrpcTransport,

@@ -6,14 +6,14 @@
 import { AuthUnavailableError } from "@langwatch/auth-contract";
 import { describe, expect, it } from "vitest";
 
-import { passwordResetMailChannels } from "../../channels/password-reset-mail-channels.registry.ts";
+import { MemoryPasswordResetMailChannel } from "../../channels/memory/memory.password-reset-mail.channel.ts";
 import { AuthModule } from "../auth.app.ts";
 
 describe("sending a requested password reset", () => {
   describe("given the process names its public base URL", () => {
     /** @scenario The reset link is rooted at the deployment's own URL and carries the token */
     it("mails the user a link to this deployment's reset page carrying the token", async () => {
-      const mail = passwordResetMailChannels.memory.create();
+      const mail = MemoryPasswordResetMailChannel.create();
       const send = AuthModule.passwordResetSender({
         mail,
         publicBaseUrl: "https://langwatch.example.com",
@@ -33,7 +33,7 @@ describe("sending a requested password reset", () => {
 
   describe("given the process names no public base URL", () => {
     it("refuses by name and mails nothing", async () => {
-      const mail = passwordResetMailChannels.memory.create();
+      const mail = MemoryPasswordResetMailChannel.create();
       const send = AuthModule.passwordResetSender({
         mail,
         publicBaseUrl: undefined,
