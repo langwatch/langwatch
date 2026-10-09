@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`InstantEvalApi`)
 
-Peers call these through the token, declared at `../contract/src/instant-eval.api.ts:99`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/instant-eval.api.ts:98`; nothing else in this package is public.
 
 #### `isEnabled`
 
@@ -293,7 +293,7 @@ type Response = z.infer<typeof instantEvalSampleSchema>; // ../contract/src/inst
 
 ### `instantEval`
 
-Contract `../contract/src/instant-eval.trpc.ts:20`, router `src/transport/instant-eval.trpc.ts:50`.
+Contract `../contract/src/instant-eval.trpc.ts:20`, router `src/transport/instant-eval.trpc.ts:53`.
 
 | Procedure                    | Kind     | Gate                                            | Input                                     | Output                               |
 | ---------------------------- | -------- | ----------------------------------------------- | ----------------------------------------- | ------------------------------------ |
