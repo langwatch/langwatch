@@ -60,7 +60,7 @@ function installed() {
         getProjectAnyDecision: async (input): Promise<PermissionDecision> =>
           input.projectId === PROJECT && input.permissions.includes("traces:view")
             ? { permitted: true, organizationRole: "MEMBER" }
-            : { permitted: false, organizationRole: "MEMBER", denialReason: "no-binding" },
+            : { permitted: false, organizationRole: "MEMBER", denialReason: "no-grant" },
         checkScopeLineage: async () => ({ kind: "consistent" }),
       }),
     },
