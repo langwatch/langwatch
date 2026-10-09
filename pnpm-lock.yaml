@@ -8835,6 +8835,9 @@ importers:
       '@langwatch/error-views':
         specifier: workspace:*
         version: link:../../../packages/error-views
+      '@langwatch/feature-flag-contract':
+        specifier: workspace:*
+        version: link:../../feature-flag/contract
       '@langwatch/gateway-contract':
         specifier: workspace:*
         version: link:../contract
@@ -15355,6 +15358,9 @@ importers:
       '@langwatch/error-views':
         specifier: workspace:*
         version: link:../../../packages/error-views
+      '@langwatch/feature-flag-contract':
+        specifier: workspace:*
+        version: link:../../feature-flag/contract
       '@langwatch/gateway-contract':
         specifier: workspace:*
         version: link:../../gateway/contract

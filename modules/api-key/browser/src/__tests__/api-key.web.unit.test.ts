@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 
-import { createUi } from "@langwatch/browser";
+import { createUi, hostServiceFakes } from "@langwatch/browser";
 import { describe, expect, it } from "vitest";
 
 import { apiKeyWeb } from "../api-key.web.ts";
@@ -17,7 +17,7 @@ describe("given a browser that installs api-key", () => {
   describe("when the kernel renders with only a transport supplied", () => {
     it("installs the module", async () => {
       const installed = await createUi({ document: browserDocument(), mount: "root" })
-        .withModules([apiKeyWeb] as const)
+        .withModules([hostServiceFakes(), apiKeyWeb] as const)
         .withTransport({ query: () => Promise.resolve(null) })
         .render();
 

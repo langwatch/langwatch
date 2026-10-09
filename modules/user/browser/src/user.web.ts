@@ -5,6 +5,7 @@
  */
 
 import { defineBrowserModule } from "@langwatch/browser";
+import { FrontendFlags } from "@langwatch/feature-flag-contract";
 import { userTrpc } from "@langwatch/user-contract";
 
 import { personalWorkspaceApi } from "./behavior/personal-workspace-api.ts";
@@ -22,37 +23,37 @@ export const userWeb = defineBrowserModule("user")
   .withScreens({
     "pages/me/index": {
       path: "/me",
-      flags: ["release_ui_ai_governance_enabled"],
+      flags: [FrontendFlags.release_ui_ai_governance_enabled],
       load: () => import("./ui/sections/personal-workspace/personal-overview.screen.tsx"),
     },
     "pages/me/configure": {
       path: "/me/configure",
-      flags: ["release_ui_ai_governance_enabled"],
+      flags: [FrontendFlags.release_ui_ai_governance_enabled],
       load: () => import("./ui/sections/personal-workspace/personal-configure.screen.tsx"),
     },
     "pages/me/pull-requests": {
       path: "/me/pull-requests",
-      flags: ["release_ui_ai_governance_enabled"],
+      flags: [FrontendFlags.release_ui_ai_governance_enabled],
       load: () => import("./ui/sections/personal-workspace/personal-pull-requests.screen.tsx"),
     },
     "pages/me/sessions": {
       path: "/me/sessions",
-      flags: ["release_ui_ai_governance_enabled"],
+      flags: [FrontendFlags.release_ui_ai_governance_enabled],
       load: () => import("./ui/sections/personal-workspace/personal-sessions.screen.tsx"),
     },
     "pages/me/budget/request": {
       path: "/me/budget/request",
-      flags: ["release_ui_ai_governance_enabled"],
+      flags: [FrontendFlags.release_ui_ai_governance_enabled],
       load: () => import("./ui/sections/personal-workspace/personal-budget-request.screen.tsx"),
     },
     // The same two workspaces scoped to one project; the application's table
     // owns these addresses, so only the loader is declared here.
     "pages/[project]/sessions": {
-      flags: ["release_ui_ai_governance_enabled"],
+      flags: [FrontendFlags.release_ui_ai_governance_enabled],
       load: () => import("./ui/sections/personal-workspace/project-sessions.screen.tsx"),
     },
     "pages/[project]/pull-requests": {
-      flags: ["release_ui_ai_governance_enabled"],
+      flags: [FrontendFlags.release_ui_ai_governance_enabled],
       load: () => import("./ui/sections/personal-workspace/project-pull-requests.screen.tsx"),
     },
     // Placed by the application's settings table until a settings anchor

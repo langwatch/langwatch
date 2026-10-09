@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 
-import { createUi } from "@langwatch/browser";
+import { createUi, hostServiceFakes } from "@langwatch/browser";
 import { FirstTouchAttributionToken, GuidedTourToken } from "@langwatch/onboarding-client";
 import { describe, expect, it } from "vitest";
 
@@ -20,7 +20,7 @@ describe("given a browser that installs onboarding", () => {
   describe("when the kernel renders with only a transport supplied", () => {
     it("installs the module", async () => {
       const installed = await createUi({ document: browserDocument(), mount: "root" })
-        .withModules([onboardingWeb] as const)
+        .withModules([hostServiceFakes(), onboardingWeb] as const)
         .withTransport({ query: () => Promise.resolve(null) })
         .render();
 

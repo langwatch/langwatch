@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 
-import { createUi } from "@langwatch/browser";
+import { createUi, hostServiceFakes } from "@langwatch/browser";
 import { describe, expect, it } from "vitest";
 
 import { datasetWeb } from "../dataset.web.ts";
@@ -17,7 +17,7 @@ describe("given a browser that installs dataset", () => {
   describe("when the kernel renders with only a transport supplied", () => {
     it("installs the module", async () => {
       const installed = await createUi({ document: browserDocument(), mount: "root" })
-        .withModules([datasetWeb] as const)
+        .withModules([hostServiceFakes(), datasetWeb] as const)
         .withTransport({ query: () => Promise.resolve(null) })
         .render();
 

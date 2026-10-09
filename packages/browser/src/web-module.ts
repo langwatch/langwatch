@@ -53,7 +53,7 @@ export type WebScreen = Readonly<{
   /** The grant the shell's router checks before this screen renders (§10). */
   requires?: string;
   /** Release flags that must all be on for this screen to exist; off answers not-found. */
-  flags?: readonly (string | ReleaseFlagToken)[];
+  flags?: readonly ReleaseFlagToken[];
 }>;
 
 export type WebScreens = Readonly<Record<string, WebScreen>>;

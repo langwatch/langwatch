@@ -4,6 +4,7 @@
  * the screen.
  */
 
+import type { ReleaseFlagToken } from "@langwatch/module";
 import type { ComponentType, ReactNode } from "react";
 
 import { UiPageForbidden, UiPageLoading, UiPageNotFound } from "./ui-page-fallbacks.tsx";
@@ -21,7 +22,7 @@ export type UiPageInstall = {
   screen: () => Promise<{ default: ComponentType }>;
   host?: ComponentType<{ children: ReactNode }>;
   permission?: string;
-  flags?: readonly string[];
+  flags?: readonly ReleaseFlagToken[];
 };
 
 /** Wraps `Page` in `Host`, the way every deleted `withXHost` HOC did. */
