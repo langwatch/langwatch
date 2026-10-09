@@ -46,7 +46,7 @@ describe("haven dev orb", () => {
       const [tag] = havenOrbTags({ slug: "feat-x" });
       expect(tag).toMatchObject({
         tag: "script",
-        injectTo: "head-prepend",
+        injectTo: "head",
         attrs: { type: "module" },
       });
       expect(tag?.attrs?.src).toMatch(/^\/@fs\/.*haven-orb\/orb-client\.ts$/u);
