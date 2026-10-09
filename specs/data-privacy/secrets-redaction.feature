@@ -245,6 +245,13 @@ Feature: Redacting secrets from traces
     Then the token is redacted
 
   @unit
+  Scenario: An open-weight model id is not mistaken for a key
+    Given a span whose model is "doubleword/nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4"
+    When the span is redacted
+    Then the model id is stored exactly as written
+    And a random key that happens to hold several separators is still redacted
+
+  @unit
   Scenario: An environment variable name is not mistaken for a key
     Given a bare environment variable name
     When the text is redacted

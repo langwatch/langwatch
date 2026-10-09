@@ -22,7 +22,7 @@ type InlineCredentials struct {
 	Gemini    map[string]string `json:"gemini,omitempty"`
 	Custom    map[string]string `json:"custom,omitempty"`
 	// Generic holds credentials for plain api-key providers (xai, groq,
-	// cerebras, deepseek) that need no provider-specific fields;
+	// cerebras, deepseek, doubleword) that need no provider-specific fields;
 	// Provider disambiguates which one. Dedicated slots exist only
 	// where the shapes genuinely differ (azure, bedrock, vertex).
 	Generic map[string]string `json:"generic,omitempty"`
@@ -93,7 +93,7 @@ func FromLiteLLMParams(provider string, params map[string]any) (InlineCredential
 			Provider: "gemini",
 			Gemini:   pickStrings(params, "api_key", "project_id", "region"),
 		}, nil
-	case "xai", "groq", "cerebras", "deepseek":
+	case "xai", "groq", "cerebras", "deepseek", "doubleword":
 		return InlineCredentials{
 			Provider: provider,
 			Generic:  pickStrings(params, "api_key", "api_base"),
