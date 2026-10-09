@@ -1637,6 +1637,9 @@ office deactivates only through user, so it keeps no picked date (Alex, 2026-10-
   API operation, and **return a plain value or throw**. No `c.json`, no
   `JSON.parse`, no manual status branches, no error envelopes, no
   `RestErrorHandler` — banned outright.
+  A route that declares its permission target (`.withPermission(perm, { at })`) also hands the
+  handler `target`, the scope the door authorised, as `.withResponse` hands it `response`
+  (DOOR-TARGET, Alex, 2026-10-09).
 - Every wire schema imports from the module's own contract. The one
   sanctioned exception: the `moduleApi<X>()` app-port interface a door
   declares for its own implementation.
