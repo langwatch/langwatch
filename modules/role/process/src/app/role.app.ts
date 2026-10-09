@@ -341,7 +341,7 @@ export class RoleModule implements RoleApi {
     throw new PermissionDeniedError({
       permission,
       scope: { type: "organization", id: organizationId },
-      denialReason: "no-binding",
+      denialReason: "no-grant",
     });
   }
 
