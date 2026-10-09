@@ -14,6 +14,7 @@ const { state } = vi.hoisted(() => ({
     provenance: {} as Record<string, { source: string }>,
     membershipQueried: [] as string[],
     departments: [] as Record<string, unknown>[],
+    reconciliationError: void 0 as unknown,
   },
 }));
 
@@ -30,7 +31,10 @@ vi.mock("../../../behavior/scim-api.ts", () => {
     scimApi: {
       scimReconciliation: {
         getAll: {
-          useQuery: () => read(() => ({ connections: state.connections, recentChanges: [] })),
+          useQuery: () =>
+            state.reconciliationError
+              ? { data: void 0, isLoading: false, isError: true, error: state.reconciliationError }
+              : read(() => ({ connections: state.connections, recentChanges: [] })),
         },
       },
     },
@@ -79,6 +83,29 @@ beforeEach(() => {
   };
   state.membershipQueried = [];
   state.departments = [];
+  state.reconciliationError = void 0;
+});
+
+describe("given a plan that does not include directory sync", () => {
+  /** @scenario "A plan without directory sync says so on the directory card" */
+  it("says it is an Enterprise feature, and keeps the read failure for any other refusal", () => {
+    state.reconciliationError = { data: { error: { code: "enterprise_plan_required" } } };
+    const gated = renderWithScimHost(
+      <DirectoryOverviewCard organizationId="org-1" canReadMembership />,
+    );
+
+    expect(screen.getByTestId("directory-card-enterprise-gate")).toHaveTextContent(
+      "Directory sync is an Enterprise feature",
+    );
+    expect(screen.queryByTestId("directory-card-failure")).toBeNull();
+    gated.unmount();
+
+    state.reconciliationError = { data: { error: { code: "internal_error" } } };
+    renderWithScimHost(<DirectoryOverviewCard organizationId="org-1" canReadMembership />);
+
+    expect(screen.getByTestId("directory-card-failure")).toBeInTheDocument();
+    expect(screen.queryByTestId("directory-card-enterprise-gate")).toBeNull();
+  });
 });
 
 describe("given a directory that manages three of four members", () => {

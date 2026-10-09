@@ -18,6 +18,7 @@ import {
 import { useDirectoryFacts } from "../../behavior/use-directory-facts.ts";
 import { directorySyncChipFor } from "../../model/directory-sync-chip.ts";
 import { relativeTime } from "../../model/display-formatters.ts";
+import { isEnterpriseGateError } from "../../model/enterprise-gate.ts";
 import { CONNECTORS_PAGE, useScimHost } from "../../model/scim-host.ts";
 
 /** Groups named before the rest collapse into a count. */
@@ -44,7 +45,11 @@ export function DirectoryOverviewCard({
   if (reconciliation.isError) {
     return (
       <OverviewCard title="Directory" data-testid="directory-card">
-        <DirectoryReadFailure />
+        {isEnterpriseGateError(reconciliation.error) ? (
+          <DirectoryEnterpriseGate />
+        ) : (
+          <DirectoryReadFailure />
+        )}
       </OverviewCard>
     );
   }
@@ -91,6 +96,16 @@ function DirectoryReadFailure() {
   return (
     <Text fontSize="13px" color="fg.muted" data-testid="directory-card-failure">
       Couldn&apos;t read your directory. Try again in a moment.
+    </Text>
+  );
+}
+
+/** A plan state, not a failure: retrying would not change it, so the card says what would. */
+function DirectoryEnterpriseGate() {
+  return (
+    <Text fontSize="13px" color="fg.muted" data-testid="directory-card-enterprise-gate">
+      Directory sync is an Enterprise feature. Once your plan includes it, connect your identity
+      provider and members, groups and sync times fill themselves in.
     </Text>
   );
 }
