@@ -1,4 +1,4 @@
-import type { FrontendFeatureFlag } from "@langwatch/feature-flag-contract";
+import { FrontendFlags, type FrontendFeatureFlag } from "@langwatch/feature-flag-contract";
 import { useMemo } from "react";
 
 import { useNavigationHost } from "../model/navigation-host.ts";
@@ -43,8 +43,12 @@ export function useReachableProducts({
   // passing `enabled: false` down to the flag QUERIES so they never ran; the
   // host answers flags now, so the same property is "do not ask".
   const NOT_ASKED = { enabled: false, isLoading: false };
-  const gatewayFlag = enabled ? host.featureFlag("release_ui_ai_gateway_menu_enabled") : NOT_ASKED;
-  const governanceFlag = enabled ? host.featureFlag("release_ui_ai_governance_enabled") : NOT_ASKED;
+  const gatewayFlag = enabled
+    ? host.featureFlag(FrontendFlags.release_ui_ai_gateway_menu_enabled)
+    : NOT_ASKED;
+  const governanceFlag = enabled
+    ? host.featureFlag(FrontendFlags.release_ui_ai_governance_enabled)
+    : NOT_ASKED;
 
   const flagValues: Partial<Record<FrontendFeatureFlag, boolean>> = {
     release_ui_ai_gateway_menu_enabled: gatewayFlag.enabled,

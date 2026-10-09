@@ -1,6 +1,6 @@
 /** Stub host for tests; built from partial reading with fail-closed defaults */
 
-import type { UiDrawerToken } from "@langwatch/browser-host/declarations";
+import type { ReleaseFlagToken, UiDrawerToken } from "@langwatch/browser-host/declarations";
 import type {
   NavigationDeployment,
   NavigationFlagReading,
@@ -143,8 +143,8 @@ export class StubNavigationHost extends NavigationHost {
     return (this.readings.permissions ?? []).includes(permission);
   }
 
-  featureFlag(flag: string): NavigationFlagReading {
-    return this.readings.flags?.[flag] ?? { enabled: false, isLoading: false };
+  featureFlag(flag: ReleaseFlagToken): NavigationFlagReading {
+    return this.readings.flags?.[flag.name] ?? { enabled: false, isLoading: false };
   }
 
   waiting(): ReactNode {

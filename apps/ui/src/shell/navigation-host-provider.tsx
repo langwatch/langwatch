@@ -18,6 +18,7 @@ import {
   useGraphicsQualityOverrideStore,
   type GraphicsQualityOverride,
 } from "@langwatch/browser-host/facilities";
+import { useUiFlags } from "@langwatch/browser-host/feature-flag";
 import { routePatternOf } from "@langwatch/browser-host/navigation-tracing";
 import { UiPageFailure, UiPageNotFound } from "@langwatch/browser/page-fallbacks";
 import type { ProcessWebConfig } from "@langwatch/config/public-app-config";
@@ -219,11 +220,12 @@ function useNavigationHostReading({
     [uiDeployment, process],
   );
 
+  const flags = useUiFlags();
   const askLangy = useLangyStore((store) => store.askLangy);
   const setHomeAskOpen = useLangyStore((store) => store.setHomeAskOpen);
   const canAskLangy = offersLangyAsk({
     hasPermission: (permission) => session.hasPermission(permission),
-    isFeatureEnabled: (flag) => session.isFeatureEnabled(flag),
+    isFeatureEnabled: (flag) => flags.flag(flag) === true,
     projectSlug: project?.slug,
     demoProjectSlug: deployment.demoProjectSlug,
   });
@@ -353,7 +355,7 @@ function useNavigationHostReading({
           waiting: <LoadingScreen />,
           notFound: <UiPageNotFound />,
           hasPermission: (permission) => session.hasPermission(permission),
-          featureFlag: (flag) => session.featureFlag(flag),
+          featureFlag: (flag) => flags.flag(flag),
         },
         {
           navigate: (to) => navigation.navigate(to),
@@ -384,6 +386,7 @@ function useNavigationHostReading({
       deployment,
       facts,
       session,
+      flags,
       commandBarAnswer,
       langy,
       accountMenu,

@@ -1,3 +1,4 @@
+import { FrontendFlags } from "@langwatch/feature-flag-contract";
 import { useMemo } from "react";
 
 import { useNavigationHost } from "../../../model/navigation-host.ts";
@@ -10,7 +11,9 @@ import {
 
 /** Flags for command list, asked through host so palette and sidebar see the same answer */
 export function useCommandFeatureFlags(): CommandFeatureFlagValues {
-  const agentTesting = useNavigationHost().featureFlag("release_ui_agent_testing_v2_enabled");
+  const agentTesting = useNavigationHost().featureFlag(
+    FrontendFlags.release_ui_agent_testing_v2_enabled,
+  );
 
   return useMemo(
     () => ({

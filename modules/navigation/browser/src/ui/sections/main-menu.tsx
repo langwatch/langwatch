@@ -3,6 +3,7 @@
  * doesn't include MainMenu column (deleted with DashboardLayout).
  */
 
+import { FrontendFlags } from "@langwatch/feature-flag-contract";
 import type { NavigationProject } from "@langwatch/navigation-contract";
 import { nowInstant } from "@langwatch/time";
 import { GitPullRequest, SquareTerminal } from "lucide-react";
@@ -83,7 +84,9 @@ interface CodingAgentLinks {
 function useCodingAgentLinks(): CodingAgentLinks {
   const host = useNavigationHost();
   const project = host.project();
-  const codingAgentPagesEnabled = host.featureFlag("release_ui_ai_governance_enabled").enabled;
+  const codingAgentPagesEnabled = host.featureFlag(
+    FrontendFlags.release_ui_ai_governance_enabled,
+  ).enabled;
   const canSeeCodingAgentActivity = codingAgentPagesEnabled && host.hasPermission("traces:view");
   const now = nowInstant();
 
@@ -215,7 +218,7 @@ function TestSection({
   // while the flag is still loading, so the group never flips on arrival.
   const host = useNavigationHost();
   const { enabled: agentTestingEnabled, isLoading: agentTestingFlagLoading } = host.featureFlag(
-    "release_ui_agent_testing_v2_enabled",
+    FrontendFlags.release_ui_agent_testing_v2_enabled,
   );
 
   return (
