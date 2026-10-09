@@ -240,6 +240,7 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   "services/voicesim",
   "tools/diffsuite",
   "tools/fuzz",
+  "tools/workerrun",
   // The Go SDK. Its span-attribute scenarios (typed input/output envelopes,
   // binary content parts, metadata hoisting, data capture) are satisfied by Go
   // tests and by nothing else, so without this root those scenarios could only

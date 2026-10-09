@@ -171,6 +171,9 @@ func PresetNames() []string {
 	return names
 }
 
+// PresetByName finds a preset by its name.
+func PresetByName(name string) (Preset, bool) { return presetByName(name) }
+
 func presetByName(name string) (Preset, bool) {
 	for i := range presets {
 		if presets[i].Name == name {
