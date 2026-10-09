@@ -89,7 +89,7 @@ export type {
 export {
   runTieredFreeToSeatEventMigration,
   TieredFreeToSeatEventMigrateTask,
-  type TieredFreeToSeatEventMigrationDatabase,
+  type TieredFreeToSeatEventMigrationPeers,
   type TieredFreeToSeatEventMigrationOutcome,
 } from "./tasks/tiered-free-to-seat-event.task.ts";
 export {
