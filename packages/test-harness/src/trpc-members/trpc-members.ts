@@ -1,6 +1,6 @@
 import type { TrpcRuntimeMembers } from "@langwatch/api/trpc";
 
-import { mintTestAuthorization } from "./test-authorization.ts";
+import { testAuthorizeDefaults } from "./test-authorization.ts";
 
 type Decisions<TContext> = ReturnType<TrpcRuntimeMembers<TContext>["authorization"]["forRequest"]>;
 type Permission<TContext> = Parameters<Decisions<TContext>["getDecision"]>[0]["permission"];
@@ -27,6 +27,7 @@ export function trpcTestMembers<TContext extends { actor: { id: string } | null 
     },
     authorization: {
       forRequest: () => ({
+        ...testAuthorizeDefaults,
         getDecision: async ({ permission }) => ({
           permitted: permits(permission),
           organizationRole: null,
@@ -36,7 +37,6 @@ export function trpcTestMembers<TContext extends { actor: { id: string } | null 
           organizationRole: null,
         }),
         checkScopeLineage: async () => ({ kind: "consistent" }),
-        authorization: mintTestAuthorization,
       }),
     },
     denials: {

@@ -22,6 +22,18 @@ export const mintTestAuthorization: NonNullable<Authorize["authorization"]> = as
   });
 
 /**
+ * The `Authorize` members a test does not ask about, as an ordinary project answers them.
+ * Spread first, so the members a test declares win: `{ ...testAuthorizeDefaults, getDecision }`.
+ */
+export const testAuthorizeDefaults = {
+  organizationOf: async () => null,
+  getPlatformDecision: async () => ({ permitted: false }),
+  projectKindOf: async () => "application",
+  authorization: mintTestAuthorization,
+  assertSecondFactor: async () => {},
+} satisfies Omit<Authorize, "getDecision" | "getProjectAnyDecision" | "checkScopeLineage">;
+
+/**
  * The authorization a mounted REST router runs on in a test, mirroring
  * trpcTestMembers: the test decides each permission, and a proof-bearing read
  * is handed an own-grant proof for the asked project.
@@ -33,6 +45,7 @@ export function restTestAuthorization({
 } = {}): Readonly<{ forRequest(request: Request): Authorize }> {
   return {
     forRequest: () => ({
+      ...testAuthorizeDefaults,
       getDecision: async ({ permission }) => ({
         permitted: permits(permission),
         organizationRole: null,
@@ -42,7 +55,6 @@ export function restTestAuthorization({
         organizationRole: null,
       }),
       checkScopeLineage: async () => ({ kind: "consistent" }),
-      authorization: mintTestAuthorization,
     }),
   };
 }
