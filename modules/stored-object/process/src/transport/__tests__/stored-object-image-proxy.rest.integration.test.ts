@@ -3,6 +3,7 @@
  * `GET /api/image-proxy` pinned to main's statuses, bodies and cache header.
  */
 import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
 import { createStoredObjectTestApp } from "../../app/__tests__/stored-object.fixture.ts";
@@ -31,6 +32,7 @@ function proxy() {
   });
   const app = createStoredObjectTestApp({ images });
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => {
         throw new Error("The image proxy asks no credential.");

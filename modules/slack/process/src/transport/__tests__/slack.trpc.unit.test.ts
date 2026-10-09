@@ -5,6 +5,7 @@
  * @see modules/slack/specs/slack-connections.feature
  */
 import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 
@@ -30,6 +31,7 @@ function members(asked: string[]): TrpcRuntimeMembers<Context> {
     },
     authorization: {
       forRequest: () => ({
+        ...testAuthorizeDefaults,
         getDecision: async ({ permission }) => {
           asked.push(permission);
           return { permitted: true, organizationRole: null };

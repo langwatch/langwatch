@@ -1,4 +1,4 @@
-import type { RestCredentialPrincipal } from "@langwatch/authorization";
+import type { Actor, RestCredentialPrincipal } from "@langwatch/authorization";
 import type {
   InstantEvalClassifierLimits,
   InstantEvalJudgement,
@@ -41,13 +41,12 @@ export interface InstantEvalRunInput {
 }
 
 /**
- * Who is asking. A run executes a statement as the project's restricted
- * identity, and what that statement may read is the asker's own protections:
- * a member's, resolved from their session, or a credential's.
+ * Who is asking: a member, or a credential with the door's actor (null for a legacy key).
+ * A run executes as the project's restricted identity and reads the asker's own protections.
  */
 export type InstantEvalActor =
   | Readonly<{ kind: "member"; userId: string }>
-  | Readonly<{ kind: "credential"; credential: RestCredentialPrincipal }>;
+  | Readonly<{ kind: "credential"; credential: RestCredentialPrincipal; actor: Actor | null }>;
 
 /** One run's counters, which is all a chip and a progress bar read. */
 export interface InstantEvalRunProgress {

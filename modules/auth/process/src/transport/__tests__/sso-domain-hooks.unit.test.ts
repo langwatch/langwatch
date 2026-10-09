@@ -95,6 +95,7 @@ function hooksRepo(members: Partial<BetterAuthHooksRepository>): BetterAuthHooks
   return {
     getUserForHooks: unused,
     countAccountsForUser: unused,
+    countPasskeysForUser: unused,
     findFederatedAccountsForUser: unused,
     findFederatedAccountsForUsers: unused,
     deleteAccounts: unused,

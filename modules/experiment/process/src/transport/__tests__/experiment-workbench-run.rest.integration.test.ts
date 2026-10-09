@@ -4,6 +4,7 @@
  */
 import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ExperimentV3RestApi } from "../experiment-v3.rest.ts";
@@ -23,6 +24,7 @@ describe("the workbench run REST family", () => {
         "ExperimentV3RestApi",
       );
       const runtime = createRestRuntime({
+        authorization: restTestAuthorization(),
         identity: {
           identify: () => ({
             actor: { type: "user" as const, id: "user-1" },

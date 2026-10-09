@@ -7,6 +7,7 @@ import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contrac
  * (platform/app/ee/governance/routers/departments.ts on origin/main).
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 
@@ -27,6 +28,7 @@ function members(asked: string[]): TrpcRuntimeMembers<TestContext> {
     identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
     authorization: {
       forRequest: () => ({
+        ...testAuthorizeDefaults,
         getDecision: async ({ permission }) => {
           asked.push(permission);
           return { permitted: permission === "governance:view", organizationRole: null };

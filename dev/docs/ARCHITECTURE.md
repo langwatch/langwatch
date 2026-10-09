@@ -598,12 +598,14 @@ services**, not capabilities (§16). Enforcement is prose for now; a lint rule f
 converted (no availability logic in `*.config.ts` projections; off states use the shared notice).
 
 **Ops and Cloud admin are split by audience** (Alex, 2026-09-29). **Ops** (`/ops/**`) is for every
-instance operator, self-hosted included: the dashboard, event sourcing, the foundry, flags,
+instance operator, self-hosted included: the dashboard, event sourcing, the foundry,
 migrations, and instance administration (users, organizations, projects, SSO connections,
 identity lookup, directory sync). **Cloud admin** (`/ops/cloud/**`) is LangWatch's own company
 tooling (subscriptions, licences, self-hosted instances, bug reports): the ops gate plus ops's own
 cloud-ops capability, invisible and refused elsewhere. `/ops/backoffice/**` redirects; "backoffice" is
 a deleted name (§15).
+Feature Flags show only with cloud ops: flags are the cloud's gradual-rollout switch and self-hosted
+gets features by release; the env override still applies everywhere (Alex, 2026-10-09).
 The capability is ops's, from its own config and secrets, never `isSaas`: ops config asks for cloud
 ops (`LANGWATCH_CLOUD_OPS`), and ops's secrets hold the licence private key, which must match the
 release's built-in public key. Asked for without a matching key refuses boot (Alex, 2026-09-29).
@@ -1172,7 +1174,14 @@ there — nothing else to configure. **The preflight is part of start()**
 (approved 2026-09-18): the moment the chain exists, every required handle
 declared anywhere in the module array is checked answerable — env set, or
 key present in the vault — and a miss fails the boot immediately, naming
-every missing key at once, values never held. **Global concerns declare the
+every missing key at once. **1Password is best effort** (Alex, 2026-10-09):
+one cheap probe per boot (`op whoami --account <acct>`); a failed probe (no
+`op`, locked, signed out, timed out) logs one warning naming why and 1Password
+sits out that boot, so optional handles stay unset and a required one fails
+with the ordinary missing-key refusal. After a good probe the preflight reads
+every single handle env and `.env` leave unanswered in parallel (capped, each
+read timed out), and a field absent from the item is an ordinary miss.
+**Global concerns declare the
 same way at their framework owner** — logging and telemetry are
 everyone-sends-to-one-place concerns, so `@langwatch/process` and
 observability packages declare their config slices and secret handles
@@ -1183,9 +1192,11 @@ telemetry initializes. The app builds only the READER — a fluent adapter chain
 .withOnePassword(...))` — installed on the Server preamble AFTER
 `withConfig`, so config can feed secrets (the 1Password vault key is a
 config fact); the builder is never imported and chains directly. **The
-chain is a lookup order, not a store**: it holds no values, pre-fetches
-nothing, enumerates no vault — each declared handle is fetched singly, at
-its owner's construction site, and handed straight to its closure. `boot()`
+chain is a lookup order, not a store**: it enumerates no vault, and env and
+`.env` hold no values — each declared handle is fetched singly, at its
+owner's construction site, and handed straight to its closure. The one
+exception is 1Password's parallel preflight answers, held only until the
+resolver seals and then dropped. `boot()`
 scopes the resolver per module: a `create()` can resolve only the handles
 its own module declared, each resolve validates against the handle's
 schema and hands the value to a closure —
@@ -1374,13 +1385,27 @@ task upgrade` stays a runner under the same lease for development, CI and an ope
 `start:prepare:db`: upgrade alone; no system-migrations pass); the root `prisma:migrate` and
 `clickhouse:migrate` scripts are aliases of it, so no script applies schema outside the ledger
 (Alex, 2026-10-09); the Helm pre-roll Job renders only
-with `serializeUpgrades`, and the compose `migrate` service is gone. The api never runs a step:
-while a Postgres schema step of its image is outstanding it serves the holding page; after that,
-until the ledger is current, it serves in upgrading mode, only sign-in and the Ops Upgrades page
-(the routes declared to serve while upgrading through a `packages/api` route declaration the door
-enforces; everything else answers the holding page), and reports not ready. A blocking step never
-touches a table owned by auth, user, organization, authz or identity; `lint:architecture` refuses
-one that does (UIW-1..11). A background step names the background steps it runs after by their step
+with `serializeUpgrades`, and the compose `migrate` service is gone. The api never runs a step,
+and it is up from boot (Alex, 2026-10-09, API-UP-DURING-UPGRADE: "anything important can get stuck
+on the queue for a few mins while upgrades happen, that's fine. Worker can be down, but api must be
+up"); dev starts it beside the worker, never after it. **No holds** (Alex, 2026-10-09, NO-HOLDS):
+while the ledger is behind, the api serves every REST, tRPC and SSE route at once and reports not
+ready until it is current. ClickHouse reads are defensive: a repository reading a column a pending
+ClickHouse step adds selects it through `ClickHouseColumns` (`@langwatch/clickhouse-client`), a
+per-target column list refreshed every 30 s, which answers the column's typed default until the
+column exists. A Postgres query the schema is not ready for (Prisma P2021/P2022, SQLSTATE
+42P01/42703) fails and says retry: `promoteStoreFailure` in `packages/api` maps it, once for every
+transport, to the handled `upgrade_in_progress` (503, Retry-After 10 s on REST, the same code over
+tRPC and SSE), and the browser's query client keeps retrying it with backoff. Ingestion is
+unaffected: it only enqueues for the worker, and a blocking step never touches a sign-in or ingest
+table. Cloud's rolling deploys keep the old pods serving through expand steps, since a new pod is
+not ready until the ledger is current. A failed step of either store shows on Ops > Upgrades with
+Retry; only a failed first install, which nobody can sign in to follow, opens the api's token
+console. A blocking step never touches a table the sign-in or ingest doors read or write
+(auth, user, organization, authz, identity, api-key, project, evaluation, evaluator,
+model-provider, monitor, experiment, governance); `lint:architecture` refuses one that does
+(UIW-1..11). A blocking data step touches only tables created in its own release; anything older
+ships as a background step (Alex, 2026-10-09). A background step names the background steps it runs after by their step
 values (`after: [step]`, STEP-AFTER); the worker waits on them, the upgrade inlines them before a
 contract, and an unknown id or a cycle refuses the plan. A fact old images never recorded is
 recorded by its owner's background data step with `needsOldWritersGone`; `project:record-created-facts`
@@ -1388,7 +1413,15 @@ runs after `instant-eval:copy-judge-spend` (ADR-174 decision 17). Prisma migrati
 ClickHouse migrations are goose SQL files. A serving process holding DDL locks is how deploys die.
 A goose file that starts a background mutation (`MATERIALIZE INDEX`) is tracked by a background step in
 the table owner that waits on `system.mutations` and fails on its fail reason, so the ledger shows it
-(`trace:track-updated-at-index-materialisation`, Alex, 2026-10-09).
+(`trace:track-updated-at-index-materialisation`, Alex, 2026-10-09); the goose file names that step in a
+`-- background step: <id>` note above the statement. Migrations are graceful because the api serves
+through them (Alex, 2026-10-09): the runner sets `lock_timeout` 2 s with a bounded retry, and the
+migration-safety scanners refuse a Postgres `UPDATE`/`DELETE` on an existing table, a volatile
+`DEFAULT` on an added column, two `ALTER`s on one existing table and a longer `lock_timeout`, and a
+ClickHouse mutation without that note, `MODIFY TTL` that materialises, `MODIFY ORDER BY`,
+`OPTIMIZE ... FINAL` and `POPULATE`; the note excuses only a mutation, never the last three. Migrations
+in the newest `langwatch@v*` tag, read from git, are history and never rewritten; a clone without the
+tags fails the guards rather than passing (Alex, 2026-10-09).
 Because they run before any module boots, apps/tasks' migration-runner files (`src/*migrat*.ts`) may
 name process packages (Alex, 2026-09-27), and so may `lwql-provision.ts` and
 `lwql-render-access-config.ts`: LangWatchQL provisioning reads both schemas under the same migration
@@ -1567,7 +1600,11 @@ organization's projects (a gateway budget's ledger) declares its **tenant set** 
 the tenant guard accepts `TenantId IN (...)` only when the list binds exactly that set, the request's
 `tenantId` among them, with no `OR` disjoining it; the member's router resolves every tenant through
 the tenant directory it already routes by and refuses a set spanning organizations. One statement,
-answered on that organization's server, never an `unscoped` reason (Alex, 2026-09-29). Eventing's replay
+answered on that organization's server, never an `unscoped` reason (Alex, 2026-09-29). The list may
+also be one `Array(String)` parameter holding exactly that set, as the proof fence binds it, and an `OR`
+bracketed beneath that set does not weaken it (M8487-GUARD-ARRAY, Alex, 2026-10-09); an `OR` in a
+subquery beneath the set, and a `NOT` in front of any tenant predicate, are refused (GUARD-FOLLOWUPS,
+Alex, 2026-10-09). Eventing's replay
 reads through the member's own surface (`query`, `stream`, `command`); `stream` yields a large read
 batch by batch under the tenant guard and the route, holding no slot and never retried.
 
@@ -1736,6 +1773,16 @@ office deactivates only through user, so it keeps no picked date (Alex, 2026-10-
 - A REST request is authenticated before its body is capped, parsed or validated: a missing or invalid credential
   answers 401/403, never 422 or 413. A door that signs over the body reads the capped raw bytes first. Which project
   the caller acts on is resolved after, from the parsed input (Alex, 2026-09-30).
+- A permission is asked where its scope location says: `{ at: "route" }`, `{ at: "header" }`, or
+  `{ at: "body"; param; schema; field? }` for a raw text JSON body, which the door's runtime parses and validates
+  against `schema` after the credential (400, then 422), then asks at the project its field names (merge #8487).
+- **Authorization fails closed** (Alex, 2026-10-09): a missing member, proof or decision refuses; a wrapper that
+  rebuilds an access object must fail to compile when the object gains a member. Every `Authorize` member is
+  required, a wrapper returns `Required<...>`, and what a type cannot express refuses at boot or at the request,
+  then by a lint rule. The aggregate admin gate (ADR-177 decision 5) applies wherever a door decides at a project,
+  a REST route's own scope included. Both runtimes require the authorization port (a REST family without one does
+  not compile and is refused at mount); `langwatch/authz-members-required` refuses an optional question on the
+  access and api-door types.
 - The exception is a hidden family, whose 404 comes before the credential or the body: `instance_admin` with no key
   set or on SaaS, and `/api/admin/*` for a caller who is not an admin (as main, 2026-09-30).
 - REST runs in three steps: the credential and identity checks that read no body (the door, and a public route's
@@ -1757,7 +1804,7 @@ office deactivates only through user, so it keeps no picked date (Alex, 2026-10-
 - The CLI token door hands a handler `session` beside `actor` (Alex, 2026-10-01): the route declares
   `.withCredential("cli_token", { session: schema })`, the framework parses it (a mismatch answers 401) and types
   the handler by `z.output`. The actor carries authz vocabulary only; logs redact `session.tokenKey` at a fixed path.
-- A legacy project key still authenticates but is never returned or displayed: no read, no rotation, no handout.
+- A legacy project key still authenticates but is never returned or displayed: no read, no rotation, no handout. Keys created on main keep main's access and new projects get no legacy key (Alex, 2026-10-09): a legacy project key or an ownerless API key reads its own project's traces on an own-only proof the door mints as the internal actor `api.rest.ownerless-project-key`; an unattended run key on a proof-bearing route answers 403.
   It migrates to an `ApiKey` row, hashed and valid until revoked, listed masked and revoke-only under a
   replace-by-deadline banner. The CLI and MCP mint a fresh key instead, a CLI login replacing that device's previous
   one, and a new project gets no customer-facing project key (Alex, 2026-09-30). No engine and no internal caller
@@ -2049,6 +2096,24 @@ A pipeline whose projections write tenant rows declares each tenant's retention 
 The eventing member is built before any module, so it holds no late-bound resolver; a pipeline
 declaring none leaves each store to stamp the platform default.
 Spec: `packages/eventing/specs/pipeline-retention.feature`.
+**Only customer telemetry expires** (Alex, 2026-10-09). The default retention applies to customer
+telemetry alone: traces, evaluations, experiments, scenarios, logs and metrics, meaning span content,
+model inputs and outputs, gateway requests, Langy conversations, coding-agent sessions and topic
+clusters. Per-trace and per-run facts age with them: later-trace milestones, evaluation-lifecycle
+completions, Instant Eval runs, pulled-usage readings, webhook spend deliveries and ingestion-pull
+runs and listings. Their configuration and once-only facts are kept by event type (first trace, a
+manual evaluation run, an ingestion source configured or disabled, a report schedule), as are
+Instant Eval judge spend, annotations, governance budget crossings and aggregate-read audits. Every
+other event (lifecycle, configuration, billing, authz, identity) is stamped 0 days and kept forever.
+The worker's event store asks each expiring row's own pipeline's `.withRetention` resolver for the
+tenant's days for its class, else the platform default, as main's policy cache did (Alex,
+2026-10-09); the worker container's boot requires the classifier. The event-log
+classification is opt-out:
+data-retention's `RETENTION_CLASS_BY_AGGREGATE_TYPE` names each aggregate type's class, an unlisted
+aggregate type is kept forever, and the worker's installation test refuses a registered aggregate
+type missing from it, so a telemetry pipeline must name its category. Rows stamped before the ruling
+are re-stamped by data-retention's background step `data-retention:keep-control-plane-events-forever`
+through eventing's retention operation. Spec: `specs/data-retention/ingestion-stamping.feature`.
 
 A module may host several pipelines: it calls `.withEventing(...)` once per
 pipeline, each a `defineEventingModule` declaration over the same app and
@@ -2760,6 +2825,9 @@ billing, so connect syncs on licensing's `contract_terms_changed` and resets on 
 `connected_term_renewed` / `connected_customer_onboarded` facts (the cap is not a precondition of the
 billing call), and billing reads the contract `GatewayBudget` through a declared share plus its ClickHouse
 spend share. `connect.errors.ts` stays in licensing-contract.
+The connect upstream reaches gateway as a licensing fact carrying the organization, base URL, instance id and
+the licence token's fingerprint, never the token; gateway reads the token from licensing's row through a declared
+read-only share (Alex, 2026-10-09, C3b D2; the C3-KEY-HASH shape).
 
 **Seat limits are organization's to answer** (Alex, 2026-09-28).
 `licenseEnforcement.checkLimit`, `checkAllLimits` and `reportLimitBlocked`

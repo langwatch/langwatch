@@ -1,23 +1,30 @@
-import { Button, Stack } from "@langwatch/design-system-internal";
-import { SimConsole, SimRefusal, useSimPoll } from "@langwatch/sim-console";
-import { nowInstant } from "@langwatch/time";
+import { Button } from "@langwatch/design-system-internal";
+import { SimConsole, useSimPoll } from "@langwatch/sim-console";
+import { useState } from "react";
 
-import { RecentRuns } from "./recent-runs.tsx";
-import { RunStatusPanel } from "./run-status-panel.tsx";
-import { StartRunForm } from "./start-run-form.tsx";
-import { fetchStatus, startRun, stopRun, type RunRequest } from "./telemetry-api.ts";
+import { FixturesView } from "./fixtures-view.tsx";
+import { RunsView } from "./runs-view.tsx";
+import { SendOneView } from "./send-one-view.tsx";
+import { SetupView } from "./setup-view.tsx";
+import { fetchStatus, stopRun } from "./telemetry-api.ts";
 
-/** The telemetry simulator's console: the current run, a start form and the runs before it. */
+const views = {
+  runs: { label: "Runs", view: RunsView },
+  send: { label: "Send one", view: SendOneView },
+  fixtures: { label: "Fixtures", view: FixturesView },
+  setup: { label: "Setup", view: SetupView },
+} as const;
+
+type ViewId = keyof typeof views;
+
+const viewIds = Object.keys(views).filter((id): id is ViewId => id in views);
+
+/** The telemetry simulator's console: runs, one-off sends, fixtures and setup. */
 export const TelemetryConsole = () => {
   const status = useSimPoll({ fetch: fetchStatus, everyMs: 1_000 });
-  const run = status.data?.run;
-  const running = run?.state === "running";
-  const start = async ({ request }: { request: RunRequest }) => {
-    const started = startRun({ request });
-    // A send answers only once done, so poll now to show it running meanwhile.
-    void status.refresh();
-    await started.finally(() => void status.refresh());
-  };
+  const [active, setActive] = useState<ViewId>("runs");
+  const View = views[active].view;
+  const running = status.data?.run?.state === "running";
   const stop = async () => {
     await stopRun().catch(() => undefined);
     await status.refresh();
@@ -28,9 +35,16 @@ export const TelemetryConsole = () => {
       sim="telemetry"
       title="Telemetry"
       stackSlug={status.data?.stack ?? ""}
-      tabs={[]}
-      activeTab=""
-      onTab={() => undefined}
+      tabs={viewIds.map((id) => ({
+        id,
+        label: views[id].label,
+        count:
+          id === "runs" && status.data
+            ? status.data.recent.length + (status.data.run ? 1 : 0)
+            : undefined,
+      }))}
+      activeTab={active}
+      onTab={(id) => setActive(viewIds.find((known) => known === id) ?? "runs")}
       status={
         status.error
           ? { tone: "error", text: status.error.message }
@@ -45,15 +59,7 @@ export const TelemetryConsole = () => {
         </Button>
       }
     >
-      {status.error && status.data === undefined ? (
-        <SimRefusal message={status.error.message} />
-      ) : (
-        <Stack gap={4}>
-          <RunStatusPanel run={run} now={nowInstant()} />
-          <StartRunForm presets={status.data?.presets ?? []} running={running} onStart={start} />
-          <RecentRuns runs={status.data?.recent ?? []} />
-        </Stack>
-      )}
+      <View status={status.data} error={status.error} refresh={status.refresh} />
     </SimConsole>
   );
 };

@@ -465,11 +465,12 @@ export interface OrganizationApi {
   getAllMembers(input: Readonly<{ organizationId: string }>): Promise<User[]>;
   /** Every member row, disabled and deactivated included: governance's identity match reads it. */
   findMembersIncludingDeactivated(input: Readonly<{ organizationId: string }>): Promise<User[]>;
-  /** Every member's department column with their name (main `department.service.ts:112-119`). */
+  /** Every member's department, name and disabledAt (main `department.service.ts:112-119`). */
   findMembersWithDepartments(input: { organizationId: string }): Promise<
     {
       userId: string;
       departmentId: string | null;
+      disabledAt: Instant | null;
       user: { name: string | null; email: string | null };
     }[]
   >;
@@ -776,6 +777,7 @@ export interface OrganizationApi {
   ): Promise<TeamWithProjects[]>;
   listTeamAccessMatrix(
     input: Readonly<{ organizationId: string }>,
+    by: OrganizationCaller,
   ): Promise<OrganizationTeamAccess[]>;
   getTeamWithProjects(
     input: Readonly<{ organizationId: string; slug: string }>,

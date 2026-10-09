@@ -108,6 +108,12 @@ export const traceHeaderSchema = z.object({
   attributes: z.record(z.string(), z.string()),
   /** Categories permanently removed by ingestion privacy policy. */
   privacy: z.object({ droppedCategories: z.array(z.string()).optional() }).nullish(),
+  /**
+   * The project that owns the trace (ADR-177 block F): on an aggregate, the
+   * member it was read from, which the drawer hands back on every later read.
+   * Absent on a shared trace, whose viewer is told nothing about the project.
+   */
+  projectId: z.string().optional(),
 });
 
 export type TraceHeader = z.infer<typeof traceHeaderSchema>;

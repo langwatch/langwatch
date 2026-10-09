@@ -27,3 +27,12 @@ Feature: One module binds the door every API request passes
       When the process opens its hosts
       Then the process opens exactly the door auth bound
       And the door binding is mounted on no REST family or tRPC namespace as a fact
+
+  Rule: Authorization fails closed
+
+    @unit
+    Scenario: A REST family mounted without an authorization port is refused
+      Given a REST family whose runtime supplies no authorization port
+      When the family is mounted
+      Then the mount is refused, naming the family
+      And a typed composition that leaves the port out does not compile

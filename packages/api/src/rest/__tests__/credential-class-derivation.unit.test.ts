@@ -7,7 +7,7 @@ import { moduleApi } from "@langwatch/module";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { createApiDouble } from "../../__tests__/api-double.ts";
+import { createApiDouble, authorizationPort } from "../../__tests__/api-double.ts";
 import { deferredScope } from "../../access/index.ts";
 import { createErrorHandler } from "../../errors.ts";
 import { getRoutePolicy } from "../../route-registry.ts";
@@ -56,6 +56,7 @@ const sessionFamily = defineRestRouter(ProbeApi)
 
 function mountAll(): void {
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } }),
       identify: () => ({ actor: null, scope: null }),

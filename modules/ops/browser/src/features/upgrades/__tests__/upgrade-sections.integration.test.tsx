@@ -53,6 +53,7 @@ function stepWith(overrides: Partial<UpgradeStepView>): UpgradeStepView {
     statusLabel: "Done",
     owner: "ops",
     description: null,
+    finishBy: null,
     recorded: true,
     inferred: false,
     attempt: 1,
@@ -259,8 +260,7 @@ describe("UpgradesOverview", () => {
       const row = screen.getByTestId(`upgrade-tenant-step-${tenantStep.name}`);
       const cells = within(row).getAllByRole("cell");
       expect(cells.map((cell) => cell.textContent)).toEqual([
-        tenantStep.name,
-        "Default prompt tags",
+        `Default prompt tags${tenantStep.name}`,
         "40",
         "2",
         "1",
@@ -338,6 +338,46 @@ describe("UpgradesOverview", () => {
       expect(row).toHaveTextContent("worker (3.20.1), api (img-dev)");
     });
 
+    /** @scenario "The background step list shows each step's state, progress and deadline" */
+    it("shows each step's status, progress and finish-by release, and who a waiting step waits on", () => {
+      const replaying = { ...running, progress: { done: 63, total: 100 }, finishBy: "3.24.0" };
+      const waiting = stepWith({
+        id: "ops:fill-owner",
+        mode: "background",
+        status: "pending",
+        statusLabel: "Waiting",
+        finishBy: "3.24.0",
+        waitingOn: [
+          {
+            role: "worker",
+            image: "img-3.20.1",
+            release: "3.20.1",
+            lastSeenAt: "2026-10-09T10:00:00.000Z",
+          },
+        ],
+      });
+      const failedBy = { ...failed, finishBy: "3.24.0" };
+      renderOverview({ status: finishing, backgroundSteps: [failedBy, replaying, waiting] });
+
+      const rows = [
+        { id: "ops:backfill-names", label: "Running" },
+        { id: "ops:fill-owner", label: "Waiting" },
+        { id: "ops:backfill-owner", label: "Failed" },
+      ];
+      for (const { id, label } of rows) {
+        const row = screen.getByTestId(`upgrade-background-step-${id}`);
+        expect(row).toHaveTextContent(id);
+        expect(row).toHaveTextContent(label);
+        expect(row).toHaveTextContent("3.24.0");
+      }
+      expect(screen.getByTestId("upgrade-background-step-ops:backfill-names")).toHaveTextContent(
+        "63%",
+      );
+      expect(screen.getByTestId("upgrade-background-step-ops:fill-owner")).toHaveTextContent(
+        "worker (3.20.1, last seen",
+      );
+    });
+
     it("shows a skeleton while the background steps load", () => {
       renderOverview({ status: finishing, backgroundLoading: true });
 
@@ -348,23 +388,49 @@ describe("UpgradesOverview", () => {
 });
 
 describe("UpgradeReleaseSteps", () => {
-  describe("when a release has a blocking, a background and an operator step", () => {
-    /** @scenario "A release's steps are grouped by mode" */
-    it("lists them under Blocking, Background and Operator in that order", () => {
-      renderIn(
-        <UpgradeReleaseSteps
-          release="3.23.0"
-          steps={[
-            stepWith({ id: "ops:move-blobs", mode: "operator" }),
-            stepWith({ id: "ops:backfill", mode: "background" }),
-            stepWith({ id: "prisma:20261006_add_owner", mode: "blocking" }),
-          ]}
-          onOpenStep={noop}
-        />,
-      );
+  describe("when a release has hundreds of applied steps and a few still to do", () => {
+    const steps = [
+      stepWith({ id: "ops:move-blobs", mode: "operator", status: "failed", statusLabel: "Failed" }),
+      stepWith({
+        id: "ops:backfill",
+        mode: "background",
+        status: "pending",
+        statusLabel: "Waiting",
+        waitingOn: [{ role: "worker", image: "img-3.19.4", release: "3.19.4", lastSeenAt: null }],
+      }),
+      ...Array.from({ length: 200 }, (_, index) =>
+        stepWith({
+          id: `clickhouse:${index}`,
+          kind: "clickhouse-schema",
+          owner: null,
+          attempt: 0,
+          inferred: true,
+          startedAt: null,
+          finishedAt: null,
+        }),
+      ),
+    ];
 
-      const headings = screen.getAllByRole("heading").map((heading) => heading.textContent);
-      expect(headings).toEqual(["Blocking", "Background", "Operator"]);
+    /** @scenario "A release's steps read as a summary, the unfinished ones first, the applied ones collapsed" */
+    it("summarises by status and kind, lists the unfinished steps first and collapses the applied ones", async () => {
+      renderIn(<UpgradeReleaseSteps release={null} steps={steps} onOpenStep={noop} />);
+
+      const summary = screen.getByTestId("upgrade-steps-summary");
+      expect(summary).toHaveTextContent("200 done");
+      expect(summary).toHaveTextContent("200 clickhouse-schema");
+      const unfinished = screen.getByTestId("upgrade-steps-unfinished");
+      expect(within(unfinished).getAllByRole("row")).toHaveLength(3);
+      expect(screen.getByTestId("upgrade-step-ops:backfill")).toHaveTextContent(
+        "Waiting on worker (3.19.4)",
+      );
+      expect(screen.queryByTestId("upgrade-step-clickhouse:0")).toBeNull();
+
+      fireEvent.click(screen.getByRole("button", { name: /Applied \(200\)/ }));
+
+      const applied = await screen.findByTestId("upgrade-step-clickhouse:0");
+      expect(applied).toHaveTextContent("Recorded done before the ledger, not run");
+      expect(applied).not.toHaveTextContent("Unattributed");
+      expect(applied).not.toHaveTextContent("Not started");
     });
   });
 });

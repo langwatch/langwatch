@@ -7,6 +7,7 @@ import {
   PLATFORM_TOOL_SLUG_BY_SOURCE_TYPE,
 } from "@langwatch/enterprise-governance-contract";
 import { createLogger } from "@langwatch/observability";
+import { isAggregateProjectKind } from "@langwatch/project-contract";
 
 import { findDeviceLabel } from "../../identity/rules/device-label.rules.ts";
 import type { GovernanceCliCaller } from "./governance-cli-access.service.ts";
@@ -27,6 +28,7 @@ export type GovernanceCliIngestionKeyOutcome =
     }>
   | Readonly<{ outcome: "direct-otel-not-allowed"; toolSlug: string }>
   | Readonly<{ outcome: "project-not-found"; projectRef: string }>
+  | Readonly<{ outcome: "aggregate-project-has-no-credential" }>
   | Readonly<{ outcome: "personal-project-not-allowed" }>
   | Readonly<{ outcome: "forbidden" }>
   | Readonly<{ outcome: "source-type-not-personal"; sourceType: string }>
@@ -117,6 +119,10 @@ export class GovernanceCliIngestionKeyMintService {
     });
 
     if (!project) return { outcome: "project-not-found", projectRef: input.projectRef };
+
+    // ADR-177 decision 7: an aggregate holds no key to hand out; no grant changes that.
+    if (isAggregateProjectKind(project.kind))
+      return { outcome: "aggregate-project-has-no-credential" };
 
     if (project.isPersonal && project.ownerUserId !== input.caller.user_id) {
       return { outcome: "personal-project-not-allowed" };

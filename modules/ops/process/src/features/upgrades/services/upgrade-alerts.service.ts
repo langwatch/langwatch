@@ -17,7 +17,7 @@ function escapeHtml(text: string): string {
   return text.replace(/[&<>"']/g, (char) => HTML_ESCAPES[char] ?? char);
 }
 
-export function describeUpgradeAlert(alert: UpgradeAlert): string {
+function describeUpgradeAlert(alert: UpgradeAlert): string {
   if (alert.kind === "step-failed") {
     return `Step ${alert.stepId} failed${alert.error ? `: ${alert.error}` : "."}`;
   }

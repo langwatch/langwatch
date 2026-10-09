@@ -7,13 +7,13 @@ import {
   NullLogRecordStorageRepository,
   type StoredLogRecordRow,
 } from "../../../../repositories/log-record-storage.repository.ts";
+import { LogRecordStorageService } from "../../../read/services/trace-log-record-read.service.ts";
 /**
  * Tests Claude Code log enrichment: joins llm_request spans (tokens + request_id) with
  * message content from OTLP log records. Tests gate, join, and best-effort degradation.
  */
 import { enrichSingleSpanWithClaudeLogContent } from "../../rules/claude-code-log-enrichment.rules.ts";
 import { ClaudeCodeLogEnrichmentService } from "../claude-code-log-enrichment.service.ts";
-import { LogRecordStorageService } from "../../../read/services/trace-log-record-read.service.ts";
 
 const PROJECT_ID = "project_test";
 const TRACE_ID = "a3c6656cf433e97549f654034be02955";

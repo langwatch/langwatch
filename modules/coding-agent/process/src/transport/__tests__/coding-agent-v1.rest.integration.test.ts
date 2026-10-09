@@ -9,6 +9,7 @@ import { bindRestMiddleware, createRestRuntime, canonicalErrorResponse } from "@
 import type { CodingAgentApi, CodingAgentPullRequestUsage } from "@langwatch/coding-agent-contract";
 import { GithubPullRequestNotMappedError } from "@langwatch/github-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 
 import { codingAgentV1Rest, codingAgentV1RestCaller } from "../coding-agent-v1.rest.ts";
@@ -194,6 +195,7 @@ function mount(overrides: Overrides) {
   const recordPullRequestUsageRead = vi.fn(async () => {});
 
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({
         actor: apiKeyUserId

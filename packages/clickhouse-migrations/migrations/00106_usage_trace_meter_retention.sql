@@ -16,15 +16,14 @@
 -- expire thirteen months after that month began; enforcement reads only the
 -- current month and the one before it.
 --
--- materialize_ttl_after_modify is left at its default, as in 00095: the table
--- is new and small, so recomputing each part's TTL is cheap, and
--- `mutations_sync = 0` keeps the deploy from waiting on it.
+-- materialize_ttl_after_modify = 0: the deploy starts no mutation. The table is
+-- new (00104, same release), so its few parts take the TTL as they merge.
 -- ============================================================================
 
 -- +goose StatementBegin
 ALTER TABLE ${CLICKHOUSE_DATABASE}.usage_trace_meter
   MODIFY TTL toDateTime(Month) + INTERVAL 13 MONTH DELETE
-  SETTINGS alter_sync = 1, mutations_sync = 0;
+  SETTINGS alter_sync = 1, mutations_sync = 0, materialize_ttl_after_modify = 0;
 -- +goose StatementEnd
 
 -- +goose Down

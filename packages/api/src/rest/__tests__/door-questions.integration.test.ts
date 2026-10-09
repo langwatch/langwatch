@@ -12,6 +12,7 @@ import { moduleApi } from "@langwatch/module";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { authorizationPort } from "../../__tests__/api-double.ts";
 import {
   KeyKindRefusedError,
   OrganizationInvalidCredentialsError,
@@ -41,7 +42,10 @@ function mount(
   router: Parameters<ReturnType<typeof createRestRuntime>["mount"]>[0],
   identity: RestIdentity,
 ) {
-  return createRestRuntime({ identity }).mount(router, {
+  return createRestRuntime({
+    authorization: authorizationPort,
+    identity,
+  }).mount(router, {
     app: () => doorsApp,
     onError: createErrorHandler(),
   });

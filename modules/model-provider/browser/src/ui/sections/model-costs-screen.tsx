@@ -11,16 +11,20 @@ import {
   Button,
   Card,
   Code,
+  HStack,
+  NativeSelect,
   Skeleton,
   Spacer,
   Table,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { Coins, MoreVertical, Plus } from "lucide-react";
+import { SearchInput } from "@langwatch/design-system/search-input";
+import { Coins, MoreVertical, Plus, SearchX } from "lucide-react";
+import { useState } from "react";
 
 import { modelProviderApi } from "../../behavior/model-provider-api.ts";
-import { toLLMModelCostRow } from "../../model/llm-model-cost-row.ts";
+import { toLLMModelCostRow, type LLMModelCostRow } from "../../model/llm-model-cost-row.ts";
 import {
   MODEL_COST_MANAGE_PERMISSION,
   useModelProviderHost,
@@ -43,6 +47,72 @@ function RateCell({ rate, isCustom }: { rate: number | undefined; isCustom: bool
   );
 }
 
+/** The provider is the part of the model name before its first "/". */
+function providerOf(row: LLMModelCostRow): string {
+  return row.model.includes("/") ? row.model.split("/")[0]! : "other";
+}
+
+function countLine(args: { loaded: boolean; isFiltering: boolean; shown: number; total: number }) {
+  if (!args.loaded) return "What each model costs per token.";
+  if (args.isFiltering) return `Showing ${args.shown} of ${args.total} models.`;
+  return `What each of the ${args.total} models costs per token.`;
+}
+
+function FilterBar(props: {
+  search: string;
+  onSearch: (value: string) => void;
+  provider: string;
+  onProvider: (value: string) => void;
+  customOnly: boolean;
+  onCustomOnly: (value: boolean) => void;
+  providerCounts: Map<string, number>;
+  total: number;
+  isFiltering: boolean;
+  onClear: () => void;
+}) {
+  return (
+    <HStack width="full" gap={3} wrap="wrap">
+      <SearchInput
+        maxWidth="320px"
+        placeholder="Search by model or regex rule"
+        aria-label="Search model costs"
+        value={props.search}
+        onChange={(event) => props.onSearch(event.target.value)}
+      />
+      <NativeSelect.Root width="56">
+        <NativeSelect.Field
+          aria-label="Filter by provider"
+          value={props.provider}
+          onChange={(event) => props.onProvider(event.target.value)}
+        >
+          <option value="">All providers ({props.total})</option>
+          {[...props.providerCounts]
+            .toSorted(([a], [b]) => a.localeCompare(b))
+            .map(([name, count]) => (
+              <option key={name} value={name}>
+                {name} ({count})
+              </option>
+            ))}
+        </NativeSelect.Field>
+        <NativeSelect.Indicator />
+      </NativeSelect.Root>
+      <Button
+        size="sm"
+        variant={props.customOnly ? "solid" : "outline"}
+        aria-pressed={props.customOnly}
+        onClick={() => props.onCustomOnly(!props.customOnly)}
+      >
+        Custom only
+      </Button>
+      {props.isFiltering && (
+        <Button size="sm" variant="ghost" onClick={props.onClear}>
+          Clear filters
+        </Button>
+      )}
+    </HStack>
+  );
+}
+
 export default function ModelCostsScreen() {
   const host = useModelProviderHost();
   const { projectId } = host.scope();
@@ -50,6 +120,33 @@ export default function ModelCostsScreen() {
     { projectId: projectId ?? "" },
     { enabled: !!projectId },
   );
+
+  const [search, setSearch] = useState("");
+  const [provider, setProvider] = useState("");
+  const [customOnly, setCustomOnly] = useState(false);
+
+  const rows = (llmModelCosts.data ?? []).map(toLLMModelCostRow);
+  const providerCounts = new Map<string, number>();
+  for (const row of rows) {
+    providerCounts.set(providerOf(row), (providerCounts.get(providerOf(row)) ?? 0) + 1);
+  }
+  const needle = search.trim().toLowerCase();
+  const visibleRows = rows.filter(
+    (row) =>
+      (!needle ||
+        row.model.toLowerCase().includes(needle) ||
+        row.regex.toLowerCase().includes(needle)) &&
+      (!provider || providerOf(row) === provider) &&
+      (!customOnly || !!row.id),
+  );
+  const isFiltering = !!needle || !!provider || customOnly;
+  const noCosts = llmModelCosts.data?.length === 0;
+  const noMatches = rows.length > 0 && visibleRows.length === 0;
+  const clearFilters = () => {
+    setSearch("");
+    setProvider("");
+    setCustomOnly(false);
+  };
 
   return (
     <>
@@ -68,17 +165,46 @@ export default function ModelCostsScreen() {
       </PageLayout.Header>
       <VStack width="full" gap={6} align="start" paddingTop={4}>
         <Text color="fg.muted">
-          {llmModelCosts.data
-            ? `What each of the ${llmModelCosts.data.length} models costs per token.`
-            : "What each model costs per token."}
+          {countLine({
+            loaded: !!llmModelCosts.data,
+            isFiltering,
+            shown: visibleRows.length,
+            total: rows.length,
+          })}
         </Text>
-        {llmModelCosts.data?.length === 0 ? (
+        {rows.length > 0 && (
+          <FilterBar
+            search={search}
+            onSearch={setSearch}
+            provider={provider}
+            onProvider={setProvider}
+            customOnly={customOnly}
+            onCustomOnly={setCustomOnly}
+            providerCounts={providerCounts}
+            total={rows.length}
+            isFiltering={isFiltering}
+            onClear={clearFilters}
+          />
+        )}
+        {noCosts && (
           <NoDataInfoBlock
             title="No model costs"
             description="Add a model to set what it costs per token"
             icon={<Coins size={24} />}
           />
-        ) : (
+        )}
+        {noMatches && (
+          <NoDataInfoBlock
+            title="No models match"
+            description="Try a different search or provider, or clear the filters."
+            icon={<SearchX size={24} />}
+          >
+            <Button size="sm" variant="outline" onClick={clearFilters}>
+              Clear filters
+            </Button>
+          </NoDataInfoBlock>
+        )}
+        {!noCosts && !noMatches && (
           <Card.Root width="full" overflow="hidden">
             <Card.Body padding={0} overflowX="auto">
               <Table.Root variant="line" width="full" maxWidth="100%">
@@ -113,7 +239,7 @@ export default function ModelCostsScreen() {
                         <Table.Cell padding={1} />
                       </Table.Row>
                     ))}
-                  {llmModelCosts.data?.map(toLLMModelCostRow).map((row) => (
+                  {visibleRows.map((row) => (
                     <Table.Row key={row.model} width="full">
                       <Table.Cell>
                         <Text

@@ -1,5 +1,5 @@
 /**
- * `AgentClient` over the `rpc` capability: the by-path dispatcher is what a
+ * `AgentClient` over the `rpc` host service: the by-path dispatcher is what a
  * host mount may reach for, never a hand-written transport, so this projects
  * it into the domain-shaped client the Agents screen was written against.
  */

@@ -13,6 +13,7 @@ import type {
   ModelDefaultConfig,
 } from "@langwatch/model-provider-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 
 import { ModelProviderAuthorizationService } from "../../services/model-provider-authorization.service.ts";
@@ -59,6 +60,7 @@ function mount(
 
   const { app } = mountableModelProviderApp({ modelProviders: options.modelProviders ?? {} });
   const hono = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: ({ permission }) => {
         asked.push(permission);

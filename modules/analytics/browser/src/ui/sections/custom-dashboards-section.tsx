@@ -2,6 +2,7 @@ import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Menu } from "@langwatch/design-system/menu";
 import { Box, Button, Input, Spinner } from "@langwatch/design-system/primitives";
 import { toaster } from "@langwatch/design-system/toaster";
+import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { ArrowDown, ArrowUp, Edit2, MoreVertical, Plus, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -18,6 +19,7 @@ interface CustomDashboardsSectionProps {
 export function CustomDashboardsSection({ projectSlug }: CustomDashboardsSectionProps) {
   const host = useAnalyticsHost();
   const project = host.project();
+  const acceptsWrites = !isAggregateProjectKind(project?.kind);
   const projectId = project?.id ?? "";
   const currentDashboardId = host.route().query.dashboard;
   /**
@@ -217,15 +219,18 @@ export function CustomDashboardsSection({ projectSlug }: CustomDashboardsSection
           </Box>
         );
       })}
-      <Button
-        size="sm"
-        width="full"
-        variant="ghost"
-        data-testid="analytics-dashboard-add"
-        onClick={handleCreateDashboard}
-      >
-        <Plus size={14} /> Add Dashboard
-      </Button>
+      {/* An aggregate (ADR-177) keeps no dashboards of its own. */}
+      {acceptsWrites && (
+        <Button
+          size="sm"
+          width="full"
+          variant="ghost"
+          data-testid="analytics-dashboard-add"
+          onClick={handleCreateDashboard}
+        >
+          <Plus size={14} /> Add Dashboard
+        </Button>
+      )}
     </>
   );
 }

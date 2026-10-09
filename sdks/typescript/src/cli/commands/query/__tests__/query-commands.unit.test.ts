@@ -2,6 +2,7 @@
  * The `langwatch query` family: a statement sent as written, parameters bound
  * as given, a keyset walk that rebinds the cursor, and a refusal before any
  * request. @see specs/analytics/lwql-cli-query.feature
+ * @see specs/typescript-sdk/cli-cross-project-access.feature
  */
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -45,6 +46,7 @@ class ProcessExitError extends Error {
 
 import { QueryApiService } from "@/client-sdk/services/query/query-api.service";
 
+import { resolveCredentials } from "../../../utils/apiKey";
 import { runQueryCommand } from "../run";
 
 const RESULT = {
@@ -336,6 +338,54 @@ describe("runQueryCommand", () => {
       await expect(
         runQueryCommand(KEYSET_SQL, { pageBy: "keyset", format: "jsonl" }),
       ).rejects.toThrow(ProcessExitError);
+    });
+  });
+});
+
+describe("runQueryCommand across projects", () => {
+  const PAGED_SQL =
+    "SELECT TraceId AS after_id, OccurredAt AS after_ts FROM analytics.traces WHERE (OccurredAt, TraceId) > ({after_ts:DateTime64(3)}, {after_id:String}) ORDER BY OccurredAt, TraceId LIMIT 2";
+
+  describe("when no --project is given", () => {
+    /** @scenario "query run reads every project the login reaches unless --project narrows it" */
+    it("sends no projectId, although the credential resolved a project", async () => {
+      await runQueryCommand("SELECT 1", {});
+
+      expect(mockQuery).toHaveBeenCalledWith({ sql: "SELECT 1" });
+      expect(mockQuery.mock.calls[0]?.[0]).not.toHaveProperty("projectId");
+    });
+  });
+
+  describe("when --project names a project", () => {
+    beforeEach(() => {
+      vi.mocked(resolveCredentials).mockResolvedValueOnce({
+        apiKey: "test-key",
+        source: "session",
+        endpoint: "https://app.langwatch.ai",
+        projectId: "project_b",
+      });
+    });
+
+    /** @scenario "query run follows --project" */
+    it("sends the resolved project id, not the slug, as projectId", async () => {
+      await runQueryCommand("SELECT 1", { project: "proj-b" });
+
+      expect(resolveCredentials).toHaveBeenCalledWith({ project: "proj-b" });
+      expect(mockQuery).toHaveBeenCalledWith({ sql: "SELECT 1", projectId: "project_b" });
+    });
+
+    it("sends it on every page of a keyset walk", async () => {
+      mockQuery
+        .mockResolvedValueOnce(KEYSET_RESULT)
+        .mockResolvedValueOnce({ ...KEYSET_RESULT, rows: [KEYSET_RESULT.rows[0]] })
+        .mockResolvedValue({ ...KEYSET_RESULT, rows: [] });
+
+      await runQueryCommand(PAGED_SQL, { pageBy: "keyset", format: "jsonl", project: "proj-b" });
+
+      expect(mockQuery.mock.calls.length).toBeGreaterThan(1);
+      expect(mockQuery.mock.calls.map((call) => call[0].projectId)).toEqual(
+        mockQuery.mock.calls.map(() => "project_b"),
+      );
     });
   });
 });

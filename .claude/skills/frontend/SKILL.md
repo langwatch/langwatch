@@ -31,6 +31,16 @@ for unmatched non-API routes **after** every declared route, with the config
 meta tag injected at serve time (the browser's only channel to its config).
 One tRPC client for the whole browser; it calls no REST.
 
+## No hand memoisation; design system first
+
+The React Compiler (Oxc's Rust port, `react({ compiler })` in
+`apps/ui/vite.config.ts`) memoises components and hooks for you. Don't write
+`useMemo`, `useCallback` or `React.memo`; remove them in files you touch. If the
+dev log says the compiler skipped a component (a ref read during render, a
+suppressed hooks rule), fix that cause. Before writing any component, check
+`packages/design-system/src/components/` (the `design-system` skill) and reuse
+it; a component another module would want is built there.
+
 ## A module's browser half (record §3.4)
 
 Layer order, one direction only: flat public entries (`src/<id>.ts`) →

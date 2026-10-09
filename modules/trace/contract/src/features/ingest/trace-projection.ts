@@ -139,3 +139,9 @@ export const traceSummaryDataSchema = z.object({
 });
 
 export type TraceSummaryData = z.infer<typeof traceSummaryDataSchema>;
+
+/** A summary as read: the fold plus the project it came from (an aggregate's member, ADR-177). */
+export const traceSummaryReadSchema = z.object({
+  ...traceSummaryDataSchema.shape,
+  tenantId: z.string(),
+});

@@ -6,6 +6,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { TraceCanonicalisationService } from "#features/derivation/services/trace-canonicalisation.service";
+import { aggregateProof, ownProof } from "~/test-utils/authorizationProofs";
 
 // TraceIOExtractionService wraps its methods in getLangWatchTracer spans.
 vi.mock("langwatch", () => ({
@@ -25,12 +26,12 @@ import {
   EVENTREF_ATTR_PREFIX,
 } from "@langwatch/trace-contract";
 
+import { TraceIOExtractionService } from "../../features/derivation/services/trace-io-extraction.service.ts";
+import { TraceSummaryService } from "../../features/read/services/trace-summary-read.service.ts";
 import {
   NullSpanStorageRepository,
   type SpanStorageRepository,
 } from "../../repositories/span-storage.repository.ts";
-import { TraceIOExtractionService } from "../../features/derivation/services/trace-io-extraction.service.ts";
-import { TraceSummaryService } from "../../features/read/services/trace-summary-read.service.ts";
 import { blobStoreResolving } from "./support/trace-blob-store.support.ts";
 
 // ---------------------------------------------------------------------------
@@ -74,7 +75,8 @@ function makeSpan(
 
 const realIOService = TraceIOExtractionService.create(TraceCanonicalisationService.create());
 
-const makeSummary = () => ({
+const makeSummary = (tenantId = "proj-1") => ({
+  tenantId,
   traceId: "trace-1",
   occurredAt: Date.now(),
   computedInput: "preview-input…",
@@ -105,7 +107,9 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
         } as never,
       });
 
-      const result = await service.getByTraceId("proj-1", "trace-1", {
+      const result = await service.getByTraceId({
+        authorization: ownProof({ projectId: "proj-1" }),
+        traceId: "trace-1",
         full: true,
       });
 
@@ -140,7 +144,9 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
           },
         });
 
-        const result = await service.getByTraceId("proj-1", "trace-1", {
+        const result = await service.getByTraceId({
+          authorization: ownProof({ projectId: "proj-1" }),
+          traceId: "trace-1",
           full: true,
         });
 
@@ -163,7 +169,10 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
           },
         });
 
-        const result = await service.getByTraceId("proj-1", "trace-1");
+        const result = await service.getByTraceId({
+          authorization: ownProof({ projectId: "proj-1" }),
+          traceId: "trace-1",
+        });
 
         expect(result.computedInput).toBe("preview-input…");
         expect(spanRepo.findNormalizedSpansByTraceId).not.toHaveBeenCalled();
@@ -189,7 +198,9 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
         },
       });
 
-      const result = await service.getByTraceId("proj-1", "trace-1", {
+      const result = await service.getByTraceId({
+        authorization: ownProof({ projectId: "proj-1" }),
+        traceId: "trace-1",
         full: true,
       });
 
@@ -221,7 +232,9 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
         },
       });
 
-      const result = await service.getByTraceId("proj-1", "trace-1", {
+      const result = await service.getByTraceId({
+        authorization: ownProof({ projectId: "proj-1" }),
+        traceId: "trace-1",
         full: true,
       });
 
@@ -247,11 +260,65 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
         },
       });
 
-      const result = await service.getByTraceId("proj-1", "trace-1", {
+      const result = await service.getByTraceId({
+        authorization: ownProof({ projectId: "proj-1" }),
+        traceId: "trace-1",
         full: true,
       });
 
       expect(result.computedInput).toBe("preview-input…");
+    });
+  });
+
+  describe("given an aggregate's proof and a member trace carrying an eventref pointer", () => {
+    describe("when full is requested", () => {
+      /** @scenario "A member trace opens in detail under the aggregate" */
+      it("re-reads the member's spans alone and resolves the body under the member", async () => {
+        const spanRepo = makeSpanRepo([
+          makeSpan({
+            tenantId: "member-1",
+            spanAttributes: {
+              "langwatch.input": "preview…",
+              [`${EVENTREF_ATTR_PREFIX}langwatch.input`]: JSON.stringify({
+                field: "langwatch.input",
+                eventId: "evt-001",
+              }),
+            },
+          }),
+        ]);
+        const blobStore = fakeBlobStore({ "langwatch.input": "member body" });
+        const service = new TraceSummaryService(
+          {
+            findByTraceId: vi.fn().mockResolvedValue(makeSummary("member-1")),
+            upsert: vi.fn(),
+          } as never,
+          {
+            spanStorageRepository: spanRepo,
+            blobStore,
+            ioExtractionService: realIOService,
+          },
+        );
+
+        const result = await service.getByTraceId({
+          authorization: aggregateProof({
+            projectId: "aggregate-1",
+            members: [
+              { projectId: "member-1", from: 0 },
+              { projectId: "member-2", from: 0 },
+            ],
+          }),
+          traceId: "trace-1",
+          full: true,
+        });
+
+        expect(result.computedInput).toBe("member body");
+        expect(result.tenantId).toBe("member-1");
+        const spanRead = vi.mocked(spanRepo.getNormalizedSpansByTraceId).mock.calls[0]?.[0];
+        expect(spanRead?.authorization.narrowedTo).toBe("member-1");
+        expect(vi.mocked(blobStore.getFromEventLog).mock.calls[0]?.[0]).toMatchObject({
+          tenantId: "member-1",
+        });
+      });
     });
   });
 });

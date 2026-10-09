@@ -75,7 +75,8 @@ export interface DashboardApi {
     dashboardIds: string[];
     viewer?: DashboardViewer;
   }): Promise<{ success: true }>;
-  getOrCreateFirst(input: { projectId: string; viewer?: DashboardViewer }): Promise<Dashboard>;
+  /** The first dashboard, created on demand; empty on an aggregate that has none (ADR-177). */
+  getOrCreateFirst(input: { projectId: string; viewer?: DashboardViewer }): Promise<Dashboard[]>;
 
   /** The member's stars for this project, boards and templates, in their own order. */
   listStarred(input: { projectId: string; userId: string }): Promise<StarredDashboard[]>;

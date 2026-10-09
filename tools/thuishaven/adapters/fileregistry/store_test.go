@@ -212,7 +212,11 @@ func TestWriteSelectionStatesEveryService(t *testing.T) {
 				t.Fatalf("written file is not valid JSON: %v", err)
 			}
 			for _, svc := range domain.SelectableServices {
-				if _, stated := raw.Services[svc]; !stated {
+				key := svc
+				if svc == "payment" {
+					key = "paymentsim" // stored under its own key; see store.go
+				}
+				if _, stated := raw.Services[key]; !stated {
 					t.Errorf("written file omits %q, so reading it back would restore its default", svc)
 				}
 			}
@@ -415,5 +419,19 @@ func TestHolderSnapshotsListsLiveClaimsAndDropsStaleOnes(t *testing.T) {
 	defer expired()
 	if got := s.HolderSnapshots("checks"); len(got) != 0 {
 		t.Fatalf("a claim past the TTL must be dropped, got %v", got)
+	}
+}
+
+// @scenario "Every haven stack runs paymentsim unless the worktree turned it off"
+func TestReadSelectionIgnoresTheOptInEraPaymentKey(t *testing.T) {
+	s := New(t.TempDir())
+	dir := t.TempDir()
+	writeSelectionJSON(t, dir, `{"services":{"payment":false}}`)
+	if sel, _ := s.ReadSelection(dir); !sel.Payment {
+		t.Error(`"payment": false from the opt-in era turned paymentsim off`)
+	}
+	writeSelectionJSON(t, dir, `{"services":{"paymentsim":false}}`)
+	if sel, _ := s.ReadSelection(dir); sel.Payment {
+		t.Error(`a stated "paymentsim": false (haven up -payment) was ignored`)
 	}
 }

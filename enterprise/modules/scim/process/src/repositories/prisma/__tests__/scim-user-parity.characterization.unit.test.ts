@@ -10,7 +10,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GrantsFake, listedGrant } from "../../../__tests__/support/grants-fake.ts";
 import { HeldConnectionsFake } from "../../../__tests__/support/held-connections-fake.ts";
-import { OrganizationAdministrationFake } from "../../../__tests__/support/organization-administration-fake.ts";
+import {
+  MembersFake,
+  OrganizationAdministrationFake,
+} from "../../../__tests__/support/organization-administration-fake.ts";
 import { scimRepositoryFixture as repository } from "../../../__tests__/support/scim-repository-fixture.ts";
 import { QuietScimSyncLifecycle } from "../../../services/__tests__/support/quiet-scim-sync-lifecycle.ts";
 import type { ScimUserProvisioning } from "../../../services/scim-provisioning.service.ts";
@@ -67,6 +70,7 @@ function harness(
   } = {},
 ) {
   const repo = options.repository ?? repository();
+  const members = new MembersFake();
   let currentUser = options.currentUser ?? user();
   const users = {
     findByEmail: vi.fn(async () => options.existingUser ?? null),
@@ -77,8 +81,12 @@ function harness(
     recordCostCenterChanged: vi.fn(async () => undefined),
   };
   const writer = new GrantsFake();
+  // Main's behaviour, which still holds where the organization proved the address's domain.
+  const connections = HeldConnectionsFake.of();
+  connections.hold({ connectionId: "okta", verifiedDomains: ["acme.com"] });
   const service = ScimService.create({
-    connections: HeldConnectionsFake.of(),
+    members,
+    connections,
     prisma: repo,
     writer,
     users,
@@ -93,7 +101,7 @@ function harness(
   if (options.membership !== void 0) {
     vi.mocked(repo.findMembership).mockResolvedValue(options.membership as never);
   }
-  return { repo, users, costCenterFacts, writer, service };
+  return { repo, users, costCenterFacts, writer, service, members };
 }
 
 describe("SCIM user parity", () => {
@@ -307,7 +315,7 @@ describe("SCIM user parity", () => {
         user: user(),
       })),
     });
-    const { repo: usedRepo, users, writer, service } = harness({ repository: repo });
+    const { repo: usedRepo, users, writer, service, members } = harness({ repository: repo });
     writer.listUserBindings.mockResolvedValue([
       listedGrant({
         id: "grant-1",
@@ -328,10 +336,10 @@ describe("SCIM user parity", () => {
     expect(writer.offboardMember).toHaveBeenCalledWith(
       expect.objectContaining({ revokedGrantIds: ["grant-1"], organizationId: "org-1" }),
     );
-    expect(usedRepo.removeMembership).toHaveBeenCalledWith({
-      userId: "user-1",
-      organizationId: "org-1",
-    });
+    expect(members.deleteMember).toHaveBeenCalledWith(
+      { organizationId: "org-1", userId: "user-1" },
+      null,
+    );
     expect(usedRepo.markUserResourceDeleted).toHaveBeenCalledWith(
       expect.objectContaining({ organizationId: "org-1", userId: "user-1" }),
     );
@@ -343,7 +351,7 @@ describe("SCIM user parity", () => {
     // enabled branch — the one a rollout turns on — had no cover at all.
     /** @scenario "Deprovisioned user's org membership and role bindings are cleaned up" */
     it("removes access through the grants offboard rather than the legacy writer", async () => {
-      const { writer, repo, service } = harness({
+      const { writer, service, members } = harness({
         membership: { userId: "user-1", organizationId: "org-1", role: "MEMBER" },
         provenOffboarding: true,
       });
@@ -356,7 +364,7 @@ describe("SCIM user parity", () => {
         expect.objectContaining({ userId: "user-1", organizationId: "org-1" }),
       );
       expect(writer.offboardMember).not.toHaveBeenCalled();
-      expect(repo.removeMembership).not.toHaveBeenCalled();
+      expect(members.deleteMember).not.toHaveBeenCalled();
     });
 
     /** @scenario "Group access replaces the membership grant an older push minted" */
@@ -448,7 +456,7 @@ describe("SCIM user parity", () => {
 
   /** @scenario A leaver loses their access however membership is being written */
   it("revokes a leaver's grants on the previous write path and keeps them a member", async () => {
-    const { repo, writer, service } = harness({ membership: { user: user() } });
+    const { writer, service, members } = harness({ membership: { user: user() } });
     writer.listUserBindings.mockResolvedValue([
       listedGrant({
         id: "grant-1",
@@ -481,11 +489,11 @@ describe("SCIM user parity", () => {
         revokedGrantIds: ["grant-1"],
       }),
     );
-    expect(repo.removeMembership).not.toHaveBeenCalled();
+    expect(members.deleteMember).not.toHaveBeenCalled();
   });
 
   it("deactivates a user through an active=false PATCH", async () => {
-    const { repo, service } = harness({
+    const { service, members } = harness({
       membership: { user: user() },
       currentUser: user({ deactivatedAt: now }),
     });
@@ -501,11 +509,11 @@ describe("SCIM user parity", () => {
       }),
     ).resolves.toMatchObject({ active: false });
     // A leaver stays a member holding nothing (scim-connection-sync.feature).
-    expect(repo.removeMembership).not.toHaveBeenCalled();
+    expect(members.deleteMember).not.toHaveBeenCalled();
   });
 
   it("deactivates a user through a full replace", async () => {
-    const { repo, service } = harness({ membership: { user: user() } });
+    const { service, members } = harness({ membership: { user: user() } });
 
     await expect(
       service.replaceUser({
@@ -520,7 +528,7 @@ describe("SCIM user parity", () => {
       }),
     ).resolves.toMatchObject({ active: false });
     // A leaver stays a member holding nothing (scim-connection-sync.feature).
-    expect(repo.removeMembership).not.toHaveBeenCalled();
+    expect(members.deleteMember).not.toHaveBeenCalled();
   });
 
   /**

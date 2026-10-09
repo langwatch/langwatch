@@ -119,3 +119,31 @@ export const projectTraceSharingDisabledEventDataSchema = z.object({
 export type ProjectTraceSharingDisabledEventData = z.infer<
   typeof projectTraceSharingDisabledEventDataSchema
 >;
+
+export const PROJECT_AGGREGATE_RULE_CHANGED_EVENT_TYPE =
+  "lw.project.aggregate_rule_changed" as const;
+export const PROJECT_AGGREGATE_RULE_CHANGED_EVENT_VERSION = "2026-10-09" as const;
+
+/** A live aggregate's rule was replaced; ids only, governance reads it through `ProjectApi`. */
+export const projectAggregateRuleChangedEventDataSchema = z.object({
+  tenantId: z.string().min(1),
+  projectId: z.string().min(1),
+  organizationId: z.string().min(1),
+  occurredAt: z.number().int().nonnegative(),
+  changedByUserId: z.string().min(1),
+});
+export type ProjectAggregateRuleChangedEventData = z.infer<
+  typeof projectAggregateRuleChangedEventDataSchema
+>;
+
+export const PROJECT_REVIVED_EVENT_TYPE = "lw.project.revived" as const;
+export const PROJECT_REVIVED_EVENT_VERSION = "2026-10-09" as const;
+
+/** An archived personal project is live again with its revived workspace; ids only. */
+export const projectRevivedEventDataSchema = z.object({
+  tenantId: z.string().min(1),
+  projectId: z.string().min(1),
+  organizationId: z.string().min(1),
+  occurredAt: z.number().int().nonnegative(),
+});
+export type ProjectRevivedEventData = z.infer<typeof projectRevivedEventDataSchema>;

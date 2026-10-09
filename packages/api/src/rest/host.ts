@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import { Hono } from "hono";
 
-import type { Entitlements } from "../access/access.ts";
+import type { Authorize, Entitlements } from "../access/access.ts";
 import { SurfaceUnconfiguredError } from "../errors.ts";
 /**
  * Where every declared REST family mounts. Thin on purpose: it states which
@@ -79,6 +79,8 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
     facts?: readonly RestTransportMiddlewareBinding[] | undefined;
     /** The plans a route declaring an entitlement asks; absent, it is refused at mount. */
     entitlements?: Entitlements | undefined;
+    /** The SAME decisions tRPC authorizes through: lineage, kind reads and route proofs. */
+    authz: Authorize;
   }): RestHost {
     return new RestHost(options);
   }
@@ -111,6 +113,7 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
     const declaration = transport as RestTransportDeclaration<unknown>;
     this.claimNamespace(declaration);
     const identities = this.identitiesFor(declaration);
+    const { authz } = this.options;
     const bindings = options?.facts ?? [];
     const credentials = new Set<RestDoorCredential>();
 
@@ -133,6 +136,7 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
       ...(this.options.idempotency ? { idempotency: this.options.idempotency } : {}),
       ...(this.options.rateLimiter ? { rateLimiter: this.options.rateLimiter } : {}),
       ...(this.options.entitlements ? { entitlements: this.options.entitlements } : {}),
+      authorization: { forRequest: () => authz },
       audit: this.options.audit,
       deprecationLog: restDeprecationLog,
     }).mount(declaration, {

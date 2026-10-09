@@ -7,8 +7,8 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { ResolveOriginCommandData, TraceSummaryData } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
 import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
+import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
 import { DEFERRED_ORIGIN_SUBSCRIBER_NAME } from "../deferred-origin.subscriber.ts";
 import { EventingTraceOriginAdapter } from "../trace-origin.commands.ts";
 import {

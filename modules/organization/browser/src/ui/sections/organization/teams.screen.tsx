@@ -497,7 +497,7 @@ function ProjectSection({
           _hover={{ bg: "gray.50", _dark: { bg: "gray.800" } }}
         >
           {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-          <Text fontSize="sm" fontWeight="medium">
+          <Text fontSize="sm" fontWeight="medium" truncate minWidth={0} title={project.name}>
             📁 {project.name}
           </Text>
           {hasOverrides && (
@@ -559,7 +559,9 @@ function ProjectSection({
                     <MemberAvatar name={m.name} image={m.image} size="xs" />
                     <Text flex={1}>{m.name}</Text>
                     <Badge colorPalette={roleBadgeColor(m.role)} size="sm">
-                      {m.customRoleName ?? m.role}
+                      <Text truncate maxWidth="160px" title={m.customRoleName ?? m.role}>
+                        {m.customRoleName ?? m.role}
+                      </Text>
                     </Badge>
                     {m.viaGroupName ? (
                       <Link href="/settings/directory?tab=groups" fontSize="xs" color="purple.400">
@@ -727,7 +729,9 @@ function TeamMemberRoleControls({
 }) {
   const roleBadge = (
     <Badge colorPalette={roleBadgeColor(member.role)} size="sm">
-      {member.customRoleName ?? member.role}
+      <Text truncate maxWidth="160px" title={member.customRoleName ?? member.role}>
+        {member.customRoleName ?? member.role}
+      </Text>
     </Badge>
   );
   if (member.viaGroupId) {
@@ -815,7 +819,9 @@ function TeamCard({
           _hover={{ bg: "gray.50", _dark: { bg: "gray.800" } }}
         >
           {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-          <Text fontWeight="semibold">{team.name}</Text>
+          <Text fontWeight="semibold" truncate minWidth={0} title={team.name}>
+            {team.name}
+          </Text>
           <Spacer />
           <Text fontSize="sm" color="gray.500">
             {team.projects.length} {team.projects.length === 1 ? "project" : "projects"}
@@ -951,7 +957,9 @@ function TeamCard({
                       on
                     </Text>
                     <Badge colorPalette="green" size="sm">
-                      📁 {m.projectName}
+                      <Text as="span" truncate maxWidth="200px" title={m.projectName}>
+                        📁 {m.projectName}
+                      </Text>
                     </Badge>
                     <Link
                       fontSize="xs"

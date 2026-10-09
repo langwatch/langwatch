@@ -1,3 +1,4 @@
+import type { SlackNoticeMessage } from "@langwatch/internal-slack";
 import type { MailSender } from "@langwatch/mail";
 import { NotificationService } from "@langwatch/notification-contract";
 import type { BoundApis } from "@langwatch/process";
@@ -5,8 +6,8 @@ import type { BoundApis } from "@langwatch/process";
 import type { AuthChannels } from "../auth.channels.ts";
 import { SesPasswordResetMailChannel } from "../ses/ses.password-reset-mail.channel.ts";
 import { SesSignUpVerificationMailChannel } from "../ses/ses.sign-up-verification-mail.channel.ts";
+import { SignupAnnouncementChannel } from "../signup-announcement.channel.ts";
 import { MemoryCliDeviceSettlementChannel } from "./memory.cli-device-settlement.channel.ts";
-import { MemorySignupAnnouncementChannel } from "./memory.signup-announcement.channel.ts";
 
 /** In-process settlements and announcements; mail goes to notification, a peer on this tier too. */
 export class MemoryAuthChannels {
@@ -21,5 +22,22 @@ export class MemoryAuthChannels {
       passwordResetMail: SesPasswordResetMailChannel.create({ mailer }),
       signUpVerificationMail: SesSignUpVerificationMailChannel.create({ mailer }),
     };
+  }
+}
+
+/** Records what would have been posted to the sign-ups channel, without a network call. */
+export class MemorySignupAnnouncementChannel extends SignupAnnouncementChannel {
+  readonly posted: SlackNoticeMessage[] = [];
+
+  private constructor() {
+    super();
+  }
+
+  static create(): MemorySignupAnnouncementChannel {
+    return new MemorySignupAnnouncementChannel();
+  }
+
+  async post(message: SlackNoticeMessage): Promise<void> {
+    this.posted.push(message);
   }
 }

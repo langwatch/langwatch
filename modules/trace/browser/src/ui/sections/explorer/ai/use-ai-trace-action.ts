@@ -1,10 +1,15 @@
-import type { AiActionError, AiActionErrorDetails } from "@langwatch/trace-contract";
+import { isAggregateProjectKind } from "@langwatch/project-contract";
+import type {
+  AiActionError,
+  AiActionErrorDetails,
+  AiActionResult,
+} from "@langwatch/trace-contract";
 import { useEffect, useRef, useState } from "react";
 
 import { useFilterStore, useViewStore } from "../../../../behavior/explorer.store.ts";
 import { api } from "../../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
-import { readHandledError } from "../../errors/index.ts";
+import { type AppErrorCode, readHandledError } from "../../errors/index.ts";
 
 /**
  * Lifts the composer's detail rows out of a handled error's `meta`.
@@ -34,13 +39,39 @@ function readAiErrorDetails(
   return Object.keys(details).length > 0 ? details : undefined;
 }
 
-type AiTraceActionMode =
+const READ_ONLY_CODE: AppErrorCode = "aggregate_project_is_read_only";
+
+/**
+ * A lens asked for on an aggregate project (ADR-177): the store refuses it silently, so the
+ * action answers with the server's read-only envelope and the composer shows its copy.
+ */
+const LENS_REFUSED_ON_AGGREGATE: AiActionError = {
+  code: READ_ONLY_CODE,
+  cause: { error: { code: READ_ONLY_CODE }, httpStatus: 403 },
+};
+
+export type AiTraceActionMode =
   /** Filter-only: applies a query, never creates a lens. */
   | "filter"
   /** Lens-only: always creates a new lens (and applies the query inside it). */
   | "lens"
   /** Either: the model picks based on the user's intent. */
   | "auto";
+
+/**
+ * The name of the lens this answer should create, or null when it creates
+ * none: `lens` mode always makes one, `auto` only when the model asked.
+ */
+function lensNameFor({
+  mode,
+  result,
+}: {
+  mode: AiTraceActionMode;
+  result: AiActionResult;
+}): string | null {
+  if (result.kind === "create_lens" && mode !== "filter") return result.name;
+  return mode === "lens" ? "Untitled lens" : null;
+}
 
 interface UseAiTraceActionOptions {
   /** Which kinds of actions this caller is willing to perform. */
@@ -74,6 +105,7 @@ export function useAiTraceAction({
   const applyQueryText = useFilterStore((s) => s.applyQueryText);
   const recordAiTranslation = useFilterStore((s) => s.recordAiTranslation);
   const createLens = useViewStore((s) => s.createLens);
+  const projectAcceptsWrites = !isAggregateProjectKind(project?.kind);
   const [error, setError] = useState<AiActionError | null>(null);
   // Track the prompt across the async boundary so onSuccess can save it
   // alongside the model's response — no plumbing through the mutation
@@ -98,15 +130,27 @@ export function useAiTraceAction({
   const aiAction = api.traces.aiAction.useMutation({
     onSuccess: (result) => {
       if (cancelledRef.current) return;
-      applyAiActionResult({
-        applyQueryText,
-        createLens,
-        mode,
-        projectId: lastSubmittedProjectIdRef.current,
-        prompt: lastSubmittedPromptRef.current,
-        recordAiTranslation,
-        result,
-      });
+      // Apply the query first so the resulting view is filtered (also so
+      // that lens creation captures the right snapshot).
+      applyQueryText(result.query);
+      // Pin the prompt against the produced query, so re-entering AI mode on the
+      // same query reopens the user's wording rather than the generated syntax.
+      if (lastSubmittedProjectIdRef.current && lastSubmittedPromptRef.current) {
+        recordAiTranslation({
+          projectId: lastSubmittedProjectIdRef.current,
+          prompt: lastSubmittedPromptRef.current,
+          query: result.query,
+        });
+      }
+      const lensName = lensNameFor({ mode, result });
+      // The query above still applies, since reading is allowed; only the
+      // lens is refused. The composer stays open with the refusal, rather
+      // than closing as if the lens had been saved.
+      if (lensName !== null && !projectAcceptsWrites) {
+        setError(LENS_REFUSED_ON_AGGREGATE);
+        return;
+      }
+      if (lensName !== null) createLens(lensName);
       onDone?.();
     },
     onError: (e) => {
@@ -142,34 +186,4 @@ export function useAiTraceAction({
     error,
     clearError: () => setError(null),
   };
-}
-
-/** What the model asked for, applied to the filter and lens stores. */
-function applyAiActionResult({
-  applyQueryText,
-  createLens,
-  mode,
-  projectId,
-  prompt,
-  recordAiTranslation,
-  result,
-}: {
-  applyQueryText: (query: string) => void;
-  createLens: (name: string) => void;
-  mode: AiTraceActionMode;
-  projectId: string | null;
-  prompt: string;
-  recordAiTranslation: (translation: { projectId: string; prompt: string; query: string }) => void;
-  result: { kind: string; name?: string; query: string };
-}): void {
-  // Apply the query first so the resulting view is filtered (also so
-  // that lens creation captures the right snapshot).
-  applyQueryText(result.query);
-  // Pin the user's natural-language prompt against the produced query.
-  if (projectId && prompt) {
-    recordAiTranslation({ projectId, prompt, query: result.query });
-  }
-  const shouldCreateLens = mode === "lens" || (mode === "auto" && result.kind === "create_lens");
-  if (!shouldCreateLens) return;
-  createLens(result.kind === "create_lens" ? (result.name ?? "Untitled lens") : "Untitled lens");
 }

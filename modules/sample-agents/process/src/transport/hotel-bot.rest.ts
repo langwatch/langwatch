@@ -23,5 +23,6 @@ export const hotelBotRest = defineRestRouter(SampleAgentsApi)
   .withHeaders(hotelBotHeadersSchema)
   .withOutput(hotelBotReplySchema)
   .withDocs({ hide: true })
+  // oxlint-disable-next-line langwatch/auth-header-read -- posts the demo project key onward
   .handle(({ app }, headers) => app.runHotelBot({ authToken: headers["x-auth-token"] }))
   .build();

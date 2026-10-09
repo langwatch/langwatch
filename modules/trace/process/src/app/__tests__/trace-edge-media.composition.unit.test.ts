@@ -17,10 +17,10 @@ import type { RecordSpanCommandData } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { S3TraceLegacySpoolChannel } from "../../channels/s3/s3.trace-legacy-spool.channel.ts";
+import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
+import { TraceBlobStoreService } from "../../features/media/services/trace-blob-store.service.ts";
 import { MemoryTraceSpanDedupRepository } from "../../repositories/memory/memory.trace-span-dedup.repository.ts";
 import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
-import { TraceBlobStoreService } from "../../features/media/services/trace-blob-store.service.ts";
-import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
 import { TraceModule } from "../trace.app.ts";
 
 const PNG_DATA_URI =

@@ -21,6 +21,12 @@ import {
   projectTraceSharingDisabledEventDataSchema,
   PROJECT_TRACE_SHARING_DISABLED_EVENT_TYPE,
   PROJECT_TRACE_SHARING_DISABLED_EVENT_VERSION,
+  PROJECT_AGGREGATE_RULE_CHANGED_EVENT_TYPE,
+  PROJECT_AGGREGATE_RULE_CHANGED_EVENT_VERSION,
+  PROJECT_REVIVED_EVENT_TYPE,
+  PROJECT_REVIVED_EVENT_VERSION,
+  projectAggregateRuleChangedEventDataSchema,
+  projectRevivedEventDataSchema,
 } from "@langwatch/project-contract";
 import { z } from "zod";
 
@@ -136,3 +142,35 @@ export const projectTraceSharingDisabledEventSchema = z.object({
 export type ProjectTraceSharingDisabledEvent = z.infer<
   typeof projectTraceSharingDisabledEventSchema
 >;
+
+export const RECORD_PROJECT_AGGREGATE_RULE_CHANGED_COMMAND_TYPE =
+  "lw.project.record_aggregate_rule_changed" as const;
+
+export const recordProjectAggregateRuleChangedCommandDataSchema =
+  projectAggregateRuleChangedEventDataSchema;
+export type RecordProjectAggregateRuleChangedCommandData = z.infer<
+  typeof recordProjectAggregateRuleChangedCommandDataSchema
+>;
+
+export const projectAggregateRuleChangedEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(PROJECT_AGGREGATE_RULE_CHANGED_EVENT_TYPE),
+  version: z.literal(PROJECT_AGGREGATE_RULE_CHANGED_EVENT_VERSION),
+  data: projectAggregateRuleChangedEventDataSchema,
+});
+export type ProjectAggregateRuleChangedEvent = z.infer<
+  typeof projectAggregateRuleChangedEventSchema
+>;
+
+export const RECORD_PROJECT_REVIVED_COMMAND_TYPE = "lw.project.record_revived" as const;
+
+export const recordProjectRevivedCommandDataSchema = projectRevivedEventDataSchema;
+export type RecordProjectRevivedCommandData = z.infer<typeof recordProjectRevivedCommandDataSchema>;
+
+export const projectRevivedEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(PROJECT_REVIVED_EVENT_TYPE),
+  version: z.literal(PROJECT_REVIVED_EVENT_VERSION),
+  data: projectRevivedEventDataSchema,
+});
+export type ProjectRevivedEvent = z.infer<typeof projectRevivedEventSchema>;

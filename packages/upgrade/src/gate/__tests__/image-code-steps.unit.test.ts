@@ -133,6 +133,7 @@ describe("servingImageTree", () => {
           findSteps: async () =>
             done.map((id) => ({
               id,
+              kind: "data" as const,
               status: "done" as const,
               mode: "blocking" as const,
               release: null,

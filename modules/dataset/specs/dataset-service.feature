@@ -206,3 +206,10 @@ Feature: Shared Dataset service
     Given a dataset upsert that names an experiment and no dataset name
     When the input is validated
     Then it is refused before the application is asked
+
+  @unit
+  Scenario: An empty dataset stored in chunks reads as empty
+    Given a ready dataset stored in chunks that holds no chunks, as an earlier release creates it
+    When its records are read, listed or copied
+    Then it reads as an empty dataset
+    And only a dataset with no chunk count recorded is refused as drift

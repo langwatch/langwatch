@@ -15,7 +15,7 @@ export type OrganizationUserRole = OrganizationRole;
 export const authzDenialReasonSchema = z.enum([
   "no-membership",
   "membership-disabled",
-  "no-binding",
+  "no-grant",
   "lite-member-restricted",
   "developer-restricted",
   "owner-ceiling",

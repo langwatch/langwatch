@@ -7,6 +7,7 @@ import { moduleApi } from "@langwatch/module";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import { authorizationPort } from "../../__tests__/api-double.ts";
 import { createErrorHandler } from "../../errors.ts";
 import type { RestCaller, RestIdentity } from "../../hosting/api-door.ts";
 import { defineRestRouter } from "../declaration.ts";
@@ -32,7 +33,7 @@ function mounted({ refuses }: { refuses: readonly AuthzPermission[] }) {
       throw new PermissionDeniedError({
         permission,
         scope: { type: "project", id: "project-1" },
-        denialReason: "no-binding",
+        denialReason: "no-grant",
       });
     }
 
@@ -54,7 +55,10 @@ function mounted({ refuses }: { refuses: readonly AuthzPermission[] }) {
     .build()
     .router();
 
-  const hono = createRestRuntime({ identity }).mount(declaration, {
+  const hono = createRestRuntime({
+    authorization: authorizationPort,
+    identity,
+  }).mount(declaration, {
     app: () => ({ open }),
     onError: createErrorHandler(),
     facts: [bindRestMiddleware(staff, readStaff)],

@@ -29,11 +29,12 @@ Anything else webhook needs belongs to another module and is reached through its
 
 ## Peers (static dependencies)
 
-| Name          | Token            | Module                                  |
-| ------------- | ---------------- | --------------------------------------- |
-| `entitlement` | `EntitlementApi` | [entitlement](../entitlement/README.md) |
-| `gateway`     | `GatewayApi`     | [gateway](../gateway/README.md)         |
-| `projects`    | `ProjectApi`     | [project](../project/README.md)         |
+| Name          | Token              | Module                                        |
+| ------------- | ------------------ | --------------------------------------------- |
+| `entitlement` | `EntitlementApi`   | [entitlement](../entitlement/README.md)       |
+| `gateway`     | `GatewayApi`       | [gateway](../gateway/README.md)               |
+| `projects`    | `ProjectApi`       | [project](../project/README.md)               |
+| `retention`   | `DataRetentionApi` | [data-retention](../data-retention/README.md) |
 
 ## Who depends on webhook
 

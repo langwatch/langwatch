@@ -2,9 +2,8 @@ import type { InstrumentationScope, SpanResourceInfoDto } from "@langwatch/trace
 import { useMemo } from "react";
 
 import { useIsReadOnlyTrace } from "../../../../behavior/explorer/context/trace-viewer-context.tsx";
+import { useTraceQueryArgs } from "../../../../behavior/explorer/use-trace-query-args.ts";
 import { api } from "../../../../behavior/trace-api.ts";
-import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 
 interface TraceResourcesResult {
   rootSpanId: string | null;
@@ -31,17 +30,14 @@ const NULL_RESULT: TraceResourcesResult = {
  * only way to surface them in the drawer.
  */
 export function useTraceResources(traceId: string | null | undefined): TraceResourcesResult {
-  const { project } = useOrganizationTeamProject();
   const isReadOnly = useIsReadOnlyTrace();
-  const occurredAtMs = useTraceDrawer((s) => s.occurredAtMs);
-  const enabled = !!project?.id && !!traceId && !isReadOnly;
+  // The drawer's own arguments, so on an aggregate this reads the member the
+  // header and the waterfall read (ADR-177 block F).
+  const { projectId, queryArgs } = useTraceQueryArgs();
+  const enabled = !!projectId && !!traceId && !isReadOnly;
 
   const query = api.traces.resourceInfo.useQuery(
-    {
-      projectId: project?.id ?? "",
-      traceId: traceId ?? "",
-      ...(occurredAtMs !== null ? { occurredAtMs } : {}),
-    },
+    { ...queryArgs, traceId: traceId ?? "" },
     {
       enabled,
       gcTime: 1_800_000,

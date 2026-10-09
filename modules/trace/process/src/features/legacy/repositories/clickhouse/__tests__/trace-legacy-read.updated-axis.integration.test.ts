@@ -10,13 +10,13 @@ import type {
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { TraceCanonicalisationService } from "../../../../derivation/services/trace-canonicalisation.service.ts";
-import { TraceLegacyReadClickHouseRepository } from "../trace-legacy-read.repository.ts";
 import { openProtections } from "../../../../../repositories/clickhouse/__tests__/open-protections.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
 } from "../../../../../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
+import { TraceCanonicalisationService } from "../../../../derivation/services/trace-canonicalisation.service.ts";
+import { TraceLegacyReadClickHouseRepository } from "../trace-legacy-read.repository.ts";
 
 const clickHouseConfigured = testClickHouseConfigured();
 

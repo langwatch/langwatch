@@ -53,6 +53,7 @@ export const webhookEndpointCreateInputSchema = z.object({
   maxBatchSize: z.number().int().optional(),
   maxBatchDelayMs: z.number().int().optional(),
   maxInFlight: z.number().int().optional(),
+  allowSelfSignedCertificate: z.boolean().optional(),
 });
 
 export const webhookEndpointUpdateInputSchema = z.object({
@@ -67,6 +68,7 @@ export const webhookEndpointUpdateInputSchema = z.object({
   maxBatchSize: z.number().int().optional(),
   maxBatchDelayMs: z.number().int().optional(),
   maxInFlight: z.number().int().optional(),
+  allowSelfSignedCertificate: z.boolean().optional(),
 });
 
 export const webhookEndpointTrpc = defineTrpcContract("webhookEndpoints")

@@ -913,7 +913,7 @@ type Response = z.infer<typeof scenarioRestVersionDetailResponseSchema>; // ../c
 
 |             |                                                        |
 | ----------- | ------------------------------------------------------ |
-| Declared at | `src/transport/simulation-run.rest.ts:54`              |
+| Declared at | `src/transport/simulation-run.rest.ts:45`              |
 | Base URL    | `/api/simulation-runs`, twin `/api/v1/simulation-runs` |
 | Addressing  | dated                                                  |
 | Credential  | project                                                |
@@ -923,7 +923,7 @@ type Response = z.infer<typeof scenarioRestVersionDetailResponseSchema>; // ../c
 
 List simulation runs, optionally filtered by scenarioSetId or batchRunId. Set-level and unfiltered listings trim each run to its first few messages and report the trim as `messagesTruncated`; pass `include=messages` to read whole conversations, which caps the page at 20 runs, ending on a batch boundary. A batch-scoped listing always carries whole conversations.
 
-Permission `scenarios:view`. Declared at `src/transport/simulation-run.rest.ts:58`.
+Permission `scenarios:view`. Declared at `src/transport/simulation-run.rest.ts:49`.
 
 Answers at `/api/simulation-runs`, `/api/v1/simulation-runs`; also, undocumented, `/api/simulation-runs/2026-08-07`, `/api/v1/simulation-runs/2026-08-07`, `/api/simulation-runs/latest`, `/api/v1/simulation-runs/latest`.
 
@@ -943,7 +943,7 @@ type Response = z.infer<typeof simulationRunListResponseSchema>; // ../contract/
 
 Get a single simulation run by its ID
 
-Permission `scenarios:view`. Declared at `src/transport/simulation-run.rest.ts:77`.
+Permission `scenarios:view`. Declared at `src/transport/simulation-run.rest.ts:68`.
 
 Answers at `/api/simulation-runs/:scenarioRunId`, `/api/v1/simulation-runs/:scenarioRunId`; also, undocumented, `/api/simulation-runs/2026-08-07/:scenarioRunId`, `/api/v1/simulation-runs/2026-08-07/:scenarioRunId`, `/api/simulation-runs/latest/:scenarioRunId`, `/api/v1/simulation-runs/latest/:scenarioRunId`.
 
@@ -959,7 +959,7 @@ type Response = z.infer<typeof scenarioRunRestResponseWithPlatformUrlSchema>; //
 
 List batch summaries for a scenario set (pass/fail counts per batch)
 
-Permission `scenarios:view`. Declared at `src/transport/simulation-run.rest.ts:96`.
+Permission `scenarios:view`. Declared at `src/transport/simulation-run.rest.ts:87`.
 
 Answers at `/api/simulation-runs/batches/list`, `/api/v1/simulation-runs/batches/list`; also, undocumented, `/api/simulation-runs/2026-08-07/batches/list`, `/api/v1/simulation-runs/2026-08-07/batches/list`, `/api/simulation-runs/latest/batches/list`, `/api/v1/simulation-runs/latest/batches/list`.
 
@@ -977,7 +977,7 @@ type Response = z.infer<typeof simulationBatchListResponseSchema>; // ../contrac
 
 Get the summary of a single batch run, including its completion flag
 
-Permission `scenarios:view`. Declared at `src/transport/simulation-run.rest.ts:122`.
+Permission `scenarios:view`. Declared at `src/transport/simulation-run.rest.ts:113`.
 
 Answers at `/api/simulation-runs/batches/:batchRunId`, `/api/v1/simulation-runs/batches/:batchRunId`; also, undocumented, `/api/simulation-runs/2026-08-07/batches/:batchRunId`, `/api/v1/simulation-runs/2026-08-07/batches/:batchRunId`, `/api/simulation-runs/latest/batches/:batchRunId`, `/api/v1/simulation-runs/latest/batches/:batchRunId`.
 

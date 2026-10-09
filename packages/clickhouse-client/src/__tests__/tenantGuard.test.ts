@@ -256,9 +256,7 @@ describe("checkTenantScope", () => {
 
   describe("given a statement the text check cannot see through", () => {
     describe("when the statement is checked", () => {
-      // Accepted limits, kept executable so they stay documented rather than
-      // becoming folklore. One match anywhere satisfies the whole statement,
-      // and closing these needs a parser. See the module docblock.
+      // Once accepted limits; each scope that reads a table now binds the tenant itself (GUARD-F2).
       it.each([
         [
           "a UNION whose second arm is unscoped",
@@ -272,8 +270,10 @@ describe("checkTenantScope", () => {
           "a scoped subquery beneath an unscoped outer query",
           "SELECT * FROM (SELECT Id FROM t WHERE TenantId = {t:String}) UNION ALL SELECT Id FROM t",
         ],
-      ])("still accepts %s", (_label, sql) => {
-        expect(checkTenantScope({ sql, params: { t: TENANT }, tenantId: TENANT })).toBeNull();
+      ])("refuses %s", (_label, sql) => {
+        expect(checkTenantScope({ sql, params: { t: TENANT }, tenantId: TENANT })).toEqual({
+          kind: "unbound-read",
+        });
       });
     });
   });

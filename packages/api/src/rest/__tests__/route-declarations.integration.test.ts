@@ -9,6 +9,7 @@ import type { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { authorizationPort } from "../../__tests__/api-double.ts";
 import { createErrorHandler, EndpointWithdrawnError } from "../../errors.ts";
 import type { RestAuditRow, RestIdentity } from "../../hosting/api-door.ts";
 import { defineRestRouter } from "../declaration.ts";
@@ -98,6 +99,7 @@ function recordingSink(): { rows: RestAuditRow[]; record(row: RestAuditRow): voi
 
 function mounted(ports: Partial<RestRuntimeMembers> = {}): Hono {
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: organizationDoor,
     doors: { instance_admin: instanceAdminDoor },
     ...ports,
@@ -148,7 +150,11 @@ describe("given a route that raises a credential kind of its own", () => {
 
   describe("when the runtime opens no door of the kind the route raised", () => {
     it("refuses the mount naming the route and the kind", () => {
-      const runtime = createRestRuntime({ identity: organizationDoor, audit: recordingSink() });
+      const runtime = createRestRuntime({
+        authorization: authorizationPort,
+        identity: organizationDoor,
+        audit: recordingSink(),
+      });
 
       expect(() =>
         runtime.mount(keys.router(), {
@@ -206,6 +212,7 @@ describe("given a route that declares the trail it leaves", () => {
   describe("when a route answers on a runtime with no audit sink", () => {
     it("refuses the mount naming the action", () => {
       const runtime = createRestRuntime({
+        authorization: authorizationPort,
         identity: organizationDoor,
         doors: { instance_admin: instanceAdminDoor },
       });

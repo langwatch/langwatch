@@ -8,10 +8,10 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { TraceExportRateLimitedError, type Protections } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import type { TraceViewerProtectionService } from "../../../../services/trace-viewer-protection.service.ts";
 import type { TraceExportBounds, TraceExportSlot } from "../trace-export-bounds.service.ts";
 import { TraceExportDownloadService } from "../trace-export-download.service.ts";
 import type { TraceExportService } from "../trace-export.service.ts";
-import type { TraceViewerProtectionService } from "../../../../services/trace-viewer-protection.service.ts";
 
 const protections = { canSeeCapturedInput: true, canSeeCapturedOutput: true } as Protections;
 const request = {

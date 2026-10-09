@@ -29,10 +29,57 @@ every process it starts, and `eval "$(haven env)"` puts the same set in your
 shell.
 
 Credential-carrying variables are classified once in `packages/secrets`
-(ADR-132). Each app resolves them through an ordered chain (env/.env, then
-1Password when `LANGWATCH_SECRETS_VAULT` is set, then a refusal by name) before
+(ADR-132). Each app resolves them through an ordered chain (env, `.env`, then
+1Password when `LANGWATCH_OP_ACCOUNT` is set, then a refusal by name) before
 its Zod parse. Never read `.env` to find a value and never print one:
 `haven env` masks every classified key (`--reveal` for the shell form).
+
+### Credentials haven makes up
+
+A haven stack needs no real credential. haven makes up `NEXTAUTH_SECRET`,
+`CREDENTIALS_SECRET`, `LANGWATCH_INSTANCE_ADMIN_API_KEY` and
+`HAVEN_SEED_SCIM_TOKEN` per stack, keeps them in its own state (never the
+checkout), and rotates them only on `haven destroy`; one you set in `.env` wins.
+The seeded admin login, slugs and access tokens are fixed. `haven seed` ends by
+printing all of them, masked (`--reveal` shows the values, `--json` gives one
+object); `haven env --reveal` has the same credentials.
+
+Stripe is paymentsim on every local and CI stack: `haven up` runs it and points
+billing at it unless `.env` or the shell sets `STRIPE_SECRET_KEY`,
+`STRIPE_WEBHOOK_SECRET` or `STRIPE_API_BASE`, in which case your keys are used.
+`haven up` prints which (`Stripe: paymentsim` or `Stripe: your key from .env`).
+
+### Keeping a credential in 1Password
+
+Addressing is convention plus one key (ARCHITECTURE.md §6): vault `Private`,
+item `LangWatch`, one field per secret named exactly its `Secret.load` id
+(`STRIPE_SECRET_KEY`), read with `op read` through the desktop app's CLI
+integration. There is no `op://` reference in `.env`: a value there is used
+literally.
+
+1. `op account list`; the URL's subdomain is your account shorthand.
+2. Add the field (empty), then paste the value in the 1Password app, never on a
+   command line. `op item edit` if `LangWatch` already exists in `Private`:
+   ```bash
+   op item create --account <shorthand> --vault Private --category "Secure Note" \
+     --title LangWatch 'STRIPE_SECRET_KEY[password]=' 'STRIPE_WEBHOOK_SECRET[password]='
+   ```
+3. In `.env`: delete the moved lines (env and `.env` answer first, so a line
+   left behind wins) and set `LANGWATCH_OP_ACCOUNT="<shorthand>"`.
+4. `haven down && haven up` (a restart keeps the old env), then
+   `haven env --agent | grep -E 'STRIPE|LANGWATCH_OP'` shows only the account.
+
+Under haven, a Stripe pair kept only in 1Password is not used: haven sees no
+Stripe key in env or `.env`, injects paymentsim's pair, and env answers first.
+Keep your own Stripe test keys in `.env` to use them.
+
+With the account set, each boot probes once with `op whoami`, then reads every
+handle missing from env and `.env` in parallel. 1Password is best effort: when
+`op` is missing, locked, signed out or times out, the boot logs one
+`[secrets] 1Password skipped` warning with the reason and carries on without
+it, so optional secrets stay unset and a missing required one fails by name.
+Unlock 1Password and restart to pick the values up. Production refuses the
+account by name.
 
 ## haven (thuishaven)
 
@@ -166,8 +213,8 @@ hand. `dev/scripts/kill-dev-tree.sh` already does it correctly.
 Locally there is one Node process by default: the `app` lane runs the ui's Vite
 server, the api and the worker together (see "One process" below). It is a
 launcher, not a process role: each still resolves its
-own secrets, config and graph; boot is worker then api, and shutdown drains the
-worker first. Production runs three Node deployments.
+own secrets, config and graph; the api and worker boot together (the api answers
+while the worker upgrades), and shutdown drains the worker first. Production runs three Node deployments.
 
 | Script                                   | What runs                                                                                |
 | ---------------------------------------- | ---------------------------------------------------------------------------------------- |

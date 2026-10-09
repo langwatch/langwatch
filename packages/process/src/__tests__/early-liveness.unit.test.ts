@@ -71,7 +71,7 @@ describe("a worker whose boot is held by a slow stage", () => {
         let stageDone = false;
         const booting = server
           .container("worker")
-          .boot()
+          .boot({ classifyEventLogRetention: () => "traces" })
           .then((application) => {
             stageDone = true;
             return application;

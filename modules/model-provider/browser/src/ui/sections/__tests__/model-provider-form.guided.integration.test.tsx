@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  * @see specs/features/onboarding/guided-welcome-takeover.feature
  */
-import { findRecommendedChatModels, modelProviders } from "@langwatch/model-provider-contract";
+import { findRecommendedChatModels } from "@langwatch/model-provider-contract";
 import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -83,7 +83,7 @@ vi.mock("../../../behavior/model-provider-api.ts", () => {
 import { describeRefusal } from "../../../model/connection-verdict-copy.ts";
 import { FakeModelProviderHost, renderWithModelProviderHost } from "../../../testing.tsx";
 import { EditModelProviderForm } from "../model-provider-form.tsx";
-import { inputFor, keyedRow } from "./model-provider-drawer-harness.tsx";
+import { keyedRow } from "./model-provider-drawer-harness.tsx";
 
 function renderGuided(providerKey: string, onSaved = vi.fn(), onFailed = vi.fn()) {
   renderWithModelProviderHost(
@@ -116,10 +116,15 @@ describe("the shared provider form in its guided presentation", () => {
 
   describe("when Codex is the selected provider", () => {
     /** @scenario "The provider marks are one row with Codex first and preselected" */
-    it("offers Sign in with ChatGPT", () => {
+    it("names Codex, offers Sign in with ChatGPT and asks no scope", () => {
       renderGuided("openai_codex");
 
-      expect(screen.getByRole("button", { name: "Sign in with ChatGPT" })).toBeInTheDocument();
+      expect(screen.getByText("Codex", { selector: "p" })).toBeInTheDocument();
+      expect(
+        screen.getByText("Sign in with your ChatGPT account, no API key needed"),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Sign in with ChatGPT" })).toBeEnabled();
+      expect(screen.queryByText(/scope/i)).toBeNull();
     });
   });
 
@@ -127,6 +132,9 @@ describe("the shared provider form in its guided presentation", () => {
     /** @scenario "An API key provider asks for the key and offers the default chat models" */
     it("asks for the key, offers the recommended model first and waits for a key", async () => {
       renderGuided("openai");
+      expect(screen.getByLabelText("API key")).toHaveAttribute("type", "password");
+      expect(screen.queryByLabelText(/base url/i)).toBeNull();
+      expect(screen.queryByText(/scope/i)).toBeNull();
       const [recommended] = findRecommendedChatModels({ provider: "openai", limit: 4 });
 
       const pills = within(screen.getByRole("group", { name: "Default chat model" })).getAllByRole(
@@ -137,7 +145,7 @@ describe("the shared provider form in its guided presentation", () => {
       expect(pills[0]).toHaveAttribute("aria-pressed", "true");
       expect(screen.getByRole("button", { name: "Connect" })).toBeDisabled();
 
-      await userEvent.setup().type(inputFor("OPENAI_API_KEY"), "sk-typed");
+      await userEvent.setup().type(screen.getByLabelText("API key"), "sk-typed");
 
       expect(screen.getByRole("button", { name: "Connect" })).toBeEnabled();
     });
@@ -145,15 +153,35 @@ describe("the shared provider form in its guided presentation", () => {
 
   describe("when a provider without a model list is selected", () => {
     /** @scenario "Azure, Bedrock and Custom take credentials and a typed model name" */
-    it.each(["azure", "bedrock", "custom"] as const)("hints %s's model is typed", (key) => {
+    it.each([
+      ["azure", "Azure"],
+      ["bedrock", "Bedrock"],
+      ["custom", "Custom"],
+    ] as const)("hints %s's model is typed", (key, name) => {
       renderGuided(key);
 
       expect(
         screen.getByText(
-          `Type it exactly as deployed: ${modelProviders[key].name} has no model list we can read for you.`,
+          `Type it exactly as deployed: ${name} has no model list we can read for you.`,
         ),
       ).toBeInTheDocument();
+      expect(screen.getByLabelText("Chat model")).toBeInTheDocument();
       expect(screen.queryByRole("group", { name: "Default chat model" })).toBeNull();
+    });
+
+    /** @scenario "Azure, Bedrock and Custom take credentials and a typed model name" */
+    it("connects Azure with the typed deployment as the chat model", async () => {
+      const { onSaved } = renderGuided("azure");
+      const user = userEvent.setup();
+
+      await user.type(screen.getByLabelText("Endpoint"), "https://acme.openai.azure.com");
+      await user.type(screen.getByLabelText("API key"), "azure-key");
+      expect(screen.getByRole("button", { name: "Connect" })).toBeDisabled();
+      await user.type(screen.getByLabelText("Chat model"), "acme-gpt");
+      await user.click(screen.getByRole("button", { name: "Connect" }));
+
+      await screen.findByRole("button", { name: "Connected" });
+      await waitFor(() => expect(onSaved).toHaveBeenCalledWith({ chatModel: "acme-gpt" }));
     });
   });
 
@@ -166,7 +194,7 @@ describe("the shared provider form in its guided presentation", () => {
       const [recommended] = findRecommendedChatModels({ provider: "openai", limit: 4 });
       const user = userEvent.setup();
 
-      await user.type(inputFor("OPENAI_API_KEY"), "sk-typed");
+      await user.type(screen.getByLabelText("API key"), "sk-typed");
       await user.click(screen.getByRole("button", { name: "Connect" }));
 
       expect(await screen.findByRole("button", { name: "Checking the key…" })).toBeDisabled();
@@ -196,7 +224,7 @@ describe("the shared provider form in its guided presentation", () => {
         "false",
       );
 
-      await user.type(inputFor("OPENAI_API_KEY"), "sk-typed");
+      await user.type(screen.getByLabelText("API key"), "sk-typed");
       await user.click(screen.getByRole("button", { name: "Connect" }));
 
       await screen.findByRole("button", { name: "Connected" });
@@ -217,7 +245,7 @@ describe("the shared provider form in its guided presentation", () => {
       renderGuided("openai");
       user = userEvent.setup();
 
-      await user.type(inputFor("OPENAI_API_KEY"), "sk-refused");
+      await user.type(screen.getByLabelText("API key"), "sk-refused");
       await user.click(screen.getByRole("button", { name: "Connect" }));
     });
 
@@ -233,7 +261,7 @@ describe("the shared provider form in its guided presentation", () => {
       listing.rows = [];
       await user.click(screen.getAllByRole("button", { pressed: false })[0] as HTMLElement);
 
-      expect(inputFor("OPENAI_API_KEY")).toHaveValue("sk-refused");
+      expect(screen.getByLabelText("API key")).toHaveValue("sk-refused");
     });
   });
 
@@ -244,7 +272,7 @@ describe("the shared provider form in its guided presentation", () => {
       const [recommended] = findRecommendedChatModels({ provider: "openai", limit: 4 });
       const user = userEvent.setup();
 
-      await user.type(inputFor("OPENAI_API_KEY"), "sk-typed");
+      await user.type(screen.getByLabelText("API key"), "sk-typed");
       await user.click(screen.getByRole("button", { name: "Connect" }));
 
       await screen.findByRole("button", { name: "Connected" });
@@ -274,14 +302,15 @@ describe("the shared provider form in its guided presentation", () => {
       expect(
         screen.getByText("Enter this code on OpenAI's device page to approve the sign-in:"),
       ).toBeInTheDocument();
-      const row = screen.getByLabelText("One-time sign-in code").parentElement as HTMLElement;
+      const row = screen.getByLabelText("One-time sign-in code").parentElement
+        ?.parentElement as HTMLElement;
       expect(within(row).getByRole("link", { name: /Open openai.com/ })).toBeInTheDocument();
 
       await user.click(within(row).getByRole("button", { name: "Copy code" }));
       expect(await navigator.clipboard.readText()).toBe("ABCD-1234");
       expect(await within(row).findByRole("button", { name: "Code copied" })).toBeInTheDocument();
 
-      const status = screen.getByText("Waiting for ChatGPT…").parentElement as HTMLElement;
+      const status = screen.getByTestId("codex-waiting");
       await user.click(within(status).getByRole("button", { name: "Cancel" }));
       expect(codex.cancel).toHaveBeenCalled();
     });
@@ -302,7 +331,7 @@ describe("the shared provider form in its guided presentation", () => {
         code: "codex_sign_in_timed_out",
       });
       expect(screen.getByText("The sign-in timed out before it was approved.")).toBeInTheDocument();
-      await userEvent.setup().click(screen.getByRole("button", { name: "Start sign-in again" }));
+      await userEvent.setup().click(screen.getByRole("button", { name: "Sign in with ChatGPT" }));
       expect(codex.begin).toHaveBeenCalled();
     });
   });
@@ -325,7 +354,7 @@ describe("the shared provider form in its guided presentation", () => {
       renderGuided("openai");
 
       expect(screen.getByTestId("environment-key-hint")).toHaveTextContent(
-        `This server already has a key for ${modelProviders.openai.name}. Connect to use it, or paste your own.`,
+        "This server already has a key for OpenAI. Connect to use it, or paste your own.",
       );
       await userEvent.setup().click(screen.getByRole("button", { name: "Connect" }));
 

@@ -111,6 +111,12 @@ export interface ViewSlice {
    * stay dismissed.
    */
   setUserLenses: (lenses: LensConfig[]) => void;
+  /**
+   * Take back a new lens the server refused to save; when it is still active the user
+   * returns to `fallbackLensId`. Explicit, because reloading an empty list keeps its
+   * reference, so `setUserLenses` never runs on a project's first lens.
+   */
+  discardRefusedLens: (args: { lensId: string; fallbackLensId: string }) => void;
 }
 
 /**
@@ -118,8 +124,17 @@ export interface ViewSlice {
  * `useLensSync`), the store calls these alongside its local writes so localStorage
  * stays a hot cache and the server stays the source of truth.
  */
-interface LensSyncBridge {
-  create: (lens: LensConfig & { /** Optional client-suggested id. */ id: string }) => void;
+export interface LensSyncBridge {
+  /**
+   * Whether the project accepts lens writes. An aggregate project is read only
+   * (ADR-177), so the store asks before every saved-lens write from any entry point.
+   */
+  acceptsWrites: () => boolean;
+  /** `fallbackLensId` is the lens the user was on before, for `discardRefusedLens`. */
+  create: (
+    lens: LensConfig & { /** Optional client-suggested id. */ id: string },
+    rollback: { fallbackLensId: string },
+  ) => void;
   rename: (lensId: string, name: string) => void;
   delete: (lensId: string) => void;
 }
@@ -128,6 +143,11 @@ let lensSyncBridge: LensSyncBridge | null = null;
 
 export function setLensSyncBridge(bridge: LensSyncBridge | null): void {
   lensSyncBridge = bridge;
+}
+
+/** True when the bridged project refuses lens writes; with no bridge nothing refuses. */
+function lensWritesRefused(): boolean {
+  return lensSyncBridge !== null && !lensSyncBridge.acceptsWrites();
 }
 
 const DISMISSED_BUILTINS_KEY = "langwatch:traces-v2:dismissed-builtins:v1";
@@ -184,7 +204,8 @@ function migrateGrouping(value: unknown): GroupingMode | undefined {
 
 // Custom lenses no longer round-trip through localStorage. They live on the server
 // (SavedView table, kind="v2-traces-lens") and `useLensSync` pushes them into the store
-// via `setUserLenses` whenever the tRPC query resolves.
+// via `setUserLenses` whenever the tRPC query resolves. A refused rename or delete
+// rolls back by invalidation, a refused create through `discardRefusedLens`.
 
 function isSortConfig(value: unknown): value is SortConfig {
   if (!value || typeof value !== "object") return false;
@@ -612,9 +633,11 @@ function lensLibraryActions(
     // current) flows go through here — the only difference is the supplied name.
     createLens: (name, overrides) => {
       const state = get();
+      // A refused create changes nothing, so the caller stays on its lens.
+      if (lensWritesRefused()) return state.activeLensId;
       const newLens = lensFromSnapshot({ name, overrides, state });
       const allLenses = [...state.allLenses, newLens];
-      lensSyncBridge?.create(newLens);
+      lensSyncBridge?.create(newLens, { fallbackLensId: state.activeLensId });
       // The new lens becomes the active one. With overrides present the saved
       // values also go into live state, so the table reflects the configured
       // shape at once rather than keeping the old grouping and columns until the
@@ -641,14 +664,7 @@ function lensLibraryActions(
       set({ draftState, sort: lens.sort, grouping: lens.grouping, columnOrder: lens.columns });
     },
 
-    renameLens: (lensId, name) =>
-      set((s) => {
-        const lens = s.allLenses.find((l) => l.id === lensId);
-        if (!lens || lens.isBuiltIn) return s;
-        const allLenses = s.allLenses.map((l) => (l.id === lensId ? { ...l, name } : l));
-        lensSyncBridge?.rename(lensId, name);
-        return { allLenses };
-      }),
+    renameLens: (lensId, name) => set((s) => renamedLensState(s, lensId, name)),
   };
 }
 
@@ -656,12 +672,12 @@ function lensLibraryActions(
 function lensLifecycleActions(
   set: ViewSet,
   get: ViewGet,
-): Pick<ViewSlice, "duplicateLens" | "deleteLens" | "setUserLenses"> {
+): Pick<ViewSlice, "duplicateLens" | "deleteLens" | "setUserLenses" | "discardRefusedLens"> {
   return {
     duplicateLens: (lensId) => {
       const state = get();
       const lens = state.allLenses.find((l) => l.id === lensId);
-      if (!lens) return lensId;
+      if (!lens || lensWritesRefused()) return lensId;
       // The SAVED lens is duplicated, never the live draft — the "Save as new
       // lens" action is what captures a draft.
       const newLens: LensConfig = {
@@ -670,7 +686,7 @@ function lensLifecycleActions(
         name: `${lens.name} (copy)`,
         isBuiltIn: false,
       };
-      lensSyncBridge?.create(newLens);
+      lensSyncBridge?.create(newLens, { fallbackLensId: state.activeLensId });
       get().setFilterFromLens(newLens.filterText);
       set({ allLenses: [...state.allLenses, newLens], ...adoptedLensState(newLens) });
       return newLens.id;
@@ -679,7 +695,7 @@ function lensLifecycleActions(
     deleteLens: (lensId) => {
       const s = get();
       const lens = s.allLenses.find((l) => l.id === lensId);
-      if (!lens || !isDeletableLens(s, lensId)) return;
+      if (!lens || !isDeletableLens(s, lens)) return;
       forgetLens(lens, lensId);
       const allLenses = s.allLenses.filter((l) => l.id !== lensId);
       const draftState = clearDraftFor(s.draftState, lensId);
@@ -696,6 +712,8 @@ function lensLifecycleActions(
     setUserLenses: (lenses) => {
       set((s) => mergedUserLenses(s, lenses));
     },
+
+    discardRefusedLens: (args) => discardRefusedLens({ set, get, ...args }),
   };
 }
 
@@ -825,9 +843,54 @@ function lensFromSnapshot({
  * deleted or dismissed, but the strip must always offer a way back to the
  * unfiltered table.
  */
-function isDeletableLens(s: ViewSlice, lensId: string): boolean {
-  if (s.allLenses.length <= 1) return false;
-  return lensId !== "all-traces";
+function isDeletableLens(s: ViewSlice, lens: LensConfig): boolean {
+  if (s.allLenses.length <= 1 || lens.id === "all-traces") return false;
+  // Dismissing a built-in is local only; deleting a saved lens is a write.
+  return lens.isBuiltIn || !lensWritesRefused();
+}
+
+/** A saved lens renamed, unless it is built in or the project refuses writes. */
+function renamedLensState(s: ViewSlice, lensId: string, name: string): Partial<ViewSlice> {
+  const lens = s.allLenses.find((l) => l.id === lensId);
+  if (!lens || lens.isBuiltIn || lensWritesRefused()) return s;
+  const allLenses = s.allLenses.map((l) => (l.id === lensId ? { ...l, name } : l));
+  lensSyncBridge?.rename(lensId, name);
+  return { allLenses };
+}
+
+/** Take a refused new lens back out, returning the user to the lens they left. */
+function discardRefusedLens({
+  set,
+  get,
+  lensId,
+  fallbackLensId,
+}: {
+  set: ViewSet;
+  get: ViewGet;
+  lensId: string;
+  fallbackLensId: string;
+}): void {
+  const s = get();
+  if (!s.allLenses.some((l) => l.id === lensId && !l.isBuiltIn)) return;
+  const allLenses = s.allLenses.filter((l) => l.id !== lensId);
+  const draftState = clearDraftFor(s.draftState, lensId);
+  const next = allLenses.find((l) => l.id === fallbackLensId) ?? allLenses[0];
+  // The user moved on while the save was in flight: leave them there.
+  if (s.activeLensId !== lensId || !next) {
+    set({ allLenses, draftState });
+    return;
+  }
+  // Back to the lens as the user left it, unsaved changes included.
+  const draft = draftState.get(next.id);
+  get().setFilterFromLens(draft?.filter ?? next.filterText);
+  set({
+    allLenses,
+    draftState,
+    activeLensId: next.id,
+    sort: draft?.sort ?? next.sort,
+    grouping: draft?.grouping ?? next.grouping,
+    columnOrder: draft?.columns ?? next.columns,
+  });
 }
 
 /** A built-in is dismissed locally; a user lens is deleted on the server. */

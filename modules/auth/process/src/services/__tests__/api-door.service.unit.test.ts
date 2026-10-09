@@ -88,6 +88,8 @@ const peers: ApiDoorPeers = {
     getSessionVersion: refuseEverything,
     getScope: refuseEverything,
     can: refuseEverything,
+    authorize: refuseEverything,
+    authorizeInternal: refuseEverything,
   },
   organizations: {
     getSettings: ({ organizationId }) =>

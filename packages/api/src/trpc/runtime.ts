@@ -13,6 +13,8 @@ import {
   type AuthzPermission,
   type PlatformTierPermission,
   type ScopeTierField,
+  type Authorization,
+  type ProofBearingPermission,
 } from "@langwatch/authorization";
 import { HandledError, isZodLikeError, ValidationError } from "@langwatch/handled-error";
 import type { ModuleApiToken, TrpcContract, TrpcContractMember } from "@langwatch/module";
@@ -50,6 +52,9 @@ import { z } from "zod";
 import {
   AuthenticationRequiredError,
   decide,
+  declaredPermissions,
+  mintAuthorization,
+  refuseWriteUnderAggregate,
   scopeWithOrganization,
   decideEntitlement,
   declareAccessMiddleware,
@@ -75,9 +80,8 @@ import {
   type ExactInputPermission,
   type InputPermission,
 } from "../access/input-permission.ts";
-import { DatabaseBusyError, isDatabaseBusy } from "../errors.ts";
+import { promoteStoreFailure } from "../errors.ts";
 import type { ApiHandlerArguments } from "../handler-arguments.ts";
-import { registerTrpcServingWhileUpgrading } from "../route-registry.ts";
 import {
   auditScopeId,
   auditScopeIds,
@@ -297,11 +301,13 @@ export type TrpcAnonymousHandlerArguments<Input, App> = Omit<
   Readonly<{ actor: null; scope: null }>;
 
 /** Whether the procedure's declaration opens a door at all. */
-type TrpcCallerKind = "authenticated" | "anonymous";
+type TrpcCallerKind = "authenticated" | "anonymous" | "proven";
 
 type HandlerArgumentsFor<Caller extends TrpcCallerKind, Input, App> = Caller extends "anonymous"
   ? TrpcAnonymousHandlerArguments<Input, App>
-  : TrpcContractHandlerArguments<Input, App>;
+  : Caller extends "proven"
+    ? TrpcContractHandlerArguments<Input, App> & Readonly<{ authorization: Authorization }>
+    : TrpcContractHandlerArguments<Input, App>;
 
 /** The facts a handler is handed beside its input, in the order it declared them. */
 type TrpcFactValues<Facts extends readonly TrpcFact[]> = {
@@ -493,11 +499,6 @@ export interface TrpcRouterAccess<
    */
   withAudit(target: TrpcAuditTarget): TrpcRouterAccess<Api, Contract, Implemented, Name, Facts>;
   /**
-   * Answers while the installation upgrades (UIW-TRPC-DECLARE); its access is still asked as
-   * declared. A batched call passes the holding door only when every procedure in it declares this.
-   */
-  servesWhileUpgrading(): TrpcRouterAccess<Api, Contract, Implemented, Name, Facts>;
-  /**
    * What the module does when the door refuses a caller: handed the parsed input and the caller,
    * awaited before the refusal is answered unchanged; a hook that throws fails the call.
    */
@@ -508,6 +509,11 @@ export interface TrpcRouterAccess<
    * The permission the parsed input chooses (`permissionBy`): its map names every value the
    * field holds. A bare entry is asked at `via`'s scope, an entry with a tier at its own field.
    */
+  /** A proof-bearing permission: the door mints the proof and the handler is handed it. */
+  withPermission(
+    permission: ProofBearingPermission,
+    options?: { via: ScopeTierField },
+  ): TrpcRouterImplementation<Api, Contract, Implemented, Name, Facts, "proven">;
   withPermission<const Choice extends InputPermission>(
     choice: Choice & ExactInputPermission<z.output<Contract["members"][Name]["input"]>, Choice>,
     options?: { via: ScopeTierField },
@@ -579,7 +585,6 @@ export interface TrpcRouterImplementation<
 
 type Implementation = Readonly<{
   access: TrpcAccess;
-  servesWhileUpgrading?: true;
   entitlement?: EntitlementGate;
   mintsCredential?: AuthzPermission;
   audit?: TrpcAuditTarget;
@@ -608,10 +613,8 @@ function mountRouter<Api, Contract extends TrpcContract>(
       }
 
       const procedure = `${contract.namespace}.${name}`;
-      const { servesWhileUpgrading, ...declared } = implementation;
-      if (servesWhileUpgrading) registerTrpcServingWhileUpgrading(procedure);
       // An implementation carries only the marks its procedure declared, so it spreads as is.
-      record[name] = runtime.procedure({ procedure, member, ...declared, app });
+      record[name] = runtime.procedure({ procedure, member, ...implementation, app });
     }
 
     return runtime.router(record) as TRPCBuiltRouter<
@@ -629,7 +632,6 @@ type PermissionArgument =
 
 /** What a selected procedure has declared beside its facts, before its access. */
 type ProcedureMarks = Readonly<{
-  servesWhileUpgrading?: true;
   entitlement?: EntitlementGate;
   mintsCredential?: AuthzPermission;
   audit?: TrpcAuditTarget;
@@ -713,7 +715,6 @@ function routerBuilder<Api, Contract extends TrpcContract, Implemented extends s
 
         return selected(name, facts, { ...marks, entitlement: { entitlement: named, ...options } });
       },
-      servesWhileUpgrading: () => selected(name, facts, { ...marks, servesWhileUpgrading: true }),
       mintsCredential: (permission: AuthzPermission) =>
         selected(name, facts, { ...marks, mintsCredential: permission }),
       onRefused: (hook: TrpcRefusalHook<unknown, unknown>) => {
@@ -1185,6 +1186,7 @@ export function createTrpcRuntime<
           members,
           declaration: request.access,
           procedure: request.procedure,
+          kind: request.member.kind,
           app: request.app,
           facts,
           ...(request.entitlement ? { entitlement: request.entitlement } : {}),
@@ -1327,6 +1329,7 @@ type HandlerArguments = Readonly<{
   input: unknown;
   actor: (Actor & { id: string }) | null;
   scope: unknown;
+  authorization: unknown;
   signal: AbortSignal | undefined;
 }>;
 
@@ -1358,6 +1361,7 @@ function access<TContext extends object>({
   members,
   declaration,
   procedure,
+  kind,
   entitlement,
   mintsCredential,
   onRefused,
@@ -1367,6 +1371,7 @@ function access<TContext extends object>({
   members: TrpcRuntimeMembers<TContext>;
   declaration: TrpcAccess;
   procedure: string;
+  kind: TrpcContractMember["kind"];
   entitlement?: EntitlementGate;
   mintsCredential?: AuthzPermission;
   onRefused?: TrpcRefusalHook<unknown, unknown>;
@@ -1386,6 +1391,7 @@ function access<TContext extends object>({
       members,
       declaration,
       procedure,
+      kind,
       app,
       facts,
       ...(entitlement ? { entitlement } : {}),
@@ -1401,6 +1407,7 @@ function check<TContext extends object>({
   members,
   declaration,
   procedure,
+  kind,
   entitlement,
   mintsCredential,
   onRefused,
@@ -1410,6 +1417,7 @@ function check<TContext extends object>({
   members: TrpcRuntimeMembers<TContext>;
   declaration: TrpcAccess;
   procedure: string;
+  kind: TrpcContractMember["kind"];
   entitlement?: EntitlementGate;
   mintsCredential?: AuthzPermission;
   onRefused?: TrpcRefusalHook<unknown, unknown>;
@@ -1435,6 +1443,7 @@ function check<TContext extends object>({
         app: app(ctx),
         actor: null,
         scope: null,
+        authorization: null,
         facts: await resolveFacts({ facts, ctx }),
       };
 
@@ -1479,14 +1488,51 @@ function check<TContext extends object>({
     const handlerArguments: ResolvedAccess = {
       app: app(ctx),
       actor: decision.actor,
-      scope: await scopeWithOrganization({
-        scope: decision.scope,
+      ...(await admittedScope({
+        declaration,
+        decision,
+        kind,
+        procedure,
         authorize: members.authorization.forRequest(ctx),
-      }),
+      })),
       facts: await resolveFacts({ facts, ctx }),
     };
 
     return next({ ctx: { handlerArguments } });
+  };
+}
+
+/**
+ * The admitted call's scope with its organisation and kind, refused as read only when a mutation
+ * writes under an aggregate (ADR-177 decision 8), and the proof a proof-bearing read carries.
+ */
+async function admittedScope({
+  declaration,
+  decision,
+  kind,
+  procedure,
+  authorize,
+}: {
+  declaration: AccessDeclaration;
+  decision: Awaited<ReturnType<typeof decide>>;
+  kind: TrpcContractMember["kind"];
+  procedure: string;
+  authorize: Authorize;
+}): Promise<Pick<ResolvedAccess, "scope" | "authorization">> {
+  const scope = await scopeWithOrganization({ scope: decision.scope, authorize });
+  if (kind === "mutation") {
+    refuseWriteUnderAggregate({ permissions: declaredPermissions(declaration), scope });
+  }
+
+  return {
+    scope,
+    authorization: await mintAuthorization({
+      permission: declaration.kind === "permission" ? declaration.permission : undefined,
+      actor: decision.actor,
+      scope: decision.scope,
+      authorize,
+      route: procedure,
+    }),
   };
 }
 
@@ -1831,7 +1877,7 @@ function handledErrors<TContext extends object>(members: TrpcRuntimeMembers<TCon
 
     if (result.ok) return result;
 
-    const cause = isDatabaseBusy(result.error.cause) ? new DatabaseBusyError() : result.error.cause;
+    const cause = promoteStoreFailure(result.error.cause);
 
     if (HandledError.isHandled(cause)) {
       throw new TRPCError({ code: trpcCodeOf(cause), message: cause.message, cause });

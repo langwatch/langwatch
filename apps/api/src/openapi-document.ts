@@ -6,6 +6,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
+import type { Authorize } from "@langwatch/api/access";
 import { buildOpenApiDocument, type RestIdentity } from "@langwatch/api/hosting";
 import { RestHost, type RestTransportDeclaration } from "@langwatch/api/rest";
 
@@ -27,6 +28,17 @@ const closed: RestIdentity = {
   identifyOptional: refuse,
   authorize: refuse,
   authorizePlatform: refuse,
+};
+
+const undecided: Authorize = {
+  getDecision: refuse,
+  getProjectAnyDecision: refuse,
+  checkScopeLineage: refuse,
+  organizationOf: refuse,
+  getPlatformDecision: refuse,
+  projectKindOf: refuse,
+  authorization: refuse,
+  assertSecondFactor: refuse,
 };
 
 type InstalledModule = Readonly<{
@@ -75,6 +87,7 @@ export function describedRestApplication(modules: readonly InstalledModule[] = p
     rateLimiter: { check: refuse },
     facts: [...facts.values()] as never,
     entitlements: { holds: refuse },
+    authz: undecided,
   });
 
   for (const declaration of declarations) rest.mount(declaration, refuse);

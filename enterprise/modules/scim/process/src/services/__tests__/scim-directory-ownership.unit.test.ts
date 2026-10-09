@@ -11,7 +11,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
 import { HeldConnectionsFake } from "../../__tests__/support/held-connections-fake.ts";
-import { OrganizationAdministrationFake } from "../../__tests__/support/organization-administration-fake.ts";
+import {
+  MembersFake,
+  OrganizationAdministrationFake,
+} from "../../__tests__/support/organization-administration-fake.ts";
 import { MemoryScimRepository } from "../../repositories/memory/memory.scim.repository.ts";
 import type { ScimCostCenterFacts } from "../scim-cost-center.service.ts";
 import type { ScimUserProvisioning } from "../scim-provisioning.service.ts";
@@ -52,6 +55,8 @@ function world() {
   const store = MemoryScimRepository.create();
   const writer = new GrantsFake();
   const connections = HeldConnectionsFake.of([OKTA, ENTRA, GLOBEX_OKTA]);
+  connections.hold({ connectionId: OKTA, verifiedDomains: ["acme.test"] });
+  connections.hold({ connectionId: GLOBEX_OKTA, verifiedDomains: ["shared.test"] });
   const users = {
     findById: vi.fn(async ({ id }) => store.users.get(id) ?? null),
     findByEmail: vi.fn(
@@ -80,6 +85,7 @@ function world() {
     recordCostCenterChanged: vi.fn(async () => undefined),
   } satisfies ScimCostCenterFacts;
   const service = ScimService.create({
+    members: new MembersFake(),
     prisma: store,
     writer,
     users,

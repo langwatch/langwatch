@@ -22,9 +22,9 @@ Predictable hostnames, not a random `happy-tiger`. Its services are reached at:
 | `nlp.<slug>.langwatch.localhost`        | NLP engine (Go)                                                             |
 | `clickhouse.<slug>.langwatch.localhost` | ClickHouse — this stack's own database                                      |
 
-The eight simulators (`mail`, `idp`, `storage`, `llm`, `voice`, `analytics`,
-`outbound`, `telemetry`) each serve a console at `<name>.<slug>.langwatch.localhost`.
-`mail`, `idp` and `storage` run by default; the rest need `haven up +<name>`.
+The nine simulators (`mail`, `idp`, `storage`, `llm`, `voice`, `analytics`,
+`outbound`, `payment`, `telemetry`) each serve a console at `<name>.<slug>.langwatch.localhost`.
+`mail`, `idp`, `storage`, `payment` and `telemetry` run by default; the rest need `haven up +<name>`.
 `haven logs <name>` reads any of them. `haven sims --json` is the agent's entry:
 one row per simulator with whether it runs in this stack, its console URL, the
 `haven up +<name>` it needs if off, its verbs and its skill. `telemetry` sends
@@ -230,6 +230,15 @@ Host header, so presigned URLs verify) and dummy S3 credentials, unless the
 environment already names `STORED_OBJECTS_BACKEND`, `S3_BUCKET_NAME`,
 `S3_ENDPOINT` or `LANGWATCH_LOCAL_STORAGE_PATH`: the root `.env` beats the
 overlay, so haven stays out of a storage choice rather than half-overriding it.
+
+payment — the Stripe stand-in (`services/paymentsim`) — runs by default, so no
+local or CI stack needs a Stripe account. Unless `.env` or the shell names
+`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` or `STRIPE_API_BASE`, the overlay
+points billing at it (`STRIPE_API_BASE=https://payment.<slug>.langwatch.localhost`,
+`sk_test_paymentsim`, `whsec_paymentsim`); with your own keys set, those are
+used. `haven up` prints `Stripe: paymentsim` or `Stripe: your key from .env`.
+`haven up -payment` drops the lane. The selection stores it as `"paymentsim"`:
+the old `"payment"` key, written as false while it was opt-in, is not read.
 Objects persist in `storage/<slug>/` under Haven's home.
 
 llm — the LLM provider stand-in (`services/llmsim`) — is opt-in: `haven up
@@ -522,6 +531,14 @@ haven env --json        # the same set, machine-readable
 haven status            # shows what the stack resolved to, no eval needed
 ```
 
+haven makes up the stack's credentials (`NEXTAUTH_SECRET`, `CREDENTIALS_SECRET`,
+`LANGWATCH_INSTANCE_ADMIN_API_KEY`, `HAVEN_SEED_SCIM_TOKEN`) per stack, in
+`<home>/credentials/<slug>.json`, and injects each one `.env` leaves unset;
+`haven destroy` forgets them. `haven seed` ends with what a tester needs: the
+app URL, the admin login, the org, team and project slugs, the project API
+key, the personal access token, the SCIM token and the instance admin key,
+masked unless `--reveal`, one JSON object with `--json`.
+
 Keeping it in memory is deliberate: a dotenv file was a copy of state haven
 already holds, sitting in the checkout with the stack's database URLs and local
 access tokens in it, going stale the moment the stack came down. `haven up`
@@ -715,7 +732,7 @@ The daemon's JSON, which the console reads:
   rather than letting a test model run as your own user. On macOS haven wants no
   colima: a development stack runs the worker on the host tier by default and
   `up` prints `Langy runs unsandboxed on this machine (macOS runs langyagent on
-  the host); set LANGY_UNSAFE_HOST_ACCESS=0 to run it sandboxed in colima`. The
+the host); set LANGY_UNSAFE_HOST_ACCESS=0 to run it sandboxed in colima`. The
   container tiers below stay as an explicit opt-in there. On the host tier haven
   also sets `LANGY_EGRESS_REQUIRE_TLS=false` in the langyagent environment (the
   worker reaches the manager's loopback relay over plain HTTP), and `up` builds the

@@ -6,6 +6,11 @@ import type {
   ModelProviderPlaygroundStatus,
 } from "@langwatch/model-provider-contract";
 import { nlpInternalSecretHeaders } from "@langwatch/process/nlp-internal-secret";
+import {
+  AggregateProjectIsReadOnlyError,
+  isAggregateProjectKind,
+  type ProjectApi,
+} from "@langwatch/project-contract";
 import { streamText, type ModelMessage } from "ai";
 
 import { getProjectModelProviders } from "../rules/legacy-model-provider.rules.ts";
@@ -20,33 +25,31 @@ type PlaygroundProvider = Readonly<{
 export class ModelProviderPlaygroundService {
   #credentialRefusals = new Map<string, { error: string }>();
   readonly #modelProviders: ModelProviderApi;
+  readonly #projects: ProjectApi;
   readonly #executionProxyBaseUrl: string;
   readonly #nlpInternalSecret: string | undefined;
 
-  private constructor(
-    modelProviders: ModelProviderApi,
-    executionProxyBaseUrl: string,
-    nlpInternalSecret: string | undefined,
-  ) {
-    this.#modelProviders = modelProviders;
-    this.#executionProxyBaseUrl = executionProxyBaseUrl;
-    this.#nlpInternalSecret = nlpInternalSecret;
+  private constructor(options: Parameters<typeof ModelProviderPlaygroundService.create>[0]) {
+    this.#modelProviders = options.modelProviders;
+    this.#projects = options.projects;
+    this.#executionProxyBaseUrl = options.executionProxyBaseUrl;
+    this.#nlpInternalSecret = options.nlpInternalSecret;
   }
 
   static create(options: {
     modelProviders: ModelProviderApi;
+    /** Asked the project's kind: an aggregate runs no completions (ADR-177 decision 8). */
+    projects: ProjectApi;
     executionProxyBaseUrl: string;
     /** The engine hop's shared credential, as the process resolved it. */
     nlpInternalSecret?: string | undefined;
   }): ModelProviderPlaygroundService {
-    return new ModelProviderPlaygroundService(
-      options.modelProviders,
-      options.executionProxyBaseUrl,
-      options.nlpInternalSecret,
-    );
+    return new ModelProviderPlaygroundService(options);
   }
 
   async execute(input: ModelProviderPlaygroundRequest): Promise<ModelProviderPlaygroundCompletion> {
+    const project = await this.#projects.findById(input.projectId);
+    if (isAggregateProjectKind(project?.kind)) throw new AggregateProjectIsReadOnlyError();
     const chosen = await this.#chooseProvider(input);
     if ("refusal" in chosen) return chosen.refusal;
 

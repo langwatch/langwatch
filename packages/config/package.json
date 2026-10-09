@@ -1,6 +1,5 @@
 {
   "name": "@langwatch/config",
-  "langwatch": { "group": "framework" },
   "version": "0.0.1",
   "private": true,
   "description": "Config as declared deployment facts: owners attach hand-written Zod leaves with env spellings where they are defined, and the app's one parse meets them, refusing by owner, path and variable name.",
@@ -37,5 +36,8 @@
     "@langwatch/vitest-config": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "langwatch": {
+    "group": "framework"
   }
 }

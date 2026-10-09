@@ -6,6 +6,7 @@
 import { createHmac } from "node:crypto";
 
 import { bindRestMiddleware, createRestRuntime } from "@langwatch/api/rest";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 
 import { SCIM_WEBHOOK_SIGNATURE_HEADER } from "../../rules/scim-webhook-signature.rules.ts";
@@ -57,6 +58,7 @@ function mount(options: { secret?: string | undefined } = {}) {
   });
 
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => {
         throw new Error("This family resolves its own credential.");

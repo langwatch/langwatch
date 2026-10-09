@@ -10,6 +10,7 @@ import type {
   OrganizationUser,
 } from "@langwatch/organization-contract";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
+import { NEVER_LANDED_ON_PROJECT_KINDS } from "@langwatch/project-contract";
 import { toDate, type Instant } from "@langwatch/time";
 
 import {
@@ -332,7 +333,11 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
 
   async findProjectSlugsForTeams({ teamIds }: { teamIds: string[] }): Promise<string[]> {
     const projects = await this.prisma.project.findMany({
-      where: { teamId: { in: teamIds }, archivedAt: null },
+      where: {
+        teamId: { in: teamIds },
+        archivedAt: null,
+        kind: { notIn: [...NEVER_LANDED_ON_PROJECT_KINDS] },
+      },
       select: { slug: true },
     });
 
@@ -345,7 +350,11 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
     organizationId: string;
   }): Promise<string[]> {
     const projects = await this.prisma.project.findMany({
-      where: { team: { organizationId, archivedAt: null }, archivedAt: null },
+      where: {
+        team: { organizationId, archivedAt: null },
+        archivedAt: null,
+        kind: { notIn: [...NEVER_LANDED_ON_PROJECT_KINDS] },
+      },
       select: { slug: true },
     });
 

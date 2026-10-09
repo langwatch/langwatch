@@ -26,15 +26,6 @@ import { toBatchSummaryResponse } from "../rules/simulation-batch-summary.rules.
 
 const logger = createLogger("langwatch:api:simulation-runs");
 
-/**
- * Platform's own address for ONE simulation run (opens in scenarioRunDetail drawer).
- * Type kept for createScenarioRunPlatformUrlBuilder (app.platformUrl resolves directly).
- */
-export type ScenarioRunPlatformUrlBuilder = (args: {
-  projectSlug: string;
-  scenarioRunId: string;
-}) => string;
-
 const notFoundResponse = {
   404: {
     description: "Not found",

@@ -2,6 +2,8 @@ package devscripts
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -10,18 +12,36 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
+	"syscall"
 	"time"
 )
 
 type buildTarget struct {
 	name, dir, entry string
 	needs            []string
+	// inputs are paths outside dir the build reads, besides its workspace deps.
+	inputs []string
 }
 
-// The packages that resolve a built `dist`; ksuid builds before mail.
+// sharedInputs are nx.json's sharedGlobals, which every build reads.
+var sharedInputs = []string{"tsconfig.base.json", "tsconfig.shared.json", "pnpm-workspace.yaml"}
+
+// The packages that resolve a built `dist`; ksuid builds before mail. The SDK's
+// inputs mirror its build inputs in nx.json, and a test holds them together.
 var buildTargets = []buildTarget{
-	{name: "langwatch", dir: "sdks/typescript", entry: "dist/index.mjs"},
+	{name: "langwatch", dir: "sdks/typescript", entry: "dist/index.mjs", inputs: []string{
+		"feature-map.json",
+		"skills",
+		"services/langevals/ts-integration/evaluators.generated.ts",
+		"modules/evaluator/contract/src/evaluators.native.ts",
+		"modules/model-provider/contract/src/catalog/model-catalog.json",
+		"modules/scenario/contract/src/evaluator-attachments.ts",
+		"modules/scenario/contract/src/suite-fields.ts",
+		"modules/trace/contract/src/trace-format.schemas.ts",
+		"packages/redaction/src",
+	}},
 	{name: "@langwatch/mcp-server", dir: "mcp/typescript", entry: "dist/index.js"},
 	{name: "@langwatch/ksuid", dir: "packages/ksuid", entry: "dist/index.d.ts"},
 	{name: "@langwatch/mail", dir: "packages/mail", entry: "dist/index.js", needs: []string{"@langwatch/ksuid"}},
@@ -31,35 +51,12 @@ const (
 	staleLock    = 10 * time.Minute
 	lockPolls    = 900
 	lockInterval = 200 * time.Millisecond
+	stampName    = ".ensure-built.stamp"
 )
 
-func mtime(path string) time.Time {
-	info, err := os.Stat(path)
-	if err != nil {
-		return time.Time{}
-	}
-	return info.ModTime()
-}
-
-func newestUnder(dir string) (time.Time, error) {
-	var newest time.Time
-	err := filepath.WalkDir(dir, func(path string, entry fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if !entry.Type().IsRegular() {
-			return nil
-		}
-		info, err := entry.Info()
-		if err != nil {
-			return nil
-		}
-		if info.ModTime().After(newest) {
-			newest = info.ModTime()
-		}
-		return nil
-	})
-	return newest, err
+// skippedNames are never build inputs: installs, outputs and caches.
+var skippedNames = map[string]bool{
+	"node_modules": true, "dist": true, ".tsup": true, ".turbo": true, ".nx": true, ".DS_Store": true,
 }
 
 func selectTargets(requested []string) ([]buildTarget, []string) {
@@ -99,89 +96,134 @@ func wantNeeds(wanted map[string]bool, name string) bool {
 	return found
 }
 
-func buildOne(root string, target buildTarget, stderr io.Writer) error {
+// inputPaths lists every path a target's build reads: its package, the shared
+// globals, its declared inputs, its needs and its workspace dependencies
+// (resolved through its node_modules links, as Node resolves them).
+func inputPaths(root string, target buildTarget) []string {
 	dir := filepath.Join(root, target.dir)
-	entry := filepath.Join(dir, target.entry)
-	newest, err := newestUnder(filepath.Join(dir, "src"))
+	paths := []string{dir}
+	for _, input := range slices.Concat(sharedInputs, target.inputs) {
+		paths = append(paths, filepath.Join(root, input))
+	}
+	for _, other := range buildTargets {
+		if slices.Contains(target.needs, other.name) {
+			paths = append(paths, filepath.Join(root, other.dir))
+		}
+	}
+	member, ok, err := readWorkspaceMember(dir)
+	if err != nil || !ok {
+		return paths
+	}
+	for _, name := range slices.Concat(member.Dependencies, member.DevDependencies) {
+		if real, err := filepath.EvalSymlinks(filepath.Join(dir, "node_modules", name)); err == nil {
+			paths = append(paths, real)
+		}
+	}
+	return paths
+}
+
+// inputHash hashes the path and content of every input file, so a touch that
+// changes nothing never forces a build.
+func inputHash(root string, target buildTarget) (string, error) {
+	sum := sha256.New()
+	for _, path := range inputPaths(root, target) {
+		err := filepath.WalkDir(path, func(file string, entry fs.DirEntry, err error) error {
+			if errors.Is(err, fs.ErrNotExist) {
+				return nil
+			}
+			if err != nil {
+				return err
+			}
+			if skippedNames[entry.Name()] && file != path {
+				if entry.IsDir() {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			if !entry.Type().IsRegular() {
+				return nil
+			}
+			data, err := os.ReadFile(file)
+			if err != nil {
+				return err
+			}
+			rel, _ := filepath.Rel(root, file)
+			fmt.Fprintf(sum, "%s\x00%d\x00", rel, len(data))
+			sum.Write(data)
+			return nil
+		})
+		if err != nil {
+			return "", err
+		}
+	}
+	return hex.EncodeToString(sum.Sum(nil)), nil
+}
+
+// stamp is what a build leaves: the input hash it was built from and the
+// built entry's mtime, so a dist rebuilt by anything else counts as stale.
+func stamp(root string, target buildTarget, hash string) string {
+	info, err := os.Stat(filepath.Join(root, target.dir, target.entry))
+	if err != nil {
+		return ""
+	}
+	return hash + " " + strconv.FormatInt(info.ModTime().UnixNano(), 10)
+}
+
+func stampPath(root string, target buildTarget) string {
+	return filepath.Join(root, target.dir, "node_modules", stampName)
+}
+
+// staleTargets returns each target whose dist is missing or was not built from
+// its inputs as they are now, with that input hash.
+func staleTargets(root string, selected []buildTarget) ([]buildTarget, []string, error) {
+	var stale []buildTarget
+	var hashes []string
+	for _, target := range selected {
+		hash, err := inputHash(root, target)
+		if err != nil {
+			return nil, nil, err
+		}
+		recorded, _ := os.ReadFile(stampPath(root, target))
+		if current := stamp(root, target, hash); current == "" || current != string(recorded) {
+			stale, hashes = append(stale, target), append(hashes, hash)
+		}
+	}
+	return stale, hashes, nil
+}
+
+// buildStale builds each stale target with its own build script, in target
+// order, and stamps it with the hash taken before the build began.
+func buildStale(root string, selected []buildTarget, stderr io.Writer) error {
+	stale, hashes, err := staleTargets(root, selected)
 	if err != nil {
 		return err
 	}
-	if mtime(entry).After(newest) {
-		return nil
+	for i, target := range stale {
+		start := time.Now()
+		fmt.Fprintf(stderr, "ensure-built: building %s (%s missing or stale)\n", target.name, target.entry)
+		args := []string{"--filter", target.name, "build"}
+		cmd := exec.CommandContext(context.Background(), "pnpm", args...)
+		cmd.Dir, cmd.Stdout, cmd.Stderr = root, os.Stdout, os.Stderr
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("pnpm %s: %w", strings.Join(args, " "), err)
+		}
+		path := stampPath(root, target)
+		_ = os.MkdirAll(filepath.Dir(path), 0o755)
+		if err := os.WriteFile(path, []byte(stamp(root, target, hashes[i])), 0o644); err != nil {
+			fmt.Fprintf(stderr, "ensure-built: could not stamp %s: %v\n", target.name, err)
+		}
+		fmt.Fprintf(stderr, "ensure-built: built %s in %s\n", target.name, time.Since(start).Round(100*time.Millisecond))
 	}
-	lock := filepath.Join(dir, "node_modules", ".ensure-built.lock")
-	if !acquireBuildLock(lock) {
-		return nil
-	}
-	defer os.RemoveAll(lock)
-	fmt.Fprintf(stderr, "ensure-built: building %s (%s missing or stale)\n", target.name, target.entry)
-	args := []string{"--filter", target.name, "build"}
-	cmd := exec.CommandContext(context.Background(), "pnpm", args...)
-	cmd.Dir, cmd.Stdout, cmd.Stderr = root, os.Stdout, os.Stderr
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("pnpm %s: %w", strings.Join(args, " "), err)
-	}
-	stampEntry(entry, target, stderr)
 	return nil
-}
-
-// acquireBuildLock takes the build lock, clearing a stale one first. When
-// another build holds it, it waits for that build and reports false.
-func acquireBuildLock(lock string) bool {
-	if info, err := os.Stat(lock); err == nil && time.Since(info.ModTime()) > staleLock {
-		_ = os.RemoveAll(lock)
-	}
-	if os.Mkdir(lock, 0o755) == nil {
-		return true
-	}
-	for i := 0; i < lockPolls && exists(lock); i++ {
-		time.Sleep(lockInterval)
-	}
-	return false
-}
-
-// stampEntry touches the built entry so its mtime passes the source's newest.
-func stampEntry(entry string, target buildTarget, stderr io.Writer) {
-	now := time.Now()
-	err := os.Chtimes(entry, now, now)
-	if err == nil {
-		return
-	}
-	reason := err.Error()
-	if errors.Is(err, fs.ErrNotExist) {
-		reason = "ENOENT: no such file or directory, utime '" + entry + "'"
-	}
-	fmt.Fprintf(stderr, "ensure-built: could not stamp %s: %s\n", target.entry, reason)
-}
-
-// buildWithNx hands the whole set to Nx, which hashes every input a build reads
-// (the SDK copies files from outside its package, which no mtime of src/ sees),
-// orders ksuid before mail through ^build, and restores a build any checkout
-// already made (ADR-150). Parallel predev hooks queue on one workspace lock.
-func buildWithNx(root string, selected []buildTarget, stderr io.Writer) int {
-	names := make([]string, 0, len(selected))
-	for _, target := range selected {
-		names = append(names, target.name)
-	}
-	defer lockWorkspace(filepath.Join(root, "node_modules", ".ensure-built.lock"))()
-	args := []string{"exec", "nx", "run-many", "-t", "build", "-p", strings.Join(names, ","), "--outputStyle=static"}
-	cmd := exec.CommandContext(context.Background(), "pnpm", args...)
-	cmd.Dir, cmd.Stdout, cmd.Stderr = root, os.Stdout, os.Stderr
-	if err := cmd.Run(); err != nil {
-		fmt.Fprintf(stderr, "ensure-built: pnpm %s: %v\n", strings.Join(args, " "), err)
-		return 1
-	}
-	return 0
 }
 
 // lockWorkspace waits for a holder to finish, clearing a lock a killed run left,
 // and returns the release; a lock it never took is left alone.
 func lockWorkspace(lock string) func() {
-	if info, err := os.Stat(lock); err == nil && time.Since(info.ModTime()) > staleLock {
-		_ = os.RemoveAll(lock)
-	}
+	_ = os.MkdirAll(filepath.Dir(lock), 0o755)
 	for i := 0; i < lockPolls; i++ {
-		if os.Mkdir(lock, 0o755) == nil {
+		clearStaleLock(lock)
+		if takeLock(lock) {
 			return func() { _ = os.RemoveAll(lock) }
 		}
 		time.Sleep(lockInterval)
@@ -189,23 +231,58 @@ func lockWorkspace(lock string) func() {
 	return func() {}
 }
 
-// EnsureBuilt builds each requested (default all) dist through Nx when the
-// workspace has it; without Nx, each that is missing or older than its sources,
-// one builder at a time per package.
+// takeLock creates the lock directory and records this process as its holder.
+func takeLock(lock string) bool {
+	if os.Mkdir(lock, 0o755) != nil {
+		return false
+	}
+	_ = os.WriteFile(filepath.Join(lock, "pid"), []byte(strconv.Itoa(os.Getpid())), 0o644)
+	return true
+}
+
+// clearStaleLock removes a lock older than staleLock or whose recorded holder
+// has exited, so a killed build never stalls the next one.
+func clearStaleLock(lock string) {
+	info, err := os.Stat(lock)
+	if err != nil {
+		return
+	}
+	if time.Since(info.ModTime()) > staleLock || !holderAlive(lock) {
+		_ = os.RemoveAll(lock)
+	}
+}
+
+// holderAlive reports whether the lock's recorded holder still runs; a lock
+// with no pid yet (just created) counts as held.
+func holderAlive(lock string) bool {
+	raw, err := os.ReadFile(filepath.Join(lock, "pid"))
+	if err != nil {
+		return true
+	}
+	pid, err := strconv.Atoi(strings.TrimSpace(string(raw)))
+	if err != nil {
+		return false
+	}
+	proc, err := os.FindProcess(pid)
+	return err == nil && proc.Signal(syscall.Signal(0)) == nil
+}
+
+// EnsureBuilt builds each requested (default all) dist whose inputs changed
+// since its last build. The fresh check takes no lock; a build re-checks under
+// the workspace lock, so parallel predev hooks build each package once.
 func EnsureBuilt(root string, requested []string, stderr io.Writer) int {
 	selected, unknown := selectTargets(requested)
 	if len(unknown) > 0 {
 		fmt.Fprintf(stderr, "ensure-built: no such target: %s\n", strings.Join(slices.Compact(unknown), ", "))
 		return 1
 	}
-	if exists(filepath.Join(root, "node_modules", ".bin", "nx")) {
-		return buildWithNx(root, selected, stderr)
+	if stale, _, err := staleTargets(root, selected); err == nil && len(stale) == 0 {
+		return 0
 	}
-	for _, target := range selected {
-		if err := buildOne(root, target, stderr); err != nil {
-			fmt.Fprintln(stderr, "ensure-built:", err)
-			return 1
-		}
+	defer lockWorkspace(filepath.Join(root, "node_modules", ".ensure-built.lock"))()
+	if err := buildStale(root, selected, stderr); err != nil {
+		fmt.Fprintln(stderr, "ensure-built:", err)
+		return 1
 	}
 	return 0
 }

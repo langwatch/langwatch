@@ -1,6 +1,6 @@
 /**
  * Annotation's answer to the port its screens declare: every method
- * projects a `@langwatch/browser-host` capability, so the module mounts it,
+ * projects a `@langwatch/browser-host` host service, so the module mounts it,
  * not the application. ARCHITECTURE.md §10.1.
  */
 
@@ -31,7 +31,7 @@ import {
 import { isOwnPersonalWorkspace } from "../model/annotation-personal-workspace.ts";
 import { annotationApi } from "./annotation-api.ts";
 
-class CapabilityAnnotationHost extends AnnotationHostApi {
+class HostServiceAnnotationHost extends AnnotationHostApi {
   constructor(
     private readonly deps: {
       organizationId: string | undefined;
@@ -151,7 +151,7 @@ export default function AnnotationHostMount({ children }: { children?: ReactNode
 
   const host = useMemo(
     () =>
-      new CapabilityAnnotationHost({
+      new HostServiceAnnotationHost({
         organizationId: organizationId ?? void 0,
         project: hostProject
           ? { id: hostProject.id, slug: hostProject.slug, name: hostProject.name }

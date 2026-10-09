@@ -17,7 +17,7 @@ import {
  * Only what this repository touches, so composition names the slice it needs
  * rather than the whole generated client.
  */
-export type ConnectedBillingDatabase = Pick<
+type ConnectedBillingDatabase = Pick<
   PrismaClient,
   | "connectedBillingAccount"
   | "connectedCreditGrant"
@@ -248,6 +248,50 @@ export class PrismaConnectedBillingRepository extends ConnectedBillingRepository
       const mapped = mapSeatChange(row);
       return mapped ? [mapped] : [];
     });
+  }
+
+  async fillSeatChangeOrganizations({
+    after,
+    limit,
+    dryRun,
+  }: {
+    after: string | null;
+    limit: number;
+    dryRun: boolean;
+  }): Promise<{ filled: number; lastLicenseRowId: string | null }> {
+    const rows = await this.prisma.connectedSeatChange.findMany({
+      where: {
+        organizationId: null,
+        accountId: { not: null },
+        ...(after === null ? {} : { licenseId: { gt: after } }),
+      },
+      orderBy: { licenseId: "asc" },
+      take: limit,
+      select: { licenseId: true, accountId: true },
+    });
+    const accountIds = rows.flatMap((row) => (row.accountId ? [row.accountId] : []));
+    const accounts = await this.prisma.connectedBillingAccount.findMany({
+      where: { id: { in: accountIds } },
+      select: { id: true, organizationId: true },
+    });
+    const owners = new Map(accounts.map((account) => [account.id, account.organizationId]));
+    let filled = 0;
+    for (const row of rows) {
+      const organizationId = row.accountId ? owners.get(row.accountId) : undefined;
+      if (!organizationId) continue;
+      if (dryRun) {
+        filled += 1;
+        continue;
+      }
+      // Guarded on null, so a row a writer named meanwhile is left as it stands.
+      const { count } = await this.prisma.connectedSeatChange.updateMany({
+        where: { licenseId: row.licenseId, organizationId: null },
+        data: { organizationId },
+      });
+      filled += count;
+    }
+
+    return { filled, lastLicenseRowId: rows.at(-1)?.licenseId ?? null };
   }
 
   async findAccountsForOrganizations(

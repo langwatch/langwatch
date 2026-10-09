@@ -1,6 +1,6 @@
 /**
  * Data Retention's answer to the port its screen declares: every method
- * projects a `@langwatch/browser-host` capability, so the module mounts it,
+ * projects a `@langwatch/browser-host` host service, so the module mounts it,
  * not the application. ARCHITECTURE.md §10.1.
  */
 
@@ -31,7 +31,7 @@ type RetentionHostReadings = {
   isEnterprise: boolean;
 };
 
-class CapabilityDataRetentionHost extends DataRetentionHostApi {
+class HostServiceDataRetentionHost extends DataRetentionHostApi {
   constructor(
     private readonly deps: {
       scope: RetentionHostScope;
@@ -127,7 +127,7 @@ export default function DataRetentionHostMount({ children }: { children?: ReactN
 
   const host = useMemo(
     () =>
-      new CapabilityDataRetentionHost({
+      new HostServiceDataRetentionHost({
         scope: {
           organizationId: organizationId ?? void 0,
           teamId,

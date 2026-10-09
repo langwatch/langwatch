@@ -9,6 +9,7 @@ import type {
 } from "@langwatch/trace-contract";
 import { safeUnflatten } from "@langwatch/trace-contract";
 
+import { computeSpanCost } from "../../span/rules/trace-span-cost-matching.rules.ts";
 import {
   extractContexts,
   extractError,
@@ -17,7 +18,6 @@ import {
   extractOutput,
   findVendor,
 } from "./legacy-span-attributes.rules.ts";
-import { computeSpanCost } from "../../span/rules/trace-span-cost-matching.rules.ts";
 
 /**
  * Coerces a value to a finite number or returns null.

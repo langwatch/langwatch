@@ -195,6 +195,7 @@ var PerWorktreeServices = []struct{ Name, Role string }{
 	{LLMService, "LLM providers (llmsim)"},
 	{AnalyticsService, "Product analytics (analyticssim)"},
 	{OutboundService, "Slack, webhooks and SQS (outboundsim)"},
+	{PaymentService, "Stripe (paymentsim)"},
 	{TelemetryService, "OTLP sender (telemetrysim)"},
 	{DesignSystemService, "Design system — Storybook"},
 	{MailRoomService, "Mail studio — transactional message preview"},
@@ -288,4 +289,10 @@ func (s Stack) Lanes() []Lane {
 // monolith, where the app lane is the API.
 func (s Stack) HealthProbeURL() string {
 	return fmt.Sprintf("http://127.0.0.1:%d/api/health", s.APIPort)
+}
+
+// ReadinessURL is the api's readiness probe, which answers 503 until the
+// upgrade ledger is current for its image and 200 after.
+func (s Stack) ReadinessURL() string {
+	return fmt.Sprintf("http://127.0.0.1:%d/readyz", s.APIPort)
 }

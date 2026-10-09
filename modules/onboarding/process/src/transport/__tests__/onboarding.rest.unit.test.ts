@@ -8,6 +8,7 @@ import {
   type OnboardingApi,
 } from "@langwatch/onboarding-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 
 import { onboardingRest, onboardingRestCredential } from "../onboarding.rest.ts";
@@ -24,6 +25,7 @@ function mount(options: { credential?: Credential; onboarding?: Partial<Onboardi
       : options.credential;
   const app = createApiFixture<OnboardingApi>(options.onboarding ?? {});
   const hono = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({
         actor: credential.userId ? { type: "user", id: credential.userId } : null,

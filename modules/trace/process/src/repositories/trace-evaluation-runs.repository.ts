@@ -1,3 +1,4 @@
+import type { Authorization } from "@langwatch/authorization";
 import type {
   EvaluationRunData,
   EvaluationSummary,
@@ -16,16 +17,31 @@ export abstract class TraceEvaluationRunsReadRepository {
     traceId: string;
   }): Promise<EvaluationRunData[]>;
 
-  /** The latest version of each run scheduled since `since`, grouped by trace. */
+  /** As `findRunsByTraceId`, read through the proof: a member is read only inside its grant (ADR-177). */
+  abstract findReadableRunsByTraceId(input: {
+    authorization: Authorization;
+    traceId: string;
+  }): Promise<EvaluationRunData[]>;
+
+  /**
+   * The latest version of each run scheduled since `since`, read through the proof (ADR-177
+   * block C). Each names the tenant it was read from: two members may hold the same trace id.
+   */
   abstract findSummariesByTraceIds(input: {
-    tenantId: string;
+    authorization: Authorization;
     traceIds: readonly string[];
     since: number;
-  }): Promise<Record<string, EvaluationSummary[]>>;
+  }): Promise<(EvaluationSummary & { tenantId: string })[]>;
 
   /** The latest version of each run against the traces; every asked trace has an entry. */
   abstract findTraceEvaluations(input: {
     tenantId: string;
+    traceIds: readonly string[];
+  }): Promise<Record<string, TraceEvaluationData[]>>;
+
+  /** As `findTraceEvaluations`, read through the proof: a member only inside its grant (ADR-177). */
+  abstract findReadableTraceEvaluations(input: {
+    authorization: Authorization;
     traceIds: readonly string[];
   }): Promise<Record<string, TraceEvaluationData[]>>;
 }

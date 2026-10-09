@@ -9,7 +9,6 @@ import { BROWSER_TEST_GLOB } from "./vitest-config.ts";
  * See dev/docs/best_practices/browser-test-lane.md for when to reach for it.
  */
 
-
 /** The npm script every package declaring the lane exposes. CI reads it. */
 export const BROWSER_TEST_SCRIPT = "test:browser";
 

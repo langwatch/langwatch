@@ -109,3 +109,20 @@ export const lwqlStatementSchema = z.object({
 });
 
 export type LangWatchQLStatementRequest = z.infer<typeof lwqlStatementSchema>;
+
+/**
+ * `POST /api/v1/query`'s body: a statement, optionally narrowed to one project the key reads.
+ * The workbench runs inside one project already, so only the key door accepts `projectId`.
+ */
+export const lwqlKeyStatementSchema = z.object({
+  ...lwqlStatementSchema.shape,
+  projectId: z
+    .string()
+    .min(1)
+    .optional()
+    .describe(
+      "Narrows the run to this one project, which the key must hold analytics:view on. Without it the run spans every project the key can read.",
+    ),
+});
+
+export type LangWatchQLKeyStatementRequest = z.infer<typeof lwqlKeyStatementSchema>;

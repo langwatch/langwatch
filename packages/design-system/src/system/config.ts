@@ -13,6 +13,9 @@ import { drawerSlotRecipe } from "./drawer.recipe.ts";
 // globals.scss. This file names the families, it does not fetch them.
 const interFontFamily = "'Inter', sans-serif";
 
+/** The site's display serif, self-hosted (apps/ui globals.scss): Langy's voice and the front door. */
+const displayFontFamily = '"Sentient", ui-serif, Georgia, "Times New Roman", serif';
+
 /** The face the product's small technical lines are set in. */
 const monoFontFamily =
   '"JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace';
@@ -89,6 +92,9 @@ export const designSystemConfig = defineConfig({
         },
         body: {
           value: interFontFamily,
+        },
+        display: {
+          value: displayFontFamily,
         },
         mono: {
           value: monoFontFamily,
@@ -752,6 +758,9 @@ export const designSystemConfig = defineConfig({
       badge: defineRecipe({
         base: {
           borderRadius: "lg",
+          maxWidth: "100%",
+          minWidth: 0,
+          overflow: "hidden",
         },
       }),
     },

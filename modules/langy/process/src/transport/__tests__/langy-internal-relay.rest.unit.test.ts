@@ -28,6 +28,7 @@ import type { ScenarioApi } from "@langwatch/scenario-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import type { UserApi } from "@langwatch/user-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
@@ -101,6 +102,7 @@ async function relayRoute() {
     channels: MemoryLangyChannels.create(),
   });
   const hono = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: app.internalDoor,
     doors: { internal_secret: app.internalDoor },
   }).mount(langyInternalRest.router(), {

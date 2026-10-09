@@ -273,6 +273,13 @@ Feature: Billing a connected self-hosted customer
     And the change is stored as not onboarded, so a later onboarding never invoices it
     And the Billing section tells the operator finance invoices the added seats by hand
 
+  @unit
+  Scenario: Seat changes recorded before they named their organization are filled in the background
+    Given seat changes stored before the organization column existed, naming only their billing account
+    When the background step billing:fill-seat-change-organizations runs
+    Then each names the organization its account belongs to, a batch at a time with a checkpoint
+    And a second run fills nothing, and a dry run writes nothing
+
   # ============================================================================
   # Monthly statement
   # ============================================================================

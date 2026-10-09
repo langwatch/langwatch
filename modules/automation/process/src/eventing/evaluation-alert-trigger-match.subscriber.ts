@@ -8,7 +8,7 @@ import type { AutomationEvaluationTriggerFilter } from "../services/automation-e
 
 const NOTIFY_TRIGGER_ACTIONS = new Set(["SEND_EMAIL", "SEND_SLACK_MESSAGE", "SEND_WEBHOOK"]);
 
-type EvaluationEvent = { occurredAt: number };
+type EvaluationEvent = { occurredAt: number; createdAt?: number };
 type EvaluationState = {
   status: string;
   traceId?: string | null;
@@ -41,7 +41,9 @@ export async function handleEvaluationAlertTriggerMatch(
   event: EvaluationEvent,
   context: { tenantId: string; state: EvaluationState },
 ): Promise<void> {
-  if (event.occurredAt < nowInstant().epochMilliseconds - 60 * 60 * 1000) return;
+  // Stale by processing time: a monitor evaluation's occurredAt is its span end (business time)
+  const processedAt = event.createdAt ?? event.occurredAt;
+  if (processedAt < nowInstant().epochMilliseconds - 60 * 60 * 1000) return;
   const evaluation = context.state;
   if (
     evaluation.status !== "processed" &&

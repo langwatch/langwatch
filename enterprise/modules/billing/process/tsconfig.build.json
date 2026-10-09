@@ -99,6 +99,9 @@
       "path": "../../../../modules/scenario/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../../packages/secrets/tsconfig.build.json"
+    },
+    {
       "path": "../../../../packages/task/tsconfig.build.json"
     },
     {

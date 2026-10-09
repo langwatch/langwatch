@@ -7,9 +7,9 @@ import { describe, expect, it, vi } from "vitest";
 
 import { TraceCanonicalisationService } from "#features/derivation/services/trace-canonicalisation.service";
 
+import { traceSummaryRow } from "../../../../../repositories/clickhouse/__tests__/support/trace-summary-row.support.ts";
 import type { TraceClickHouseClient } from "../../../../../repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
 import { TraceLegacyReadClickHouseRepository } from "../trace-legacy-read.repository.ts";
-import { traceSummaryRow } from "../../../../../repositories/clickhouse/__tests__/support/trace-summary-row.support.ts";
 
 const FILTER = {
   sql: "Attributes[{attrKey_0:String}] = {attrValue_1:String}",

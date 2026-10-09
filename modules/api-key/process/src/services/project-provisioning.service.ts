@@ -1,9 +1,16 @@
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
-import type { PaginatedProjects, Project, ProjectApi } from "@langwatch/project-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import {
+  projectKindsHiddenFrom,
+  type PaginatedProjects,
+  type Project,
+  type ProjectApi,
+} from "@langwatch/project-contract";
 
-/** The page a listing asks for, and the key whose reach cuts it. */
+/** The page a listing asks for, and the key (and its owner's role) whose reach cuts it. */
 export type VisibleProjectsQuery = Readonly<{
   apiKeyId: string;
+  userId: string | null;
   organizationId: string;
   page: number;
   limit: number;
@@ -34,6 +41,7 @@ export type ProvisionedProject = Readonly<{
 export class ProjectProvisioningService {
   static create(options: {
     apiKeys: Pick<ApiKeyApi, "create" | "resolveVisibleProjects">;
+    organizations: Pick<OrganizationApi, "isMember" | "getMember">;
     projects: Pick<ProjectApi, "createInOrganization" | "listByOrganization">;
   }): ProjectProvisioningService {
     return new ProjectProvisioningService(options);
@@ -56,8 +64,18 @@ export class ProjectProvisioningService {
       organizationId: input.organizationId,
       page: input.page,
       limit: input.limit,
+      hiddenKinds: projectKindsHiddenFrom(await this.#ownerRole(input)),
       ...(visible.kind === "some" ? { projectIds: visible.ids } : {}),
     });
+  }
+
+  /** The key owner's organisation role; a service key acts for nobody, so it has none. */
+  async #ownerRole(input: VisibleProjectsQuery): Promise<string | null> {
+    const { organizationId, userId } = input;
+    if (!userId || !(await this.options.organizations.isMember({ organizationId, userId }))) {
+      return null;
+    }
+    return (await this.options.organizations.getMember({ organizationId, userId })).role;
   }
 
   async provisionProject(input: ProjectProvisioningRequest): Promise<ProvisionedProject> {

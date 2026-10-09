@@ -5,6 +5,7 @@
  */
 import { createRestRuntime } from "@langwatch/api/rest";
 import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { RedisMcpOAuthClientRepository } from "../../repositories/redis/redis.mcp-oauth-client.repository.ts";
@@ -64,6 +65,7 @@ function harnessFor(options: { held: readonly string[]; approver?: McpApprover |
   });
 
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       identifyOptional: () =>
         approver ? { actor: { type: "user", id: approver.user.id }, scope: null } : null,

@@ -1,27 +1,32 @@
-import type {
-  FoldProjectionStore,
-  ProjectionStoreContext,
-  FoldStateRead,
+import {
+  type FoldProjectionStore,
+  type ProjectionStoreContext,
+  type FoldStateRead,
+  type FoldReadAuthorizer,
+  foldReadPurpose,
 } from "@langwatch/eventing";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 
 import type { TraceSummaryProjectionRepository } from "../repositories/trace-summary-projection.repository.ts";
 
 /**
- * Thin FoldProjectionStore adapter for trace summaries. Delegates directly to
- * TraceSummaryRepository — no mapper needed since the projection uses camelCase types.
+ * Thin FoldProjectionStore adapter for trace summaries; no mapper, the projection uses camelCase.
+ * Writes name the tenant from the context; the read is fenced by an own-only proof on that
+ * tenant from `authorize` (ADR-177 block C), so the fold reads back exactly the row it wrote.
  */
 export class TraceSummaryStore implements FoldProjectionStore<TraceSummaryData> {
   private constructor(
     private readonly storage: TraceSummaryProjectionRepository,
     private readonly defaultRetentionDays: () => number,
+    private readonly authorize: FoldReadAuthorizer,
   ) {}
 
   static create(options: {
     storage: TraceSummaryProjectionRepository;
     defaultRetentionDays: () => number;
+    authorize: FoldReadAuthorizer;
   }): TraceSummaryStore {
-    return new TraceSummaryStore(options.storage, options.defaultRetentionDays);
+    return new TraceSummaryStore(options.storage, options.defaultRetentionDays, options.authorize);
   }
 
   /**
@@ -71,7 +76,10 @@ export class TraceSummaryStore implements FoldProjectionStore<TraceSummaryData> 
     // by toYearWeek) prunes instead of cold-scanning. The EXECUTOR retries a
     // windowed miss without the window — correctness never depends on width.
     const folded = await this.storage.findByTraceId({
-      tenantId: String(context.tenantId),
+      authorization: await this.authorize({
+        projectId: String(context.tenantId),
+        purpose: foldReadPurpose({ context, entry: "TraceSummaryStore.get" }),
+      }),
       traceId: aggregateId,
       window: context.readWindow,
     });

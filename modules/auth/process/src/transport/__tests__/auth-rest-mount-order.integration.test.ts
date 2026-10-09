@@ -11,6 +11,7 @@ import {
   RestHost,
 } from "@langwatch/api/rest";
 import { moduleApi } from "@langwatch/module";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
@@ -62,6 +63,7 @@ function mountedInInstallOrder() {
   };
   const closed = BearerIdentity.create({ name: "unconfigured", token: void 0 });
   const host = RestHost.create({
+    authz: restTestAuthorization().forRequest(),
     identities: {
       project: closed,
       organization: closed,

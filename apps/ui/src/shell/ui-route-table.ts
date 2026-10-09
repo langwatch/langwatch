@@ -341,7 +341,6 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
           {
             path: "/settings/security",
             page: "pages/settings/security",
-            heading: "account",
           },
           {
             // Members, Teams, Groups and SCIM became the Directory and its tabs.
@@ -405,7 +404,6 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
           {
             path: "/settings/profile",
             page: "pages/settings/profile",
-            heading: "account",
           },
           {
             path: "/settings/scim",
@@ -536,12 +534,10 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
           {
             path: "/me",
             page: "pages/me/index",
-            heading: "account",
           },
           {
             path: "/me/configure",
             page: "pages/me/configure",
-            heading: "account",
           },
           {
             // The devices inventory moved into a tab of /me/configure, and this
@@ -556,12 +552,10 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
           {
             path: "/me/pull-requests",
             page: "pages/me/pull-requests",
-            heading: "account",
           },
           {
             path: "/me/sessions",
             page: "pages/me/sessions",
-            heading: "account",
           },
           {
             // Budget-increase request page that the CLI's `langwatch request-increase`
@@ -570,7 +564,6 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
             // budget-exceeded → request flow Ariana caught in dogfood.
             path: "/me/budget/request",
             page: "pages/me/budget/request",
-            heading: "account",
           },
 
           // AI Gateway: org-scoped admin pages live under /gateway/** at the top level,
@@ -919,10 +912,12 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
       },
       { path: "/ops/foundry", page: "pages/ops/foundry" },
       {
+        // Tenant migrations are a tab of the Upgrades page now.
         path: "/ops/migrations",
-        page: "pages/ops/migrations",
+        redirect: { from: "/ops/migrations", to: "/ops/upgrades", pinParams: { tab: "tenants" } },
       },
       { path: "/ops/upgrades", page: "pages/ops/upgrades" },
+      { path: "/ops/upgrades/preview", page: "pages/ops/upgrades/preview" },
       {
         path: "/ops/upgrades/releases/:release",
         page: "pages/ops/upgrades/releases/[release]",

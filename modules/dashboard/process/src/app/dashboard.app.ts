@@ -15,6 +15,7 @@ import {
   type LangWatchQLQueryResult,
   type LangWatchQLTimeWindow,
 } from "@langwatch/analytics-contract";
+import { assertProjectAcceptsWrites } from "@langwatch/authorization";
 import {
   AutomationApi,
   type AutomationApi as AutomationApiContract,
@@ -43,7 +44,11 @@ import {
   type DashboardServerConfig,
 } from "@langwatch/dashboard-contract";
 import type { FeatureSetup } from "@langwatch/process";
-import { ProjectApi, type ProjectApi as ProjectApiContract } from "@langwatch/project-contract";
+import {
+  isAggregateProjectKind,
+  ProjectApi,
+  type ProjectApi as ProjectApiContract,
+} from "@langwatch/project-contract";
 
 import type { DashboardRepositories } from "../repositories/dashboard.repositories.ts";
 import { dashboardPlatformUrl } from "../rules/dashboard-platform-url.rules.ts";
@@ -279,9 +284,29 @@ export class DashboardModule implements DashboardApi {
     return this.#dashboards.reorder(input);
   }
 
-  /** The viewer's first dashboard, created on demand. */
-  getOrCreateFirst(input: { projectId: string; viewer?: DashboardViewer }): Promise<Dashboard> {
-    return this.#dashboards.getOrCreateFirst(input);
+  /** The project's first dashboard, created on demand; none is created under an aggregate. */
+  async getOrCreateFirst(input: {
+    projectId: string;
+    viewer?: DashboardViewer;
+  }): Promise<Dashboard[]> {
+    return this.#dashboards.getOrCreateFirst({
+      ...input,
+      acceptsWrites: await this.#acceptsWrites(input.projectId),
+    });
+  }
+
+  /** ADR-177 decision 8: nothing is written under an aggregate's tenant. */
+  async #acceptsWrites(projectId: string): Promise<boolean> {
+    const project = await this.#projects.findById(projectId);
+
+    return !isAggregateProjectKind(project?.kind);
+  }
+
+  /** Saved-view writes sit under `traces:view`, which the door reads as a read, so ask here. */
+  async #refuseOnAggregate(projectId: string): Promise<void> {
+    const project = await this.#projects.findById(projectId);
+
+    assertProjectAcceptsWrites({ kind: project?.kind });
   }
 
   /** The member's stars (boards and templates) for this project, in their own order. */
@@ -289,29 +314,38 @@ export class DashboardModule implements DashboardApi {
     return this.#dashboards.listStarred(input);
   }
 
-  /** Stars a board or template for the member; appends at the end and is idempotent. */
-  star(input: {
+  /**
+   * Stars a board or template for the member; appends at the end and is idempotent.
+   * Star writes sit under `analytics:view`, so they ask the aggregate guard here too.
+   */
+  async star(input: {
     projectId: string;
     userId: string;
     star: DashboardStar;
   }): Promise<{ success: true }> {
+    await this.#refuseOnAggregate(input.projectId);
+
     return this.#dashboards.star(input);
   }
 
-  unstar(input: {
+  async unstar(input: {
     projectId: string;
     userId: string;
     star: DashboardStar;
   }): Promise<{ success: true }> {
+    await this.#refuseOnAggregate(input.projectId);
+
     return this.#dashboards.unstar(input);
   }
 
   /** Rewrites the member's star order from the stars given, in the order given. */
-  reorderStars(input: {
+  async reorderStars(input: {
     projectId: string;
     userId: string;
     stars: DashboardStar[];
   }): Promise<{ success: true }> {
+    await this.#refuseOnAggregate(input.projectId);
+
     return this.#dashboards.reorderStars(input);
   }
 
@@ -801,7 +835,7 @@ export class DashboardModule implements DashboardApi {
   // -- saved views -----------------------------------------------------------
 
   /** The project's shared views plus the caller's own personal ones. */
-  listSavedViews(input: {
+  async listSavedViews(input: {
     projectId: string;
     actorId: string;
     kind?: string;
@@ -809,12 +843,13 @@ export class DashboardModule implements DashboardApi {
     return this.#savedViews.getAll({
       projectId: input.projectId,
       userId: input.actorId,
+      acceptsWrites: await this.#acceptsWrites(input.projectId),
       ...(input.kind === undefined ? {} : { kind: input.kind }),
     });
   }
 
   /** A new view, shared with the project or personal to the caller. */
-  createSavedView(input: {
+  async createSavedView(input: {
     projectId: string;
     actorId: string;
     id?: string;
@@ -825,6 +860,8 @@ export class DashboardModule implements DashboardApi {
     personal: boolean;
     kind?: string;
   }): Promise<SavedView> {
+    await this.#refuseOnAggregate(input.projectId);
+
     return this.#savedViews.createView({
       projectId: input.projectId,
       input: {
@@ -840,11 +877,13 @@ export class DashboardModule implements DashboardApi {
   }
 
   /** Removes one view; a personal view only for the member who owns it. */
-  deleteSavedView(input: {
+  async deleteSavedView(input: {
     projectId: string;
     actorId: string;
     viewId: string;
   }): Promise<SavedView> {
+    await this.#refuseOnAggregate(input.projectId);
+
     return this.#savedViews.delete({
       projectId: input.projectId,
       viewId: input.viewId,
@@ -853,12 +892,14 @@ export class DashboardModule implements DashboardApi {
   }
 
   /** Renames one view, under the same ownership rule. */
-  renameSavedView(input: {
+  async renameSavedView(input: {
     projectId: string;
     actorId: string;
     viewId: string;
     name: string;
   }): Promise<SavedView> {
+    await this.#refuseOnAggregate(input.projectId);
+
     return this.#savedViews.rename({
       projectId: input.projectId,
       viewId: input.viewId,
@@ -868,11 +909,13 @@ export class DashboardModule implements DashboardApi {
   }
 
   /** The order the tab strip lists them in, under the same ownership rule. */
-  reorderSavedViews(input: {
+  async reorderSavedViews(input: {
     projectId: string;
     actorId: string;
     viewIds: string[];
   }): Promise<{ success: true }> {
+    await this.#refuseOnAggregate(input.projectId);
+
     return this.#savedViews.reorder({
       projectId: input.projectId,
       viewIds: input.viewIds,

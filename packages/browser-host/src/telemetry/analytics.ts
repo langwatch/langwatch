@@ -1,5 +1,5 @@
 /**
- * The one instrumentation capability — the browser twin of a channel
+ * The one instrumentation host service — the browser twin of a channel
  * (ARCHITECTURE.md §10.1). A module emits named events through it and never
  * imports posthog, gtag or a tracing SDK; the shell composes the destinations.
  */
@@ -69,7 +69,7 @@ class InertUiAnalytics extends UiAnalytics {
 export const INERT_UI_ANALYTICS: UiAnalytics = new InertUiAnalytics();
 
 /**
- * The analytics capability above this screen. A screen mounted outside the
+ * The analytics host service above this screen. A screen mounted outside the
  * shell reads the inert one rather than crashing, the same way
  * {@link useUiDeployment} degrades.
  */

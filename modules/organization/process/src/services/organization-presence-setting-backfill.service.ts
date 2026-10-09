@@ -11,7 +11,7 @@ type OrganizationPresenceSettingBackfillPeers = Readonly<{
   record: (input: { organizationId: string }) => Promise<boolean>;
 }>;
 
-export type OrganizationPresenceSettingBackfillReport = {
+type OrganizationPresenceSettingBackfillReport = {
   afterOrganizationId: string | null;
   organizations: number;
   recorded: number;

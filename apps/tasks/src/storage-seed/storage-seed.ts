@@ -7,6 +7,7 @@
 import { createHash, createHmac } from "node:crypto";
 
 import { API_KEY_PREFIX, INGEST_KEY_PREFIX } from "@langwatch/api-key-contract";
+import { AuthzApi } from "@langwatch/authz-contract";
 import { allowLoopbackVoiceProviders, Config, parseProcessConfig } from "@langwatch/config";
 import {
   DEFAULT_LICENSE_PUBLIC_KEY,
@@ -26,13 +27,15 @@ import { SecretsResolver } from "@langwatch/secrets";
 import { hash as hashPassword } from "bcrypt";
 
 import type { TaskInput } from "../config.ts";
+import { withTasksApp } from "../module-task.ts";
 import { resolveApiKeyPepper } from "./api-key-pepper.ts";
 import {
-  adminGrantBindings,
-  privateTokenGrantBinding,
-  publicTokenGrantBinding,
-  seedGrantBinding,
-  seedRoleProjection,
+  adminGrants,
+  attachSeedGrants,
+  privateTokenGrant,
+  publicTokenGrant,
+  type SeedGrant,
+  type SeedRole,
 } from "./seed-authz.ts";
 import { seedDemoPlatform } from "./seed-demo-platform.ts";
 import {
@@ -279,37 +282,39 @@ export async function storageSeed({ connections, chain, environment }: TaskInput
     update: { role: "ADMIN" },
   });
 
-  await prisma.roleBinding.deleteMany({
-    where: { organizationId: organization.id, userId: user.id },
-  });
-  for (const binding of adminGrantBindings({
-    organizationId: organization.id,
-    teamId: team.id,
-    userId: user.id,
-  })) {
-    await seedGrantBinding({ prisma, binding });
-  }
-
-  await seedToolUsers({
-    prisma,
-    environment,
-    hashedPassword,
-    organizationId: organization.id,
-    teamId: team.id,
-  });
+  const grants = adminGrants({ organizationId: organization.id, teamId: team.id, userId: user.id });
+  grants.push(
+    ...(await seedToolUsers({
+      prisma,
+      environment,
+      hashedPassword,
+      organizationId: organization.id,
+      teamId: team.id,
+    })),
+  );
 
   // The two ApiKey rows are the only seeded state that needs the pepper, so a
   // checkout without one still gets its organization, team, project and admin
   // login — it just cannot write a hash the applications would verify.
-  if (apiKeyPepper !== undefined) {
-    await seedAccessTokens({
-      prisma,
-      apiKeyPepper,
-      organizationId: organization.id,
-      projectId: project.id,
-      userId: user.id,
-    });
-  }
+  const tokens =
+    apiKeyPepper === undefined
+      ? { grants: [], roles: [] }
+      : await seedAccessTokens({
+          prisma,
+          apiKeyPepper,
+          organizationId: organization.id,
+          projectId: project.id,
+          userId: user.id,
+        });
+  await withTasksApp({
+    use: (app) =>
+      attachSeedGrants({
+        authz: app.service(AuthzApi),
+        organizationId: organization.id,
+        roles: tokens.roles,
+        grants: [...grants, ...tokens.grants],
+      }),
+  });
 
   // Default-model config at the organization scope so prompt-create +
   // workflow runs in e2e tests resolve a model without requiring CI to also
@@ -397,7 +402,7 @@ export async function storageSeed({ connections, chain, environment }: TaskInput
  * An organization-wide SCIM token under the pepper-free sha256 digest main's
  * older rows use, so it verifies whichever pepper the stack resolves.
  */
-/** Seeds each tool's own login, membership and admin grants beside the admin's. */
+/** Seeds each tool's own login and membership beside the admin's; answers their admin grants. */
 async function seedToolUsers({
   prisma,
   environment,
@@ -410,7 +415,8 @@ async function seedToolUsers({
   hashedPassword: string;
   organizationId: string;
   teamId: string;
-}): Promise<void> {
+}): Promise<SeedGrant[]> {
+  const grants: SeedGrant[] = [];
   for (const toolUser of TOOL_USERS) {
     const seeded = await prisma.user.upsert(
       buildAdminUserUpsertArgs({
@@ -446,21 +452,9 @@ async function seedToolUsers({
       create: { userId: seeded.id, teamId, role: "ADMIN" },
       update: { role: "ADMIN" },
     });
-    await prisma.roleBinding.deleteMany({
-      where: { organizationId, userId: seeded.id },
-    });
-    for (const binding of adminGrantBindings({
-      organizationId,
-      teamId,
-      userId: seeded.id,
-      ids: {
-        organization: `${toolUser.id}-organization-binding`,
-        team: `${toolUser.id}-team-binding`,
-      },
-    })) {
-      await seedGrantBinding({ prisma, binding });
-    }
+    grants.push(...adminGrants({ organizationId, teamId, userId: seeded.id }));
   }
+  return grants;
 }
 
 async function seedScimToken({
@@ -502,7 +496,7 @@ async function seedAccessTokens({
   organizationId: string;
   projectId: string;
   userId: string;
-}) {
+}): Promise<{ grants: SeedGrant[]; roles: SeedRole[] }> {
   // Private access token: sk-lw- full-access personal access token, owned by
   // the admin user, ORGANIZATION-scope ADMIN — the ApiKey-table equivalent of
   // a GitHub PAT.
@@ -525,13 +519,6 @@ async function seedAccessTokens({
       revokedAt: null,
     },
   });
-  await prisma.roleBinding.deleteMany({
-    where: { apiKeyId: privateApiKey.id },
-  });
-  await seedGrantBinding({
-    prisma,
-    binding: privateTokenGrantBinding({ organizationId, apiKeyId: privateApiKey.id }),
-  });
 
   // Public access token: ik-lw- ingestion-only token, PROJECT-scoped, CUSTOM
   // role restricted to traces:create — mirrors what ApiKeyService.create()
@@ -553,17 +540,6 @@ async function seedAccessTokens({
     },
     update: { permissions: ["traces:create"] },
   });
-  const roleProjected = await seedRoleProjection({
-    prisma,
-    role: {
-      id: ingestionRole.id,
-      organizationId,
-      name: PUBLIC_TOKEN_ROLE_NAME,
-      description: PUBLIC_TOKEN_ROLE_DESCRIPTION,
-      permissions: ["traces:create"],
-      kind: ROLE_KIND.SYSTEM_API_KEY,
-    },
-  });
   const publicApiKey = await prisma.apiKey.upsert({
     where: { lookupId: PUBLIC_TOKEN_LOOKUP_ID },
     create: {
@@ -581,18 +557,21 @@ async function seedAccessTokens({
       revokedAt: null,
     },
   });
-  await prisma.roleBinding.deleteMany({ where: { apiKeyId: publicApiKey.id } });
-  if (roleProjected) {
-    await seedGrantBinding({
-      prisma,
-      binding: publicTokenGrantBinding({
-        organizationId,
-        projectId,
-        apiKeyId: publicApiKey.id,
+  return {
+    roles: [
+      {
         roleId: ingestionRole.id,
-      }),
-    });
-  }
+        name: PUBLIC_TOKEN_ROLE_NAME,
+        description: PUBLIC_TOKEN_ROLE_DESCRIPTION,
+        permissions: ["traces:create"],
+        kind: ROLE_KIND.SYSTEM_API_KEY,
+      },
+    ],
+    grants: [
+      privateTokenGrant({ organizationId, apiKeyId: privateApiKey.id }),
+      publicTokenGrant({ projectId, apiKeyId: publicApiKey.id, roleId: ingestionRole.id }),
+    ],
+  };
 }
 
 // Model providers from the environment: for every registry provider whose

@@ -12,6 +12,7 @@ import {
 } from "@langwatch/api/rest";
 import type { AuthzAccessBinding } from "@langwatch/authz-contract";
 import { ROLE_KIND, type Role } from "@langwatch/role-contract";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
@@ -95,6 +96,7 @@ function world({
     };
   };
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       identify: ({ request }) => admit(request),
       authenticate: ({ request }) => admit(request),

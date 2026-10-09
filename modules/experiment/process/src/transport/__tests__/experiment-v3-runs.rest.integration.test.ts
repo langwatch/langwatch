@@ -16,6 +16,7 @@ import type { ExecutionSummary, Experiment, ExperimentRun } from "@langwatch/exp
 import { NotFoundError } from "@langwatch/handled-error";
 import { resolveRequestBound } from "@langwatch/plans";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -225,7 +226,10 @@ async function harness({
     }),
     authorize: () => ({ permitted: true, organizationRole: null }),
   };
-  const runtime = createRestRuntime({ identity });
+  const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
+    identity,
+  });
   const keyedFacts = [
     bindRestMiddleware(projectRestFacts, () => ({
       projectSlug: "acme",
@@ -252,6 +256,7 @@ async function harness({
   const legacyBrowser = browserFamily(experimentWorkbenchRunLegacyRest);
   // Every REST family the module declares, mounted in its declared order on the host.
   const host = RestHost.create({
+    authz: restTestAuthorization().forRequest(),
     identities: {
       project: identity,
       organization: identity,

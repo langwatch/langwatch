@@ -22,6 +22,8 @@ type options struct {
 	check    bool
 	only     string
 	manifest string
+	cpuprof  string
+	memprof  string
 	stdout   io.Writer
 	stderr   io.Writer
 }
@@ -36,6 +38,8 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	flags.BoolVar(&opts.check, "check", false, "exit 1 with a diff when a page is stale or undescribed")
 	flags.StringVar(&opts.only, "only", "", "only pages whose path starts with this prefix")
 	flags.StringVar(&opts.manifest, "manifest", "", "read the extractor manifest from this file instead of running node")
+	flags.StringVar(&opts.cpuprof, "cpuprofile", "", "write a CPU profile of the run to this file")
+	flags.StringVar(&opts.memprof, "memprofile", "", "write an allocation profile of the run to this file")
 	if err := flags.Parse(args); err != nil {
 		return 2
 	}
@@ -43,6 +47,12 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "readmegen: pass exactly one of --write or --check")
 		return 2
 	}
+	stop, err := startProfiles(opts)
+	if err != nil {
+		fmt.Fprintln(stderr, "readmegen:", err)
+		return 2
+	}
+	defer stop()
 	if err := run(context.Background(), opts); err != nil {
 		var stale errStale
 		if !errors.As(err, &stale) {

@@ -1,6 +1,6 @@
 ---
 name: sims
-description: "Map of LangWatch's local simulators and how they run: llmsim, mailsim, storagesim, analyticssim, idpsim, voicesim, outboundsim and telemetrysim, the haven sims lane, the single Go mono-binary (`service combined`), the ADR-160 consoles and load runs. Use when someone says 'which simulators are there', 'sims', 'run it locally at scale', 'load test the sims', 'haven up +llm', 'the sims lane', 'where is the sim console', 'add a simulator', or does not know which sim to use."
+description: "Map of LangWatch's local simulators and how they run: llmsim, mailsim, storagesim, analyticssim, idpsim, voicesim, outboundsim, paymentsim and telemetrysim, the haven sims lane, the single Go mono-binary (`service combined`), the ADR-160 consoles and load runs. Use when someone says 'which simulators are there', 'sims', 'run it locally at scale', 'load test the sims', 'haven up +llm', 'the sims lane', 'where is the sim console', 'add a simulator', or does not know which sim to use."
 user-invocable: true
 ---
 
@@ -25,6 +25,7 @@ built by Vite into the Go package's `web/dist` and embedded (ADR-160,
 | `voicesim`     | ElevenLabs voice, OpenAI audio                      | `+voice`     | `voicesim`                                 | `VOICESIM_SEED`        |
 | `telemetrysim` | OTLP senders (traces, logs, metrics, coding agents) | `+telemetry` | [`telemetrysim`](../telemetrysim/SKILL.md) | `--seed` per run       |
 | `outboundsim`  | Slack, webhook receivers, SQS                       | `+outbound`  | `outboundsim`                              | `OUTBOUNDSIM_SEED`     |
+| `paymentsim`   | Stripe (API, signed webhooks, meters)               | default      | `paymentsim`                               | `PAYMENTSIM_CATALOG`   |
 
 Each has a console at `<name>.<slug>.langwatch.localhost` (names: `llm`, `mail`, `storage`,
 `analytics`, `idp`, `voice`, `outbound`, `telemetry`) and logs via `haven logs <name>`. `haven up +llm +analytics`
@@ -42,7 +43,7 @@ Chakra, no product design system.
   gateway. `haven restart sims` bounces them all. `haven logs <name>` still reads each.
 - A checkout whose mono-binary has no `combined` subcommand, or a monolith build, runs
   haven's bundled copy of each sim as one lane each (`haven simulator <name>`, hidden).
-- Without haven: `make service svc=combined args="mailsim storagesim llmsim analyticssim voicesim idpsim telemetrysim outboundsim"`,
+- Without haven: `make service svc=combined args="mailsim storagesim llmsim analyticssim voicesim idpsim telemetrysim outboundsim paymentsim"`,
   or one sim: `make service svc=<name>`. `make service-watch svc=<name>` adds air reload.
   `make service` builds the console bundle first; a binary without it serves a one-line
   page naming the build command.
@@ -77,4 +78,5 @@ Every console action has a verb (`--json` on reads, non-zero exit on failure, `-
 | voice     | `haven voice status\|calls\|call <id>\|clear`                                                                         |
 | telemetry | `haven telemetry send\|load\|fuzz\|status\|stop`                                                                      |
 | outbound  | `haven outbound status\|records\|deliveries\|wait --channel\|fault add\|list\|clear\|receiver set\|urls\|clear`       |
+| payment   | `haven payment status\|events\|usage\|advance --seconds\|fail --customer\|deliver --ids\|hold\|release\|reset` |
 | idp       | `haven idp tenants\|tenant show\|apps add\|populate\|churn\|scim ...\|signin\|reset` (full list: `haven sims --json`) |

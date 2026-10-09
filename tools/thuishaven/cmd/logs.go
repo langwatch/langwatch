@@ -65,7 +65,7 @@ func apiLaneFile(available map[string]bool) string {
 // goLaneSimulators are the simulators a go.work checkout's sims lane hosts
 // (cmd/service/combined_dev.go), or its go lane on an older haven. They have
 // no capture of their own, so `haven logs idp` reads that lane's lines.
-var goLaneSimulators = []string{"idp", "mail", "storage", "voice", "llm", "analytics", "outbound", "telemetry"}
+var goLaneSimulators = []string{"idp", "mail", "storage", "voice", "llm", "analytics", "outbound", "payment", "telemetry"}
 
 // logSource is one selected view: a capture file, the CLI name its lines are
 // labeled with, and — for one application of a shared lane — the application a
@@ -101,7 +101,7 @@ var logServiceColors = map[string]string{
 	// The single Node lane of a monolith checkout, in the ui lane's color:
 	// it is the same half of the stack, in one process instead of two.
 	"app":           "34",
-	"design-system": "96", "mail-room": "95", "idp": "92", "mail": "94", "storage": "36", "voice": "93", "llm": "35", "analytics": "33", "outbound": "90", "telemetry": "91",
+	"design-system": "96", "mail-room": "95", "idp": "92", "mail": "94", "storage": "36", "voice": "93", "llm": "35", "analytics": "33", "outbound": "90", "payment": "32", "telemetry": "91",
 	// Earlier lane names. A log file written before the local topology changed
 	// still reads in its own color rather than falling to plain text.
 	"backend": "32", "workers": "32", "gateway": "33", "nlp": "36",

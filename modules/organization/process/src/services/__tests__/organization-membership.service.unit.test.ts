@@ -23,6 +23,7 @@ const mockInvalidateOrganization = vi.fn();
 const mockCheckLimit = vi.fn();
 const mockAssertRoleChangeAllowed = vi.fn();
 const mockMemberDisabled = vi.fn();
+const mockMemberEnabled = vi.fn();
 const mockCreateAndAssign = vi.fn();
 const mockGetProvisioningSummaryById = vi.fn();
 const mockStandingFor = vi.fn<OrganizationTestArrivals["standingFor"]>(async () => ({
@@ -86,6 +87,7 @@ describe("OrganizationMembershipService", () => {
   };
   const seatNotices: OrganizationSeatRevocationNotice = {
     memberDisabled: mockMemberDisabled,
+    memberEnabled: mockMemberEnabled,
   };
   const grantCache: OrganizationGrantCache = {
     invalidateOrganization: mockInvalidateOrganization,
@@ -119,6 +121,7 @@ describe("OrganizationMembershipService", () => {
     vi.mocked(mockRepo.deleteMember).mockResolvedValue([]);
     service = OrganizationMembershipService.create({
       workspaceNotices: { personalWorkspaceArchived },
+      memberNotices: { memberRemoved: async () => {}, memberDepartmentChanged: async () => {} },
       repository: mockRepo,
       creations: mockCreations,
       seats,
@@ -488,6 +491,7 @@ describe("OrganizationMembershipService", () => {
     const refusing = () =>
       OrganizationMembershipService.create({
         workspaceNotices: { personalWorkspaceArchived },
+        memberNotices: { memberRemoved: async () => {}, memberDepartmentChanged: async () => {} },
         repository: mockRepo,
         creations: mockCreations,
         seats,
@@ -799,16 +803,48 @@ describe("OrganizationMembershipService", () => {
         expect(mockMemberDisabled).not.toHaveBeenCalled();
       });
 
+      /** @scenario "Re-enabling a member records that their seat was given back" */
+      it("records the member as re-enabled after the membership write", async () => {
+        vi.mocked(mockRepo.getMembership).mockResolvedValue({
+          ...activeMember,
+          disabledAt: Temporal.Instant.from("2026-08-01T00:00:00Z"),
+        });
+        mockCheckLimit.mockResolvedValue({
+          allowed: true,
+          limitType: "members",
+          current: 1,
+          max: 5,
+        });
+
+        await service.setMemberDisabled({
+          organizationId: "org-123",
+          userId: "user-456",
+          disabled: false,
+          actingUser: { id: "admin-789" },
+        });
+
+        expect(vi.mocked(mockRepo.setMemberDisabled).mock.invocationCallOrder[0]).toBeLessThan(
+          mockMemberEnabled.mock.invocationCallOrder[0] ?? 0,
+        );
+        expect(mockMemberEnabled).toHaveBeenCalledWith({
+          organizationId: "org-123",
+          userId: "user-456",
+          enabledByUserId: "admin-789",
+        });
+      });
+
       /** @scenario "A process that cannot record the seat revocation refuses the disable" */
       it("refuses the disable when the revocation cannot be recorded", async () => {
         const unrecorded = OrganizationMembershipService.create({
           workspaceNotices: { personalWorkspaceArchived },
+          memberNotices: { memberRemoved: async () => {}, memberDepartmentChanged: async () => {} },
           repository: mockRepo,
           creations: mockCreations,
           seats,
           seatNotices: {
             memberDisabled: () =>
               Promise.reject(new Error("organization_lifecycle is not registered in this process")),
+            memberEnabled: async () => {},
           },
           grantCache,
           testArrivals,

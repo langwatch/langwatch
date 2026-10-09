@@ -15,6 +15,7 @@ import { defineProcessModule, type PublishedProcessModule } from "@langwatch/pro
 import { defineProjectionReplayStep } from "@langwatch/upgrade/step";
 
 import { ScimModule } from "./app/scim.app.ts";
+import { scimChannels } from "./channels/scim-channels.registry.ts";
 import { scimCostCenterEventing } from "./eventing/scim-cost-center.pipeline.ts";
 import { scimDirectoryEventing } from "./eventing/scim-directory.pipeline.ts";
 import {
@@ -36,6 +37,7 @@ import { scimWebhookDelivery, scimWebhookRest } from "./transport/scim-webhook.r
 export const scimProcessModule: PublishedProcessModule<"scim", ScimApi, ScimServerConfig> =
   defineProcessModule("scim")
     .withRepositories(scimRepositories)
+    .withChannels(scimChannels)
     .withApi(ScimModule)
     .withTransports(
       scimTokenRest,

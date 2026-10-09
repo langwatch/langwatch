@@ -5,7 +5,7 @@
 import type { UiFailureNotice, UiSuccessNotice } from "./capabilities.ts";
 
 /**
- * Whatever answers a report — the application's feedback capability, or a
+ * Whatever answers a report — the application's feedback host service, or a
  * feature host that already answers the same two questions.
  */
 export type UiFeedbackSink = {

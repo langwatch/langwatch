@@ -5,6 +5,7 @@
  */
 
 import type { LangWatchQLRunCaller } from "@langwatch/analytics-contract";
+import { type Actor, type Authorization, PermissionDeniedError } from "@langwatch/authorization";
 import {
   type InstantEvalActor,
   type InstantEvalJudgmentStatus,
@@ -41,6 +42,7 @@ import type {
   AcceptedInstantEvalStatement,
   InstantEvalStatementService,
 } from "./instant-eval-statement.service.ts";
+import type { InstantEvalTraceProofService } from "./instant-eval-trace-proof.service.ts";
 
 const logger = createLogger("langwatch:instant-eval:run");
 
@@ -79,6 +81,7 @@ export interface InstantEvalRunPeers {
    */
   selectTraceIds?(input: {
     projectId: string;
+    authorization: Authorization;
     filter: string;
     window: { from: number; to: number };
     limit: number;
@@ -106,6 +109,8 @@ interface InstantEvalRunUnits {
     InstantEvalFreeBudgetService,
     "standing" | "assertWithinBudget" | "reserve" | "release"
   >;
+  /** The asker's traces:view proof a filter's selection is read under. */
+  proofs: Pick<InstantEvalTraceProofService, "mint">;
 }
 
 export class InstantEvalRunService {
@@ -142,7 +147,7 @@ export class InstantEvalRunService {
     // Before the statement is accepted, so an organization past its budget is
     // told so without the probe reading anything on its behalf.
     await this.units.budget.assertWithinBudget({ projectId });
-    const accepted = await this.#accept({ projectId, caller, input, rowLimit });
+    const accepted = await this.#accept({ projectId, actor, caller, input, rowLimit });
     const runId = this.units.creates.nextRunId();
     await this.#reserve({ projectId, caller, accepted, rowLimit, runId });
 
@@ -175,7 +180,7 @@ export class InstantEvalRunService {
     const estimate = await this.units.estimates.estimateRun({
       caller: caller.project,
       protections: caller.protections,
-      accepted: await this.#accept({ projectId, caller, input, rowLimit }),
+      accepted: await this.#accept({ projectId, actor, caller, input, rowLimit }),
       rowLimit,
     });
     // An estimate is never refused by the budget: it judges nothing, and a
@@ -342,16 +347,18 @@ export class InstantEvalRunService {
   /** The statement this request means, cleared for running. */
   async #accept({
     projectId,
+    actor,
     caller,
     input,
     rowLimit,
   }: {
     projectId: string;
+    actor: InstantEvalActor;
     caller: LangWatchQLRunCaller;
     input: InstantEvalRunInput;
     rowLimit: number;
   }): Promise<AcceptedInstantEvalStatement> {
-    const statement = await this.#statementFor({ projectId, input, rowLimit });
+    const statement = await this.#statementFor({ projectId, actor, input, rowLimit });
 
     return this.units.statements.accept({
       caller: caller.project,
@@ -363,10 +370,12 @@ export class InstantEvalRunService {
 
   async #statementFor({
     projectId,
+    actor,
     input,
     rowLimit,
   }: {
     projectId: string;
+    actor: InstantEvalActor;
     input: InstantEvalRunInput;
     rowLimit: number;
   }): Promise<InstantEvalStatement> {
@@ -377,7 +386,7 @@ export class InstantEvalRunService {
     if (!peers.compileFilter) {
       return instantEvalStatementFor({
         ...base,
-        selection: await this.#selectionFor({ projectId, input, filter, rowLimit }),
+        selection: await this.#selectionFor({ projectId, actor, input, filter, rowLimit }),
       });
     }
 
@@ -402,7 +411,7 @@ export class InstantEvalRunService {
         }
         return instantEvalStatementFor({
           ...base,
-          selection: await this.#selectionFor({ projectId, input, filter, rowLimit }),
+          selection: await this.#selectionFor({ projectId, actor, input, filter, rowLimit }),
         });
     }
   }
@@ -417,11 +426,13 @@ export class InstantEvalRunService {
   /** The trace ids a target's filter selects, resolved by the explorer's own compiler. */
   async #selectionFor({
     projectId,
+    actor,
     input,
     filter,
     rowLimit,
   }: {
     projectId: string;
+    actor: InstantEvalActor;
     input: InstantEvalRunInput;
     filter: string;
     rowLimit: number;
@@ -437,8 +448,15 @@ export class InstantEvalRunService {
     }
     const window = instantEvalShorthandWindow({ shorthand, now: this.now() });
 
+    const authorization = await this.units.proofs.mint({
+      projectId,
+      actor: proofActorOf({ projectId, actor }),
+      route: "instantEval.runs",
+    });
+
     return this.peers.selectTraceIds({
       projectId,
+      authorization,
       filter,
       window: { from: window.start.epochMilliseconds, to: window.end.epochMilliseconds },
       limit: rowLimit,
@@ -493,4 +511,15 @@ export class InstantEvalRunService {
       );
     }
   }
+}
+
+/** Who a selection's proof is minted for: the member, or the door's actor (ruling IE-KEY-ACTOR). */
+function proofActorOf({ projectId, actor }: { projectId: string; actor: InstantEvalActor }): Actor {
+  if (actor.kind === "member") return { type: "user", id: actor.userId };
+  if (actor.actor) return actor.actor;
+  throw new PermissionDeniedError({
+    permission: "traces:view",
+    scope: { type: "project", id: projectId },
+    denialReason: "no-grant",
+  });
 }

@@ -3,11 +3,14 @@ import type { OnboardingVariant } from "@langwatch/onboarding-contract";
 import type { Instant } from "@langwatch/time";
 import { z } from "zod";
 
+import { aggregateRuleSchema } from "./project.aggregate-rule.ts";
+
 export const PROJECT_FEATURE_ID = "project" as const;
 
 export const PROJECT_KIND = {
   APPLICATION: "application",
   INTERNAL_GOVERNANCE: "internal_governance",
+  AGGREGATE: "aggregate",
 } as const;
 
 export const projectKindSchema = z.enum(PROJECT_KIND);
@@ -75,6 +78,8 @@ export const projectSchema = z
     ownerUserId: z.string().nullable(),
     personalFeatures: projectJsonValueSchema,
     departmentId: z.string().nullable(),
+    /** ADR-177: an aggregate's stored rule; optional so fixtures predating it still parse. */
+    aggregateRule: projectJsonValueSchema.nullable().optional(),
     langyEgressAllowlist: projectJsonValueSchema.nullable(),
     lastCodingAgentSessionAt: z.date().nullable(),
     lastCodingAgentPullRequestAt: z.date().nullable(),
@@ -133,6 +138,10 @@ export const createProjectInputSchema = z
     framework: z.string(),
     teamId: z.string().min(1),
     apiKey: z.string(),
+    /** Omitted means the column default, `"application"`. */
+    kind: projectKindSchema.optional(),
+    /** ADR-177: set only on an aggregate project, already validated. */
+    aggregateRule: aggregateRuleSchema.optional(),
   })
   .strict();
 export type CreateProjectInput = z.infer<typeof createProjectInputSchema>;
@@ -144,6 +153,7 @@ export const projectPaginationSchema = z
     limit: z.number().int().positive(),
     projectIds: z.array(z.string().min(1)).optional(),
     includeGovernance: z.boolean().optional(),
+    hiddenKinds: z.array(projectKindSchema).optional(),
   })
   .strict();
 export type ProjectPaginationInput = z.infer<typeof projectPaginationSchema>;
@@ -191,6 +201,8 @@ export const projectIdentitySchema = z
     isPersonal: z.boolean(),
     /** That person, when the workspace is personal. */
     ownerUserId: z.string().min(1).nullable(),
+    /** ADR-177: the door refuses every credential presented for an aggregate. */
+    kind: z.string().min(1),
   })
   .strict();
 export type ProjectIdentity = z.infer<typeof projectIdentitySchema>;
@@ -222,6 +234,7 @@ export const traceDestinationProjectSchema = z
     id: z.string().min(1),
     teamId: z.string().min(1),
     archivedAt: z.date().nullable(),
+    kind: z.string(),
   })
   .strict();
 export type TraceDestinationProject = z.infer<typeof traceDestinationProjectSchema>;

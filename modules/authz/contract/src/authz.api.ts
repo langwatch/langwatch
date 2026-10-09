@@ -1,4 +1,7 @@
 import type {
+  Actor,
+  Authorization,
+  AuthorizationPurpose,
   AuthzGetDecisionInput,
   AuthzGetProjectAnyDecisionInput,
   AuthzPermission,
@@ -59,11 +62,23 @@ export interface AuthzApi {
   check(args: Queries.AuthzCheckInput): Promise<AuthzDecision>;
   checkDetailed(args: Queries.AuthzCheckInput): Promise<Queries.AuthzCheckDetailedOutput>;
   can(args: Queries.AuthzCanInput): Promise<boolean>;
+  /**
+   * With `proof` on a project scope, also mints the sealed `Authorization` its reads carry
+   * (ADR-166, ADR-177 block B); `authorization` is null everywhere else.
+   */
   authorize<Tier extends DeclaredScopeTier, Permission extends AuthzPermission>(args: {
     principal: AuthzPrincipalRef;
     permission: Permission;
     scope: Extract<AuthzScopeRef, { type: Tier }>;
-  }): Promise<Authorized<Tier, Permission>>;
+    proof?: Readonly<{ actor: Actor; purpose: AuthorizationPurpose }>;
+  }): Promise<Authorized<Tier, Permission> & Readonly<{ authorization: Authorization | null }>>;
+  /** The own-only proof platform code reads its own project with (ADR-177); evaluates nothing. */
+  authorizeInternal(args: {
+    actor: Extract<Actor, { type: "internal" | "system" }>;
+    projectId: string;
+    permission: AuthzPermission;
+    purpose: AuthorizationPurpose;
+  }): Promise<Authorization>;
   effectivePermissions(
     args: Queries.AuthzEffectivePermissionsInput,
   ): Promise<Queries.AuthzEffectivePermissionsOutput>;
@@ -162,6 +177,18 @@ export interface AuthzApi {
   revokeResourceGrants(
     args: Commands.AuthzRevokeResourceGrantsInput,
   ): Promise<Commands.AuthzRevokeResourceGrantsOutput>;
+  /** The live shared reads (ADR-177) one reader project holds, one per member project. */
+  findLiveSharedProjectGrants(
+    args: Commands.AuthzFindLiveSharedProjectGrantsInput,
+  ): Promise<Commands.AuthzSharedProjectGrant[]>;
+  /** A `project-reader` grant from reader to member carrying `condition`; idempotent per pair. */
+  attachSharedProjectGrant(
+    args: Commands.AuthzAttachSharedProjectGrantInput,
+  ): Promise<Commands.AuthzAttachSharedProjectGrantOutput>;
+  /** One read-your-writes wait for shared reads attached with `awaitProjection: false`. */
+  awaitSharedProjectGrants(args: Commands.AuthzAwaitSharedProjectGrantsInput): Promise<void>;
+  /** Revokes a reader's live shared reads (all, or those on `memberProjectIds`); answers ids. */
+  revokeSharedProjectGrants(args: Commands.AuthzRevokeSharedProjectGrantsInput): Promise<string[]>;
   changeBindingRole(
     args: Commands.AuthzChangeBindingRoleInput,
   ): Promise<Commands.AuthzChangeBindingRoleOutput>;

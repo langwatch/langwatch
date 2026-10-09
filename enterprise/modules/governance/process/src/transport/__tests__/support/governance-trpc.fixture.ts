@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 import { initTRPC } from "@trpc/server";
 
 export type GovernanceTrpcTestContext = { actor: { id: string; impersonatorId?: string } };
@@ -16,6 +17,7 @@ export function governanceTrpcMembers({
     identity: { caller: (ctx) => ({ actor: { type: "user", ...ctx.actor } }) },
     authorization: {
       forRequest: () => ({
+        ...testAuthorizeDefaults,
         getDecision: async ({ permission, scope }) => {
           asked.push(permission);
           return { permitted: permits(permission, scope), organizationRole: null };

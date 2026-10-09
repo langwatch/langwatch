@@ -100,21 +100,21 @@ function setGraphicsQualityFromMenu(value: string): void {
 export function UiNavigationHost({
   children,
   commandBar = false,
-  capabilities,
+  rootHostServices,
   process,
 }: {
   children: ReactNode;
   /** The process owner's slice, handed down by the chrome. */
   process: ProcessWebConfig;
   /** Auth's session and organization's scope, loaded before the shell rendered. */
-  capabilities: UiRootHostServices;
+  rootHostServices: UiRootHostServices;
   /**
    * Whether this mount carries the search palette — a singleton (one
    * document, one Cmd+K), so only the chrome layout route asks for it.
    */
   commandBar?: boolean;
 }) {
-  const { host, failure } = useNavigationHostReading({ commandBar, capabilities, process });
+  const { host, failure } = useNavigationHostReading({ commandBar, rootHostServices, process });
 
   if (failure.departing) return <LoadingScreen />;
   if (failure.copy) {
@@ -126,8 +126,8 @@ export function UiNavigationHost({
     );
   }
 
-  const { NavigationHostProvider } = capabilities.navigationHost;
-  const { CommandBarProvider } = capabilities.commandBar;
+  const { NavigationHostProvider } = rootHostServices.navigationHost;
+  const { CommandBarProvider } = rootHostServices.commandBar;
   return (
     <NavigationHostProvider value={host}>
       {commandBar ? <CommandBarProvider>{children}</CommandBarProvider> : children}
@@ -137,9 +137,9 @@ export function UiNavigationHost({
 
 function useNavigationHostReading({
   commandBar,
-  capabilities: {
+  rootHostServices: {
     session: auth,
-    scope: scopeCapability,
+    scope: scopeHostService,
     organizationFacts,
     navigationHost,
     commandBar: palette,
@@ -150,19 +150,19 @@ function useNavigationHostReading({
   process,
 }: {
   commandBar: boolean;
-  capabilities: UiRootHostServices;
+  rootHostServices: UiRootHostServices;
   process: ProcessWebConfig;
 }) {
   const { session, navigation, documentTitle, route } = useUiHostServices();
   const activeScope = useUiScope().activeScope();
-  const memory = scopeCapability.useUiScopeMemory();
+  const memory = scopeHostService.useUiScopeMemory();
   const facts = organizationFacts.useUiOrganizationFacts();
-  const routeReading = scopeCapability.useUiRouteReading();
+  const routeReading = scopeHostService.useUiRouteReading();
   const address = useUiAddress();
   const rpc = useUiRpc();
   const { openDrawer } = useDrawer();
 
-  const organizations = scopeCapability.useUiOrganizations({
+  const organizations = scopeHostService.useUiOrganizations({
     transport: rpc,
     isDemo: false,
     enabled: true,
@@ -187,8 +187,10 @@ function useNavigationHostReading({
   );
   const organizationRole = useMemo(
     () =>
-      scopeCapability.organizationRoleOf(read.find((one) => one.id === activeScope.organizationId)),
-    [read, activeScope.organizationId, scopeCapability],
+      scopeHostService.organizationRoleOf(
+        read.find((one) => one.id === activeScope.organizationId),
+      ),
+    [read, activeScope.organizationId, scopeHostService],
   );
   const team = useMemo(
     () => teamHoldingProject(graph, activeScope.projectId),
@@ -210,9 +212,9 @@ function useNavigationHostReading({
         organization,
         userId: currentUser?.id,
         organizationRole,
-        teamRules: scopeCapability,
+        teamRules: scopeHostService,
       }),
-    [organization, currentUser?.id, organizationRole, scopeCapability],
+    [organization, currentUser?.id, organizationRole, scopeHostService],
   );
 
   const uiDeployment = useUiDeployment();
@@ -345,7 +347,9 @@ function useNavigationHostReading({
           pathname,
           search,
           projectParam: routeReading.projectParam,
-          projectSlugFromAddress: scopeCapability.projectSlugAddressedBy(routeReading.projectParam),
+          projectSlugFromAddress: scopeHostService.projectSlugAddressedBy(
+            routeReading.projectParam,
+          ),
           catchAllPath: routeReading.pathname.replace(/^\/@project\/?/, ""),
           routePattern,
           deployment,
@@ -368,7 +372,7 @@ function useNavigationHostReading({
           replace: (to) => navigation.replace(to),
           back: () => navigation.back(),
           rememberScope: (write: NavigationScopeWrite) =>
-            rememberScope({ write, remember: scopeCapability.rememberUiScopeSelection }),
+            rememberScope({ write, remember: scopeHostService.rememberUiScopeSelection }),
           signOut: () => void auth.signOutUi(),
           setDocumentTitle,
           openDrawer: openDrawerByName,
@@ -398,7 +402,7 @@ function useNavigationHostReading({
       accountMenu,
       navigation,
       auth,
-      scopeCapability,
+      scopeHostService,
       setDocumentTitle,
       openDrawerByName,
       openDrawerByToken,

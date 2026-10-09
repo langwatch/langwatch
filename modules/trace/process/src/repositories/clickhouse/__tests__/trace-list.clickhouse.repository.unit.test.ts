@@ -1,3 +1,4 @@
+import { AuthorizedClickHouse } from "@langwatch/clickhouse-client";
 import { clickHouseClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 // Unit tests for SQL `listAll` emits. List pages in two stages: inner picks
 // page traces (keys only), outer reads payload. Dedup is full-window aggregate.
@@ -5,6 +6,7 @@ import { clickHouseClientDouble } from "@langwatch/test-harness/client-doubles/c
 import type { TraceListQuery } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { ownProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
 import { TraceListClickHouseRepository } from "../trace-list.repository.ts";
 
 /** The full-window version dedup, identified by its GROUP BY. */
@@ -20,20 +22,22 @@ function occurrences({ haystack, needle }: { haystack: string; needle: string })
 function makeRepo() {
   const queries: string[] = [];
   const client = clickHouseClientDouble({
-    query: vi.fn(async ({ query }: { query: string }) => {
-      queries.push(query);
-      return { json: async () => [] };
+    query: vi.fn(async ({ sql }: { sql: string }) => {
+      queries.push(sql);
+      return { rows: [] };
     }),
   });
   return {
-    repo: TraceListClickHouseRepository.create(async () => client),
+    repo: TraceListClickHouseRepository.create({
+      clickhouse: new AuthorizedClickHouse({ resolveClient: async () => client }),
+    }),
     queries,
   };
 }
 
 function baseQuery(overrides: Partial<TraceListQuery> = {}): TraceListQuery {
   return {
-    tenantId: "tenant-1",
+    authorization: ownProof({ projectId: "tenant-1" }),
     timeRange: { from: 1_000, to: 2_000 },
     sort: { column: "OccurredAt", direction: "desc" },
     limit: 25,
@@ -80,6 +84,34 @@ describe("TraceListClickHouseRepository.listAll (unit)", () => {
       const countQuery = queries.find(isCountQuery);
       expect(countQuery).toBeDefined();
       expect(occurrences({ haystack: countQuery!, needle: DEDUP_AGGREGATE })).toBe(1);
+    });
+  });
+
+  describe("when the query carries a keyset cursor", () => {
+    it("breaks sort ties on the tenant and the trace id together, since two members may hold one trace id", async () => {
+      const { repo, queries } = makeRepo();
+
+      await repo.listAll(
+        baseQuery({
+          cursor: {
+            sortValue: 1_500,
+            tenantId: "tenant-1",
+            traceId: "trace-a",
+          },
+        }),
+      );
+
+      const pageQuery = queries.find(isPageQuery)!;
+      expect(pageQuery).toContain(
+        "(TenantId, TraceId) > ({cursorTenantId:String}, {cursorTraceId:String})",
+      );
+      expect(pageQuery).not.toMatch(/AND TraceId > \{cursorTraceId/);
+      expect(
+        occurrences({
+          haystack: pageQuery,
+          needle: "TenantId ASC, TraceId ASC",
+        }),
+      ).toBe(2);
     });
   });
 

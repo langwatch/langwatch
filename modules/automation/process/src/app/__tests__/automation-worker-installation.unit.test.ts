@@ -1,7 +1,3 @@
-/**
- * @vitest-environment node
- * The automation module installed on the worker role: the pipeline it hosts, over memory.
- */
 import type { AnalyticsApi } from "@langwatch/analytics-contract";
 import type { AnnotationApi } from "@langwatch/annotation-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
@@ -11,6 +7,11 @@ import {
   type AutomationServerConfig,
   type CreateTriggerCommand,
 } from "@langwatch/automation-contract";
+/**
+ * @vitest-environment node
+ * The automation module installed on the worker role: the pipeline it hosts, over memory.
+ */
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { type DatasetApi, InvalidColumnError } from "@langwatch/dataset-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
@@ -106,6 +107,7 @@ function automationLogLines(): unknown[] {
 
 function peers(installed: Installed = {}) {
   return {
+    "data-retention": createApiFixture<DataRetentionApi>({}),
     analytics: createApiFixture<AnalyticsApi>(),
     monitor: createApiFixture<MonitorApi>(),
     evaluator: createApiFixture<EvaluatorApi>(),

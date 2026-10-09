@@ -6,13 +6,17 @@
 import { defineTrpcContract } from "@langwatch/module";
 
 import {
+  projectAggregateMemberCandidatesInputSchema,
   projectArchiveByIdInputSchema,
   projectCreateInputSchema,
   projectScopeSchema,
+  projectUpdateAggregateRuleInputSchema,
   projectUpdateInputSchema,
 } from "./project-trpc.schemas.ts";
 import { PROJECT_LEGACY_KEY_REVOKED_EVENT_TYPE } from "./project.events.ts";
 import {
+  projectAggregateMemberCandidatesSchema,
+  projectAggregateRuleUpdatedSchema,
   projectApiKeyRevokedSchema,
   projectArchivedSchema,
   projectFirstMessageSchema,
@@ -52,4 +56,14 @@ export const projectTrpc = defineTrpcContract("project")
   .mutation("archiveById")
   .withInput(projectArchiveByIdInputSchema)
   .withOutput(projectArchivedSchema)
+
+  // ADR-177: an organisation admin edits which projects an aggregate reads.
+  .mutation("updateAggregateRule")
+  .withInput(projectUpdateAggregateRuleInputSchema)
+  .withOutput(projectAggregateRuleUpdatedSchema)
+
+  // ADR-177: what an explicit rule may name, owners included; organisation admins only.
+  .query("aggregateMemberCandidates")
+  .withInput(projectAggregateMemberCandidatesInputSchema)
+  .withOutput(projectAggregateMemberCandidatesSchema)
   .build();

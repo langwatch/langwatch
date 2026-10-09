@@ -14,6 +14,7 @@ import { PrismaGdprUserDataEraseRepository } from "../prisma.user-data-erase.rep
 /** The erase transaction's writes, for a user who owns nothing, recorded in the order seen. */
 function databaseRecording({ failOn }: { failOn?: string } = {}) {
   const writes: string[] = [];
+  const outboxRows: unknown[] = [];
   const write = (name: string) =>
     vi.fn(async () => {
       if (failOn === name) throw new Error(`${name} unavailable`);
@@ -23,6 +24,7 @@ function databaseRecording({ failOn }: { failOn?: string } = {}) {
   const outboxCreateMany = vi.fn(async (args?: { data: unknown }) => {
     if (failOn === "outbox") throw new Error("outbox unavailable");
     const rows = [args?.data].flat();
+    outboxRows.push(...rows);
     const keys = rows.map((row) => (row as { messageKey?: unknown } | undefined)?.messageKey);
     writes.push(`outbox:${keys.join(",")}`);
     return { count: rows.length };
@@ -38,7 +40,10 @@ function databaseRecording({ failOn }: { failOn?: string } = {}) {
     auditLog: { updateMany: write("auditLog.updateMany") },
     annotationQueueMembers: { deleteMany: write("annotationQueueMembers.deleteMany") },
     teamUser: { deleteMany: write("teamUser.deleteMany") },
-    organizationUser: { deleteMany: write("organizationUser.deleteMany") },
+    organizationUser: {
+      deleteMany: write("organizationUser.deleteMany"),
+      findMany: async () => [{ organizationId: "org_shared" }],
+    },
     account: { deleteMany: write("account.deleteMany") },
     session: { deleteMany: write("session.deleteMany") },
     user: { delete: write("user.delete") },
@@ -50,7 +55,7 @@ function databaseRecording({ failOn }: { failOn?: string } = {}) {
     }),
   });
   const repository = PrismaGdprUserDataEraseRepository.create({ database: client });
-  return { repository, writes, state };
+  return { repository, writes, state, outboxRows };
 }
 
 const ERASE = { userId: "user-1", projectIds: [], soleOwnedTeamIds: [], soleOwnedOrgIds: [] };
@@ -58,12 +63,13 @@ const ERASE = { userId: "user-1", projectIds: [], soleOwnedTeamIds: [], soleOwne
 describe("PrismaGdprUserDataEraseRepository's erased fact", () => {
   /** @scenario "An erasure records user's erased fact with the erase" */
   it("appends the erased fact in the erase's transaction, after the user row goes", async () => {
-    const { repository, writes, state } = databaseRecording();
+    const { repository, writes, state, outboxRows } = databaseRecording();
 
     await repository.eraseUserAndOwnedResources(ERASE);
 
     expect(writes.slice(-2)).toEqual(["user.delete", "outbox:user-1:erased"]);
     expect(state.committed).toBe(true);
+    expect(JSON.stringify(outboxRows)).toContain('"organizationIds":["org_shared"]');
   });
 
   /** @scenario "An erasure that rolls back records no erased fact" */

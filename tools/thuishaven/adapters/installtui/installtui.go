@@ -324,8 +324,16 @@ func (m model) mark(r row) string {
 // isManual reports whether haven cannot run the row's chosen candidate here.
 func isManual(r row) bool {
 	c := r.st.Candidates[r.candidate]
-	command, _ := c.InstallOn(runtime.GOOS)
+	command, _ := c.InstallOn(platform(r))
 	return !c.Declines && command == ""
+}
+
+// platform is the GOOS the row was planned for, so the picker and the plan agree.
+func platform(r row) string {
+	if r.st.Platform != "" {
+		return r.st.Platform
+	}
+	return runtime.GOOS
 }
 
 // outcome is what enter does with this row, in the words of what will run. A
@@ -341,7 +349,7 @@ func (m model) outcome(r row) string {
 		prefix = "have " + r.st.Observed + " " + havenui.Bullet + " "
 	}
 	candidate := r.st.Candidates[r.candidate]
-	command, manual := candidate.InstallOn(runtime.GOOS)
+	command, manual := candidate.InstallOn(platform(r))
 	choices := ""
 	if len(r.st.Candidates) > 1 {
 		choices = "  (←/→ other choices)"

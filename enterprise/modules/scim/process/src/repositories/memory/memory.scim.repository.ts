@@ -279,14 +279,6 @@ export class MemoryScimRepository extends ScimRepository {
     });
   };
 
-  removeMembership = async (input: { organizationId: string; userId: string }): Promise<void> => {
-    const index = this.memberships.findIndex(
-      (row) => row.organizationId === input.organizationId && row.userId === input.userId,
-    );
-    if (index === -1) throw new Error("No such membership to remove");
-    this.memberships.splice(index, 1);
-  };
-
   async findDirectoryGroupIds(input: {
     organizationId: string;
     userId: string;

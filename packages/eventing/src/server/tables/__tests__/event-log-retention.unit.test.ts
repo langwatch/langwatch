@@ -12,7 +12,6 @@ import {
 
 const classification: EventLogRetentionClassification = {
   categories: ["traces", "scenarios", "experiments"],
-  fallbackCategory: "traces",
   indefiniteClass: "indefinite",
   classByAggregateType: {
     user_identity: "indefinite",
@@ -36,9 +35,9 @@ function retentionOver() {
   return { retention, statements };
 }
 
-const NEVER_EXPIRING =
+const NEVER_EXPIRING_EVENT_TYPES =
   "NOT (startsWith(EventType, 'lw.identity.') OR startsWith(EventType, 'lw.authz.') OR " +
-  "EventType IN ('lw.governance.vk_lifecycle') OR AggregateType IN ('user_identity'))";
+  "EventType IN ('lw.governance.vk_lifecycle'))";
 
 describe("EventLogRetention", () => {
   describe("when a category's retention is applied", () => {
@@ -60,15 +59,15 @@ describe("EventLogRetention", () => {
           sql:
             "ALTER TABLE event_log UPDATE _retention_days = {retentionDays:UInt16} " +
             "WHERE TenantId = {tenantId:String} AND _retention_days != {retentionDays:UInt16}" +
-            ` AND (${NEVER_EXPIRING} AND AggregateType IN ('simulation_run', 'suite_run'))` +
+            ` AND (${NEVER_EXPIRING_EVENT_TYPES} AND AggregateType IN ('simulation_run', 'suite_run'))` +
             " AND length('langwatch:event-log-retention-category:scenarios') > 0",
           params: { tenantId: "project-1", retentionDays: 30 },
         },
       ]);
     });
 
-    /** @scenario "The fallback category keeps every other finite category's rows out" */
-    it("excludes every other finite category's aggregates from the fallback", async () => {
+    /** @scenario "An aggregate type mapped to no category is never rewritten" */
+    it("rewrites only the aggregate types the category lists, never an unlisted one", async () => {
       const { retention, statements } = retentionOver();
 
       await retention.retainCategory({
@@ -78,8 +77,9 @@ describe("EventLogRetention", () => {
       });
 
       expect(statements[0]!.sql).toContain(
-        `AND (${NEVER_EXPIRING} AND AggregateType NOT IN ('experiment_run', 'simulation_run', 'suite_run'))`,
+        `AND (${NEVER_EXPIRING_EVENT_TYPES} AND AggregateType IN ('trace'))`,
       );
+      expect(statements[0]!.sql).not.toContain("NOT IN");
     });
 
     /** @scenario "Rows that never expire are never rewritten" */
@@ -91,7 +91,44 @@ describe("EventLogRetention", () => {
       }
 
       expect(statements).toHaveLength(3);
-      for (const statement of statements) expect(statement.sql).toContain(NEVER_EXPIRING);
+      for (const statement of statements)
+        expect(statement.sql).toContain(NEVER_EXPIRING_EVENT_TYPES);
+    });
+  });
+
+  describe("when the never-expiring rows are kept forever", () => {
+    /** @scenario "Every never-expiring row on a target is re-stamped to be kept forever" */
+    it("re-stamps every tenant's never-expiring rows on the routed target to 0 days", async () => {
+      const { retention, statements } = retentionOver();
+
+      await retention.keepIndefiniteRows({ organizationId: "org-private" });
+
+      expect(statements).toEqual([
+        {
+          tenantId: "",
+          organizationId: "org-private",
+          table: "event_log",
+          kind: "write",
+          sql:
+            "ALTER TABLE event_log UPDATE _retention_days = 0 WHERE _retention_days != 0 AND " +
+            "(startsWith(EventType, 'lw.identity.') OR startsWith(EventType, 'lw.authz.') OR " +
+            "EventType IN ('lw.governance.vk_lifecycle') OR " +
+            "AggregateType NOT IN ('experiment_run', 'simulation_run', 'suite_run', 'trace'))" +
+            " AND length('langwatch:event-log-retention-category:indefinite') > 0",
+          unscoped: expect.objectContaining({ reason: expect.any(String) }),
+        },
+      ]);
+      expect(
+        retention.categoryOfMutation({ table: "event_log", command: statements[0]!.sql }),
+      ).toBe("indefinite");
+    });
+
+    it("targets the shared server when no organization is named", async () => {
+      const { retention, statements } = retentionOver();
+
+      await retention.keepIndefiniteRows({});
+
+      expect(statements[0]).not.toHaveProperty("organizationId");
     });
   });
 

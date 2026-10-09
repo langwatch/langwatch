@@ -12,6 +12,7 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import type { SecretApi, StashRevealInput } from "@langwatch/secret-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
@@ -171,6 +172,7 @@ async function mountedCreate(
     };
   };
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: { authenticate: door, identify: door },
     doors: { api_key: { authenticate: door, identify: door } },
     idempotency: passthroughIdempotency,

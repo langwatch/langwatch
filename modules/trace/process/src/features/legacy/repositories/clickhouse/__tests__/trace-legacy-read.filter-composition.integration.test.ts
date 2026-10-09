@@ -10,14 +10,15 @@ import { TRACE_FILTER_EXAMPLES, type GetAllTracesForProjectInput } from "@langwa
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { traceQueryTranslation } from "../../../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
-import { TraceCanonicalisationService } from "../../../../derivation/services/trace-canonicalisation.service.ts";
-import { TraceLegacyReadClickHouseRepository } from "../trace-legacy-read.repository.ts";
+import { ownProof } from "../../../../../__tests__/support/authorization-proofs.fixture.ts";
 import { openProtections } from "../../../../../repositories/clickhouse/__tests__/open-protections.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
 } from "../../../../../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
+import { traceQueryTranslation } from "../../../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
+import { TraceCanonicalisationService } from "../../../../derivation/services/trace-canonicalisation.service.ts";
+import { TraceLegacyReadClickHouseRepository } from "../trace-legacy-read.repository.ts";
 
 const clickHouseConfigured = testClickHouseConfigured();
 
@@ -83,13 +84,13 @@ async function search({
   const filterWhere = queryText
     ? traceQueryTranslation.translateFilter({
         queryText,
-        tenantId,
         timeRange: { from: window.startDate, to: window.endDate },
       })
     : null;
   const results = await repo.listAllTracesForProject(searchInput(input), openProtections, {
     downloadMode: true,
     ...(filterWhere ? { filterWhere } : {}),
+    authorization: ownProof({ projectId: tenantId }),
   });
   return results.groups
     .flat()

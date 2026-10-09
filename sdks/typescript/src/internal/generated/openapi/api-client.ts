@@ -169,6 +169,8 @@ export interface paths {
          *
          *     Any LangWatch API key — project, organization or personal — reaches every project it can read `analytics:view` on: an organization or personal key spans its projects, a project key its one. Rows from more than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic — to read a single project, filter inside the statement with `WHERE TenantId = '<project id>'`.
          *
+         *     To run over one project only, send its id as `projectId` in the body: the run then reads that project's rows alone, redacted by that project's own protections. A `projectId` the key cannot read `analytics:view` on, in its own organization, is refused with `project_not_found` (404), the same answer as a project that does not exist. Without `projectId` the run spans every project the key can read.
+         *
          *     A statement that names no `LIMIT` is capped at 10,000 rows: that `LIMIT` is appended before the query runs. A statement whose own `LIMIT` asks for more is refused with `LIMIT_TOO_HIGH` — lower it and page the rest with `LIMIT`/`OFFSET` and an `ORDER BY`. When using `UNION`, every top-level branch must carry its own `LIMIT` clause of 10,000 rows or fewer, or the query is refused with `LIMIT_REQUIRED_PER_BRANCH`. A result whose body exceeds about 8,000,000 bytes is refused outright with `lwql_result_too_large`, never cut — select fewer columns or a smaller `LIMIT`.
          *
          *     Failures answer with their real HTTP status (a refused query is 403, not 200) and this API's canonical error envelope — the same `code` and `meta` every other REST family publishes.
@@ -8391,11 +8393,13 @@ export interface operations {
                         end: string | number;
                     };
                     granularitySeconds?: 1 | 60 | 3600 | 86400 | 604800;
+                    /** @description Narrows the run to this one project, which the key must hold analytics:view on. Without it the run spans every project the key can read. */
+                    projectId?: string;
                 };
             };
         };
         responses: {
-            /** @description The query ran. Columns, rows, execution statistics and diagnostics, scoped to the projects the key can read. */
+            /** @description The query ran. Columns, rows, execution statistics and diagnostics, scoped to the projects the key can read, or to the one project `projectId` names. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -8511,6 +8515,36 @@ export interface operations {
             };
             /** @description Forbidden */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

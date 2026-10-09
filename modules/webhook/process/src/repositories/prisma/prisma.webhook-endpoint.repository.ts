@@ -190,6 +190,7 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRepositor
     maxBatchSize?: number;
     maxBatchDelayMs?: number;
     maxInFlight?: number;
+    allowSelfSignedCertificate?: boolean;
     signatureScheme?: WebhookSignatureScheme;
     sharedSecret?: string;
     idempotencyKey?: string;
@@ -216,6 +217,9 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRepositor
     }
     if (params.maxInFlight !== undefined) {
       data.maxInFlight = params.maxInFlight;
+    }
+    if (params.allowSelfSignedCertificate !== undefined) {
+      data.allowSelfSignedCertificate = params.allowSelfSignedCertificate;
     }
     if (params.signatureScheme !== undefined) {
       data.signatureScheme = params.signatureScheme;
@@ -272,6 +276,7 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRepositor
     maxBatchSize?: number;
     maxBatchDelayMs?: number;
     maxInFlight?: number;
+    allowSelfSignedCertificate?: boolean;
   }): Promise<WebhookEndpointView> {
     const endpoint = await this.getEndpoint(params);
     const sqsUpdate =
@@ -299,6 +304,9 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRepositor
     }
     if (params.maxInFlight !== undefined) {
       data.maxInFlight = params.maxInFlight;
+    }
+    if (params.allowSelfSignedCertificate !== undefined) {
+      data.allowSelfSignedCertificate = params.allowSelfSignedCertificate;
     }
     const updated = await this.prisma.webhookEndpoint.update({
       where: { id: endpoint.id },
@@ -449,6 +457,7 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRepositor
     return httpDestinationConfig({
       url: endpoint.url ?? "",
       signatureScheme: endpoint.signatureScheme,
+      allowSelfSignedCertificate: endpoint.allowSelfSignedCertificate,
     });
   }
 
@@ -906,6 +915,7 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRepositor
       maxBatchSize: endpoint.maxBatchSize,
       maxBatchDelayMs: endpoint.maxBatchDelayMs,
       maxInFlight: endpoint.maxInFlight,
+      allowSelfSignedCertificate: endpoint.allowSelfSignedCertificate,
       createdAt: endpoint.createdAt,
       updatedAt: endpoint.updatedAt,
     };

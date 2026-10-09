@@ -1,5 +1,5 @@
 /**
- * The one reading of the page's config slices into the deployment capability,
+ * The one reading of the page's config slices into the deployment host service,
  * so a module never reads the meta tag itself — a host reaching past this is
  * the side door §3.4 shut.
  */

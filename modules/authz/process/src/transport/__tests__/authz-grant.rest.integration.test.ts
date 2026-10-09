@@ -14,6 +14,7 @@ import {
   type RestDeprecationLog,
 } from "@langwatch/api/rest";
 import type { AuthzManagedOrganizationBinding, AuthzPrincipalRef } from "@langwatch/authz-contract";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
@@ -187,6 +188,7 @@ function world({
     caller: KEY,
   });
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       identify: admit,
       authenticate: admit,

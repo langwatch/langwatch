@@ -22,11 +22,10 @@ import type {
   RangeFacetDef,
 } from "#features/facet/rules/trace-facet-registry.rules";
 
-import { isExpressionCategorical } from "../rules/trace-facet-classification.rules.ts";
-import { scopeTraceFilterToTable } from "../rules/trace-facet-scope.rules.ts";
 import type { TraceFilterWhere } from "../../../rules/trace-filter-hidden-origins.rules.ts";
 import type { DiscoverParams } from "../../../rules/trace-list-cache-key.rules.ts";
 import type { TraceTopicNamingService } from "../../topic/services/trace-topic-naming.service.ts";
+import { isExpressionCategorical } from "../rules/trace-facet-classification.rules.ts";
 
 export class TraceFacetDescriptorService {
   private constructor(
@@ -95,7 +94,7 @@ export class TraceFacetDescriptorService {
 
     const namesTopics = def.key === "topic" || def.key === "subtopic";
     const enriched = namesTopics
-      ? await this.topicNaming.enrichTopicNames(params.tenantId, raw)
+      ? await this.topicNaming.enrichTopicNames(params.authorization, raw)
       : raw;
 
     return {
@@ -152,7 +151,7 @@ export class TraceFacetDescriptorService {
 
     if (isExpressionCategorical(def)) {
       result = await this.repository.findCategoricalFacet({
-        tenantId: params.tenantId,
+        authorization: params.authorization,
         timeRange: params.timeRange,
         table: def.table,
         timeColumn: this.facets.timeColumns[def.table],
@@ -163,28 +162,19 @@ export class TraceFacetDescriptorService {
       });
     } else {
       const query = def.queryBuilder({
-        tenantId: params.tenantId,
         timeRange: params.timeRange,
         limit,
         offset: 0,
-        ...(filterWhere
-          ? {
-              traceScope: scopeTraceFilterToTable({
-                table: def.table,
-                filterWhere,
-                isLiveWindow: params.timeRange.live === true,
-              }),
-            }
-          : {}),
+        ...(filterWhere ? { filterWhere, isLiveWindow: params.timeRange.live === true } : {}),
       });
       result = await this.repository.findCategoricalFacetRaw({
-        tenantId: params.tenantId,
+        authorization: params.authorization,
         query,
       });
     }
 
     if (def.key === "topic" || def.key === "subtopic") {
-      result = await this.topicNaming.enrichTopicNames(params.tenantId, result);
+      result = await this.topicNaming.enrichTopicNames(params.authorization, result);
     }
 
     return {
@@ -207,7 +197,7 @@ export class TraceFacetDescriptorService {
     filterWhere?: TraceFilterWhere;
   }): Promise<RangeFacetDescriptor> {
     const result = await this.repository.findRangeStatsForTable({
-      tenantId: params.tenantId,
+      authorization: params.authorization,
       timeRange: params.timeRange,
       table: def.table,
       timeColumn: this.facets.timeColumns[def.table],
@@ -235,13 +225,12 @@ export class TraceFacetDescriptorService {
     limit: number;
   }): Promise<DynamicKeysFacetDescriptor> {
     const query = def.queryBuilder({
-      tenantId: params.tenantId,
       timeRange: params.timeRange,
       limit,
       offset: 0,
     });
     const result = await this.repository.findCategoricalFacetRaw({
-      tenantId: params.tenantId,
+      authorization: params.authorization,
       query,
     });
 

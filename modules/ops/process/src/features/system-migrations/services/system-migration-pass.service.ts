@@ -20,16 +20,13 @@ import type {
   OrganizationDataplaneResolver,
 } from "../../../app/ops.app.ts";
 import type { OpsRepositories } from "../../../repositories/ops.repositories.ts";
-import {
-  migrationRunsOnThisInstallation,
-  userMigrates,
-} from "../../../rules/ops-system-migration-cohort.rules.ts";
+import { migrationRunsOnThisInstallation } from "../../../rules/ops-system-migration-cohort.rules.ts";
 import {
   declarationOf,
   mergeSummaries,
 } from "../../../rules/system-migration-pass-summary.rules.ts";
 import { RoutingTableOrganizationDataplaneService } from "../../../services/organization-dataplane.service.ts";
-import { SystemMigrationCohortService } from "./system-migration-cohort.service.ts";
+import { SystemMigrationPassCohortService } from "./system-migration-pass-cohort.service.ts";
 import type { SystemMigrationPassRequestsService } from "./system-migration-pass-requests.service.ts";
 import { SystemMigrationsService } from "./system-migrations.service.ts";
 
@@ -94,7 +91,14 @@ export class SystemMigrationPassService {
     return new SystemMigrationPassService(options);
   }
 
-  private constructor(private readonly options: SystemMigrationPassOptions) {}
+  readonly #cohorts: SystemMigrationPassCohortService;
+
+  private constructor(private readonly options: SystemMigrationPassOptions) {
+    this.#cohorts = SystemMigrationPassCohortService.create({
+      repositories: options.repositories,
+      ...(options.dataplane ? { dataplane: options.dataplane } : {}),
+    });
+  }
 
   async runPass({ signal }: { signal?: AbortSignal }): Promise<MigrationPassSummary> {
     const isSaaS = this.options.isSaaS();
@@ -108,7 +112,7 @@ export class SystemMigrationPassService {
     const userCohort =
       userMigrations.length === 0
         ? null
-        : await this.userCohort({ isSaaS, enrollments, migrations: userMigrations });
+        : await this.#cohorts.user({ isSaaS, enrollments, migrations: userMigrations });
 
     const summary = await organization.runner.runPass({ signal });
 
@@ -158,7 +162,7 @@ export class SystemMigrationPassService {
       });
       if (migrations.length === 0) continue;
       driven.push(...migrations.map((migration) => migration.name));
-      const cohort = await this.declaredCohort({ axis, isSaaS, migrations });
+      const cohort = await this.#cohorts.declared({ axis, isSaaS, migrations });
       for (const bucket of groupByTenantSource({ migrations, everyTenant: sources[axis] })) {
         const runner = new SystemMigrationRunnerService({
           now: nowInstant,
@@ -173,25 +177,6 @@ export class SystemMigrationPassService {
     }
     await declared.settle.settle({ ids: driven });
     return merged;
-  }
-
-  /** Enrolment paces every axis: a project through its organization, a user by membership. */
-  private async declaredCohort({
-    axis,
-    isSaaS,
-    migrations,
-  }: {
-    axis: TenantMigrationStep["tenants"];
-    isSaaS: boolean;
-    migrations: readonly SystemMigration[];
-  }): Promise<MigrationCohort> {
-    const enrollments = this.options.repositories.migrationEnrollments;
-    if (axis === "user") return this.userCohort({ isSaaS, enrollments, migrations });
-    const organizationCohort = await this.cohort({ isSaaS, enrollments, migrations });
-    if (axis === "organization" || !isSaaS) return organizationCohort;
-    const projects = this.options.repositories.projectTenants;
-    return async ({ tenantId, migrationName }) =>
-      organizationCohort({ tenantId: await projects.getOrganizationId(tenantId), migrationName });
   }
 
   /**
@@ -235,7 +220,7 @@ export class SystemMigrationPassService {
       tenants: {
         findTenantIdsAfter: async ({ cursor }) => (cursor === null ? [organizationId] : []),
       },
-      cohort: await this.cohort({
+      cohort: await this.#cohorts.organization({
         isSaaS,
         enrollments: this.options.repositories.migrationEnrollments,
         migrations,
@@ -345,7 +330,11 @@ export class SystemMigrationPassService {
   }) {
     const { migrationState: state, migrationLease: lease } = this.options.repositories;
     const migrations = this.released({ migrations: this.options.migrations(), isSaaS });
-    const organizationCohort = await this.cohort({ isSaaS, enrollments, migrations });
+    const organizationCohort = await this.#cohorts.organization({
+      isSaaS,
+      enrollments,
+      migrations,
+    });
     const projectTenants =
       this.options.tenantAxis === "project" ? this.options.repositories.projectTenants : null;
     const cohort: MigrationCohort =
@@ -384,38 +373,6 @@ export class SystemMigrationPassService {
   }
 
   /**
-   * The user-rooted leg's cohort. Enrollment is read once, fresh, at the start
-   * of the pass; membership is answered per candidate user against the
-   * enrolled organizations only.
-   */
-  async userCohort({
-    isSaaS,
-    enrollments,
-    migrations,
-  }: {
-    isSaaS: boolean;
-    enrollments: SystemMigrationPassRepositories["migrationEnrollments"];
-    migrations: readonly SystemMigration[];
-  }): Promise<MigrationCohort> {
-    const automatic = new Set(
-      migrations.filter((one) => one.enrolledAutomatically).map((one) => one.name),
-    );
-    const memberships = this.options.repositories.migrationMemberships;
-    const enrolled = isSaaS
-      ? await enrollments.findEnrolledOrganizationIdsByMigration()
-      : new Map<string, Set<string>>();
-    return async ({ tenantId, migrationName }) => {
-      const enrolledAutomatically = automatic.has(migrationName);
-      const organizationIds = [...(enrolled.get(migrationName) ?? [])];
-      const memberOfEnrolledOrganization =
-        isSaaS && !enrolledAutomatically && organizationIds.length > 0
-          ? await memberships.isMemberOfAny({ userId: tenantId, organizationIds })
-          : false;
-      return userMigrates({ isSaaS, enrolledAutomatically, memberOfEnrolledOrganization });
-    };
-  }
-
-  /**
    * Never terminal: the sweep removes rows the pass did not write, so a pass
    * that reported nothing because a sweep threw would hide the migration
    * outcome an operator asked for.
@@ -445,43 +402,6 @@ export class SystemMigrationPassService {
         runsAutomaticallyOnSelfHosted: migration.runsAutomaticallyOnSelfHosted,
       }),
     );
-  }
-
-  /**
-   * Read once, fresh, at the start of the run rather than per tenant: one
-   * query instead of one per tenant per migration. Self-hosted never reads
-   * enrollment at all - there is nothing to pace.
-   */
-  private async cohort({
-    isSaaS,
-    enrollments,
-    migrations,
-  }: {
-    isSaaS: boolean;
-    enrollments: SystemMigrationPassRepositories["migrationEnrollments"];
-    migrations: readonly SystemMigration[];
-  }): Promise<(args: { tenantId: string; migrationName: string }) => boolean> {
-    const enrolled = isSaaS
-      ? await enrollments.findEnrolledOrganizationIdsByMigration()
-      : new Map<string, Set<string>>();
-    const cohort = SystemMigrationCohortService.create({
-      isSaaS,
-      enrolled,
-      migrations,
-      dataplane:
-        this.options.dataplane ??
-        RoutingTableOrganizationDataplaneService.create({ routes: new Map() }),
-    });
-    return ({ tenantId, migrationName }) => {
-      const admission = cohort.admits({ organizationId: tenantId, migrationName });
-      if (admission.admitted && admission.dataplane.kind === "private") {
-        logger.debug(
-          { migrationName, organizationId: tenantId, endpoint: admission.dataplane.endpoint },
-          "organization with a dedicated data plane is in this migration's cohort",
-        );
-      }
-      return admission.admitted;
-    };
   }
 
   /**

@@ -1,27 +1,18 @@
 /**
  * The contract budget of a connected customer (ADR-156 §5): one blocking
- * organization budget, moved by LangWatch when the terms change and by the
- * customer up to the commit plus the agreed overage maximum.
+ * organization budget, moved by LangWatch when the terms change. The customer
+ * moves its own cap through the connect module.
  */
 
-import {
-  ConnectBudgetAboveContractMaximumError,
-  ConnectBudgetNotSetError,
-  type ContractTerms,
-} from "@langwatch/enterprise-licensing-contract";
-import { ValidationError } from "@langwatch/handled-error";
+import type { ContractTerms } from "@langwatch/enterprise-licensing-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 
 import type { IssuedLicenseRecord } from "../repositories/issued-license.repository.ts";
 import { contractTermsOf } from "../rules/contract-terms.rules.ts";
 
-const CENTS = 100;
-
 interface ContractBudgetCollaborators {
   store: ContractBudgetStore;
   licensesOf: (organizationId: string) => Promise<IssuedLicenseRecord[]>;
-  /** Attributed when the customer moves its own cap: no person is present. */
-  systemActorId: string;
   now?: () => Instant;
 }
 
@@ -99,34 +90,6 @@ export class ContractBudgetService implements ContractBudgets {
       id: existing.id,
       actorId: operatorId,
     });
-  }
-
-  /** The customer sets its own cap. It may be below what is already spent. */
-  async setCap({
-    organizationId,
-    capUsdCents,
-  }: {
-    organizationId: string;
-    capUsdCents: number;
-  }): Promise<{ capUsdCents: number; maximumUsdCents: number }> {
-    if (!Number.isSafeInteger(capUsdCents) || capUsdCents <= 0) {
-      throw new ValidationError("The cap must be a positive amount");
-    }
-    const existing = await this.collaborators.store.findForOrganization(organizationId);
-    if (!existing) throw new ConnectBudgetNotSetError();
-
-    const { maximumUsdCents } = await this.termsOf(organizationId);
-    if (capUsdCents > maximumUsdCents) {
-      throw new ConnectBudgetAboveContractMaximumError(maximumUsdCents / CENTS);
-    }
-    await this.collaborators.store.setLimit({
-      organizationId,
-      id: existing.id,
-      limitUsdCents: capUsdCents,
-      capSetByCustomer: true,
-      actorId: this.collaborators.systemActorId,
-    });
-    return { capUsdCents, maximumUsdCents };
   }
 }
 

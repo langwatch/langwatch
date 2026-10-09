@@ -10,6 +10,7 @@ import type { ExperimentApi } from "@langwatch/experiment-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type * as observabilityModule from "@langwatch/observability";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import type { Context } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
@@ -42,6 +43,7 @@ function mount(
 ) {
   const assertBatchLogWithinLimit = options.assertBatchLogWithinLimit ?? (async () => undefined);
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({
         actor: { type: "user", id: "user-1" },
@@ -201,6 +203,7 @@ describe("given the legacy evaluation batch log behind a door that refuses the c
       }
     }
     const runtime = createRestRuntime({
+      authorization: restTestAuthorization(),
       identity: {
         authenticate: () => {
           throw new DoorRefusedError();

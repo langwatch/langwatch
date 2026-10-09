@@ -5,6 +5,7 @@
  */
 import { apiErrorBody, createRestRuntime, type IdempotentRunner } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import type { ErrorHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
@@ -69,6 +70,7 @@ export function mountWebhookRest(
   const app = WebhookModule.fromDependencies({ ...unreachableDependencies(), ...dependencies });
 
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({
         actor: { type: "api_key", id: "webhook-key" },

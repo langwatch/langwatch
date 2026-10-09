@@ -15,6 +15,7 @@ import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
 import { GatewayModule } from "../../app/gateway.app.ts";
@@ -102,6 +103,7 @@ async function mount() {
   });
   const keyDoor = () => ({ ...door(), scope: { tier: "organization" as const, id: ORG_ID } });
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: { authenticate: door, identify: door },
     doors: { api_key: { authenticate: keyDoor, identify: keyDoor } },
     idempotency: async ({ handler }) => {

@@ -42,6 +42,7 @@
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/langy-client": "workspace:*",
     "@langwatch/langy-contract": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@monaco-editor/react": "catalog:",

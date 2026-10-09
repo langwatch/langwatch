@@ -12,6 +12,7 @@ import type { Encryption } from "@langwatch/process-stores";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 
 import { GATEWAY_DEBITS_PROCESS_NAME } from "../../eventing/gateway-debit.process.ts";
@@ -219,6 +220,7 @@ type InstalledGateway = Awaited<ReturnType<typeof installGateway>>["state"];
 function servedInternalDoor(state: InstalledGateway, app: GatewayModule) {
   const closed = BearerIdentity.create({ name: "unconfigured", token: undefined });
   const runtime = RestHost.create({
+    authz: restTestAuthorization().forRequest(),
     identities: {
       project: closed,
       organization: closed,

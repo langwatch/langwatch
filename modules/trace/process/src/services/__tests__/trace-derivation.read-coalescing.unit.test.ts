@@ -1,11 +1,16 @@
 import type { DerivedTraceEvent, NormalizedSpan } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { TraceDerivationSpanReaderRepository } from "../../repositories/trace-derivation-span-reader.repository.ts";
-import { ScenarioRoleMetricsDerivationService } from "../scenario-role-metrics-derivation.service.ts";
-import { SpanCostService } from "../../features/span/services/span-cost.service.ts";
+import {
+  aggregateProof,
+  ownProof,
+  ownProofAuthorizer,
+} from "../../__tests__/support/authorization-proofs.fixture.ts";
 import { TraceEventDerivationService } from "../../features/derivation/services/trace-event-derivation.service.ts";
 import type { TraceModelCost } from "../../features/derivation/services/trace-model-cost.service.ts";
+import { SpanCostService } from "../../features/span/services/span-cost.service.ts";
+import { TraceDerivationSpanReaderRepository } from "../../repositories/trace-derivation-span-reader.repository.ts";
+import { ScenarioRoleMetricsDerivationService } from "../scenario-role-metrics-derivation.service.ts";
 
 /**
  * Read amplification across a coalesced fold batch: subscribers dispatch
@@ -57,7 +62,10 @@ describe("trace-level derivations", () => {
       /** @scenario "Repeated trace-level derivations within one fold version read stored spans once" */
       it("reads the stored events once, not once per invocation", async () => {
         const reader = new CountingReader();
-        const service = TraceEventDerivationService.create({ spans: reader });
+        const service = TraceEventDerivationService.create({
+          spans: reader,
+          authorize: ownProofAuthorizer,
+        });
 
         for (let i = 0; i < 10; i++) await service.derive(BATCH_PARAMS);
 
@@ -84,7 +92,10 @@ describe("trace-level derivations", () => {
       /** @scenario A derivation re-reads once the fold has advanced with new spans */
       it("re-reads the stored events for the newer fold version", async () => {
         const reader = new CountingReader();
-        const service = TraceEventDerivationService.create({ spans: reader });
+        const service = TraceEventDerivationService.create({
+          spans: reader,
+          authorize: ownProofAuthorizer,
+        });
 
         await service.derive(BATCH_PARAMS);
         await service.derive({ ...BATCH_PARAMS, foldVersion: 6 });
@@ -110,11 +121,39 @@ describe("trace-level derivations", () => {
     });
   });
 
+  describe("given an aggregate and its member derive the same trace at one fold version", () => {
+    describe("when both read within one batch", () => {
+      it("reads once per proof, never sharing an entry", async () => {
+        const reader = new CountingReader();
+        const service = TraceEventDerivationService.create({
+          spans: reader,
+          authorize: ownProofAuthorizer,
+        });
+        const read = { traceId: "trace-1", occurredAtMs: 1000, foldVersion: 5 };
+
+        await service.deriveFor({ ...read, authorization: ownProof({ projectId: "member-1" }) });
+        await service.deriveFor({
+          ...read,
+          authorization: aggregateProof({
+            projectId: "aggregate-1",
+            members: [{ projectId: "member-1", from: 0 }],
+          }),
+        });
+        await service.deriveFor({ ...read, authorization: ownProof({ projectId: "member-1" }) });
+
+        expect(reader.eventReads).toBe(2);
+      });
+    });
+  });
+
   describe("given a live read that carries no fold watermark", () => {
     describe("when it is issued twice", () => {
       it("always hits storage, never the memo", async () => {
         const reader = new CountingReader();
-        const service = TraceEventDerivationService.create({ spans: reader });
+        const service = TraceEventDerivationService.create({
+          spans: reader,
+          authorize: ownProofAuthorizer,
+        });
 
         const { foldVersion: _ignored, ...live } = BATCH_PARAMS;
         await service.derive(live);

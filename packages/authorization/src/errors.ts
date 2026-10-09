@@ -132,3 +132,17 @@ export class MembershipDisabledError extends HandledError {
     this.name = "MembershipDisabledError";
   }
 }
+
+/** A write was aimed at an aggregate project, which is read only (ADR-177 decision 8). */
+export class AggregateProjectIsReadOnlyError extends HandledError {
+  declare readonly code: "aggregate_project_is_read_only";
+
+  constructor() {
+    super(
+      "aggregate_project_is_read_only",
+      "This project reads traces from other projects, so no data can be added to it",
+      { httpStatus: 403, fault: "customer" },
+    );
+    this.name = "AggregateProjectIsReadOnlyError";
+  }
+}

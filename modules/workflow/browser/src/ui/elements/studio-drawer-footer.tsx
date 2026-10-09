@@ -1,6 +1,6 @@
 import { createContext, type ReactNode, useContext, useEffect } from "react";
 
-import { studioDrawerFooterSlice } from "../../behavior/studio-drawer-footer.store.ts";
+import { useStudioDrawerFooterSlice } from "../../behavior/studio-drawer-footer.store.ts";
 
 /** Lets a properties panel omit controls already rendered by its drawer. */
 const InsideDrawerContext = createContext(false);
@@ -14,7 +14,7 @@ export function useInsideDrawer(): boolean {
 }
 
 export function useRegisterDrawerFooter(footer: ReactNode): void {
-  const register = studioDrawerFooterSlice((state) => state.register);
+  const register = useStudioDrawerFooterSlice((state) => state.register);
   useEffect(() => {
     if (footer === null) return;
     register(footer);

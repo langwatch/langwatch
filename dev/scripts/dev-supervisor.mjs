@@ -166,15 +166,18 @@ function isConfigJson(normalized) {
 }
 
 /**
- * Whether a change needs a new process. A child that reloads in-process still
- * needs one for a package.json or a file in its own `src/`: Node loaded those
- * natively, and no module runner can drop them.
+ * Whether a change needs a new process. A child that reloads in-process never
+ * does: Vite re-reads package.json, and its own `src/` waits for a manual
+ * restart (hostEditWaits), so the stack never drops for an edit.
  */
 export function needsNewProcess({ relativePath, reloadsInChild }) {
-  if (shouldIgnoreWatchPath(relativePath)) return false;
-  if (!reloadsInChild) return true;
-  const normalized = relativePath.split(path.sep).join("/");
-  return /(^|\/)package\.json$/.test(normalized) || normalized.startsWith("src/");
+  return !reloadsInChild && !shouldIgnoreWatchPath(relativePath);
+}
+
+/** An in-process child's own source changed: Node loaded it natively, so it applies on restart. */
+export function hostEditWaits({ relativePath, reloadsInChild }) {
+  if (!reloadsInChild || shouldIgnoreWatchPath(relativePath)) return false;
+  return relativePath.split(path.sep).join("/").startsWith("src/");
 }
 
 /** The watch roots and quiet window, from the environment (or its defaults). */
@@ -615,6 +618,18 @@ export function createBackendFilter({ cwd, roots }) {
   return { isOutsideBackend, loadable };
 }
 
+/** Feeds one watched change to `debouncer`, or says a host edit waits for a restart. */
+function noteChange({ dir, abs, filename, debouncer, filter, reloadsInChild }) {
+  const rel = path.join(dir, filename);
+  if (hostEditWaits({ relativePath: rel, reloadsInChild })) {
+    stderr(`${PREFIX} ${rel} changed; it applies on the next restart (haven restart app)\n`);
+    return;
+  }
+  if (!needsNewProcess({ relativePath: rel, reloadsInChild })) return;
+  if (filter.isOutsideBackend(path.join(abs, filename))) return;
+  debouncer.note(rel);
+}
+
 /**
  * Watches `dirs` and feeds non-ignored changes to `debouncer`. An
  * unwatchable directory is skipped with a warning, never a gate — the
@@ -627,11 +642,7 @@ function watchDirs({ dirs, debouncer, filter, reloadsInChild }) {
     if (!fs.existsSync(abs)) continue;
     try {
       const watcher = fs.watch(abs, { recursive: true }, (_event, filename) => {
-        if (!filename) return;
-        const rel = path.join(dir, filename);
-        if (!needsNewProcess({ relativePath: rel, reloadsInChild })) return;
-        if (filter.isOutsideBackend(path.join(abs, filename))) return;
-        debouncer.note(rel);
+        if (filename) noteChange({ dir, abs, filename, debouncer, filter, reloadsInChild });
       });
       watchers.push(watcher);
     } catch (err) {

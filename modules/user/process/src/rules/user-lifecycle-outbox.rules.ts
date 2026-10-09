@@ -6,7 +6,7 @@
 import type { ProcessStore } from "@langwatch/eventing";
 import type {
   UserCreatedEventData,
-  UserLifecycleEventData,
+  UserErasedEventData,
   UserRegisteredEventData,
 } from "@langwatch/user-contract";
 
@@ -22,12 +22,12 @@ const USER_FACTS_PROCESS_KEY = "facts";
 export type UserFactIntent =
   | Readonly<{ type: typeof USER_FACTS_RECORD_CREATED_INTENT; data: UserCreatedEventData }>
   | Readonly<{ type: typeof USER_FACTS_RECORD_REGISTERED_INTENT; data: UserRegisteredEventData }>
-  | Readonly<{ type: typeof USER_FACTS_RECORD_ERASED_INTENT; data: UserLifecycleEventData }>;
+  | Readonly<{ type: typeof USER_FACTS_RECORD_ERASED_INTENT; data: UserErasedEventData }>;
 
 type UserFactAppend = Omit<Parameters<ProcessStore["appendIntents"]>[0], "transaction">;
 
 /** The key a fact's intent and its event share: once per user and kind. */
-export function userFactKey(intent: UserFactIntent): string {
+function userFactKey(intent: UserFactIntent): string {
   const kind = {
     [USER_FACTS_RECORD_CREATED_INTENT]: "created",
     [USER_FACTS_RECORD_REGISTERED_INTENT]: "registered",

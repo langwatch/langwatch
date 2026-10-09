@@ -8,9 +8,9 @@ import {
   type TraceExportDownloadInput,
 } from "@langwatch/trace-contract";
 
+import type { TraceViewerProtectionService } from "../../../services/trace-viewer-protection.service.ts";
 import type { TraceExportBounds, TraceExportSlot } from "./trace-export-bounds.service.ts";
 import type { TraceExportService } from "./trace-export.service.ts";
-import type { TraceViewerProtectionService } from "../../../services/trace-viewer-protection.service.ts";
 
 const logger = createLogger("langwatch:trace-export-download");
 

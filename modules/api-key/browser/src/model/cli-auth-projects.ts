@@ -1,6 +1,8 @@
-// CLI project picker: shared projects + explicit personal entry (ownerUserId filter prevents
-// admins seeing others' workspaces). Personal is deliberate act (prevents auto-select hazard).
-// Default: last worked, sole shared, then personal (never dead-ends).
+// CLI project picker: shared projects (never governance or aggregate: no traces) + explicit
+// personal entry (ownerUserId filter prevents admins seeing others' workspaces). Personal is a
+// deliberate act (prevents auto-select hazard). Default: last worked, sole shared, then personal.
+
+import { NON_DESTINATION_PROJECT_KINDS } from "@langwatch/project-contract";
 
 export interface CliAuthProjectOption {
   id: string;
@@ -45,7 +47,10 @@ function findOwnPersonalProject(
 ): CliAuthProjectOption | null {
   for (const team of teams) {
     const personal = (team.projects ?? []).find(
-      (p) => p.isPersonal && p.ownerUserId === currentUserId && p.kind !== "internal_governance",
+      (p) =>
+        p.isPersonal &&
+        p.ownerUserId === currentUserId &&
+        !NON_DESTINATION_PROJECT_KINDS.includes(p.kind ?? ""),
     );
     if (personal) {
       return {
@@ -98,7 +103,7 @@ export function resolveCliAuthProjects(args: {
 } {
   const projects = (args.teams ?? []).flatMap((team) =>
     (team.projects ?? [])
-      .filter((p) => !p.isPersonal && p.kind !== "internal_governance")
+      .filter((p) => !p.isPersonal && !NON_DESTINATION_PROJECT_KINDS.includes(p.kind ?? ""))
       .map((p) => ({
         id: p.id,
         name: p.name,

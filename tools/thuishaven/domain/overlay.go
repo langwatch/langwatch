@@ -198,9 +198,8 @@ func (s Stack) OverlayEnv() []string {
 		"LANGWATCH_ADMIN_PASSWORD="+DefaultAdminPassword,
 		"LANGWATCH_PRIVATE_ACCESS_TOKEN="+DefaultPrivateAccessToken,
 		"LANGWATCH_PUBLIC_ACCESS_TOKEN="+DefaultPublicAccessToken,
-		// ee/admin/isAdmin.ts gates platform-admin (impersonation etc.) on this
-		// comma-separated list. The seeded admin needs to be in it, or logging in
-		// as DefaultAdminEmail gets a normal user, not a platform admin.
+		// Feeds only ops's one-time platform-operator seed (skipped when IS_SAAS
+		// is on); the seed shell grants the seeded admin the role directly.
 		"ADMIN_EMAILS="+DefaultAdminEmail,
 	)
 	// langyagent (the worker manager): the control plane dials it at its loopback
@@ -487,6 +486,39 @@ func OutboundProviderEnv(resolved map[string]string, endpoint string) []string {
 		env = append(env, "WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS=1")
 	}
 	return env
+}
+
+// PaymentSimSecretKey and PaymentSimWebhookSecret are the dev-only pair haven
+// gives billing when it points Stripe at paymentsim.
+const (
+	PaymentSimSecretKey     = "sk_test_paymentsim"
+	PaymentSimWebhookSecret = "whsec_paymentsim"
+)
+
+// HasOwnStripe reports whether .env or the shell names any Stripe setting.
+func HasOwnStripe(resolved map[string]string) bool {
+	return resolved["STRIPE_SECRET_KEY"] != "" || resolved["STRIPE_WEBHOOK_SECRET"] != "" || resolved["STRIPE_API_BASE"] != ""
+}
+
+// PaymentProviderEnv points billing's Stripe client at paymentsim, only when the
+// resolved environment names neither Stripe credential: billing refuses half a
+// pair, and a developer's own Stripe test account is never rewired.
+func PaymentProviderEnv(resolved map[string]string, endpoint string) []string {
+	if HasOwnStripe(resolved) {
+		return nil
+	}
+	return []string{"STRIPE_API_BASE=" + endpoint, "STRIPE_SECRET_KEY=" + PaymentSimSecretKey, "STRIPE_WEBHOOK_SECRET=" + PaymentSimWebhookSecret}
+}
+
+// StripeNotice is the line `haven up` prints: which Stripe billing talks to.
+func StripeNotice(resolved map[string]string, isPaymentSimOn bool) string {
+	switch {
+	case HasOwnStripe(resolved):
+		return "Stripe: your key from .env"
+	case isPaymentSimOn:
+		return "Stripe: paymentsim"
+	}
+	return "Stripe: none, billing is off (`haven up +payment` starts paymentsim)"
 }
 
 // llmProbeProviders are the providers whose credential probe the model-provider

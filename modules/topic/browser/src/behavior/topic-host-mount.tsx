@@ -1,6 +1,6 @@
 /**
  * Topic's answer to the port its screen declares: every method projects a
- * `@langwatch/browser-host` capability, so the module mounts it, not the
+ * `@langwatch/browser-host` host service, so the module mounts it, not the
  * application. ARCHITECTURE.md §10.1.
  */
 
@@ -19,7 +19,7 @@ import {
   type TopicSuccessNotice,
 } from "../model/topic-host.ts";
 
-class CapabilityTopicHost extends TopicHostApi {
+class HostServiceTopicHost extends TopicHostApi {
   constructor(private readonly deps: { projectId: string | undefined; feedback: UiFeedback }) {
     super();
   }
@@ -46,7 +46,7 @@ export default function TopicHostMount({ children }: { children?: ReactNode }) {
   const { feedback } = useUiHostServices();
   const { projectId } = useUiScope().activeScope();
   const host = useMemo(
-    () => new CapabilityTopicHost({ projectId: projectId ?? void 0, feedback }),
+    () => new HostServiceTopicHost({ projectId: projectId ?? void 0, feedback }),
     [projectId, feedback],
   );
   return <TopicHostProvider value={host}>{children}</TopicHostProvider>;

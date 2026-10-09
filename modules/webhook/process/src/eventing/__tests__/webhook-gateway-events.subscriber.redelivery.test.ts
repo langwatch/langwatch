@@ -119,6 +119,7 @@ async function deliverSpendSteps({
       tenantId: PROJECT_ID,
       aggregateId: requestId,
       occurredAt: Date.now(),
+      createdAt: Date.now(),
       ...arrival,
     });
 

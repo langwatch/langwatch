@@ -34,6 +34,13 @@ Feature: A secret can be handed over once, under an id, and never again
       And the secret is still there for the organization that stashed it
 
     @unit
+    Scenario: A reveal is served only to the person it was stashed for
+      Given a secret stashed for one member of an organization
+      When another member of the same organization reads the reveal id
+      Then the read is refused with the code secret_reveal_expired
+      And the secret is still there for the member it was stashed for
+
+    @unit
     Scenario: A reveal left unread past its window is gone
       Given a secret stashed under a reveal id
       When a day passes before anybody reads it

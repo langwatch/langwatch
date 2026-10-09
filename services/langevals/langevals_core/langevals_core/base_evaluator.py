@@ -24,7 +24,10 @@ from tenacity import (
 )
 from tqdm.auto import tqdm as tqdm_auto
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
-from langevals_core.litellm_patch import patch_litellm
+from langevals_core.litellm_patch import (
+    RequestEndpointWithoutKeyError,
+    patch_litellm,
+)
 from langevals_core.request_env import bind_request_env, request_env
 
 import time
@@ -245,6 +248,9 @@ models_providers_env_vars = {
 
 models_env_vars = [env for envs in models_providers_env_vars.values() for env in envs]
 
+# Evaluator env vars that choose where the evaluator's own calls are sent.
+ENDPOINT_ENV_SUFFIXES = ("_ENDPOINT", "_BASE_URL", "_API_BASE", "_URL")
+
 
 class BaseEvaluator(BaseModel, Generic[TEntry, TSettings, TResult], ABC):
     default_settings: ClassVar[TSettings]  # type: ignore
@@ -290,13 +296,18 @@ class BaseEvaluator(BaseModel, Generic[TEntry, TSettings, TResult], ABC):
                 f"Variable {var} not defined in evaluator env_vars, cannot access it."
             )
 
-        try:
-            return (
-                self.env[var]
-                if self.env is not None and var in self.env
-                else os.environ[var]
+        if self.env is not None and var in self.env:
+            return self.env[var]
+        # The server's own values never pair with an endpoint the request chose.
+        if self.env and any(
+            name.endswith(ENDPOINT_ENV_SUFFIXES) and name in self.env
+            for name in self.env_vars
+        ):
+            raise RequestEndpointWithoutKeyError(
+                f"Variable {var} must be supplied with the request that sets the endpoint."
             )
-
+        try:
+            return os.environ[var]
         except KeyError:
             raise EnvMissingException(f"Variable {var} not defined in environment.")
 

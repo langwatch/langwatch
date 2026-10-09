@@ -8,6 +8,8 @@ export type CodeStepId =
   | "automation:reconcile-report-schedules-after-rollout"
   | "automation:reconcile-slack-claims"
   | "billing:record-usage-billing-catch-up"
+  | "billing:fill-seat-change-organizations"
+  | "data-retention:keep-control-plane-events-forever"
   | "dataset:move-content-to-object-storage"
   | "entitlement:seed-trace-meter"
   | "governance:record-coding-assistant-billing"

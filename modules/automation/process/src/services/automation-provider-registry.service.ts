@@ -28,7 +28,7 @@ import {
 } from "#services/automation-webhook-secrets.service";
 
 /** What a channel's persist hook is handed. */
-export interface PersistActionParamsArgs {
+interface PersistActionParamsArgs {
   /** Schema-parsed wire `actionParams` for this channel. */
   incoming: unknown;
   /**
@@ -40,7 +40,7 @@ export interface PersistActionParamsArgs {
 }
 
 /** The server half of one channel. */
-export interface ServerDef {
+interface ServerDef {
   /** The discriminator stored on the trigger row. */
   readonly action: TriggerAction;
   /**
@@ -53,7 +53,7 @@ export interface ServerDef {
 }
 
 /** One channel: its portable definition, and its process-owned secret half. */
-export interface ServerEntry {
+interface ServerEntry {
   shared: SharedDef;
   server: ServerDef;
 }

@@ -78,6 +78,7 @@ export {
 } from "./pipeline/eventingModule.ts";
 export {
   type OpenPipelineDefinition,
+  pipelineRetentionOf,
   type SealedPipelineDefinition,
   sealPipelineDefinition,
 } from "./pipeline/sealedPipeline.ts";
@@ -226,6 +227,7 @@ export * from "./replay/replayProjections.ts";
 export * from "./replay/projectionLaneReplay.ts";
 export * from "./replay/types.ts";
 export * from "./services/errorHandling.ts";
+export { type FoldReadAuthorizer, foldReadPurpose } from "./projections/foldReadPurpose.ts";
 export * from "./stores/eventStoreUtils.ts";
 export * from "./stores/abstractEventStore.ts";
 export * from "./stores/eventStoreProducerOnly.ts";

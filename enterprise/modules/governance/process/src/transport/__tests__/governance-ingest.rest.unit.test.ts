@@ -14,6 +14,7 @@ import type { ProjectApi } from "@langwatch/project-contract";
  * deployment folds nowhere. Spec: specs/ai-gateway/governance/
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 
 import { MemoryOttlTransformChannel } from "../../channels/memory/memory.ottl-transform.channel.ts";
@@ -125,6 +126,7 @@ function mountIngest(world: World = {}) {
   });
 
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => {
         throw new Error("the ingest receivers resolve their own credential.");

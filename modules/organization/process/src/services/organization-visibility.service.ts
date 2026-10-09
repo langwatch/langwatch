@@ -12,6 +12,7 @@ import {
   type OrganizationCaller,
   type OrganizationWithMembersAndTheirTeams,
 } from "@langwatch/organization-contract";
+import { hasTracesToShow, projectKindsHiddenFrom } from "@langwatch/project-contract";
 
 import { userCanOpenTeam } from "../rules/team-visibility.rules.ts";
 import { OrganizationMembershipService } from "./organization-membership.service.ts";
@@ -93,6 +94,7 @@ export class OrganizationVisibilityService {
         : [];
 
     for (const organization of organizations) {
+      this.#showProjectKindsTo({ organization, userId });
       this.#redactStoredCredentials(organization);
       this.#narrowToViewer({
         organization,
@@ -163,6 +165,21 @@ export class OrganizationVisibilityService {
       permission: "organization:manage",
       organizationId: input.organizationId,
     });
+  }
+
+  /**
+   * An aggregate reads other people's personal projects, so only an
+   * organisation admin sees one (ADR-177 decision 5). It is never sent traces,
+   * so its first-message flag reads through {@link hasTracesToShow}.
+   */
+  #showProjectKindsTo(input: { organization: FullyLoadedOrganization; userId: string }): void {
+    const role = input.organization.members.find((member) => member.userId === input.userId)?.role;
+    const hidden: readonly string[] = projectKindsHiddenFrom(role);
+    for (const team of input.organization.teams) {
+      team.projects = team.projects
+        .filter((project) => !hidden.includes(project.kind))
+        .map((project) => ({ ...project, firstMessage: hasTracesToShow(project) }));
+    }
   }
 
   /**

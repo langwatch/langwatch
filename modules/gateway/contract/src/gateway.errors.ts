@@ -407,6 +407,20 @@ export class GatewayBudgetCycleAnchorInvalidError extends HandledError {
   }
 }
 
+/** A key named an aggregate project as its trace destination; it owns no traces (ADR-177 decision 7). */
+export class GatewayTraceProjectNotADestinationError extends HandledError {
+  declare readonly code: "gateway_trace_project_not_a_destination";
+
+  constructor() {
+    super(
+      "gateway_trace_project_not_a_destination",
+      "That project reads traces from other projects and does not receive traces of its own",
+      { httpStatus: 400, fault: "customer" },
+    );
+    this.name = "GatewayTraceProjectNotADestinationError";
+  }
+}
+
 /** A page cursor this surface never issued; restarting the walk would re-serve every row. */
 export class GatewayInvalidCursorError extends HandledError {
   declare readonly code: "invalid_cursor";

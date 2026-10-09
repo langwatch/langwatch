@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 )
 
 // browserPage is a module's browser half: declaration, screens, drawers, calls.
@@ -144,20 +145,44 @@ func (g *generator) drawerOpeners(owner string, drawer *Drawer) []string {
 	if !drawer.Name.Resolved {
 		return nil
 	}
-	patterns := []string{`\w*Drawer\(\s*["'` + "`" + `]` + regexp.QuoteMeta(drawer.Name.Value) + `["'` + "`" + `]`,
-		`drawer\.open=` + regexp.QuoteMeta(drawer.Name.Value) + `\b`}
-	if drawer.Token != "" {
-		patterns = append(patterns, `\b`+regexp.QuoteMeta(drawer.Token)+`\b`)
+	name := regexp.QuoteMeta(drawer.Name.Value)
+	// Each regexp is tried only where its literal occurs: one alternation over every
+	// browser half ran Go's NFA at each byte and was 90% of a run.
+	openers := []opener{
+		{drawer.Name.Value, regexp.MustCompile(`Drawer\(\s*["'` + "`" + `]` + name + `["'` + "`" + `]`)},
+		{drawer.Name.Value, regexp.MustCompile(`drawer\.open=` + name + `\b`)},
 	}
-	pattern := regexp.MustCompile(strings.Join(patterns, "|"))
+	if drawer.Token != "" {
+		openers = append(openers, opener{drawer.Token, regexp.MustCompile(`\b` + regexp.QuoteMeta(drawer.Token) + `\b`)})
+	}
+	sources := g.browserSources()
+	opens := make([]bool, len(sources))
+	var wg sync.WaitGroup
+	for i, source := range sources {
+		wg.Go(func() {
+			for _, try := range openers {
+				if strings.Contains(source.text, try.literal) && try.pattern.MatchString(source.text) {
+					opens[i] = true
+					return
+				}
+			}
+		})
+	}
+	wg.Wait()
 	var found []string
-	for _, source := range g.browserSources() {
-		if source.module != owner && !contains(found, source.module) && pattern.MatchString(source.text) {
+	for i, source := range sources {
+		if opens[i] && source.module != owner && !contains(found, source.module) {
 			found = append(found, source.module)
 		}
 	}
 	sort.Strings(found)
 	return found
+}
+
+// opener is one way a source opens a drawer, and a literal every match contains.
+type opener struct {
+	literal string
+	pattern *regexp.Regexp
 }
 
 type browserSource struct{ module, text string }

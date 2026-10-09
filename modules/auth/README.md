@@ -13,7 +13,7 @@ Signing in and staying signed in: the browser session, the signed-out front door
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                   |
 | Api token      | `AuthApi` = `moduleApi<AuthApi>()("auth")`, `contract/src/auth.api.ts:417` (57 operations) |
 | Other token    | `AuthCliDeviceFlowApi`, `process/src/transport/auth-cli-device-flow.rest.ts:42`            |
-| Other token    | `AuthDoorApi`, `process/src/transport/auth.rest.ts:45`                                     |
+| Other token    | `AuthDoorApi`, `process/src/transport/auth.rest.ts:47`                                     |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                 |
 
 ## What auth owns

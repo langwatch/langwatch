@@ -1,6 +1,7 @@
 import { moduleApi } from "@langwatch/module";
 import type { OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
 
+import type { PrivacyPolicyRequestMemo } from "./data-privacy.request-memo.ts";
 import type { DataPrivacySnapshot } from "./data-privacy.snapshot.ts";
 import type {
   DataPrivacyConfig,
@@ -48,6 +49,14 @@ export interface SpanContentDropResult {
 /** Callable data-privacy operations shared by process peers after composition. */
 export interface DataPrivacyApi {
   getResolvedForProject(input: { projectId: string }): Promise<ResolvedDataPrivacy>;
+  /**
+   * The strictest fold of every listed project's policy, for a read that sees
+   * several (ADR-177 decision 9). The memo holds one request's folds.
+   */
+  getResolvedForProjects(input: {
+    projectIds: readonly string[];
+    memo?: PrivacyPolicyRequestMemo;
+  }): Promise<ResolvedDataPrivacy>;
   /**
    * Hands the deployment's Google service-account credential, which this
    * module owns, to `build` — undefined where none is configured — and

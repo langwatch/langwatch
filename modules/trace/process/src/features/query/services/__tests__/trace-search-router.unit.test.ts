@@ -14,6 +14,7 @@ import {
   deps,
   input,
   NoModel,
+  PROOF,
   ProviderDisabled,
   ProviderError,
   RANGE,
@@ -64,6 +65,7 @@ describe("given the browser brings Instant Eval's classification", () => {
       });
       expect(d.buildFilter).toHaveBeenCalledWith({
         projectId: "project-1",
+        authorization: PROOF,
         prompt: "errors from gpt-4",
         timeRange: RANGE,
       });

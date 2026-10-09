@@ -111,6 +111,8 @@ export const opsUpgradeStepSchema = z.object({
   statusLabel: z.string(),
   owner: z.string().nullable(),
   description: z.string().nullable(),
+  /** The release a background step must have finished by; null when it names none. */
+  finishBy: z.string().nullable(),
   recorded: z.boolean(),
   inferred: z.boolean(),
   attempt: z.number().int(),

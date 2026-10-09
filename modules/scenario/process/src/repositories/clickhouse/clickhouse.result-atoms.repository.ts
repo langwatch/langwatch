@@ -366,7 +366,7 @@ type RawAtomQueryRow = Omit<RawAtomRow, "Status"> & { Status: string };
  * through, so the composition root can hand it the same routed-tenant
  * client v1's `SimulationClickHouseClient` already composes, with no cast.
  */
-export type ResultAtomsClickHouseClient = {
+type ResultAtomsClickHouseClient = {
   query(input: {
     query: string;
     query_params: Record<string, string | string[]>;

@@ -223,6 +223,8 @@ describe("the worker process installation", () => {
       expect(schedules).not.toEqual([]);
       expect(schedules).toContain("spendSpikeEvaluation");
       expect(schedules).toContain("governanceTraceFacts");
+      // governance's aggregate reconcile: project and member facts enqueue, a daily wake sweeps.
+      expect(schedules).toContain("aggregateProjectReconcile");
       // user's fact outbox: its delivered intents are pruned on the worker's daily wake.
       expect(schedules).toContain("userLifecycleFacts");
     } finally {

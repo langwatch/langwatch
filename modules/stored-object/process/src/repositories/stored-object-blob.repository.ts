@@ -16,9 +16,3 @@ export interface StoredObjectBlobRepository {
   /** Answers whether `uri` currently holds bytes. */
   exists(uri: string): Promise<boolean>;
 }
-
-/**
- * A provider the scheme registry builds on first use rather than at compose
- * time, for a backend whose credentials are not resolved yet.
- */
-export type StoredObjectBlobRepositoryFactory = () => StoredObjectBlobRepository | undefined;

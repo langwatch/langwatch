@@ -15,7 +15,7 @@ import { moduleApi } from "@langwatch/module";
 import { resolveRequestBound } from "@langwatch/plans";
 import type { z } from "zod";
 
-import { cliDeviceFlowRefusalDocument } from "../rules/cli-device-flow-refusal.rules.ts";
+import { cliDeviceFlowRefusalDocument } from "../features/cli-device/rules/cli-device-flow-refusal.rules.ts";
 
 const BODY_LIMIT_JSON_BYTES = resolveRequestBound("bodyLimitJsonBytes", "ENTERPRISE");
 

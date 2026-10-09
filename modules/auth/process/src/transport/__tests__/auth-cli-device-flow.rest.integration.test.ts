@@ -11,21 +11,22 @@ import { createRestRuntime } from "@langwatch/api/rest";
 import { CliSessionRecordNotFoundError, cliRefreshTokenKey } from "@langwatch/auth-contract";
 import { OrganizationNotFoundError } from "@langwatch/organization-contract";
 import { ProjectNotFoundError } from "@langwatch/project-contract";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { UserNotFoundError } from "@langwatch/user-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { MemoryCliDeviceSettlementChannel } from "../../channels/memory/memory.cli-device-settlement.channel.ts";
-import type { CliDeviceSessionRepository } from "../../repositories/cli-device-session.repository.ts";
-import type { CliDeviceDirectory } from "../../services/cli-device-directory.service.ts";
+import type { CliDeviceDirectory } from "../../features/cli-device/services/cli-device-directory.service.ts";
 import {
   CliDeviceFlowService,
   type CliDeviceFlowCollaborators,
-} from "../../services/cli-device-flow.service.ts";
+} from "../../features/cli-device/services/cli-device-flow.service.ts";
 import {
   CliDeviceSessionService,
   DEFAULT_REFRESH_TOKEN_TTL_SECONDS,
-} from "../../services/cli-device-session.service.ts";
+} from "../../features/cli-device/services/cli-device-session.service.ts";
+import type { CliDeviceSessionRepository } from "../../repositories/cli-device-session.repository.ts";
 import { authCliDeviceFlowRest, type AuthCliDeviceFlowApi } from "../auth-cli-device-flow.rest.ts";
 
 const USER_ID = "user-1";
@@ -1397,6 +1398,7 @@ type LiveProject = {
   apiKey: string;
   isPersonal: boolean;
   ownerUserId: string | null;
+  kind: string;
 };
 
 function liveProject(overrides: Partial<LiveProject> = {}): LiveProject {
@@ -1408,6 +1410,7 @@ function liveProject(overrides: Partial<LiveProject> = {}): LiveProject {
     apiKey: "sk-lw-shared",
     isPersonal: false,
     ownerUserId: null,
+    kind: "application",
     ...overrides,
   };
 }
@@ -1622,6 +1625,7 @@ async function personSession(world: ReturnType<typeof deviceFlowWorld>) {
 
 function mount(world: ReturnType<typeof deviceFlowWorld>) {
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => {
         throw new Error("the device grant resolves its own credential.");

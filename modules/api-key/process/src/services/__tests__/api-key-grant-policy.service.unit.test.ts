@@ -4,7 +4,10 @@
  * scope.
  */
 
-import { ApiKeyScopeViolationError } from "@langwatch/api-key-contract";
+import {
+  AggregateProjectHasNoCredentialError,
+  ApiKeyScopeViolationError,
+} from "@langwatch/api-key-contract";
 import type { ApiKeyScope } from "@langwatch/api-key-contract";
 import { MemberNotFoundError } from "@langwatch/organization-contract";
 import { describe, expect, it } from "vitest";
@@ -20,7 +23,11 @@ type Fakes = {
   customRoles?: { id: string; permissions: unknown }[];
   team?: "found" | "missing";
   seat?: "ADMIN" | "MEMBER" | "EXTERNAL" | "DEVELOPER" | "absent";
-  project?: { archivedAt?: Date | null; team: { id: string; organizationId: string } };
+  project?: {
+    archivedAt?: Date | null;
+    kind?: string;
+    team: { id: string; organizationId: string };
+  };
   personalOwner?: string | null;
   attached?: { attached: string[]; duplicates: string[] };
   calls?: Record<string, unknown>[];
@@ -64,6 +71,7 @@ function policyWith(fakes: Fakes = {}) {
       getWithTeam: async () =>
         fakes.project ?? {
           archivedAt: null,
+          kind: "application",
           team: { id: "team-1", organizationId: "organization-1" },
         },
       findPersonalWorkspaceOwner: async () =>
@@ -327,6 +335,22 @@ describe("ApiKeyGrantPolicyService", () => {
 
         await expect(service.validateScope(scope(), ORG)).rejects.toBeInstanceOf(
           ApiKeyScopeViolationError,
+        );
+      });
+    });
+
+    describe("given an aggregate project in this organization", () => {
+      it("refuses it, because an aggregate owns no credential", async () => {
+        const { service } = policyWith({
+          project: {
+            archivedAt: null,
+            kind: "aggregate",
+            team: { id: "team-1", organizationId: ORG },
+          },
+        });
+
+        await expect(service.validateScope(scope(), ORG)).rejects.toBeInstanceOf(
+          AggregateProjectHasNoCredentialError,
         );
       });
     });

@@ -14,6 +14,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/pkg/clog"
+	"github.com/langwatch/langwatch/pkg/config"
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
@@ -73,10 +74,15 @@ func InternalAuthMiddleware(secret string) func(http.Handler) http.Handler {
 				return
 			}
 
-			// Buffer the body once so the downstream handler can re-read it.
-			// /internal/* payloads are small (statements + base64 OTLP),
-			// well within the 32MB ceiling enforced inside the handlers.
-			body, err := io.ReadAll(r.Body)
+			// Buffer the body once, under the gateway-wide ceiling, so the
+			// downstream handler can re-read it.
+			body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, config.DefaultMaxRequestBodyBytes))
+			if bodyReadErrorCode(err) == domain.ErrPayloadTooLarge {
+				herr.WriteHTTP(w, herr.New(r.Context(), domain.ErrPayloadTooLarge, herr.M{
+					"message": "request body exceeds the /internal/* ceiling",
+				}))
+				return
+			}
 			if err != nil {
 				herr.WriteHTTP(w, herr.New(r.Context(), domain.ErrInternal, herr.M{
 					"message": "failed to read request body",

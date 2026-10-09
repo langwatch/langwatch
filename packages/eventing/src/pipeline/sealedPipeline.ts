@@ -1,5 +1,6 @@
 import type { AggregateDefinition } from "../domain/definitions.ts";
 import type { Event, Projection } from "../domain/types.ts";
+import type { RetentionPolicyResolver } from "../runtime.types.ts";
 import type { ProcessManagerDefinition } from "./processManagerDefinition.ts";
 import type { RegisteredCommand, StaticPipelineDefinition } from "./staticBuilder.types.ts";
 import type { PipelineMetadata } from "./types.ts";
@@ -36,4 +37,20 @@ export function sealPipelineDefinition<
     processManagers: definition.processManagers,
     open: (use) => use(definition),
   };
+}
+
+/** The tenant retention the first registered pipeline of this aggregate type declares (§9). */
+export function pipelineRetentionOf({
+  definitions,
+  aggregateType,
+}: {
+  definitions: readonly SealedPipelineDefinition[];
+  aggregateType: string;
+}): RetentionPolicyResolver | undefined {
+  for (const sealed of definitions) {
+    if (sealed.metadata.aggregateType !== aggregateType) continue;
+    const resolver = sealed.open((definition) => definition.retentionPolicyResolver);
+    if (resolver) return resolver;
+  }
+  return undefined;
 }

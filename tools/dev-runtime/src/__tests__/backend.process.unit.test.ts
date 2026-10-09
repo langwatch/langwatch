@@ -28,23 +28,28 @@ function halfSpies(order: string[]) {
 
 describe("given the backend process hosts both applications", () => {
   describe("when it boots", () => {
-    /** @scenario "The backend process starts the worker before the API" */
-    it("starts the worker before the API", async () => {
+    /** @scenario "The backend process starts the API without waiting for the worker's upgrade" */
+    it("boots the API while the worker is still starting", async () => {
       const order: string[] = [];
       const { api, worker } = halfSpies(order);
+      let apiStarted = (): void => {};
+      const apiStarting = new Promise<void>((resolve) => (apiStarted = resolve));
 
       const halves = await startBackend({
         startWorker: async () => {
           order.push("worker.start");
+          await apiStarting;
+          order.push("worker.upgraded");
           return worker;
         },
         startApi: async () => {
           order.push("api.start");
+          apiStarted();
           return api;
         },
       });
 
-      expect(order).toEqual(["worker.start", "api.start"]);
+      expect(order).toEqual(["worker.start", "api.start", "worker.upgraded"]);
       expect(halves).toEqual({ api, worker });
     });
 
@@ -81,6 +86,22 @@ describe("given the backend process hosts both applications", () => {
         }),
       ).rejects.toThrow("no database");
       expect(order).toEqual(["worker.close"]);
+    });
+
+    /** @scenario "A half-started backend drains what it did start" */
+    it("closes the API when the worker refuses to boot", async () => {
+      const order: string[] = [];
+      const { api } = halfSpies(order);
+
+      await expect(
+        startBackend({
+          startWorker: async () => {
+            throw new Error("upgrade failed");
+          },
+          startApi: async () => api,
+        }),
+      ).rejects.toThrow("upgrade failed");
+      expect(order).toEqual(["api.close"]);
     });
   });
 

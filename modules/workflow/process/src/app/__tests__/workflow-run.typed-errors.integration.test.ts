@@ -12,6 +12,7 @@ import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
 import { HttpWorkflowChannels } from "../../channels/http/http.workflow.channels.ts";
@@ -47,6 +48,7 @@ async function postRun({ repositories }: { repositories: WorkflowRepositories })
     repositories,
   });
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({ actor: null, scope: { tier: "project", id: "project_1" } as const }),
     },

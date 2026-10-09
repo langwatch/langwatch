@@ -10,7 +10,7 @@ import {
 /** The one write the backfill makes: closing a run that can no longer finish. */
 type StalledRunCloser = Pick<ScenarioExecutionService, "finishUnsuccessfulRun">;
 
-export type StalledRunFinder = {
+type StalledRunFinder = {
   findStalledRuns(input: { now: number; thresholdMs: number }): Promise<SimulationStalledRun[]>;
 };
 

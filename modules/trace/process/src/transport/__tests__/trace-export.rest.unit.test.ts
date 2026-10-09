@@ -6,6 +6,7 @@
 import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { nowInstant } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -36,6 +37,7 @@ function buildApi({
   }));
   const app = createApiFixture<TraceApi>({ downloadTraceExport });
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({ actor: { type: "user", id: "user-1" }, scope: null }),
       identify: () => {

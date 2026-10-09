@@ -10,6 +10,7 @@ import {
 } from "@langwatch/api/trpc";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -63,6 +64,7 @@ function door({
     identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
     authorization: {
       forRequest: () => ({
+        ...testAuthorizeDefaults,
         getDecision: async ({ permission, scope }) => {
           asked.push({ permission, scope });
 

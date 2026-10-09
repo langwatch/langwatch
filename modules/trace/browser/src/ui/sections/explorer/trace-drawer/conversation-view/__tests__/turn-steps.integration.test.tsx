@@ -12,8 +12,8 @@ vi.mock("../../../../../../behavior/trace-api.ts", () => ({
   api: { traces: { spansFull: { useQuery: mockUseQuery } } },
 }));
 
-vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
-  useOrganizationTeamProject: () => ({ project: { id: "project_1" } }),
+vi.mock("../../../../../../behavior/explorer/use-trace-query-args.ts", () => ({
+  useTraceQueryArgs: () => ({ projectId: "project_1", tenantId: undefined }),
 }));
 
 import { TurnSteps, turnHasGenieSteps } from "../turn-steps.tsx";

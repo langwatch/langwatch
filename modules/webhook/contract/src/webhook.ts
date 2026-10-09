@@ -64,6 +64,8 @@ export const webhookEndpointViewSchema = z.object({
   maxBatchSize: z.number().int(),
   maxBatchDelayMs: z.number().int(),
   maxInFlight: z.number().int(),
+  /** Self-hosted only: deliveries accept a receiver's self-signed certificate. */
+  allowSelfSignedCertificate: z.boolean(),
   createdAt: z.date(),
   updatedAt: z.date(),
 });

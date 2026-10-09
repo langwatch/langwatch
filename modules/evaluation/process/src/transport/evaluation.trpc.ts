@@ -40,7 +40,13 @@ export const evaluationTrpcTransport: TrpcRouterDeclaration<EvaluationApi, typeo
     // `traces:view`, as on `traces.getEvaluationInputs`: the path moved, not the gate.
     .procedure("getEvaluationInputs")
     .withPermission("traces:view")
-    .handle(({ app, input }) =>
-      app.findInputs({ tenantId: input.projectId, evaluationId: input.evaluationId }),
+    .handle(({ app, input, actor, authorization }) =>
+      app.findInputs({
+        projectId: input.projectId,
+        evaluationId: input.evaluationId,
+        ...(input.tenantId === undefined ? {} : { tenantId: input.tenantId }),
+        authorization,
+        userId: actor.id,
+      }),
     )
     .build();

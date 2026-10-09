@@ -11,6 +11,7 @@ import {
 } from "@langwatch/api/rest";
 import type { ExperimentApi } from "@langwatch/experiment-contract";
 import { HandledError } from "@langwatch/handled-error";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 
 import { experimentDspyStepsRest } from "../experiment-dspy-steps.rest.ts";
@@ -57,6 +58,7 @@ function mountLogSteps({
   const app = stubExperimentApi(stubs);
 
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: ({ request, permission }) => {
         if (request.headers.get("Authorization") !== `Bearer ${GOOD_KEY}`) {

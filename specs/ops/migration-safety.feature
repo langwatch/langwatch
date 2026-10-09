@@ -142,6 +142,54 @@ Feature: Migration safety
     Then the scanner reports nothing
     # No code reads either by name, so there is no old image to break.
 
+  # ── Postgres: the api serves through the upgrade (Alex, 2026-10-09) ──
+
+  @unit
+  Scenario: An inline UPDATE or DELETE on an existing table is refused by name
+    When the migration updates or deletes rows of a table it did not create
+    Then the scanner names the migration and the table
+    And the fix says to ship it as a batched, checkpointed background step
+
+  @unit
+  Scenario: DML on a table the migration creates, or an upsert, is accepted
+    When the migration updates a table it creates, or upserts with ON CONFLICT DO UPDATE
+    Then the scanner reports nothing
+
+  @unit
+  Scenario: A column added with a volatile default is refused by name
+    When the migration adds a column to an existing table with gen_random_uuid(), random() or a SERIAL type
+    Then the scanner names the migration, the column and the function
+    And the fix says the table is rewritten under ACCESS EXCLUSIVE
+    # now() and CURRENT_TIMESTAMP are stable: Postgres stores them once, no rewrite.
+
+  @unit
+  Scenario: A constant or stable default is accepted
+    When the migration adds a column with a constant default, now() or CURRENT_TIMESTAMP
+    Then the scanner reports nothing
+
+  @unit
+  Scenario: Two ALTER statements on one existing table are refused by name
+    When the migration has two ALTER TABLE statements on a table it did not create
+    Then the scanner names the migration, the table and the count
+    And the fix says to write one ALTER TABLE with comma-separated actions
+
+  @unit
+  Scenario: One ALTER per existing table is accepted
+    When the migration has one ALTER TABLE per existing table, or several on a table it creates
+    Then the scanner reports nothing
+
+  @unit
+  Scenario: A lock_timeout above the runner's ceiling is refused by name
+    When the migration sets lock_timeout above 2 seconds, or to 0
+    Then the scanner names the migration and the value
+    And the fix says the runner sets 2 seconds and retries
+    # The runner's DEFAULT_LOCK_TIMEOUT_MS is 2 s with a bounded retry (packages/upgrade).
+
+  @unit
+  Scenario: A lock_timeout at or below the ceiling is accepted
+    When the migration sets lock_timeout to 2 seconds or less
+    Then the scanner reports nothing
+
   # ── ClickHouse ────────────────────────────────────────────────────────
 
   @unit
@@ -202,6 +250,32 @@ Feature: Migration safety
     When the up migration creates a view beside the old one and drops the old under a note
     Then the scanner reports nothing
 
+  # ── ClickHouse: no long rewrite at deploy (Alex, 2026-10-09) ─────────
+
+  @unit
+  Scenario: A ClickHouse mutation at deploy is refused unless a background step tracks it
+    When the up migration runs ALTER ... UPDATE or DELETE, DELETE FROM, or MATERIALIZE a column, index, projection or TTL
+    And no "-- background step: <id>" note sits above the statement
+    Then the scanner names the migration, the mutation and the table
+    And the fix says to track it with a background step that waits on system.mutations
+
+  @unit
+  Scenario: A mutation under a note naming its background step is accepted
+    When a "-- background step: <id>" note naming a declared code step sits above the mutation
+    Then the scanner reports nothing
+    And a note naming no declared step is refused by name
+
+  @unit
+  Scenario: MODIFY TTL is refused unless it skips materialising
+    When the up migration modifies a table TTL without SETTINGS materialize_ttl_after_modify = 0
+    Then the scanner refuses it as a mutation at deploy
+
+  @unit
+  Scenario: MODIFY ORDER BY, OPTIMIZE FINAL and POPULATE are refused by name
+    When the up migration changes a sort key, runs OPTIMIZE ... FINAL or creates a materialized view with POPULATE
+    Then the scanner names the migration and the table
+    # These run inside goose and block the upgrade; no step note accepts them.
+
   # ── The scanner itself ────────────────────────────────────────────────
 
   @unit
@@ -247,3 +321,22 @@ Feature: Migration safety
     When the scanner runs
     Then that migration is not read
     And the test fails and names the entry if its migration.sql no longer hashes to that sha
+
+  @unit
+  Scenario: Floor history answers only to the older rules
+    Given Postgres migrations shipped in the newest langwatch@v* release tag
+    When the graceful rules scan them
+    Then they report findings, and the tree scan skips them up to that tag's newest migration, which is on disk
+    # Released history is never rewritten; the cutoff is read from git, never a constant.
+
+  @unit
+  Scenario: ClickHouse floor history answers only to the older rules
+    Given goose files shipped in the newest langwatch@v* release tag
+    When the graceful rules scan them
+    Then the tree scan skips them up to that tag's newest file, which is on disk
+
+  @unit
+  Scenario: A clone without release tags fails the guard with the command that fetches them
+    Given a checkout where no langwatch@v* release tag is readable, as in a shallow CI clone
+    When the Postgres or ClickHouse migration-safety test reads the released cutoff
+    Then it fails, never passes silently, and names the git fetch that brings the tags

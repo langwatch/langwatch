@@ -1,7 +1,7 @@
 /**
  * The shell's answer to auth's host port: the deployment's public shape, its
  * own address, and somewhere to report a failure, over auth's loaded host
- * capability. Auth may reach none of these for itself.
+ * service. Auth may reach none of these for itself.
  */
 
 import type {
@@ -70,7 +70,7 @@ export function uiAuthHost({
   }
 
   return function UiAuthHost() {
-    const capabilities = useOptionalUiHostServices();
+    const hostServices = useOptionalUiHostServices();
     const location = useLocation();
     const params = useParams();
     const [search] = useSearchParams();
@@ -82,9 +82,9 @@ export function uiAuthHost({
         query: Object.fromEntries(search.entries()),
       };
       return new ShellAuthHost(config, reading, (failure) =>
-        capabilities?.feedback?.failed(failure),
+        hostServices?.feedback?.failed(failure),
       );
-    }, [location.pathname, params, search, capabilities]);
+    }, [location.pathname, params, search, hostServices]);
 
     return (
       <auth.AuthHostProvider value={host}>

@@ -4,6 +4,7 @@
  * Ported from main's ai-query.ts; the model calls go through ModelProviderApi.
  */
 
+import type { Authorization } from "@langwatch/authorization";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import {
@@ -276,16 +277,16 @@ export class TraceAiQueryService {
 
   /** `allSettled`: one failing facet drops that field's examples, never the catalogue. */
   private async buildFieldsBlock({
-    projectId,
+    authorization,
     timeRange,
   }: {
-    projectId: string;
+    authorization: Authorization;
     timeRange: { from: number; to: number };
   }): Promise<string> {
     const results = await Promise.allSettled(
       CATEGORICAL_FACET_KEYS.map((facetKey) =>
         this.facets.readFacetValues({
-          tenantId: projectId,
+          authorization,
           timeRange,
           facetKey,
           limit: DYNAMIC_VALUES_LIMIT,

@@ -47,9 +47,9 @@ export class PrismaTopicRepository
   }
 
   async findNamesByIds(input: TopicNamesInput): Promise<Map<string, string>> {
-    if (input.ids.length === 0) return new Map();
+    if (input.ids.length === 0 || input.projectIds.length === 0) return new Map();
     const rows = await this.prisma.topic.findMany({
-      where: { projectId: input.projectId, id: { in: input.ids } },
+      where: { projectId: { in: input.projectIds }, id: { in: input.ids } },
       select: { id: true, name: true },
     });
     return new Map(rows.map((row) => [row.id, row.name]));

@@ -1,5 +1,6 @@
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Menu } from "@langwatch/design-system/menu";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * Directory sync across every customer, in the back office (ADR-122): the
@@ -11,7 +12,6 @@ import {
   Box,
   Button,
   Card,
-  Heading,
   HStack,
   SimpleGrid,
   Spinner,
@@ -64,8 +64,10 @@ export default function DirectorySyncView() {
 
   return (
     <>
-      <VStack gap={6} width="full" align="start">
-        <Heading>Directory Sync</Heading>
+      <PageLayout.Header>
+        <PageLayout.Heading>Directory Sync</PageLayout.Heading>
+      </PageLayout.Header>
+      <VStack gap={6} width="full" align="start" paddingTop={4}>
         <SearchInput
           value={search}
           onChange={(event) => onSearchChange(event.target.value)}

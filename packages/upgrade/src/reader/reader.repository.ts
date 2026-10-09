@@ -43,6 +43,7 @@ const stepRowSchema = z.object({
   updated_at: instant,
   owner: nullable(z.string()),
   description: nullable(z.string()),
+  finish_by: nullable(z.string()),
 });
 export type LedgerStepRow = z.infer<typeof stepRowSchema>;
 

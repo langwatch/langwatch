@@ -15,6 +15,7 @@ import { ProjectApi } from "@langwatch/project-contract";
 import { ShareApi } from "@langwatch/share-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import type { RecordSpanCommandData } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
@@ -175,6 +176,7 @@ function deployment(access: CollectorAccess = {}) {
   apis.ready();
 
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => {
         throw new Error("the ingestion doors resolve their own credential");

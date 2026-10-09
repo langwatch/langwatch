@@ -1,6 +1,7 @@
 import {
   MASKED_KEY_PLACEHOLDER,
   findModelProviderDefinition,
+  ModelProviderInvalidError,
   ProviderKeyMissingError,
   type ModelProviderCredentialVerdict,
   type ModelProviderApi,
@@ -40,6 +41,11 @@ export abstract class ModelProviderCredentialProbe {
     customBaseUrl: string | undefined;
     modelProviders: Pick<ModelProviderApi, "findProviderForProject">;
   }): Promise<ModelProviderCredentialVerdict>;
+  /** Refuses a credential write whose endpoint the egress fence would refuse to reach. */
+  abstract assertEndpointAllowed(input: {
+    provider: string;
+    customKeys: Record<string, unknown>;
+  }): Promise<void>;
 }
 
 /**
@@ -347,6 +353,21 @@ export class HttpModelProviderCredentialProbeService extends ModelProviderCreden
       customKeys: input.customKeys,
       egress: this.egress,
       deployedBaseUrls: this.deployedBaseUrls,
+    });
+  }
+
+  async assertEndpointAllowed(input: {
+    provider: string;
+    customKeys: Record<string, unknown>;
+  }): Promise<void> {
+    const endpointField = findModelProviderDefinition(input.provider)?.endpointKey;
+    const endpoint = endpointField ? input.customKeys[endpointField] : undefined;
+    if (typeof endpoint !== "string" || endpoint.trim() === "") return;
+
+    await this.egress.assertDestination(endpoint.trim()).catch((error: unknown) => {
+      throw new ModelProviderInvalidError(
+        error instanceof Error ? error.message : "The endpoint is not allowed",
+      );
     });
   }
 

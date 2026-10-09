@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { narrowMapColumnProjection } from "../clickhouse.field-mappings.mapper.ts";
 import {
   latestVersionSubquery,
@@ -16,9 +17,10 @@ describe("parseLatestVersionColumn", () => {
 
   describe("when the entry is an aliased expression", () => {
     it("splits the expression from the alias", () => {
-      expect(
-        parseLatestVersionColumn("CAST(TotalCost AS String) AS CostText"),
-      ).toEqual({ name: "CostText", expression: "CAST(TotalCost AS String)" });
+      expect(parseLatestVersionColumn("CAST(TotalCost AS String) AS CostText")).toEqual({
+        name: "CostText",
+        expression: "CAST(TotalCost AS String)",
+      });
     });
   });
 });
@@ -86,10 +88,7 @@ describe("narrowMapColumnProjection", () => {
       expect(
         narrowMapColumnProjection({
           column: "Attributes",
-          expressions: [
-            "ts.Attributes['langwatch.user_id']",
-            "mapKeys(ts.Attributes)",
-          ],
+          expressions: ["ts.Attributes['langwatch.user_id']", "mapKeys(ts.Attributes)"],
         }),
       ).toBeNull();
     });

@@ -18,6 +18,7 @@ import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 
 import { GatewayModule } from "../../app/gateway.app.ts";
@@ -237,6 +238,7 @@ async function mountAsLegacyProjectKey() {
     scope: { tier: "organization" as const, id: ORG_A },
   });
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: { authenticate: door, identify: door },
     doors: { api_key: { authenticate: keyDoor, identify: keyDoor } },
     idempotency: async ({ handler }) => {

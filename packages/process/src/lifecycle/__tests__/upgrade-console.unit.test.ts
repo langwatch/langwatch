@@ -110,9 +110,9 @@ const settledWithin = (promise: Promise<boolean>, ms: number) =>
   ]);
 
 describe("the upgrade console", () => {
-  describe("given the ledger records a failure in the holding phase", () => {
+  describe("given the ledger records a failed first install", () => {
     describe("when a browser asks for a page without a console session", () => {
-      /** @scenario "The holding page of a failed upgrade asks for the token and shows no failure detail" */
+      /** @scenario "The console of a failed first install asks for the token and shows no failure detail" */
       it("answers 503 asking for the token and names no step, error or host", async () => {
         const thread = await bootThread();
         await showConsole(thread);
@@ -331,7 +331,7 @@ describe("the upgrade console", () => {
         await showConsole(thread);
         const cookie = await openSession(thread);
         expect((await post(thread, UPGRADE_RETRY_PATH, {}, cookie)).status).toBe(303);
-        await thread.hold({ phase: "upgrade-gate", outstandingStepIds: [] });
+        await thread.liftConsole();
         const { retried } = await showConsole(thread);
 
         const page = await (await browse(thread, cookie)).text();
@@ -346,14 +346,14 @@ describe("the upgrade console", () => {
 
     describe("when the console session presses Retry and the worker's next run succeeds", () => {
       /** @scenario "Retry from the console returns the failed step to pending and the api moves on when the worker's run succeeds" */
-      it("hands the Retry to the gate, and once the hold lifts neither the console nor its token answers", async () => {
+      it("hands the Retry to the gate, and once the console lifts neither the console nor its token answers", async () => {
         const thread = await bootThread();
         const { retried } = await showConsole(thread);
         const cookie = await openSession(thread);
 
         const pressed = await post(thread, UPGRADE_RETRY_PATH, {}, cookie);
         expect(await retried).toBe(true);
-        await thread.hold(undefined);
+        await thread.liftConsole();
         const page = await browse(thread, cookie);
         const token = await submit(thread, TOKEN);
 

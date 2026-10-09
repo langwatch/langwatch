@@ -25,10 +25,29 @@ vi.mock("@langwatch/observability", () => ({
 import { Temporal } from "@langwatch/time";
 
 import { HttpHubspotFormChannel } from "../channels/http/http.hubspot-form.channel.ts";
+import { MemoryUsageLimitEmailChannel } from "../channels/memory/memory.usage-limit-email.channel.ts";
 import { SlackBillingAlertChannel } from "../channels/slack/slack.billing-alert.channel.ts";
 import { UsageLimitEmailChannel, type UsageLimitEmailData } from "../index.ts";
 import { BillingErrorReporter } from "../services/billing-error-reporter.service.ts";
 import { NotificationService } from "../services/billing-usage-notice.service.ts";
+
+/**
+ * The live Slack and HubSpot channels over the suite's mocks; usage-limit mail
+ * held in memory unless a test fakes it.
+ */
+const createService = (
+  options: Omit<
+    Parameters<typeof NotificationService.create>[0],
+    "slack" | "hubspotForms" | "usageLimitEmail"
+  > &
+    Partial<Parameters<typeof NotificationService.create>[0]>,
+): NotificationService =>
+  NotificationService.create({
+    slack: SlackBillingAlertChannel.create(),
+    hubspotForms: HttpHubspotFormChannel.create(),
+    usageLimitEmail: MemoryUsageLimitEmailChannel.create(),
+    ...options,
+  });
 
 class FakeErrorReporter extends BillingErrorReporter {
   private constructor(readonly capture = vi.fn()) {
@@ -83,7 +102,7 @@ describe("NotificationService", () => {
     };
     errorReporter = FakeErrorReporter.create();
     usageLimitEmail = FakeUsageLimitEmail.create();
-    service = NotificationService.create({ config, errorReporter, usageLimitEmail });
+    service = createService({ config, errorReporter, usageLimitEmail });
   });
 
   describe("create()", () => {
@@ -283,7 +302,7 @@ describe("NotificationService", () => {
         // suite-wide @slack/webhook mock discards the constructor argument,
         // which would let a wrong-channel regression pass unnoticed.
         const createSlackWebhook = vi.fn(() => ({ send: mockSlackSend }));
-        const scopedService = NotificationService.create({
+        const scopedService = createService({
           config: {
             ...config,
             slackSubscriptionsChannel: "https://hooks.slack.com/subs",
@@ -312,7 +331,7 @@ describe("NotificationService", () => {
 
     describe("when the payment provider runs in test mode", () => {
       it("links to the subscription in Stripe's test dashboard", async () => {
-        const testModeService = NotificationService.create({
+        const testModeService = createService({
           config: {
             ...config,
             slackSubscriptionsChannel: "https://hooks.slack.com/subs",
@@ -333,7 +352,7 @@ describe("NotificationService", () => {
     describe("when the notice's props are refused", () => {
       /** @scenario "A notice whose props are refused is reported, never thrown" */
       it("reports the refusal and resolves", async () => {
-        const brokenService = NotificationService.create({
+        const brokenService = createService({
           config: {
             baseHost: "not a url",
             slackSubscriptionsChannel: "https://hooks.slack.com/subs",
@@ -602,7 +621,7 @@ describe("NotificationService", () => {
     describe("when HubSpot env vars are not set", () => {
       it("returns without sending", async () => {
         const mockFetch = vi.fn();
-        const localService = NotificationService.create({
+        const localService = createService({
           config: {
             ...config,
             hubspotPortalId: undefined,
@@ -621,7 +640,7 @@ describe("NotificationService", () => {
     describe("when HubSpot env vars are set", () => {
       it("submits form data to HubSpot", async () => {
         const mockFetch = vi.fn().mockResolvedValue(new Response("ok", { status: 200 }));
-        const localService = NotificationService.create({
+        const localService = createService({
           config: {
             ...config,
             hubspotPortalId: "12345",
@@ -646,7 +665,7 @@ describe("NotificationService", () => {
     describe("when HubSpot request fails", () => {
       it("catches the error and captures exception", async () => {
         const mockFetch = vi.fn().mockResolvedValue(new Response("fail", { status: 500 }));
-        const localService = NotificationService.create({
+        const localService = createService({
           config: {
             ...config,
             hubspotPortalId: "12345",
@@ -682,7 +701,7 @@ describe("NotificationService", () => {
     describe("when hubspotFormId is not configured", () => {
       it("returns without sending", async () => {
         const mockFetch = vi.fn();
-        const localService = NotificationService.create({
+        const localService = createService({
           config: {
             ...config,
             hubspotPortalId: "12345",
@@ -701,7 +720,7 @@ describe("NotificationService", () => {
     describe("when hubspotPortalId is not configured", () => {
       it("returns without sending", async () => {
         const mockFetch = vi.fn();
-        const localService = NotificationService.create({
+        const localService = createService({
           config: {
             ...config,
             hubspotPortalId: undefined,
@@ -719,7 +738,7 @@ describe("NotificationService", () => {
     describe("when both hubspotPortalId and hubspotFormId are configured", () => {
       it("submits form data to the correct HubSpot URL with correct fields", async () => {
         const mockFetch = vi.fn().mockResolvedValue(new Response("ok", { status: 200 }));
-        const localService = NotificationService.create({
+        const localService = createService({
           config: {
             ...config,
             hubspotPortalId: "12345",
@@ -780,7 +799,7 @@ describe("NotificationService", () => {
 
       it("splits a multi-word userName into firstname and lastname", async () => {
         const mockFetch = vi.fn().mockResolvedValue(new Response("ok", { status: 200 }));
-        const localService = NotificationService.create({
+        const localService = createService({
           config: {
             ...config,
             hubspotPortalId: "12345",
@@ -804,7 +823,7 @@ describe("NotificationService", () => {
 
       it("applies per-field defaults when signUpData is missing", async () => {
         const mockFetch = vi.fn().mockResolvedValue(new Response("ok", { status: 200 }));
-        const localService = NotificationService.create({
+        const localService = createService({
           config: {
             ...config,
             hubspotPortalId: "12345",
@@ -832,7 +851,7 @@ describe("NotificationService", () => {
 
       it("falls back to top-level utmCampaign when signUpData has none", async () => {
         const mockFetch = vi.fn().mockResolvedValue(new Response("ok", { status: 200 }));
-        const localService = NotificationService.create({
+        const localService = createService({
           config: {
             ...config,
             hubspotPortalId: "12345",
@@ -857,7 +876,7 @@ describe("NotificationService", () => {
     describe("when HubSpot request fails", () => {
       it("catches the error and captures exception", async () => {
         const mockFetch = vi.fn().mockRejectedValue(new Error("Network error"));
-        const localService = NotificationService.create({
+        const localService = createService({
           config: {
             ...config,
             hubspotPortalId: "12345",
@@ -876,7 +895,7 @@ describe("NotificationService", () => {
     describe("when HubSpot returns a non-OK status", () => {
       it("captures a descriptive error", async () => {
         const mockFetch = vi.fn().mockResolvedValue(new Response("fail", { status: 500 }));
-        const localService = NotificationService.create({
+        const localService = createService({
           config: {
             ...config,
             hubspotPortalId: "12345",

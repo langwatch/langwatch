@@ -30,6 +30,7 @@ function notices(
     recordPresenceSettingChanged: idle,
     recordTraceSharingDisabled: idle,
     recordMemberDisabled: idle,
+    recordMemberEnabled: idle,
   });
   return { service, reportError };
 }

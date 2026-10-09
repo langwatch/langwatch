@@ -2,6 +2,7 @@ import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 /** Exercises the declaration on its in-memory runtime without external members. */
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
 import { MemoryGatewayAgentCacheEntryRepository } from "../../repositories/memory/memory.gateway-agent-cache.repository.ts";
@@ -21,6 +22,7 @@ function mountedAgentCache() {
     deleteAgentCacheEntry: (input) => service.delete(input),
   });
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({
         actor: { type: "api_key", id: "api-key-1" },

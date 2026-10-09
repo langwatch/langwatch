@@ -27,6 +27,7 @@ import {
   virtualKeyBudgetInputSchema,
 } from "@langwatch/gateway-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
@@ -137,6 +138,7 @@ function mount(
     return caller;
   };
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: { authenticate: door, identify: door },
     doors: { api_key: { authenticate: authenticateKey, identify: identifyKey } },
     idempotency: passthroughIdempotency,
@@ -211,7 +213,7 @@ describe("the gateway platform family's public wire", () => {
       throw new PermissionDeniedError({
         permission,
         scope: { type: "organization", id: ORGANIZATION_ID },
-        denialReason: "no-binding",
+        denialReason: "no-grant",
       });
     };
 
@@ -259,7 +261,7 @@ describe("the gateway platform family's public wire", () => {
       throw new PermissionDeniedError({
         permission,
         scope: { type: "project", id: PROJECT_ID },
-        denialReason: "no-binding",
+        denialReason: "no-grant",
       });
     };
 

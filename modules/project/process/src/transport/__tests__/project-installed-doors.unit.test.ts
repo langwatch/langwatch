@@ -12,6 +12,7 @@ import { ProjectApi } from "@langwatch/project-contract";
  * @see specs/projects/projects-browser-door.feature
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { describe, expect, it } from "vitest";
 
@@ -78,6 +79,7 @@ async function doors(overrides: Partial<Peers> = {}) {
   const host = TrpcHost.create({
     sessions: SessionReader.create({ verify: async () => ({ userId: ACTOR.id }) }),
     authz: {
+      ...testAuthorizeDefaults,
       getDecision: async () => PERMITTED,
       getProjectAnyDecision: async () => PERMITTED,
       checkScopeLineage: async () => ({ kind: "consistent" }),

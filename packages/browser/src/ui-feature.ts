@@ -54,7 +54,7 @@ export type UiFeatureInstall = {
   apis?: readonly UiFeatureApiBinding[];
   /** Every feature's reader of a failed mutation, in install order. */
   failures?: readonly UiFailureInterceptor[];
-  /** Capability ports the composing application answers itself. */
+  /** Host service ports the composing application answers itself. */
   capabilities?: UiHostServiceInstall;
   /** The transport those hooks run on. Built same-origin when absent. */
   transport?: UiFeatureApiTransport;
@@ -70,7 +70,7 @@ export type UiFeatureInstall = {
   routes?: Readonly<Record<UiWebRouteParent, readonly RouteObject[]>>;
   /** Every installed module's declared host mounts, in install order. */
   hosts?: readonly UiModuleHostMount[];
-  /** Drawn once inside the capabilities, beside the open drawer; saas's analytics block. */
+  /** Drawn once inside the host services, beside the open drawer; saas's analytics block. */
   footer?: ComponentType;
 };
 

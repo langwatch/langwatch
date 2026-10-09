@@ -139,6 +139,7 @@ describe("trace view contract", () => {
       "lastUsedPromptSpanId",
       "attributes",
       "privacy",
+      "projectId",
     ]);
     expect(Object.keys(spanDetailSchema.shape)).toEqual([
       "spanId",

@@ -1,6 +1,6 @@
 /**
- * The session capability as a screen reads it: who is here, what they may
- * do, what is switched on. Where they are STANDING is the scope capability
+ * The session host service as a screen reads it: who is here, what they may
+ * do, what is switched on. Where they are STANDING is the scope host service
  * beside this one, and it arrives here as a reading (§10.1).
  * @vitest-environment jsdom
  */
@@ -67,7 +67,7 @@ class SilentFeedback extends UiFeedback {
   failed(): void {}
 }
 
-/** What the scope capability publishes while it is still resolving. */
+/** What the scope host service publishes while it is still resolving. */
 const RESOLVING: UiActiveScopeReading = {
   status: "loading",
   organization: void 0,

@@ -8,7 +8,7 @@ import { createHash } from "node:crypto";
 import type { OpsExplainType } from "@langwatch/ops-contract";
 
 /** Whether a query may be wrapped, and the wrapped form when it may. */
-export interface OpsExplainBuild {
+interface OpsExplainBuild {
   wrapped?: string;
   type?: OpsExplainType;
   reason?: string;

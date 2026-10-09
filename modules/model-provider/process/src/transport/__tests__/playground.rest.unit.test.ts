@@ -9,6 +9,7 @@ import type {
   ModelProviderPlaygroundCompletion,
   ModelProviderPlaygroundRequest,
 } from "@langwatch/model-provider-contract";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
 import { playgroundRest } from "../playground.rest.ts";
@@ -40,10 +41,13 @@ function mount(
       return { permitted: options.permitted ?? true, organizationRole: null };
     },
   };
-  const hono = createRestRuntime({ identity }).mount(playgroundRest.router(), {
-    app: () => app,
-    onError: createErrorHandler(),
-  });
+  const hono = createRestRuntime({ identity, authorization: restTestAuthorization() }).mount(
+    playgroundRest.router(),
+    {
+      app: () => app,
+      onError: createErrorHandler(),
+    },
+  );
 
   return (body: unknown = { messages: [] }, path = "/api/playground") =>
     hono.fetch(

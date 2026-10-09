@@ -79,6 +79,19 @@ Feature: Shared project service
     Then the service throws a personal-workspace boundary error
     And it does not write the forbidden change
 
+  @unit
+  Scenario: A member who may only update a project cannot move it to another team
+    Given a project in team "alpha" of its organization
+    When a caller without project:manage on the project, or without project:create in team "beta", moves it to team "beta"
+    Then the service refuses with a project permission error
+    And it does not write the project
+
+  @unit
+  Scenario: A project manager who may create in the destination team moves the project
+    Given a project in team "alpha" of its organization
+    When a caller with project:manage on the project and project:create in team "beta" moves it to team "beta"
+    Then the project moves to team "beta"
+
   # Gap: no test yet proves the tRPC door and the provided ProjectApi share one service over one store.
   @unimplemented
   Scenario: Project compatibility transports share one runtime service

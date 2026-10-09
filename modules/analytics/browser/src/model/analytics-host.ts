@@ -17,6 +17,8 @@ export type AnalyticsHostProject = {
    * about the project rather than the range.
    */
   hasFirstMessage: boolean;
+  /** The project's kind (`application`, `aggregate`, ...), when the host has read it. */
+  kind?: string;
 };
 
 /** The path parameters and query string a screen was opened with. */

@@ -9,7 +9,7 @@ import { featureFlagTrpc } from "@langwatch/feature-flag-contract";
 import { InlineCommandPaletteToken, SidebarToken } from "@langwatch/navigation-client";
 
 import { navigationApi } from "./behavior/navigation-api.ts";
-import { sidebarCapability } from "./behavior/sidebar-capability.ts";
+import { sidebarHostService } from "./behavior/sidebar-host-service.ts";
 
 export const navigationWeb = defineBrowserModule("navigation")
   // navigationApi reads featureFlag.*, so the flags' session tier travels with it.
@@ -37,7 +37,7 @@ export const navigationWeb = defineBrowserModule("navigation")
     commandBar: { load: () => import("./command-bar.ts") },
   })
   /** Sidebar group fold/expand/restore, lent to onboarding's guided tour. */
-  .lends(SidebarToken, { value: sidebarCapability })
+  .lends(SidebarToken, { value: sidebarHostService })
   /** The palette drawn inline in a landing hero, lent to project (§10.1). */
   .lends(InlineCommandPaletteToken, {
     load: async () => ({

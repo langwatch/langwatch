@@ -20,6 +20,7 @@ import {
   type ProjectIdentity,
 } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { PersonalUsageKeyMismatchError, type UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -121,6 +122,7 @@ async function mounted({
   });
 
   const hono = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => {
         if (!authenticated) throw new ProjectMissingCredentialsError();

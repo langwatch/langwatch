@@ -2,7 +2,7 @@
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { sidebarCapability } from "../sidebar-capability.ts";
+import { sidebarHostService } from "../sidebar-host-service.ts";
 import { clearSidebarSectionOverrides } from "../sidebar-section-store.ts";
 import { useSidebarSectionState } from "../use-sidebar-section-state.ts";
 
@@ -18,7 +18,7 @@ describe("useSidebarSectionState", () => {
     );
     expect(result.current.isExpanded).toBe(false);
 
-    sidebarCapability.expandGroup("build");
+    sidebarHostService.expandGroup("build");
     rerender();
 
     expect(result.current.isExpanded).toBe(true);
@@ -38,11 +38,11 @@ describe("useSidebarSectionState", () => {
     const { result, rerender } = renderHook(() =>
       useSidebarSectionState({ id: "build", defaultExpanded: false }),
     );
-    sidebarCapability.expandGroup("build");
+    sidebarHostService.expandGroup("build");
     rerender();
     expect(result.current.isExpanded).toBe(true);
 
-    sidebarCapability.restoreAll();
+    sidebarHostService.restoreAll();
     rerender();
 
     expect(result.current.isExpanded).toBe(false);

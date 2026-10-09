@@ -17223,6 +17223,102 @@ echo "{\"Authorization\": \"Bearer $(get-langwatch-token.sh)\"}"
 
 ---
 
+# FILE: ./coding-agents/codebase-experiment.mdx
+
+---
+title: Test How Your Codebase Steers an Agent
+sidebarTitle: Codebase A/B Experiment
+description: Run the same coding agent task on two versions of your codebase and compare speed, cost and the defects the agent leaves behind. Includes the run we did on our own monorepo.
+keywords:
+  - coding agent codebase structure
+  - claude code refactor experiment
+  - agent friendly codebase
+  - coding agent defects
+  - measure coding agent productivity
+---
+
+A refactor, a new lint rule, a `CLAUDE.md` rewrite or a set of skills all claim to make coding agents work better on your code. You can test that claim: give the same task to the same agent on the codebase before and after the change, and compare what each run cost, how long it took, and what it got wrong.
+
+This is a manual experiment. You run both sessions and grade the result yourself; LangWatch records the sessions and gives you the numbers to compare.
+
+## The run we did
+
+We tested a large layout migration of the LangWatch monorepo ([langwatch#7536](https://github.com/langwatch/langwatch/pull/7536)), which splits the code into feature modules with strict lint rules. The question was whether the new layout made an agent faster, cheaper or more correct.
+
+Two Claude Code sessions started 15 seconds apart on 2026-09-08 on the same machine, with the same prompt and models: a Fable 5.1 coordinator that delegated to Opus sub-agents.
+
+The task was a full feature: an upload button for image cells in datasets and the evaluation workbench, a file column type, files delivered to prompts and agents as attachments, browser testing with screenshots, then a pull request driven through review. One session ran on the old layout and opened [langwatch#7964](https://github.com/langwatch/langwatch/pull/7964); the other ran on the new one and opened [langwatch#7972](https://github.com/langwatch/langwatch/pull/7972).
+
+| | Old layout ([#7964](https://github.com/langwatch/langwatch/pull/7964)) | New layout ([#7972](https://github.com/langwatch/langwatch/pull/7972)) |
+|---|---|---|
+| Wall clock, raw | 3h 52m | 3h 26m |
+| Wall clock, confounds removed | 3h 13m | 3h 08m |
+| Cost, raw (API-equivalent) | 182.28 USD | 189.58 USD |
+| Cost, confounds removed | 167.09 USD | 178.36 USD |
+| Model calls | 1,747 | 1,518 |
+| Tool calls | 1,480 | 1,310 |
+| Mean context of a sub-agent call | 156k tokens | 202k tokens |
+| Typecheck runs | 19 whole-repository, median 78 s | 38 scoped, median 5 s |
+| Review bot threads on the pull request | 33, over 5 review passes | 11, over 1 review pass |
+| Severe defects found by reading the final diff | 0 | 3 |
+
+Each run hit one problem unrelated to the layout, and the adjusted rows remove both. The old-layout machine restarted mid-run (about 102 tool calls and 15 USD of repeated work). The new layout's base branch was missing two files, so the app would not boot until a sub-agent rebuilt them (about 25 minutes and 11 USD).
+
+## What it showed
+
+Speed: about the same. The new layout finished 5 minutes earlier once the confounds were removed, at the same tool-call rate. Its feedback loop was much faster: scoped typechecks took 5 seconds at the median against 78, so the agent checked twice as often for a third of the waiting time.
+
+Cost: about 7% higher on the new layout. It made fewer calls, but each sub-agent carried 29% more context, because one feature now spans several packages and a sub-agent keeps all of them in view. In both runs, the final reports sub-agents write back to the coordinator were about 20% of the cost.
+
+Review: the old-layout pull request drew 33 review bot threads across 5 passes before it merged, about 7 per pass. The new-layout pull request drew 11 threads in its one pass and was closed, so the totals measure how long each stayed in review, not which layout drew fewer findings.
+
+Defects: we read both final diffs and rated each problem. A severe defect is wrong behaviour on a main path of the feature: data lost or delivered wrong, or a request the server should refuse that it accepts. A minor defect is duplication, misplaced code or an inefficiency that does not change what the user gets.
+
+The new layout placed every file where its rules said, and avoided the duplication and one wrong-direction import found in the old run.
+
+The new layout still left the three severe defects, all on the run path: a missing attachment fell back silently and the run succeeded, connected agents received a 27 MB base64 string as message text, and the upload endpoint had no request size cap. The old layout left no severe defect; its findings were all minor: a size limit stated in three places, double buffering, a stray results row, and that import. We merged the old-layout pull request.
+
+With one run per layout, this is a diagnosis, not proof. Agent behaviour varies a lot between runs of the same prompt. The run did show where to look: the layout steered file placement and loop speed, but neither codebase named the connected-agent path or a size cap as required, so the agent skipped them on both. Those belong in a written spec for the feature.
+
+## Run it on your codebase
+
+1. Pick one feature-sized task that touches several parts of the code, and write a single prompt for it that includes testing and opening a pull request.
+2. Prepare two branches: the codebase before and after the change you want to test. Make sure both build and pass CI before you start; a broken base costs the run time and money that tell you about the base, not the change.
+3. [Connect Claude Code to LangWatch](/coding-agents/claude-code), then start both sessions at the same time, on the same machine, with the same model settings, each in its own worktree.
+4. Let both open a pull request and go through the same review bot or reviewer.
+5. Compare the two sessions in LangWatch (queries below), and note anything unrelated to the change that cost either run time, so you can subtract it.
+6. Grade the defects. Count review threads, then have one reviewer read both diffs without knowing which is which and rate every defect as severe (wrong behaviour on a main path) or minor. Run the feature yourself.
+7. Repeat with at least three runs per side before you decide. Use the same prompt each time, and start every run in a fresh worktree at the same commit of its branch, with its own pull request branch, so no run starts from an earlier run's code.
+
+## Read the numbers in LangWatch
+
+The [sessions list](/coding-agents/sessions) shows each session's cost, duration, model calls and peak context, and the [pull requests view](/coding-agents/pull-requests) shows what each pull request cost. To compare branches side by side, run LangWatchQL with the `langwatch` command-line tool:
+
+```bash
+langwatch query run "SELECT GitBranch, count() AS sessions, sum(ModelCalls) AS model_calls,
+  sum(ToolCalls) AS tool_calls, round(sum(CostUsd), 2) AS cost_usd
+  FROM langwatch.coding_sessions
+  WHERE GitBranch IN ('before-branch', 'after-branch') GROUP BY GitBranch"
+```
+
+This reads every project your login can read and every session ever recorded on those branches. Pass `--project <project>` to both commands, and if the branch names were used before, add a time filter: on `StartedAt` for sessions, and `AND TimeUnixMs >= now() - INTERVAL 7 DAY` for events.
+
+For the feedback loop, compare tool durations per branch:
+
+```bash
+langwatch query run "SELECT Branch, ToolName, count() AS runs,
+  quantileExact(0.5)(DurationMs) AS median_ms, sum(DurationMs) AS total_ms
+  FROM langwatch.coding_session_events
+  WHERE EventKind = 'tool_result' AND Branch IN ('before-branch', 'after-branch')
+  GROUP BY Branch, ToolName ORDER BY total_ms DESC"
+```
+
+Your own coding agent can run these too: see [Explore your usage with your own agent](/coding-agents/explore-your-usage-with-your-own-agent).
+
+**Also check:** [Run your own cost experiments](/coding-agents/cost-experiments) for A/B tests of single settings, and [Reduce coding agent cost](/coding-agents/reduce-coding-agent-cost) for the settings worth testing first.
+
+---
+
 # FILE: ./coding-agents/compare-provider-costs.mdx
 
 ---
@@ -17416,6 +17512,116 @@ The report leads with the answer ("your last 30 days cost $X; the same usage pri
 Repricing prices the same usage; a different model changes the usage. The report states window differences and obvious capability constraints and leaves the quality judgment to you.
 
 **Also check:** [Usage analytics](/coding-agents/usage-analytics) for the data this investigation reads, and [Find your context sweet spot](/coding-agents/find-your-context-sweet-spot) for lowering the bill without switching anything.
+
+---
+
+# FILE: ./coding-agents/cost-experiments.mdx
+
+---
+title: Run Your Own Cost Experiments
+sidebarTitle: Cost Experiments
+description: A/B test a Claude Code setting on your own tasks before you roll it out, with the steps, the metric and where LangWatch shows the result. Includes the runs we did.
+keywords:
+  - claude code a/b test
+  - claude code compaction experiment
+  - claude code model comparison cost
+  - prompt cache ttl experiment
+  - claude code subagent model
+---
+
+The savings on [Reduce coding agent cost](/coding-agents/reduce-coding-agent-cost) come from many organisations' sessions. Your work may differ, so measure a setting on your own tasks before you change it for a whole team. Each experiment below runs the same task twice or more under two settings and compares what LangWatch recorded.
+
+These are manual experiments: you run them on your machine, and LangWatch records the sessions.
+
+## How to run any of them
+
+1. [Connect Claude Code to LangWatch](/coding-agents/claude-code) on the machine you test on.
+2. Pick tasks you really do, with a check that says whether the result is right: a failing test to fix, a question with a known answer. Without the check, a cheaper arm may just be doing less.
+3. Run each arm with `claude -p` and pass the setting with `--settings`, which wins over your user settings. A shell `export` loses to a value in any `settings.json` `env` block, so the run silently tests the default.
+
+   ```bash
+   claude -p "<task prompt>" --output-format json \
+     --settings '{"autoCompactWindow": 150000}' > arm-b-run-1.json
+   ```
+
+4. Give each run its own directory with a fresh checkout at the same commit, so the runs do not read each other's cache and no run starts from an earlier run's changes.
+5. Alternate the arms (A, B, A, B) instead of running all of one first.
+6. Run each arm at least three times. Agent behaviour varies: in one of our pilots the same prompt took 19 API calls in one run and 150 in another.
+7. Compare cost, cache reads, model calls and the task check. The JSON result has `total_cost_usd` and `usage`, and each run shows up as a session in the [sessions list](/coding-agents/sessions) with its cost, model calls, peak context and compactions.
+
+On a Claude subscription, `total_cost_usd` and LangWatch both show API-equivalent USD: the result tells you how much more work fits in your plan, not a bill.
+
+## Compaction window
+
+**Question:** does compacting earlier cost less on your sessions, and what does the agent lose?
+
+**Arms:** default against `{"autoCompactWindow": <n>}`, where `n` sits below the peak context your long sessions reach. [Find your context sweet spot](/coding-agents/find-your-context-sweet-spot) suggests a value from your own data.
+
+**Task:** one that grows the context well past `n`, for example reading a large module file by file and answering questions about it. Ask one or two questions at the end about something from early in the session, to see what compaction dropped.
+
+**Metric:** cost and cache-read tokens per run, compactions per run, and the answers. In LangWatch, the session detail shows each compaction with the context before and after it.
+
+**What we measured:** a scripted session read 145 source files one per turn, then answered 6 questions about details in the first files. The default window never compacted and peaked at 488k tokens. A 150k window compacted 4 to 5 times, each at about 118k.
+
+| | Default | `autoCompactWindow: 150000` |
+|---|---|---|
+| Runs | 4 | 4 |
+| Cost per run, list prices | 9.78 USD | 4.81 USD |
+| Cache reads per run | 75.7M | 20.6M |
+| Questions about early files answered | 6 of 6 | 0 of 6 |
+
+The early window cut cost by 51%, but the agent lost what it had read before each compaction. Pick a window that compacts long sessions without cutting into the part of the session your agent still needs, and check the answers, not only the cost.
+
+## Model version
+
+**Question:** does the current model cost less on your tasks than the version you pinned, at the same quality?
+
+**Arms:** `--model claude-opus-5` against `--model claude-opus-5-5`, or whichever pinned id and successor you use.
+
+**Task:** three to five real bug fixes, each with a failing test. Keep a second, hidden set of tests per bug and run it after the agent finishes, to check the fix and not only the visible test.
+
+**Metric:** cost, model calls, duration and hidden tests passed. In LangWatch, [usage analytics](/coding-agents/usage-analytics) splits cost by model.
+
+**What we measured:** 5 bug fixes in a small Python library, 3 runs per model per bug, alternating models, each scored by hidden tests.
+
+| | Opus 5 | Opus 5.5 |
+|---|---|---|
+| Runs | 15 | 15 |
+| Hidden tests passed | 15 of 15 | 15 of 15 |
+| Mean cost per fix | 0.50 USD | 0.19 USD |
+| Median turns | 8 | 5 |
+| Median duration | 51 s | 17 s |
+
+Opus 5.5 cost 63% less per fix (95% CI 56 to 69%) at the same quality. Its lower prices explain about a third of the cost; the rest came from fewer tokens, with half the cache reads and a third of the output.
+
+## Prompt cache lifetime
+
+**Question:** for pay-per-token users, does a one-hour cache on the main conversation cost less than the default five minutes?
+
+**Arms:** `{"promptCacheTtl": "5m"}` against `{"promptCacheTtl": "1h"}`.
+
+**Task:** a session with real pauses. Run three or four prompts in one session with `claude -p --resume <session id>`, and wait 10 to 20 minutes between them, the length of a review or a meeting.
+
+**Metric:** cache-write tokens and cost per session. The JSON result splits writes into `usage.cache_creation.ephemeral_5m_input_tokens` and `ephemeral_1h_input_tokens`. On the five-minute arm, the first call after each pause writes the whole context again. Run this on an API key: a subscription already gets the hour on the main conversation.
+
+## Sub-agent model
+
+**Question:** do built-in sub-agents on Sonnet cost less without hurting the result?
+
+**Arms:** default against `{"env": {"CLAUDE_CODE_SUBAGENT_MODEL": "sonnet"}}`. Explore and Plan keep the main model unless you also set `"CLAUDE_CODE_SUBAGENT_MODEL_FORCE": "1"`, so decide whether they belong in the test.
+
+**Task:** work that makes the agent search and read code through sub-agents, such as "find every place that reads this config value and change it", with a test that checks the change.
+
+**Metric:** cost of the sub-agent calls and the test result. In LangWatch, sub-agent calls carry a query source that starts with `agent:`, so you can split the cost by thread:
+
+```bash
+langwatch query run "SELECT QuerySource, Model, round(sum(CostUsd), 2) AS cost_usd
+  FROM langwatch.coding_session_events
+  WHERE EventKind = 'model_call' AND SessionId IN ('<run 1>', '<run 2>')
+  GROUP BY QuerySource, Model ORDER BY cost_usd DESC"
+```
+
+**Also check:** [Test how your codebase steers an agent](/coding-agents/codebase-experiment) for a larger experiment on speed and defects, run on our own monorepo.
 
 ---
 
@@ -18986,6 +19192,352 @@ Work with the agent for a minute, then open [/me](https://app.langwatch.ai/me):
 - **Send a machine to a team project** with `--project`, or wire servers and CI with no login. See [Team projects](/coding-agents/team-projects) and [Headless machines and CI](/coding-agents/headless-and-ci).
 - **Route the model calls through the LangWatch AI Gateway** for budgets, model policies and provider fallback. See the [coding CLI gateway integrations](/coding-agents/overview).
 - **Control what gets stored.** [Privacy](/coding-agents/privacy) states who can read your sessions, and you can drop the conversation content while keeping the cost and token counts.
+
+---
+
+# FILE: ./coding-agents/reduce-coding-agent-cost.mdx
+
+---
+title: Reduce Coding Agent Cost
+sidebarTitle: Reduce Cost
+description: Seven Claude Code settings and habits that cut cost and context, how to check each one on your own sessions in LangWatch, and the saving to expect.
+keywords:
+  - claude code cost
+  - claude code settings
+  - claude code prompt cache ttl
+  - claude code auto compact window
+  - claude code subagent model
+  - make claude code plan last longer
+---
+
+Most Claude Code spend is cache reads and cache writes: across 105 organisations on LangWatch over 30 days, cache reads were 49% of API-equivalent spend and cache writes 32%. The settings below change how much context each call carries, how often it is written again, and which model reads it.
+
+The skill on this page reads your sessions, runs one check per recommendation, and writes a report with the ones your data supports. Each recommendation states its evidence, the `settings.json` change and the expected saving.
+
+## How you pay changes what a saving means
+
+On a Claude subscription a saving is more work before you reach the plan's usage limits. LangWatch shows those sessions in API-equivalent USD, the price the same tokens would have at Anthropic's list prices. On an API key, Amazon Bedrock, Google Cloud, Microsoft Foundry or usage credits, every token is billed, and a saving is cash.
+
+## Run the check
+
+{/* lw-generated:skill:start */}
+
+<div className="lw-accordion" data-open="true">
+  <div className="lw-accordion-header" role="button" tabIndex={0} aria-expanded="true">
+    <span className="lw-accordion-title">Where can my coding agents save tokens?</span>
+    <svg className="lw-accordion-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9L12 15L18 9" /></svg>
+  </div>
+  <div className="lw-accordion-body">
+    <div className="lw-accordion-commands">
+      <div className="lw-accordion-cmd-col">
+        <div className="lw-accordion-cmd-label">Install via CLI</div>
+        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"npx skills add langwatch/skills/coding-agent-cost"} data-track="docs_copy_skill_install" data-track-title={"Where can my coding agents save tokens?"} data-track-skill={"langwatch/skills/coding-agent-cost"}>
+          <code>npx skills add langwatch/skills/coding-agent-cost</code>
+          <span className="lw-inline-copy-btn lw-copy-line-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+          <span className="lw-inline-copy-btn lw-copy-line-check" style={{ display: "none" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        </div>
+      </div>
+      <div className="lw-accordion-cmd-col">
+        <div className="lw-accordion-cmd-label">Skill Usage</div>
+        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"/coding-agent-cost"} data-track="docs_copy_slash_command" data-track-title={"Where can my coding agents save tokens?"} data-track-command={"/coding-agent-cost"}>
+          <code><span className="lw-slash-command">/coding-agent-cost</span></code>
+          <span className="lw-inline-copy-btn lw-copy-line-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+          <span className="lw-inline-copy-btn lw-copy-line-check" style={{ display: "none" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        </div>
+      </div>
+    </div>
+    <div className="lw-accordion-actions">
+      <div className="lw-accordion-action" role="button" tabIndex={0} data-copy-source="prompt" data-track="docs_copy_prompt" data-track-title={"Where can my coding agents save tokens?"} data-track-skill={"langwatch/skills/coding-agent-cost"}>
+        <span className="lw-accordion-action-icon lw-copy-line-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+        <span className="lw-accordion-action-icon lw-copy-line-check" style={{ display: "none" }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        <span className="lw-accordion-action-text">
+          <span className="lw-accordion-action-title">Copy Full Prompt</span>
+          <span className="lw-accordion-action-subtitle">Run skill without installing</span>
+        </span>
+        <div className="lw-prompt-source">
+
+````text
+Where can my coding agents save tokens?
+
+You are using LangWatch for your AI agent project. Follow these instructions.
+
+IMPORTANT: You will need a LangWatch API key. Check whether LANGWATCH_API_KEY is already set: in the process environment, which is where CI injects it, and otherwise in the project's .env file. Use that key instead of asking for a new one. Read LANGWATCH_ENDPOINT from the same places, and nothing else out of .env: if the endpoint is set, the project is on a self-hosted instance, and the CLI works against that endpoint instead of app.langwatch.ai.
+Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it once with `npm install -g langwatch`, then run the `langwatch` binary directly; an unpinned `npx langwatch` re-resolves the package from the registry on every run.
+
+# Cut Your Coding Agent's Cost and Context
+
+This skill reads the user's own Claude Code sessions from LangWatch, runs one check per recommendation below, and reports only the recommendations their data supports. Every recommendation names the evidence, the exact setting and an expected saving, and says whether that saving was measured in a controlled run or estimated from token counts. It is read-only on the platform and leaves one report file behind.
+
+## Step 1: Set up the LangWatch CLI
+
+Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it once with `npm install -g langwatch`, then run the `langwatch` binary directly; an unpinned `npx langwatch` re-resolves the package from the registry on every run.
+
+Coding-agent sessions live in the user's personal LangWatch workspace by default. `langwatch login --device` signs this machine in; add `--project <slug>` on every read command when the sessions live in a team project instead.
+
+Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
+
+```bash
+langwatch docs                                    # Docs index
+langwatch docs integration/python/guide           # Python integration
+langwatch docs integration/typescript/guide       # TypeScript integration
+langwatch docs prompt-management/cli              # Prompts CLI
+langwatch scenario-docs                           # Scenario docs index
+```
+
+Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. List and get commands accept `--format json` for machine-readable output. Every list command takes `--limit <n>` to cap the rows and `--jq <expr>` to read part of the answer. A paginated list answers with an envelope, so count its rows through the row array (`--jq '.traces | length'`), and read how many there are in all at `.pagination.total`. Bare `--jq length` counts the fields of the envelope, not the rows. Read the docs first instead of guessing SDK APIs or CLI flags.
+
+If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
+
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx --yes langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`. With `--session`, always run `--dry-run` first and let the user read the payload, because a transcript carries content they never reviewed. `npx --yes langwatch report --help` explains the options.
+
+## Step 2: Find Out How the User Pays
+
+The same tokens mean different things to different users, so settle this before any number goes in the report.
+
+- **Claude subscription (Pro, Max, Team, Enterprise seats):** no per-token bill. A saving means more work before the plan's usage limits, not cash. Show USD as "API-equivalent usage" in brackets.
+- **API key, Amazon Bedrock, Google Cloud, Microsoft Foundry, or a subscription drawing on usage credits:** every token is billed. A saving is cash.
+
+Ask the user, or check on their machine: run `claude -p "hello" --output-format json` and read `usage.cache_creation`. One-hour writes (`ephemeral_1h_input_tokens` above zero) on that main-conversation request mean a subscription within plan usage. Five-minute writes (`ephemeral_5m_input_tokens`) mean an API key, a cloud provider or usage credits. Check 5 below also reads this from the data.
+
+## Step 3: Pull the Data
+
+Every query below is LangWatchQL, run with `langwatch query run "<sql>" -o json`. Run `langwatch query schema` once to confirm the column names. Use one window everywhere, 30 days unless the user names another, and aggregate in SQL: a result is capped at 10,000 rows.
+
+`langwatch.coding_session_events` holds one row per event. Model calls have `EventKind = 'model_call'` with `Model`, `InputTokens`, `OutputTokens`, `CacheReadTokens`, `CacheCreationTokens`, `CostUsd`, `TimeUnixMs` and `QuerySource`. `QuerySource` tells threads apart: `repl_main_thread%` or `sdk` is the main conversation, `agent:builtin:<type>` and `agent:custom` are sub-agents, `agent_summary` is a sub-agent's final report, `compact` is a compaction. The context a call carried is `InputTokens + CacheReadTokens + CacheCreationTokens`.
+
+Without `--project`, a query reads every project the login can reach, so check the scope first:
+
+```sql
+SELECT TenantId, count() AS calls, round(sum(CostUsd), 2) AS cost_usd
+FROM langwatch.coding_session_events
+WHERE EventKind = 'model_call' AND TimeUnixMs >= now() - INTERVAL 30 DAY
+GROUP BY TenantId ORDER BY cost_usd DESC
+```
+
+If more than one project comes back, ask whether the report covers the user's own sessions or the whole team. For one project, pass `--project <id or slug>` to every query below; on a LangWatch server older than this flag's support, also add `AND TenantId = '<id>'`.
+
+`langwatch.coding_sessions` holds one row per session, with `Title`, `PeakContextTokens`, `Compactions`, `Models`, `SubAgentTypes`, `CostUsd`, `StartedAt` and `UserId`. Use it to name example sessions.
+
+Start with the spend mix:
+
+```sql
+SELECT Model,
+  multiIf(QuerySource LIKE 'repl_main_thread%' OR QuerySource = 'sdk', 'main',
+          QuerySource LIKE 'agent%', 'subagent', 'other') AS thread,
+  count() AS calls, sum(InputTokens) AS input, sum(OutputTokens) AS output,
+  sum(CacheReadTokens) AS cache_read, sum(CacheCreationTokens) AS cache_write,
+  round(sum(CostUsd), 2) AS cost_usd
+FROM langwatch.coding_session_events
+WHERE EventKind = 'model_call' AND TimeUnixMs >= now() - INTERVAL 30 DAY
+GROUP BY Model, thread ORDER BY cost_usd DESC
+```
+
+Fetch Anthropic's current price list (https://platform.claude.com/docs/en/about-claude/pricing) before repricing anything, and cite it with the fetch date. Never price from memory. The multipliers to check there: a five-minute cache write costs 1.25x the base input price, a one-hour write 2x, a cache read 0.1x on most models and less on some newer ones.
+
+## Step 4: Run the Checks
+
+Run each check, keep the ones that fire, and price each saving on the user's own tokens. The expected ranges below come from 105 organisations' Claude Code data on LangWatch (30 days, API-equivalent USD). Each is labelled **measured** (a controlled A/B run on the same tasks) or **estimated** (the same tokens repriced or re-simulated). Say which one in the report.
+
+### 1. Older model version
+
+**Fires when** 1% or more of spend is on a model that has a cheaper successor in the same tier: Opus 5 or Opus 4.5 to 4.8 (successor Opus 5.5), Sonnet 5 or Sonnet 4.x (Sonnet 5.5), Fable 5 (Fable 5.1). Use the spend mix from Step 3.
+
+**Saving:** reprice the same input, output, cache-read and cache-write tokens at the successor's prices. Cache reads usually dominate coding-agent spend, so the read price difference drives the result. Across organisations where this fires (88% of them) the estimated median is 24% of Claude Code spend, p90 42%. Models from Opus 4.6 back use an older tokenizer that counts fewer tokens for the same text, so the gap for those is smaller than repricing shows.
+
+Measured in a controlled run: on 5 bug-fix tasks (15 runs per model, every hidden test passed with both), Opus 5.5 cost 63% less than Opus 5 per task (95% CI 56 to 69%). The price list explains about 33 points; the rest came from fewer tokens, with half the cache reads, a third of the output and a median of 17 s per task against 51 s.
+
+**Setting:** in `~/.claude/settings.json` (or managed settings for a team), use the alias instead of a pinned id, and check that no `ANTHROPIC_MODEL`, `ANTHROPIC_DEFAULT_OPUS_MODEL` or `ANTHROPIC_DEFAULT_SONNET_MODEL` in the `env` block pins the old one:
+
+```json
+{ "model": "opus" }
+```
+
+### 2. Main conversation past 400k tokens of context
+
+**Fires when** main-thread calls carry more than 400,000 tokens of context. Every call re-reads the whole history from cache, so cost per call grows with context.
+
+```sql
+SELECT SessionId, max(InputTokens + CacheReadTokens + CacheCreationTokens) AS peak_context,
+  countIf(InputTokens + CacheReadTokens + CacheCreationTokens > 400000) AS calls_over_400k,
+  round(sum(CostUsd), 2) AS cost_usd
+FROM langwatch.coding_session_events
+WHERE EventKind = 'model_call' AND (QuerySource LIKE 'repl_main_thread%' OR QuerySource = 'sdk')
+  AND TimeUnixMs >= now() - INTERVAL 30 DAY
+GROUP BY SessionId HAVING calls_over_400k > 0 ORDER BY cost_usd DESC LIMIT 50
+```
+
+**Saving:** simulate compaction at 400k per session: after compacting, the thread restarts at about 40k tokens and grows again, so a call at context `c` above 400k would carry about `40000 + ((c - 400000) mod 360000)`. Saving = removed tokens x read price, minus each compaction (one read of 400k plus about 40k output and 40k write). Estimated median 7% of spend (p90 23%) where it fires, and about 29% on threads that pass 800k.
+
+Measured in a controlled run (4 runs per arm): a session that read 145 files one per turn and peaked at 488k tokens cost 51% less with a 150k window than with the default, with 73% fewer cache reads. The agent then answered 0 of 6 questions about early files, against 6 of 6 without compaction, so do not set the window far below 400k, and expect details from before a compaction to need re-reading.
+
+**Setting:** in `settings.json`, and remove any `CLAUDE_CODE_AUTO_COMPACT_WINDOW` from `env` blocks first, because the environment variable wins over the setting:
+
+```json
+{ "autoCompactWindow": 400000 }
+```
+
+Also: `/compact` at the end of a task, `/clear` before an unrelated one.
+
+### 3. Sub-agents past 600k tokens of context
+
+**Fires when** sub-agent calls (`QuerySource LIKE 'agent%'`) carry more than 600,000 tokens. Use check 2's query with that filter and the threshold changed. The data has no sub-agent id, so count calls, not threads.
+
+**Saving:** the same simulation. Estimated 35% of what those sub-agents cost, but only 18% of organisations that use sub-agents have any, median 2% of total spend. Say "these sub-agents", not "your bill".
+
+**Setting:** the same `autoCompactWindow` applies to sub-agents. The other fix is narrower sub-agent tasks, for example one sub-agent per module instead of one for the whole repository.
+
+### 4. Opus or Fable on built-in sub-agents
+
+**Fires when** `agent:builtin:Explore`, `agent:builtin:general-purpose` or `agent_summary` calls run on an Opus or Fable model.
+
+```sql
+SELECT QuerySource, Model, count() AS calls, round(sum(CostUsd), 2) AS cost_usd
+FROM langwatch.coding_session_events
+WHERE EventKind = 'model_call' AND TimeUnixMs >= now() - INTERVAL 30 DAY
+  AND (QuerySource LIKE 'agent:builtin:%' OR QuerySource = 'agent_summary')
+GROUP BY QuerySource, Model ORDER BY cost_usd DESC
+```
+
+**Saving:** reprice those calls at Sonnet 5.5. Estimated median 4% of spend (p90 19%) where it fires (73% of organisations). Overlaps with check 1 when the sub-agents run an old Opus, so do not add the two. Searching and reading code rarely needs the top model, but say that the user should watch the quality of the sub-agents' reports for a week.
+
+**Setting:** there is no top-level settings key for this. Set the `CLAUDE_CODE_SUBAGENT_MODEL` variable in the `env` block of `settings.json`. On its own it moves general-purpose and any custom agent without a `model:` line; Explore and Plan stay on the main conversation's model:
+
+```json
+{ "env": { "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet" } }
+```
+
+To move Explore and Plan too, add `"CLAUDE_CODE_SUBAGENT_MODEL_FORCE": "1"` to the same block (Claude Code v2.1.257 or later). It also overrides custom agents' `model:` lines and the model Claude picks for a single call, so suggest it only when no custom agent needs a stronger model. To move only Explore, the user can define an agent named `Explore` with `model: sonnet` in `~/.claude/agents/`.
+
+### 5. API key: the five-minute cache is rebuilt after pauses
+
+Applies only to users who pay per token (Step 2). On an API key, Bedrock, Google Cloud or usage credits, Claude Code caches every request for five minutes. A pause of 5 to 60 minutes (reading a diff, a meeting, a long test run) expires the cache, and the next call writes the whole context again.
+
+```sql
+SELECT Model, count() AS calls, sum(cw) AS write_tokens,
+  countIf(gap > 300 AND gap <= 3600) AS pauses_5_to_60_min,
+  countIf(gap > 300 AND gap <= 3600 AND cw > 0.5 * ctx AND ctx > 20000) AS rebuilds_5_to_60_min,
+  sumIf(cw, gap > 300 AND gap <= 3600 AND cw > 0.5 * ctx AND ctx > 20000) AS rebuild_tokens
+FROM (
+  SELECT Model, CacheCreationTokens AS cw,
+    InputTokens + CacheReadTokens + CacheCreationTokens AS ctx,
+    dateDiff('second', lagInFrame(TimeUnixMs) OVER w, TimeUnixMs) AS gap,
+    row_number() OVER w AS rn
+  FROM langwatch.coding_session_events
+  WHERE EventKind = 'model_call' AND (QuerySource LIKE 'repl_main_thread%' OR QuerySource = 'sdk')
+    AND TimeUnixMs >= now() - INTERVAL 30 DAY
+  WINDOW w AS (PARTITION BY SessionId ORDER BY TimeUnixMs
+               ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING)
+)
+WHERE rn > 1 GROUP BY Model ORDER BY write_tokens DESC
+```
+
+**Fires when** more than half of the 5 to 60 minute pauses end in a rebuild. That also confirms a five-minute cache: on a subscription main thread, under 10% of such pauses rebuild.
+
+**Saving:** with the one-hour cache those rebuilds become reads, and every write costs 2x instead of 1.25x. Per model, in base-input-price units: saving = `(2 - read multiplier) x rebuild_tokens - 0.75 x write_tokens`. Recommend it only when the result is positive. Estimated: applied to 101 organisations' real pause patterns, the one-hour cache comes out cheaper for 84 of them, median 59 USD a month (11% of spend), p90 25%. Not measured in a controlled run yet.
+
+**Setting:** `settings.json`, Claude Code v2.1.242 or later:
+
+```json
+{ "promptCacheTtl": "1h" }
+```
+
+Leave sub-agents on five minutes: their pauses are short, and on the same data a one-hour sub-agent cache was cheaper for none of 95 organisations. Through an LLM gateway set with `ANTHROPIC_BASE_URL`, the gateway must forward the `anthropic-beta` header for the one-hour cache to apply. To confirm it took effect, run `claude -p "hello" --output-format json` and check `usage.cache_creation.ephemeral_1h_input_tokens`.
+
+### 6. Subscription: keep the one-hour cache on the main conversation
+
+Applies to subscription users. Claude Code already gives their main conversation the one-hour cache and their sub-agents the five-minute one. Recommend against `promptCacheTtl: "5m"`, `CLAUDE_CODE_PROMPT_CACHE_TTL=5m` or `FORCE_PROMPT_CACHING_5M` if any is set: on the same data, a five-minute main cache would have used more for 84 of 101 organisations. When the plan runs out and Claude Code draws on usage credits, it drops the main conversation to five minutes; `"promptCacheTtl": "1h"` keeps the hour there too, which check 5 prices.
+
+### 7. Sessions that should have been split
+
+**Fires when** a main-thread call after more than 60 minutes idle rewrites more than half of a context over 20k tokens. Use check 5's query with `gap > 3600`. The cache is gone after an hour on any plan, so the whole context is written again at the user's cache write rate: 2x base price with the one-hour cache, 1.25x with the five-minute one.
+
+**Saving:** rebuild tokens x (write multiplier - read multiplier) x base price is the upper bound: 1.9 with the one-hour cache, 1.15 with the five-minute one (a fresh session still writes a small prefix). Estimated median 5% of spend where it fires (93% of organisations).
+
+**Habit, not a setting:** `/compact` before a long break, `/clear` or a new session for unrelated work. Name the user's own sessions that did this.
+
+## Step 5: Report
+
+Write a single self-contained `coding-agent-cost-report.html` in the project root (inline CSS, no external assets) with:
+
+- **The answer first:** the top two or three recommendations by saving, each in one line with the number, the label (measured or estimated) and the setting.
+- A table with one row per fired check: evidence (calls, tokens, example sessions by title), saving in USD and as a share of spend, the label, and the exact `settings.json` snippet.
+- For subscription users, every saving worded as usage before plan limits, with API-equivalent USD in brackets. For API-key users, cash.
+- The window used, the price list link with its fetch date, and the formula behind each estimate.
+- A note that savings overlap (checks 1 and 4 price the same Opus sub-agent calls; checks 2, 3 and 7 touch the same long threads), so the rows do not add up to a total.
+
+State the top recommendation directly in the conversation too. To check the effect later, run the same queries on a window that starts after the change: the session list at `/me/sessions` shows peak context, compactions and cost per session.
+
+## Common Mistakes
+
+- Do NOT tell a subscription user they will save money; they save usage. Do NOT quote USD to them without "API-equivalent".
+- Do NOT recommend a five-minute main cache to a subscription user, and do NOT recommend a one-hour sub-agent cache to anyone.
+- Do NOT set any of these as a shell `export`: a value in a `settings.json` `env` block wins over the shell, so the export is silently ignored. Put settings in `settings.json` and check every level (user, project, local, managed) for a conflicting value.
+- Do NOT present an estimated saving as measured. Only the numbers marked measured above came from controlled runs.
+- Do NOT add the savings of overlapping checks into one total.
+- Do NOT count the first call of a session as a rebuild; it builds the cache.
+- If the CLI returns an error, report the user-facing consequence, not the raw error text.
+````
+
+        </div>
+      </div>
+      <div className="lw-accordion-action" role="button" tabIndex={0} data-download-url="https://raw.githubusercontent.com/langwatch/skills/main/coding-agent-cost/SKILL.md" data-download-name="SKILL.md" data-track="docs_download_skill" data-track-title={"Where can my coding agents save tokens?"} data-track-skill={"langwatch/skills/coding-agent-cost"}>
+        <span className="lw-accordion-action-icon"><svg width="16" height="16" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15.25 3.75H2.75C1.64543 3.75 0.75 4.64543 0.75 5.75V12.25C0.75 13.3546 1.64543 14.25 2.75 14.25H15.25C16.3546 14.25 17.25 13.3546 17.25 12.25V5.75C17.25 4.64543 16.3546 3.75 15.25 3.75Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M8.75 11.25V6.75H8.356L6.25 9.5L4.144 6.75H3.75V11.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M11.5 9.5L13.25 11.25L15 9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M13.25 11.25V6.75" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
+        <span className="lw-accordion-action-text">
+          <span className="lw-accordion-action-title">Download SKILL.md</span>
+          <span className="lw-accordion-action-subtitle">Manual installation</span>
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+
+{/* lw-generated:skill:end */}
+
+## The recommendations
+
+Measured means a controlled A/B run on the same tasks, described in [Run your own cost experiments](/coding-agents/cost-experiments). Estimated means the same tokens repriced or re-simulated from 30 days of real sessions. Ranges are per organisation where the check fires, as a share of its Claude Code spend.
+
+| Recommendation | Setting in `settings.json` | Who it applies to | Expected saving |
+|---|---|---|---|
+| Use the current model version | `"model": "opus"` (not a pinned older id) | 88% of organisations | Estimated median 24%, p90 42%. Measured 63% on our bug-fix runs |
+| Compact the main conversation at 400k | `"autoCompactWindow": 400000` | 79% | Estimated median 7%, p90 23%; about 29% on threads past 800k. Measured 51% at 150k on a long reading session, with lost recall |
+| Compact sub-agents past 600k | same `autoCompactWindow`, and narrower sub-agent tasks | 18% of those with sub-agents | Estimated 35% of those sub-agents' cost, median 2% of the total |
+| Run built-in sub-agents on Sonnet | `"env": { "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet" }`, plus `"CLAUDE_CODE_SUBAGENT_MODEL_FORCE": "1"` to include Explore and Plan | 73% | Estimated median 4%, p90 19% |
+| API key: one-hour cache on the main conversation | `"promptCacheTtl": "1h"` | pay-per-token users whose cache is rebuilt after pauses | Estimated median 11%, p90 25% |
+| Subscription: keep the one-hour main cache | do not set `promptCacheTtl` to `"5m"` | subscription users | Estimated: a five-minute main cache would cost more for 84 of 101 organisations |
+| Split long sessions | `/compact` before a break, `/clear` for a new task | 93% | Estimated median 5% |
+
+The savings overlap. An old Opus running your sub-agents counts in the first and fourth rows, and a long session counts in the compaction and split rows, so the rows do not add up.
+
+## The prompt cache lifetime
+
+Claude Code caches each request for five minutes or one hour. On a subscription within plan usage, the main conversation gets one hour and sub-agents five minutes. On an API key, a cloud provider or usage credits, everything gets five minutes. A one-hour write costs 2x the base input price and a five-minute write 1.25x.
+
+With five minutes, a pause of 5 to 60 minutes expires the cache and the next call writes the whole context again. Applied to 101 organisations' real pause patterns, the one-hour main cache comes out cheaper for 84 of them. For sub-agents it came out cheaper for none of 95, because their calls run back to back. So pay-per-token users should set `"promptCacheTtl": "1h"` (Claude Code v2.1.242 or later) and leave `subagentPromptCacheTtl` alone.
+
+To see which lifetime your main conversation uses, run `claude -p "hello" --output-format json` and read `usage.cache_creation`: one-hour writes are under `ephemeral_1h_input_tokens`, five-minute writes under `ephemeral_5m_input_tokens`.
+
+## Put settings in settings.json
+
+A value in the `env` block of any `settings.json` wins over a shell `export`, so the export can be silently ignored. Put each setting in `~/.claude/settings.json`, in the project's `.claude/settings.json`, or in managed settings for a team. Check every level for a conflicting value first, including `ANTHROPIC_MODEL`, `CLAUDE_CODE_AUTO_COMPACT_WINDOW` and `CLAUDE_CODE_PROMPT_CACHE_TTL` in an `env` block, because each environment variable overrides the setting of the same purpose. The sub-agent model has no setting of its own, so it goes in `env`.
+
+```json ~/.claude/settings.json
+{
+  "model": "opus",
+  "autoCompactWindow": 400000,
+  "env": {
+    "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet"
+  }
+}
+```
+
+Pay-per-token users add `"promptCacheTtl": "1h"`.
+
+## Check the effect
+
+Run the same check on a window that starts after the change. The [sessions list](/coding-agents/sessions) shows peak context, compactions and cost per session, and [usage analytics](/coding-agents/usage-analytics) shows the model mix and cache split over time.
+
+**Also check:** [Run your own cost experiments](/coding-agents/cost-experiments) to measure a setting on your own work before rolling it out, and [Find your context sweet spot](/coding-agents/find-your-context-sweet-spot) to pick a compaction window from your own sessions.
 
 ---
 
@@ -55125,6 +55677,275 @@ State the headline numbers directly in the conversation too.
 
 <div className="lw-accordion">
   <div className="lw-accordion-header" role="button" tabIndex={0} aria-expanded="false">
+    <span className="lw-accordion-title">Cut my coding agents' cost and context</span>
+    <svg className="lw-accordion-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9L12 15L18 9" /></svg>
+  </div>
+  <div className="lw-accordion-body">
+    <div className="lw-accordion-commands">
+      <div className="lw-accordion-cmd-col">
+        <div className="lw-accordion-cmd-label">Install via CLI</div>
+        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"npx skills add langwatch/skills/coding-agent-cost"} data-track="docs_copy_skill_install" data-track-title={"Cut my coding agents' cost and context"} data-track-skill={"langwatch/skills/coding-agent-cost"}>
+          <code>npx skills add langwatch/skills/coding-agent-cost</code>
+          <span className="lw-inline-copy-btn lw-copy-line-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+          <span className="lw-inline-copy-btn lw-copy-line-check" style={{ display: "none" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        </div>
+      </div>
+      <div className="lw-accordion-cmd-col">
+        <div className="lw-accordion-cmd-label">Skill Usage</div>
+        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"/coding-agent-cost"} data-track="docs_copy_slash_command" data-track-title={"Cut my coding agents' cost and context"} data-track-command={"/coding-agent-cost"}>
+          <code><span className="lw-slash-command">/coding-agent-cost</span></code>
+          <span className="lw-inline-copy-btn lw-copy-line-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+          <span className="lw-inline-copy-btn lw-copy-line-check" style={{ display: "none" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        </div>
+      </div>
+    </div>
+    <div className="lw-accordion-actions">
+      <div className="lw-accordion-action" role="button" tabIndex={0} data-copy-source="prompt" data-track="docs_copy_prompt" data-track-title={"Cut my coding agents' cost and context"} data-track-skill={"langwatch/skills/coding-agent-cost"}>
+        <span className="lw-accordion-action-icon lw-copy-line-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+        <span className="lw-accordion-action-icon lw-copy-line-check" style={{ display: "none" }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        <span className="lw-accordion-action-text">
+          <span className="lw-accordion-action-title">Copy Full Prompt</span>
+          <span className="lw-accordion-action-subtitle">Run skill without installing</span>
+        </span>
+        <div className="lw-prompt-source">
+
+````text
+Where can my coding agents save tokens?
+
+You are using LangWatch for your AI agent project. Follow these instructions.
+
+IMPORTANT: You will need a LangWatch API key. Check whether LANGWATCH_API_KEY is already set: in the process environment, which is where CI injects it, and otherwise in the project's .env file. Use that key instead of asking for a new one. Read LANGWATCH_ENDPOINT from the same places, and nothing else out of .env: if the endpoint is set, the project is on a self-hosted instance, and the CLI works against that endpoint instead of app.langwatch.ai.
+Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it once with `npm install -g langwatch`, then run the `langwatch` binary directly; an unpinned `npx langwatch` re-resolves the package from the registry on every run.
+
+# Cut Your Coding Agent's Cost and Context
+
+This skill reads the user's own Claude Code sessions from LangWatch, runs one check per recommendation below, and reports only the recommendations their data supports. Every recommendation names the evidence, the exact setting and an expected saving, and says whether that saving was measured in a controlled run or estimated from token counts. It is read-only on the platform and leaves one report file behind.
+
+## Step 1: Set up the LangWatch CLI
+
+Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it once with `npm install -g langwatch`, then run the `langwatch` binary directly; an unpinned `npx langwatch` re-resolves the package from the registry on every run.
+
+Coding-agent sessions live in the user's personal LangWatch workspace by default. `langwatch login --device` signs this machine in; add `--project <slug>` on every read command when the sessions live in a team project instead.
+
+Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
+
+```bash
+langwatch docs                                    # Docs index
+langwatch docs integration/python/guide           # Python integration
+langwatch docs integration/typescript/guide       # TypeScript integration
+langwatch docs prompt-management/cli              # Prompts CLI
+langwatch scenario-docs                           # Scenario docs index
+```
+
+Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. List and get commands accept `--format json` for machine-readable output. Every list command takes `--limit <n>` to cap the rows and `--jq <expr>` to read part of the answer. A paginated list answers with an envelope, so count its rows through the row array (`--jq '.traces | length'`), and read how many there are in all at `.pagination.total`. Bare `--jq length` counts the fields of the envelope, not the rows. Read the docs first instead of guessing SDK APIs or CLI flags.
+
+If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
+
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx --yes langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`. With `--session`, always run `--dry-run` first and let the user read the payload, because a transcript carries content they never reviewed. `npx --yes langwatch report --help` explains the options.
+
+## Step 2: Find Out How the User Pays
+
+The same tokens mean different things to different users, so settle this before any number goes in the report.
+
+- **Claude subscription (Pro, Max, Team, Enterprise seats):** no per-token bill. A saving means more work before the plan's usage limits, not cash. Show USD as "API-equivalent usage" in brackets.
+- **API key, Amazon Bedrock, Google Cloud, Microsoft Foundry, or a subscription drawing on usage credits:** every token is billed. A saving is cash.
+
+Ask the user, or check on their machine: run `claude -p "hello" --output-format json` and read `usage.cache_creation`. One-hour writes (`ephemeral_1h_input_tokens` above zero) on that main-conversation request mean a subscription within plan usage. Five-minute writes (`ephemeral_5m_input_tokens`) mean an API key, a cloud provider or usage credits. Check 5 below also reads this from the data.
+
+## Step 3: Pull the Data
+
+Every query below is LangWatchQL, run with `langwatch query run "<sql>" -o json`. Run `langwatch query schema` once to confirm the column names. Use one window everywhere, 30 days unless the user names another, and aggregate in SQL: a result is capped at 10,000 rows.
+
+`langwatch.coding_session_events` holds one row per event. Model calls have `EventKind = 'model_call'` with `Model`, `InputTokens`, `OutputTokens`, `CacheReadTokens`, `CacheCreationTokens`, `CostUsd`, `TimeUnixMs` and `QuerySource`. `QuerySource` tells threads apart: `repl_main_thread%` or `sdk` is the main conversation, `agent:builtin:<type>` and `agent:custom` are sub-agents, `agent_summary` is a sub-agent's final report, `compact` is a compaction. The context a call carried is `InputTokens + CacheReadTokens + CacheCreationTokens`.
+
+Without `--project`, a query reads every project the login can reach, so check the scope first:
+
+```sql
+SELECT TenantId, count() AS calls, round(sum(CostUsd), 2) AS cost_usd
+FROM langwatch.coding_session_events
+WHERE EventKind = 'model_call' AND TimeUnixMs >= now() - INTERVAL 30 DAY
+GROUP BY TenantId ORDER BY cost_usd DESC
+```
+
+If more than one project comes back, ask whether the report covers the user's own sessions or the whole team. For one project, pass `--project <id or slug>` to every query below; on a LangWatch server older than this flag's support, also add `AND TenantId = '<id>'`.
+
+`langwatch.coding_sessions` holds one row per session, with `Title`, `PeakContextTokens`, `Compactions`, `Models`, `SubAgentTypes`, `CostUsd`, `StartedAt` and `UserId`. Use it to name example sessions.
+
+Start with the spend mix:
+
+```sql
+SELECT Model,
+  multiIf(QuerySource LIKE 'repl_main_thread%' OR QuerySource = 'sdk', 'main',
+          QuerySource LIKE 'agent%', 'subagent', 'other') AS thread,
+  count() AS calls, sum(InputTokens) AS input, sum(OutputTokens) AS output,
+  sum(CacheReadTokens) AS cache_read, sum(CacheCreationTokens) AS cache_write,
+  round(sum(CostUsd), 2) AS cost_usd
+FROM langwatch.coding_session_events
+WHERE EventKind = 'model_call' AND TimeUnixMs >= now() - INTERVAL 30 DAY
+GROUP BY Model, thread ORDER BY cost_usd DESC
+```
+
+Fetch Anthropic's current price list (https://platform.claude.com/docs/en/about-claude/pricing) before repricing anything, and cite it with the fetch date. Never price from memory. The multipliers to check there: a five-minute cache write costs 1.25x the base input price, a one-hour write 2x, a cache read 0.1x on most models and less on some newer ones.
+
+## Step 4: Run the Checks
+
+Run each check, keep the ones that fire, and price each saving on the user's own tokens. The expected ranges below come from 105 organisations' Claude Code data on LangWatch (30 days, API-equivalent USD). Each is labelled **measured** (a controlled A/B run on the same tasks) or **estimated** (the same tokens repriced or re-simulated). Say which one in the report.
+
+### 1. Older model version
+
+**Fires when** 1% or more of spend is on a model that has a cheaper successor in the same tier: Opus 5 or Opus 4.5 to 4.8 (successor Opus 5.5), Sonnet 5 or Sonnet 4.x (Sonnet 5.5), Fable 5 (Fable 5.1). Use the spend mix from Step 3.
+
+**Saving:** reprice the same input, output, cache-read and cache-write tokens at the successor's prices. Cache reads usually dominate coding-agent spend, so the read price difference drives the result. Across organisations where this fires (88% of them) the estimated median is 24% of Claude Code spend, p90 42%. Models from Opus 4.6 back use an older tokenizer that counts fewer tokens for the same text, so the gap for those is smaller than repricing shows.
+
+Measured in a controlled run: on 5 bug-fix tasks (15 runs per model, every hidden test passed with both), Opus 5.5 cost 63% less than Opus 5 per task (95% CI 56 to 69%). The price list explains about 33 points; the rest came from fewer tokens, with half the cache reads, a third of the output and a median of 17 s per task against 51 s.
+
+**Setting:** in `~/.claude/settings.json` (or managed settings for a team), use the alias instead of a pinned id, and check that no `ANTHROPIC_MODEL`, `ANTHROPIC_DEFAULT_OPUS_MODEL` or `ANTHROPIC_DEFAULT_SONNET_MODEL` in the `env` block pins the old one:
+
+```json
+{ "model": "opus" }
+```
+
+### 2. Main conversation past 400k tokens of context
+
+**Fires when** main-thread calls carry more than 400,000 tokens of context. Every call re-reads the whole history from cache, so cost per call grows with context.
+
+```sql
+SELECT SessionId, max(InputTokens + CacheReadTokens + CacheCreationTokens) AS peak_context,
+  countIf(InputTokens + CacheReadTokens + CacheCreationTokens > 400000) AS calls_over_400k,
+  round(sum(CostUsd), 2) AS cost_usd
+FROM langwatch.coding_session_events
+WHERE EventKind = 'model_call' AND (QuerySource LIKE 'repl_main_thread%' OR QuerySource = 'sdk')
+  AND TimeUnixMs >= now() - INTERVAL 30 DAY
+GROUP BY SessionId HAVING calls_over_400k > 0 ORDER BY cost_usd DESC LIMIT 50
+```
+
+**Saving:** simulate compaction at 400k per session: after compacting, the thread restarts at about 40k tokens and grows again, so a call at context `c` above 400k would carry about `40000 + ((c - 400000) mod 360000)`. Saving = removed tokens x read price, minus each compaction (one read of 400k plus about 40k output and 40k write). Estimated median 7% of spend (p90 23%) where it fires, and about 29% on threads that pass 800k.
+
+Measured in a controlled run (4 runs per arm): a session that read 145 files one per turn and peaked at 488k tokens cost 51% less with a 150k window than with the default, with 73% fewer cache reads. The agent then answered 0 of 6 questions about early files, against 6 of 6 without compaction, so do not set the window far below 400k, and expect details from before a compaction to need re-reading.
+
+**Setting:** in `settings.json`, and remove any `CLAUDE_CODE_AUTO_COMPACT_WINDOW` from `env` blocks first, because the environment variable wins over the setting:
+
+```json
+{ "autoCompactWindow": 400000 }
+```
+
+Also: `/compact` at the end of a task, `/clear` before an unrelated one.
+
+### 3. Sub-agents past 600k tokens of context
+
+**Fires when** sub-agent calls (`QuerySource LIKE 'agent%'`) carry more than 600,000 tokens. Use check 2's query with that filter and the threshold changed. The data has no sub-agent id, so count calls, not threads.
+
+**Saving:** the same simulation. Estimated 35% of what those sub-agents cost, but only 18% of organisations that use sub-agents have any, median 2% of total spend. Say "these sub-agents", not "your bill".
+
+**Setting:** the same `autoCompactWindow` applies to sub-agents. The other fix is narrower sub-agent tasks, for example one sub-agent per module instead of one for the whole repository.
+
+### 4. Opus or Fable on built-in sub-agents
+
+**Fires when** `agent:builtin:Explore`, `agent:builtin:general-purpose` or `agent_summary` calls run on an Opus or Fable model.
+
+```sql
+SELECT QuerySource, Model, count() AS calls, round(sum(CostUsd), 2) AS cost_usd
+FROM langwatch.coding_session_events
+WHERE EventKind = 'model_call' AND TimeUnixMs >= now() - INTERVAL 30 DAY
+  AND (QuerySource LIKE 'agent:builtin:%' OR QuerySource = 'agent_summary')
+GROUP BY QuerySource, Model ORDER BY cost_usd DESC
+```
+
+**Saving:** reprice those calls at Sonnet 5.5. Estimated median 4% of spend (p90 19%) where it fires (73% of organisations). Overlaps with check 1 when the sub-agents run an old Opus, so do not add the two. Searching and reading code rarely needs the top model, but say that the user should watch the quality of the sub-agents' reports for a week.
+
+**Setting:** there is no top-level settings key for this. Set the `CLAUDE_CODE_SUBAGENT_MODEL` variable in the `env` block of `settings.json`. On its own it moves general-purpose and any custom agent without a `model:` line; Explore and Plan stay on the main conversation's model:
+
+```json
+{ "env": { "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet" } }
+```
+
+To move Explore and Plan too, add `"CLAUDE_CODE_SUBAGENT_MODEL_FORCE": "1"` to the same block (Claude Code v2.1.257 or later). It also overrides custom agents' `model:` lines and the model Claude picks for a single call, so suggest it only when no custom agent needs a stronger model. To move only Explore, the user can define an agent named `Explore` with `model: sonnet` in `~/.claude/agents/`.
+
+### 5. API key: the five-minute cache is rebuilt after pauses
+
+Applies only to users who pay per token (Step 2). On an API key, Bedrock, Google Cloud or usage credits, Claude Code caches every request for five minutes. A pause of 5 to 60 minutes (reading a diff, a meeting, a long test run) expires the cache, and the next call writes the whole context again.
+
+```sql
+SELECT Model, count() AS calls, sum(cw) AS write_tokens,
+  countIf(gap > 300 AND gap <= 3600) AS pauses_5_to_60_min,
+  countIf(gap > 300 AND gap <= 3600 AND cw > 0.5 * ctx AND ctx > 20000) AS rebuilds_5_to_60_min,
+  sumIf(cw, gap > 300 AND gap <= 3600 AND cw > 0.5 * ctx AND ctx > 20000) AS rebuild_tokens
+FROM (
+  SELECT Model, CacheCreationTokens AS cw,
+    InputTokens + CacheReadTokens + CacheCreationTokens AS ctx,
+    dateDiff('second', lagInFrame(TimeUnixMs) OVER w, TimeUnixMs) AS gap,
+    row_number() OVER w AS rn
+  FROM langwatch.coding_session_events
+  WHERE EventKind = 'model_call' AND (QuerySource LIKE 'repl_main_thread%' OR QuerySource = 'sdk')
+    AND TimeUnixMs >= now() - INTERVAL 30 DAY
+  WINDOW w AS (PARTITION BY SessionId ORDER BY TimeUnixMs
+               ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING)
+)
+WHERE rn > 1 GROUP BY Model ORDER BY write_tokens DESC
+```
+
+**Fires when** more than half of the 5 to 60 minute pauses end in a rebuild. That also confirms a five-minute cache: on a subscription main thread, under 10% of such pauses rebuild.
+
+**Saving:** with the one-hour cache those rebuilds become reads, and every write costs 2x instead of 1.25x. Per model, in base-input-price units: saving = `(2 - read multiplier) x rebuild_tokens - 0.75 x write_tokens`. Recommend it only when the result is positive. Estimated: applied to 101 organisations' real pause patterns, the one-hour cache comes out cheaper for 84 of them, median 59 USD a month (11% of spend), p90 25%. Not measured in a controlled run yet.
+
+**Setting:** `settings.json`, Claude Code v2.1.242 or later:
+
+```json
+{ "promptCacheTtl": "1h" }
+```
+
+Leave sub-agents on five minutes: their pauses are short, and on the same data a one-hour sub-agent cache was cheaper for none of 95 organisations. Through an LLM gateway set with `ANTHROPIC_BASE_URL`, the gateway must forward the `anthropic-beta` header for the one-hour cache to apply. To confirm it took effect, run `claude -p "hello" --output-format json` and check `usage.cache_creation.ephemeral_1h_input_tokens`.
+
+### 6. Subscription: keep the one-hour cache on the main conversation
+
+Applies to subscription users. Claude Code already gives their main conversation the one-hour cache and their sub-agents the five-minute one. Recommend against `promptCacheTtl: "5m"`, `CLAUDE_CODE_PROMPT_CACHE_TTL=5m` or `FORCE_PROMPT_CACHING_5M` if any is set: on the same data, a five-minute main cache would have used more for 84 of 101 organisations. When the plan runs out and Claude Code draws on usage credits, it drops the main conversation to five minutes; `"promptCacheTtl": "1h"` keeps the hour there too, which check 5 prices.
+
+### 7. Sessions that should have been split
+
+**Fires when** a main-thread call after more than 60 minutes idle rewrites more than half of a context over 20k tokens. Use check 5's query with `gap > 3600`. The cache is gone after an hour on any plan, so the whole context is written again at the user's cache write rate: 2x base price with the one-hour cache, 1.25x with the five-minute one.
+
+**Saving:** rebuild tokens x (write multiplier - read multiplier) x base price is the upper bound: 1.9 with the one-hour cache, 1.15 with the five-minute one (a fresh session still writes a small prefix). Estimated median 5% of spend where it fires (93% of organisations).
+
+**Habit, not a setting:** `/compact` before a long break, `/clear` or a new session for unrelated work. Name the user's own sessions that did this.
+
+## Step 5: Report
+
+Write a single self-contained `coding-agent-cost-report.html` in the project root (inline CSS, no external assets) with:
+
+- **The answer first:** the top two or three recommendations by saving, each in one line with the number, the label (measured or estimated) and the setting.
+- A table with one row per fired check: evidence (calls, tokens, example sessions by title), saving in USD and as a share of spend, the label, and the exact `settings.json` snippet.
+- For subscription users, every saving worded as usage before plan limits, with API-equivalent USD in brackets. For API-key users, cash.
+- The window used, the price list link with its fetch date, and the formula behind each estimate.
+- A note that savings overlap (checks 1 and 4 price the same Opus sub-agent calls; checks 2, 3 and 7 touch the same long threads), so the rows do not add up to a total.
+
+State the top recommendation directly in the conversation too. To check the effect later, run the same queries on a window that starts after the change: the session list at `/me/sessions` shows peak context, compactions and cost per session.
+
+## Common Mistakes
+
+- Do NOT tell a subscription user they will save money; they save usage. Do NOT quote USD to them without "API-equivalent".
+- Do NOT recommend a five-minute main cache to a subscription user, and do NOT recommend a one-hour sub-agent cache to anyone.
+- Do NOT set any of these as a shell `export`: a value in a `settings.json` `env` block wins over the shell, so the export is silently ignored. Put settings in `settings.json` and check every level (user, project, local, managed) for a conflicting value.
+- Do NOT present an estimated saving as measured. Only the numbers marked measured above came from controlled runs.
+- Do NOT add the savings of overlapping checks into one total.
+- Do NOT count the first call of a session as a rebuild; it builds the cache.
+- If the CLI returns an error, report the user-facing consequence, not the raw error text.
+````
+
+        </div>
+      </div>
+      <div className="lw-accordion-action" role="button" tabIndex={0} data-download-url="https://raw.githubusercontent.com/langwatch/skills/main/coding-agent-cost/SKILL.md" data-download-name="SKILL.md" data-track="docs_download_skill" data-track-title={"Cut my coding agents' cost and context"} data-track-skill={"langwatch/skills/coding-agent-cost"}>
+        <span className="lw-accordion-action-icon"><svg width="16" height="16" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15.25 3.75H2.75C1.64543 3.75 0.75 4.64543 0.75 5.75V12.25C0.75 13.3546 1.64543 14.25 2.75 14.25H15.25C16.3546 14.25 17.25 13.3546 17.25 12.25V5.75C17.25 4.64543 16.3546 3.75 15.25 3.75Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M8.75 11.25V6.75H8.356L6.25 9.5L4.144 6.75H3.75V11.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M11.5 9.5L13.25 11.25L15 9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M13.25 11.25V6.75" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
+        <span className="lw-accordion-action-text">
+          <span className="lw-accordion-action-title">Download SKILL.md</span>
+          <span className="lw-accordion-action-subtitle">Manual installation</span>
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div className="lw-accordion">
+  <div className="lw-accordion-header" role="button" tabIndex={0} aria-expanded="false">
     <span className="lw-accordion-title"><strong>⭐ All of the above:</strong> Take my agent to the next level</span>
     <svg className="lw-accordion-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9L12 15L18 9" /></svg>
   </div>
@@ -67615,7 +68436,7 @@ The **Ops Console** (`/ops`) is a platform-wide operations interface built for t
 | Want to test trace ingestion against a project | [The Foundry](/self-hosting/ops/foundry): build and send synthetic traces                                    |
 | SSO setup or directory sync needs investigation | The identity and directory Backoffice pages below                                                            |
 | An upgrade is running, behind or failed       | `/ops/upgrades`: the installation's state, each release's steps and every run ([Upgrade Guide](/self-hosting/upgrade#while-it-runs-and-after)) |
-| An upgrade is waiting on an organization migration | `/ops/migrations`: inspect its result and report                                                          |
+| An upgrade is waiting on an organization migration | `/ops/upgrades?tab=tenants`: Ops > Upgrades > Tenant migrations, to inspect its result and report         |
 | Failed jobs need reprocessing                  | [Queue Management](/self-hosting/ops/queue-management): redrive from the DLQ                                 |
 
 ## Feature Overview
@@ -67674,7 +68495,7 @@ across organizations.
 | `/ops/backoffice/sso-connections` | Inspect connection state and domain evidence, investigate setup, or pause and resume a connection. |
 | `/ops/backoffice/directory-sync` | Inspect SCIM sync failures, provisioning attempts and external user mappings. Retry a retired apply after fixing its cause. |
 | `/ops/upgrades` | Follow an upgrade: the installation's state, each release's steps and every run with its phases and error. |
-| `/ops/migrations` | Inspect migration progress and reports, or run a targeted migration for an organization. |
+| `/ops/upgrades?tab=tenants` | Ops > Upgrades > Tenant migrations: inspect migration progress and reports, or run a targeted migration for an organization. |
 
 Pausing SSO stops new sign-ins through the connection. It leaves existing
 sessions and SCIM provisioning in place. Removing a connection also stops
@@ -69541,10 +70362,12 @@ organization, without waiting. See
 The preparation step still fails in three cases: the migration runner itself
 fails outright, the queue behind it fails to drain, or the fleet makes no
 progress for 25 passes (about two minutes: for example because Redis is
-unreachable, or another process holds every claim). It exits non-zero, which
-fails the upgrade (the Helm pre-upgrade Job where one renders, otherwise the
-workers), and the new api is not ready until the installation is current, so
-the previous version keeps serving; the next run retries from scratch.
+unreachable, or another process holds every claim).
+
+In any of them it exits non-zero, which fails the upgrade (the Helm
+pre-upgrade Job where one renders, otherwise the workers), and the new api is
+not ready until the installation is current, so the previous version keeps
+serving; the next run retries from scratch.
 
 Keep the current identity-provider configuration, callback URLs, and
 `CREDENTIALS_SECRET` during the upgrade. The migration preserves the existing
@@ -69556,10 +70379,11 @@ resolve held or parked tenants; they are not a routine preflight.
 ## Check the migration results
 
 Sign in with an operator account from `ADMIN_EMAILS` and open **Ops >
-Migrations** (`/ops/migrations`). It lists every registered migration with
-Held and Parked counts, and lets you search for an organization to inspect
-its status, target a migration run for it, or kick a fresh pass immediately
-rather than waiting for the next restart.
+Upgrades > Tenant migrations** (`/ops/upgrades?tab=tenants`). It lists every
+registered tenant migration with its Finalized, Held and Parked counts, and
+lets you search for an organization to inspect its status, target a migration
+run for it, or start a fresh pass immediately rather than waiting for the next
+restart.
 
 The live connection indexes deliberately refuse duplicate slots rather than
 silently choosing a connection. `REJECTED`, `DRAFT`, and `CLAIMED` still occupy
@@ -69732,7 +70556,7 @@ Every `1` is safe to retry: the ledger remembers what is done.
 
 ### When a PostgreSQL migration fails
 
-PostgreSQL applies a migration one statement at a time, so a statement cancelled by the 10 second `lock_timeout` leaves its earlier statements applied and a failed row in `_prisma_migrations`. Every migration written after `20261006180001_gateway_realtime_session_metering` is written to survive a second run. For those, `upgrade` marks the failed row rolled back itself (`prisma migrate resolve --rolled-back <migration>`), waits and applies it again, up to 3 attempts with a 2 second then 4 second wait.
+PostgreSQL applies a migration one statement at a time, so a statement cancelled by the 2 second `lock_timeout` leaves its earlier statements applied and a failed row in `_prisma_migrations`. Every migration written after `20261006180001_gateway_realtime_session_metering` is written to survive a second run. For those, `upgrade` marks the failed row rolled back itself (`prisma migrate resolve --rolled-back <migration>`), waits and applies it again, up to 3 attempts with a 2 second then 4 second wait.
 
 A failed row an earlier run left is cleared the same way before the schema is applied.
 
@@ -69742,7 +70566,7 @@ An older migration, or a failed one this image does not ship, stops the run with
 
 Two schema changes touch a whole large table while the upgrade runs.
 
-- **`AuditLog` unique index** (`170500_audit_log_idempotency_key`): PostgreSQL builds it in place and holds a lock that blocks audit writes for the build. On a large table the build can outlast the 10 second `lock_timeout` and fail. Build the index yourself first, during a quiet period, with `CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS` using the index name the migration declares. The migration then finds it and moves on.
+- **`AuditLog` unique index** (`170500_audit_log_idempotency_key`): PostgreSQL builds it in place and holds a lock that blocks audit writes for the build. On a large table the build can outlast the 2 second `lock_timeout` and fail. Build the index yourself first, during a quiet period, with `CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS` using the index name the migration declares. The migration then finds it and moves on.
 - **ClickHouse `trace_summaries` index** (`00103_trace_summaries_updated_at_index`): the index is added and then materialised over every existing row. The mutation runs in the background and competes with merges for IO, and later `ALTER` statements on that table queue behind it. Watch `system.mutations` and run the upgrade at a quiet time on a large table.
 
 ### What the upgrade does
@@ -69756,7 +70580,7 @@ Two schema changes touch a whole large table while the upgrade runs.
   Migrations the image ships that no release lists yet are applied in one pass at the end. A ClickHouse target that fails is reported after the others have run, and fails the upgrade.
 - **Its own record first.** The upgrade keeps its ledger, its lease and the list of running processes in their own PostgreSQL schema, `<your schema>_upgrade_ledger` (`public_upgrade_ledger` by default), which it creates before anything else. The database user in `DATABASE_URL` needs `CREATE` on the database for that; if it has none, create the schema beforehand with that user as its owner.
 - **Never below the floor.** Each release names a long-term-support floor. An installation older than the floor is refused by name (exit code `2`): upgrade to the floor release first, then to this one. [Releases and support](/self-hosting/releases) explains the LTS schedule and which LTS to stop at.
-- **Short locks and retries.** PostgreSQL statements run with a 10 second `lock_timeout`. A statement that waits longer fails instead of blocking your traffic. The upgrade makes up to 3 attempts at a failed schema apply (waiting 2 seconds, then 4), then exits; the previous version keeps serving, and running it again resumes where it stopped.
+- **Short locks and retries.** PostgreSQL statements run with a 2 second `lock_timeout`. A statement that waits longer fails instead of blocking your traffic. The upgrade makes up to 3 attempts at a failed schema apply (waiting 2 seconds, then 4), then exits; the previous version keeps serving, and running it again resumes where it stopped.
 - **One run at a time.** The upgrade holds a lease in its ledger, renews it every 15 seconds and loses it after 60 seconds without a renewal. A second run waits up to 10 minutes for a live holder, saying so every 30 seconds, then exits `3`.
 - **Background steps.** Data copies that do not block the release run on the workers after the upgrade. A step that must not run while an older version still writes waits until every running app and worker is on a version that knows it.
 
@@ -69917,9 +70741,9 @@ The upgrade keeps existing accounts working with no manual step, apart from the 
 - SSO users land on their existing user and organization. The callback URL stays `/api/auth/callback/<provider>`, so the identity provider registration does not change.
 - Azure AD accounts move to the key the new sign-in looks them up by on each user's first sign-in after the upgrade. There is no SQL to run.
 - Browser sessions and API keys keep working.
-- The identity migrations run on first start. Check **Ops > Migrations** afterwards; see [Check the migration results](#check-the-migration-results).
+- The identity migrations run on first start. Check **Ops > Upgrades > Tenant migrations** afterwards; see [Check the migration results](#check-the-migration-results).
 
-The first start runs a migration preflight before the app reports ready. `--timeout 45m` on `helm upgrade` gives it room to start. A migration that cannot finish during the preflight stays gated and does not block startup, so check **Ops > Migrations** once the rollout completes. The app can restart once or twice while the bundled ClickHouse restarts on its new image; that is expected.
+The first start runs a migration preflight before the app reports ready. `--timeout 45m` on `helm upgrade` gives it room to start. A migration that cannot finish during the preflight stays gated and does not block startup, so check **Ops > Upgrades > Tenant migrations** once the rollout completes. The app can restart once or twice while the bundled ClickHouse restarts on its new image; that is expected.
 
 **Provider setting.** The chart now passes `app.nextAuth.provider` to the app as `AUTH_PROVIDER`. `NEXTAUTH_PROVIDER` is still read and logs a deprecation warning. If you select the provider with `NEXTAUTH_PROVIDER` in `app.extraEnvs`, the chart leaves the setting to you, as before. Outside the chart, set `AUTH_PROVIDER`; when both are set it wins.
 
@@ -70027,7 +70851,7 @@ Sent with every report. `DISABLE_USAGE_STATS=true` stops the report as a whole.
 | `auth_method` | at the time of the report | Which sign-in method is configured, so an authentication problem can be reproduced rather than guessed at. | AUTH_PROVIDER, else the deprecated NEXTAUTH_PROVIDER |
 | `sso_provider` | at the time of the report | The name of the identity provider in use, never its configuration or its secrets, so an SSO problem names the product it is about. | Organization.ssoProvider |
 | `connected` | at the time of the report | Whether this install's license names a hosted service, which decides what it may call and which host answers it. | the signed license |
-| `license_key_source` | at the time of the report | Whether licenses are verified against the key LangWatch builds into the release or one a development build was given instead. Release builds verify against the embedded key only, so they always report `embedded`. | the build, then LANGWATCH_LICENSE_PUBLIC_KEY on a development build |
+| `license_key_source` | at the time of the report | Whether licenses are verified against the key LangWatch builds into the release or one the operator named instead, so an install trusting its own signer is not mistaken for a licensed one. | LANGWATCH_LICENSE_PUBLIC_KEY, set or not |
 | `license_key_fingerprint` | at the time of the report | The first 16 hex characters of the SHA-256 of the verifying public key, which tells a development key from a self-made one. Never the key. | the verifying public key |
 | `license_id` | at the time of the report | The license this install runs on, so a report can be matched to the license it claims. Null on an install holding none. | LANGWATCH_LICENSE_KEY, else the first organization's license |
 | `license_verified` | at the time of the report | Whether that license's signature verified against the key, so a license that does not verify is told apart from one that does. Null on an install holding none. | the signed license |
@@ -73835,7 +74659,11 @@ Send your LangWatch API key in any one of these forms:
 | Bearer | `Authorization: Bearer <token>` |
 | Basic | `Authorization: Basic base64(projectId:token)` |
 
-Any LangWatch API key works here: project, organization, or personal. Rows come from every project the key holds the `analytics:view` permission on: a project key reaches its one project, an organization or personal key reaches every project it can read. No project header is required. To narrow the result to one project, filter inside the statement itself with `WHERE TenantId = '<project id>'`.
+Any LangWatch API key works here: project, organization, or personal. Rows come from every project the key holds the `analytics:view` permission on: a project key reaches its one project, an organization or personal key reaches every project it can read. No project header is required.
+
+To run `POST /api/v1/query` over one project only, send its id as `projectId` in the request body: the run then reads that project's rows alone, under that project's own content protections. Without `projectId` the run covers every project the key can read.
+
+You can also filter inside the statement itself with `WHERE TenantId = '<project id>'`, but the result is then redacted by the strictest protection across all the projects the key can read.
 
 A result that mixes rows from more than one project carries the `MULTI_PROJECT_RESULT` diagnostic, so a caller who expected a single project can tell.
 
@@ -73851,6 +74679,7 @@ Both endpoints answer with the standard LangWatch error envelope and a real HTTP
 | `401` | `missing_credentials` | No supported authentication credential was sent. |
 | `401` | `invalid_credentials` | The API key is unknown, revoked, or has the wrong secret. |
 | `403` | `api_key_permission_denied` | The key lacks the `analytics:view` permission on any project. |
+| `404` | `project_not_found` | The body's `projectId` names a project the key cannot read with `analytics:view`, or one that does not exist. The two cases get the same answer. |
 | `413` | `lwql_result_too_large` | The result body exceeds about 8,000,000 bytes. |
 | `422` | `query_scan_limit_exceeded` | The statement is valid but would scan more data than the key allows. |
 

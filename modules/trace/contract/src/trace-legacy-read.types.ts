@@ -1,3 +1,5 @@
+import type { Authorization } from "@langwatch/authorization";
+
 import type { ProjectionPlan } from "./features/ingest/trace-projection.types.ts";
 
 /**
@@ -39,6 +41,8 @@ export interface GetAllTracesForProjectOptions {
    */
   resolveBlobs?: boolean;
   scrollId?: string | null;
+  /** The proof `filterWhere`'s tenant markers expand into (ADR-177 block C). */
+  authorization?: Authorization;
   /**
    * Which time axis the date window + keyset cursor filter on. "occurred"
    * (default) keeps the legacy OccurredAt behavior; "updated" pages by last

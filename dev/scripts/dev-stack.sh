@@ -250,7 +250,7 @@ fi
 # reload on every file change and are restarted when they crash, so a
 # migration inside one of them runs again on each of those — which is how a
 # crashlooping api lane came to re-run three migration processes every second.
-# `haven up` owns the same step for a haven stack (its `prepare` step). The
+# `haven up` runs no such step: its worker runs the upgrade at boot. The
 # script is apps/api's: `pnpm task upgrade` under its own lease, so two stacks
 # starting at once serialise rather than rebuilding a schema underneath one
 # another, then the system-migrations pass (specs/upgrade/entry-points.feature).

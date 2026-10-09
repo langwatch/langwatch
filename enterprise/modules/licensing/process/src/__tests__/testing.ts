@@ -6,7 +6,6 @@ import {
   CONNECT_DEFAULT_LICENSE_ENDPOINT,
 } from "@langwatch/enterprise-licensing-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
-import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import { planQuantities } from "@langwatch/plans";
 import { ResourceScope, type ServerRole } from "@langwatch/process";
 import { ScopedSecrets } from "@langwatch/secrets";
@@ -271,7 +270,6 @@ export function createTestLicensingApp(
   const secrets = options.secrets ?? {};
   return LicensingModule.create({
     dependencies: {
-      instantEval: createApiFixture<InstantEvalApi>(),
       scopes: createApiFixture<AuthzApi>(),
       gateway: createApiFixture<GatewayApi>(),
       ...options.dependencies,

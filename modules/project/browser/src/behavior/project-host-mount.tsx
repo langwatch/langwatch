@@ -1,7 +1,7 @@
 /**
  * Project's answer to the port its settings screen declares: the organization
  * graph comes from this module's own tRPC read, everything else projects a
- * `@langwatch/browser-host` capability. ARCHITECTURE.md §10.1.
+ * `@langwatch/browser-host` host service. ARCHITECTURE.md §10.1.
  */
 
 import { useUiHostServices, useUiScope } from "@langwatch/browser-host/capabilities";
@@ -28,7 +28,7 @@ type ProjectOrganizationGraph = ProjectApiMap["organization"]["getAll"]["query"]
 /** A stable reference, so a query still loading never re-triggers a memo below it. */
 const NO_ORGANIZATIONS: readonly ProjectOrganizationGraph[] = [];
 
-class CapabilityProjectHost extends ProjectHostApi {
+class HostServiceProjectHost extends ProjectHostApi {
   private readonly organization_: ProjectHostOrganization | undefined;
   private readonly project_: ProjectHostProject | undefined;
   private readonly hasPermissionOf: (permission: string) => boolean;
@@ -137,7 +137,7 @@ export default function ProjectHostMount({ children }: { children?: ReactNode })
 
   const host = useMemo(
     () =>
-      new CapabilityProjectHost({
+      new HostServiceProjectHost({
         organization,
         project,
         hasPermissionOf: (permission) => session.hasPermission(permission),

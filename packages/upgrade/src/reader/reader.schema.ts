@@ -91,6 +91,8 @@ export const upgradeStepViewSchema = z.object({
   statusLabel: z.string(),
   owner: z.string().nullable(),
   description: z.string().nullable(),
+  /** The release a background step must finish by (STEP-FINISHBY); null when it names none. */
+  finishBy: z.string().nullable(),
   recorded: z.boolean(),
   inferred: z.boolean(),
   attempt: z.number().int(),
@@ -200,6 +202,7 @@ export const upgradeImageStepSchema = z.object({
   release: z.string().nullable().optional(),
   owner: z.string().nullable().optional(),
   description: z.string().nullable().optional(),
+  finishBy: z.string().nullable().optional(),
   needsOldWritersGone: z.boolean().optional(),
 });
 export type UpgradeImageStep = z.infer<typeof upgradeImageStepSchema>;

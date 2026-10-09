@@ -5,6 +5,7 @@
  */
 import { ProjectInvalidCredentialsError, ProjectMissingCredentialsError } from "@langwatch/api";
 import { BearerIdentity, RestHost } from "@langwatch/api/rest";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 
 import type { AuthSessionPoll } from "../../rules/auth-session-poll.rules.ts";
@@ -39,6 +40,7 @@ function authWorld(overrides: Partial<AuthDoorApi> = {}) {
   };
   const closed = BearerIdentity.create({ name: "unconfigured", token: void 0 });
   const host = RestHost.create({
+    authz: restTestAuthorization().forRequest(),
     identities: {
       project: closed,
       organization: closed,
@@ -207,6 +209,34 @@ describe("given the /api/auth family mounted on a process's own doors", () => {
 
       expect(retry.status).toBe(302);
       expect(world.revokeSessionFromCookies).toHaveBeenCalledTimes(2);
+    });
+
+    it.each([
+      ["GET", "cross-site"],
+      ["GET", "same-site"],
+      ["POST", "cross-site"],
+    ])("refuses a %s sign-out another site started (%s), ending nothing", async (method, site) => {
+      const world = authWorld();
+
+      const response = await world.app.request(`${BASE_URL}/api/auth/logout`, {
+        method,
+        headers: { cookie: "better-auth.session_token=abc", "sec-fetch-site": site },
+      });
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({ code: "cross_origin_refused" });
+      expect(world.revokeSessionFromCookies).not.toHaveBeenCalled();
+    });
+
+    it("signs out a navigation from our own pages", async () => {
+      const world = authWorld();
+
+      const response = await world.app.request(`${BASE_URL}/api/auth/logout`, {
+        headers: { cookie: "better-auth.session_token=abc", "sec-fetch-site": "same-origin" },
+      });
+
+      expect(response.status).toBe(302);
+      expect(world.revokeSessionFromCookies).toHaveBeenCalled();
     });
 
     it("follows the federated target where the deployment resolves one", async () => {

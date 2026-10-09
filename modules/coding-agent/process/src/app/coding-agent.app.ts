@@ -1,4 +1,5 @@
 import { AuditLogApi } from "@langwatch/audit-log-contract";
+import type { Authorization } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
 import {
   type CodingAgentSessionLookupInput,
@@ -301,13 +302,14 @@ export class CodingAgentModule implements CodingAgentApi {
     traceId: string;
     occurredAtMs?: number | undefined;
     viewerUserId: string;
+    authorization?: Authorization;
   }): Promise<CodingAgentTranscript> {
     return codingAgentTranscriptSchema.parse(await this.#traces.readCodingAgentTranscript(input));
   }
 
   /** Port of main's `traces.sessions`: trace reads the page for the viewer, this enriches it. */
   readSessionGroupsForViewer(
-    input: TraceSessionGroupsInput & { viewerUserId: string },
+    input: TraceSessionGroupsInput & { viewerUserId: string; authorization: Authorization },
   ): Promise<TracesSessionsPage> {
     return this.#sessionGroups.readForViewer(input);
   }

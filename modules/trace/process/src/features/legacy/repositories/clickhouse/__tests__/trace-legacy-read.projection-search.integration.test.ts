@@ -8,19 +8,19 @@ import type {
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { enrichTracesWithEvaluations } from "../../../../../rules/trace-evaluation-enrichment.rules.ts";
-/** @vitest-environment node
- * @integration
- * Integration coverage for the trace search projection DSL. Proves
- * specs/traces/trace-search-projection.feature against real infra. */
-import { compileProjection } from "../../../../projection/rules/trace-projection-compile.rules.ts";
-import { TraceCanonicalisationService } from "../../../../derivation/services/trace-canonicalisation.service.ts";
-import { TraceLegacyReadClickHouseRepository } from "../trace-legacy-read.repository.ts";
 import { openProtections } from "../../../../../repositories/clickhouse/__tests__/open-protections.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
 } from "../../../../../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
+import { enrichTracesWithEvaluations } from "../../../../../rules/trace-evaluation-enrichment.rules.ts";
+import { TraceCanonicalisationService } from "../../../../derivation/services/trace-canonicalisation.service.ts";
+/** @vitest-environment node
+ * @integration
+ * Integration coverage for the trace search projection DSL. Proves
+ * specs/traces/trace-search-projection.feature against real infra. */
+import { compileProjection } from "../../../../projection/rules/trace-projection-compile.rules.ts";
+import { TraceLegacyReadClickHouseRepository } from "../trace-legacy-read.repository.ts";
 
 const clickHouseConfigured = testClickHouseConfigured();
 

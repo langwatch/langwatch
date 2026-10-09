@@ -74,7 +74,7 @@ class RecordingFeedback extends UiFeedback {
   }
 }
 
-/** The scope capability beside this one, already settled on nothing. */
+/** The scope host service beside this one, already settled on nothing. */
 const RESOLVED_SCOPE: UiActiveScopeReading = {
   status: "ready",
   organization: void 0,

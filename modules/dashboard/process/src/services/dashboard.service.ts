@@ -215,21 +215,25 @@ export class DashboardService {
     return { success: true as const };
   }
 
-  /** The project's first board, or a new one after the last. */
+  /** The first dashboard, created when there is none and the project takes writes (ADR-177). */
   async getOrCreateFirst(input: {
     projectId: string;
+    acceptsWrites: boolean;
     viewer?: DashboardViewer;
-  }): Promise<Dashboard> {
+  }): Promise<Dashboard[]> {
     const projectId = projectIdSchema.parse(input.projectId);
 
     const first = await this.#repository.findFirstDashboard({ projectId });
-    if (first) return first;
+    if (first) return [first];
+    if (!input.acceptsWrites) return [];
 
-    return this.create({
+    const created = await this.create({
       projectId,
       name: "Reports",
       ...(input.viewer === undefined ? {} : { createdById: input.viewer.userId }),
     });
+
+    return [created];
   }
 
   // -- favourites ------------------------------------------------------------

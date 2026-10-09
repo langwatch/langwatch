@@ -8,7 +8,7 @@ import type { NavigationOrganization, NavigationTeam } from "@langwatch/navigati
 
 import type { UiRootHostServices } from "./ui-root-host-services";
 
-/** Organization's team rules, handed in from its loaded scope capability. */
+/** Organization's team rules, handed in from its loaded scope host service. */
 export type NavigationTeamRules = Pick<
   UiRootHostServices["scope"],
   "selectAmbientTeam" | "userCanOpenTeam"
@@ -61,6 +61,7 @@ export function toNavigationOrganizations(read: NavigationGraphRead): Navigation
         id: project.id,
         name: project.name,
         slug: project.slug,
+        kind: project.kind,
         isPersonal: team.isPersonal,
         lastCodingAgentSessionAt: project.lastCodingAgentSessionAt,
         lastCodingAgentPullRequestAt: project.lastCodingAgentPullRequestAt,

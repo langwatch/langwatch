@@ -42,12 +42,12 @@ import type { FeatureSetup } from "@langwatch/process";
 import { Temporal } from "@langwatch/time";
 
 import type { BillingStripeChannels } from "../channels/billing-stripe.channels.ts";
-import { billingSubscriptionNotifierChannels } from "../channels/billing-subscription-notifier-channels.registry.ts";
 import type { BillingSubscriptionNotifier } from "../channels/billing-subscription-notifier.channel.ts";
-import { billingWebhookHostChannels } from "../channels/billing-webhook-host-channels.registry.ts";
 import type { BillingWebhookHost } from "../channels/billing-webhook-host.channel.ts";
 import type { BillingChannels } from "../channels/billing.channels.ts";
 import type { ConnectedStatementMailChannel } from "../channels/connected-statement-mail.channel.ts";
+import { SlackBillingSubscriptionNotifierChannel } from "../channels/slack/slack.billing-subscription-notifier.channel.ts";
+import { SlackBillingWebhookHostChannel } from "../channels/slack/slack.billing-webhook-host.channel.ts";
 import type { BillingLifecyclePipeline } from "../eventing/billing-lifecycle.pipeline.ts";
 import {
   type BillingReportingDefinition,
@@ -141,7 +141,7 @@ type StripeWebhookComposition = Readonly<{
   /** Main's licence purchase: signs, records, mails and announces; absent without the key. */
   licensePurchase?: LicensePurchaseHandler;
   /** Clears a trial's licence once its subscription activates; licensing owns it. */
-  licenses: Pick<LicensingApi, "removeLicense">;
+  licenses: Pick<LicensingApi, "removeLicense" | "getLicenseStatus">;
 }>;
 
 type SubscriptionComposition = Readonly<{
@@ -227,12 +227,12 @@ export class BillingModule
       resourceLimitAlerts,
       lifecycle,
       webhook: {
-        host: billingWebhookHostChannels.slack.create({ notices }),
+        host: SlackBillingWebhookHostChannel.create({ notices }),
         licenses: setup.dependencies.licensing,
         licensePurchase,
       },
       subscription: {
-        notifier: billingSubscriptionNotifierChannels.slack.create({ notices }),
+        notifier: SlackBillingSubscriptionNotifierChannel.create({ notices }),
         facts: lifecycle,
       },
     });

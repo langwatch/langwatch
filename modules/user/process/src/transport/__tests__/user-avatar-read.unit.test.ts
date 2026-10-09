@@ -7,6 +7,7 @@
 import { ProjectMissingCredentialsError } from "@langwatch/api";
 import { createRestRuntime } from "@langwatch/api/rest";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { UserAvatarNotFoundError } from "@langwatch/user-contract";
 import type { ErrorHandler } from "hono";
 import { describe, expect, it } from "vitest";
@@ -145,6 +146,7 @@ function mountAvatars(options: { read: UserAvatarFileApi["getAvatarBytes"]; allo
   const app = createApiFixture<UserAvatarFileApi>({ getAvatarBytes: options.read });
 
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => {
         throw new Error("An avatar read asks no permission of its credential.");

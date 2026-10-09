@@ -20,7 +20,7 @@ import {
   type VizTab,
   viewModeForEditState,
 } from "../model/trace-drawer-params.ts";
-import { type DrawerChromeState, drawerChrome } from "./drawer-chrome.store.ts";
+import { type DrawerChromeState, useDrawerChrome } from "./drawer-chrome.store.ts";
 
 /** A trace the reader navigated away from inside the drawer, and the view they left it on. */
 export interface TraceHistoryEntry {
@@ -28,6 +28,8 @@ export interface TraceHistoryEntry {
   viewMode: DrawerViewMode;
   /** The trace's `occurredAt` (ms since epoch), the partition-pruning hint its reads need. */
   occurredAtMs?: number;
+  /** The member that owns the trace on an aggregate, so going back reopens that member's trace. */
+  tenantId?: string;
 }
 
 /** What the trace drawer changes in the address; none of it is held anywhere else. */
@@ -49,6 +51,8 @@ interface TraceDrawerAddressActions {
   clearPinnedSpans: () => void;
   /** Fill in the partition hint from a resolved trace timestamp when the link carried none. */
   backfillOccurredAtMs: (occurredAtMs: number) => void;
+  /** Fill in the owning member from the header read when an aggregate deep link named none. */
+  backfillTenantId: (tenantId: string) => void;
 }
 
 /** The trace drawer as its callers read it: the address, the reader's chrome, and the writes. */
@@ -77,13 +81,14 @@ function traceEntryOf({
 }: {
   params: Record<string, unknown>;
 }): TraceHistoryEntry | undefined {
-  const { traceId, mode, t } = params;
+  const { traceId, mode, t, tenantId } = params;
   if (typeof traceId !== "string") return undefined;
   const occurredAt = typeof t === "string" && isOccurredAtParam(t) ? Number(t) : undefined;
   return {
     traceId,
     viewMode: typeof mode === "string" && isViewMode(mode) ? mode : DEFAULT_VIEW_MODE,
     ...(occurredAt !== undefined ? { occurredAtMs: occurredAt } : {}),
+    ...(typeof tenantId === "string" && tenantId !== "" ? { tenantId } : {}),
   };
 }
 
@@ -105,22 +110,22 @@ function pinned({ ids, spanId }: { ids: string[]; spanId: string }): string[] {
 
 const addressActions: TraceDrawerAddressActions = {
   selectSpan: (spanId) => {
-    drawerChrome.getState().expandSpanDetail();
+    useDrawerChrome.getState().expandSpanDetail();
     writeAddress({ span: spanId });
   },
   clearSpan: () => writeAddress({ span: undefined }),
   openSpanInTrace: (spanId) => {
-    drawerChrome.getState().expandSpanDetail();
+    useDrawerChrome.getState().expandSpanDetail();
     writeAddress({ span: spanId, viz: "waterfall", mode: "trace" });
   },
   setIsEditing: (value) => writeAddress({ edit: value ? "1" : undefined }),
   setViewMode: (mode) => {
-    drawerChrome.getState().rememberViewMode(mode);
+    useDrawerChrome.getState().rememberViewMode(mode);
     writeAddress({ mode });
   },
   setViewModeTransient: (mode) => writeAddress({ mode }),
   setVizTab: (tab) => {
-    drawerChrome.getState().rememberVizTab(tab);
+    useDrawerChrome.getState().rememberVizTab(tab);
     writeAddress({ viz: tab });
   },
   setVizTabTransient: (tab) => writeAddress({ viz: tab }),
@@ -143,6 +148,10 @@ const addressActions: TraceDrawerAddressActions = {
     if (addressNow().occurredAtMs !== null) return;
     if (!Number.isFinite(occurredAtMs) || occurredAtMs <= 0) return;
     writeAddress({ t: String(Math.trunc(occurredAtMs)) });
+  },
+  backfillTenantId: (tenantId) => {
+    if (addressNow().tenantId !== null || tenantId === "") return;
+    writeAddress({ tenantId });
   },
 };
 
@@ -181,7 +190,7 @@ export function useTraceDrawer<T>(selector: (state: TraceDrawerState) => T): T {
     () => ({ address: readTraceDrawerAddress(query), backStack: traceBackStackOf(state) }),
     [query, state],
   );
-  return drawerChrome((chrome) => selector(composeState({ ...view, chrome })));
+  return useDrawerChrome((chrome) => selector(composeState({ ...view, chrome })));
 }
 
 /** The same reading for event handlers and callbacks, taken from the address now. */
@@ -190,7 +199,7 @@ export function getTraceDrawer(): TraceDrawerState {
   return composeState({
     address: readTraceDrawerAddress(query),
     backStack: traceBackStackOf(state),
-    chrome: drawerChrome.getState(),
+    chrome: useDrawerChrome.getState(),
   });
 }
 

@@ -7,6 +7,7 @@ import {
 } from "@langwatch/langy-contract";
 /** @see specs/langy/langy-health-canary.feature (Route — GET /api/health/langy) */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
 import { LangyCanaryService } from "../../services/langy-canary.service.ts";
@@ -59,18 +60,18 @@ function probe(options: { getRestCaller?: () => Promise<LangyRestCaller> } = {})
       permission: input.permission,
     };
   };
-  const hono = createRestRuntime({ identity: { authenticate } }).mount(
-    platformHealthLangyProbeRest.router(),
-    {
-      app: () => ({
-        probeLangy: (key) => canary.probe(key),
-        probeWithProjectKey: () => {
-          throw new Error("the Langy probe never reaches the project-keyed canaries");
-        },
-      }),
-      onError: canonicalErrorResponse,
-    },
-  );
+  const hono = createRestRuntime({
+    authorization: restTestAuthorization(),
+    identity: { authenticate },
+  }).mount(platformHealthLangyProbeRest.router(), {
+    app: () => ({
+      probeLangy: (key) => canary.probe(key),
+      probeWithProjectKey: () => {
+        throw new Error("the Langy probe never reaches the project-keyed canaries");
+      },
+    }),
+    onError: canonicalErrorResponse,
+  });
 
   return {
     turnsStarted,

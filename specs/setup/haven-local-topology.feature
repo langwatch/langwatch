@@ -29,17 +29,18 @@ Feature: The local development topology
   # --- The backend process ---
 
   @unit
-  Scenario: The backend process starts the worker before the API
+  Scenario: The backend process starts the API without waiting for the worker's upgrade
     Given the backend launcher booting both applications
+    And the worker is still running the upgrade
     When it starts
-    Then the worker application is started first
-    And the API application is started after it
+    Then the API application is started beside the worker, not after it
+    And work the API enqueues meanwhile waits for the worker (Alex, 2026-10-09)
 
   @unit
   Scenario: A half-started backend drains what it did start
-    Given a worker that started and an API that refuses to boot
+    Given one half that started and another that refuses to boot
     When the backend launcher boots
-    Then the worker is closed before the failure is reported
+    Then the half that started is closed before the failure is reported
     And the caller is left with no half-started process to handle
 
   # The worker's jobs call back into the API's in-process graph. Closing the

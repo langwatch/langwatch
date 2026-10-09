@@ -10,3 +10,4 @@ export * from "./data-privacy.snapshot.ts";
 export * from "./data-privacy.trpc.ts";
 export * from "./data-privacy.visibility.ts";
 export * from "./data-privacy.config.ts";
+export * from "./data-privacy.request-memo.ts";

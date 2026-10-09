@@ -26,6 +26,7 @@ import {
   type EventingSetup,
   type Projection,
   type RegisteredCommand,
+  type RetentionPolicyResolver,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 
@@ -121,6 +122,8 @@ type AdapterOptions = {
   costRollup?: GovernanceCostRollupFoldProjection;
   /** The per-charge record the watch holds the fold against; worker-hosted like the fold. */
   costCharges?: GovernanceCostChargeMapProjection;
+  /** Each tenant's retention, stamped on the readings' event rows. */
+  retention?: RetentionPolicyResolver | undefined;
 };
 
 export class PulledUsageEventingAdapter {
@@ -128,12 +131,20 @@ export class PulledUsageEventingAdapter {
   private readonly costRollupWatch: CostRollupWatchProcess | undefined;
   private readonly costRollup: GovernanceCostRollupFoldProjection | undefined;
   private readonly costCharges: GovernanceCostChargeMapProjection | undefined;
+  private readonly retention: RetentionPolicyResolver | undefined;
 
-  private constructor({ ledger, costRollupWatch, costRollup, costCharges }: AdapterOptions) {
+  private constructor({
+    ledger,
+    costRollupWatch,
+    costRollup,
+    costCharges,
+    retention,
+  }: AdapterOptions) {
     this.ledger = ledger;
     this.costRollupWatch = costRollupWatch;
     this.costRollup = costRollup;
     this.costCharges = costCharges;
+    this.retention = retention;
   }
 
   static create(options: AdapterOptions = {}): PulledUsageEventingAdapter {
@@ -167,6 +178,7 @@ export class PulledUsageEventingAdapter {
       .withCommand("recordPulledUsage", RecordPulledUsageCommand)
       .withCommand("retractPulledUsage", RetractPulledUsageCommand)
       .withCommand("recordPulledUsagePriced", RecordPulledUsagePricedCommand);
+    if (this.retention) pipeline.withRetention(this.retention);
     if (this.costRollup) {
       pipeline.withClickHouseFoldProjection(this.costRollup);
     }

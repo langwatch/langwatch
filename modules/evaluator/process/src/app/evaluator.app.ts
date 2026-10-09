@@ -555,7 +555,7 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
       throw new PermissionDeniedError({
         permission: "evaluations:manage",
         scope: { type: "project", id: source.projectId },
-        denialReason: "no-binding",
+        denialReason: "no-grant",
       });
     }
 

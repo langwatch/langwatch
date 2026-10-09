@@ -1,11 +1,14 @@
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
 import {
   FLOOR_AND_LOCK_RULES,
+  GRACEFUL_RULES,
   type MigrationSource,
   formatFindings,
   parseBaseline,
@@ -37,6 +40,45 @@ const BASELINE_FROZEN_AT = "20261006170505_project_active_day";
  * it answers to all. Like BASELINE_FROZEN_AT, it is never moved to silence a finding.
  */
 const NEW_RULES_FROM = "20261006170527_data_privacy_project_scope";
+
+/** The newest migration in the newest `langwatch@v*` tag: history the graceful rules skip. */
+function newestReleasedMigration({ cwd }: { cwd: string }): string {
+  const git = (args: string[]) =>
+    execFileSync("git", args, {
+      cwd,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      // A release tag lists every file it holds: about 2 MB today.
+      maxBuffer: 64 * 1024 * 1024,
+    });
+  let cause: unknown;
+  try {
+    const tag = git(["tag", "--list", "langwatch@v*", "--sort=-v:refname"])
+      .split("\n")
+      .find((name) => /^langwatch@v\d+\.\d+\.\d+$/.test(name));
+    const paths = tag ? git(["ls-tree", "-r", "--full-tree", "--name-only", tag]) : "";
+    const newest = paths
+      .split("\n")
+      .flatMap(
+        (path) =>
+          /(?:^|\/)prisma\/migrations\/(\d{14}_[^/]+)\/migration\.sql$/.exec(path)?.[1] ?? [],
+      )
+      .toSorted()
+      .at(-1);
+    if (newest) return newest;
+  } catch (error) {
+    // Not a clone, or git is missing: the same answer as a clone without tags, cause kept.
+    cause = error;
+  }
+  throw new Error(
+    "No langwatch@v* release tag with Prisma migrations in this clone, so released migrations " +
+      "cannot be told from new ones. Fetch the tags: git fetch --tags origin (CI: " +
+      "git fetch --depth=1 origin '+refs/tags/langwatch@v*:refs/tags/langwatch@v*').",
+    { cause },
+  );
+}
+
+const RELEASED_THROUGH = newestReleasedMigration({ cwd: import.meta.dirname });
 
 const baseline = parseBaseline(
   readFileSync(resolve(import.meta.dirname, "migration-safety.baseline.txt"), "utf8"),
@@ -79,10 +121,9 @@ const unshipped = migrations.filter(
 
 /** What the tree scan reports for one migration, with the new rules only above their marker. */
 function scanTree(migration: MigrationSource) {
-  const findings = scanPostgresMigration({ ...migration, floor: treeFloor });
-  return migration.name <= NEW_RULES_FROM
-    ? findings.filter((finding) => !FLOOR_AND_LOCK_RULES.has(finding.rule))
-    : findings;
+  return scanPostgresMigration({ ...migration, floor: treeFloor })
+    .filter((finding) => migration.name > NEW_RULES_FROM || !FLOOR_AND_LOCK_RULES.has(finding.rule))
+    .filter((finding) => migration.name > RELEASED_THROUGH || !GRACEFUL_RULES.has(finding.rule));
 }
 
 const scanWith = (sql: string, floor: string) =>
@@ -140,7 +181,7 @@ describe("Postgres migration safety", () => {
           'UPDATE "P" SET "slug" = "id" WHERE "slug" IS NULL;\n' +
             'ALTER TABLE "P" ALTER COLUMN "slug" SET NOT NULL;',
         ),
-      ).toEqual(["set-not-null-on-populated-column"]);
+      ).toEqual(["set-not-null-on-populated-column", "inline-dml-on-existing-table"]);
     });
 
     /** @scenario "Setting NOT NULL on a table the migration creates is accepted" */
@@ -258,8 +299,8 @@ describe("Postgres migration safety", () => {
           'CREATE TABLE "S" ("id" TEXT NOT NULL, "at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,\n' +
             ' CONSTRAINT "S_pkey" PRIMARY KEY ("id"));\n' +
             'CREATE INDEX "S_at_idx" ON "S"("at");\n' +
-            'ALTER TABLE "P" ADD COLUMN IF NOT EXISTS "note" TEXT;\n' +
-            'ALTER TABLE "P" ADD COLUMN IF NOT EXISTS "n" INTEGER NOT NULL DEFAULT 0;',
+            'ALTER TABLE "P" ADD COLUMN IF NOT EXISTS "note" TEXT,\n' +
+            '  ADD COLUMN IF NOT EXISTS "n" INTEGER NOT NULL DEFAULT 0;',
         ),
       ).toEqual([]);
       const privacy = readMigration("20261006170527_data_privacy_project_scope");
@@ -300,6 +341,125 @@ describe("Postgres migration safety", () => {
     it("accepts an index or constraint rename, which no code reads by name", () => {
       expect(rules('ALTER INDEX "P_slug_key" RENAME TO "P_slug_unique";')).toEqual([]);
       expect(rules('ALTER TABLE "P" RENAME CONSTRAINT "P_pkey" TO "Project_pkey";')).toEqual([]);
+    });
+  });
+
+  describe("when the graceful rules scan a migration", () => {
+    /** @scenario "An inline UPDATE or DELETE on an existing table is refused by name" */
+    it("refuses UPDATE and DELETE on an existing table, naming it and the background step", () => {
+      const findings = scan('UPDATE "P" AS p SET "slug" = "id" WHERE "slug" IS NULL;');
+      expect(findings.map((finding) => finding.rule)).toEqual(["inline-dml-on-existing-table"]);
+      expect(findings[0]?.problem).toContain("existing table p");
+      expect(findings[0]?.fix).toContain("background step");
+      expect(rules('DELETE FROM "P" WHERE "gone";')).toEqual(["inline-dml-on-existing-table"]);
+    });
+
+    /** @scenario "DML on a table the migration creates, or an upsert, is accepted" */
+    it("accepts DML on a new table, ON CONFLICT DO UPDATE and ON DELETE clauses", () => {
+      expect(
+        rules('CREATE TABLE "N" ("id" TEXT);\nUPDATE "N" SET "id" = \'x\';\nDELETE FROM "N";'),
+      ).toEqual([]);
+      expect(
+        rules(
+          'INSERT INTO "N" ("id") VALUES (\'x\') ON CONFLICT ("id") DO UPDATE SET "id" = \'y\';',
+        ),
+      ).toEqual([]);
+    });
+
+    /** @scenario "A column added with a volatile default is refused by name" */
+    it("refuses gen_random_uuid(), random() and SERIAL on an existing table, naming the column", () => {
+      const findings = scan(
+        'ALTER TABLE "P" ADD COLUMN "key" TEXT NOT NULL DEFAULT gen_random_uuid()::text;',
+      );
+      expect(findings.map((finding) => finding.rule)).toEqual([
+        "volatile-default-on-existing-table",
+      ]);
+      expect(findings[0]?.problem).toContain("p.key");
+      expect(findings[0]?.fix).toContain("rewrites the whole table");
+      expect(rules('ALTER TABLE "P" ADD COLUMN "n" DOUBLE PRECISION DEFAULT random();')).toEqual([
+        "volatile-default-on-existing-table",
+      ]);
+      expect(rules('ALTER TABLE "P" ADD COLUMN "seq" BIGSERIAL;')).toEqual([
+        "volatile-default-on-existing-table",
+      ]);
+    });
+
+    /** @scenario "A constant or stable default is accepted" */
+    it("accepts a constant default, now() and CURRENT_TIMESTAMP, and anything on a new table", () => {
+      expect(rules('ALTER TABLE "P" ADD COLUMN "at" TIMESTAMP(3) DEFAULT now();')).toEqual([]);
+      expect(
+        rules('ALTER TABLE "P" ADD COLUMN "at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;'),
+      ).toEqual([]);
+      expect(
+        rules(
+          'CREATE TABLE "N" ("id" TEXT);\nALTER TABLE "N" ADD COLUMN "k" TEXT DEFAULT gen_random_uuid();',
+        ),
+      ).toEqual([]);
+    });
+
+    /** @scenario "Two ALTER statements on one existing table are refused by name" */
+    it("refuses two ALTER TABLE statements on one existing table, naming it and the count", () => {
+      const findings = scan(
+        'ALTER TABLE "P" ADD COLUMN "a" TEXT;\nALTER TABLE "P" ADD COLUMN "b" TEXT;',
+      );
+      expect(findings.map((finding) => finding.rule)).toEqual(["several-alters-on-one-table"]);
+      expect(findings[0]?.problem).toBe("alters existing table p in 2 statements");
+      expect(findings[0]?.fix).toContain("separated by commas");
+    });
+
+    /** @scenario "One ALTER per existing table is accepted" */
+    it("accepts one ALTER with several actions, and ALTERs on different or new tables", () => {
+      expect(
+        rules(
+          'ALTER TABLE "P" ADD COLUMN "a" TEXT,\n  ADD COLUMN "b" TEXT;\n' +
+            'ALTER TABLE "Q" ADD COLUMN "a" TEXT;\n' +
+            'CREATE TABLE "N" ("id" TEXT);\nALTER TABLE "N" ADD COLUMN "a" TEXT;\n' +
+            'ALTER TABLE "N" ADD COLUMN "b" TEXT;',
+        ),
+      ).toEqual([]);
+    });
+
+    /** @scenario "A lock_timeout above the runner's ceiling is refused by name" */
+    it("refuses a lock_timeout above 2 s, or turned off, naming the value", () => {
+      const findings = scan("SET lock_timeout = '10s';");
+      expect(findings.map((finding) => finding.rule)).toEqual(["lock-timeout-above-ceiling"]);
+      expect(findings[0]?.problem).toContain("10000 ms");
+      expect(rules("SET LOCAL lock_timeout TO 0;")).toEqual(["lock-timeout-above-ceiling"]);
+      expect(rules("SELECT set_config('lock_timeout', '1min', true);")).toEqual([
+        "lock-timeout-above-ceiling",
+      ]);
+    });
+
+    /** @scenario "A lock_timeout at or below the ceiling is accepted" */
+    it("accepts a lock_timeout of 2 s or less", () => {
+      expect(rules("SET lock_timeout = '2s';\nSET LOCAL lock_timeout = 500;")).toEqual([]);
+    });
+  });
+
+  describe("given the released history", () => {
+    /** @scenario "Floor history answers only to the older rules" */
+    it("skips the graceful rules up to the newest release tag's newest migration, which is on disk", () => {
+      expect(migrations.map((migration) => migration.name)).toContain(RELEASED_THROUGH);
+      const history = migrations.filter((migration) => migration.name <= RELEASED_THROUGH);
+      const graceful = history.flatMap((migration) =>
+        scanPostgresMigration({ ...migration, floor: treeFloor }).filter((finding) =>
+          GRACEFUL_RULES.has(finding.rule),
+        ),
+      );
+      expect(graceful.length).toBeGreaterThan(0);
+      expect(
+        history.flatMap(scanTree).filter((finding) => GRACEFUL_RULES.has(finding.rule)),
+      ).toEqual([]);
+    });
+
+    /** @scenario "A clone without release tags fails the guard with the command that fetches them" */
+    it("refuses to guess the released history where no release tag is readable", () => {
+      const bare = mkdtempSync(resolve(tmpdir(), "migration-safety-no-tags-"));
+      try {
+        expect(() => newestReleasedMigration({ cwd: bare })).toThrow(/git fetch --tags origin/);
+      } finally {
+        rmSync(bare, { recursive: true, force: true });
+      }
     });
   });
 

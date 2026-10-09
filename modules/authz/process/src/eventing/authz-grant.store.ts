@@ -11,9 +11,16 @@ import {
   PlatformPermissionNotAssignableError,
   PLATFORM_OPERATOR_ROLE_ID,
   PLATFORM_TENANT_ID,
+  type AuthzAttachSharedProjectGrantInput,
+  type AuthzAttachSharedProjectGrantOutput,
+  type AuthzAwaitSharedProjectGrantsInput,
+  type AuthzFindLiveSharedProjectGrantsInput,
   type AuthzLedgerResourceTerms,
+  type AuthzRevokeSharedProjectGrantsInput,
+  type AuthzSharedProjectGrant,
   type DefineRoleCommandData,
   type GrantEventSource,
+  newAuthzGrantId,
   type RevokeGrantCommandData,
 } from "@langwatch/authz-contract";
 import { createLogger } from "@langwatch/observability";
@@ -25,8 +32,10 @@ import type { AuthzEpochRepository } from "../repositories/authz-epoch.repositor
 import { BindingMissingError, type GrantWrite } from "../repositories/authz-grant.repository.ts";
 import type { AuthzLedgerReadRepository } from "../repositories/authz-ledger-read.repository.ts";
 import type { AuthzMembershipStampRepository } from "../repositories/authz-membership-stamp.repository.ts";
+import type { ScopeLineageRepository } from "../repositories/authz-read.repository.ts";
 import type { AuthzRevocationRepository } from "../repositories/authz-revocation.repository.ts";
 import { bindingIdentityKey } from "../repositories/eventing/eventing.authz-grant.mapper.ts";
+import { sharedProjectReadsOf } from "../repositories/eventing/eventing.authz-read.mapper.ts";
 import {
   compatBindingFromGrantFact,
   grantRowToFact,
@@ -98,6 +107,8 @@ type EventingAuthzLedgerAdapterOptions = {
   /** The live Grant and Role heads every read-your-writes hold polls. */
   reads: AuthzLedgerReadRepository;
   dispatcher: AuthzGrantsCommandDispatcher;
+  /** Where a shared-read attach asks that both projects sit in the organization. */
+  lineage: Pick<ScopeLineageRepository, "findProjectLineage">;
   epoch: AuthzEpochRepository;
   revocation: AuthzRevocationRepository;
   /** The membership lifetime a USER attach is fenced to. */
@@ -427,6 +438,111 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
         }),
     });
     await this.options.epoch.bump({ organizationId });
+  }
+
+  /**
+   * INSERT one shared project read (ADR-177): the reader holds `project-reader` on the member's
+   * PROJECT scope, carrying the condition the proof copies. Both projects must sit in this
+   * organization; a live grant for the pair is answered as it stands, so a reconciler may rerun.
+   */
+  async attachSharedProjectGrant({
+    organizationId,
+    readerProjectId,
+    memberProjectId,
+    condition,
+    actor,
+    source = "aggregate-reconciler",
+    commandId,
+    awaitProjection = true,
+  }: AuthzAttachSharedProjectGrantInput): Promise<AuthzAttachSharedProjectGrantOutput> {
+    refusePlatformTenant(organizationId);
+    if (readerProjectId === memberProjectId) {
+      throw new GrantValidationError("A project cannot share a read with itself", {
+        projectId: readerProjectId,
+      });
+    }
+    for (const projectId of [readerProjectId, memberProjectId]) {
+      const lineage = await this.options.lineage.findProjectLineage({ projectId });
+      if (lineage?.organizationId !== organizationId) {
+        throw new GrantValidationError("Project is not in this organization", { projectId });
+      }
+    }
+    const live = await this.findLiveSharedProjectGrants({ organizationId, readerProjectId });
+    const existing = live.find((grant) => grant.memberProjectId === memberProjectId);
+    if (existing) return { grantId: existing.grantId, wasAttached: false };
+
+    const principal = { type: "project" as const, id: readerProjectId };
+    const scope = { type: "PROJECT" as const, id: memberProjectId };
+    const grantId = newAuthzGrantId();
+    await (
+      await this.commands()
+    ).commands.attachGrant.send({
+      tenantId: organizationId,
+      organizationId,
+      commandId: commandId ?? this.options.newCommandId?.() ?? newCommandId(),
+      grant: {
+        grantId,
+        principal,
+        roleKey: sharedProjectReadsOf({ organizationId, readerProjectId }).roleKey,
+        scope,
+        condition,
+        source,
+        actor,
+        occurredAtMs: this.now(),
+      },
+    });
+    if (awaitProjection) {
+      await this.awaitSharedProjectGrants({ organizationId, grantIds: [grantId] });
+    } else {
+      await this.options.epoch.bump({ organizationId });
+    }
+    return { grantId, wasAttached: true };
+  }
+
+  /** One read-your-writes wait for a batch of shared reads; bumps the epoch once they land. */
+  async awaitSharedProjectGrants({
+    organizationId,
+    grantIds,
+  }: AuthzAwaitSharedProjectGrantsInput): Promise<void> {
+    if (grantIds.length === 0) return;
+    await this.awaitProjection({
+      what: `attach of ${grantIds.length} shared read(s)`,
+      organizationId,
+      check: async () =>
+        (
+          await this.options.reads.findLiveGrantIds({
+            where: { organizationId, id: { in: [...grantIds] } },
+          })
+        ).length === grantIds.length,
+    });
+    await this.options.epoch.bump({ organizationId });
+  }
+
+  /** A reader's live shared reads; a row whose window no longer parses is still revocable. */
+  async findLiveSharedProjectGrants({
+    organizationId,
+    readerProjectId,
+  }: AuthzFindLiveSharedProjectGrantsInput): Promise<AuthzSharedProjectGrant[]> {
+    return this.options.reads.findLiveSharedProjectGrants({ organizationId, readerProjectId });
+  }
+
+  /** Revoke a reader's live shared reads, all or those on `memberProjectIds`; answers the ids. */
+  async revokeSharedProjectGrants({
+    organizationId,
+    readerProjectId,
+    memberProjectIds,
+    actor,
+    reason,
+  }: AuthzRevokeSharedProjectGrantsInput): Promise<string[]> {
+    const live = await this.findLiveSharedProjectGrants({ organizationId, readerProjectId });
+    const bindingIds = live
+      .filter(
+        (grant) =>
+          memberProjectIds === undefined || memberProjectIds.includes(grant.memberProjectId),
+      )
+      .map((grant) => grant.grantId);
+    await this.revokeBindings({ organizationId, bindingIds, actor, ...(reason ? { reason } : {}) });
+    return bindingIds;
   }
 
   /**

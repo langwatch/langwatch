@@ -1,6 +1,6 @@
 /**
  * Gateway's answer to the port its screens declare: every method projects a
- * `@langwatch/browser-host` capability or its own read. ARCHITECTURE.md §10.1.
+ * `@langwatch/browser-host` host service or its own read. ARCHITECTURE.md §10.1.
  */
 
 import {
@@ -88,7 +88,7 @@ function planOf({
   };
 }
 
-class CapabilityGatewayHost extends GatewayHostApi {
+class HostServiceGatewayHost extends GatewayHostApi {
   private readonly activeScope: GatewayScope;
   private readonly scopeHost: UiScopeHost | undefined;
   private readonly deployment_: GatewayDeployment;
@@ -148,7 +148,13 @@ class CapabilityGatewayHost extends GatewayHostApi {
     const project = this.scopeHost?.project();
     const team = this.scopeHost?.team();
     if (!project || !team) return void 0;
-    return { id: project.id, name: project.name, slug: project.slug, teamId: team.id };
+    return {
+      id: project.id,
+      name: project.name,
+      slug: project.slug,
+      teamId: team.id,
+      kind: project.kind,
+    };
   }
 
   team(): GatewayTeam | undefined {
@@ -240,7 +246,7 @@ export default function GatewayHostMount({ children }: { children?: ReactNode })
 
   const host = useMemo(
     () =>
-      new CapabilityGatewayHost({
+      new HostServiceGatewayHost({
         activeScope: { organizationId, projectId },
         scopeHost,
         deployment: { isSaas: isSaaS, appBaseUrl, gatewayBaseUrl },

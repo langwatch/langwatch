@@ -183,7 +183,6 @@ export abstract class ScimRepository {
     /** Held without access until a seat frees: written disabled, as seat reconciliation does. */
     pending?: boolean;
   }) => Promise<void>;
-  abstract removeMembership: (input: { organizationId: string; userId: string }) => Promise<void>;
   /** This organization's SCIM-pushed groups this person belongs to. */
   abstract findDirectoryGroupIds(input: {
     organizationId: string;

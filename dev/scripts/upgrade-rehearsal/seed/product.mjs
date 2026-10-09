@@ -3,6 +3,7 @@
 // Usage: node product.mjs seed|readback  (APP_BASE, SEED_EMAIL, SEED_PASSWORD, SEED_LABEL, OUT)
 // readback also reads SEEDS (the seed run's JSON). Each kind is seeded or names why it was not.
 
+import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
@@ -14,6 +15,7 @@ const SLACK_WEBHOOK = "https://hooks.slack.com/services/T0000000/B0000000/rehear
 /**
  * One entry per seeded kind: `create` writes it on the old image, `read` asks head for it and
  * `marker` is the text head's answer must contain. `unseedable` names why a kind has no seed.
+ * A `bulk` kind is written ctx.perKind times; `create` and `marker` take its index `i`.
  */
 export const PRODUCT_KINDS = [
   {
@@ -38,7 +40,7 @@ export const PRODUCT_KINDS = [
         projectId: ctx.projectId,
         scope: { scopeType: "PROJECT", scopeId: ctx.projectId },
         category: "traces",
-        retentionDays: 45,
+        retentionDays: 63,
       },
     }),
     read: ({ ctx }) => ({ path: "dataRetention.getRules", input: { projectId: ctx.projectId } }),
@@ -53,6 +55,7 @@ export const PRODUCT_KINDS = [
         traceId: ctx.traceId,
         comment: `rehearsal ${ctx.label}`,
         isThumbsUp: true,
+        scoreOptions: {},
       },
     }),
     read: ({ ctx }) => ({
@@ -112,10 +115,112 @@ export const PRODUCT_KINDS = [
     marker: ({ ctx }) => `rehearsal report ${ctx.label}`,
   },
   {
+    kind: "dataset",
+    bulk: true,
+    create: ({ ctx, i }) => ({
+      path: "dataset.upsert",
+      input: {
+        projectId: ctx.projectId,
+        name: `rehearsal dataset ${ctx.label} ${nth(i)}`,
+        columnTypes: [
+          { name: "input", type: "string" },
+          { name: "expected_output", type: "string" },
+        ],
+        datasetRecords: [
+          { input: "alpha", expected_output: "a" },
+          { input: "beta", expected_output: "b" },
+          { input: "gamma", expected_output: "g" },
+        ],
+      },
+    }),
+    read: ({ ctx }) => ({ path: "dataset.getAll", input: { projectId: ctx.projectId } }),
+    marker: ({ ctx, i }) => `rehearsal dataset ${ctx.label} ${nth(i)}`,
+  },
+  {
+    kind: "evaluator",
+    bulk: true,
+    create: ({ ctx, i }) => ({
+      path: "evaluators.create",
+      input: {
+        projectId: ctx.projectId,
+        name: `rehearsal evaluator ${ctx.label} ${nth(i)}`,
+        type: "evaluator",
+        config: {
+          evaluatorType: "langevals/exact_match",
+          settings: { caseSensitive: false },
+        },
+      },
+    }),
+    read: ({ ctx }) => ({ path: "evaluators.getAll", input: { projectId: ctx.projectId } }),
+    marker: ({ ctx, i }) => `rehearsal evaluator ${ctx.label} ${nth(i)}`,
+  },
+  {
+    kind: "prompt",
+    bulk: true,
+    create: ({ ctx, i }) => ({
+      path: "prompts.create",
+      input: {
+        projectId: ctx.projectId,
+        data: {
+          scope: "PROJECT",
+          handle: promptHandle({ ctx, i }),
+          prompt: "rehearsal seed",
+        },
+      },
+    }),
+    read: ({ ctx }) => ({
+      path: "prompts.getAllPromptsForProject",
+      input: { projectId: ctx.projectId },
+    }),
+    marker: ({ ctx, i }) => promptHandle({ ctx, i }),
+  },
+  {
+    kind: "monitor",
+    bulk: true,
+    create: ({ ctx, i }) => ({
+      path: "monitors.create",
+      input: {
+        projectId: ctx.projectId,
+        name: `rehearsal monitor ${ctx.label} ${nth(i)}`,
+        checkType: "langevals/exact_match",
+        preconditions: [],
+        settings: { caseSensitive: false },
+        sample: 1,
+        executionMode: "ON_MESSAGE",
+        evaluatorId: ctx.created?.evaluator?.[i]?.id,
+      },
+    }),
+    read: ({ ctx }) => ({
+      path: "monitors.getAllForProject",
+      input: { projectId: ctx.projectId },
+    }),
+    marker: ({ ctx, i }) => `rehearsal monitor ${ctx.label} ${nth(i)}`,
+  },
+  {
+    kind: "scenario",
+    bulk: true,
+    create: ({ ctx, i }) => ({
+      path: "scenarios.create",
+      input: {
+        projectId: ctx.projectId,
+        name: `rehearsal scenario ${ctx.label} ${nth(i)}`,
+        situation: "A customer asks for a refund.",
+        criteria: [],
+        labels: [],
+      },
+    }),
+    read: ({ ctx }) => ({ path: "scenarios.getAll", input: { projectId: ctx.projectId } }),
+    marker: ({ ctx, i }) => `rehearsal scenario ${ctx.label} ${nth(i)}`,
+  },
+  {
     kind: "suite",
     create: ({ ctx }) => ({
       path: "suites.create",
-      input: { projectId: ctx.projectId, name: `rehearsal suite ${ctx.label}` },
+      input: {
+        projectId: ctx.projectId,
+        name: `rehearsal suite ${ctx.label}`,
+        scenarioIds: [ctx.created?.scenario?.[0]?.id].filter(Boolean),
+      },
     }),
     read: ({ ctx }) => ({ path: "suites.getAll", input: { projectId: ctx.projectId } }),
     marker: ({ ctx }) => `rehearsal suite ${ctx.label}`,
@@ -151,18 +256,44 @@ export function holdsMarker({ answer, marker }) {
   return marker === null || JSON.stringify(answer).includes(marker);
 }
 
+/** Retries the org create while the old worker misses the api's read-your-writes window. */
+async function initializeOrganization({ wire, ctx }) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await wire.mutate({
+        path: "onboarding.initializeOrganization",
+        input: { orgName: `Rehearsal ${ctx.label}`, projectName: `rehearsal ${ctx.label}` },
+      });
+    } catch (error) {
+      const message = String(error?.message ?? error);
+      if (attempt >= 6 || !message.includes("authz_grant_not_confirmed")) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 10_000));
+    }
+  }
+}
+
 async function prepare({ wire, ctx }) {
   await wire.signIn({ email: ctx.email, password: ctx.password });
-  const created = await wire.mutate({
-    path: "onboarding.initializeOrganization",
-    input: { orgName: `Rehearsal ${ctx.label}`, projectName: `rehearsal ${ctx.label}` },
-  });
+  const created = await initializeOrganization({ wire, ctx });
   ctx.organizationId = created.organizationId;
+  ctx.grantPaidPlan?.({ organizationId: ctx.organizationId }); // retention overrides refuse a free plan
   const organizations = await wire.query({ path: "organization.getAll", input: {} });
   ctx.projectId = findProjectId({ organizations, slug: created.projectSlug });
   if (!ctx.projectId) {
     ctx.projectId = organizations?.[0]?.teams?.[0]?.projects?.[0]?.id;
   }
+  // Main's prompts.create refuses MODEL_NOT_CONFIGURED without a default model at some scope.
+  await wire
+    .mutate({
+      path: "modelProvider.setRoleAssignmentForScope",
+      input: {
+        scopeType: "PROJECT",
+        scopeId: ctx.projectId,
+        role: "DEFAULT",
+        model: "openai/gpt-5",
+      },
+    })
+    .catch(() => {}); // a failure shows up as the prompt kind's own MODEL_NOT_CONFIGURED
   const { apiKey } = await wire.query({
     path: "project.getProjectAPIKey",
     input: { projectId: ctx.projectId },
@@ -187,6 +318,13 @@ async function prepare({ wire, ctx }) {
   });
 }
 
+/** A bulk kind's zero-padded index, so no marker is a prefix of another. */
+export const nth = (i) => String(i).padStart(5, "0");
+
+/** Lowercase handle for a bulk prompt; main's handle regex allows only [a-z0-9_-]. */
+const promptHandle = ({ ctx, i }) =>
+  `rehearsal-prompt-${ctx.label}-${nth(i)}`.toLowerCase().replace(/[^a-z0-9_-]/g, "-");
+
 /** Writes every seedable kind on the old image; one failure never stops the others. */
 export async function seedProducts({ wire, ctx }) {
   await prepare({ wire, ctx });
@@ -197,14 +335,34 @@ export async function seedProducts({ wire, ctx }) {
       kinds.push({ kind: entry.kind, seeded: false, reason });
       continue;
     }
-    try {
-      await wire.mutate(entry.create({ ctx }));
-      kinds.push({ kind: entry.kind, seeded: true });
-    } catch (error) {
-      kinds.push({ kind: entry.kind, seeded: false, reason: String(error.message ?? error) });
+    const total = entry.bulk ? (ctx.perKind ?? 1) : 1;
+    let created = 0;
+    let error = null;
+    for (let i = 0; i < total; i++) {
+      try {
+        ((ctx.created ??= {})[entry.kind] ??= [])[i] = await wire.mutate(entry.create({ ctx, i }));
+        created++;
+      } catch (caught) {
+        error ??= String(caught.message ?? caught);
+      }
     }
+    kinds.push(
+      created > 0
+        ? {
+            kind: entry.kind,
+            seeded: true,
+            ...(entry.bulk && { created, failed: total - created }),
+          }
+        : { kind: entry.kind, seeded: false, reason: error },
+    );
   }
-  const { email: _email, password: _password, licenceKey: _key, ...context } = ctx;
+  const {
+    email: _email,
+    password: _password,
+    licenceKey: _key,
+    created: _created,
+    ...context
+  } = ctx;
   return { context, kinds };
 }
 
@@ -213,13 +371,29 @@ export async function readBack({ wire, ctx, seeds }) {
   await wire.signIn({ email: ctx.email, password: ctx.password });
   const seeded = { ...ctx, ...seeds.context };
   const kinds = [];
-  for (const { kind } of seeds.kinds.filter((each) => each.seeded)) {
-    const entry = PRODUCT_KINDS.find((each) => each.kind === kind);
+  for (const seed of seeds.kinds.filter((each) => each.seeded)) {
+    const entry = PRODUCT_KINDS.find((each) => each.kind === seed.kind);
     try {
       const answer = await wire.query(entry.read({ ctx: seeded }));
-      kinds.push({ kind, found: holdsMarker({ answer, marker: entry.marker({ ctx: seeded }) }) });
+      if (!entry.bulk) {
+        kinds.push({
+          kind: seed.kind,
+          found: holdsMarker({ answer, marker: entry.marker({ ctx: seeded }) }),
+        });
+        continue;
+      }
+      let foundCount = 0;
+      for (let i = 0; i < seed.created + seed.failed; i++) {
+        if (holdsMarker({ answer, marker: entry.marker({ ctx: seeded, i }) })) foundCount++;
+      }
+      kinds.push({
+        kind: seed.kind,
+        found: foundCount >= seed.created,
+        foundCount,
+        created: seed.created,
+      });
     } catch (error) {
-      kinds.push({ kind, found: false, error: String(error.message ?? error) });
+      kinds.push({ kind: seed.kind, found: false, error: String(error.message ?? error) });
     }
   }
   return { kinds };
@@ -232,7 +406,26 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
     password: process.env.SEED_PASSWORD,
     label: process.env.SEED_LABEL ?? "rehearsal",
     licenceKey: process.env.REHEARSAL_LICENSE_KEY,
+    perKind: Number(process.env.SEED_PER_KIND ?? 1),
   };
+  // SaaS has no headless checkout, so an ACTIVE paid subscription is written straight to Postgres.
+  if (process.env.DATABASE_URL) {
+    ctx.grantPaidPlan = ({ organizationId }) =>
+      execFileSync(
+        "psql",
+        [
+          process.env.DATABASE_URL.split("?")[0],
+          "-q",
+          "-v",
+          "ON_ERROR_STOP=1",
+          "-v",
+          `org=${organizationId}`,
+        ],
+        {
+          input: `INSERT INTO "Subscription" (id, "organizationId", plan, status) VALUES ('rehearsal_sub_' || md5(random()::text), :'org', 'LAUNCH', 'ACTIVE');`,
+        },
+      );
+  }
   const wire = createWire({ appBase: process.env.APP_BASE });
   const result =
     mode === "seed"

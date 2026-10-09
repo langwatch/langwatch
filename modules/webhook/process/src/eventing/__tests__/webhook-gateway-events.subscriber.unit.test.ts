@@ -13,6 +13,7 @@ const context = (eventId: string) => ({
   tenantId: "project-1",
   aggregateId: "aggregate-1",
   occurredAt: 1_000,
+  createdAt: 1_000,
   eventId,
 });
 

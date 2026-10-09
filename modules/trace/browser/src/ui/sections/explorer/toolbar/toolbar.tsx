@@ -1,5 +1,6 @@
 import { Box, Button, Flex, Icon, IconButton } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { Bookmark, Compass, Download, Map, Tent } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -8,6 +9,7 @@ import { useFilterStore, useViewStore } from "../../../../behavior/explorer.stor
 import { useOnboardingStore } from "../../../../behavior/explorer/onboarding/store/onboarding-store.ts";
 import { useProjectHasTraces } from "../../../../behavior/explorer/use-project-has-traces.ts";
 import { useDismissTraceDrawer } from "../../../../behavior/trace-drawer.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { TRACE_EXPLORER_SPOTLIGHTS } from "../../../../model/explorer/onboarding/spotlights/spotlights.ts";
 import { LensNamePopover } from "../../../elements/explorer/toolbar/lens-name-popover.tsx";
 import { useIsNewAccount } from "../hooks/use-is-new-account.ts";
@@ -167,6 +169,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll, hideSampleDataAct
   // that silently fails to filter on load. The button comes back the
   // moment the error is resolved.
   const hasParseError = useFilterStore((s) => Boolean(s.parseError));
+  const { project } = useOrganizationTeamProject();
+  const canSaveLenses = !isAggregateProjectKind(project?.kind);
 
   // Measure the toolbar's own width so controls can collapse when space runs
   // out (narrow window OR a wide filters sidebar — viewport breakpoints miss
@@ -221,7 +225,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll, hideSampleDataAct
       )}
       <LensTabs />
       <Flex marginLeft="auto" gap={1.5} align="center" flexShrink={0}>
-        {activeLensIsDraft && !hasParseError && (
+        {canSaveLenses && activeLensIsDraft && !hasParseError && (
           <LensNamePopover
             defaultName={`${activeLensName} (copy)`}
             onSubmit={(name) => createLens(name)}

@@ -1,3 +1,5 @@
+import type { EventLogRetentionClassifier } from "@langwatch/eventing/server";
+
 import type { EventingConfig } from "./config.ts";
 import { consumingEventing, producerEventing } from "./eventing-role.ts";
 
@@ -11,14 +13,20 @@ export interface PipelineSettings {
 
 /** A producer cannot claim the queue; a consumer also produces follow-up commands. */
 export class PipelineParticipation<Mode extends "produce" | "consume" = "produce" | "consume"> {
-  private constructor(readonly mode: Mode) {}
+  private constructor(
+    readonly mode: Mode,
+    private readonly classifyEventLogRetention?: EventLogRetentionClassifier,
+  ) {}
 
   static producer(): PipelineParticipation<"produce"> {
     return new PipelineParticipation("produce");
   }
 
-  static consumer(): PipelineParticipation<"consume"> {
-    return new PipelineParticipation("consume");
+  /** Only a consumer appends, so only it classifies each event_log row for retention. */
+  static consumer(
+    classifyEventLogRetention?: EventLogRetentionClassifier,
+  ): PipelineParticipation<"consume"> {
+    return new PipelineParticipation("consume", classifyEventLogRetention);
   }
 
   configure(settings: PipelineSettings): EventingConfig {
@@ -33,6 +41,7 @@ export class PipelineParticipation<Mode extends "produce" | "consume" = "produce
     return consumingEventing({
       executionTarget: "worker",
       defaultRetentionDays: settings.defaultRetentionDays,
+      classifyEventLogRetention: this.classifyEventLogRetention,
       ...queuePolicy,
     });
   }
@@ -45,7 +54,9 @@ export class ProducerPipelines {
 }
 
 export class ConsumerPipelines {
-  consume(): PipelineParticipation<"consume"> {
-    return PipelineParticipation.consumer();
+  consume(
+    classifyEventLogRetention?: EventLogRetentionClassifier,
+  ): PipelineParticipation<"consume"> {
+    return PipelineParticipation.consumer(classifyEventLogRetention);
   }
 }
