@@ -154,7 +154,8 @@ export function Toaster({
   useEffect(() => {
     if (!open) return;
     const away = (event: PointerEvent) => {
-      if (event.target instanceof Element && !event.target.closest("[data-toast-region]")) setOpen(false);
+      if (event.target instanceof Element && !event.target.closest("[data-toast-region]"))
+        setOpen(false);
     };
     document.addEventListener("pointerdown", away);
     return () => document.removeEventListener("pointerdown", away);

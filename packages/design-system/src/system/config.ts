@@ -13,7 +13,8 @@ import { drawerSlotRecipe } from "./drawer.recipe.ts";
 // globals.scss. This file names the families, it does not fetch them.
 const interFontFamily = "'Inter', sans-serif";
 
-/** The site's display serif, self-hosted (apps/ui globals.scss): Langy's voice and the front door. */
+/** The site's display serif, self-hosted (apps/ui globals.scss): Langy's voice and the front
+ * door. */
 const displayFontFamily = '"Sentient", ui-serif, Georgia, "Times New Roman", serif';
 
 /** The face the product's small technical lines are set in. */

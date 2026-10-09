@@ -176,7 +176,7 @@ export const modelProviders = {
         .string()
         .nullable()
         .optional()
-        .refine((value) => !value?.trim() || z.url().safeParse(value.trim()).success, {
+        .refine((value) => !value?.trim() || z.url().validate(value.trim()), {
           message: "must be a full URL, for example https://inference.acme.internal/v1",
         }),
     }),
