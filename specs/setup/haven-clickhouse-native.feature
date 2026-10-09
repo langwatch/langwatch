@@ -70,6 +70,36 @@ Feature: haven's ClickHouse runs natively on macOS
       When haven renders the native users configuration
       Then the default user signs in with the local password, from loopback only
 
+  Rule: The native server opens as many files as the container allows
+
+    @unit
+    Scenario: The native server asks for the container's open-file limit, capped by the OS
+      When haven renders the native server configuration
+      Then max_open_files is the container's 262144
+      But never more than the soft limit this machine lets haven raise to
+      And macOS's 10240 when that limit cannot be read
+
+    @unit
+    Scenario: Native status reports the server's open-file limit
+      Given the native ClickHouse server is running
+      When haven reports its status
+      Then it shows the max_open_files the server raised its limit to at boot
+
+  Rule: Two worktrees starting the native server at once never race
+
+    @unit
+    Scenario: A second worktree starting ClickHouse waits for the first
+      Given one haven holds the machine-wide native ClickHouse lock
+      When a second haven starts the native server
+      Then it waits until the first releases the lock
+      And then finds the first's server running instead of starting its own
+
+    @unit
+    Scenario: A haven waiting on the lock gives up when its context ends
+      Given another haven holds the machine-wide native ClickHouse lock
+      When the waiting haven's context ends
+      Then it stops waiting and reports why
+
   Rule: LangWatchQL reaches Postgres on the host's loopback
 
     @unit
@@ -101,3 +131,10 @@ Feature: haven's ClickHouse runs natively on macOS
       When haven reports its status
       Then it shows the server process's resident memory
       And names the max_server_memory_usage cap it is measured against
+
+    @unit
+    Scenario: A server started by an older haven is found by its listening port
+      Given the native ClickHouse server is running without a recorded pid file
+      When haven looks for the server process
+      Then it finds the pid listening on the server's HTTP port when its command line names haven's config
+      And it records the pid file for next time

@@ -51,7 +51,7 @@ func TestClickHouseNativeArtifactFor(t *testing.T) {
 // @scenario "The native server listens on loopback only, in haven's home"
 // @scenario "The native server keeps the container's access rules and timezone"
 func TestRenderClickHouseNativeServerConfig(t *testing.T) {
-	got := RenderClickHouseNativeServerConfig("/h/clickhouse-native/", 18123)
+	got := RenderClickHouseNativeServerConfig("/h/clickhouse-native/", 18123, 262144)
 	for _, want := range []string{
 		"<listen_host>127.0.0.1</listen_host>",
 		"<http_port>18123</http_port>",
@@ -62,6 +62,7 @@ func TestRenderClickHouseNativeServerConfig(t *testing.T) {
 		"<log>/h/clickhouse-native/log/clickhouse-server.log</log>",
 		"<select_from_system_db_requires_grant>true</select_from_system_db_requires_grant>",
 		"<timezone>UTC</timezone>",
+		"<max_open_files>262144</max_open_files>",
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("native config missing %s", want)
@@ -96,5 +97,26 @@ func TestLWQLPostgresHostFollowsRuntime(t *testing.T) {
 	}
 	if got := ClickHouseRuntimeContainer.PostgresHost(); got != ColimaHostAddress {
 		t.Errorf("container runtime: got %q", got)
+	}
+}
+
+// @scenario "The native server asks for the container's open-file limit, capped by the OS"
+func TestClickHouseNativeOpenFiles(t *testing.T) {
+	for limit, want := range map[uint64]uint64{0: 10240, 10240: 10240, 245760: 245760, 262144: 262144, 1 << 20: 262144} {
+		if got := ClickHouseNativeOpenFiles(limit); got != want {
+			t.Errorf("ClickHouseNativeOpenFiles(%d) = %d; want %d", limit, got, want)
+		}
+	}
+}
+
+// @scenario "Native status reports the server's open-file limit"
+func TestParseClickHouseNativeOpenFiles(t *testing.T) {
+	if got, ok := ParseClickHouseNativeOpenFiles(RenderClickHouseNativeServerConfig("/h", 1, 245760)); !ok || got != 245760 {
+		t.Errorf("rendered config: got %d, %v", got, ok)
+	}
+	for _, bad := range []string{"", "<clickhouse/>", "<max_open_files>x</max_open_files>", "<max_open_files>12"} {
+		if _, ok := ParseClickHouseNativeOpenFiles(bad); ok {
+			t.Errorf("%q: want no limit", bad)
+		}
 	}
 }

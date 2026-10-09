@@ -29,6 +29,7 @@ type Server struct {
 	home     string // <havenHome>/clickhouse-native
 	artifact domain.PinnedArtifact
 	limits   domain.ClickHouseLimits
+	runCmd   func(name string, args ...string) ([]byte, error) // test seam for ps and lsof
 	clickhousehttp.Client
 }
 
@@ -49,12 +50,18 @@ func (s *Server) binaryPath() string {
 func (s *Server) configPath() string   { return filepath.Join(s.home, "config.xml") }
 func (s *Server) endpointPath() string { return filepath.Join(s.home, "endpoint.json") }
 func (s *Server) pidPath() string      { return filepath.Join(s.home, "clickhouse.pid") }
+func (s *Server) lockPath() string     { return filepath.Join(s.home, "ensure.lock") }
 func (s *Server) stdoutPath() string   { return filepath.Join(s.home, "log", "stdout.log") }
 
 // Ensure downloads the binary on first use, writes the config, and starts the
 // server unless one is already answering on the pinned version and config.
 // A changed config or version restarts it over the same data directory.
 func (s *Server) Ensure(ctx context.Context) (int, error) {
+	unlock, err := s.lock(ctx)
+	if err != nil {
+		return 0, err
+	}
+	defer unlock()
 	bin, err := s.ensureBinary(ctx)
 	if err != nil {
 		return 0, err
@@ -82,6 +89,45 @@ func (s *Server) Ensure(ctx context.Context) (int, error) {
 	return ep.HTTPPort, nil
 }
 
+// lock takes the machine-wide lock around download and start, waiting while
+// another worktree's haven holds it: the waiter then finds that server running
+// instead of failing on the data directory's lock. Released by the returned func.
+func (s *Server) lock(ctx context.Context) (func(), error) {
+	if err := os.MkdirAll(s.home, 0o750); err != nil {
+		return nil, err
+	}
+	f, err := os.OpenFile(s.lockPath(), os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		return nil, err
+	}
+	for {
+		err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
+		if err == nil {
+			return func() { _ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN); _ = f.Close() }, nil
+		}
+		if !errors.Is(err, syscall.EWOULDBLOCK) {
+			_ = f.Close()
+			return nil, fmt.Errorf("lock %s: %w", s.lockPath(), err)
+		}
+		select {
+		case <-ctx.Done():
+			_ = f.Close()
+			return nil, fmt.Errorf("waiting for another haven to start ClickHouse: %w", ctx.Err())
+		case <-time.After(250 * time.Millisecond):
+		}
+	}
+}
+
+// maxOpenFiles is the open-file limit the server sets itself at boot (see
+// domain.ClickHouseNativeOpenFiles), from haven's own already-raised soft limit.
+func maxOpenFiles() uint64 {
+	var lim syscall.Rlimit
+	if syscall.Getrlimit(syscall.RLIMIT_NOFILE, &lim) != nil {
+		return domain.ClickHouseNativeOpenFiles(0)
+	}
+	return domain.ClickHouseNativeOpenFiles(lim.Cur)
+}
+
 // ensureBinary installs the pinned binary on first use (see pinnedrelease).
 func (s *Server) ensureBinary(ctx context.Context) (string, error) {
 	bin, err := pinnedrelease.Ensure(ctx, s.artifact, s.binaryPath())
@@ -95,7 +141,7 @@ func (s *Server) ensureBinary(ctx context.Context) (string, error) {
 // users.d overrides the container mounts, reporting whether any changed.
 func (s *Server) writeConfig(port int) (bool, error) {
 	files := map[string]string{
-		s.configPath(): domain.RenderClickHouseNativeServerConfig(s.home, port),
+		s.configPath(): domain.RenderClickHouseNativeServerConfig(s.home, port, maxOpenFiles()),
 		filepath.Join(s.home, "config.d", domain.ClickHouseConfigFile):     domain.RenderClickHouseConfig(s.limits),
 		filepath.Join(s.home, "users.xml"):                                 domain.RenderClickHouseNativeUsersConfig(),
 		filepath.Join(s.home, "users.d", domain.ClickHouseUsersConfigFile): domain.ClickHouseUsersConfig,
@@ -155,22 +201,45 @@ func (s *Server) applySystemLogPolicy(ctx context.Context) {
 	}
 }
 
-// ownedPID is the recorded server pid while that process is still haven's
-// clickhouse (its command line names this home), so a reused pid is never hit.
+// ownedPID is the server pid while that process is still haven's clickhouse
+// (its command line names this home), so a reused pid is never hit. A missing
+// or stale pid file falls back to the HTTP port's listener and is rewritten.
 func (s *Server) ownedPID() (int, bool) {
-	b, err := os.ReadFile(s.pidPath())
+	if b, err := os.ReadFile(s.pidPath()); err == nil {
+		if pid, err := strconv.Atoi(strings.TrimSpace(string(b))); err == nil && s.isOurs(pid) {
+			return pid, true
+		}
+	}
+	port := s.HTTPPort()
+	if port == 0 {
+		return 0, false
+	}
+	out, err := s.output("lsof", "-nP", "-iTCP:"+strconv.Itoa(port), "-sTCP:LISTEN", "-t")
 	if err != nil {
 		return 0, false
 	}
-	pid, err := strconv.Atoi(strings.TrimSpace(string(b)))
-	if err != nil || pid <= 0 {
-		return 0, false
+	for _, f := range strings.Fields(string(out)) {
+		if pid, err := strconv.Atoi(f); err == nil && s.isOurs(pid) {
+			_ = os.WriteFile(s.pidPath(), []byte(f), 0o600)
+			return pid, true
+		}
 	}
-	cmdline, err := exec.CommandContext(context.Background(), "ps", "-p", strconv.Itoa(pid), "-o", "command=").Output() // #nosec G204 -- fixed ps argv; the only variable is a parsed integer pid
-	if err != nil || !strings.Contains(string(cmdline), s.configPath()) {
-		return 0, false
+	return 0, false
+}
+
+func (s *Server) isOurs(pid int) bool {
+	if pid <= 0 {
+		return false
 	}
-	return pid, true
+	cmdline, err := s.output("ps", "-p", strconv.Itoa(pid), "-o", "command=")
+	return err == nil && strings.Contains(string(cmdline), s.configPath())
+}
+
+func (s *Server) output(name string, args ...string) ([]byte, error) {
+	if s.runCmd != nil {
+		return s.runCmd(name, args...)
+	}
+	return exec.CommandContext(context.Background(), name, args...).Output() // #nosec G204 -- fixed argv; variables are parsed integers
 }
 
 // Stop terminates the server haven started and waits for it to exit, so a
@@ -239,13 +308,23 @@ func (s *Server) Health(ctx context.Context) (bool, string) {
 		return false, fmt.Sprintf("native server on :%d not answering (logs in %s)", ep.HTTPPort, filepath.Join(s.home, "log"))
 	}
 	dbs, _ := s.Databases(ctx)
-	detail := fmt.Sprintf("native %s up on :%d, %d stack database(s)", domain.ClickHouseNativeVersion, ep.HTTPPort, len(dbs))
+	detail := fmt.Sprintf("native %s up on :%d, %d stack database(s), max_open_files %s", domain.ClickHouseNativeVersion, ep.HTTPPort, len(dbs), s.openFilesLimit())
 	if used := s.residentMemory(ctx); used != "" {
 		detail += fmt.Sprintf(", memory %s of %dMB max_server_memory_usage (no OS ceiling)", used, s.limits.MaxServerMemory>>20)
 	} else {
 		detail += ", memory unreadable"
 	}
 	return true, detail
+}
+
+// openFilesLimit is the max_open_files the running server was configured with,
+// the soft limit it set itself at boot ("unknown" if the config is unreadable).
+func (s *Server) openFilesLimit() string {
+	b, err := os.ReadFile(s.configPath())
+	if v, ok := domain.ParseClickHouseNativeOpenFiles(string(b)); err == nil && ok {
+		return strconv.FormatUint(v, 10)
+	}
+	return "unknown"
 }
 
 // residentMemory is the server process's RSS from ps. ClickHouse's own
