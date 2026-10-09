@@ -66,6 +66,7 @@
     "langwatch/plan-literals": "error",
     "langwatch/prisma-count-in-list-query": "error",
     "langwatch/refusal-is-a-handled-error": "error",
+    "langwatch/no-hono-http-exception": "error",
     "langwatch/schema-outside-contract": "error",
     "langwatch/service-does-not-open-a-channel": "error",
     "langwatch/service-loads-its-own-config": "error",

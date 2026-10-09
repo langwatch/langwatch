@@ -1,8 +1,8 @@
 Feature: The raw-body-bypass lint rule
   The framework owns request validation. A module's `.withRawBody(...)` names a
   non-JSON `mediaType` and states a `because`, a transport never calls
-  `JSON.parse` on a body by hand, and no module imports
-  `hono/http-exception`. The rule accepts a disable that states
+  `JSON.parse` on a body by hand (a hand-built `hono/http-exception` is
+  no-hono-http-exception's). The rule accepts a disable that states
   why the framework cannot express the case.
 
   @unit
@@ -22,12 +22,6 @@ Feature: The raw-body-bypass lint rule
     Given a module transport that calls JSON.parse
     When the raw-body-bypass rule runs over it
     Then it reports jsonParse
-
-  @unit
-  Scenario: A module importing hono/http-exception is reported
-    Given a module transport that imports HTTPException from hono/http-exception
-    When the raw-body-bypass rule runs over it
-    Then it reports honoException
 
   @unit
   Scenario: JSON.parse outside a transport is not this rule's business

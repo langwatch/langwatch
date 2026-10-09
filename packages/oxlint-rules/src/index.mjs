@@ -41,6 +41,7 @@ import { noAmbientContextRule } from "./rules/no-ambient-context.rule.mjs";
 import { noBootHookOutsideGuardRule } from "./rules/no-boot-hook-outside-guard.rule.mjs";
 import { noFormWatchInChildRule } from "./rules/no-form-watch-in-child.rule.mjs";
 import { noHandRolledPlanGateRule } from "./rules/no-hand-rolled-plan-gate.rule.mjs";
+import { noHonoHttpExceptionRule } from "./rules/no-hono-http-exception.rule.mjs";
 import { noInlineDynamicImportRule } from "./rules/no-inline-dynamic-import.rule.mjs";
 import { noLoggerSpyRule } from "./rules/no-logger-spy.rule.mjs";
 import { noPortVocabularyRule } from "./rules/no-port-vocabulary.rule.mjs";
@@ -120,6 +121,7 @@ const HOUSE_RULES = [
   noAliasReexportRule,
   noBootHookOutsideGuardRule,
   noHandRolledPlanGateRule,
+  noHonoHttpExceptionRule,
   noAmbientContextRule,
   requestDeliveryFromAnIntentRule,
   noInlineDynamicImportRule,
@@ -215,6 +217,7 @@ export {
   noAliasReexportRule,
   noBootHookOutsideGuardRule,
   noHandRolledPlanGateRule,
+  noHonoHttpExceptionRule,
   noAmbientContextRule,
   requestDeliveryFromAnIntentRule,
   noInlineDynamicImportRule,

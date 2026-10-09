@@ -76,14 +76,6 @@ describe("given a module transport", () => {
     });
   });
 
-  describe("when it imports hono/http-exception", () => {
-    /** @scenario "A module importing hono/http-exception is reported" */
-    it("reports honoException", () => {
-      expect(messageIds('import { HTTPException } from "hono/http-exception";')).toEqual([
-        "honoException",
-      ]);
-    });
-  });
 });
 
 describe("given a module service", () => {

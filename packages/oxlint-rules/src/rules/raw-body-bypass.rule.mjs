@@ -3,7 +3,6 @@ import { defineRule } from "../define-rule.mjs";
 // The framework owns request validation (api-framework-bypass plan, guard 3).
 // A raw body is for bytes that are not JSON, and states why (W-02 G3a, Alex 2026-10-08).
 
-const HONO_EXCEPTION = "hono/http-exception";
 const NAMES_JSON = /json/i;
 
 function isJsonParse(callee) {
@@ -55,21 +54,12 @@ export const rawBodyBypassRule = defineRule({
       why: "Parsing a body by hand skips the framework's validation and its 400 and 422 answers.",
       fix: "Declare the body with `.withInput(schema)` and read `input` in the handler. Read the `api-transports` skill.",
     },
-    honoException: {
-      what: "`{{path}}` imports `hono/http-exception`.",
-      why: "A module answers with a HandledError; a raw HTTPException skips the framework's error mapping.",
-      fix: "Drop the hand-built answer: `.withBodyLimit` refuses with `PayloadTooLargeError`; throw a HandledError otherwise. Read the `api-transports` skill.",
-    },
   },
   create(context, file) {
     const path = file.workspacePath;
     const inTransport = file.role === "process" && file.sourcePath?.startsWith("transport/");
 
     return {
-      ImportDeclaration(node) {
-        if (node.source.value !== HONO_EXCEPTION) return;
-        context.report({ node, messageId: "honoException", data: { path } });
-      },
       CallExpression(node) {
         const { callee } = node;
         if (inTransport && isJsonParse(callee)) {
