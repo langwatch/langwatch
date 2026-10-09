@@ -9,6 +9,7 @@ import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { workflowStudioRest } from "../workflow-studio.rest.ts";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 
 const signedIn: RestCaller = { actor: { type: "user", id: "user_1" }, scope: null };
 
@@ -25,6 +26,7 @@ function mount({
   kind?: string;
 }) {
   const projects: Authorize = {
+    ...testAuthorizeDefaults,
     getDecision: async () => ({ permitted: true, organizationRole: "ADMIN" }),
     getProjectAnyDecision: async () => ({ permitted: true, organizationRole: "ADMIN" }),
     checkScopeLineage: async () => ({ kind: "consistent" }),
