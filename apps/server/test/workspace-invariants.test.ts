@@ -462,10 +462,10 @@ describe("the repo is a single pnpm workspace", () => {
       expect(scripts["ensure:built"]).toContain(ensureBuilt);
     });
 
-    /** @scenario A fresh worktree prepares its databases without a manual SDK build */
-    it("builds the SDK before the root database preparation, which production does not run", () => {
+    /** @scenario A fresh worktree prepares its databases without a manual bundle build */
+    it("builds every dist bundle before the root database preparation, which production does not run", () => {
       const scripts = readJson("package.json").scripts as Record<string, string>;
-      expect(scripts["start:prepare:db"]).toMatch(new RegExp(`^bash ${ensureBuilt} langwatch && `));
+      expect(scripts["start:prepare:db"]).toMatch(new RegExp(`^bash ${ensureBuilt} && `));
       const apiScripts = readJson("apps/api/package.json").scripts as Record<string, string>;
       expect(apiScripts["start:prepare:db"]).not.toContain("ensure-built");
     });

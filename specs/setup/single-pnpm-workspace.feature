@@ -252,7 +252,7 @@ Feature: One workspace for every JavaScript project in the repo
     # built from, and never pays for a build it does not need.
 
   @unit
-  Scenario: A fresh worktree prepares its databases without a manual SDK build
+  Scenario: A fresh worktree prepares its databases without a manual bundle build
     Given a worktree that has installed but never built the TypeScript SDK
     When its databases are prepared, by haven or by `pnpm start:prepare:db`
     Then the SDK is built first, without being asked for

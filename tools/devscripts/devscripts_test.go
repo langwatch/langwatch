@@ -236,7 +236,7 @@ func TestEnsureBuilt(t *testing.T) {
 	})
 }
 
-// @scenario "A fresh worktree prepares its databases without a manual SDK build"
+// @scenario "A fresh worktree prepares its databases without a manual bundle build"
 func TestEnsureBuiltSDKStaleness(t *testing.T) {
 	built := func(t *testing.T, root string, at time.Time) {
 		t.Helper()
