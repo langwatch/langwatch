@@ -14,6 +14,7 @@ import {
   reservedTraceMetadataSchema,
   type Span,
 } from "./types";
+import { extractChunkTextualContent } from "./collector/rag";
 import { getRAGChunks, getRAGInfo } from "./utils";
 
 // Define a Trace type that includes annotations for use within this file
@@ -1211,6 +1212,18 @@ const unwrapTypedObject = (v: unknown): unknown => {
   return obj.value;
 };
 
+// Extracts the textual content of a RAGChunk object ({ content, document_id? }).
+// Returns the content string (possibly blank) when v is a RAGChunk, undefined
+// when it is not. Returning "" rather than undefined for blank content prevents
+// tryAndConvertTo from falling through to JSON.stringify for the scalar case.
+// Callers that want to omit blank entries (e.g. the string[] branch) filter
+// afterwards: keep when ragText === undefined || ragText.trim().length > 0.
+const unwrapRagChunk = (v: unknown): string | undefined => {
+  if (v === null || typeof v !== "object" || Array.isArray(v)) return undefined;
+  if (!("content" in v)) return undefined;
+  return extractChunkTextualContent((v as { content: unknown }).content);
+};
+
 export const tryAndConvertTo = <T extends keyof StringTypeToType>(
   value: any,
   type: T,
@@ -1223,17 +1236,24 @@ export const tryAndConvertTo = <T extends keyof StringTypeToType>(
     return undefined;
   }
   if (type === "string") {
-    return (
-      typeof value === "string" ? value : JSON.stringify(value)
-    ) as StringTypeToType[T];
+    if (typeof value === "string") return value as StringTypeToType[T];
+    // A RAGChunk object should contribute its textual content, not its full
+    // JSON envelope — the document_id is metadata, not context for a judge.
+    const ragContent = unwrapRagChunk(value);
+    if (ragContent !== undefined) return ragContent as StringTypeToType[T];
+    return JSON.stringify(value) as StringTypeToType[T];
   }
   if (type === "number") {
     return Number(value) as StringTypeToType[T];
   }
   if (Array.isArray(value) && type === "string[]") {
-    return value.map((v) =>
-      tryAndConvertTo(v, "string"),
-    ) as unknown as StringTypeToType[T];
+    return value
+      .filter((v) => {
+        const ragText = unwrapRagChunk(v);
+        // Non-RAGChunk items always pass through; blank-content RAGChunks are dropped.
+        return ragText === undefined || ragText.trim().length > 0;
+      })
+      .map((v) => tryAndConvertTo(v, "string")) as unknown as StringTypeToType[T];
   }
   if (
     typeof value === "string" &&
@@ -1246,9 +1266,12 @@ export const tryAndConvertTo = <T extends keyof StringTypeToType>(
       }
       if (Array.isArray(parsed)) {
         if (type === "string[]") {
-          return parsed.map((v) =>
-            tryAndConvertTo(v, "string"),
-          ) as unknown as StringTypeToType[T];
+          return (parsed as unknown[])
+            .filter((v) => {
+              const ragText = unwrapRagChunk(v);
+              return ragText === undefined || ragText.trim().length > 0;
+            })
+            .map((v) => tryAndConvertTo(v, "string")) as unknown as StringTypeToType[T];
         }
         return parsed as unknown as StringTypeToType[T];
       }

@@ -37,12 +37,32 @@ describe("FallbackExtractor", () => {
 
       expect(ctx.out[ATTR_KEYS.SPAN_TYPE]).toBe("tool");
     });
+
+    it("infers tool from gen_ai.operation.name = execute_tool (OTel GenAI semconv)", () => {
+      const ctx = createExtractorContext({
+        [ATTR_KEYS.GEN_AI_OPERATION_NAME]: "execute_tool",
+      });
+
+      extractor.apply(ctx);
+
+      expect(ctx.out[ATTR_KEYS.SPAN_TYPE]).toBe("tool");
+    });
   });
 
   describe("when no span type set and agent indicators present", () => {
     it("infers agent from gen_ai.agent.name presence", () => {
       const ctx = createExtractorContext({
         [ATTR_KEYS.GEN_AI_AGENT_NAME]: "my-agent",
+      });
+
+      extractor.apply(ctx);
+
+      expect(ctx.out[ATTR_KEYS.SPAN_TYPE]).toBe("agent");
+    });
+
+    it("infers agent from gen_ai.operation.name = invoke_agent (OTel GenAI semconv)", () => {
+      const ctx = createExtractorContext({
+        [ATTR_KEYS.GEN_AI_OPERATION_NAME]: "invoke_agent",
       });
 
       extractor.apply(ctx);
