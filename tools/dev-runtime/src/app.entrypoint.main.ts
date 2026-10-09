@@ -65,7 +65,7 @@ const isWatching =
 const isRecycleArmed = process.env.LANGWATCH_DEV_RELOAD?.trim() === "module";
 const recycleLimits = {
   maxGenerations: envPositive({ name: "LANGWATCH_DEV_RECYCLE_GENERATIONS", fallback: 50 }),
-  maxRssMiB: envPositive({ name: "LANGWATCH_DEV_RECYCLE_RSS_MIB", fallback: 4_096 }),
+  maxRssMiB: envPositive({ name: "LANGWATCH_DEV_RECYCLE_RSS_MIB", fallback: 8_192 }),
 };
 const rssMiB = (): number => Math.round(process.memoryUsage.rss() / 1_048_576);
 

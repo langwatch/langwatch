@@ -263,7 +263,7 @@ Feature: The local development process topology
   @unit
   Scenario: The in-process api lane hands over to a fresh process once its memory passes the ceiling
     Given the api lane reloading in-process under the supervisor
-    And its RSS is above LANGWATCH_DEV_RECYCLE_RSS_MIB (4096 by default)
+    And its RSS is above LANGWATCH_DEV_RECYCLE_RSS_MIB (8192 by default)
     When the next module edit arrives
     Then the host logs "backend recycling" with the RSS ceiling as its reason
     And it drains and exits non-zero, so the supervisor starts a fresh process
