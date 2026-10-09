@@ -2,7 +2,6 @@ package controlplane
 
 import (
 	"net/http"
-	"net/url"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -62,16 +61,4 @@ func TestSign_DeterministicMAC(t *testing.T) {
 	// Regardless, both signatures should be non-empty hex strings
 	assert.NotEmpty(t, sig1)
 	assert.NotEmpty(t, sig2)
-}
-
-// The same vector is asserted by the TypeScript verifier's rule test, so the
-// two ends cannot drift apart on how a query is canonicalised.
-func TestCanonicalPathSortsAndEncodesTheQuery(t *testing.T) {
-	u, err := url.Parse("/api/internal/gateway/budget-bucket-spend?end_user_id=a%20b%2Bc~*!&budget_id=x%2Fy&a=2&a=1&n=%C3%A9&flag")
-	require.NoError(t, err)
-
-	assert.Equal(t,
-		"/api/internal/gateway/budget-bucket-spend?a=1&a=2&budget_id=x%2Fy&end_user_id=a%20b%2Bc~%2A%21&flag=&n=%C3%A9",
-		CanonicalPath(u))
-	assert.Equal(t, "/api/internal/gateway/health", CanonicalPath(&url.URL{Path: "/api/internal/gateway/health"}))
 }

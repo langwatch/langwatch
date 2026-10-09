@@ -16,7 +16,6 @@ import (
 	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/config"
 	"github.com/langwatch/langwatch/pkg/herr"
-	"github.com/langwatch/langwatch/services/aigateway/adapters/controlplane"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
@@ -33,7 +32,7 @@ const gatewaySignatureWindowSeconds = 300
 //
 // Canonical signing string (constant across both directions):
 //
-//	METHOD + "\n" + controlplane.CanonicalPath + "\n" + TIMESTAMP + "\n" + hex(sha256(body))
+//	METHOD + "\n" + PATH + "\n" + TIMESTAMP + "\n" + hex(sha256(body))
 //
 // Headers (matching `enterprise/modules/governance/process/src/channels/http/http.ottl-transform.channel.ts`):
 //
@@ -92,7 +91,7 @@ func InternalAuthMiddleware(secret string) func(http.Handler) http.Handler {
 			}
 			r.Body = io.NopCloser(bytes.NewReader(body))
 
-			expected := computeSignature(secret, r.Method, controlplane.CanonicalPath(r.URL), presentedTs, body)
+			expected := computeSignature(secret, r.Method, r.URL.Path, presentedTs, body)
 			if !constantTimeHexEqual(expected, presentedSig) {
 				clog.Get(r.Context()).Warn("internal_auth_signature_mismatch",
 					zap.String("path", r.URL.Path),
@@ -131,8 +130,7 @@ func InternalAuthMiddleware(secret string) func(http.Handler) http.Handler {
 	}
 }
 
-// computeSignature returns hex(hmac_sha256(secret, METHOD\nPATH\nTS\nhex(sha256(body)))),
-// where path is controlplane.CanonicalPath.
+// computeSignature returns hex(hmac_sha256(secret, METHOD\nPATH\nTS\nhex(sha256(body)))).
 // The body hash is hex-encoded inside the canonical string so it
 // matches the TS verifier byte-for-byte (which uses
 // `createHash('sha256').digest('hex')`).
