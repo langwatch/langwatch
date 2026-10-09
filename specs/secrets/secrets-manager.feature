@@ -42,6 +42,19 @@ Feature: Secrets Manager
     And it says what secrets are for
 
   @integration
+  Scenario: A fast load never flashes a skeleton
+    Given the project has no secrets
+    When I open Settings > Secrets and the list answers quickly
+    Then no loading skeleton or table is shown
+    And the page says none are configured
+
+  @integration
+  Scenario: A slow load shows a light skeleton
+    Given the secrets list is slow to answer
+    When I open Settings > Secrets
+    Then a loading skeleton appears only after a short delay
+
+  @integration
   Scenario: Add a secret
     Given I may manage secrets
     When I add a secret
