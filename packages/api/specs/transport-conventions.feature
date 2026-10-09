@@ -262,6 +262,14 @@ Feature: The REST runtime renders what a transport may not hand-roll
       Then the handler is handed the body as sent
       And a route that declares a refusal for a media type it never named, or names a media type with parameters or a wildcard, refuses to build
 
+    @integration
+    Scenario: A raw body route refuses the media types it names and reads any other
+      Given a raw-body route that reads any media type and refuses application/grpc by name, as the OTLP doors do (Alex, 2026-10-09)
+      When it is called with a body under application/grpc, under that type with a +suffix, or in another letter case
+      Then it is refused with 415 and the code unsupported_media_type after the credential door, and the handler is not reached
+      And a body under any other media type, or with no Content-Type at all, reaches the handler as sent
+      And a route that refuses by name beside a media type it enforces, or names a wildcard, refuses to build
+
   Rule: A JSON body that names its media type is read only under it (Alex, G3b)
 
     @integration

@@ -395,4 +395,37 @@ describe("the ingestion-source receivers", () => {
       expect(logCollection).not.toHaveBeenCalled();
     });
   });
+
+  describe.each([
+    { door: "trace", path: `/api/ingest/otel/${SOURCE_ID}`, contentType: "application/grpc" },
+    {
+      door: "log",
+      path: `/api/ingest/otel/${SOURCE_ID}/v1/logs`,
+      contentType: "application/grpc+proto",
+    },
+    {
+      door: "metric",
+      path: `/api/ingest/otel/${SOURCE_ID}/v1/metrics`,
+      contentType: "application/grpc",
+    },
+  ])("when a gRPC-framed export reaches the $door OTLP door", ({ path, contentType }) => {
+    /** @scenario "A gRPC-framed export is refused with a clear answer" */
+    it("refuses it with 415 unsupported_media_type before the source is resolved", async () => {
+      const logCollection = vi.fn<GovernanceIngestLogCollectionChannel>();
+      const metricCollection = vi.fn<GovernanceIngestMetricCollectionChannel>();
+      const api = mountIngest({ logCollection, metricCollection });
+
+      const response = await api.post(path, "\u0000\u0000\u0000\u0000\u0000", {
+        "content-type": contentType,
+      });
+
+      expect(response.status).toBe(415);
+      expect(await response.json()).toMatchObject({ code: "unsupported_media_type" });
+      expect(api.findIngestionSourceByIngestSecret).not.toHaveBeenCalled();
+      expect(api.ingestionSourceRecordEventReceived).not.toHaveBeenCalled();
+      expect(api.traceCollection).not.toHaveBeenCalled();
+      expect(logCollection).not.toHaveBeenCalled();
+      expect(metricCollection).not.toHaveBeenCalled();
+    });
+  });
 });

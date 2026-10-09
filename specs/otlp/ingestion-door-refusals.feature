@@ -68,13 +68,13 @@ Feature: OTLP ingestion doors refuse what they cannot safely hold
 
   Rule: Only OTLP over HTTP is served
 
-    # Gap: no door looks at a gRPC content type; the frame reaches the
-    # protobuf parser, which may accept or fail it by chance.
-    @integration @unimplemented
+    # Alex, 2026-10-09: a gRPC frame reaches us only through a proxy that
+    # terminates HTTP/2 onto the HTTP port; main fed it to the protobuf parser.
+    @integration
     Scenario: A gRPC-framed export is refused with a clear answer
       Given an exporter holds a key for its project
-      When it posts a gRPC-framed request with content type application/grpc to the trace, log or metric door
-      Then the export is refused as an unsupported media type
+      When it posts a gRPC-framed request with content type application/grpc or application/grpc+proto to the trace, log, metric or governance OTLP door
+      Then the export is refused with 415 and the code unsupported_media_type
       And nothing is recorded
 
   Rule: The metric door serves an exporter over its composition

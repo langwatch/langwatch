@@ -720,6 +720,11 @@ function routeStack<Api>({
   const mismatch = named?.mismatch;
   const media =
     named && mismatch !== undefined && mismatch !== "accepted" ? [mediaTypeMiddleware(named)] : [];
+  const refuses = route.rawBody?.refuses;
+  const refused =
+    route.rawBody && refuses
+      ? [refusedMediaTypeMiddleware({ refuses, expected: route.rawBody.mediaType })]
+      : [];
 
   return [
     ...legacyErrorScopes(route),
@@ -743,8 +748,8 @@ function routeStack<Api>({
     // body: then the capped bytes are read once, exactly as sent, and it verifies those.
     // The media type is asked after the door either way (E9): a missing credential answers 401.
     ...(doorReadsBody(route)
-      ? [...cap, ...raw, door, ...media]
-      : [door, ...credentialFacts({ route, facts }), ...media, ...cap, ...raw]),
+      ? [...cap, ...raw, door, ...media, ...refused]
+      : [door, ...credentialFacts({ route, facts }), ...media, ...refused, ...cap, ...raw]),
     ...(route.multipart
       ? [
           multipartMiddleware({
@@ -895,6 +900,28 @@ function mediaTypeMiddleware(declared: RestRawBody | RestInputMediaType): Middle
       throw declared.mismatch === "malformed_request"
         ? new MediaTypeMalformedRequestError(refusal)
         : new UnsupportedMediaTypeError(refusal);
+    }
+
+    await next();
+  };
+}
+
+/** Refuses a body sent under a media type its route names, or that type with a `+suffix`. */
+function refusedMediaTypeMiddleware({
+  refuses,
+  expected,
+}: {
+  refuses: readonly string[];
+  expected: string;
+}): MiddlewareHandler {
+  return async (context, next) => {
+    const received = mediaTypeEssence(context.req.header("content-type"));
+    const isRefused = refuses.some(
+      (refused) => received === refused || received?.startsWith(`${refused}+`),
+    );
+
+    if (received !== null && isRefused) {
+      throw new UnsupportedMediaTypeError({ received, expected });
     }
 
     await next();

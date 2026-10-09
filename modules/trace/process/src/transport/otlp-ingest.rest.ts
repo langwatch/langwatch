@@ -25,6 +25,7 @@ import {
   readCorrectedPath,
   readOtlpBody,
   stampCorrectedPath,
+  OTLP_REFUSED_MEDIA_TYPES,
 } from "@langwatch/otlp";
 import { resolveRequestBound } from "@langwatch/plans";
 import {
@@ -337,7 +338,7 @@ export const otlpIngestRest = defineRestRouter(TraceApi)
   .withAddressing("literal", { v1Twin: false })
 
   .post("/api/otel/v1/traces", "ingestOtlpTraces")
-  .withRawBody("bytes")
+  .withRawBody("bytes", { refuses: OTLP_REFUSED_MEDIA_TYPES })
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
   .withAccess(PUBLIC_ACCESS)
   .withResponse("protocol", {
@@ -360,7 +361,7 @@ export const otlpIngestRest = defineRestRouter(TraceApi)
   // against the allow-list in `canonicalOtlpPath` before it is served.
   .post("/:otlpBase{.+}/v1/traces", "ingestOtlpTracesAlias")
   .withParams(otlpTraceAliasParamsSchema)
-  .withRawBody("bytes")
+  .withRawBody("bytes", { refuses: OTLP_REFUSED_MEDIA_TYPES })
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
   .withAccess(PUBLIC_ACCESS)
   .withResponse("protocol", {
@@ -375,7 +376,7 @@ export const otlpIngestRest = defineRestRouter(TraceApi)
 
   .post("/:otlpBase{.+}/v1/traces/", "ingestOtlpTracesAliasSlash")
   .withParams(otlpTraceAliasParamsSchema)
-  .withRawBody("bytes")
+  .withRawBody("bytes", { refuses: OTLP_REFUSED_MEDIA_TYPES })
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
   .withAccess(PUBLIC_ACCESS)
   .withResponse("protocol", {
@@ -389,7 +390,7 @@ export const otlpIngestRest = defineRestRouter(TraceApi)
   )
 
   .post("/v1/traces", "ingestOtlpTracesRootV1")
-  .withRawBody("bytes")
+  .withRawBody("bytes", { refuses: OTLP_REFUSED_MEDIA_TYPES })
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
   .withAccess(PUBLIC_ACCESS)
   .withResponse("protocol", {
@@ -403,7 +404,7 @@ export const otlpIngestRest = defineRestRouter(TraceApi)
   )
 
   .post("/v1/traces/", "ingestOtlpTracesRootV1Slash")
-  .withRawBody("bytes")
+  .withRawBody("bytes", { refuses: OTLP_REFUSED_MEDIA_TYPES })
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
   .withAccess(PUBLIC_ACCESS)
   .withResponse("protocol", {

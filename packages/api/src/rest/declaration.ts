@@ -835,9 +835,9 @@ class RouteBuilder<Api, S extends RouteShape> {
   }
 
   /**
-   * The body is the evidence, so nothing parses it: the handler gets the exact characters or
-   * bytes sent, read once. A named `mediaType` is enforced after the door: another Content-Type
-   * is refused with `mismatch` (415, main's 400 where kept), or read anyway when `accepted`.
+   * The body is the evidence: the handler gets the exact characters or bytes sent, read once.
+   * A named `mediaType` is enforced after the door: another type is refused with `mismatch`
+   * (415, main's 400 where kept) or read when `accepted`; `refuses` names types refused with 415.
    */
   withRawBody<Form extends RestRawBodyForm>(
     this: RouteBuilder<Api, With<S, { method: Exclude<HttpMethod, "get" | "head"> }>>,
@@ -845,6 +845,7 @@ class RouteBuilder<Api, S extends RouteShape> {
     options: Readonly<{
       mediaType?: string;
       mismatch?: RestMediaTypeMismatch;
+      refuses?: readonly string[];
       /** Why the route needs the exact body; `langwatch/raw-body-bypass` asks for it. */
       because?: string;
     }> = {},
@@ -1990,9 +1991,14 @@ function rawBodyOf({
 }: {
   operation: string;
   form: RestRawBodyForm;
-  options: Readonly<{ mediaType?: string; mismatch?: RestMediaTypeMismatch }>;
+  options: Readonly<{
+    mediaType?: string;
+    mismatch?: RestMediaTypeMismatch;
+    refuses?: readonly string[];
+  }>;
 }): RestRawBody {
-  const { mediaType, mismatch } = options;
+  const { mediaType, mismatch, refuses } = options;
+  const refused = refuses === undefined ? {} : { refuses: refusedOf({ operation, options }) };
 
   if (mediaType === undefined) {
     if (mismatch !== undefined) {
@@ -2001,10 +2007,37 @@ function rawBodyOf({
       );
     }
 
-    return { form, mediaType: DEFAULT_RAW_MEDIA_TYPE[form] };
+    return { form, mediaType: DEFAULT_RAW_MEDIA_TYPE[form], ...refused };
   }
 
-  return { form, ...namedMediaType({ operation, mediaType, mismatch }) };
+  return { form, ...namedMediaType({ operation, mediaType, mismatch }), ...refused };
+}
+
+/** The media types a raw body refuses by name: single essences, beside a type it reads anyway. */
+function refusedOf({
+  operation,
+  options,
+}: {
+  operation: string;
+  options: Readonly<{
+    mediaType?: string;
+    mismatch?: RestMediaTypeMismatch;
+    refuses?: readonly string[];
+  }>;
+}): readonly string[] {
+  if (options.mediaType !== undefined && options.mismatch !== "accepted") {
+    throw new Error(`REST ${operation} refuses media types by name beside the one it enforces`);
+  }
+
+  return (options.refuses ?? []).map((refused) => {
+    const essence = refused.toLowerCase();
+
+    if (!MEDIA_TYPE_ESSENCE.test(essence)) {
+      throw new Error(`REST ${operation} refuses "${refused}", which names no single media type`);
+    }
+
+    return essence;
+  });
 }
 
 type NamedMediaType = Readonly<{

@@ -184,3 +184,10 @@ export function applyReceiverProvenance({
     );
   }
 }
+
+/** Media types an OTLP door refuses with 415: OTLP is served over HTTP only, never gRPC framing. */
+export const OTLP_REFUSED_MEDIA_TYPES = [
+  "application/grpc",
+  "application/grpc-web",
+  "application/grpc-web-text",
+];

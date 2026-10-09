@@ -196,4 +196,23 @@ describe("given the metric module as a process composes it", () => {
       expect(sentPoints).toHaveLength(0);
     });
   });
+
+  describe.each(["application/grpc", "application/grpc+proto"])(
+    "when a gRPC-framed export is posted under %s",
+    (contentType) => {
+      /** @scenario "A gRPC-framed export is refused with a clear answer" */
+      it("refuses it with 415 unsupported_media_type and sends nothing on", async () => {
+        const { post, sentPoints } = deployment();
+
+        const response = await post({
+          body: new Uint8Array(5),
+          headers: { "Content-Type": contentType },
+        });
+
+        expect(response.status).toBe(415);
+        expect(await response.json()).toMatchObject({ code: "unsupported_media_type" });
+        expect(sentPoints).toHaveLength(0);
+      });
+    },
+  );
 });
