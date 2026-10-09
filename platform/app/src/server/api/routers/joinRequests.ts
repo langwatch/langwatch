@@ -1,16 +1,27 @@
 import { auditLog } from "@ee/audit-log/auditLog";
 import {
+  DEFAULT_JOIN_REQUEST_ORIGIN,
   DOMAIN_JOIN_SETTINGS,
+  JOIN_REQUEST_ORIGINS,
   JOINER_ROLES,
   type JoinLookupDecision,
+  seatForJoiner,
 } from "@langwatch/identity";
 import { z } from "zod";
-import type { PrismaClient } from "~/generated/prisma/client";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import {
-  identityEmail,
   joinRequestsService,
+  provenAddresses,
 } from "~/server/app-layer/identity/runtime";
+
+/**
+ * Where a request is made (ADR-143 v6), as the browser asserts it. Trusted
+ * because it can only LOWER the seat: `cli` lands a Developer, `web` the
+ * joiner seat, and an older client that names nothing is a web one.
+ */
+const joinOriginInput = z
+  .enum(JOIN_REQUEST_ORIGINS)
+  .default(DEFAULT_JOIN_REQUEST_ORIGIN);
 
 /**
  * Joining an organization (D12, ADR-117): the lookup, the ask, the two admin
@@ -49,7 +60,6 @@ export const joinRequestsRouter = createTRPCRouter({
     })
     .query(async ({ ctx }): Promise<JoinLookupDecision> => {
       const verifiedEmail = await verifiedEmailFor({
-        prisma: ctx.prisma,
         userId: ctx.session.user.id,
       });
       return joinRequestsService().lookup({
@@ -72,7 +82,6 @@ export const joinRequestsRouter = createTRPCRouter({
     })
     .query(async ({ ctx }): Promise<JoinLookupDecision> => {
       const verifiedEmail = await verifiedEmailFor({
-        prisma: ctx.prisma,
         userId: ctx.session.user.id,
       });
       return joinRequestsService().offerForSignedInUser({
@@ -90,7 +99,6 @@ export const joinRequestsRouter = createTRPCRouter({
     })
     .mutation(async ({ ctx }) => {
       const verifiedEmail = await verifiedEmailFor({
-        prisma: ctx.prisma,
         userId: ctx.session.user.id,
       });
       await joinRequestsService().dismissOffer({
@@ -109,19 +117,19 @@ export const joinRequestsRouter = createTRPCRouter({
    * carries on to the offer or to workspace creation.
    */
   admitAutomatically: protectedProcedure
-    .input(z.object({}))
+    .input(z.object({ origin: joinOriginInput }))
     .noPermission({
       reason:
         "admits the caller to an organization that opted into admitting their own verified domain; the handler re-derives the match server-side and admits nothing else",
     })
-    .mutation(async ({ ctx }) => {
+    .mutation(async ({ ctx, input }) => {
       const verifiedEmail = await verifiedEmailFor({
-        prisma: ctx.prisma,
         userId: ctx.session.user.id,
       });
       const joined = await joinRequestsService().joinAutomaticallyIfAdmitted({
         userId: ctx.session.user.id,
         verifiedEmail,
+        origin: input.origin,
       });
       return { organization: joined?.organization ?? null };
     }),
@@ -147,7 +155,9 @@ export const joinRequestsRouter = createTRPCRouter({
 
   /** Ask one organization to let you in. */
   request: protectedProcedure
-    .input(z.object({ organizationId: z.string().min(1) }))
+    .input(
+      z.object({ organizationId: z.string().min(1), origin: joinOriginInput }),
+    )
     .noPermission({
       reason:
         "asking to join is the one action a non-member takes on an organization; the handler proves the organization was OFFERED to this caller's verified domain and refuses anything else as if it did not exist",
@@ -155,13 +165,13 @@ export const joinRequestsRouter = createTRPCRouter({
     })
     .mutation(async ({ ctx, input }) => {
       const verifiedEmail = await verifiedEmailFor({
-        prisma: ctx.prisma,
         userId: ctx.session.user.id,
       });
       return joinRequestsService().request({
         userId: ctx.session.user.id,
         verifiedEmail,
         organizationId: input.organizationId,
+        origin: input.origin,
       });
     }),
 
@@ -190,6 +200,11 @@ export const joinRequestsRouter = createTRPCRouter({
       const pending = await joinRequestsService().pendingForOrganization({
         organizationId: input.organizationId,
       });
+      // The seat each request lands in if approved (ADR-143 v6): read only,
+      // because approval carries no role choice and never will.
+      const { joinerRole } = await joinRequestsService().readJoining({
+        organizationId: input.organizationId,
+      });
       // Who is asking, by name. The requester's ADDRESS is deliberately not
       // returned: the domain is what was matched and what the admin is
       // deciding on, and the local part is not the organization's business
@@ -208,6 +223,7 @@ export const joinRequestsRouter = createTRPCRouter({
         requestedAt: new Date(request.createdAtMs),
         expiresAt:
           request.expiresAtMs === null ? null : new Date(request.expiresAtMs),
+        seat: seatForJoiner({ origin: request.origin, joinerRole }),
       }));
     }),
 
@@ -358,25 +374,16 @@ export const JOIN_SETTING_AUDIT_ACTION = "organization.joining.changed";
  * The caller's own verified address, and the reason every procedure above
  * starts here.
  *
- * `verifiedEmailsOf` answers `null` for a user who is not on identifiers yet,
- * which is the legacy fallback the rest of the identity surface uses: the
- * `User.email` column, but only where better-auth has marked it verified. An
- * unverified address answers null, and every caller treats that as the
+ * The first of the list `provenAddresses()` reads, which is the one rule the
+ * invitation lookup applies to the same person: identifiers first, else the
+ * legacy `User.email` column only where better-auth has marked it verified.
+ * An unverified address answers null, and every caller treats that as the
  * universal nothing.
  */
 async function verifiedEmailFor({
-  prisma,
   userId,
 }: {
-  prisma: PrismaClient;
   userId: string;
 }): Promise<string | null> {
-  const verified = await identityEmail().verifiedEmailsOf({ userId });
-  if (verified !== null) return verified[0]?.value ?? null;
-
-  const row = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { email: true, emailVerified: true },
-  });
-  return row?.emailVerified ? (row.email ?? null) : null;
+  return (await provenAddresses().addressesOf({ userId }))[0] ?? null;
 }

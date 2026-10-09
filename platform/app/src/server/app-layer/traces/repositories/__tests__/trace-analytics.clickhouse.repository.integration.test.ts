@@ -17,17 +17,20 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { TraceAnalyticsRow } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceAnalytics.foldProjection";
+import { ownProof } from "~/test-utils/authorizationProofs";
+import { traceAnalyticsRepositoryFor } from "~/test-utils/traceAnalyticsRepository";
 import {
   startTestContainers,
   stopTestContainers,
 } from "../../../../event-sourcing/__tests__/integration/testContainers";
-import { TraceAnalyticsClickHouseRepository } from "../trace-analytics.clickhouse.repository";
+import type { TraceAnalyticsClickHouseRepository } from "../trace-analytics.clickhouse.repository";
 
 let ch: ClickHouseClient;
 let repo: TraceAnalyticsClickHouseRepository;
 
 const tag = nanoid();
 const tenantId = `${tag}-project`;
+const authorization = ownProof({ projectId: tenantId });
 const baseMs = Date.now();
 const window = { fromMs: baseMs - 60_000, toMs: baseMs + 60_000 };
 
@@ -85,7 +88,7 @@ function traceRow(over: Partial<TraceAnalyticsRow> = {}): TraceAnalyticsRow {
 beforeAll(async () => {
   const containers = await startTestContainers();
   ch = containers.clickHouseClient;
-  repo = new TraceAnalyticsClickHouseRepository(async () => ch);
+  repo = traceAnalyticsRepositoryFor(async () => ch);
 }, 60_000);
 
 afterAll(async () => {
@@ -109,7 +112,7 @@ describe("trace_analytics round-trip (migrations 00039 + 00056 + 00061)", () => 
       await repo.upsertBatch([{ row, retentionDays: 30 }]);
 
       const read = await repo.findByTraceIdWithApplied({
-        tenantId,
+        authorization,
         traceId: `${tag}-rt`,
         window,
       });
@@ -158,7 +161,7 @@ describe("trace_analytics round-trip (migrations 00039 + 00056 + 00061)", () => 
       ]);
 
       const read = await repo.findByTraceIdWithApplied({
-        tenantId,
+        authorization,
         traceId: `${tag}-dedup`,
         window,
       });
@@ -176,7 +179,7 @@ describe("trace_analytics round-trip (migrations 00039 + 00056 + 00061)", () => 
       ]);
 
       const read = await repo.findByTraceIdWithApplied({
-        tenantId,
+        authorization,
         traceId: `${tag}-applied`,
         window,
       });
@@ -205,7 +208,7 @@ describe("trace_analytics round-trip (migrations 00039 + 00056 + 00061)", () => 
       });
 
       const read = await repo.findByTraceIdWithApplied({
-        tenantId,
+        authorization,
         traceId,
         window,
       });

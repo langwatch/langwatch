@@ -87,6 +87,9 @@ export function harness({
       findMany: vi.fn().mockResolvedValue([]),
       count: vi.fn().mockResolvedValue(0),
     },
+    // ADR-144: the shared-read writer asks which organization each project
+    // sits in. Empty by default; a test seeds the lineage it is about.
+    project: { findMany: vi.fn().mockResolvedValue([]) },
     organizationUser: {
       findMany: vi
         .fn()

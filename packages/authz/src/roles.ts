@@ -11,7 +11,23 @@ export type BuiltinRoleKey =
   | "lite-member"
   | "demo-viewer"
   | "org-admin"
-  | "org-member";
+  | "org-member"
+  | typeof PROJECT_READER_ROLE_KEY;
+
+/** ADR-144: the role key a shared project-to-project grant carries. */
+export const PROJECT_READER_ROLE_KEY = "project-reader" as const;
+
+/**
+ * ADR-144: everything a project-reader grant may do, and nothing else. An
+ * aggregate project reads its members' traces and analytics; it never
+ * manages, shares, annotates or sees prompts, datasets or secrets. The list
+ * is closed on purpose - the matcher test proves every other permission is
+ * denied through this role.
+ */
+export const PROJECT_READER_PERMISSIONS: readonly AuthzPermission[] = [
+  "traces:view",
+  "analytics:view",
+];
 
 const VIEWER: readonly AuthzPermission[] = [
   "project:view",
@@ -185,6 +201,7 @@ const ROLE_PERMISSION_SETS: Record<BuiltinRoleKey, ReadonlySet<string>> = {
   "demo-viewer": new Set(DEMO_VIEWER),
   "org-admin": new Set(ORG_ADMIN),
   "org-member": new Set(ORG_MEMBER),
+  "project-reader": new Set(PROJECT_READER_PERMISSIONS),
 };
 
 export function builtinRolePermissions(

@@ -206,7 +206,7 @@ describe("project.regenerateApiKey mutation logic", () => {
       ).resolves.toEqual({ apiKey: "sk-lw-secret" });
       expect(mockPrisma.project.findUnique).toHaveBeenCalledWith({
         where: { id: "project-own" },
-        select: { apiKey: true },
+        select: { apiKey: true, kind: true },
       });
     });
 

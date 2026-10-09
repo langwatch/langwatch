@@ -375,7 +375,7 @@ LangWatch accepts OTLP/HTTP at two distinct URLs. They share **everything that m
 
 The two URLs are split for **auth + routing convenience**, not for architectural reasons. Internally they share everything that matters:
 
-- **Same hardened OTLP parser**: `platform/app/src/server/otel/parseOtlpBody.ts` (`readOtlpBody` + `parseOtlpTraces`, `parseOtlpLogs`) handles gzip, deflate, brotli decompression, JSON + protobuf decode, and the JSON-then-protobuf-encode fallback path. Both URLs call into it. There is no parser-quality gap.
+- **Same hardened OTLP parser**: `platform/app/src/server/otel/parseOtlpBody.ts` (`readOtlpBody` + `parseOtlpTraces`, `parseOtlpLogs`) handles gzip, deflate, brotli and zstd decompression (gzip and zstd are also detected from the body's leading bytes), JSON + protobuf decode, and the JSON-then-protobuf-encode fallback path. Both URLs call into it. There is no parser-quality gap.
 - **Same trace pipeline**: both URLs hand off to the existing `traces.collection.handleOtlpTraceRequest` (or `traces.logCollection.handleOtlpLogRequest` for log-shaped sources) that powers `/api/otel/v1/traces`. No parallel write path. No parallel storage.
 - **Same `recorded_spans` and `log_records` tables**, governance-ingested events land in the same ClickHouse storage that powers the rest of the platform. They're distinguished by reserved attribute namespaces stamped at the receiver edge:
   - `langwatch.origin.kind = "ingestion_source"`, discriminator
@@ -1041,6 +1041,10 @@ provider:
 
 Under the door setting, **Seat for people who join** decides what a person admitted without an invitation lands on: **Member** (the default, a full seat that can be added to shared teams and projects) or **Developer** (a project of their own, with access to no shared team or project). The same choice applies to people your identity provider admits. Invitations always name their own seat and ignore this setting.
 
+Somebody who signs up from the terminal, by running `langwatch login` and creating their account on the page it opens, lands on a **Developer** seat whichever option is chosen here, both when you approve their request and when the door is automatic. The pending requests list shows the seat each request will land on. Raising them to a Member seat afterwards is done from the member dialog, as for anyone else.
+
+When a person reaches the welcome screen with an invitation already waiting on their verified address, accepting that invitation is offered first and asking to join is not. The seat is the one the invitation names.
+
 The **Account lockout** and **Session limits** cards in the same section apply
 to password sign-in for the organization. They remain available when you stop
 using single sign-on. Changing a policy requires `organization:manage`.
@@ -1057,7 +1061,7 @@ A Developer cannot open, be invited to, or be added to any shared team or projec
 
 Moving a member to a Developer seat removes their bindings on every shared team, shared project and the organization, and records each removal in the audit log. Their personal project, its traces and their API keys stay. A key that pointed at a shared project stops working on its own, because a key can never do more than its owner can. Moving a Developer to a Member seat grants no team access on its own; add teams afterwards.
 
-The CLI honours the seat too: `langwatch login` offers a Developer their personal project only and refuses a shared one.
+The CLI honours the seat too: `langwatch login` offers a Developer their personal project only and refuses a shared one, and `langwatch instrument <tool> --project` cannot pin a coding agent to a shared project. A person who joins the organization by domain after signing up from `langwatch login` lands on this seat regardless of the **Seat for people who join** setting (see [Let colleagues join by domain](#let-colleagues-join-by-domain)).
 
 ## Teams
 
@@ -12940,7 +12944,7 @@ Claude Cowork pushes telemetry over OTLP/HTTP. The receiver is wired and accepts
 
 - **Receiver:** `POST /api/ingest/otel/:sourceId`, same endpoint as [`otel_generic`](/ai-governance/ingestion-sources/otel-generic).
 - **Auth:** `Authorization: Bearer lw_is_<secret>`.
-- **Body:** OTLP/HTTP JSON envelope (also accepts protobuf + gzip, deflate, brotli per the shared parser).
+- **Body:** OTLP/HTTP JSON envelope (also accepts protobuf + gzip, deflate, brotli, zstd per the shared parser).
 - **OTLP shape:** Spans (lands in `recorded_spans` with origin metadata stamped). Same handoff path as `otel_generic`.
 - **Pipeline:** Receiver lazy-ensures the hidden Governance Project, stamps `langwatch.origin.*` on every span, hands off to the existing trace pipeline. Cowork tool-call spans land as the OCSF "Action = tool_call"; model-call spans land as "Action = chat" via the governance fold's heuristic.
 - **Status flip:** receiver calls `recordEventReceived(sourceId)` after any successful 202; source flips from `awaiting_first_event` → `active`.
@@ -13354,7 +13358,7 @@ If a field doesn't resolve from the precedence list, the fold projection stores 
 
 ## What is still envelope-only, follow-up work
 
-- **gRPC.** Only OTLP/HTTP JSON + protobuf is implemented (gzip, deflate, brotli accepted via the shared parser). OTLP/gRPC is not yet wired. Use the JSON or protobuf HTTP exporter on the upstream side.
+- **gRPC.** Only OTLP/HTTP JSON + protobuf is implemented (gzip, deflate, brotli and zstd accepted via the shared parser; gzip and zstd bodies are recognised even without a correct Content-Encoding). OTLP/gRPC is not yet wired. Use the JSON or protobuf HTTP exporter on the upstream side.
 - **Span events, span links.** Not extracted into separate fold dimensions in this slice; the parent span's data is surfaced. Span events appear in the trace viewer's drill-down.
 
 ## Verify with CLI + web
@@ -17944,6 +17948,8 @@ langwatch instrument claude --project acme-app
 ```
 
 This mints an ingest key for this device, scoped to the project, and pins the tool to the project. LangWatch creates one key per device and never replaces another device's key, so any number of machines can report to one project at the same time. You need a login and the `traces:create` permission on the project.
+
+A member on a [Developer seat](/platform/members-and-teams#developers) holds no permission on any shared project, so the pin is refused and the device keeps its current connection. Ask an administrator to move you to a Member seat and add you to the team that owns the project.
 
 The wrapper takes the same flag and then starts the agent:
 
@@ -61462,7 +61468,22 @@ A delivered license that does not verify is not applied. The install keeps the l
 
 An install with its own `JEV_API_KEY` judges with that key and is unchanged by Connect: its evaluations stay on your infrastructure whatever else is switched on.
 
-Without a judge key, an install whose license names **Instant Evals** judges through LangWatch. An organization whose admin switched it off publishes the eval functions as unavailable, so a query never comes back with judged columns that are all empty.
+Without a judge key, an install whose license names **Instant Evals** judges through LangWatch. The license turns them on, with no release flag to set. An organization whose admin switched it off publishes the eval functions as unavailable, so a query never comes back with judged columns that are all empty.
+
+An install with its own judge key still turns Instant Evals on with `RELEASE_INSTANT_EVALS=1`, because no license names that judge.
+
+When a sentence typed in trace search can't be judged, the popover under the search bar says why:
+
+| The popover says | What to do |
+| --- | --- |
+| Your license doesn't include Instant Evals | Contact us to add them to your license. |
+| Instant Evals are switched off for your organization | An organization admin switches them back on in **Settings, Connect**. |
+| This install isn't connected to LangWatch | Switch Connect on, and allow outbound HTTPS to `connect.langwatch.ai` and `gateway.langwatch.ai`. |
+| Instant Evals are off on this install | The install judges with its own key, or has judging turned off. Whoever runs it sets `RELEASE_INSTANT_EVALS=1`, with a judge configured. |
+
+On an install that judges through LangWatch, the "Instant Evals can't run right now" popover also names both addresses, so check that they are still reachable.
+
+With `RELEASE_INSTANT_EVALS=1` set, the four popovers above never show: a sentence that can't be judged gets "Instant Evals can't run right now" instead, whatever the reason. An install that judges through LangWatch needs no flag, so remove it there to get the popover that says why.
 
 Judging is charged at the list rate, 0.0546 USD per million input tokens the judge reads, and counts against your cap. The 1 USD free budget of the Cloud free plan does not apply here: your commit and your cap govern instead. See [Limits and cost](/features/instant-evals/limits-and-cost) for what a run reads and costs.
 

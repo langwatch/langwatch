@@ -68,12 +68,16 @@ import {
   deviceLabelForSession,
   sanitizeDeviceLabel,
 } from "~/server/api-key/device-label";
-import { ApiKeyScopeViolationError } from "~/server/api-key/errors";
+import {
+  AggregateProjectHasNoCredentialError,
+  ApiKeyScopeViolationError,
+} from "~/server/api-key/errors";
 import { getApp, tryGetApp } from "~/server/app-layer/app";
 import {
   probeOrganizationPermission,
   probeProjectPermission,
 } from "~/server/app-layer/permissions/imperative";
+import { traceDestinationViolation } from "~/server/app-layer/projects/project-kinds";
 import { getServerAuthSession, type Session } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { featureFlagService } from "~/server/featureFlag";
@@ -430,6 +434,29 @@ async function isDeveloperSeat({
 }
 
 /**
+ * ADR-144 decision 7: an aggregate project receives no traces, so no key the
+ * CLI hands out (a project's base key, a minted ingestion key) may point at
+ * it. Checked before any permission, because no grant changes the answer.
+ *
+ * Answered in this router's OAuth-style envelope rather than thrown: the
+ * CLI's project-key login reads `error` and `error_description` at the top
+ * level of the body without looking for the handled-error envelope, so a
+ * thrown error would reach it as a bare status. The code is still the
+ * registered one, so every surface names this refusal the same way.
+ */
+function refuseNonDestination(
+  c: Context,
+  project: { kind: string },
+): Response | null {
+  if (!traceDestinationViolation(project.kind)) return null;
+  const refusal = new AggregateProjectHasNoCredentialError();
+  return c.json(
+    { error: refusal.code, error_description: refusal.message },
+    403,
+  );
+}
+
+/**
  * The authorization rule every endpoint that hands back a Project.apiKey
  * shares (/approve with a project pick, /project-key): a personal project is
  * honoured only as the caller's OWN explicit pick (the original hazard, per
@@ -443,9 +470,16 @@ async function isDeveloperSeat({
  */
 async function refuseProjectKeyHandout(
   c: Context,
-  project: { id: string; isPersonal: boolean; ownerUserId: string | null },
+  project: {
+    id: string;
+    isPersonal: boolean;
+    ownerUserId: string | null;
+    kind: string;
+  },
   session: Session,
 ): Promise<Response | null> {
+  const notADestination = refuseNonDestination(c, project);
+  if (notADestination) return notADestination;
   if (project.isPersonal && project.ownerUserId !== session.user.id) {
     return c.json(
       {
@@ -2150,6 +2184,7 @@ secured.access(CLI_POLICY).post("/project-key", async (c: Context) => {
       name: true,
       isPersonal: true,
       ownerUserId: true,
+      kind: true,
     },
   });
   if (!project) {
@@ -2592,6 +2627,7 @@ async function findProjectInOrg({
     name: true,
     isPersonal: true,
     ownerUserId: true,
+    kind: true,
   } as const;
   const inOrg = { archivedAt: null, team: { organizationId } };
   return (
@@ -2645,6 +2681,9 @@ async function mintProjectIngestionKey(
       404,
     );
   }
+
+  const notADestination = refuseNonDestination(c, project);
+  if (notADestination) return notADestination;
 
   // Another user's personal workspace is theirs alone; no permission grant
   // can make a second principal's key into it legitimate.
@@ -3237,6 +3276,7 @@ secured.access(cliApproveAuth).post("/approve", async (c: Context) => {
         name: true,
         isPersonal: true,
         ownerUserId: true,
+        kind: true,
       },
     });
     if (!project) {

@@ -15,6 +15,9 @@ import type { LimitType } from "./types";
 export const LIMIT_TYPE_LABELS: Record<LimitType, string> = {
   members: "team members",
   membersLite: "lite members",
+  scenarios: "scenarios",
+  scenarioSets: "simulations",
+  evaluators: "custom evaluators",
 } as const;
 
 /**
@@ -30,6 +33,9 @@ export const LIMIT_TYPE_LABELS: Record<LimitType, string> = {
 export const LIMIT_TYPE_DISPLAY_LABELS: Record<LimitType, string> = {
   members: "Team Members",
   membersLite: "Lite Members",
+  scenarios: "Scenarios",
+  scenarioSets: "Simulations",
+  evaluators: "Custom Evaluators",
 } as const;
 
 /**

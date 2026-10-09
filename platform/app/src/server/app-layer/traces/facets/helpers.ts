@@ -3,24 +3,30 @@
  * One source of truth — every facet builder consumes these.
  */
 
+import {
+  type TenantScopeTimeColumn,
+  tenantScope,
+} from "~/server/app-layer/clients/clickhouse/authorized-reads";
 import type { FacetQueryContext } from "../facet-registry";
 
 /**
- * `WHERE` predicate that pins every facet query to the right tenant and
+ * `WHERE` predicate that pins every facet query to the tenant fence and the
  * time window. The time column varies per table — `OccurredAt` for
  * `trace_summaries`, `StartTime` for `stored_spans`, `ScheduledAt` for
  * `evaluation_runs`. See `TABLE_TIME_COLUMNS` in `facet-registry.ts`.
  *
- * TenantId comes first in the predicate list because of how the
+ * The tenant marker comes first in the predicate list because of how the
  * cross-tenant index is laid out — the multitenancy review in
- * `dev/docs/best_practices/clickhouse-queries.md` calls this out.
+ * `dev/docs/best_practices/clickhouse-queries.md` calls this out. The
+ * authorized reader expands it into the proof's fence, windowed on this
+ * same column (ADR-144 block C).
  */
 export function buildTimeWhere(
-  timeColumn: string,
+  timeColumn: TenantScopeTimeColumn,
   ctx?: Pick<FacetQueryContext, "traceScope">,
 ): string {
   return [
-    "TenantId = {tenantId:String}",
+    tenantScope(timeColumn),
     `${timeColumn} >= fromUnixTimestamp64Milli({timeFrom:Int64})`,
     `${timeColumn} <= fromUnixTimestamp64Milli({timeTo:Int64})`,
     ...(ctx?.traceScope ? [ctx.traceScope.sql] : []),
@@ -54,12 +60,11 @@ export const KEY_DISCOVERY_SETTINGS: Record<string, string> = {
 /**
  * The bound-parameter tuple every facet query relies on. Helpers that need
  * `prefix` add it on top, since not every builder supports key/value
- * prefix-filtering.
+ * prefix-filtering. The tenant is not among them: the reader binds it.
  */
 export function baseParams(ctx: FacetQueryContext): Record<string, unknown> {
   return {
     ...ctx.traceScope?.params,
-    tenantId: ctx.tenantId,
     timeFrom: ctx.timeRange.from,
     timeTo: ctx.timeRange.to,
     limit: ctx.limit,

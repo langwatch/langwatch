@@ -1,3 +1,4 @@
+import type { Authorization } from "@langwatch/actor";
 import { createLogger } from "@langwatch/observability";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
@@ -11,13 +12,21 @@ import { IdUtils } from "~/server/event-sourcing/pipelines/trace-processing/util
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import { validateBatchTenants } from "../../_shared/clickhouse-batch";
 import {
+  type AuthorizedClickHouse,
+  type TenantScopedReader,
+  tenantScope,
+  tenantScopeKey,
+  tenantSet,
+} from "../../clients/clickhouse/authorized-reads";
+import {
   DEFAULT_PARTITION_WINDOW_MS,
   queryWindowed,
 } from "../../clients/clickhouse/windowed-read";
 import type { TraceSummaryData } from "../types";
 import type { TraceSummaryFieldsBase } from "./_summary-fields.types";
 import type {
-  FindByTraceIdOptions,
+  FindByTraceIdParams,
+  TraceSummaryRead,
   TraceSummaryRepository,
 } from "./trace-summary.repository";
 
@@ -26,6 +35,26 @@ const TABLE_NAME = "trace_summaries" as const;
 const logger = createLogger(
   "langwatch:app-layer:traces:trace-summary-repository",
 );
+
+/** A failed summary read, logged with the fence it ran under. */
+function logSummaryReadFailure({
+  authorization,
+  traceId,
+  error,
+}: {
+  authorization: Authorization;
+  traceId: string;
+  error: unknown;
+}): void {
+  logger.warn(
+    {
+      traceId,
+      scope: tenantScopeKey({ authorization, reads: "traces" }),
+      error: error instanceof Error ? error.message : String(error),
+    },
+    "Failed to get trace summary from ClickHouse",
+  );
+}
 
 type ClickHouseSummaryWriteRecord = WithDateWrites<
   ClickHouseSummaryRecord,
@@ -82,7 +111,22 @@ interface ClickHouseSummaryRecord extends TraceSummaryFieldsBase {
 export class TraceSummaryClickHouseRepository
   implements TraceSummaryRepository
 {
-  constructor(private readonly resolveClient: ClickHouseClientResolver) {}
+  /**
+   * Writes resolve the tenant's own client by the summary's tenant id, the
+   * way the projection hands it over. Reads never name a tenant: they go
+   * through the authorized client, which fences every statement by the proof
+   * (ADR-144 block C).
+   */
+  constructor(
+    private readonly deps: {
+      resolveClient: ClickHouseClientResolver;
+      clickhouse: AuthorizedClickHouse;
+    },
+  ) {}
+
+  private reader(authorization: Authorization): TenantScopedReader {
+    return this.deps.clickhouse.as(authorization, { reads: "traces" });
+  }
 
   async upsert(
     data: TraceSummaryData,
@@ -101,7 +145,7 @@ export class TraceSummaryClickHouseRepository
     );
 
     try {
-      const client = await this.resolveClient(tenantId);
+      const client = await this.deps.resolveClient(tenantId);
       const record = this.toClickHouseRecord(
         data,
         tenantId,
@@ -142,7 +186,7 @@ export class TraceSummaryClickHouseRepository
     );
 
     try {
-      const client = await this.resolveClient(tenantId);
+      const client = await this.deps.resolveClient(tenantId);
       const records = entries.map(
         ({ data, tenantId: tid, retentionDays: rd }) => {
           const projectionId =
@@ -178,16 +222,11 @@ export class TraceSummaryClickHouseRepository
     }
   }
 
-  async findByTraceId(
-    tenantId: string,
-    traceId: string,
-    options?: FindByTraceIdOptions,
-  ): Promise<TraceSummaryData | null> {
-    EventUtils.validateTenantId(
-      { tenantId },
-      "TraceSummaryClickHouseRepository.findByTraceId",
-    );
-
+  async findByTraceId({
+    authorization,
+    traceId,
+    ...options
+  }: FindByTraceIdParams): Promise<TraceSummaryRead | null> {
     // Fold read-back path (ADR-066): an explicit window is applied verbatim
     // with NO internal fallback — the caller (the fold executor) owns the miss
     // retry, so a second recovery ladder here would re-run the resolve seek on
@@ -196,10 +235,10 @@ export class TraceSummaryClickHouseRepository
     // `clickhouse_windowed_read_total` exactly once. The centre/half-width
     // round-trip is exact: fromMs/toMs are integers, so their mean and
     // half-difference are exactly representable and reconstruct the bounds.
-    if (options?.window) {
+    if (options.window) {
       const { fromMs, toMs } = options.window;
       try {
-        return await queryWindowed<TraceSummaryData | null>({
+        return await queryWindowed<TraceSummaryRead | null>({
           table: TABLE_NAME,
           hintMs: (fromMs + toMs) / 2,
           windowMs: (toMs - fromMs) / 2,
@@ -209,19 +248,15 @@ export class TraceSummaryClickHouseRepository
             // With a hint and `fallback: "none"` the fragment is always
             // present; the null arm exists only to satisfy the contract.
             window
-              ? await this.queryByTraceId(tenantId, traceId, {
-                  fromMs: window.fromMs,
-                  toMs: window.toMs,
+              ? await this.queryByTraceId({
+                  authorization,
+                  traceId,
+                  window: { fromMs: window.fromMs, toMs: window.toMs },
                 })
               : null,
         });
       } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
-        logger.warn(
-          { tenantId, traceId, error: errorMessage },
-          "Failed to get trace summary from ClickHouse",
-        );
+        logSummaryReadFailure({ authorization, traceId, error });
         throw error;
       }
     }
@@ -247,25 +282,26 @@ export class TraceSummaryClickHouseRepository
     // The resolve+retry lives inside the fallback `run`, so the cheap seek fires
     // only when the hinted stage misses (or is skipped) — never on the happy
     // path, keeping exactly the same SQL attempts in the same order as before.
-    const hasHint = options?.occurredAtMs !== undefined;
+    const hasHint = options.occurredAtMs !== undefined;
 
     try {
-      return await queryWindowed<TraceSummaryData | null>({
+      return await queryWindowed<TraceSummaryRead | null>({
         table: TABLE_NAME,
-        hintMs: options?.occurredAtMs ?? null,
+        hintMs: options.occurredAtMs ?? null,
         fallback: "unbounded",
         isEmpty: (result) => result === null,
         run: async (window) => {
           if (window) {
-            return await this.queryByTraceId(tenantId, traceId, {
-              fromMs: window.fromMs,
-              toMs: window.toMs,
+            return await this.queryByTraceId({
+              authorization,
+              traceId,
+              window: { fromMs: window.fromMs, toMs: window.toMs },
             });
           }
           // Fallback stage: the hint window missed, or there was no hint.
           if (hasHint) {
             logger.debug(
-              { tenantId, traceId, occurredAtMs: options!.occurredAtMs },
+              { traceId, occurredAtMs: options.occurredAtMs },
               "Trace summary not found in hint window — resolving OccurredAt to bound the retry",
             );
           }
@@ -279,29 +315,71 @@ export class TraceSummaryClickHouseRepository
           // historical sentinel rows still use the legacy unbounded fallback to
           // preserve correctness.
           const resolved = await this.resolveOccurredAtMs({
-            tenantId,
+            authorization,
             traceId,
           });
           if (!resolved.found) return null;
           if (resolved.occurredAtMs === undefined) {
             logger.debug(
-              { tenantId, traceId },
+              { traceId },
               "Trace summary resolved with sentinel OccurredAt — falling back to unbounded read",
             );
-            return await this.queryByTraceId(tenantId, traceId);
+            return await this.queryByTraceId({ authorization, traceId });
           }
-          return await this.queryByTraceId(tenantId, traceId, {
-            fromMs: resolved.occurredAtMs - DEFAULT_PARTITION_WINDOW_MS,
-            toMs: resolved.occurredAtMs + DEFAULT_PARTITION_WINDOW_MS,
+          return await this.queryByTraceId({
+            authorization,
+            traceId,
+            window: {
+              fromMs: resolved.occurredAtMs - DEFAULT_PARTITION_WINDOW_MS,
+              toMs: resolved.occurredAtMs + DEFAULT_PARTITION_WINDOW_MS,
+            },
           });
         },
       });
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      logSummaryReadFailure({ authorization, traceId, error });
+      throw error;
+    }
+  }
+
+  /**
+   * The tenant that holds a trace, of those the proof reads. The table is
+   * `ORDER BY (TenantId, TraceId)`, so this is the same sort-key point seek
+   * as {@link resolveOccurredAtMs}, over one small column, instead of the
+   * heavy single-trace read that projects the computed input, output and
+   * attributes. Ordered by tenant, so when two members hold the id it picks
+   * the one {@link queryByTraceId} returns.
+   */
+  async findTenantIdByTraceId({
+    authorization,
+    traceId,
+  }: {
+    authorization: Authorization;
+    traceId: string;
+  }): Promise<string | null> {
+    try {
+      const result = await this.reader(authorization).query({
+        query: `
+          SELECT TenantId
+          FROM ${TABLE_NAME}
+          WHERE ${tenantScope("OccurredAt")}
+            AND TraceId = {traceId:String}
+          ORDER BY TenantId
+          LIMIT 1
+        `,
+        query_params: { traceId },
+        format: "JSONEachRow",
+      });
+      const rows = (await result.json()) as Array<{ TenantId: string }>;
+      return rows[0]?.TenantId ?? null;
+    } catch (error) {
       logger.warn(
-        { tenantId, traceId, error: errorMessage },
-        "Failed to get trace summary from ClickHouse",
+        {
+          traceId,
+          scope: tenantScopeKey({ authorization, reads: "traces" }),
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Failed to resolve the tenant of a trace from ClickHouse",
       );
       throw error;
     }
@@ -326,23 +404,23 @@ export class TraceSummaryClickHouseRepository
    * same sentinel drove into `MEMORY_LIMIT_EXCEEDED`.
    */
   private async resolveOccurredAtMs({
-    tenantId,
+    authorization,
     traceId,
   }: {
-    tenantId: string;
+    authorization: Authorization;
     traceId: string;
   }): Promise<{ found: boolean; occurredAtMs?: number }> {
-    const client = await this.resolveClient(tenantId);
+    const client = this.reader(authorization);
     const result = await client.query({
       query: `
         SELECT
           count() AS rowCount,
           toUnixTimestamp64Milli(min(OccurredAt)) AS occurredAtMs
         FROM ${TABLE_NAME}
-        WHERE TenantId = {tenantId:String}
+        WHERE ${tenantScope("OccurredAt")}
           AND TraceId = {traceId:String}
       `,
-      query_params: { tenantId, traceId },
+      query_params: { traceId },
       format: "JSONEachRow",
     });
     const rows = (await result.json()) as Array<{
@@ -368,11 +446,23 @@ export class TraceSummaryClickHouseRepository
       : { found: true };
   }
 
-  private async queryByTraceId(
-    tenantId: string,
-    traceId: string,
-    window?: { fromMs: number; toMs: number },
-  ): Promise<TraceSummaryData | null> {
+  /**
+   * The heavy single-trace read. The fence is the only tenant predicate, in
+   * the outer scope and in the dedup subquery alike, so an aggregate reads
+   * the latest version of every tenant's row under this id and a plain
+   * project reads its own. Two members may hold the same trace id (ADR-144
+   * v4.1); the read cannot name one of them, so the winners are ordered by
+   * tenant and the first is returned, the same row on every read.
+   */
+  private async queryByTraceId({
+    authorization,
+    traceId,
+    window,
+  }: {
+    authorization: Authorization;
+    traceId: string;
+    window?: { fromMs: number; toMs: number };
+  }): Promise<TraceSummaryRead | null> {
     const outerTimeFilter = window
       ? "AND t.OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64}) " +
         "AND t.OccurredAt <= fromUnixTimestamp64Milli({toMs:Int64})"
@@ -382,12 +472,19 @@ export class TraceSummaryClickHouseRepository
         "AND OccurredAt <= fromUnixTimestamp64Milli({toMs:Int64})"
       : "";
 
-    const client = await this.resolveClient(tenantId);
+    const client = this.reader(authorization);
     // IN-tuple dedup over the ReplacingMergeTree: the inner SELECT scans
     // only (TenantId, TraceId, UpdatedAt) — small, sparse — to find the
     // latest version, then the outer SELECT pulls the heavy columns
     // (ComputedInput, ComputedOutput, Attributes, etc.) for that one row.
     // See dev/docs/best_practices/clickhouse-queries.md.
+    //
+    // The windowed fence sits in the inner SELECT only. The outer one
+    // projects `toUnixTimestamp64Milli(t.OccurredAt) AS OccurredAt`, so a bare
+    // `OccurredAt` there is that integer, which ClickHouse compares against a
+    // DateTime64 bound as seconds: every `>= from` passed and every `< until`
+    // failed, dropping a member's trace from a grant with an end. The outer
+    // scope takes the tenant set, and the IN-tuple carries the window.
     const result = await client.query({
       query: `
         SELECT
@@ -435,29 +532,30 @@ export class TraceSummaryClickHouseRepository
           t.HasAnnotation AS HasAnnotation,
           t.TraceName AS TraceName
         FROM ${TABLE_NAME} AS t
-        WHERE t.TenantId = {tenantId:String}
+        WHERE ${tenantSet()}
           AND t.TraceId = {traceId:String}
           ${outerTimeFilter}
           AND (t.TenantId, t.TraceId, t.UpdatedAt) IN (
             SELECT TenantId, TraceId, max(UpdatedAt)
             FROM ${TABLE_NAME}
-            WHERE TenantId = {tenantId:String}
+            WHERE ${tenantScope("OccurredAt")}
               AND TraceId = {traceId:String}
               ${innerTimeFilter}
             GROUP BY TenantId, TraceId
           )
+        ORDER BY t.TenantId ASC
         LIMIT 1
       `,
       query_params: window
-        ? { tenantId, traceId, fromMs: window.fromMs, toMs: window.toMs }
-        : { tenantId, traceId },
+        ? { traceId, fromMs: window.fromMs, toMs: window.toMs }
+        : { traceId },
       format: "JSONEachRow",
     });
 
     const rows = await result.json<ClickHouseSummaryRecord>();
     const row = rows[0];
     if (!row) return null;
-    return this.fromClickHouseRecord(row);
+    return { ...this.fromClickHouseRecord(row), tenantId: row.TenantId };
   }
 
   private fromClickHouseRecord(

@@ -9,9 +9,9 @@
  * Feature: specs/traces/trace-summary-storage-anchor.feature
  */
 import { describe, expect, it, vi } from "vitest";
-
 import type { TraceSummaryRepository } from "~/server/app-layer/traces/repositories/trace-summary.repository";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import { ownProofAuthorizer } from "~/test-utils/authorizationProofs";
 import type { ProjectionStoreContext } from "../../../../projections/projectionStoreContext";
 import { TraceSummaryStore } from "../traceSummary.store";
 
@@ -39,7 +39,13 @@ function state(overrides: Partial<TraceSummaryData>): TraceSummaryData {
 function storeWithRecorder() {
   const upsert = vi.fn(async () => undefined);
   const repo = { upsert } as unknown as TraceSummaryRepository;
-  return { store: new TraceSummaryStore(repo), upsert };
+  return {
+    store: new TraceSummaryStore({
+      repository: repo,
+      authorize: ownProofAuthorizer,
+    }),
+    upsert,
+  };
 }
 
 describe("the trace summary persist gate", () => {
@@ -114,7 +120,10 @@ describe("the trace summary persist gate", () => {
         upsert: vi.fn(async () => undefined),
         upsertBatch,
       } as unknown as TraceSummaryRepository;
-      const store = new TraceSummaryStore(repo);
+      const store = new TraceSummaryStore({
+        repository: repo,
+        authorize: ownProofAuthorizer,
+      });
 
       await store.storeBatch([
         {

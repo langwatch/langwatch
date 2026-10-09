@@ -120,6 +120,7 @@ describe("effective team admins through a group", () => {
     it("lists the Member on the team and not the Developer", async () => {
       const teams = await new TeamService({ prisma }).getTeamsWithRoleBindings({
         organizationId,
+        callerOrganizationRole: "ADMIN",
       });
 
       const listed = (

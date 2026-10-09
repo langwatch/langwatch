@@ -1,6 +1,9 @@
 import { Box, Combobox, HStack, Portal } from "@chakra-ui/react";
 import { Check, Plus, Search } from "lucide-react";
-import { ProjectAvatar } from "~/components/ProjectAvatar";
+import {
+  AggregateProjectAvatar,
+  ProjectAvatar,
+} from "~/components/ProjectAvatar";
 import type { ProjectPickGroup, ProjectPickItem } from "./projectPickItems";
 
 /**
@@ -121,6 +124,8 @@ function ProjectItemRow({
       <HStack gap={2} width="full">
         {item.kind === "new-project" ? (
           <Plus size={13} aria-hidden />
+        ) : item.isAggregate ? (
+          <AggregateProjectAvatar name={item.label} />
         ) : (
           <ProjectAvatar name={item.label} />
         )}
