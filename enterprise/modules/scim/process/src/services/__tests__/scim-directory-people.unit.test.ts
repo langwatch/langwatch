@@ -101,7 +101,6 @@ function world() {
         );
         if (at !== -1) store.memberships.splice(at, 1);
       }),
-      createInvitations: vi.fn(async () => []),
     },
     connections,
     prisma: store,

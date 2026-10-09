@@ -389,9 +389,11 @@ describe("SCIM characterization: provisioning invariants", () => {
       })),
       create: vi.fn(),
     } satisfies ScimUserProvisioning;
+    const connections = HeldConnectionsFake.of();
+    connections.hold({ connectionId: "okta", verifiedDomains: ["example.com"] });
     const scim = ScimService.create({
       members: new MembersFake(),
-      connections: HeldConnectionsFake.of(),
+      connections,
       prisma: repo,
       users,
       writer,

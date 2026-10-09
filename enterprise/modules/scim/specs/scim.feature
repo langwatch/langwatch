@@ -72,21 +72,19 @@ Feature: Enterprise SCIM package boundary
 
     A directory may mint a new account, and may link an existing account whose
     address is on a domain one of the organization's connections has proved.
-    Any other existing account is invited instead: it joins only once the
-    person accepts, and until then the directory reads it as inactive.
+    Any other existing account is refused: the person joins by invitation.
 
     @unit
-    Scenario: A pushed address on an unproven domain that already has an account becomes a pending invitation
+    Scenario: A pushed address on an unproven domain that already has an account is refused
       Given an account already exists for an address on a domain the organization has not proved
       When the directory creates that user
-      Then the organization invites the address and grants no membership
-      And the directory reads the user back with active false
+      Then the push is refused with 409 and no membership or directory resource is written
 
     @unit
     Scenario: A pushed address on a proven domain that already has an account is linked directly
       Given an account already exists for an address on a domain one of the organization's connections proved
       When the directory creates that user
-      Then the account becomes a member at once and no invitation is sent
+      Then the account becomes a member at once
 
   Rule: A name is patched one half at a time
 

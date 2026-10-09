@@ -245,8 +245,9 @@ export class ScimProvisioningService {
         });
       }
       returning = previous !== null && previous.deletedAt === null;
-      // An account another domain vouches for is never adopted by a push.
-      if (!returning && !(await this.isOnProvenDomain({ organizationId, user: existingUser }))) {
+      // An account another domain vouches for is never adopted by an active push.
+      const admitting = request.active !== false && !returning;
+      if (admitting && !(await this.isOnProvenDomain({ organizationId, user: existingUser }))) {
         return this.scimError({
           status: "409",
           scimType: "uniqueness",

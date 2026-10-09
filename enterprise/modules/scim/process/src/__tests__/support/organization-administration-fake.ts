@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { OrganizationApi, OrganizationInviteCreated } from "@langwatch/organization-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 // Authz's active-administrator read, as a double: it answers nobody by
 // default, so a test that says nothing about administration removes someone
 // who is not the last administrator.
@@ -12,8 +12,7 @@ export class OrganizationAdministrationFake implements ScimOrganizationAdministr
   readonly findActiveOrganizationAdministrators = vi.fn(async (): Promise<string[]> => []);
 }
 
-/** Organization's member removal, which a SCIM delete asks for with no acting user, and its invitations. */
-export class MembersFake implements Pick<OrganizationApi, "deleteMember" | "createInvitations"> {
+/** Organization's member removal, which a SCIM delete asks for with no acting user. */
+export class MembersFake implements Pick<OrganizationApi, "deleteMember"> {
   readonly deleteMember = vi.fn(async (): Promise<void> => undefined);
-  readonly createInvitations = vi.fn(async (): Promise<OrganizationInviteCreated[]> => []);
 }

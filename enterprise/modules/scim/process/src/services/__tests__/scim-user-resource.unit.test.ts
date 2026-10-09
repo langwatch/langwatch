@@ -5,10 +5,7 @@
  */
 import { ScimProtocolError } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import type {
-  OrganizationApi,
-  OrganizationApiCreateInvitationsInput,
-} from "@langwatch/organization-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import { fromDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
@@ -70,17 +67,11 @@ class DirectoryStore {
     return `${organizationId}:${userId}`;
   }
 
-  readonly invitations: OrganizationApiCreateInvitationsInput[] = [];
-
-  /** Organization's member removal and invitations, over the memberships the repository reads. */
-  members(): Pick<OrganizationApi, "deleteMember" | "createInvitations"> {
+  /** Organization's member removal, over the same memberships the repository reads. */
+  members(): Pick<OrganizationApi, "deleteMember"> {
     return {
       deleteMember: vi.fn(async ({ organizationId, userId }) => {
         this.memberships.delete(this.key(organizationId, userId));
-      }),
-      createInvitations: vi.fn(async (input: OrganizationApiCreateInvitationsInput) => {
-        this.invitations.push(input);
-        return [];
       }),
     };
   }
@@ -517,23 +508,19 @@ describe("the organization's own directory resource", () => {
 describe("an existing account the directory pushes", () => {
   const push = { schemas: [USER_SCHEMA], userName: "known@example.test", active: true };
 
-  /** @scenario "A pushed address on an unproven domain that already has an account becomes a pending invitation" */
-  it("invites it, grants no membership and reads it back inactive", async () => {
+  /** @scenario "A pushed address on an unproven domain that already has an account is refused" */
+  it("refuses it with 409 and grants no membership", async () => {
     const store = new DirectoryStore();
     store.accounts.set("user-1", account({ id: "user-1", email: "known@example.test" }));
     const { service, minted } = directory(store);
 
-    const created = await service.createUser({ organizationId: ORGANIZATION, request: push });
+    const refusal = await refusalOf(
+      service.createUser({ organizationId: ORGANIZATION, request: push }),
+    );
 
+    expect(refusal.response).toMatchObject({ status: "409", scimType: "uniqueness" });
     expect(store.memberships.has(`${ORGANIZATION}:user-1`)).toBe(false);
-    expect(created).toMatchObject({ id: "user-1", active: false });
-    expect(store.invitations).toEqual([
-      {
-        organizationId: ORGANIZATION,
-        invites: [{ email: "known@example.test", role: "MEMBER" }],
-        validation: "lenient",
-      },
-    ]);
+    expect(store.resources.size).toBe(0);
     expect(minted).toEqual([]);
   });
 
@@ -549,6 +536,5 @@ describe("an existing account the directory pushes", () => {
 
     expect(store.memberships.has(`${ORGANIZATION}:user-1`)).toBe(true);
     expect(created).toMatchObject({ id: "user-1", active: true });
-    expect(store.invitations).toEqual([]);
   });
 });

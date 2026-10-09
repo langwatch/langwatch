@@ -56,6 +56,7 @@ function world() {
   const writer = new GrantsFake();
   const connections = HeldConnectionsFake.of([OKTA, ENTRA, GLOBEX_OKTA]);
   connections.hold({ connectionId: OKTA, verifiedDomains: ["acme.test"] });
+  connections.hold({ connectionId: GLOBEX_OKTA, verifiedDomains: ["shared.test"] });
   const users = {
     findById: vi.fn(async ({ id }) => store.users.get(id) ?? null),
     findByEmail: vi.fn(
