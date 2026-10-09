@@ -417,6 +417,7 @@ export const WelcomeScreen: React.FC = () => {
         subTitle={currentScreen?.subHeading}
         showBackButton={false}
         widthVariant={guided ? "guided" : "narrow"}
+        below={currentScreen?.footer ? <currentScreen.footer surface={screenSurface} /> : null}
       >
         <VStack gap={5} align="stretch" w="full" minW="0">
           <Box position="relative" overflow="hidden" py="1" px="2" my="-1" mx="-2">
@@ -461,8 +462,6 @@ export const WelcomeScreen: React.FC = () => {
               isLastScreen={isLastScreen}
             />
           </motion.div>
-
-          {currentScreen?.footer ? <currentScreen.footer surface={screenSurface} /> : null}
 
           <motion.div layout transition={{ duration: 0.3, ease: [0.32, 0.72, 0, 1] }}>
             <HStack justify="center" gap={1.5}>
