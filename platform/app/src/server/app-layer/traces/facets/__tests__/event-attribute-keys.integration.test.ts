@@ -22,6 +22,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { wrapWithDefaultSettings } from "~/server/clickhouse/safeClickhouseClient";
+import { expandStatementForProject } from "~/test-utils/authorizationProofs";
 import {
   cleanupTestData,
   getTestClickHouseClient,
@@ -29,6 +30,18 @@ import {
 import { buildEventAttributeKeysFacetQuery } from "../event-attribute-keys";
 
 const TENANT_ID = "facet-event-attr-keys-test";
+
+/** The facet query as the authorized reader would send it for this tenant. */
+function forTenant<T extends { sql: string; params: Record<string, unknown> }>(
+  query: T,
+): T {
+  const expanded = expandStatementForProject({
+    query: query.sql,
+    queryParams: query.params,
+    projectId: TENANT_ID,
+  });
+  return { ...query, sql: expanded.query, params: expanded.queryParams };
+}
 
 // Deliberately small in rows and lopsided in shape: few distinct keys, very
 // large values. What separates the two queries is the values-to-keys ratio,
@@ -129,7 +142,6 @@ describe("event-attribute-keys facet integration", () => {
   });
 
   const ctx = {
-    tenantId: TENANT_ID,
     // Wide window: seeded spans land within a few minutes of now.
     timeRange: { from: Date.now() - 60 * 60 * 1000, to: Date.now() + 60_000 },
     limit: 1000,
@@ -139,7 +151,7 @@ describe("event-attribute-keys facet integration", () => {
   describe("given seeded spans with event attributes", () => {
     describe("when discovering keys under a tight memory budget", () => {
       it("completes and returns every distinct key exactly once", async () => {
-        const query = buildEventAttributeKeysFacetQuery(ctx);
+        const query = forTenant(buildEventAttributeKeysFacetQuery(ctx));
         const result = await ch.query({
           query: query.sql,
           query_params: query.params,
@@ -160,7 +172,7 @@ describe("event-attribute-keys facet integration", () => {
       it("counts every (span, event) occurrence of a key, as before the fix", async () => {
         // The subcolumn must not change multiplicity: one row per key per event
         // per span, which is what orders the sidebar by frequency.
-        const query = buildEventAttributeKeysFacetQuery(ctx);
+        const query = forTenant(buildEventAttributeKeysFacetQuery(ctx));
         const result = await ch.query({
           query: query.sql,
           query_params: query.params,
@@ -181,7 +193,7 @@ describe("event-attribute-keys facet integration", () => {
         // short-circuit go through the Map, dragging the values column in.
         // This is the pre-fix shape; it must exceed the budget the
         // subcolumn query clears.
-        const query = buildEventAttributeKeysFacetQuery(ctx);
+        const query = forTenant(buildEventAttributeKeysFacetQuery(ctx));
         const preFixSql = query.sql
           .replace(
             "arrayJoin(arrayJoin(`Events.Attributes`.keys))",
