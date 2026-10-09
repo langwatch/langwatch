@@ -12,6 +12,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { signInSecurityTrpcTransport } from "../sign-in-security.trpc.ts";
 import { authTrpcTestMembers, type AuthTrpcTestContext } from "./auth.trpc.harness.ts";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 
 const SETTINGS = {
   lockoutAfterFailedAttempts: 5,
@@ -31,6 +32,7 @@ function mounted(api: AuthApi, permitted = true) {
       ...members,
       authorization: {
         forRequest: () => ({
+          ...testAuthorizeDefaults,
           getDecision: async () => ({ permitted, organizationRole: null }),
           getProjectAnyDecision: async () => ({ permitted, organizationRole: null }),
           checkScopeLineage: async () => ({ kind: "consistent" }),

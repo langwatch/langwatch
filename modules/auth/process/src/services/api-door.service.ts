@@ -108,7 +108,7 @@ export class ApiDoorService {
   }
 
   /** The decisions both transports ask, and the platform grant asked of the operator (E4). */
-  #authorize(): ApiDoor["authz"] {
+  #authorize(): Required<ApiDoor["authz"]> {
     const authz = this.#peers.authz;
 
     return {
