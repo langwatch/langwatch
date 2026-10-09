@@ -1,5 +1,5 @@
 import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
-import { useFieldArray, useFormContext } from "react-hook-form";
+import { useFieldArray, useFormContext, useWatch } from "react-hook-form";
 
 import { PromptMessagesField } from "../../fields/prompt-messages-field.tsx";
 
@@ -10,8 +10,8 @@ export function PromptMessagesEditor() {
     name: "version.configData.messages",
   });
 
-  // Watch inputs directly - avoid useMemo to ensure reactivity on form changes
-  const inputs = form.watch("version.configData.inputs") ?? [];
+  // useWatch, not form.watch: the React Compiler memoises watch() on the stable form object.
+  const inputs = useWatch({ control: form.control, name: "version.configData.inputs" }) ?? [];
   // Map to Variable[] format with both identifier and type
   const availableVariables = inputs.map((input) => ({
     identifier: input.identifier,
