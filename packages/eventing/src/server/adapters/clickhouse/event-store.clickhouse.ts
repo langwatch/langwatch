@@ -3,7 +3,7 @@ import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 
 import type { Event } from "../../../domain/types.ts";
-import type { RetentionPolicyResolver } from "../../../runtime.types.ts";
+import type { RetentionPolicy, RetentionPolicyResolver } from "../../../runtime.types.ts";
 import { AbstractEventStore } from "../../../stores/abstractEventStore.ts";
 import type { EventStoreReadContext } from "../../../stores/eventStore.types.ts";
 import type {
@@ -29,6 +29,20 @@ export type EventLogRetentionClassifier = (row: {
   EventType: string;
 }) => string;
 
+/** The tenant retention a row's own pipeline declares, by aggregate type (`.withRetention`). */
+export type EventLogRetentionPolicyLookup = (
+  aggregateType: string,
+) => RetentionPolicyResolver | undefined;
+
+interface EventingClickHouseEventStoreOptions {
+  repository: EventRepository;
+  retention: EventingRetentionConfiguration;
+  /** Every row's tenant retention; a pipeline's own, from `retentionPolicyFor`, wins. */
+  retentionPolicyResolver?: RetentionPolicyResolver;
+  retentionPolicyFor?: EventLogRetentionPolicyLookup;
+  classifyEventLogRetention?: EventLogRetentionClassifier;
+}
+
 /**
  * ClickHouse-backed EventStore with OpenTelemetry instrumentation and
  * structured logging: wraps operations in spans, logs errors via pino, and
@@ -42,26 +56,18 @@ export class EventingClickHouseEventStore<
 
   private readonly retention: EventingRetentionConfiguration;
   private readonly retentionPolicyResolver?: RetentionPolicyResolver;
+  private readonly retentionPolicyFor?: EventLogRetentionPolicyLookup;
   private readonly classifyEventLogRetention?: EventLogRetentionClassifier;
 
-  private constructor(options: {
-    repository: EventRepository;
-    retention: EventingRetentionConfiguration;
-    retentionPolicyResolver?: RetentionPolicyResolver;
-    classifyEventLogRetention?: EventLogRetentionClassifier;
-  }) {
+  private constructor(options: EventingClickHouseEventStoreOptions) {
     super(options.repository);
     this.retention = options.retention;
     this.retentionPolicyResolver = options.retentionPolicyResolver;
+    this.retentionPolicyFor = options.retentionPolicyFor;
     this.classifyEventLogRetention = options.classifyEventLogRetention;
   }
 
-  static create(options: {
-    repository: EventRepository;
-    retention: EventingRetentionConfiguration;
-    retentionPolicyResolver?: RetentionPolicyResolver;
-    classifyEventLogRetention?: EventLogRetentionClassifier;
-  }): EventingClickHouseEventStore {
+  static create(options: EventingClickHouseEventStoreOptions): EventingClickHouseEventStore {
     return new EventingClickHouseEventStore(options);
   }
 
@@ -110,35 +116,38 @@ export class EventingClickHouseEventStore<
     // no-op: removed verbose per-store logging
   }
 
-  // With a classifier wired, a row it calls indefinite stamps 0 (kept forever) with or without
-  // a tenant policy, as on main; any other row ages with its category, or the process default.
-  // Without one, every row stamps "traces".
-  // Spec: packages/eventing/specs/pipeline-retention.feature.
+  // A row the classifier calls indefinite stamps 0 (kept forever), as on main. Any other row
+  // takes the tenant policy for its class from its pipeline's resolver, else the process default.
+  // No classifier: every row is "traces". Spec: packages/eventing/specs/pipeline-retention.feature.
   protected override async enrichRecordsForStorage(
     records: EventRecord[],
     context: EventStoreReadContext<EventType>,
   ): Promise<EventRecord[]> {
     if (records.length === 0) return records;
-    const classified = records.map((record) => ({
-      record,
-      retentionClass: this.classifyEventLogRetention?.(record) ?? "traces",
-    }));
-    const finite = classified.some(
-      ({ retentionClass }) => retentionClass !== EVENT_LOG_INDEFINITE_RETENTION_CLASS,
+    const policies = new Map<string, Promise<RetentionPolicy | null>>();
+    const policyOf = (aggregateType: string) => {
+      const resolver = this.retentionPolicyFor?.(aggregateType) ?? this.retentionPolicyResolver;
+      if (!resolver) return undefined;
+      const known = policies.get(aggregateType);
+      if (known) return known;
+      const resolving = resolver.resolve(String(context.tenantId));
+      policies.set(aggregateType, resolving);
+      return resolving;
+    };
+    return Promise.all(
+      records.map(async (record) => {
+        const retentionClass = this.classifyEventLogRetention?.(record) ?? "traces";
+        if (retentionClass === EVENT_LOG_INDEFINITE_RETENTION_CLASS) {
+          return { ...record, _retention_days: 0 };
+        }
+        const resolving = policyOf(record.AggregateType);
+        if (!resolving) return record;
+        const policy = await resolving;
+        return {
+          ...record,
+          _retention_days: policy?.[retentionClass] ?? this.retention.defaultRetentionDays,
+        };
+      }),
     );
-    const policy =
-      finite && this.retentionPolicyResolver
-        ? await this.retentionPolicyResolver.resolve(String(context.tenantId))
-        : undefined;
-    return classified.map(({ record, retentionClass }) => {
-      if (retentionClass === EVENT_LOG_INDEFINITE_RETENTION_CLASS) {
-        return { ...record, _retention_days: 0 };
-      }
-      if (!this.retentionPolicyResolver) return record;
-      return {
-        ...record,
-        _retention_days: policy?.[retentionClass] ?? this.retention.defaultRetentionDays,
-      };
-    });
   }
 }

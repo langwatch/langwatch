@@ -54,12 +54,12 @@ Feature: Retention stamping at ingestion time
   # Only customer telemetry expires (Alex, 2026-10-09); every other event is kept forever.
   @unit
   Scenario: Customer telemetry event families remain policy-bound
-    When trace, log, metric, evaluation, collector-evaluation, Langy-conversation, topic-model, gateway-spend, automation-trigger-match, or coding-agent-fact events are recorded
+    When trace, log, metric, evaluation, collector-evaluation, Langy-conversation, topic-model, gateway-spend, automation-trigger-match, coding-agent-fact, later-trace milestone, evaluation-lifecycle completion, Instant Eval run, pulled-usage, webhook spend-delivery, or ingestion-pull run and listing events are recorded
     Then their event_log records use the traces retention category
 
   @unit
   Scenario: Every other event family is retained indefinitely
-    When organization, project, user, prompt, workflow, billing, entitlement, governance, pulled-usage, ingestion-pull, or report-schedule configuration events are recorded
+    When organization, project, user, prompt, workflow, billing, entitlement, governance, annotation, Instant Eval judge spend, aggregate-read audit, first-trace milestone, manual evaluation run, ingestion-pull configuration, or report-schedule configuration events are recorded
     Then their event_log records have _retention_days = 0
 
   @unit

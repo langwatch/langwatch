@@ -2099,8 +2099,16 @@ Spec: `packages/eventing/specs/pipeline-retention.feature`.
 **Only customer telemetry expires** (Alex, 2026-10-09). The default retention applies to customer
 telemetry alone: traces, evaluations, experiments, scenarios, logs and metrics, meaning span content,
 model inputs and outputs, gateway requests, Langy conversations, coding-agent sessions and topic
-clusters. Every other event (lifecycle, configuration, billing, authz, identity, governance facts and
-usage meters) is stamped 0 days and kept forever. The event-log classification is opt-out:
+clusters. Per-trace and per-run facts age with them: later-trace milestones, evaluation-lifecycle
+completions, Instant Eval runs, pulled-usage readings, webhook spend deliveries and ingestion-pull
+runs and listings. Their configuration and once-only facts are kept by event type (first trace, a
+manual evaluation run, an ingestion source configured or disabled, a report schedule), as are
+Instant Eval judge spend, annotations, governance budget crossings and aggregate-read audits. Every
+other event (lifecycle, configuration, billing, authz, identity) is stamped 0 days and kept forever.
+The worker's event store asks each expiring row's own pipeline's `.withRetention` resolver for the
+tenant's days for its class, else the platform default, as main's policy cache did (Alex,
+2026-10-09); the worker container's boot requires the classifier. The event-log
+classification is opt-out:
 data-retention's `RETENTION_CLASS_BY_AGGREGATE_TYPE` names each aggregate type's class, an unlisted
 aggregate type is kept forever, and the worker's installation test refuses a registered aggregate
 type missing from it, so a telemetry pipeline must name its category. Rows stamped before the ruling

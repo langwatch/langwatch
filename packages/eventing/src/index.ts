@@ -78,6 +78,7 @@ export {
 } from "./pipeline/eventingModule.ts";
 export {
   type OpenPipelineDefinition,
+  pipelineRetentionOf,
   type SealedPipelineDefinition,
   sealPipelineDefinition,
 } from "./pipeline/sealedPipeline.ts";

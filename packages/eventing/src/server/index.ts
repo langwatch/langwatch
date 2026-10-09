@@ -4,6 +4,7 @@ export {
 } from "./adapters/clickhouse/event-repository.clickhouse.ts";
 export {
   EventingClickHouseEventStore,
+  type EventLogRetentionPolicyLookup,
   type EventLogRetentionClassifier,
 } from "./adapters/clickhouse/event-store.clickhouse.ts";
 export {

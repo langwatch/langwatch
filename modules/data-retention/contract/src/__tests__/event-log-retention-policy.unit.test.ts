@@ -74,6 +74,12 @@ describe("classifyEventLogRowRetention", () => {
       ["gateway_request", "traces"],
       ["coding_agent_session", "traces"],
       ["trigger", "traces"],
+      ["trace_project_milestone", "traces"],
+      ["evaluation_lifecycle", "traces"],
+      ["instant_eval_run", "traces"],
+      ["pulled_usage", "traces"],
+      ["webhook_spend_delivery", "traces"],
+      ["ingestion_pull", "traces"],
     ] as [string, EventLogRetentionClass][])(
       "classifies %s under its own workload category (%s)",
       (aggregateType, expected) => {
@@ -98,8 +104,13 @@ describe("classifyEventLogRowRetention", () => {
       ["billing_lifecycle", "lw.billing.subscription_started"],
       ["entitlement_organization", "lw.entitlement.month_counted"],
       ["governance_subject", "lw.governance.budget_crossing"],
-      ["pulled_usage", "lw.obs.pulled_usage.observed"],
       ["ingestion_pull", "lw.obs.ingestion_pull.configured"],
+      ["ingestion_pull", "lw.obs.ingestion_pull.disabled"],
+      ["trace_project_milestone", "lw.trace.first_trace_recorded"],
+      ["evaluation_lifecycle", "lw.evaluation.ran"],
+      ["instant_eval_judge_spend", "lw.instant_eval_judge.spend_priced"],
+      ["annotation", "lw.annotation.created"],
+      ["authz_aggregate_read", "lw.authz.aggregate_read"],
       ["billing_report", "some.ordinary.event"],
       ["trigger", "lw.automation.report_schedule.configured"],
     ])("classifies %s (%s) as indefinite", (aggregateType, eventType) => {
@@ -109,12 +120,15 @@ describe("classifyEventLogRowRetention", () => {
     });
 
     /** @scenario "Customer telemetry event families remain policy-bound" */
-    it("keeps a trigger's per-trace matches with the traces category", () => {
+    it.each([
+      ["trigger", "lw.automation.trigger.match_recorded"],
+      ["trace_project_milestone", "lw.trace.trace_received"],
+      ["evaluation_lifecycle", "lw.evaluation.lifecycle_completed"],
+      ["ingestion_pull", "lw.obs.ingestion_pull.run_completed"],
+      ["ingestion_pull", "lw.obs.ingestion_pull.people_listed"],
+    ])("ages %s's per-run row (%s) with the traces category", (aggregateType, eventType) => {
       expect(
-        classifyEventLogRowRetention({
-          AggregateType: "trigger",
-          EventType: "lw.automation.trigger.match_recorded",
-        }),
+        classifyEventLogRowRetention({ AggregateType: aggregateType, EventType: eventType }),
       ).toBe("traces");
     });
   });

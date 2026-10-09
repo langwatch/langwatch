@@ -15,14 +15,18 @@ export type EventLogRetentionClass = RetentionCategory | "indefinite";
 export const INDEFINITE_EVENT_TYPE_PREFIXES = ["lw.identity.", "lw.authz."] as const;
 
 /**
- * Never-expiring events on an aggregate that otherwise expires: virtual-key lifecycle (security)
- * and a report schedule's configuration, beside the per-trace trigger matches.
+ * Never-expiring events on an aggregate that otherwise expires: security facts, configuration
+ * and once-only milestones, beside the per-trace or per-run rows that age out (Alex, 2026-10-09).
  */
 export const INDEFINITE_EVENT_TYPES = [
   "lw.governance.vk_lifecycle",
   "lw.automation.report_schedule.configured",
   "lw.automation.report_schedule.paused",
   "lw.automation.report_schedule.resumed",
+  "lw.trace.first_trace_recorded",
+  "lw.evaluation.ran",
+  "lw.obs.ingestion_pull.configured",
+  "lw.obs.ingestion_pull.disabled",
 ] as const;
 
 /**
@@ -42,6 +46,12 @@ export const RETENTION_CLASS_BY_AGGREGATE_TYPE: Record<string, EventLogRetention
   topic_clustering: "traces",
   gateway_request: "traces",
   trigger: "traces",
+  trace_project_milestone: "traces",
+  evaluation_lifecycle: "traces",
+  instant_eval_run: "traces",
+  pulled_usage: "traces",
+  webhook_spend_delivery: "traces",
+  ingestion_pull: "traces",
   experiment_run: "experiments",
   simulation_run: "scenarios",
   simulation_set: "scenarios",
@@ -57,7 +67,6 @@ export const RETENTION_CLASS_BY_AGGREGATE_TYPE: Record<string, EventLogRetention
   coding_assistant_billing: "indefinite",
   dataset: "indefinite",
   entitlement_organization: "indefinite",
-  evaluation_lifecycle: "indefinite",
   evaluator: "indefinite",
   experiment_lifecycle: "indefinite",
   gateway_connect_managed_key: "indefinite",
@@ -65,9 +74,7 @@ export const RETENTION_CLASS_BY_AGGREGATE_TYPE: Record<string, EventLogRetention
   global: "indefinite",
   governance_subject: "indefinite",
   guided_onboarding: "indefinite",
-  ingestion_pull: "indefinite",
   instant_eval_judge_spend: "indefinite",
-  instant_eval_run: "indefinite",
   join_request: "indefinite",
   langy_guided_onboarding: "indefinite",
   licensing_customer: "indefinite",
@@ -79,7 +86,6 @@ export const RETENTION_CLASS_BY_AGGREGATE_TYPE: Record<string, EventLogRetention
   project: "indefinite",
   projection_replay: "indefinite",
   prompt: "indefinite",
-  pulled_usage: "indefinite",
   scenario: "indefinite",
   scim_directory_move: "indefinite",
   scim_member: "indefinite",
@@ -87,11 +93,9 @@ export const RETENTION_CLASS_BY_AGGREGATE_TYPE: Record<string, EventLogRetention
   scim_sync: "indefinite",
   sso_connection: "indefinite",
   system_migration_pass: "indefinite",
-  trace_project_milestone: "indefinite",
   user: "indefinite",
   user_account: "indefinite",
   user_identity: "indefinite",
-  webhook_spend_delivery: "indefinite",
   workflow: "indefinite",
 };
 

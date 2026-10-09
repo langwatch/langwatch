@@ -78,9 +78,9 @@ export class WorkerProcessContainer extends ProcessContainer {
   }
 
   /** The worker alone appends to the event log, so its root names each row's retention class. */
-  boot(
-    options: { classifyEventLogRetention?: EventLogRetentionClassifier } = {},
-  ): Promise<Omit<BootedApplication, "tasks">> {
+  boot(options: {
+    classifyEventLogRetention: EventLogRetentionClassifier;
+  }): Promise<Omit<BootedApplication, "tasks">> {
     return this.runtime.boot({
       role: "worker",
       modules: this.modules,

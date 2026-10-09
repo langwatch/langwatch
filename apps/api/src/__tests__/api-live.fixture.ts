@@ -119,7 +119,10 @@ async function bootWorkerBeside(environment: Readonly<Record<string, string>>) {
     .withProcessOwnership(false)
     .withSecrets((_config, secrets) => secrets.withEnv())
     .start();
-  await server.run(await server.container("worker").boot());
+  // Stand-in until apps/api depends on @langwatch/data-retention-contract; no api suite reads it.
+  await server.run(
+    await server.container("worker").boot({ classifyEventLogRetention: () => "indefinite" }),
+  );
 
   return server;
 }
