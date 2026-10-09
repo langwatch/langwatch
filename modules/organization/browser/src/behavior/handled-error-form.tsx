@@ -1,7 +1,7 @@
 /** Server rejections placed where the reader is looking; field errors not toasts. */
 
-import { UiErrorActions } from "@langwatch/browser/error-actions";
 import { Alert, List } from "@langwatch/design-system/primitives";
+import { ErrorActions } from "@langwatch/error-views";
 import { explainAnyError } from "@langwatch/handled-error/presentation";
 import {
   readEnvelopeTraceId,
@@ -143,7 +143,7 @@ export function HandledErrorAlert({ error, title, fallbackTitle }: HandledErrorA
             ))}
           </List.Root>
         )}
-        <UiErrorActions
+        <ErrorActions
           docsUrl={handled?.docsUrl}
           traceId={handled?.traceId || readEnvelopeTraceId(error)}
         />
