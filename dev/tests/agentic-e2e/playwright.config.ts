@@ -41,8 +41,9 @@ const CHROMIUM_ARGS = [
 export default defineConfig({
   testDir: "./tests",
 
-  /* Global setup - validates environment before running tests */
-  globalSetup: require.resolve("./tests/global-setup.ts"),
+  /* Global setup - validates environment before running tests. The unit project needs no
+   * stack, and globalSetup is config-wide, so `test:unit` sets E2E_UNIT to skip it. */
+  globalSetup: process.env.E2E_UNIT ? undefined : require.resolve("./tests/global-setup.ts"),
 
   /* Ignore the MCP seed file - it's only for planning exploration */
   testIgnore: ["**/seed.spec.ts"],
@@ -96,6 +97,12 @@ export default defineConfig({
 
   /* Project configurations */
   projects: [
+    /* Pure unit tests of the suite's own helpers: no stack, no setup dependency */
+    {
+      name: "unit",
+      testMatch: /.*\.unit\.test\.ts/,
+    },
+
     /* Setup project - runs authentication once */
     {
       name: "setup",
@@ -121,7 +128,7 @@ export default defineConfig({
     /* Main test project - uses authenticated state */
     {
       name: "chromium",
-      testIgnore: ["**/journey/**"],
+      testIgnore: ["**/journey/**", "**/*.unit.test.ts"],
       use: {
         ...devices["Desktop Chrome"],
         storageState: AUTH_FILE,

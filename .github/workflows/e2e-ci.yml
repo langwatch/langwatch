@@ -220,6 +220,11 @@ jobs:
             !/docs/images/
           sparse-checkout-cone-mode: false
 
+      # This job boots no licence and no Connect, so it runs as sh-free. The mode
+      # file answers LANGWATCH_DEPLOYMENT_MODE; $GITHUB_ENV takes assignments only.
+      - name: Load the deployment mode
+        run: grep -E '^[A-Z_]+=' dev/tests/modes/sh-free.env >> "$GITHUB_ENV"
+
       - name: Setup pnpm
         uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
@@ -296,6 +301,9 @@ jobs:
 
       - name: Build browser bundle
         run: pnpm exec nx run workspace:build:types --outputStyle=static && pnpm exec nx run @langwatch/ui:build --outputStyle=static
+
+      - name: Unit-test the e2e guard
+        run: pnpm --filter langwatch-e2e-tests test:unit
 
       - name: Run E2E tests
         env:

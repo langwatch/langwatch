@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "test": "playwright test",
+    "test:unit": "E2E_UNIT=1 playwright test --project=unit",
     "test:ui": "playwright test --ui",
     "typecheck": "tsc --noEmit"
   },
