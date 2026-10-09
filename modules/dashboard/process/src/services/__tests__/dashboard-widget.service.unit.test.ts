@@ -24,8 +24,8 @@ function setUp() {
 }
 
 describe("given the dashboard widget service over the memory repository", () => {
-  /** @scenario "The widget service refuses an invalid definition before writing it" */
   describe("when a definition with a prototype parameter name is written", () => {
+    /** @scenario "The widget service refuses an invalid definition before writing it" */
     it("refuses the create and stores nothing", async () => {
       const { repository, service } = setUp();
 
@@ -38,6 +38,7 @@ describe("given the dashboard widget service over the memory repository", () => 
       expect(await repository.findAll({ projectId: "project-1" })).toEqual([]);
     });
 
+    /** @scenario "The widget service refuses an invalid definition before writing it" */
     it("refuses the update and keeps the stored definition", async () => {
       const { service } = setUp();
       const created = await service.createWidget({

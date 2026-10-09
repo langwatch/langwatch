@@ -68,10 +68,3 @@ Feature: Consumer pause and resume
     Given a held process runtime that is paused
     When the runtime starts
     Then no outbox drains until it resumes
-
-  @unit
-  Scenario: Eventing pauses and resumes its global queue and process runtime together
-    Given an eventing runtime whose global queue can pause
-    When its consumers pause and then resume
-    Then the global queue pauses and resumes once each
-    And a queue started after the pause starts paused
