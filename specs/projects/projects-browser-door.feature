@@ -61,6 +61,13 @@ Feature: The project.* browser namespace is served by the application the compos
     When the settings page opens
     Then the secret field is empty and says a stored secret is replaced by typing a new one
 
+  @integration
+  Scenario: A blank organization name is refused on the field
+    Given somebody who manages an organization
+    When the organization form is saved with the name cleared
+    Then the name field says it is required, as on main
+    And no organization update is sent
+
   Scenario: A blank storage secret leaves the stored secret unchanged
     Given storage settings with a stored secret
     When the settings form is saved with an endpoint and a key id but a blank secret

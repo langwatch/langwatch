@@ -27,9 +27,10 @@ import { useState } from "react";
 import {
   Controller,
   type SubmitHandler,
-  type UseFormGetFieldState,
+  type Control,
   type UseFormRegister,
   useForm,
+  useFormState,
   useWatch,
 } from "react-hook-form";
 
@@ -99,23 +100,25 @@ function AdminOnlyBadge() {
 
 function OrganizationIdentityFields({
   canManage,
-  getFieldState,
+  control,
   organization,
   project,
   register,
 }: {
   canManage: boolean;
-  getFieldState: UseFormGetFieldState<OrganizationFormData>;
+  control: Control<OrganizationFormData>;
   organization: ProjectHostOrganization;
   project: ProjectHostProject | undefined;
   register: UseFormRegister<OrganizationFormData>;
 }) {
+  // A subscription, so a refused save re-renders the field as invalid (WEB-5602 pattern).
+  const { errors } = useFormState({ control, name: "name" });
   return (
     <>
       <HorizontalFormControl
         label="Name"
         helper="The name of your organization"
-        invalid={!!getFieldState("name").error}
+        invalid={!!errors.name}
       >
         {canManage ? (
           <>
@@ -263,7 +266,7 @@ function SettingsForm({
     supportContact: organization.supportContact ?? "",
     primaryIntent: organization.primaryIntent ?? "",
   });
-  const { register, handleSubmit, getFieldState, control } = useForm({
+  const { register, handleSubmit, control } = useForm({
     defaultValues,
   });
   const updateOrganization = projectApi.organization.update.useMutation();
@@ -332,7 +335,7 @@ function SettingsForm({
               <Card.Body paddingY={0}>
                 <OrganizationIdentityFields
                   canManage={canManageOrganization}
-                  getFieldState={getFieldState}
+                  control={control}
                   organization={organization}
                   project={project}
                   register={register}
