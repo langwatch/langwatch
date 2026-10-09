@@ -257,12 +257,19 @@ Feature: Ops shows an installation's release upgrades, read-only
     When an operator opens Ops, Upgrades
     Then no Dataplanes tab is offered
 
-  # Upgrading mode (UIW-6, then API-UP-DURING-UPGRADE, Alex 2026-10-09: every route serves by default)
+  # NO-HOLDS (Alex, 2026-10-09): the api serves every route while upgrading, so a failed schema step
+  # of either store shows here with Retry; only a failed first install opens the token console.
   @unit
-  Scenario: The Upgrades and system-migration procedures serve while the installation upgrades
-    Given the api is in upgrading mode
-    When a batched call names the upgrade reads, Retry and the system-migration procedures
-    Then it passes the holding door to the door that asks ops:view or ops:manage at the platform
+  Scenario: A failed Postgres or ClickHouse schema step offers Retry on the Upgrades page
+    Given the worker's upgrade failed on a "prisma:" or a "clickhouse:" schema step
+    When an operator holding ops:manage retries it from the Upgrades page
+    Then the step is pending again for the worker's next run
+
+  @unit
+  Scenario: Every route serves while upgrading and still asks its declared permission
+    Given the installation is upgrading
+    When a caller without the operator grant calls an upgrade read
+    Then the door refuses it before the reader is asked
 
   # --- Tenant and operator steps on the Upgrades page (U4, U5) ---
 

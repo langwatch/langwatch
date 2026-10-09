@@ -162,7 +162,7 @@ export function upgradeGateOver({
                 findLeaseHolder,
                 wait,
               })
-            : await failedRunOnHold({
+            : await failedFirstInstallRun({
                 verdict: await gate.admit(),
                 findFailedSteps: findBlockingFailures,
                 findRuns: () => ledger.findRuns(),
@@ -219,10 +219,11 @@ function consoleRetryFor({
 }
 
 /**
- * UIW-7: a holding api reads a failure from the ledger, never from a run of its own: its image's
- * failed blocking steps and the last failed run report's log tail. Upgrading opens no console.
+ * UIW-7, NO-HOLDS: an api whose installation never finished an upgrade (a first install, so
+ * nobody can sign in to Ops > Upgrades) reads the failure from the ledger for the token console:
+ * its image's failed blocking steps and the last failed run's log tail; later ones go to Upgrades.
  */
-export async function failedRunOnHold({
+export async function failedFirstInstallRun({
   verdict,
   findFailedSteps,
   findRuns,
@@ -231,10 +232,12 @@ export async function failedRunOnHold({
   findFailedSteps: () => Promise<UpgradeFailedRun["failedSteps"]>;
   findRuns: () => Promise<readonly Pick<UpgradeRun, "outcome" | "report">[]>;
 }): Promise<ServingVerdict> {
-  if (verdict.outcome !== "holding") return verdict;
+  if (verdict.outcome !== "upgrading") return verdict;
+  const runs = await findRuns();
+  if (runs.some((run) => run.outcome === "succeeded")) return verdict;
   const failedSteps = await findFailedSteps();
   if (failedSteps.length === 0) return verdict;
-  const report = (await findRuns()).findLast((run) => run.outcome === "failed")?.report;
+  const report = runs.findLast((run) => run.outcome === "failed")?.report;
   return { ...verdict, failedRun: { failedSteps, logTail: logTailSchema.parse(report?.logTail) } };
 }
 
@@ -244,9 +247,8 @@ export type UpgradeLeaseHolder = () => Promise<Pick<
   "owner" | "host" | "image"
 > | null>;
 
-/** A holding or upgrading api keeps the connection: it asks again over it. */
-const closesOn = (verdict: ServingVerdict) =>
-  !verdict.admitted && verdict.outcome !== "holding" && verdict.outcome !== "upgrading";
+/** An upgrading api keeps the connection: it asks again over it. */
+const closesOn = (verdict: ServingVerdict) => !verdict.admitted && verdict.outcome !== "upgrading";
 
 async function liveLeaseHolder({ runner }: { runner: UpgradeRunnerRepository }) {
   if (!(await runner.ledgerExists())) return null;

@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import { UpgradeRunLog } from "../../runner/run-log.ts";
 import { apiPhaseVerdict } from "../serving-gate.ts";
-import { failedRunOnHold } from "../serving-upgrade-gate.ts";
+import { failedFirstInstallRun } from "../serving-upgrade-gate.ts";
 
 const SCHEMA_STEP = "prisma:20261009_add_column";
 const failedSteps = [{ id: SCHEMA_STEP, error: "column exists" }];
@@ -16,24 +16,24 @@ const runs = [
   { outcome: null, report: null },
 ];
 
-describe("failedRunOnHold", () => {
-  describe("given the worker's upgrade failed on a Postgres schema step", () => {
+describe("failedFirstInstallRun", () => {
+  describe("given the worker's first install failed", () => {
     /** @scenario "The console shows the failure from the run report in the ledger" */
-    it("hands the holding verdict the failed steps and the last failed run report's log tail", async () => {
-      const verdict = await failedRunOnHold({
+    it("hands the upgrading verdict the failed steps and the last failed run report's log tail", async () => {
+      const verdict = await failedFirstInstallRun({
         verdict: apiPhaseVerdict({ outstanding: [SCHEMA_STEP] }),
         findFailedSteps: async () => failedSteps,
         findRuns: async () => runs,
       });
 
       expect(verdict).toMatchObject({
-        outcome: "holding",
+        outcome: "upgrading",
         failedRun: { failedSteps, logTail: ["applying", "column exists"] },
       });
     });
 
     it("hands an empty log tail when the run report carries none", async () => {
-      const verdict = await failedRunOnHold({
+      const verdict = await failedFirstInstallRun({
         verdict: apiPhaseVerdict({ outstanding: [SCHEMA_STEP] }),
         findFailedSteps: async () => failedSteps,
         findRuns: async () => [{ outcome: "failed", report: { logTail: "not lines" } }],
@@ -43,13 +43,13 @@ describe("failedRunOnHold", () => {
     });
   });
 
-  describe("given the failure is after the schema phase", () => {
-    /** @scenario "A failure after the schema phase opens no console" */
-    it("leaves the upgrading verdict without a failed run", async () => {
-      const verdict = await failedRunOnHold({
-        verdict: apiPhaseVerdict({ outstanding: ["dataset:move"] }),
-        findFailedSteps: async () => [{ id: "dataset:move", error: "broke" }],
-        findRuns: async () => runs,
+  describe("given the installation finished an upgrade before", () => {
+    /** @scenario "A failure on an installation that finished an upgrade before opens no console" */
+    it("leaves the upgrading verdict without a failed run, for Ops > Upgrades to show", async () => {
+      const verdict = await failedFirstInstallRun({
+        verdict: apiPhaseVerdict({ outstanding: [SCHEMA_STEP] }),
+        findFailedSteps: async () => failedSteps,
+        findRuns: async () => [{ outcome: "succeeded", report: null }, ...runs],
       });
 
       expect(verdict.outcome).toBe("upgrading");

@@ -393,11 +393,13 @@ export function activeTraceContext(): { traceId?: string; spanId?: string } {
 
 /**
  * The 503 refusals that keep their body through the 5xx mask: the caller waits and retries,
- * and the code says why (rulings 2026-10-06, round 9, CH-1). Any other undeclared 5xx stays masked.
+ * and the code says why (rulings 2026-10-06, round 9, CH-1; NO-HOLDS, 2026-10-09). Any other
+ * undeclared 5xx stays masked.
  */
 export const TRANSIENT_REFUSAL_CODES = [
   "clickhouse_overloaded",
   "service_unavailable",
+  "upgrade_in_progress",
 ] as const satisfies readonly AppErrorCode[];
 
 const TRANSIENT_REFUSAL_STATUS = 503;

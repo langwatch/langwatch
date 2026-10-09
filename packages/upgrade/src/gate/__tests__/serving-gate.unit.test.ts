@@ -176,37 +176,23 @@ describe("createUpgradeGate", () => {
     });
   });
 
-  /** @scenario "An api on a first install holds" */
-  it("answers holding to the api on an empty ledger and an empty schema", async () => {
+  /** @scenario "An api on a first install is upgrading" */
+  it("answers upgrading to the api on an empty ledger and an empty schema", async () => {
     const { gate } = gateOver({ role: "api", steps: [], schemaIsEmpty: true });
-    await expect(gate.admit()).resolves.toMatchObject({ admitted: false, outcome: "holding" });
+    await expect(gate.admit()).resolves.toMatchObject({ admitted: false, outcome: "upgrading" });
   });
 
-  /** @scenario "An api whose image has a Postgres schema step outstanding holds" */
-  it("answers holding to the api, naming the pending Postgres schema step", async () => {
+  /** @scenario "An api whose image has a schema step of either store outstanding is upgrading" */
+  it("answers upgrading to the api, naming the pending Postgres and ClickHouse schema steps", async () => {
     const steps = [
       { id: PRISMA, status: "pending" as const },
-      { id: GOOSE, status: "done" as const },
-    ];
-    const { gate } = gateOver({ role: "api", steps });
-    await expect(gate.admit()).resolves.toMatchObject({
-      admitted: false,
-      outcome: "holding",
-      outstanding: [PRISMA],
-    });
-  });
-
-  /** @scenario "An api whose image has a ClickHouse schema step outstanding holds" */
-  it("answers holding to the api while a ClickHouse schema step is pending", async () => {
-    const steps = [
-      { id: PRISMA, status: "done" as const },
       { id: GOOSE, status: "pending" as const },
     ];
     const { gate } = gateOver({ role: "api", steps });
     await expect(gate.admit()).resolves.toMatchObject({
       admitted: false,
-      outcome: "holding",
-      outstanding: [GOOSE],
+      outcome: "upgrading",
+      outstanding: [PRISMA, GOOSE],
     });
   });
 

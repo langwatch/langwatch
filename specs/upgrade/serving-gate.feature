@@ -6,7 +6,7 @@
 # not done or not-needed, or when its release is below the highest floor any upgrade run
 # recorded. Admitted, it writes its roster entry and refreshes it until a graceful stop removes it.
 # The tasks role runs `upgrade` and is never gated. Since UPGRADE-IN-WORKER (UIW-1..11) a behind
-# or first-install verdict makes the worker run `upgrade` and the api hold (in-app-upgrade.feature).
+# or first-install verdict makes the worker run `upgrade` and the api serve at once (in-app-upgrade.feature).
 
 Feature: Serving processes refuse to start when the installation is behind their image
   As an operator upgrading a LangWatch installation
@@ -72,25 +72,19 @@ Feature: Serving processes refuse to start when the installation is behind their
     Then the verdict is a first install naming the command "pnpm task upgrade"
 
   @unit
-  Scenario: An api on a first install holds
+  Scenario: An api on a first install is upgrading
     Given the ledger has no steps and no runs
     And the application schema is empty
     When the api's serving gate checks the image
-    Then the verdict is holding
+    Then the verdict is upgrading
 
+  # NO-HOLDS (Alex, 2026-10-09): the api holds for no step; a Postgres read the schema is not ready
+  # for answers upgrade_in_progress and a ClickHouse read skips a column not added yet.
   @unit
-  Scenario: An api whose image has a Postgres schema step outstanding holds
-    Given the ledger records "prisma:20261006180000_add_column" as pending
+  Scenario: An api whose image has a schema step of either store outstanding is upgrading
+    Given the ledger records "prisma:20261006180000_add_column" as pending and "clickhouse:00042" as pending
     When the api's serving gate checks the image
-    Then the verdict is holding, naming step "prisma:20261006180000_add_column"
-
-  # API-UP-CLICKHOUSE (recommended, pending Alex's ruling): ClickHouse additive DDL is metadata-only,
-  # so the api holds for it as it does for Postgres, and no reader tolerates a missing column.
-  @unit
-  Scenario: An api whose image has a ClickHouse schema step outstanding holds
-    Given the ledger records "prisma:20261006180000_add_column" as done and "clickhouse:00042" as pending
-    When the api's serving gate checks the image
-    Then the verdict is holding, naming step "clickhouse:00042"
+    Then the verdict is upgrading, naming both steps
 
   @unit
   Scenario: An api whose schema steps are done while a blocking step is outstanding is upgrading

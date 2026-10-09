@@ -1771,7 +1771,9 @@ office deactivates only through user, so it keeps no picked date (Alex, 2026-10-
   rebuilds an access object must fail to compile when the object gains a member. Every `Authorize` member is
   required, a wrapper returns `Required<...>`, and what a type cannot express refuses at boot or at the request,
   then by a lint rule. The aggregate admin gate (ADR-177 decision 5) applies wherever a door decides at a project,
-  a REST route's own scope included.
+  a REST route's own scope included. Both runtimes require the authorization port (a REST family without one does
+  not compile and is refused at mount); `langwatch/authz-members-required` refuses an optional question on the
+  access and api-door types.
 - The exception is a hidden family, whose 404 comes before the credential or the body: `instance_admin` with no key
   set or on SaaS, and `/api/admin/*` for a caller who is not an admin (as main, 2026-09-30).
 - REST runs in three steps: the credential and identity checks that read no body (the door, and a public route's

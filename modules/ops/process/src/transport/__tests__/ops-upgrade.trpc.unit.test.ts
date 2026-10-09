@@ -4,7 +4,6 @@
  * `ops:view` on the platform, and an operator gets the reader's answers unchanged.
  * Spec: modules/ops/specs/upgrades.feature
  */
-import { routesHeldWhileUpgrading } from "@langwatch/api";
 import {
   bindTrpcFact,
   createTrpcRuntime,
@@ -270,6 +269,20 @@ describe("ops.upgrade.retryStep", () => {
     });
   });
 
+  describe("given a blocking schema step of either store that failed", () => {
+    /** @scenario "A failed Postgres or ClickHouse schema step offers Retry on the Upgrades page" */
+    it.each(["prisma:20261009_add_column", "clickhouse:00042"])(
+      "records %s pending for the worker's next run",
+      async (id) => {
+        const step = { ...FAILED_STEP, id, mode: "blocking" as const };
+        const ledger = ledgerHolding(step);
+        const { manager } = mount({ ledger });
+
+        await expect(manager.retryStep({ id })).resolves.toMatchObject({ status: "pending" });
+      },
+    );
+  });
+
   describe("given a background step that is running", () => {
     /** @scenario "Retrying a step that is not failed is refused" */
     it("answers upgrade_step_not_failed naming the status and leaves the step running", async () => {
@@ -296,20 +309,7 @@ describe("ops.upgrade.retryStep", () => {
 });
 
 describe("given the installation upgrading", () => {
-  /** @scenario "The Upgrades and system-migration procedures serve while the installation upgrades" */
-  it("passes a batch of every Upgrades read, Retry and each migration procedure", () => {
-    const names = Object.keys(boundAccess());
-    const held = routesHeldWhileUpgrading().map((source) => new RegExp(source));
-    const passes = (route: string) => !held.some((pattern) => pattern.test(route));
-
-    expect(names).toHaveLength(9 + MIGRATION_PROCEDURE_NAMES.length);
-    expect(passes(`GET /api/trpc/${names.join(",")}`)).toBe(true);
-    for (const name of MIGRATION_PROCEDURE_NAMES) {
-      expect([name, passes(`POST /api/trpc/ops.upgrade.status,${name}`)]).toEqual([name, true]);
-    }
-  });
-
-  /** @scenario "Every route serves while upgrading unless it holds, naming why" */
+  /** @scenario "Every route serves while upgrading and still asks its declared permission" */
   it("still asks a declared procedure's permission at the door", async () => {
     const reader = readerOfOneRelease();
     const { outsider } = mount({ reader });

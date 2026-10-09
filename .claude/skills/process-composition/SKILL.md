@@ -77,8 +77,8 @@ An app is `src/main.ts` plus `src/config.ts`, and holds no product code (§1, §
 10. **Connection strings are the stores' secrets**, and store clients appear in exactly one place:
     the chain. A module never names a URL or opens a client (§6, §7).
 11. **Migrations run through `pnpm task upgrade`**, never composed by the api (§7, ADR-173,
-    UPGRADE-IN-WORKER). The worker's gate runs it at boot under the runner's lease; the api holds,
-    then serves only `servesWhileUpgrading` routes, until the ledger is current. Both compose
+    UPGRADE-IN-WORKER). The worker's gate runs it at boot under the runner's lease; the api holds
+    nothing and serves every route while the ledger catches up (NO-HOLDS). Both compose
     `withUpgradeGate`, which refuses by name while a blocking step of the image is outstanding. A module declares its steps with `.withMigrations` (`migration` skill).
 12. **Composition is proven by booting it.** The installation test boots the installed list in a
     role over memory stores with no server (§4 last paragraph, §13). A unit test with fakes proves

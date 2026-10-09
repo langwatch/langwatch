@@ -29,10 +29,34 @@ every process it starts, and `eval "$(haven env)"` puts the same set in your
 shell.
 
 Credential-carrying variables are classified once in `packages/secrets`
-(ADR-132). Each app resolves them through an ordered chain (env/.env, then
-1Password when `LANGWATCH_SECRETS_VAULT` is set, then a refusal by name) before
+(ADR-132). Each app resolves them through an ordered chain (env, `.env`, then
+1Password when `LANGWATCH_OP_ACCOUNT` is set, then a refusal by name) before
 its Zod parse. Never read `.env` to find a value and never print one:
 `haven env` masks every classified key (`--reveal` for the shell form).
+
+### Keeping a credential in 1Password
+
+Addressing is convention plus one key (ARCHITECTURE.md §6): vault `Private`,
+item `LangWatch`, one field per secret named exactly its `Secret.load` id
+(`STRIPE_SECRET_KEY`), read with `op read` through the desktop app's CLI
+integration. There is no `op://` reference in `.env`: a value there is used
+literally.
+
+1. `op account list`; the URL's subdomain is your account shorthand.
+2. Add the field (empty), then paste the value in the 1Password app, never on a
+   command line. `op item edit` if `LangWatch` already exists in `Private`:
+   ```bash
+   op item create --account <shorthand> --vault Private --category "Secure Note" \
+     --title LangWatch 'STRIPE_SECRET_KEY[password]=' 'STRIPE_WEBHOOK_SECRET[password]='
+   ```
+3. In `.env`: delete the moved lines (env and `.env` answer first, so a line
+   left behind wins) and set `LANGWATCH_OP_ACCOUNT="<shorthand>"`.
+4. `haven down && haven up` (a restart keeps the old env), then
+   `haven env --agent | grep -E 'STRIPE|LANGWATCH_OP'` shows only the account.
+
+With the account set, every handle missing from env and `.env` asks `op`, so a
+locked or signed-out 1Password fails the boot with `one_password_unavailable`.
+Production refuses the account by name.
 
 ## haven (thuishaven)
 

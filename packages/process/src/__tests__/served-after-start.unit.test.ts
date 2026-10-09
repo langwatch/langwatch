@@ -21,7 +21,7 @@ function urlOf(server: Server): string {
 
 describe("given a component still starting ahead of the runtime", () => {
   describe("when a request reaches the application", () => {
-    /** @scenario "A released request reaches its handler only once the runtime has started" */
+    /** @scenario "A request that arrives while the runtime starts reaches its handler only once it has started" */
     it("waits for the runtime to start before the handler runs", async () => {
       let finishStarting = (): void => undefined;
       const starting = new Promise<void>((resolve) => {

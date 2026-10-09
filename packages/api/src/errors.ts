@@ -436,6 +436,40 @@ export class DatabaseBusyError extends HandledError {
   }
 }
 
+/**
+ * Prisma's codes for a table (P2021) or column (P2022) the schema doesn't have, and Postgres's
+ * SQLSTATEs for the same (42P01, 42703) when `pg` raises them raw.
+ */
+const SCHEMA_BEHIND_CODES: readonly unknown[] = ["P2021", "P2022", "42P01", "42703"];
+
+/** Whether the query named a table or column the schema does not have yet. */
+export function isSchemaBehind(error: unknown): boolean {
+  return error instanceof Error && "code" in error && SCHEMA_BEHIND_CODES.includes(error.code);
+}
+
+/** The code is ahead of the Postgres schema while the worker upgrades it (NO-HOLDS); retry soon. */
+export class UpgradeInProgressError extends HandledError {
+  declare readonly code: "upgrade_in_progress";
+
+  constructor() {
+    super("upgrade_in_progress", "LangWatch is upgrading. Retry shortly.", {
+      httpStatus: 503,
+      fault: "platform",
+      retryable: true,
+      meta: { retryAfterMs: 10_000 },
+    });
+
+    this.name = "UpgradeInProgressError";
+  }
+}
+
+/** The one mapping of a store failure every boundary answers handled: busy pool, schema behind. */
+export function promoteStoreFailure<T>(raised: T): T | HandledError {
+  if (isDatabaseBusy(raised)) return new DatabaseBusyError();
+  if (isSchemaBehind(raised)) return new UpgradeInProgressError();
+  return raised;
+}
+
 // ---------------------------------------------------------------------------
 // Hono onError handler
 // ---------------------------------------------------------------------------
@@ -450,7 +484,7 @@ export function createErrorHandler(): (err: Error, c: Context) => Response | Pro
     // Promote first so the response and the log agree on one error. Reporting
     // the raw ZodError would log it as unhandled, at `error`, against the 500
     // it no longer is.
-    const promoted = isDatabaseBusy(err) ? new DatabaseBusyError() : err;
+    const promoted = promoteStoreFailure(err);
     const effective = isZodLikeError(promoted) ? validationErrorFromZod(promoted) : promoted;
     const { status, body } = formatError({ err: effective });
 

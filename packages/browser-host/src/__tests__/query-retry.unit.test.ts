@@ -12,6 +12,15 @@ const handled = ({ code, httpStatus }: { code: string; httpStatus: number }) => 
 
 describe("shouldRetryQuery", () => {
   describe("given a query that failed", () => {
+    describe("when the api answers that it is upgrading", () => {
+      /** @scenario "The browser retries a read answered upgrade_in_progress" */
+      it("keeps retrying past the usual retry limit", () => {
+        const upgrading = handled({ code: "upgrade_in_progress", httpStatus: 503 });
+
+        expect(shouldRetryQuery(MAX_QUERY_RETRIES + 10, upgrading)).toBe(true);
+      });
+    });
+
     describe("when the failure names a cause a retry cannot fix", () => {
       /** @scenario "A preview failure only an operator can fix is not retried" */
       it("does not retry an unlinked subscription", () => {

@@ -20,42 +20,23 @@ export const HEARTBEAT_STALL_BUDGET_MS = 5 * 60 * 1000;
 export const MAIN_THREAD_PROXY_TIMEOUT_MS = 10_000;
 
 const BIND_HANDOVER_MS = 10_000;
-/** How long a caller held off by an upgrade waits before trying again; the page refreshes on it. */
+/** How long a caller turned away by the upgrade console waits before trying again. */
 export const UPGRADE_RETRY_AFTER_SECONDS = 10;
-/** A held request waits this long for its route to pass before it is answered held (API-UP). */
-export const UPGRADE_HOLD_WINDOW_MS = 30_000;
-/**
- * Held requests one door parks at once; past it a held request is answered 503 at once, so a
- * flood cannot hold every socket for the window. ponytail: one global count, per client if abused.
- */
-export const UPGRADE_HOLD_MAX_PARKED = 1_000;
 
 /** The failure console's forms (UPGRADE-CONSOLE, 2026-10-09); answered only while it shows. */
 export const UPGRADE_CONSOLE_PATH = "/_upgrade/console";
 export const UPGRADE_RETRY_PATH = "/_upgrade/retry";
-/** D3: the token is swapped once for this cookie, void when the hold lifts or the process exits. */
+/** D3: the token is swapped once for this cookie, void once the console lifts or the api ends. */
 export const UPGRADE_CONSOLE_COOKIE = "langwatch_upgrade_console";
 /** D2: a console token opens the console once, within this long of being printed. */
 export const UPGRADE_CONSOLE_TOKEN_TTL_MS = 30 * 60_000;
 /** D4: wrong tokens a process takes in a minute before every submission answers 429. */
 export const UPGRADE_CONSOLE_WRONG_TOKENS_PER_MINUTE = 5;
 
-/** The api's phase once the schema steps are done: it boots and serves every route not held. */
-export const UPGRADING_PHASE = "upgrading";
-/** Where the upgrading holding page sends a browser: sign-in, then the Upgrades page. */
-export const UPGRADE_SIGN_IN_HREF = "/auth/signin?callbackUrl=%2Fops%2Fupgrades";
-
-/** All the unauthenticated holding page may say (Q-U4): the phase and outstanding step ids. */
-export type UpgradeHolding = Readonly<{ phase: string; outstandingStepIds: readonly string[] }>;
-
-/**
- * What still reaches the main thread while the door holds: exact `paths` (the health routes) and,
- * in upgrading mode, every request but `held`: regex sources over `METHOD /path` (API-UP).
- */
-export type UpgradePassThrough = Readonly<{ paths: readonly string[]; held?: readonly string[] }>;
-
 /** A failed upgrade run, shown only to a console session. D1: the thread gets the token's hash. */
 export type UpgradeConsole = Readonly<{
+  /** Exact paths still proxied while the console shows: the health routes. */
+  passThrough?: readonly string[];
   failedSteps: readonly Readonly<{ id: string; error: string | null }>[];
   logTail: readonly string[];
   tokenSha256: string;
@@ -65,25 +46,6 @@ export type UpgradeConsole = Readonly<{
 
 const escapeHtml = (value: string): string =>
   value.replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`);
-
-/** The page browsers see while an upgrade holds the door. Spec: upgrade-holding-page.feature */
-export function renderUpgradeHoldingPage({ phase, outstandingStepIds }: UpgradeHolding): string {
-  const steps = outstandingStepIds.map((id) => `<li><code>${escapeHtml(id)}</code></li>`).join("");
-  return [
-    "<!doctype html>",
-    `<html lang="en"><head><meta charset="utf-8"><meta http-equiv="refresh" content="${UPGRADE_RETRY_AFTER_SECONDS}">`,
-    "<title>LangWatch is upgrading</title>",
-    "<style>body{font-family:system-ui,sans-serif;max-width:32rem;margin:15vh auto;padding:0 1rem;color:#1a1a1a}</style>",
-    "</head><body><h1>LangWatch is upgrading</h1>",
-    `<p>Phase: <strong>${escapeHtml(phase)}</strong></p>`,
-    steps === "" ? "" : `<p>Outstanding steps:</p><ul>${steps}</ul>`,
-    // The schema phase runs no sign-in code, so only the upgrading phase links to it.
-    phase === UPGRADING_PHASE
-      ? `<p><a href="${UPGRADE_SIGN_IN_HREF}">Sign in to follow the upgrade</a></p>`
-      : "",
-    "<p>This page refreshes on its own.</p></body></html>",
-  ].join("");
-}
 
 const consolePage = (body: readonly string[]): string =>
   [
@@ -146,51 +108,17 @@ const stalledMs = () => {
   return Date.now() - lastBeatSeenAt;
 };
 const target = { host: "127.0.0.1", port: workerData.proxyPort };
-let holdingPage = null;
-let passThrough = { paths: [], held: null };
 let consoleHold = null;
 const sessions = [];
 let wrongTokensAt = [];
 const sha256 = (value) => crypto.createHash("sha256").update(value).digest();
-const answerHolding = (req, res) => {
-  const html = String(req.headers.accept || "").includes("text/html");
+const answerUpgrading = (req, res) => {
   req.resume();
   res.writeHead(503, {
-    "Content-Type": html ? "text/html; charset=utf-8" : "text/plain",
+    "Content-Type": "text/plain",
     "Retry-After": String(workerData.retryAfterSeconds),
     "Cache-Control": "no-store",
-    "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'",
-  }).end(html ? holdingPage : "LangWatch is upgrading");
-};
-const parked = new Set();
-const releaseParked = () => {
-  for (const release of [...parked]) release();
-};
-// API-UP-DURING-UPGRADE: a held request waits for the hold to lift or its route to pass.
-const park = (req, res) => {
-  if (parked.size >= workerData.maxParked) return answerHolding(req, res);
-  const release = () => {
-    if (holdingPage !== null && !passes(req) && consoleHold === null) return;
-    settle();
-    serveOrHold(req, res);
-  };
-  const timer = setTimeout(() => {
-    settle();
-    serveOrHold(req, res);
-  }, workerData.holdWindowMs);
-  const settle = () => {
-    clearTimeout(timer);
-    parked.delete(release);
-  };
-  parked.add(release);
-  res.on("close", settle);
-};
-const passes = (req) => {
-  const path = String(req.url).split("?")[0];
-  if (passThrough.paths.includes(path)) return true;
-  if (passThrough.held === null) return false;
-  const route = req.method + " " + path;
-  return !passThrough.held.some((pattern) => pattern.test(route));
+  }).end("LangWatch is upgrading");
 };
 const answerConsole = (res, status, page, headers) => {
   res.writeHead(status, {
@@ -220,7 +148,7 @@ const crossSite = (req) => {
 };
 const openConsole = (req, res, token) => {
   const held = consoleHold;
-  if (held === null) return answerHolding(req, res);
+  if (held === null) return answerUpgrading(req, res);
   const now = Date.now();
   wrongTokensAt = wrongTokensAt.filter((at) => now - at < 60000);
   if (wrongTokensAt.length >= workerData.wrongTokensPerMinute) {
@@ -268,7 +196,7 @@ const answerFailed = (req, res) => {
     res.writeHead(303, { Location: "/", "Cache-Control": "no-store" }).end();
     return;
   }
-  if (!String(req.headers.accept || "").includes("text/html")) return answerHolding(req, res);
+  if (!String(req.headers.accept || "").includes("text/html")) return answerUpgrading(req, res);
   answerConsole(res, 503, hasSession(req) ? consoleHold.consolePage : consoleHold.loginPage);
 };
 const unavailable = (res, body) => {
@@ -290,18 +218,14 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, { "Content-Type": "text/plain" }).end("ready");
     return;
   }
-  if (holdingPage !== null && !passes(req) && consoleHold === null) {
-    park(req, res);
+  // UIW-7: only a failed first install's console stands in front of the routes (NO-HOLDS).
+  if (consoleHold !== null && !consoleHold.passThrough.includes(String(req.url).split("?")[0])) {
+    answerFailed(req, res);
     return;
   }
-  serveOrHold(req, res);
+  proxy(req, res);
 });
-const serveOrHold = (req, res) => {
-  if (holdingPage !== null && !passes(req)) {
-    if (consoleHold !== null) answerFailed(req, res);
-    else answerHolding(req, res);
-    return;
-  }
+const proxy = (req, res) => {
   const upstream = http.request({ ...target, method: req.method, path: req.url, headers: req.headers, agent: false });
   const timer = setInterval(() => {
     if (stalledMs() < workerData.proxyTimeoutMs) return;
@@ -325,7 +249,7 @@ const serveOrHold = (req, res) => {
   req.pipe(upstream);
 };
 server.on("upgrade", (req, socket, head) => {
-  if (holdingPage !== null) {
+  if (consoleHold !== null) {
     socket.end("HTTP/1.1 503 Service Unavailable\\r\\nRetry-After: " + workerData.retryAfterSeconds + "\\r\\nConnection: close\\r\\nContent-Length: 0\\r\\n\\r\\n");
     return;
   }
@@ -353,23 +277,17 @@ server.on("error", (error) => {
   parentPort.postMessage({ type: "failed", code: error.code, message: error.message });
 });
 parentPort.on("message", (message) => {
-  if (message.type === "hold") {
-    holdingPage = message.page;
-    passThrough = {
-      paths: message.paths,
-      held: message.held === null ? null : message.held.map((source) => new RegExp(source)),
-    };
+  if (message.type === "lift") {
     consoleHold = null;
-    if (message.page === null) sessions.length = 0;
-    releaseParked();
-    parentPort.postMessage({ type: "held" });
+    sessions.length = 0;
+    parentPort.postMessage({ type: "lifted" });
     return;
   }
   if (message.type === "console") {
     // CONSOLE-FOLLOWUPS: a session opened one failed run's console, never the next run's.
     sessions.length = 0;
-    holdingPage = message.loginPage;
     consoleHold = {
+      passThrough: message.passThrough,
       loginPage: message.loginPage,
       refusedPage: message.refusedPage,
       consolePage: message.consolePage,
@@ -377,7 +295,6 @@ parentPort.on("message", (message) => {
       expiresAt: Date.now() + message.tokenTtlMs,
       used: false,
     };
-    releaseParked();
     return;
   }
   if (message.type !== "close") return;
@@ -411,7 +328,7 @@ type ThreadMessage =
   | { type: "listening"; address: AddressInfo }
   | { type: "failed"; code?: string; message: string }
   | { type: "closed" }
-  | { type: "held" }
+  | { type: "lifted" }
   | { type: "retry" }
   | { type: "stragglers" };
 
@@ -425,8 +342,8 @@ export type LivenessThread = Readonly<{
   address: AddressInfo;
   /** Stops accepting, gives in-flight requests `graceMs`, destroys the rest, ends the thread. */
   close: (options: { graceMs: number }) => Promise<void>;
-  /** Serves the holding page in place of the main thread until called with `undefined`. */
-  hold: (holding: UpgradeHolding | undefined, passThrough?: UpgradePassThrough) => Promise<void>;
+  /** Takes the failure console down: every request reaches the main thread again. */
+  liftConsole: () => Promise<void>;
   /** Shows the failure console; true once a console session pressed Retry, false if it ended. */
   holdConsole: (upgradeConsole: UpgradeConsole) => Promise<boolean>;
 }>;
@@ -440,8 +357,6 @@ export async function startLivenessThread({
   logger,
   stallBudgetMs = HEARTBEAT_STALL_BUDGET_MS,
   proxyTimeoutMs = MAIN_THREAD_PROXY_TIMEOUT_MS,
-  holdWindowMs = UPGRADE_HOLD_WINDOW_MS,
-  maxParked = UPGRADE_HOLD_MAX_PARKED,
 }: {
   port: number;
   heartbeat: SharedArrayBuffer;
@@ -452,10 +367,6 @@ export async function startLivenessThread({
   logger: LivenessLogger;
   stallBudgetMs?: number;
   proxyTimeoutMs?: number;
-  /** How long a held request waits for its route to pass (UPGRADE_HOLD_WINDOW_MS). */
-  holdWindowMs?: number;
-  /** How many held requests may wait at once (UPGRADE_HOLD_MAX_PARKED). */
-  maxParked?: number;
 }): Promise<LivenessThread> {
   const thread = new Worker(LIVENESS_THREAD_SOURCE, {
     eval: true,
@@ -471,8 +382,6 @@ export async function startLivenessThread({
       readinessPath: READINESS_PATH,
       handoverMs: BIND_HANDOVER_MS,
       retryAfterSeconds: UPGRADE_RETRY_AFTER_SECONDS,
-      holdWindowMs,
-      maxParked,
       consolePath: UPGRADE_CONSOLE_PATH,
       retryPath: UPGRADE_RETRY_PATH,
       consoleCookie: UPGRADE_CONSOLE_COOKIE,
@@ -492,21 +401,16 @@ export async function startLivenessThread({
   thread.on("error", (error) => logger.error({ error }, "liveness thread failed"));
   return {
     address,
-    hold: async (holding, passThrough = { paths: [] }) => {
-      const held = nextMessage({ thread, type: "held" });
-      const page = holding === undefined ? null : renderUpgradeHoldingPage(holding);
-      thread.postMessage({
-        type: "hold",
-        page,
-        paths: passThrough.paths,
-        held: passThrough.held ?? null,
-      });
-      await Promise.race([held, exited]);
+    liftConsole: async () => {
+      const lifted = nextMessage({ thread, type: "lifted" });
+      thread.postMessage({ type: "lift" });
+      await Promise.race([lifted, exited]);
     },
     holdConsole: async (upgradeConsole) => {
       const retried = nextMessage({ thread, type: "retry" }).then(() => true);
       thread.postMessage({
         type: "console",
+        passThrough: upgradeConsole.passThrough ?? [],
         loginPage: renderUpgradeConsoleLogin({ refused: false }),
         refusedPage: renderUpgradeConsoleLogin({ refused: true }),
         consolePage: renderUpgradeConsole(upgradeConsole),

@@ -4875,6 +4875,11 @@ const presentations = {
     title: "That request was sent in the wrong format",
     describe: () => "Send the body with the Content-Type this endpoint reads, then try again.",
   },
+  upgrade_in_progress: {
+    title: "LangWatch is upgrading",
+    describe: () =>
+      "This part of LangWatch is being upgraded and will be back in a minute or two. It retries on its own.",
+  },
   upgrade_not_found: {
     title: "That upgrade record wasn't found",
     describe: () => "The step or run may be from another installation. Reload the upgrades page.",
