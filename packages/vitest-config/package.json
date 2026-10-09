@@ -34,7 +34,9 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@langwatch/observability": "workspace:*"
+    "@langwatch/observability": "workspace:*",
+    "@vitejs/plugin-react": "catalog:",
+    "oxc-transform-react": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",
