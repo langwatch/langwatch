@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`GatewayApi`)
 
-Peers call these through the token, declared at `../contract/src/gateway.api.ts:569`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/gateway.api.ts:570`; nothing else in this package is public.
 It extends `GatewayInternalProtocol`.
 
 #### `internalDoor`
@@ -1783,14 +1783,16 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ## Workers
 
-### Pipeline `gateway_connect_managed_key` (aggregate `global`)
+### Pipeline `gateway_connect_managed_key` (aggregate `gateway_connect_managed_key`)
 
-Declared at `src/eventing/gateway-connect-managed-key.pipeline.ts:34`.
+Declared at `src/eventing/gateway-connect-managed-key.pipeline.ts:49`. Events: `gatewayManagedKeyProvisionedEventSchema`.
 
-| Kind            | Name                                  | Handles                                                                                                  | Declared at                                               |
-| --------------- | ------------------------------------- | -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| peer subscriber | `gatewayConnectManagedKeyRetired`     | `lw.licensing.managed_key_retired` from [licensing](../../../enterprise/modules/licensing/README.md)     | `src/eventing/gateway-connect-managed-key.pipeline.ts:41` |
-| peer subscriber | `gatewayConnectManagedKeyInvalidated` | `lw.licensing.managed_key_invalidated` from [licensing](../../../enterprise/modules/licensing/README.md) | `src/eventing/gateway-connect-managed-key.pipeline.ts:48` |
+| Kind            | Name                                  | Handles                                                                                                    | Declared at                                               |
+| --------------- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| command         | `recordManagedKeyProvisioned`         | –                                                                                                          | `src/eventing/gateway-connect-managed-key.pipeline.ts:55` |
+| peer subscriber | `gatewayConnectManagedKeyIssued`      | `lw.licensing.connect_credential_issued` from [licensing](../../../enterprise/modules/licensing/README.md) | `src/eventing/gateway-connect-managed-key.pipeline.ts:57` |
+| peer subscriber | `gatewayConnectManagedKeyRetired`     | `lw.licensing.managed_key_retired` from [licensing](../../../enterprise/modules/licensing/README.md)       | `src/eventing/gateway-connect-managed-key.pipeline.ts:63` |
+| peer subscriber | `gatewayConnectManagedKeyInvalidated` | `lw.licensing.managed_key_invalidated` from [licensing](../../../enterprise/modules/licensing/README.md)   | `src/eventing/gateway-connect-managed-key.pipeline.ts:70` |
 
 ### Pipeline `governance_events_processing` (aggregate `governance_subject`)
 
@@ -1851,9 +1853,9 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                          | Environment variable                    | Declared at                            |
 | ------ | ----------------------------- | --------------------------------------- | -------------------------------------- |
-| secret | `internalSecret`              | `LW_GATEWAY_INTERNAL_SECRET`            | `src/app/gateway.app.ts:1141`          |
-| secret | `jwtSecret`                   | `LW_GATEWAY_JWT_SECRET`                 | `src/app/gateway.app.ts:1142`          |
-| secret | `virtualKeyPepper`            | `LW_VIRTUAL_KEY_PEPPER`                 | `src/app/gateway.app.ts:1143`          |
+| secret | `internalSecret`              | `LW_GATEWAY_INTERNAL_SECRET`            | `src/app/gateway.app.ts:1149`          |
+| secret | `jwtSecret`                   | `LW_GATEWAY_JWT_SECRET`                 | `src/app/gateway.app.ts:1150`          |
+| secret | `virtualKeyPepper`            | `LW_VIRTUAL_KEY_PEPPER`                 | `src/app/gateway.app.ts:1151`          |
 | config | `spendSettlementGraceMs`      | `LW_SPEND_SETTLEMENT_GRACE_MS`          | `../contract/src/gateway.config.ts:26` |
 | config | `internalUrl`                 | `LW_GATEWAY_INTERNAL_URL`               | `../contract/src/gateway.config.ts:28` |
 | config | `controlPlaneUrl`             | `GATEWAY_CONTROL_PLANE_URL`             | `../contract/src/gateway.config.ts:30` |

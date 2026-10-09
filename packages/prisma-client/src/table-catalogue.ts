@@ -1171,6 +1171,7 @@ export const prismaModelFieldCatalogue = {
     "sqsSecretAccessKeyEncrypted",
     "secretEncrypted",
     "signatureScheme",
+    "idempotencyKey",
     "previousSecretEncrypted",
     "previousSecretExpiresAt",
     "enabledEvents",
@@ -2168,7 +2169,8 @@ export const prismaModelFieldCatalogue = {
     "connectServices",
     "licenseTokenHash",
     "licenseInstanceId",
-    "licenseExpiresAt"
+    "licenseExpiresAt",
+    "licenseId"
   ],
   "VirtualKeyScope": [
     "id",

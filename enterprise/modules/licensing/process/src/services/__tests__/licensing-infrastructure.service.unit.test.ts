@@ -3,7 +3,10 @@ import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import { createTestLicensingApp, VALID_LICENSE_KEY } from "../../__tests__/testing.ts";
-import { MemoryOrganizationLicenseRepository } from "../../repositories/memory/memory.organization-license.repository.ts";
+import {
+  MemoryOrganizationLicenseRepository,
+  type OrganizationLicenseColumns,
+} from "../../repositories/memory/memory.organization-license.repository.ts";
 import type { OrganizationLicenseReads } from "../../repositories/organization-license.repository.ts";
 import { LicensingInfrastructureService } from "../licensing-infrastructure.service.ts";
 
@@ -193,6 +196,32 @@ describe("licensing infrastructure composed with licence storage", () => {
         new Map([[LICENSED_ORGANIZATION_ID, VALID_LICENSE_KEY]]),
       ),
     );
+
+    await expect(repository.getOrganizationLicense(LICENSED_ORGANIZATION_ID)).resolves.toEqual({
+      licenseKey: VALID_LICENSE_KEY,
+    });
+    await expect(repository.findOrganizationsWithLicense()).resolves.toEqual([
+      { organizationId: LICENSED_ORGANIZATION_ID, licenseKey: VALID_LICENSE_KEY },
+    ]);
+  });
+
+  /** @scenario "A licence written to organization's columns after licensing's row is read from them" */
+  it("answers the key an old image wrote to organization's columns after licensing's row", async () => {
+    const columns = new Map<string, OrganizationLicenseColumns>([
+      [LICENSED_ORGANIZATION_ID, { licenseKey: "column-key" }],
+    ]);
+    const licenses = MemoryOrganizationLicenseRepository.create(columns);
+    const { repository } = composeWithStorage(licenses);
+    await repository.storeLicense(LICENSED_ORGANIZATION_ID, {
+      licenseKey: "row-key",
+      expiresAt: Temporal.Instant.from("2027-01-01T00:00:00Z"),
+      validatedAt: null,
+    });
+
+    columns.set(LICENSED_ORGANIZATION_ID, {
+      licenseKey: VALID_LICENSE_KEY,
+      updatedAt: Temporal.Instant.from("2099-01-01T00:00:00Z"),
+    });
 
     await expect(repository.getOrganizationLicense(LICENSED_ORGANIZATION_ID)).resolves.toEqual({
       licenseKey: VALID_LICENSE_KEY,

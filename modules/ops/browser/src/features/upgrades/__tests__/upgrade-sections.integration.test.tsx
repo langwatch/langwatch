@@ -16,7 +16,7 @@ import type {
 import { UpgradeReleaseSteps } from "../ui/sections/upgrade-release-steps.tsx";
 import { UpgradeRunPhases } from "../ui/sections/upgrade-run-phases.tsx";
 import { UpgradeStepDetail } from "../ui/sections/upgrade-step-detail.tsx";
-import { UpgradesOverview } from "../ui/sections/upgrades-overview.tsx";
+import { type UpgradeTenantStepView, UpgradesOverview } from "../ui/sections/upgrades-overview.tsx";
 
 function renderIn(node: ReactNode) {
   return render(<DesignSystemProvider forcedTheme="light">{node}</DesignSystemProvider>);
@@ -75,12 +75,16 @@ function renderOverview({
   failedSteps = [],
   backgroundSteps = [],
   backgroundLoading,
+  operatorSteps,
+  tenantSteps,
   onRetryStep,
 }: {
   status: UpgradeStatusView;
   failedSteps?: UpgradeStepView[];
   backgroundSteps?: UpgradeStepView[];
   backgroundLoading?: boolean;
+  operatorSteps?: UpgradeStepView[];
+  tenantSteps?: UpgradeTenantStepView[];
   onRetryStep?: (stepId: string) => void;
 }) {
   const onOpenStep = vi.fn();
@@ -94,6 +98,8 @@ function renderOverview({
       failedSteps={failedSteps}
       backgroundSteps={backgroundSteps}
       backgroundLoading={backgroundLoading}
+      operatorSteps={operatorSteps}
+      tenantSteps={tenantSteps}
       onRetryStep={onRetryStep}
       onOpenRelease={noop}
       onOpenRun={noop}
@@ -195,6 +201,72 @@ describe("UpgradesOverview", () => {
       expect(attention).toHaveTextContent("Owner column missing: run the Prisma migration first");
       fireEvent.click(within(attention).getByRole("button", { name: /ops:backfill-owner/ }));
       expect(onOpenStep).toHaveBeenCalledWith("ops:backfill-owner");
+    });
+  });
+
+  describe("when an operator step is unfinished", () => {
+    const failed = stepWith({
+      id: "ops:reseal-credentials",
+      mode: "operator",
+      status: "failed",
+      statusLabel: "Failed",
+      lastError: "Key not loaded",
+    });
+    const pending = stepWith({
+      id: "ops:move-archives",
+      mode: "operator",
+      status: "pending",
+      statusLabel: "Pending",
+    });
+
+    /** @scenario "An unfinished operator step shows its state and a failed one offers Retry to a manager" */
+    it("lists both with their status and offers Retry on the failed one only", () => {
+      const onRetryStep = vi.fn();
+      renderOverview({ status: statusWith({}), operatorSteps: [failed, pending], onRetryStep });
+
+      const list = screen.getByTestId("upgrade-operator-steps");
+      expect(screen.getByTestId("upgrade-operator-step-ops:move-archives")).toHaveTextContent(
+        "Pending",
+      );
+      expect(within(list).getAllByRole("button", { name: "Retry" })).toHaveLength(1);
+      const failedRow = screen.getByTestId("upgrade-operator-step-ops:reseal-credentials");
+      expect(failedRow).toHaveTextContent("Key not loaded");
+      fireEvent.click(within(failedRow).getByRole("button", { name: "Retry" }));
+      expect(onRetryStep).toHaveBeenCalledWith("ops:reseal-credentials");
+    });
+  });
+
+  describe("when a tenant step exists", () => {
+    const tenantStep: UpgradeTenantStepView = {
+      name: "prompt:seed-tags-for-untagged-organizations",
+      title: "Default prompt tags",
+      description: "Seeds the default prompt tags.",
+      requiresOperatorConfirmation: false,
+      availableOnThisInstallation: true,
+      enrolledAutomatically: true,
+      counts: { migrated: 2, finalized: 40, parked: 1, rolled_back: 0 },
+      enrollment: null,
+      attention: [],
+    };
+
+    /** @scenario "Each tenant step shows its tenants' progress on the Upgrades page" */
+    it("lists its tenants finalized, held and parked, and opens the step", () => {
+      const { onOpenStep } = renderOverview({
+        status: statusWith({}),
+        tenantSteps: [tenantStep],
+      });
+
+      const row = screen.getByTestId(`upgrade-tenant-step-${tenantStep.name}`);
+      const cells = within(row).getAllByRole("cell");
+      expect(cells.map((cell) => cell.textContent)).toEqual([
+        tenantStep.name,
+        "Default prompt tags",
+        "40",
+        "2",
+        "1",
+      ]);
+      fireEvent.click(row);
+      expect(onOpenStep).toHaveBeenCalledWith(tenantStep.name);
     });
   });
 

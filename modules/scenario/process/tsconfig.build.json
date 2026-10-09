@@ -12,8 +12,7 @@
     "./src/index.ts",
     "./src/services/scenario-failure-handler.service.ts",
     "src/repositories/clickhouse/simulation-clickhouse.repository.ts",
-    "src/eventing/simulation-processing-producer.pipeline.ts",
-    "./src/tasks/stalled-runs-backfill.task.ts"
+    "src/eventing/simulation-processing-producer.pipeline.ts"
   ],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
@@ -133,6 +132,9 @@
     },
     {
       "path": "../../trace/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/upgrade/tsconfig.build.json"
     },
     {
       "path": "../../user/contract/tsconfig.build.json"

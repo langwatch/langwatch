@@ -261,7 +261,7 @@ Feature: Automation ownership
     Then no automation is read and no match is recorded
 
   # Upgrade steps (migration plan D.1, DATA-AUTOMATION): each repair runs once early and once
-  # more after every older image stops serving; the operator tasks stay as re-runs.
+  # more after every older image stops serving; Ops > Upgrades, Retry step, re-runs a failed one.
   @unit
   Scenario: The first report-schedule step configures every active report that has no schedule
     Given an active report trigger without a schedule process

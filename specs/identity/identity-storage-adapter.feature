@@ -258,6 +258,15 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     Then the heal is driven over the drifted users alone
     And the backfill is still driven over every user
 
+  # The heal repairs users the identifier backfill has latched, and that backfill
+  # runs on every installation and enrols every user, so the heal follows it there.
+  @unit
+  Scenario: The heal pass runs wherever the identifier backfill latches users
+    Given the identifier backfill runs on self-hosted installations and enrols every user automatically
+    When the heal pass declares where it runs
+    Then it runs on self-hosted installations too
+    And it enrols every user automatically, as the backfill does
+
   @unit
   Scenario: An unreadable gate cache degrades writes to the legacy branch, never to an error
     Given the gate cache cannot be read

@@ -25,6 +25,7 @@ import { MemoryTraceEditOverlayRepository } from "./memory.trace-edit-overlay.re
 import { MemoryTraceEvaluationRunsRepository } from "./memory.trace-evaluation-runs.repository.ts";
 import { MemoryTraceExistenceRepository } from "./memory.trace-existence.repository.ts";
 import { MemoryTraceExportSlotRepository } from "./memory.trace-export-slot.repository.ts";
+import { MemoryTraceIndexMaterialisationRepository } from "./memory.trace-index-materialisation.repository.ts";
 import { MemoryTraceIngestSourceBillingRepository } from "./memory.trace-ingest-source-billing.repository.ts";
 import { MemoryTraceInstantEvalRunsRepository } from "./memory.trace-instant-eval-runs.repository.ts";
 import { MemoryTraceModelSpendRepository } from "./memory.trace-model-spend.repository.ts";
@@ -134,6 +135,7 @@ export class MemoryTraceRepositories {
       eventPayloads: MemoryTracePayloadReaderRepository.create(),
       clusteringSample: MemoryNullTraceClusteringSampleRepository.create(),
       usageCount: MemoryTraceUsageCountRepository.create(),
+      indexMaterialisation: MemoryTraceIndexMaterialisationRepository.create(),
       modelSpend: MemoryTraceModelSpendRepository.create(),
       attributeSpend: MemoryTraceAttributeSpendRepository.create(),
       attributedRollup: MemoryNullTraceAttributedRollupRepository.create(),

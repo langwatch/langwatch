@@ -26,7 +26,7 @@ GET    /api/messages/{id}    /{id}/html      one message: text, html, headers, l
 GET    /api/messages/wait?to=&subject=&after=<id>&timeout=30s
                                              long poll; 200 message, 204 on timeout
 DELETE /api/messages   |   DELETE /api/messages/{id}
-GET    /api/inbox                            stack, SMTP address, persistence
+GET    /api/inbox                            stack, own address, SMTP address, persistence
 ```
 
 Test pattern: trigger the action, then `curl ".../api/messages/wait?to=a@x.test&subject=verify&timeout=20s"`
@@ -50,6 +50,6 @@ and read `links[0]`. Use `after=<newest id>` to ignore older mail.
 `--json` on every read (default in agent mode); non-zero exit on failure, including a `wait` timeout.
 
 ```
-haven mail address | list [--to] [--subject] | get <id> [--html] | links <id>
-haven mail wait [--to] [--subject] [--timeout 30s] | delete <id> | clear
+haven mail address | inbox | list [--to] [--subject] | get <id> [--html] | links <id>
+haven mail wait [--to] [--subject] [--after <id>] [--timeout 30s] | delete <id> | clear
 ```

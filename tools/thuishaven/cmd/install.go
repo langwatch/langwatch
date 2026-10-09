@@ -396,6 +396,10 @@ func printPostureNote(w io.Writer, posture app.ContainerPosture, paint painter) 
 	if posture.Posture == domain.PostureUnset {
 		return
 	}
+	// macOS needs no runtime, so only a posture someone chose is worth a line.
+	if runtime.GOOS == "darwin" && posture.Source == domain.PostureDetected {
+		return
+	}
 	fmt.Fprintln(w, "  "+paint(havenui.Muted, posture.Line()))
 }
 

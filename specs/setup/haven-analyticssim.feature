@@ -8,7 +8,8 @@ Feature: analyticssim, a local stand-in for PostHog and Customer.io
   sent. It checks no key: it is a dev shim.
 
   # Bound by Go tests in services/analyticssim/analyticssim_test.go and
-  # tools/thuishaven/domain/overlay_analytics_test.go, by their `// @scenario`
+  # tools/thuishaven/domain/overlay_analytics_test.go and
+  # tools/thuishaven/cmd/sim_analytics_test.go, by their `// @scenario`
   # annotations, and by apps/analyticssim-web/src/__tests__/records-console.integration.test.tsx.
 
   Scenario: PostHog calls from either client become records
@@ -33,6 +34,29 @@ Feature: analyticssim, a local stand-in for PostHog and Customer.io
     Given records from both providers
     When the console is open
     Then it lists them newest first, filterable by provider and kind, with each record's properties and raw call
+
+  @integration
+  Scenario: The console shows how busy the stack has been
+    Given records the app sent, beside seeded sample records
+    When the console is open
+    Then it shows the calls in the last five minutes, the distinct ids among them and the last call's name
+
+  @integration
+  Scenario: The console narrows the list to one person from a record
+    Given records about two distinct ids
+    When the operator opens a record and asks for that person's records
+    Then the list shows only records with that distinct id
+
+  Scenario: haven analytics shows one record in full
+    Given records from both providers
+    When an agent runs "haven analytics record <id>"
+    Then it prints that record's facts, properties and raw call
+    And an unknown id is refused
+
+  Scenario: haven analytics status reports the activity and records filter by name
+    When an agent runs "haven analytics status"
+    Then it prints the activity the console shows beside the record count
+    And "haven analytics records --name <name>" filters like "--event <name>"
 
   Scenario: haven runs analyticssim only when the worktree asks for it
     Given a worktree that has never been up

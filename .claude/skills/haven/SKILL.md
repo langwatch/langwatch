@@ -1,6 +1,6 @@
 ---
 name: haven
-description: "Daily use of thuishaven (`haven`), the dev-stack orchestrator: start, stop and inspect this worktree's stack, read logs, print the resolved env without leaking a secret, find the app and API URLs, and drive a stack as an agent. Use when someone says 'haven up', 'start the stack', 'is the stack up', 'haven logs', 'haven status', 'haven env', 'what is the app URL', 'app.<slug>.langwatch.localhost', 'haven up --agent -d', 'restart the api lane', 'reset the database', or 'try a PR locally'. When the stack will not come up, or the page is blank or the log is frozen, read troubleshooting.md beside this file."
+description: "Daily use of thuishaven (`haven`), the dev-stack orchestrator: start, stop and inspect this worktree's stack, read logs, print the resolved env without leaking a secret, find the app and API URLs, and drive a stack as an agent. Use when someone says 'haven up', 'start the stack', 'is the stack up', 'haven logs', 'haven status', 'haven env', 'what is the app URL', 'app.<slug>.langwatch.localhost', 'haven up --agent -d', 'restart the api lane', 'reset the database', 'haven install --build', 'stack home', 'haven feedback', 'the haven orb', or 'try a PR locally'. When the stack will not come up, or the page is blank or the log is frozen, read troubleshooting.md beside this file."
 user-invocable: true
 argument-hint: "[up | status | logs <service> | env | down | restart <lane> | db ...]"
 ---
@@ -17,9 +17,13 @@ Run it from the workspace root. `make haven <sub>` forwards to the CLI (`dev/hav
 `make haven install` puts plain `haven` on your PATH and installs what the machine
 needs. With no TTY it runs `haven install --yes` (no prompts; on macOS also the
 native tier: `brew install grafana prometheus loki` and the pinned ClickHouse,
-Tempo and Alloy downloads). colima is optional. A failed non-required row is
+Tempo and Alloy downloads). macOS needs no colima: the install list leaves the
+runtime off and Langy runs on the host tier by default (`up` says it is unsandboxed). A failed non-required row is
 logged and the run carries on. Re-running is a no-op;
-`haven install --list --agent` reports without installing.
+`haven install --list --agent` reports without installing. `haven install --build` builds the
+consoles the binary embeds in one cached, parallel `nx run-many` (the `haven-console` project tag
+is the one list) behind a single progress line, then the binary; a console that fails to build
+serves a page naming `make haven-web`. Logs go to the install log directory.
 
 ## As an agent
 
@@ -108,6 +112,17 @@ haven query promql 'rate(http_server_request_duration_count[5m])' --since 30m
 Only `haven down` followed by `haven up` reloads a changed `.env`. `haven restart` does
 not.
 
+## The stack home
+
+`https://<slug>.langwatch.localhost` (`apps/haven-web`) lists every surface with its status. A
+surface that is not live says why (what it waits for and its lane's last warning), and its row has
+Restart, or Start for a surface that was not selected. An api the stack refuses to serve because
+the database is below the LTS floor shows a database reset button. `haven db reset` migrates and
+seeds exactly the databases it dropped, also for a stack the hub does not know yet. The daemon
+trusts a pid only together with its process start time, holds its claim as a flock for its whole
+life, and writes stack records atomically, so a recycled pid or a second daemon cannot be mistaken
+for ours (`tools/thuishaven/app/identity.go`).
+
 ## The env, without leaking it
 
 - `haven env` prints this stack's resolved environment with every secret masked
@@ -162,7 +177,7 @@ worktree's.
 
 `troubleshooting.md` (same folder) covers: a stack that is already up, the portless
 proxy dying or holding root-owned state, `.localhost` not resolving on WSL2, Langy
-needing `opencode` on the host, stale k8s URLs in `.env`, a frozen log, a blank page
+needing its `langy-worker` binary on the host, stale k8s URLs in `.env`, a frozen log, a blank page
 that is only Vite re-optimising, and signing in for a browser check.
 
 ## Do not

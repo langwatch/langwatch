@@ -33,6 +33,11 @@ export const UPGRADE_CONSOLE_TOKEN_TTL_MS = 30 * 60_000;
 /** D4: wrong tokens a process takes in a minute before every submission answers 429. */
 export const UPGRADE_CONSOLE_WRONG_TOKENS_PER_MINUTE = 5;
 
+/** The api's phase once the schema steps are done: it boots and serves declared routes (UIW-1). */
+export const UPGRADING_PHASE = "upgrading";
+/** Where the upgrading holding page sends a browser: sign-in, then the Upgrades page. */
+export const UPGRADE_SIGN_IN_HREF = "/auth/signin?callbackUrl=%2Fops%2Fupgrades";
+
 /** All the unauthenticated holding page may say (Q-U4): the phase and outstanding step ids. */
 export type UpgradeHolding = Readonly<{ phase: string; outstandingStepIds: readonly string[] }>;
 
@@ -65,6 +70,10 @@ export function renderUpgradeHoldingPage({ phase, outstandingStepIds }: UpgradeH
     "</head><body><h1>LangWatch is upgrading</h1>",
     `<p>Phase: <strong>${escapeHtml(phase)}</strong></p>`,
     steps === "" ? "" : `<p>Outstanding steps:</p><ul>${steps}</ul>`,
+    // The schema phase runs no sign-in code, so only the upgrading phase links to it.
+    phase === UPGRADING_PHASE
+      ? `<p><a href="${UPGRADE_SIGN_IN_HREF}">Sign in to follow the upgrade</a></p>`
+      : "",
     "<p>This page refreshes on its own.</p></body></html>",
   ].join("");
 }

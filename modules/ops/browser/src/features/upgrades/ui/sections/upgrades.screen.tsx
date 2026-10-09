@@ -12,7 +12,7 @@ import { UpgradeReadState } from "./upgrade-read-state.tsx";
 import { UPGRADE_STEP_OVERLAY, UpgradeStepDrawer } from "./upgrade-step-drawer.tsx";
 import { UpgradesOverview } from "./upgrades-overview.tsx";
 
-/** Background step statuses that are finished; every other one is still listed. */
+/** Background and operator step statuses that are finished; every other one is still listed. */
 const FINISHED = new Set(["done", "not-needed"]);
 
 /** How many recent runs the overview lists. */
@@ -28,6 +28,8 @@ export default function UpgradesScreen() {
   const runs = api.ops.upgrade.listRuns.useQuery({ limit: RECENT_RUNS });
   const failed = api.ops.upgrade.listSteps.useQuery({ status: "failed" });
   const background = api.ops.upgrade.listSteps.useQuery({ mode: "background" });
+  const operator = api.ops.upgrade.listSteps.useQuery({ mode: "operator" });
+  const tenants = api.ops.upgrade.listSystemMigrations.useQuery();
   const targets = api.ops.upgrade.listTargets.useQuery();
   const canManage = useOpsHost().isOpsAdmin();
   const { retryStep, retryingStepId } = useRetryUpgradeStep();
@@ -56,6 +58,10 @@ export default function UpgradesScreen() {
                     (step) => !FINISHED.has(step.status),
                   )}
                   backgroundLoading={background.isLoading}
+                  operatorSteps={(operator.data?.items ?? []).filter(
+                    (step) => !FINISHED.has(step.status),
+                  )}
+                  tenantSteps={tenants.data ?? []}
                   onRetryStep={canManage ? retryStep : void 0}
                   retryingStepId={retryingStepId}
                   onOpenRelease={(release) =>

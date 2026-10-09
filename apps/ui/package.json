@@ -139,6 +139,7 @@
     "bcrypt": "catalog:",
     "dotenv": "catalog:",
     "jsdom": "catalog:",
+    "modern-screenshot": "^4.7.0",
     "nanoid": "^6.0.0",
     "playwright": "catalog:",
     "typescript": "catalog:",

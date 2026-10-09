@@ -31,6 +31,7 @@ import type {
   CreatePasskeyUserRow,
   SetFirstUserPasswordRow,
   UserCreatedRow,
+  UserStandingRow,
   UserDeactivationOutcome,
   UserRepository,
   StoredProfileChange,
@@ -88,6 +89,21 @@ export class MemoryUserRepository implements UserRepository {
       .toSorted((a, b) => Number(a.id > b.id) - Number(a.id < b.id))
       .slice(0, limit)
       .map((row) => ({ id: row.id, createdAt: row.createdAt }));
+  }
+
+  async findStandingPage({
+    afterId,
+    limit,
+  }: {
+    afterId: string | null;
+    limit: number;
+  }): Promise<UserStandingRow[]> {
+    return this.#database
+      .rows()
+      .filter((row) => afterId === null || row.id > afterId)
+      .toSorted((a, b) => Number(a.id > b.id) - Number(a.id < b.id))
+      .slice(0, limit)
+      .map((row) => ({ id: row.id, deactivatedAt: row.deactivatedAt }));
   }
 
   async findProfiles(userIds: string[]): Promise<UserFullProfile[]> {

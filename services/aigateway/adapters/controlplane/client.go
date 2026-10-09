@@ -189,12 +189,13 @@ var connectRefusals = map[string]herr.Code{
 	string(domain.ErrConnectLicenseRevoked):       domain.ErrConnectLicenseRevoked,
 	string(domain.ErrConnectLicenseExpired):       domain.ErrConnectLicenseExpired,
 	string(domain.ErrConnectWrongInstance):        domain.ErrConnectWrongInstance,
+	string(domain.ErrConnectCredentialPending):    domain.ErrConnectCredentialPending,
 }
 
-// connectRefusal decodes a license token refusal from a 4xx answer. The decoded
-// code decides it, never a substring of the body.
+// connectRefusal decodes a license token refusal from a 4xx answer, or the
+// pending answer from a 503. The decoded code decides it, never a substring.
 func connectRefusal(status int, body []byte) (herr.Code, bool) {
-	if status < http.StatusBadRequest || status >= http.StatusInternalServerError {
+	if status < http.StatusBadRequest || status > http.StatusServiceUnavailable {
 		return "", false
 	}
 	var rejection struct {
@@ -206,6 +207,9 @@ func connectRefusal(status int, body []byte) (herr.Code, bool) {
 		return "", false
 	}
 	code, ok := connectRefusals[rejection.Error.Code]
+	if ok && status >= http.StatusInternalServerError && code != domain.ErrConnectCredentialPending {
+		return "", false
+	}
 	return code, ok
 }
 

@@ -1131,6 +1131,8 @@ A module never re-derives them from `process.env`.
 `databaseTarget` and `prisma` and builds its connection bundle there. Its
 passwords stay the module's own `static readonly secrets`. No password means
 LangWatchQL answers "unavailable" and every query is refused (ADR-159).
+Boot convergence never throws; the upgrade's `langwatchql` reconciler converges with `failOnError`, so a refused
+provisioning fails the run (Alex, 2026-10-09).
 Data-privacy's directory is another: its repository registry builds it over
 `prisma`.
 
@@ -1366,7 +1368,9 @@ runner, in its own process), waits while another runner holds the lease, takes n
 ledger is current, and after a failed run waits for a Retry that returns the step to `pending`
 (Alex, 2026-10-09, UPGRADE-IN-WORKER, superseding UPGRADE-FIXES' "the worker never does"). `pnpm
 task upgrade` stays a runner under the same lease for development, CI and an operator (apps/api
-`start:prepare:db`: upgrade alone; no system-migrations pass); the Helm pre-roll Job renders only
+`start:prepare:db`: upgrade alone; no system-migrations pass); the root `prisma:migrate` and
+`clickhouse:migrate` scripts are aliases of it, so no script applies schema outside the ledger
+(Alex, 2026-10-09); the Helm pre-roll Job renders only
 with `serializeUpgrades`, and the compose `migrate` service is gone. The api never runs a step:
 while a Postgres schema step of its image is outstanding it serves the holding page; after that,
 until the ledger is current, it serves in upgrading mode, only sign-in and the Ops Upgrades page
@@ -1375,8 +1379,13 @@ enforces; everything else answers the holding page), and reports not ready. A bl
 touches a table owned by auth, user, organization, authz or identity; `lint:architecture` refuses
 one that does (UIW-1..11). A background step names the background steps it runs after by their step
 values (`after: [step]`, STEP-AFTER); the worker waits on them, the upgrade inlines them before a
-contract, and an unknown id or a cycle refuses the plan. Prisma migrations live with the schema;
+contract, and an unknown id or a cycle refuses the plan. A fact old images never recorded is
+recorded by its owner's background data step with `needsOldWritersGone`; `project:record-created-facts`
+runs after `instant-eval:copy-judge-spend` (ADR-174 decision 17). Prisma migrations live with the schema;
 ClickHouse migrations are goose SQL files. A serving process holding DDL locks is how deploys die.
+A goose file that starts a background mutation (`MATERIALIZE INDEX`) is tracked by a background step in
+the table owner that waits on `system.mutations` and fails on its fail reason, so the ledger shows it
+(`trace:track-updated-at-index-materialisation`, Alex, 2026-10-09).
 Because they run before any module boots, apps/tasks' migration-runner files (`src/*migrat*.ts`) may
 name process packages (Alex, 2026-09-27), and so may `lwql-provision.ts` and
 `lwql-render-access-config.ts`: LangWatchQL provisioning reads both schemas under the same migration
@@ -1385,14 +1394,17 @@ lock, before serve, and the access-config render runs from env alone in its Helm
 touches; a check refuses a migration touching two owners' tables (Alex, 2026-10-06, round 7, D3). A
 migration main has released keeps main's bytes even when it touches two owners: installs hold its
 checksum, so a later idempotent migration carries the split instead, and the check names it as
-released history (Alex, 2026-10-09).
+released history (Alex, 2026-10-09). A registered step is re-run only by the app, Retry step on Ops > Upgrades,
+under the lease and the old-writer gate; no module task runs a step's code directly (Alex, 2026-10-09).
 Operator-started jobs (re-sealing credentials after a `CREDENTIALS_SECRET` rotation, moving object
 storage to another provider) are not release steps: they stay named tasks an operator starts, safe to
 run again, outside the ledger (Alex, 2026-10-09). Main's virtual-key config backfill is deleted, not
 ported: its strip migration shipped in 3.19.0, below the 3.20.1 floor (Alex, 2026-10-09). Each serving
 process's roster row records `credentialKeyFingerprint` of every credential key it accepts, never the
 key, and `credentials-reseal` refuses to apply while any live row lacks the current or the previous
-key (Alex, 2026-10-09).
+key (Alex, 2026-10-09). Governance's anomaly destination migration passes a migration-only `idempotencyKey` on
+`CreateWebhookEndpointCommand`, unique per organization by a Postgres index, so a re-run or a
+concurrent create answers the endpoint already made (Alex, 2026-10-09, D2).
 
 **In-place system migrations belong to their subject; the framework runs, ops reads and requests**
 (Alex, 2026-10-06, round 14, Q-U8 and UP-3, amending "the runner belongs to ops"). The upgrade run
@@ -1407,7 +1419,8 @@ step's per-tenant state lives in one framework-owned table beside the ledger,
 tenant steps as a framework input, as it hands a migration binder its `replayer`; the api builds tenant
 steps only, for ops' targeted run, and ops builds the state repository in its own registry. Worker boot
 accepts a tenant step and the background runner skips it; its ledger row is `done` when a pass leaves no
-tenant held or parked and reopens when one appears (Alex, 2026-10-09, S6-WIRE). Ops keeps the pass for
+tenant held or parked and reopens when one appears (Alex, 2026-10-09, S6-WIRE). Stored-object's ClickHouse import is a `project` tenant step with
+`needsOldWritersGone` in place of a writer-drain proof; its legacy reads stay (Alex, 2026-10-09). Ops keeps the pass for
 now, fed that one list, paging tenant ids through the framework's `TenantSource`, and composes the
 migrations page, enrolment, the targeted run and the pass over its Redis lease, never importing a peer's
 process package. Until their owners move, identity, authz and automation still answer
@@ -1420,11 +1433,19 @@ no manual task (Alex, 2026-09-30).
 
 **Upgrades run on deploy** (ADR-173, which carries every ruling of rounds 8 to 17). One ledger keyed by
 step id (and target) serves cloud and self-hosted, and presence says when old writers are gone. A
-serving process stops serving once its last good presence write is older than the 60 s stale bound; a
-rollback is detected from presence, an older image's live row after the last run reopening
+failing presence write never takes an admitted process out of service; a presence row not refreshed
+within the 10 min stale bound stops counting as live (Alex, 2026-10-09). A rollback is detected from presence, an older image's live row after the last run reopening
 level-triggered background steps (Alex, 2026-10-06, round 9). The runner writes the run's phases into
 its run report and raises a read hint the api relays, so the Upgrades page refreshes on it and never
-polls (Alex, 2026-10-06, rounds 8 and 9).
+polls (Alex, 2026-10-06, rounds 8 and 9). A background step that rewrites a row live writers also save
+writes compare-and-set on the row's `updatedAt`, so a save made during the pass keeps its newer value (Alex, 2026-10-09).
+While licensing's licence rows and organization's columns are both written, the newer `updatedAt` wins
+both the copy and the reads, organization's columns only where `Organization.updatedAt` is later than
+the row's; an unrelated organization update inside the mirror lag makes stale columns look newer, and
+host clocks differ, which is the accepted ceiling (Alex, 2026-10-09).
+A step that moves a stored value to a new shape annotates the old shape (an inline anomaly webhook
+destination gains an optional `endpointId`) so a rolled-back image still reads it, and a contract step
+after the floor rewrites it to the new shape (Alex, 2026-10-09, D1-A).
 
 **An LTS is an upgrade stop, never a maintained line** (Alex, 2026-10-09, LTS-SCHEDULE). An LTS is
 named every April and October; the first is 3.20.1 (2026-10-06), the next April 2027. Only the
@@ -1625,7 +1646,10 @@ operations never take a platform scope (Alex, 2026-10-01).
 Only ops and identity grant or revoke; listing takes no caller, and user reads it to refuse deactivating the last active operator. The
 seed runs once behind a marker, never again because the live list is empty. Authz learns who is
 deactivated or erased from user's and identity's facts into its own table, never from the User table
-(Alex, 2026-10-01). The page reaches them through three OpsApi pass-throughs (`listPlatformOperators`,
+(Alex, 2026-10-01). A standing change an old image made without its fact is repaired by user's
+`user:record-standing-facts` step: each deactivated account re-stated at its stored stamp, and each
+active account its own log still holds deactivated recorded reactivated at the run's start
+(Alex, 2026-10-09). The page reaches them through three OpsApi pass-throughs (`listPlatformOperators`,
 `grantPlatformOperator`, `revokePlatformOperator`) gated `ops:manage`; the seed does not latch while the
 install has no users (Alex, 2026-10-01).
 **Billing staff read with `ops:view`, write with `ops:manage`** (Alex, 2026-10-01): the connected-billing
@@ -1960,6 +1984,8 @@ replay apply it, so consumers and type filters see only the current type; `drain
 jobNames?, removeAfter }` routes jobs a previous release queued under the former pipeline's keys into the current
 lanes for one release. Each upcast is an `event-upcast` background step in the upgrade ledger, and
 `EventUpcastReader` answers the stored events it still covers (`packages/eventing/specs/event-upcast.feature`).
+The eventing member builds it over the raw event log, the booted process answers it as `upcastReader()`, and every
+`pnpm task upgrade` run records each upcast's step (Alex, 2026-10-09).
 An upcast's step id is `upcast:<pipeline>:<stored type>`; its optional rewrite copies corrected events into
 `event_log`, and a renamed aggregate's originals are deleted only by a contract step at the LTS floor; a
 lint names any drain older than one release (`langwatch/upcast-drain-window`, against `removeAfter`); a fresh install plans upcast steps by their mode (Alex,

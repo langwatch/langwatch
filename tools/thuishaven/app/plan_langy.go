@@ -1,11 +1,14 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
@@ -122,18 +125,7 @@ func (o *Orchestrator) langyChild(st domain.Stack, opts PlanOptions, base []stri
 	laRoot := filepath.Join(o.cfg.Home, "langyagent", st.Slug)
 	_ = os.MkdirAll(filepath.Join(laRoot, "sessions"), 0o755)
 	_ = os.MkdirAll(filepath.Join(laRoot, "workspace"), 0o755)
-	piWorkerPath := filepath.Join(opts.RepoRoot, ".bin", "langy-worker", "langy-worker")
-	// A missing wrapper binary fails every worker spawn with exec-not-found,
-	// which reads as a bug rather than a setup gap. Say so at startup, once,
-	// while the operator is still looking at the terminal.
-	if !isExecutableFile(piWorkerPath) {
-		fmt.Printf(
-			"  warning: the langy worker binary is not built at %s.\n"+
-				"  Every worker spawn will fail until you run\n"+
-				"  `pnpm --filter @langwatch/langyworker build:binary`.\n",
-			piWorkerPath,
-		)
-	}
+	piWorkerPath := langyWorkerBinaryPath(opts.RepoRoot)
 	return Child{
 		Name: "langyagent", Dir: opts.RepoRoot, Color: palette[6],
 		Shell: goServiceShell(opts.RepoRoot, "langyagent", opts.ShouldGoWatch),
@@ -146,6 +138,10 @@ func (o *Orchestrator) langyChild(st domain.Stack, opts PlanOptions, base []stri
 			fmt.Sprintf("LANGY_WORKER_IDLE_MS=%d", langyWorkerIdleMS(localLangyWorkerIdleHostMS)),
 			fmt.Sprintf("LANGY_REAPER_INTERVAL_MS=%d", localLangyReaperIntervalMS),
 			"LANGY_UNSAFE_DEV_DISABLE_ISOLATION=true",
+			// The worker reaches the manager's loopback relay over plain HTTP, which
+			// the always-on TLS egress rung would refuse; this tier has already
+			// accepted reduced isolation (troubleshooting gotcha 3).
+			"LANGY_EGRESS_REQUIRE_TLS=false",
 			// The manager spawns this worktree's own built wrapper binary
 			// (`pnpm --filter @langwatch/langyworker build:binary`). Without an
 			// explicit path it falls back to bare `langy-worker` on PATH, which
@@ -153,6 +149,32 @@ func (o *Orchestrator) langyChild(st domain.Stack, opts PlanOptions, base []stri
 			// which reads as a bug instead of a setup gap.
 			"LANGY_PI_WORKER_BINARY_PATH="+piWorkerPath,
 		),
+	}
+}
+
+const langyWorkerBuildCommand = "pnpm --filter @langwatch/langyworker build:binary"
+
+func langyWorkerBinaryPath(repoRoot string) string {
+	return filepath.Join(repoRoot, ".bin", "langy-worker", "langy-worker")
+}
+
+// ensureLangyWorkerBinary builds the langy-worker wrapper the host tier spawns
+// when it is missing. A failed build deselects Langy (the rest of the stack
+// still comes up) and names the command and the log.
+func (o *Orchestrator) ensureLangyWorkerBinary(ctx context.Context, st domain.Stack, opts *PlanOptions) {
+	if !opts.Selection.Langy || st.LangyTier.RunsInContainer() || isExecutableFile(langyWorkerBinaryPath(opts.RepoRoot)) {
+		return
+	}
+	dir, _ := domain.StackLogPaths(st.WorktreeDir, st.Slug)
+	_ = os.MkdirAll(dir, 0o700)
+	logPath := filepath.Join(dir, "langy-worker-build.log")
+	fmt.Printf("  langyagent: building the langy-worker binary (output in %s)…\n", logPath)
+	shell := langyWorkerBuildCommand + " >" + shQuote(logPath) + " 2>&1"
+	job := onceJob{Slug: st.Slug, WorktreeDir: st.WorktreeDir, Name: "langy-worker-build", Dir: opts.RepoRoot, Shell: shell}
+	if err := o.runOnceJob(ctx, job); err != nil {
+		fmt.Printf("  langyagent: the langy-worker build failed, so Langy is off for this run.\n  Build it with `%s`; log: %s\n", langyWorkerBuildCommand, logPath)
+		o.log.Warn("langy-worker build failed — skipping langyagent", zap.String("log", logPath), zap.Error(err))
+		opts.Selection.Langy = false
 	}
 }
 

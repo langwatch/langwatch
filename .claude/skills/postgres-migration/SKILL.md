@@ -19,7 +19,7 @@ Files: `packages/prisma-client/prisma/schema.prisma` and
 ```bash
 # Edit schema.prisma, then generate the SQL WITHOUT applying it, so you can shape it:
 pnpm --filter @langwatch/prisma-client exec prisma migrate dev --create-only --config ./prisma.config.ts
-# Apply it the way every entry point does (upgrade, then the system-migrations pass):
+# Apply it the way a deployment does (`pnpm task upgrade`; the worker runs it at boot):
 pnpm start:prepare:db
 ```
 

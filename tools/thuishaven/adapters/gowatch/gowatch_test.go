@@ -109,3 +109,27 @@ func TestFailedBuildKeepsTheRunningChild(t *testing.T) {
 		t.Fatal("a good build did not swap in a new child")
 	}
 }
+
+func TestFingerprintPathsSeesAWatchedFileAndATreeButNotATest(t *testing.T) {
+	root := t.TempDir()
+	write := func(rel, body string) {
+		path := filepath.Join(root, rel)
+		if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("go.mod", "module x\n")
+	write("src/a.go", "package a\n")
+	before := FingerprintPaths(root, "go.mod", "src", "missing")
+	write("src/a_test.go", "package a\n")
+	if FingerprintPaths(root, "go.mod", "src", "missing") != before {
+		t.Error("a test file changed the fingerprint")
+	}
+	write("go.mod", "module x // edited\n")
+	if FingerprintPaths(root, "go.mod", "src", "missing") == before {
+		t.Error("an edited go.mod did not change the fingerprint")
+	}
+}

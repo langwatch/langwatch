@@ -175,7 +175,10 @@ func (s *Server) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	s.serveS3(rec, r)
 	bucket, key, _ := strings.Cut(strings.TrimPrefix(r.URL.Path, "/"), "/")
 	if bucket != "healthz" || key != "" {
-		s.log.add(requestEntry{Method: r.Method, Bucket: bucket, Key: key, Status: rec.status, At: time.Now()})
+		s.log.add(requestEntry{
+			Method: r.Method, Bucket: bucket, Key: key, Status: rec.status, At: time.Now(),
+			Auth: authKind(r), RequestID: rec.Header().Get("x-amz-request-id"),
+		})
 	}
 }
 

@@ -1,7 +1,9 @@
 package orbstore
 
 import (
+	"encoding/base64"
 	"errors"
+	"os"
 	"testing"
 	"time"
 )
@@ -57,5 +59,35 @@ func TestPageIsEmptyBeforeThePushAndRoundTripsAfter(t *testing.T) {
 	got, err := store.Page()
 	if err != nil || got.URL != want.URL || len(got.Network) != 1 {
 		t.Fatalf("got %+v, %v", got, err)
+	}
+}
+
+// @scenario "haven stores the capture beside the note"
+func TestAddStoresTheCaptureAsAPNGBesideTheNote(t *testing.T) {
+	store := At(t.TempDir())
+	png := []byte("\x89PNG\r\n\x1a\nfake")
+	item, err := store.Add(Report{Note: "n", Image: pngDataURL + base64.StdEncoding.EncodeToString(png)}, time.Unix(1, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stored, err := os.ReadFile(item.Screenshot)
+	if err != nil || string(stored) != string(png) {
+		t.Fatalf("screenshot %q: %q, %v", item.Screenshot, stored, err)
+	}
+	got, err := store.Get(item.ID)
+	if err != nil || got.Image != "" || got.Screenshot != item.Screenshot {
+		t.Fatalf("the note keeps the data URL or loses the path: %+v, %v", got, err)
+	}
+}
+
+func TestAddRefusesAnImageThatIsNotAPNG(t *testing.T) {
+	store := At(t.TempDir())
+	for _, image := range []string{"data:image/svg+xml;base64,PHN2Zy8+", pngDataURL + base64.StdEncoding.EncodeToString([]byte("<svg/>"))} {
+		if _, err := store.Add(Report{Note: "n", Image: image}, time.Unix(1, 0)); !errors.Is(err, ErrBadImage) {
+			t.Fatalf("%s: got %v, want ErrBadImage", image, err)
+		}
+	}
+	if items, _ := store.List(); len(items) != 0 {
+		t.Fatalf("stored %d items from refused posts", len(items))
 	}
 }

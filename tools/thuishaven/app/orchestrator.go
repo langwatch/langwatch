@@ -161,7 +161,7 @@ func (o *Orchestrator) resolveSlug(p UpParams) (string, error) {
 }
 
 // provision resolves the slug, allocates ports, registers the hostnames, writes
-// the overlay + registry entry, and starts the heartbeat. It returns the stack
+// the overlay + registry entry; the caller starts the heartbeat. It returns the stack
 // and a cleanup that deregisters the routes and drops the registry entry. When
 // shouldManageDBs is set it also ensures the shared ClickHouse + Postgres servers
 // and this stack's databases on them before the overlay is written, so
@@ -324,7 +324,6 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		return domain.Stack{}, nil, fmt.Errorf("recording database activity for %q: %w", st.Slug, err)
 	}
 	o.printStack(st)
-	go o.heartbeat(ctx, st)
 	return st, cleanup, nil
 }
 
@@ -523,7 +522,15 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 	if err != nil {
 		return err
 	}
-	defer cleanup()
+	stopBeat := o.startHeartbeat(ctx, st)
+	isHandedOver := false
+	defer func() {
+		stopBeat()
+		if !isHandedOver {
+			cleanup()
+			removeKeeperPlan(st.WorktreeDir, st.Slug)
+		}
+	}()
 	endRegistration()
 	fmt.Printf("  %s\n\n", opts.Selection.DescribeForLayout(st.Layout))
 
@@ -532,9 +539,14 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 	}
 	o.EnsureGateHookForUp(p.WorktreeDir)
 	opts.langyDockerHost = o.langyContainerHost(ctx, st, &opts)
+	o.ensureLangyWorkerBinary(ctx, st, &opts)
 	children := o.planChildren(st, opts, p.WorktreeDir)
 	retireStaleSimsCapture(children)
-	o.sup.Supervise(ctx, children)
+	stopBeat()
+	if err := o.handOver(st, children, opts.IsForegroundClient); err != nil {
+		return err
+	}
+	isHandedOver = true
 	return nil
 }
 
@@ -750,6 +762,7 @@ func (o *Orchestrator) UpStub(ctx context.Context, p UpParams, echo func(ports [
 		return err
 	}
 	defer cleanup()
+	go o.heartbeat(ctx, st)
 	var ports []int
 	for _, s := range st.Services {
 		ports = append(ports, s.Port)
@@ -926,6 +939,10 @@ func (o *Orchestrator) Down(ctx context.Context, p UpParams, force bool) error {
 	}
 	o.stopNxDaemon(ctx, p.WorktreeDir)
 	o.store.RemoveStack(slug)
+	if ok {
+		removeKeeperPlan(st.WorktreeDir, slug)
+	}
+	removeKeeperPlan(p.WorktreeDir, slug)
 	fmt.Printf("stack %q torn down (databases kept — `haven db reset` for fresh ones)\n", slug)
 	return nil
 }

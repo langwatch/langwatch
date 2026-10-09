@@ -537,6 +537,11 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       When the worker's installed modules list their upgrade steps
       Then billing:record-usage-billing-catch-up comes before instant-eval:copy-judge-spend
 
+    @integration
+    Scenario: No module task runs a catch-up step's code
+      When the tasks process lists the tasks its installed modules declare
+      Then none of them runs the usage-billing or the spend catch-up
+
   Rule: The picker offers Instant Evals behind the release flag or the organization's opt-in
 
     @integration

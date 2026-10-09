@@ -7,7 +7,6 @@ import { automationChannels } from "./channels/automation-channels.registry.ts";
 import { automationsEventing } from "./eventing/automations.pipeline.ts";
 import { slackClaimReconcileCursorSchema } from "./features/slack/services/automation-slack-claim-reconcile.service.ts";
 import { automationRepositories } from "./repositories/automation-repositories.registry.ts";
-import { ReportScheduleBackfillTask } from "./tasks/report-schedule-backfill.task.ts";
 import { SlackAlertTask } from "./tasks/slack-alert.task.ts";
 import { createAutomationRest } from "./transport/automation.rest.ts";
 import { automationTrpcTransport } from "./transport/automation.trpc.ts";
@@ -30,10 +29,7 @@ export const automationProcessModule: PublishedProcessModule<
     slackAutomationRest,
     unsubscribeRest,
   )
-  .withTasks(({ app, config }) => [
-    SlackAlertTask.create({ baseHost: config.publicBaseUrl ?? "" }),
-    ReportScheduleBackfillTask.create(app),
-  ])
+  .withTasks(({ config }) => [SlackAlertTask.create({ baseHost: config.publicBaseUrl ?? "" })])
   .withMigrations(({ app }) => {
     const slack = app.slackConnectionMigration();
     const run: MigrationStepRun = async ({ dryRun }) =>

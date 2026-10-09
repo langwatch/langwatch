@@ -239,6 +239,26 @@ describe("given a rule whose destination is a registered webhook endpoint", () =
     });
   });
 
+  describe("when an inline destination the migration annotated fires an alert", () => {
+    /** @scenario "A migrated inline destination delivers through its endpoint" */
+    it("records the deliver intent for the endpoint and posts nothing inline", async () => {
+      const { dispatcher, http, recorded } = withOutbox();
+      const migrated = {
+        destinations: [
+          { type: "webhook", url: "https://siem.example.test/hook", endpointId: "endpoint-1" },
+        ],
+      };
+
+      const result = await dispatcher.dispatchAlert(dispatchInput(migrated));
+
+      expect(http.calls).toHaveLength(0);
+      expect(result.outcomes).toEqual([
+        { destinationIndex: 0, type: "webhook_endpoint", status: "queued" },
+      ]);
+      expect(await recorded()).toHaveLength(1);
+    });
+  });
+
   describe("when no outbox is connected in this process", () => {
     /** @scenario "A rule delivering to a webhook endpoint records one deliver intent per alert" */
     it("reports the destination as failed rather than dropping it silently", async () => {

@@ -1,4 +1,4 @@
-import { Badge, KeyValue, Panel, Stack, Text } from "@langwatch/design-system-internal";
+import { Badge, Button, KeyValue, Panel, Stack, Text } from "@langwatch/design-system-internal";
 import { SimJson } from "@langwatch/sim-console";
 
 import type { AnalyticsRecord } from "./analytics-api.ts";
@@ -12,7 +12,14 @@ const shown = ({ value }: { value: unknown }) =>
   typeof value === "string" ? value : JSON.stringify(value);
 
 /** One record: its facts, its properties or traits, then the call as the vendor got it. */
-export const RecordDetail = ({ record }: { record: AnalyticsRecord }) => {
+export const RecordDetail = ({
+  record,
+  onPerson,
+}: {
+  record: AnalyticsRecord;
+  /** Narrows the list to this record's distinct id. */
+  onPerson: (distinctId: string) => void;
+}) => {
   const properties = Object.entries(record.properties).toSorted(([a], [b]) => a.localeCompare(b));
   return (
     <article data-testid="record-detail">
@@ -20,6 +27,13 @@ export const RecordDetail = ({ record }: { record: AnalyticsRecord }) => {
         <Panel
           title={record.name || record.kind}
           meta={<Badge>{providerLabel[record.provider]}</Badge>}
+          actions={
+            record.distinctId ? (
+              <Button size="sm" onClick={() => onPerson(record.distinctId)}>
+                Records for this id
+              </Button>
+            ) : undefined
+          }
         >
           <KeyValue
             items={[

@@ -348,3 +348,29 @@ Feature: Shared organization service
     When the organization and its first team are committed
     Then organization records "lw.organization.created" carrying the organization's id and name
     And peers such as prompt seed their own defaults from that fact
+
+  @unit
+  Scenario: The organization presence step records every organization a page at a time
+    Given three organizations with stored presence settings, served two to a page
+    When the organization presence upgrade step runs
+    Then each organization's stored setting is recorded once
+    And the step saves its checkpoint after each page, naming the page's last organization
+
+  @unit
+  Scenario: The organization presence step resumes after the last page it saved
+    Given the organization presence upgrade step's checkpoint names the second organization
+    When the step runs again
+    Then only the organizations after the second are recorded
+
+  @unit
+  Scenario: A dry run of the organization presence step records nothing and saves no checkpoint
+    Given three organizations with stored presence settings
+    When the organization presence upgrade step runs as a dry run
+    Then no setting is recorded and no checkpoint is saved
+    And the report counts the organizations it would visit
+
+  @integration
+  Scenario: The organization presence step is a background step that waits for old writers to go
+    When the worker's installed modules list their upgrade steps
+    Then organization:record-presence-settings is a background data step
+    And it runs only once no older image serves

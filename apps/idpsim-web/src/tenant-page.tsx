@@ -8,6 +8,7 @@ import { ActivityTab } from "./tenant/activity.tsx";
 import { DomainTab } from "./tenant/domain.tsx";
 import { ProvisioningTab } from "./tenant/provisioning.tsx";
 import { SetupTab } from "./tenant/setup.tsx";
+import { SigningTab } from "./tenant/signing.tsx";
 import { UsersTab } from "./tenant/users.tsx";
 import { answerStatus, useAnswer } from "./use-answer.ts";
 
@@ -16,6 +17,7 @@ export const TENANT_TABS = [
   { id: "provisioning", label: "Provisioning" },
   { id: "domain", label: "Domain" },
   { id: "users", label: "Users" },
+  { id: "signing", label: "Signing" },
   { id: "activity", label: "Activity" },
 ] as const;
 
@@ -72,7 +74,8 @@ export const TenantPage = ({ tenantId }: { tenantId: number }) => {
               {tab === "setup" && <SetupTab tenant={data} reload={reload} />}
               {tab === "provisioning" && <ProvisioningTab tenant={data} reload={reload} />}
               {tab === "domain" && <DomainTab tenant={data} reload={reload} />}
-              {tab === "users" && <UsersTab tenant={data} />}
+              {tab === "users" && <UsersTab tenant={data} reload={reload} />}
+              {tab === "signing" && <SigningTab tenant={data} reload={reload} />}
               {tab === "activity" && <ActivityTab tenantId={data.id} />}
             </>
           )}

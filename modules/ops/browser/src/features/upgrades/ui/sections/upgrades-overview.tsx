@@ -19,6 +19,7 @@ import { readableDate } from "@langwatch/time";
 import { DatabaseZap } from "lucide-react";
 import type { ReactNode } from "react";
 
+import type { RouterOutputs } from "../../../../behavior/ops-api.ts";
 import { formatDuration } from "../../../../model/ops-formatters.ts";
 import {
   runOutcomeLabel,
@@ -35,6 +36,9 @@ import type {
 } from "../../model/upgrade-view.ts";
 import { UpgradeStatusBadge } from "../elements/upgrade-status-badge.tsx";
 
+/** U4: one tenant step (`name` is its step id) with its tenants' state counts, as served. */
+export type UpgradeTenantStepView = RouterOutputs["ops"]["upgrade"]["listSystemMigrations"][number];
+
 /** The address segment of steps the image declares under no release. */
 export const UNRELEASED = "unreleased";
 
@@ -47,7 +51,11 @@ export type UpgradesOverviewProps = {
   backgroundSteps?: readonly UpgradeStepView[];
   /** The background read is still loading: the list shows a skeleton. */
   backgroundLoading?: boolean;
-  /** Given only to an `ops:manage` reader: a failed background step then offers Retry. */
+  /** Operator steps not yet done, from `listSteps({ mode: "operator" })`. */
+  operatorSteps?: readonly UpgradeStepView[];
+  /** Tenant steps with their tenants' progress, from `listSystemMigrations`. */
+  tenantSteps?: readonly UpgradeTenantStepView[];
+  /** Given only to an `ops:manage` reader: a failed background or operator step offers Retry. */
   onRetryStep?: (stepId: string) => void;
   retryingStepId?: string | null;
   /** The eventing upcaster's "active upcasts" reading, mounted by the screen once it exists. */
@@ -234,19 +242,21 @@ function RunsTable({
   );
 }
 
-function BackgroundSteps({
+function PendingSteps({
+  group,
   steps,
   onOpenStep,
   onRetryStep,
   retryingStepId,
 }: {
+  group: "background" | "operator";
   steps: readonly UpgradeStepView[];
   onOpenStep: (stepId: string) => void;
   onRetryStep?: (stepId: string) => void;
   retryingStepId?: string | null;
 }) {
   return (
-    <ListTable data-testid="upgrade-background-steps">
+    <ListTable data-testid={`upgrade-${group}-steps`}>
       <Table.Header>
         <Table.Row>
           <Table.ColumnHeader>Step</Table.ColumnHeader>
@@ -264,7 +274,7 @@ function BackgroundSteps({
             key={step.id}
             cursor="pointer"
             onClick={() => onOpenStep(step.id)}
-            data-testid={`upgrade-background-step-${step.id}`}
+            data-testid={`upgrade-${group}-step-${step.id}`}
           >
             <Table.Cell fontFamily="mono">{step.id}</Table.Cell>
             <Table.Cell>
@@ -304,6 +314,44 @@ function BackgroundSteps({
   );
 }
 
+function TenantSteps({
+  steps,
+  onOpenStep,
+}: {
+  steps: readonly UpgradeTenantStepView[];
+  onOpenStep: (stepId: string) => void;
+}) {
+  return (
+    <ListTable data-testid="upgrade-tenant-steps">
+      <Table.Header>
+        <Table.Row>
+          <Table.ColumnHeader>Step</Table.ColumnHeader>
+          <Table.ColumnHeader>Title</Table.ColumnHeader>
+          <Table.ColumnHeader>Finalized</Table.ColumnHeader>
+          <Table.ColumnHeader>Held</Table.ColumnHeader>
+          <Table.ColumnHeader>Parked</Table.ColumnHeader>
+        </Table.Row>
+      </Table.Header>
+      <Table.Body>
+        {steps.map((step) => (
+          <Table.Row
+            key={step.name}
+            cursor="pointer"
+            onClick={() => onOpenStep(step.name)}
+            data-testid={`upgrade-tenant-step-${step.name}`}
+          >
+            <Table.Cell fontFamily="mono">{step.name}</Table.Cell>
+            <Table.Cell>{step.title}</Table.Cell>
+            <Table.Cell>{step.counts.finalized}</Table.Cell>
+            <Table.Cell>{step.counts.migrated}</Table.Cell>
+            <Table.Cell>{step.counts.parked}</Table.Cell>
+          </Table.Row>
+        ))}
+      </Table.Body>
+    </ListTable>
+  );
+}
+
 function OverviewBlock({ title, children }: { title: string; children: ReactNode }) {
   return (
     <Stack gap={3}>
@@ -321,6 +369,8 @@ export function UpgradesOverview({
   failedSteps,
   backgroundSteps = [],
   backgroundLoading = false,
+  operatorSteps = [],
+  tenantSteps = [],
   onRetryStep,
   retryingStepId,
   activeUpcasts,
@@ -355,7 +405,8 @@ export function UpgradesOverview({
           )}
           {backgroundLoading && <Skeleton height="120px" aria-label="Loading background steps" />}
           {backgroundSteps.length > 0 && (
-            <BackgroundSteps
+            <PendingSteps
+              group="background"
               steps={backgroundSteps}
               onOpenStep={onOpenStep}
               onRetryStep={onRetryStep}
@@ -363,6 +414,22 @@ export function UpgradesOverview({
             />
           )}
           {activeUpcasts}
+        </OverviewBlock>
+      )}
+      {operatorSteps.length > 0 && (
+        <OverviewBlock title="Operator steps">
+          <PendingSteps
+            group="operator"
+            steps={operatorSteps}
+            onOpenStep={onOpenStep}
+            onRetryStep={onRetryStep}
+            retryingStepId={retryingStepId}
+          />
+        </OverviewBlock>
+      )}
+      {tenantSteps.length > 0 && (
+        <OverviewBlock title="Tenant steps">
+          <TenantSteps steps={tenantSteps} onOpenStep={onOpenStep} />
         </OverviewBlock>
       )}
       <OverviewBlock title="Recent runs">

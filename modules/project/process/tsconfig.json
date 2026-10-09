@@ -67,6 +67,9 @@
       "path": "../../../packages/time/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/upgrade/tsconfig.build.json"
+    },
+    {
       "path": "../../instant-eval-judge/process/tsconfig.build.json"
     },
     {

@@ -216,6 +216,7 @@ export class VirtualKeyService {
   async setLicenseFactsInternal(input: {
     id: string;
     organizationId: string;
+    licenseId?: string;
     tokenHash: string;
     instanceId: string | null;
     expiresAt: Instant | null;
@@ -226,6 +227,14 @@ export class VirtualKeyService {
   /** Used by the `/resolve-key` license-token path — do not expose on public tRPC. */
   async findByLicenseTokenHashInternal(tokenHash: string): Promise<GatewayLicensedKey | null> {
     return this.repository.findByLicenseTokenHash(tokenHash);
+  }
+
+  /** The managed-key path's idempotency read; do not expose on public tRPC. */
+  async findConnectKeyIdsForLicenseInternal(input: {
+    organizationId: string;
+    licenseId: string;
+  }): Promise<string[]> {
+    return this.repository.findConnectKeyIdsForLicense(input);
   }
 
   /** Reversible stop, leaving budgets and key material untouched. */

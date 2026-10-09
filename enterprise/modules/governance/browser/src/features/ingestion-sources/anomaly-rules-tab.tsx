@@ -963,10 +963,10 @@ function readDestination(raw: string) {
   };
 }
 
-/** The picker's value: the named endpoint, nothing for an inline webhook, else dashboard only. */
+/** The picker's value: the named endpoint (a migrated inline one too), else dashboard only. */
 function destinationPickerValue(destination: ReturnType<typeof readDestination>) {
   if (destination.type === "webhook_endpoint") return destination.endpointId;
-  if (destination.type === "webhook") return "";
+  if (destination.type === "webhook") return destination.endpointId;
   return NO_DESTINATION;
 }
 
@@ -991,7 +991,7 @@ function RuleDestinationField({
     enabled: canViewEndpoints,
   });
   const destination = readDestination(composer.destinationConfig);
-  const isInline = destination.type === "webhook";
+  const isInline = destination.type === "webhook" && destination.endpointId === "";
   const pickerOptions = useMemo(
     () => [{ value: NO_DESTINATION, label: "Governance dashboard only" }, ...options],
     [options],

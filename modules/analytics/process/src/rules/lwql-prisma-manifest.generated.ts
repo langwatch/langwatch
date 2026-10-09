@@ -835,6 +835,7 @@ export interface LwqlPrismaRows {
     readonly sqsSecretAccessKeyEncrypted: "String?";
     readonly secretEncrypted: "String";
     readonly signatureScheme: "String?";
+    readonly idempotencyKey: "String?";
     readonly previousSecretEncrypted: "String?";
     readonly previousSecretExpiresAt: "DateTime?";
     readonly enabledEvents: "String[]";
@@ -1708,6 +1709,7 @@ export interface LwqlPrismaRows {
     readonly licenseTokenHash: "String?";
     readonly licenseInstanceId: "String?";
     readonly licenseExpiresAt: "DateTime?";
+    readonly licenseId: "String?";
   };
   readonly VirtualKeyScope: {
     readonly id: "String";

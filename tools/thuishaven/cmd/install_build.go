@@ -51,7 +51,7 @@ func havenBuildSteps() []buildStep {
 // runInstallBuild is `haven install --build`, run from the repository root.
 func runInstallBuild(ctx context.Context, d deps) error {
 	logDir := filepath.Join(havenHome(), "logs", "install")
-	if err := os.MkdirAll(logDir, 0o755); err != nil { //nolint:gosec // haven's own home, same mode as its siblings
+	if err := os.MkdirAll(logDir, 0o700); err != nil { //nolint:gosec // log folder is owner-only
 		return err
 	}
 	return runBuildSteps(ctx, buildRun{w: os.Stdout, logDir: logDir, live: !d.isAgent && stdoutIsTTY(), steps: havenBuildSteps()})

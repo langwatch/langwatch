@@ -57,4 +57,19 @@ export class MemoryAnomalyRuleRepository extends AnomalyRuleRepository {
     this.store.anomalyRules[index] = updated;
     return updated;
   }
+
+  async updateIfUnchanged({
+    id,
+    updatedAt,
+    changes,
+  }: {
+    id: string;
+    updatedAt: AnomalyRule["updatedAt"];
+    changes: AnomalyRuleChanges;
+  }): Promise<boolean> {
+    const current = this.store.anomalyRules.find((rule) => rule.id === id);
+    if (current?.updatedAt.getTime() !== updatedAt.getTime()) return false;
+    await this.update(id, changes);
+    return true;
+  }
 }

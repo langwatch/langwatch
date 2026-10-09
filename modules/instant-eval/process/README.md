@@ -6,7 +6,7 @@ The server half of [instant-eval](../README.md). Instant evaluations: the opt-in
 
 ## Installation
 
-`defineProcessModule("instant-eval").withRepositories(instantEvalRepositories).withChannels(instantEvalChannels).withApi(InstantEvalModule).withTransports(instantEvalRest, instantEvalTrpcTransport).withTransportFacts(…).withEventing(instantEvalEventing).withMigrations(…).withTasks(…)`, `src/instant-eval.module.ts:24`.
+`defineProcessModule("instant-eval").withRepositories(instantEvalRepositories).withChannels(instantEvalChannels).withApi(InstantEvalModule).withTransports(instantEvalRest, instantEvalTrpcTransport).withTransportFacts(…).withEventing(instantEvalEventing).withMigrations(…)`, `src/instant-eval.module.ts:23`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -400,14 +400,6 @@ Declared at `src/eventing/instant-eval-processing.pipeline.ts:60`. Events: `inst
 | command             | `recordFinished`                                                        | –                                              | `src/eventing/instant-eval-processing.pipeline.ts:83` |
 | process manager     | `instantEval`                                                           | intents `finish`, `judgePage`, `plan` (outbox) | `src/eventing/instant-eval-processing.pipeline.ts:84` |
 | Postgres projection | `≈ createInstantEvalRunProjection({ store: deps.instantEvalRunStore })` | –                                              | `src/eventing/instant-eval-processing.pipeline.ts:73` |
-
-### Tasks
-
-Run by the tasks process, before serve.
-
-| Task                                | Class                              | Declared at                                              |
-| ----------------------------------- | ---------------------------------- | -------------------------------------------------------- |
-| `instant-eval-judge-spend-catch-up` | `InstantEvalJudgeSpendCatchUpTask` | `src/tasks/instant-eval-judge-spend-catch-up.task.ts:20` |
 
 ## Configuration
 

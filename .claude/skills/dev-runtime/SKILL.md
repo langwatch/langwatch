@@ -1,6 +1,6 @@
 ---
 name: dev-runtime
-description: "How the Node side of a dev stack runs without haven, and the one-process lane: `pnpm dev`, `pnpm dev:one`, `LANGWATCH_DEV_ONE_PROCESS=1`, tools/dev-runtime (ui + api + worker in one Node process), backend reload on a file change, the debounce (quiet window + max wait), ports derived from PORT. Use when someone says 'pnpm dev', 'dev:one', 'one process', 'the app lane', 'backend reload', 'why did the api restart', 'reload storm', 'ADR-168', 'dev-runtime', 'backend ready', or 'LANGWATCH_DEV_WATCH'. ADR-168 is Proposed, not accepted."
+description: "How the Node side of a dev stack runs without haven, and the one-process lane: `pnpm dev`, `pnpm dev:one`, `LANGWATCH_DEV_ONE_PROCESS=1`, tools/dev-runtime (ui + api + worker in one Node process), backend reload on a file change, the debounce (quiet window + max wait), ports derived from PORT. Use when someone says 'pnpm dev', 'dev:one', 'one process', 'the app lane', 'backend reload', 'why did the api restart', 'reload storm', 'ADR-168', 'dev-runtime', 'backend ready', or 'LANGWATCH_DEV_WATCH'. ADR-168 is Accepted (2026-10-09); one process is the default and `LANGWATCH_DEV_ONE_PROCESS=0` splits."
 user-invocable: true
 argument-hint: "[dev | dev:one | reload | ports]"
 ---
@@ -12,10 +12,9 @@ applications of a local stack so no app carries a dev branch (record §1). Produ
 runs each app's own `main.ts`, and the helm chart runs api, worker and tasks as split apps.
 
 **Status of ADR-168** (`dev/docs/adr/168-one-process-dev-with-debounced-module-reload.md`):
-`Proposed`, dated 2026-09-30. Its step 1 (the supervisor trigger fixes) and B1 (the host)
-have landed. Since 2026-10-09, at Alex's direction, the split stack's api lane reloads
-in-process by default (ADR-168 "Step 3, as shipped"); the one-process `app` lane is still a
-trial, and the four open questions at the foot of the ADR are Alex's, not answered.
+`Accepted` on 2026-10-09 (amendment "one process is the default"): `pnpm dev` and `haven up`
+start the single `app` lane, and the split stack's api lane reloads in-process (ADR-168 "Step 3,
+as shipped"). The open questions at the foot of the ADR that remain are Alex's, not answered.
 
 ## The two shapes
 
@@ -25,8 +24,8 @@ trial, and the four open questions at the foot of the ADR are Alex's, not answer
 | One process (default) | one `app` lane: Vite, api and worker                             | `pnpm dev`, or `pnpm dev:one` alone                             | re-links only what a change reaches, in process             |
 
 - `pnpm dev` is `dev-supervisor.mjs` over `dev/scripts/dev-stack.sh`, which runs the lanes
-  through `concurrently`: `ui`, `go`, `langy`, then `backend` (or `app`). It migrates once
-  before any lane starts. Run it from the root.
+  through `concurrently`: `ui`, `go`, `langy`, then `backend` (or `app`). It runs the upgrade
+  (`start:prepare:db`, `pnpm task upgrade`) once before any lane starts. Run it from the root.
 - Under haven the same switch applies, and it also folds the simulators into the Go lane:
   `LANGWATCH_DEV_ONE_PROCESS=0` in the environment or `.env`, then `haven up -f`, splits both.
   `LANGWATCH_GO_ONE_PROCESS` is a deprecated alias (warned; refused if it disagrees). `haven logs ui|api|worker` then read the one `app` capture,

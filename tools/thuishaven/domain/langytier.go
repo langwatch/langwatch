@@ -16,7 +16,7 @@ import "strings"
 type LangyTier int
 
 const (
-	// LangyTierSandboxed is the default and mirrors production: the worker runs in
+	// LangyTierSandboxed is the default off macOS and mirrors production: the worker runs in
 	// a colima container (root, so setuid+chown work) with the ADR-033 per-worker
 	// UID sandbox active, and the colima VM isolates the whole thing from the host.
 	// A sibling worker cannot read another's plaintext credentials, and nothing the
@@ -63,6 +63,10 @@ type LangyTierRequest struct {
 	// this machine at all. False means the container tiers cannot run, so the
 	// choice is the host tier or no langyagent.
 	ContainerRuntimeAvailable bool
+	// IsMacOS is whether haven runs on macOS, where the default is the host tier
+	// so a fresh machine needs no colima (HAVEN-NO-COLIMA-MAC). Opting into a
+	// container tier there is LANGY_UNSAFE_CONTAINER or LANGY_UNSAFE_HOST_ACCESS=0.
+	IsMacOS bool
 }
 
 // LangyHostFallbackNotice is the one line printed when the tier was chosen for
@@ -71,13 +75,16 @@ type LangyTierRequest struct {
 // believes they have must never be inferred in silence.
 const LangyHostFallbackNotice = "no container runtime; running langyagent on the host because this is a development stack; set LANGY_UNSAFE_HOST_ACCESS=0 to refuse"
 
+// LangyMacHostNotice is that line for the macOS default, which needs no colima.
+const LangyMacHostNotice = "Langy runs unsandboxed on this machine (macOS runs langyagent on the host); set LANGY_UNSAFE_HOST_ACCESS=0 to run it sandboxed in colima"
+
 // ResolveLangyTier maps a request to a tier, and to a notice when the tier was
 // resolved from the machine rather than from a flag ("" when it was asked for).
 //
 // Host access is the strongest opt-in and implies the container relaxation, so
 // it wins whenever set; otherwise the container-relaxation flag steps down one
-// rung. With neither flag set, a development stack on a machine with no
-// container runtime resolves to the host tier — the container tiers cannot run
+// rung. With neither flag set, a development stack on macOS, or on a machine
+// with no container runtime, resolves to the host tier — the container tiers cannot run
 // there, and the alternative is haven running no manager at all. Every other
 // case is the sandboxed default: an explicit refusal, a machine that does have a
 // runtime, and anything that is not a development stack all keep it.
@@ -89,6 +96,8 @@ func ResolveLangyTier(req LangyTierRequest) (tier LangyTier, notice string) {
 		return LangyTierContainerUnsafe, ""
 	case req.HostAccessRefused:
 		return LangyTierSandboxed, ""
+	case req.IsDevelopment && req.IsMacOS:
+		return LangyTierHostUnsafe, LangyMacHostNotice
 	case req.IsDevelopment && !req.ContainerRuntimeAvailable:
 		return LangyTierHostUnsafe, LangyHostFallbackNotice
 	default:

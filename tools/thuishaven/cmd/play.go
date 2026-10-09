@@ -213,7 +213,7 @@ type playChild struct {
 // teardown will destroy.
 func startPlayLaunch(rec app.PlayRecord, preset string) (playChild, error) {
 	logPath := stackLogPath(rec.Checkout, rec.Slug)
-	if err := os.MkdirAll(filepath.Dir(logPath), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(logPath), 0o700); err != nil {
 		return playChild{}, err
 	}
 	// haven's own source comes from the trusted checkout, never from the

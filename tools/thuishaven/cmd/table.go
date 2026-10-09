@@ -220,6 +220,13 @@ var baseTable = []commandSpec{
 		run:     runGoWatch,
 	},
 	{
+		name:    "keep",
+		args:    "<slug>",
+		maxArgs: 1,
+		hidden:  true,
+		run:     runKeep,
+	},
+	{
 		name:      "up",
 		summary:   "start or reconcile this worktree's stack; +svc/-svc picks services and sticks",
 		args:      "[+svc|-svc …]",
@@ -269,7 +276,11 @@ var baseTable = []commandSpec{
 			// child above runs under Setsid and is naturally exempt.
 			ctx, unwatch := watchLaunchingGroup(ctx)
 			defer unwatch()
-			return d.orch.Up(ctx, d.params, d.opts)
+			d.opts.IsForegroundClient = !isSessionLeader()
+			if err := d.orch.Up(ctx, d.params, d.opts); err != nil {
+				return err
+			}
+			return followAsOwner(ctx, d)
 		},
 	},
 	{
@@ -690,9 +701,12 @@ var baseTable = []commandSpec{
 		run:     runUpgrade,
 	},
 	{
-		name:   "daemon",
-		hidden: true,
-		run:    func(ctx context.Context, d deps, _ invocation) error { return d.orch.RunDaemon(ctx, d.dash) },
+		name:    "daemon",
+		args:    "[restart]",
+		maxArgs: 1,
+		flags:   []flagSpec{{long: "--after", takesValue: true, value: "<pid>", summary: "wait for this daemon to exit, then take over"}},
+		hidden:  true,
+		run:     runDaemon,
 	},
 }
 

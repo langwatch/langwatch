@@ -5,6 +5,7 @@ import {
 } from "@langwatch/api/rest";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 import type { TraceApi, TraceServerConfig } from "@langwatch/trace-contract";
+import { defineMigrationStep } from "@langwatch/upgrade/step";
 
 import { TraceModule } from "./app/trace.app.ts";
 import { traceProcessingEventing } from "./eventing/trace-processing.pipeline.ts";
@@ -12,6 +13,7 @@ import { traceProjectMilestonesEventing } from "./eventing/trace-project-milesto
 import { traceCollectorEvaluationsEventing } from "./features/ingestion/eventing/trace-collector-evaluations.pipeline.ts";
 import { traceIngestSourceBillingEventing } from "./features/ingestion/eventing/trace-ingest-source-billing.pipeline.ts";
 import { traceRepositories } from "./repositories/trace-repositories.registry.ts";
+import { TraceIndexMaterialisationService } from "./services/trace-index-materialisation.service.ts";
 import { collectorRest } from "./transport/collector.rest.ts";
 import { exportProgressTrpcTransport } from "./transport/export-progress.trpc.ts";
 import { otlpIngestRest } from "./transport/otlp-ingest.rest.ts";
@@ -71,4 +73,22 @@ export const traceProcessModule: PublishedProcessModule<"trace", TraceApi, Trace
     .withEventing(traceProcessingEventing)
     .withEventing(traceProjectMilestonesEventing)
     .withEventing(traceCollectorEvaluationsEventing)
-    .withEventing(traceIngestSourceBillingEventing);
+    .withEventing(traceIngestSourceBillingEventing)
+    .withMigrations(({ repositories }) => [
+      defineMigrationStep({
+        id: "trace:track-updated-at-index-materialisation",
+        kind: "data",
+        mode: "background",
+        description:
+          "Waits for ClickHouse to build the trace summaries updated-at index over existing rows.",
+        needsOldWritersGone: false,
+        run: ({ checkpoint, dryRun, signal }) =>
+          TraceIndexMaterialisationService.create({
+            mutations: repositories.indexMaterialisation,
+          }).waitForUpdatedAtIndex({
+            dryRun,
+            signal,
+            onPoll: (progress) => checkpoint.save({ report: progress }),
+          }),
+      }),
+    ]);

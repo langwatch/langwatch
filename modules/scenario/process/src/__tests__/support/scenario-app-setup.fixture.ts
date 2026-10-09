@@ -40,6 +40,16 @@ export const scenarioTestConfig: ScenarioServerConfig = {
     nodeCompileCache: void 0,
     corepackEnableDownloadPrompt: void 0,
     nodeExtraCaCerts: void 0,
+    logSettings: {
+      LOG_LEVEL: void 0,
+      LOG_CONSOLE_LEVEL: void 0,
+      LOG_OTEL_LEVEL: void 0,
+      LOG_FORMAT: void 0,
+      PINO_LOG_LEVEL: void 0,
+      _LOG_LEVEL: void 0,
+      PINO_CONSOLE_LEVEL: void 0,
+      PINO_OTEL_LEVEL: void 0,
+    },
   },
 };
 

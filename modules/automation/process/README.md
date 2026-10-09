@@ -6,7 +6,7 @@ The server half of [automation](../README.md). Automations: triggers and their f
 
 ## Installation
 
-`defineProcessModule("automation").withRepositories(automationRepositories).withChannels(automationChannels).withApi(AutomationModule).withTransports(…, automationTrpcTransport, emailSuppressionTrpcTransport, slackAutomationRest, unsubscribeRest).withTasks(…).withMigrations(…).withEventing(automationsEventing)`, `src/automation.module.ts:22`.
+`defineProcessModule("automation").withRepositories(automationRepositories).withChannels(automationChannels).withApi(AutomationModule).withTransports(…, automationTrpcTransport, emailSuppressionTrpcTransport, slackAutomationRest, unsubscribeRest).withTasks(…).withMigrations(…).withEventing(automationsEventing)`, `src/automation.module.ts:21`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -959,10 +959,9 @@ Declared at `src/eventing/automation.pipeline.ts:182`. Events: `triggerMatchReco
 
 Run by the tasks process, before serve.
 
-| Task                       | Class                        | Declared at                                     |
-| -------------------------- | ---------------------------- | ----------------------------------------------- |
-| `slack-alert`              | `SlackAlertTask`             | `src/tasks/slack-alert.task.ts:9`               |
-| `report-schedule-backfill` | `ReportScheduleBackfillTask` | `src/tasks/report-schedule-backfill.task.ts:12` |
+| Task          | Class            | Declared at                       |
+| ------------- | ---------------- | --------------------------------- |
+| `slack-alert` | `SlackAlertTask` | `src/tasks/slack-alert.task.ts:9` |
 
 ## Configuration
 

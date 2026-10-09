@@ -443,6 +443,20 @@ test_no_workers_runs_a_worker_sidecar() {
   echo "ok   [workers off] the app pod runs the worker as a sidecar with the longer grace period"
 }
 
+# With metrics on and no workers Deployment, the sidecar scrapes on 9465 so it does not
+# clash with the api's 9464; the scrape annotation keeps naming the api.
+test_sidecar_metrics_port_differs_from_the_api() {
+  local flags="--set app.telemetry.metrics.enabled=true --set app.telemetry.metrics.apiKey.value=k"
+  local off on
+  off=$(render "--set workers.enabled=false $flags -s templates/app/deployment.yaml")
+  expect_contains "sidecar metrics" "$off" 'value: "9465"' || return 0
+  expect_contains "sidecar metrics" "$off" 'value: "9464"' || return 0
+  expect_contains "sidecar metrics" "$off" 'prometheus.io/port: "9464"' || return 0
+  on=$(render "$flags -s templates/workers/deployment.yaml")
+  expect_absent "workers on" "$on" 'value: "9465"' || return 0
+  echo "ok   [workers off, metrics on] the sidecar scrapes on 9465, the api on 9464"
+}
+
 test_no_pre_roll_job_without_serialised_upgrades() {
   local label flags
   for label in knob-off dataplane; do
@@ -813,6 +827,7 @@ test_workers_come_back_after_the_app_rollout
 test_rollout_check_waits_for_the_new_pod
 test_dataplane_renders_no_hook
 test_no_workers_runs_a_worker_sidecar
+test_sidecar_metrics_port_differs_from_the_api
 test_no_pre_roll_job_without_serialised_upgrades
 test_knob_off_renders_no_hook
 test_hook_rbac_is_scoped

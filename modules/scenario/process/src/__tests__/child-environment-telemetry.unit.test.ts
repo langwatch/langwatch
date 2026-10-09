@@ -24,6 +24,7 @@ const config = {
 };
 
 describe("buildChildEnvironment telemetry", () => {
+  /** @scenario "The child's environment carries the log settings and no collector credential" */
   it("passes log level and format names and no collector endpoint or headers", () => {
     const result = buildChildEnvironment({
       config,

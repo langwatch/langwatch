@@ -121,3 +121,35 @@ Feature: Annotation service boundary
     When the screen mounts and the score editor opens or closes
     Then no score list is requested with an empty project id
     And the list is requested once the project resolves
+
+  @unit
+  Scenario: The annotation trace step records every organization's annotations a page at a time
+    Given three organizations, each with an annotated trace
+    When the annotation trace upgrade step runs
+    Then every annotation is recorded on its trace
+    And the step saves its checkpoint after each page, naming the page's last organization
+
+  @unit
+  Scenario: The annotation trace step resumes after the last page of organizations it saved
+    Given the annotation trace upgrade step's checkpoint names the second organization
+    When the step runs again
+    Then only the third organization's annotations are recorded
+
+  @unit
+  Scenario: A dry run of the annotation trace step records nothing and saves no checkpoint
+    Given three organizations, each with an annotated trace
+    When the annotation trace upgrade step runs as a dry run
+    Then no annotation is recorded and no checkpoint is saved
+    And the report counts the annotations it would record
+
+  @unit
+  Scenario: The annotation trace step stops between projects when the worker stops it
+    Given an annotation trace upgrade step whose run has been aborted
+    When the step runs
+    Then no annotation is recorded and no checkpoint is saved
+
+  @integration
+  Scenario: The annotation trace step is a background step that waits for old writers to go
+    When the worker's installed modules list their upgrade steps
+    Then annotation:record-trace-annotations is a background data step
+    And it runs only once no older image serves

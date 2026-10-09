@@ -1,5 +1,5 @@
 import { Section } from "@langwatch/design-system-internal";
-import { SimConsole, useSimPoll } from "@langwatch/sim-console";
+import { SimConsole, SimRefusal, useSimPoll } from "@langwatch/sim-console";
 import { useCallback, useEffect, useState } from "react";
 
 import { BucketsTab } from "./buckets-tab.tsx";
@@ -52,6 +52,17 @@ export const StorageConsole = () => {
   const objects = useSimPoll({ fetch: () => storageApi.objects({ bucket: "" }) });
   const requests = useSimPoll({ fetch: storageApi.requests });
   const bucketNames = (buckets.data ?? []).map((entry) => entry.name);
+  const [refusal, setRefusal] = useState("");
+  /** Runs one control call, then refreshes what it changed; a refusal shows above the tab. */
+  const act = (call: () => Promise<void>) => {
+    setRefusal("");
+    void call()
+      .catch((caught: unknown) => setRefusal(caught instanceof Error ? caught.message : "Refused"))
+      .finally(() => {
+        void buckets.refresh();
+        void objects.refresh();
+      });
+  };
 
   return (
     <SimConsole
@@ -72,6 +83,7 @@ export const StorageConsole = () => {
       }
     >
       <Section title={HEADINGS[tab].title} description={HEADINGS[tab].description}>
+        {refusal === "" ? null : <SimRefusal message={refusal} />}
         {tab === "buckets" ? (
           <BucketsTab
             buckets={buckets.data ?? []}
@@ -80,6 +92,7 @@ export const StorageConsole = () => {
               setBucket(name);
               open("objects");
             }}
+            onSeed={() => act(storageApi.seed)}
           />
         ) : null}
         {tab === "objects" ? (
@@ -88,6 +101,8 @@ export const StorageConsole = () => {
             buckets={bucketNames}
             bucket={bucket}
             onBucket={setBucket}
+            onClear={(name) => act(() => storageApi.clear({ bucket: name }))}
+            onDelete={(object) => act(() => storageApi.remove(object))}
           />
         ) : null}
         {tab === "requests" ? <RequestsTab requests={requests.data ?? []} /> : null}

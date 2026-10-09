@@ -2510,6 +2510,10 @@ model WebhookEndpoint {
   /// `t=,v1=`. `legacy_sha256`: one raw message per POST signed `sha256=`, kept
   /// only for endpoints migrated from governance anomaly destinations.
   signatureScheme             String?
+  /// Set only by governance's anomaly destination migration: a create that
+  /// repeats it in the same organization answers the endpoint it made. An
+  /// archived endpoint gives its key up, so a retry after cleanup creates anew.
+  idempotencyKey              String?
   /// The secret this endpoint signed with before the last roll. Deliveries
   /// carry a second `v1=` computed from it until it expires, so a receiver
   /// swaps secrets on its own schedule instead of dropping deliveries in the
@@ -2539,6 +2543,7 @@ model WebhookEndpoint {
 
   deliveries WebhookEndpointDelivery[]
 
+  @@unique([organizationId, idempotencyKey])
   @@index([organizationId, status])
 }
 
@@ -4858,6 +4863,8 @@ model VirtualKey {
   licenseTokenHash  String?   @unique
   licenseInstanceId String?
   licenseExpiresAt  DateTime?
+  // The licence a CONNECT key serves; gateway finds the key by it before minting one (C3b).
+  licenseId         String?
 
   @@unique([hashedSecret])
   @@unique([organizationId, externalId])

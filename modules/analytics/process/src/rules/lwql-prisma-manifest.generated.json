@@ -9444,6 +9444,15 @@
           "documentation": "How deliveries are formatted and signed. Null: the batch envelope signed\n`t=,v1=`. `legacy_sha256`: one raw message per POST signed `sha256=`, kept\nonly for endpoints migrated from governance anomaly destinations."
         },
         {
+          "name": "idempotencyKey",
+          "columnName": "idempotencyKey",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "Set only by governance's anomaly destination migration: a create that\nrepeats it in the same organization answers the endpoint it made. An\narchived endpoint gives its key up, so a retry after cleanup creates anew."
+        },
+        {
           "name": "previousSecretEncrypted",
           "columnName": "previousSecretEncrypted",
           "type": "String",
@@ -18858,6 +18867,15 @@
           "name": "licenseExpiresAt",
           "columnName": "licenseExpiresAt",
           "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "licenseId",
+          "columnName": "licenseId",
+          "type": "String",
           "kind": "scalar",
           "isList": false,
           "isOptional": true,

@@ -6,7 +6,7 @@ The server half of [model-provider](../README.md). Model providers: the provider
 
 ## Installation
 
-`defineProcessModule("model-provider").withRepositories(modelProviderRepositories).withChannels(modelProviderChannels).withApi(ModelProviderModule).withTransports(modelProviderRest, modelDefaultsRest, playgroundRest, modelProviderTrpcTransport, llmModelCostTrpcTransport, translateTrpcTransport).withTransportFacts(…).withTasks(…)`, `src/model-provider.module.ts:29`.
+`defineProcessModule("model-provider").withRepositories(modelProviderRepositories).withChannels(modelProviderChannels).withApi(ModelProviderModule).withTransports(modelProviderRest, modelDefaultsRest, playgroundRest, modelProviderTrpcTransport, llmModelCostTrpcTransport, translateTrpcTransport).withTransportFacts(…).withTasks(…).withMigrations(…)`, `src/model-provider.module.ts:30`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -844,7 +844,6 @@ Run by the tasks process, before serve.
 | Task                                   | Class                                  | Declared at                                                 |
 | -------------------------------------- | -------------------------------------- | ----------------------------------------------------------- |
 | `model-registry-sync`                  | `ModelRegistrySyncTask`                | `src/tasks/model-registry-sync.task.ts:358`                 |
-| `model-provider-migrate-credentials`   | `ModelProviderCredentialsMigrateTask`  | `src/tasks/model-provider-credentials-migrate.task.ts:49`   |
 | `model-provider-migrate-custom-models` | `ModelProviderCustomModelsMigrateTask` | `src/tasks/model-provider-custom-models-migrate.task.ts:62` |
 
 ## Configuration

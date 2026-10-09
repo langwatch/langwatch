@@ -39,6 +39,11 @@ README there is the full reference), console `apps/idpsim-web` (ADR-160).
 
 ## Faults
 
+- Console: the tenant page's **Signing** tab does every fault below (disabling a user is on **Users**):
+  shows published key ids (which signs), skew and the armed break; rotates or drops a key,
+  applies skew, arms any tamper mode (ID token or SAML), signs an unsolicited SAML response
+  with a "Post it to the ACS" form, lists sign-in links (as `haven idp signin`) and resets.
+  After any reload its skew and break inputs show the tenant's values again.
 - `POST /control/t/<n>/tamper {"mode":"saml-bad-signature|saml-unsigned|saml-wrong-audience|saml-wrong-recipient|saml-expired|saml-not-yet-valid|saml-replayed-assertion|saml-wrong-in-response-to"}` breaks the next SAML response once (`haven idp tamper <n> <mode>`).
 - `POST /control/t/<n>/config {"skewSeconds":600}` runs the tenant clock ahead (negative = behind) for ID tokens and SAML assertions (`haven idp skew <n> <seconds>`).
 - `POST /control/t/<n>/rotate-key {}` makes a new signing key current while JWKS and SAML metadata still publish the old one; `{"dropPrevious":true}` stops publishing it (`haven idp rotate-key <n> [--drop-previous]`). Reset clears skew but keeps keys.
@@ -54,14 +59,20 @@ README there is the full reference), console `apps/idpsim-web` (ADR-160).
 - Scale: `POST /control/t/<n>/population {"users":5000,"groups":12}` (caps 50,000 and 500),
   then `POST .../churn {"join":120,"leave":80,"rename":40}`. Seeded, so repeatable.
 - Domain proof: `dig @127.0.0.1 -p 15353 TXT acme1.test`; HTTP: any `/.well-known/<file>`.
-  More domains: `PUT /control/dns/txt`, `PUT /control/verification`.
+  More domains, one channel each: `PUT|DELETE /control/dns/txt {"domain","values"}`
+  (`haven idp dns add|remove`) and `PUT|DELETE /control/verification {"domain","token"}`
+  (`haven idp verification set <domain> <token>` / `clear <domain>`). Console: the **Domain**
+  tab's "A TXT record on any domain" and "Well-known verification file" panels.
+- SCIM events: the **Provisioning** tab's "Send one SCIM event" (shown when connected) has an
+  Advanced section for `--id`, `--member-id`, `--set` (one `key=value` per line), `--inactive`,
+  `--no-external-id` and the enterprise department, cost center and manager.
 
 ## From a terminal or agent
 
 `haven idp <verb>` drives a running idpsim (`--json` on reads, `--stack <slug>` for another stack):
-`tenants` (every tenant, as the console's landing page lists them), `tenant show <t>`, `apps add|remove`, `populate`, `churn`, `user add`, `scim target set|clear`,
+`tenants` (every tenant, as the console's landing page lists them), `tenant show <t>` (also prints signing keys, skew and the armed break), `apps add|remove`, `populate`, `churn`, `user add`, `scim target set|clear`,
 `scim push|pull|sync`, `scim-event <t> <kind> [--style okta|entra] [--user] [--group] [--set k=v]`,
-`dns add|remove`, `activity`, `signin <t> --user <email>` (prints the IdP-initiated URL),
+`dns add|remove`, `verification set|clear`, `activity`, `signin <t> --user <email>` (prints the IdP-initiated URL),
 `reset`, `samlp <t> on|off`. Full table: `services/idpsim/README.md`.
 
 - Legacy SSO: `haven idp legacy provider <t> auth0|okta|cognito|onelogin|azure|show`, then

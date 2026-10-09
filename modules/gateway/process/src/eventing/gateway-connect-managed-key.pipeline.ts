@@ -1,9 +1,11 @@
 /**
- * Gateway ends or re-resolves a licence's managed key from licensing's facts (C3b), so licensing
- * calls no gateway operation for either; both writes are safe to repeat on a redelivery.
+ * Gateway's side of a licence's managed key (C3b): it provisions the key from licensing's issued
+ * fact and says so, and ends or re-resolves it from licensing's facts. Every write repeats safely.
  * Spec: enterprise/modules/licensing/specs/licensing.feature
  */
 import {
+  CONNECT_CREDENTIAL_ISSUED_EVENT_TYPE,
+  connectCredentialIssuedEventDataSchema,
   MANAGED_KEY_INVALIDATED_EVENT_TYPE,
   MANAGED_KEY_RETIRED_EVENT_TYPE,
   managedKeyInvalidatedEventDataSchema,
@@ -14,29 +16,49 @@ import {
   defineEventingModule,
   definePipeline,
   type EventingSetup,
+  type Projection,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
+import {
+  GATEWAY_CONNECT_MANAGED_KEY_AGGREGATE_TYPE,
+  type GatewayManagedKeyProvisionedEventData,
+} from "@langwatch/gateway-contract";
 
 import type { GatewayModule } from "../app/gateway.app.ts";
 import type { GatewayRepositories } from "../repositories/gateway.repositories.ts";
 import type { ConnectManagedKeyService } from "../services/connect-managed-key.service.ts";
+import {
+  GATEWAY_CONNECT_MANAGED_KEY_PIPELINE_NAME,
+  type GatewayManagedKeyProvisionedEvent,
+  gatewayManagedKeyProvisionedEventSchema,
+  RecordManagedKeyProvisionedCommand,
+} from "./gateway-connect-managed-key.intent.ts";
 
-const GATEWAY_CONNECT_MANAGED_KEY_PIPELINE_NAME = "gateway_connect_managed_key" as const;
-
-export type GatewayConnectManagedKeyPipeline = StaticPipelineDefinition<never>;
+export type GatewayConnectManagedKeyPipeline = StaticPipelineDefinition<
+  GatewayManagedKeyProvisionedEvent,
+  Record<string, Projection>,
+  { name: "recordManagedKeyProvisioned"; payload: GatewayManagedKeyProvisionedEventData }
+>;
 
 export function buildGatewayConnectManagedKeyPipeline({
   managedKeys,
 }: {
-  managedKeys: Pick<ConnectManagedKeyService, "retire" | "invalidate">;
+  managedKeys: Pick<ConnectManagedKeyService, "provisionForLicense" | "retire" | "invalidate">;
 }): GatewayConnectManagedKeyPipeline {
   return (
     definePipeline({
       name: GATEWAY_CONNECT_MANAGED_KEY_PIPELINE_NAME,
-      // `global`: gateway appends no events here; it only applies licensing's.
-      aggregate: defineAggregate({ type: "global" }),
+      // Keyed by organisation, so one customer's provisioned facts stay in order (C3B-NAMES).
+      aggregate: defineAggregate({ type: GATEWAY_CONNECT_MANAGED_KEY_AGGREGATE_TYPE }),
     })
-      .withEvents([])
+      .withEvents([gatewayManagedKeyProvisionedEventSchema])
+      .withCommand("recordManagedKeyProvisioned", RecordManagedKeyProvisionedCommand)
+      // Finds the licence's key before minting one, so a repeat answers with the same key.
+      .withPeerSubscriber("gatewayConnectManagedKeyIssued", {
+        eventType: CONNECT_CREDENTIAL_ISSUED_EVENT_TYPE,
+        data: connectCredentialIssuedEventDataSchema,
+        handle: (issued) => managedKeys.provisionForLicense(issued),
+      })
       // A revoke leaves an already-revoked key alone, so a redelivery ends the key once.
       .withPeerSubscriber("gatewayConnectManagedKeyRetired", {
         eventType: MANAGED_KEY_RETIRED_EVENT_TYPE,
@@ -59,4 +81,5 @@ export const gatewayConnectManagedKeyEventing = defineEventingModule({
   pipeline: GATEWAY_CONNECT_MANAGED_KEY_PIPELINE_NAME,
   build: ({ app }: EventingSetup<GatewayRepositories, GatewayModule>) =>
     app.connectManagedKeyPipeline(),
+  connect: ({ app, commands }) => app.connectManagedKeyCommands(commands),
 });

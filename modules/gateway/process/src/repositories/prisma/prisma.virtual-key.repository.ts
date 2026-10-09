@@ -480,6 +480,7 @@ export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeyReposito
     input: {
       id: string;
       organizationId: string;
+      licenseId?: string;
       tokenHash: string;
       instanceId: string | null;
       expiresAt: Instant | null;
@@ -492,6 +493,7 @@ export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeyReposito
         licenseTokenHash: input.tokenHash,
         licenseInstanceId: input.instanceId,
         licenseExpiresAt: input.expiresAt ? toDate(input.expiresAt) : null,
+        licenseId: input.licenseId,
         revision: { increment: 1n },
       },
     });
@@ -516,6 +518,28 @@ export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeyReposito
       expiresAt: row.licenseExpiresAt ? fromDate(row.licenseExpiresAt) : null,
       services: row.connectServices,
     };
+  }
+
+  async findConnectKeyIdsForLicense(input: {
+    organizationId: string;
+    licenseId: string;
+  }): Promise<string[]> {
+    const rows = await this.client().virtualKey.findMany({
+      where: {
+        organizationId: input.organizationId,
+        purpose: "CONNECT",
+        status: { not: "REVOKED" },
+        // A key minted before the column names its licence only as `Connect <licenseId>`.
+        OR: [
+          { licenseId: input.licenseId },
+          { licenseId: null, name: `Connect ${input.licenseId}` },
+        ],
+      },
+      orderBy: { createdAt: "asc" },
+      select: { id: true },
+    });
+
+    return rows.map((row) => row.id);
   }
 
   async recordUsage(id: string, at: Instant, tx?: GatewayPersistenceTransaction): Promise<void> {

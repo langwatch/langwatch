@@ -13,7 +13,6 @@ import { instantEvalChannels } from "./channels/instant-eval-channels.registry.t
 import { instantEvalEventing } from "./eventing/instant-eval-processing.pipeline.ts";
 import { instantEvalRepositories } from "./repositories/instant-eval-repositories.registry.ts";
 import { InstantEvalJudgeSpendBackfillService } from "./services/instant-eval-judge-spend-backfill.service.ts";
-import { InstantEvalJudgeSpendCatchUpTask } from "./tasks/instant-eval-judge-spend-catch-up.task.ts";
 import { instantEvalRest } from "./transport/instant-eval.rest.ts";
 import { instantEvalTrpcTransport } from "./transport/instant-eval.trpc.ts";
 
@@ -61,11 +60,5 @@ export const instantEvalProcessModule: PublishedProcessModule<
         });
         return { ...report, dryRun };
       },
-    }),
-  ])
-  .withTasks(({ app, dependencies }) => [
-    InstantEvalJudgeSpendCatchUpTask.create({
-      organizations: dependencies.organizations,
-      instantEvals: app,
     }),
   ]);

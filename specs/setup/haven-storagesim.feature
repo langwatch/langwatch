@@ -130,6 +130,28 @@ Feature: storagesim, a local S3 stand-in run by haven
     When the developer deletes one object, then clears one bucket, over the console API
     Then the deleted object reads as missing and only the other bucket's objects remain
 
+  Scenario: The console mints a presigned URL that storagesim accepts
+    Given an empty store
+    When the console asks /_sim/api/presign for a PUT and then a GET of one key
+    Then the presigned PUT stores the bytes and the presigned GET reads them back
+    And a missing key, a method other than GET or PUT, or an expiry outside S3's bounds answers 400
+    And the request log names each request's auth as presigned, with its request id
+
+  Scenario: The console adds the demo objects on request
+    Given an empty store
+    When the developer POSTs /_sim/api/seed
+    Then the demo objects are in bucket langwatch, and a GET of the route answers 405
+
+  @integration
+  Scenario: The console deletes, clears, seeds and presigns from its screens
+    Given the console lists an object
+    When the developer deletes it, clears its bucket, adds the demo objects and copies a presigned URL
+    Then each action calls its control route and the lists refresh
+
+  Scenario: haven storage presigns, seeds and reads the request log for agents
+    When an agent runs "haven storage presign <bucket> <key> --put", "haven storage seed" and "haven storage requests"
+    Then each calls its control route, and the requests verb prints auth and request id per line
+
   Scenario: The console serves its bundle beside the S3 paths
     When a browser opens /_sim/ on storagesim
     Then it serves the built console, or names the build command when the bundle is missing

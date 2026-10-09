@@ -160,3 +160,45 @@ func TestConsoleDeletesAnObjectAndClearsABucket(t *testing.T) {
 		t.Fatalf("left = %+v", left.Objects)
 	}
 }
+
+// @scenario "The console mints a presigned URL that storagesim accepts"
+func TestConsolePresignsAPutAndAGetThatRoundTrip(t *testing.T) {
+	srv := newTestServer(t)
+	var minted struct{ URL, Method string }
+	if status := getJSON(t, srv.URL+"/_sim/api/presign?bucket=uploads&key=a%20b/c.txt&method=PUT&expires=60", &minted); status != http.StatusOK {
+		t.Fatalf("presign PUT = %d", status)
+	}
+	if resp, body := do(t, http.MethodPut, minted.URL, strings.NewReader("hello"), nil); resp.StatusCode != http.StatusOK {
+		t.Fatalf("presigned PUT = %d %s", resp.StatusCode, body)
+	}
+	getJSON(t, srv.URL+"/_sim/api/presign?bucket=uploads&key=a%20b/c.txt", &minted)
+	if resp, body := do(t, http.MethodGet, minted.URL, nil, nil); resp.StatusCode != http.StatusOK || body != "hello" {
+		t.Fatalf("presigned GET = %d %q", resp.StatusCode, body)
+	}
+	for _, bad := range []string{"bucket=uploads", "bucket=uploads&key=k&method=DELETE", "bucket=uploads&key=k&expires=0"} {
+		if status := getJSON(t, srv.URL+"/_sim/api/presign?"+bad, &struct{}{}); status != http.StatusBadRequest {
+			t.Fatalf("presign %s = %d", bad, status)
+		}
+	}
+	var log struct{ Requests []requestEntry }
+	getJSON(t, srv.URL+"/_sim/api/requests", &log)
+	if got := log.Requests[0]; got.Auth != "presigned" || got.RequestID == "" {
+		t.Fatalf("newest request = %+v", got)
+	}
+}
+
+// @scenario "The console adds the demo objects on request"
+func TestConsoleSeedsTheDemoObjectsOnAPost(t *testing.T) {
+	srv := newTestServer(t)
+	if resp, _ := do(t, http.MethodGet, srv.URL+"/_sim/api/seed", nil, nil); resp.StatusCode != http.StatusMethodNotAllowed {
+		t.Fatalf("GET seed = %d", resp.StatusCode)
+	}
+	if _, body := do(t, http.MethodPost, srv.URL+"/_sim/api/seed", nil, nil); strings.TrimSpace(body) != `{"seeded":2}` {
+		t.Fatalf("seed = %q", body)
+	}
+	var listed struct{ Objects []objectInfo }
+	getJSON(t, srv.URL+"/_sim/api/objects?bucket=langwatch", &listed)
+	if len(listed.Objects) != len(seedObjects) {
+		t.Fatalf("objects after seed = %+v", listed.Objects)
+	}
+}

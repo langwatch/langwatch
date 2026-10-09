@@ -6,7 +6,7 @@ The server half of [workflow](../README.md). Workflows: definitions, graph versi
 
 ## Installation
 
-`defineProcessModule("workflow").withRepositories(workflowRepositories).withChannels(workflowChannels).withApi(WorkflowModule).withTransports(…, workflowTrpcTransport, workflowOptimizationTrpcTransport, workflowRunRest, workflowStudioRest, workflowExecuteSyncRest).withEventing(workflowNlpLambdaCleanupEventing).withEventing(workflowLifecycleEventing).withEventing(workflowAgentArchiveCascadeEventing).withTasks(…).withMigrations(…).withTransportFacts(…)`, `src/workflow.module.ts:30`.
+`defineProcessModule("workflow").withRepositories(workflowRepositories).withChannels(workflowChannels).withApi(WorkflowModule).withTransports(…, workflowTrpcTransport, workflowOptimizationTrpcTransport, workflowRunRest, workflowStudioRest, workflowExecuteSyncRest).withEventing(workflowNlpLambdaCleanupEventing).withEventing(workflowLifecycleEventing).withEventing(workflowAgentArchiveCascadeEventing).withMigrations(…).withTransportFacts(…)`, `src/workflow.module.ts:30`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -868,14 +868,6 @@ Declared at `src/eventing/workflow-nlp-lambda-cleanup.pipeline.ts:31`.
 | Kind            | Name                       | Handles                                                                                      | Declared at                                               |
 | --------------- | -------------------------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
 | process manager | `workflowNlpLambdaCleanup` | every 1 d (`NLP_LAMBDA_CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `sweep` (outbox) | `src/eventing/workflow-nlp-lambda-cleanup.pipeline.ts:36` |
-
-### Tasks
-
-Run by the tasks process, before serve.
-
-| Task                                   | Class                                 | Declared at                                               |
-| -------------------------------------- | ------------------------------------- | --------------------------------------------------------- |
-| `backfill-http-credentials-to-secrets` | `WorkflowHttpCredentialsBackfillTask` | `src/tasks/workflow-http-credentials-backfill.task.ts:27` |
 
 ## Configuration
 

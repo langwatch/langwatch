@@ -14,7 +14,7 @@ shim, never expose it. Code: `services/voicesim`, console `apps/voicesim-web`.
 ## Run it
 
 - Opt-in: `haven up +voice` (sticky). Hosted in the `sims` lane.
-- Console: `https://voice.<slug>.langwatch.localhost`; `haven status` shows the loopback port.
+- Console: `https://voice.<slug>.langwatch.localhost` (calls, transcripts, events, Clear calls); `haven status` shows the loopback port.
 - Unless `.env` names `ELEVENLABS_BASE_URL`, the overlay sets it to `http://127.0.0.1:<port>`,
   a dummy `ELEVENLABS_API_KEY` when none is set, and `VOICE_UNSAFE_ALLOW_LOOPBACK_PROVIDERS=1`.
 - The seed then stores the ElevenLabs provider row at voicesim. Standalone:
@@ -37,6 +37,7 @@ OpenAI audio is not redirected: the product has no audio-only OpenAI base URL, a
 
 ```
 GET /_sim/api/calls     # newest first: turns, frame counts, protocol events
+DELETE /_sim/api/calls  # forget every call (204); ids keep counting
 GET /_sim/api/status    # stack, call count, the base URLs to point a provider at
 GET /v1/convai/conversation/get-signed-url?agent_id=<id>
 POST /v1/audio/speech   POST /v1/audio/transcriptions
@@ -62,5 +63,5 @@ A call id is `conv_voicesim_0001`, `0002`, ... An unfaked provider path answers 
 `--json` on every read; non-zero exit on failure; `--stack <slug>` reads another worktree.
 
 ```
-haven voice status | calls | call <id>
+haven voice status | calls | call <id> | clear
 ```

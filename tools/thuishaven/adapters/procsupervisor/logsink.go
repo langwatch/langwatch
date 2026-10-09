@@ -107,7 +107,7 @@ func (s *logSink) open() error { return s.openFile(true) }
 // into unbounded recursion and a stack overflow that took the launcher — and
 // with it the whole stack — down.
 func (s *logSink) openFile(mayRotate bool) error {
-	if err := os.MkdirAll(filepath.Dir(s.path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(s.path), 0o700); err != nil {
 		return err
 	}
 	f, err := os.OpenFile(s.path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)

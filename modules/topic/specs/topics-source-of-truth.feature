@@ -70,3 +70,32 @@ Feature: Topic clustering owns the topic model
     Given the projected topic model is lost or corrupted
     When projections are replayed from the event log
     Then the same topics, hierarchy, and clustering state come back
+
+  @unimplemented
+  Scenario: The topic-model seed runs as an upgrade ledger step
+    Given an installation upgraded from a release whose projects hold pre-ownership topics
+    When the worker runs the background step "topic:seed-topic-model-history"
+    Then every project without a projected topic model has its topics recorded on the stream
+    And the step's checkpoint names the last project of each page it finished
+    And running the step again records nothing new
+
+  @unimplemented
+  Scenario: A topic-model seed step that fails for a project resumes before that project
+    Given one project's topics cannot be recorded
+    When the step "topic:seed-topic-model-history" runs
+    Then the step fails naming how many projects it could not seed
+    And its checkpoint stops before the page that held the failed project
+    And retrying the step reaches that project again
+
+  @unimplemented
+  Scenario: A dry run of the topic-model seed writes nothing
+    When the step "topic:seed-topic-model-history" runs as a dry run
+    Then it reports how many projects it would seed
+    And it records no topics and saves no checkpoint
+
+  @unimplemented
+  Scenario: The clustering schedule seed runs as an upgrade ledger step
+    Given eligible projects that predate event-sourced scheduling and have no scheduled wake
+    When the worker runs the background step "topic:seed-clustering-schedules"
+    Then each of those projects is asked for a bootstrap clustering run
+    And projects that already have a scheduled wake are skipped

@@ -2020,6 +2020,13 @@ export class OpsModule implements OpsApi {
     return this.#platformOperators().seedOnce(operatorSeed);
   }
 
+  /** Step `ops:seed-platform-operators`: ADMIN_EMAILS's verified users, while nobody holds it. */
+  seedPlatformOperatorsFromAdminEmails({ dryRun }: { dryRun: boolean }): Promise<number> {
+    const { operatorSeed } = this.#dependencies;
+    if (!operatorSeed) throw new OpsCapabilityUnavailableError("the platform-operator seed");
+    return this.#platformOperators().seedFromAdminEmails({ settings: operatorSeed, dryRun });
+  }
+
   /** The grants `ops_platform_operator_seed`'s recorded decision asks for, as the system. */
   grantSeededPlatformOperators(decision: {
     via: "admin-emails" | "sole-organization-admin" | "none";

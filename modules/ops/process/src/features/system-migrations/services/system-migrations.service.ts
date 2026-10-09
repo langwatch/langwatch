@@ -161,16 +161,23 @@ export class SystemMigrationsService {
     await this.deps.requestPass({ actorUserId });
   }
 
+  /** Set once this process has completed a pass; until then every re-drive runs ungated. */
+  private passCompletedInProcess = false;
+
   /**
-   * One pass on the worker. An operator's kick always runs; the hourly re-drive first asks the
-   * stored state whether any tenant could still move, so a latched fleet is not swept.
+   * One pass on the worker. An operator's kick and a process's first re-drive always run, so a
+   * pass that died part-way is finished (Alex, 2026-10-09); later re-drives first ask the stored
+   * state whether any tenant could still move or be discovered, so a latched fleet is not swept.
    */
   async executePass({ redrive }: { redrive: boolean }): Promise<void> {
-    if (redrive && !(await this.deps.hasTenantAwaitingRedrive())) {
-      logger.debug("no parked or held tenant; skipping the system migration re-drive");
+    if (redrive && this.passCompletedInProcess && !(await this.deps.hasTenantAwaitingRedrive())) {
+      logger.debug(
+        "no parked, held or undiscovered tenant; skipping the system migration re-drive",
+      );
       return;
     }
     const summary = await this.deps.runPass({});
+    this.passCompletedInProcess = true;
     logger.info({ summary, redrive }, "system migration pass complete");
   }
 

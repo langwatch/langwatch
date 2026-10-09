@@ -25,7 +25,6 @@ import {
 } from "./services/usage-reporting.service.ts";
 import { detectEnvironment, StripePricesSyncTask } from "./tasks/stripe-prices-sync.task.ts";
 import { TieredFreeToSeatEventMigrateTask } from "./tasks/tiered-free-to-seat-event.task.ts";
-import { UsageBillingCatchUpTask } from "./tasks/usage-billing-catch-up.task.ts";
 import { billingStripeWebhookRest } from "./transport/billing-stripe-webhook.rest.ts";
 import { connectedBillingTrpcTransport } from "./transport/connected-billing.trpc.ts";
 import { currencyTrpcTransport } from "./transport/currency.trpc.ts";
@@ -79,7 +78,6 @@ export const billingProcessModule: PublishedProcessModule<
     }),
   ])
   .withTasks(async ({ app, repositories, secrets, config }) => [
-    UsageBillingCatchUpTask.create({ organizations: repositories.organizations, billing: app }),
     TieredFreeToSeatEventMigrateTask.create({
       peers: {
         organizations: repositories.organizations,

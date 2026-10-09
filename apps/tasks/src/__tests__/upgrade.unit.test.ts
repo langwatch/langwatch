@@ -16,11 +16,12 @@ import {
   parseUpgradeArgs,
   runUpgradeCommand,
   sqlReader,
+  upcastStepsOf,
   withLockTimeout,
 } from "../upgrade.ts";
 
 /** No module declares a step: the command never boots the tasks process. */
-const noCodeSteps: DeclaredCodeSteps = (use) => use([]);
+const noCodeSteps: DeclaredCodeSteps = (use) => use({ steps: [] });
 
 /** A database with no ledger and no Prisma history: every presence probe finds nothing. */
 const emptyDatabase: UpgradePostgres = {
@@ -120,7 +121,7 @@ describe("the upgrade subcommands", () => {
     const declared: DeclaredCodeSteps = async (use) => {
       events.push("booted");
       try {
-        return await use([step]);
+        return await use({ steps: [step] });
       } finally {
         events.push("closed");
       }
@@ -199,5 +200,53 @@ describe("the upgrade task with no ClickHouse target", () => {
     expect(line.level).toBe("warn");
     expect(line.message).toContain("CLICKHOUSE_URL");
     expect(line.fields.next).toContain("CLICKHOUSE_URL");
+  });
+});
+
+describe("the upgrade's declared upcast steps", () => {
+  describe("when the tasks process holds an event log", () => {
+    /** @scenario "The upgrade reads each declared upcast from the booted tasks process" */
+    it("answers each upcast's step id and stored events, with the rest as its report", async () => {
+      const upcasts = upcastStepsOf({
+        app: {
+          upcastReader: () => ({
+            findActiveUpcasts: async () => [
+              {
+                id: "upcast:entitlement:lw.usage.month_counted",
+                pipeline: "entitlement",
+                from: "lw.usage.month_counted",
+                fromAggregateType: null,
+                to: "lw.usage.month_metered",
+                drainsFrom: null,
+                storedEvents: 3,
+              },
+            ],
+          }),
+        },
+      });
+
+      expect(await upcasts()).toEqual([
+        {
+          id: "upcast:entitlement:lw.usage.month_counted",
+          storedEvents: 3,
+          report: {
+            pipeline: "entitlement",
+            from: "lw.usage.month_counted",
+            fromAggregateType: null,
+            to: "lw.usage.month_metered",
+            drainsFrom: null,
+          },
+        },
+      ]);
+    });
+  });
+
+  describe("when the tasks process holds no event log", () => {
+    /** @scenario "A tasks process without an event log hands the upgrade no upcast steps" */
+    it("answers none", async () => {
+      const upcasts = upcastStepsOf({ app: { upcastReader: () => undefined } });
+
+      expect(await upcasts()).toEqual([]);
+    });
   });
 });

@@ -3,6 +3,8 @@
  * `lw.organization.created`, only when it holds no tag. The tenant list comes from the runner.
  * Spec: modules/prompt/specs/prompt.feature
  */
+import type { TenantMigrationOutcome } from "@langwatch/system-migrations";
+
 import type { PromptTagRepository } from "../repositories/prompt-tag.repository.ts";
 
 type PromptTagBackfillPeers = Readonly<{
@@ -28,5 +30,13 @@ export class PromptTagBackfillService {
     if (held.length > 0) return { seeded: false };
     if (!dryRun) await this.peers.tags.seedForOrg({ organizationId });
     return { seeded: true };
+  }
+
+  /** The tenant step's body: seeds, then proves the organization holds a tag. */
+  async migrateTenant({ tenantId }: { tenantId: string }): Promise<TenantMigrationOutcome> {
+    const { seeded } = await this.seedTenant({ organizationId: tenantId, dryRun: false });
+    const held = await this.peers.tags.findAll({ organizationId: tenantId });
+    const report = { kind: "prompt_tags_seeded", seeded, tags: held.length };
+    return held.length > 0 ? { status: "finalized", report } : { status: "migrated", report };
   }
 }

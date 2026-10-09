@@ -56,6 +56,7 @@ class StubRepository implements UserRepository {
   hasAccountOnDomain = vi.fn(async () => false);
   hasAnyAccount = vi.fn(async () => true);
   findCreatedPage = vi.fn(async () => []);
+  findStandingPage = vi.fn(async () => []);
   findProfiles = vi.fn(async () => [user]);
   findById = vi.fn(async (): Promise<UserFullProfile | null> => user);
   findByEmail = vi.fn(async (): Promise<UserFullProfile[]> => [user]);

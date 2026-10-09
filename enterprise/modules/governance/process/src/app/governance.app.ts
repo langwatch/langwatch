@@ -311,7 +311,7 @@ type EventingSenders = Readonly<Record<string, EventingCommandSender<unknown>>>;
 /** The peers this application reads, resolved from {@link GovernanceModule.dependencies}. */
 interface GovernanceAppDependencies {
   /** Anomaly alerts to a rule's registered endpoints, and the endpoints W-11's step creates. */
-  webhooks: Pick<WebhookApi, "requestDelivery" | "create">;
+  webhooks: Pick<WebhookApi, "requestDelivery" | "create" | "archive">;
   /**
    * The organization a project belongs to, for the project-scoped REST family,
    * and the organization's hidden governance project, which is the tenant an
@@ -570,6 +570,7 @@ export class GovernanceModule implements GovernanceRestApi {
       rules: repositories.anomalyRules,
       organizationIds: (input) => dependencies.organizations.listAllIds(input),
       createEndpoint: (command) => dependencies.webhooks.create(command),
+      archiveEndpoint: (input) => dependencies.webhooks.archive(input),
       alertEventType: ANOMALY_ALERT_EVENT_TYPE,
     });
     this.activityMonitor = ActivityMonitorService.create({

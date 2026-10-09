@@ -9,7 +9,10 @@ import {
 } from "@langwatch/system-migrations";
 import { nowInstant } from "@langwatch/time";
 import { type TenantMigrationStep, tenantAxisSchema } from "@langwatch/upgrade/step";
-import type { TenantStepSettleService } from "@langwatch/upgrade/step/tenant-state";
+import type {
+  TenantStepSettleService,
+  TenantStepSettleState,
+} from "@langwatch/upgrade/step/tenant-state";
 
 import type {
   OpsAppDependencies,
@@ -76,7 +79,7 @@ type SystemMigrationPassOptions = Readonly<{
    */
   declared?: Readonly<{
     steps: () => readonly TenantMigrationStep[];
-    state: SystemMigrationStateRepository;
+    state: SystemMigrationStateRepository & TenantStepSettleState;
     /** Level-triggers each driven step's ledger row after the pass (S6-SETTLE). */
     settle: Pick<TenantStepSettleService, "settle">;
   }>;
@@ -242,16 +245,47 @@ export class SystemMigrationPassService {
   }
 
   /**
-   * Whether a pass on this installation could still move a tenant, asked only about the migrations
-   * it runs: another deployment's row in a shared table is not work waiting here.
+   * Whether a pass on this installation could still move or discover a tenant, asked only about the
+   * migrations it runs: a held or parked tenant, or an automatic migration no tenant has met yet (a
+   * new registration, a fresh install). A latched fleet pays one indexed read per migration.
    */
   async hasTenantAwaitingRedrive(): Promise<boolean> {
     const isSaaS = this.options.isSaaS();
-    const migrationNames = [
+    const registered = [
       ...this.released({ migrations: this.options.migrations(), isSaaS }),
       ...this.released({ migrations: this.options.userMigrations(), isSaaS }),
-    ].map((migration) => migration.name);
-    return this.options.repositories.migrationState.hasTenantAwaitingRedrive({ migrationNames });
+    ];
+    const state = this.options.repositories.migrationState;
+    const migrationNames = registered.map((migration) => migration.name);
+    if (await state.hasTenantAwaitingRedrive({ migrationNames })) return true;
+    for (const migration of registered) {
+      if (!admitsUnenrolled({ isSaaS, migration })) continue;
+      if (await state.hasFinalizedTenant({ migrationName: migration.name })) continue;
+      const pinned = await state.findRecordsByStatus({
+        migrationName: migration.name,
+        statuses: ["rolled_back"],
+        limit: 1,
+      });
+      if (pinned.length === 0) return true;
+    }
+    return this.hasDeclaredStepAwaitingPass({ isSaaS });
+  }
+
+  /** The same question of the declared tenant steps, over the framework's own state table. */
+  private async hasDeclaredStepAwaitingPass({ isSaaS }: { isSaaS: boolean }): Promise<boolean> {
+    const declared = this.options.declared;
+    if (!declared) return false;
+    const steps = this.released({
+      migrations: declared.steps().map((step) => ({ ...step, name: step.id })),
+      isSaaS,
+    });
+    for (const step of steps) {
+      if (await declared.state.hasUnsettledTenant({ migrationName: step.name })) return true;
+      if (!admitsUnenrolled({ isSaaS, migration: step })) continue;
+      // ponytail: a step whose every tenant was rolled back reads as unmet and is passed each wake.
+      if (!(await declared.state.hasFinalizedTenant({ migrationName: step.name }))) return true;
+    }
+    return false;
   }
 
   /**
@@ -515,4 +549,15 @@ export class SystemMigrationPassService {
       hasTenantAwaitingRedrive: () => passes.hasTenantAwaitingRedrive(),
     });
   }
+}
+
+/** Admitted without operator enrollment: every self-hosted release, cloud once it has soaked. */
+function admitsUnenrolled({
+  isSaaS,
+  migration,
+}: {
+  isSaaS: boolean;
+  migration: SystemMigration;
+}): boolean {
+  return !isSaaS || migration.enrolledAutomatically;
 }

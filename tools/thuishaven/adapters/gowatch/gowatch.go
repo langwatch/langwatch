@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"hash/fnv"
 	"io/fs"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -52,15 +51,14 @@ var skippedDirs = map[string]bool{"node_modules": true, "dist": true, ".bin": tr
 // change the binary, and a mass test write is the common AI burst, so
 // `_test.go` is not watched.
 func Fingerprint(repoRoot string) uint64 {
+	return FingerprintPaths(repoRoot, append([]string{"go.work"}, watchedDirs...)...)
+}
+
+// FingerprintPaths is Fingerprint over the given files and trees under root.
+func FingerprintPaths(root string, paths ...string) uint64 {
 	h := fnv.New64a()
-	add := func(path string, info fs.FileInfo) {
-		_, _ = fmt.Fprintf(h, "%s|%d|%d\n", path, info.Size(), info.ModTime().UnixNano())
-	}
-	if info, err := os.Stat(filepath.Join(repoRoot, "go.work")); err == nil {
-		add("go.work", info)
-	}
-	for _, dir := range watchedDirs {
-		top := filepath.Join(repoRoot, dir)
+	for _, p := range paths {
+		top := filepath.Join(root, p)
 		_ = filepath.WalkDir(top, func(path string, d fs.DirEntry, err error) error {
 			switch {
 			case err != nil:
@@ -69,7 +67,7 @@ func Fingerprint(repoRoot string) uint64 {
 				return skipDir(path, top, d.Name())
 			case isWatchedFile(d.Name()):
 				if info, err := d.Info(); err == nil {
-					add(path, info)
+					_, _ = fmt.Fprintf(h, "%s|%d|%d\n", path, info.Size(), info.ModTime().UnixNano())
 				}
 			}
 			return nil
@@ -86,7 +84,7 @@ func skipDir(path, top, name string) error {
 }
 
 func isWatchedFile(name string) bool {
-	return (strings.HasSuffix(name, ".go") && !strings.HasSuffix(name, "_test.go")) || name == "go.mod" || name == "go.sum"
+	return (strings.HasSuffix(name, ".go") && !strings.HasSuffix(name, "_test.go")) || name == "go.mod" || name == "go.sum" || name == "go.work"
 }
 
 // Swapper owns the one running child. Build writes the binary; Start runs it.

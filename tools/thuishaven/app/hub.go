@@ -44,6 +44,7 @@ func (o *Orchestrator) DownStack(ctx context.Context, slug string) error {
 		}
 	}
 	o.store.RemoveStack(slug)
+	removeKeeperPlan(st.WorktreeDir, slug)
 	return nil
 }
 

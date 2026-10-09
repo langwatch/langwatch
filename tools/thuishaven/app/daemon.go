@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"time"
 
 	"go.uber.org/zap"
@@ -49,9 +50,10 @@ func (o *Orchestrator) daemonAlive() bool {
 
 // RunDaemon is the singleton server + monitor. It registers the shared surfaces
 // (dashboard, telemetry, observability), serves them, and reaps stacks whose
-// launcher has exited or gone stale.
-func (o *Orchestrator) RunDaemon(ctx context.Context, dash Dashboard) error {
-	if o.daemonAlive() {
+// launcher has exited or gone stale. A non-zero after is the predecessor this
+// daemon succeeds: it waits for that daemon to let go of the lock (D10).
+func (o *Orchestrator) RunDaemon(ctx context.Context, dash Dashboard, after int) error {
+	if after == 0 && o.daemonAlive() {
 		fmt.Println("haven daemon already running")
 		return nil
 	}
@@ -72,7 +74,7 @@ func (o *Orchestrator) RunDaemon(ctx context.Context, dash Dashboard) error {
 	// spawn a daemon. The flock lets exactly one racer win and is held for life;
 	// the kernel drops it when its holder dies, so a crashed daemon's record is
 	// simply overwritten by the next claim (D9).
-	claimed, err := o.store.ClaimDaemon(info)
+	claimed, err := o.claimDaemon(ctx, info, after)
 	if err != nil {
 		return err
 	}
@@ -101,6 +103,54 @@ func (o *Orchestrator) RunDaemon(ctx context.Context, dash Dashboard) error {
 		zap.String("dashboard", o.cfg.Naming.URL(domain.HubService, "", scheme, pport)))
 	go o.monitorLoop(ctx)
 	return dash.Serve(ctx, port)
+}
+
+// successorWait bounds how long a successor waits for its predecessor's lock.
+const successorWait = 30 * time.Second
+
+// claimDaemon takes the singleton lock; a successor retries until its
+// predecessor has exited, and gives up quietly if another daemon won meanwhile.
+func (o *Orchestrator) claimDaemon(ctx context.Context, info DaemonInfo, after int) (bool, error) {
+	deadline := time.Now().Add(successorWait)
+	for {
+		claimed, err := o.store.ClaimDaemon(info)
+		if claimed || err != nil || after == 0 || time.Now().After(deadline) {
+			return claimed, err
+		}
+		select {
+		case <-ctx.Done():
+			return false, nil
+		case <-time.After(100 * time.Millisecond):
+		}
+	}
+}
+
+// StartDaemonSuccessor spawns a daemon that takes over once pid exits. The
+// successor runs DaemonArgv, so a rebuilt or reinstalled binary is what serves.
+func (o *Orchestrator) StartDaemonSuccessor(pid int, dir string) error {
+	argv := append(slices.Clone(o.cfg.DaemonArgv), "--after", strconv.Itoa(pid))
+	return o.sys.SpawnDetached(argv, dir, filepath.Join(o.cfg.Home, "haven.log"))
+}
+
+// RestartDaemon replaces the running daemon with a fresh one and returns the
+// new pid. Stacks are untouched: their launchers are in their own sessions and
+// the daemon signals nobody on exit. No daemon running means one is started.
+func (o *Orchestrator) RestartDaemon(dir string) (int, error) {
+	old, ok := o.store.Daemon()
+	if !ok || !o.daemonAlive() {
+		o.ensureDaemon(dir)
+	} else {
+		if err := o.StartDaemonSuccessor(old.PID, dir); err != nil {
+			return 0, err
+		}
+		o.sys.Terminate(old.PID)
+	}
+	for deadline := time.Now().Add(successorWait); time.Now().Before(deadline); time.Sleep(100 * time.Millisecond) {
+		if info, ok := o.store.Daemon(); ok && info.PID != old.PID && o.daemonAlive() {
+			return info.PID, nil
+		}
+	}
+	return 0, fmt.Errorf("no haven daemon came up within %s; see %s", successorWait, filepath.Join(o.cfg.Home, "haven.log"))
 }
 
 // monitorLoop prunes stacks whose launcher has died (crashed pnpm dev, closed
@@ -199,6 +249,7 @@ func (o *Orchestrator) reapStack(s domain.Stack, dead, stale bool) {
 		o.removeStackRoutes(s.Slug, s.Services)
 	}
 	o.store.RemoveStack(s.Slug)
+	removeKeeperPlan(s.WorktreeDir, s.Slug)
 	reason := "launcher died"
 	if timedOut {
 		reason = "heartbeat stale past the idle TTL"

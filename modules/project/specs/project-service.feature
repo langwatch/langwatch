@@ -207,6 +207,43 @@ Feature: Shared project service
     And each project's fact is keyed alike on both runs, so the second run records nothing new
 
   @unit
+  Scenario: A project fact step records every organization's projects a page at a time
+    Given three organizations, served two to a page
+    When a project fact upgrade step runs
+    Then each organization's projects are recorded once
+    And the step saves its checkpoint after each page, naming the page's last organization
+
+  @unit
+  Scenario: A project fact step resumes after the last page of organizations it saved
+    Given a project fact upgrade step whose checkpoint names the second organization
+    When the step runs again
+    Then only the organizations after the second are recorded
+
+  @unit
+  Scenario: A dry run of a project fact step records nothing and saves no checkpoint
+    Given three organizations with projects
+    When a project fact upgrade step runs as a dry run
+    Then no fact is recorded and no checkpoint is saved
+    And the report counts the projects it would record where the fact can preview them
+
+  @unit
+  Scenario: A project fact step stops between organizations when the worker stops it
+    Given a project fact upgrade step whose run has been aborted
+    When the step runs
+    Then no organization is recorded and no checkpoint is saved
+
+  @integration
+  Scenario: The project fact steps are background steps that wait for old writers to go
+    When the worker's installed modules list their upgrade steps
+    Then project:record-created-facts, project:record-department-assignments and project:record-presence-settings are background data steps
+    And each runs only once no older image serves
+
+  @integration
+  Scenario: The project created step runs after the judge spend catch-up
+    When the worker's installed modules list their upgrade steps
+    Then project:record-created-facts runs after instant-eval:copy-judge-spend
+
+  @unit
   Scenario: The model-defaults scope picker offers an archived project
     Given an organization with a live project, an archived project and the hidden governance project
     When the live non-governance project ids are read including archived projects

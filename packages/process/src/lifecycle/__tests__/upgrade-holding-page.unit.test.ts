@@ -1,11 +1,15 @@
 import http from "node:http";
 import net, { type AddressInfo } from "node:net";
 
+import { routesServingWhileUpgrading } from "@langwatch/api";
+import { BrowserBundle } from "@langwatch/api/hosting";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   LIVENESS_PATH,
   renderUpgradeHoldingPage,
+  UPGRADE_SIGN_IN_HREF,
+  UPGRADING_PHASE,
   startHeartbeat,
   startLivenessThread,
   type Heartbeat,
@@ -162,6 +166,23 @@ describe("the upgrade holding page", () => {
     });
   });
 
+  describe("given the api serves in upgrading mode", () => {
+    /** @scenario "The upgrading holding page offers sign-in to follow the upgrade" */
+    it("links to sign-in returning to the Upgrades page, and the schema phase does not", () => {
+      const upgrading = renderUpgradeHoldingPage({
+        phase: UPGRADING_PHASE,
+        outstandingStepIds: [],
+      });
+      const schema = renderUpgradeHoldingPage({ phase: "schema", outstandingStepIds: [] });
+
+      expect(UPGRADE_SIGN_IN_HREF).toBe("/auth/signin?callbackUrl=%2Fops%2Fupgrades");
+      expect(upgrading).toContain(
+        `<a href="${UPGRADE_SIGN_IN_HREF}">Sign in to follow the upgrade</a>`,
+      );
+      expect(schema).not.toContain("<a ");
+    });
+  });
+
   describe("given a phase and step ids carrying markup", () => {
     /** @scenario "The holding page escapes everything it renders" */
     it("renders them escaped", () => {
@@ -233,6 +254,62 @@ describe("the liveness door's routing while it holds", () => {
         expect(mixed.status).toBe(503);
         expect(proxied).toHaveBeenCalledOnce();
       });
+    });
+  });
+});
+
+describe("the liveness door in upgrading mode with the browser bundle's declarations", () => {
+  const upgradingHold = { phase: UPGRADING_PHASE, outstandingStepIds: ["trace:fill-cost"] };
+  const passing = [
+    { method: "GET", path: "/assets/index-abc123.js" },
+    { method: "HEAD", path: "/assets/index-abc123.css" },
+    { method: "GET", path: "/favicon.ico" },
+    { method: "GET", path: "/favicon.svg" },
+    { method: "GET", path: "/fonts/Sentient-Regular.woff2" },
+    { method: "GET", path: "/auth/signin?callbackUrl=%2Fops%2Fupgrades" },
+    { method: "GET", path: "/ops/upgrades" },
+    { method: "GET", path: "/ops/upgrades/runs/run_1" },
+  ];
+
+  async function holdUpgrading(proxied: () => void): Promise<LivenessThread> {
+    BrowserBundle.registerRoutePolicies();
+    const thread = await bootThread({ onProxied: proxied });
+    await thread.hold(upgradingHold, { paths: [], routes: routesServingWhileUpgrading() });
+    return thread;
+  }
+
+  describe("when a browser loads sign-in, the Upgrades pages and the files the shell needs", () => {
+    it("proxies each to the main thread", async () => {
+      const proxied = vi.fn();
+      const thread = await holdUpgrading(proxied);
+
+      for (const { method, path } of passing) {
+        const response = await fetch(urlOf(thread.address, path), { method });
+        expect({ method, path, status: response.status }).toEqual({ method, path, status: 200 });
+      }
+      expect(proxied).toHaveBeenCalledTimes(passing.length);
+    });
+  });
+
+  describe("when a browser requests a page that is not served", () => {
+    /** @scenario "The holding page offers sign-in to follow the upgrade" */
+    it("holds it with a link to sign-in returning to Ops > Upgrades, and the link passes", async () => {
+      const proxied = vi.fn();
+      const thread = await holdUpgrading(proxied);
+
+      const held = await fetch(urlOf(thread.address, "/settings"), {
+        headers: { Accept: "text/html" },
+      });
+      const page = await held.text();
+      const followed = await fetch(urlOf(thread.address, UPGRADE_SIGN_IN_HREF));
+      const otherWrite = await fetch(urlOf(thread.address, "/auth/signin"), { method: "POST" });
+
+      expect(held.status).toBe(503);
+      expect(page).toContain(`<a href="${UPGRADE_SIGN_IN_HREF}">Sign in to follow the upgrade</a>`);
+      expect(UPGRADE_SIGN_IN_HREF).toBe("/auth/signin?callbackUrl=%2Fops%2Fupgrades");
+      expect(followed.status).toBe(200);
+      expect(otherWrite.status).toBe(503);
+      expect(proxied).toHaveBeenCalledOnce();
     });
   });
 });

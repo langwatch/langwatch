@@ -1,12 +1,14 @@
 import { bindRestMiddleware, organizationCredentialOfRequest } from "@langwatch/api/rest";
 import type { OrganizationApi, OrganizationServerConfig } from "@langwatch/organization-contract";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
+import { defineMigrationStep } from "@langwatch/upgrade/step";
 
 import { OrganizationModule } from "./app/organization.app.ts";
 import { organizationAuditEventing } from "./eventing/organization-audit.pipeline.ts";
 import { organizationLifecycleEventing } from "./eventing/organization-lifecycle.pipeline.ts";
 import { seatLimitEventing } from "./eventing/seat-limit.pipeline.ts";
 import { organizationRepositories } from "./repositories/organization-repositories.registry.ts";
+import { OrganizationPresenceSettingBackfillService } from "./services/organization-presence-setting-backfill.service.ts";
 import { OrganizationPresenceSettingBackfillTask } from "./tasks/organization-presence-setting-backfill.task.ts";
 import { groupsRest } from "./transport/group.rest.ts";
 import { groupTrpcTransport } from "./transport/group.trpc.ts";
@@ -50,4 +52,29 @@ export const organizationProcessModule: PublishedProcessModule<
   .withEventing(seatLimitEventing)
   .withEventing(organizationLifecycleEventing)
   .withEventing(organizationAuditEventing)
+  // Old images record no presence fact: run once none serves (ADR-173 §3).
+  .withMigrations(({ app }) => [
+    defineMigrationStep({
+      id: "organization:record-presence-settings",
+      kind: "data",
+      mode: "background",
+      needsOldWritersGone: true,
+      description: "Records every existing organization's presence setting, for presence to fold.",
+      run: async ({ checkpoint, dryRun, signal }) => {
+        const resumed = checkpoint.resumeFrom?.afterOrganizationId;
+        const report = await OrganizationPresenceSettingBackfillService.create({
+          peers: {
+            organizations: app,
+            record: ({ organizationId }) => app.recordStoredPresenceSetting({ organizationId }),
+          },
+        }).backfill({
+          after: typeof resumed === "string" ? resumed : undefined,
+          dryRun,
+          signal,
+          onPage: (page) => checkpoint.save({ report: page }),
+        });
+        return { ...report, dryRun };
+      },
+    }),
+  ])
   .withTasks(({ app }) => [OrganizationPresenceSettingBackfillTask.create({ organizations: app })]);

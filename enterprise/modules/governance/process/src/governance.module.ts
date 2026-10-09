@@ -141,7 +141,7 @@ export const governanceProcessModule: PublishedProcessModule<"governance", Gover
         kind: "data",
         mode: "background",
         description:
-          "Moves each anomaly rule's inline webhook destinations onto legacy-scheme webhook endpoints.",
+          "Annotates each inline anomaly webhook destination with a legacy-scheme endpoint.",
         needsOldWritersGone: true,
         run: async ({ checkpoint, dryRun, signal }) => {
           const resumed = checkpoint.resumeFrom?.afterOrganizationId;

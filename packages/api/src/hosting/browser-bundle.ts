@@ -6,7 +6,9 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import { publicEndpoint } from "../access-policy.ts";
 import type { SecurityHeaders } from "../policy/security-headers.ts";
+import { registerRoutePolicy } from "../route-registry.ts";
 import type { HttpFailureAnswer, HttpHandler } from "./http-mux.ts";
 import type { SessionCaller, SessionReader } from "./session-reader.ts";
 
@@ -41,6 +43,24 @@ const BARE_SHELL_PATH = "/index.html";
 /** Where the bundle's content-hashed assets live, and are cached forever. */
 const ASSET_PREFIX = "/assets/";
 
+/** The fonts the shell's stylesheets load at startup from the bundle root (apps/ui/public). */
+const STARTUP_FONTS = ["Bold", "Extralight", "Light", "Medium", "Regular"].map(
+  (weight) => `/fonts/Sentient-${weight}.woff2`,
+);
+
+/**
+ * What the bundle serves while the installation upgrades (UIW-BUNDLE-PASS): its assets, the root
+ * files the shell loads at startup, sign-in and the Upgrades pages. Never `GET /*`.
+ */
+const SERVED_WHILE_UPGRADING: readonly { method: string; path: string }[] = [
+  { method: "HEAD", path: "/assets/*" },
+  ...["/assets/*", "/favicon.ico", "/favicon.svg", ...STARTUP_FONTS].map((path) => ({
+    method: "GET",
+    path,
+  })),
+  ...["/auth/signin", "/ops/upgrades", "/ops/upgrades/*"].map((path) => ({ method: "GET", path })),
+];
+
 /**
  * What this deployment injects into the shell's head, knowing who is asking.
  * Every caller answers the same thing for everyone today; the parameter is what
@@ -71,6 +91,23 @@ export class BrowserBundle {
     authorizeDocument?: DocumentAccess;
   }): BrowserBundle {
     return new BrowserBundle(options);
+  }
+
+  /** Puts the paths it serves while upgrading in the route-policy registry. Idempotent. */
+  static registerRoutePolicies(): void {
+    for (const { method, path } of SERVED_WHILE_UPGRADING) {
+      registerRoutePolicy({
+        method,
+        path,
+        policy: publicEndpoint(
+          "a browser bundle file or the SPA shell; the shell reads the session and authorizes itself",
+        ),
+        family: "browser-bundle",
+        credentialClass: "none",
+        credential: "public",
+        servesWhileUpgrading: true,
+      });
+    }
   }
 
   private readonly dist: string | undefined;

@@ -289,7 +289,8 @@ export type GatewayLicenseTokenRefusal =
   | "connect_license_not_registered"
   | "connect_license_revoked"
   | "connect_license_expired"
-  | "connect_wrong_instance";
+  | "connect_wrong_instance"
+  | "connect_credential_pending";
 
 /** The managed key a license token runs under, and what its token may carry. */
 export type GatewayLicenseTokenResolution =

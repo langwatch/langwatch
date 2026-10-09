@@ -6,13 +6,14 @@ import {
 } from "@langwatch/api/rest";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 import type { ScenarioApi, ScenarioServerConfig } from "@langwatch/scenario-contract";
+import { defineMigrationStep } from "@langwatch/upgrade/step";
 
 import { ScenarioModule } from "./app/scenario.app.ts";
 import { scenarioChannels } from "./channels/scenario-channels.registry.ts";
 import { scenarioLifecycleEventing } from "./eventing/scenario-lifecycle.pipeline.ts";
 import { simulationProcessingEventing } from "./eventing/simulation-processing.pipeline.ts";
 import { scenarioRepositories } from "./repositories/scenario-repositories.registry.ts";
-import { StalledRunsBackfillTask } from "./tasks/stalled-runs-backfill.task.ts";
+import { StalledRunsBackfillService } from "./services/stalled-runs-backfill.service.ts";
 import { agentTestCallerKey, scenarioAgentTestRest } from "./transport/scenario-agent-test.rest.ts";
 import { scenarioEventsRest } from "./transport/scenario-event.rest.ts";
 import { scenarioGenerateRest } from "./transport/scenario-generate.rest.ts";
@@ -54,9 +55,17 @@ export const scenarioProcessModule: PublishedProcessModule<
   ])
   .withEventing(scenarioLifecycleEventing)
   .withEventing(simulationProcessingEventing)
-  .withTasks(({ repositories, app }) => [
-    StalledRunsBackfillTask.create({
-      finder: () => repositories.stalledRuns,
-      execution: () => app,
+  .withMigrations(({ repositories, app }) => [
+    defineMigrationStep({
+      id: "scenario:close-stalled-runs",
+      kind: "data",
+      mode: "background",
+      description: "Closes historical simulation runs that never received a terminal event.",
+      needsOldWritersGone: true,
+      run: ({ dryRun }) =>
+        StalledRunsBackfillService.create({
+          finder: repositories.stalledRuns,
+          execution: app,
+        }).backfill({ dryRun }),
     }),
   ]);

@@ -19,6 +19,8 @@ export const createWebhookEndpointCommandSchema = z.object({
   signatureScheme: webhookSignatureSchemeSchema.optional(),
   /** The same migration only: the rule's existing secret signs, so its receiver keeps verifying. */
   sharedSecret: z.string().min(1).max(512).optional(),
+  /** The same migration only: unique per organization, a repeat answers the existing endpoint. */
+  idempotencyKey: z.string().min(1).optional(),
 });
 export type CreateWebhookEndpointCommand = z.infer<typeof createWebhookEndpointCommandSchema>;
 

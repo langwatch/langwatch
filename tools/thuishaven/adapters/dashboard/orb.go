@@ -3,6 +3,7 @@ package dashboard
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/url"
 	"os/exec"
@@ -13,8 +14,8 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
-// orbMaxBody bounds one orb post: a note plus two 200-entry buffers.
-const orbMaxBody = 1 << 20
+// orbMaxBody bounds one orb post: a note, two 200-entry buffers and a base64 capture.
+const orbMaxBody = 4 << 20
 
 // orbLink is one console the orb's panel links.
 type orbLink struct {
@@ -59,6 +60,10 @@ func (s *Server) handleOrbFeedback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	item, err := orbstore.At(s.config.LogDir(st.Slug)).Add(report, time.Now())
+	if errors.Is(err, orbstore.ErrBadImage) {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

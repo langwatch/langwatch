@@ -87,6 +87,7 @@ func newServer(cfg Config, bundle fs.FS) *Server {
 	mux.HandleFunc("POST /v1/audio/transcriptions", s.handleTranscription)
 	mux.HandleFunc("GET /_sim/api/status", s.handleStatus)
 	mux.HandleFunc("GET /_sim/api/calls", s.handleCalls)
+	mux.HandleFunc("DELETE /_sim/api/calls", s.handleClearCalls)
 	// A provider or console path voicesim does not fake is a 404, never the console page.
 	for _, pattern := range []string{"GET /v1/", "POST /v1/", "GET /_sim/api/"} {
 		mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
@@ -210,6 +211,11 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		Stack: s.cfg.Stack, Calls: s.calls.len(),
 		ElevenLabsBaseURL: origin, OpenAIBaseURL: origin + "/v1",
 	})
+}
+
+func (s *Server) handleClearCalls(w http.ResponseWriter, _ *http.Request) {
+	s.calls.clear()
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) handleCalls(w http.ResponseWriter, _ *http.Request) {

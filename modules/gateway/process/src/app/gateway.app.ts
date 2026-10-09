@@ -242,7 +242,10 @@ import type { GatewaySpendFoldCacheRepository } from "../repositories/gateway-sp
 import type { GatewaySpendScopeRepository } from "../repositories/gateway-spend-scope.repository.ts";
 import type { GatewayLicensedKey } from "../repositories/gateway-virtual-key.repository.ts";
 import type { GatewayRepositories } from "../repositories/gateway.repositories.ts";
-import { ConnectManagedKeyService } from "../services/connect-managed-key.service.ts";
+import {
+  ConnectManagedKeyService,
+  type ManagedKeyProvisionedSender,
+} from "../services/connect-managed-key.service.ts";
 import { GatewayAgentCacheService } from "../services/gateway-agent-cache.service.ts";
 import { GatewayAuthzScopePermissionsService } from "../services/gateway-authz-scope-permissions.service.ts";
 import { GatewayCacheRuleService } from "../services/gateway-cache-rule.service.ts";
@@ -380,10 +383,15 @@ type GatewayVirtualKeyOperations = Readonly<{
   setLicenseFactsInternal(input: {
     id: string;
     organizationId: string;
+    licenseId?: string;
     tokenHash: string;
     instanceId: string | null;
     expiresAt: Instant | null;
   }): Promise<void>;
+  findConnectKeyIdsForLicenseInternal(input: {
+    organizationId: string;
+    licenseId: string;
+  }): Promise<string[]>;
   /** A CONNECT key by the registry hash of its license token. */
   findByLicenseTokenHashInternal(tokenHash: string): Promise<GatewayLicensedKey | null>;
   disable(input: {
@@ -1455,6 +1463,11 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
   /** gateway_connect_managed_key: ends or re-resolves a licence's managed key from its facts. */
   connectManagedKeyPipeline(): GatewayConnectManagedKeyPipeline {
     return buildGatewayConnectManagedKeyPipeline({ managedKeys: this.#connectManagedKeyService() });
+  }
+
+  /** Binds the sender the managed-key service records the provisioned fact through. */
+  connectManagedKeyCommands(commands: ManagedKeyProvisionedSender): void {
+    this.#connectManagedKeyService().connect(commands);
   }
 
   /** Binds the crossing and lifecycle senders the debit writer and key services record through. */
