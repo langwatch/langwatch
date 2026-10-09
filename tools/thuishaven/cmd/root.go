@@ -215,6 +215,7 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 		SimulatorArgv:           simulatorArgv(),
 		GoWatchArgv:             goWatchArgv(),
 		UpArgv:                  selfArgv(worktree, "up"),
+		KeepArgv:                selfArgv(trustedRepoRoot(), "keep"),
 		IsAgent:                 isAgent,
 		PortlessDisabled:        devEnv("PORTLESS") == "0",
 		ShouldManageClickHouse:  devEnv("LANGWATCH_HAVEN_CH") != "0",

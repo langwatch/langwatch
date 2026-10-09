@@ -149,8 +149,10 @@ func (System) SpawnDetached(argv []string, dir, logPath string) error {
 	cmd := exec.Command(argv[0], argv[1:]...)
 	cmd.Dir = dir
 	cmd.Env = os.Environ()
-	f, ferr := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	// Owner-only: a keeper's or an up's output carries seed secrets.
+	f, ferr := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 	if ferr == nil {
+		_ = f.Chmod(0o600)
 		cmd.Stdout, cmd.Stderr = f, f
 	}
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}

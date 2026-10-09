@@ -49,7 +49,11 @@ type Stack struct {
 	// LauncherPID it is the launcher's identity. Empty on records written
 	// before it existed, which fall back to liveness alone.
 	LauncherStart string `json:"launcherStart,omitempty"`
-	RedisDB       int    `json:"redisDb"`
+	// OwnerPID and OwnerStart name the foreground up that stays the stack's
+	// client (D7); empty for a detached stack.
+	OwnerPID   int    `json:"ownerPid,omitempty"`
+	OwnerStart string `json:"ownerStart,omitempty"`
+	RedisDB    int    `json:"redisDb"`
 	// APIPort is the Hono API's loopback port. It is reached two ways: same-
 	// origin at app.<slug>.../api (Vite proxies /api → 127.0.0.1:APIPort, so
 	// the frontend and its API still share one URL for the browser), and

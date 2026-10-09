@@ -44,7 +44,9 @@ type Config struct {
 	// UpArgv is this Haven executable plus `up`, resolved once in the composition
 	// root against the TRUSTED checkout — never against the directory a child
 	// will run in. Empty disables starting a stack from the dashboard.
-	UpArgv                   []string
+	UpArgv []string
+	// KeepArgv is this Haven executable plus `keep`: the stack's keeper.
+	KeepArgv                 []string
 	IsAgent                  bool // token-free plain output for AI drivers (no color/TUI)
 	ShouldManageClickHouse   bool // haven provisions a shared ClickHouse container (colima) + per-slug DBs
 	ShouldStopClickHouseIdle bool // daemon stops the managed CH container when the last stack is reaped
@@ -121,7 +123,10 @@ type Config struct {
 
 // PlanOptions decide which services `up` runs and how.
 type PlanOptions struct {
-	ShouldGoWatch bool // rebuild and swap the Go services (haven go-watch; air for langyagent); on unless LANGWATCH_GO_WATCH=0 or --watch=false
+	// IsForegroundClient marks an up that stays the stack's owner after the
+	// hand-over, following its log and downing it when it goes (D7).
+	IsForegroundClient bool
+	ShouldGoWatch      bool // rebuild and swap the Go services (haven go-watch; air for langyagent); on unless LANGWATCH_GO_WATCH=0 or --watch=false
 	// ShouldRunOneProcess runs a modular checkout's ui and api lanes as one app
 	// lane: Vite, api and worker in one Node process (ADR-168, B1). On unless
 	// LANGWATCH_DEV_ONE_PROCESS=0.

@@ -199,6 +199,7 @@ func (o *Orchestrator) reapStack(s domain.Stack, dead, stale bool) {
 		o.removeStackRoutes(s.Slug, s.Services)
 	}
 	o.store.RemoveStack(s.Slug)
+	removeKeeperPlan(s.WorktreeDir, s.Slug)
 	reason := "launcher died"
 	if timedOut {
 		reason = "heartbeat stale past the idle TTL"

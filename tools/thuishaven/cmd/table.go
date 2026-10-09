@@ -220,6 +220,13 @@ var baseTable = []commandSpec{
 		run:     runGoWatch,
 	},
 	{
+		name:    "keep",
+		args:    "<slug>",
+		maxArgs: 1,
+		hidden:  true,
+		run:     runKeep,
+	},
+	{
 		name:      "up",
 		summary:   "start or reconcile this worktree's stack; +svc/-svc picks services and sticks",
 		args:      "[+svc|-svc …]",
@@ -269,7 +276,11 @@ var baseTable = []commandSpec{
 			// child above runs under Setsid and is naturally exempt.
 			ctx, unwatch := watchLaunchingGroup(ctx)
 			defer unwatch()
-			return d.orch.Up(ctx, d.params, d.opts)
+			d.opts.IsForegroundClient = !isSessionLeader()
+			if err := d.orch.Up(ctx, d.params, d.opts); err != nil {
+				return err
+			}
+			return followAsOwner(ctx, d)
 		},
 	},
 	{
