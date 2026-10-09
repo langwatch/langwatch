@@ -627,7 +627,7 @@ function deniedError({
   const denied = new PermissionDeniedError({
     permission,
     scope: { type: scope.tier, id: scope.id },
-    denialReason: denialReason ?? "no-binding",
+    denialReason: denialReason ?? "no-grant",
   });
 
   // The wire code that results is FORBIDDEN, not the UNAUTHORIZED spelled

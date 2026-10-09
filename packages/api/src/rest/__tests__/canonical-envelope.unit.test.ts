@@ -261,7 +261,7 @@ describe("a route whose API key does not grant the permission it requires", () =
       throw new PermissionDeniedError({
         permission,
         scope: { type: "project", id: "project-secret" },
-        denialReason: "no-binding",
+        denialReason: "no-grant",
       });
     },
   };

@@ -69,7 +69,7 @@ describe("opening an aggregate project at the door", () => {
 
       await expect(refusal).rejects.toMatchObject({
         code: "permission_denied",
-        denialReason: "no-binding",
+        denialReason: "no-grant",
       });
     });
 

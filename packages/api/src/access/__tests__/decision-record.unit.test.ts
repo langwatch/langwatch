@@ -27,7 +27,7 @@ function authorize({ permitted }: { permitted: boolean }): Authorize {
     getDecision: async () =>
       permitted
         ? { permitted, organizationRole: null }
-        : { permitted, organizationRole: null, denialReason: "no-binding" },
+        : { permitted, organizationRole: null, denialReason: "no-grant" },
     getProjectAnyDecision: async () => ({ permitted, organizationRole: null }),
     checkScopeLineage: async () => ({ kind: "consistent" }),
   };
@@ -61,7 +61,7 @@ describe("an authorization decision", () => {
           permission: "organization:manage",
           scope,
           permitted: false,
-          denialReason: "no-binding",
+          denialReason: "no-grant",
         });
 
         expect(record).toMatchObject({
@@ -69,7 +69,7 @@ describe("an authorization decision", () => {
           subjectUserId: "sam",
           impersonating: true,
           permitted: false,
-          denialReason: "no-binding",
+          denialReason: "no-grant",
           permission: "organization:manage",
           scopeTier: "organization",
           scopeId: "org_acme",
@@ -121,7 +121,7 @@ describe("an authorization decision", () => {
           }),
           expect.objectContaining({
             permitted: false,
-            denialReason: "no-binding",
+            denialReason: "no-grant",
             actorUserId: "operator_1",
             subjectUserId: "sam",
             impersonating: true,

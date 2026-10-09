@@ -46,7 +46,7 @@ function keyDoor(withheld: readonly string[] = []) {
         throw new PermissionDeniedError({
           permission,
           scope: { type: "organization", id: ORGANIZATION.id },
-          denialReason: "no-binding",
+          denialReason: "no-grant",
         });
       }
 

@@ -931,7 +931,7 @@ export async function mintAuthorization({
     throw new PermissionDeniedError({
       permission,
       scope: scope ? { type: scope.tier, id: scope.id } : { type: "resource", id: route },
-      denialReason: "no-binding",
+      denialReason: "no-grant",
     });
   }
 
@@ -1254,7 +1254,7 @@ function recordDecision({
 }
 
 function denialReasonOf(decision: PermissionDecision): AuthzDenialReason {
-  return decision.denialReason ?? "no-binding";
+  return decision.denialReason ?? "no-grant";
 }
 
 function declaredPermissionOf(declaration: AccessDeclaration): string {
@@ -1294,6 +1294,6 @@ export function refuseImpersonatedMint({
   throw new PermissionDeniedError({
     permission,
     scope: scope ? { type: scope.tier, id: scope.id } : { type: "resource", id: address },
-    denialReason: "no-binding",
+    denialReason: "no-grant",
   });
 }

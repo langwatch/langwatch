@@ -63,7 +63,7 @@ function door({
         throw new PermissionDeniedError({
           permission: missing,
           scope: { type: "project", id: "project-1" },
-          denialReason: "no-binding",
+          denialReason: "no-grant",
         });
       }
 
