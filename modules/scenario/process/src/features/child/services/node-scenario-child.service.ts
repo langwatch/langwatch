@@ -49,6 +49,7 @@ interface ScenarioChildParentEnvironment {
   nodeCompileCache?: string;
   corepackEnableDownloadPrompt?: string;
   nodeExtraCaCerts?: string;
+  logSettings?: Record<string, string | undefined>;
 }
 
 export interface ScenarioChildProcessConfig {
@@ -414,6 +415,7 @@ function buildChildProcessEnvironment(
     // credential answers from the parent fine and 401s on every simulation run
     // against a workflow or code agent.
     [NLP_INTERNAL_SECRET_ENV]: config.nlpInternalSecret,
+    ...parent.logSettings,
     ...scenario,
   };
   const environment: NodeJS.ProcessEnv = {};

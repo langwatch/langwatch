@@ -136,3 +136,13 @@ Feature: One OpenTelemetry setup every process uses
       When a second application in the same process composes its observability with that handle
       Then it is handed the same handle
       And the telemetry SDK is not set up a second time
+
+  Rule: The scenario child runs customer code and gets no collector access
+
+    @unit
+    Scenario: The child's environment carries the log settings and no collector credential
+      Given a parent whose log level, log format and old level names are set
+      And the parent's collector endpoint and OTLP headers are set
+      When the scenario child's environment is built
+      Then the log level and format names reach the child
+      And "OTEL_EXPORTER_OTLP_ENDPOINT" and "OTEL_EXPORTER_OTLP_HEADERS" do not
