@@ -370,6 +370,9 @@
       "path": "modules/feature-flag/browser/tsconfig.json"
     },
     {
+      "path": "modules/feature-flag/client/tsconfig.json"
+    },
+    {
       "path": "modules/feature-flag/contract/tsconfig.json"
     },
     {

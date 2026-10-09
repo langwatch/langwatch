@@ -3,6 +3,7 @@
  * registry.
  */
 
+import { releaseFlags } from "@langwatch/module";
 import { z } from "zod";
 
 export const FRONTEND_FEATURE_FLAGS = [
@@ -54,6 +55,9 @@ export const FRONTEND_FEATURE_FLAGS = [
   // id, which the percentage rollout buckets on (guided-onboarding-variant.feature).
   "experiment_onboarding_langy_guided",
 ] as const;
+
+/** One `ReleaseFlagToken` per browser-visible flag; screens and readers name these. */
+export const FrontendFlags = releaseFlags(FRONTEND_FEATURE_FLAGS);
 
 /** A key the browser may ask about. */
 export type FrontendFeatureFlag = (typeof FRONTEND_FEATURE_FLAGS)[number];

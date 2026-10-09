@@ -129,6 +129,6 @@ export {
   PUBLIC_ANONYMOUS_FEATURE_FLAGS,
   publicAnonymousFlagMapSchema,
 } from "./frontend-feature-flags.ts";
-export { FRONTEND_FEATURE_FLAGS } from "./frontend-feature-flags.ts";
+export { FRONTEND_FEATURE_FLAGS, FrontendFlags } from "./frontend-feature-flags.ts";
 export { VOICE_AGENTS_DISABLED_MESSAGE, VOICE_AGENTS_FLAG_KEY } from "./voice-agents.ts";
 export * from "./feature-flag.api.ts";

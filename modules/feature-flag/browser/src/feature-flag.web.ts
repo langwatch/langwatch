@@ -4,5 +4,8 @@
  */
 
 import { defineBrowserModule } from "@langwatch/browser";
+import { UiFlagsService } from "@langwatch/browser-host/feature-flag";
 
-export const featureFlagWeb = defineBrowserModule("feature-flag");
+export const featureFlagWeb = defineBrowserModule("feature-flag").provides(UiFlagsService, {
+  load: () => import("./behavior/ui-flags-source.ts"),
+});
