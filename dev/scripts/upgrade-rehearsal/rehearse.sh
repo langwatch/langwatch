@@ -301,10 +301,10 @@ drill() {
     sleep 1
   done
   local signal_at exited_at
-  signal_at="$(date -u +%FT%T.%3NZ)"
+  signal_at="$(node -p "new Date().toISOString()")"
   compose kill -s "$signal" head-worker >/dev/null
   compose wait head-worker >/dev/null 2>&1 || true
-  exited_at="$(date -u +%FT%T.%3NZ)"
+  exited_at="$(node -p "new Date().toISOString()")"
   ledger_query "$name-after.json"
   node -e '
     const [running, after, signalAt, exitedAt] = process.argv.slice(1);
