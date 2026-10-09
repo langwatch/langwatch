@@ -296,6 +296,24 @@ func (s *Stack) Stop(ctx context.Context) error {
 	return s.rt.Docker(ctx, dockerHost, "rm", "-f", domain.ObservabilityContainer).Run()
 }
 
+// StopIfRunning stops a running haven LGTM container and reports whether it did,
+// so the native tier can take its ports. It never starts colima, and the
+// container holds no volume, so nothing persistent is lost.
+func (s *Stack) StopIfRunning(ctx context.Context) (bool, error) {
+	if s.rt == nil || !s.rt.IsRunning(ctx) {
+		return false, nil
+	}
+	dockerHost, err := s.rt.DockerHost(ctx)
+	if err != nil {
+		return false, err
+	}
+	out, err := s.rt.Docker(ctx, dockerHost, "inspect", "-f", "{{.State.Running}}", domain.ObservabilityContainer).Output()
+	if err != nil || !domain.ObservabilityContainerRunning(string(out)) {
+		return false, nil //nolint:nilerr // an absent container is a stopped one
+	}
+	return true, s.rt.Docker(ctx, dockerHost, "stop", domain.ObservabilityContainer).Run()
+}
+
 // IsRunning reports whether Grafana is answering right now. It probes the port
 // rather than asking docker, so it is cheap enough for the daemon's monitor loop
 // and true only when the stack is actually usable.

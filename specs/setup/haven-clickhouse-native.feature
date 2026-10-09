@@ -92,3 +92,12 @@ Feature: haven's ClickHouse runs natively on macOS
     And the stack's migrations run on its own database
     And an ingested trace is readable through analytics
     And a LangWatchQL query joins a Postgres table through the named collection
+
+  Rule: Status reports the native server's memory
+
+    @unit
+    Scenario: Native status reads the server's resident memory from the process
+      Given the native ClickHouse server is running
+      When haven reports its status
+      Then it shows the server process's resident memory
+      And names the max_server_memory_usage cap it is measured against

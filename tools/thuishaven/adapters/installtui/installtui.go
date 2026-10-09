@@ -23,17 +23,16 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/havenui"
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
 // Column widths, padded as plain text and styled afterwards — see
-// havenui.Pad for why that order is not a preference.
-const (
-	nameWidth        = 22
-	requirementWidth = 13
-)
+// havenui.Pad for why that order is not a preference. The name column is
+// sized to the longest name (nameWidth).
+const requirementWidth = 13
 
 // Result is what the developer decided.
 type Result struct {
@@ -260,7 +259,7 @@ func (m model) renderHeader() string {
 // distinguish nothing.
 func (m model) renderRow(i int, r row) string {
 	cursor := "  "
-	name := havenui.Pad(r.st.Name, nameWidth)
+	name := havenui.Pad(r.st.Name, m.nameWidth())
 	if i == m.cursor {
 		cursor = havenui.Selected.Render(havenui.Cursor + " ")
 		name = havenui.Selected.Render(name)
@@ -268,6 +267,15 @@ func (m model) renderRow(i int, r row) string {
 	return cursor + m.box(r) + " " + name +
 		havenui.Muted.Render(havenui.Pad(r.st.Requirement.String(), requirementWidth)) +
 		m.outcome(r) + "\n"
+}
+
+// nameWidth is the longest row name plus a two-space gutter.
+func (m model) nameWidth() int {
+	w := 0
+	for i := range m.rows {
+		w = max(w, lipgloss.Width(m.rows[i].st.Name))
+	}
+	return w + 2
 }
 
 // box is the row's answer at a glance: what happens when enter is pressed.

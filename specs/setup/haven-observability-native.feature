@@ -120,3 +120,22 @@ Feature: The observability stack runs natively on macOS
       When the observability stack is stopped
       Then every native process is stopped
       And the data it collected is discarded
+
+  Rule: The native tier takes the container's ports over and names any conflict
+
+    Scenario: A running observability container is stopped before the native tier starts
+      Given haven's own observability container is still running in colima
+      When the native tier comes up
+      Then haven stops that container, keeping colima running
+      And prints one line saying it did
+
+    Scenario: A port held by another process is named in the status
+      Given another process listens on a port a native component needs
+      When the native tier comes up or its status is read
+      Then haven names the component, the port and the process holding it
+      And a colima port forward is called out as a container still publishing it
+
+    Scenario: A component's own process is not a conflict
+      Given a native component's own process already listens on its port
+      When haven checks the component's ports
+      Then no conflict is reported

@@ -240,10 +240,23 @@ func (s *Server) Health(ctx context.Context) (bool, string) {
 	}
 	dbs, _ := s.Databases(ctx)
 	detail := fmt.Sprintf("native %s up on :%d, %d stack database(s)", domain.ClickHouseNativeVersion, ep.HTTPPort, len(dbs))
-	if used := s.MemoryResident(ctx); used != "" {
-		detail += fmt.Sprintf(", memory %s of %dMB soft cap (no OS ceiling)", used, s.limits.MaxServerMemory>>20)
+	if used := s.residentMemory(ctx); used != "" {
+		detail += fmt.Sprintf(", memory %s of %dMB max_server_memory_usage (no OS ceiling)", used, s.limits.MaxServerMemory>>20)
 	} else {
 		detail += ", memory unreadable"
 	}
 	return true, detail
+}
+
+// residentMemory is the server process's RSS from ps. ClickHouse's own
+// MemoryResident metric answered nothing on macOS (seen live 2026-10-09), so
+// the query is only the fallback when the pid is not haven's.
+func (s *Server) residentMemory(ctx context.Context) string {
+	if pid, ok := s.ownedPID(); ok {
+		out, err := exec.CommandContext(ctx, "ps", "-p", strconv.Itoa(pid), "-o", "rss=").Output() // #nosec G204 -- fixed ps argv; the only variable is a parsed integer pid
+		if b, ok := domain.ParsePSRSS(string(out)); err == nil && ok {
+			return domain.HumanBytes(b)
+		}
+	}
+	return s.MemoryResident(ctx)
 }

@@ -21,9 +21,10 @@ func observabilityStack(rt *colima.Runtime, ram uint64, cpus int) app.Observabil
 		fmt.Fprintf(os.Stderr, "haven: %s=%q names no tier (native, container) — using %s\n",
 			domain.ObservabilityTierEnvVar, pinned, tier)
 	}
+	container := otellgtm.New(rt, havenHome(), envOr("HAVEN_OBS_IMAGE", domain.ObservabilityImage),
+		observabilityEndpoints(), observabilityLimits(ram, cpus))
 	if tier == domain.ObservabilityTierContainer {
-		return otellgtm.New(rt, havenHome(), envOr("HAVEN_OBS_IMAGE", domain.ObservabilityImage),
-			observabilityEndpoints(), observabilityLimits(ram, cpus))
+		return container
 	}
 	endpoints := observabilityEndpoints()
 	endpoints.PyroscopePort = 0
@@ -33,6 +34,7 @@ func observabilityStack(rt *colima.Runtime, ram uint64, cpus int) app.Observabil
 		Home: havenHome(), Endpoints: endpoints, Limits: observabilityLimits(ram, cpus),
 		TempoBin: devEnv("HAVEN_OBS_TEMPO_BIN"), TempoArtifact: tempo,
 		AlloyBin: devEnv("HAVEN_OBS_ALLOY_BIN"), AlloyArtifact: alloy,
+		Container: container, // stopped when running: it publishes the same ports
 	})
 }
 
