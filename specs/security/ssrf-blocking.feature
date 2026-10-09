@@ -102,7 +102,8 @@ Feature: SSRF blocking via BLOCK_LOCAL_HTTP_CALLS toggle (TS + Go parity)
 
   Rule: ALLOWED_PROXY_HOSTS is a literal hostname allowlist evaluated regardless of NODE_ENV
     Match is case-insensitive on hostname only (port is ignored). Matches bypass
-    private-IP/localhost checks. Cloud metadata is NEVER bypassed.
+    private-IP/localhost checks, and the .local/.localhost block for on-premise
+    hosts. Cloud metadata and cloud internal domains are NEVER bypassed.
 
     @unit
     Scenario Outline: <impl> allows allowlisted host even when BLOCK_LOCAL_HTTP_CALLS is "true"
@@ -140,6 +141,45 @@ Feature: SSRF blocking via BLOCK_LOCAL_HTTP_CALLS toggle (TS + Go parity)
         | impl   |
         | TS     |
         | Go     |
+
+  # ============================================================================
+  # On-premise hosts — blocked by default, allowlistable per host
+  # ============================================================================
+
+  Rule: An operator can reach a specific on-premise .local host via ALLOWED_PROXY_HOSTS
+    LangWatch running inside a customer datacentre has to call services named
+    under .local / .localhost. Those suffixes are blocked by default, but unlike
+    cloud internal domains they name private infrastructure that hands out no
+    ambient credentials, so an operator may re-enable one exact host. Naming a
+    cloud internal domain in the allowlist still fails.
+
+    @unit
+    Scenario: TS allows an allowlisted on-premise .local host
+      Given BLOCK_LOCAL_HTTP_CALLS is "true"
+      And ALLOWED_PROXY_HOSTS is "llm.corp.local"
+      When TS validates "http://llm.corp.local/v1/chat"
+      Then the validation passes
+
+    @unit
+    Scenario: TS still blocks a .local host that is not allowlisted
+      Given BLOCK_LOCAL_HTTP_CALLS is "true"
+      And ALLOWED_PROXY_HOSTS is "llm.corp.local"
+      When TS validates "http://other.corp.local/api"
+      Then the validation fails with an SSRF block error
+
+    @unit
+    Scenario: TS refuses to allowlist a cloud internal domain
+      Given BLOCK_LOCAL_HTTP_CALLS is "true"
+      And ALLOWED_PROXY_HOSTS is "s3.amazonaws.com"
+      When TS validates "http://s3.amazonaws.com/bucket"
+      Then the validation fails with an SSRF block error
+
+    @unit
+    Scenario: TS refuses a cloud internal domain dressed up with a .local suffix
+      Given BLOCK_LOCAL_HTTP_CALLS is "true"
+      And ALLOWED_PROXY_HOSTS is "metadata.google.internal.local"
+      When TS validates "http://metadata.google.internal.local/computeMetadata/v1/"
+      Then the validation fails with an SSRF block error
 
   # ============================================================================
   # Cloud metadata — ALWAYS blocked, no escape
