@@ -242,8 +242,10 @@ phase0_seed() {
   compose up -d --wait postgres redis clickhouse clickhouse-private
   [[ "$ORIGIN" == "empty" ]] && return 0
   log "phase 0: old image $OLD_IMAGE up"
-  compose up -d old-app old-worker
+  # The app first: two concurrent prisma migrate deploys race on an empty database (P2002).
+  compose up -d old-app
   wait_http "http://localhost:${OLD_APP_PORT}/api/health" 600 || { log "old app never became healthy"; return 1; }
+  compose up -d old-worker
   compose exec -T postgres psql -U prisma -d mydb -v run="$RUN_ID" -f - <"$HERE/seed/tenancy.sql" >>"$RUN_DIR/rehearse.log"
   phase0_products
   local key
