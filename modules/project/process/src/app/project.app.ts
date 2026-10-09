@@ -1,5 +1,5 @@
 import { AuditLogApi } from "@langwatch/audit-log-contract";
-import { type AuthzPermission } from "@langwatch/authorization";
+import { type AuthzPermission, type PrincipalRef } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
 import {
   DataPrivacyApi,
@@ -170,6 +170,7 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
       repository: repositories.projects,
       credentials: ProjectCredentialsService.create(),
       organizations: dependencies.organizations,
+      authorization: dependencies.authorization,
       created: lifecycle,
     });
     const operations = ProjectOperationsService.create({
@@ -318,12 +319,18 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
   }
 
   updateInOrganization(
-    input: Readonly<{ projectId: string; organizationId: string; data: UpdateProjectInput }>,
+    input: Readonly<{
+      projectId: string;
+      organizationId: string;
+      data: UpdateProjectInput;
+      by: PrincipalRef;
+    }>,
   ): Promise<Project> {
     return this.#projectService.update({
       id: input.projectId,
       organizationId: input.organizationId,
       data: input.data,
+      by: input.by,
     });
   }
 

@@ -1,3 +1,5 @@
+import type { PrincipalRef } from "@langwatch/authorization";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import {
   PROJECT_KIND,
@@ -121,6 +123,7 @@ export class ProjectService {
     repository: ProjectRepository;
     credentials: ProjectCredentials;
     organizations: OrganizationApi;
+    authorization: Pick<AuthzApi, "checkByIds">;
     created: ProjectCreatedNoticeService;
     storedObjects?: ProjectStoredObjects;
     diagnostics?: ProjectDiagnostics;
@@ -286,6 +289,7 @@ export class ProjectService {
     id: string;
     organizationId: string;
     data: UpdateProjectInput;
+    by: PrincipalRef;
   }): Promise<Project> {
     return this.writes.update(input);
   }

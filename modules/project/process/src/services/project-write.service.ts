@@ -1,3 +1,5 @@
+import { ProjectPermissionDeniedError, type PrincipalRef } from "@langwatch/authorization";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   type OrganizationApi,
   type OrganizationTeam,
@@ -30,6 +32,7 @@ export class ProjectWriteService {
   private readonly repository: ProjectRepository;
   private readonly credentials: ProjectCredentials;
   private readonly organizations: OrganizationApi;
+  private readonly authorization: Pick<AuthzApi, "checkByIds">;
   private readonly created: ProjectCreatedNoticeService;
   private readonly storedObjects?: ProjectStoredObjects;
   private readonly diagnostics?: ProjectDiagnostics;
@@ -38,6 +41,7 @@ export class ProjectWriteService {
     repository: ProjectRepository;
     credentials: ProjectCredentials;
     organizations: OrganizationApi;
+    authorization: Pick<AuthzApi, "checkByIds">;
     created: ProjectCreatedNoticeService;
     storedObjects?: ProjectStoredObjects;
     diagnostics?: ProjectDiagnostics;
@@ -45,6 +49,7 @@ export class ProjectWriteService {
     this.repository = options.repository;
     this.credentials = options.credentials;
     this.organizations = options.organizations;
+    this.authorization = options.authorization;
     this.created = options.created;
     this.storedObjects = options.storedObjects;
     this.diagnostics = options.diagnostics;
@@ -54,6 +59,7 @@ export class ProjectWriteService {
     repository: ProjectRepository;
     credentials: ProjectCredentials;
     organizations: OrganizationApi;
+    authorization: Pick<AuthzApi, "checkByIds">;
     created: ProjectCreatedNoticeService;
     storedObjects?: ProjectStoredObjects;
     diagnostics?: ProjectDiagnostics;
@@ -151,6 +157,8 @@ export class ProjectWriteService {
     id: string;
     organizationId: string;
     data: UpdateProjectInput;
+    /** Who asks: a move needs `project:manage` here and `project:create` at the destination. */
+    by: PrincipalRef;
   }): Promise<Project> {
     const data = input.data;
     // Read scoped to the organization: an unscoped refusal would tell a caller
@@ -175,6 +183,7 @@ export class ProjectWriteService {
           isProjectPersonal: owned.isPersonal,
           isDestinationTeamPersonal: team.isPersonal,
         });
+        await this.assertMayMove({ by: input.by, projectId: owned.id, teamId: team.id });
       }
     }
 
@@ -215,6 +224,27 @@ export class ProjectWriteService {
     await this.created.archived({ projectId: input.id, organizationId: input.organizationId });
 
     return project;
+  }
+
+  private async assertMayMove(input: {
+    by: PrincipalRef;
+    projectId: string;
+    teamId: string;
+  }): Promise<void> {
+    const [manages, creates] = await Promise.all([
+      this.authorization.checkByIds({
+        principal: input.by,
+        permission: "project:manage",
+        projectId: input.projectId,
+      }),
+      this.authorization.checkByIds({
+        principal: input.by,
+        permission: "project:create",
+        teamId: input.teamId,
+      }),
+    ]);
+    if (!manages.allowed) throw new ProjectPermissionDeniedError("project:manage");
+    if (!creates.allowed) throw new ProjectPermissionDeniedError("project:create");
   }
 
   private async findActiveTeam(input: {

@@ -1171,6 +1171,7 @@ export const prismaModelFieldCatalogue = {
     "maxBatchSize",
     "maxBatchDelayMs",
     "maxInFlight",
+    "allowSelfSignedCertificate",
     "lastSuccessAt",
     "lastFailureAt",
     "archivedAt",

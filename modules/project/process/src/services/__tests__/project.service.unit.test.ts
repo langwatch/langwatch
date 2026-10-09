@@ -1,3 +1,5 @@
+import { ProjectPermissionDeniedError, type AuthzPermission } from "@langwatch/authorization";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   OrganizationHasNoTeamError,
   type OrganizationApi,
@@ -391,6 +393,8 @@ class FixedCredentials extends ProjectCredentials {
   }
 }
 
+const MEMBER = { type: "user", id: "user_1" } as const;
+
 const createService = (
   repository: StubRepository,
   organizations = new StubOrganizationService(),
@@ -402,9 +406,16 @@ const createService = (
       findWithTeam: async () => null,
     },
   }),
+  granted: (permission: AuthzPermission) => boolean = () => true,
 ): ProjectService =>
   ProjectService.create({
     created,
+    authorization: createApiFixture<AuthzApi>({
+      checkByIds: async ({ permission }) => ({
+        allowed: granted(permission),
+        organizationRole: null,
+      }),
+    }),
     repository,
     credentials: new FixedCredentials(),
     organizations: createApiFixture<OrganizationApi>({
@@ -942,6 +953,7 @@ describe("ProjectService", () => {
     await createService(repository, organizations).update({
       id: applicationProject.id,
       organizationId: "org",
+      by: MEMBER,
       data: { name: "Renamed" },
     });
 
@@ -963,6 +975,7 @@ describe("ProjectService", () => {
       createService(repository, organizations).update({
         id: applicationProject.id,
         organizationId: "org",
+        by: MEMBER,
         data: { teamId: "missing" },
       }),
     ).rejects.toBeInstanceOf(DestinationTeamNotFoundError);
@@ -983,7 +996,12 @@ describe("ProjectService", () => {
     organizations.findActiveTeam.mockResolvedValue(destination);
 
     const outcome = await createService(repository, organizations)
-      .update({ id: current.id, organizationId: "org", data: { teamId: destination.id } })
+      .update({
+        id: current.id,
+        organizationId: "org",
+        by: MEMBER,
+        data: { teamId: destination.id },
+      })
       .catch((error: unknown) => error);
     return { outcome, repository };
   };
@@ -1026,6 +1044,7 @@ describe("ProjectService", () => {
     await createService(repository, organizations).update({
       id: applicationProject.id,
       organizationId: "org",
+      by: MEMBER,
       data: { teamId: "team_2" },
     });
 
@@ -1040,6 +1059,51 @@ describe("ProjectService", () => {
     });
   });
 
+  describe("when a caller moves a project to another team", () => {
+    const attemptMove = async (granted: AuthzPermission[]) => {
+      const repository = new StubRepository();
+      const organizations = new StubOrganizationService();
+      repository.findWithTeam.mockResolvedValue(projectWithTeam({ teamId: "team_1" }));
+      organizations.findActiveTeam.mockResolvedValue({ id: "team_2", isPersonal: false });
+
+      const outcome = await createService(repository, organizations, undefined, (permission) =>
+        granted.includes(permission),
+      )
+        .update({
+          id: applicationProject.id,
+          organizationId: "org",
+          by: MEMBER,
+          data: { teamId: "team_2" },
+        })
+        .catch((error: unknown) => error);
+      return { outcome, repository };
+    };
+
+    /** @scenario "A member who may only update a project cannot move it to another team" */
+    it("refuses a caller who may update the project but not manage it", async () => {
+      const { outcome, repository } = await attemptMove(["project:update", "project:create"]);
+
+      expect(outcome).toBeInstanceOf(ProjectPermissionDeniedError);
+      expect(repository.update).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A member who may only update a project cannot move it to another team" */
+    it("refuses a manager who may not create projects in the destination team", async () => {
+      const { outcome, repository } = await attemptMove(["project:update", "project:manage"]);
+
+      expect(outcome).toBeInstanceOf(ProjectPermissionDeniedError);
+      expect(repository.update).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A project manager who may create in the destination team moves the project" */
+    it("moves the project for a manager who may create in the destination team", async () => {
+      const { outcome, repository } = await attemptMove(["project:manage", "project:create"]);
+
+      expect(outcome).toBe(applicationProject);
+      expect(repository.update).toHaveBeenCalled();
+    });
+  });
+
   /** @scenario tRPC project.update rejects cross-org team */
   /** @scenario "Project settings cross an organization boundary" */
   it("refuses a destination team that belongs to another organization", async () => {
@@ -1051,6 +1115,7 @@ describe("ProjectService", () => {
       createService(repository, organizations).update({
         id: applicationProject.id,
         organizationId: "org",
+        by: MEMBER,
         data: { teamId: "team-of-another-org" },
       }),
     ).rejects.toBeInstanceOf(DestinationTeamNotFoundError);
@@ -1072,6 +1137,7 @@ describe("ProjectService", () => {
       createService(repository, organizations).update({
         id: applicationProject.id,
         organizationId: "org",
+        by: MEMBER,
         data: { name: "My Workspace", teamId: "personal" },
       }),
     ).resolves.toBe(applicationProject);
@@ -1120,12 +1186,18 @@ describe("ProjectService", () => {
       const service = createService(repository, organizations);
 
       await expect(
-        service.update({ id: "governance-project", organizationId: "org", data: { name: "x" } }),
+        service.update({
+          id: "governance-project",
+          organizationId: "org",
+          by: MEMBER,
+          data: { name: "x" },
+        }),
       ).rejects.toBeInstanceOf(GovernanceProjectProtectedError);
       await expect(
         service.update({
           id: "governance-project",
           organizationId: "org",
+          by: MEMBER,
           data: { teamId: "team_2" },
         }),
       ).rejects.toBeInstanceOf(GovernanceProjectProtectedError);
@@ -1154,7 +1226,12 @@ describe("ProjectService", () => {
       const service = createService(repository);
 
       await expect(
-        service.update({ id: applicationProject.id, organizationId: "org", data: { name: "x" } }),
+        service.update({
+          id: applicationProject.id,
+          organizationId: "org",
+          by: MEMBER,
+          data: { name: "x" },
+        }),
       ).resolves.toBe(applicationProject);
       await expect(
         service.archive({ id: applicationProject.id, organizationId: "org" }),
@@ -1257,6 +1334,7 @@ describe("ProjectService lifecycle facts for authz's lineage", () => {
       await service.update({
         id: applicationProject.id,
         organizationId: "org",
+        by: MEMBER,
         data: { teamId: "team_beta" },
       });
 
@@ -1280,11 +1358,13 @@ describe("ProjectService lifecycle facts for authz's lineage", () => {
       await service.update({
         id: applicationProject.id,
         organizationId: "org",
+        by: MEMBER,
         data: { teamId: "team_alpha" },
       });
       await service.update({
         id: applicationProject.id,
         organizationId: "org",
+        by: MEMBER,
         data: { name: "Renamed" },
       });
 
@@ -1318,6 +1398,7 @@ describe("ProjectService lifecycle facts for authz's lineage", () => {
         service.update({
           id: applicationProject.id,
           organizationId: "org",
+          by: MEMBER,
           data: { teamId: "team_beta" },
         }),
       ).resolves.toBe(applicationProject);

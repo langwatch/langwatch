@@ -2513,6 +2513,9 @@ model WebhookEndpoint {
   maxBatchSize                Int                    @default(100)
   maxBatchDelayMs             Int                    @default(250)
   maxInFlight                 Int                    @default(4)
+  /// Self-hosted only: deliveries accept the receiver's self-signed TLS
+  /// certificate. Off by default; the hosted product ignores it.
+  allowSelfSignedCertificate  Boolean                @default(false)
   lastSuccessAt               DateTime?
   lastFailureAt               DateTime?
   archivedAt                  DateTime?

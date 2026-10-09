@@ -11,6 +11,7 @@ import {
   MANAGEMENT_API_VERSION,
   NotFoundError,
 } from "@langwatch/api/rest";
+import type { PrincipalRef } from "@langwatch/authorization";
 import type {
   DataPrivacyApi,
   DataPrivacyPiiRedactionLevel,
@@ -66,7 +67,12 @@ export interface ProjectManagementApi
    * would let a token issued for one organization write to another's project.
    */
   updateInOrganization(
-    input: Readonly<{ projectId: string; organizationId: string; data: UpdateProjectInput }>,
+    input: Readonly<{
+      projectId: string;
+      organizationId: string;
+      data: UpdateProjectInput;
+      by: PrincipalRef;
+    }>,
   ): Promise<Project>;
   /**
    * Archives one of this organization's projects, answering with the row it
@@ -83,7 +89,7 @@ export const ProjectManagementApi = moduleApi<ProjectManagementApi>()("project")
 /** The member an organization credential acts for; null for a service key, which acts as nobody. */
 export const projectRestCaller = defineRestMiddleware(
   "projectRestCaller",
-  z.object({ userId: z.string().nullable() }),
+  z.object({ userId: z.string().nullable(), apiKeyId: z.string() }),
 );
 
 /**
@@ -150,7 +156,12 @@ export const projectRest = defineRestRouter(ProjectManagementApi)
   .handle(async ({ app, input, scope }, caller) => {
     await assertAggregateWritable({ app, id: input.id, organizationId: scope.id, caller });
 
-    return updateProject({ app, input, organizationId: scope.id });
+    return updateProject({
+      app,
+      input,
+      organizationId: scope.id,
+      by: { type: "apiKey", id: caller.apiKeyId },
+    });
   })
 
   .delete("/:id", "archiveProject")
@@ -317,6 +328,7 @@ async function updateProject({
   app,
   input,
   organizationId,
+  by,
 }: {
   app: ProjectManagementApi;
   input: Readonly<{
@@ -328,10 +340,12 @@ async function updateProject({
     piiRedactionLevel?: DataPrivacyPiiRedactionLevel | undefined;
   }>;
   organizationId: string;
+  by: PrincipalRef;
 }) {
   const project = await app.updateInOrganization({
     projectId: input.id,
     organizationId,
+    by,
     data: {
       ...(input.name !== undefined && { name: input.name }),
       ...(input.language !== undefined && { language: input.language }),

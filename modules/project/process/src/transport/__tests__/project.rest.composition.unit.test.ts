@@ -5,6 +5,7 @@
  * Spec: specs/projects/projects-management-door.feature
  */
 import { AuditLogApi } from "@langwatch/audit-log-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
 import type {
   DataPrivacyApi,
@@ -26,7 +27,12 @@ import type { RecordProjectCreatedCommandData } from "../../eventing/project-lif
 import { MemoryProjectStorageSettingsRepository } from "../../repositories/memory/memory.project-storage-settings.repository.ts";
 import { MemoryProjectDatabase } from "../../repositories/memory/memory.project.database.ts";
 import { MemoryProjectRepository } from "../../repositories/memory/memory.project.repository.ts";
-import { mountProjectRestApplication, ORGANIZATION_ID, USER_ID } from "./project.rest.harness.ts";
+import {
+  API_KEY_ID,
+  mountProjectRestApplication,
+  ORGANIZATION_ID,
+  USER_ID,
+} from "./project.rest.harness.ts";
 
 const OTHER_ORGANIZATION_ID = "organization-other";
 const GOVERNANCE_PROJECT_ID = "project_governance";
@@ -105,12 +111,14 @@ function project(overrides: Partial<Project> = {}): Project {
  * in-memory backing of its own repository interface, seeded with one project
  * in this organization and one in another.
  */
-function application(): {
+function application({ granted }: { granted?: readonly AuthzPermission[] } = {}): {
   app: ProjectModule;
   database: MemoryProjectDatabase;
+  checkByIds: ReturnType<typeof vi.fn<AuthzApi["checkByIds"]>>;
 } {
   const database = MemoryProjectDatabase.create();
   database.putTeam(team());
+  database.putTeam(team({ id: "team-2" }));
   database.putTeam(team({ id: "team-other", organizationId: OTHER_ORGANIZATION_ID }));
   database.putProject(project());
   database.putProject(
@@ -130,7 +138,11 @@ function application(): {
     }),
   );
 
-  const teams = [team(), team({ id: "team-other", organizationId: OTHER_ORGANIZATION_ID })];
+  const teams = [
+    team(),
+    team({ id: "team-2" }),
+    team({ id: "team-other", organizationId: OTHER_ORGANIZATION_ID }),
+  ];
   const organizations = createApiFixture<OrganizationApi>({
     getTeam: async ({ teamId, organizationId }) => {
       const found = teams.find((t) => t.id === teamId && t.organizationId === organizationId);
@@ -147,8 +159,17 @@ function application(): {
     },
   });
 
+  const checkByIds = vi.fn<AuthzApi["checkByIds"]>(async ({ permission }) => ({
+    allowed: granted?.includes(permission) ?? false,
+    organizationRole: null,
+  }));
   const app = ProjectModule.create({
-    dependencies: { ...unreachablePeers(), organizations, dataPrivacy },
+    dependencies: {
+      ...unreachablePeers(),
+      ...(granted && { authorization: createApiFixture<AuthzApi>({ checkByIds }) }),
+      organizations,
+      dataPrivacy,
+    },
     repositories: {
       projects: MemoryProjectRepository.create({ memory: database }),
       storageSettings: MemoryProjectStorageSettingsRepository.create({ memory: database }),
@@ -158,7 +179,7 @@ function application(): {
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
   });
 
-  return { app, database };
+  return { app, database, checkByIds };
 }
 
 describe("the projects REST family over the application the composition builds", () => {
@@ -276,6 +297,43 @@ describe("the projects REST family over the application the composition builds",
       expect(recorded).toHaveBeenCalledWith(
         expect.objectContaining({ projectId: created.id, organizationId: ORGANIZATION_ID }),
       );
+    });
+  });
+
+  describe("when the organization key moves a project to another team", () => {
+    /** @scenario "A member who may only update a project cannot move it to another team" */
+    it("refuses a key that may not manage the project, and moves nothing", async () => {
+      const { app, database } = application({ granted: ["project:update", "project:create"] });
+      const { send } = mountProjectRestApplication(app);
+
+      const response = await send("/api/projects/project_1", {
+        method: "PATCH",
+        body: { teamId: "team-2" },
+      });
+
+      expect(response.status).toBe(403);
+      expect(database.findProject("project_1")?.teamId).toBe("team-1");
+    });
+
+    /** @scenario "A project manager who may create in the destination team moves the project" */
+    it("moves it for a key that manages it and may create in the destination", async () => {
+      const { app, database, checkByIds } = application({
+        granted: ["project:manage", "project:create"],
+      });
+      const { send } = mountProjectRestApplication(app);
+
+      const response = await send("/api/projects/project_1", {
+        method: "PATCH",
+        body: { teamId: "team-2" },
+      });
+
+      expect(response.status).toBe(200);
+      expect(database.findProject("project_1")?.teamId).toBe("team-2");
+      expect(checkByIds).toHaveBeenCalledWith({
+        principal: { type: "apiKey", id: API_KEY_ID },
+        permission: "project:create",
+        teamId: "team-2",
+      });
     });
   });
 

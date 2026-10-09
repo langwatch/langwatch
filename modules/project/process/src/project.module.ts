@@ -19,9 +19,10 @@ export const projectProcessModule: PublishedProcessModule<"project", ProjectApi>
     .withApi(ProjectModule)
     .withTransports(projectRest, projectTrpcTransport)
     .withTransportFacts(() => [
-      bindRestMiddleware(projectRestCaller, (context) => ({
-        userId: organizationCredentialOfRequest(context.req.raw).userId,
-      })),
+      bindRestMiddleware(projectRestCaller, (context) => {
+        const { userId, apiKeyId } = organizationCredentialOfRequest(context.req.raw);
+        return { userId, apiKeyId };
+      }),
     ])
     .withEventing(projectLifecycleEventing)
     // Old images record none of these facts: each runs once no old image serves (ADR-173 §3).

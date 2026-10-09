@@ -113,6 +113,7 @@ export class ProjectOperationsService {
       id: input.projectId,
       organizationId,
       data,
+      by: { type: "user", id: by.id },
     });
     const stored = await this.dependencies.storageSettings.update({
       projectId: input.projectId,
