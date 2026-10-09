@@ -12,21 +12,22 @@ import (
 	"strings"
 	"syscall"
 
+	"golang.org/x/crypto/bcrypt"
+
 	"github.com/langwatch/langwatch/tools/seedgen"
 )
 
 // runOptions are run-only flags: they pick the route and the run directory, never the plan, so
 // they stay out of the run id.
 type runOptions struct {
-	executor, app, into, runDir string
-	resume                      bool
+	executor, app, runDir string
+	resume                bool
 }
 
 // parseRunOptions takes the run-only flags out of args and leaves the plan flags.
 func parseRunOptions(args []string) (runOptions, []string, error) {
 	options := runOptions{executor: "task", app: os.Getenv("BASE_HOST"), runDir: filepath.Join(os.TempDir(), "seedgen")}
-	values := map[string]*string{"executor": &options.executor, "app": &options.app, "into": &options.into,
-		"run-dir": &options.runDir}
+	values := map[string]*string{"executor": &options.executor, "app": &options.app, "run-dir": &options.runDir}
 	var rest []string
 	for i := 0; i < len(args); i++ {
 		name, value, hasValue := strings.Cut(strings.TrimLeft(args[i], "-"), "=")
@@ -53,9 +54,6 @@ func parseRunOptions(args []string) (runOptions, []string, error) {
 func (options runOptions) validate() error {
 	if options.executor != "task" && options.executor != "door" {
 		return &seedgen.FlagError{Flag: "executor", Value: options.executor, Accepts: "task or door"}
-	}
-	if org, project, ok := strings.Cut(options.into, "/"); options.into != "" && (!ok || org == "" || project == "") {
-		return &seedgen.FlagError{Flag: "into", Value: options.into, Accepts: "ORG_ID/PROJECT_ID"}
 	}
 	return nil
 }
@@ -89,10 +87,14 @@ func runSeed(options runOptions, plan *seedgen.Plan, out streams) int {
 	if err != nil {
 		return fail(2, err)
 	}
-	if options.into != "" {
-		seedgen.BindInto(plan, checkpoint, options.into)
+	if plan.Flags.Into != "" {
+		seedgen.BindInto(plan, checkpoint, plan.Flags.Into)
 	}
-	executor, err := newExecutor(ctx, options, stderr)
+	runnerArgs, err := handDownPasswordHash(options.runDir)
+	if err != nil {
+		return fail(2, err)
+	}
+	executor, err := newExecutor(ctx, options, stderr, runnerArgs)
 	if err != nil {
 		return fail(1, err)
 	}
@@ -100,6 +102,7 @@ func runSeed(options runOptions, plan *seedgen.Plan, out streams) int {
 		Path: checkpointPath, Sensors: seedgen.StackSensors(options.app), Log: stderr, Drain: options.app != ""})
 	_ = executor.Close()
 	printResult(stdout, result)
+	printSeeded(stdout, checkpoint)
 	var stall *seedgen.StallError
 	if errors.As(err, &stall) {
 		return fail(4, err)
@@ -107,7 +110,36 @@ func runSeed(options runOptions, plan *seedgen.Plan, out streams) int {
 	if err != nil {
 		return fail(1, err)
 	}
+	if result.IdentityRefused > 0 {
+		return fail(1, fmt.Errorf("%d identity steps were refused; the counts above are what exists", result.IdentityRefused))
+	}
 	return 0
+}
+
+// handDownPasswordHash hashes the one dev password every seeded login shares into a 0600 file in
+// the run directory and names it to the runner, so the password never reaches it; with no
+// password set, seeded users get none.
+func handDownPasswordHash(runDir string) ([]string, error) {
+	password := os.Getenv("LANGWATCH_ADMIN_PASSWORD")
+	if password == "" {
+		return nil, nil
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), 10)
+	if err != nil {
+		return nil, err
+	}
+	path := filepath.Join(runDir, "password.hash")
+	if err := os.WriteFile(path, hash, 0o600); err != nil {
+		return nil, err
+	}
+	return []string{"--password-hash-file", path}, nil
+}
+
+// printSeeded is what exists after the run, counted from acks only, never from the plan.
+func printSeeded(w io.Writer, checkpoint *seedgen.Checkpoint) {
+	counts := checkpoint.Counters
+	_, _ = fmt.Fprintf(w, "seeded: %d orgs, %d users, %d projects, %d members\n", counts[seedgen.KindOrgCreate],
+		counts[seedgen.KindUserCreate], counts[seedgen.KindProjectCreate], counts[seedgen.KindMemberAdd])
 }
 
 // openCheckpoint loads the run's checkpoint on --resume; otherwise it runs the preflight (exit 2,
@@ -130,7 +162,7 @@ func openCheckpoint(ctx context.Context, options runOptions, plan *seedgen.Plan)
 	return seedgen.NewCheckpoint(plan.Run, nil), seedgen.NewManifest(plan).Write(options.runDir)
 }
 
-func newExecutor(ctx context.Context, options runOptions, log io.Writer) (seedgen.Executor, error) {
+func newExecutor(ctx context.Context, options runOptions, log io.Writer, runnerArgs []string) (seedgen.Executor, error) {
 	if options.executor == "door" {
 		if options.app == "" {
 			return nil, errors.New("the door executor needs --app (the haven route) or BASE_HOST")
@@ -141,7 +173,7 @@ func newExecutor(ctx context.Context, options runOptions, log io.Writer) (seedge
 	if err != nil {
 		return nil, err
 	}
-	return seedgen.StartTaskPipe(ctx, repo, log)
+	return seedgen.StartTaskPipe(ctx, repo, log, runnerArgs...)
 }
 
 // repoRoot is the nearest directory up from here holding pnpm-workspace.yaml.

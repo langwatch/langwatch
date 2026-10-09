@@ -11,11 +11,14 @@ import {
 import { HandledError } from "@langwatch/handled-error";
 import { LogApi } from "@langwatch/log-contract";
 import { MetricApi } from "@langwatch/metric-contract";
+import { OrganizationApi } from "@langwatch/organization-contract";
+import { ProjectApi } from "@langwatch/project-contract";
 import {
   DEFAULT_PII_REDACTION_LEVEL,
   TraceApi,
   type OtlpTracesInput,
 } from "@langwatch/trace-contract";
+import { UserApi } from "@langwatch/user-contract";
 import { z } from "zod";
 
 import type { SeedAction, SeedReply } from "./protocol.ts";
@@ -27,7 +30,16 @@ export type SeedApis = Readonly<{
   trace: Pick<TraceApi, "otlpTraces">;
   log: Pick<LogApi, "collectOtlpLogs">;
   metric: Pick<MetricApi, "collectOtlpMetrics">;
+  user: Pick<UserApi, "findByEmail" | "create" | "setFirstPassword">;
+  organization: Pick<
+    OrganizationApi,
+    "getAllForUser" | "createAndAssign" | "createMembership" | "changeMemberRole" | "addTeamMember"
+  >;
+  project: Pick<ProjectApi, "listByTeam" | "create">;
 }>;
+
+/** What a run carries beside the Apis: the one dev password's hash every seeded login shares. */
+export type SeedSettings = Readonly<{ passwordHash: string | null }>;
 
 /** The Api tokens `SeedApis` is read from in the booted tasks App. */
 export const seedApiTokens = {
@@ -36,12 +48,22 @@ export const seedApiTokens = {
   trace: TraceApi,
   log: LogApi,
   metric: MetricApi,
+  user: UserApi,
+  organization: OrganizationApi,
+  project: ProjectApi,
 } as const;
 
 type SeedRefs = Record<string, string>;
-/** `retry` names a refusal seedgen retries with back-off: a queue or store was not reachable. */
-type SeedOutcome = { refs: SeedRefs } | { retry: string };
-type SeedKind = (input: { action: SeedAction; apis: SeedApis }) => Promise<SeedOutcome>;
+/**
+ * `retry` names a refusal seedgen retries with back-off (a queue or store was not reachable);
+ * `refused` one it does not.
+ */
+type SeedOutcome = { refs: SeedRefs } | { retry: string } | { refused: string };
+type SeedKind = (input: {
+  action: SeedAction;
+  apis: SeedApis;
+  settings: SeedSettings;
+}) => Promise<SeedOutcome>;
 const applied: SeedOutcome = { refs: {} };
 
 const inOrganization = <Input extends z.ZodType>(input: Input) =>
@@ -63,6 +85,35 @@ const retentionSetSchema = inOrganization(
   }),
 );
 
+const userCreateSchema = z.object({
+  ref: z.string().min(1),
+  input: z.object({ email: z.email(), state: z.enum(["accepted", "invited"]) }),
+});
+const orgCreateSchema = z.object({
+  ref: z.string().startsWith("$org:"),
+  as: z.string().min(1),
+  input: z.object({ name: z.string().min(1), team: z.string().min(1) }),
+});
+const projectCreateSchema = z.object({
+  ref: z.string().min(1),
+  org: z.string().min(1),
+  as: z.string().min(1),
+  input: z.object({ name: z.string().min(1), team: z.string().min(1) }),
+});
+const memberAddSchema = z.object({
+  org: z.string().min(1),
+  as: z.string().min(1),
+  input: z.object({
+    user: z.string().min(1),
+    role: z.enum(["ADMIN", "MEMBER", "EXTERNAL"]),
+    team: z.string().min(1),
+    teamRole: z.enum(["ADMIN", "MEMBER", "VIEWER"]),
+  }),
+});
+
+/** The tiny Organization fields find-before-create reads. */
+const noDemo = { isDemo: false, demoProjectUserId: "", demoProjectId: "" } as const;
+
 const otlpRequestSchema = z.custom<OtlpTracesInput["traceRequest"]>(
   (value) => typeof value === "object" && value !== null && !Array.isArray(value),
 );
@@ -76,6 +127,82 @@ const otlpOutcome = (result: { outcome: "collected" } | { outcome: "unavailable"
  * bounded by what that user holds; only one with none is the tasks operator's `system` write.
  */
 export const SEED_KINDS: Readonly<Record<string, SeedKind>> = {
+  /** Finds the account by email, else mints it; an accepted user gets the shared dev password. */
+  "user.create": async ({ action, apis, settings }) => {
+    const { ref, input } = userCreateSchema.parse(action);
+    const user =
+      (await apis.user.findByEmail({ email: input.email })) ??
+      (await apis.user.create({
+        name: input.email.split("@")[0] ?? input.email,
+        email: input.email,
+      }));
+    if (settings.passwordHash && input.state === "accepted") {
+      await apis.user.setFirstPassword({ id: user.id, passwordHash: settings.passwordHash });
+    }
+    return { refs: { [ref]: user.id } };
+  },
+  /** The owner founds the org and its main team, unless it already founded one so named. */
+  "org.create": async ({ action, apis }) => {
+    const { ref, as, input } = orgCreateSchema.parse(action);
+    const teamRef = `$team:${ref.slice("$org:".length)}/${input.team}`;
+    const found = (await apis.organization.getAllForUser(noDemo, { id: as })).find(
+      (organization) => organization.name === input.name,
+    );
+    const team = found?.teams.find((candidate) => !candidate.isPersonal) ?? found?.teams[0];
+    if (found && team) return { refs: { [ref]: found.id, [teamRef]: team.id } };
+    const created = await apis.organization.createAndAssign({ orgName: input.name }, { id: as });
+    return { refs: { [ref]: created.organization.id, [teamRef]: created.team.id } };
+  },
+  "project.create": async ({ action, apis }) => {
+    const { ref, org, as, input } = projectCreateSchema.parse(action);
+    const existing = (
+      await apis.project.listByTeam({ organizationId: org, teamId: input.team })
+    ).find((project) => project.name === input.name);
+    const project =
+      existing ??
+      (await apis.project.create(
+        {
+          organizationId: org,
+          teamId: input.team,
+          name: input.name,
+          language: "other",
+          framework: "other",
+        },
+        { id: as },
+      ));
+    return { refs: { [ref]: project.id } };
+  },
+  /**
+   * Admits a user as the owner would: a membership row with the owner's admission (a grant alone
+   * makes no member), then the row's role, then the main team. A seat the plan cannot spare is
+   * refused, so the counts never claim a member who waits.
+   */
+  "member.add": async ({ action, apis }) => {
+    const { org, as, input } = memberAddSchema.parse(action);
+    const actor = { type: "user" as const, id: as };
+    const admission = await apis.organization.createMembership({
+      organizationId: org,
+      userId: input.user,
+      seat: "MEMBER",
+      admittedBy: { actor, commandId: action.id },
+    });
+    if (admission.pending) return { refused: "seat_unavailable" };
+    if (input.role !== admission.seat) {
+      await apis.organization.changeMemberRole(
+        { organizationId: org, userId: input.user, role: input.role },
+        { id: as },
+      );
+    }
+    await apis.organization.addTeamMember({
+      organizationId: org,
+      teamId: input.team,
+      userId: input.user,
+      role: input.teamRole,
+      actor,
+      caller: actor,
+    });
+    return applied;
+  },
   "grant.attach": async ({ action, apis }) => {
     const { org, ref, input } = grantAttachSchema.parse(action);
     const grants = input.grants.map((grant) => ({ ...grant, bindingId: newAuthzGrantId() }));
@@ -157,15 +284,18 @@ const refusal = ({
 export async function applySeedAction({
   action,
   apis,
+  settings = { passwordHash: null },
 }: {
   action: SeedAction;
   apis: SeedApis;
+  settings?: SeedSettings;
 }): Promise<SeedReply> {
   const kind = SEED_KINDS[action.kind];
   if (!kind) return refusal({ action, code: "unknown_seed_kind", retryable: false });
   try {
-    const outcome = await kind({ action, apis });
+    const outcome = await kind({ action, apis, settings });
     if ("retry" in outcome) return refusal({ action, code: outcome.retry, retryable: true });
+    if ("refused" in outcome) return refusal({ action, code: outcome.refused, retryable: false });
     const minted = Object.keys(outcome.refs).length > 0;
     return { id: action.id, ok: true, ...(minted ? { refs: outcome.refs } : {}) };
   } catch (error) {

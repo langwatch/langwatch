@@ -1,8 +1,10 @@
 package app
 
 import (
+	"path/filepath"
 	"testing"
 
+	"github.com/langwatch/langwatch/tools/seedgen"
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
@@ -33,5 +35,40 @@ func TestSeedAccessMasksUnlessRevealed(t *testing.T) {
 		if value != domain.MaskedSecret {
 			t.Errorf("%s printed unmasked: %q", name, value)
 		}
+	}
+}
+
+// @scenario "The access block lists every seeded org and its logins"
+func TestSeedAccessListsOnlyTheOrgsTheSeedCreated(t *testing.T) {
+	o := seedOrchestrator(t, &fakeSupervisor{}, seedStack())
+	flags, err := seedgen.ParseFlags([]string{"--size", "tiny", "--private", "0", "--org", "name=acme,users=3",
+		"--org", "name=globex,users=2"}, seedNow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan, err := seedgen.NewPlan(flags)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(o.seedRunsDir("feat-x"), plan.Run)
+	if err := seedgen.NewManifest(plan).Write(dir); err != nil {
+		t.Fatal(err)
+	}
+	acme := plan.Orgs[0]
+	refs := seedgen.Refs{acme.Ref: "org_acme", acme.Users[0].Ref: "user_owner", acme.Users[1].Ref: "user_member"}
+	if err := seedgen.NewCheckpoint(plan.Run, refs).Save(filepath.Join(dir, "run.json")); err != nil {
+		t.Fatal(err)
+	}
+
+	access, err := o.seedAccess(UpParams{ExplicitSlug: "feat-x"}, false)
+	if err != nil {
+		t.Fatalf("seedAccess: %v", err)
+	}
+	if len(access.Orgs) != 1 || access.Orgs[0].ID != "org_acme" || access.Orgs[0].Name != "acme" {
+		t.Fatalf("orgs = %+v: want only acme, the one the product minted", access.Orgs)
+	}
+	logins := access.Orgs[0].Logins
+	if len(logins) != 2 || logins[0].Email != acme.Users[0].Email || logins[1].Password != domain.MaskedSecret {
+		t.Fatalf("logins = %+v: want the owner and the one minted member, masked", logins)
 	}
 }

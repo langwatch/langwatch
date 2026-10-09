@@ -26,6 +26,29 @@ Feature: seed:apply applies seedgen's actions through installed module APIs
     And every action is acknowledged with its id
 
   @unit
+  Scenario: Seeded users, orgs, projects and memberships go through the module APIs
+    When seedgen sends user.create, org.create, project.create and member.add actions
+    Then a user is found by email or created through the user API
+    And an org is founded by its owner through the organization API, minting the org and its main team as references
+    And a project is created by the owner in the main team through the project API
+    And a member is admitted by the owner as a membership row, given its role, then added to the main team
+    And anything an earlier run created is found and returned instead of created again
+
+  @unit
+  Scenario: Seeded users share one dev password
+    Given seedgen hands the runner the hash of the stack's dev password
+    When accepted and invited users are created
+    Then each accepted user gets that password and an invited user gets none
+    And the password itself never reaches the runner
+
+  @unit
+  Scenario: The persona counts haven seed prints are what it created
+    Given a membership the organization holds pending for want of a seat
+    When the member.add action is applied
+    Then the reply is a refusal, so the member is not counted as created
+    And seedgen prints its counts from acknowledged actions only and exits 1 when an identity action was refused
+
+  @unit
   Scenario: An acknowledged grant returns its minted id as a reference
     When a grant.attach action naming a ref is applied
     Then the reply carries a reference for each grant that was attached and none for a held one
