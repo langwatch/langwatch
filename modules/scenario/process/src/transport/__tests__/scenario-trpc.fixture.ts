@@ -13,6 +13,7 @@ import type { Actor, AuthzPermission } from "@langwatch/authorization";
 import type { TrpcContract } from "@langwatch/module";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 import { initTRPC } from "@trpc/server";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 
 type TestContext = object;
 
@@ -33,6 +34,7 @@ function portsGranting(
     identity: { caller: () => ({ actor }) },
     authorization: {
       forRequest: () => ({
+        ...testAuthorizeDefaults,
         getDecision: async (input) => ({
           permitted: holds(input.permission),
           organizationRole: null,
