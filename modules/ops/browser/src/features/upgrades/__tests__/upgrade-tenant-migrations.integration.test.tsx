@@ -9,7 +9,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const LONG_TITLE = "T".repeat(300);
 
-const MIGRATIONS = [
+let MIGRATIONS: Record<string, unknown>[] = [];
+const LONG_STEP = [
   {
     name: "ops:long-step",
     title: LONG_TITLE,
@@ -22,6 +23,7 @@ const MIGRATIONS = [
     attention: [],
   },
 ];
+let isSaaS = false;
 
 vi.mock("../../../behavior/ops-api.ts", () => ({
   api: {
@@ -30,7 +32,7 @@ vi.mock("../../../behavior/ops-api.ts", () => ({
       upgrade: {
         listSystemMigrations: { useQuery: () => ({ data: MIGRATIONS, isLoading: false }) },
         listMigrationEnrollments: {
-          useQuery: () => ({ data: { isSaaS: false, enrollments: [] } }),
+          useQuery: () => ({ data: { isSaaS, enrollments: [] } }),
         },
         runSystemMigrationPass: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
         enrollMigrationTenant: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
@@ -58,19 +60,56 @@ import { UpgradeTenantMigrations } from "../ui/sections/upgrade-tenant-migration
 
 afterEach(cleanup);
 
+function renderTab() {
+  render(
+    <DesignSystemProvider forcedTheme="light">
+      <UpgradeTenantMigrations />
+    </DesignSystemProvider>,
+  );
+}
+
 describe("UpgradeTenantMigrations", () => {
   describe("given a step with a 300-character title and two parked organizations", () => {
     it("names the title in full on hover and badges only the non-zero parked count", () => {
-      render(
-        <DesignSystemProvider forcedTheme="light">
-          <UpgradeTenantMigrations />
-        </DesignSystemProvider>,
-      );
+      MIGRATIONS = LONG_STEP;
+      isSaaS = false;
+      renderTab();
 
       const row = screen.getByTestId("upgrade-tenant-migration-ops:long-step");
       expect(within(row).getByTitle(LONG_TITLE)).toBeTruthy();
       expect(row.querySelectorAll("[class*='badge']").length).toBe(1);
       expect(screen.getByTestId("upgrade-tenant-migrations-table")).toBeTruthy();
+    });
+  });
+
+  describe("given an automatic step on SaaS with one held organization and no enrolment rows", () => {
+    it("reads Enrolled as All and lists the held organization without an empty enrolment table", () => {
+      MIGRATIONS = [
+        {
+          ...LONG_STEP[0],
+          name: "authz:engine",
+          title: "Authorization engine",
+          counts: { finalized: 0, migrated: 1, parked: 0, rolled_back: 0 },
+          attention: [
+            {
+              migrationName: "authz:engine",
+              tenantId: "org-1",
+              organizationName: "Held org",
+              status: "migrated",
+              attempts: 1,
+              updatedAt: 0,
+              report: null,
+            },
+          ],
+        },
+      ];
+      isSaaS = true;
+      renderTab();
+
+      const row = screen.getByTestId("upgrade-tenant-migration-authz:engine");
+      expect(within(row).getByText("All")).toBeTruthy();
+      expect(screen.queryByText("No organizations are enrolled for this step yet.")).toBeNull();
+      expect(screen.getByText("Organization needing attention")).toBeTruthy();
     });
   });
 });

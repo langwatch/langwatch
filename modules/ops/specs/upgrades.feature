@@ -80,6 +80,13 @@ Feature: Ops shows an installation's release upgrades, read-only
     And the retired Ops, Migrations address opens this tab
 
   @integration
+  Scenario: An automatic step reads every organization as enrolled
+    Given a step that enrols every organization automatically, with one held organization
+    When an operator opens the Tenant migrations tab on SaaS
+    Then its Enrolled count reads All and no empty enrolment list is shown
+    And the held organization is listed as needing attention
+
+  @integration
   Scenario: The step drawer shows a step's error, fix and checkpoint, read-only
     Given a failed data step whose error names its fix and whose report holds a checkpoint
     When an operator opens the step drawer
