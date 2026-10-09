@@ -51,7 +51,13 @@ describe("the toast stack opening in two steps", () => {
     const fanned = spread();
     expect(fanned).toBeLessThan(front().getBoundingClientRect().height * 2);
 
+    front().querySelector("button")?.click();
+    expect(document.querySelector("[data-fan]")).not.toBeNull();
+    await waitFor(() => expect(roots()).toHaveLength(3));
+    await waitFor(() => expect(spread()).toBeLessThan(fanned));
+    const fannedThree = spread();
+
     await userEvent.click(front());
-    await waitFor(() => expect(spread()).toBeGreaterThan(fanned + 40));
+    await waitFor(() => expect(spread()).toBeGreaterThan(fannedThree + 40));
   });
 });
