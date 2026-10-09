@@ -68,7 +68,7 @@ function connection(over: Partial<SsoConnectionState> = {}): SsoConnectionState 
 }
 
 type MembershipWrite = () => Promise<"created" | "already-present">;
-type JoinerSeat = "MEMBER" | "DEVELOPER";
+type JoinerSeat = "MEMBER" | "DEVELOPER" | "EXTERNAL";
 
 function serviceOver({
   row,
@@ -78,6 +78,7 @@ function serviceOver({
   joinerSeat = "MEMBER",
   existingSeat,
   pendingAdmission = null,
+  held = false,
 }: {
   row: SsoConnectionState | null;
   member?: boolean;
@@ -87,6 +88,8 @@ function serviceOver({
   joinerSeat?: JoinerSeat;
   /** The seat a row that was already there holds, when the write collides. */
   existingSeat?: JoinerSeat;
+  /** The seat given is held pending: no seat was free (seat-limit-at-provisioning.feature). */
+  held?: boolean;
   pendingAdmission?: AuthzPendingAdmission | null;
 }) {
   let pending = pendingAdmission;
@@ -103,6 +106,7 @@ function serviceOver({
     return {
       outcome,
       seat: outcome === "already-present" ? (existingSeat ?? joinerSeat) : joinerSeat,
+      pending: held,
     };
   });
   const readPendingAdmission = vi.fn(async () =>
@@ -456,6 +460,25 @@ describe("given an organization whose joiner seat is Developer (ADR-171)", () =>
       organizationName: ORG.name,
     });
     expect(parts.startNurturing).toHaveBeenCalledTimes(1);
+  });
+
+  it("attaches no full member grant to an arrival given a Lite Member seat", async () => {
+    const parts = serviceOver({ row: connection(), joinerSeat: "EXTERNAL" });
+
+    await parts.service.joinOrganization({ user: USER, org: ORG, domain: "acme.com" });
+
+    expect(parts.attachBindings).not.toHaveBeenCalled();
+    expect(parts.joinedAutomatically).toHaveBeenCalledTimes(1);
+  });
+
+  it("attaches no grant and announces nothing for an arrival held pending", async () => {
+    const parts = serviceOver({ row: connection(), joinerSeat: "EXTERNAL", held: true });
+
+    await parts.service.joinOrganization({ user: USER, org: ORG, domain: "acme.com" });
+
+    expect(parts.attachBindings).not.toHaveBeenCalled();
+    expect(parts.joinedAutomatically).not.toHaveBeenCalled();
+    expect(parts.announceSignup).not.toHaveBeenCalled();
   });
 
   it("still resumes a Full member's pending grant when their row was already there", async () => {

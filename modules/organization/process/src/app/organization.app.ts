@@ -117,6 +117,7 @@ import {
   type SignInSecurityPolicy,
   type OrganizationApiSeatCheckoutInput,
   type OrganizationSeatCheckoutRedirect,
+  type OrganizationAdmission,
 } from "@langwatch/organization-contract";
 import type * as organizationContractModule from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
@@ -819,7 +820,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       seat?: "MEMBER" | "DEVELOPER";
       origin?: OrganizationJoinOrigin;
     }>,
-  ): Promise<{ outcome: "created" | "already-present"; seat: "MEMBER" | "DEVELOPER" }> {
+  ): Promise<OrganizationAdmission> {
     return this.#dependencies.membership.createMembership(input);
   }
 

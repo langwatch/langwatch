@@ -26,6 +26,7 @@ import {
 } from "@langwatch/organization-contract";
 import type {
   FullyLoadedOrganization,
+  OrganizationAdmission,
   OrganizationFounding,
   OrganizationWithMembersAndTheirTeams,
   User,
@@ -1687,27 +1688,29 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
    * the grant lands still leaves the marker. P2002 HERE is a concurrent
    * callback or a retry; any other constraint is a real failure.
    */
+  async readJoinerSeat({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<"MEMBER" | "DEVELOPER"> {
+    const organization = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { joinerRole: true },
+    });
+    return readJoinerRole(organization?.joinerRole);
+  }
+
   async createMembership(input: {
     organizationId: string;
     userId: string;
     pendingAdmissionId: string;
     via: DeveloperAdmissionVia;
-    /** The seat a caller decided (ADR-171 v6); absent reads the joiner seat. */
-    seat?: "MEMBER" | "DEVELOPER";
+    seat: "MEMBER" | "DEVELOPER" | "EXTERNAL";
+    pending: boolean;
     /** Where a join request was made, for the Developer admission audit row. */
     origin?: "web" | "cli";
-  }): Promise<{ outcome: "created" | "already-present"; seat: "MEMBER" | "DEVELOPER" }> {
-    const { organizationId, userId } = input;
-    const seat =
-      input.seat ??
-      readJoinerRole(
-        (
-          await this.prisma.organization.findUnique({
-            where: { id: organizationId },
-            select: { joinerRole: true },
-          })
-        )?.joinerRole,
-      );
+  }): Promise<OrganizationAdmission> {
+    const { organizationId, userId, seat, pending } = input;
     try {
       await this.prisma.$transaction(async (tx) => {
         await tx.organizationUser.create({
@@ -1715,6 +1718,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
             userId,
             organizationId,
             role: seat,
+            disabledAt: pending ? new Date() : null,
             pendingSsoGrantId: seat === "MEMBER" ? input.pendingAdmissionId : null,
           },
         });
@@ -1738,19 +1742,16 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
           });
         }
       });
-      return { outcome: "created", seat };
+      return { outcome: "created", seat, pending };
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
         // The row that is there decides, not today's setting: a MEMBER row a
         // concurrent callback made still has its grant to attach.
         const existing = await this.prisma.organizationUser.findUnique({
           where: { userId_organizationId: { userId, organizationId } },
-          select: { role: true },
+          select: { role: true, disabledAt: true },
         });
-        return {
-          outcome: "already-present",
-          seat: existing?.role === OrganizationUserRole.DEVELOPER ? "DEVELOPER" : "MEMBER",
-        };
+        return { outcome: "already-present", ...admittedSeatOf(existing) };
       }
       throw error;
     }
@@ -2299,4 +2300,15 @@ function memberSummaryFromRecord(record: MemberSummaryRecord): OrganizationMembe
     createdAt: fromDate(record.createdAt),
     updatedAt: fromDate(record.updatedAt),
   };
+}
+
+/** The seat an existing row holds, as an admission answers it; a disabled Lite row is pending. */
+function admittedSeatOf(
+  row: { role: string; disabledAt: Date | null } | null,
+): Pick<OrganizationAdmission, "seat" | "pending"> {
+  if (row?.role === OrganizationUserRole.DEVELOPER) return { seat: "DEVELOPER", pending: false };
+  if (row?.role === OrganizationUserRole.EXTERNAL) {
+    return { seat: "EXTERNAL", pending: row.disabledAt !== null };
+  }
+  return { seat: "MEMBER", pending: false };
 }

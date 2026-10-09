@@ -13,6 +13,7 @@ import type {
   PricingModel,
   TeamUserRole,
   User,
+  OrganizationAdmission,
 } from "@langwatch/organization-contract";
 
 import type { DeveloperAdmissionVia } from "../rules/admission-audit.rules.ts";
@@ -381,21 +382,24 @@ export abstract class OrganizationMembershipRepository {
     userId: string;
   }) => Promise<MemberTeamBinding[]>;
 
+  /** The seat a joiner lands on when nobody decided one (ADR-171). */
+  abstract readJoinerSeat: (input: { organizationId: string }) => Promise<"MEMBER" | "DEVELOPER">;
+
   /**
-   * Admits somebody on the joiner seat (ADR-171): a MEMBER carries the grant
-   * intent an unfinished admission resumes from (ADR-129), a DEVELOPER none.
-   * A row already there is `"already-present"`: a retry, not a failure.
+   * Writes the seat the service decided (ADR-171): a MEMBER carries the grant intent an
+   * unfinished admission resumes from (ADR-129), any other seat none; `pending` writes it disabled.
+   * A row already there is `"already-present"`, answered from that row: a retry, not a failure.
    */
   abstract createMembership: (input: {
     organizationId: string;
     userId: string;
     pendingAdmissionId: string;
     via: DeveloperAdmissionVia;
-    /** The seat a caller decided (ADR-171 v6); absent reads the joiner seat. */
-    seat?: "MEMBER" | "DEVELOPER";
+    seat: "MEMBER" | "DEVELOPER" | "EXTERNAL";
+    pending: boolean;
     /** Where a join request was made, for the Developer admission audit row. */
     origin?: "web" | "cli";
-  }) => Promise<{ outcome: "created" | "already-present"; seat: "MEMBER" | "DEVELOPER" }>;
+  }) => Promise<OrganizationAdmission>;
 
   /** The plain MEMBER row an SSO domain auto-join writes; an existing row is "already-present". */
   abstract createSsoDomainMembership: (input: {

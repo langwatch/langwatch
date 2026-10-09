@@ -132,10 +132,10 @@ export class SsoArrivalService {
       organizationId: org.id,
       userId: user.id,
     });
-    if (written.seat === "DEVELOPER") {
-      // No grant, so nothing to resume: the row is the admission (ADR-171).
-      // Only the arrival that created it announces.
-      if (written.outcome !== "created") return;
+    if (written.seat !== "MEMBER") {
+      // A Developer or Lite seat gets no grant, so the row is the admission (ADR-171); a pending
+      // one waits for a seat, shown to admins. Only the arrival that created it announces.
+      if (written.outcome !== "created" || written.pending) return;
       await this.deps.notifications?.joinedAutomatically({
         organizationId: org.id,
         requesterUserId: user.id,

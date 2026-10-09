@@ -8,6 +8,7 @@ import type {
 } from "@langwatch/onboarding-contract";
 import type { Instant } from "@langwatch/time";
 
+import type { OrganizationAdmission } from "./admission-seat.ts";
 import type {
   GroupDetail,
   GroupListItem,
@@ -411,9 +412,10 @@ export interface OrganizationApi {
     }>,
   ): Promise<AuthzAccessBreakdownOutput>;
   /**
-   * Admits somebody on the joiner seat (ADR-129, ADR-171): a MEMBER's grant lands now with
-   * `admittedBy` or an SSO arrival resumes it; a DEVELOPER's row is the whole admission.
-   * `seat` is the row's role; `"already-present"` is a concurrent callback or a retry.
+   * Admits somebody on the seat the licence leaves free (ADR-129, ADR-171, admission-seat.ts): a
+   * MEMBER's grant lands now with `admittedBy` or an SSO arrival resumes it; a DEVELOPER or Lite
+   * (EXTERNAL) row is the whole admission, held `pending` when no seat is free. `seat` is the row's
+   * role; `"already-present"` is a concurrent callback or a retry, answered from the row there.
    */
   createMembership(
     input: Readonly<{
@@ -425,7 +427,7 @@ export interface OrganizationApi {
       /** Where a join request was made, written on the Developer admission audit row. */
       origin?: OrganizationJoinOrigin;
     }>,
-  ): Promise<{ outcome: "created" | "already-present"; seat: "MEMBER" | "DEVELOPER" }>;
+  ): Promise<OrganizationAdmission>;
   isMember(input: Readonly<{ organizationId: string; userId: string }>): Promise<boolean>;
   memberOrganizationIds(
     input: Readonly<{ userId: string; organizationIds: string[] }>,

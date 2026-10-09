@@ -24,6 +24,26 @@ function developerSeatExcludes({
   return binding.scopeType === "ORGANIZATION" || Boolean(binding.viaGroupId);
 }
 
+/**
+ * A Lite seat holds a group binding as a team Lite Member at most, nothing at the organization,
+ * whatever role the group carries (seat-limit-at-provisioning.feature). The seat is read at every
+ * collect, so the cap lifts once the person holds a full seat.
+ */
+function liteSeatWithholds({
+  binding,
+  grants,
+  permission,
+}: {
+  binding: Pick<CollectedBinding, "scopeType" | "viaGroupId">;
+  grants: CollectedGrants;
+  permission: string;
+}): boolean {
+  if (grants.organizationRole !== "EXTERNAL" || !binding.viaGroupId) return false;
+  return (
+    binding.scopeType === "ORGANIZATION" || !builtinRoleGrants({ role: "lite-member", permission })
+  );
+}
+
 /** A custom role grants exactly its own permissions; an unknown or empty one grants nothing. */
 function customRoleGrants({
   roleKey,
@@ -62,6 +82,7 @@ export function bindingGrants({
   }
 
   if (developerSeatExcludes({ binding, grants })) return false;
+  if (liteSeatWithholds({ binding, grants, permission })) return false;
 
   const { roleKey } = binding;
   // A custom key is authoritative, including grants imported beside a legacy
@@ -80,7 +101,7 @@ export function bindingGrants({
     return builtinRoleGrants({ role: "org-member", permission });
   }
 
-  // EXTERNAL membership caps built-in team/project grants, not custom roles.
+  // EXTERNAL membership caps built-in team/project grants; only a direct custom role escapes it.
   if (grants.organizationRole === "EXTERNAL") {
     return builtinRoleGrants({ role: "lite-member", permission });
   }

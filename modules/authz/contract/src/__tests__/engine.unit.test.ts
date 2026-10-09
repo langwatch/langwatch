@@ -1,7 +1,9 @@
+import { ALL_PERMISSIONS } from "@langwatch/authorization";
 import { describe, expect, it } from "vitest";
 
 import type { AuthzScopeRef, CollectedBinding, CollectedGrants, ResourceGrant } from "../authz.ts";
 import { AuthzEngine } from "../engine.ts";
+import { builtinRoleGrants } from "../roles.ts";
 
 const engine = new AuthzEngine();
 
@@ -297,6 +299,90 @@ describe("authz engine decide()", () => {
           scope: projectScope,
         }).allowed,
       ).toBe(false);
+    });
+  });
+
+  describe("given directory group grants carrying the admin role", () => {
+    const viaGroupId = "group-admins";
+    const groupGrants = [
+      binding({ roleKey: "admin", scopeType: "ORGANIZATION", scopeId: ORG, viaGroupId }),
+      binding({ roleKey: "admin", scopeType: "TEAM", scopeId: TEAM, viaGroupId }),
+      binding({ roleKey: "custom:cr-admin", scopeType: "ORGANIZATION", scopeId: ORG, viaGroupId }),
+      binding({ roleKey: "custom:cr-admin", scopeType: "TEAM", scopeId: TEAM, viaGroupId }),
+    ];
+    const adminCustomRole = new Map([["cr-admin", ["datasets:manage", "annotations:create"]]]);
+    const heldOnProject = ({ grants }: { grants: CollectedGrants }) =>
+      ALL_PERMISSIONS.filter(
+        (permission) => engine.decide({ grants, permission, scope: projectScope }).allowed,
+      );
+    const beyondLite = ({ held }: { held: readonly string[] }) =>
+      held.filter((permission) => !builtinRoleGrants({ role: "lite-member", permission }));
+
+    describe("when the person holds a Lite Member seat", () => {
+      const grants = makeGrants({
+        organizationRole: "EXTERNAL",
+        bindings: groupGrants,
+        customRolePermissions: adminCustomRole,
+      });
+
+      /** @scenario "A directory group granting admin past the seats is capped to Lite Member permissions" */
+      it("holds only Lite Member permissions through the group", () => {
+        const held = heldOnProject({ grants });
+        expect(held).toContain("annotations:create");
+        expect(beyondLite({ held })).toEqual([]);
+        const denied = engine.decide({
+          grants,
+          permission: "datasets:manage",
+          scope: projectScope,
+        });
+        expect(denied.allowed).toBe(false);
+        expect(denied.denialReason).toBe("lite-member-restricted");
+      });
+
+      it("keeps a direct Viewer grant as written", () => {
+        const direct = makeGrants({
+          organizationRole: "EXTERNAL",
+          bindings: [binding({ roleKey: "viewer", scopeType: "TEAM", scopeId: TEAM })],
+        });
+        expect(
+          engine.decide({ grants: direct, permission: "traces:view", scope: projectScope }).allowed,
+        ).toBe(true);
+      });
+    });
+
+    describe("when the person holds a full seat", () => {
+      const grants = makeGrants({
+        organizationRole: "MEMBER",
+        bindings: groupGrants,
+        customRolePermissions: adminCustomRole,
+      });
+
+      /** @scenario "A capped group grant lifts once a full seat frees" */
+      it("holds the group grant's admin permissions", () => {
+        expect(
+          engine.decide({ grants, permission: "datasets:manage", scope: projectScope }).allowed,
+        ).toBe(true);
+        expect(beyondLite({ held: heldOnProject({ grants }) })).not.toEqual([]);
+      });
+
+      it("keeps a custom role carried by the group as written", () => {
+        const customOnly = makeGrants({
+          organizationRole: "MEMBER",
+          bindings: [
+            binding({
+              roleKey: "custom:cr-admin",
+              scopeType: "ORGANIZATION",
+              scopeId: ORG,
+              viaGroupId,
+            }),
+          ],
+          customRolePermissions: adminCustomRole,
+        });
+        expect(
+          engine.decide({ grants: customOnly, permission: "datasets:manage", scope: projectScope })
+            .allowed,
+        ).toBe(true);
+      });
     });
   });
 

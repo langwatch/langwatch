@@ -46,8 +46,10 @@ describe("creating a membership for an arriving person", () => {
         userId: USER_ID,
         pendingAdmissionId: "rolebinding_1",
         via: "sso",
+        seat: await repository.readJoinerSeat({ organizationId: ORGANIZATION_ID }),
+        pending: false,
       }),
-    ).resolves.toEqual({ outcome: "created", seat: "MEMBER" });
+    ).resolves.toEqual({ outcome: "created", seat: "MEMBER", pending: false });
 
     expect(memory.organizationUsers).toHaveLength(1);
     expect(memory.organizationUsers[0]).toMatchObject({
@@ -66,13 +68,15 @@ describe("creating a membership for an arriving person", () => {
       userId: USER_ID,
       pendingAdmissionId: "rolebinding_1",
       via: "sso" as const,
+      seat: "MEMBER" as const,
+      pending: false,
     };
 
     await repository.createMembership(membership);
 
     await expect(
       repository.createMembership({ ...membership, pendingAdmissionId: "rolebinding_2" }),
-    ).resolves.toEqual({ outcome: "already-present", seat: "MEMBER" });
+    ).resolves.toEqual({ outcome: "already-present", seat: "MEMBER", pending: false });
     expect(memory.organizationUsers).toHaveLength(1);
     expect(memory.organizationUsers[0]?.pendingSsoGrantId).toBe("rolebinding_1");
   });
@@ -88,8 +92,10 @@ describe("creating a membership for an arriving person", () => {
           userId: USER_ID,
           pendingAdmissionId: "rolebinding_1",
           via: "sso",
+          seat: await repository.readJoinerSeat({ organizationId: ORGANIZATION_ID }),
+          pending: false,
         }),
-      ).resolves.toEqual({ outcome: "created", seat: "DEVELOPER" });
+      ).resolves.toEqual({ outcome: "created", seat: "DEVELOPER", pending: false });
       expect(memory.organizationUsers[0]).toMatchObject({
         role: "DEVELOPER",
         pendingSsoGrantId: null,
