@@ -362,6 +362,8 @@ function InlineInviteBox({ onStartTyping }: { onStartTyping: (email: string) => 
         if (next.trim().length > 0) {
           onStartTyping(next);
           setValue("");
+          // Else further keystrokes land here and reopen the drawer with just that character.
+          event.target.blur();
         } else {
           setValue(next);
         }
