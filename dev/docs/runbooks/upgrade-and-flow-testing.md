@@ -31,7 +31,7 @@ Sources, read in this order when a step here is unclear:
             │                                                                                    │
  SEED ──────┼─► STORES ──► OLD RELEASE UP ──► TRAFFIC ──► CUT ──► SWITCH ──► WATCH ──► CHECKS ──┼─► REPORT
  upgradelab │   upgradelab_<cell>   origin/main     API mix +    old worker  head api  holding,   I0..I9, N1..N4,
- seed (today)│   PG + CH (+private) app + worker  ingest, from  paused, jobs first,    hold ≤30 s, H1..H3, O1,    report.md
+ seed (today)│   PG + CH (+private) app + worker  ingest, from  paused, jobs first,    no holds,   H1..H3, O1,    report.md
  seedgen     │   own redis-server   start:prepare  before the   queue       worker    Ops >      logs, browser  report.json
  (planned)   │                      :db            cut to after             runs the  Upgrades   consoles       shots/
             │                                     ready                    upgrade                              │
@@ -183,7 +183,7 @@ The phases the poller records (`report.md` "Api phase" table), from a real run o
 | down                  | 74332   |   <- old stopped, head api not yet answering
 | not-ready             | 90884   |
 | holding:upgrade-gate  | 91333   |
-| holding:holding       | 91833   |   <- Postgres schema step outstanding: requests held ≤30 s, then 503
+| holding:holding       | 91833   |   <- Postgres schema step outstanding: held ≤30 s then 503 (before the no-holds ruling)
 | ready                 | 111857  |
 ```
 
