@@ -1507,7 +1507,7 @@ export class GovernanceModule implements GovernanceRestApi {
       throw new PermissionDeniedError({
         permission: "ingestionSources:manage",
         scope: { type: "organization", id: rotate.organizationId },
-        denialReason: "no-binding",
+        denialReason: "no-grant",
       });
     }
     const rotated = await this.ingestionSources.rotateSecret(rotate);
@@ -2249,7 +2249,7 @@ function refuseImpersonatedKeyMint(input: {
   throw new PermissionDeniedError({
     permission: "organization:view",
     scope: { type: "organization", id: input.organizationId },
-    denialReason: "no-binding",
+    denialReason: "no-grant",
   });
 }
 
