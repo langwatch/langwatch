@@ -465,6 +465,8 @@ interface GovernanceAppDependencies {
     | "awaitSharedProjectGrants"
     | "revokeSharedProjectGrants"
   >;
+  /** Each tenant's retention, which the pull and usage event rows are stamped with. */
+  retention: Pick<DataRetentionApi, "getResolvedForProject">;
 }
 
 /** How a process installs this application: its peers, its config, its secrets, its repositories. */
@@ -557,6 +559,7 @@ export class GovernanceModule implements GovernanceRestApi {
         logs: dependencies.logs,
         metrics: dependencies.metrics,
         webhooks: dependencies.webhooks,
+        retention: dependencies.retention,
       },
       repositories,
       erasureSuppression,

@@ -3,6 +3,7 @@ import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
 import type { ScimApi } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
@@ -21,12 +22,12 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import type { WebhookApi } from "@langwatch/webhook-contract";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
 import { GovernanceModule } from "../governance.app.ts";
 
-function buildApp() {
+function buildApp(retention = createApiFixture<DataRetentionApi>()) {
   return GovernanceModule.create({
     config: void 0,
     repositories: MemoryGovernanceRepositories.create(),
@@ -49,6 +50,7 @@ function buildApp() {
       auditLog: createApiFixture<AuditLogApi>(),
       logs: createApiFixture<LogApi>(),
       metrics: createApiFixture<MetricApi>(),
+      retention,
     },
     resources: new ResourceScope(),
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
@@ -89,6 +91,21 @@ describe("the pulled-usage pipeline's commands", () => {
         "retractPulledUsage",
         "recordPulledUsagePriced",
       ]);
+    });
+  });
+});
+
+describe("the pulled-usage pipeline's event rows", () => {
+  describe("when the store stamps a tenant's retention", () => {
+    it("asks data-retention for the tenant's policy", async () => {
+      const policy = { defaultRetentionDays: 30 };
+      const getResolvedForProject = vi.fn(async () => policy);
+      const app = await buildApp(createApiFixture<DataRetentionApi>({ getResolvedForProject }));
+
+      const pipeline = app.pulledUsagePipeline({ participation: "consume" });
+
+      await expect(pipeline.retentionPolicyResolver?.resolve("project_1")).resolves.toBe(policy);
+      expect(getResolvedForProject).toHaveBeenCalledWith({ projectId: "project_1" });
     });
   });
 });
