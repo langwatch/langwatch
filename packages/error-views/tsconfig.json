@@ -22,6 +22,9 @@
     },
     {
       "path": "../handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../vitest-config/tsconfig.build.json"
     }
   ]
 }

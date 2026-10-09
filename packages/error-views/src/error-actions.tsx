@@ -1,5 +1,4 @@
-import { Link } from "@langwatch/browser-host/link";
-import { chakra, HStack, type SystemStyleObject } from "@langwatch/design-system/primitives";
+import { chakra, HStack, Link, type SystemStyleObject } from "@langwatch/design-system/primitives";
 import { CheckIcon, CopyIcon, ExternalLinkIcon } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 

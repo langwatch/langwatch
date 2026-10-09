@@ -14805,6 +14805,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
+      '@langwatch/error-views':
+        specifier: workspace:*
+        version: link:../../../packages/error-views
       '@langwatch/evaluation-contract':
         specifier: workspace:*
         version: link:../../evaluation/contract
@@ -16326,6 +16329,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../design-system
+      '@langwatch/error-views':
+        specifier: workspace:*
+        version: link:../error-views
       '@tanstack/react-query':
         specifier: 'catalog:'
         version: 5.101.4(react@19.2.8)
@@ -16802,6 +16808,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../handled-error
+      lucide-react:
+        specifier: 'catalog:'
+        version: 1.22.0(react@19.2.8)
       react:
         specifier: ^19.2.7
         version: 19.2.8
@@ -16809,9 +16818,24 @@ importers:
       '@emotion/react':
         specifier: 'catalog:'
         version: 11.14.0(@types/react@19.2.18)(react@19.2.8)(supports-color@10.2.2)
+      '@langwatch/vitest-config':
+        specifier: workspace:*
+        version: link:../vitest-config
+      '@testing-library/jest-dom':
+        specifier: 'catalog:'
+        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.0.1)
+      '@testing-library/react':
+        specifier: 'catalog:'
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@testing-library/user-event':
+        specifier: 'catalog:'
+        version: 14.6.1(@testing-library/dom@10.4.1)
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.18
+      jsdom:
+        specifier: 'catalog:'
+        version: 30.0.1(@noble/hashes@2.2.0)
       typescript:
         specifier: 'catalog:'
         version: 7.0.2

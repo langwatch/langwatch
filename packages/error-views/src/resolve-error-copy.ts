@@ -22,7 +22,7 @@ export interface ResolvedErrorCopy {
 }
 
 /**
- * What an INLINE failure surface in this package says to a customer.
+ * What an INLINE failure surface in the app says to a customer.
  */
 export function resolveErrorCopy({
   error,

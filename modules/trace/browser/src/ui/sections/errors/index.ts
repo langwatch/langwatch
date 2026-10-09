@@ -2,9 +2,8 @@
  * The one place the app turns an error into something a person can read.
  */
 
-// `ErrorActions` is deliberately absent: the two inline surfaces below render
-// it themselves, and a consumer that wants the row on its own deep-imports
-// `../../elements/errors/error-actions`.
+// `ErrorActions` is deliberately absent: the inline surfaces below render it
+// themselves; a consumer that wants the row alone imports `@langwatch/error-views`.
 export { FormServerError } from "./form-server-error.tsx";
 export type { HandledErrorStateProps } from "./handled-error-state.tsx";
 export { HandledErrorState } from "./handled-error-state.tsx";
@@ -26,7 +25,7 @@ export type { HandledErrorShape } from "@langwatch/handled-error/read-handled-er
 // code-keyed registry; one we cannot resolves to the generic line and a trace
 // id. See the note above `isRecord` in `readHandledError`.
 export { readHandledError } from "@langwatch/handled-error/read-handled-error";
-export type { ResolvedErrorCopy } from "../../../behavior/errors/logic/resolve-error-copy.ts";
-export { resolveErrorCopy } from "../../../behavior/errors/logic/resolve-error-copy.ts";
+export type { ResolvedErrorCopy } from "@langwatch/error-views";
+export { resolveErrorCopy } from "@langwatch/error-views";
 export type { ShowErrorToastOptions } from "../../../behavior/errors/logic/show-error-toast.ts";
 export { showErrorToast } from "../../../behavior/errors/logic/show-error-toast.ts";
