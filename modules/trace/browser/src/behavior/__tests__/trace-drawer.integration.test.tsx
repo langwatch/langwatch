@@ -34,6 +34,7 @@ function mountOn(url: string) {
     isOpen: useTraceDrawer((s) => s.isOpen),
     traceId: useTraceDrawer((s) => s.traceId),
     projectId: useTraceDrawer((s) => s.projectId),
+    tenantId: useTraceDrawer((s) => s.tenantId),
     occurredAtMs: useTraceDrawer((s) => s.occurredAtMs),
     selectedSpanId: useTraceDrawer((s) => s.selectedSpanId),
     viewMode: useTraceDrawer((s) => s.viewMode),
@@ -256,6 +257,30 @@ describe("given the trace drawer is open", () => {
   });
 });
 
+describe("given a drawer open on an aggregate's trace", () => {
+  describe("when the row that opened it named a member and the header later names another", () => {
+    it("keeps the member the row named", () => {
+      const { result } = mountOn(`${OPEN}&drawer.tenantId=member-a`);
+
+      act(() => getTraceDrawer().backfillTenantId("member-b"));
+
+      expect(result.current.tenantId).toBe("member-a");
+    });
+  });
+
+  describe("when a deep link named no member and the header names the one it read", () => {
+    it("follows that member", () => {
+      const { result } = mountOn(OPEN);
+      expect(result.current.tenantId).toBeNull();
+
+      act(() => getTraceDrawer().backfillTenantId("member-b"));
+
+      expect(result.current.tenantId).toBe("member-b");
+      expect(drawerParams()["drawer.tenantId"]).toBe("member-b");
+    });
+  });
+});
+
 describe("given no trace drawer is open", () => {
   describe("when the drawer is asked to change something", () => {
     it("leaves the address alone", () => {
@@ -297,6 +322,21 @@ describe("given a stack of drawers beneath the open one", () => {
       };
 
       expect(traceBackStackOf(state)).toEqual([]);
+    });
+
+    it("keeps the member each trace was read on, so going back reopens it", () => {
+      const state = {
+        drawerStack: [
+          {
+            drawer: "traceV2Details",
+            params: { traceId: "trace-a", mode: "trace", tenantId: "member-a" },
+          },
+        ],
+      };
+
+      expect(traceBackStackOf(state)).toEqual([
+        { traceId: "trace-a", viewMode: "trace", tenantId: "member-a" },
+      ]);
     });
 
     it("is empty when the address carries no stack", () => {

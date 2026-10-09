@@ -219,9 +219,10 @@ export abstract class OrganizationRepository {
   abstract findProjectIds(organizationId: string): Promise<string[]>;
   /** The id and name of each named project that exists; an unknown id is left out. */
   abstract findProjectNames(projectIds: readonly string[]): Promise<Pick<Project, "id" | "name">[]>;
-  /** The organization's live projects, governance excluded, newest first; one team's when named. */
+  /** The live projects outside `hiddenKinds`, newest first; one team's when named. */
   abstract findProjects(input: {
     organizationId: string;
+    hiddenKinds: readonly string[];
     teamId?: string;
     limit?: number;
   }): Promise<OrganizationTeamProject[]>;

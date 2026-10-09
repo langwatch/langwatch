@@ -12,6 +12,7 @@ import {
   ForbiddenError,
   UnauthorizedError,
 } from "@langwatch/api/rest";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import { LocalFeatureApis } from "@langwatch/process";
 import {
   PersonalWorkspaceBoundaryError,
@@ -22,6 +23,7 @@ import {
   type ProjectApi,
 } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import { ProjectProvisioningService } from "../../services/project-provisioning.service.ts";
@@ -33,6 +35,7 @@ const USER_ID = "user-1";
 const API_KEY_ID = "api-key-1";
 const CREDENTIAL = "organization-credential";
 const NOW = new Date("2026-08-24T00:00:00.000Z");
+const JOINED = Temporal.Instant.from("2026-08-24T00:00:00Z");
 
 const EVERY_PERMISSION = ["project:create", "project:view"] as const;
 
@@ -89,12 +92,34 @@ function mount(
     apiKeys?: Partial<Pick<ApiKeyApi, "create" | "resolveVisibleProjects">>;
     projects?: Partial<Pick<ProjectApi, "createInOrganization" | "listByOrganization">>;
     granted?: readonly string[];
+    /** The key owner's organisation role; `null` for a non-member. */
+    ownerRole?: string | null;
+    /** The key's owner; `null` for a service key. */
+    ownerUserId?: string | null;
   } = {},
 ) {
+  const ownerRole = options.ownerRole === undefined ? "ADMIN" : options.ownerRole;
+  const ownerUserId = options.ownerUserId === undefined ? USER_ID : options.ownerUserId;
   const provisioning = ProjectProvisioningService.create({
     apiKeys: createApiFixture<ApiKeyApi>(
       { resolveVisibleProjects: async () => SEES_EVERYTHING, ...options.apiKeys },
       "ApiKeyApi",
+    ),
+    organizations: createApiFixture<OrganizationApi>(
+      {
+        isMember: async () => ownerRole !== null,
+        getMember: async () => ({
+          userId: USER_ID,
+          organizationId: ORGANIZATION_ID,
+          role: ownerRole ?? "MEMBER",
+          disabledAt: null,
+          createdAt: JOINED,
+          updatedAt: JOINED,
+          user: { id: USER_ID, name: null, email: null },
+          teams: [],
+        }),
+      },
+      "OrganizationApi",
     ),
     projects: createApiFixture<ProjectApi>({ ...options.projects }, "ProjectApi"),
   });
@@ -135,7 +160,10 @@ function mount(
     app: () => apis.reference(ApiKeyProjectsDoorApi),
     onError: canonicalErrorResponse,
     facts: [
-      bindRestMiddleware(apiKeyRestCredential, () => ({ apiKeyId: API_KEY_ID, userId: USER_ID })),
+      bindRestMiddleware(apiKeyRestCredential, () => ({
+        apiKeyId: API_KEY_ID,
+        userId: ownerUserId,
+      })),
     ],
   });
 
@@ -381,6 +409,7 @@ describe("the projects collection, served by api-key", () => {
         organizationId: ORGANIZATION_ID,
         page: 1,
         limit: 100,
+        hiddenKinds: ["internal_governance"],
         projectIds: ["project_1", "project_9"],
       });
     });
@@ -413,7 +442,28 @@ describe("the projects collection, served by api-key", () => {
         organizationId: ORGANIZATION_ID,
         page: 1,
         limit: 50,
+        hiddenKinds: ["internal_governance"],
       });
+    });
+
+    describe("when the organization holds an aggregate project", () => {
+      it.each([
+        ["an admin owner", { ownerRole: "ADMIN" }, ["internal_governance"]],
+        ["a member owner", { ownerRole: "MEMBER" }, ["internal_governance", "aggregate"]],
+        ["a non-member owner", { ownerRole: null }, ["internal_governance", "aggregate"]],
+        ["a service key", { ownerUserId: null }, ["internal_governance", "aggregate"]],
+      ] as const)(
+        "hides aggregates unless the key acts for an admin: %s",
+        async (_, owner, hidden) => {
+          const listByOrganization = vi.fn(async () => page([]));
+          const { send } = mount({ projects: { listByOrganization }, ...owner });
+
+          expect((await send("/api/projects")).status).toBe(200);
+          expect(listByOrganization).toHaveBeenCalledWith(
+            expect.objectContaining({ hiddenKinds: hidden }),
+          );
+        },
+      );
     });
   });
 });

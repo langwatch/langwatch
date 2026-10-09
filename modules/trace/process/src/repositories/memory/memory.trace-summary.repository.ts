@@ -1,6 +1,11 @@
+import { type Authorization, projectIdsReadBy } from "@langwatch/authorization";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 
-import { TraceSummaryRepository, type FindByTraceIdOptions } from "../trace-summary.repository.ts";
+import {
+  TraceSummaryRepository,
+  type FindByTraceIdParams,
+  type TraceSummaryRead,
+} from "../trace-summary.repository.ts";
 
 function summaryKey(tenantId: string, traceId: string): string {
   return `${tenantId} ${traceId}`;
@@ -28,10 +33,25 @@ export class MemoryTraceSummaryRepository extends TraceSummaryRepository {
     for (const entry of entries) await this.upsert(entry.data, entry.tenantId);
   }
 
-  async findByTraceId(
-    trace: { tenantId: string; traceId: string },
-    _options?: FindByTraceIdOptions,
-  ): Promise<TraceSummaryData | null> {
-    return this.#summaries.get(summaryKey(trace.tenantId, trace.traceId)) ?? null;
+  async findByTraceId({
+    authorization,
+    traceId,
+  }: FindByTraceIdParams): Promise<TraceSummaryRead | null> {
+    const [tenantId] = await this.findTenantIdsByTraceId({ authorization, traceId });
+    const summary =
+      tenantId === undefined ? undefined : this.#summaries.get(summaryKey(tenantId, traceId));
+    return tenantId === undefined || summary === undefined ? null : { ...summary, tenantId };
+  }
+
+  async findTenantIdsByTraceId({
+    authorization,
+    traceId,
+  }: {
+    authorization: Authorization;
+    traceId: string;
+  }): Promise<string[]> {
+    return projectIdsReadBy(authorization).filter((tenantId) =>
+      this.#summaries.has(summaryKey(tenantId, traceId)),
+    );
   }
 }

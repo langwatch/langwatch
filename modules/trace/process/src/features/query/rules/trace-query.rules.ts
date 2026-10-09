@@ -14,12 +14,12 @@ import {
   type TranslationContext,
 } from "@langwatch/trace-contract";
 
+import { boundedSubquery } from "../repositories/clickhouse/clickhouse.trace-query-subquery.mapper.ts";
 import {
   type AndChain,
   buildAndChain,
   type EvaluationScope,
 } from "./trace-query-evaluation-scope.rules.ts";
-import { boundedSubquery } from "./trace-query-subquery.rules.ts";
 import {
   EVENT_ATTRIBUTE_PREFIX,
   EVENT_ATTRIBUTE_PREFIX_LEGACY,

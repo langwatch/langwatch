@@ -1,5 +1,8 @@
+import type { Authorization } from "@langwatch/authorization";
+import { ownProjectIdOf, tenantScopeKey } from "@langwatch/clickhouse-client";
+import type { FoldReadAuthorizer } from "@langwatch/eventing";
 import { nowInstant } from "@langwatch/time";
-import type { DerivedTraceEvent } from "@langwatch/trace-contract";
+import type { DerivedTraceEvent, TraceDerivedEventsInput } from "@langwatch/trace-contract";
 
 import type { TraceDerivationSpanReaderRepository } from "../../../repositories/trace-derivation-span-reader.repository.ts";
 
@@ -26,23 +29,38 @@ interface MemoEntry {
 export class TraceEventDerivationService {
   static create(options: {
     spans: TraceDerivationSpanReaderRepository;
+    authorize: FoldReadAuthorizer;
   }): TraceEventDerivationService {
-    return new TraceEventDerivationService(options.spans);
+    return new TraceEventDerivationService(options.spans, options.authorize);
   }
 
   private readonly memo = new Map<string, MemoEntry>();
 
-  private constructor(private readonly spans: TraceDerivationSpanReaderRepository) {}
+  private constructor(
+    private readonly spans: TraceDerivationSpanReaderRepository,
+    private readonly authorize: FoldReadAuthorizer,
+  ) {}
 
-  derive(input: {
-    projectId: string;
+  async derive({ projectId, ...input }: TraceDerivedEventsInput): Promise<DerivedTraceEvent[]> {
+    const authorization = await this.authorize({
+      projectId,
+      purpose: { kind: "operator", entry: "TraceEventDerivationService.derive" },
+    });
+    return this.deriveFor({ authorization, ...input });
+  }
+
+  /** Keyed on the fence the proof allows, so an aggregate never shares an entry with a member. */
+  deriveFor(input: {
+    authorization: Authorization;
     traceId: string;
-    occurredAtMs?: number;
-    foldVersion?: number;
+    occurredAtMs?: number | undefined;
+    foldVersion?: number | undefined;
   }): Promise<DerivedTraceEvent[]> {
     const read = () =>
       this.spans.findDerivedEventsByTraceId({
-        tenantId: input.projectId,
+        // shortcut: the derivation reader still filters one TenantId, so a read takes the proof's
+        // own project; fence it through AuthorizedClickHouse once an aggregate derives events.
+        tenantId: ownProjectIdOf({ authorization: input.authorization, reads: "traces" }),
         traceId: input.traceId,
         ...(input.occurredAtMs === undefined ? {} : { occurredAtMs: input.occurredAtMs }),
       });
@@ -50,7 +68,8 @@ export class TraceEventDerivationService {
       return read();
     }
 
-    const key = `${input.projectId}:${input.traceId}:${input.foldVersion}`;
+    const scope = tenantScopeKey({ authorization: input.authorization, reads: "traces" });
+    const key = `${scope}:${input.traceId}:${input.foldVersion}`;
     const now = nowInstant().epochMilliseconds;
     const hit = this.memo.get(key);
     if (hit && hit.expiresAt > now) {

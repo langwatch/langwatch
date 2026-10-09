@@ -168,6 +168,7 @@ export class OrganizationService {
 
   listProjects(input: {
     organizationId: string;
+    hiddenKinds: readonly string[];
     teamId?: string;
     limit?: number;
   }): Promise<OrganizationTeamProject[]> {

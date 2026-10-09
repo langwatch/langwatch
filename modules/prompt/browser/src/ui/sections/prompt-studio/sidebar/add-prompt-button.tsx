@@ -1,5 +1,6 @@
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { LuPlus } from "react-icons/lu";
 
 import { useCreateDraftPrompt } from "../../../../behavior/use-create-draft-prompt.ts";
@@ -16,7 +17,7 @@ interface AddPromptButtonProps {
  */
 export function AddPromptButton({ iconOnly }: AddPromptButtonProps) {
   const { createDraftPrompt } = useCreateDraftPrompt();
-  const { hasPermission } = usePromptProject();
+  const { project, hasPermission } = usePromptProject();
   // The restriction modal belongs to the shell, so the host is asked to offer
   // the upgrade.
   const host = usePromptHost();
@@ -28,6 +29,10 @@ export function AddPromptButton({ iconOnly }: AddPromptButtonProps) {
     }
     void createDraftPrompt();
   };
+
+  // An aggregate (ADR-177) keeps no prompts of its own; offering one there
+  // would only end in the server's refusal.
+  if (isAggregateProjectKind(project?.kind)) return null;
 
   return (
     <Tooltip content="New Prompt" disabled={!iconOnly}>

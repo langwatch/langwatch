@@ -15009,6 +15009,16 @@
               "available": true
             },
             {
+              "name": "AggregateRule",
+              "type": "Nullable(String)",
+              "description": "The scope rule an aggregate project materialises into grants.",
+              "unit": null,
+              "gates": [
+                "output"
+              ],
+              "available": true
+            },
+            {
               "name": "FirstMessage",
               "type": "Bool",
               "description": "FirstMessage",

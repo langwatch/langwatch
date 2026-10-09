@@ -36,6 +36,8 @@ export type SessionGroupCodingAgentDto = z.infer<typeof sessionGroupCodingAgentD
 
 export const sessionGroupDtoSchema = z.object({
   conversationId: z.string(),
+  /** The project the session belongs to; on an aggregate, the member. */
+  projectId: z.string(),
   traceCount: z.number(),
   totalCost: z.number(),
   totalTokens: z.number(),

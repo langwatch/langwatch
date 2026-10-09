@@ -83,7 +83,7 @@ function protectionsFor(userId: string) {
     projects: createApiFixture<ProjectApi>({ findWithTeam: async () => project }),
     plans: createApiFixture<PlanProvider>({}),
     dataPrivacy: createApiFixture<DataPrivacyApi>({
-      getResolvedForProject: async () => ownerOnlyInput,
+      getResolvedForProjects: async () => ownerOnlyInput,
     }),
     fallbackVisibilityDays: 30,
     logger: createTestLogger().logger,

@@ -8,7 +8,7 @@ import {
 } from "@langwatch/enterprise-scim-contract";
 import { ScimProtocolError } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import { admissionSeat, seatsFree } from "@langwatch/organization-contract";
+import { admissionSeat, seatsFree, type OrganizationApi } from "@langwatch/organization-contract";
 import type { UserProfile, UserApi } from "@langwatch/user-contract";
 
 import type { ScimSeatRepository } from "../repositories/scim-seat.repository.ts";
@@ -65,6 +65,7 @@ export class ScimProvisioningService {
     users,
     costCenterFacts,
     organization,
+    members,
     lifecycle,
     provenOffboarding,
     authority,
@@ -77,6 +78,7 @@ export class ScimProvisioningService {
     users: ScimUserProvisioning;
     costCenterFacts: ScimCostCenterFacts;
     organization: ScimOrganizationAdministration;
+    members: Pick<OrganizationApi, "deleteMember">;
     lifecycle: ScimSyncLifecycle;
     provenOffboarding: boolean;
     authority: Pick<ScimDirectoryIdentityService, "assertWritable">;
@@ -95,6 +97,7 @@ export class ScimProvisioningService {
       grants,
       lifecycle,
       organization,
+      members,
       provenOffboarding,
     });
     this.listing = ScimUserListingService.create(prisma);
@@ -110,6 +113,7 @@ export class ScimProvisioningService {
     users: ScimUserProvisioning;
     costCenterFacts: ScimCostCenterFacts;
     organization: ScimOrganizationAdministration;
+    members: Pick<OrganizationApi, "deleteMember">;
     lifecycle: ScimSyncLifecycle;
     provenOffboarding: boolean;
     authority: Pick<ScimDirectoryIdentityService, "assertWritable">;

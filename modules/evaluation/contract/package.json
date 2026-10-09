@@ -20,6 +20,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@langwatch/authorization": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",

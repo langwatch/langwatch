@@ -11,6 +11,12 @@ import {
   ORGANIZATION_CREATED_EVENT_VERSION,
   ORGANIZATION_MEMBER_DISABLED_EVENT_TYPE,
   ORGANIZATION_MEMBER_DISABLED_EVENT_VERSION,
+  ORGANIZATION_MEMBER_ENABLED_EVENT_TYPE,
+  ORGANIZATION_MEMBER_ENABLED_EVENT_VERSION,
+  ORGANIZATION_MEMBER_REMOVED_EVENT_TYPE,
+  ORGANIZATION_MEMBER_REMOVED_EVENT_VERSION,
+  ORGANIZATION_MEMBER_DEPARTMENT_CHANGED_EVENT_TYPE,
+  ORGANIZATION_MEMBER_DEPARTMENT_CHANGED_EVENT_VERSION,
   ORGANIZATION_TRACE_SHARING_DISABLED_EVENT_TYPE,
   ORGANIZATION_TRACE_SHARING_DISABLED_EVENT_VERSION,
   PERSONAL_WORKSPACE_PROVISIONED_EVENT_TYPE,
@@ -28,6 +34,9 @@ import {
   ORGANIZATION_LIFECYCLE_EVENT_VERSION,
   type OrganizationCreatedEvent,
   type OrganizationMemberDisabledEvent,
+  type OrganizationMemberEnabledEvent,
+  type OrganizationMemberRemovedEvent,
+  type OrganizationMemberDepartmentChangedEvent,
   type OrganizationPresenceSettingChangedEvent,
   type OrganizationSignedUpEvent,
   type OrganizationTraceSharingDisabledEvent,
@@ -39,6 +48,9 @@ import {
   RECORD_INTEGRATION_METHOD_CHOSEN_COMMAND_TYPE,
   RECORD_CREATED_COMMAND_TYPE,
   RECORD_MEMBER_DISABLED_COMMAND_TYPE,
+  RECORD_MEMBER_ENABLED_COMMAND_TYPE,
+  RECORD_MEMBER_REMOVED_COMMAND_TYPE,
+  RECORD_MEMBER_DEPARTMENT_CHANGED_COMMAND_TYPE,
   RECORD_INVITE_ACCEPTED_COMMAND_TYPE,
   RECORD_MEMBERS_INVITED_COMMAND_TYPE,
   RECORD_PERSONAL_WORKSPACE_PROVISIONED_COMMAND_TYPE,
@@ -56,6 +68,12 @@ import {
   recordCreatedCommandDataSchema,
   type RecordMemberDisabledCommandData,
   recordMemberDisabledCommandDataSchema,
+  type RecordMemberEnabledCommandData,
+  recordMemberEnabledCommandDataSchema,
+  type RecordMemberRemovedCommandData,
+  recordMemberRemovedCommandDataSchema,
+  type RecordMemberDepartmentChangedCommandData,
+  recordMemberDepartmentChangedCommandDataSchema,
   recordInviteAcceptedCommandDataSchema,
   type RecordMembersInvitedCommandData,
   recordMembersInvitedCommandDataSchema,
@@ -478,6 +496,104 @@ export class RecordMemberDisabledCommand implements CommandHandler<
   }
 
   static getAggregateId(payload: RecordMemberDisabledCommandData): string {
+    return payload.organizationId;
+  }
+}
+
+/** Records a seat given back, keyed on the member and its moment; governance reacts on its side. */
+export class RecordMemberEnabledCommand implements CommandHandler<
+  Command<RecordMemberEnabledCommandData>,
+  OrganizationMemberEnabledEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_MEMBER_ENABLED_COMMAND_TYPE,
+    recordMemberEnabledCommandDataSchema,
+    "Record that an organization gave a member's seat back",
+  );
+
+  handle(command: Command<RecordMemberEnabledCommandData>): OrganizationMemberEnabledEvent[] {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<OrganizationMemberEnabledEvent>({
+        aggregateType: ORGANIZATION_AGGREGATE_TYPE,
+        aggregateId: data.organizationId,
+        tenantId: createTenantId(command.tenantId),
+        type: ORGANIZATION_MEMBER_ENABLED_EVENT_TYPE,
+        version: ORGANIZATION_MEMBER_ENABLED_EVENT_VERSION,
+        data,
+        occurredAt: data.occurredAt,
+        idempotencyKey: `${data.organizationId}:member_enabled:${data.userId}:${data.occurredAt}`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: RecordMemberEnabledCommandData): string {
+    return payload.organizationId;
+  }
+}
+
+/** Records a member removed, keyed on the member and its moment; governance reacts on its side. */
+export class RecordMemberRemovedCommand implements CommandHandler<
+  Command<RecordMemberRemovedCommandData>,
+  OrganizationMemberRemovedEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_MEMBER_REMOVED_COMMAND_TYPE,
+    recordMemberRemovedCommandDataSchema,
+    "Record that a member left an organization",
+  );
+
+  handle(command: Command<RecordMemberRemovedCommandData>): OrganizationMemberRemovedEvent[] {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<OrganizationMemberRemovedEvent>({
+        aggregateType: ORGANIZATION_AGGREGATE_TYPE,
+        aggregateId: data.organizationId,
+        tenantId: createTenantId(command.tenantId),
+        type: ORGANIZATION_MEMBER_REMOVED_EVENT_TYPE,
+        version: ORGANIZATION_MEMBER_REMOVED_EVENT_VERSION,
+        data,
+        occurredAt: data.occurredAt,
+        idempotencyKey: `${data.organizationId}:member_removed:${data.userId}:${data.occurredAt}`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: RecordMemberRemovedCommandData): string {
+    return payload.organizationId;
+  }
+}
+
+/** Records a member's department set or cleared; governance re-reads aggregates from it. */
+export class RecordMemberDepartmentChangedCommand implements CommandHandler<
+  Command<RecordMemberDepartmentChangedCommandData>,
+  OrganizationMemberDepartmentChangedEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_MEMBER_DEPARTMENT_CHANGED_COMMAND_TYPE,
+    recordMemberDepartmentChangedCommandDataSchema,
+    "Record that a member's department was set or cleared",
+  );
+
+  handle(
+    command: Command<RecordMemberDepartmentChangedCommandData>,
+  ): OrganizationMemberDepartmentChangedEvent[] {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<OrganizationMemberDepartmentChangedEvent>({
+        aggregateType: ORGANIZATION_AGGREGATE_TYPE,
+        aggregateId: data.organizationId,
+        tenantId: createTenantId(command.tenantId),
+        type: ORGANIZATION_MEMBER_DEPARTMENT_CHANGED_EVENT_TYPE,
+        version: ORGANIZATION_MEMBER_DEPARTMENT_CHANGED_EVENT_VERSION,
+        data,
+        occurredAt: data.occurredAt,
+        idempotencyKey: `${data.organizationId}:member_department_changed:${data.userId}:${data.occurredAt}`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: RecordMemberDepartmentChangedCommandData): string {
     return payload.organizationId;
   }
 }

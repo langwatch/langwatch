@@ -1617,7 +1617,7 @@ const storedObjects = defineRestRouter(ObjectApi)
   .withAddressing("v1-only")
   .get("/:id", "readStoredObject")
   .withParams(z.object({ id: z.string() }))
-  .withPermission("traces:view")
+  .withPermission("annotations:view")
   .withRawResponse({ produces: ["application/octet-stream", "text/plain"] })
   .methods(["GET", "HEAD"])
   .handle(async ({ app, input }) => {

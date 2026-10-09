@@ -43,7 +43,7 @@ class CapabilityProjectHomeHost extends ProjectHomeHost {
   private readonly isDemoProject: boolean;
   private readonly deployment_: ProjectHomeDeployment;
   private readonly reducedMotion_: boolean;
-  private readonly navigateOf: (to: string) => void;
+  private readonly navigateOf: (to: string, options?: { replace?: boolean }) => void;
   private readonly returnTo_: string | undefined;
 
   constructor(options: {
@@ -58,7 +58,7 @@ class CapabilityProjectHomeHost extends ProjectHomeHost {
     isDemoProject: boolean;
     deployment: ProjectHomeDeployment;
     reducedMotion: boolean;
-    navigateOf: (to: string) => void;
+    navigateOf: (to: string, options?: { replace?: boolean }) => void;
     returnTo: string | undefined;
   }) {
     super();
@@ -125,8 +125,8 @@ class CapabilityProjectHomeHost extends ProjectHomeHost {
     return this.reducedMotion_;
   }
 
-  navigate(to: string): void {
-    this.navigateOf(to);
+  navigate(to: string, options?: { replace?: boolean }): void {
+    this.navigateOf(to, options);
   }
 
   override returnTo(): string | undefined {
@@ -160,6 +160,7 @@ export default function ProjectHomeHostMount({ children }: { children?: ReactNod
   const projectId = scopeProject?.id;
   const projectName = scopeProject?.name;
   const projectSlug = scopeProject?.slug;
+  const projectKind = scopeProject?.kind;
   const organizationId = scopeOrg?.id;
   const organizationName = scopeOrg?.name;
   const actorId = actor?.id;
@@ -182,7 +183,13 @@ export default function ProjectHomeHostMount({ children }: { children?: ReactNod
       new CapabilityProjectHomeHost({
         project:
           projectId !== void 0
-            ? { id: projectId, name: projectName ?? "", slug: projectSlug ?? "", firstMessage }
+            ? {
+                id: projectId,
+                name: projectName ?? "",
+                slug: projectSlug ?? "",
+                firstMessage,
+                ...(projectKind !== void 0 ? { kind: projectKind } : {}),
+              }
             : void 0,
         organization:
           organizationName !== void 0 && organizationId !== void 0
@@ -205,13 +212,15 @@ export default function ProjectHomeHostMount({ children }: { children?: ReactNod
           ...(deployment.appBaseUrl ? { baseHost: deployment.appBaseUrl } : {}),
         },
         reducedMotion,
-        navigateOf: (to) => navigation.navigate(to),
+        navigateOf: (to, options) =>
+          options?.replace ? navigation.replace(to) : navigation.navigate(to),
         returnTo,
       }),
     [
       projectId,
       projectName,
       projectSlug,
+      projectKind,
       firstMessage,
       organizationId,
       organizationName,

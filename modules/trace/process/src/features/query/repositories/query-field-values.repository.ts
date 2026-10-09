@@ -1,6 +1,8 @@
+import type { Authorization } from "@langwatch/authorization";
 import type { TraceQueryFieldCatalogueInput } from "@langwatch/trace-contract";
 
 export type TraceQueryFieldValuesInput = TraceQueryFieldCatalogueInput & {
+  authorization: Authorization;
   facetKey: string;
   limit: number;
   offset: number;

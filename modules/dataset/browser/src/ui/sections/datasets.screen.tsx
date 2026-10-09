@@ -29,6 +29,8 @@ import {
   useDisclosure,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { AggregateReadOnlyGate } from "@langwatch/error-views";
+import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { readableDate } from "@langwatch/time";
 import {
   ChevronDown,
@@ -245,6 +247,7 @@ function DatasetStatusBadge({ status }: { status: string | null | undefined }) {
 export default function DatasetsScreen() {
   const host = useDatasetHost();
   const project = host.project();
+  const projectIsAggregate = isAggregateProjectKind(project?.kind);
   const isLiteMember = host.isLiteMember();
   const addEditDatasetDrawer = useDisclosure();
   const bulkUploadModal = useDisclosure();
@@ -351,86 +354,91 @@ export default function DatasetsScreen() {
             onChange={(event) => setSearch(event.target.value)}
           />
         </InputGroup>
-        <UploadOrCreateDatasetMenu
-          onUpload={() => bulkUploadModal.onOpen()}
-          onCreate={openCreateDrawer}
-        >
-          <Button variant="outline" size="sm" data-testid="upload-or-create-dataset">
-            <Upload height={17} width={17} strokeWidth={2.5} /> Upload or create dataset{" "}
-            <ChevronDown size={16} />
-          </Button>
-        </UploadOrCreateDatasetMenu>
+        {!projectIsAggregate && (
+          <UploadOrCreateDatasetMenu
+            onUpload={() => bulkUploadModal.onOpen()}
+            onCreate={openCreateDrawer}
+          >
+            <Button variant="outline" size="sm" data-testid="upload-or-create-dataset">
+              <Upload height={17} width={17} strokeWidth={2.5} /> Upload or create dataset{" "}
+              <ChevronDown size={16} />
+            </Button>
+          </UploadOrCreateDatasetMenu>
+        )}
       </PageLayout.Header>
       <PageLayout.Container paddingY={6}>
-        {datasets.data && datasets.data.length === 0 ? (
-          <NoDataInfoBlock
-            title="No datasets yet"
-            description="Upload or create datasets on your messages to do further analysis or to train your own models."
-            docsInfo={
-              <VStack gap={3}>
-                <HStack gap={2}>
-                  <UploadOrCreateDatasetMenu
-                    onUpload={() => bulkUploadModal.onOpen()}
-                    onCreate={openCreateDrawer}
-                  >
-                    <Button
-                      size="sm"
-                      colorPalette="orange"
-                      data-testid="empty-state-create-dataset"
+        {/* An aggregate (ADR-177) keeps no datasets of its own; the server refuses one. */}
+        <AggregateReadOnlyGate isAggregate={projectIsAggregate}>
+          {datasets.data && datasets.data.length === 0 ? (
+            <NoDataInfoBlock
+              title="No datasets yet"
+              description="Upload or create datasets on your messages to do further analysis or to train your own models."
+              docsInfo={
+                <VStack gap={3}>
+                  <HStack gap={2}>
+                    <UploadOrCreateDatasetMenu
+                      onUpload={() => bulkUploadModal.onOpen()}
+                      onCreate={openCreateDrawer}
                     >
-                      <Upload size={16} /> Upload or create dataset <ChevronDown size={16} />
-                    </Button>
-                  </UploadOrCreateDatasetMenu>
-                </HStack>
-                <Text>
-                  To learn more about datasets, please visit our{" "}
-                  <a
-                    href="https://docs.langwatch.ai/datasets/overview"
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{ color: "inherit", textDecoration: "underline" }}
-                  >
-                    documentation
-                  </a>
-                  .
-                </Text>
-              </VStack>
-            }
-            icon={<TableIcon size={24} />}
-          />
-        ) : (
-          <ListTable>
-            <Table.Header>
-              <Table.Row>
-                <Table.ColumnHeader>Name</Table.ColumnHeader>
-                <Table.ColumnHeader>Columns</Table.ColumnHeader>
-                <Table.ColumnHeader>Entries</Table.ColumnHeader>
-                <Table.ColumnHeader width={240}>Last Update</Table.ColumnHeader>
-                <Table.ColumnHeader width={20}></Table.ColumnHeader>
-              </Table.Row>
-            </Table.Header>
-            <Table.Body>
-              <DatasetTableBody
-                columnsOf={columnsOf}
-                datasets={filteredDatasets}
-                goToDataset={goToDataset}
-                isLiteMember={isLiteMember}
-                isLoading={datasets.isLoading}
-                onCopy={setCopyDataset}
-                onDelete={setDatasetToDelete}
-                onEdit={(dataset) => {
-                  setEditDataset({
-                    datasetId: dataset.id,
-                    name: dataset.name,
-                    columnTypes: columnsOf(dataset),
-                  });
-                  addEditDatasetDrawer.onOpen();
-                }}
-                search={search}
-              />
-            </Table.Body>
-          </ListTable>
-        )}
+                      <Button
+                        size="sm"
+                        colorPalette="orange"
+                        data-testid="empty-state-create-dataset"
+                      >
+                        <Upload size={16} /> Upload or create dataset <ChevronDown size={16} />
+                      </Button>
+                    </UploadOrCreateDatasetMenu>
+                  </HStack>
+                  <Text>
+                    To learn more about datasets, please visit our{" "}
+                    <a
+                      href="https://docs.langwatch.ai/datasets/overview"
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{ color: "inherit", textDecoration: "underline" }}
+                    >
+                      documentation
+                    </a>
+                    .
+                  </Text>
+                </VStack>
+              }
+              icon={<TableIcon size={24} />}
+            />
+          ) : (
+            <ListTable>
+              <Table.Header>
+                <Table.Row>
+                  <Table.ColumnHeader>Name</Table.ColumnHeader>
+                  <Table.ColumnHeader>Columns</Table.ColumnHeader>
+                  <Table.ColumnHeader>Entries</Table.ColumnHeader>
+                  <Table.ColumnHeader width={240}>Last Update</Table.ColumnHeader>
+                  <Table.ColumnHeader width={20}></Table.ColumnHeader>
+                </Table.Row>
+              </Table.Header>
+              <Table.Body>
+                <DatasetTableBody
+                  columnsOf={columnsOf}
+                  datasets={filteredDatasets}
+                  goToDataset={goToDataset}
+                  isLiteMember={isLiteMember}
+                  isLoading={datasets.isLoading}
+                  onCopy={setCopyDataset}
+                  onDelete={setDatasetToDelete}
+                  onEdit={(dataset) => {
+                    setEditDataset({
+                      datasetId: dataset.id,
+                      name: dataset.name,
+                      columnTypes: columnsOf(dataset),
+                    });
+                    addEditDatasetDrawer.onOpen();
+                  }}
+                  search={search}
+                />
+              </Table.Body>
+            </ListTable>
+          )}
+        </AggregateReadOnlyGate>
       </PageLayout.Container>
 
       <AddOrEditDatasetDrawer

@@ -7,7 +7,7 @@ import type { AuthDirectoryRepository } from "../../../repositories/auth-directo
 /** The project fields a device grant binds a session to. */
 export type AuthDirectoryProject = Pick<
   Project,
-  "id" | "slug" | "name" | "teamId" | "isPersonal" | "ownerUserId"
+  "id" | "slug" | "name" | "teamId" | "isPersonal" | "ownerUserId" | "kind"
 >;
 
 /**
@@ -131,6 +131,6 @@ export class CliDeviceDirectoryService implements CliDeviceDirectory {
 }
 
 function bindable(project: AuthDirectoryProject): AuthDirectoryProject {
-  const { id, slug, name, teamId, isPersonal, ownerUserId } = project;
-  return { id, slug, name, teamId, isPersonal, ownerUserId };
+  const { id, slug, name, teamId, isPersonal, ownerUserId, kind } = project;
+  return { id, slug, name, teamId, isPersonal, ownerUserId, kind };
 }

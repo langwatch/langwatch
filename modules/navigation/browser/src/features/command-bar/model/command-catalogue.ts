@@ -1,4 +1,5 @@
 import type { FrontendFeatureFlag } from "@langwatch/feature-flag-contract";
+import type { ProjectNavigation } from "@langwatch/project-contract";
 import {
   Activity,
   Anvil,
@@ -51,6 +52,7 @@ export const navigationCommands: Command[] = [
   // Main pages
   {
     id: "nav-home",
+    navigationSection: "home",
     label: "Home",
     description: "Project home",
     icon: Home,
@@ -60,6 +62,7 @@ export const navigationCommands: Command[] = [
   },
   {
     id: "nav-analytics",
+    navigationSection: "analytics",
     label: "Analytics",
     description: "Analytics dashboard",
     icon: TrendingUp,
@@ -90,6 +93,7 @@ export const navigationCommands: Command[] = [
   },
   {
     id: "nav-agent-testing",
+    navigationSection: "test",
     label: "Agent Testing",
     description: "Test cases and their results",
     icon: FlaskConical,
@@ -103,6 +107,7 @@ export const navigationCommands: Command[] = [
   },
   {
     id: "nav-simulations",
+    navigationSection: "test",
     label: "Simulations",
     description: "Simulation runs",
     icon: Play,
@@ -118,6 +123,7 @@ export const navigationCommands: Command[] = [
   },
   {
     id: "nav-scenarios",
+    navigationSection: "test",
     label: "Scenarios",
     description: "Simulations → Scenarios",
     icon: FlaskConical,
@@ -131,6 +137,7 @@ export const navigationCommands: Command[] = [
   },
   {
     id: "nav-online-evaluations",
+    navigationSection: "onlineEvaluations",
     label: "Online Evaluations",
     description: "Configure production evaluations and guardrails",
     icon: CheckSquare,
@@ -140,6 +147,7 @@ export const navigationCommands: Command[] = [
   },
   {
     id: "nav-experiments",
+    navigationSection: "test",
     label: "Experiments",
     description: "View experiments",
     icon: FlaskConical,
@@ -149,6 +157,7 @@ export const navigationCommands: Command[] = [
   },
   {
     id: "nav-annotations",
+    navigationSection: "test",
     label: "Annotations",
     description: "Annotation queues",
     icon: Pencil,
@@ -158,6 +167,7 @@ export const navigationCommands: Command[] = [
   },
   {
     id: "nav-annotations-all",
+    navigationSection: "test",
     label: "All Annotations",
     description: "Annotations → All",
     icon: Pencil,
@@ -167,6 +177,7 @@ export const navigationCommands: Command[] = [
   },
   {
     id: "nav-annotations-inbox",
+    navigationSection: "test",
     label: "My Annotation Inbox",
     description: "Annotations → Inbox",
     icon: Inbox,
@@ -176,6 +187,7 @@ export const navigationCommands: Command[] = [
   },
   {
     id: "nav-annotations-queue",
+    navigationSection: "test",
     label: "My Annotation Queue",
     description: "Annotations → My Queue",
     icon: ListTree,
@@ -185,6 +197,7 @@ export const navigationCommands: Command[] = [
   },
   {
     id: "nav-prompts",
+    navigationSection: "build",
     label: "Prompts",
     description: "Manage prompts",
     icon: BookText,
@@ -194,6 +207,7 @@ export const navigationCommands: Command[] = [
   },
   {
     id: "nav-agents",
+    navigationSection: "build",
     label: "Agents",
     description: "Manage agents",
     icon: Bot,
@@ -203,6 +217,7 @@ export const navigationCommands: Command[] = [
   },
   {
     id: "nav-workflows",
+    navigationSection: "build",
     label: "Workflows",
     description: "Manage workflows",
     icon: Workflow,
@@ -212,6 +227,7 @@ export const navigationCommands: Command[] = [
   },
   {
     id: "nav-evaluators",
+    navigationSection: "build",
     label: "Evaluators",
     description: "Manage evaluators",
     icon: Percent,
@@ -221,6 +237,7 @@ export const navigationCommands: Command[] = [
   },
   {
     id: "nav-datasets",
+    navigationSection: "build",
     label: "Datasets",
     description: "Manage datasets",
     icon: Table,
@@ -230,6 +247,7 @@ export const navigationCommands: Command[] = [
   },
   {
     id: "nav-automations",
+    navigationSection: "build",
     label: "Automations",
     description: "Manage automations",
     icon: Bell,
@@ -555,6 +573,7 @@ export const navigationCommands: Command[] = [
 export const actionCommands: Command[] = [
   {
     id: "action-new-agent",
+    navigationSection: "build",
     label: "New Agent",
     description: "Create a new agent",
     icon: Plus,
@@ -563,6 +582,7 @@ export const actionCommands: Command[] = [
   },
   {
     id: "action-new-evaluation",
+    navigationSection: "test",
     label: "New Evaluation",
     description: "Create a new evaluation",
     icon: Plus,
@@ -571,6 +591,7 @@ export const actionCommands: Command[] = [
   },
   {
     id: "action-new-prompt",
+    navigationSection: "build",
     label: "New Prompt",
     description: "Create a new prompt",
     icon: Plus,
@@ -579,6 +600,7 @@ export const actionCommands: Command[] = [
   },
   {
     id: "action-new-dataset",
+    navigationSection: "build",
     label: "New Dataset",
     description: "Create a new dataset",
     icon: Plus,
@@ -587,6 +609,7 @@ export const actionCommands: Command[] = [
   },
   {
     id: "action-new-automation",
+    navigationSection: "build",
     label: "New Automation",
     description: "Create a notification or action triggered by trace filters",
     icon: Bell,
@@ -595,6 +618,7 @@ export const actionCommands: Command[] = [
   },
   {
     id: "action-new-scenario",
+    navigationSection: "test",
     label: "New Scenario",
     description: "Create a new scenario",
     icon: Plus,
@@ -787,6 +811,24 @@ export function filterCommandsByFeatureFlags({
     if (!command.featureFlag) return true;
     return flags[command.featureFlag.flag] === command.featureFlag.enabled;
   });
+}
+
+/**
+ * Drops the commands whose navigation section this project's navigation
+ * does not show, so Quick Search offers an aggregate (ADR-177) what its
+ * sidebar does and no way to create data under it. A command with no
+ * section is always offered.
+ */
+export function filterCommandsByProjectNavigation({
+  commands,
+  navigation,
+}: {
+  commands: Command[];
+  navigation: ProjectNavigation;
+}): Command[] {
+  return commands.filter(
+    (command) => !command.navigationSection || navigation[command.navigationSection],
+  );
 }
 
 /**

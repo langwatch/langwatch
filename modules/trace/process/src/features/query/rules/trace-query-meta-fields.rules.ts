@@ -8,7 +8,10 @@ import {
   type Unsupported,
 } from "@langwatch/trace-contract";
 
-import { boundedSubquery, scenarioRunSubquery } from "./trace-query-subquery.rules.ts";
+import {
+  boundedSubquery,
+  scenarioRunSubquery,
+} from "../repositories/clickhouse/clickhouse.trace-query-subquery.mapper.ts";
 import {
   TRACE_ATTRIBUTE_PREFIX_LEGACY,
   extractStringValue,

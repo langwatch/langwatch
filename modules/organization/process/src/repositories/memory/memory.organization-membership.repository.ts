@@ -398,6 +398,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     {
       userId: string;
       departmentId: string | null;
+      disabledAt: Instant | null;
       user: { name: string | null; email: string | null };
     }[]
   > {
@@ -408,6 +409,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
         return {
           userId: row.userId,
           departmentId: row.departmentId ?? null,
+          disabledAt: row.disabledAt ?? null,
           user: { name, email },
         };
       });

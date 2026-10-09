@@ -1,4 +1,5 @@
 import { Box, HStack, Icon, Text } from "@langwatch/design-system/primitives";
+import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { Lightbulb } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
@@ -7,6 +8,7 @@ import { createPortal } from "react-dom";
 
 import { useFilterStore } from "../../../../behavior/explorer.store.ts";
 import type { FloatRect } from "../../../../behavior/use-float-rect.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { AiQueryComposer } from "./ai-query-composer.tsx";
 import { AiShaderBackdrop } from "./ai-shader-backdrop.tsx";
 import { FloatingAiErrorRow } from "./floating-ai-error-row.tsx";
@@ -19,22 +21,33 @@ interface FloatingAiBarProps {
   autoSubmit?: boolean;
 }
 
-const AI_TIPS = [
-  "Save the result as a lens with the + button next to your lenses.",
+const SAVE_AS_LENS_TIP = "Save the result as a lens with the + button next to your lenses.";
+
+const GENERAL_TIPS = [
   "Press Enter to apply, Esc to cancel.",
   "Don't know the syntax? AI's got your back. Just describe what you want.",
 ];
 
+/** Tips for a project that can save lenses: the "+" tip leads. */
+const TIPS_WITH_LENS_SAVE = [SAVE_AS_LENS_TIP, ...GENERAL_TIPS];
+
+/**
+ * Cycles the composer tips. An aggregate project has no "+" to save a lens
+ * (ADR-177), so its tips leave out the one that points to it.
+ */
 const useCyclingTip = (active: boolean): string => {
+  const { project } = useOrganizationTeamProject();
+  const canSaveLenses = !isAggregateProjectKind(project?.kind);
+  const tips = canSaveLenses ? TIPS_WITH_LENS_SAVE : GENERAL_TIPS;
   const [index, setIndex] = useState(0);
   useEffect(() => {
     if (!active) return;
     const id = setInterval(() => {
-      setIndex((i) => (i + 1) % AI_TIPS.length);
+      setIndex((i) => i + 1);
     }, 4200);
     return () => clearInterval(id);
   }, [active]);
-  return AI_TIPS[index] ?? AI_TIPS[0]!;
+  return tips[index % tips.length]!;
 };
 
 /**

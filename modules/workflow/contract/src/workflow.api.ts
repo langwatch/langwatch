@@ -260,8 +260,8 @@ export interface WorkflowApi {
    */
   streamStudioEvent(input: {
     body: string;
-    /** Absent when no one is signed in, which is refused. */
-    userId: string | undefined;
+    /** The signed-in user the door admitted with workflows:manage at the body's project. */
+    userId: string;
   }): Promise<AsyncIterable<StudioServerEvent>>;
   /** Opens one studio run and streams the engine's events back through `onEvent`. */
   postStudioEvent(input: {

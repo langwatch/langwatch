@@ -1,3 +1,4 @@
+import { bindRestMiddleware, organizationCredentialOfRequest } from "@langwatch/api/rest";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { defineMigrationStep, type MigrationStepRun } from "@langwatch/upgrade/step";
@@ -9,7 +10,7 @@ import { ProjectFactsBackfillService } from "./services/project-facts-backfill.s
 import { ProjectCreatedBackfillTask } from "./tasks/project-created-backfill.task.ts";
 import { ProjectDepartmentAssignedBackfillTask } from "./tasks/project-department-assigned-backfill.task.ts";
 import { ProjectPresenceSettingBackfillTask } from "./tasks/project-presence-setting-backfill.task.ts";
-import { projectRest } from "./transport/project.rest.ts";
+import { projectRest, projectRestCaller } from "./transport/project.rest.ts";
 import { projectTrpcTransport } from "./transport/project.trpc.ts";
 
 export const projectProcessModule: PublishedProcessModule<"project", ProjectApi> =
@@ -17,6 +18,11 @@ export const projectProcessModule: PublishedProcessModule<"project", ProjectApi>
     .withRepositories(projectRepositories)
     .withApi(ProjectModule)
     .withTransports(projectRest, projectTrpcTransport)
+    .withTransportFacts(() => [
+      bindRestMiddleware(projectRestCaller, (context) => ({
+        userId: organizationCredentialOfRequest(context.req.raw).userId,
+      })),
+    ])
     .withEventing(projectLifecycleEventing)
     // Old images record none of these facts: each runs once no old image serves (ADR-173 §3).
     .withMigrations(({ app, dependencies }) => {

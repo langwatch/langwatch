@@ -232,6 +232,8 @@ describe("given organization records a newly created personal workspace", () => 
       recordProjectArchived: lifecycle.commands.recordProjectArchived,
       recordProjectDepartmentAssigned: lifecycle.commands.recordProjectDepartmentAssigned,
       recordProjectTraceSharingDisabled: lifecycle.commands.recordProjectTraceSharingDisabled,
+      recordProjectAggregateRuleChanged: lifecycle.commands.recordProjectAggregateRuleChanged,
+      recordProjectRevived: lifecycle.commands.recordProjectRevived,
     });
     eventing.register(createdListener(heard));
 
@@ -278,6 +280,7 @@ describe("given organization records a personal team's creation twice under two 
     const recorded = vi.fn(async (_input: { projectId: string; organizationId: string }) => void 0);
     const personalProjects = PersonalProjectService.create({
       projects: MemoryProjectRepository.create({ memory }),
+      lifecycle: { revived: async () => undefined },
     });
     const eventing = new EventSourcing({ eventStore: EventStoreMemory.createForTesting() });
     const organization = eventing.register(organizationStandIn());

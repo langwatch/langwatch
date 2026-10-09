@@ -41,6 +41,7 @@ const seats: OrganizationSeatLicense = {
 };
 const seatNotices: OrganizationSeatRevocationNotice = {
   memberDisabled: vi.fn(),
+  memberEnabled: vi.fn(),
 };
 const grantCache: OrganizationGrantCache = {
   invalidateOrganization: vi.fn(),

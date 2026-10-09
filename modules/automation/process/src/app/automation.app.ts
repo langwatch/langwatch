@@ -449,6 +449,7 @@ export class AutomationModule implements AutomationApi {
         projects: setup.dependencies.projects,
         analytics: setup.dependencies.analytics,
         traces: setup.dependencies.traces,
+        authz: setup.dependencies.authorization,
         delivery: infrastructure.delivery,
         slackDestinations: infrastructure.slackDestinations,
         suppression: automation.#automation,

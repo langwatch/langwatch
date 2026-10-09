@@ -232,6 +232,7 @@ export default function OnboardingHostMount({ children }: { children?: ReactNode
 
   const governance = useLentHooks(SampleChoiceToken) ?? INERT_GOVERNANCE;
 
+  const scopeProjectKind = session.snapshot().scope.project?.kind;
   const scope: OnboardingScope = useMemo(
     () => ({
       organization: graph.organization,
@@ -241,11 +242,12 @@ export default function OnboardingHostMount({ children }: { children?: ReactNode
             id: graph.activeProject.project.id,
             name: graph.activeProject.project.name,
             slug: graph.activeProject.project.slug,
+            ...(scopeProjectKind !== void 0 ? { kind: scopeProjectKind } : {}),
           }
         : void 0,
       isLoading: graph.isLoading,
     }),
-    [graph],
+    [graph, scopeProjectKind],
   );
 
   const host = useMemo(

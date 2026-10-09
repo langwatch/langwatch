@@ -136,6 +136,7 @@ describe("WebSocketHost", () => {
         organizationId: "org_1",
         isPersonal: false,
         ownerUserId: null,
+        kind: "application",
       },
     };
     const asked: Parameters<RestIdentity["authenticate"]>[0][] = [];

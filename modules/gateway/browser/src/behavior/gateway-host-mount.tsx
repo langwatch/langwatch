@@ -148,7 +148,13 @@ class CapabilityGatewayHost extends GatewayHostApi {
     const project = this.scopeHost?.project();
     const team = this.scopeHost?.team();
     if (!project || !team) return void 0;
-    return { id: project.id, name: project.name, slug: project.slug, teamId: team.id };
+    return {
+      id: project.id,
+      name: project.name,
+      slug: project.slug,
+      teamId: team.id,
+      kind: project.kind,
+    };
   }
 
   team(): GatewayTeam | undefined {

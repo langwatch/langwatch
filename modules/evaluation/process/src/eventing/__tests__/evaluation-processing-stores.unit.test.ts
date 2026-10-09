@@ -2,11 +2,13 @@ import type {
   AnalyticsEvaluationUpsertInput,
   AnalyticsEvaluationRollupAppendInput,
 } from "@langwatch/analytics-contract";
+import { projectIdsReadBy } from "@langwatch/authorization";
 import type { EvaluationRunData, UpsertEvaluationRunCommand } from "@langwatch/evaluation-contract";
 import { createTenantId, type ProjectionStoreContext } from "@langwatch/eventing";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
+import { ownProof } from "../../__tests__/support/authorization-proofs.fixture.ts";
 import type { EvaluationRunProjectionRepository } from "../../repositories/evaluation-run-projection.repository.ts";
 import { MemoryEvaluationAnalyticsFoldCacheRepository } from "../../repositories/memory/memory.evaluation.repositories.ts";
 import { EvaluationAnalyticsFoldProjection } from "../evaluation-analytics-fold.projection.ts";
@@ -48,6 +50,12 @@ const run: EvaluationRunData = {
 
 function storesReading(defaultRetentionDays: () => number) {
   const runs: UpsertEvaluationRunCommand[] = [];
+  const authorizeFoldRead = vi.fn(async ({ projectId }: { projectId: string }) =>
+    ownProof({ projectId }),
+  );
+  const findRunByEvaluationId = vi.fn<EvaluationRunProjectionRepository["findRunByEvaluationId"]>(
+    async () => run,
+  );
   const analytics: AnalyticsEvaluationUpsertInput[] = [];
   const rollups: AnalyticsEvaluationRollupAppendInput[] = [];
   const stores = EvaluationProcessingStoresAdapter.create({
@@ -55,6 +63,7 @@ function storesReading(defaultRetentionDays: () => number) {
       upsertRun: async (input) => {
         runs.push(input);
       },
+      findRunByEvaluationId,
     }),
     analytics: createApiFixture<EvaluationAnalyticsWrites>({
       upsertEvaluationAnalytics: async (input) => {
@@ -67,10 +76,32 @@ function storesReading(defaultRetentionDays: () => number) {
     analyticsFoldCache: MemoryEvaluationAnalyticsFoldCacheRepository.create(),
     defaultRetentionDays,
     tenantRetention: { resolve: async () => null },
+    authorizeFoldRead,
   }).buildStores();
 
-  return { stores, runs, analytics };
+  return { stores, runs, analytics, authorizeFoldRead, findRunByEvaluationId };
 }
+
+describe("given evaluation's run fold store", () => {
+  describe("when it reads a run back during a fold", () => {
+    it("reads through an own-only proof minted for the context's tenant, never a bare tenant id", async () => {
+      const { stores, authorizeFoldRead, findRunByEvaluationId } = storesReading(() => 30);
+
+      await expect(
+        stores.evalRunStore.get("evaluation-1", { ...context, eventId: "event-1" }),
+      ).resolves.toEqual({ kind: "folded", state: run });
+
+      expect(authorizeFoldRead).toHaveBeenCalledWith({
+        projectId: TENANT,
+        purpose: { kind: "event", eventId: "event-1" },
+      });
+      const lookup = findRunByEvaluationId.mock.calls[0]?.[0];
+      expect(lookup).not.toHaveProperty("tenantId");
+      expect(lookup?.evaluationId).toBe("evaluation-1");
+      expect(lookup && projectIdsReadBy(lookup.authorization)).toEqual([TENANT]);
+    });
+  });
+});
 
 describe("given evaluation's fold stores built over the platform default retention", () => {
   describe("when a run and its analytics fold are written for a tenant with no override", () => {

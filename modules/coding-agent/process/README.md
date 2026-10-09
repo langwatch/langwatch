@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`CodingAgentApi`)
 
-Peers call these through the token, declared at `../contract/src/coding-agent.api.ts:61`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/coding-agent.api.ts:62`; nothing else in this package is public.
 
 #### `findBySessionId`
 
@@ -29,7 +29,7 @@ findSessionForTrace(input: { projectId: string; traceId: string; }): Promise<Cod
 #### `readTranscriptForViewer`
 
 ```typescript
-readTranscriptForViewer(input: { projectId: string; traceId: string; occurredAtMs?: number | undefined; viewerUserId: string; }): Promise<CodingAgentTranscript>;
+readTranscriptForViewer(input: { projectId: string; traceId: string; occurredAtMs?: number | undefined; viewerUserId: string; authorization?: Authorization; }): Promise<CodingAgentTranscript>;
 ```
 
 #### `linkTraceSessionsToPullRequests`
@@ -85,7 +85,7 @@ contributeSpanFacts(data: ContributeSpanFactsCommandData): Promise<void>;
 The Sessions lens (main's `traces.sessions`): trace's page for the viewer, enriched here.
 
 ```typescript
-readSessionGroupsForViewer(input: TraceSessionGroupsInput & { viewerUserId: string }): Promise<TracesSessionsPage>;
+readSessionGroupsForViewer(input: TraceSessionGroupsInput & { viewerUserId: string; authorization: Authorization }): Promise<TracesSessionsPage>;
 ```
 
 #### `recordPullRequestUsageRead`

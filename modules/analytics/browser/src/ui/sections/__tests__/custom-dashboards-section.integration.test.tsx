@@ -129,3 +129,26 @@ describe("the custom dashboards list", () => {
     expect(screen.queryByText("Delete")).toBeNull();
   });
 });
+
+describe("the dashboard list on an aggregate project", () => {
+  /** @scenario "The app marks the aggregate and offers no way to add data to it" */
+  it("offers no way to create a dashboard", () => {
+    api.dashboards = [];
+    const host = new StubAnalyticsHost({
+      project: {
+        id: "proj-agg",
+        slug: "company-traces",
+        name: "Company Traces",
+        hasFirstMessage: true,
+        kind: "aggregate",
+      },
+    });
+    render(
+      <AnalyticsTestHarness host={host}>
+        <CustomDashboardsSection projectSlug="company-traces" />
+      </AnalyticsTestHarness>,
+    );
+
+    expect(screen.queryByTestId("analytics-dashboard-add")).not.toBeInTheDocument();
+  });
+});

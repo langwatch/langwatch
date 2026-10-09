@@ -23,6 +23,13 @@ vi.mock("../../../../../behavior/use-create-draft-prompt.ts", () => ({
   useCreateDraftPrompt: () => ({ createDraftPrompt: vi.fn() }),
 }));
 
+vi.mock("../../../../../behavior/use-prompt-project.ts", () => ({
+  usePromptProject: () => ({
+    project: { id: "proj-1", slug: "web-app", kind: "application" },
+    hasPermission: () => true,
+  }),
+}));
+
 import { NoPromptsOnboardingState } from "../no-prompts-onboarding-state.tsx";
 
 const traceLends = uiDeclarations([

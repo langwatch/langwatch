@@ -494,6 +494,28 @@ describe("the CLI governance plane", () => {
       });
     });
 
+    it("refuses an aggregate project before any permission is asked, and mints nothing", async () => {
+      const issueForProject = vi.fn();
+      const permittedOnProject = vi.fn().mockResolvedValue(true);
+      const api = mountCli({
+        ingestionKeys: { issueForProject },
+        projects: { findLiveByRef: vi.fn().mockResolvedValue([{ ...PROJECT, kind: "aggregate" }]) },
+        permittedOnProject,
+      });
+
+      const response = await api.post(
+        "/api/auth/cli/governance/ingestion-key",
+        mintFor(PROJECT.id),
+      );
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({
+        error: "aggregate_project_has_no_credential",
+      });
+      expect(permittedOnProject).not.toHaveBeenCalled();
+      expect(issueForProject).not.toHaveBeenCalled();
+    });
+
     /** @scenario Minting into a project the caller cannot write to is refused */
     it("answers 403 forbidden and mints nothing without traces:create on it", async () => {
       const issueForProject = vi.fn();

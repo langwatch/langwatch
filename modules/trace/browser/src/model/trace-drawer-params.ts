@@ -106,6 +106,8 @@ export interface TraceDrawerAddress {
   isOpen: boolean;
   traceId: string | null;
   projectId: string | null;
+  /** The member project that owns the trace on an aggregate (ADR-177 block F), else null. */
+  tenantId: string | null;
   occurredAtMs: number | null;
   selectedSpanId: string | null;
   pinnedSpanIds: string[];
@@ -118,6 +120,7 @@ const CLOSED: TraceDrawerAddress = {
   isOpen: false,
   traceId: null,
   projectId: null,
+  tenantId: null,
   occurredAtMs: null,
   selectedSpanId: null,
   pinnedSpanIds: [],
@@ -139,6 +142,7 @@ export function readTraceDrawerAddress(
     isOpen: true,
     traceId,
     projectId: query["drawer.projectId"] || null,
+    tenantId: query["drawer.tenantId"] || null,
     occurredAtMs: isOccurredAtParam(occurredAt) ? Number(occurredAt) : null,
     selectedSpanId: query["drawer.span"] || null,
     pinnedSpanIds: parsePinnedSpansParam(query["drawer.pinnedSpans"]),
@@ -146,4 +150,36 @@ export function readTraceDrawerAddress(
     addressedViewMode: isViewMode(mode) ? mode : null,
     addressedVizTab: isVizTab(viz) ? viz : null,
   };
+}
+
+/**
+ * The drawer params that name one trace: its id, its partition hint and, on an
+ * aggregate, the member that owns it (ADR-177 block F), so a reload or a copied
+ * link reopens the same member's trace. A plain project names no member.
+ */
+export function traceDrawerParams({
+  traceId,
+  occurredAtMs,
+  tenantId,
+}: {
+  traceId: string;
+  occurredAtMs?: number | null;
+  tenantId?: string | null;
+}): { traceId: string; t?: string; tenantId?: string } {
+  return {
+    traceId,
+    ...(occurredAtMs !== null && occurredAtMs !== undefined ? { t: String(occurredAtMs) } : {}),
+    ...(tenantId ? { tenantId } : {}),
+  };
+}
+
+/** The member to name for a trace owned by `ownerProjectId`, read from `projectId`: the owner when it is another project, else null. */
+export function memberTenantOf({
+  ownerProjectId,
+  projectId,
+}: {
+  ownerProjectId: string | null | undefined;
+  projectId: string | null | undefined;
+}): string | null {
+  return ownerProjectId && ownerProjectId !== projectId ? ownerProjectId : null;
 }

@@ -91,6 +91,15 @@ function world() {
     }),
   } satisfies ScimUserProvisioning;
   const service = ScimService.create({
+    // Organization owns the membership row; a delete asks it to remove the member.
+    members: {
+      deleteMember: vi.fn(async ({ organizationId, userId }) => {
+        const at = store.memberships.findIndex(
+          (row) => row.organizationId === organizationId && row.userId === userId,
+        );
+        if (at !== -1) store.memberships.splice(at, 1);
+      }),
+    },
     connections: HeldConnectionsFake.of([OKTA, ENTRA]),
     prisma: store,
     writer,

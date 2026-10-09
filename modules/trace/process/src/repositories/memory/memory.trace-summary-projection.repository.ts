@@ -1,3 +1,4 @@
+import { type Authorization, projectIdsReadBy } from "@langwatch/authorization";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 
 import {
@@ -26,9 +27,13 @@ export class MemoryTraceSummaryProjectionRepository extends TraceSummaryProjecti
   }
 
   async findByTraceId(input: {
-    tenantId: string;
+    authorization: Authorization;
     traceId: string;
   }): Promise<TraceSummaryData | null> {
-    return this.summaries.get(`${input.tenantId}:${input.traceId}`) ?? null;
+    for (const tenantId of projectIdsReadBy(input.authorization)) {
+      const summary = this.summaries.get(`${tenantId}:${input.traceId}`);
+      if (summary) return summary;
+    }
+    return null;
   }
 }

@@ -3,7 +3,7 @@ import {
   DepartmentNotFoundError,
 } from "@langwatch/enterprise-governance-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
+import { PROJECT_KIND, type ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
@@ -38,14 +38,24 @@ async function harness(options: { targetExists?: boolean } = {}) {
     departmentId: department.id,
     at: Temporal.Instant.from("2026-01-01T00:00:00Z"),
   });
+  const hiddenAsked: string[][] = [];
   const projects = createApiFixture<ProjectApi>({
     assignProjectDepartment: async ({ projectId }) => (writes.push(`project:${projectId}`), exists),
-    findProjectsWithDepartments: async () => [
-      { id: "project-1", name: "Chat", departmentId: department.id },
-    ],
+    findProjectsWithDepartments: async ({ hiddenKinds }) => {
+      hiddenAsked.push([...hiddenKinds]);
+      return [{ id: "project-1", name: "Chat", departmentId: department.id }];
+    },
   });
-  const service = DepartmentService.create({ repository, organizations, projects });
-  return { service, department, writes, repository };
+  const reconciles: string[] = [];
+  const service = DepartmentService.create({
+    repository,
+    organizations,
+    projects,
+    onMemberDepartmentAssigned: async ({ userId }) => {
+      reconciles.push(userId);
+    },
+  });
+  return { service, department, writes, repository, reconciles, hiddenAsked };
 }
 
 describe("DepartmentService", () => {
@@ -134,7 +144,9 @@ describe("DepartmentService", () => {
   it("lists members with their email, named by display name or else email, beside teams and projects", async () => {
     const { service, department } = await harness();
 
-    expect(await service.getAssignments({ organizationId: ORG })).toEqual({
+    expect(
+      await service.getAssignments({ organizationId: ORG, callerOrganizationRole: "ADMIN" }),
+    ).toEqual({
       users: [
         { id: "user-1", name: "Ada", email: "ada@acme.com", departmentId: department.id },
         { id: "user-2", name: "zed@acme.com", email: "zed@acme.com", departmentId: null },
@@ -142,6 +154,19 @@ describe("DepartmentService", () => {
       teams: [{ id: "team-1", name: "Web", departmentId: null }],
       projects: [{ id: "project-1", name: "Chat", departmentId: department.id }],
     });
+  });
+
+  /** ADR-177 decision 5: only an organisation admin sees an aggregate project. */
+  it.each([
+    ["ADMIN", [PROJECT_KIND.INTERNAL_GOVERNANCE]],
+    ["MEMBER", [PROJECT_KIND.INTERNAL_GOVERNANCE, PROJECT_KIND.AGGREGATE]],
+    [null, [PROJECT_KIND.INTERNAL_GOVERNANCE, PROJECT_KIND.AGGREGATE]],
+  ])("asks for the projects a %s caller may see", async (role, hidden) => {
+    const { service, hiddenAsked } = await harness();
+
+    await service.getAssignments({ organizationId: ORG, callerOrganizationRole: role });
+
+    expect(hiddenAsked).toEqual([hidden]);
   });
 
   it("answers a past day's departments keyed by member", async () => {
@@ -154,5 +179,32 @@ describe("DepartmentService", () => {
     });
 
     expect([...onDay]).toEqual([["user-1", department.id]]);
+  });
+});
+
+describe("given a member's department assigned from governance", () => {
+  describe("when the member exists", () => {
+    it("enqueues the aggregate reconcile once the write lands", async () => {
+      const { service, department, reconciles } = await harness();
+
+      await service.assignUser({
+        organizationId: ORG,
+        userId: "user-2",
+        departmentId: department.id,
+      });
+
+      expect(reconciles).toEqual(["user-2"]);
+    });
+  });
+
+  describe("when the member is not found", () => {
+    it("enqueues nothing, because nothing changed", async () => {
+      const { service, department, reconciles } = await harness({ targetExists: false });
+
+      await expect(
+        service.assignUser({ organizationId: ORG, userId: "user-9", departmentId: department.id }),
+      ).rejects.toBeInstanceOf(DepartmentAssignmentTargetNotFoundError);
+      expect(reconciles).toEqual([]);
+    });
   });
 });

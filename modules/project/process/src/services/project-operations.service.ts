@@ -7,6 +7,7 @@ import {
   type Project,
   type UpdateProjectInput,
   type ProjectLegacyKeyStatus,
+  type AggregateRule,
 } from "@langwatch/project-contract";
 
 import type {
@@ -60,10 +61,14 @@ export class ProjectOperationsService {
       name: string;
       language: string;
       framework: string;
+      kind?: "aggregate" | undefined;
+      aggregateRule?: AggregateRule | undefined;
     }>,
     by: ProjectCaller,
   ): Promise<Project> {
     return this.dependencies.projects.create({
+      kind: input.kind,
+      aggregateRule: input.aggregateRule,
       organizationId: input.organizationId,
       userId: by.id,
       teamId: input.teamId,

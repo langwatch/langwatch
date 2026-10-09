@@ -31,6 +31,7 @@ import { CreateDashboardWidgetDrawer } from "../../../features/dashboard-widget/
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
 import type { ChartGridPlacement } from "../../../model/chart-grid.ts";
 import { Link } from "../../elements/analytics-link.tsx";
+import { withAggregateAnalyticsGate } from "../aggregate-analytics-gate.tsx";
 import AnalyticsLayout from "../analytics-layout.tsx";
 import { DashboardAutoRefreshMenu } from "../dashboard-auto-refresh-menu.tsx";
 import { FilterSidebar } from "../filter-sidebar.tsx";
@@ -38,7 +39,11 @@ import { ReportGrid } from "../report-grid.tsx";
 import { DashboardRefreshedAtContext } from "../use-dashboard-auto-refresh.ts";
 
 function ReportsContent() {
-  const { project, organization } = useOrganizationTeamProject();
+  const { project, organization, hasPermission } = useOrganizationTeamProject();
+  // Each write is refused where the server refuses it: on an aggregate (ADR-177) and without
+  // the grant.
+  const canAddChart = hasPermission("analytics:create");
+  const canRenameDashboard = hasPermission("analytics:update");
   const { showFilters } = useFilterToggle();
   const host = useAnalyticsHost();
   const showErrorToast = useShowErrorToast();
@@ -208,13 +213,13 @@ function ReportsContent() {
       title={dashboardTitle}
       railEntry="reports"
       analyticsHeaderProps={{
-        isEditable: true,
+        isEditable: canRenameDashboard,
         onTitleSave: handleTitleSave,
       }}
       extraHeaderButtons={
         <>
           <DashboardAutoRefreshMenu option={autoRefresh.option} onChange={autoRefresh.setOption} />
-          {project ? (
+          {project && canAddChart ? (
             <AddChartButton
               opensDrawer={customChartPlaygroundEnabled}
               href={addChartUrl}
@@ -230,7 +235,7 @@ function ReportsContent() {
           there would hit a Save button that always fails. This drawer is
           the one "create a new chart" path that still works, and it lands
           the new widget on this dashboard directly. */}
-      {project && customChartPlaygroundEnabled && (
+      {project && canAddChart && customChartPlaygroundEnabled && (
         <CreateDashboardWidgetDrawer
           open={isAddChartOpen}
           onClose={() => setIsAddChartOpen(false)}
@@ -245,10 +250,14 @@ function ReportsContent() {
         <Alert.Root status="info" variant="surface" marginBottom={6}>
           <Alert.Indicator />
           <VStack align="start">
-            <Alert.Title>Add your custom graphs here</Alert.Title>
+            <Alert.Title>
+              {canAddChart ? "Add your custom graphs here" : "No custom graphs yet"}
+            </Alert.Title>
             <Alert.Description>
               <Text as="span">
-                You haven{"'"}t set up any custom graphs yet. Click + Add chart to get started.
+                {canAddChart
+                  ? "You haven't set up any custom graphs yet. Click + Add chart to get started."
+                  : "Nobody has added a custom graph to this dashboard yet."}
               </Text>
             </Alert.Description>
           </VStack>
@@ -326,4 +335,7 @@ function AddChartButton({
   );
 }
 
-export default ReportsContent;
+/** Exported for the test that renders the body past the aggregate gate. */
+export { ReportsContent };
+
+export default withAggregateAnalyticsGate("Reports", ReportsContent);

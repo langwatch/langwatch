@@ -4,7 +4,7 @@ import {
   type AgentCopyCreated,
 } from "@langwatch/agent-contract";
 import { ApiKeyApi, ApiKeyPermissionDeniedError } from "@langwatch/api-key-contract";
-import { ProjectPermissionDeniedError, type AuthzPermission } from "@langwatch/authorization";
+import type { AuthzPermission } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
 /**
  * The workflow module's application: what all five of its doors call. A caller
@@ -71,7 +71,6 @@ import {
   workflowConfig,
   type WorkflowServerConfig,
   type WorkflowUsageCount,
-  WorkflowCallerUnauthenticatedError,
   LlmModelNotSetError,
   WorkflowOptimizationRemovedError,
   WorkflowStudioEventInvalidError,
@@ -1048,7 +1047,7 @@ export class WorkflowModule implements WorkflowApi, WorkflowBrowserApi {
     userId,
   }: {
     body: string;
-    userId: string | undefined;
+    userId: string;
   }): Promise<AsyncIterable<StudioServerEvent>> {
     const [posted] = findPostedJson(body);
     const validated = posted ? workflowStudioRestEventSchema.safeParse(posted) : undefined;
@@ -1057,14 +1056,6 @@ export class WorkflowModule implements WorkflowApi, WorkflowBrowserApi {
     const projectId = validated.data.projectId;
     const eventWithoutEnvs = posted.event as StudioClientEvent;
     logger.info({ event: eventWithoutEnvs.type, projectId }, "post_event");
-
-    if (userId === undefined) throw new WorkflowCallerUnauthenticatedError();
-    const permitted = await this.hasProjectPermission({
-      userId,
-      projectId,
-      permission: "workflows:manage",
-    });
-    if (!permitted) throw new ProjectPermissionDeniedError("workflows:manage");
 
     const message = await this.#preparedForDispatch({
       event: eventWithoutEnvs,

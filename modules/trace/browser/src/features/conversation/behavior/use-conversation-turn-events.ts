@@ -61,9 +61,10 @@ export function useConversationTurnEvents(turns: TraceListItem[]): TraceListItem
       mergeTraceEvents({
         rows: turns,
         rollups: query.data,
+        projectId,
         isLoading,
         isUnavailable: enabled && query.isError,
       }),
-    [turns, query.data, query.isError, isLoading, enabled],
+    [turns, query.data, projectId, query.isError, isLoading, enabled],
   );
 }

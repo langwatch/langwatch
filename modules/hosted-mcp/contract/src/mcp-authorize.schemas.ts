@@ -14,6 +14,7 @@ export const signedOut = z.object({ error: z.string() });
 export const refused = z.object({
   error: z.string(),
   error_description: z.string().optional(),
+  code: z.string().optional(),
   redirect: z.string().optional(),
 });
 

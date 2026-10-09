@@ -52,7 +52,6 @@ describe("has:feedback", () => {
     it("looks for the thumbs_up_down event name", () => {
       const compiled = traceQueryTranslation.translateFilter({
         queryText: "has:feedback",
-        tenantId: "t1",
         timeRange: { from: 0, to: 1 },
       });
       expect(compiled?.sql).toContain("thumbs_up_down");

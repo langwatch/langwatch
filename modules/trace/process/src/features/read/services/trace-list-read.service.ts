@@ -1,8 +1,10 @@
+import { type Authorization, ownProjectIdReadBy } from "@langwatch/authorization";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import {
   TRACE_ORIGIN_CLICKHOUSE_EXPRESSION,
   TRACE_LIST_MAX_OFFSET_ROWS,
   PageTooDeepError,
+  listedTraceKey,
   teaserOf,
 } from "@langwatch/trace-contract";
 import type {
@@ -13,32 +15,37 @@ import type {
   TraceListItem,
   TraceListPage,
   TraceListRead,
+  TraceRef,
   Protections,
 } from "@langwatch/trace-contract";
 
 import type { FacetCatalog } from "#features/facet/rules/trace-facet-registry.rules";
 
 import type { TraceEvaluationRunsReadRepository } from "../../../repositories/trace-evaluation-runs.repository.ts";
-import type { TraceTopicNamesReadRepository } from "../../topic/repositories/trace-topic-names.repository.ts";
-import type { FacetFilterResolver } from "../../facet/rules/trace-facet-filter.rules.ts";
-import type { DiscoverParams, FacetValuesParams } from "../../../rules/trace-list-cache-key.rules.ts";
+import type {
+  DiscoverParams,
+  FacetValuesParams,
+} from "../../../rules/trace-list-cache-key.rules.ts";
 import {
   cursorForTraceRow,
   mapToTraceListItem,
   SORT_COLUMN_MAP,
 } from "../../../rules/trace-list-row.rules.ts";
 import { TraceDiscoverService } from "../../../services/trace-discover.service.ts";
+import type { FacetFilterResolver } from "../../facet/rules/trace-facet-filter.rules.ts";
 import { TraceFacetValuesService } from "../../facet/services/trace-facet-values.service.ts";
+import type { TraceTopicNamesReadRepository } from "../../topic/repositories/trace-topic-names.repository.ts";
 import { TraceTopicNamingService } from "../../topic/services/trace-topic-naming.service.ts";
 
 interface ListParams {
-  tenantId: string;
+  authorization: Authorization;
   timeRange: { from: number; to: number };
   sort: { columnId: string; direction: "asc" | "desc" };
   /** 1-based offset compatibility for non-cursor callers. */
   page?: number;
   pageSize: number;
-  cursor?: TraceListCursor;
+  /** A cursor minted before it carried its tenant reads as the proof's own project. */
+  cursor?: Omit<TraceListCursor, "tenantId"> & { tenantId?: string };
   filterWhere?: { sql: string; params: Record<string, unknown> };
   /**
    * Visibility gate: list items older than this cutoff get their
@@ -48,7 +55,7 @@ interface ListParams {
 }
 
 interface FacetParams {
-  tenantId: string;
+  authorization: Authorization;
   /** The exact window the list reads, never snapped. */
   timeRange: { from: number; to: number; live?: boolean };
   /** The predicate each facet is counted under. */
@@ -56,21 +63,21 @@ interface FacetParams {
 }
 
 interface NewCountParams {
-  tenantId: string;
+  authorization: Authorization;
   timeRange: { from: number; to: number };
   since: number;
   filterWhere?: { sql: string; params: Record<string, unknown> };
 }
 
 interface TraceIdsParams {
-  tenantId: string;
+  authorization: Authorization;
   timeRange: { from: number; to: number };
   filterWhere?: { sql: string; params: Record<string, unknown> };
   limit: number;
 }
 
 interface SuggestParams {
-  tenantId: string;
+  authorization: Authorization;
   field: string;
   prefix: string;
   limit?: number;
@@ -199,34 +206,44 @@ export class TraceListService {
     }
 
     const result = await this.repository.listAll({
-      tenantId: params.tenantId,
+      authorization: params.authorization,
       timeRange: params.timeRange,
       sort: { column: sortColumn, direction: params.sort.direction },
       // Read one sentinel row so `nextCursor` is exact without guessing from
       // totalHits (which may change under a live range between requests).
       limit: params.pageSize + 1,
-      cursor: params.cursor,
+      cursor: params.cursor
+        ? {
+            sortValue: params.cursor.sortValue,
+            tenantId: params.cursor.tenantId ?? ownProjectIdReadBy(params.authorization),
+            traceId: params.cursor.traceId,
+          }
+        : undefined,
       offset,
       filterWhere: params.filterWhere,
     });
 
     const hasMore = result.rows.length > params.pageSize;
     const visibleRows = hasMore ? result.rows.slice(0, params.pageSize) : result.rows;
-    const items = visibleRows.map((row) => mapToTraceListItem(row));
-    const traceIds = items.map((item) => item.traceId);
-
-    const evaluations = await this.evaluationRuns.findSummariesByTraceIds({
-      tenantId: params.tenantId,
-      traceIds,
-      since: params.timeRange.from,
-    });
+    const evaluations = evaluationsByListedRow(
+      await this.evaluationRuns.findSummariesByTraceIds({
+        authorization: params.authorization,
+        // Two members may list the same id; the read needs it once.
+        traceIds: [...new Set(visibleRows.map((row) => row.traceId))],
+        since: params.timeRange.from,
+      }),
+    );
+    const items = visibleRows.map((row) => ({
+      ...mapToTraceListItem(row),
+      evaluations:
+        evaluations.get(listedTraceKey({ projectId: row.tenantId, traceId: row.traceId })) ?? [],
+    }));
 
     const gatedItems = TraceListService.#gateItems(items, params.visibilityCutoffMs);
 
     return {
       items: gatedItems,
       totalHits: result.totalHits,
-      evaluations,
       nextCursor:
         hasMore && visibleRows.length > 0
           ? cursorForTraceRow(visibleRows[visibleRows.length - 1]!, sortColumn)
@@ -241,14 +258,14 @@ export class TraceListService {
    */
   getFacets(params: FacetParams): Promise<FacetDescriptor[]> {
     return this.discover.getFilteredFacets({
-      params: { tenantId: params.tenantId, timeRange: params.timeRange },
+      params: { authorization: params.authorization, timeRange: params.timeRange },
       filterFor: params.filterFor,
     });
   }
 
   async getNewCount(params: NewCountParams): Promise<number> {
     return this.repository.findCount({
-      tenantId: params.tenantId,
+      authorization: params.authorization,
       timeRange: params.timeRange,
       since: params.since,
       filterWhere: params.filterWhere,
@@ -256,13 +273,13 @@ export class TraceListService {
   }
 
   /**
-   * The trace ids a filter selects, newest first, capped. What an Instant
-   * Eval run started from the Explorer judges when its own dialect cannot
-   * compile the filter.
+   * The traces a filter selects, newest first, capped, each named by tenant and
+   * trace id. What an Instant Eval run started from the Explorer judges when its
+   * own dialect cannot compile the filter.
    */
-  async getTraceIds(params: TraceIdsParams): Promise<string[]> {
-    return this.repository.findTraceIds({
-      tenantId: params.tenantId,
+  async getTraceRefs(params: TraceIdsParams): Promise<TraceRef[]> {
+    return this.repository.findTraceRefs({
+      authorization: params.authorization,
       timeRange: params.timeRange,
       ...(params.filterWhere ? { filterWhere: params.filterWhere } : {}),
       limit: params.limit,
@@ -276,10 +293,28 @@ export class TraceListService {
     }
 
     return this.repository.findDistinctValues({
-      tenantId: params.tenantId,
+      authorization: params.authorization,
       column,
       prefix: params.prefix,
       limit: params.limit ?? 20,
     });
   }
+}
+
+type ListedEvaluation = TraceListItem["evaluations"][number];
+
+/**
+ * A page's evaluations keyed by tenant and trace id together: on an aggregate two
+ * members may hold the same id, and the pair keeps one member's evaluation off the
+ * other's row (ADR-177).
+ */
+function evaluationsByListedRow(
+  evaluations: readonly (ListedEvaluation & { tenantId: string })[],
+): Map<string, ListedEvaluation[]> {
+  const byRow = new Map<string, ListedEvaluation[]>();
+  for (const { tenantId, ...summary } of evaluations) {
+    const key = listedTraceKey({ projectId: tenantId, traceId: summary.traceId ?? "" });
+    byRow.set(key, [...(byRow.get(key) ?? []), summary]);
+  }
+  return byRow;
 }

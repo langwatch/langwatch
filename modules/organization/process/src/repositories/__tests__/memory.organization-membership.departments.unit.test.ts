@@ -67,6 +67,7 @@ describe("the member department column", () => {
         {
           userId: "maria",
           departmentId: "dept_eng",
+          disabledAt: null,
           user: { name: null, email: "maria@acme.com" },
         },
       ]);

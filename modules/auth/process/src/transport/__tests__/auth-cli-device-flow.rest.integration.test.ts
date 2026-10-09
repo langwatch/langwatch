@@ -1397,6 +1397,7 @@ type LiveProject = {
   apiKey: string;
   isPersonal: boolean;
   ownerUserId: string | null;
+  kind: string;
 };
 
 function liveProject(overrides: Partial<LiveProject> = {}): LiveProject {
@@ -1408,6 +1409,7 @@ function liveProject(overrides: Partial<LiveProject> = {}): LiveProject {
     apiKey: "sk-lw-shared",
     isPersonal: false,
     ownerUserId: null,
+    kind: "application",
     ...overrides,
   };
 }

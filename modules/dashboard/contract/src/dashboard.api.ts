@@ -46,7 +46,8 @@ export interface DashboardApi {
   rename(input: { projectId: string; dashboardId: string; name: string }): Promise<Dashboard>;
   delete(input: { projectId: string; dashboardId: string }): Promise<Dashboard>;
   reorder(input: { projectId: string; dashboardIds: string[] }): Promise<{ success: true }>;
-  getOrCreateFirst(input: { projectId: string }): Promise<Dashboard>;
+  /** The first dashboard, created on demand; empty on an aggregate that has none (ADR-177). */
+  getOrCreateFirst(input: { projectId: string }): Promise<Dashboard[]>;
   /** Where a reader opens each of these dashboards, keyed by dashboard id. */
   getDashboardLinks(input: {
     projectId: string;

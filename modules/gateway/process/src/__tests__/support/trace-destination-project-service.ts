@@ -13,6 +13,7 @@ const DESTINATION_SELECT = {
   id: true,
   teamId: true,
   archivedAt: true,
+  kind: true,
 } as const;
 
 /**
@@ -133,6 +134,7 @@ export function createTraceDestinationProjects(prisma: PrismaClient): ProjectApi
           organizationId: row.team.organizationId,
           isPersonal: false,
           ownerUserId: null,
+          kind: row.kind,
         }));
       },
     },

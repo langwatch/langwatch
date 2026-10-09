@@ -102,6 +102,45 @@ export type OrganizationMemberDisabledEventData = z.infer<
   typeof organizationMemberDisabledEventDataSchema
 >;
 
+export const ORGANIZATION_MEMBER_ENABLED_EVENT_TYPE = "lw.organization.member_enabled" as const;
+export const ORGANIZATION_MEMBER_ENABLED_EVENT_VERSION = "2026-10-09" as const;
+
+/** A disabled seat given back; peers restore what the seat gave (§9, M8487-MEMBER-ENABLED). */
+export const organizationMemberEnabledEventDataSchema = z.object({
+  ...envelope,
+  /** Who re-enabled the seat; absent for an organization key with no member. */
+  enabledByUserId: z.string().min(1).nullish(),
+});
+export type OrganizationMemberEnabledEventData = z.infer<
+  typeof organizationMemberEnabledEventDataSchema
+>;
+
+export const ORGANIZATION_MEMBER_REMOVED_EVENT_TYPE = "lw.organization.member_removed" as const;
+export const ORGANIZATION_MEMBER_REMOVED_EVENT_VERSION = "2026-10-09" as const;
+
+/** A member left the organization; peers drop what the membership gave them (§9). */
+export const organizationMemberRemovedEventDataSchema = z.object({
+  ...envelope,
+  /** Who removed the member; absent for a removal no member made. */
+  removedByUserId: z.string().min(1).nullish(),
+});
+export type OrganizationMemberRemovedEventData = z.infer<
+  typeof organizationMemberRemovedEventDataSchema
+>;
+
+export const ORGANIZATION_MEMBER_DEPARTMENT_CHANGED_EVENT_TYPE =
+  "lw.organization.member_department_changed" as const;
+export const ORGANIZATION_MEMBER_DEPARTMENT_CHANGED_EVENT_VERSION = "2026-10-09" as const;
+
+/** A member's department was set or cleared; peers re-read what follows the department (§9). */
+export const organizationMemberDepartmentChangedEventDataSchema = z.object({
+  ...envelope,
+  departmentId: z.string().min(1).nullable(),
+});
+export type OrganizationMemberDepartmentChangedEventData = z.infer<
+  typeof organizationMemberDepartmentChangedEventDataSchema
+>;
+
 /** An organization now exists, on every creation path; peers seed their own defaults (§9). */
 export const organizationCreatedEventDataSchema = z.object({
   tenantId: z.string().min(1),

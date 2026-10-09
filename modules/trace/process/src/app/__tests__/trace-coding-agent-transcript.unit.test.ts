@@ -32,7 +32,12 @@ describe("TraceModule.readCodingAgentTranscript", () => {
         publiclyShared: false,
       });
       expect(getSpansByTraceId).toHaveBeenCalledWith(
-        expect.objectContaining({ tenantId: PROJECT_ID, visibilityCutoffMs: CUTOFF_MS }),
+        expect.objectContaining({
+          authorization: expect.objectContaining({
+            grants: [expect.objectContaining({ projectId: PROJECT_ID, kind: "own" })],
+          }),
+          visibilityCutoffMs: CUTOFF_MS,
+        }),
       );
       expect(transcript).toMatchObject({ entries: [] });
     });

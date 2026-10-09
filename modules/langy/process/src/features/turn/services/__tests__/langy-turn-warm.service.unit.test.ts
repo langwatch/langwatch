@@ -14,6 +14,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   langyTurnDependencies,
   type LangyTurnDepsOverrides,
+  projectsOfKind,
   workerCredentials,
 } from "../../../../__tests__/support/langy-turn-deps.ts";
 import type {
@@ -22,6 +23,18 @@ import type {
 } from "../../../../channels/langy-worker.channel.ts";
 import { LangyFinalPartsService } from "../../../../services/langy-final-parts.service.ts";
 import { LangyTurnWarmService } from "../langy-turn-warm.service.ts";
+
+const logger = vi.hoisted(() => ({
+  debug: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  child: vi.fn(),
+}));
+vi.mock("@langwatch/observability", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  createLogger: () => logger,
+}));
 
 const SESSION = { user: { id: "user-1" } };
 
@@ -258,6 +271,33 @@ describe("LangyTurnWarmService.warmConversationWorker", () => {
 
       expect(result).toEqual({ conversationId: "conv-warm", warmed: false });
       expect(mocks.warm).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given the project is an aggregate", () => {
+    it("skips the warm and writes no conversation", async () => {
+      const { deps, mocks } = makeDeps({ projects: projectsOfKind("aggregate") });
+      const service = LangyTurnWarmService.create(deps);
+
+      const result = await service.warmConversationWorker(warmInput());
+
+      expect(result).toEqual({ conversationId: null, warmed: false });
+      expect(mocks.ensureConversation).not.toHaveBeenCalled();
+      expect(mocks.warm).not.toHaveBeenCalled();
+    });
+
+    it("logs the aggregate refusal at debug, not as a warning", async () => {
+      logger.debug.mockClear();
+      logger.warn.mockClear();
+      const { deps } = makeDeps({ projects: projectsOfKind("aggregate") });
+
+      await LangyTurnWarmService.create(deps).warmConversationWorker(warmInput());
+
+      expect(logger.warn).not.toHaveBeenCalled();
+      expect(logger.debug).toHaveBeenCalledWith(
+        expect.objectContaining({ code: "aggregate_project_is_read_only" }),
+        expect.any(String),
+      );
     });
   });
 

@@ -19,6 +19,7 @@ const PROJECT = {
   teamId: "team_1",
   isPersonal: false,
   ownerUserId: null,
+  kind: "application",
 };
 
 function directoryOver({
@@ -111,6 +112,7 @@ describe("CliDeviceDirectoryService", () => {
         teamId: "team_1",
         isPersonal: false,
         ownerUserId: null,
+        kind: "application",
       });
     });
 

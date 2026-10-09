@@ -21,6 +21,8 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { S3TraceLegacySpoolChannel } from "../../channels/s3/s3.trace-legacy-spool.channel.ts";
+import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
+import { TraceBlobStoreService } from "../../features/media/services/trace-blob-store.service.ts";
 import { traceSummaryRow } from "../../repositories/clickhouse/__tests__/support/trace-summary-row.support.ts";
 import type {
   TraceClickHouseClient,
@@ -28,8 +30,6 @@ import type {
 } from "../../repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
 import { MemoryTraceSpanDedupRepository } from "../../repositories/memory/memory.trace-span-dedup.repository.ts";
 import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
-import { TraceBlobStoreService } from "../../features/media/services/trace-blob-store.service.ts";
-import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
 import { TraceModule } from "../trace.app.ts";
 
 const PROJECT = "project-1";
@@ -76,7 +76,7 @@ function compose({
   resolve,
   plans,
   dataPrivacy = createApiFixture<DataPrivacyApi>({
-    getResolvedForProject: async () => PLATFORM_DEFAULT_DATA_PRIVACY,
+    getResolvedForProjects: async () => PLATFORM_DEFAULT_DATA_PRIVACY,
   }),
   askedOrganizations = [],
 }: {
@@ -173,7 +173,7 @@ describe("given a process that composed its own ClickHouse", () => {
       resolve: clickHouseHolding({ ageDays: 1, asked: [] }),
       plans: planWithWindow(null),
       dataPrivacy: createApiFixture<DataPrivacyApi>({
-        getResolvedForProject: () => Promise.reject(new Error("policy store down")),
+        getResolvedForProjects: () => Promise.reject(new Error("policy store down")),
       }),
     });
     const hidden = await unresolvedPolicy.getById({ projectId: PROJECT, traceId: TRACE });

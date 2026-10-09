@@ -4,7 +4,11 @@ import { useCallback } from "react";
 import { drawerChrome } from "../../../behavior/drawer-chrome.store.ts";
 import { guardTraceEditExit } from "../../../behavior/explorer/utils/trace-edit-mode.ts";
 import { getTraceDrawer, useTraceDrawer } from "../../../behavior/trace-drawer.ts";
-import { type DrawerViewMode, TRACE_DRAWER_NAME } from "../../../model/trace-drawer-params.ts";
+import {
+  type DrawerViewMode,
+  TRACE_DRAWER_NAME,
+  traceDrawerParams,
+} from "../../../model/trace-drawer-params.ts";
 
 type NavigateToTraceInput = {
   fromTraceId: string;
@@ -18,6 +22,11 @@ type NavigateToTraceInput = {
   /** Trace's actual occurredAt (ms). */
   toTimestamp?: number;
   toViewMode?: DrawerViewMode;
+  /**
+   * The member that owns the trace navigated to, on an aggregate. Defaults to the member the
+   * drawer is on: every caller walks a conversation's turns, which stay on one member.
+   */
+  toTenantId?: string | null;
   /**
    * When false, apply `toViewMode` for this navigation only without
    * persisting it as the remembered default — e.g. peeking at a
@@ -33,7 +42,7 @@ function openTrace({
   openDrawer: ReturnType<typeof useDrawer>["openDrawer"];
   input: NavigateToTraceInput;
 }): void {
-  const { fromViewMode, fromTimestamp, toTraceId, toTimestamp, toViewMode } = input;
+  const { fromViewMode, fromTimestamp, toTraceId, toTimestamp, toViewMode, toTenantId } = input;
   const leaving = getTraceDrawer();
   // The entry the trace becomes records the view it was left on.
   leaving.setViewModeTransient(fromViewMode);
@@ -44,8 +53,11 @@ function openTrace({
   openDrawer(
     TRACE_DRAWER_NAME,
     {
-      traceId: toTraceId,
-      ...(toTimestamp !== undefined ? { t: String(toTimestamp) } : {}),
+      ...traceDrawerParams({
+        traceId: toTraceId,
+        occurredAtMs: toTimestamp,
+        tenantId: toTenantId === undefined ? leaving.tenantId : toTenantId,
+      }),
       ...(leaving.projectId !== null ? { projectId: leaving.projectId } : {}),
       mode: toViewMode ?? fromViewMode,
       viz: leaving.vizTab,

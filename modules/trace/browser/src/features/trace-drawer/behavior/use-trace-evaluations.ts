@@ -1,12 +1,9 @@
 import type { Evaluation } from "@langwatch/trace-contract";
 import { useMemo } from "react";
 
-import { useTraceViewer } from "../../../behavior/explorer/context/trace-viewer-context.tsx";
 import type { EvalSummary } from "../../../behavior/explorer/types/trace.ts";
+import { useTraceQueryArgs } from "../../../behavior/explorer/use-trace-query-args.ts";
 import { api } from "../../../behavior/trace-api.ts";
-import { useTraceDrawer } from "../../../behavior/trace-drawer.ts";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
-import { isPreviewTraceId } from "../../../model/preview-trace-id.ts";
 
 export type RichEval = EvalSummary & {
   evaluationId: string;
@@ -94,20 +91,19 @@ export function mapScore(ev: Evaluation): number | boolean | null {
 }
 
 export function useTraceEvaluations(): TraceEvaluationsResult {
-  const viewer = useTraceViewer();
-  const { project } = useOrganizationTeamProject();
-  const storeTraceId = useTraceDrawer((s) => s.traceId);
-  const traceId = viewer.traceId ?? storeTraceId;
+  // Read-only viewers and previews are gated out by `isReady`. The read looks
+  // up by trace id and prunes nothing by time, so it carries no time hint; on
+  // an aggregate it still reads the member the drawer is on (ADR-177 block F).
+  const { isReady, queryArgs } = useTraceQueryArgs();
+  const evaluationsArgs = {
+    projectId: queryArgs.projectId,
+    traceId: queryArgs.traceId,
+    ...(queryArgs.tenantId !== undefined ? { tenantId: queryArgs.tenantId } : {}),
+  };
 
   // TODO(traces-v2): migrate to `traces.evals` once the v2 schema carries `spanId`,
   // `errorStacktrace`, and `retries` — the rich evaluations panel surfaces all three.
-  const isPreview = !!traceId && isPreviewTraceId(traceId);
-  const query = api.traces.getEvaluations.useQuery(
-    { projectId: project?.id ?? "", traceId: traceId ?? "" },
-    {
-      enabled: !!project?.id && !!traceId && !isPreview && !viewer.isReadOnly,
-    },
-  );
+  const query = api.traces.getEvaluations.useQuery(evaluationsArgs, { enabled: isReady });
 
   const rawEvaluations = query.data;
 

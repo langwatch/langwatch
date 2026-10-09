@@ -662,6 +662,8 @@ describe("ProjectService", () => {
         recordProjectArchived: { send: async () => undefined },
         recordProjectDepartmentAssigned: { send: async () => undefined },
         recordProjectTraceSharingDisabled: { send: async () => undefined },
+        recordProjectAggregateRuleChanged: { send: async () => undefined },
+        recordProjectRevived: { send: async () => undefined },
       });
 
       await createService(new StubRepository(), new StubOrganizationService(), created).create(
@@ -696,6 +698,8 @@ describe("ProjectService", () => {
         recordProjectArchived: { send: async () => undefined },
         recordProjectDepartmentAssigned: { send: async () => undefined },
         recordProjectTraceSharingDisabled: { send: async () => undefined },
+        recordProjectAggregateRuleChanged: { send: async () => undefined },
+        recordProjectRevived: { send: async () => undefined },
       });
 
       await createService(new StubRepository(), new StubOrganizationService(), created).create(
@@ -730,6 +734,8 @@ describe("ProjectService", () => {
         recordProjectArchived: { send: async () => undefined },
         recordProjectDepartmentAssigned: { send: async () => undefined },
         recordProjectTraceSharingDisabled: { send: async () => undefined },
+        recordProjectAggregateRuleChanged: { send: async () => undefined },
+        recordProjectRevived: { send: async () => undefined },
       });
 
       await expect(
@@ -1223,6 +1229,8 @@ describe("ProjectService lifecycle facts for authz's lineage", () => {
       recordProjectArchived: { send: archived },
       recordProjectDepartmentAssigned: { send: async () => undefined },
       recordProjectTraceSharingDisabled: { send: async () => undefined },
+      recordProjectAggregateRuleChanged: { send: async () => undefined },
+      recordProjectRevived: { send: async () => undefined },
     });
     const repository = new StubRepository();
     repository.findWithTeam.mockResolvedValue(projectWithTeam({ teamId: "team_alpha" }));
@@ -1347,6 +1355,8 @@ describe("ProjectService department facts for data privacy's fold", () => {
       recordProjectArchived: { send: async () => undefined },
       recordProjectDepartmentAssigned: { send: departments },
       recordProjectTraceSharingDisabled: { send: async () => undefined },
+      recordProjectAggregateRuleChanged: { send: async () => undefined },
+      recordProjectRevived: { send: async () => undefined },
     });
     const repository = new StubRepository();
     repository.assignProjectDepartment.mockResolvedValue(assigned);

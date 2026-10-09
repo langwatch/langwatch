@@ -54,8 +54,10 @@ reorder(input: { projectId: string; dashboardIds: string[] }): Promise<{ success
 
 #### `getOrCreateFirst`
 
+The first dashboard, created on demand; empty on an aggregate that has none (ADR-177).
+
 ```typescript
-getOrCreateFirst(input: { projectId: string }): Promise<Dashboard>;
+getOrCreateFirst(input: { projectId: string }): Promise<Dashboard[]>;
 ```
 
 #### `getDashboardLinks`
@@ -849,7 +851,7 @@ Contract `../contract/src/dashboard.trpc.ts:22`, router `src/transport/dashboard
 | `dashboards.rename`            | mutation | Permission `analytics:update` | inline                 | `dashboardTrpcRowSchema`         |
 | `dashboards.delete`            | mutation | Permission `analytics:delete` | `dashboardScopeSchema` | `dashboardTrpcRowSchema`         |
 | `dashboards.reorderDashboards` | mutation | Permission `analytics:update` | inline                 | `dashboardReorderResponseSchema` |
-| `dashboards.getOrCreateFirst`  | query    | Permission `analytics:view`   | `projectScopeSchema`   | `dashboardTrpcRowSchema`         |
+| `dashboards.getOrCreateFirst`  | query    | Permission `analytics:view`   | `projectScopeSchema`   | inline                           |
 
 ```typescript
 // dashboards.getAll
@@ -917,7 +919,15 @@ type Output = z.infer<typeof dashboardReorderResponseSchema>; // ../contract/src
 
 // dashboards.getOrCreateFirst
 type Input = z.infer<typeof projectScopeSchema>; // ../contract/src/dashboard.trpc.ts:16
-type Output = z.infer<typeof dashboardTrpcRowSchema>; // ../contract/src/dashboard.responses.ts:30
+// Output: inline, ../contract/src/dashboard.trpc.ts:56
+type Output = {
+  id: string;
+  projectId: string;
+  name: string;
+  order: number;
+  createdAt: unknown;
+  updatedAt: unknown;
+} | null;
 ```
 
 ### `graphs`

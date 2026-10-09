@@ -38,6 +38,7 @@ import {
   expiryIncompleteReason,
   resolveExpiresAt,
 } from "../../model/virtual-key-expiration.ts";
+import { virtualKeyProjectOptions } from "../../model/virtual-key-project-options.ts";
 import {
   TAGS_CSV_MAX_LENGTH,
   VK_TAGS_FIELD_DESCRIPTION,
@@ -98,18 +99,6 @@ function maxOpenSessionsInvalid(value: string): boolean {
   if (trimmed === "") return false;
   const parsed = Number(trimmed);
   return !Number.isInteger(parsed) || parsed < 1;
-}
-
-function availableProjectsOf(
-  teams: readonly GatewayTeam[],
-): { id: string; name: string; teamId: string }[] {
-  return teams.flatMap((t) =>
-    t.projects.map((p) => ({
-      id: p.id,
-      name: p.name,
-      teamId: t.id,
-    })),
-  );
 }
 
 function tracesHrefFor(input: {
@@ -462,7 +451,7 @@ export function VirtualKeyEditDrawer({
     [organization?.teams],
   );
   const availableProjects = useMemo(
-    () => availableProjectsOf(organization?.teams ?? []),
+    () => virtualKeyProjectOptions(organization?.teams),
     [organization?.teams],
   );
   const viewTracesHref = useMemo(

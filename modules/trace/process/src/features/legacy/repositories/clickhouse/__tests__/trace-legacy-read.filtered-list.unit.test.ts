@@ -2,12 +2,15 @@
  * @vitest-environment node
  * Spec: modules/trace/specs/trace-legacy-filtered-search.feature
  */
+import { tenantScope } from "@langwatch/clickhouse-client";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { GetAllTracesForProjectInput } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { TraceCanonicalisationService } from "#features/derivation/services/trace-canonicalisation.service";
+import { boundedSubquery } from "#features/query/repositories/clickhouse/clickhouse.trace-query-subquery.mapper";
 
+import { ownProof } from "../../../../../__tests__/support/authorization-proofs.fixture.ts";
 import type { TraceClickHouseClient } from "../../../../../repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
 import { TraceLegacyReadClickHouseRepository } from "../trace-legacy-read.repository.ts";
 
@@ -73,6 +76,38 @@ describe("TraceLegacyReadClickHouseRepository filtered list", () => {
       await expect(
         repository.listAllTracesForProject(search({ "bogus.field": ["x"] }), PROTECTIONS),
       ).rejects.toThrow(/unsupported fields/);
+      expect(query).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a compiled filter whose span clause carries a tenant marker", () => {
+    const filterWhere = {
+      sql: boundedSubquery("stored_spans", "StartTime", "SpanName = {spanName:String}"),
+      params: { timeFrom: 1000, timeTo: 5000, spanName: "llm" },
+    };
+
+    it("expands the marker into the proof's own project", async () => {
+      const { repository, query } = compose();
+
+      await repository.listAllTracesForProject(search({}), PROTECTIONS, {
+        filterWhere,
+        authorization: ownProof({ projectId: "project-1" }),
+      });
+
+      const statements = query.mock.calls.map((call) => call[0]);
+      expect(statements.some((statement) => statement.query.includes("stored_spans"))).toBe(true);
+      for (const statement of statements) {
+        expect(statement.query).not.toContain(tenantScope("StartTime"));
+      }
+      expect(Object.values(statements[0]?.query_params ?? {})).toContainEqual(["project-1"]);
+    });
+
+    it("refuses the read without a proof", async () => {
+      const { repository, query } = compose();
+
+      await expect(
+        repository.listAllTracesForProject(search({}), PROTECTIONS, { filterWhere }),
+      ).rejects.toThrow(/needs the proof/);
       expect(query).not.toHaveBeenCalled();
     });
   });

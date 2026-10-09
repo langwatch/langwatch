@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { PROJECT_KIND } from "@langwatch/project-contract";
+import { NON_DESTINATION_PROJECT_KINDS } from "@langwatch/project-contract";
 
 import { BillingProjectDirectoryRepository } from "../billing-project-directory.repository.ts";
 
@@ -33,7 +33,8 @@ export class PrismaBillingProjectDirectoryRepository extends BillingProjectDirec
     organizationId: string;
   }): Promise<{ id: string; name: string }[]> {
     return this.prisma.project.findMany({
-      where: { team: { organizationId }, kind: { not: PROJECT_KIND.INTERNAL_GOVERNANCE } },
+      // The governance project's usage stays in the org total; an aggregate holds none (ADR-177).
+      where: { team: { organizationId }, kind: { notIn: [...NON_DESTINATION_PROJECT_KINDS] } },
       select: { id: true, name: true },
       orderBy: { name: "asc" },
     });

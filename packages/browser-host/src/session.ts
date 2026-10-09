@@ -11,6 +11,8 @@ export type UiSessionScopeProject = Readonly<{
   id: string;
   slug: string;
   name: string;
+  /** The project's kind (`application`, `aggregate`, ...), when the scope has read it. */
+  kind?: string;
   /** A Mustache template turning a `user_id` into a link, when the project set one. */
   userLinkTemplate?: string | null;
 }>;

@@ -1,4 +1,5 @@
 import type { TraceEventRollup } from "@langwatch/trace-contract";
+import { listedTraceKey } from "@langwatch/trace-contract";
 import { keepPreviousData } from "@tanstack/react-query";
 import { useMemo } from "react";
 
@@ -56,30 +57,49 @@ export function useTraceListEvents({
   const isLoading = enabled && (query.isLoading || query.isPlaceholderData);
   const isUnavailable = enabled && query.isError;
 
+  const projectId = project?.id;
   return useMemo(
-    () => mergeTraceEvents({ rows, rollups, isLoading, isUnavailable }),
-    [rows, rollups, isLoading, isUnavailable],
+    () =>
+      mergeTraceEvents({
+        rows,
+        rollups,
+        projectId,
+        isLoading,
+        isUnavailable,
+      }),
+    [rows, rollups, projectId, isLoading, isUnavailable],
   );
 }
 
 /**
  * Puts each row's rollup on the row. Shared with the conversation view, whose
  * turns are trace rows read outside the list and need the same merge.
+ *
+ * Rollups are keyed by project and trace id together, because on an aggregate
+ * two members may hold the same trace id. A row is looked up under the project
+ * it names, or under the project that read it when it names none.
  */
 export function mergeTraceEvents({
   rows,
   rollups,
+  projectId,
   isLoading,
   isUnavailable,
 }: {
   rows: TraceListItem[];
   rollups: Record<string, TraceEventRollup> | undefined;
+  /** The project the read ran under, for a row that names no project. */
+  projectId: string | undefined;
   isLoading: boolean;
   isUnavailable: boolean;
 }): TraceListItem[] {
   if (!rollups && !isLoading && !isUnavailable) return rows;
   return rows.map((row) => {
-    const rollup = rollups?.[row.traceId];
+    const owner = row.projectId ?? projectId;
+    const rollup =
+      owner === undefined
+        ? undefined
+        : rollups?.[listedTraceKey({ projectId: owner, traceId: row.traceId })];
     return {
       ...row,
       events: rollup

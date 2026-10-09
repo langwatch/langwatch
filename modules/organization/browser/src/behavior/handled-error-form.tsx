@@ -1,6 +1,12 @@
 /** Server rejections placed where the reader is looking; field errors not toasts. */
 
-import { Alert } from "@langwatch/design-system/primitives";
+import { UiErrorActions } from "@langwatch/browser/error-actions";
+import { Alert, List } from "@langwatch/design-system/primitives";
+import { explainAnyError } from "@langwatch/handled-error/presentation";
+import {
+  readEnvelopeTraceId,
+  readHandledError as readHandledEnvelope,
+} from "@langwatch/handled-error/read-handled-error";
 import { AlertCircle } from "lucide-react";
 
 /**
@@ -107,12 +113,18 @@ export interface HandledErrorAlertProps {
 }
 
 /**
- * A failure that is still true, said in place — the inline counterpart to
- * the host's `failed` notice: a toast is for something that just happened,
- * an alert for a form that is still rejected.
+ * A failure that is still true, said in place: registered copy beats the
+ * caller's fallback title, the description never repeats a server message,
+ * and the error ID is always offered (ported from main's HandledErrorAlert).
  */
 export function HandledErrorAlert({ error, title, fallbackTitle }: HandledErrorAlertProps) {
   if (error === null || error === void 0) return null;
+
+  const handled = readHandledEnvelope(error);
+  const explanation = explainAnyError(error);
+  const headline =
+    title ?? (explanation.isRegistered ? explanation.title : (fallbackTitle ?? explanation.title));
+  const tips = (handled?.tips ?? []).filter((tip) => tip !== explanation.description);
 
   return (
     <Alert.Root status="error" role="alert">
@@ -120,8 +132,21 @@ export function HandledErrorAlert({ error, title, fallbackTitle }: HandledErrorA
         <AlertCircle aria-hidden />
       </Alert.Indicator>
       <Alert.Content>
-        <Alert.Title>{title ?? fallbackTitle ?? "Something went wrong"}</Alert.Title>
-        <Alert.Description>{UNKNOWN_ERROR_DESCRIPTION}</Alert.Description>
+        <Alert.Title>{headline}</Alert.Title>
+        {explanation.description && (
+          <Alert.Description>{explanation.description}</Alert.Description>
+        )}
+        {tips.length > 0 && (
+          <List.Root gap={0.5} marginTop={1.5} paddingLeft={4}>
+            {tips.map((tip, index) => (
+              <List.Item key={index}>{tip}</List.Item>
+            ))}
+          </List.Root>
+        )}
+        <UiErrorActions
+          docsUrl={handled?.docsUrl}
+          traceId={handled?.traceId || readEnvelopeTraceId(error)}
+        />
       </Alert.Content>
     </Alert.Root>
   );

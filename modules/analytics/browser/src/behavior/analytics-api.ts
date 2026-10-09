@@ -194,7 +194,7 @@ type BorrowedProcedures = {
       };
     };
     getOrCreateFirst: {
-      query: { input: ProjectScope; output: DashboardRow };
+      query: { input: ProjectScope; output: DashboardRow | null };
     };
   };
   graphs: {

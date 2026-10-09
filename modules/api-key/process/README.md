@@ -410,7 +410,7 @@ type Response = z.infer<typeof projectRestPageSchema>; // ../contract/src/api-ke
 
 Create a project
 
-Permission `project:create`. Declared at `src/transport/api-key-projects.rest.ts:111`.
+Permission `project:create`. Declared at `src/transport/api-key-projects.rest.ts:112`.
 
 Answers at `/api/projects`.
 

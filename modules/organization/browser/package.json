@@ -36,6 +36,7 @@
     "@langwatch/enterprise-scim-contract": "workspace:*",
     "@langwatch/entitlement-contract": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
     "@langwatch/identity-client": "workspace:*",
     "@langwatch/identity-contract": "workspace:*",
     "@langwatch/organization-client": "workspace:*",

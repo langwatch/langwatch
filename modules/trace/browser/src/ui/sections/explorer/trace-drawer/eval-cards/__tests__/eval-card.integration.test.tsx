@@ -26,6 +26,10 @@ vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
   }),
 }));
 
+vi.mock("../../../../../../behavior/explorer/use-trace-query-args.ts", () => ({
+  useTraceQueryArgs: () => ({ projectId: "project_test", tenantId: null }),
+}));
+
 import { EvalCard } from "../eval-card.tsx";
 import type { EvalEntry } from "../utils.ts";
 

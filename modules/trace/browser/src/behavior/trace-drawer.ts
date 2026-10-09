@@ -28,6 +28,8 @@ export interface TraceHistoryEntry {
   viewMode: DrawerViewMode;
   /** The trace's `occurredAt` (ms since epoch), the partition-pruning hint its reads need. */
   occurredAtMs?: number;
+  /** The member that owns the trace on an aggregate, so going back reopens the same member's trace. */
+  tenantId?: string;
 }
 
 /** What the trace drawer changes in the address; none of it is held anywhere else. */
@@ -49,6 +51,8 @@ interface TraceDrawerAddressActions {
   clearPinnedSpans: () => void;
   /** Fill in the partition hint from a resolved trace timestamp when the link carried none. */
   backfillOccurredAtMs: (occurredAtMs: number) => void;
+  /** Fill in the owning member from the header read when a deep link into an aggregate named none. */
+  backfillTenantId: (tenantId: string) => void;
 }
 
 /** The trace drawer as its callers read it: the address, the reader's chrome, and the writes. */
@@ -77,13 +81,14 @@ function traceEntryOf({
 }: {
   params: Record<string, unknown>;
 }): TraceHistoryEntry | undefined {
-  const { traceId, mode, t } = params;
+  const { traceId, mode, t, tenantId } = params;
   if (typeof traceId !== "string") return undefined;
   const occurredAt = typeof t === "string" && isOccurredAtParam(t) ? Number(t) : undefined;
   return {
     traceId,
     viewMode: typeof mode === "string" && isViewMode(mode) ? mode : DEFAULT_VIEW_MODE,
     ...(occurredAt !== undefined ? { occurredAtMs: occurredAt } : {}),
+    ...(typeof tenantId === "string" && tenantId !== "" ? { tenantId } : {}),
   };
 }
 
@@ -143,6 +148,10 @@ const addressActions: TraceDrawerAddressActions = {
     if (addressNow().occurredAtMs !== null) return;
     if (!Number.isFinite(occurredAtMs) || occurredAtMs <= 0) return;
     writeAddress({ t: String(Math.trunc(occurredAtMs)) });
+  },
+  backfillTenantId: (tenantId) => {
+    if (addressNow().tenantId !== null || tenantId === "") return;
+    writeAddress({ tenantId });
   },
 };
 

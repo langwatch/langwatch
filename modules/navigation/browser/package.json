@@ -36,6 +36,7 @@
     "@langwatch/navigation-contract": "workspace:*",
     "@langwatch/ops-contract": "workspace:*",
     "@langwatch/organization-client": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
     "@langwatch/prompt-client": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/user-contract": "workspace:*",

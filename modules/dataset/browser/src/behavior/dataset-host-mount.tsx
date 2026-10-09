@@ -61,7 +61,9 @@ class CapabilityDatasetHost extends DatasetHostApi {
 
   project(): DatasetHostProject | undefined {
     const project = this.scopeHost?.project();
-    return project ? { id: project.id, slug: project.slug, name: project.name } : void 0;
+    return project
+      ? { id: project.id, slug: project.slug, name: project.name, kind: project.kind }
+      : void 0;
   }
 
   hasPermission(permission: string): boolean {

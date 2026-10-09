@@ -24,6 +24,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@langwatch/authorization": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/module": "workspace:*",
     "@langwatch/span-normalisation": "workspace:*",

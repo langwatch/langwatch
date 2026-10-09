@@ -17,8 +17,11 @@ import type {
 } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { MemoryTraceEvaluationRunsRepository } from "../../repositories/memory/memory.trace-evaluation-runs.repository.ts";
+import { aggregateProof, ownProof } from "../../__tests__/support/authorization-proofs.fixture.ts";
+import { TraceSummaryService } from "../../features/read/services/trace-summary-read.service.ts";
 import type { TraceSpanCostSuggestion } from "../../features/span/services/span-cost-suggestion.service.ts";
+import { MemoryTraceEvaluationRunsRepository } from "../../repositories/memory/memory.trace-evaluation-runs.repository.ts";
+import { MemoryTraceSummaryRepository } from "../../repositories/memory/memory.trace-summary.repository.ts";
 import type { TraceLegacyRead } from "../../services/trace-viewer.service.ts";
 import type { TraceService as TraceTreeService } from "../../services/trace.service.ts";
 import {
@@ -74,6 +77,8 @@ function harness(
     getAllTracesForProject: TraceLegacyRead["getAllTracesForProject"];
     getTracesWithSpans: TraceLegacyRead["getTracesWithSpans"];
     getByTraceId: TraceSummaryReader["getByTraceId"];
+    summary: TraceSummaryReader;
+    evaluationRuns: MemoryTraceEvaluationRunsRepository;
   }> = {},
 ) {
   const tryGetById = vi.fn<TraceLegacyRead["findById"]>(
@@ -112,7 +117,7 @@ function harness(
     getSpanSummaryByTraceId: record("getSpanSummaryByTraceId"),
   };
 
-  const summary: TraceSummaryReader = { getByTraceId };
+  const summary: TraceSummaryReader = reads.summary ?? { getByTraceId };
 
   const app = TraceModule.fromDependencies({
     storedObjects: createApiFixture<StoredObjectApi>(),
@@ -140,7 +145,7 @@ function harness(
       },
       cleanupTenantEmitter: () => undefined,
     },
-    evaluationRuns: MemoryTraceEvaluationRunsRepository.create(),
+    evaluationRuns: reads.evaluationRuns ?? MemoryTraceEvaluationRunsRepository.create(),
     share: {} as ShareApi,
     projects: {
       getOrganizationId: async (projectId: string) => `organization-of-${projectId}`,
@@ -260,6 +265,180 @@ describe("TraceModule", () => {
     });
   });
 
+  describe("when an evaluation read carries the route's proof (ADR-177 block F)", () => {
+    const AGGREGATE = "project-aggregate";
+    const ENGINEER = "project-engineer";
+    const SELLER = "project-seller";
+    const aggregate = () =>
+      aggregateProof({
+        projectId: AGGREGATE,
+        members: [
+          { projectId: ENGINEER, from: 0 },
+          { projectId: SELLER, from: 0 },
+        ],
+      });
+    const run = (tenantId: string) => ({
+      tenantId,
+      evaluationId: `evaluation-${tenantId}`,
+      evaluatorId: "evaluator-1",
+      evaluatorType: "langevals/exact_match",
+      evaluatorName: null,
+      traceId: "trace-1",
+      isGuardrail: false,
+      status: "processed" as const,
+      score: 1,
+      passed: true,
+      label: null,
+      details: "quotes the captured input",
+      inputs: { input: "captured" },
+      error: null,
+      errorDetails: null,
+      createdAt: 1_000,
+      updatedAt: 1_000,
+      LastEventOccurredAt: 1_000,
+      archivedAt: null,
+      scheduledAt: null,
+      startedAt: null,
+      completedAt: null,
+      costId: null,
+    });
+    const VISIBLE = { canSeeCapturedInput: true, canSeeCapturedOutput: true };
+
+    async function memberHarness({ holders }: { holders: string[] }) {
+      const repository = MemoryTraceSummaryRepository.create();
+      for (const tenantId of holders) {
+        await repository.upsert({ ...summaryRow(false), traceId: "trace-1" }, tenantId);
+      }
+      const built = harness({
+        summary: TraceSummaryService.create({ repository }),
+        evaluationRuns: MemoryTraceEvaluationRunsRepository.create({
+          runs: [run(ENGINEER), run(SELLER), run("project-1")],
+        }),
+      });
+      const protect = vi.spyOn(built.app, "resolveViewerProtections").mockResolvedValue(VISIBLE);
+      return { ...built, protect };
+    }
+
+    describe("given a plain project's proof", () => {
+      it("reads its one project's runs and verdicts, never an empty answer", async () => {
+        const { app, getEvaluationsMultiple } = await memberHarness({ holders: [] });
+        const proof = { projectId: "project-1", traceId: "trace-1", viewerUserId: "user-1" };
+
+        const runs = await app.readEvaluationRuns({ ...proof, authorization: ownProof(proof) });
+        const verdicts = await app.readEvaluations({ ...proof, authorization: ownProof(proof) });
+
+        expect(runs.map((r) => r.evaluationId)).toEqual(["evaluation-project-1"]);
+        expect(verdicts["trace-1"]?.map((e) => e.evaluation_id)).toEqual(["evaluation-project-1"]);
+        expect(getEvaluationsMultiple).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("given an aggregate whose request names the member", () => {
+      it("reads that member's runs, with protections through the narrowed proof", async () => {
+        const { app, protect } = await memberHarness({ holders: [SELLER] });
+
+        const runs = await app.readEvaluationRuns({
+          projectId: AGGREGATE,
+          traceId: "trace-1",
+          tenantId: SELLER,
+          authorization: aggregate(),
+          viewerUserId: "user-1",
+        });
+
+        expect(runs.map((r) => r.evaluationId)).toEqual([`evaluation-${SELLER}`]);
+        expect(protect.mock.calls[0]?.[0].authorization?.narrowedTo).toBe(SELLER);
+      });
+
+      it("reads the drawer's verdicts through the narrowed proof, never another member's", async () => {
+        const { app, protect } = await memberHarness({ holders: [SELLER] });
+        protect.mockResolvedValue({ canSeeCapturedInput: false, canSeeCapturedOutput: true });
+
+        const verdicts = await app.readEvaluations({
+          projectId: AGGREGATE,
+          traceId: "trace-1",
+          tenantId: SELLER,
+          authorization: aggregate(),
+          viewerUserId: "user-1",
+        });
+
+        expect(verdicts["trace-1"]?.map((e) => e.evaluation_id)).toEqual([`evaluation-${SELLER}`]);
+        expect(verdicts["trace-1"]?.[0]).toMatchObject({ score: 1, details: null, inputs: null });
+      });
+    });
+
+    describe("when a detail read asks for the trace's member proof", () => {
+      it("narrows an aggregate to the member that holds the trace", async () => {
+        const { app } = await memberHarness({ holders: [ENGINEER] });
+
+        const proof = await app.authorizationForTrace({
+          authorization: aggregate(),
+          traceId: "trace-1",
+        });
+
+        expect(proof.narrowedTo).toBe(ENGINEER);
+      });
+
+      it("refuses a named member the proof cannot read as trace not found", async () => {
+        const { app } = await memberHarness({ holders: [ENGINEER] });
+
+        await expect(
+          app.authorizationForTrace({
+            authorization: aggregate(),
+            traceId: "trace-1",
+            tenantId: "project-outsider",
+          }),
+        ).rejects.toMatchObject({ code: "trace_not_found" });
+      });
+    });
+
+    describe("given an aggregate no member of which holds the trace", () => {
+      it("answers empty rather than reading across every member", async () => {
+        const { app, getEvaluationsMultiple } = await memberHarness({ holders: [] });
+        const input = {
+          projectId: AGGREGATE,
+          traceId: "trace-1",
+          authorization: aggregate(),
+          viewerUserId: "user-1",
+        };
+
+        await expect(app.readEvaluationRuns(input)).resolves.toEqual([]);
+        await expect(app.readEvaluations(input)).resolves.toEqual({});
+        expect(getEvaluationsMultiple).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("given a summary reader that cannot narrow", () => {
+      it("refuses the member read loudly", async () => {
+        const { app } = harness();
+
+        await expect(
+          app.readEvaluationRuns({
+            projectId: AGGREGATE,
+            traceId: "trace-1",
+            authorization: aggregate(),
+            viewerUserId: "user-1",
+          }),
+        ).rejects.toThrow("Trace member narrowing is unavailable");
+      });
+    });
+
+    describe("given protections that hide captured content", () => {
+      it("keeps the verdict and drops the quoted content", async () => {
+        const { app, protect } = await memberHarness({ holders: [SELLER] });
+        protect.mockResolvedValue({ canSeeCapturedInput: false, canSeeCapturedOutput: true });
+
+        const [gated] = await app.readEvaluationRuns({
+          projectId: AGGREGATE,
+          traceId: "trace-1",
+          authorization: aggregate(),
+          viewerUserId: "user-1",
+        });
+
+        expect(gated).toMatchObject({ score: 1, passed: true, details: null, inputs: null });
+      });
+    });
+  });
+
   describe("readSpans()", () => {
     describe("given a caller that knows when the trace occurred", () => {
       it("passes the hint on the span read", async () => {
@@ -303,7 +482,7 @@ describe("TraceModule", () => {
 
         await expect(
           app.isTraceWindowRedacted({
-            projectId: "project-1",
+            authorization: ownProof({ projectId: "project-1" }),
             traceId: "trace-1",
             visibilityCutoffMs: null,
           }),
@@ -320,15 +499,13 @@ describe("TraceModule", () => {
 
         await expect(
           app.isTraceWindowRedacted({
-            projectId: "project-1",
+            authorization: ownProof({ projectId: "project-1" }),
             traceId: "trace-1",
             visibilityCutoffMs: 1_000,
           }),
         ).resolves.toBe(true);
         expect(getByTraceId).toHaveBeenCalledWith(
-          "project-1",
-          "trace-1",
-          expect.objectContaining({ visibilityCutoffMs: 1_000, full: false }),
+          expect.objectContaining({ traceId: "trace-1", visibilityCutoffMs: 1_000, full: false }),
         );
       });
     });
@@ -339,7 +516,7 @@ describe("TraceModule", () => {
 
         await expect(
           app.isTraceWindowRedacted({
-            projectId: "project-1",
+            authorization: ownProof({ projectId: "project-1" }),
             traceId: "trace-1",
             visibilityCutoffMs: 1_000,
           }),
@@ -359,7 +536,7 @@ describe("TraceModule", () => {
 
         await expect(
           app.isTraceWindowRedacted({
-            projectId: "project-1",
+            authorization: ownProof({ projectId: "project-1" }),
             traceId: "trace-1",
             visibilityCutoffMs: 1_000,
           }),

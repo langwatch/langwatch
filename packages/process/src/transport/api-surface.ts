@@ -145,6 +145,7 @@ class ApiSurface {
       rateLimiter,
       facts: this.#restFacts(),
       entitlements: this.door.entitlements,
+      authz: this.door.authz,
     });
   }
 

@@ -10,6 +10,9 @@ import type {
   RecordIntegrationMethodChosenCommandData,
   RecordInviteAcceptedCommandData,
   RecordMemberDisabledCommandData,
+  RecordMemberEnabledCommandData,
+  RecordMemberDepartmentChangedCommandData,
+  RecordMemberRemovedCommandData,
   RecordMembersInvitedCommandData,
   RecordPersonalWorkspaceProvisionedCommandData,
   RecordPersonalTeamCreatedCommandData,
@@ -37,6 +40,9 @@ export type OrganizationLifecycleSenders = Readonly<{
   recordPresenceSettingChanged: Sender<RecordPresenceSettingChangedCommandData>;
   recordTraceSharingDisabled: Sender<RecordTraceSharingDisabledCommandData>;
   recordMemberDisabled: Sender<RecordMemberDisabledCommandData>;
+  recordMemberEnabled: Sender<RecordMemberEnabledCommandData>;
+  recordMemberRemoved: Sender<RecordMemberRemovedCommandData>;
+  recordMemberDepartmentChanged: Sender<RecordMemberDepartmentChangedCommandData>;
   recordCreated: Sender<RecordCreatedCommandData>;
 }>;
 
@@ -148,6 +154,31 @@ export class OrganizationLifecycleNoticeService {
     input: Readonly<{ organizationId: string; userId: string; disabledByUserId: string | null }>,
   ): Promise<void> {
     const sender = this.#senders?.recordMemberDisabled;
+    if (!sender) throw new Error("organization_lifecycle is not registered in this process");
+    await sender.send({ ...this.#envelope(input.organizationId), ...input });
+  }
+
+  /** A seat given back; awaited and loud, since governance rejoins aggregates on this record. */
+  async memberEnabled(input: Recorded<RecordMemberEnabledCommandData>): Promise<void> {
+    const sender = this.#senders?.recordMemberEnabled;
+    if (!sender) throw new Error("organization_lifecycle is not registered in this process");
+    await sender.send({ ...this.#envelope(input.organizationId), ...input });
+  }
+
+  /** A member removed; awaited and loud, since governance revokes aggregates on this record. */
+  async memberRemoved(
+    input: Recorded<RecordMemberRemovedCommandData> & { occurredAt?: number },
+  ): Promise<void> {
+    const sender = this.#senders?.recordMemberRemoved;
+    if (!sender) throw new Error("organization_lifecycle is not registered in this process");
+    await sender.send({ ...this.#envelope(input.organizationId), ...input });
+  }
+
+  /** A department set or cleared; awaited and loud, since governance re-reads aggregates on it. */
+  async memberDepartmentChanged(
+    input: Recorded<RecordMemberDepartmentChangedCommandData>,
+  ): Promise<void> {
+    const sender = this.#senders?.recordMemberDepartmentChanged;
     if (!sender) throw new Error("organization_lifecycle is not registered in this process");
     await sender.send({ ...this.#envelope(input.organizationId), ...input });
   }

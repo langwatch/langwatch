@@ -128,3 +128,9 @@ Feature: An API key's check is shared through Redis for five seconds, and a revo
       Given a key whose answer holds a project of its organization it is not bound to
       When callers on two pods name that project
       Then both are refused and the project is read once
+
+    @unit
+    Scenario: A held project without its kind is read again
+      Given a legacy key whose held answer was written before projects carried a kind
+      When the key is checked
+      Then the held answer is ignored and the project is read from Postgres

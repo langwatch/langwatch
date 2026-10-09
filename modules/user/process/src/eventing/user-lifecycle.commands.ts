@@ -18,6 +18,8 @@ import {
   RECORD_USER_REGISTERED_COMMAND_TYPE,
   type RecordUserCreatedCommandData,
   recordUserCreatedCommandDataSchema,
+  type RecordUserErasedCommandData,
+  recordUserErasedCommandDataSchema,
   type RecordUserLifecycleCommandData,
   recordUserLifecycleCommandDataSchema,
   type RecordUserRegisteredCommandData,
@@ -183,16 +185,16 @@ export class RecordUserCreatedCommand implements CommandHandler<
 
 /** Records that an account was erased on request; once per user, so a retried erasure adds none. */
 export class RecordUserErasedCommand implements CommandHandler<
-  Command<RecordUserLifecycleCommandData>,
+  Command<RecordUserErasedCommandData>,
   UserErasedEvent
 > {
   static readonly schema = defineCommandSchema(
     RECORD_USER_ERASED_COMMAND_TYPE,
-    recordUserLifecycleCommandDataSchema,
+    recordUserErasedCommandDataSchema,
     "Record that a user account was erased",
   );
 
-  async handle(command: Command<RecordUserLifecycleCommandData>): Promise<UserErasedEvent[]> {
+  async handle(command: Command<RecordUserErasedCommandData>): Promise<UserErasedEvent[]> {
     const data = command.data;
     return [
       EventUtils.createEvent<UserErasedEvent>({
@@ -209,7 +211,7 @@ export class RecordUserErasedCommand implements CommandHandler<
     ];
   }
 
-  static getAggregateId(payload: RecordUserLifecycleCommandData): string {
+  static getAggregateId(payload: RecordUserErasedCommandData): string {
     return payload.userId;
   }
 

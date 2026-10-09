@@ -3,6 +3,7 @@
  * @see specs/ai-gateway/governance/cli-login.feature
  */
 
+import { AggregateProjectHasNoCredentialError } from "@langwatch/api-key-contract";
 import {
   CliDeviceFlowRefusedError,
   approveRequestSchema,
@@ -11,6 +12,7 @@ import {
 import { PermissionDeniedError } from "@langwatch/authorization";
 import type { FeatureFlagKey, FeatureFlagTarget } from "@langwatch/feature-flag-contract";
 import { createLogger } from "@langwatch/observability";
+import { isAggregateProjectKind } from "@langwatch/project-contract";
 
 import {
   expired,
@@ -216,6 +218,12 @@ async function approveProject({
       }
       throw error;
     });
+
+  // ADR-177 decision 7: an aggregate holds no key to hand out; no grant changes that.
+  if (isAggregateProjectKind(project.kind)) {
+    const refusal = new AggregateProjectHasNoCredentialError();
+    throw refused(refusal.code, refusal.message, 403);
+  }
 
   if (project.isPersonal && project.ownerUserId !== person.id) {
     throw refused(

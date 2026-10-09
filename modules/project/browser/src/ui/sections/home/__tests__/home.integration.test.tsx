@@ -298,12 +298,20 @@ describe("HomePage composition", () => {
   });
 });
 
-/** The stub, told where a project switch asked to land and whether the scope is still resolving. */
+/** The stub, told where a switch asked to land, whether the scope resolves, and the kind. */
 class ReturningHomeHost extends StubProjectHomeHost {
   readonly visited: string[] = [];
+  readonly replaced: string[] = [];
 
-  constructor(private readonly options: { returnTo: string | undefined; isLoading: boolean }) {
+  constructor(
+    private readonly options: { returnTo: string | undefined; isLoading: boolean; kind?: string },
+  ) {
     super();
+  }
+
+  override project(): ProjectHomeProject | undefined {
+    const project = super.project();
+    return project && this.options.kind ? { ...project, kind: this.options.kind } : project;
   }
 
   override returnTo(): string | undefined {
@@ -314,8 +322,9 @@ class ReturningHomeHost extends StubProjectHomeHost {
     return this.options.isLoading;
   }
 
-  override navigate(to?: string): void {
-    if (to !== void 0) this.visited.push(to);
+  override navigate(to?: string, options?: { replace?: boolean }): void {
+    if (to === void 0) return;
+    (options?.replace ? this.replaced : this.visited).push(to);
   }
 }
 
@@ -360,6 +369,50 @@ describe("the home route after a project switch", () => {
 
       expect(host.visited).toEqual([]);
       expect(screen.getByTestId("traces-overview")).toBeInTheDocument();
+    });
+  });
+});
+
+/** ADR-177: an aggregate has no home, so its home route lands on its Trace Explorer. */
+describe("the home route of a project whose navigation has no home", () => {
+  describe("given an aggregate project", () => {
+    /** @scenario "Opening an aggregate's home lands on the Trace Explorer" */
+    it("replaces the home with the aggregate's Trace Explorer and draws no home", () => {
+      const host = new ReturningHomeHost({ returnTo: void 0, isLoading: false, kind: "aggregate" });
+      renderHomeRoute(host);
+
+      expect(host.replaced).toEqual(["/acme-app/traces"]);
+      expect(host.visited).toEqual([]);
+      expect(screen.queryByTestId("traces-overview")).toBeNull();
+    });
+  });
+
+  describe("given an ordinary project", () => {
+    it("draws the home and redirects nowhere", () => {
+      const host = new ReturningHomeHost({
+        returnTo: void 0,
+        isLoading: false,
+        kind: "application",
+      });
+      renderHomeRoute(host);
+
+      expect(host.replaced).toEqual([]);
+      expect(host.visited).toEqual([]);
+      expect(screen.getByTestId("traces-overview")).toBeInTheDocument();
+    });
+  });
+
+  describe("given an aggregate whose home carries a return_to", () => {
+    it("follows the return_to instead of the Trace Explorer", () => {
+      const host = new ReturningHomeHost({
+        returnTo: "/acme-app/traces/trace-1",
+        isLoading: false,
+        kind: "aggregate",
+      });
+      renderHomeRoute(host);
+
+      expect(host.visited).toEqual(["/acme-app/traces/trace-1"]);
+      expect(host.replaced).toEqual([]);
     });
   });
 });

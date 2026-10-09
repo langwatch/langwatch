@@ -1,9 +1,15 @@
-/** Create-project drawer: inline error (no toast), hard nav after create. */
+/** Create-project drawer: inline error (no toast); an aggregate opens on its entry path. */
 
 import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Heading } from "@langwatch/design-system/primitives";
 import type { UiCreateProjectDrawerProps } from "@langwatch/organization-contract";
+import {
+  isAggregateProjectRouteRefused,
+  PROJECT_KIND,
+  projectEntryPath,
+  type AggregateRule,
+} from "@langwatch/project-contract";
 import type React from "react";
 
 import { api } from "../../behavior/organization-api.ts";
@@ -12,6 +18,7 @@ import { useDrawer } from "../../behavior/use-drawer.ts";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
 import { useOrganizationHost } from "../../model/organization-host.ts";
 import { NEW_TEAM_VALUE } from "../../model/project-form-validation.ts";
+import { aggregateRuleOf } from "./aggregate-member-picker.tsx";
 import { ProjectForm, type ProjectFormData } from "./project-form.tsx";
 
 /** Every list a freshly created project has to show up in right away. */
@@ -23,6 +30,37 @@ function invalidateProjectListQueries(utils: ReturnType<typeof api.useUtils>): v
   void utils.team.getTeamsWithGrants.invalidate();
 }
 
+/**
+ * The server's rule (ADR-177 decision 5), asked of the caller's role in the
+ * organization the project is created in, which need not be the one viewed.
+ */
+function canCreateAggregateIn({
+  organizations,
+  organizationId,
+}: {
+  organizations: { id: string; members: { role: string }[] }[] | undefined;
+  organizationId: string | undefined;
+}): boolean {
+  const organization = organizations?.find((candidate) => candidate.id === organizationId);
+  // `organization.getAll` narrows `members` to the caller's own row.
+  return !isAggregateProjectRouteRefused({
+    kind: PROJECT_KIND.AGGREGATE,
+    organizationRole: organization?.members[0]?.role,
+  });
+}
+
+/** The kind fields of the create request: none unless Governance is checked. */
+function aggregateFieldsOf(data: ProjectFormData): {
+  kind?: typeof PROJECT_KIND.AGGREGATE;
+  aggregateRule?: AggregateRule;
+} {
+  if (!data.isAggregate) return {};
+  return {
+    kind: PROJECT_KIND.AGGREGATE,
+    aggregateRule: aggregateRuleOf(data.aggregateMembers),
+  };
+}
+
 export function CreateProjectDrawer({
   open = true,
   onClose,
@@ -32,11 +70,16 @@ export function CreateProjectDrawer({
   onCreated,
 }: UiCreateProjectDrawerProps): React.ReactElement {
   const { organization: currentOrganization } = useOrganizationTeamProject();
+  const organizations = api.organization.getAll.useQuery({ isDemo: false });
   const host = useOrganizationHost();
   const toaster = useOrganizationToaster();
   const analytics = useUiAnalytics();
 
   const effectiveOrganizationId = organizationIdProp ?? currentOrganization?.id;
+  const canCreateAggregate = canCreateAggregateIn({
+    organizations: organizations.data,
+    organizationId: effectiveOrganizationId,
+  });
   const { closeDrawer } = useDrawer();
   const queryClient = api.useUtils();
 
@@ -69,6 +112,7 @@ export function CreateProjectDrawer({
         ...(data.newTeamName ? { newTeamName: data.newTeamName } : {}),
         language: data.language,
         framework: data.framework,
+        ...aggregateFieldsOf(data),
       },
       {
         onSuccess: (result) => {
@@ -93,7 +137,9 @@ export function CreateProjectDrawer({
           onCreated?.({ projectSlug: result.projectSlug });
 
           if (navigateOnCreate) {
-            host.navigate(`/${result.projectSlug}`);
+            host.navigate(
+              projectEntryPath({ slug: result.projectSlug, kind: aggregateFieldsOf(data).kind }),
+            );
             return;
           }
 
@@ -129,6 +175,7 @@ export function CreateProjectDrawer({
             error={createProject.error}
             {...(defaultTeamId ? { defaultTeamId } : {})}
             {...(effectiveOrganizationId ? { organizationId: effectiveOrganizationId } : {})}
+            canCreateAggregate={canCreateAggregate}
           />
         </Drawer.Body>
       </Drawer.Content>
