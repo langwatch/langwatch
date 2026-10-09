@@ -520,6 +520,6 @@ function proofActorOf({ projectId, actor }: { projectId: string; actor: InstantE
   throw new PermissionDeniedError({
     permission: "traces:view",
     scope: { type: "project", id: projectId },
-    denialReason: "no-binding",
+    denialReason: "no-grant",
   });
 }
