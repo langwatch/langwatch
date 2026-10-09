@@ -269,13 +269,13 @@ Feature: haven seed fills a stack with every kind of data, at any size, without 
 
   # --- Coverage --------------------------------------------------------------------------
 
-  @unit @unimplemented
+  @unit
   Scenario: The static coverage check names an item with no generator
     Given an event type, enum value, lifecycle column, table or process manager with no generator and no exemption
     When "seedgen coverage --static" runs
     Then it lists that item by id as a gap
 
-  @unit @unimplemented
+  @unit
   Scenario: The static coverage check names a stale entry
     Given coverage.json names an item that no longer exists in the tree
     When "seedgen coverage --static" runs

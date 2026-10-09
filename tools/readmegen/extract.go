@@ -25,6 +25,11 @@ const extractorHome = "packages/architecture-enforcer"
 // extractorParts run as two node processes at once; each writes its half of the manifest.
 var extractorParts = []string{"facts", "routes"}
 
+// Extract runs the extractor for callers outside readmegen (seedgen coverage).
+func Extract(ctx context.Context, root string, log io.Writer) (Manifest, error) {
+	return runExtractor(ctx, root, log)
+}
+
 // runExtractor writes the embedded extractor into the checkout, runs its parts
 // with node's own type stripping, merges their manifests and removes the scripts.
 func runExtractor(ctx context.Context, root string, log io.Writer) (Manifest, error) {
