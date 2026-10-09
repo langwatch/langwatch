@@ -192,7 +192,7 @@ describe("given the members the user box matches against", () => {
 
   describe("when nothing matches", () => {
     /** @scenario The user search resolves a typed name or address to one actor */
-    it("returns no id, which the screen reads as matching nobody", () => {
+    it("applies no user filter rather than filtering to nobody", () => {
       expect(matchMemberId(members, "carol")).toBeUndefined();
     });
   });

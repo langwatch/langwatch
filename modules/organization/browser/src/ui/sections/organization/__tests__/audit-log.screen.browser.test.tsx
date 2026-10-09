@@ -1,11 +1,11 @@
 /**
- * Real-Chromium audit log: a user search matching nobody and a row written by no user.
+ * Real-Chromium audit log: a row written by no user names the system as its actor.
  * Spec: specs/audit-log/audit-log.feature
  */
 
 import { cleanup, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { page, userEvent } from "vitest/browser";
+import { page } from "vitest/browser";
 
 import { FakeOrganizationHost, renderWithOrganizationHost } from "../../../../testing.tsx";
 import AuditLogScreen from "../audit-log.screen.tsx";
@@ -78,20 +78,6 @@ beforeEach(async () => {
 afterEach(() => cleanup());
 
 describe("given the audit log in a real browser", () => {
-  describe("when the user search matches no member", () => {
-    /** @scenario The user search resolves a typed name or address to one actor */
-    it("shows the empty state and disables the export", async () => {
-      renderWithOrganizationHost(<AuditLogScreen />, enterpriseHost());
-      await waitFor(() => expect(screen.getByText("Alice")).toBeVisible());
-
-      await userEvent.fill(page.getByLabelText("Search by User"), "zz-nobody");
-
-      await waitFor(() => expect(screen.getByText("No audit logs found")).toBeVisible());
-      expect(screen.queryByText("Alice")).not.toBeInTheDocument();
-      expect(screen.getByRole("button", { name: /Export CSV/ })).toBeDisabled();
-    });
-  });
-
   describe("when a row was written by no user", () => {
     /** @scenario A row written by a system actor says so rather than naming nobody */
     it("names the system as the actor", async () => {

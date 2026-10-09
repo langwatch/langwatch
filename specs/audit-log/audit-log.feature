@@ -220,7 +220,7 @@ Feature: Unified Audit Log
   Scenario: The user search resolves a typed name or address to one actor
     Given alice types part of a member's name or email address
     Then the read is filtered by that member's user id, not by the typed string
-    And a search matching nobody shows the empty state and offers no export, rather than the whole log
+    And a search matching nobody applies no user filter rather than filtering to nobody
 
   # ──────────────────────────────────────────────────────────────────────────
   # Export — a report taken over anything wider than the view on screen is a

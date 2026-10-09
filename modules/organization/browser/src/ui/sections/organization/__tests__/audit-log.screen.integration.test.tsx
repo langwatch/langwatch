@@ -364,23 +364,6 @@ describe("given a reader narrowing the table", () => {
     });
   });
 
-  describe("when the search matches no member", () => {
-    /** @scenario The user search resolves a typed name or address to one actor */
-    it("shows the empty state and offers no export rather than the whole log", async () => {
-      state.members = [
-        { userId: "u-9", user: { id: "u-9", name: "Alice Doe", email: "alice@example.com" } },
-      ];
-      state.auditLogs = [auditRow()];
-      state.totalCount = 1;
-      renderWithOrganizationHost(<AuditLogScreen />, planHost());
-
-      await userEvent.type(screen.getByLabelText("Search by User"), "zz-nobody");
-
-      expect(await screen.findByText("No audit logs found")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: /export/i })).toBeDisabled();
-    });
-  });
-
   describe("when a project is picked", () => {
     /** @scenario Changing a filter returns the table to its first page */
     it("writes the project into the address and returns to the first page", async () => {
