@@ -110,7 +110,9 @@ function f1({ roster, steps, headImage }) {
   if (!Array.isArray(roster) || !Array.isArray(steps)) {
     return missing("F-1", title, ["ledger-roster.json", "ledger-steps.json"]);
   }
-  const head = roster.filter((row) => !headImage || row.image === headImage);
+  const tagged = roster.filter((row) => !headImage || row.image === headImage);
+  // An unstamped rehearsal build reports its release version, not the docker tag; old images write no roster.
+  const head = tagged.length > 0 ? tagged : roster;
   const empty = head.filter((row) => !Array.isArray(row.steps) || row.steps.length === 0);
   const waiting = NOWG_STEP_IDS.filter((id) => {
     const row = steps.find((step) => step.id === id);

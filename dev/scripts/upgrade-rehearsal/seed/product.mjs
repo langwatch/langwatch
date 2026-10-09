@@ -426,7 +426,8 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
         },
       );
   }
-  const wire = createWire({ appBase: process.env.APP_BASE });
+  // Head shares the old image's BASE_HOST, so its auth trusts only that origin.
+  const wire = createWire({ appBase: process.env.APP_BASE, origin: process.env.APP_ORIGIN });
   const result =
     mode === "seed"
       ? await seedProducts({ wire, ctx })
