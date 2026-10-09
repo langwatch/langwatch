@@ -14,7 +14,7 @@ seeded Markov chain: the same prompt gets the same answer, at no cost. Code:
 
 - Opt-in: `haven up +llm` (sticky). Hosted in the `sims` lane.
 - Console: `https://llm.<slug>.langwatch.localhost`; `haven status` shows the loopback
-  port for drivers (`POST /v1/chat/completions`, `/v1/messages`, `/v1/embeddings`).
+  port for drivers (`POST /v1/chat/completions`, `/v1/messages`, `/v1/responses`, `/v1/embeddings`).
   Calls tab: filter, per-call detail, Clear calls. Settings tab: forced error, seed and the
   per-call override headers.
 - Overlay sets `OPENAI_BASE_URL`, `ANTHROPIC_BASE_URL` and dummy keys, so the seeded
