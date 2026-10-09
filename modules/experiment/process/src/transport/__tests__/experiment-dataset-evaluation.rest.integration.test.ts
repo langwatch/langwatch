@@ -14,6 +14,7 @@ import type {
 import { HandledError } from "@langwatch/handled-error";
 import type * as observabilityModule from "@langwatch/observability";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 
 import { experimentDatasetEvaluationRest } from "../experiment-dataset-evaluation.rest.ts";
@@ -41,6 +42,7 @@ const BODY = {
 /** The door over an experiment App answering `evaluateDataset` as given. */
 function mount(evaluateDataset: ExperimentApi["evaluateDataset"], refused: unknown[] = []) {
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({
         actor: { type: "user", id: "user-1" },

@@ -527,9 +527,8 @@ export class AccessWiringError extends Error {
 export const SCOPE_INPUT_FIELDS = Object.values(SCOPE_TIER_FIELDS) as readonly ScopeTierField[];
 
 /**
- * The one check both runtimes run, after the parser and before the handler.
- * A declaration whose check needs a port the process did not supply is refused
- * by name rather than passed.
+ * The one check both runtimes run, after the parser and before the handler. Both
+ * runtimes require the authorization port, so no check is skipped for want of one.
  */
 export async function decide({
   declaration,
@@ -541,18 +540,18 @@ export async function decide({
   declaration: AccessDeclaration;
   caller: Caller;
   input: unknown;
-  authorize?: Authorize;
+  authorize: Authorize;
   denials?: AccessDenial;
 }): Promise<AccessDecision> {
   // A platform permission names no tenant, so no input scope is checked before it is asked.
   if (declaration.kind === "permission-platform") {
-    return decidePlatformCaller({ declaration, caller, ...(authorize ? { authorize } : {}) });
+    return decidePlatformCaller({ declaration, caller, authorize });
   }
 
   const credentialScope = caller.scope ?? null;
   assertInputScope({ input, scope: credentialScope });
 
-  if (authorize) await assertScopeLineage({ declaration, input, authorize });
+  await assertScopeLineage({ declaration, input, authorize });
 
   const decision = await decideDeclared({ declaration, caller, input, authorize, denials });
   for (const scope of secondFactorScopes({ declaration, input, decision })) {
@@ -572,7 +571,7 @@ async function decideDeclared({
   declaration: Exclude<AccessDeclaration, PlatformPermissionDeclaration>;
   caller: Caller;
   input: unknown;
-  authorize: Authorize | undefined;
+  authorize: Authorize;
   denials: AccessDenial | undefined;
 }): Promise<AccessDecision> {
   const credentialScope = caller.scope ?? null;
@@ -629,11 +628,10 @@ export async function assertSecondFactor({
 }: {
   caller: Caller;
   scope: AuthzDeclaredScopeId;
-  authorize: Authorize | undefined;
+  authorize: Authorize;
 }): Promise<void> {
   const session = caller.browserSession;
   if (!session || caller.actor?.type !== "user") return;
-  if (!authorize) throw new Error("the second-factor gate needs an authorization port");
 
   const organizationId =
     scope.tier === "organization"
@@ -658,12 +656,10 @@ export async function scopeWithOrganization({
   authorize,
 }: {
   scope: AuthzDeclaredScopeId | null;
-  authorize?: Authorize;
+  authorize: Authorize;
 }): Promise<AuthzHandlerScope | null> {
   if (scope === null) return null;
   if (scope.tier === "organization") return { ...scope, organizationId: scope.id };
-
-  if (!authorize) return { ...scope, organizationId: null };
 
   const organizationId = await authorize.organizationOf({ tier: scope.tier, id: scope.id });
   if (scope.tier === "team") return { ...scope, organizationId };
@@ -714,14 +710,14 @@ async function decidePlatformCaller({
 }: {
   declaration: PlatformPermissionDeclaration;
   caller: Caller;
-  authorize?: Authorize;
+  authorize: Authorize;
 }): Promise<AccessDecision> {
   if (!caller.actor && declaration.refusal !== "hidden") throw new AuthenticationRequiredError();
 
   await decidePlatform({
     declaration,
     actor: caller.actor,
-    ask: authorize?.getPlatformDecision.bind(authorize),
+    ask: authorize.getPlatformDecision.bind(authorize),
   });
 
   return { actor: caller.actor, scope: null };
@@ -737,11 +733,10 @@ async function decidePermission({
   declaration: Extract<AccessDeclaration, { kind: "permission" }>;
   caller: Caller;
   input: unknown;
-  authorize?: Authorize;
+  authorize: Authorize;
   denials?: AccessDenial;
 }): Promise<AccessDecision> {
   const { actor } = requireCaller(caller);
-  const decisions = requireAuthorize({ authorize, kind: declaration.kind });
 
   const scope = requireDeclaredScope({
     permission: declaration.permission,
@@ -750,9 +745,9 @@ async function decidePermission({
   });
 
   const decision = await gatedDecision({
-    decisions,
+    decisions: authorize,
     scope,
-    decision: await decisions.getDecision({
+    decision: await authorize.getDecision({
       userId: actor.id,
       permission: declaration.permission,
       scope,
@@ -777,11 +772,10 @@ async function decidePermissionAny({
   declaration: Extract<AccessDeclaration, { kind: "permission-any" }>;
   caller: Caller;
   input: unknown;
-  authorize?: Authorize;
+  authorize: Authorize;
   denials?: AccessDenial;
 }): Promise<AccessDecision> {
   const { actor } = requireCaller(caller);
-  const decisions = requireAuthorize({ authorize, kind: declaration.kind });
   const [first, ...rest] = declaration.permissions;
 
   if (!first) throw new Error("a permission-any access declaration named no permissions");
@@ -792,9 +786,9 @@ async function decidePermissionAny({
   const scope = requireDeclaredScope({ permission: first, input, via: "projectId" });
 
   const decision = await gatedDecision({
-    decisions,
+    decisions: authorize,
     scope,
-    decision: await decisions.getProjectAnyDecision({
+    decision: await authorize.getProjectAnyDecision({
       userId: actor.id,
       projectId: scope.id,
       permissions: [first, ...rest],
@@ -819,11 +813,10 @@ async function decidePermissionAll({
   declaration: PermissionAllDeclaration;
   caller: Caller;
   input: unknown;
-  authorize?: Authorize;
+  authorize: Authorize;
   denials?: AccessDenial;
 }): Promise<AccessDecision> {
   const { actor } = requireCaller(caller);
-  const decisions = requireAuthorize({ authorize, kind: declaration.kind });
   const [first] = declaration.permissions;
 
   const scope = requireDeclaredScope({
@@ -834,9 +827,9 @@ async function decidePermissionAll({
 
   for (const permission of declaration.permissions) {
     const decision = await gatedDecision({
-      decisions,
+      decisions: authorize,
       scope,
-      decision: await decisions.getDecision({ userId: actor.id, permission, scope }),
+      decision: await authorize.getDecision({ userId: actor.id, permission, scope }),
     });
     recordDecision({ actor, permission, scope, decision });
 
@@ -856,11 +849,10 @@ async function decidePermissionByInput({
   declaration: InputPermissionDeclaration;
   caller: Caller;
   input: unknown;
-  authorize?: Authorize;
+  authorize: Authorize;
   denials?: AccessDenial;
 }): Promise<AccessDecision> {
   const { actor } = requireCaller(caller);
-  const decisions = requireAuthorize({ authorize, kind: declaration.kind });
   const { permission, scope: named } = chosenPermission({ declared: declaration, input });
 
   const scope =
@@ -872,9 +864,9 @@ async function decidePermissionByInput({
     });
 
   const decision = await gatedDecision({
-    decisions,
+    decisions: authorize,
     scope,
-    decision: await decisions.getDecision({ userId: actor.id, permission, scope }),
+    decision: await authorize.getDecision({ userId: actor.id, permission, scope }),
   });
   recordDecision({ actor, permission, scope, decision });
 
@@ -892,14 +884,13 @@ export async function gatedDecision({
   scope,
   decision,
 }: {
-  decisions: Pick<Authorize, "projectKindOf"> | undefined;
+  decisions: Pick<Authorize, "projectKindOf">;
   scope: AuthzDeclaredScopeId;
   decision: PermissionDecision;
 }): Promise<PermissionDecision> {
   if (scope.tier !== "project" || !decision.permitted || decision.organizationRole === "ADMIN") {
     return decision;
   }
-  if (!decisions) throw new Error("the aggregate admin gate needs an authorization port");
 
   return applyAggregateAdminGate({ decision, kind: await decisions.projectKindOf(scope.id) });
 }
@@ -919,11 +910,11 @@ export async function mintAuthorization({
   permission: AuthzPermission | undefined;
   actor: Actor | null;
   scope: AuthzDeclaredScopeId | null;
-  authorize: Authorize | undefined;
+  authorize: Authorize;
   route: string;
 }): Promise<Authorization | null> {
   if (!permission || !PROOF_BEARING_PERMISSIONS.has(permission)) return null;
-  if (scope?.tier !== "project" || !actor || !authorize) {
+  if (scope?.tier !== "project" || !actor) {
     throw new PermissionDeniedError({
       permission,
       scope: scope ? { type: scope.tier, id: scope.id } : { type: "resource", id: route },
@@ -1140,20 +1131,6 @@ function requireCaller(caller: Caller): { actor: AccessActor } {
   if (!caller.actor) throw new AuthenticationRequiredError();
 
   return { actor: caller.actor };
-}
-
-function requireAuthorize({
-  authorize,
-  kind,
-}: {
-  authorize: Authorize | undefined;
-  kind: AccessDeclaration["kind"];
-}): Authorize {
-  if (authorize) return authorize;
-
-  throw new Error(
-    `a "${kind}" access declaration needs an authorization port, and this surface supplied none`,
-  );
 }
 
 function requireDeclaredScope({

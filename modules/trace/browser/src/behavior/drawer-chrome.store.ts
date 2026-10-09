@@ -121,7 +121,7 @@ function expandedSpanDetail(s: DrawerChromeState): Partial<DrawerChromeState> {
   };
 }
 
-export const drawerChrome = defineSlice<DrawerChromeState>({
+export const useDrawerChrome = defineSlice<DrawerChromeState>({
   name: "trace:drawer-chrome",
   create: (set) => ({
     isMaximized: false,

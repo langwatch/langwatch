@@ -11,6 +11,7 @@ import {
   UnauthorizedError,
 } from "@langwatch/api/rest";
 import type { ExperimentApi } from "@langwatch/experiment-contract";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 
 import { experimentRest, experimentRestCredential } from "../experiment.rest.ts";
 
@@ -64,6 +65,7 @@ export function mountExperimentRest(
   const checked = options.checked ?? [];
 
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: ({ request, permission }) => {
         checked.push(`authenticate`);

@@ -1,10 +1,15 @@
 package cell
 
 import (
+	"context"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 )
 
 // @scenario "A cell refuses a store it does not own"
@@ -46,7 +51,7 @@ func TestEveryProfileRoutesToTheCellsOwnStores(t *testing.T) {
 			t.Fatalf("%s: %v", name, err)
 		}
 		for key, value := range env {
-			if strings.Contains(value, "clickhouse-private:") || strings.Contains(value, "storagesim:") || strings.HasPrefix(key, "DATAPLANE_S3__") {
+			if strings.Contains(value, "clickhouse-private:") || strings.Contains(value, "storagesim:") {
 				t.Errorf("%s: compose-network value survived in %s", name, key)
 			}
 		}
@@ -60,6 +65,11 @@ func TestEveryProfileRoutesToTheCellsOwnStores(t *testing.T) {
 	hybrid, _ := BuildEnv(EnvInput{Profile: Profiles["hybrid"], Stores: stores, APIPort: 7100})
 	if got := hybrid["CLICKHOUSE_URL__snap__snap_hybrid_org_4"]; got != "http://d:p@127.0.0.1:8123/upgradelab_x_p_snap" {
 		t.Errorf("hybrid private target = %q", got)
+	}
+	stores.S3 = map[string]int{"": 7201, "snap": 7202}
+	hybrid, _ = BuildEnv(EnvInput{Profile: Profiles["hybrid"], Stores: stores, APIPort: 7100})
+	if got := hybrid["DATAPLANE_S3__snap__snap_hybrid_org_4"]; !strings.Contains(got, `"endpoint":"http://127.0.0.1:7202"`) || hybrid["S3_ENDPOINT"] != "http://127.0.0.1:7201" {
+		t.Errorf("hybrid object stores not the cell's: private %q shared %q", got, hybrid["S3_ENDPOINT"])
 	}
 }
 
@@ -89,5 +99,25 @@ func TestTrafficIsSeededAndJudgedPerKindAndPhase(t *testing.T) {
 	}
 	if PhaseOf(0, "", false) != "down" || PhaseOf(200, "", true) != "ready" || PhaseOf(503, "Phase: <strong>upgrading</strong>", true) != "holding:upgrading" {
 		t.Error("PhaseOf misreads a probe")
+	}
+}
+
+// @scenario "Traffic is seeded and judged per kind and per api phase"
+func TestUpgradeInProgressIsRetriedAfterRetryAfter(t *testing.T) {
+	var answered atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		if answered.Add(1) == 1 {
+			w.Header().Set("Retry-After", "1")
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = w.Write([]byte(`{"code":"upgrade_in_progress"}`))
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+	traffic := &Traffic{Client: Client{URL: server.URL}, Hold: 5 * time.Second, Origin: time.Now(), http: server.Client()}
+	call := traffic.one(context.Background(), Kind{Name: "rest-read", Do: restRead}, 0)
+	if call.Status != http.StatusOK || call.Retries != 1 || call.UpgradeInProgress != 1 || call.NonOK != 1 || call.RetryWindowMs < 900 {
+		t.Errorf("call = %+v, want 200 after one retry about a second later", call)
 	}
 }

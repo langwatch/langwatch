@@ -19,7 +19,7 @@ export type ServingImage = z.infer<typeof servingImageSchema>;
 
 const SETTLED: ReadonlySet<UpgradeStepStatus> = new Set(["done", "not-needed"]);
 
-/** How often a waiting worker or a holding api asks the ledger again (UPGRADE-IN-WORKER). */
+/** How often a waiting worker or an upgrading api asks the ledger again (UPGRADE-IN-WORKER). */
 export const UPGRADE_RE_ASK_MS = 10_000;
 
 /** A failed `upgrade` run, for the api's console: the failed steps and the run's last lines. */
@@ -39,10 +39,10 @@ export type ServingVerdict =
     }>
   | Readonly<{
       admitted: false;
-      outcome: "holding" | "upgrading";
+      outcome: "upgrading";
       outstanding: readonly string[];
       refusal: string;
-      /** UIW-7: a holding api whose image's blocking step failed shows the token console. */
+      /** An api whose first install failed shows the token console: nobody can sign in yet. */
       failedRun?: UpgradeFailedRun;
     }>
   | Readonly<{
@@ -128,24 +128,14 @@ export function firstInstallVerdict(): ServingVerdict {
 }
 
 /**
- * The steps the api holds requests for, so new code never reads a schema it is ahead of. ClickHouse
- * DDL is metadata-only, so it waits in the same window (API-UP-CLICKHOUSE, pending Alex's ruling;
- * the other option is readers that tolerate a missing column). Spec: serving-gate.feature.
+ * The api never runs a step (UIW-1) and holds for none (NO-HOLDS, Alex 2026-10-09): it serves
+ * while upgrading, a Postgres read ahead of the schema answers upgrade_in_progress.
  */
-export function holdsApiRequests(stepId: string): boolean {
-  return stepId.startsWith("prisma:") || stepId.startsWith("clickhouse:");
-}
-
-/** The api never runs a step (UIW-1): it holds while a schema step is outstanding, then serves. */
 export function apiPhaseVerdict({
   outstanding,
 }: {
   outstanding: readonly string[];
 }): ServingVerdict {
-  const schema = outstanding.filter(holdsApiRequests);
-  const left = schema.length > 0 ? schema : outstanding;
-  const refusal = `the worker's \`${UPGRADE_COMMAND}\` has not finished: ${left.join(", ")}`;
-  return schema.length > 0
-    ? { admitted: false, outcome: "holding", outstanding: schema, refusal }
-    : { admitted: false, outcome: "upgrading", outstanding, refusal };
+  const refusal = `the worker's \`${UPGRADE_COMMAND}\` has not finished: ${outstanding.join(", ")}`;
+  return { admitted: false, outcome: "upgrading", outstanding, refusal };
 }

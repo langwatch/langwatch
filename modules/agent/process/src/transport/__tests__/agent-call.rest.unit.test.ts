@@ -14,6 +14,7 @@ import {
 } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { Hono } from "hono";
 /**
  * @vitest-environment node
@@ -47,6 +48,7 @@ function buildApi(
   const call = vi.fn(options.call ?? (async () => outcome));
   const app = createApiFixture<AgentApi>({ call });
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: ({ permission }): RestCaller => {
         if (options.authorizeRefuses && permission === "scenarios:create") {

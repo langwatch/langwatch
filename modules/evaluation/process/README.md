@@ -372,12 +372,13 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `evaluation_lifecycle` (aggregate `evaluation_lifecycle`)
 
-Declared at `src/eventing/evaluation-lifecycle.pipeline.ts:39`. Events: `evaluationRanEventSchema`, `evaluationLifecycleCompletedEventSchema`.
+Declared at `src/eventing/evaluation-lifecycle.pipeline.ts:42`. Events: `evaluationRanEventSchema`, `evaluationLifecycleCompletedEventSchema`.
 
-| Kind    | Name                                 | Handles | Declared at                                        |
-| ------- | ------------------------------------ | ------- | -------------------------------------------------- |
-| command | `recordEvaluationRan`                | –       | `src/eventing/evaluation-lifecycle.pipeline.ts:44` |
-| command | `recordEvaluationLifecycleCompleted` | –       | `src/eventing/evaluation-lifecycle.pipeline.ts:45` |
+| Kind      | Name                                 | Handles | Declared at                                        |
+| --------- | ------------------------------------ | ------- | -------------------------------------------------- |
+| command   | `recordEvaluationRan`                | –       | `src/eventing/evaluation-lifecycle.pipeline.ts:47` |
+| command   | `recordEvaluationLifecycleCompleted` | –       | `src/eventing/evaluation-lifecycle.pipeline.ts:48` |
+| retention | `≈ retention`                        | –       | `src/eventing/evaluation-lifecycle.pipeline.ts:49` |
 
 ### Pipeline `evaluation_processing` (aggregate `evaluation`)
 

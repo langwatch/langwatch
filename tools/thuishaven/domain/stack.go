@@ -195,6 +195,7 @@ var PerWorktreeServices = []struct{ Name, Role string }{
 	{LLMService, "LLM providers (llmsim)"},
 	{AnalyticsService, "Product analytics (analyticssim)"},
 	{OutboundService, "Slack, webhooks and SQS (outboundsim)"},
+	{PaymentService, "Stripe (paymentsim)"},
 	{TelemetryService, "OTLP sender (telemetrysim)"},
 	{DesignSystemService, "Design system — Storybook"},
 	{MailRoomService, "Mail studio — transactional message preview"},

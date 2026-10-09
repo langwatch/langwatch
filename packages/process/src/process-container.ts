@@ -1,6 +1,7 @@
 import { TransportSelection } from "@langwatch/api/hosting/selection";
 import type { SurfaceDefaultsOptions } from "@langwatch/api/policy";
 import type { ConfigOwner } from "@langwatch/config";
+import type { EventLogRetentionClassifier } from "@langwatch/eventing/server";
 import type { ModuleApiToken } from "@langwatch/module";
 import {
   ConsumerPipelines,
@@ -76,11 +77,14 @@ export class WorkerProcessContainer extends ProcessContainer {
     super(runtime, modules);
   }
 
-  boot(): Promise<Omit<BootedApplication, "tasks">> {
+  /** The worker alone appends to the event log, so its root names each row's retention class. */
+  boot(options: {
+    classifyEventLogRetention: EventLogRetentionClassifier;
+  }): Promise<Omit<BootedApplication, "tasks">> {
     return this.runtime.boot({
       role: "worker",
       modules: this.modules,
-      pipelines: new ConsumerPipelines().consume(),
+      pipelines: new ConsumerPipelines().consume(options.classifyEventLogRetention),
     });
   }
 }

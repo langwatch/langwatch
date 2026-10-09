@@ -1,231 +1,103 @@
 /**
- * Seeded grants land where the authz engine reads them: the `Grant` and `Role`
- * projections, with the compat `RoleBinding` row kept aligned under the same
- * id. Ported from main's platform/app/prisma/seed-authz.ts.
+ * The fixed local identity's grants and the public token's role, sent as authz commands so
+ * the worker's projections write every row (dev/docs/plans/seed-2026-10-09.md §3.1).
  */
 import {
-  bindingRoleKeyOf,
-  STORED_PRINCIPAL_KIND,
-  type GrantEventSource,
-  type GrantScopeTier,
+  newAuthzGrantId,
+  type AuthzApi,
+  type AuthzDefineRoleInput,
+  type AuthzLedgerBindingAttach,
 } from "@langwatch/authz-contract";
-import type { Prisma, PrismaClient, TeamUserRole } from "@langwatch/prisma-client/generated";
-import { fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
 
-const SEED_GRANT_SOURCE: GrantEventSource = "grants-service";
+export type SeedGrant = Omit<AuthzLedgerBindingAttach, "bindingId">;
+export type SeedRole = Omit<AuthzDefineRoleInput, "organizationId" | "actor">;
 
-export type SeedGrantBinding = {
-  id: string;
-  organizationId: string;
-  principal: { type: "user" | "apiKey"; id: string };
-  role: TeamUserRole;
-  customRoleId?: string | null;
-  scope: { type: GrantScopeTier; id: string };
-};
+const SYSTEM_ACTOR = { type: "system", id: null } as const;
 
-export type SeedRoleProjection = {
-  id: string;
-  organizationId: string;
-  name: string;
-  description: string | null;
-  permissions: string[];
-  kind: "custom" | "system_api_key";
-};
-
-const LOCAL_DEV_BINDING_IDS = {
-  adminOrganization: "local-dev-admin-organization-binding",
-  adminTeam: "local-dev-admin-team-binding",
-  privateToken: "local-dev-private-token-binding",
-  publicToken: "local-dev-public-token-binding",
-} as const;
-
-export function adminGrantBindings({
+/** ORGANIZATION-scope and TEAM-scope ADMIN: the admin's, and each tool user's. */
+export function adminGrants({
   organizationId,
   teamId,
   userId,
-  ids = {
-    organization: LOCAL_DEV_BINDING_IDS.adminOrganization,
-    team: LOCAL_DEV_BINDING_IDS.adminTeam,
-  },
 }: {
   organizationId: string;
   teamId: string;
   userId: string;
-  /** The two binding ids; the admin's by default, distinct for any other seeded admin. */
-  ids?: { organization: string; team: string };
-}): SeedGrantBinding[] {
-  const principal: SeedGrantBinding["principal"] = { type: "user", id: userId };
+}): SeedGrant[] {
+  const grant = { principal: { userId }, role: "ADMIN", customRoleId: null } as const;
   return [
-    {
-      id: ids.organization,
-      organizationId,
-      principal,
-      role: "ADMIN",
-      scope: { type: "ORGANIZATION", id: organizationId },
-    },
-    {
-      id: ids.team,
-      organizationId,
-      principal,
-      role: "ADMIN",
-      scope: { type: "TEAM", id: teamId },
-    },
+    { ...grant, scopeType: "ORGANIZATION", scopeId: organizationId },
+    { ...grant, scopeType: "TEAM", scopeId: teamId },
   ];
 }
 
 /** The private access token: a full-access personal token, ORGANIZATION-scope ADMIN. */
-export function privateTokenGrantBinding({
+export function privateTokenGrant({
   organizationId,
   apiKeyId,
 }: {
   organizationId: string;
   apiKeyId: string;
-}): SeedGrantBinding {
+}): SeedGrant {
   return {
-    id: LOCAL_DEV_BINDING_IDS.privateToken,
-    organizationId,
-    principal: { type: "apiKey", id: apiKeyId },
+    principal: { apiKeyId },
     role: "ADMIN",
-    scope: { type: "ORGANIZATION", id: organizationId },
+    customRoleId: null,
+    scopeType: "ORGANIZATION",
+    scopeId: organizationId,
   };
 }
 
-/** The public ingestion token: its restricted custom role, on one project. */
-export function publicTokenGrantBinding({
-  organizationId,
+/** The public ingestion token: its restricted role, on one project. */
+export function publicTokenGrant({
   projectId,
   apiKeyId,
   roleId,
 }: {
-  organizationId: string;
   projectId: string;
   apiKeyId: string;
   roleId: string;
-}): SeedGrantBinding {
+}): SeedGrant {
   return {
-    id: LOCAL_DEV_BINDING_IDS.publicToken,
-    organizationId,
-    principal: { type: "apiKey", id: apiKeyId },
+    principal: { apiKeyId },
     role: "CUSTOM",
     customRoleId: roleId,
-    scope: { type: "PROJECT", id: projectId },
+    scopeType: "PROJECT",
+    scopeId: projectId,
   };
 }
 
-export function grantRowFor({
-  binding,
-  occurredAt,
+/**
+ * Defines the roles, then attaches the grants a principal does not already hold. The operator
+ * running the seed writes as `system`. A stack whose worker is not up yet does not fail the seed:
+ * the commands are durable and project once it drains.
+ */
+export async function attachSeedGrants({
+  authz,
+  organizationId,
+  roles,
+  grants,
 }: {
-  binding: SeedGrantBinding;
-  occurredAt: Instant;
-}): Prisma.GrantUncheckedCreateInput {
-  return {
-    id: binding.id,
-    organizationId: binding.organizationId,
-    principalType: STORED_PRINCIPAL_KIND[binding.principal.type],
-    principalId: binding.principal.id,
-    roleKey: bindingRoleKeyOf({
-      role: binding.role,
-      customRoleId: binding.customRoleId ?? null,
-    }),
-    legacyRole: binding.role,
-    source: SEED_GRANT_SOURCE,
-    scopeType: binding.scope.type,
-    scopeId: binding.scope.id,
-    occurredAt: toDate(occurredAt),
-  };
-}
-
-export function compatRoleBindingFor(
-  binding: SeedGrantBinding,
-): Prisma.RoleBindingUncheckedCreateInput {
-  return {
-    id: binding.id,
-    organizationId: binding.organizationId,
-    userId: binding.principal.type === "user" ? binding.principal.id : null,
-    apiKeyId: binding.principal.type === "apiKey" ? binding.principal.id : null,
-    role: binding.role,
-    customRoleId: binding.customRoleId ?? null,
-    scopeType: binding.scope.type,
-    scopeId: binding.scope.id,
-  };
-}
-
-export function roleRowFor({
-  role,
-  occurredAt,
-}: {
-  role: SeedRoleProjection;
-  occurredAt: Instant;
-}): Prisma.RoleUncheckedCreateInput {
-  return {
-    id: role.id,
-    organizationId: role.organizationId,
-    name: role.name,
-    description: role.description,
-    permissions: role.permissions,
-    kind: role.kind,
-    occurredAt: toDate(occurredAt),
-  };
-}
-
-/** Refuses to recreate a grant a previous run saw revoked, and says so with `false`. */
-export async function seedGrantBinding({
-  prisma,
-  binding,
-}: {
-  prisma: PrismaClient;
-  binding: SeedGrantBinding;
-}): Promise<boolean> {
-  return prisma.$transaction((tx) => seedGrantBindingInTransaction({ tx, binding }));
-}
-
-async function seedGrantBindingInTransaction({
-  tx,
-  binding,
-}: {
-  tx: Prisma.TransactionClient;
-  binding: SeedGrantBinding;
-}): Promise<boolean> {
-  const existing = await tx.grant.findUnique({
-    where: { id: binding.id },
-    select: { revokedAt: true, occurredAt: true },
-  });
-  if (existing?.revokedAt) {
-    await tx.roleBinding.deleteMany({ where: { id: binding.id } });
-    return false;
+  authz: Pick<AuthzApi, "defineRole" | "attachBindings">;
+  organizationId: string;
+  roles: SeedRole[];
+  grants: SeedGrant[];
+}): Promise<void> {
+  for (const role of roles) {
+    await authz.defineRole({
+      ...role,
+      organizationId,
+      actor: SYSTEM_ACTOR,
+      requireProjection: false,
+    });
   }
-
-  const { id: bindingId, ...bindingUpdate } = compatRoleBindingFor(binding);
-  await tx.roleBinding.upsert({
-    where: { id: bindingId },
-    create: compatRoleBindingFor(binding),
-    update: bindingUpdate,
+  await authz.attachBindings({
+    organizationId,
+    bindings: grants.map((grant) => ({ ...grant, bindingId: newAuthzGrantId() })),
+    caller: { type: "system" },
+    actor: SYSTEM_ACTOR,
+    onDuplicate: "skip",
+    awaitProjection: true,
+    requireProjection: false,
   });
-  const occurredAt = existing ? fromDate(existing.occurredAt) : nowInstant();
-  const grant = grantRowFor({ binding, occurredAt });
-  const { id: grantId, ...grantUpdate } = grant;
-  await tx.grant.upsert({ where: { id: grantId }, create: grant, update: grantUpdate });
-  return true;
-}
-
-/** Refuses to recreate a role a previous run saw deleted, and says so with `false`. */
-export async function seedRoleProjection({
-  prisma,
-  role,
-}: {
-  prisma: PrismaClient;
-  role: SeedRoleProjection;
-}): Promise<boolean> {
-  const existing = await prisma.role.findUnique({
-    where: { id: role.id },
-    select: { deletedAt: true, occurredAt: true },
-  });
-  if (existing?.deletedAt) return false;
-
-  const occurredAt = existing ? fromDate(existing.occurredAt) : nowInstant();
-  const row = roleRowFor({ role, occurredAt });
-  const { id: roleId, ...roleUpdate } = row;
-  await prisma.role.upsert({ where: { id: roleId }, create: row, update: roleUpdate });
-  return true;
 }

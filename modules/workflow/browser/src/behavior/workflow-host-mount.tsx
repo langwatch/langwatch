@@ -24,7 +24,7 @@ import type {
   WorkflowRouteReading,
   WorkflowScope,
 } from "../model/workflow-host.ts";
-import { workflowHostSlice } from "./workflow-host.store.ts";
+import { useWorkflowHostSlice } from "./workflow-host.store.ts";
 
 function capabilityWorkflowHost({
   scopeHost,
@@ -109,7 +109,7 @@ export default function WorkflowHostMount({ children }: { children?: ReactNode }
   );
 
   useLayoutEffect(() => {
-    workflowHostSlice.setState(host, true);
+    useWorkflowHostSlice.setState(host, true);
     setPublished(true);
   }, [host]);
 

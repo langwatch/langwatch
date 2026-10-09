@@ -10,6 +10,7 @@ import {
 } from "@langwatch/analytics-contract";
 import { bindRestMiddleware, canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import { LocalFeatureApis } from "@langwatch/process";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { TRACE_FILTER_EXAMPLES } from "@langwatch/trace-contract";
 import { Hono } from "hono";
 
@@ -50,6 +51,7 @@ export function mountQueryDoor({
   const keyScope = () => ({ tier: "organization" as const, id: `org-of-${tenant().id}` });
 
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     // The whole of the credential chain this test fakes: one authenticated key.
     identity: {
       authenticate: () => ({ actor: { type: "api_key", id: "key-asking" }, scope: keyScope() }),

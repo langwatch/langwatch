@@ -21,6 +21,9 @@ const REPOSITORY_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", ".."
 
 const roots: string[] = [];
 
+/** A fixture root is no clone, so it names the newest released migration itself. */
+const FIXTURE_RELEASED = "20261001120000_released";
+
 const SCHEMA = [
   "User",
   "Organization",
@@ -91,11 +94,13 @@ export class Repository { static readonly tables = prismaTables(${names}); }
       );
     },
     findings: () =>
-      lintUpgradeSignInTablesAt({ root, catalogue }).map((violation) => ({
-        file: violation.file.slice(root.length + 1),
-        message: violation.message,
-        allowed: violation.allowed,
-      })),
+      lintUpgradeSignInTablesAt({ root, catalogue, released: FIXTURE_RELEASED }).map(
+        (violation) => ({
+          file: violation.file.slice(root.length + 1),
+          message: violation.message,
+          allowed: violation.allowed,
+        }),
+      ),
     tables: () => [...signInTables({ root, catalogue })].toSorted(([a], [b]) => a.localeCompare(b)),
   };
 
@@ -208,14 +213,18 @@ describe("upgrade sign-in tables", () => {
       "packages/prisma-client/prisma/migrations/20991231000000_dataset/migration.sql",
       'CREATE TABLE IF NOT EXISTS "Dataset" ("id" TEXT);\n',
     );
-    world.write(
-      "packages/upgrade/releases/3.20.0.json",
-      '{ "steps": [{ "id": "prisma:20261005000000_later" }] }',
-    );
     world.step({ owner: "dataset", mode: "blocking", sql: 'UPDATE "Dataset" SET "x" = 1' });
 
     expect(world.findings()).toEqual([]);
     expect(releasedThrough({ root: REPOSITORY_ROOT }) >= "20261001120000").toBe(true);
+  });
+
+  /** @scenario "A clone without release tags fails the policy with the command that fetches them" */
+  it("refuses to guess the released migration where no release tag is readable", () => {
+    const root = mkdtempSync(join(tmpdir(), "upgrade-sign-in-tables-no-tags-"));
+    roots.push(root);
+
+    expect(() => releasedThrough({ root })).toThrow(/git fetch --tags origin/);
   });
 
   describe("given the tree", () => {

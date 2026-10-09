@@ -25,7 +25,8 @@ type Stores struct {
 	PostgresBase, ClickHouseBase string // server URLs with credentials, no database
 	Name                         string // upgradelab_<cell>
 	RedisPort                    string
-	Private                      []string // private ClickHouse labels (hybrid)
+	Private                      []string       // private ClickHouse labels (hybrid)
+	S3                           map[string]int // storagesim port per object target: "" shared, else a private label
 }
 
 // DatabaseURL is the Prisma URL both releases share; schema mydb matches the tenancy SQL.
@@ -41,6 +42,16 @@ func (stores Stores) ClickHouseURL(label string) string {
 		return stores.ClickHouseBase + "/" + stores.Name
 	}
 	return stores.ClickHouseBase + "/" + stores.Name + "_p_" + label
+}
+
+// queryURL is where the harness posts a query against a target: ClickHouse's HTTP door takes the
+// database as a parameter, never as the path the apps' URLs carry.
+func (stores Stores) queryURL(label string) string {
+	database := stores.Name
+	if label != "" {
+		database += "_p_" + label
+	}
+	return stores.ClickHouseBase + "/?database=" + database
 }
 
 // RedisURL is the cell's own redis-server; the branch reads no db index, so no shared server is safe.

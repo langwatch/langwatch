@@ -390,7 +390,12 @@ export class EvaluationModule implements EvaluationApiContract {
     environment: EvaluatorEnvironmentService,
   ): EvaluationModule {
     const commands = EvaluationCommandDispatcherService.create();
-    const lifecycle = EvaluationLifecycleService.create();
+    const lifecycle = EvaluationLifecycleService.create({
+      retention: {
+        resolve: (tenantId) =>
+          dependencies.retention.getResolvedForProject({ projectId: tenantId }),
+      },
+    });
     const { langevals } = channels;
     const staging = repositories.langevalsStaging;
     const telemetry = EvaluationExecutionMetricsService.create();

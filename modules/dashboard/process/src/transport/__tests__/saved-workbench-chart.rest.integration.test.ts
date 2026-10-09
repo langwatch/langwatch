@@ -15,6 +15,7 @@ import { VEGA_LITE_SCHEMA_URL } from "@langwatch/analytics-contract/visualizatio
 import { createLangWatchQLService } from "@langwatch/analytics-process/testing";
 import { bindRestMiddleware, createRestRuntime, canonicalErrorResponse } from "@langwatch/api/rest";
 import { PermissionDeniedError } from "@langwatch/authorization";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -80,6 +81,7 @@ function mountKey({
     scope: { tier: "project" as const, id: projectId },
   };
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       // A project-tier route asks its permission of the door itself.
       authenticate: ({ permission }) => {

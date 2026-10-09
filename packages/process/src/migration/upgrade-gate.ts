@@ -8,12 +8,7 @@ import { hostname } from "node:os";
 import { setTimeout as sleep } from "node:timers/promises";
 
 import type { ServerRole } from "../feature-installer.ts";
-import {
-  UPGRADE_CONSOLE_TOKEN_TTL_MS,
-  UPGRADING_PHASE,
-  type UpgradeConsole,
-  type UpgradeHolding,
-} from "../lifecycle/liveness-thread.ts";
+import { UPGRADE_CONSOLE_TOKEN_TTL_MS, type UpgradeConsole } from "../lifecycle/liveness-thread.ts";
 import type { ServerComponent, ServerLogger } from "../server.ts";
 
 /** Tasks runs `upgrade` itself and is never gated. */
@@ -22,12 +17,12 @@ export type UpgradeGatedRole = Exclude<ServerRole, "tasks">;
 /** What the api's upgrade console shows of a run that failed (UPGRADE-CONSOLE, 2026-10-09). */
 export type UpgradeGateFailedRun = Pick<UpgradeConsole, "failedSteps" | "logTail">;
 
-/** The api holds (a Postgres schema step outstanding) or upgrades, and asks again (UIW-1). */
+/** The api serves while the worker upgrades, and asks again (UIW-1, NO-HOLDS). */
 export type UpgradeGateWaiting = Readonly<{
   admitted: false;
-  outcome: "holding" | "upgrading";
+  outcome: "upgrading";
   outstanding: readonly string[];
-  /** UIW-7: read from the ledger; only a holding verdict carries one. */
+  /** UIW-7: read from the ledger; only a failed first install carries one. */
   failedRun?: UpgradeGateFailedRun;
 }>;
 
@@ -50,22 +45,24 @@ export type UpgradeGate = Readonly<{
   retryFailedSteps?: () => Promise<void>;
 }>;
 
-/** Shows a failure's console (true on Retry, never settling once it ends) and writes its Retry. */
+/** Shows a failure's console (true on Retry, never settling after), writes its Retry, lifts it. */
 type OperatorConsole = Readonly<{
   show: (failedRun: UpgradeGateFailedRun) => Promise<boolean>;
   retry: () => Promise<void>;
+  lift: () => Promise<void>;
 }>;
 
 const NEVER = new Promise<boolean>(() => undefined);
 
 /** What an operator reads on the gate's lines: the phase, what it waits on, what to do next. */
 const GATE_PHASE = "upgrade-gate";
+const UPGRADING_PHASE = "upgrading";
 const CONSOLE_PHASE = "upgrade-console";
 const LEDGER = "the upgrade ledger (DATABASE_URL)";
 const LEDGER_UNREADABLE_NEXT =
   "check DATABASE_URL reaches Postgres and `pnpm task upgrade status` answers, then start this process again";
 const REFUSED_NEXT = "do what the refusal names, then start this process again";
-/** How often a holding or upgrading api asks the ledger again (UPGRADE-IN-WORKER). */
+/** How often an upgrading api asks the ledger again (UPGRADE-IN-WORKER). */
 const RE_ASK_MS = 10_000;
 
 const isWaiting = (verdict: UpgradeGateVerdict): verdict is UpgradeGateWaiting =>
@@ -101,28 +98,28 @@ export function assertGatedRole(role: string): asserts role is UpgradeGatedRole 
 
 /**
  * Hosted by the preamble: starts after boot and before the application runtime, stops after it.
- * A refusal, or an unanswering gate, throws; once admitted it serves until stopped (2026-10-09).
- * `onHolding` holds the page (Q-U4); `onFailed` shows the ledger's failure console (UIW-7).
+ * A refusal, or an unanswering gate, throws; an upgrading api serves at once (NO-HOLDS) and asks
+ * on until current. `onFailed` shows a failed first install's console (UIW-7).
  */
 export function upgradeGateComponent({
   server,
   role,
   gate,
   logger,
-  onHolding,
   onFailed,
+  onConsoleLifted,
   reAskMs = RE_ASK_MS,
 }: {
   server: string;
   role: UpgradeGatedRole;
   gate: UpgradeGate;
   logger: ServerLogger;
-  onHolding?: (holding: UpgradeHolding | undefined) => Promise<void>;
   onFailed?: (upgradeConsole: UpgradeConsole) => Promise<boolean>;
+  onConsoleLifted?: () => Promise<void>;
   reAskMs?: number;
 }): ServerComponent {
   let admitted = false;
-  /** Set while an upgrading api serves its declared routes and asks on until current. */
+  /** Set while an upgrading api serves and asks on until current. */
   let upgrading: Readonly<{ stop: AbortController; asking: Promise<void> }> | undefined;
   /** D1, D2: a fresh token per failed run, printed on one log line; only its hash is kept. */
   const issueConsoleToken = (): Pick<UpgradeConsole, "tokenSha256" | "tokenTtlMs"> => {
@@ -154,6 +151,7 @@ export function upgradeGateComponent({
               (retried) => retried || NEVER,
             ),
           retry: retryFailedSteps,
+          lift: onConsoleLifted ?? (async () => undefined),
         }
       : undefined;
   const refuse = (refusal: string, next: string): never => {
@@ -177,22 +175,12 @@ export function upgradeGateComponent({
         },
         `${server} (${role}): checking the upgrade ledger before serving`,
       );
-      let verdict: UpgradeGateVerdict;
       const say = (fields: object, line: string) =>
         logger.info(fields, `${server} (${role}): ${line}`);
-      // Only the gate's phase: its steps are behind `admit`, and a refusal's text is never shown.
-      await onHolding?.({ phase: GATE_PHASE, outstandingStepIds: [] });
+      let verdict: UpgradeGateVerdict;
       try {
-        verdict = await admitWhenCurrent({
-          admit: gate.admit,
-          onHolding,
-          operatorConsole,
-          reAskMs,
-          say,
-          bootsWhileUpgrading: role === "api",
-        });
+        verdict = await gate.admit();
       } catch (error) {
-        await onHolding?.(undefined);
         const cause = `the upgrade ledger could not be read (DATABASE_URL): ${messageOf(error)}`;
         return refuse(cause, LEDGER_UNREADABLE_NEXT);
       }
@@ -211,17 +199,24 @@ export function upgradeGateComponent({
         );
       };
       if (isWaiting(verdict)) {
-        // UIW-1, Q5: boot and serve the declared routes; the hold lifts at current.
+        say(
+          {
+            phase: UPGRADING_PHASE,
+            waitingOn: "the worker's upgrade run",
+            next: "nothing to do: this api serves meanwhile",
+          },
+          `the installation is upgrading (${verdict.outstanding.join(", ")}); serving and asking again every ${reAskMs / 1000} s`,
+        );
         upgrading = askInBackground({
+          first: verdict,
           admit: gate.admit,
-          onHolding,
+          operatorConsole,
           reAskMs,
           say,
           onCurrent: serving,
         });
         return;
       }
-      await onHolding?.(undefined);
       if (!verdict.admitted) {
         return refuse(verdict.refusal, REFUSED_NEXT);
       }
@@ -239,50 +234,51 @@ export function upgradeGateComponent({
   };
 }
 
-/** Asks on after start returned; `onCurrent` runs once with the hold lifted. */
+/** Asks on after start returned; `onCurrent` runs once with the console lifted. */
 function askInBackground({
   onCurrent,
-  onHolding,
   ...asking
 }: Omit<Parameters<typeof askUntilCurrent>[0], "signal"> & { onCurrent: () => void }) {
   const stop = new AbortController();
-  const current = askUntilCurrent({ ...asking, onHolding, signal: stop.signal });
+  const current = askUntilCurrent({ ...asking, signal: stop.signal });
   return {
     stop,
     asking: current.then(async (admitted) => {
       if (!admitted) return;
-      await onHolding?.(undefined);
+      await asking.operatorConsole?.lift();
       onCurrent();
     }),
   };
 }
 
+type ConsoleState = { shown: string; retried: Promise<boolean> };
+
 /**
- * An upgrading api asks until the ledger is current; true once admitted, false when stopped.
- * An unreadable ledger or a refusal mid-upgrade is said and asked again: the process serves
- * already.
+ * An upgrading api asks until the ledger is current; true once admitted, false when stopped. An
+ * unreadable ledger or a refusal mid-upgrade is said and asked again: the process serves already.
+ * A console Retry returns the failed steps to `pending` (UIW-7, UIW-LOSER-WAITS).
  */
 async function askUntilCurrent({
+  first,
   admit,
-  onHolding,
+  operatorConsole,
   reAskMs,
   say,
   signal,
 }: {
+  first: UpgradeGateWaiting;
   admit: () => Promise<UpgradeGateVerdict>;
-  onHolding: ((holding: UpgradeHolding | undefined) => Promise<void>) | undefined;
+  operatorConsole: OperatorConsole | undefined;
   reAskMs: number;
   say: (fields: object, line: string) => void;
   signal: AbortSignal;
 }): Promise<boolean> {
+  const state: ConsoleState = { shown: "", retried: NEVER };
+  let verdict: UpgradeGateVerdict = first;
   while (!signal.aborted) {
-    const verdict = await admit().catch((error: unknown): UpgradeGateVerdict => ({
-      admitted: false,
-      refusal: `the upgrade ledger could not be read: ${messageOf(error)}`,
-    }));
     if (verdict.admitted) return true;
     if (isWaiting(verdict)) {
-      await onHolding?.({ phase: verdict.outcome, outstandingStepIds: verdict.outstanding });
+      await showConsoleOnce({ verdict, state, operatorConsole });
     } else {
       say(
         {
@@ -293,71 +289,38 @@ async function askUntilCurrent({
         redactUrls(verdict.refusal),
       );
     }
-    await sleep(reAskMs, undefined, { signal }).catch(() => undefined);
+    const asleep = sleep(reAskMs, undefined, { signal }).then(
+      () => false,
+      () => false,
+    );
+    if (await Promise.race([state.retried, asleep])) {
+      await operatorConsole?.retry();
+      Object.assign(state, { shown: "", retried: NEVER });
+    }
+    if (signal.aborted) break;
+    verdict = await admit().catch((error: unknown): UpgradeGateVerdict => ({
+      admitted: false,
+      refusal: `the upgrade ledger could not be read: ${messageOf(error)}`,
+    }));
   }
   return false;
 }
 
-type ConsoleState = { shown: string; retried: Promise<boolean> };
-
-/**
- * The worker runs the upgrade; the api re-asks every 10 s, holding the door meanwhile. A console
- * Retry returns the failed steps to `pending` and the next ask moves on (UIW-7, UIW-LOSER-WAITS).
- */
-async function admitWhenCurrent({
-  admit,
-  onHolding,
-  operatorConsole,
-  reAskMs,
-  say,
-  bootsWhileUpgrading,
-}: {
-  admit: () => Promise<UpgradeGateVerdict>;
-  onHolding: ((holding: UpgradeHolding | undefined) => Promise<void>) | undefined;
-  operatorConsole?: OperatorConsole;
-  reAskMs: number;
-  say: (fields: object, line: string) => void;
-  /** An api returns at the upgrading phase instead of waiting for current. */
-  bootsWhileUpgrading: boolean;
-}): Promise<UpgradeGateVerdict> {
-  let phase = "";
-  const state: ConsoleState = { shown: "", retried: NEVER };
-  for (;;) {
-    const verdict = await admit();
-    if (!isWaiting(verdict)) return verdict;
-    if (verdict.outcome !== phase) {
-      const next = "nothing to do: this api serves once the ledger is current";
-      say(
-        { phase: verdict.outcome, waitingOn: "the worker's upgrade run", next },
-        `the installation is ${verdict.outcome} (${verdict.outstanding.join(", ")}); asking again every ${reAskMs / 1000} s`,
-      );
-      phase = verdict.outcome;
-    }
-    await holdOrShowConsole({ verdict, state, onHolding, operatorConsole });
-    if (bootsWhileUpgrading && verdict.outcome === UPGRADING_PHASE) return verdict;
-    const retried = await Promise.race([state.retried, sleep(reAskMs).then(() => false)]);
-    if (!retried) continue;
-    await operatorConsole?.retry();
-    Object.assign(state, { shown: "", retried: NEVER });
-  }
-}
-
-/** Holds the page, or opens a holding failure's console once per failure, a new token each. */
-async function holdOrShowConsole({
+/** Opens a failed first install's console once per failure, a new token each; lifts it after. */
+async function showConsoleOnce({
   verdict,
   state,
-  onHolding,
   operatorConsole,
 }: {
   verdict: UpgradeGateWaiting;
   state: ConsoleState;
-  onHolding: ((holding: UpgradeHolding | undefined) => Promise<void>) | undefined;
   operatorConsole: OperatorConsole | undefined;
 }): Promise<void> {
-  const failedRun = verdict.outcome === "holding" ? verdict.failedRun : undefined;
-  if (!failedRun || !operatorConsole) {
+  if (!operatorConsole) return;
+  const failedRun = verdict.failedRun;
+  if (!failedRun) {
+    if (state.shown !== "") await operatorConsole.lift();
     Object.assign(state, { shown: "", retried: NEVER });
-    await onHolding?.({ phase: verdict.outcome, outstandingStepIds: verdict.outstanding });
     return;
   }
   const failure = JSON.stringify(failedRun.failedSteps);

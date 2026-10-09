@@ -9,7 +9,7 @@ import { Readable } from "node:stream";
 import { createRestRuntime } from "@langwatch/api/rest";
 import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
 import type { PermissionDecision } from "@langwatch/authorization";
-import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
+import { testAuthorizeDefaults, restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { initTRPC } from "@trpc/server";
 import type { ErrorHandler } from "hono";
 import { describe, expect, it } from "vitest";
@@ -84,6 +84,7 @@ function installed() {
   }).mount(storedObjectTrpcTransport, () => app);
 
   const rest = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => {
         throw new Error("The signed read asks no credential of the door.");

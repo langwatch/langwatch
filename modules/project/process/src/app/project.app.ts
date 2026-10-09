@@ -166,9 +166,10 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
       logger,
       projects: repositories.projects,
     });
+    const credentials = ProjectCredentialsService.create();
     const projects = ProjectApplicationService.create({
       repository: repositories.projects,
-      credentials: ProjectCredentialsService.create(),
+      credentials,
       organizations: dependencies.organizations,
       authorization: dependencies.authorization,
       created: lifecycle,
@@ -189,6 +190,7 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
       organizations: dependencies.organizations,
       personalProjects: PersonalProjectService.create({
         projects: repositories.projects,
+        credentials,
         lifecycle,
       }),
       aggregates: AggregateProjectService.create({

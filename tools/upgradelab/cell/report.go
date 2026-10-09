@@ -53,6 +53,11 @@ type KindSummary struct {
 	Lost       int    `json:"lost"` // answered 2xx, never visible
 	MaxLatency int64  `json:"maxLatencyMs"`
 	FirstError string `json:"firstError,omitempty"`
+	// Upgrade-in-progress answers retried, the longest retry window, and every non-2xx seen on any attempt.
+	UpgradeInProgress int   `json:"upgradeInProgress"`
+	Retries           int   `json:"retries"`
+	MaxRetryWindowMs  int64 `json:"maxRetryWindowMs"`
+	NonOK             int   `json:"nonOk"`
 }
 
 // PhaseStatuses counts each status code per api phase, every kind together.
@@ -93,7 +98,7 @@ func verdict(id string, pass bool, detail string) Verdict {
 var invariantNames = map[string]string{
 	"H1":  "each tenant's telemetry and projections land only on its own target",
 	"H2":  "the upgrade applied every ClickHouse target and the ledger shows each",
-	"I0":  "api holds (holding page, then upgrading mode) until the ledger is current",
+	"I0":  "the api serves everything from boot while the upgrade runs: no holding page",
 	"I2":  "ledger current: every step done or not-needed (operator steps aside)",
 	"I2b": "nothing reopened after ready",
 	"I3":  "api ready and every live roster row declares the image's steps",
@@ -101,11 +106,20 @@ var invariantNames = map[string]string{
 	"I6":  "seeded product kinds read back through head",
 	"I8":  "a second upgrade exits 0 and changes no ledger row",
 	"I9":  "no error lines in head's api and worker logs",
-	"N1":  "head api answers ingest before the upgrade is done",
-	"N2":  "no failed call through the switch (held then answered counts)",
+	"N2":  "every call eventually succeeds (upgrade_in_progress retried per Retry-After)",
+	"N1":  "head's api answers before the upgrade is done",
+	"N7":  "head's api started before its worker never exits before ready (restarts counted)",
+	"N6":  "no call went unanswered (refused, reset, or no release behind the balancer)",
+	"N5":  "ingest never answers a non-2xx, on any attempt",
 	"N3":  "no lost write: every 2xx write visible after settle",
 	"N4":  "queued work drains once head's worker runs",
 	"O1":  "Ops > Upgrades shows the right state",
+	"H3":  "a private organization reads its own trace and dataset through head",
+	"H4":  "objects land only in their tenant's S3: the private bucket holds the private project's, the shared none of them",
+	"H5":  "the shared tenant cannot read the private tenant's trace or dataset",
+	"D1":  "api before worker: a read meets 503 upgrade_in_progress with Retry-After and succeeds on retry",
+	"D2":  "head's worker killed mid-upgrade and restarted: the upgrade still completes",
+	"D3":  "a failed background step retried from Ops > Upgrades runs again to done",
 }
 
 // Summarize folds the calls by kind and by phase; visible holds each write id seen after settle.
@@ -141,6 +155,13 @@ func Summarize(calls []Call, timeline []PhaseChange, visible map[string]bool) ([
 func (summary *KindSummary) add(call Call, visible map[string]bool) {
 	summary.Sent++
 	summary.MaxLatency = max(summary.MaxLatency, call.Latency)
+	summary.UpgradeInProgress += call.UpgradeInProgress
+	summary.Retries += call.Retries
+	summary.MaxRetryWindowMs = max(summary.MaxRetryWindowMs, call.RetryWindowMs)
+	summary.NonOK += call.NonOK
+	if call.Status == 0 {
+		summary.NonOK++
+	}
 	if !call.ok() {
 		summary.Failed++
 		summary.FirstError = firstOf(summary.FirstError, fmt.Sprintf("%s at %d ms: %.200s", statusName(call), call.AtMs, call.Error))
@@ -175,9 +196,10 @@ func (report *Report) Markdown() string {
 	for _, each := range report.Verdicts {
 		fmt.Fprintf(&text, "| %s | %s | %s | %s |\n", each.ID, each.Name, each.Result, strings.ReplaceAll(each.Detail, "|", "/"))
 	}
-	text.WriteString("\n| Kind | Sent | 2xx | Failed | Visible | Lost | Max latency ms |\n| --- | --- | --- | --- | --- | --- | --- |\n")
+	text.WriteString("\n| Kind | Sent | 2xx (final) | Failed | Visible | Lost | Non-2xx seen | upgrade_in_progress | Retries | Max retry window ms | Max latency ms |\n|" + strings.Repeat(" --- |", 11) + "\n")
 	for _, each := range report.Traffic {
-		fmt.Fprintf(&text, "| %s | %d | %d | %d | %s | %s | %d |\n", each.Kind, each.Sent, each.OK, each.Failed, writeCell(each, each.Visible), writeCell(each, each.Lost), each.MaxLatency)
+		fmt.Fprintf(&text, "| %s | %d | %d | %d | %s | %s | %d | %d | %d | %d | %d |\n", each.Kind, each.Sent, each.OK, each.Failed,
+			writeCell(each, each.Visible), writeCell(each, each.Lost), each.NonOK, each.UpgradeInProgress, each.Retries, each.MaxRetryWindowMs, each.MaxLatency)
 	}
 	report.writeTimeline(&text)
 	fmt.Fprintf(&text, "\nMarks (ms from start): %v\n\nQueue: baseline %d, peak %d at %d ms, drained %d ms after head's worker started\n\n",

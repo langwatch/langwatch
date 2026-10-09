@@ -42,7 +42,7 @@ export function restTestAuthorization({
   permits = () => true,
 }: {
   permits?: (permission: Parameters<Authorize["getDecision"]>[0]["permission"]) => boolean;
-} = {}): Readonly<{ forRequest(request: Request): Authorize }> {
+} = {}): Readonly<{ forRequest(): Authorize }> {
   return {
     forRequest: () => ({
       ...testAuthorizeDefaults,

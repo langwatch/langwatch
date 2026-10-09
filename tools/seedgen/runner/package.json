@@ -1,0 +1,32 @@
+{
+  "name": "@langwatch/seedgen-runner",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The seed:apply task plugin: applies seedgen's NDJSON actions through installed module Apis in the tasks process.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/data-retention-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/log-contract": "workspace:*",
+    "@langwatch/metric-contract": "workspace:*",
+    "@langwatch/process": "workspace:*",
+    "@langwatch/task": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@langwatch/test-harness": "workspace:*",
+    "@langwatch/vitest-config": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

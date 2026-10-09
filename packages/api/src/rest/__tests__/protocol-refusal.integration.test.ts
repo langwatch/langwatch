@@ -8,6 +8,7 @@ import { moduleApi } from "@langwatch/module";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import { authorizationPort } from "../../__tests__/api-double.ts";
 import { anyAuthenticated } from "../../access/access.ts";
 import type { RestIdentity } from "../../hosting/api-door.ts";
 import { MANAGEMENT_API_VERSION } from "../addressing.ts";
@@ -152,6 +153,7 @@ function mounted() {
   };
 
   const host = RestHost.create({
+    authz: authorizationPort.forRequest(),
     identities: {
       project: closed,
       organization: closed,

@@ -10,6 +10,7 @@ import { memoryStores } from "@langwatch/process-stores";
  * @see modules/stored-object/specs/stored-object-file-routes.feature
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
 import { MemoryStoredObjectSealRepository } from "../../repositories/memory/memory.stored-object-seal.repository.ts";
@@ -67,6 +68,7 @@ function restHost(): RestHost {
   const closed = BearerIdentity.create({ name: "unconfigured", token: undefined });
 
   return RestHost.create({
+    authz: restTestAuthorization().forRequest(),
     identities: {
       project: projectDoor,
       organization: closed,

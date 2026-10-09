@@ -40,7 +40,7 @@ import {
   type DeclaredAuthzMiddleware,
   type EnforcedScopeFields,
 } from "../access/declared-middleware.ts";
-import { DatabaseBusyError, isDatabaseBusy } from "../errors.ts";
+import { promoteStoreFailure } from "../errors.ts";
 import type { RateLimiter } from "../ports.ts";
 import {
   auditScopeIds,
@@ -852,7 +852,7 @@ function promotedTrpcErrors({
   cause: unknown;
   translate: (cause: unknown) => { code: TRPCError["code"]; message: string } | null | undefined;
 }): TRPCError[] {
-  const cause = isDatabaseBusy(raised) ? new DatabaseBusyError() : raised;
+  const cause = promoteStoreFailure(raised);
 
   if (HandledError.isHandled(cause)) {
     return [

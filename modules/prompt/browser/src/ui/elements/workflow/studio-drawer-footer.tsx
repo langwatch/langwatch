@@ -5,14 +5,14 @@ import { type ReactNode, useEffect } from "react";
 type DrawerFooterSlot = { register: (footer: ReactNode) => void };
 
 /** Where no studio drawer is open, a registered footer has nowhere to render. */
-const drawerFooterSlot = readSlice<DrawerFooterSlot>({
+const useDrawerFooterSlot = readSlice<DrawerFooterSlot>({
   name: WORKFLOW_DRAWER_FOOTER_SLICE,
   absent: { register: () => void 0 },
 });
 
 /** Lets drawer content register actions in the studio drawer's footer slice. */
 export function useRegisterDrawerFooter(footer: ReactNode): void {
-  const register = drawerFooterSlot((state) => state.register);
+  const register = useDrawerFooterSlot((state) => state.register);
   useEffect(() => {
     if (footer === null) return;
     register(footer);

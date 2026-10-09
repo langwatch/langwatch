@@ -8,6 +8,7 @@ import type {
 } from "@langwatch/langy-contract";
 /** @see specs/langy/langy-api-key-turns.feature */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
 import { langyTurnsRest } from "../langy-turns.rest.ts";
@@ -49,7 +50,10 @@ function buildApi(options: {
       options.settle ? options.settle(input) : { kind: "stopped" },
   });
 
-  const hono = createRestRuntime({ identity: { authenticate } }).mount(langyTurnsRest.router(), {
+  const hono = createRestRuntime({
+    authorization: restTestAuthorization(),
+    identity: { authenticate },
+  }).mount(langyTurnsRest.router(), {
     app: () => app,
     onError: (error, context) => canonicalErrorResponse(error, context),
   });

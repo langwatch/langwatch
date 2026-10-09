@@ -142,6 +142,7 @@ describe("automation's peer subscribers", () => {
           status: "processed",
           traceId: "trace-1",
           occurredAt: NOW,
+          createdAt: NOW,
         },
       };
       expect(calls).toEqual([expected, expected]);
@@ -379,6 +380,7 @@ describe("AutomationEvaluationSubscriberService", () => {
         evaluationId: "eval-1",
         status: "processed",
         occurredAt: NOW,
+        createdAt: NOW,
       });
 
       expect(findRunByEvaluationId).toHaveBeenCalledWith({
@@ -388,6 +390,40 @@ describe("AutomationEvaluationSubscriberService", () => {
       expect(sent.map(({ triggerId, traceId }) => [triggerId, traceId])).toEqual([
         ["trigger-2", "trace-1"],
       ]);
+    });
+  });
+
+  describe("given an evaluation dated by its span end", () => {
+    const HOUR = 60 * 60 * 1000;
+
+    /** @scenario "An evaluation settled late still matches, judged stale by its processing time" */
+    it("matches when the span ended over an hour ago but the event was created now", async () => {
+      const { reactions, sent } = service({ runTraceId: "trace-1" });
+
+      await reactions.handleEvaluationSettled({
+        projectId: "project-1",
+        evaluationId: "eval-1",
+        status: "processed",
+        occurredAt: NOW - 2 * HOUR,
+        createdAt: NOW,
+      });
+
+      expect(sent.map(({ traceId }) => traceId)).toEqual(["trace-1"]);
+    });
+
+    /** @scenario "An evaluation settled late still matches, judged stale by its processing time" */
+    it("records nothing when the event itself was created over an hour ago", async () => {
+      const { reactions, sent } = service({ runTraceId: "trace-1" });
+
+      await reactions.handleEvaluationSettled({
+        projectId: "project-1",
+        evaluationId: "eval-1",
+        status: "processed",
+        occurredAt: NOW,
+        createdAt: NOW - 2 * HOUR,
+      });
+
+      expect(sent).toEqual([]);
     });
   });
 });

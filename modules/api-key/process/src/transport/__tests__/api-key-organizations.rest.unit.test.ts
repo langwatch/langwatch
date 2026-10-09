@@ -17,6 +17,7 @@ import {
 } from "@langwatch/organization-contract";
 import { LocalFeatureApis } from "@langwatch/process";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { nowInstant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
@@ -86,6 +87,7 @@ function mount({ failKeys = 0 }: { failKeys?: number } = {}) {
   apis.ready();
 
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       identify: ({ request }) => {
         const presented = request.headers.get("Authorization");

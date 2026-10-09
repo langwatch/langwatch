@@ -46,18 +46,19 @@ export class SecretsResolver {
 
   seal(): void {
     this.#sealed = true;
+    this.chain.forget();
   }
 
   /**
-   * Fails the boot at second zero with the whole shopping list, instead of at
-   * the Nth module's constructor. Answers are fetched to test and dropped.
+   * Fails the boot at second zero with the whole shopping list. Every single
+   * id is fetched at once, so 1Password reads in parallel and holds until seal.
    */
   async preflight(declared: readonly SecretHandle<unknown>[]): Promise<void> {
-    const required = [
-      ...new Set(declared.filter((h) => !h.optional && !h.family).map((h) => h.id)),
-    ];
-    const answers = await Promise.all(required.map((id) => this.chain.fetch(id)));
-    const missing = required.filter((_, index) => answers[index] === undefined);
+    const singles = declared.filter((h) => !h.family);
+    const ids = [...new Set(singles.map((h) => h.id))];
+    const answers = await Promise.all(ids.map((id) => this.chain.fetch(id)));
+    const required = new Set(singles.filter((h) => !h.optional).map((h) => h.id));
+    const missing = ids.filter((id, index) => required.has(id) && answers[index] === undefined);
 
     if (missing.length > 0) throw new SecretsPreflightError(missing);
   }

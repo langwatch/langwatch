@@ -133,6 +133,15 @@ export abstract class ConnectedBillingRepository {
     organizationId: string;
     accountId: string | null;
   }): Promise<ConnectedSeatChangeRecord[]>;
+  /**
+   * Names the organization, from its account, on up to `limit` seat changes after `after` (by
+   * license row) that name none; a dry run writes nothing. Answers the count and the last row read.
+   */
+  abstract fillSeatChangeOrganizations(input: {
+    after: string | null;
+    limit: number;
+    dryRun: boolean;
+  }): Promise<{ filled: number; lastLicenseRowId: string | null }>;
   abstract addInvoice(accountId: string, invoice: ConnectedInvoiceRecord): Promise<void>;
   /** The accounts of these organizations; one without an account is left out. */
   abstract findAccountsForOrganizations(

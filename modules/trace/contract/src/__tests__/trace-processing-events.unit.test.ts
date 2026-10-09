@@ -4,6 +4,7 @@ import {
   tenantIdSchema,
   isSpanReceivedEvent,
   isTopicAssignedEvent,
+  metricDataPointCorrelatedEventSchema,
   parseSpanReferencedPayload,
   topicAssignedEventDataSchema,
   topicAssignedEventSchema,
@@ -45,6 +46,41 @@ describe("events schemas", () => {
             type: "lw.obs.trace.span_received",
           }),
         ).toBeNull();
+      });
+    });
+  });
+
+  describe("metricDataPointCorrelatedEventSchema()", () => {
+    describe("when main queued the event with no metadata field", () => {
+      /** Literals as main's createEvent wrote them: an empty metadata object is dropped. */
+      const mainQueuedJob = () => ({
+        id: "event_main_queued",
+        version: "2026-07-15",
+        aggregateId: "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
+        aggregateType: "trace",
+        tenantId: "project_1",
+        createdAt: 1_000,
+        occurredAt: 1_000,
+        type: "lw.obs.trace.metric_data_point_correlated",
+        data: {
+          traceId: "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
+          spanId: "0011223344556677",
+          pointId: "a".repeat(64),
+          seriesId: "b".repeat(64),
+          metricName: "gen_ai.client.token.usage",
+          metricUnit: "{token}",
+          metricKind: "histogram",
+          exemplarValue: 12,
+          exemplarTimeUnixMs: 1_000,
+        },
+        idempotencyKey: "project_1:point",
+      });
+
+      /** @scenario "A trace fold job main queued without event metadata parses on this worker" */
+      it("parses it unchanged", () => {
+        expect(metricDataPointCorrelatedEventSchema.parse(mainQueuedJob())).toEqual(
+          mainQueuedJob(),
+        );
       });
     });
   });
@@ -156,7 +192,7 @@ describe("events schemas", () => {
 
       expect(result.success).toBe(true);
       if (!result.success) throw new Error("unreachable: asserted above");
-      expect(result.data.metadata.processingTraceparent).toBe("00-abc123-def456-01");
+      expect(result.data.metadata?.processingTraceparent).toBe("00-abc123-def456-01");
     });
   });
 

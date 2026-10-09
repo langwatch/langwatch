@@ -9,11 +9,10 @@ import { TRPCError } from "@trpc/server";
 
 import { credentialClassFor, handlerManagedAuth } from "../access-policy.ts";
 import {
-  DatabaseBusyError,
-  isDatabaseBusy,
   LiveStreamCrossSiteBlockedError,
   LiveStreamNotFoundError,
   LiveStreamUnsupportedProcedureError,
+  promoteStoreFailure,
 } from "../errors.ts";
 import { BrowserOriginGuard } from "../policy/browser-origin.ts";
 import { registerRoutePolicy } from "../route-registry.ts";
@@ -319,10 +318,10 @@ function sseErrorFrame(err: unknown): Record<string, unknown> {
   return { type: "error", message: "An unknown error occurred" };
 }
 
-/** The HandledError behind a stream failure, if any; a busy database is the handled 503. */
+/** The HandledError behind a stream failure, if any; a busy or upgrading store is a handled 503. */
 function handledCauseOf(err: unknown): HandledError | undefined {
   const raised = err instanceof TRPCError ? err.cause : err;
-  const candidate = isDatabaseBusy(raised) ? new DatabaseBusyError() : raised;
+  const candidate = promoteStoreFailure(raised);
 
   // isHandled also matches an instance from a second copy of the package,
   // which bare `instanceof` misses — see its brand check.

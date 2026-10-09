@@ -30,7 +30,7 @@ func TestOneGoProcessHostsTheDataPlaneAndTheSimulators(t *testing.T) {
 		if !ok {
 			t.Fatal("no go lane was planned")
 		}
-		if !strings.Contains(goLane.Shell, `args="aigateway nlpgo idpsim mailsim storagesim voicesim llmsim analyticssim outboundsim telemetrysim"`) {
+		if !strings.Contains(goLane.Shell, `args="aigateway nlpgo idpsim mailsim storagesim voicesim llmsim analyticssim outboundsim paymentsim telemetrysim"`) {
 			t.Errorf("go lane runs %q, want the data plane and every simulator", goLane.Shell)
 		}
 		if _, ok := findChild(children, SimsLane); ok {

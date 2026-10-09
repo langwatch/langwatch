@@ -34,6 +34,7 @@ import { ResourceScope } from "@langwatch/process";
 import type { ProjectIdentity, ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import type { WebhookApi } from "@langwatch/webhook-contract";
@@ -142,6 +143,7 @@ async function buildApi(
   const refusals: string[] = [];
 
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: ({ request, permission }) => {
         const presented =

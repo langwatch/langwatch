@@ -26,6 +26,7 @@ import {
 import { Prisma } from "@langwatch/prisma-client/generated";
 // @vitest-environment node
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
@@ -167,6 +168,7 @@ function mountFamily({
     scope: { tier: "project" as const, id: PROJECT_ID },
   });
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: { authenticate: projectDoor, identify: projectDoor },
     doors: { api_key: fakeKeyDoor({ asked, keyHolds }) },
     idempotency,

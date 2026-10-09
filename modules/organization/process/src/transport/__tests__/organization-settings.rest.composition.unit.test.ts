@@ -4,6 +4,7 @@ import {
   createRestRuntime,
   UnauthorizedError,
 } from "@langwatch/api/rest";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 /**
  * @vitest-environment node
  * `/api/organization` profile against the real composed application over the module's own
@@ -57,6 +58,7 @@ async function application() {
     return door();
   };
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       identify: ({ request }) => requireCredential(request),
       authenticate: ({ request }) => requireCredential(request),

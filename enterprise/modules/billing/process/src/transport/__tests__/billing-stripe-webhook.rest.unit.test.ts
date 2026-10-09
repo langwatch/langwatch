@@ -5,6 +5,7 @@
  */
 import { createRestRuntime, canonicalErrorResponse } from "@langwatch/api/rest";
 import type { HandleEventResult } from "@langwatch/enterprise-billing-contract";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import type Stripe from "stripe";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -35,6 +36,7 @@ const handleEvent = vi.fn<StripeWebhookEvents["handleEvent"]>();
 
 function mounted() {
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => {
         throw new Error("The provider callback answers with no credential resolved.");

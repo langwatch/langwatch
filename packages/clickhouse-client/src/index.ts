@@ -23,6 +23,11 @@ export type {
   QueryResult,
 } from "./query.ts";
 export type { ClickHouseQueryClientOptions } from "./client.ts";
+export {
+  CLICKHOUSE_COLUMNS_QUERY,
+  CLICKHOUSE_COLUMNS_REFRESH_MS,
+  ClickHouseColumns,
+} from "./present-columns.ts";
 export { ClickHouseQueryClient } from "./client.ts";
 export {
   ClickHouseConfigService,

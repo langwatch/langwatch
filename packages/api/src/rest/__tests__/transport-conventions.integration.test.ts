@@ -4,6 +4,7 @@ import type { ErrorHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import { authorizationPort } from "../../__tests__/api-double.ts";
 import { RateLimitedError } from "../../errors.ts";
 import { defineRestRouter } from "../declaration.ts";
 import { canonicalErrorFor, canonicalErrorResponse } from "../response.ts";
@@ -98,6 +99,7 @@ function actionsApp({ onError = canonicalErrorResponse }: { onError?: ErrorHandl
   });
 
   const app = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } as const }),
     },

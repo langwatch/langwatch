@@ -6,6 +6,7 @@ import type { AgentApi } from "@langwatch/agent-contract";
  */
 import { createRestRuntime, canonicalErrorResponse } from "@langwatch/api/rest";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
@@ -16,6 +17,7 @@ function buildApi(relayMaxPayloadMb?: number) {
   const framesSpy = vi.fn(async () => ({ accepted: 1 }));
   const app = createApiFixture<AgentApi>({ connectFrames: framesSpy });
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: connectDoor(),
   } as never);
   const hono = new Hono();

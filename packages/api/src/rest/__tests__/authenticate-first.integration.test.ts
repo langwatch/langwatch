@@ -279,7 +279,10 @@ describe("a request authenticated before its body is parsed", () => {
         publicBaseUrl: "https://app.example",
       });
 
-      const hono = createRestRuntime({ identity }).mount(drafts.router(), {
+      const hono = createRestRuntime({
+        authorization: authorizationPort,
+        identity,
+      }).mount(drafts.router(), {
         app: () => api,
         onError: createErrorHandler(),
       });

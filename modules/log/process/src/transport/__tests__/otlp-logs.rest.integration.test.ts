@@ -7,6 +7,7 @@ import type { OtlpDoorRequest } from "@langwatch/otlp";
  * receiver, and the wire each outcome is written in.
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
 import { otlpLogsRest } from "../otlp-logs.rest.ts";
@@ -27,6 +28,7 @@ function mountedDoor() {
     },
   };
   const host = RestHost.create({
+    authz: restTestAuthorization().forRequest(),
     identities: {
       project: closed,
       organization: closed,

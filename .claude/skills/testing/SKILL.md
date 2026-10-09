@@ -43,6 +43,9 @@ and judging whether a bind proves its scenario (the `spec-binding-review` skill)
 submit")` for given/when instead of a flat test with comments.
 10. **A green package test is not proof of wire compatibility.** For a route, procedure name, input,
     output or status, mount the real router (see below) and diff the served surface against `origin/main`.
+11. **A live stack needs no real credential.** Stripe is paymentsim on every haven and CI stack unless
+    `.env` sets a Stripe key (`paymentsim` skill). Logins and stack credentials are made up by haven:
+    `haven seed --json --reveal` or `haven env --json --reveal`, never 1Password or a real key.
 
 ## Backend: the shapes
 

@@ -31,7 +31,7 @@ Sources, read in this order when a step here is unclear:
             │                                                                                    │
  SEED ──────┼─► STORES ──► OLD RELEASE UP ──► TRAFFIC ──► CUT ──► SWITCH ──► WATCH ──► CHECKS ──┼─► REPORT
  upgradelab │   upgradelab_<cell>   origin/main     API mix +    old worker  head api  holding,   I0..I9, N1..N4,
- seed (today)│   PG + CH (+private) app + worker  ingest, from  paused, jobs first,    hold ≤30 s, H1..H3, O1,    report.md
+ seed (today)│   PG + CH (+private) app + worker  ingest, from  paused, jobs first,    no holds,   H1..H3, O1,    report.md
  seedgen     │   own redis-server   start:prepare  before the   queue       worker    Ops >      logs, browser  report.json
  (planned)   │                      :db            cut to after             runs the  Upgrades   consoles       shots/
             │                                     ready                    upgrade                              │
@@ -183,7 +183,7 @@ The phases the poller records (`report.md` "Api phase" table), from a real run o
 | down                  | 74332   |   <- old stopped, head api not yet answering
 | not-ready             | 90884   |
 | holding:upgrade-gate  | 91333   |
-| holding:holding       | 91833   |   <- Postgres schema step outstanding: requests held ≤30 s, then 503
+| holding:holding       | 91833   |   <- Postgres schema step outstanding: held ≤30 s then 503 (before the no-holds ruling)
 | ready                 | 111857  |
 ```
 
@@ -209,8 +209,8 @@ date**. **Needs attention** means a failed step: Retry is on that page (`ops:man
 | Ruling or check | Pass | Cell id | State |
 | --- | --- | --- | --- |
 | Api up during the upgrade | head api answers from its first second; no `down` beyond process start; `/healthz` in every phase | I0, N1 | ✅ judged |
-| Ingest serves while upgrading | every OTLP, collector and track post answers 2xx; a 503 with Retry-After only inside a Postgres schema phase longer than 30 s | N1, N2 | ✅ judged |
-| Requests held ≤ 30 s in blocking schema steps | no held call over `UPGRADE_HOLD_WINDOW_MS` (30 s, `packages/process/src/lifecycle/liveness-thread.ts:26`); `-hold 35s` counts a longer one as failed | N2 | ✅ judged |
+| Ingest serves while upgrading | every OTLP, collector and track post answers 2xx, or a 503 `upgrade_in_progress` with Retry-After that succeeds on retry | N1, N2 | ✅ judged |
+| No holds | nothing is held; a call that reaches a schema still behind answers 503 `upgrade_in_progress` (Retry-After 10 s) and the client retries; no unanswered call | N2 | ✅ judged |
 | 0 failed calls | `Failed` = 0 for every kind (eventually consistent: a retried 503 that later succeeds is not a failure) | N2 | ✅ |
 | 0 lost writes, 0 dropped traces | `Lost` = 0: every 2xx write is visible after settle | N3 | ✅ |
 | Queued work drains | jobs queued at the cut drain on head's worker | N4 | ✅ |
@@ -309,6 +309,8 @@ haven status --agent          # slug = flows-<name>; app at https://app.flows-<n
   reaches a real provider, the `.env` names `OPENAI_BASE_URL`: remove that line in the worktree's
   `.env`, then `haven down` and `haven up` again.
 - Seed: `haven db seed demo` today; `haven seed --persona <p> --size <n> --days <d>` (planned, SG7).
+- Credentials: none to fetch. Stripe is paymentsim on every haven stack unless `.env` sets a Stripe
+  key; haven makes up the rest, and `haven seed --json --reveal` prints the logins, slugs and keys.
 - **Plug in after upgrade:** point a stack at a kept cell's stores (`-keep`) to prove each flow on
   upgraded data. ❌ There is no haven verb for "use these stores" yet (L9, `haven db snapshot`).
   Until then, run flows on a fresh head stack and on U1's restored snapshot once L6a lands.

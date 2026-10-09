@@ -1,10 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
- * The hosted end of Connect (ADR-156): what a self-hosted license calls on
- * LangWatch Cloud, and what it is answered.
- *
- * Every field an install reads is snake_case, because the gateway relays the
- * answer byte for byte and the install's own SDK reads it.
+ * A connected customer's contract terms and seats, and the hosted usage answer billing still reads
+ * through licensing (ADR-156). Install-facing fields are snake_case: the gateway relays them as is.
  */
 
 import { z } from "zod";
@@ -20,14 +17,6 @@ export interface HostedCaller {
   organizationId: string;
   projectId: string | null;
 }
-
-/** What the gateway sends: the resolved caller, and the caller's own JSON. */
-export const hostedServiceEnvelopeSchema = z.object({
-  virtual_key_id: z.string().min(1),
-  organization_id: z.string().min(1),
-  project_id: z.string(),
-  payload: z.unknown(),
-});
 
 /**
  * What a customer's licenses add up to commercially. The budget spans
@@ -88,38 +77,6 @@ export const hostedUsageAnswerSchema = z.object({
   budgets: z.array(hostedBudgetSchema),
 });
 
-/**
- * One question's answer, as the hosted route relays it. Mirrors the judge's
- * own verdict; this contract may not name instant-eval's shapes.
- */
-const hostedVerdictSchema = z.object({
-  questionId: z.string(),
-  probability: z.number().optional(),
-  score: z.number().optional(),
-  label: z.string().optional(),
-  probabilities: z.record(z.string(), z.number()).optional(),
-});
-
-/**
- * The list price is what the customer is charged and all it is told. What the
- * judge cost LangWatch stays on the spend row.
- */
-export const hostedClassifyAnswerSchema = z.object({
-  verdicts: z.array(hostedVerdictSchema),
-  skipped_reason: z.string().optional(),
-  input_tokens: z.number(),
-  is_text_truncated: z.boolean(),
-  charged_usd: z.number(),
-});
-
-export const hostedCapAnswerSchema = z.object({
-  cap_usd: z.number(),
-  maximum_cap_usd: z.number(),
-});
-
 export type HostedBudgetWire = z.infer<typeof hostedBudgetSchema>;
 export type HostedContractWire = z.infer<typeof hostedContractSchema>;
 export type HostedUsageAnswer = z.infer<typeof hostedUsageAnswerSchema>;
-export type HostedVerdict = z.infer<typeof hostedVerdictSchema>;
-export type HostedClassifyAnswer = z.infer<typeof hostedClassifyAnswerSchema>;
-export type HostedCapAnswer = z.infer<typeof hostedCapAnswerSchema>;

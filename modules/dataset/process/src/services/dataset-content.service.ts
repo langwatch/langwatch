@@ -81,7 +81,7 @@ export class DatasetContentService implements DatasetContent {
     const start = (page - 1) * limit;
     const end = start + limit;
     const records: DatasetRecord[] = [];
-    if (!dataset.chunkCount) {
+    if (dataset.chunkCount === null) {
       throw new DatasetChunkCountMissingError(dataset.id);
     }
     const selected =
@@ -218,7 +218,7 @@ export class DatasetContentService implements DatasetContent {
     limitBytes: number;
   }): Promise<DatasetWithRecords> {
     this.assertReady(dataset);
-    if (!dataset.chunkCount) {
+    if (dataset.chunkCount === null) {
       throw new DatasetChunkCountMissingError(dataset.id);
     }
     if (entrySelection === "all") {
@@ -348,7 +348,7 @@ export class DatasetContentService implements DatasetContent {
     targetProjectId: string;
   }): Promise<void> {
     this.assertReady(source);
-    if (!source.chunkCount) {
+    if (source.chunkCount === null) {
       throw new DatasetChunkCountMissingError(source.id);
     }
     // One chunk in memory at a time, whatever the dataset's size.

@@ -5,6 +5,7 @@
  */
 import { createRestRuntime } from "@langwatch/api/rest";
 import type { MetricApi } from "@langwatch/metric-contract";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
 import { otlpMetricsRest } from "../otlp-metrics.rest.ts";
@@ -23,6 +24,7 @@ function mount() {
     },
   };
   const hono = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => {
         throw new Error("the receiver resolves its own credential");

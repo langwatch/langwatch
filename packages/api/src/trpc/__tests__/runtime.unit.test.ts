@@ -393,6 +393,36 @@ describe("a mounted contract procedure", () => {
       });
     });
   });
+
+  describe("given the code is ahead of a Postgres schema the worker still upgrades", () => {
+    /** @scenario "A Postgres read the schema is not ready for answers upgrade_in_progress" */
+    it.each(["P2021", "P2022", "42P01", "42703"])(
+      "fails %s as the retryable upgrade_in_progress",
+      async (code) => {
+        const { runtime } = harness();
+        const app: ReviewApi = { read: async () => ({ id: "annotation-1", comment: "" }) };
+        const declaration = reviewRouter({
+          getById: async () => {
+            throw Object.assign(new Error("The column `x` does not exist"), { code });
+          },
+        });
+
+        const call = runtime
+          .mount(declaration, () => app)
+          .createCaller({ actor: { id: "reviewer-1" } })
+          .getById({ projectId: "project-1", id: "annotation-1" });
+
+        await expect(call).rejects.toMatchObject({
+          code: "SERVICE_UNAVAILABLE",
+          cause: { code: "upgrade_in_progress", httpStatus: 503, retryable: true },
+        });
+        expect((await onTheWire(call)).data.error).toMatchObject({
+          code: "upgrade_in_progress",
+          meta: { retryAfterMs: 10_000 },
+        });
+      },
+    );
+  });
 });
 
 /** The wire shape a failed call arrives in, through the process's own formatter. */

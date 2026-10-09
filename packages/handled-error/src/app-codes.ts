@@ -814,6 +814,7 @@ export const APP_ERROR_CODES = [
   "unsubscribe_link_invalid",
   "unsubscribe_rate_limited",
   "unsupported_media_type",
+  "upgrade_in_progress",
   "upgrade_invalid_cursor",
   "upgrade_not_found",
   "upgrade_plan_unavailable",

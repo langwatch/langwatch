@@ -14,7 +14,6 @@ import {
   type Heartbeat,
   type LivenessThread,
   type UpgradeConsole,
-  type UpgradeHolding,
 } from "./lifecycle/liveness-thread.ts";
 import { HTTP_CLOSE_PHASE_MS, HTTP_DRAIN_GRACE_MS } from "./lifecycle/shutdown-deadline.ts";
 import { ResourceScope } from "./resource-scope.ts";
@@ -211,22 +210,17 @@ export class Server {
   }
 
   /**
-   * Answers every request but the probes with the upgrade holding page until called with
-   * `undefined`. A door on the main loop has no thread to hold it.
-   * Spec: upgrade-holding-page.feature
+   * Shows a failed first install's console in front of every route but the probes; true on Retry,
+   * false with no thread to show it. Spec: upgrade-holding-page.feature
    */
-  async holdForUpgrade(
-    holding: UpgradeHolding | undefined,
-    held?: readonly string[],
-  ): Promise<void> {
-    // The health routes answer in every phase; given `held`, every other route serves (API-UP).
-    const paths = [...this.healthRoutes.keys()];
-    await this.livenessThread?.hold(holding, held === undefined ? { paths } : { paths, held });
+  async consoleForUpgrade(upgradeConsole: UpgradeConsole): Promise<boolean> {
+    const passThrough = [...this.healthRoutes.keys()];
+    return (await this.livenessThread?.holdConsole({ ...upgradeConsole, passThrough })) ?? false;
   }
 
-  /** Shows a failed upgrade's console; true on Retry, false with no thread to show it. */
-  async consoleForUpgrade(upgradeConsole: UpgradeConsole): Promise<boolean> {
-    return (await this.livenessThread?.holdConsole(upgradeConsole)) ?? false;
+  /** Takes the upgrade console down once the ledger is current. */
+  async liftUpgradeConsole(): Promise<void> {
+    await this.livenessThread?.liftConsole();
   }
 
   private openHealth(): Promise<void> {
@@ -346,8 +340,8 @@ export class Server {
   }
 
   /**
-   * A request the upgrade hold released while the components still start waits for them, so no
-   * handler runs before the runtime it calls into (API-UP); a start that failed answers 503.
+   * A request that arrives while the components still start waits for them, so no handler runs
+   * before the runtime it calls into (API-UP); a start that failed answers 503.
    */
   private async whenStarted(
     application: ApplicationHandler,

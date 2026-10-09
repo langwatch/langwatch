@@ -41,7 +41,10 @@ func runDB(ctx context.Context, d deps, inv invocation) error {
 		if err != nil || !proceed {
 			return err
 		}
-		return d.orch.DBReset(ctx, d.params, dbPresetArg(inv))
+		if err := d.orch.DBReset(ctx, d.params, dbPresetArg(inv)); err != nil {
+			return err
+		}
+		return d.orch.SeedPreset(ctx, d.params, dbPresetArg(inv))
 	case "seed":
 		if inv.has("--yes") {
 			return fmt.Errorf("db seed is non-destructive (an idempotent upsert, nothing dropped) — no confirmation to give")
@@ -49,7 +52,10 @@ func runDB(ctx context.Context, d deps, inv invocation) error {
 		if err := guardSeedEnv(d); err != nil {
 			return err
 		}
-		return d.orch.DBSeed(ctx, d.params, dbPresetArg(inv))
+		if err := d.orch.DBSeed(ctx, d.params, dbPresetArg(inv)); err != nil {
+			return err
+		}
+		return d.orch.SeedPreset(ctx, d.params, dbPresetArg(inv))
 	case "prune":
 		if inv.has("--dry-run") && inv.has("--yes") {
 			return fmt.Errorf("--dry-run and --yes contradict each other")

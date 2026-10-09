@@ -16,6 +16,7 @@ import {
   type EvaluatorApi,
 } from "@langwatch/evaluator-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 
 import { createEvaluatorRest } from "../evaluator.rest.ts";
@@ -57,6 +58,7 @@ function buildApi(overrides: Partial<EvaluatorApi> = {}) {
   });
 
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } as const }),
     },

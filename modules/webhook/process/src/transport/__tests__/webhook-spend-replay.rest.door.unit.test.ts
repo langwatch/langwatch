@@ -8,6 +8,7 @@ import { ProjectMissingCredentialsError } from "@langwatch/api";
 import type { Entitlements } from "@langwatch/api/access";
 import { canonicalErrorResponse, createRestRuntime, ForbiddenError } from "@langwatch/api/rest";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
@@ -43,6 +44,7 @@ function mount({ planIncludesBilling }: { planIncludesBilling: boolean }) {
       ),
   };
   const hono = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: { authenticate: door, identify: door },
     entitlements,
   }).mount(webhookSpendReplayRest.router(), {

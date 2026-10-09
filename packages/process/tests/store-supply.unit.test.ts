@@ -73,7 +73,7 @@ describe("given an installed module that keeps relational state", () => {
         .withSecrets((_, secrets) => secrets.withEnv())
         .start();
       try {
-        await server.container("worker").boot();
+        await server.container("worker").boot({ classifyEventLogRetention: () => "traces" });
 
         expect(built).toEqual(["live"]);
       } finally {
@@ -94,7 +94,7 @@ describe("given an installed module that keeps relational state", () => {
         .withSecrets((_, secrets) => secrets.withEnv())
         .start();
       try {
-        const boot = server.container("worker").boot();
+        const boot = server.container("worker").boot({ classifyEventLogRetention: () => "traces" });
 
         await expect(boot).rejects.toMatchObject({
           name: "MissingMemberError",

@@ -1,5 +1,6 @@
 import type { RestIdentity } from "@langwatch/api/hosting";
 import { RestHost } from "@langwatch/api/rest";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 
 import { processModules } from "../process-modules.generated.ts";
 import { bootApi } from "./api-installation.fixture.ts";
@@ -38,6 +39,7 @@ export async function bootDescribedRest() {
   const { runtime } = await bootApi({
     surface: () => {
       rest = RestHost.create({
+        authz: restTestAuthorization().forRequest(),
         identities: {
           project: closed,
           organization: closed,

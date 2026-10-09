@@ -18,6 +18,7 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { createOpsTestApp } from "../../app/__tests__/ops.fixture.ts";
@@ -96,6 +97,7 @@ describe.skipIf(!DB_URL)("bug reports intake", () => {
   function mountApp(options: { apiKeys?: ApiKeyApi } = {}) {
     const app = opsApp(options);
     const runtime = createRestRuntime({
+      authorization: restTestAuthorization(),
       identity: {
         authenticate: () => {
           throw new Error("The intake resolves its own credential.");

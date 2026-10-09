@@ -32,10 +32,10 @@ export class HttpBillingChannels {
     const webhooks = await secrets.into(billingSecrets.stripeWebhookSecret, (signingSecret) =>
       HttpStripeWebhooksChannel.create({ signingSecret }),
     );
-    const { nodeEnvironment } = config;
+    const { nodeEnvironment, stripeApiBase: apiBase } = config;
     const stripe = await secrets.into(billingSecrets.stripeSecretKey, (secretKey) =>
       secretKey
-        ? { webhooks, ...composeHttpBillingStripe({ secretKey, nodeEnvironment }) }
+        ? { webhooks, ...composeHttpBillingStripe({ secretKey, nodeEnvironment, apiBase }) }
         : void 0,
     );
     return {

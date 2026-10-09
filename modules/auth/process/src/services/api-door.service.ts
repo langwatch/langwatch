@@ -8,13 +8,14 @@ import type {
 } from "@langwatch/api/hosting";
 import {
   ForbiddenError,
+  OWNERLESS_PROJECT_KEY_PROOF_CODE_PATH,
   recordKeyCredential,
   recordOrganizationCredential,
   recordProjectCredential,
 } from "@langwatch/api/rest";
 import { recordAuditLogCommandSchema, type AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
-import type { Actor, Authorization } from "@langwatch/authorization";
+import { PermissionDeniedError, type Actor, type Authorization } from "@langwatch/authorization";
 import {
   AuthzScopeNotFoundError,
   type AuthzApi,
@@ -60,7 +61,7 @@ export type ApiDoorPeers = Readonly<{
     "getDecision" | "getProjectAnyDecision" | "checkScopeLineage" | "getSessionVersion"
   > &
     ApiRestCredentialPeers["authz"] &
-    Pick<AuthzApi, "getScope" | "can" | "authorize">;
+    Pick<AuthzApi, "getScope" | "can" | "authorize" | "authorizeInternal">;
   organizations: Pick<
     OrganizationApi,
     "getSettings" | "getOrganizationIdByTeamId" | "findPersonalTeamOwners"
@@ -158,11 +159,14 @@ export class ApiDoorService {
     purpose,
   }: Parameters<NonNullable<ApiDoor["authz"]["authorization"]>>[0]): Promise<Authorization> {
     const { authz } = this.#peers;
+    if (actor.type === "internal" && actor.codePath === OWNERLESS_PROJECT_KEY_PROOF_CODE_PATH) {
+      return authz.authorizeInternal({ actor, projectId, permission, purpose });
+    }
     const scope = await authz.getScope({ projectId });
     if (scope.type !== "project") throw new Error(`${projectId} resolved to no project`);
 
     const { authorization } = await authz.authorize({
-      principal: proofPrincipalOf(actor),
+      principal: proofPrincipalOf({ actor, permission, projectId }),
       permission,
       scope,
       proof: { actor, purpose },
@@ -482,8 +486,23 @@ function ownedCaller({
 }
 
 /** Whom a door-minted proof is asked for: the person (impersonated, as decided) or the key. */
-function proofPrincipalOf(actor: Actor): AuthzPrincipalRef {
+function proofPrincipalOf({
+  actor,
+  permission,
+  projectId,
+}: {
+  actor: Actor;
+  permission: string;
+  projectId: string;
+}): AuthzPrincipalRef {
   if (actor.type === "user") return { type: "user", id: actor.id };
   if (actor.type === "api_key") return { type: "apiKey", id: actor.id };
+  if (actor.type === "system") {
+    throw new PermissionDeniedError({
+      permission,
+      scope: { type: "project", id: projectId },
+      denialReason: "no-grant",
+    });
+  }
   throw new Error(`a ${actor.type} actor reached a door that mints a route proof`);
 }

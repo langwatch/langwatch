@@ -13,6 +13,7 @@ import {
 } from "@langwatch/api/rest";
 import type { Experiment, ExperimentApi } from "@langwatch/experiment-contract";
 import { HandledError } from "@langwatch/handled-error";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 
 import { experimentInitRest } from "../experiment-init.rest.ts";
@@ -77,6 +78,7 @@ function mountInit({
   const app = stubExperimentApi(stubs);
 
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: ({ request, permission }) => {
         const presented = request.headers.get("Authorization");

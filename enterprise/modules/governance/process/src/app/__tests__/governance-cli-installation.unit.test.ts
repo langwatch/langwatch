@@ -5,6 +5,7 @@ import { BearerIdentity, RestHost } from "@langwatch/api/rest";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
 import type { ScimApi } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
@@ -23,6 +24,7 @@ import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
  * @vitest-environment node
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import type { WebhookApi } from "@langwatch/webhook-contract";
@@ -53,6 +55,7 @@ const MAIN_CLI_ROUTES = [
 function restHost() {
   const closed = BearerIdentity.create({ name: "unconfigured", token: void 0 });
   return RestHost.create({
+    authz: restTestAuthorization().forRequest(),
     identities: {
       project: closed,
       organization: closed,
@@ -76,6 +79,7 @@ async function boot(rest: RestHost) {
     .withStores(memoryStores())
     .expose(() => ({ hosts: { rest, trpc: { mount: () => ({}) } }, serve: () => undefined }))
     .provide({
+      "data-retention": createApiFixture<DataRetentionApi>({}),
       webhook: createApiFixture<WebhookApi>(),
       agent: createApiFixture<AgentApi>(),
       project: createApiFixture<ProjectApi>(),

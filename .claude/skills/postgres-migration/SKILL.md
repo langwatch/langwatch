@@ -58,8 +58,11 @@ folder into a release manifest (`packages/upgrade/releases/<release>.json`); you
 
 Every finding prints its own fix. Source: `packages/prisma-client/src/__tests__/migration-safety.rules.ts`.
 A table created in the same migration is empty, so the locking rules leave it alone. The last four
-rows keep the api serving through the upgrade (Alex, 2026-10-09); migrations in the LTS floor's tag are
-history they skip, and the ones above it they still name are listed in the test for a fix.
+rows keep the api serving through the upgrade (Alex, 2026-10-09). Migrations in the newest `langwatch@v*`
+tag are history they skip; the test reads that tag from git and fails with the fetch command in a clone
+without tags (`git fetch --tags origin`). Above it there is no allow-list: fix the migration. An unreleased
+folder may be rewritten (one `ALTER` per table per migration, new keys for the rest); one merged on main
+is never edited and goes in `migration-safety.from-main.txt` instead.
 
 | Rule                                               | Refuses                                                                            | Write instead                                                                                                   |
 | -------------------------------------------------- | ---------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |

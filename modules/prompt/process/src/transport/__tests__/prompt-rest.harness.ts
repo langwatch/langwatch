@@ -9,6 +9,7 @@ import { ScopedSecrets } from "@langwatch/secrets";
  * two facts the process resolves bound to fixed answers.
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
 import { PromptModule } from "#app/prompt.app";
@@ -54,6 +55,7 @@ export function mountPromptRest(options: {
   const organizationId = options.organizationId ?? PROMPT_TEST_ORGANIZATION;
 
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({
         actor: { type: "api_key", id: "api_key_1" },

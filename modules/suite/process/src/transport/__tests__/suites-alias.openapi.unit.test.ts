@@ -6,6 +6,7 @@
 import type { RestIdentity } from "@langwatch/api/hosting";
 import { buildOpenApiDocument } from "@langwatch/api/hosting";
 import { RestHost, type RestTransportDeclaration } from "@langwatch/api/rest";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
@@ -43,6 +44,7 @@ async function generate(): Promise<Document> {
   }
 
   const rest = RestHost.create({
+    authz: restTestAuthorization().forRequest(),
     identities: {
       project: closed,
       organization: closed,

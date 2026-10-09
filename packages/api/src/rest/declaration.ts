@@ -40,7 +40,6 @@ import {
 } from "../access/input-permission.ts";
 import { PayloadTooLargeError } from "../errors.ts";
 import type { ApiHandlerArguments } from "../handler-arguments.ts";
-import { assertHoldReason, type UpgradeHoldReason } from "../route-registry.ts";
 import {
   assertAddressingOptions,
   assertVersionLabel,
@@ -522,8 +521,6 @@ export type RestTransportRoute<Api> = Readonly<{
   readonly operation: string;
   readonly version: DateVersion;
   readonly docs?: RestTransportDocs;
-  /** Held before the door until the ledger is current; every other route serves (API-UP). */
-  readonly holdsWhileUpgrading?: UpgradeHoldReason;
   readonly params?: z.ZodObject;
   readonly input?: SourceSchema;
   /** Present exactly when the body is a JSON array: `input` is then `{ [as]: schema }`. */
@@ -619,7 +616,6 @@ export type RestArrayBodyDeclared = Readonly<{ as: string; schema: z.ZodArray }>
 
 /** Everything a route has declared so far, before `handle` freezes it. */
 type RouteState = Readonly<{
-  holdsWhileUpgrading?: UpgradeHoldReason;
   params?: z.ZodObject;
   input?: SourceSchema;
   arrayBody?: RestArrayBodyDeclared;
@@ -1174,18 +1170,6 @@ class RouteBuilder<Api, S extends RouteShape> {
     });
   }
 
-  /** Every route serves while upgrading; this one holds until the ledger is current (API-UP). */
-  holdsWhileUpgrading(reason: UpgradeHoldReason): RouteBuilder<Api, S> {
-    assertHoldReason({ address: `${this.method.toUpperCase()} ${this.path}`, reason });
-    return new RouteBuilder<Api, S>({
-      router: this.router,
-      method: this.method,
-      path: this.path,
-      operation: this.operation,
-      state: { ...this.state, holdsWhileUpgrading: { because: reason.because } },
-    });
-  }
-
   withDocs(docs: RestTransportDocs): RouteBuilder<Api, S> {
     return new RouteBuilder<Api, S>({
       router: this.router,
@@ -1658,12 +1642,11 @@ function declaredParts(state: RouteState): Partial<RestTransportRoute<unknown>> 
   };
 }
 
-/** What the door reads of a route beyond its permission: gates, credential, audit, upgrading. */
+/** What the door reads of a route beyond its permission: gates, credential, audit. */
 function doorParts(state: RouteState): Partial<RestTransportRoute<unknown>> {
   return {
     ...(state.entitlement ? { entitlement: state.entitlement } : {}),
     ...(state.mintsCredential ? { mintsCredential: state.mintsCredential } : {}),
-    ...(state.holdsWhileUpgrading ? { holdsWhileUpgrading: state.holdsWhileUpgrading } : {}),
     ...(state.credential ? { credential: state.credential } : {}),
     ...(state.key ? { key: state.key } : {}),
     ...(state.keyKinds ? { keyKinds: state.keyKinds } : {}),

@@ -19,6 +19,7 @@ import type { ResourceOwnership } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { type SimulationService } from "@langwatch/scenario-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 
@@ -131,6 +132,7 @@ export function createScenarioRestTestRuntime(
   } = {},
 ) {
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => {
         if (options.authenticated === false) {

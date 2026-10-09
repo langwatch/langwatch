@@ -10,8 +10,13 @@ import { defineAggregate } from "../../domain/definitions.ts";
 import { createTenantId } from "../../domain/tenantId.ts";
 import type { Event } from "../../domain/types.ts";
 import { EventSourcing } from "../../eventSourcing.ts";
+import { pipelineRetentionOf } from "../../pipeline/sealedPipeline.ts";
 import { definePipeline } from "../../pipeline/staticBuilder.ts";
 import type { RetentionPolicy, RetentionPolicyResolver } from "../../runtime.types.ts";
+import { EventingClickHouseEventRepository } from "../../server/adapters/clickhouse/event-repository.clickhouse.ts";
+import { EventingClickHouseEventStore } from "../../server/adapters/clickhouse/event-store.clickhouse.ts";
+import type { EventingClickHouseClient } from "../../server/clickhouse-client-resolver.ts";
+import { createEventingRetentionConfiguration } from "../../server/eventing-server-runtime.ts";
 import {
   createMockAppendStore,
   createMockEventStore,
@@ -154,6 +159,40 @@ describe("a pipeline's declared retention", () => {
         .catch(() => undefined);
 
       expect(store.append).not.toHaveBeenCalled();
+      await eventSourcing.close();
+    });
+  });
+
+  describe("given an event store that reads each row's pipeline retention at append", () => {
+    /** @scenario "An event_log row takes the tenant's retention from its own pipeline's resolver" */
+    it("stamps a trace event row with the tenant's 90-day traces policy", async () => {
+      const insert = vi.fn<EventingClickHouseClient["insert"]>().mockResolvedValue(undefined);
+      const client: EventingClickHouseClient = { query: vi.fn(), insert };
+      const retention = createEventingRetentionConfiguration({ defaultRetentionDays: 49 });
+      const resolve = vi.fn(async () => ({ traces: 90, scenarios: 30, experiments: 30 }));
+      const { definition } = pipelineWith({ resolve });
+      const eventStore = EventingClickHouseEventStore.create({
+        repository: EventingClickHouseEventRepository.create({
+          resolveClient: async () => client,
+          retention,
+        }),
+        retention,
+        retentionPolicyFor: (aggregateType) =>
+          pipelineRetentionOf({ definitions: eventSourcing.definitions, aggregateType }),
+        classifyEventLogRetention: () => "traces",
+      });
+      const eventSourcing = EventSourcing.createForTesting({ eventStore });
+      const pipeline = eventSourcing.register(definition);
+
+      await pipeline.service.storeEvents([eventFor("project-90")], {
+        tenantId: createTenantId("project-90"),
+      });
+
+      const eventLogRows = insert.mock.calls
+        .filter(([request]) => request.table === "event_log")
+        .flatMap(([request]) => request.values as { _retention_days: number }[]);
+      expect(eventLogRows.map((row) => row._retention_days)).toEqual([90]);
+      expect(resolve).toHaveBeenCalledWith("project-90");
       await eventSourcing.close();
     });
   });

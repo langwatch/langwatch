@@ -753,7 +753,10 @@ function rolesApp(
 ): { app: Hono; authenticate: ReturnType<typeof vi.fn> } {
   const authenticate = vi.fn(() => ({ actor: null, scope }));
 
-  const runtime = createRestRuntime({ identity: { authenticate } });
+  const runtime = createRestRuntime({
+    authorization: authorizationPort,
+    identity: { authenticate },
+  });
 
   const app = runtime.mount(roles.router(), {
     app: () => roleApplication,

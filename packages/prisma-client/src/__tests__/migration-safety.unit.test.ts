@@ -1,5 +1,7 @@
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -39,16 +41,44 @@ const BASELINE_FROZEN_AT = "20261006170505_project_active_day";
  */
 const NEW_RULES_FROM = "20261006170527_data_privacy_project_scope";
 
-/** The newest migration in langwatch@v3.20.1, the LTS floor: history the graceful rules skip. */
-const FLOOR_HISTORY_THROUGH = "20261001120000_sso_provider_entra_issuer_trailing_slash";
+/** The newest migration in the newest `langwatch@v*` tag: history the graceful rules skip. */
+function newestReleasedMigration({ cwd }: { cwd: string }): string {
+  const git = (args: string[]) =>
+    execFileSync("git", args, {
+      cwd,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      // A release tag lists every file it holds: about 2 MB today.
+      maxBuffer: 64 * 1024 * 1024,
+    });
+  let cause: unknown;
+  try {
+    const tag = git(["tag", "--list", "langwatch@v*", "--sort=-v:refname"])
+      .split("\n")
+      .find((name) => /^langwatch@v\d+\.\d+\.\d+$/.test(name));
+    const paths = tag ? git(["ls-tree", "-r", "--full-tree", "--name-only", tag]) : "";
+    const newest = paths
+      .split("\n")
+      .flatMap(
+        (path) =>
+          /(?:^|\/)prisma\/migrations\/(\d{14}_[^/]+)\/migration\.sql$/.exec(path)?.[1] ?? [],
+      )
+      .toSorted()
+      .at(-1);
+    if (newest) return newest;
+  } catch (error) {
+    // Not a clone, or git is missing: the same answer as a clone without tags, cause kept.
+    cause = error;
+  }
+  throw new Error(
+    "No langwatch@v* release tag with Prisma migrations in this clone, so released migrations " +
+      "cannot be told from new ones. Fetch the tags: git fetch --tags origin (CI: " +
+      "git fetch --depth=1 origin '+refs/tags/langwatch@v*:refs/tags/langwatch@v*').",
+    { cause },
+  );
+}
 
-/** Graceful-rule findings above the floor, listed for a fix (2026-10-09); never add to it. */
-const OPEN_FINDINGS: readonly string[] = [
-  "20261001120001_organization_instant_evals_opt_in several-alters-on-one-table",
-  "20261006170507_virtual_key_license_facts several-alters-on-one-table",
-  "20261006170511_connected_seat_change_not_onboarded inline-dml-on-existing-table",
-  "20261006170511_connected_seat_change_not_onboarded several-alters-on-one-table",
-];
+const RELEASED_THROUGH = newestReleasedMigration({ cwd: import.meta.dirname });
 
 const baseline = parseBaseline(
   readFileSync(resolve(import.meta.dirname, "migration-safety.baseline.txt"), "utf8"),
@@ -93,10 +123,7 @@ const unshipped = migrations.filter(
 function scanTree(migration: MigrationSource) {
   return scanPostgresMigration({ ...migration, floor: treeFloor })
     .filter((finding) => migration.name > NEW_RULES_FROM || !FLOOR_AND_LOCK_RULES.has(finding.rule))
-    .filter(
-      (finding) => migration.name > FLOOR_HISTORY_THROUGH || !GRACEFUL_RULES.has(finding.rule),
-    )
-    .filter((finding) => !OPEN_FINDINGS.includes(`${finding.migration} ${finding.rule}`));
+    .filter((finding) => migration.name > RELEASED_THROUGH || !GRACEFUL_RULES.has(finding.rule));
 }
 
 const scanWith = (sql: string, floor: string) =>
@@ -409,11 +436,11 @@ describe("Postgres migration safety", () => {
     });
   });
 
-  describe("given the floor history and the open findings", () => {
+  describe("given the released history", () => {
     /** @scenario "Floor history answers only to the older rules" */
-    it("skips the graceful rules up to the floor's newest migration, which is on disk", () => {
-      expect(migrations.map((migration) => migration.name)).toContain(FLOOR_HISTORY_THROUGH);
-      const history = migrations.filter((migration) => migration.name <= FLOOR_HISTORY_THROUGH);
+    it("skips the graceful rules up to the newest release tag's newest migration, which is on disk", () => {
+      expect(migrations.map((migration) => migration.name)).toContain(RELEASED_THROUGH);
+      const history = migrations.filter((migration) => migration.name <= RELEASED_THROUGH);
       const graceful = history.flatMap((migration) =>
         scanPostgresMigration({ ...migration, floor: treeFloor }).filter((finding) =>
           GRACEFUL_RULES.has(finding.rule),
@@ -425,14 +452,14 @@ describe("Postgres migration safety", () => {
       ).toEqual([]);
     });
 
-    /** @scenario "Every open finding still occurs, so a fixed one leaves the list" */
-    it("names only findings the scan still reports", () => {
-      const found = migrations.flatMap((migration) =>
-        scanPostgresMigration({ ...migration, floor: treeFloor }).map(
-          (finding) => `${finding.migration} ${finding.rule}`,
-        ),
-      );
-      expect(OPEN_FINDINGS.filter((entry) => !found.includes(entry))).toEqual([]);
+    /** @scenario "A clone without release tags fails the guard with the command that fetches them" */
+    it("refuses to guess the released history where no release tag is readable", () => {
+      const bare = mkdtempSync(resolve(tmpdir(), "migration-safety-no-tags-"));
+      try {
+        expect(() => newestReleasedMigration({ cwd: bare })).toThrow(/git fetch --tags origin/);
+      } finally {
+        rmSync(bare, { recursive: true, force: true });
+      }
     });
   });
 

@@ -5,6 +5,7 @@
 import { moduleApi } from "@langwatch/module";
 import { describe, expect, it } from "vitest";
 
+import { authorizationPort } from "../../__tests__/api-double.ts";
 import { createErrorHandler } from "../../errors.ts";
 import { CliTokenIdentity } from "../cli-token-identity.ts";
 import { defineRestRouter } from "../declaration.ts";
@@ -42,7 +43,11 @@ describe("a proof-bearing route", () => {
         },
       };
 
-      const response = await createRestRuntime({ identity: door, doors: { cli_token: door } })
+      const response = await createRestRuntime({
+        authorization: authorizationPort,
+        identity: door,
+        doors: { cli_token: door },
+      })
         .mount(routes, { app: () => app, onError: createErrorHandler() })
         .request(`/api/proof-reads/${VERSION}/`, {
           headers: { authorization: "Bearer lw_at_live" },

@@ -63,7 +63,7 @@ var productDoors = map[string]productDoor{
 	"annotation": {read: "annotation.getByTraceId", marker: named("rehearsal"), input: func(ctx ProductContext) any {
 		return map[string]any{"projectId": ctx.ProjectID, "traceId": ctx.TraceID}
 	}, create: func(ctx ProductContext) any {
-		return map[string]any{"projectId": ctx.ProjectID, "traceId": ctx.TraceID, "comment": "rehearsal " + ctx.Label, "isThumbsUp": true}
+		return map[string]any{"projectId": ctx.ProjectID, "traceId": ctx.TraceID, "comment": "rehearsal " + ctx.Label, "isThumbsUp": true, "scoreOptions": map[string]any{}}
 	}},
 	"workflow": {read: "workflow.getAll", input: projectInput, marker: named("rehearsal workflow"), create: func(ctx ProductContext) any {
 		return map[string]any{"projectId": ctx.ProjectID, "commitMessage": "rehearsal seed", "dsl": map[string]any{
@@ -97,6 +97,8 @@ type Seeder struct {
 	input   ProductInput
 	cookie  string
 	Context ProductContext
+	// PlainWire: the release's tRPC carries plain JSON (head), not main's superjson {"json": ...}.
+	PlainWire bool
 }
 
 // NewSeeder defaults the client to one with a minute's timeout per request.
@@ -126,18 +128,22 @@ func (seeder *Seeder) Seed(ctx context.Context) error {
 	return errors.Join(refused...)
 }
 
-// Count asks the old app, per seedable kind, how many listed rows hold the seed's marker.
+// Count asks the app, per seedable kind, how many listed rows hold the seed's marker. A refused read
+// counts 0 and is named in the error; the other kinds are still counted.
 func (seeder *Seeder) Count(ctx context.Context) (map[string]int, error) {
 	counts := map[string]int{}
+	var refused []error
 	for _, kind := range seedableKinds() {
 		door := productDoors[kind.Kind]
 		var answer json.RawMessage
 		if err := seeder.trpc(ctx, trpcCall{path: door.read, input: door.input(seeder.Context), out: &answer}); err != nil {
-			return nil, fmt.Errorf("count kind %s: %w", kind.Kind, err)
+			refused = append(refused, fmt.Errorf("count kind %s: %w", kind.Kind, err))
+			counts[kind.Kind] = 0
+			continue
 		}
 		counts[kind.Kind] = countHolding(answer, door.marker(seeder.Context))
 	}
-	return counts, nil
+	return counts, errors.Join(refused...)
 }
 
 // countHolding counts a list answer's items holding marker; any other answer counts as one item.
@@ -243,7 +249,10 @@ type trpcCall struct {
 }
 
 func (seeder *Seeder) trpc(ctx context.Context, call trpcCall) error {
-	envelope := map[string]any{"json": call.input}
+	var envelope any = map[string]any{"json": call.input}
+	if seeder.PlainWire {
+		envelope = call.input
+	}
 	wire := wireCall{what: "query " + call.path, method: http.MethodGet, header: seeder.session()}
 	if call.mutation {
 		wire.what, wire.method, wire.path, wire.body = "mutation "+call.path, http.MethodPost, "/api/trpc/"+call.path, envelope
@@ -257,6 +266,17 @@ func (seeder *Seeder) trpc(ctx context.Context, call trpcCall) error {
 	_, text, err := seeder.send(ctx, wire)
 	if err != nil || call.out == nil {
 		return err
+	}
+	if seeder.PlainWire {
+		var plain struct {
+			Result struct {
+				Data json.RawMessage `json:"data"`
+			} `json:"result"`
+		}
+		if err := json.Unmarshal(text, &plain); err != nil {
+			return fmt.Errorf("%s: %w", wire.what, err)
+		}
+		return json.Unmarshal(orNull(plain.Result.Data), call.out)
 	}
 	var answer struct {
 		Result struct {

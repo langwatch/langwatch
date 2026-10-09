@@ -74,8 +74,9 @@ const traceEventSchema = z.object({
 });
 
 /**
- * Zod schema for EventMetadataBase.
- * Base metadata that all events can have.
+ * Base metadata that all events can have. Every event whose metadata fields are all optional
+ * takes it `.optional()`: `createEvent` drops an empty object, as main did, so queued and stored
+ * events from main carry none, and the queue parses each job against this schema.
  */
 const eventMetadataBaseSchema = eventMetadataSchema;
 
@@ -83,7 +84,7 @@ export const spanRecordedEventSchema = z.object({
   ...traceEventSchema.shape,
   type: z.literal(SPAN_RECORDED_EVENT_TYPE),
   data: recordTraceSpanEventDataSchema,
-  metadata: eventMetadataBaseSchema,
+  metadata: eventMetadataBaseSchema.optional(),
 });
 
 type SpanRecordedEvent = z.infer<typeof spanRecordedEventSchema>;
@@ -201,7 +202,7 @@ export const topicAssignedEventSchema = z.object({
   ...traceEventSchema.shape,
   type: z.literal(TOPIC_ASSIGNED_EVENT_TYPE),
   data: topicAssignedEventDataSchema,
-  metadata: topicAssignedEventMetadataSchema,
+  metadata: topicAssignedEventMetadataSchema.optional(),
 });
 export type TopicAssignedEvent = z.infer<typeof topicAssignedEventSchema>;
 
@@ -239,7 +240,7 @@ export const logRecordReceivedEventSchema = z.object({
   ...traceEventSchema.shape,
   type: z.literal(LOG_RECORD_RECEIVED_EVENT_TYPE),
   data: logRecordReceivedEventDataSchema,
-  metadata: logRecordReceivedEventMetadataSchema,
+  metadata: logRecordReceivedEventMetadataSchema.optional(),
 });
 
 export type LogRecordReceivedEventData = z.infer<typeof logRecordReceivedEventDataSchema>;
@@ -254,7 +255,7 @@ export const logContributedEventSchema = z.object({
   ...traceEventSchema.shape,
   type: z.literal(LOG_CONTRIBUTED_EVENT_TYPE),
   data: logContributedEventDataSchema,
-  metadata: eventMetadataBaseSchema,
+  metadata: eventMetadataBaseSchema.optional(),
 });
 export type LogContributedEvent = z.infer<typeof logContributedEventSchema>;
 
@@ -274,7 +275,7 @@ export const metricDataPointCorrelatedEventSchema = z.object({
   ...traceEventSchema.shape,
   type: z.literal(METRIC_DATA_POINT_CORRELATED_EVENT_TYPE),
   data: metricDataPointCorrelatedEventDataSchema,
-  metadata: metricDataPointCorrelatedEventMetadataSchema,
+  metadata: metricDataPointCorrelatedEventMetadataSchema.optional(),
 });
 export type MetricDataPointCorrelatedEvent = z.infer<typeof metricDataPointCorrelatedEventSchema>;
 
@@ -299,7 +300,7 @@ export const originResolvedEventSchema = z.object({
   ...traceEventSchema.shape,
   type: z.literal(ORIGIN_RESOLVED_EVENT_TYPE),
   data: originResolvedEventDataSchema,
-  metadata: originResolvedEventMetadataSchema,
+  metadata: originResolvedEventMetadataSchema.optional(),
 });
 export type OriginResolvedEvent = z.infer<typeof originResolvedEventSchema>;
 

@@ -7,6 +7,7 @@ import { moduleApi } from "@langwatch/module";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { authorizationPort } from "../../__tests__/api-double.ts";
 import { publicRoute } from "../../access/access.ts";
 import { createErrorHandler } from "../../errors.ts";
 import { defineRestRouter } from "../declaration.ts";
@@ -32,6 +33,7 @@ describe("given a route whose handler answers a shape its output schema refuses"
   /** @scenario "A procedure whose answer breaks its output schema refuses rather than answering" */
   it("answers an internal error and never the handler's value", async () => {
     const runtime = createRestRuntime({
+      authorization: authorizationPort,
       identity: { authenticate: () => ({ actor: null, scope: null }) },
     });
 

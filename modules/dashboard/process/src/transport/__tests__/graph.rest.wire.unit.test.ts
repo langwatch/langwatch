@@ -4,6 +4,7 @@
  * it reads back, lists and renames at that size. Spec: dashboard-service.feature.
  */
 import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
 import { createDashboardTestApp } from "../../app/__tests__/dashboard.fixture.ts";
@@ -19,6 +20,7 @@ function mountedGraphs() {
     scope: { tier: "project" as const, id: PROJECT_ID },
   };
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: { authenticate: () => caller, identify: () => caller },
   });
   const hono = runtime.mount(graphRest.router(), {

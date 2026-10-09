@@ -28,11 +28,14 @@ type HttpBillingStripeSubjects = Omit<BillingStripeChannels, "webhooks">;
 export function composeHttpBillingStripe({
   secretKey,
   nodeEnvironment,
+  apiBase,
 }: {
   secretKey: string;
   nodeEnvironment: string | undefined;
+  /** Another origin speaking Stripe's API (paymentsim); unset is Stripe itself. */
+  apiBase?: string;
 }): HttpBillingStripeSubjects {
-  const stripe = new Stripe(secretKey, { apiVersion: STRIPE_API_VERSION });
+  const stripe = new Stripe(secretKey, { apiVersion: STRIPE_API_VERSION, ...hostOf(apiBase) });
   return {
     customers: HttpStripeCustomersChannel.create({ stripe }),
     subscriptions: HttpStripeSubscriptionsChannel.create({ stripe }),
@@ -46,4 +49,12 @@ export function composeHttpBillingStripe({
           .CONNECTED_HOSTED_USAGE_QUARTERLY,
     }),
   };
+}
+
+/** The SDK's host, port and protocol for an API origin. */
+function hostOf(apiBase: string | undefined): Stripe.StripeConfig {
+  if (!apiBase) return {};
+  const url = new URL(apiBase);
+  const protocol = url.protocol === "http:" ? "http" : "https";
+  return { host: url.hostname, port: url.port || (protocol === "http" ? 80 : 443), protocol };
 }

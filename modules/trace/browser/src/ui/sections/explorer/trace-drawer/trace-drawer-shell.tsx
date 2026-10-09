@@ -31,10 +31,8 @@ export interface TraceV2DrawerShellProps {
    */
   projectId?: string;
   /**
-   * The member that owns the trace, on an aggregate (ADR-144 block F), so a
-   * reload or a copied link reopens the same member. Read by the URL
-   * hydrator into `openTrace(..., { tenantId })`; written only when it is
-   * not the drawer's own project.
+   * The member that owns the trace on an aggregate (ADR-144 block F), so a reload or a copied
+   * link reopens the same member. Written only when it is not the drawer's own project.
    */
   tenantId?: string;
 }
@@ -87,7 +85,7 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
   }
 
   // The drawer width is driven by the operator's drag (persisted in
-  // drawerChrome.widthPx).
+  // useDrawerChrome.widthPx).
   const viewportWidth = typeof window !== "undefined" ? window.innerWidth : Infinity;
   const isCompactViewport = viewportWidth < 768;
   const effectiveWidthPx = Math.min(widthPx ?? DRAWER_DEFAULT_WIDTH_PX, viewportWidth);

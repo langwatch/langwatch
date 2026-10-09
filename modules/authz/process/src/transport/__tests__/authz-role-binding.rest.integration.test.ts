@@ -15,6 +15,7 @@ import {
   permissionsConferred,
   type AuthzManagedOrganizationBinding,
 } from "@langwatch/authz-contract";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
@@ -89,6 +90,7 @@ function world({ rows = [] as AuthzManagedOrganizationBinding[] } = {}) {
     };
   };
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       identify: ({ request }) => admit(request),
       authenticate: ({ request }) => admit(request),

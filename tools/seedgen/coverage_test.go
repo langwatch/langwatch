@@ -91,7 +91,7 @@ func TestStaticCheckNamesAnItemWithNoGenerator(t *testing.T) {
 	}
 	for _, item := range inventory {
 		if item != "enum:TeamUserRole.CUSTOM" {
-			full.Generators[item] = []string{"some.kind"}
+			full.Generators[item] = []string{KindProjectCreate}
 		}
 	}
 	require.False(t, CheckStatic(inventory, full).Failed())

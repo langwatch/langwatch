@@ -62,3 +62,9 @@ Feature: A blocking upgrade step never touches a sign-in or ingest table
     Given the repository's blocking steps
     When the steps touching a sign-in table are counted
     Then there are none
+
+  @unit @architecture
+  Scenario: A clone without release tags fails the policy with the command that fetches them
+    Given a checkout where no langwatch@v* release tag is readable
+    When the policy reads the newest released Prisma migration
+    Then it fails and names the git fetch that brings the tags

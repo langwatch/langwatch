@@ -2,6 +2,7 @@ import { moduleApi } from "@langwatch/module";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import { authorizationPort } from "../../__tests__/api-double.ts";
 import { defineRestRouter } from "../declaration.ts";
 import { canonicalErrorResponse } from "../response.ts";
 import { createRestRuntime } from "../runtime.ts";
@@ -30,6 +31,7 @@ function scoresApp() {
   const score = vi.fn(async (_input: Record<string, unknown>) => ({ ok: true }));
 
   const app = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } as const }),
     },

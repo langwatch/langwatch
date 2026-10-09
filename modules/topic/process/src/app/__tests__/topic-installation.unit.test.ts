@@ -1,3 +1,4 @@
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createApp } from "@langwatch/process";
@@ -13,6 +14,7 @@ function process(role: "api" | "worker") {
     .withModules([topicProcessModule])
     .withStores(memoryStores())
     .provide({
+      "data-retention": createApiFixture<DataRetentionApi>({}),
       evaluation: createApiFixture<EvaluationApi>({}),
       trace: createApiFixture<TraceApi>({}),
       "model-provider": createApiFixture<ModelProviderApi>({}),

@@ -9,6 +9,7 @@ import { Hono, type Hono as HonoApp } from "hono";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { authorizationPort } from "../../__tests__/api-double.ts";
 import { anyAuthenticated, publicRoute, type Entitlements } from "../../access/access.ts";
 import {
   ApiVersionConflictError,
@@ -204,6 +205,7 @@ describe("defineRestRouter", () => {
         .router();
 
       const runtime = createRestRuntime({
+        authorization: authorizationPort,
         identity: {
           authenticate: () => ({ actor: null, scope: { tier: "organization", id: "org-1" } }),
         },
@@ -284,6 +286,7 @@ describe("defineRestRouter", () => {
         .router();
 
       const runtime = createRestRuntime({
+        authorization: authorizationPort,
         identity: {
           authenticate: () => ({ actor: null, scope: { tier: "organization", id: "org-1" } }),
         },
@@ -514,6 +517,7 @@ describe("defineRestRouter", () => {
         .router();
 
       const runtime = createRestRuntime({
+        authorization: authorizationPort,
         identity: {
           authenticate: () => ({ actor: null, scope: { tier: "organization", id: "org-1" } }),
         },
@@ -625,6 +629,7 @@ describe("a mount binding the facts a declaration names", () => {
 
   function mountWith(facts: readonly RestTransportMiddlewareBinding[]): () => void {
     const runtime = createRestRuntime({
+      authorization: authorizationPort,
       identity: {
         authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } }),
       },
@@ -739,6 +744,7 @@ describe("a route that asks whether its tenant holds an entitlement", () => {
 
   function mounted({ holds, handle }: { holds: Entitlements["holds"]; handle: () => void }) {
     const runtime = createRestRuntime({
+      authorization: authorizationPort,
       identity: {
         authenticate: () => ({ actor: null, scope: { tier: "organization", id: "org-1" } }),
       },
@@ -807,6 +813,7 @@ describe("a route that asks whether its tenant holds an entitlement", () => {
     ).toThrow(/no tenant to ask whether it holds "enterprise"/);
 
     const runtime = createRestRuntime({
+      authorization: authorizationPort,
       identity: {
         authenticate: () => ({ actor: null, scope: { tier: "organization", id: "org-1" } }),
       },
@@ -851,6 +858,7 @@ describe("a route whose plan question names a capability and asks only for some 
       .router();
 
     return createRestRuntime({
+      authorization: authorizationPort,
       identity: {
         authenticate: () => ({ actor: null, scope: { tier: "organization", id: "org-1" } }),
       },
@@ -985,6 +993,7 @@ describe("a create declared replayable under a caller's key", () => {
     handle: (name: string) => Promise<string> | string;
   }) {
     const runtime = createRestRuntime({
+      authorization: authorizationPort,
       identity: {
         authenticate: () => ({ actor: null, scope: { tier: "organization", id: "org-1" } }),
       },
@@ -1104,6 +1113,7 @@ describe("a create declared replayable under a caller's key", () => {
     expect(runs).toBe(2);
 
     const runtime = createRestRuntime({
+      authorization: authorizationPort,
       identity: {
         authenticate: () => ({ actor: null, scope: { tier: "organization", id: "org-1" } }),
       },
@@ -1127,6 +1137,7 @@ describe("a route declared as minting a credential", () => {
 
   function mounted({ impersonatorId, handle }: { impersonatorId?: string; handle: () => void }) {
     const runtime = createRestRuntime({
+      authorization: authorizationPort,
       identity: {
         authenticate: () => ({
           actor: { type: "user", id: "user-1", ...(impersonatorId ? { impersonatorId } : {}) },

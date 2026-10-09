@@ -36,6 +36,6 @@ Anything else data-retention needs belongs to another module and is reached thro
 
 ## Who depends on data-retention
 
-[analytics](../analytics/README.md), [coding-agent](../coding-agent/README.md), [evaluation](../evaluation/README.md), [experiment](../experiment/README.md), [langy](../langy/README.md), [log](../log/README.md), [metric](../metric/README.md), [ops](../ops/README.md), [scenario](../scenario/README.md), [share](../share/README.md), [suite](../suite/README.md), [trace](../trace/README.md) (as a peer).
+[analytics](../analytics/README.md), [automation](../automation/README.md), [coding-agent](../coding-agent/README.md), [evaluation](../evaluation/README.md), [experiment](../experiment/README.md), [governance](../../enterprise/modules/governance/README.md), [langy](../langy/README.md), [log](../log/README.md), [metric](../metric/README.md), [ops](../ops/README.md), [scenario](../scenario/README.md), [share](../share/README.md), [suite](../suite/README.md), [topic](../topic/README.md), [trace](../trace/README.md), [webhook](../webhook/README.md) (as a peer).
 
 <!-- readme:generated:end -->

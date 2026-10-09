@@ -162,7 +162,7 @@ structural fact, not a convention someone could skip.
 
 The worker also owns the upgrade: at boot, while the ledger is behind its image, its gate runs
 `pnpm task upgrade` under the runner's lease and takes no job until the ledger is current; the api
-holds, then serves only `servesWhileUpgrading` routes (`upgrade` skill, UPGRADE-IN-WORKER).
+holds nothing and serves every route meanwhile (`upgrade` skill, UPGRADE-IN-WORKER, NO-HOLDS).
 
 A module declares its whole pipeline once:
 

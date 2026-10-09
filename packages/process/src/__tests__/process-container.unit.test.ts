@@ -72,7 +72,7 @@ describe("process container", () => {
       })
       .build();
     const worker = new WorkerProcessContainer(containerRuntime(phases), [module]);
-    const runtime = await worker.boot();
+    const runtime = await worker.boot({ classifyEventLogRetention: () => "traces" });
     expect(phases).toEqual(["consumer"]);
     expect("exposeTransports" in worker).toBe(false);
     await runtime.start();
@@ -93,7 +93,9 @@ describe("process container", () => {
     }
     const module = defineProcessModule("dataset").withApi(CatalogueApp).build();
 
-    const runtime = await new WorkerProcessContainer(containerRuntime([]), [module]).boot();
+    const runtime = await new WorkerProcessContainer(containerRuntime([]), [module]).boot({
+      classifyEventLogRetention: () => "traces",
+    });
 
     expect(runtime.service(CatalogueApi).read()).toBe("one dataset");
     expect(() => runtime.service(MissingApi)).toThrow(/\bprompt\b/);

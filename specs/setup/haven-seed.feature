@@ -20,7 +20,7 @@ Feature: haven seed fills a stack with every kind of data, at any size, without 
     And every data kind has at least one record once the worker drains
     And "haven up" reports ready within 60 seconds
 
-  @integration @unimplemented
+  @unit
   Scenario: haven up does not wait past a minute for the auto-seed
     Given the tiny seed has not drained after 60 seconds
     When "haven up" reaches its wait limit
@@ -33,7 +33,7 @@ Feature: haven seed fills a stack with every kind of data, at any size, without 
     When I run "haven up"
     Then no seed runs
 
-  @unit @unimplemented
+  @unit
   Scenario: The auto-seed can be turned off
     Given HAVEN_AUTO_SEED is 0, or I pass "--no-seed"
     When I run "haven up" on an empty stack
@@ -48,7 +48,7 @@ Feature: haven seed fills a stack with every kind of data, at any size, without 
     And their telemetry spans the 30 days before the anchor
     And the run manifest records the flags, the anchor and the recipe version
 
-  @unit @unimplemented
+  @unit
   Scenario: The same seed gives the same logical content
     Given two plans built from the same flags, seed and anchor
     Then their actions, natural keys, payload fields, business times and counts are identical
@@ -59,24 +59,33 @@ Feature: haven seed fills a stack with every kind of data, at any size, without 
     When I run "haven seed" with the same flags and seed 7
     Then every action finds its record by natural key and creates nothing new
 
-  @unit @unimplemented
+  @unit
   Scenario: Any telemetry size from one span to two million is accepted
     When I run "haven seed --spans 1" or "haven seed --spans 2000000"
     Then the plan holds exactly that many spans, with logs and metric points in proportion
 
-  @unit @unimplemented
+  @unit
   Scenario: Bad flags are refused before anything is written
     When I run "haven seed --size huge" or "haven seed --days 0" or "haven seed --persona nosuch"
     Then the command exits 2 naming the flag and the values it accepts
     And no store is touched
 
-  @unit @unimplemented
+  @unit
   Scenario: A dry run prints the plan without writing
     When I run "haven seed --size medium --dry-run"
     Then it prints the counts per kind, the estimated rows and bytes per store and the expected duration
     And no store is touched
 
-  @integration @unimplemented
+  @unit
+  Scenario: haven seed returns the logins and the credentials haven made up
+    Given a stack that is up
+    When "haven seed" finishes
+    Then it prints the app URL, the seeded admin login, the organization, team and project slugs,
+      the project API key, the personal access token, the SCIM token and the instance admin key
+    And every secret value is masked unless "--reveal" is given
+    And "--json" prints the same as one object
+
+  @unit
   Scenario: haven seed refuses a stack that is not up
     Given the stack's api or worker is not running
     When I run "haven seed"
@@ -95,7 +104,7 @@ Feature: haven seed fills a stack with every kind of data, at any size, without 
     Then each is created by an installed module API operation in the tasks process
     And the worker runs the commands, projections, subscribers and process managers they cause
 
-  @integration @unimplemented
+  @unit
   Scenario: The fixed local identity's grants come from real commands
     When the fixed local identity is seeded
     Then its grants and roles are attached through the authz API
@@ -116,39 +125,39 @@ Feature: haven seed fills a stack with every kind of data, at any size, without 
 
   # --- Memory guard ----------------------------------------------------------------------
 
-  @unit @unimplemented
+  @unit
   Scenario: The seed backs off when ClickHouse nears its memory limit
     Given ClickHouse memory use passes 70 percent of its configured limit
     When the guard reads its signals
     Then the in-flight window halves and the change is logged with the signal and value
     And above 85 percent sending pauses until use drops below 60 percent
 
-  @unit @unimplemented
+  @unit
   Scenario: The seed backs off when the worker falls behind
     Given the worker's queued jobs pass 20,000 or the oldest job is older than 60 seconds
     When the guard reads its signals
     Then the in-flight window halves
     And sending pauses above 50,000 jobs until the backlog drops below 10,000
 
-  @unit @unimplemented
+  @unit
   Scenario: The seed backs off on too many ClickHouse parts, Redis memory or host memory pressure
     Given any of those signals passes its threshold
     When the guard reads its signals
     Then the in-flight window halves, or pauses at the critical threshold
 
-  @integration @unimplemented
+  @unit
   Scenario: A seed that stays paused stops with a checkpoint and resumes later
     Given sending has been paused for 10 minutes
     Then the seed exits 4 "stalled", naming the signal and its value
     And "haven seed --resume" continues from the last acknowledged action without duplicating data
 
-  @unit @unimplemented
+  @unit
   Scenario: The seed refuses a plan that cannot fit
     Given the plan's estimated bytes exceed the free disk, or ClickHouse's limit is below the tier's floor
     When the seed starts
     Then it exits 2 before writing, naming the shortfall and the haven limit that raises it
 
-  @unit @unimplemented
+  @unit
   Scenario: The generator streams instead of holding the plan
     When the plan for the large tier is walked end to end
     Then the generator's memory stays under 256 MB

@@ -7,6 +7,7 @@ import { moduleApi } from "@langwatch/module";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import { authorizationPort } from "../../__tests__/api-double.ts";
 import { createErrorHandler } from "../../errors.ts";
 import { defineRestRouter } from "../declaration.ts";
 import { createRestRuntime } from "../runtime.ts";
@@ -45,7 +46,10 @@ function mountNotes() {
     authorize,
   };
 
-  const app = createRestRuntime({ identity }).mount(notes.router(), {
+  const app = createRestRuntime({
+    authorization: authorizationPort,
+    identity,
+  }).mount(notes.router(), {
     app: () => ({ createNote }),
     onError: createErrorHandler(),
   });

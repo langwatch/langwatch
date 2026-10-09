@@ -7,6 +7,7 @@ import {
 /** @vitest-environment node */
 import type { RestResolvedProjectCredential } from "@langwatch/authorization";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -44,6 +45,7 @@ function mount(
   caller: { userId: string | null; credential: RestResolvedProjectCredential } | null = null,
 ) {
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({
         actor: caller?.userId ? { type: "user", id: caller.userId } : null,

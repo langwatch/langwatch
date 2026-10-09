@@ -13,6 +13,7 @@ import {
 import { PermissionDeniedError } from "@langwatch/authorization";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
@@ -62,6 +63,7 @@ function mount({ grants }: { grants: readonly string[] }) {
     return caller;
   };
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: { authenticate, identify },
   });
   const hono = runtime.mount(agentCacheRest.router(), {

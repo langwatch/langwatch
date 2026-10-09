@@ -12,6 +12,7 @@ import {
   StoredObjectNotFoundError,
   StoredObjectOwnerLookupUnavailableError,
 } from "@langwatch/stored-object-contract";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import type { ErrorHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
@@ -332,6 +333,7 @@ function mount(options: {
   const api: StoredObjectFileApi = { readFile: (input) => files.read(input) };
 
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => {
         throw new Error("A byte read asks no permission of its credential.");

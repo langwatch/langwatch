@@ -10,6 +10,7 @@ import { join } from "node:path";
 import type { RestIdentity } from "@langwatch/api/hosting";
 import { RestHost } from "@langwatch/api/rest";
 import { composeApiApplication } from "@langwatch/process";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import type { Hono } from "hono";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -66,6 +67,7 @@ async function bootedApi() {
   const { runtime } = await bootApi({
     surface: () => {
       rest = RestHost.create({
+        authz: restTestAuthorization().forRequest(),
         identities: {
           project: closed,
           organization: closed,

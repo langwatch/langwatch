@@ -69,7 +69,7 @@ func TestTheSimsLaneHostsTheSimulatorsInADevCheckout(t *testing.T) {
 	if !ok {
 		t.Fatal("no sims lane was planned")
 	}
-	if !strings.Contains(lane.Shell, `args="idpsim mailsim storagesim voicesim llmsim analyticssim outboundsim telemetrysim"`) {
+	if !strings.Contains(lane.Shell, `args="idpsim mailsim storagesim voicesim llmsim analyticssim outboundsim paymentsim telemetrysim"`) {
 		t.Errorf("sims lane runs %q, want it to host every simulator", lane.Shell)
 	}
 	want := map[string]string{

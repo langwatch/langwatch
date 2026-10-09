@@ -7,7 +7,7 @@
 import { BlankScopeIdError, PermissionDeniedError } from "@langwatch/authorization";
 import { describe, expect, it } from "vitest";
 
-import { authorizeDefaults } from "../../__tests__/api-double.ts";
+import { authorizationPort, authorizeDefaults } from "../../__tests__/api-double.ts";
 import { ScopeInputMismatchError } from "../../errors.ts";
 import {
   AccessWiringError,
@@ -183,6 +183,7 @@ describe("deciding access for one call", () => {
           declaration: { kind: "service-authorized", reason: "the door", permissions: [] },
           caller: { actor: null, scope: { tier: "project", id: "project-1" } },
           input: { projectId: "project-2" },
+          authorize: authorizationPort.forRequest(),
         });
       } catch (error) {
         if (error instanceof ScopeInputMismatchError) return error;
@@ -219,6 +220,7 @@ describe("deciding access for one call", () => {
           declaration: { kind: "no-permission", reason: "public read" },
           caller: reviewer,
           input: { projectId: "project-1" },
+          authorize: authorizationPort.forRequest(),
         }),
       ).rejects.toThrow(/projectId is not allowed to be used without permission check/);
     });
@@ -232,21 +234,10 @@ describe("deciding access for one call", () => {
         },
         caller: reviewer,
         input: { projectId: "project-1" },
+        authorize: authorizationPort.forRequest(),
       });
 
       expect(decision).toEqual({ actor: { type: "user", id: "reviewer-1" }, scope: null });
-    });
-  });
-
-  describe("given the surface supplied no authorization port", () => {
-    it("refuses a declaration whose check it cannot run, by name", async () => {
-      await expect(
-        decide({
-          declaration: { kind: "permission", permission: "annotations:view" },
-          caller: reviewer,
-          input: { projectId: "project-1" },
-        }),
-      ).rejects.toThrow(/"permission" access declaration needs an authorization port/);
     });
   });
 });

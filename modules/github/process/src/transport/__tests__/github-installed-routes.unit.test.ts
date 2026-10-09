@@ -13,6 +13,7 @@ import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
  * @see modules/github/specs/github-install-routes.feature
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
 import { githubProcessModule } from "../../github.module.ts";
@@ -75,6 +76,7 @@ function restHost(): RestHost {
   const closed = BearerIdentity.create({ name: "unconfigured", token: undefined });
 
   return RestHost.create({
+    authz: restTestAuthorization().forRequest(),
     identities: {
       project: closed,
       organization: closed,

@@ -2157,42 +2157,44 @@ Declared at `src/eventing/ingestion-pull-reconcile.pipeline.ts:37`.
 
 ### Pipeline `ingestion_pull_processing` (aggregate `ingestion_pull`)
 
-Declared at `src/eventing/ingestion-pull.pipeline.ts:102`. Events: `ingestionPullConfiguredEventSchema`, `ingestionPullDisabledEventSchema`, `ingestionPullRunCompletedEventSchema`, `ingestionPullRunFailedEventSchema`, `ingestionPullAgentsListingRequestedEventSchema`, `ingestionPullAgentsListedEventSchema`, `ingestionPullAgentsListingRefusedEventSchema`, `ingestionPullPeopleListingRequestedEventSchema`, `ingestionPullPeopleListedEventSchema`, `ingestionPullPeopleListingRefusedEventSchema`.
+Declared at `src/eventing/ingestion-pull.pipeline.ts:105`. Events: `ingestionPullConfiguredEventSchema`, `ingestionPullDisabledEventSchema`, `ingestionPullRunCompletedEventSchema`, `ingestionPullRunFailedEventSchema`, `ingestionPullAgentsListingRequestedEventSchema`, `ingestionPullAgentsListedEventSchema`, `ingestionPullAgentsListingRefusedEventSchema`, `ingestionPullPeopleListingRequestedEventSchema`, `ingestionPullPeopleListedEventSchema`, `ingestionPullPeopleListingRefusedEventSchema`.
 
 | Kind                | Name                                                                             | Handles                                           | Declared at                                   |
 | ------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------- | --------------------------------------------- |
-| command             | `configure`                                                                      | –                                                 | `src/eventing/ingestion-pull.pipeline.ts:123` |
-| command             | `disable`                                                                        | –                                                 | `src/eventing/ingestion-pull.pipeline.ts:124` |
-| command             | `recordRunCompleted`                                                             | –                                                 | `src/eventing/ingestion-pull.pipeline.ts:125` |
-| command             | `recordRunFailed`                                                                | –                                                 | `src/eventing/ingestion-pull.pipeline.ts:126` |
-| command             | `requestAgentsListing`                                                           | –                                                 | `src/eventing/ingestion-pull.pipeline.ts:127` |
-| command             | `recordAgentsListed`                                                             | –                                                 | `src/eventing/ingestion-pull.pipeline.ts:128` |
-| command             | `recordAgentsListingRefused`                                                     | –                                                 | `src/eventing/ingestion-pull.pipeline.ts:129` |
-| command             | `requestPeopleListing`                                                           | –                                                 | `src/eventing/ingestion-pull.pipeline.ts:130` |
-| command             | `recordPeopleListed`                                                             | –                                                 | `src/eventing/ingestion-pull.pipeline.ts:131` |
-| command             | `recordPeopleListingRefused`                                                     | –                                                 | `src/eventing/ingestion-pull.pipeline.ts:132` |
-| process manager     | `ingestionPull`                                                                  | ≈ applier `this.options.process.processManager()` | `src/eventing/ingestion-pull.pipeline.ts:134` |
-| Postgres projection | `≈ IngestionPullRunStatusEventingProjection.create(this.options.runStatusStore)` | –                                                 | `src/eventing/ingestion-pull.pipeline.ts:120` |
+| command             | `configure`                                                                      | –                                                 | `src/eventing/ingestion-pull.pipeline.ts:126` |
+| command             | `disable`                                                                        | –                                                 | `src/eventing/ingestion-pull.pipeline.ts:127` |
+| command             | `recordRunCompleted`                                                             | –                                                 | `src/eventing/ingestion-pull.pipeline.ts:128` |
+| command             | `recordRunFailed`                                                                | –                                                 | `src/eventing/ingestion-pull.pipeline.ts:129` |
+| command             | `requestAgentsListing`                                                           | –                                                 | `src/eventing/ingestion-pull.pipeline.ts:130` |
+| command             | `recordAgentsListed`                                                             | –                                                 | `src/eventing/ingestion-pull.pipeline.ts:131` |
+| command             | `recordAgentsListingRefused`                                                     | –                                                 | `src/eventing/ingestion-pull.pipeline.ts:132` |
+| command             | `requestPeopleListing`                                                           | –                                                 | `src/eventing/ingestion-pull.pipeline.ts:133` |
+| command             | `recordPeopleListed`                                                             | –                                                 | `src/eventing/ingestion-pull.pipeline.ts:134` |
+| command             | `recordPeopleListingRefused`                                                     | –                                                 | `src/eventing/ingestion-pull.pipeline.ts:135` |
+| process manager     | `ingestionPull`                                                                  | ≈ applier `this.options.process.processManager()` | `src/eventing/ingestion-pull.pipeline.ts:138` |
+| Postgres projection | `≈ IngestionPullRunStatusEventingProjection.create(this.options.runStatusStore)` | –                                                 | `src/eventing/ingestion-pull.pipeline.ts:123` |
+| retention           | `≈ this.options.retention`                                                       | –                                                 | `src/eventing/ingestion-pull.pipeline.ts:136` |
 
 ### Pipeline `pulled_usage_processing` (aggregate `pulled_usage`)
 
-Declared at `src/eventing/pulled-usage.pipeline.ts:156`. Events: `pulledUsageObservedEventSchema`, `pulledUsageRetractedEventSchema`, `pulledUsagePricedEventSchema`.
+Declared at `src/eventing/pulled-usage.pipeline.ts:167`. Events: `pulledUsageObservedEventSchema`, `pulledUsageRetractedEventSchema`, `pulledUsagePricedEventSchema`.
 
 | Kind                       | Name                      | Handles                                           | Declared at                                 |
 | -------------------------- | ------------------------- | ------------------------------------------------- | ------------------------------------------- |
-| command                    | `recordPulledUsage`       | –                                                 | `src/eventing/pulled-usage.pipeline.ts:167` |
-| command                    | `retractPulledUsage`      | –                                                 | `src/eventing/pulled-usage.pipeline.ts:168` |
-| command                    | `recordPulledUsagePriced` | –                                                 | `src/eventing/pulled-usage.pipeline.ts:169` |
-| process manager            | `pulledUsageLedger`       | ≈ applier `this.ledger.processManager()`          | `src/eventing/pulled-usage.pipeline.ts:177` |
-| process manager            | `costRollupWatch`         | ≈ applier `this.costRollupWatch.processManager()` | `src/eventing/pulled-usage.pipeline.ts:181` |
-| ClickHouse fold projection | `≈ this.costRollup`       | –                                                 | `src/eventing/pulled-usage.pipeline.ts:171` |
-| ClickHouse map projection  | `≈ this.costCharges`      | –                                                 | `src/eventing/pulled-usage.pipeline.ts:174` |
+| command                    | `recordPulledUsage`       | –                                                 | `src/eventing/pulled-usage.pipeline.ts:178` |
+| command                    | `retractPulledUsage`      | –                                                 | `src/eventing/pulled-usage.pipeline.ts:179` |
+| command                    | `recordPulledUsagePriced` | –                                                 | `src/eventing/pulled-usage.pipeline.ts:180` |
+| process manager            | `pulledUsageLedger`       | ≈ applier `this.ledger.processManager()`          | `src/eventing/pulled-usage.pipeline.ts:189` |
+| process manager            | `costRollupWatch`         | ≈ applier `this.costRollupWatch.processManager()` | `src/eventing/pulled-usage.pipeline.ts:193` |
+| retention                  | `≈ this.retention`        | –                                                 | `src/eventing/pulled-usage.pipeline.ts:181` |
+| ClickHouse fold projection | `≈ this.costRollup`       | –                                                 | `src/eventing/pulled-usage.pipeline.ts:183` |
+| ClickHouse map projection  | `≈ this.costCharges`      | –                                                 | `src/eventing/pulled-usage.pipeline.ts:186` |
 
 ## Configuration
 
 | Kind   | Leaf                      | Environment variable                  | Declared at                               |
 | ------ | ------------------------- | ------------------------------------- | ----------------------------------------- |
-| secret | `–`                       | `GOVERNANCE_ERASURE_PSEUDONYM_SECRET` | `src/app/governance.app.ts:506`           |
+| secret | `–`                       | `GOVERNANCE_ERASURE_PSEUDONYM_SECRET` | `src/app/governance.app.ts:510`           |
 | config | `gatewayPublicUrl`        | `LW_GATEWAY_PUBLIC_URL`               | `../contract/src/governance.config.ts:33` |
 | config | `gatewayInternalUrl`      | `LW_GATEWAY_INTERNAL_URL`             | `../contract/src/governance.config.ts:34` |
 | config | `gatewayLegacyUrl`        | `LW_GATEWAY_BASE_URL`                 | `../contract/src/governance.config.ts:35` |

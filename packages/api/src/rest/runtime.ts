@@ -4,6 +4,7 @@ import {
   type Authorization,
   type AuthzDeclaredScopeId,
   type AuthzPermission,
+  internalActor,
   writesUnderProject,
 } from "@langwatch/authorization";
 import { HandledError } from "@langwatch/handled-error";
@@ -54,11 +55,7 @@ import {
 } from "../errors.ts";
 import type { RestAuditSink, RestCaller, RestIdentity } from "../hosting/api-door.ts";
 import type { RateLimiter, ResponseCache } from "../ports.ts";
-import {
-  type RegisteredSharedPath,
-  registerRoutePolicy,
-  type UpgradeHoldReason,
-} from "../route-registry.ts";
+import { type RegisteredSharedPath, registerRoutePolicy } from "../route-registry.ts";
 import {
   addressesOf,
   basePathOf,
@@ -71,6 +68,10 @@ import {
   type HttpMethod,
   type VersionStatus,
 } from "./addressing.ts";
+import {
+  admittedOwnerlessProjectKeyFor,
+  OWNERLESS_PROJECT_KEY_PROOF_CODE_PATH,
+} from "./credential.ts";
 import {
   DOOR_SCOPE_TIER,
   permissionOf,
@@ -167,8 +168,8 @@ export type RestRuntimeMembers = Readonly<{
   doors?: Partial<Readonly<Record<RestDoorCredential, RestDoor>>>;
   /** Where every route that declared an action leaves its row. */
   audit?: RestAuditSink;
-  /** Only a family whose routes carry a check of their own supplies these. */
-  authorization?: Readonly<{ forRequest(request: Request): Authorize }>;
+  /** The decisions every route is authorized through; required, so no check is skipped. */
+  authorization: Readonly<{ forRequest(request: Request): Authorize }>;
   /** The counter behind every route that declared how often one caller may ask. */
   rateLimiter?: RateLimiter;
   /** The store behind every route that declared how long its answer stands. */
@@ -423,6 +424,14 @@ function assertPortsBound<Api>({
   declaration: RestTransportDeclaration<Api>;
   ports: RestRuntimeMembers;
 }): void {
+  // Required by the type; refused here too, for a caller that reached the mount untyped.
+  if (!ports.authorization) {
+    throw new Error(
+      `REST ${declaration.namespace} is mounted with no authorization port, and every route is ` +
+        "authorized through one",
+    );
+  }
+
   const base = basePathOf(declaration);
 
   for (const route of declaration.routes) {
@@ -1274,7 +1283,7 @@ async function assertRouteSecondFactor({
   caller: RestCaller;
   actor: AccessActor | null;
   scope: AuthzDeclaredScopeId | null;
-  authorize: Authorize | undefined;
+  authorize: Authorize;
 }): Promise<void> {
   if (!scope) return;
 
@@ -1306,7 +1315,7 @@ function decideRouteCaller<Api>({
     },
     caller: { actor: normalizedActor(caller.actor), scope: caller.scope },
     input,
-    ...(ports.authorization ? { authorize: ports.authorization.forRequest(context.req.raw) } : {}),
+    authorize: ports.authorization.forRequest(context.req.raw),
     ...(ports.denials ? { denials: ports.denials } : {}),
   });
 }
@@ -1395,7 +1404,7 @@ function handlerMiddleware<Api>({
     // one, and the door's own otherwise. Both the plan question and the
     // idempotency tenancy are asked about exactly this scope.
     const resolved = target ?? decision.scope;
-    const authorize = ports.authorization?.forRequest(context.req.raw);
+    const authorize = ports.authorization.forRequest(context.req.raw);
 
     await assertRouteSecondFactor({ caller, actor: decision.actor, scope: resolved, authorize });
 
@@ -1413,7 +1422,7 @@ function handlerMiddleware<Api>({
     const actor = doorActorOf({ credential, actor: decision.actor });
     const authorization = await mintAuthorization({
       permission: route.permission,
-      actor,
+      actor: actor ?? ownerlessKeyProofActor({ credential, request: context.req.raw, resolved }),
       scope: resolved,
       authorize,
       route: `${family}.${route.operation}`,
@@ -1476,7 +1485,7 @@ async function refuseAggregateWrite({
   if (["GET", "HEAD", "OPTIONS"].includes(request.method)) return;
   if (scope?.tier !== "project" || !permissions.some(writesUnderProject)) return;
 
-  const authorize = ports.authorization?.forRequest(request);
+  const authorize = ports.authorization.forRequest(request);
   refuseWriteUnderAggregate({
     permissions,
     scope: await scopeWithOrganization({ scope, authorize }),
@@ -1997,7 +2006,7 @@ async function checkRouteScope({
 
   if (!asked) return null;
 
-  const authorize = ports.authorization?.forRequest(context.req.raw);
+  const authorize = ports.authorization.forRequest(context.req.raw);
   for (const permission of asked.permissions) {
     const decision = await requireAuthorize(door)({ caller, permission, target: asked.target });
 
@@ -2318,6 +2327,26 @@ function doorActorOf({
   actor: Actor | null;
 }): Actor | null {
   return credential !== "browser" && DOOR_SCOPE_TIER[credential] === null ? null : actor;
+}
+
+/**
+ * A project key that stands for nobody proves its own project's read as the door's own,
+ * as main did; the door already asked the key's access. Nothing else gets an actor here.
+ */
+function ownerlessKeyProofActor({
+  credential,
+  request,
+  resolved,
+}: {
+  credential: RestDoorCredential;
+  request: Request;
+  resolved: AuthzDeclaredScopeId | null;
+}): Actor | null {
+  if (credential !== "project" || resolved?.tier !== "project") return null;
+
+  return admittedOwnerlessProjectKeyFor({ request, projectId: resolved.id })
+    ? internalActor(OWNERLESS_PROJECT_KEY_PROOF_CODE_PATH)
+    : null;
 }
 
 /**
@@ -2895,7 +2924,6 @@ function mountRoute({
       credentialClass,
       credential,
       ...(sharedPath ? { sharedPath } : {}),
-      ...upgradingFlag(route),
     });
   }
 
@@ -3074,11 +3102,4 @@ function mountCredential<Api>({
   }
 
   return named;
-}
-
-/** API-UP: the registry records a route declared to hold while upgrading, with its reason. */
-function upgradingFlag<Api>(route: RestTransportRoute<Api>): {
-  holdsWhileUpgrading?: UpgradeHoldReason;
-} {
-  return route.holdsWhileUpgrading ? { holdsWhileUpgrading: route.holdsWhileUpgrading } : {};
 }

@@ -10,9 +10,7 @@ import type {
 import type {
   ConnectedSeats,
   ContractTerms,
-  HostedCapAnswer,
   HostedCaller,
-  HostedClassifyAnswer,
   HostedUsageAnswer,
 } from "./connect-hosted.ts";
 import type {
@@ -216,20 +214,8 @@ export interface LicensingApi {
     hostnameOptOut?: boolean;
   }): Promise<void>;
 
-  /**
-   * The hosted end of Connect (ADR-156 §5), which only LangWatch Cloud
-   * composes: whether the calling key belongs to an entitled license.
-   */
-  classifyForHostedCaller(input: {
-    caller: HostedCaller;
-    payload: unknown;
-    /** The calling install's request: a judgement it no longer waits for is abandoned. */
-    signal?: AbortSignal;
-  }): Promise<HostedClassifyAnswer>;
-  /** What the caller spent against every budget that applies to it. */
+  /** What the caller spent against each budget that applies to it, for billing's contract spend. */
   getHostedUsage(input: { caller: HostedCaller }): Promise<HostedUsageAnswer>;
-  /** The customer moves its own hosted cap, up to the contract maximum. */
-  setHostedBudgetCap(input: { caller: HostedCaller; payload: unknown }): Promise<HostedCapAnswer>;
   /** What a customer's licenses add up to commercially, right now. */
   getContractTerms(input: { organizationId: string }): Promise<ContractTerms>;
   /** The seats a connected customer holds and last reported, for its statement and overview. */
@@ -255,6 +241,15 @@ export interface LicensingApi {
     virtualKeyId: string;
     organizationId: string;
   }): Promise<ConnectService[]>;
+  /**
+   * The active license behind one managed key in one organization, as the
+   * hosted routes check it: one entry naming its entitled services (possibly
+   * none), or empty where no active license of that organization holds the key.
+   */
+  findManagedKeyLicense(input: {
+    virtualKeyId: string;
+    organizationId: string;
+  }): Promise<{ services: ConnectService[] }[]>;
 
   /**
    * Activation codes (ADR-156, section 5): the short code a fresh install

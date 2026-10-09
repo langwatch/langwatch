@@ -2005,20 +2005,22 @@ Declared at `src/eventing/trace-processing-projections.pipeline.ts:104`. Events:
 
 ### Pipeline `trace_project_milestones` (aggregate `trace_project_milestone`)
 
-Declared at `src/eventing/trace-project-milestones.pipeline.ts:21`. Events: `firstTraceRecordedEventSchema`, `traceReceivedEventSchema`.
+Declared at `src/eventing/trace-project-milestones.pipeline.ts:22`. Events: `firstTraceRecordedEventSchema`, `traceReceivedEventSchema`.
 
-| Kind    | Name                  | Handles | Declared at                                            |
-| ------- | --------------------- | ------- | ------------------------------------------------------ |
-| command | `recordFirstTrace`    | –       | `src/eventing/trace-project-milestones.pipeline.ts:26` |
-| command | `recordTraceReceived` | –       | `src/eventing/trace-project-milestones.pipeline.ts:27` |
+| Kind      | Name                  | Handles | Declared at                                            |
+| --------- | --------------------- | ------- | ------------------------------------------------------ |
+| command   | `recordFirstTrace`    | –       | `src/eventing/trace-project-milestones.pipeline.ts:27` |
+| command   | `recordTraceReceived` | –       | `src/eventing/trace-project-milestones.pipeline.ts:28` |
+| retention | `≈ retention`         | –       | `src/eventing/trace-project-milestones.pipeline.ts:29` |
 
 ### Pipeline `trace_collector_evaluations` (aggregate `trace_collector_evaluation`)
 
-Declared at `src/features/ingestion/eventing/trace-collector-evaluations.pipeline.ts:17`. Events: `collectorEvaluationReceivedEventSchema`.
+Declared at `src/features/ingestion/eventing/trace-collector-evaluations.pipeline.ts:18`. Events: `collectorEvaluationReceivedEventSchema`.
 
-| Kind    | Name                        | Handles | Declared at                                                                  |
-| ------- | --------------------------- | ------- | ---------------------------------------------------------------------------- |
-| command | `recordCollectorEvaluation` | –       | `src/features/ingestion/eventing/trace-collector-evaluations.pipeline.ts:22` |
+| Kind      | Name                        | Handles | Declared at                                                                  |
+| --------- | --------------------------- | ------- | ---------------------------------------------------------------------------- |
+| command   | `recordCollectorEvaluation` | –       | `src/features/ingestion/eventing/trace-collector-evaluations.pipeline.ts:23` |
+| retention | `≈ retention`               | –       | `src/features/ingestion/eventing/trace-collector-evaluations.pipeline.ts:24` |
 
 ### Pipeline `trace_ingest_source_billing` (aggregate `global`)
 

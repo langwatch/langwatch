@@ -29,6 +29,7 @@ import { AuthApi, type BrowserSessionInventoryEntry } from "@langwatch/auth-cont
  */
 import { type AuthzPermission, PermissionDeniedError } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
+import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
 import {
   type CliBootstrapResult,
@@ -156,6 +157,7 @@ import type {
   EventingParticipation,
   IntentContext,
   ProcessStore,
+  RetentionPolicyResolver,
 } from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { GatewayApi } from "@langwatch/gateway-contract";
@@ -501,6 +503,8 @@ export class GovernanceModule implements GovernanceRestApi {
     logs: LogApi,
     metrics: MetricApi,
     webhooks: WebhookApi,
+    /** Each tenant's retention, which the pull and usage event rows are stamped with. */
+    retention: DataRetentionApi,
   };
   static readonly config = governanceConfig;
   static readonly secrets = governanceSecrets;
@@ -1025,11 +1029,13 @@ export class GovernanceModule implements GovernanceRestApi {
     participation: EventingParticipation;
   }): IngestionPullDefinition {
     const runStatusStore = this.repositories.ingestionPullRuns;
+    const retention = this.tenantRetention();
     if (participation === "produce") {
-      return IngestionPullEventingAdapter.create({ runStatusStore }).build();
+      return IngestionPullEventingAdapter.create({ runStatusStore, retention }).build();
     }
     return IngestionPullEventingAdapter.create({
       runStatusStore,
+      retention,
       process: this.ingestionPullProcess(),
     }).build();
   }
@@ -1097,7 +1103,9 @@ export class GovernanceModule implements GovernanceRestApi {
   }: {
     participation: EventingParticipation;
   }): PulledUsageDefinition {
-    if (participation === "produce") return PulledUsageEventingAdapter.create().build();
+    const retention = this.tenantRetention();
+    if (participation === "produce")
+      return PulledUsageEventingAdapter.create({ retention }).build();
     const costRollup = GovernanceCostRollupFoldProjection.create({
       store: GovernanceCostRollupStore.create(this.repositories.costRollup),
       actorIds: {
@@ -1139,7 +1147,16 @@ export class GovernanceModule implements GovernanceRestApi {
       costRollup,
       costCharges,
       costRollupWatch,
+      retention,
     }).build();
+  }
+
+  /** Each tenant's retention, which the pull and usage event rows are stamped with. */
+  private tenantRetention(): RetentionPolicyResolver {
+    return {
+      resolve: (tenantId) =>
+        this.dependencies.retention.getResolvedForProject({ projectId: tenantId }),
+    };
   }
 
   connectPulledUsage(commands: EventingSenders): void {

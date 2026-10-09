@@ -10,6 +10,7 @@ import {
   createRestRuntime,
   UnauthorizedError,
 } from "@langwatch/api/rest";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
 import { organizationModuleSetup } from "../../app/__tests__/support/organization-module-setup.ts";
@@ -64,6 +65,7 @@ async function application({ foreignTeamId }: { foreignTeamId?: string } = {}) {
     };
   };
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       identify: ({ request }) => admit(request),
       authenticate: ({ request }) => admit(request),
