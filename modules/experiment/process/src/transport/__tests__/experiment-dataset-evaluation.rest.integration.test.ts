@@ -4,7 +4,7 @@
  * and bodies, byte for byte, now that experiment serves it.
  * @see modules/experiment/specs/experiment-dataset-evaluation.feature
  */
-import { createRestRuntime } from "@langwatch/api/rest";
+import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import { EvaluationRestExperimentNotFoundError } from "@langwatch/evaluation-contract";
 import type {
   DatasetEvaluationInput,
@@ -52,6 +52,7 @@ function mount(evaluateDataset: ExperimentApi["evaluateDataset"], refused: unkno
     app: () => createApiFixture<ExperimentApi>({ evaluateDataset }),
     onError: (error, context) => {
       refused.push(error);
+      if (HandledError.isHandled(error)) return canonicalErrorResponse(error, context);
 
       return context.json({ error: String(error) }, 500);
     },
@@ -105,13 +106,13 @@ describe("given the dataset evaluation door", () => {
   );
 
   /** @scenario "A dataset evaluation refuses what it cannot run with main's status and body" */
-  it("answers a body not sent as JSON with main's 400 sentence before the handler", async () => {
+  it("answers a body not sent as JSON with the framework's 400 malformed_request before the handler", async () => {
     const response = await mount(async () => {
       throw new Error("the handler must not run");
     })("{}", "text/plain");
 
     expect(response.status).toBe(400);
-    await expect(response.text()).resolves.toBe('{"message":"Bad request"}');
+    await expect(response.json()).resolves.toMatchObject({ code: "malformed_request" });
   });
 
   /** @scenario "A dataset evaluation refuses what it cannot run with main's status and body" */

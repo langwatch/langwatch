@@ -23,7 +23,7 @@ import {
   type Span,
 } from "@langwatch/trace-contract";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import type { ZodError } from "zod";
+import { z, type ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
 
 import {
@@ -129,44 +129,6 @@ export const ingestPlanLimitRefusal: RestProtocolRefusal = ({ failure, response 
         body: JSON.stringify(ingestDoorRefusalBody(failure)),
       })
     : response.decline();
-
-/** The collector's refusals: the plan limit, and main's 400 for a body not sent as JSON. */
-const collectorRefusal: RestProtocolRefusal = (context) =>
-  HandledError.isHandled(context.failure) && context.failure.code === "malformed_request"
-    ? context.response.write({
-        status: 400,
-        mediaType: PRODUCES_JSON,
-        body: JSON.stringify({ message: "Invalid body, expecting json" }),
-      })
-    : ingestPlanLimitRefusal(context);
-
-/** The request body as a JSON object, or the refusal reading it earned. */
-function readCollectorBody(raw: string): CollectorBody | CollectorRejection {
-  // warn, not error: a malformed body is the caller's mistake and we answer
-  // it with a 400. These three sites return rather than throw, so they never
-  // reach the boundary that would classify them as customer fault, and at
-  // error level they were about a fifth of this service's error stream.
-  let body: unknown;
-  try {
-    body = JSON.parse(raw);
-  } catch {
-    logger.warn("collector request body is not valid json");
-
-    return { rejected: true, body: { message: "Invalid body, expecting json" }, status: 400 };
-  }
-
-  // `typeof null` is "object" and an array is one too, so both walk past a
-  // bare typeof check and reach `"metadata" in body` below — which throws on
-  // null. That is the same customer mistake as the two guards above, so it
-  // belongs on the same 400 rather than in the error stream as a 500.
-  if (body === null || Array.isArray(body) || typeof body !== "object") {
-    logger.warn("collector request body is not a json object");
-
-    return { rejected: true, body: { message: "Invalid body, expecting json" }, status: 400 };
-  }
-
-  return Object.fromEntries(Object.entries(body));
-}
 
 /** The legacy rewrites, the evaluation refusals, and the schema the whole body must satisfy. */
 function parseCollectorParams(
@@ -283,11 +245,11 @@ async function ingestCollectorBody(input: {
 async function collect({
   app,
   request,
-  raw,
+  body,
 }: {
   app: CollectorApp;
   request: Request;
-  raw: string;
+  body: CollectorBody;
 }): Promise<CollectorAnswer> {
   let auth: CollectorCredential;
   try {
@@ -296,9 +258,6 @@ async function collect({
     if (!isIngestDoorRefusal(error)) throw error;
     return refusalAnswer(error);
   }
-
-  const body = readCollectorBody(raw);
-  if (isCollectorRejection(body)) return answer(body.body, body.status);
 
   const project = auth.project;
 
@@ -334,8 +293,7 @@ export const collectorRest = defineRestRouter(CollectorApi)
   .withAddressing("literal", { v1Twin: false })
 
   .post("/api/collector", "collectTrace")
-  // A body not sent as JSON keeps main's 400 sentence (record §8, E9).
-  .withRawBody("text", { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })
+  .withInput(z.looseObject({}), { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })
   .withAccess(
     publicRoute({
       reason:
@@ -346,11 +304,11 @@ export const collectorRest = defineRestRouter(CollectorApi)
   .withResponse("protocol", {
     produces: PRODUCES_JSON,
     because: COLLECTOR_PROTOCOL_REASON,
-    refusal: collectorRefusal,
+    refusal: ingestPlanLimitRefusal,
   })
   .withDocs({ hide: true })
-  .handle(async ({ app, raw, request, response }) =>
-    response.write(await collect({ app, request, raw })),
+  .handle(async ({ app, input, request, response }) =>
+    response.write(await collect({ app, request, body: input })),
   )
 
   .build();

@@ -3,12 +3,7 @@
  * address a released SDK has always called, plus its `/api/v1` twin.
  * @see specs/monitors/guardrails-api-compatibility.feature
  */
-import {
-  defineRestRouter,
-  MANAGEMENT_API_VERSION,
-  resolver,
-  type RestProtocolRefusal,
-} from "@langwatch/api/rest";
+import { defineRestRouter, MANAGEMENT_API_VERSION, resolver } from "@langwatch/api/rest";
 import {
   DATASET_CEILING_LIMITS,
   DATASET_DEFAULT_LIMITS,
@@ -28,7 +23,7 @@ import {
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { ZodError as ZodErrorClass } from "zod";
+import { z, ZodError as ZodErrorClass } from "zod";
 import { fromZodError } from "zod-validation-error";
 
 const logger = createLogger("langwatch:experiment-batch-log");
@@ -49,19 +44,6 @@ const batchLogTooLarge = (): Error =>
 
 const LEGACY_PROTOCOL_REASON =
   "Released SDKs parse these doors' own statuses and bodies, refusals included";
-
-/**
- * Main's 400 for a body not sent as JSON, in the sentence the door has always written;
- * every other refusal (401, 403, 413) stays on the family's boundary, as before.
- */
-const LOG_RESULTS_MALFORMED: RestProtocolRefusal = ({ failure, response }) =>
-  HandledError.isHandled(failure) && failure.code === "malformed_request"
-    ? response.write({
-        status: 400,
-        mediaType: PRODUCES_JSON,
-        body: JSON.stringify({ message: "Invalid body, expecting json" }),
-      })
-    : response.decline();
 
 /** One protocol answer, in the shape `c.json(body, status)` used to write. */
 type LegacyAnswer = Readonly<{
@@ -89,13 +71,12 @@ export const experimentBatchLogRest = defineRestRouter(ExperimentApi)
   .withAddressing("literal", { v1Twin: true })
 
   .post("/api/evaluations/batch/log_results", "postApiEvaluationsBatchLogResults")
-  .withRawBody("text", { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })
+  .withInput(z.looseObject({}), { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })
   .withPermission("evaluations:manage")
   .withBodyLimit({ maxBytes: BATCH_LOG_MAX_BYTES, onExceeded: batchLogTooLarge })
   .withResponse("protocol", {
     produces: PRODUCES_JSON,
     because: LEGACY_PROTOCOL_REASON,
-    refusal: LOG_RESULTS_MALFORMED,
   })
   .withDocs({
     summary: "Report batch evaluation results",
@@ -129,28 +110,23 @@ export const experimentBatchLogRest = defineRestRouter(ExperimentApi)
       },
     },
   })
-  .handle(async ({ app, raw, scope, response }) =>
-    response.write(await logBatchResults({ app, raw, projectId: scope.id })),
+  .handle(async ({ app, input, scope, response }) =>
+    response.write(await logBatchResults({ app, body: input, projectId: scope.id })),
   )
   .build();
 
 async function logBatchResults({
   app,
-  raw,
+  body,
   projectId,
 }: {
   app: ExperimentApi;
-  raw: string;
+  body: Record<string, unknown>;
   projectId: string;
 }): Promise<LegacyAnswer> {
-  // Size comes from the wire bytes, not a re-serialisation of the parsed body —
-  // these payloads carry full dataset entries and LLM outputs.
-  const payloadSize = Buffer.byteLength(raw, "utf8");
+  // The framework consumed the wire bytes; the re-serialised body is within whitespace of them.
+  const payloadSize = Buffer.byteLength(JSON.stringify(body), "utf8");
   await app.assertBatchLogWithinLimit({ projectId, payloadBytes: payloadSize });
-  const body = parseJson(raw);
-
-  if (!body) return answer({ message: "Invalid body, expecting json" }, 400);
-
   let params: ESBatchEvaluationRESTParams;
 
   try {
@@ -228,19 +204,6 @@ async function recordBatch({
 }
 
 // ============ Shared helpers ============
-
-/** The document, or nothing where the body was not a JSON object. */
-function parseJson(raw: string): Record<string, unknown> | null {
-  try {
-    const parsed: unknown = JSON.parse(raw);
-
-    return typeof parsed === "object" && parsed !== null
-      ? (parsed as Record<string, unknown>)
-      : null;
-  } catch {
-    return null;
-  }
-}
 
 /** A refusal's sentence, whichever kind of failure produced it. */
 function sentenceFor(error: unknown): string {

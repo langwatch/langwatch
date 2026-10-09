@@ -41,11 +41,11 @@ describe("the SDK dataset evaluation REST family", () => {
     });
 
     /** @scenario "The dataset evaluation door keeps its wire after the move" */
-    it("caps the body at 30MB and refuses past it with the plain 413", () => {
+    it("caps the body at 30MB and refuses past it with payload_too_large", () => {
       const [route] = declaration.routes;
 
       expect(route?.bodyLimit?.maxBytes).toBe(30 * 1024 * 1024);
-      expect(route?.bodyLimit?.onExceeded?.()).toMatchObject({ status: 413 });
+      expect(route?.bodyLimit?.onExceeded?.()).toMatchObject({ code: "payload_too_large" });
     });
   });
 });

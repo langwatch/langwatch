@@ -2,8 +2,9 @@
  * @vitest-environment node
  * What the evaluate doors tell a caller whose body is not JSON, or not an evaluation.
  */
-import { createRestRuntime } from "@langwatch/api/rest";
+import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
+import { HandledError } from "@langwatch/handled-error";
 import type * as observabilityModule from "@langwatch/observability";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
@@ -23,16 +24,13 @@ vi.mock("@langwatch/observability", async (importOriginal) => ({
 
 const PROJECT_ID = "project-1";
 
-/** Main's `c.json({ message: "Bad request" }, 400)` on the evaluate doors, byte for byte. */
-const MAIN_EVALUATE_BAD_REQUEST = '{"message":"Bad request"}';
-
 describe("given an evaluate door", () => {
   describe("when the body is not sent as json", () => {
     it.each([
       "/api/evaluations/basic/evaluate",
       "/api/evaluations/langevals/valid_format/evaluate",
       "/api/guardrails/basic/evaluate",
-    ])("answers %s with main's 400 body before the handler", async (path) => {
+    ])("answers %s with the framework's 400 malformed_request before the handler", async (path) => {
       const runtime = createRestRuntime({
         identity: {
           authenticate: () => ({
@@ -44,7 +42,10 @@ describe("given an evaluate door", () => {
       const app = runtime.mount(evaluationsLegacyRest.router(), {
         // "{}" parses, so a handler reached here would call the empty fixture and 500.
         app: () => createApiFixture<EvaluationApi>({}),
-        onError: (error, context) => context.json({ error: String(error) }, 500),
+        onError: (error, context) =>
+          HandledError.isHandled(error)
+            ? canonicalErrorResponse(error, context)
+            : context.json({ error: String(error) }, 500),
       });
 
       const response = await app.fetch(
@@ -57,7 +58,7 @@ describe("given an evaluate door", () => {
 
       expect(response.status).toBe(400);
       expect(response.headers.get("content-type")).toMatch(/^application\/json/);
-      await expect(response.text()).resolves.toBe(MAIN_EVALUATE_BAD_REQUEST);
+      await expect(response.json()).resolves.toMatchObject({ code: "malformed_request" });
     });
   });
 });
