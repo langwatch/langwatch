@@ -12,6 +12,15 @@ import { type ComponentType, createElement, forwardRef, type ReactNode } from "r
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
+const flags = vi.hoisted((): Record<string, boolean> => ({}));
+
+vi.mock("@langwatch/feature-flag-client", () => ({
+  useFeatureFlag: ({ name }: { name: string }) => ({
+    enabled: flags[name] ?? false,
+    isLoading: false,
+  }),
+}));
+
 vi.mock("react-contextual-analytics", () => ({
   AnalyticsBoundary: ({ children }: { children: ReactNode }) => children,
   useAnalytics: () => ({ emit: vi.fn() }),
@@ -140,7 +149,6 @@ const SAAS_DEPLOYMENT: UiDeployment = {
   hasEmailProvider: true,
 };
 
-const flags: Record<string, boolean> = {};
 const failures: OnboardingFailureNotice[] = [];
 const hardRedirects: string[] = [];
 let organizations: OnboardingOrganization[] = [];
