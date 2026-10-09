@@ -23,6 +23,7 @@ import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import SettingsLayout from "../../components/SettingsLayout";
 import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { manualTriggerFeedback } from "./topic-clustering-trigger-feedback";
 
 /**
  * Fixed copy per failure code. The classifier's code is the ONLY thing the
@@ -111,20 +112,8 @@ function TopicClusteringCard({ project }: { project: { id: string } }) {
 
   const triggerClustering = api.project.triggerTopicClustering.useMutation({
     onSuccess: (result) => {
-      if (result.started) {
-        setLastTriggeredAt(Date.now());
-        toaster.create({
-          title: "Topic clustering started",
-          description: "This can take several minutes.",
-          type: "success",
-        });
-      } else {
-        toaster.create({
-          title: "A run is already in progress",
-          description: "Its results will appear here when it finishes.",
-          type: "info",
-        });
-      }
+      if (result.started) setLastTriggeredAt(Date.now());
+      toaster.create(manualTriggerFeedback(result));
       void utils.topics.getClusteringStatus.invalidate({
         projectId: project.id,
       });
