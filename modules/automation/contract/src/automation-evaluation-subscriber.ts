@@ -1,6 +1,10 @@
 import { z } from "zod";
 
-export const automationEvaluationSubscriberEventSchema = z.object({ occurredAt: z.number() });
+export const automationEvaluationSubscriberEventSchema = z.object({
+  occurredAt: z.number(),
+  // Processing time; the stale guard reads it, since occurredAt may be the evaluated span's end
+  createdAt: z.number().optional(),
+});
 
 export type AutomationEvaluationSubscriberEvent = z.infer<
   typeof automationEvaluationSubscriberEventSchema

@@ -70,6 +70,7 @@ const CONTEXT = {
   tenantId: INVITED.tenantId,
   aggregateId: INVITED.organizationId,
   occurredAt: INVITED.occurredAt,
+  createdAt: INVITED.occurredAt,
   eventId: "event-1",
 };
 

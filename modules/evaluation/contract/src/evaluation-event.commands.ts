@@ -14,6 +14,8 @@ export const executeEvaluationCommandDataSchema = z.object({
   evaluatorName: z.string().optional(),
   isGuardrail: z.boolean().optional(),
   occurredAt: z.number(),
+  // The evaluated trace's last span end: the reported event's business time; absent, occurredAt
+  spanEndedAt: z.number().optional(),
   // Thread debouncing: when > 0, traces in the same thread share one dedup key
   threadIdleTimeout: z.number().optional(),
   // Trace metadata passed from evaluationTrigger subscriber

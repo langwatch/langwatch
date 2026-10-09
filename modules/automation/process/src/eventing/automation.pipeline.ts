@@ -383,6 +383,7 @@ const buildAutomationsPipeline = (deps: AutomationsPipelineDeps) => {
           evaluationId: context.aggregateId,
           status: data.status,
           occurredAt: context.occurredAt,
+          createdAt: context.createdAt,
         }),
     })
     .withPeerSubscriber("evaluationReportedTriggerMatch", {
@@ -400,6 +401,7 @@ const buildAutomationsPipeline = (deps: AutomationsPipelineDeps) => {
           status: data.status,
           traceId: data.traceId,
           occurredAt: context.occurredAt,
+          createdAt: context.createdAt,
         }),
     })
     .withPeerSubscriber("traceSpanGraphActivity", {
