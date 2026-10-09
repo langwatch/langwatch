@@ -324,6 +324,13 @@ Feature: Internal feature flag system for system-level kill switches
            default as the places a value comes from, in that order
       And it names no external flag service either
 
+    @unit
+    Scenario: Self-hosted installs do not offer the Feature Flags page
+      Given an operator on an install where ops's cloud-ops capability is off
+      Then the Ops menu has no Feature Flags entry
+      And /ops/feature-flags answers as an unknown page
+      But an environment override still sets a flag
+
     Scenario: Operator without ops:manage permission cannot toggle flags
       Given an operator with only ops:view permission opens the page
       When the operator attempts to toggle a flag
