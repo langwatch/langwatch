@@ -80,6 +80,7 @@ describe("useUrlParamToOpenNewTab", () => {
     query.value = {};
     fetchPrompt.mockReset();
     clearStoreInstances();
+    capabilities.storage = memoryStorage();
     mockGetResolvedDefault.mockReturnValue({ data: { model: "openai/gpt-5-mini" } });
   });
 
@@ -122,6 +123,29 @@ describe("useUrlParamToOpenNewTab", () => {
       expect(fetchPrompt).toHaveBeenCalledTimes(1);
       expect(fetchPrompt).toHaveBeenCalledWith({ idOrHandle: "prompt-1", projectId: "project_1" });
       expect(store.getState().windows[0]?.tabs[0]?.data.meta.title).toBe("greeter");
+    });
+  });
+
+  describe("given a reload of a ?promptId= link whose prompt already has a tab", () => {
+    /** @scenario "Reloading a promptId link focuses the tab already holding that prompt" */
+    it("focuses that tab and opens no second one", async () => {
+      query.value = { promptId: "prompt-1" };
+      fetchPrompt.mockResolvedValue({ id: "prompt-1", version: 2 });
+      const store = getStoreForTesting({ projectId: "project_1", capabilities });
+      const tabData = (configId: string) => ({
+        chat: { initialMessagesFromSpanData: [] },
+        form: { currentValues: { configId } },
+        meta: { title: configId },
+        variableValues: {},
+      });
+      const greeterTabId = store.getState().addTab({ data: tabData("prompt-1") });
+      const otherTabId = store.getState().addTab({ data: tabData("prompt-2") });
+      expect(store.getState().isTabIdActive(otherTabId)).toBe(true);
+
+      render(<TestComponent />);
+
+      await waitFor(() => expect(store.getState().isTabIdActive(greeterTabId)).toBe(true));
+      expect(store.getState().windows.flatMap((w) => w.tabs)).toHaveLength(2);
     });
   });
 });

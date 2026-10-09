@@ -15,12 +15,13 @@ function usePromptIdQueryParam() {
 }
 
 /**
- * Custom hook to open a new tab based on a promptId in the URL. Single Responsibility:
- * Opens a new tab based on a promptId in the URL.
+ * Opens the prompt named by `?promptId=` in a new tab, or focuses the tab
+ * already holding it (a reload restores tabs before the link is read again).
  */
 export function useUrlParamToOpenNewTab() {
   const { project } = usePromptProject();
   const addTab = useDraggableTabsBrowserStore((state) => state.addTab);
+  const focusTabByConfigId = useDraggableTabsBrowserStore((state) => state.focusTabByConfigId);
   const { selectedPromptId } = usePromptIdQueryParam();
   const trpc = promptClient.useUtils();
 
@@ -34,9 +35,7 @@ export function useUrlParamToOpenNewTab() {
 
   useEffect(() => {
     async function openNewTab() {
-      if (!selectedPromptId) return;
-      if (!project?.id) return;
-      if (opened.current === selectedPromptId) return;
+      if (!selectedPromptId || !project?.id || opened.current === selectedPromptId) return;
       opened.current = selectedPromptId;
 
       const prompt = await trpc.prompts.getByIdOrHandle.fetch({
@@ -51,6 +50,11 @@ export function useUrlParamToOpenNewTab() {
         defaultModel: resolvedDefaultModel,
         useSystemMessage: true,
       });
+
+      // The link stays in the URL to be shared, so a reload focuses its tab.
+      if (defaultValues.configId && focusTabByConfigId({ configId: defaultValues.configId })) {
+        return;
+      }
 
       addTab({
         data: {
@@ -73,5 +77,12 @@ export function useUrlParamToOpenNewTab() {
     // A failure here is a prompt that will not open; the reader sees the tab
     // never arrive, which is the same thing the application's log line said.
     void openNewTab().catch(() => undefined);
-  }, [addTab, resolvedDefaultModel, project?.id, selectedPromptId, trpc.prompts.getByIdOrHandle]);
+  }, [
+    addTab,
+    focusTabByConfigId,
+    resolvedDefaultModel,
+    project?.id,
+    selectedPromptId,
+    trpc.prompts.getByIdOrHandle,
+  ]);
 }

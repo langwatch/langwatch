@@ -104,6 +104,8 @@ export interface DraggableTabsBrowserState {
   getByTabId: (tabId: string) => TabData | undefined;
   /** Is the tab id active? Checks across all windows and tavs */
   isTabIdActive: (tabId: string) => boolean;
+  /** Focus the first open tab holding this prompt; false when none is open */
+  focusTabByConfigId: (params: { configId: string }) => boolean;
 
   /** Reset store to initial state and clear its persisted storage */
   reset: () => void;
@@ -624,6 +626,18 @@ function createDraggableTabsBrowserStore(projectId: string, capabilities: Prompt
           get()
             .windows.flatMap((w) => w.tabs)
             .find((t) => t.id === tabId)?.data,
+
+        focusTabByConfigId: ({ configId }) => {
+          for (const tabbedWindow of get().windows) {
+            const tab = tabbedWindow.tabs.find(
+              (t) => t.data.form.currentValues?.configId === configId,
+            );
+            if (!tab) continue;
+            get().setActiveTab({ windowId: tabbedWindow.id, tabId: tab.id });
+            return true;
+          }
+          return false;
+        },
       })),
       {
         name: storageKey,
