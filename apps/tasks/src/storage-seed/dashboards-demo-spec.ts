@@ -87,6 +87,10 @@ export interface DashboardsDemoEffect {
   kappa?: Record<string, number>;
   rampDays?: number;
   untilDay?: number;
+  /** Shift of the resolved share for conversations from these customers. */
+  customers?: Record<string, number>;
+  /** Only between these UTC hours, [from, to), on the change's days. */
+  hours?: [number, number];
 }
 
 export interface DashboardsDemoChange {

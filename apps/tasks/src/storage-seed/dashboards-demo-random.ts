@@ -3,7 +3,14 @@
  * every stream is seeded from a key, so a re-run regenerates the same traces.
  */
 
+import { createHash } from "node:crypto";
+
 const SEED = "langwatch-dashboards-demo";
+
+/** A stable hex id for a key, the shape OTLP wants: 32 characters for a trace, 16 for a span. */
+export function hexId({ key, length }: { key: string; length: 16 | 32 }): string {
+  return createHash("sha256").update(`${SEED}:${key}`).digest("hex").slice(0, length);
+}
 
 export function hashString(value: string): number {
   let hash = 0x811c9dc5;

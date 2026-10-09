@@ -713,7 +713,7 @@ export const DASHBOARDS_DEMO_PROJECT_SPECS: readonly DashboardsDemoProjectSpec[]
       "tokPerReq": 3400,
       "models": [
         [
-          "claude-sonnet-4.5",
+          "claude-sonnet-4-5",
           0.6
         ],
         [
@@ -1314,7 +1314,7 @@ export const DASHBOARDS_DEMO_PROJECT_SPECS: readonly DashboardsDemoProjectSpec[]
           0.85
         ],
         [
-          "claude-sonnet-4.5",
+          "claude-sonnet-4-5",
           0.15
         ]
       ],
@@ -2329,11 +2329,11 @@ export const DASHBOARDS_DEMO_PROJECT_SPECS: readonly DashboardsDemoProjectSpec[]
       {
         "day": 68,
         "kind": "model",
-        "label": "Model gpt-5 to claude-sonnet-4.5",
+        "label": "Model gpt-5 to claude-sonnet-4-5",
         "effect": {
           "models": [
             [
-              "claude-sonnet-4.5",
+              "claude-sonnet-4-5",
               0.95
             ],
             [
@@ -2377,7 +2377,7 @@ export const DASHBOARDS_DEMO_PROJECT_SPECS: readonly DashboardsDemoProjectSpec[]
       "tokPerReq": 2800,
       "models": [
         [
-          "claude-sonnet-4.5",
+          "claude-sonnet-4-5",
           1
         ]
       ],
@@ -2733,7 +2733,7 @@ export const DASHBOARDS_DEMO_PROJECT_SPECS: readonly DashboardsDemoProjectSpec[]
       "tokPerReq": 3000,
       "models": [
         [
-          "claude-sonnet-4.5",
+          "claude-sonnet-4-5",
           0.85
         ],
         [

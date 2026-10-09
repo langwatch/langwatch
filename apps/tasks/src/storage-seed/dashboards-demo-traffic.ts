@@ -10,7 +10,9 @@ import type {
   TrackEventRESTParamsValidator,
 } from "@langwatch/trace-contract";
 
-import { DemoRandom } from "./dashboards-demo-random.ts";
+import { type DemoDay, isWeekend } from "./dashboards-demo-days.ts";
+import type { DashboardsDemoAgent } from "./dashboards-demo-ids.ts";
+import { DemoRandom, hexId } from "./dashboards-demo-random.ts";
 import type {
   DashboardsDemoChange,
   DashboardsDemoEffect,
@@ -19,19 +21,20 @@ import type {
   DashboardsDemoOutcome,
   DashboardsDemoProjectSpec,
 } from "./dashboards-demo-spec.ts";
+import { DEMO_CUSTOMERS } from "./dashboards-demo-story.ts";
 
-/** The prototype's last day; the seed maps it onto today. */
-export const PROTOTYPE_LAST_DAY = 89;
-
-const DAY_MS = 86_400_000;
-
-/** USD per million input and output tokens; close enough for a demo. */
-const MODEL_PRICES: Record<string, [number, number]> = {
+/** USD per million input and output tokens, the providers' list prices. */
+export const MODEL_PRICES: Record<string, [number, number]> = {
+  "gpt-5-nano": [0.05, 0.4],
   "gpt-5-mini": [0.25, 2],
   "gpt-5": [1.25, 10],
-  "claude-sonnet-4.5": [3, 15],
+  "claude-haiku-4-5": [1, 5],
+  "claude-sonnet-4-5": [3, 15],
   "gemini-2.5-pro": [1.25, 10],
 };
+
+/** The sub-agents a planner hands work to, each its own named agent span. */
+const PLANNER_SUB_AGENTS = ["cart-agent", "payment-agent"] as const;
 
 const OUTCOMES: DashboardsDemoOutcome[] = [
   "resolved",
@@ -48,7 +51,10 @@ const DEFAULT_ERROR_TYPES: [string, number][] = [
   ["upstream_5xx", 0.1],
 ];
 
-/** Judges and checks that read safety, not answer quality, so a failed conversation does not drag them. */
+/**
+ * Judges and checks that read safety, not answer quality, so a failed conversation does not
+ * drag them.
+ */
 const SAFETY_CHECKS = new Set([
   "pii-guard",
   "pii-leak",
@@ -67,11 +73,20 @@ export interface DemoTurn {
 const clamp = ({ value, min = 0, max = 1 }: { value: number; min?: number; max?: number }) =>
   Math.max(min, Math.min(max, value));
 
-/** How strongly a change applies on a prototype day: 0 before it, ramping to 1. */
-function effectWeight({ change, day }: { change: DashboardsDemoChange; day: number }): number {
+/** How strongly a change applies on a prototype day and UTC hour: 0 before it, ramping to 1. */
+function effectWeight({
+  change,
+  day,
+  hour,
+}: {
+  change: DashboardsDemoChange;
+  day: number;
+  hour: number;
+}): number {
   const effect = change.effect;
   if (!effect || day < change.day) return 0;
   if (effect.untilDay !== undefined && day >= effect.untilDay) return 0;
+  if (effect.hours && (hour < effect.hours[0] || hour >= effect.hours[1])) return 0;
   const ramp = effect.rampDays ?? 0;
   return ramp > 0 ? Math.min(1, (day - change.day + 1) / ramp) : 1;
 }
@@ -85,12 +100,14 @@ interface ActiveEffect {
 function activeEffects({
   spec,
   day,
+  hour,
 }: {
   spec: DashboardsDemoProjectSpec;
   day: number;
+  hour: number;
 }): ActiveEffect[] {
   return spec.changes.flatMap((change) => {
-    const weight = effectWeight({ change, day });
+    const weight = effectWeight({ change, day, hour });
     return weight > 0 && change.effect ? [{ effect: change.effect, weight, change }] : [];
   });
 }
@@ -118,7 +135,7 @@ function multOf({
   }, 1);
 }
 
-/** The prompt or config version a trace ran on: the latest prompt-like change on or before its day. */
+/** The prompt or config version a trace ran on: the latest release on or before its day. */
 function versionOn({ spec, day }: { spec: DashboardsDemoProjectSpec; day: number }): string {
   const releases = spec.changes.filter(
     (change) => change.day <= day && (change.kind === "prompt" || change.kind === "base-prompt"),
@@ -127,17 +144,25 @@ function versionOn({ spec, day }: { spec: DashboardsDemoProjectSpec; day: number
   return latest ? (latest.version ?? latest.label) : `${spec.id} baseline`;
 }
 
-/** Traces per day on the demo: the prototype's volume scaled to a dev box, lighter at weekends. */
+/**
+ * Traces per day: the prototype's volume scaled to a dev box, times the size flag, growing
+ * about 0.4% a day. Interactive agents are lighter at weekends; a batch job is not.
+ */
 export function demoTracesPerDay({
   spec,
-  date,
+  agent,
+  day,
+  scale,
 }: {
   spec: DashboardsDemoProjectSpec;
-  date: Date;
+  agent: DashboardsDemoAgent;
+  day: DemoDay;
+  scale: number;
 }): number {
   const base = clamp({ value: Math.round(spec.traffic.reqPerDay / 30), min: 12, max: 90 });
-  const weekday = date.getUTCDay();
-  return Math.round(base * (weekday === 0 || weekday === 6 ? 0.6 : 1));
+  const weekend = agent.shape !== "batch" && isWeekend(day) ? 0.6 : 1;
+  const growth = 1 - day.daysAgo * 0.004;
+  return Math.max(1, Math.round(base * weekend * growth * scale));
 }
 
 function turnsOf({ spec, random }: { spec: DashboardsDemoProjectSpec; random: DemoRandom }) {
@@ -181,11 +206,13 @@ function outcomeMix({
   effects,
   segment,
   topic,
+  customer,
 }: {
   spec: DashboardsDemoProjectSpec;
   effects: ActiveEffect[];
   segment: string;
   topic: string;
+  customer: string | undefined;
 }): [DashboardsDemoOutcome, number][] {
   const mix = OUTCOMES.map((outcome) => {
     const shifted =
@@ -199,7 +226,8 @@ function outcomeMix({
       get: (effect) =>
         (effect.segments?.[segment] ?? 0) +
         (effect.tenants?.[segment] ?? 0) +
-        (effect.topics?.[topic] ?? 0),
+        (effect.topics?.[topic] ?? 0) +
+        (customer ? (effect.customers?.[customer] ?? 0) : 0),
     });
   if (segmentShift === 0) return mix;
   const resolved = mix[0]?.[1] ?? 0;
@@ -301,6 +329,11 @@ interface SpanClock {
   at: number;
 }
 
+/** Omit per member of the Span union, so each span type keeps its own fields. */
+type SpanFields<S = Span> = S extends unknown
+  ? Omit<S, "span_id" | "parent_id" | "trace_id" | "timestamps">
+  : never;
+
 function childSpan({
   traceId,
   parentId,
@@ -314,7 +347,7 @@ function childSpan({
   spanId: string;
   clock: SpanClock;
   durationMs: number;
-  fields: Omit<Span, "span_id" | "parent_id" | "trace_id" | "timestamps">;
+  fields: SpanFields;
 }): Span {
   const startedAt = clock.at;
   clock.at += Math.max(5, Math.round(durationMs));
@@ -328,11 +361,13 @@ function childSpan({
 }
 
 interface Turn {
+  agent: DashboardsDemoAgent;
   traceId: string;
   startedAt: number;
   isLastTurn: boolean;
   threadId: string | undefined;
   userId: string | undefined;
+  customerId: string | undefined;
   segment: string;
   topic: string;
   language: string | undefined;
@@ -519,7 +554,7 @@ function spansFor({
   random: DemoRandom;
 }): { spans: Span[]; finishedAt: number; failed: boolean } {
   const traceId = turn.traceId;
-  const rootId = `span_${traceId}_root`;
+  const rootId = hexId({ key: `${traceId}:root`, length: 16 });
   const clock: SpanClock = { at: turn.startedAt + random.int({ min: 2, max: 20 }) };
   const children: Span[] = [];
   const latencyScale = multOf({ effects, get: (effect) => effect.p95 });
@@ -531,7 +566,7 @@ function spansFor({
     ? random.weighted(spec.vocab.errorTypes ?? DEFAULT_ERROR_TYPES)
     : undefined;
   let next = 0;
-  const id = () => `span_${traceId}_${next++}`;
+  const id = () => hexId({ key: `${traceId}:${next++}`, length: 16 });
 
   if (spec.vocab.retrieval) {
     const empty = errorType === "empty_retrieval";
@@ -576,29 +611,48 @@ function spansFor({
     }
   } else {
     const tools = toolsFor({ spec, turn, random, effects });
+    const planner = turn.agent.shape === "planner";
+    if (planner) children.push(llmSpan({ name: "plan" }));
     for (const [position, tool] of tools.entries()) {
       const isFailing = failed && errorType === "tool_error" && position === 0;
-      children.push(
-        childSpan({
-          traceId,
-          parentId: rootId,
-          spanId: id(),
-          clock,
-          durationMs: random.logNormal({ median: p95 * 0.06, p95: p95 * 0.2 }),
-          fields: {
-            type: "tool",
-            name: tool,
-            input: { type: "json", value: { topic: turn.topic } },
-            output: isFailing ? undefined : { type: "json", value: { ok: true } },
-            error: isFailing ? errorCapture(`${tool} returned 500`) : undefined,
-          },
-        }),
-      );
+      let parentId = rootId;
+      if (planner) {
+        const subAgent = PLANNER_SUB_AGENTS[position % PLANNER_SUB_AGENTS.length] ?? "worker";
+        parentId = id();
+        children.push(
+          childSpan({
+            traceId,
+            parentId: rootId,
+            spanId: parentId,
+            clock: { at: clock.at },
+            durationMs: 0,
+            fields: { type: "agent", name: subAgent, params: { "gen_ai.agent.name": subAgent } },
+          }),
+        );
+      }
+      const toolSpan = childSpan({
+        traceId,
+        parentId,
+        spanId: id(),
+        clock,
+        durationMs: random.logNormal({ median: p95 * 0.06, p95: p95 * 0.2 }),
+        fields: {
+          type: "tool",
+          name: tool,
+          input: { type: "json", value: { topic: turn.topic } },
+          output: isFailing ? undefined : { type: "json", value: { ok: true } },
+          error: isFailing ? errorCapture(`${tool} returned 500`) : undefined,
+        },
+      });
+      children.push(toolSpan);
+      // A sub-agent span closes when its tool call does.
+      const subAgentSpan = planner ? children.find((span) => span.span_id === parentId) : undefined;
+      if (subAgentSpan) subAgentSpan.timestamps.finished_at = toolSpan.timestamps.finished_at;
     }
     children.push(llmSpan());
   }
 
-  function llmSpan(): Span {
+  function llmSpan({ name }: { name?: string } = {}): Span {
     const models = modelMix({ spec, effects, random });
     const model = random.weighted(models);
     const tokens = Math.round(
@@ -642,7 +696,7 @@ function spansFor({
       durationMs,
       fields: {
         type: "llm",
-        name: spec.archetype === "voice" ? "llm_turn" : "generate",
+        name: name ?? (spec.archetype === "voice" ? "llm_turn" : "generate"),
         model,
         input: { type: "chat_messages", value: [{ role: "user", content: input }] },
         output: isFailing ? undefined : { type: "text", value: output },
@@ -669,6 +723,7 @@ function spansFor({
     trace_id: traceId,
     type: spec.archetype === "rag" || spec.archetype === "extraction" ? "chain" : "agent",
     name: rootName,
+    params: { "gen_ai.agent.name": turn.agent.name },
     input: { type: "text", value: input },
     output: failed ? undefined : { type: "text", value: output },
     error: failed ? errorCapture(errorType ?? "error") : undefined,
@@ -731,25 +786,25 @@ function toolsFor({
 /** One conversation's turns on a day: the traces and their thumbs events, all deterministic. */
 export function conversationTurns({
   spec,
+  agent,
   projectSlug,
-  date,
+  demoDay,
   index,
-  dayStart,
-  todayStart,
 }: {
   spec: DashboardsDemoProjectSpec;
+  agent: DashboardsDemoAgent;
   projectSlug: string;
-  /** The UTC date, YYYY-MM-DD; with the index it names every id. */
-  date: string;
+  demoDay: DemoDay;
+  /** With the project, agent and day it names every id. */
   index: number;
-  dayStart: number;
-  /** Midnight UTC of the seed's today, which maps onto the prototype's last day. */
-  todayStart: number;
 }): DemoTurn[] {
-  const random = new DemoRandom(`${projectSlug}:${date}:${index}`);
-  const daysAgo = Math.round((todayStart - dayStart) / DAY_MS);
-  const day = PROTOTYPE_LAST_DAY - daysAgo;
-  const effects = activeEffects({ spec, day });
+  const key = `${projectSlug}_${agent.name}_${demoDay.key}_${index}`;
+  const random = new DemoRandom(key);
+  const day = demoDay.prototypeDay;
+  const hour = random.weighted<number>(
+    Array.from({ length: 24 }, (_, h) => [h, hourWeight({ agent, hour: h })]),
+  );
+  const effects = activeEffects({ spec, day, hour });
   const segment = random.weighted(spec.attention.values);
   const topic =
     spec.attention.unit === "topic" || spec.attention.unit === "documentType"
@@ -761,7 +816,15 @@ export function conversationTurns({
       : spec.languages
         ? random.weighted(spec.languages)
         : undefined;
-  const outcome = random.weighted(outcomeMix({ spec, effects, segment, topic }));
+  const interactive = agent.shape !== "batch";
+  const userId =
+    interactive && random.chance(spec.coverage.user_id ?? 0)
+      ? `user-${String(Math.floor(Math.pow(random.next(), 2.2) * 400)).padStart(3, "0")}`
+      : undefined;
+  const customerId = userId ? customerOf(userId) : undefined;
+  const outcome = random.weighted(
+    outcomeMix({ spec, effects, segment, topic, customer: customerId }),
+  );
   const reviewShift = shiftOf({ effects, get: (effect) => effect.reviewShare });
   const finalOutcome: DashboardsDemoOutcome =
     spec.archetype === "extraction" && outcome === "handover" && reviewShift < 0
@@ -773,31 +836,26 @@ export function conversationTurns({
     finalOutcome === "resolved"
       ? undefined
       : failureReason({ spec, effects, outcome: finalOutcome, random });
-  const threadId = random.chance(spec.coverage.thread_id ?? 0)
-    ? `thread_${projectSlug}_${date}_${index}`
-    : undefined;
-  const userId = random.chance(spec.coverage.user_id ?? 0)
-    ? `user-${String(Math.floor(Math.pow(random.next(), 2.2) * 400)).padStart(3, "0")}`
-    : undefined;
-  const hour = random.weighted<number>(
-    Array.from({ length: 24 }, (_, h) => [h, h >= 8 && h <= 18 ? 3 : h >= 6 && h <= 22 ? 1 : 0.25]),
-  );
+  const threadId =
+    interactive && random.chance(spec.coverage.thread_id ?? 0) ? `thread_${key}` : undefined;
   const turns = turnsOf({ spec, random });
   const action = generativeAction({ spec, effects, segment, random });
   const fields =
     spec.archetype === "extraction" ? fieldResults({ spec, effects, segment, random }) : [];
-  let startedAt = dayStart + hour * 3_600_000 + random.int({ min: 0, max: 3_540_000 });
+  let startedAt = demoDay.dayStart + hour * 3_600_000 + random.int({ min: 0, max: 3_540_000 });
   const result: DemoTurn[] = [];
 
   for (let turnIndex = 0; turnIndex < turns; turnIndex++) {
-    const traceId = `trace_${projectSlug}_${date}_${index}_${turnIndex}`;
+    const traceId = hexId({ key: `trace:${key}_${turnIndex}`, length: 32 });
     const isLastTurn = turnIndex === turns - 1;
     const turn: Turn = {
+      agent,
       traceId,
       startedAt,
       isLastTurn,
       threadId,
       userId,
+      customerId,
       segment,
       topic,
       language,
@@ -843,6 +901,17 @@ export function conversationTurns({
   return result;
 }
 
+/** Interactive agents follow the working day; a batch job runs between 01:00 and 04:00 UTC. */
+function hourWeight({ agent, hour }: { agent: DashboardsDemoAgent; hour: number }): number {
+  if (agent.shape === "batch") return hour >= 1 && hour < 4 ? 1 : 0;
+  return hour >= 8 && hour <= 18 ? 3 : hour >= 6 && hour <= 22 ? 1 : 0.25;
+}
+
+/** The customer an end user belongs to, fixed per user so a customer's users stay theirs. */
+function customerOf(userId: string): string {
+  return new DemoRandom(`customer:${userId}`).weighted(DEMO_CUSTOMERS);
+}
+
 function metadataFor({
   spec,
   turn,
@@ -867,7 +936,7 @@ function metadataFor({
   return {
     thread_id: turn.threadId,
     user_id: turn.userId,
-    customer_id: spec.attention.unit === "tenant" ? turn.segment : undefined,
+    customer_id: turn.customerId,
     labels,
     sdk_language: "python",
     topic: turn.topic,
@@ -926,12 +995,11 @@ function feedbackFor({
 }
 
 /** Conversations per day, from traces per day and the archetype's turns per conversation. */
-export function demoConversationsPerDay({
-  spec,
-  date,
-}: {
+export function demoConversationsPerDay(input: {
   spec: DashboardsDemoProjectSpec;
-  date: Date;
+  agent: DashboardsDemoAgent;
+  day: DemoDay;
+  scale: number;
 }): number {
-  return Math.max(1, Math.round(demoTracesPerDay({ spec, date }) / averageTurns(spec)));
+  return Math.max(1, Math.round(demoTracesPerDay(input) / averageTurns(input.spec)));
 }

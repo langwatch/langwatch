@@ -1,8 +1,10 @@
 /**
  * The dashboards demo's identity rows, idempotent: one organization, one team, the demo
  * projects with their fixed keys, and an existing user made admin of both. No new users.
+ * A project the team holds that the demo no longer lists is archived.
  */
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { nowInstant, toDate } from "@langwatch/time";
 
 import {
   DASHBOARDS_DEMO_BINDING_IDS,
@@ -55,7 +57,7 @@ export async function seedDashboardsDemoIdentity({
     select: { id: true },
   });
   for (const project of DASHBOARDS_DEMO_PROJECTS) {
-    const hasTraffic = project.archetype !== undefined;
+    const hasTraffic = project.agents.length > 0;
     await prisma.project.upsert({
       where: { id: project.id },
       create: {
@@ -69,10 +71,25 @@ export async function seedDashboardsDemoIdentity({
         firstMessage: hasTraffic,
         integrated: hasTraffic,
       },
-      update: { name: project.name, apiKey: project.apiKey, archivedAt: null },
+      update: {
+        name: project.name,
+        apiKey: project.apiKey,
+        archivedAt: null,
+        firstMessage: hasTraffic,
+        integrated: hasTraffic,
+      },
       select: { id: true },
     });
   }
+
+  await prisma.project.updateMany({
+    where: {
+      teamId: team.id,
+      archivedAt: null,
+      id: { notIn: DASHBOARDS_DEMO_PROJECTS.map(({ id }) => id) },
+    },
+    data: { archivedAt: toDate(nowInstant()) },
+  });
 
   await prisma.organizationUser.upsert({
     where: { userId_organizationId: { userId, organizationId: organization.id } },
