@@ -279,6 +279,9 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 				Start:   orch.StartWorktreeStack,
 				Down:    orch.DownStack,
 				Destroy: orch.DestroyStack,
+				// Add one service to a live stack; reset a stack's databases.
+				StartService:   orch.StartStackService,
+				ResetDatabases: orch.ResetStackDatabases,
 			},
 			Limits: dashboard.Limits{Report: limitsReport, Set: setLimit, Unset: unsetLimit},
 		}),

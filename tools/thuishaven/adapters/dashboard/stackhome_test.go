@@ -267,22 +267,45 @@ func TestStackHomeCarriesFactsSurfacesErrorsAndCredentials(t *testing.T) {
 func TestStackHomeJSONFieldNames(t *testing.T) {
 	f := newHomeFixture(t)
 	body := decode[map[string]any](t, f.get("feat-x.langwatch.localhost", "/api/stacks/feat-x"))
-	pinKeys(t, "stack home", body, "slug", "registered", "live", "hubUrl", "homeUrl", "facts", "surfaces", "errors", "credentials", "actions")
+	pinKeys(t, "stack home", body, "slug", "registered", "live", "hubUrl", "homeUrl", "facts", "surfaces", "errors", "credentials", "actions", "belowFloor")
 	facts := body["facts"].(map[string]any)
 	pinKeys(t, "facts", facts, "branch", "worktreeDir", "layout", "baseline", "uptimeSeconds", "rssBytes", "heartbeatAt", "databases")
 	databases := facts["databases"].(map[string]any)
 	pinKeys(t, "databases", databases, "postgres", "clickhouse", "redis")
 	pinKeys(t, "postgres", databases["postgres"], "name", "port")
 	pinKeys(t, "redis", databases["redis"], "db", "port")
-	pinKeys(t, "surface", body["surfaces"].([]any)[0], "name", "role", "hostname", "url", "port", "status", "hint", "fallback", "reason", "detail", "restart")
+	pinKeys(t, "surface", body["surfaces"].([]any)[0], "name", "role", "hostname", "url", "port", "status", "hint", "fallback", "reason", "detail", "restart", "start")
 	credentials := body["credentials"].(map[string]any)
 	pinKeys(t, "credentials", credentials, "login", "mailAddress", "idpTenants", "apiKey")
 	pinKeys(t, "login", credentials["login"], "email")
 	pinKeys(t, "apiKey", credentials["apiKey"], "masked", "revealPath")
 	pinKeys(t, "idp tenant", credentials["idpTenants"].([]any)[0], "id", "domain", "url")
-	pinKeys(t, "actions", body["actions"], "canRestart", "canStart", "startDir")
+	pinKeys(t, "actions", body["actions"], "canRestart", "canStart", "startDir", "canStartService", "canResetDatabases")
 	if errs, ok := body["errors"].([]any); !ok || errs == nil {
 		t.Errorf("errors must be an array even when empty, got %v", body["errors"])
+	}
+}
+
+// @scenario "A stack whose database is below the upgrade floor can reset its databases from the stack home"
+func TestStackHomeSaysWhenTheFloorHoldsTheAPI(t *testing.T) {
+	f := newHomeFixture(t)
+	if err := os.Mkdir(filepath.Join(f.logDir, "feat-x"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	at := time.Date(2026, 9, 28, 9, 0, 0, 0, time.UTC).Format(time.RFC3339Nano)
+	refusal := at + ` {"level":"error","code":"refused_below_floor","msg":"this installation is on 3.19.3; upgrade to 3.20.1 (LTS) first"}` + "\n"
+	writeLog(t, filepath.Join(f.logDir, "feat-x", "api.log"), refusal)
+	f.up[5100] = false
+
+	home := decode[stackHomeJSON](t, f.get("feat-x.langwatch.localhost", "/api/stacks/feat-x"))
+	if want := "this installation is on 3.19.3; upgrade to 3.20.1 (LTS) first"; home.BelowFloor != want {
+		t.Errorf("belowFloor = %q, want %q", home.BelowFloor, want)
+	}
+
+	f.up[5100] = true
+	home = decode[stackHomeJSON](t, f.get("feat-x.langwatch.localhost", "/api/stacks/feat-x"))
+	if home.BelowFloor != "" {
+		t.Errorf("a live api is not held, belowFloor = %q", home.BelowFloor)
 	}
 }
 

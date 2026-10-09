@@ -46,6 +46,7 @@ const surface = ({ slug, seed }: { slug: string; seed: SurfaceSeed }): Surface =
     reason: seed.reason ?? (seed.hint ? `not part of this stack; start it with ${seed.hint}` : ""),
     detail: "",
     restart: "",
+    start: seed.status === "not-selected" ? (seed.hint ?? "").replace("haven up +", "") : "",
   };
 };
 
@@ -134,7 +135,14 @@ export const liveHome = ({ now, surfaces }: { now: number; surfaces?: Surface[] 
     idpTenants: [{ id: "acme", domain: "acme.test", url: `https://idp.feat-x.${DOMAIN}/acme` }],
     apiKey: { masked: "sk-lw-••••••••9f3a", revealPath: "/api/stacks/feat-x/api-key" },
   },
-  actions: { canRestart: true, canStart: false, startDir: factsFor({ slug: "feat-x", live: true, now }).worktreeDir },
+  actions: {
+    canRestart: true,
+    canStart: false,
+    startDir: factsFor({ slug: "feat-x", live: true, now }).worktreeDir,
+    canStartService: true,
+    canResetDatabases: true,
+  },
+  belowFloor: "",
 });
 
 export const stoppedHome = ({ now }: { now: number }): StackHome => {
@@ -154,7 +162,14 @@ export const stoppedHome = ({ now }: { now: number }): StackHome => {
       idpTenants: [],
       apiKey: null,
     },
-    actions: { canRestart: false, canStart: true, startDir: facts.worktreeDir },
+    actions: {
+      canRestart: false,
+      canStart: true,
+      startDir: facts.worktreeDir,
+      canStartService: false,
+      canResetDatabases: true,
+    },
+    belowFloor: "",
   };
 };
 
@@ -184,7 +199,13 @@ export const hub = ({ now }: { now: number }): Hub => {
     live: false,
     homeUrl: `https://issue4821-a-rather-long-worktree-name.${DOMAIN}`,
     surfaces: surfacesFor({ slug: "issue4821-a-rather-long-worktree-name", status: "down" }),
-    actions: { canRestart: false, canStart: false, startDir: "" },
+    actions: {
+      canRestart: false,
+      canStart: false,
+      startDir: "",
+      canStartService: false,
+      canResetDatabases: false,
+    },
   };
   return {
     shared: {

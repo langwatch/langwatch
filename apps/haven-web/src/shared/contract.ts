@@ -23,6 +23,8 @@ export const surfaceSchema = z.object({
   detail: z.string(),
   /** The `haven restart` name that bounces this row, "" when it has none. */
   restart: z.string(),
+  /** The `haven up +<name>` name that adds this not-selected row, "" when it has none. */
+  start: z.string(),
 });
 export type Surface = z.infer<typeof surfaceSchema>;
 
@@ -77,7 +79,15 @@ export const stackHomeSchema = z.object({
   surfaces: z.array(surfaceSchema),
   errors: z.array(laneErrorsSchema),
   credentials: credentialsSchema,
-  actions: z.object({ canRestart: z.boolean(), canStart: z.boolean(), startDir: z.string() }),
+  actions: z.object({
+    canRestart: z.boolean(),
+    canStart: z.boolean(),
+    startDir: z.string(),
+    canStartService: z.boolean(),
+    canResetDatabases: z.boolean(),
+  }),
+  /** The upgrade gate's refusal while it holds the api, "" otherwise. */
+  belowFloor: z.string(),
 });
 export type StackHome = z.infer<typeof stackHomeSchema>;
 

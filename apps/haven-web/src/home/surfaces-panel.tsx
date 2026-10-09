@@ -13,10 +13,12 @@ import { surfaceState } from "../shared/surfaces.ts";
 export type RowRestart = {
   /** Undefined when the stack is not running, so no row offers it. */
   onRestart?: (surface: Surface) => void;
+  /** Undefined when the stack is not running, so no not-selected row offers a start. */
+  onStart?: (surface: Surface) => void;
   busy?: string;
 };
 
-const columnsFor = ({ onRestart, busy }: RowRestart): TableColumn<Surface>[] => [
+const columnsFor = ({ onRestart, onStart, busy }: RowRestart): TableColumn<Surface>[] => [
   {
     key: "status",
     header: "Status",
@@ -67,8 +69,19 @@ const columnsFor = ({ onRestart, busy }: RowRestart): TableColumn<Surface>[] => 
     header: "",
     width: "112px",
     align: "end",
-    cell: (surface) =>
-      onRestart === undefined || surface.restart === "" ? null : (
+    cell: (surface) => {
+      if (onStart !== undefined && surface.start !== "") {
+        return (
+          <ConfirmButton
+            variant="secondary"
+            label={busy === surface.name ? "Starting" : "Start"}
+            confirmLabel={`Start ${surface.start}?`}
+            disabled={busy !== undefined}
+            onConfirm={() => onStart(surface)}
+          />
+        );
+      }
+      return onRestart === undefined || surface.restart === "" ? null : (
         <ConfirmButton
           variant="secondary"
           label={busy === surface.name ? "Restarting" : "Restart"}
@@ -76,7 +89,8 @@ const columnsFor = ({ onRestart, busy }: RowRestart): TableColumn<Surface>[] => 
           disabled={busy !== undefined}
           onConfirm={() => onRestart(surface)}
         />
-      ),
+      );
+    },
   },
 ];
 
@@ -84,6 +98,7 @@ const columnsFor = ({ onRestart, busy }: RowRestart): TableColumn<Surface>[] => 
 export const SurfacesPanel = ({
   surfaces,
   onRestart,
+  onStart,
   busy,
 }: RowRestart & { surfaces: Surface[] }) => {
   const selected = surfaces.filter((surface) => surface.status !== "not-selected");
@@ -91,7 +106,7 @@ export const SurfacesPanel = ({
   return (
     <Panel title="Surfaces" meta={`${live} of ${selected.length} live`}>
       <Table
-        columns={columnsFor({ onRestart, busy })}
+        columns={columnsFor({ onRestart, onStart, busy })}
         rows={surfaces}
         rowKey={(surface) => surface.name}
         caption="Surfaces of this stack"

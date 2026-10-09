@@ -39,6 +39,8 @@ type stackHomeJSON struct {
 	Errors      []laneErrorsJSON `json:"errors"`
 	Credentials credentialsJSON  `json:"credentials"`
 	Actions     stackActionsJSON `json:"actions"`
+	// BelowFloor is the upgrade gate's refusal while it holds the api, else "".
+	BelowFloor string `json:"belowFloor"`
 }
 
 type factsJSON struct {
@@ -83,6 +85,8 @@ type surfaceJSON struct {
 	Reason  string `json:"reason"`
 	Detail  string `json:"detail"`
 	Restart string `json:"restart"`
+	// Start is the `haven up +<x>` name a Not selected row may add.
+	Start string `json:"start"`
 }
 
 type laneErrorsJSON struct {
@@ -112,6 +116,10 @@ type stackActionsJSON struct {
 	CanRestart bool   `json:"canRestart"`
 	CanStart   bool   `json:"canStart"`
 	StartDir   string `json:"startDir"`
+	// CanStartService offers Start on Not selected rows; CanResetDatabases the
+	// below-floor callout's reset.
+	CanStartService   bool `json:"canStartService"`
+	CanResetDatabases bool `json:"canResetDatabases"`
 }
 
 // IdPTenant is one tenant of the IdP simulator a stack routes to.
@@ -240,8 +248,40 @@ func (s *Server) handleStackHome(w http.ResponseWriter, r *http.Request) {
 			CanRestart: canRestart,
 			CanStart:   !h.live && s.config.Actions.Start != nil && st.WorktreeDir != "",
 			StartDir:   st.WorktreeDir,
+
+			CanStartService:   h.live && s.config.Actions.StartService != nil,
+			CanResetDatabases: registered && s.config.Actions.ResetDatabases != nil,
 		},
+		BelowFloor: floorRefusal(surfaces, tails, st.Layout),
 	})
+}
+
+// floorRefusal is the upgrade gate's refusal (code refused_below_floor) from
+// the api's lanes while the api is not live, its msg field when it has one.
+func floorRefusal(surfaces []surfaceJSON, tails map[string][]logLine, layout domain.Layout) string {
+	for _, sf := range surfaces {
+		if sf.Name != domain.APIService || sf.Status == statusLive {
+			continue
+		}
+		for _, lane := range surfaceLanes(sf.Name, layout) {
+			if line, ok := newestMentioning(tails[lane], "refused_below_floor"); ok {
+				if rec, parsed := logfmt.Parse(line.Text); parsed && rec.Message != "" {
+					return rec.Message
+				}
+				return line.Text
+			}
+		}
+	}
+	return ""
+}
+
+func newestMentioning(lines []logLine, needle string) (logLine, bool) {
+	for i := len(lines) - 1; i >= 0; i-- {
+		if strings.Contains(lines[i].Text, needle) {
+			return lines[i], true
+		}
+	}
+	return logLine{}, false
 }
 
 func (s *Server) facts(h homeState, extras Extras) factsJSON {
@@ -473,6 +513,8 @@ func explain(h homeState, surfaces []surfaceJSON, tails map[string][]logLine) {
 		sf := &surfaces[i]
 		if sf.Status != statusNotSelected {
 			sf.Restart = restartName(sf.Name, h.stack.Layout)
+		} else {
+			sf.Start = domain.CLIServiceNameForLayout(sf.Name, h.stack.Layout)
 		}
 		reason, isWaiting := reasonFor(h, *sf)
 		sf.Reason = reason
