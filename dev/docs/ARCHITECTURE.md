@@ -162,6 +162,13 @@ sets them through new `OrganizationApi` operations. Monitor reads an evaluator's
 new `EvaluationApi` read operation. Billing's Slack channel is renamed `billing-alert` (`BillingAlertChannel`),
 ownership unchanged (Alex, 2026-10-05).
 
+**Patched dependencies** (Alex, 2026-10-09). A third-party package is patched only when the behaviour
+cannot be reached through its options, and the upstream change is proposed at the same time. The patch
+is `patches/<name>@<version>.patch`, a diff against the published files as `pnpm patch-commit` writes it,
+registered under `patchedDependencies` in `pnpm-workspace.yaml` for one exact version; an upgrade re-cuts
+or drops it. Each patch has one owning module and a test there that runs the patched path. First:
+`@better-auth/sso@1.7.1`, per-connection IdP-initiated SAML, owned by auth.
+
 ---
 
 ## 3. A module

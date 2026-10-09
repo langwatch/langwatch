@@ -1,5 +1,6 @@
 import { passkey } from "@better-auth/passkey";
 import type {
+  SSOOptions,
   SSOUserResolution,
   SSOUserResolutionContext,
   SSOUserResolutionInput,
@@ -20,20 +21,22 @@ import {
   type AssertedEmailVerification,
   assertedEmailVerification,
   type IdentityApi,
+  idpInitiatedLanding,
   type SignInMethodPolicy,
   type SsoAssertionApi,
+  ssoSamlIdpConfigSchema,
 } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
 import { fromDate } from "@langwatch/time";
 import type { UserApi } from "@langwatch/user-contract";
 import { compare, hash } from "bcrypt";
 import { type Auth, type BetterAuthOptions, betterAuth } from "better-auth";
+import type { AdapterFactory } from "better-auth/adapters";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import type { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { twoFactor } from "better-auth/plugins/two-factor";
 
 import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";
-import type { AdapterFactory } from "better-auth/adapters";
 import { findRegisteredRefusals } from "../../rules/better-auth-error-code.rules.ts";
 import {
   findSubmittedAddresses,
@@ -742,6 +745,25 @@ function genericOAuthPlugins(
 }
 
 /**
+ * Sign-ins a SAML identity provider starts: the connection's own document opts it in
+ * and lists where one may land, and identity's rule picks the landing from that list.
+ * specs/identity/sso-saml-idp-initiated.feature
+ */
+export const ssoSamlOptions: NonNullable<SSOOptions["saml"]> = {
+  // Pinned: the per-connection opt-in lives inside this check; off would admit every connection.
+  enableInResponseToValidation: true,
+  resolveIdpInitiatedLanding: ({ relayState, samlConfig, appOrigin }) => {
+    const document = ssoSamlIdpConfigSchema.pick({ idpInitiated: true }).safeParse(samlConfig);
+    return idpInitiatedLanding({
+      relayState,
+      allowedTargets: document.success ? document.data.idpInitiated.landingTargets : [],
+      appOrigin,
+      defaultTarget: "/",
+    });
+  },
+};
+
+/**
  * The single sign-on plugin: `/sign-in/sso` and the callbacks a customer's
  * own identity provider answers. Mounted always, because a connection is
  * refused per organization by the gate below and never by an absent route.
@@ -769,6 +791,7 @@ function ssoPlugin({
     /** Somebody with no account who signs in through their employer's
      *  provider gets one; where they land is the arrival policy's business. */
     disableImplicitSignUp: false,
+    saml: ssoSamlOptions,
     resolveUser: async (input, context) => {
       const resolution = await resolveSsoUser({ assertions, input, context });
       // The exact account admitted here is the one the session it mints is attributed to.

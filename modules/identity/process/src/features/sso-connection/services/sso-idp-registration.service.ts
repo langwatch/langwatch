@@ -110,6 +110,7 @@ export class SsoIdpRegistrationService {
       entityId: entityId === "" ? null : entityId,
       metadataXml: metadataXml === "" ? null : metadataXml,
       certificate: certificate === "" ? null : certificate,
+      idpInitiated: registration.idpInitiated,
     };
   }
 }

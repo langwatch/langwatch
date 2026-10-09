@@ -51,6 +51,7 @@ function samlRegistration(over: Partial<SsoSamlRegistration> = {}): SsoSamlRegis
     entityId: null,
     metadataXml: null,
     certificate: null,
+    idpInitiated: { enabled: false, landingTargets: [] },
     ...over,
   };
 }

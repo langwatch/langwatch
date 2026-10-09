@@ -21,7 +21,7 @@ Feature: Signing in from the identity provider's own portal through a SAML conne
       Then "acme-okta" admits responses it did not ask for
       And the identity provider settings form shows the opt-in and both landing pages
 
-    @integration @unimplemented
+    @integration
     Scenario: A connection is not opted in until somebody opts it in
       Given "acme-okta" was registered before this setting existed
       Then "acme-okta" does not admit responses it did not ask for
@@ -47,14 +47,14 @@ Feature: Signing in from the identity provider's own portal through a SAML conne
 
   Rule: a response nobody asked for signs in only through an opted-in connection
 
-    @integration @unimplemented
+    @integration
     Scenario: An unsolicited response for an opted-in connection signs the person in
       Given "acme-okta" is opted in
       When the identity provider posts a valid signed response for "carol@acme.com" that answers no request
       Then "carol@acme.com" is signed in through "acme-okta"
       And the session records the same sign-in method as one LangWatch started
 
-    @integration @unimplemented
+    @integration
     Scenario: An unsolicited response for a connection not opted in is refused
       Given "acme-okta" is not opted in
       When the identity provider posts a valid signed response that answers no request
@@ -62,7 +62,7 @@ Feature: Signing in from the identity provider's own portal through a SAML conne
       And the log names "acme-okta" and the refusal as a response nobody asked for
       And the person sees the sign-in error screen without the reason
 
-    @integration @unimplemented
+    @integration
     Scenario: A sign-in LangWatch started is unaffected by the opt-in
       Given "acme-okta" is not opted in
       When "carol@acme.com" starts single sign-on from LangWatch and the provider answers that request
@@ -107,7 +107,7 @@ Feature: Signing in from the identity provider's own portal through a SAML conne
 
   Rule: every other check applies exactly as for a sign-in LangWatch started
 
-    @integration @unimplemented
+    @integration
     Scenario: A replayed assertion is refused
       Given "acme-okta" is opted in
       And an unsolicited response for "carol@acme.com" has already signed her in
@@ -115,7 +115,7 @@ Feature: Signing in from the identity provider's own portal through a SAML conne
       Then nobody is signed in by the second post
       And the log names the refusal as a replayed assertion
 
-    @integration @unimplemented
+    @integration
     Scenario Outline: An unsolicited response that fails a response check is refused
       Given "acme-okta" is opted in
       When the identity provider posts an unsolicited response whose <check> is wrong

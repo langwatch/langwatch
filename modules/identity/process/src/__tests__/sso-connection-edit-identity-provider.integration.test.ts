@@ -292,6 +292,7 @@ describe("editing a connection's identity provider settings", () => {
             entityId: "https://login.acme.example",
             metadataXml: null,
             certificate: null,
+            idpInitiated: { enabled: false, landingTargets: [] },
           }),
         );
 

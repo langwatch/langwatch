@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 /**
  * Where a SAML sign-in the identity provider started lands: a target the
  * connection lists, matched exactly and never decoded, or the default home.
@@ -12,6 +14,16 @@ const LANDING_PATH = /^\/(?!\/)[\w\-.~!$&'()*+,;=:@/?]*$/;
 export function isAllowableLandingTarget(target: string): boolean {
   return target.length <= MAX_TARGET_LENGTH && LANDING_PATH.test(target);
 }
+
+const landingTargetSchema = z.string().refine((target) => isAllowableLandingTarget(target));
+
+/** A SAML connection's opt-in to sign-ins its identity provider starts; older documents parse as off. */
+export const ssoSamlIdpInitiatedSchema = z
+  .object({
+    enabled: z.boolean().default(false),
+    landingTargets: z.array(landingTargetSchema).max(20).default([]),
+  })
+  .default({ enabled: false, landingTargets: [] });
 
 /** The listed target the RelayState names, or `defaultTarget` for anything else. */
 export function idpInitiatedLanding({
@@ -37,9 +49,5 @@ function ownOriginPath({
   relayState: string;
   appOrigin: string;
 }): string {
-  if (relayState.startsWith("/") || !URL.canParse(relayState)) return relayState;
-  const url = new URL(relayState);
-  const own =
-    url.origin === new URL(appOrigin).origin && url.username === "" && url.password === "";
-  return own ? url.pathname + url.search : relayState;
+  return relayState.startsWith(`${appOrigin}/`) ? relayState.slice(appOrigin.length) : relayState;
 }

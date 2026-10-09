@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   idpInitiatedLanding,
   isAllowableLandingTarget,
-} from "../sso-idp-initiated-landing.rules.ts";
+} from "../sso-idp-initiated-landing.ts";
 
 const appOrigin = "https://app.langwatch.example";
 const defaultTarget = "/";

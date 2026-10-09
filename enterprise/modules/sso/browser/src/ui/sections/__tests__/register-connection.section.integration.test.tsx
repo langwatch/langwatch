@@ -252,6 +252,7 @@ describe("registering an identity provider", () => {
         entityId: null,
         metadataXml: "<EntityDescriptor />",
         certificate: null,
+        idpInitiated: { enabled: false, landingTargets: [] },
       });
     });
 

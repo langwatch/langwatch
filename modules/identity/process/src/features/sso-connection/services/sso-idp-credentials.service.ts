@@ -101,6 +101,7 @@ export class SsoIdpCredentialsService {
       entityId: config?.entityId ?? idpMetadata.issuer,
       metadataXml: config?.metadataXml ?? null,
       certificate: config?.certificate ?? null,
+      idpInitiated: config?.idpInitiated ?? { enabled: false, landingTargets: [] },
     };
   }
 

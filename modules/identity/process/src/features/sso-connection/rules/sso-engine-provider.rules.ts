@@ -96,5 +96,8 @@ export function samlProviderDocument({
     spMetadata: { entityID: serviceProviderEntityId },
     wantAssertionsSigned: true,
     mapping: { id: "nameID", email: "email" },
+    // The engine admits unsolicited responses per provider; auth reads the landing list.
+    allowIdpInitiated: config.idpInitiated.enabled,
+    idpInitiated: config.idpInitiated,
   });
 }

@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { ssoSamlIdpInitiatedSchema } from "./sso-idp-initiated-landing.ts";
+
 /**
  * What an administrator hands over to register their identity provider (D09).
  * Two protocols and one shape each, discriminated rather than a bag of
@@ -23,6 +25,8 @@ export const ssoSamlRegistrationSchema = z.object({
   entityId: z.string().trim().max(2048).nullable().default(null),
   metadataXml: z.string().max(512_000).nullable().default(null),
   certificate: z.string().max(64_000).nullable().default(null),
+  /** Sign-ins the identity provider starts: off until an editor opts in. */
+  idpInitiated: ssoSamlIdpInitiatedSchema,
 });
 
 export const ssoIdpRegistrationSchema = z.discriminatedUnion("protocol", [
@@ -65,6 +69,7 @@ export type SsoIdentityProviderView =
       entityId: string | null;
       metadataXml: string | null;
       certificate: string | null;
+      idpInitiated: SsoSamlIdpConfig["idpInitiated"];
     }
   /** A grandfathered connection dials the legacy provider: no settings of its own. */
   | { protocol: "grandfathered" };
@@ -82,6 +87,7 @@ export const ssoSamlIdpConfigSchema = z.object({
   entityId: z.string().nullable(),
   metadataXml: z.string().nullable(),
   certificate: z.string().nullable(),
+  idpInitiated: ssoSamlIdpInitiatedSchema,
 });
 export type SsoSamlIdpConfig = z.infer<typeof ssoSamlIdpConfigSchema>;
 

@@ -6,6 +6,7 @@
  * because "not supplied" and "supplied blank" are different answers.
  */
 import type { SsoSetupRegistration } from "@langwatch/enterprise-sso-contract";
+import { ssoSamlIdpInitiatedSchema } from "@langwatch/identity-contract";
 
 import type { IdentityProviderPreset, SsoProtocol } from "./identity-providers.ts";
 
@@ -18,6 +19,26 @@ export interface RegisterForm {
   entityId: string;
   metadataXml: string;
   certificate: string;
+  idpInitiated: SamlIdpInitiated;
+}
+
+export type SamlIdpInitiated = Extract<SsoSetupRegistration, { protocol: "saml" }>["idpInitiated"];
+
+export const IDP_INITIATED_OFF: SamlIdpInitiated = { enabled: false, landingTargets: [] };
+
+/** Whether `target` may join the list: new, and passing the contract's own check, as the server does. */
+export function canListLandingTarget({
+  listed,
+  target,
+}: {
+  listed: readonly string[];
+  target: string;
+}): boolean {
+  return (
+    !listed.includes(target) &&
+    ssoSamlIdpInitiatedSchema.safeParse({ enabled: true, landingTargets: [...listed, target] })
+      .success
+  );
 }
 
 export const EMPTY_REGISTER_FORM: RegisterForm = {
@@ -29,6 +50,7 @@ export const EMPTY_REGISTER_FORM: RegisterForm = {
   entityId: "",
   metadataXml: "",
   certificate: "",
+  idpInitiated: IDP_INITIATED_OFF,
 };
 
 /** The identity-provider half of the form, in the shape the command takes. */
@@ -54,6 +76,7 @@ export function idpFromForm({
     entityId: form.entityId || null,
     metadataXml: form.metadataXml || null,
     certificate: form.certificate || null,
+    idpInitiated: form.idpInitiated,
   };
 }
 
