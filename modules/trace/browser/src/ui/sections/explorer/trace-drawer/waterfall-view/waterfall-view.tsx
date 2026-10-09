@@ -2,7 +2,7 @@ import { formatDuration } from "@langwatch/design-system/display-formatters";
 import { Box, chakra, Flex, HStack, Icon, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { LangwatchSignalBucket, SpanTreeNode } from "@langwatch/trace-contract";
-import { useVirtualizer } from "@tanstack/react-virtual";
+import { useVirtualizer, type VirtualItem } from "@tanstack/react-virtual";
 import type React from "react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LuChevronsDownUp, LuChevronsUpDown, LuSparkles } from "react-icons/lu";
@@ -381,7 +381,8 @@ export const WaterfallView = memo(function WaterfallView({
           selectedSpanId={selectedSpanId}
           timelineContentRef={timelineContentRef}
           timelinePanelRef={timelinePanelRef}
-          virtualizer={virtualizer}
+          totalSize={virtualizer.getTotalSize()}
+          virtualItems={virtualizer.getVirtualItems()}
           visibleTimeMarkers={visibleTimeMarkers}
         />
       )}
@@ -777,7 +778,8 @@ function TimelinePanel({
   selectedSpanId,
   timelineContentRef,
   timelinePanelRef,
-  virtualizer,
+  totalSize,
+  virtualItems,
   visibleTimeMarkers,
 }: {
   flatRows: ReturnType<typeof flattenTree>;
@@ -789,7 +791,9 @@ function TimelinePanel({
   selectedSpanId: string | null;
   timelineContentRef: React.RefObject<HTMLDivElement | null>;
   timelinePanelRef: (el: HTMLDivElement | null) => void;
-  virtualizer: ReturnType<typeof useVirtualizer<HTMLDivElement, Element>>;
+  totalSize: number;
+  /** Values, not the virtualizer: the React Compiler caches reads of its stable instance. */
+  virtualItems: VirtualItem[];
   visibleTimeMarkers: number[];
 }) {
   return (
@@ -875,7 +879,7 @@ function TimelinePanel({
           <Box
             ref={timelineContentRef}
             position="relative"
-            height={`${virtualizer.getTotalSize()}px`}
+            height={`${totalSize}px`}
             width="full"
             style={{ willChange: "transform" }}
           >
@@ -907,7 +911,7 @@ function TimelinePanel({
               })}
             </Box>
 
-            {virtualizer.getVirtualItems().map((virtualRow) => {
+            {virtualItems.map((virtualRow) => {
               const row = flatRows[virtualRow.index]!;
 
               if (row.kind === "group") {
