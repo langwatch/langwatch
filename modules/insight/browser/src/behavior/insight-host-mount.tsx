@@ -4,7 +4,7 @@
  */
 
 import {
-  useUiCapabilities,
+  useUiHostServices,
   type UiFeedback,
   type UiNavigation,
   type UiRoute,
@@ -80,7 +80,7 @@ class CapabilityInsightHost extends InsightHostApi {
 
 /** One provider above the routed tree; default-exported because `mounts.load` resolves it. */
 export default function InsightHostMount({ children }: { children?: ReactNode }) {
-  const { session, route, navigation, feedback } = useUiCapabilities();
+  const { session, route, navigation, feedback } = useUiHostServices();
   const langy = useLentOperations(LangyAskToken);
   // Read as a primitive: the flags service hands a new object on every render.
   const enabled = useUiFlags().flag(FrontendFlags.release_insights);

@@ -4,9 +4,9 @@
  * Notices, navigations, query writes and Langy asks are RECORDED, not performed.
  */
 
-import { UiCapabilityContextProvider } from "@langwatch/browser-host/capabilities";
+import { UiHostServicesContextProvider } from "@langwatch/browser-host/capabilities";
 import { type UiLend, uiDeclarations } from "@langwatch/browser-host/declarations";
-import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
 import { createUiQueryClient } from "@langwatch/browser/query-client";
 import { answeringUiTransport, type UiProcedureAnswer } from "@langwatch/browser/testing-transport";
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
@@ -101,7 +101,7 @@ export function renderWithInsightHost({
 }): RenderResult & { host: StubInsightHost } {
   const queryClient = createUiQueryClient({ onMutationError: () => void 0 });
   const capabilities = {
-    ...createUiCapabilitiesFromHost({
+    ...createUiHostServicesFromHost({
       route: () => ({ params: {}, query: {} }),
       navigate: () => void 0,
     }),
@@ -112,11 +112,11 @@ export function renderWithInsightHost({
   return {
     ...render(
       <DesignSystemProvider forcedTheme="light">
-        <UiCapabilityContextProvider value={capabilities}>
+        <UiHostServicesContextProvider value={capabilities}>
           <insightApi.Provider client={answeringUiTransport(answer)} queryClient={queryClient}>
             <InsightHostProvider value={host}>{element}</InsightHostProvider>
           </insightApi.Provider>
-        </UiCapabilityContextProvider>
+        </UiHostServicesContextProvider>
       </DesignSystemProvider>,
     ),
     host,
