@@ -60,9 +60,9 @@ Shapes: self-hosted · cloud · cloud hybrid (tenants on their own ClickHouse an
 | Tested-flow ledger | Missing area files, fold in the code sweep (3,103 rows), assemble the #8553 body; coordinator publishes |
 | Upgrade e2e harness | First proven cell (cloud, no hybrid, small) with overlap; verdicts per invariant into #8553 |
 | UPG-003 | Legacy and ownerless main keys keep main's access; no legacy key for new projects |
-| Retention loop | C3 cuts licensing's edges: C3a-S1 (connect module, lane running) removes licensing → Instant Eval; C3b-3 (after S1; fingerprint fact, ruled) and C3a-S2/S3 remove licensing → gateway. Then apply the saved retention patch (local handoff `gw-ie-retention.patch`) |
+| Retention loop | C3 cuts licensing's edges: C3a-S1 landed (connect module; licensing no longer calls Instant Eval; peer cycles 80 → 73). C3a-S2 (contract budget sync, lane running), then S3 and C3b-3 (fingerprint fact, ruled) remove licensing → gateway. Then apply the saved retention patch (local handoff `gw-ie-retention.patch`) |
 | Haven | Stripe is paymentsim unless the developer sets their own Stripe keys, which are then used; `haven seed` returns logins and made-up credentials; skills updated |
-| Upgrade cells 2 | Hybrid small (UP-04), self-hosted small (UP-06), drills |
+| Upgrade cells 3 | Backfills every earlier round onto #8553, finishes upgradelab's `-ledger` writer (claims and reports its own rows), reruns UP-04 and UP-06 on the fixed head, triages UPG-007 and UPG-008 |
 
 ## 5. Next, in order
 

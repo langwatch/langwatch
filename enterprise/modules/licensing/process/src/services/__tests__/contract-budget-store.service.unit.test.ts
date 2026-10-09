@@ -1,12 +1,8 @@
-import type {
-  CreateGatewayBudgetInput,
-  GatewayApi,
-  GatewayBudgetWithSeats,
-  GatewayMoney,
-} from "@langwatch/gateway-contract";
+import type { GatewayApi, GatewayBudgetWithSeats, GatewayMoney } from "@langwatch/gateway-contract";
 /**
  * @vitest-environment node
- * @see enterprise/modules/licensing/specs/licensing.feature
+ * The contract budget's creation and cap are connect's; licensing only reads it and starts a
+ * window.
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
@@ -53,7 +49,7 @@ function budget(overrides: Partial<GatewayBudgetWithSeats>): GatewayBudgetWithSe
 }
 
 function storeOver(budgets: GatewayBudgetWithSeats[]) {
-  const created: CreateGatewayBudgetInput[] = [];
+  const resets: Parameters<GatewayApi["resetBudget"]>[0][] = [];
   const store = ContractBudgetStoreService.create({
     gateway: createApiFixture<GatewayApi>({
       listBudgetsWithHealth: async () => ({
@@ -62,18 +58,17 @@ function storeOver(budgets: GatewayBudgetWithSeats[]) {
         readAt: AT,
         scopeReach: new Map(),
       }),
-      createBudget: async (input) => {
-        created.push(input);
+      resetBudget: async (input) => {
+        resets.push(input);
         return budget({});
       },
     }),
   });
-  return { store, created };
+  return { store, resets };
 }
 
 describe("the contract budget kept in the gateway's budget table", () => {
   describe("given a live budget carrying the contract's external id", () => {
-    /** @scenario "The contract budget is the organization's live gateway budget named by the contract's id" */
     it("answers it in cents, with the cap the customer set", async () => {
       const { store } = storeOver([budget({ id: "other", externalId: null }), budget({})]);
 
@@ -86,7 +81,6 @@ describe("the contract budget kept in the gateway's budget table", () => {
   });
 
   describe("given only an archived contract budget", () => {
-    /** @scenario "An archived contract budget is no contract budget" */
     it("answers none", async () => {
       const { store } = storeOver([budget({ archivedAt: AT })]);
 
@@ -94,26 +88,13 @@ describe("the contract budget kept in the gateway's budget table", () => {
     });
   });
 
-  describe("when the contract budget is created", () => {
-    /** @scenario "The contract budget is the organization's live gateway budget named by the contract's id" */
-    it("writes a blocking organization budget under the contract's id, capped by LangWatch", async () => {
-      const { store, created } = storeOver([]);
+  describe("when a new window is started", () => {
+    it("asks the gateway to reset the budget under the actor", async () => {
+      const { store, resets } = storeOver([budget({})]);
 
-      await store.create({ organizationId: "org-1", limitUsdCents: 50000, operatorId: "op-1" });
+      await store.reset({ organizationId: "org-1", id: "budget-1", actorId: "op-1" });
 
-      expect(created).toMatchObject([
-        {
-          organizationId: "org-1",
-          scope: { kind: "ORGANIZATION", organizationId: "org-1" },
-          window: "MANUAL",
-          limitUsd: "500.00",
-          onBreach: "BLOCK",
-          externalId: CONTRACT_BUDGET_EXTERNAL_ID,
-          metadata: { connect_cap_set_by: "langwatch" },
-          allowUnreachable: true,
-          actorUserId: "op-1",
-        },
-      ]);
+      expect(resets).toEqual([{ id: "budget-1", organizationId: "org-1", actorUserId: "op-1" }]);
     });
   });
 });

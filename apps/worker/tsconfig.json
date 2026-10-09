@@ -76,6 +76,9 @@
       "path": "../../enterprise/modules/billing/process/tsconfig.build.json"
     },
     {
+      "path": "../../enterprise/modules/connect/process/tsconfig.build.json"
+    },
+    {
       "path": "../../enterprise/modules/demo-data/process/tsconfig.build.json"
     },
     {

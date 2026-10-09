@@ -31,7 +31,8 @@ type Call struct {
 	RetryWindowMs     int64 `json:"retryWindowMs,omitempty"`
 	UpgradeInProgress int   `json:"upgradeInProgress,omitempty"`
 	NonOK             int   `json:"nonOk,omitempty"`
-	MissingRetryAfter int   `json:"missingRetryAfter,omitempty"` // upgrade_in_progress answers with no Retry-After
+	MissingRetryAfter int   `json:"missingRetryAfter,omitempty"`
+	Gap               int   `json:"gap,omitempty"` // attempts no release answered (retried in stop-start) // upgrade_in_progress answers with no Retry-After
 	firstRetryMs      int64
 }
 
@@ -98,7 +99,9 @@ func resource(name string) map[string]any {
 func otlpTrace(ctx context.Context, client Client, n int) (*http.Request, string, error) {
 	id := SeededID(client.Seed, "otlp-trace", n)
 	span := map[string]any{"traceId": id, "spanId": id[:16], "name": "upgradelab span " + strconv.Itoa(n), "kind": 1,
-		"startTimeUnixNano": nowNano(), "endTimeUnixNano": nowNano()}
+		"startTimeUnixNano": nowNano(), "endTimeUnixNano": nowNano(),
+		// 3.20.1 drops a span without attributes yet answers 2xx (UPG-007); SDKs always send them.
+		"attributes": []any{map[string]any{"key": "upgradelab.n", "value": map[string]any{"stringValue": strconv.Itoa(n)}}}}
 	body := map[string]any{"resourceSpans": []any{map[string]any{"resource": resource("upgradelab"),
 		"scopeSpans": []any{map[string]any{"scope": scope, "spans": []any{span}}}}}}
 	request, err := client.post(ctx, "/api/otel/v1/traces", body)
@@ -186,6 +189,8 @@ type Traffic struct {
 	Kinds  []Kind
 	Origin time.Time
 	Hold   time.Duration
+	// RetryUnanswered: a stop-start deploy has a gap with no release; clients retry it as they would a 503.
+	RetryUnanswered bool
 
 	http  *http.Client
 	mu    sync.Mutex
@@ -266,6 +271,10 @@ func (traffic *Traffic) attempt(ctx context.Context, kind Kind, call *Call) time
 	call.Error = string(head)
 	if response.StatusCode == http.StatusBadGateway && call.Error == unreachableBody {
 		call.Status = 0 // the balancer had no release to send it to: unanswered, not an api status
+		call.Gap++
+		if traffic.RetryUnanswered {
+			return time.Second
+		}
 		return 0
 	}
 	call.NonOK++

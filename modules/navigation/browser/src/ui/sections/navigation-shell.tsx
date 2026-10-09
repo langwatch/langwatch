@@ -15,7 +15,7 @@ import {
 import { useProjectAddressRedirect } from "../../behavior/use-project-address-redirect.ts";
 import { APP_HEADER_HEIGHT } from "../../model/menu-widths.ts";
 import { useNavigationHost } from "../../model/navigation-host.ts";
-import { shellContentMaxWidth } from "../../model/shell-layout.ts";
+import { LANGY_DOCK_TRANSITION, shellContentMaxWidth } from "../../model/shell-layout.ts";
 import { ICON_RAIL_WIDTH, IconRail } from "./icon-rail.tsx";
 import { MobileShell } from "./mobile-shell.tsx";
 import { ProductSidebar } from "./product-sidebar.tsx";
@@ -156,6 +156,7 @@ function ShellContentRow({
   children: ReactNode;
 }) {
   const { activeProductId, isCompactSidebar, menuWidth } = state;
+  const host = useNavigationHost();
   // The rail is a sibling of this column, so its width is room the page does
   // not have, the same as the sidebar's.
   const contentMaxWidth = shellContentMaxWidth({
@@ -163,50 +164,56 @@ function ShellContentRow({
     railWidth: isIconRail ? ICON_RAIL_WIDTH : null,
   });
 
-  return (
-    <HStack
-      width="full"
-      alignItems="stretch"
-      gap={0}
-      minHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
-    >
-      <ProductSidebar surface={activeProductId ?? "settings"} isCompact={isCompactSidebar} />
-
-      <Box
-        data-testid="shell-content-column"
+  return host.langyDockRoom({
+    render: (langyDockInset) => (
+      <HStack
         width="full"
-        height="full"
-        background="bg.page"
+        alignItems="stretch"
+        gap={0}
         minHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
-        maxHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
-        maxWidth={contentMaxWidth}
       >
+        <ProductSidebar surface={activeProductId ?? "settings"} isCompact={isCompactSidebar} />
+
         <Box
+          data-testid="shell-content-column"
           width="full"
           height="full"
-          background="bg.surface"
-          borderTopLeftRadius="xl"
-          borderTopWidth="1px"
-          borderLeftWidth="1px"
-          borderStyle="solid"
-          // In light mode `border.muted` is the same grey as `bg.page`, so the
-          // panel edge needs the stronger token to read at all. Dark keeps the
-          // muted one, which already contrasts against the page there.
-          borderColor="border"
-          _dark={{
-            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.07)",
-            borderColor: "border.muted",
-          }}
-          overflow="auto"
-          display="flex"
+          background="bg.page"
           minHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
           maxHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
-          position="relative"
-          data-tour="main-content"
+          maxWidth={contentMaxWidth}
+          paddingRight={`${langyDockInset}px`}
+          transition={`padding-right ${LANGY_DOCK_TRANSITION}`}
         >
-          {children}
+          <Box
+            width="full"
+            height="full"
+            background="bg.surface"
+            borderTopLeftRadius="xl"
+            borderTopWidth="1px"
+            borderLeftWidth="1px"
+            borderStyle="solid"
+            // In light mode `border.muted` is the same grey as `bg.page`, so the
+            // panel edge needs the stronger token to read at all. Dark keeps the
+            // muted one, which already contrasts against the page there.
+            borderColor="border"
+            borderTopRightRadius={langyDockInset > 0 ? "xl" : 0}
+            borderRightWidth={langyDockInset > 0 ? "1px" : 0}
+            _dark={{
+              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.07)",
+              borderColor: "border.muted",
+            }}
+            overflow="auto"
+            display="flex"
+            minHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
+            maxHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
+            position="relative"
+            data-tour="main-content"
+          >
+            {children}
+          </Box>
         </Box>
-      </Box>
-    </HStack>
-  );
+      </HStack>
+    ),
+  });
 }

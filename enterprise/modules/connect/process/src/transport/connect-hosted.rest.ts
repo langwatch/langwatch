@@ -15,11 +15,13 @@ import {
   requestValidationErrorFrom,
 } from "@langwatch/api/rest";
 import {
+  ConnectApi,
   hostedCapAnswerSchema,
   hostedClassifyAnswerSchema,
   hostedServiceEnvelopeSchema,
+} from "@langwatch/enterprise-connect-contract";
+import {
   hostedUsageAnswerSchema,
-  LicensingApi,
   type HostedCaller,
 } from "@langwatch/enterprise-licensing-contract";
 import { resolveRequestBound } from "@langwatch/plans";
@@ -60,7 +62,7 @@ function callerOf(input: {
   };
 }
 
-export const connectHostedRest = defineRestRouter(LicensingApi)
+export const connectHostedRest = defineRestRouter(ConnectApi)
   .withNamespace("connect-hosted")
   .withVersion(MANAGEMENT_API_VERSION)
   .withCredential("internal_secret")

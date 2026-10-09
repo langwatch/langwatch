@@ -18,9 +18,16 @@ export function useJoinBeforeCreate({ enabled }: { enabled: boolean }) {
   });
   const mine = identityClient.identity.joinRequests.mine.useQuery(void 0, { enabled });
   const askToJoin = identityClient.identity.joinRequests.request.useMutation();
+  const dismissOffer = identityClient.identity.joinRequests.dismissOffer.useMutation();
   const utils = identityClient.useUtils();
 
   const continueToWorkspaceCreation = useCallback(() => hardRedirect("/"), []);
+
+  // Recorded so the welcome screen does not ask again; a failed save still lets them on.
+  const declineAndContinue = useCallback(
+    () => dismissOffer.mutate({}, { onSettled: () => hardRedirect("/") }),
+    [dismissOffer],
+  );
 
   const requestJoin = useCallback(
     (organization: JoinableOrganization) => {
@@ -48,6 +55,8 @@ export function useJoinBeforeCreate({ enabled }: { enabled: boolean }) {
     mine,
     requestError: askToJoin.error,
     continueToWorkspaceCreation,
+    declineAndContinue,
+    declining: dismissOffer.isPending,
     requestJoin,
     admitAndLand,
   };

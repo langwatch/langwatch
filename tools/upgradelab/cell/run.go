@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -35,6 +36,9 @@ type Options struct {
 	WorkerDelay, Rate, Hold          time.Duration
 	SwitchOn, ServiceBin             string
 	Drills                           []string // DrillAPIEarly, DrillWorkerRestart, DrillRetry
+	Ledger                           []string // #8553 rows this cell claims and reports to
+	MaxLoad                          float64  // refuse to start above this 1-minute load average
+	TestedBy                         string   // who runs the cell, for the ledger's Tested by (lane:<id> (model) or @handle)
 	Keep, Shots                      bool
 }
 
@@ -61,6 +65,7 @@ type run struct {
 	marks              map[string]int64
 	shotsWG            sync.WaitGroup
 	atReady            []LedgerRow
+	ledgerBefore       map[string]string // each -ledger row as it was before the claim
 	balancer           *Balancer
 	fromPort, headPort int
 	private            map[string]string // label -> organization on that private ClickHouse target
@@ -79,11 +84,16 @@ func (options Options) Name() string {
 
 // Run executes the cell and writes report.json and report.md into RunDir; the error is operational only.
 func Run(ctx context.Context, options Options) (*Report, error) {
+	if load := oneMinuteLoad(); options.MaxLoad > 0 && load > options.MaxLoad {
+		return nil, fmt.Errorf("machine load %.0f is above -max-load %.0f: a loaded host voids a cell's timings, so it does not start", load, options.MaxLoad)
+	}
 	cell, err := prepare(options)
 	if err != nil {
 		return nil, err
 	}
 	defer cell.teardown()
+	cell.claimLedger(ctx)
+	cell.noteLoad("start")
 	steps := []struct {
 		name string
 		do   func(context.Context) error
@@ -103,6 +113,8 @@ func Run(ctx context.Context, options Options) (*Report, error) {
 	}
 	cell.finishTraffic()
 	cell.partialTraffic()
+	cell.noteLoad("end")
+	cell.reportLedger(ctx)
 	return cell.report, cell.write()
 }
 
@@ -139,7 +151,7 @@ func prepare(options Options) (*run, error) {
 	}
 	cell := &run{options: options, profile: profile, origin: time.Now(), marks: map[string]int64{}, granted: make(chan struct{})}
 	cell.report = &Report{Cell: options.Name(), Deployment: options.Deployment, Tier: options.Tier, Shape: options.Shape,
-		Release: options.Release, Head: options.HeadDir, Started: cell.origin.UTC().Format(time.RFC3339)}
+		Release: options.Release, Head: options.HeadDir, HeadCommit: HeadCommit(options.HeadDir), Started: cell.origin.UTC().Format(time.RFC3339)}
 	return cell, nil
 }
 
@@ -349,7 +361,7 @@ func (cell *run) basePrompt(ctx context.Context) error {
 
 // trafficBefore starts the mix and the samplers on main, and lets it run.
 func (cell *run) trafficBefore(ctx context.Context) error {
-	cell.traffic = &Traffic{Client: cell.client, Kinds: Mix(cell.options.Rate), Origin: cell.origin, Hold: cell.options.Hold}
+	cell.traffic = &Traffic{Client: cell.client, Kinds: Mix(cell.options.Rate), Origin: cell.origin, Hold: cell.options.Hold, RetryUnanswered: cell.profile.StopStart}
 	trafficCtx, stop := context.WithCancel(context.WithoutCancel(ctx))
 	cell.stopTraffic = stop
 	cell.trafficDone = make(chan struct{})
@@ -656,7 +668,7 @@ func (cell *run) shootPhases(ctx context.Context) {
 }
 
 func (cell *run) shoot(ctx context.Context, phase string) {
-	signIn := phase == "holding:upgrading" || phase == "ready" || phase == "settled"
+	signIn := phase == "holding:upgrading" || phase == "ready" || phase == "settled" || phase == "drill-failed"
 	if phase == "down" {
 		return
 	}
@@ -679,7 +691,7 @@ func (cell *run) shoot(ctx context.Context, phase string) {
 	if err := os.WriteFile(script, opsScript, 0o600); err != nil {
 		return
 	}
-	shotCtx, cancel := context.WithTimeout(ctx, 90*time.Second)
+	shotCtx, cancel := context.WithTimeout(ctx, 3*time.Minute) // the script's own waits add up to about 140 s
 	defer cancel()
 	command := exec.CommandContext(shotCtx, "node", script, string(args)) // #nosec G204 -- harness-written script.
 	command.Dir = filepath.Join(cell.options.HeadDir, "apps", "ui")
@@ -728,3 +740,24 @@ func (cell *run) write() error {
 }
 
 var httpClient = newHTTPClient()
+
+// noteLoad records the machine's load averages: a loaded machine slows workers and starves the shared ClickHouse.
+func (cell *run) noteLoad(when string) {
+	out, err := exec.CommandContext(context.Background(), "sysctl", "-n", "vm.loadavg").Output() // #nosec G204 -- fixed argv.
+	if err == nil {
+		cell.report.Notes = append(cell.report.Notes, "machine load at "+when+": "+strings.Trim(strings.TrimSpace(string(out)), "{ }"))
+	}
+}
+
+func oneMinuteLoad() float64 {
+	out, err := exec.CommandContext(context.Background(), "sysctl", "-n", "vm.loadavg").Output() // #nosec G204 -- fixed argv.
+	if err != nil {
+		return 0
+	}
+	fields := strings.Fields(strings.Trim(strings.TrimSpace(string(out)), "{ }"))
+	if len(fields) == 0 {
+		return 0
+	}
+	load, _ := strconv.ParseFloat(fields[0], 64)
+	return load
+}

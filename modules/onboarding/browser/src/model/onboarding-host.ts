@@ -5,7 +5,7 @@
 
 import type { ReleaseFlagToken } from "@langwatch/browser-host/declarations";
 import type { LangyKickoffBrief } from "@langwatch/langy-contract";
-import type { JoinOfferProps } from "@langwatch/organization-client";
+import type { JoinInsteadProps, JoinOfferProps } from "@langwatch/organization-client";
 import type { TimeInput } from "@langwatch/time";
 import { createContext, useContext, type ComponentType } from "react";
 
@@ -125,6 +125,8 @@ export type OnboardingFailureNotice = {
 export type OnboardingJoinOffer = {
   readonly key: string;
   readonly JoinOffer: ComponentType<JoinOfferProps>;
+  /** The quiet way back below the organization form, once the offer was declined. */
+  readonly JoinInstead?: ComponentType<JoinInsteadProps>;
 };
 
 export abstract class OnboardingHostApi {

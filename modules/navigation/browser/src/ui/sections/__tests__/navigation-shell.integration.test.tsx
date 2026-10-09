@@ -159,6 +159,28 @@ function renderShell({
   );
 }
 
+describe("the content card beside the docked Langy panel", () => {
+  describe("when the docked panel is open", () => {
+    it("keeps the dock's room on the right and closes the card's right edge", () => {
+      renderShell({ readings: { langyDockInset: 404 } });
+
+      expect(screen.getByTestId("shell-content-column")).toHaveStyle({ paddingRight: "404px" });
+      const card = screen.getByTestId("page-body").closest("[data-tour='main-content']");
+      expect(card).toHaveStyle({
+        borderRightWidth: "1px",
+      });
+    });
+  });
+
+  describe("when the panel is closed", () => {
+    it("gives the card the whole row", () => {
+      renderShell();
+
+      expect(screen.getByTestId("shell-content-column")).toHaveStyle({ paddingRight: "0px" });
+    });
+  });
+});
+
 describe("the front door at /", () => {
   afterEach(() => cleanup());
 

@@ -70,9 +70,17 @@ func parse(args []string) (Options, error) {
 	flags.StringVar(&options.ServiceBin, "service-bin", ".claude/tmp/upgradelab/bin/service", "the Go service binary hosting storagesim (go build -tags dev -o <path> ./cmd/service), for profiles with object stores")
 	flags.BoolVar(&options.Keep, "keep", false, "keep the cell's databases afterwards (kept anyway when a step fails)")
 	flags.BoolVar(&options.Shots, "shots", true, "screenshot each api phase and Ops > Upgrades (Playwright from head's apps/ui)")
+	flags.Float64Var(&options.MaxLoad, "max-load", 40, "refuse to start when the machine's 1-minute load average is above this (0: never refuse)")
+	flags.StringVar(&options.TestedBy, "tested-by", "", "who runs the cell, written to the ledger's Tested by: lane:<id> (model) or @handle")
+	ledger := flags.String("ledger", "", "comma-separated #8553 rows (UP-04, UD-7, ...) to claim at start and report at the end")
 	drills := flags.String("drills", "", "comma-separated drills on top of the profile: api-early (switch on /healthz), worker-restart, retry")
 	if err := flags.Parse(args); err != nil {
 		return options, err
+	}
+	for _, id := range strings.Split(*ledger, ",") {
+		if id = strings.TrimSpace(id); id != "" {
+			options.Ledger = append(options.Ledger, id)
+		}
 	}
 	for _, drill := range strings.Split(*drills, ",") {
 		switch drill {

@@ -13,6 +13,8 @@ export type EditModelProviderFormProps = {
   onSaved?: (saved: { chatModel?: string }) => void;
   /** Onboarding's presentation: Connect wording, model pills, no settings chrome. */
   guided?: boolean;
+  /** A surface's first-model setup (Langy's panel): credentials, default chat model and Save. */
+  embedded?: boolean;
   /** Why the connection did not happen: a refused credential, or a failed or timed-out sign-in. */
   onFailed?: (failure: { provider: string; code: string }) => void;
 };

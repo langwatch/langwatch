@@ -376,6 +376,12 @@
       "subjects": ["billing"]
     },
     {
+      "id": "connect",
+      "root": "enterprise/modules/connect",
+      "classification": "enterprise",
+      "subjects": ["connect-hosted"]
+    },
+    {
       "id": "demo-data",
       "root": "enterprise/modules/demo-data",
       "classification": "enterprise",
