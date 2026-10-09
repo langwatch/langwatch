@@ -21,6 +21,9 @@ const (
 	DrillRetry         = "retry"          // D3: a failed background step is retried from Ops > Upgrades
 )
 
+// drillRows are the #8553 drill rows a drill cell reports to, each judged by its own drill alone.
+var drillRows = map[string]string{"UD-7": "D1", "UD-4": "D2", "UD-8": "D3"}
+
 // drillState is what the drills measured.
 type drillState struct {
 	killedAtMs, killedDone, killedTotal int
@@ -136,7 +139,8 @@ func (cell *run) drillVerdicts(final []LedgerRow) []Verdict {
 				finalStatus = row.Status
 			}
 		}
-		verdicts = append(verdicts, verdict("D3", state.retryStatus == http.StatusOK && finalStatus == "done" && slices.Contains(state.statuses, "done"),
+		seen := !cell.options.Shots || strings.HasPrefix(state.failedShot, "Needs attention") // UD-8 expects the page to say so
+		verdicts = append(verdicts, verdict("D3", seen && state.retryStatus == http.StatusOK && finalStatus == "done" && slices.Contains(state.statuses, "done"),
 			fmt.Sprintf("step %s failed; Ops showed %q; retryStep answered %d %.160s; status after %v; final %q", state.retried, state.failedShot, state.retryStatus, state.retryBody, state.statuses, finalStatus)))
 	}
 	return verdicts
