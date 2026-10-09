@@ -17,6 +17,7 @@ import {
 } from "@langwatch/design-system/primitives";
 import {
   DEFAULT_INSIGHT_VALID_DAYS,
+  type FileInsightInput,
   INSIGHT_TONES,
   type InsightTone,
   insightBodySchema,
@@ -71,6 +72,26 @@ export function SaveAsInsightAction(props: LangyAnswerActionProps) {
   );
 }
 
+/** What the answer was about, as the filing keeps it: the pointer, the query and its window. */
+function filedSubject(
+  subject: LangyAnswerActionProps["subject"],
+): Pick<FileInsightInput, "board" | "lwql" | "replay"> {
+  const { board, evidence } = subject ?? {};
+  return {
+    ...(board ? { board: { id: board.id, name: board.name, widget: board.widget ?? null } } : {}),
+    ...(evidence
+      ? {
+          lwql: evidence.lwql,
+          replay: {
+            ...evidence.window,
+            period: evidence.period ?? null,
+            parameters: { ...evidence.parameters },
+          },
+        }
+      : {}),
+  };
+}
+
 function SaveAsInsightDialog({
   answer,
   onClose,
@@ -101,6 +122,7 @@ function SaveAsInsightDialog({
         ...(answer.conversationId
           ? { source: { conversationId: answer.conversationId, messageId: answer.messageId } }
           : {}),
+        ...filedSubject(answer.subject),
       },
       {
         onSuccess: onSaved,

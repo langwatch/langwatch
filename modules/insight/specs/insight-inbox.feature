@@ -35,6 +35,80 @@ Feature: The insights inbox
       When the request is validated
       Then it is refused with a field error on the title
 
+  Rule: Where an insight came from
+    An insight may point at the board and the widget it came from. It is only a pointer:
+    nothing checks that either exists, and the insight reads the same once either is deleted.
+
+    @unit
+    Scenario: An insight filed from a board keeps a pointer to the board and the widget
+      Given a member saves a Langy answer that was about a widget on a board
+      When the insight is filed
+      Then it keeps the ids and the names of the board and the widget as they were
+      And every reader of the project reads the same pointer
+
+    @unit
+    Scenario: A member's filing is recorded as saved from a chat
+      Given a member files an insight
+      When a reader reads their inbox
+      Then the insight is recorded as filed from a chat, not by a run
+
+    @unit
+    Scenario: An insight filed before pointers existed still reads
+      Given a filed event stored without a board, a kind or a window
+      When the event is folded
+      Then the insight has no pointer and no window
+      And it is recorded as filed from a chat
+
+    @unit
+    Scenario: An insight stored before pointers existed still reads
+      Given an insight row written before the pointer and window columns existed
+      When the row is read
+      Then the insight has no pointer and no window
+      And it is recorded as filed from a chat
+
+    @unit
+    Scenario: The pointer is stored as plain ids and names
+      Given an insight that came from a widget on a board
+      When its row is written
+      Then the row holds the board's id and name and the widget's id and name
+      And reading the row back gives the same pointer
+
+    @integration
+    Scenario: Saving a Langy answer about a board passes the pointer and the window
+      Given a Langy answer that names the board, the widget, the query and the window it read
+      When a member saves it as an insight
+      Then the filing carries that board and widget, that query and that window
+      And an answer that names none of them is filed with none
+
+  Rule: Evidence on fixed dates
+    An insight keeps what to run, never the result: its query, the fixed window the query
+    read and the values in force when it was filed.
+
+    @unit
+    Scenario: An insight keeps its query, the fixed window and the values it was filed with
+      Given a member files an insight with a query, a window and parameter values
+      When a reader reads their inbox
+      Then the insight carries that query, that window and those values unchanged
+
+    @unit
+    Scenario: A window without a query is refused
+      Given a file request with a window and no query
+      When the request is validated
+      Then it is refused with a field error on the window
+
+    @unit
+    Scenario: A window that ends before it starts is refused
+      Given a file request whose window ends before it starts
+      When the request is validated
+      Then it is refused with a field error on the window's end
+
+    @unit
+    Scenario: The window is stored beside the values in force
+      Given an insight with a query, a window and parameter values
+      When its row is written
+      Then the row holds the start, the end and the step as columns and the values as one JSON map
+      And reading the row back gives the same window and values
+
   Rule: Folders are derived per reader, at read time
 
     @unit

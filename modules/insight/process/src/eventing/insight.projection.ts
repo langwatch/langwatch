@@ -7,6 +7,9 @@ import type { StateProjectionDefinition, StateProjectionStore } from "@langwatch
 import {
   INSIGHT_EVENT_TYPES,
   INSIGHT_PROJECTION_VERSIONS,
+  type InsightBoard,
+  type InsightFiledVia,
+  type InsightReplay,
   type InsightSource,
   type InsightTone,
 } from "@langwatch/insight-contract";
@@ -20,7 +23,10 @@ export interface InsightState {
   readonly topic: string | null;
   readonly validDays: number;
   readonly lwql: string | null;
+  readonly replay: InsightReplay | null;
   readonly source: InsightSource | null;
+  readonly board: InsightBoard | null;
+  readonly filedVia: InsightFiledVia;
   readonly filedByUserId: string | null;
   /** Epoch milliseconds. */
   readonly filedAt: number;
@@ -34,7 +40,10 @@ const INITIAL_INSIGHT_STATE: InsightState = {
   topic: null,
   validDays: 1,
   lwql: null,
+  replay: null,
   source: null,
+  board: null,
+  filedVia: "chat",
   filedByUserId: null,
   filedAt: 0,
   renewedAt: null,

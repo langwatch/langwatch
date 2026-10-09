@@ -21,6 +21,60 @@ export const insightSourceSchema = z.object({
 });
 export type InsightSource = z.infer<typeof insightSourceSchema>;
 
+/** How an insight was filed: a person saving a Langy answer, or a scheduled run. */
+export const INSIGHT_FILED_VIA = ["chat", "run"] as const;
+export const insightFiledViaSchema = z.enum(INSIGHT_FILED_VIA);
+export type InsightFiledVia = z.infer<typeof insightFiledViaSchema>;
+
+const pointerIdSchema = z.string().min(1).max(200);
+const pointerNameSchema = z.string().trim().min(1).max(200);
+
+/**
+ * The board and widget an insight came from. Only a pointer: nothing checks that either
+ * exists, and the names are kept as filed, so the card still says where it came from once
+ * the board or the widget is gone.
+ */
+export const insightBoardSchema = z.object({
+  id: pointerIdSchema,
+  name: pointerNameSchema,
+  widget: z.object({ id: pointerIdSchema, name: pointerNameSchema }).nullable(),
+});
+export type InsightBoard = z.infer<typeof insightBoardSchema>;
+
+const MAX_REPLAY_PARAMETERS = 32;
+const replayParameterValueSchema = z.union([
+  z.string().max(4_000),
+  z.number().finite(),
+  z.boolean(),
+]);
+
+/**
+ * The evidence, kept as what to run and never as results: the fixed window the query read
+ * and the values in force when the insight was filed. A relative period would slide, and
+ * the chart would stop matching the text.
+ */
+export const insightReplaySchema = z
+  .object({
+    /** Epoch milliseconds. The window is half-open: `[start, end)`. */
+    start: z.number().int().nonnegative(),
+    end: z.number().int().positive(),
+    /** The datapoint step the query read with, in seconds. */
+    granularitySeconds: z.number().int().positive(),
+    /** The board's period as it was set ("Last 30 days"), for the line under the chart. */
+    period: z.string().trim().min(1).max(80).nullable(),
+    /** The query's named parameter values; empty when it takes none. */
+    parameters: z
+      .record(z.string().min(1).max(64), replayParameterValueSchema)
+      .refine((parameters) => Object.keys(parameters).length <= MAX_REPLAY_PARAMETERS, {
+        error: `At most ${MAX_REPLAY_PARAMETERS} parameter values are kept with an insight`,
+      }),
+  })
+  .refine(({ start, end }) => end > start, {
+    path: ["end"],
+    error: "The window must end after it starts",
+  });
+export type InsightReplay = z.infer<typeof insightReplaySchema>;
+
 /** One insight as a reader sees it: the shared record plus that reader's own state. */
 export const insightEntrySchema = z.object({
   id: z.string(),
@@ -31,7 +85,11 @@ export const insightEntrySchema = z.object({
   validDays: z.number().int(),
   /** The LangWatchQL query behind the insight, its evidence. */
   lwql: z.string().nullable(),
+  /** The fixed window and values `lwql` replays with; null when it was filed without one. */
+  replay: insightReplaySchema.nullable(),
   source: insightSourceSchema.nullable(),
+  board: insightBoardSchema.nullable(),
+  filedVia: insightFiledViaSchema,
   filedByUserId: z.string().nullable(),
   /** Epoch milliseconds. */
   filedAt: z.number(),
@@ -44,16 +102,23 @@ export type InsightEntry = z.infer<typeof insightEntrySchema>;
 
 export const insightProjectScopeSchema = z.object({ projectId: z.string().min(1) });
 
-export const fileInsightInputSchema = z.object({
-  ...insightProjectScopeSchema.shape,
-  title: insightTitleSchema,
-  body: insightBodySchema,
-  tone: insightToneSchema,
-  topic: insightTopicSchema.optional(),
-  validDays: insightValidDaysSchema.default(DEFAULT_INSIGHT_VALID_DAYS),
-  lwql: z.string().trim().min(1).max(20_000).optional(),
-  source: insightSourceSchema.optional(),
-});
+export const fileInsightInputSchema = z
+  .object({
+    ...insightProjectScopeSchema.shape,
+    title: insightTitleSchema,
+    body: insightBodySchema,
+    tone: insightToneSchema,
+    topic: insightTopicSchema.optional(),
+    validDays: insightValidDaysSchema.default(DEFAULT_INSIGHT_VALID_DAYS),
+    lwql: z.string().trim().min(1).max(20_000).optional(),
+    replay: insightReplaySchema.optional(),
+    source: insightSourceSchema.optional(),
+    board: insightBoardSchema.optional(),
+  })
+  .refine(({ lwql, replay }) => replay === undefined || lwql !== undefined, {
+    path: ["replay"],
+    error: "A window needs the query it replays",
+  });
 export type FileInsightInput = z.infer<typeof fileInsightInputSchema>;
 
 export const insightScopeSchema = z.object({

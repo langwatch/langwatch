@@ -1067,7 +1067,16 @@ export const prismaModelFieldCatalogue = {
     "occurredAt",
     "acceptedAt",
     "lastEventId",
-    "projectionVersion"
+    "projectionVersion",
+    "boardId",
+    "boardName",
+    "widgetId",
+    "widgetName",
+    "filedVia",
+    "replayStart",
+    "replayEnd",
+    "replayGranularitySeconds",
+    "replayContext"
   ],
   "InsightReaderProjection": [
     "id",

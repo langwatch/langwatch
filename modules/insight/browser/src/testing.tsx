@@ -4,6 +4,9 @@
  * Notices, navigations, query writes and Langy asks are RECORDED, not performed.
  */
 
+import { UiCapabilityContextProvider } from "@langwatch/browser-host/capabilities";
+import { type UiLend, uiDeclarations } from "@langwatch/browser-host/declarations";
+import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
 import { createUiQueryClient } from "@langwatch/browser/query-client";
 import { answeringUiTransport, type UiProcedureAnswer } from "@langwatch/browser/testing-transport";
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
@@ -81,23 +84,39 @@ export class StubInsightHost extends InsightHostApi {
   }
 }
 
-/** Renders one element inside the harness and hands back the host it recorded on. */
+/**
+ * Renders one element inside the harness and hands back the host it recorded on. `lends` is
+ * what a peer lends by token (§10.1), as an installed analytics would; none unless given.
+ */
 export function renderWithInsightHost({
   element,
   answer,
   host = new StubInsightHost(),
+  lends = [],
 }: {
   element: ReactElement;
   answer: UiProcedureAnswer;
   host?: StubInsightHost;
+  lends?: readonly UiLend[];
 }): RenderResult & { host: StubInsightHost } {
   const queryClient = createUiQueryClient({ onMutationError: () => void 0 });
+  const capabilities = {
+    ...createUiCapabilitiesFromHost({
+      route: () => ({ params: {}, query: {} }),
+      navigate: () => void 0,
+    }),
+    declarations: uiDeclarations([
+      { name: "analytics", installation: { capabilities: {}, lends } },
+    ]),
+  };
   return {
     ...render(
       <DesignSystemProvider forcedTheme="light">
-        <insightApi.Provider client={answeringUiTransport(answer)} queryClient={queryClient}>
-          <InsightHostProvider value={host}>{element}</InsightHostProvider>
-        </insightApi.Provider>
+        <UiCapabilityContextProvider value={capabilities}>
+          <insightApi.Provider client={answeringUiTransport(answer)} queryClient={queryClient}>
+            <InsightHostProvider value={host}>{element}</InsightHostProvider>
+          </insightApi.Provider>
+        </UiCapabilityContextProvider>
       </DesignSystemProvider>,
     ),
     host,
@@ -114,7 +133,10 @@ export function insightEntry(overrides: Partial<InsightEntry> = {}): InsightEntr
     topic: null,
     validDays: 7,
     lwql: null,
+    replay: null,
     source: null,
+    board: null,
+    filedVia: "chat",
     filedByUserId: "user-filer",
     filedAt: nowInstant().epochMilliseconds,
     renewedAt: null,

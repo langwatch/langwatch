@@ -2239,27 +2239,41 @@ model DashboardFavourite {
 /// A read model: rebuildable by replaying the event log. Epochs in milliseconds.
 model InsightProjection {
   /// The insight id, which is also its aggregate id.
-  id                   String  @id
-  projectId            String
-  title                String
-  body                 String
+  id                       String  @id
+  projectId                String
+  title                    String
+  body                     String
   /// bad | watch | good
-  tone                 String
-  topic                String?
-  validDays            Int
-  lwql                 String?
-  sourceConversationId String?
-  sourceMessageId      String?
-  filedByUserId        String?
-  filedAt              Float
+  tone                     String
+  topic                    String?
+  validDays                Int
+  lwql                     String?
+  sourceConversationId     String?
+  sourceMessageId          String?
+  filedByUserId            String?
+  filedAt                  Float
   /// Set by a later run that found the insight still true; nothing writes it before slice 3.
-  renewedAt            Float?
-  createdAt            Float
-  updatedAt            Float
-  occurredAt           Float
-  acceptedAt           Float
-  lastEventId          String
-  projectionVersion    String
+  renewedAt                Float?
+  createdAt                Float
+  updatedAt                Float
+  occurredAt               Float
+  acceptedAt               Float
+  lastEventId              String
+  projectionVersion        String
+  /// The board and widget it came from. A pointer only, never a relation: the row reads the
+  /// same once either is deleted, so the names are kept as filed.
+  boardId                  String?
+  boardName                String?
+  widgetId                 String?
+  widgetName               String?
+  /// chat | run
+  filedVia                 String  @default("chat")
+  /// The fixed window `lwql` replays over (epoch milliseconds, half-open) and its step.
+  replayStart              Float?
+  replayEnd                Float?
+  replayGranularitySeconds Int?
+  /// The values in force when it was filed: `{ period, parameters }`.
+  replayContext            Json?
 
   @@index([projectId, filedAt])
 }

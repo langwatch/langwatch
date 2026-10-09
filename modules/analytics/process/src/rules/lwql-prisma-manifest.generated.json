@@ -8429,6 +8429,87 @@
           "isList": false,
           "isOptional": false,
           "documentation": ""
+        },
+        {
+          "name": "boardId",
+          "columnName": "boardId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The board and widget it came from. A pointer only, never a relation: the row reads the\nsame once either is deleted, so the names are kept as filed."
+        },
+        {
+          "name": "boardName",
+          "columnName": "boardName",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "widgetId",
+          "columnName": "widgetId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "widgetName",
+          "columnName": "widgetName",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "filedVia",
+          "columnName": "filedVia",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "chat | run"
+        },
+        {
+          "name": "replayStart",
+          "columnName": "replayStart",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The fixed window `lwql` replays over (epoch milliseconds, half-open) and its step."
+        },
+        {
+          "name": "replayEnd",
+          "columnName": "replayEnd",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "replayGranularitySeconds",
+          "columnName": "replayGranularitySeconds",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "replayContext",
+          "columnName": "replayContext",
+          "type": "Json",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The values in force when it was filed: `{ period, parameters }`."
         }
       ]
     },

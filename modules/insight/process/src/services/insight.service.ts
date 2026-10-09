@@ -48,7 +48,11 @@ export class InsightService {
       topic: input.topic ?? null,
       validDays: input.validDays,
       lwql: input.lwql ?? null,
+      replay: input.replay ?? null,
       source: input.source ?? null,
+      board: input.board ?? null,
+      // A member's own filing; the scheduled run will be the one to say "run".
+      filedVia: "chat" as const,
       filedByUserId: userId,
     };
     const { insightId, ...entry } = filed;

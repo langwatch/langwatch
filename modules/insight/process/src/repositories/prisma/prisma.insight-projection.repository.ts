@@ -5,9 +5,15 @@ import type {
   StoredProjectionRead,
 } from "@langwatch/eventing";
 import { PrismaRepository } from "@langwatch/prisma-client";
+import { Prisma } from "@langwatch/prisma-client/generated";
 
 import type { InsightState } from "../../eventing/insight.projection.ts";
-import { type InsightRow, insightEntryFromRows } from "./prisma.insight.mapper.ts";
+import {
+  boardColumns,
+  type InsightRow,
+  insightEntryFromRows,
+  replayColumns,
+} from "./prisma.insight.mapper.ts";
 
 /** The shared record is the inbox entry without a reader, so the read mapper serves both. */
 function fromRow(row: InsightRow): StoredProjection<InsightState> {
@@ -51,11 +57,16 @@ export class PrismaInsightProjectionRepository
   ): Promise<void> {
     const id = context.key ?? context.aggregateId;
     const projectId = String(context.tenantId);
-    const { source, ...state } = projection.state;
+    const { source, board, replay, ...state } = projection.state;
+    const { replayContext, ...window } = replayColumns(replay);
     const data = {
       ...state,
       sourceConversationId: source?.conversationId ?? null,
       sourceMessageId: source?.messageId ?? null,
+      ...boardColumns(board),
+      ...window,
+      // A JSON column takes SQL NULL only by name.
+      replayContext: replayContext ?? Prisma.DbNull,
       createdAt: projection.createdAt,
       updatedAt: projection.updatedAt,
       occurredAt: projection.occurredAt,

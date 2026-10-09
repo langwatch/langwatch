@@ -5,9 +5,19 @@
 
 import { z } from "zod";
 
-import { insightSourceSchema, insightToneSchema } from "./insight.ts";
+import {
+  insightBoardSchema,
+  insightFiledViaSchema,
+  insightReplaySchema,
+  insightSourceSchema,
+  insightToneSchema,
+} from "./insight.ts";
 
-/** An insight filed by a person saving a Langy answer, or by Langy itself. */
+/**
+ * An insight filed by a person saving a Langy answer, or by Langy itself. `replay`, `board`
+ * and `filedVia` came after the first filings: each has a default, so an event stored
+ * without them reads as no window, no pointer and saved from a chat.
+ */
 export const insightFiledEventDataSchema = z.object({
   insightId: z.string().min(1),
   title: z.string(),
@@ -16,7 +26,10 @@ export const insightFiledEventDataSchema = z.object({
   topic: z.string().nullable(),
   validDays: z.number().int().positive(),
   lwql: z.string().nullable(),
+  replay: insightReplaySchema.nullable().default(null),
   source: insightSourceSchema.nullable(),
+  board: insightBoardSchema.nullable().default(null),
+  filedVia: insightFiledViaSchema.default("chat"),
   /** Null when Langy filed it on a scheduled run. */
   filedByUserId: z.string().nullable(),
 });

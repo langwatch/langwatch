@@ -60,6 +60,66 @@ describe("given a member files an insight", () => {
   });
 });
 
+const BOARD = {
+  id: "dashboard-1",
+  name: "Checkout health",
+  widget: { id: "widget-1", name: "Errors by day" },
+};
+const REPLAY = {
+  start: Date.UTC(2026, 6, 5),
+  end: Date.UTC(2026, 7, 4),
+  granularitySeconds: 86_400,
+  period: "Last 30 days",
+  parameters: { model: "gpt-5", minimum: 5, includeRetries: false },
+};
+const QUERY = "SELECT count() FROM traces WHERE model = {model:String}";
+
+describe("given a member saves a Langy answer that was about a widget on a board", () => {
+  describe("when the insight is filed", () => {
+    /** @scenario "An insight filed from a board keeps a pointer to the board and the widget" */
+    it("keeps the board and the widget, ids and names, for every reader", async () => {
+      const filed = await installed.app.fileInsight({ ...filing({ board: BOARD }), userId: FILER });
+
+      expect(filed.board).toEqual(BOARD);
+      for (const userId of [FILER, READER]) {
+        const [entry] = await installed.app.findInsights({ projectId: PROJECT, userId });
+        expect(entry?.board).toEqual(BOARD);
+      }
+    });
+  });
+});
+
+describe("given a member files an insight away from any board", () => {
+  describe("when a reader reads their inbox", () => {
+    /** @scenario "A member's filing is recorded as saved from a chat" */
+    it("records it as filed from a chat, with no pointer and no window", async () => {
+      const filed = await installed.app.fileInsight({ ...filing(), userId: FILER });
+
+      const [entry] = await installed.app.findInsights({ projectId: PROJECT, userId: READER });
+
+      expect(filed).toMatchObject({ filedVia: "chat", board: null, replay: null });
+      expect(entry).toMatchObject({ filedVia: "chat", board: null, replay: null });
+    });
+  });
+});
+
+describe("given a member files an insight with a query, a window and parameter values", () => {
+  describe("when a reader reads their inbox", () => {
+    /** @scenario "An insight keeps its query, the fixed window and the values it was filed with" */
+    it("carries that query, that window and those values unchanged", async () => {
+      await installed.app.fileInsight({
+        ...filing({ lwql: QUERY, replay: REPLAY }),
+        userId: FILER,
+      });
+
+      const [entry] = await installed.app.findInsights({ projectId: PROJECT, userId: READER });
+
+      expect(entry?.lwql).toBe(QUERY);
+      expect(entry?.replay).toEqual(REPLAY);
+    });
+  });
+});
+
 describe("given an insight the reader marked done", () => {
   describe("when the reader keeps it", () => {
     /** @scenario "Keeping an archived insight brings it back to the inbox" */
