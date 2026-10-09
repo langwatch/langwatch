@@ -468,7 +468,7 @@ const (
 	// it has its own liveness, and a stack whose worker is down looks healthy
 	// from every other row.
 	WorkerLane = "worker"
-	// AppLane is the ui and api lanes run as one process (LANGWATCH_DEV_ONE_PROCESS=1).
+	// AppLane is the ui and api lanes run as one process, the default (LANGWATCH_DEV_ONE_PROCESS=0 splits them).
 	// Same name as a monolith checkout's one lane, for the same reason.
 	AppLane = domain.MonolithAppLane
 	// GoLane is the process hosting the Go data-plane services, and the

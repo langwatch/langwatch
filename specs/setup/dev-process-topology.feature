@@ -240,8 +240,6 @@ Feature: The local development process topology
 
   # Plain `pnpm dev` and `haven up` run the ui's Vite server, the api and the
   # worker as one `app` lane; LANGWATCH_DEV_ONE_PROCESS=0 is the opt-out.
-  # Bind: dev/scripts/dev-stack.sh and haven's optionsFromEnv have no test yet.
-  @unimplemented
   Scenario: A local stack runs the ui, the api and the worker in one process unless split
     Given a contributor starts a stack with plain pnpm dev or haven up
     When LANGWATCH_DEV_ONE_PROCESS is unset

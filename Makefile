@@ -182,7 +182,7 @@ service-watch:
 		air --build.cmd "mkdir -p .bin/$(svc) && go build -tags dev -o .bin/$(svc)/$(svc) ./cmd/service" \
 			--build.full_bin ".bin/$(svc)/$(svc) $(svc) $(args)" \
 			--build.include_ext "go" \
-			--build.delay $${LANGWATCH_DEV_WATCH_DEBOUNCE_MS:-750} \
+			--build.delay $${LANGWATCH_DEV_WATCH_DEBOUNCE_MS:-2000} \
 			--build.include_dir "cmd,pkg,services" \
 			--build.exclude_dir ".bin,tmp,vendor,node_modules,services/langyworker/node_modules"
 

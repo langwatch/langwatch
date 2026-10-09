@@ -122,7 +122,8 @@ type Config struct {
 type PlanOptions struct {
 	ShouldGoWatch bool // air hot-reload for the Go services instead of `go run`
 	// ShouldRunOneProcess runs a modular checkout's ui and api lanes as one app
-	// lane: Vite, api and worker in one Node process (ADR-168, B1).
+	// lane: Vite, api and worker in one Node process (ADR-168, B1). On unless
+	// LANGWATCH_DEV_ONE_PROCESS=0.
 	ShouldRunOneProcess bool
 	// ShouldRunGoAsOneProcess hosts the linked simulators in the go lane, not a
 	// sims lane of their own: one Go process (LANGWATCH_GO_ONE_PROCESS=1, a trial).
