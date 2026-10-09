@@ -6,7 +6,7 @@ import {
 import { nowInstant, toDate } from "@langwatch/time";
 
 import type { MigrationEnrollmentRecord } from "../../rules/system-migration-support.rules.ts";
-import type { SystemMigrationEnrollmentRepository } from "../system-migration-enrollment.repository.ts";
+import type { SystemMigrationEnrollmentRepository } from "../system-migration.repository.ts";
 
 /**
  * Enrollments in one process's memory. The organization table is not ops' to hold, so this tier

@@ -5,7 +5,7 @@
  */
 
 import {
-  useUiCapabilities,
+  useUiHostServices,
   useUiCopyTargets,
   useUiScope,
   type UiCopyTargets,
@@ -108,7 +108,7 @@ class CapabilityEvaluatorHost extends EvaluatorHostApi {
  * is what `mounts.load` resolves.
  */
 export default function EvaluatorHostMount({ children }: { children?: ReactNode }) {
-  const { session, route, feedback } = useUiCapabilities();
+  const { session, route, feedback } = useUiHostServices();
   const lent = useUiCopyTargets();
   const { projectId } = useUiScope().activeScope();
   const scopeHost = useUiScope().scopeHost();

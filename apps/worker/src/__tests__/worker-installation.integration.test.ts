@@ -426,6 +426,23 @@ describe("the worker process installation", () => {
     }
   });
 
+  it("hosts licensing's managed-key attach lane on the licensing_customer pipeline", async () => {
+    const { runtime, eventing } = await bootWorker();
+
+    try {
+      const customer = eventing.definitions.find(
+        (definition) => definition.metadata.name === "licensing_customer",
+      );
+      expect(
+        customer?.open((definition) =>
+          (definition.globalProjections ?? []).map(({ name }) => name),
+        ),
+      ).toContain("licensing_customer.licensingManagedKeyProvisioned");
+    } finally {
+      await runtime.stop();
+    }
+  });
+
   /** @scenario "The worker hands gateway's governance facts to webhook delivery" */
   it("hosts webhook's subscribers on gateway's governance facts and its governance delivery", async () => {
     const { runtime, eventing } = await bootWorker();

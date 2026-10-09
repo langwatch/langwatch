@@ -104,7 +104,7 @@ describe("the picker's catalogue filter", () => {
     /** @scenario "AC134 Picker filters: sections are branches in tree order, coloured by trunk" */
     it("lists every widget once, under its branch, branches in tree order", () => {
       const sections = pickerSections({ questions: PICKER_QUESTIONS });
-      const treeOrder = QUESTION_BRANCHES.map(({ title }) => title);
+      const treeOrder: readonly string[] = QUESTION_BRANCHES.map(({ title }) => title);
 
       expect(sections.flatMap(({ questions }) => ids(questions))).toEqual(
         expect.arrayContaining(ids(PICKER_QUESTIONS)),

@@ -1,10 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from "fs";
 import path from "path";
 
-import {
-  injectPublicAppConfigIntoHtml,
-  type PublicAppConfig,
-} from "@langwatch/config/public-app-config";
 import { shikiManualChunk } from "@langwatch/design-system/shiki-chunking";
 import react from "@vitejs/plugin-react";
 import dotenv from "dotenv";
@@ -18,7 +14,7 @@ import { entryCoreChunkGroup, hostMountsChunkGroup } from "./vite/entry-core-chu
 import { HAVEN_SLUG_ENV, havenOrb } from "./vite/haven-orb";
 import { havenHmrGate } from "./vite/havenHmrGate";
 import { mailPreview } from "./vite/mail-preview";
-import { fetchPublicConfigFromApi } from "./vite/public-config-from-api";
+import { publicConfigPages } from "./vite/public-config-from-api";
 import { pushServiceWorker } from "./vite/push-service-worker";
 import { rootDiscoveryProxyPattern } from "./vite/root-discovery-proxy";
 import { SHIKI_PREBUNDLE_INCLUDE } from "./vite/shiki-prebundle";
@@ -195,23 +191,12 @@ function patchObjectInspectBrowserStub(): Plugin {
  * Vite owns the shell, so it performs the same explicit boot mapping itself.
  */
 function injectDevelopmentPublicConfig({ apiUrl }: { apiUrl: string }): Plugin {
-  let last: PublicAppConfig | undefined;
-  // The api may boot after this server and reloads on its own: read it per page, waiting only
-  // for the first answer, then keeping the last one while a reload has it briefly down.
-  const current = async (): Promise<PublicAppConfig> => {
-    try {
-      last = await fetchPublicConfigFromApi({ apiUrl, waitMs: last ? 0 : 30_000 });
-    } catch (failure) {
-      if (!last) throw failure;
-    }
-    return last;
-  };
+  // The api may boot after this server and reloads on its own, so it is read per page.
+  const pageOf = publicConfigPages({ apiUrl, warn: (message) => devLogger.warn(message) });
   return {
     name: "inject-development-public-config",
     apply: "serve",
-    async transformIndexHtml(html) {
-      return injectPublicAppConfigIntoHtml({ html, config: await current() });
-    },
+    transformIndexHtml: (html) => pageOf(html),
     configurePreviewServer(server) {
       const shellPath = path.resolve(server.config.root, server.config.build.outDir, "index.html");
       server.middlewares.use((request, response, next) => {
@@ -219,9 +204,9 @@ function injectDevelopmentPublicConfig({ apiUrl }: { apiUrl: string }): Plugin {
         const isShell = pathname.endsWith(".html") || !path.extname(pathname);
         if (request.method !== "GET" || !isShell || !existsSync(shellPath)) return next();
         const html = readFileSync(shellPath, "utf8");
-        void current().then((config) => {
+        void pageOf(html).then((page) => {
           response.setHeader("Content-Type", "text/html");
-          response.end(injectPublicAppConfigIntoHtml({ html, config }));
+          response.end(page);
         }, next);
       });
     },
@@ -300,7 +285,8 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
       // The list, and the reason each entry is named through its owner, live in
       // ./vite/shiki-prebundle so one value is what the config and its guard
       // both read.
-      include: [...SHIKI_PREBUNDLE_INCLUDE],
+      // The React Compiler's output imports its runtime; prebundled up front, not found mid-page.
+      include: [...SHIKI_PREBUNDLE_INCLUDE, "react/compiler-runtime"],
     },
     build: {
       outDir: "dist/client",

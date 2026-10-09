@@ -28,4 +28,3 @@ export * from "./features/spend/gateway-spend-event.trpc.ts";
 export * from "./features/spend/gateway-principal-spend.ts";
 export * from "./gateway.governance-events.ts";
 export * from "./features/spend/gateway.spend-events.ts";
-export * from "./gateway.connect-managed-key-events.ts";

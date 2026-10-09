@@ -1,12 +1,12 @@
 /**
- * A From LangWatch board's widgets on the board grid, read-only: no drag, resize or menu,
- * only Ask Langy, which changes nothing. Each widget runs its own queries over the board's period.
+ * A From LangWatch board's widgets on the board grid, read-only: no drag or resize, only Ask
+ * Langy and Export CSV, which change nothing. Each widget runs its own queries over the
+ * board's period.
  */
 
 import { useMemo } from "react";
 
 import { ChartGrid } from "../../../../ui/sections/chart-grid.tsx";
-import { DashboardWidgetFrameOverWindow } from "../../../dashboard-widget/ui/sections/dashboard-widget-frame.tsx";
 import {
   atLeastBoardMinRows,
   BOARD_GRID_ROW_HEIGHT_PX,
@@ -14,13 +14,13 @@ import {
 } from "../../model/board-grid.ts";
 import type { BoardPeriod } from "../../model/board-period.ts";
 import type { BoardTemplateWidget } from "../../templates/index.ts";
-import { AskLangyButton } from "../blocks/ask-langy-button.tsx";
-import { WidgetCardShell, widgetBodyHeightPx } from "../blocks/widget-card-shell.tsx";
+import { CuratedWidgetCard } from "./curated-widget-card.tsx";
 
 export function CuratedWidgetsGrid({
   projectId,
   projectSlug,
   templateId,
+  boardName,
   widgets,
   period,
   onAskLangy,
@@ -28,6 +28,7 @@ export function CuratedWidgetsGrid({
   projectId: string;
   projectSlug: string;
   templateId: string;
+  boardName: string;
   widgets: readonly BoardTemplateWidget[];
   period: BoardPeriod;
   /** Drafts a prompt about the widget in Langy; absent when Langy is not available. */
@@ -51,26 +52,18 @@ export function CuratedWidgetsGrid({
       renderCard={({ graphId, rowSpan }) => {
         const widget = byKey.get(graphId);
         if (!widget) return null;
-        const { name, definition } = widget;
         return (
-          <WidgetCardShell
-            name={name}
-            description={definition.description}
-            controls={
-              onAskLangy && <AskLangyButton name={name} onClick={() => onAskLangy(widget)} />
-            }
-          >
-            <DashboardWidgetFrameOverWindow
-              id={`${templateId}-${graphId}`}
-              graph={definition}
-              projectId={projectId}
-              projectSlug={projectSlug}
-              widgetName={name}
-              maxHeight={widgetBodyHeightPx(rowSpan)}
-              timeWindow={timeWindow}
-              granularitySeconds={granularitySeconds}
-            />
-          </WidgetCardShell>
+          <CuratedWidgetCard
+            widget={widget}
+            frameId={`${templateId}-${graphId}`}
+            boardName={boardName}
+            projectId={projectId}
+            projectSlug={projectSlug}
+            rowSpan={rowSpan}
+            timeWindow={timeWindow}
+            granularitySeconds={granularitySeconds}
+            onAskLangy={onAskLangy && (() => onAskLangy(widget))}
+          />
         );
       }}
     />

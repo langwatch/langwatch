@@ -39,6 +39,7 @@ export {
   type CatalogueTemplate,
   focusTemplateId,
   templateSetupNeeds,
+  templateWidgetGaps,
 } from "./model/catalogue-templates.ts";
 export {
   CATALOGUE_WIDGETS,

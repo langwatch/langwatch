@@ -89,6 +89,8 @@ describe("given the browsers somebody is signed in on", () => {
       expect(band.getAllByText(/Chrome on macOS/).length).toBe(2);
       expect(band.getAllByText(/Email and password/).length).toBe(2);
       expect(band.getByText("This browser")).toBeTruthy();
+      expect(band.getByText("The browsers holding a live sign-in to this account.")).toBeTruthy();
+      expect(band.getAllByTestId("browser-session-row").length).toBe(2);
     });
 
     /** @scenario "The account surface serves the browsers somebody is signed in on" */

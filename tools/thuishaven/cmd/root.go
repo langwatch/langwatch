@@ -247,7 +247,7 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 
 	orch := app.New(app.Deps{
 		Cfg: cfg, Proxy: proxy, Store: store, Sup: sup, Sys: sys,
-		CH: ch, PG: pg, RDS: rds, Obs: obs, Hyg: hyg, Sem: sem,
+		CH: ch, PG: pg, RDS: rds, Obs: obs, Hyg: hyg, Sem: sem, Daemon: dashboard.Client{},
 		Container: rt, Janitor: dockerjanitor.New(rt), Jobs: jobscratch.New(),
 		State:   claudestate.New(),
 		ProcTel: procmetrics.New(observabilityEndpoints().OTLPHTTPPort),
@@ -283,6 +283,8 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 				// Add one service to a live stack; reset a stack's databases.
 				StartService:   orch.StartStackService,
 				ResetDatabases: orch.ResetStackDatabases,
+				// The up's hand-over: the daemon is the one place keepers start.
+				StartKeeper: orch.StartKeeper,
 			},
 			Limits: dashboard.Limits{Report: limitsReport, Set: setLimit, Unset: unsetLimit},
 		}),

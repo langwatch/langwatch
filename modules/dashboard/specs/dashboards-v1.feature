@@ -127,7 +127,7 @@ Feature: Dashboards v1
   Scenario: AC15 Widget menu actions persist after reload
     Given a widget on a board, including one made from the template
     When the member opens its menu
-    Then it offers Edit code, Copy widget id, Copy API snippet, Duplicate and Delete
+    Then it offers Edit code, Copy widget id, Copy API snippet, Export CSV, Duplicate and Delete
     And Edit code opens the widget editor on that widget's own code and queries
     And a Duplicate, a Delete, a move or a resize on the grid is still there after reload
     # (changed by langwatch/tasks#911: the menu follows the prototype; see dashboards-widget-flow.feature)

@@ -448,7 +448,16 @@ export class LicenseRegistryService {
  * credential: both write to the change feed every gateway polls.
  */
 export interface ConnectManagedKeys {
-  provision(params: { organizationId: string; licenseId: string }): Promise<{ id: string }>;
+  /** Records that the licence has no managed key yet; gateway provisions one from the fact. */
+  issue(params: {
+    organizationId: string;
+    licenseId: string;
+    issuedLicenseId: string;
+    instanceId: string;
+    tokenHash: string;
+    expiresAt: Instant;
+    services: readonly ConnectService[];
+  }): Promise<void>;
   /** Ends the key for good. Safe to repeat. */
   retire(params: { virtualKeyId: string; organizationId: string; actorId: string }): Promise<void>;
   /** Makes every gateway resolve the license again on its next call. */

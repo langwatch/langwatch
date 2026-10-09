@@ -366,6 +366,19 @@ Feature: Enterprise licensing lifecycle
       And a managed-key-invalidated fact naming the other key and its organisation
 
     @unit
+    Scenario: Licensing records a licence's connect credential issued as a fact for gateway to provision
+      Given a bound licence with no managed key
+      When its token is resolved
+      Then licensing records a connect-credential-issued fact naming the licence, its install, the token's registry hash and its services, never the token
+      And the call answers connect_credential_pending
+
+    @unit
+    Scenario: Licensing attaches gateway's provisioned key once, however often the fact arrives
+      Given gateway has recorded a managed key provisioned for a licence
+      When licensing receives the fact once and then again
+      Then the licence holds that key and nothing is ended on the repeat
+
+    @unit
     Scenario: Gateway ends or re-resolves a licence's managed key from licensing's fact, however often it arrives
       Given gateway subscribes to licensing's managed-key facts
       When a managed-key-retired fact arrives once and then again

@@ -1,3 +1,4 @@
+import { useUiSupportChat } from "@langwatch/browser-host/capabilities";
 import { setFlowCallbacks, useDrawer } from "@langwatch/browser-host/drawer";
 import { Link } from "@langwatch/browser-host/link";
 import { toaster } from "@langwatch/browser-host/toaster";
@@ -51,7 +52,6 @@ import {
 } from "react-resizable-panels";
 import { useShallow } from "zustand/react/shallow";
 
-import { assertCrispChatHidden } from "../../../behavior/crisp-bubble-policy.ts";
 import { LLMModelDisplay } from "../../../behavior/lent-model-provider.tsx";
 import { useComponentVersion } from "../../../behavior/optimization_studio/use-component-version.tsx";
 import { useGetDatasetData } from "../../../behavior/optimization_studio/use-get-dataset-data.ts";
@@ -234,12 +234,13 @@ export default function OptimizationStudio() {
     [],
   );
 
-  // The Crisp bubble policy keeps the support bubble hidden app-wide unless
+  // The support chat keeps its bubble hidden app-wide unless
   // deliberately opened; re-assert on entering the studio so it can never
   // cover the canvas controls even if Crisp booted mid-navigation.
+  const supportChat = useUiSupportChat();
   useEffect(() => {
-    assertCrispChatHidden();
-  }, []);
+    supportChat?.hide();
+  }, [supportChat]);
 
   useAskBeforeLeaving();
 

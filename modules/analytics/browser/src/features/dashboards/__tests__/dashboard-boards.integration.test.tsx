@@ -1026,7 +1026,7 @@ describe("a member's board", () => {
 
     describe("when the member opens its menu", () => {
       /** @scenario "AC15 Widget menu actions persist after reload" */
-      it("offers Edit code, the two copies, Duplicate and Delete, and nothing else", async () => {
+      it("offers Edit code, the two copies, Export CSV, Duplicate and Delete, and nothing else", async () => {
         const user = userEvent.setup({ pointerEventsCheck: 0 });
         openBoard({ server: boardWithOneWidget() });
 
@@ -1037,6 +1037,7 @@ describe("a member's board", () => {
           "Edit code",
           "Copy widget id",
           "Copy API snippet",
+          "Export CSV Still loading",
           "Duplicate",
           "Delete",
         ]);

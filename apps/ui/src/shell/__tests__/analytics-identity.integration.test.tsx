@@ -9,8 +9,8 @@ import {
   BrowserUiDocumentTitle,
   type UiActiveScope,
   type UiActor,
-  type UiCapabilities,
-  UiCapabilityContextProvider,
+  type UiHostServices,
+  UiHostServicesContextProvider,
   UiFeedback,
   UiNavigation,
   UiRoute,
@@ -126,7 +126,7 @@ function capabilities(
   organizationId: string | undefined,
   analytics: UiAnalytics,
   attribution: Readonly<Record<string, string>> = CAMPAIGN,
-): UiCapabilities {
+): UiHostServices {
   return {
     documentTitle: BrowserUiDocumentTitle.create(),
     feedback: new SilentFeedback(),
@@ -158,9 +158,9 @@ function Probe() {
 }
 function draw(user: UiActor | null, organizationId: string | undefined, analytics: UiAnalytics) {
   return render(
-    <UiCapabilityContextProvider value={capabilities(user, organizationId, analytics)}>
+    <UiHostServicesContextProvider value={capabilities(user, organizationId, analytics)}>
       <Probe />
-    </UiCapabilityContextProvider>,
+    </UiHostServicesContextProvider>,
   );
 }
 
@@ -181,9 +181,9 @@ describe("who the shell tells analytics is reading", () => {
     const analytics = new RecordingAnalytics();
     const view = draw(ADA, "org_1", analytics);
     view.rerender(
-      <UiCapabilityContextProvider value={capabilities(BOB, "org_1", analytics)}>
+      <UiHostServicesContextProvider value={capabilities(BOB, "org_1", analytics)}>
         <Probe />
-      </UiCapabilityContextProvider>,
+      </UiHostServicesContextProvider>,
     );
     expect(analytics.calls).toContain("reset");
     expect(analytics.calls.at(-2)).toBe("identify user_bob -");
@@ -214,9 +214,9 @@ describe("the signed_in event the shell sends for an identified person", () => {
   it("sends signed_in with no property when there is no attribution", () => {
     const analytics = new RecordingAnalytics();
     render(
-      <UiCapabilityContextProvider value={capabilities(ADA, "org_1", analytics, {})}>
+      <UiHostServicesContextProvider value={capabilities(ADA, "org_1", analytics, {})}>
         <Probe />
-      </UiCapabilityContextProvider>,
+      </UiHostServicesContextProvider>,
     );
     expect(analytics.tracked).toEqual([{ name: "signed_in", attributes: {} }]);
   });
@@ -270,9 +270,9 @@ describe("the signed_in event the shell sends for an identified person", () => {
     const analytics = new RecordingAnalytics();
     const view = draw(ADA, "org_1", analytics);
     view.rerender(
-      <UiCapabilityContextProvider value={capabilities(BOB, "org_1", analytics)}>
+      <UiHostServicesContextProvider value={capabilities(BOB, "org_1", analytics)}>
         <Probe />
-      </UiCapabilityContextProvider>,
+      </UiHostServicesContextProvider>,
     );
     expect(analytics.tracked).toEqual([SIGNED_IN, SIGNED_IN]);
   });
@@ -282,9 +282,9 @@ describe("the signed_in event the shell sends for an identified person", () => {
     const analytics = new RecordingAnalytics();
     draw(ADA, "org_1", analytics).unmount();
     render(
-      <UiCapabilityContextProvider value={capabilities(BOB, "org_1", analytics)}>
+      <UiHostServicesContextProvider value={capabilities(BOB, "org_1", analytics)}>
         <Probe />
-      </UiCapabilityContextProvider>,
+      </UiHostServicesContextProvider>,
     ).unmount();
 
     resetSignedInTracking();

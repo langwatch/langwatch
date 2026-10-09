@@ -1,5 +1,5 @@
 import { apiKeyClient, personalTokenInput } from "@langwatch/api-key-client";
-import { useOptionalUiCapabilities } from "@langwatch/browser-host/capabilities";
+import { useOptionalUiHostServices } from "@langwatch/browser-host/capabilities";
 import { useRef } from "react";
 
 import { useShowErrorToast } from "../../../behavior/ops-feedback.ts";
@@ -11,7 +11,7 @@ export function useTargetProjectKey() {
   const project = useTargetProject();
   const { mutateAsync, reset } = apiKeyClient.apiKey.create.useMutation({ gcTime: 0 });
   const showErrorToast = useShowErrorToast();
-  const userId = useOptionalUiCapabilities()?.session.currentUser()?.id;
+  const userId = useOptionalUiHostServices()?.session.currentUser()?.id;
   const scopeKey = project ? `${project.organizationId}|${project.id}|${userId}` : undefined;
   const currentScope = useRef(scopeKey);
   currentScope.current = scopeKey;

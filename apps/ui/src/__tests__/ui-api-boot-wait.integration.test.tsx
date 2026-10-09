@@ -40,9 +40,9 @@ import { createUiFeatureShell } from "@langwatch/browser/feature-shell";
 import type { UiFeatureApiTransport } from "@langwatch/browser/transport";
 import type { UiScopeOrganization, UiScopeTeam } from "@langwatch/organization-contract";
 
-import { loadUiRootCapabilities } from "../shell/ui-root-capabilities";
+import { loadUiRootHostServices } from "../shell/ui-root-host-services";
 
-const root = await loadUiRootCapabilities();
+const root = await loadUiRootHostServices();
 
 /** The graph `organization.getAll` returns, only as far as this gate reads it. */
 const JANE = "user-jane";
@@ -177,7 +177,7 @@ function renderShell({
     capabilities: { feedback },
     transport: answeringTransport,
     // The composition root's four calls, with the recorded session client
-    // drilled in — see `useBrowserUiCapabilities` in main.tsx.
+    // drilled in — see `useBrowserUiHostServices` in main.tsx.
     session: ({ transport: mounted, feedback: told }) => {
       const sessionReading = root.session.useUiSessionReading({
         feedback: told,

@@ -4,65 +4,31 @@
  */
 export {
   STORE_CLIENT_NAMES,
-  type Cache,
-  type Clock,
   type Encryption,
-  type IdempotencyStore,
-  type StoreClientName,
-  type ObjectBodyFacts,
   type ObjectDigest,
   type ObjectStorage,
   type ObjectStorageDestination,
-  type StoreClients,
   type RateLimitDecision,
   type RateLimiter,
-  type SecretResolver,
   type StoresMemberSource,
   type SignedObjectUpload,
   type StoredObjectAddress,
-  type Telemetry,
-  type UploadFacts,
 } from "./members.ts";
 export {
   hostedStores,
   MemberNotConfiguredError,
-  MemberSuppliedUndefinedError,
-  StoreNotAnsweringError,
   type ProcessMemberSource,
-  type ProcessStores,
 } from "./create-members.ts";
-export type {
-  ClickHouseConfig,
-  ClickHousePrivateRoute,
-  DatabaseConfig,
-  EventingConfig,
-  EventingGroupQueueConfig,
-  EventingStoreConfig,
-  ObjectStorageAccount,
-  ObjectStorageAzureConfig,
-  ObjectStorageAzureIdentity,
-  ObjectStorageConfig,
-  ObjectStoragePrivateAccount,
-  ProcessConfig,
-  RedisConfig,
-} from "./config.ts";
-export { aesEncryption, loggedTelemetry, resolvedSecrets, systemClock } from "./config-members.ts";
-export { consumingEventing, producerEventing } from "./eventing-role.ts";
-export type { EventingEventLogMembers } from "./eventing-members.ts";
-export { redisCache, redisIdempotency, redisRateLimiter } from "./redis-members.ts";
-export { memoryStores } from "./memory-stores.ts";
+export type { ProcessConfig } from "./config.ts";
+export { aesEncryption, resolvedSecrets, systemClock } from "./config-members.ts";
+export { redisRateLimiter } from "./redis-members.ts";
+export { memoryStores, type MemoryStores } from "./memory-stores.ts";
 export { memorySessionState } from "./memory-session-state.ts";
-export {
-  cachedTenantDirectory,
-  prismaTenantDirectory,
-  privateTenantListing,
-  type TenantDirectory,
-} from "./tenant-directory.ts";
+export { privateTenantListing } from "./tenant-directory.ts";
 export {
   ObjectBodyShortError,
   ObjectBodyTooLargeError,
   StoredObjectNotFoundError,
-  UnknownStorageProjectError,
 } from "./object-storage-backend.ts";
 export {
   AzureBackendMisconfiguredError,
@@ -74,7 +40,6 @@ export {
   PipelineParticipation,
   ProducerPipelines,
   ConsumerPipelines,
-  type PipelineSettings,
 } from "./pipeline-selection.ts";
 export { openStores } from "./open-stores.ts";
 export { clickhouseRoutesOf } from "./clickhouse-routes.ts";

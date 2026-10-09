@@ -3,21 +3,15 @@
  * account, and the one way to end one of them without ending them all.
  */
 
-import {
-  Badge,
-  Button,
-  HStack,
-  Spacer,
-  Spinner,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
-import { nowInstant, readableDate } from "@langwatch/time";
+import { Badge, Button, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
+import { SettingsSection, SettingsSectionRow } from "@langwatch/design-system/settings-section";
+import { nowInstant, toEpochMs } from "@langwatch/time";
 import { Monitor } from "lucide-react";
 
 import { api } from "../../behavior/personal-workspace-api.ts";
 import { browserSessionLabel, isSessionStale } from "../../model/browser-session.ts";
 import { usePersonalWorkspaceHost } from "../../model/personal-workspace-host.ts";
+import { formatRelativeTime } from "../../model/relative-time.ts";
 
 export function BrowserSessionsSection() {
   const host = usePersonalWorkspaceHost();
@@ -39,73 +33,62 @@ export function BrowserSessionsSection() {
   const now = nowInstant();
 
   return (
-    <VStack align="start" gap={4} width="full" data-testid="browser-sessions-settings-section">
-      <VStack align="start" gap={1}>
-        <HStack gap={2}>
-          <Monitor size={18} />
-          <Text fontWeight={600}>Where you are signed in</Text>
-        </HStack>
-        <Text color="fg.muted" fontSize="sm">
-          End a browser you no longer use, or one you do not recognize. Signing out of this one uses
-          the sign-out control.
-        </Text>
-      </VStack>
-
+    <SettingsSection
+      icon={<Monitor size={18} />}
+      title="Where you are signed in"
+      hint="The browsers holding a live sign-in to this account."
+      data-testid="browser-sessions-settings-section"
+    >
       {sessions.isLoading && <Spinner size="sm" />}
-
       {!sessions.isLoading && listed.length === 0 && (
         <Text fontSize="sm" color="fg.muted">
-          No other browsers hold a sign-in to this account.
+          Nothing is signed in but the browser you are reading this in.
         </Text>
       )}
-
-      <VStack align="stretch" gap={2} width="full">
-        {listed.map((session) => (
-          <HStack
-            key={session.sessionId}
-            width="full"
-            gap={3}
-            alignItems="start"
-            data-testid="browser-session-row"
-          >
-            <Monitor size={16} />
-            <VStack align="start" gap={0}>
-              <HStack gap={2}>
-                <Text fontSize="sm">{browserSessionLabel(session.userAgent)}</Text>
-                {session.current && (
-                  <Badge colorPalette="green" size="sm" data-testid="current-session-chip">
-                    This browser
-                  </Badge>
-                )}
-                {!session.current &&
-                  isSessionStale({ lastActiveAt: session.lastActiveAt, now }) && (
-                    <Badge colorPalette="orange" size="sm" data-testid="stale-session-chip">
-                      Not used lately
+      {listed.length > 0 && (
+        <VStack align="stretch" gap={2} width="full">
+          {listed.map((session) => (
+            <SettingsSectionRow key={session.sessionId} data-testid="browser-session-row">
+              <VStack align="start" gap={0} flex={1} minWidth={0}>
+                <HStack gap={2} flexWrap="wrap">
+                  <Text fontSize="sm" fontWeight={500}>
+                    {browserSessionLabel(session.userAgent)}
+                  </Text>
+                  {session.current && (
+                    <Badge colorPalette="green" size="sm" data-testid="current-session-chip">
+                      This browser
                     </Badge>
                   )}
-              </HStack>
-              <Text fontSize="xs" color="fg.muted">
-                {session.method}
-                {session.secondFactorProven ? " with two-step verification" : ""} ·{" "}
-                {session.ipAddress ?? "address unknown"} · last used{" "}
-                {readableDate(session.lastActiveAt).toLocaleDateString()}
-              </Text>
-            </VStack>
-            <Spacer />
-            {!session.current && (
-              <Button
-                size="xs"
-                variant="outline"
-                aria-label={`Sign out ${browserSessionLabel(session.userAgent)}`}
-                onClick={() => void end(session.sessionId)}
-                disabled={endSession.isPending}
-              >
-                Sign out
-              </Button>
-            )}
-          </HStack>
-        ))}
-      </VStack>
-    </VStack>
+                  {!session.current &&
+                    isSessionStale({ lastActiveAt: session.lastActiveAt, now }) && (
+                      <Badge colorPalette="orange" size="sm" data-testid="stale-session-chip">
+                        Not used lately
+                      </Badge>
+                    )}
+                </HStack>
+                <Text fontSize="xs" color="fg.muted">
+                  {session.method}
+                  {session.secondFactorProven ? " with two-step verification" : ""} · Signed in{" "}
+                  {formatRelativeTime(toEpochMs(session.signedInAt))}
+                  {!session.current &&
+                    ` · Last active ${formatRelativeTime(toEpochMs(session.lastActiveAt))}`}
+                </Text>
+              </VStack>
+              {!session.current && (
+                <Button
+                  size="xs"
+                  variant="outline"
+                  aria-label={`Sign out ${browserSessionLabel(session.userAgent)}`}
+                  onClick={() => void end(session.sessionId)}
+                  disabled={endSession.isPending}
+                >
+                  Sign out
+                </Button>
+              )}
+            </SettingsSectionRow>
+          ))}
+        </VStack>
+      )}
+    </SettingsSection>
   );
 }

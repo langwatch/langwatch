@@ -10,15 +10,15 @@ import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 
 import {
-  resolveUiCapabilities,
-  UiCapabilityContextProvider,
-  UiCapabilityUnavailableError,
+  resolveUiHostServices,
+  UiHostServicesContextProvider,
+  UiHostServiceUnavailableError,
   UiNavigation,
   UiRoute,
   UiRpc,
   useUiRpc,
   BrowserUiDocumentTitle,
-  type UiCapabilities,
+  type UiHostServices,
   type UiRouteReadingValues,
   type UiRpcSubscription,
 } from "../capabilities";
@@ -52,8 +52,8 @@ class RecordedUiRpc extends UiRpc {
   }
 }
 
-function capabilitiesWith(rpc?: UiRpc): UiCapabilities {
-  return resolveUiCapabilities({
+function capabilitiesWith(rpc?: UiRpc): UiHostServices {
+  return resolveUiHostServices({
     install: {},
     documentTitle: BrowserUiDocumentTitle.create(),
     navigation: new InertUiNavigation(),
@@ -62,9 +62,9 @@ function capabilitiesWith(rpc?: UiRpc): UiCapabilities {
   });
 }
 
-function mounted(capabilities: UiCapabilities) {
+function mounted(capabilities: UiHostServices) {
   return ({ children }: { children: ReactNode }) => (
-    <UiCapabilityContextProvider value={capabilities}>{children}</UiCapabilityContextProvider>
+    <UiHostServicesContextProvider value={capabilities}>{children}</UiHostServicesContextProvider>
   );
 }
 
@@ -85,7 +85,7 @@ describe("given a screen mounted with no dispatcher above it", () => {
     const { result } = renderHook(() => useUiRpc(), { wrapper: mounted(capabilitiesWith()) });
 
     expect(() => result.current.query("organization.getAll", {})).toThrow(
-      UiCapabilityUnavailableError,
+      UiHostServiceUnavailableError,
     );
   });
 
@@ -93,7 +93,7 @@ describe("given a screen mounted with no dispatcher above it", () => {
     const { result } = renderHook(() => useUiRpc());
 
     expect(() => result.current.mutate("organization.update", {})).toThrow(
-      UiCapabilityUnavailableError,
+      UiHostServiceUnavailableError,
     );
   });
 });

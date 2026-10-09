@@ -5,7 +5,7 @@
  */
 
 import {
-  useUiCapabilities,
+  useUiHostServices,
   useUiScope,
   type UiFeedback,
   type UiSession,
@@ -71,7 +71,7 @@ class CapabilitySecretHost extends SecretHostApi {
  * is what `mounts.load` resolves.
  */
 export default function SecretHostMount({ children }: { children?: ReactNode }) {
-  const { session, feedback } = useUiCapabilities();
+  const { session, feedback } = useUiHostServices();
   const { projectId } = useUiScope().activeScope();
   const Switcher = useLent(ProjectSwitcherToken);
   const host = useMemo(

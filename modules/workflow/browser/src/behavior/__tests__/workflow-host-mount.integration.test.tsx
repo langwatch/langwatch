@@ -1,13 +1,13 @@
 import {
-  UiCapabilityContextProvider,
+  UiHostServicesContextProvider,
   UiCopyTargets,
   UiScope,
   UiSession,
   type UiActiveScope,
-  type UiCapabilities,
+  type UiHostServices,
   type UiCopyTarget,
 } from "@langwatch/browser-host/capabilities";
-import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
 import {
   createUiScopeHost,
   type UiScopeHost,
@@ -125,8 +125,8 @@ async function renderUnderMount(
     organization: () => ({ id: "org-1" }),
     team: () => ({ id: "team-1" }),
   });
-  const capabilities: UiCapabilities = {
-    ...createUiCapabilitiesFromHost(
+  const capabilities: UiHostServices = {
+    ...createUiHostServicesFromHost(
       {
         route: () => ({ params: { project: "demo" }, query: {}, pathname: "/demo/workflows" }),
         navigate: navigated,
@@ -138,9 +138,9 @@ async function renderUnderMount(
   };
 
   renderWithDesignSystem(
-    <UiCapabilityContextProvider value={capabilities}>
+    <UiHostServicesContextProvider value={capabilities}>
       <Mount>{children}</Mount>
-    </UiCapabilityContextProvider>,
+    </UiHostServicesContextProvider>,
   );
 }
 

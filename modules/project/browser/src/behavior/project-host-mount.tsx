@@ -4,7 +4,7 @@
  * `@langwatch/browser-host` capability. ARCHITECTURE.md §10.1.
  */
 
-import { useUiCapabilities, useUiScope } from "@langwatch/browser-host/capabilities";
+import { useUiHostServices, useUiScope } from "@langwatch/browser-host/capabilities";
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { useLent } from "@langwatch/browser-host/lent";
 import type { UiScopeHost } from "@langwatch/browser-host/use-organization-team-project";
@@ -106,7 +106,7 @@ class CapabilityProjectHost extends ProjectHostApi {
  * is what `mounts.load` resolves.
  */
 export default function ProjectHostMount({ children }: { children?: ReactNode }) {
-  const { session, feedback } = useUiCapabilities();
+  const { session, feedback } = useUiHostServices();
   const scope = useUiScope();
   const { organizationId, projectId } = scope.activeScope();
   const scopeHost = scope.scopeHost();

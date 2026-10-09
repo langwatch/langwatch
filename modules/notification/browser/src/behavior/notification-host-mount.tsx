@@ -4,7 +4,7 @@
  */
 
 import {
-  useUiCapabilities,
+  useUiHostServices,
   useUiScope,
   type UiFeedback,
   type UiSession,
@@ -51,7 +51,7 @@ class CapabilityNotificationHost extends NotificationHostApi {
  * is what `mounts.load` resolves.
  */
 export default function NotificationHostMount({ children }: { children?: ReactNode }) {
-  const { session, feedback } = useUiCapabilities();
+  const { session, feedback } = useUiHostServices();
   const { projectId } = useUiScope().activeScope();
 
   const host = useMemo(

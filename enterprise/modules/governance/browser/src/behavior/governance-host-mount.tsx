@@ -5,7 +5,7 @@
  */
 
 import {
-  useUiCapabilities,
+  useUiHostServices,
   useUiScope,
   type UiFeedback,
   type UiNavigation,
@@ -108,7 +108,7 @@ class CapabilityGovernanceHost extends GovernanceHostApi {
  * is what `mounts.load` resolves.
  */
 export default function GovernanceHostMount({ children }: { children?: ReactNode }) {
-  const { session, feedback, navigation, route } = useUiCapabilities();
+  const { session, feedback, navigation, route } = useUiHostServices();
   const flags = useUiFlags();
   const { organizationId } = useUiScope().activeScope();
 

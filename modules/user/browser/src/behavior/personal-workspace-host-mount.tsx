@@ -5,7 +5,7 @@
  */
 
 import {
-  useUiCapabilities,
+  useUiHostServices,
   useUiDeployment,
   useUiScope,
   type UiFeedback,
@@ -290,7 +290,7 @@ class CapabilityPersonalWorkspaceHost extends PersonalWorkspaceHostApi {
  * that is what `mounts.load` resolves.
  */
 export default function PersonalWorkspaceHostMount({ children }: { children?: ReactNode }) {
-  const { session, navigation, route, feedback } = useUiCapabilities();
+  const { session, navigation, route, feedback } = useUiHostServices();
   const flags = useUiFlags();
   const scope = useUiScope();
   const activeScope = scope.activeScope();

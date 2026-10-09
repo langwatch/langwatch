@@ -13,6 +13,7 @@ import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
 import { IdentityModule } from "../app/identity.app.ts";
+import { MemoryIdentityChannels } from "../channels/memory/memory.identity.channels.ts";
 import { MemoryIdentityRepositories } from "../repositories/memory/memory.identity.repositories.ts";
 
 const LATCHED = "user-latched";
@@ -28,15 +29,16 @@ const ACCOUNT = {
 async function identityWithLatchedUser(): Promise<IdentityModule> {
   const repositories = MemoryIdentityRepositories.create();
   await repositories.latch.recordFinalized({ userId: LATCHED, report: null });
+  const config = {
+    ssoDomainProofDnsServers: [],
+    isSaas: false,
+    publicBaseUrl: undefined,
+    passkeysEnabled: false,
+    mfaEnrollmentOpen: false,
+    localPasswords: true,
+  };
   return IdentityModule.create({
-    config: {
-      ssoDomainProofDnsServers: [],
-      isSaas: false,
-      publicBaseUrl: undefined,
-      passkeysEnabled: false,
-      mfaEnrollmentOpen: false,
-      localPasswords: true,
-    },
+    config,
     dependencies: {
       organizations: createApiFixture<OrganizationApi>(),
       permissions: createApiFixture<AuthzApi>(),
@@ -50,7 +52,14 @@ async function identityWithLatchedUser(): Promise<IdentityModule> {
     resources: new ResourceScope(),
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
     repositories,
-    channels: { authReads: createApiFixture<AuthApi>(), authCommands: createApiFixture<AuthApi>() },
+    channels: MemoryIdentityChannels.create({
+      config,
+      bound: {
+        authReads: createApiFixture<AuthApi>(),
+        authCommands: createApiFixture<AuthApi>(),
+        notifications: createApiFixture<NotificationService>(),
+      },
+    }),
   });
 }
 

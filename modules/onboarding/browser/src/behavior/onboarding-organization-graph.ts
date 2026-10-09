@@ -4,7 +4,7 @@
  * to one hook since both are read together on every onboarding screen.
  */
 
-import { useUiCapabilities } from "@langwatch/browser-host/capabilities";
+import { useUiHostServices } from "@langwatch/browser-host/capabilities";
 import type { TimeInput } from "@langwatch/time";
 import { useMemo } from "react";
 
@@ -85,7 +85,7 @@ export function useOnboardingOrganizationGraph(input: {
   organizationId: string | undefined;
   projectId: string | undefined;
 }): OnboardingOrganizationGraph {
-  const { session } = useUiCapabilities();
+  const { session } = useUiHostServices();
   const graphQuery = onboardingApi.organization.getAll.useQuery(
     { isDemo: false },
     { enabled: !!session.currentUser() },

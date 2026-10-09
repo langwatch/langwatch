@@ -5,7 +5,7 @@
  */
 
 import {
-  useUiCapabilities,
+  useUiHostServices,
   useUiDeployment,
   useUiScope,
   type UiFeedback,
@@ -206,7 +206,7 @@ class CapabilityAutomationHost extends AutomationHost {
  * is what `mounts.load` resolves.
  */
 export default function AutomationHostMount({ children }: { children?: ReactNode }) {
-  const { session, navigation, route, feedback } = useUiCapabilities();
+  const { session, navigation, route, feedback } = useUiHostServices();
   const { organizationId, projectId } = useUiScope().activeScope();
   const scopeHost: UiScopeHost | undefined = useUiScope().scopeHost();
   const { openDrawer: openRegisteredDrawer, goBack, closeDrawer } = useDrawer();

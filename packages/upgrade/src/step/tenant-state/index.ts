@@ -1,5 +1,7 @@
-export { MemoryTenantStepStateRepository } from "./memory.tenant-state.repository.ts";
-export { MemoryTenantStepLedgerRepository } from "./memory.tenant-step-ledger.repository.ts";
+export {
+  MemoryTenantStepLedgerRepository,
+  MemoryTenantStepStateRepository,
+} from "./memory.tenant-state.repository.ts";
 export { TenantStepStateRepository } from "./tenant-state.repository.ts";
 export {
   type TenantStepLedger,

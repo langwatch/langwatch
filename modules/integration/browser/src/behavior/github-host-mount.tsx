@@ -5,7 +5,7 @@
  */
 
 import {
-  useUiCapabilities,
+  useUiHostServices,
   useUiScope,
   type UiFeedback,
   type UiRoute,
@@ -73,7 +73,7 @@ class CapabilityGithubHost extends GithubHostApi {
  * is what `mounts.load` resolves.
  */
 export default function GithubHostMount({ children }: { children?: ReactNode }) {
-  const { feedback, route, session } = useUiCapabilities();
+  const { feedback, route, session } = useUiHostServices();
   const { organizationId } = useUiScope().activeScope();
   const host = useMemo(
     () =>

@@ -64,7 +64,6 @@ import {
   type SsoArrivalAdmission,
   type SsoArrivalApi,
 } from "@langwatch/identity-contract";
-import type { MailSender } from "@langwatch/mail";
 import { NotificationService } from "@langwatch/notification-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import { OrganizationApi } from "@langwatch/organization-contract";
@@ -113,10 +112,8 @@ import {
 } from "../channels/http/http.passkey-sign-up.channel.ts";
 import { SignInRouterShadow } from "../channels/http/http.sign-in-router-shadow.channel.ts";
 import { type SignUpAddressConfirmation } from "../channels/http/http.sign-up-confirmation.channel.ts";
-import { passwordResetMailChannels } from "../channels/password-reset-mail-channels.registry.ts";
 import type { PasswordResetMailChannel } from "../channels/password-reset-mail.channel.ts";
-import { signUpVerificationMailChannels } from "../channels/sign-up-verification-mail-channels.registry.ts";
-import { signupAnnouncementChannels } from "../channels/signup-announcement-channels.registry.ts";
+import type { SignUpVerificationMailChannel } from "../channels/sign-up-verification-mail.channel.ts";
 import {
   type AuthLifecycleDefinition,
   buildAuthLifecyclePipeline,
@@ -498,8 +495,6 @@ export class AuthModule implements AuthApiContract {
   static async create(setup: AuthSetup): Promise<AuthModule> {
     const { repositories, channels, dependencies, config } = setup;
     const processName = setup.role ?? "this process";
-    /** Every mail auth sends goes out through notification, which owns the gateway. */
-    const mailer: MailSender = { send: (content) => dependencies.notifications.sendEmail(content) };
     const now = nowInstant;
     const accountRows = repositories.betterAuthHooks;
     /** Every sign-up door's verdict: whether any account exists, then organization's policy. */
@@ -567,7 +562,7 @@ export class AuthModule implements AuthApiContract {
       },
       signUp: buildSignUpVerification({
         publicBaseUrl: config.publicBaseUrl,
-        mailer,
+        mail: channels.signUpVerificationMail,
         repositories,
         now,
         users: dependencies.users,
@@ -675,15 +670,11 @@ export class AuthModule implements AuthApiContract {
       platformSsoAllowed: () => dependencies.licensing.isPlatformSsoLicensed(),
     });
 
-    const signupAnnouncements = await setup.secrets.into(
-      AuthModule.secrets.internalSlackSignupsWebhook,
-      (webhookUrl) =>
-        SignupAnnouncementService.create({
-          channel: webhookUrl ? signupAnnouncementChannels.live.create({ webhookUrl }) : undefined,
-          publicBaseUrl: config.publicBaseUrl,
-          logger,
-        }),
-    );
+    const signupAnnouncements = SignupAnnouncementService.create({
+      channel: channels.signupAnnouncements,
+      publicBaseUrl: config.publicBaseUrl,
+      logger,
+    });
 
     return setup.secrets.into(AuthModule.secrets.session, (sessionSecret) => {
       assertAuthServerConfig(config, sessionSecret);
@@ -737,7 +728,7 @@ export class AuthModule implements AuthApiContract {
             organizations: dependencies.organizations,
             signUpPolicy: { checkSignUp },
             sendResetPassword: AuthModule.passwordResetSender({
-              mail: passwordResetMailChannels.ses.create({ mailer }),
+              mail: channels.passwordResetMail,
               publicBaseUrl: config.publicBaseUrl,
               processName,
             }),
@@ -1251,7 +1242,7 @@ export class AuthModule implements AuthApiContract {
 /** The ceremony this process can run, or nothing where it has no public base URL to link to. */
 function buildSignUpVerification({
   publicBaseUrl,
-  mailer,
+  mail,
   repositories,
   now,
   users,
@@ -1262,7 +1253,7 @@ function buildSignUpVerification({
   isEmailUnconfigured,
 }: {
   publicBaseUrl: string | undefined;
-  mailer: MailSender;
+  mail: SignUpVerificationMailChannel;
   repositories: AuthRepositories;
   now: () => Instant;
   users: UserApi;
@@ -1276,7 +1267,7 @@ function buildSignUpVerification({
 
   return SignUpVerificationService.create({
     tokens: repositories.signUpTokens,
-    mailer: signUpVerificationMailChannels.ses.create({ mailer }),
+    mailer: mail,
     users,
     route,
     checkSignUp,

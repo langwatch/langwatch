@@ -50,7 +50,12 @@ export class SessionKeyIdentity implements RestIdentity {
       instanceToken: request.headers.get(this.#instanceTokenHeader),
     });
 
-    return { actor: holder.actor, scope: { tier: "project", id: holder.projectId } };
+    // The whole holder is the session a route may declare, as the CLI token door hands its own.
+    return {
+      actor: holder.actor,
+      scope: { tier: "project", id: holder.projectId },
+      session: holder,
+    };
   }
 }
 

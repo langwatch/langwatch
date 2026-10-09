@@ -1,5 +1,5 @@
 import {
-  useUiCapabilities,
+  useUiHostServices,
   useUiDeployment,
   useUiScope,
   type UiFeedback,
@@ -91,7 +91,7 @@ class CapabilityLicensingHost extends LicensingHostApi {
  * dialog every routed page opens. Default-exported because `mounts.load` resolves it.
  */
 export default function LicensingHostMount({ children }: { children?: ReactNode }) {
-  const { feedback, session } = useUiCapabilities();
+  const { feedback, session } = useUiHostServices();
   const mayManageOrganization = session.hasPermission("organization:manage");
   const { organizationId } = useUiScope().activeScope();
   const deployment = useUiDeployment();

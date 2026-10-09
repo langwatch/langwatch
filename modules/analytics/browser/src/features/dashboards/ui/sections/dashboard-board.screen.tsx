@@ -188,6 +188,7 @@ function OpenBoard({ board }: { board: SavedBoard }) {
                 projectId={projectId}
                 projectSlug={saved.projectSlug}
                 dashboardId={board.id}
+                boardName={board.name}
                 widgets={widgets}
                 period={period}
                 isWriting={boardWidgets.isWriting}

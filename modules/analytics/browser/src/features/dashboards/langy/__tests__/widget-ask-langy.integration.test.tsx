@@ -191,6 +191,7 @@ describe("Ask Langy on a widget card", () => {
         "Edit code",
         "Copy widget id",
         "Copy API snippet",
+        "Export CSV Still loading",
         "Duplicate",
         "Delete",
       ]);

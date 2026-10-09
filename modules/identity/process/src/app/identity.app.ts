@@ -42,7 +42,6 @@ import {
   type IdentityStorageAdapterInput,
   type IdentityCeremoniesApi,
 } from "@langwatch/identity-contract";
-import type { MailSender } from "@langwatch/mail";
 import { NotificationService } from "@langwatch/notification-contract";
 /**
  * The identity feature's application: guards, ledger writer, backfill,
@@ -59,20 +58,8 @@ import { UserApi } from "@langwatch/user-contract";
 import type { BetterAuthOptions } from "better-auth";
 import type { AdapterFactory } from "better-auth/adapters";
 
-import { addressConfirmationMailChannels } from "../channels/address-confirmation-mail-channels.registry.ts";
 import { systemHostAddresses } from "../channels/dns.host-addresses.channel.ts";
 import type { IdentityChannels } from "../channels/identity.channels.ts";
-import { joinRequestNotificationMailChannels } from "../channels/join-request-notification-mail-channels.registry.ts";
-import { organizationMfaRequirementMailChannels } from "../channels/organization-mfa-requirement-mail-channels.registry.ts";
-import { signupAnnouncementChannels } from "../channels/signup-announcement-channels.registry.ts";
-import { ssoBreakGlassWarningChannels } from "../channels/sso-break-glass-warning-channels.registry.ts";
-import {
-  ssoDomainProofChannels,
-  ssoDomainProofFileChannels,
-} from "../channels/sso-domain-proof-channels.registry.ts";
-import { SSO_DOMAIN_PROOF_PUBLIC_EGRESS } from "../channels/sso-domain-proof-file.channel.ts";
-import { ssoDomainProofMailChannels } from "../channels/sso-domain-proof-mail-channels.registry.ts";
-import { ssoIssuerDiscoveryChannels } from "../channels/sso-issuer-discovery-channels.registry.ts";
 import { ConnectedIdentityEventing } from "../eventing/identity-command-senders.store.ts";
 import { IdentityEventStores } from "../eventing/identity-event-stores.store.ts";
 import { IdentityLedgerStore } from "../eventing/identity-ledger.store.ts";
@@ -468,18 +455,11 @@ export class IdentityModule
   static readonly secrets = { internalSlackSignupsWebhook } as const;
 
   static async create(setup: IdentitySetup): Promise<IdentityModule> {
-    const mailer: MailSender = {
-      send: (content) => setup.dependencies.notifications.sendEmail(content),
-    };
-    const signupAnnouncements = await setup.secrets.into(
-      IdentityModule.secrets.internalSlackSignupsWebhook,
-      (webhookUrl) =>
-        SignupAnnouncementService.create({
-          channel: webhookUrl ? signupAnnouncementChannels.live.create({ webhookUrl }) : undefined,
-          publicBaseUrl: setup.config.publicBaseUrl,
-          logger: createLogger("langwatch:identity:signup-announcement"),
-        }),
-    );
+    const signupAnnouncements = SignupAnnouncementService.create({
+      channel: setup.channels.signupAnnouncements,
+      publicBaseUrl: setup.config.publicBaseUrl,
+      logger: createLogger("langwatch:identity:signup-announcement"),
+    });
     const engineProviders = SsoEngineProviderService.create({
       credentials: setup.repositories.ssoCredentials,
       rows: setup.repositories.ssoEngineProviders,
@@ -610,10 +590,7 @@ export class IdentityModule
         scim: setup.dependencies.scim,
       }),
       engineProvider: engineProviders,
-      mail: ssoDomainProofMailChannels.ses.create({
-        mailer,
-        baseUrl: setup.config.publicBaseUrl ?? "",
-      }),
+      mail: setup.channels.ssoDomainProofMail,
       licensing: setup.dependencies.licensing,
       authorization: setup.dependencies.permissions,
     });
@@ -637,10 +614,7 @@ export class IdentityModule
     const dialableIdpOrigins = () => setup.channels.authReads.findDialableIdentityProviderOrigins();
     // The same fence the published-proof reads go through: an issuer is a
     // string an administrator typed.
-    const issuerDiscovery = ssoIssuerDiscoveryChannels.live.create({
-      policy: SSO_DOMAIN_PROOF_PUBLIC_EGRESS,
-      dialableInternalOrigins: dialableIdpOrigins,
-    });
+    const issuerDiscovery = setup.channels.ssoIssuerDiscovery;
     const ssoIssuers = SsoIssuerDirectoryService.create({
       connections: setup.repositories.ssoConnections,
       endpointOrigins: SsoIssuerEndpointOriginsService.create({
@@ -654,12 +628,8 @@ export class IdentityModule
     // deciding for itself where a customer's proof is read from.
     const domainProofChannels = ssoConnections
       ? {
-          proofs: ssoDomainProofChannels.live.create({
-            nameservers: setup.config.ssoDomainProofDnsServers,
-          }),
-          files: ssoDomainProofFileChannels.live.create({
-            policy: SSO_DOMAIN_PROOF_PUBLIC_EGRESS,
-          }),
+          proofs: setup.channels.ssoDomainProofs,
+          files: setup.channels.ssoDomainProofFiles,
         }
       : null;
     const ssoDomainCeremony =
@@ -783,7 +753,7 @@ export class IdentityModule
       : null;
     const ssoBreakGlassGrants = SsoBreakGlassService.create({
       bindings: setup.repositories.ssoBreakGlass,
-      warnings: ssoBreakGlassWarningChannels.live.create(),
+      warnings: setup.channels.ssoBreakGlassWarnings,
       newBindingId: newSsoBreakGlassBindingId,
       directory: breakGlassDirectory(setup.dependencies.organizations),
       holderIsEligible: holderCanWalkIn,
@@ -874,10 +844,7 @@ export class IdentityModule
         heads: setup.repositories.heads,
         identity,
         ceremony: verification,
-        mail: addressConfirmationMailChannels.ses.create({
-          mailer,
-          baseUrl: setup.config.publicBaseUrl ?? "",
-        }),
+        mail: setup.channels.addressConfirmationMail,
         rateLimiter: setup.repositories.rateLimits,
         sessions: setup.channels.authReads,
         accountAddress: async ({ userId }) => {
@@ -962,7 +929,7 @@ export class IdentityModule
         },
         notifier: OrganizationMfaNotifierService.create({
           accounts: setup.repositories.twoStepVerification,
-          mail: organizationMfaRequirementMailChannels.ses.create({ mailer }),
+          mail: setup.channels.organizationMfaMail,
           emails,
         }),
         entitled: async ({ organizationId }) =>
@@ -984,10 +951,7 @@ export class IdentityModule
             notifier: JoinRequestNotifierService.create({
               audience: setup.repositories.joinRequestAudience,
               context: setup.repositories.joinRequestNotificationContext,
-              mail: joinRequestNotificationMailChannels.ses.create({
-                mailer,
-                baseUrl: setup.config.publicBaseUrl ?? "",
-              }),
+              mail: setup.channels.joinRequestMail,
               baseHost: setup.config.publicBaseUrl ?? "",
               plans: setup.dependencies.entitlements,
             }),

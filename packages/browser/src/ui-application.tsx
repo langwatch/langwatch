@@ -3,7 +3,7 @@
  */
 
 import type { UiDrawerRegistry } from "@langwatch/browser-host/drawer";
-import { createUiRouter, type UiRouter } from "@langwatch/browser-host/navigation";
+import { createUiRouter, type UiBrowserRouter } from "@langwatch/browser-host/navigation";
 import type { ComponentType } from "react";
 import type { FallbackProps } from "react-error-boundary";
 
@@ -50,7 +50,7 @@ export type UiApplicationInstall = {
 
 export type UiApplication = {
   outerProvider: UiProviderShell;
-  router: UiRouter;
+  router: UiBrowserRouter;
 };
 
 export function createUiApplication({
@@ -88,6 +88,7 @@ export function createUiApplication({
           ...(features.sessionVersions ? { sessionVersions: features.sessionVersions } : {}),
           ...(features.session ? { session: features.session } : {}),
           ...(features.hostServices ? { hostServices: features.hostServices } : {}),
+          ...(features.footer ? { footer: features.footer } : {}),
         }),
         pageErrorFallback: pages.errorFallback,
       }),

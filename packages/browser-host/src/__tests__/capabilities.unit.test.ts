@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   BrowserUiDocumentTitle,
-  resolveUiCapabilities,
-  UiCapabilityUnavailableError,
+  resolveUiHostServices,
+  UiHostServiceUnavailableError,
   UiFeedback,
   UiNavigation,
   UiRoute,
@@ -89,7 +89,7 @@ describe("given the capability ports a screen asks instead of reaching for the b
       const navigation = new RecordingNavigation();
       const documentTitle = BrowserUiDocumentTitle.create({ title: "" });
 
-      const capabilities = resolveUiCapabilities({
+      const capabilities = resolveUiHostServices({
         install: {},
         documentTitle,
         navigation,
@@ -101,7 +101,7 @@ describe("given the capability ports a screen asks instead of reaching for the b
     });
 
     it("refuses feedback by name rather than swallowing what the user should read", () => {
-      const capabilities = resolveUiCapabilities({
+      const capabilities = resolveUiHostServices({
         install: {},
         documentTitle: BrowserUiDocumentTitle.create({ title: "" }),
         navigation: new RecordingNavigation(),
@@ -110,14 +110,14 @@ describe("given the capability ports a screen asks instead of reaching for the b
 
       expect(() =>
         capabilities.feedback.failed({ error: new Error("boom"), fallbackTitle: "Couldn't save" }),
-      ).toThrow(UiCapabilityUnavailableError);
+      ).toThrow(UiHostServiceUnavailableError);
       expect(() => capabilities.feedback.succeeded({ title: "Saved" })).toThrow(
-        /"feedback" UI capability has no implementation/,
+        /"feedback" UI host service has no implementation/,
       );
     });
 
     it("refuses the session by name rather than answering an empty permission set", () => {
-      const capabilities = resolveUiCapabilities({
+      const capabilities = resolveUiHostServices({
         install: {},
         documentTitle: BrowserUiDocumentTitle.create({ title: "" }),
         navigation: new RecordingNavigation(),
@@ -125,13 +125,13 @@ describe("given the capability ports a screen asks instead of reaching for the b
       });
 
       expect(() => capabilities.session.hasPermission("prompt:read")).toThrow(
-        /"session" UI capability has no implementation/,
+        /"session" UI host service has no implementation/,
       );
-      expect(() => capabilities.session.currentUser()).toThrow(UiCapabilityUnavailableError);
+      expect(() => capabilities.session.currentUser()).toThrow(UiHostServiceUnavailableError);
     });
 
     it("refuses the scope by name rather than answering an unresolved one", () => {
-      const capabilities = resolveUiCapabilities({
+      const capabilities = resolveUiHostServices({
         install: {},
         documentTitle: BrowserUiDocumentTitle.create({ title: "" }),
         navigation: new RecordingNavigation(),
@@ -140,7 +140,7 @@ describe("given the capability ports a screen asks instead of reaching for the b
 
       expect(capabilities.scope).toBeDefined();
       expect(() => capabilities.scope?.activeScope()).toThrow(
-        /"scope" UI capability has no implementation/,
+        /"scope" UI host service has no implementation/,
       );
     });
   });
@@ -149,7 +149,7 @@ describe("given the capability ports a screen asks instead of reaching for the b
     it("answers with it, so a mounted composition stops refusing", () => {
       const session = new StubSession();
 
-      const capabilities = resolveUiCapabilities({
+      const capabilities = resolveUiHostServices({
         install: {},
         documentTitle: BrowserUiDocumentTitle.create({ title: "" }),
         navigation: new RecordingNavigation(),
@@ -163,7 +163,7 @@ describe("given the capability ports a screen asks instead of reaching for the b
     it("still lets an installed session win over it", () => {
       const installed = new StubSession();
 
-      const capabilities = resolveUiCapabilities({
+      const capabilities = resolveUiHostServices({
         install: { session: installed },
         documentTitle: BrowserUiDocumentTitle.create({ title: "" }),
         navigation: new RecordingNavigation(),
@@ -181,7 +181,7 @@ describe("given the capability ports a screen asks instead of reaching for the b
       const session = new StubSession();
       const installedNavigation = new RecordingNavigation();
 
-      const capabilities = resolveUiCapabilities({
+      const capabilities = resolveUiHostServices({
         install: { feedback, session, navigation: installedNavigation },
         documentTitle: BrowserUiDocumentTitle.create({ title: "" }),
         navigation: new RecordingNavigation(),

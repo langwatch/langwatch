@@ -5,6 +5,7 @@ package portlessproxy
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -268,4 +269,24 @@ func (p *Proxy) Endpoint() (string, int) {
 		return "https", port
 	}
 	return "http", port
+}
+
+// Routes is portless's live route table, hostname -> port; empty when unreadable.
+func (p *Proxy) Routes() map[string]int {
+	routes := map[string]int{}
+	b, err := os.ReadFile(filepath.Join(p.stateDir(), "routes.json"))
+	if err != nil {
+		return routes
+	}
+	var entries []struct {
+		Hostname string `json:"hostname"`
+		Port     int    `json:"port"`
+	}
+	if json.Unmarshal(b, &entries) != nil {
+		return routes
+	}
+	for _, e := range entries {
+		routes[e.Hostname] = e.Port
+	}
+	return routes
 }

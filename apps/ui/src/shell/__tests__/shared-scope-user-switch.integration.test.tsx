@@ -7,7 +7,7 @@
 
 import type { ModuleApiMap, RouterFromMap } from "@langwatch/api/web";
 import type { UiAuthClient } from "@langwatch/auth-contract";
-import { useUiCapabilities } from "@langwatch/browser-host/capabilities";
+import { useUiHostServices } from "@langwatch/browser-host/capabilities";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { createUiFeatureShell } from "@langwatch/browser/feature-shell";
 import type { UiFeatureApiTransport } from "@langwatch/browser/transport";
@@ -20,9 +20,9 @@ import { observable } from "@trpc/server/observable";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { loadUiRootCapabilities } from "../ui-root-capabilities";
+import { loadUiRootHostServices } from "../ui-root-host-services";
 
-const root = await loadUiRootCapabilities();
+const root = await loadUiRootHostServices();
 
 const JANE = "user-jane";
 const JOHN = "user-john";
@@ -132,7 +132,7 @@ function mountShell({
   });
 
   function Probe() {
-    const { session } = useUiCapabilities();
+    const { session } = useUiHostServices();
     const { project, organization } = useOrganizationTeamProject();
     const userId = session.currentUser()?.id;
     const can = session.hasPermission("annotations:update");

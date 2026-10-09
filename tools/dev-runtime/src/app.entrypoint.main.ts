@@ -15,12 +15,16 @@ import {
   BACKEND_READY_MSG,
   disposeGeneration,
   drainBackend,
+  forwardPort,
+  freeLoopbackPort,
   listenersAddedSince,
+  replaceBackend,
   snapshotListeners,
   startBackend,
   type AddedListener,
   type BackendHalves,
   type ListenerSnapshot,
+  type PortForwarder,
 } from "./backend.process.ts";
 import {
   createReloadTrigger,
@@ -69,6 +73,8 @@ let ui: ViteDevServer | undefined;
 let backendVite: ViteDevServer | undefined;
 let runner: ModuleRunner | undefined;
 let halves: BackendHalves | undefined;
+/** API_PORT, held by the host so a reload never closes it; each generation binds its own port. */
+let apiPort: PortForwarder | undefined;
 /** The process listeners present when the serving generation booted. */
 let listenersAtBoot: ListenerSnapshot = new Map();
 let generation = 0;
@@ -95,6 +101,7 @@ const stop = (code: number): Promise<void> => {
       for (const watcher of watchers) watcher.close();
       await reloading;
       if (halves) await drainBackend(halves);
+      await apiPort?.close();
       await runner?.close();
       await Promise.all([ui?.close(), backendVite?.close()]);
     } catch (error) {
@@ -192,10 +199,70 @@ async function disposeOld({
   }
 }
 
+/** A boot that threw: logged by the half that refused it, and retried on the next change. */
+function bootRefused(error: unknown): void {
+  isRetryOwed = true;
+  const half = backendHalfOf(error);
+  const event = halves
+    ? `${half ?? "backend"} boot failed; generation ${generation} keeps serving what it can`
+    : "boot failed; waiting for a change";
+  write(
+    processFailureLine({
+      service: half ? BACKEND_HALF_SERVICE[half] : APP_SERVICE,
+      event,
+      error,
+      level: "warn",
+    }),
+  );
+}
+
 /**
- * Link the new generation first; only if it links, drain the old one (worker,
- * then api) and boot the new. A failed link keeps the old generation serving,
- * a failed boot waits for the next change. Never rejects.
+ * Boots the linked generation: beside the serving one when there is one (the api first, then
+ * API_PORT moves, then the old drains and the worker starts), else both halves fresh. Answers how
+ * many listeners the old generation left behind; a refused half throws, tagged with its name.
+ */
+async function bootNext({
+  worker,
+  api,
+  added,
+}: {
+  worker: typeof WorkerMain;
+  api: typeof ApiMain;
+  added: readonly AddedListener[];
+}): Promise<number> {
+  const port = await freeLoopbackPort();
+  const old = halves;
+  if (!old) {
+    halves = await startBackend({
+      startWorker: worker.startWorker,
+      startApi: (options) => api.startApi({ ...options, port }),
+    });
+    apiPort?.route(port);
+    return 0;
+  }
+  let removed = 0;
+  const replaced = await replaceBackend({
+    startWorker: worker.startWorker,
+    startApi: api.startApi,
+    apiPort: port,
+    route: (next) => apiPort?.route(next),
+    disposeOld: async () => {
+      halves = undefined;
+      const count = await disposeOld({ old, added });
+      // Recycling: the old generation did not drain, so no worker starts beside it.
+      if (count === undefined) throw new Error("recycling after a failed drain");
+      removed = count;
+    },
+  });
+  halves = replaced.halves;
+  if (replaced.workerFailure !== undefined) throw replaced.workerFailure;
+  return removed;
+}
+
+/**
+ * Link the new generation first; only if it links, boot its api beside the old one, move
+ * API_PORT to it, drain the old (worker, then api) and start the new worker. A failed link or
+ * api boot keeps the old generation serving. Never rejects.
  */
 async function reload(files: string[]): Promise<void> {
   if (stopping || !runner) return;
@@ -226,32 +293,16 @@ async function reload(files: string[]): Promise<void> {
     return;
   }
   const drainedAt = Date.now();
-  let listenersRemoved = 0;
-  if (halves) {
-    const old = halves;
-    halves = undefined;
-    const removed = await disposeOld({ old, added });
-    if (removed === undefined) return;
-    listenersRemoved = removed;
-  }
-  const drainMs = Date.now() - drainedAt;
+  let listenersRemoved: number;
   if (stopping) return;
   listenersAtBoot = snapshotListeners(process);
   try {
-    halves = await startBackend({ startWorker: worker.startWorker, startApi: api.startApi });
+    listenersRemoved = await bootNext({ worker, api, added });
   } catch (error) {
-    isRetryOwed = true;
-    const half = backendHalfOf(error);
-    write(
-      processFailureLine({
-        service: half ? BACKEND_HALF_SERVICE[half] : APP_SERVICE,
-        event: "boot failed; waiting for a change",
-        error,
-        level: "warn",
-      }),
-    );
+    if (!stopping) bootRefused(error);
     return;
   }
+  const swapMs = Date.now() - drainedAt;
   isRetryOwed = false;
   generation += 1;
   const record = {
@@ -260,7 +311,7 @@ async function reload(files: string[]): Promise<void> {
     generation,
     changedFiles: files.length,
     files: files.slice(0, 10).map((file) => path.relative(REPO_ROOT, file)),
-    drainMs,
+    swapMs,
     listenersRemoved,
     readyMs: Date.now() - startedAt,
     rssMiB: rssMiB(),
@@ -305,6 +356,7 @@ export async function bootApp({ withUi }: { withUi: boolean }): Promise<void> {
     process.chdir(UI_ROOT);
     ui = await startUi();
   }
+  apiPort = await forwardPort({ port: envPositive({ name: "API_PORT", fallback: 6_560 }) });
   backendVite = await startBackendVite();
   const ssr = backendVite.environments.ssr;
   runner = createServerModuleRunner(ssr, { hmr: false });

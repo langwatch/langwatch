@@ -15,8 +15,8 @@ import type {
   InstalledPeersInAnyBranch,
   InstalledSupplyPeers,
   Merge,
-  MissingSupplyFields,
-  MissingSupplyFieldsFrom,
+  MissingRequirementFields,
+  MissingRequirementFieldsFrom,
   RequiredConfig,
   RequiredMembers,
   RequiredPeers,
@@ -40,7 +40,7 @@ type MissingFrom<
   Config,
   Peers,
 > =
-  MissingSupplyFieldsFrom<
+  MissingRequirementFieldsFrom<
     RequiredMemberSet,
     RequiredConfigSet,
     RequiredPeerSet,
@@ -80,12 +80,12 @@ type StoreSuppliedNames =
   | "clock"
   | "secrets"
   | "encryption"
-  | "relational"
-  | "analytical"
-  | "keyvalue"
-  | "blobs"
-  | "logging"
-  | "metrics"
+  | "prisma"
+  | "clickhouse"
+  | "redis"
+  | "objectStorage"
+  | "logger"
+  | "telemetry"
   | "eventing"
   | "rateLimiter"
   | "cache"
@@ -159,7 +159,7 @@ export class ProcessSupply<
   Members extends SupplyRecord = Record<never, never>,
   Config extends SupplyRecord = Record<never, never>,
   Peers extends SupplyRecord = Record<never, never>,
-  Missing extends string = keyof MissingSupplyFields<Modules, Members, Config, Peers> & string,
+  Missing extends string = keyof MissingRequirementFields<Modules, Members, Config, Peers> & string,
   Rest = never,
   Trpc = never,
   RequiredMemberSet extends SupplyRecord = RequiredMembers<Modules>,
@@ -463,7 +463,7 @@ export class ProcessSupply<
       role: state.role,
       config: state.config,
       ...(state.secrets ? { secrets: state.secrets } : {}),
-      stores: storesWith(state.stores, legacyMemberNames(state.members)),
+      stores: storesWith(state.stores, state.members),
     };
     const transport = state.transport;
     let exposed: ExposedSurface<Rest, Trpc> | undefined;
@@ -521,23 +521,6 @@ function storesWith(
       return stores.read(name);
     },
   };
-}
-
-function legacyMemberNames(members: SupplyRecord): SupplyRecord {
-  const aliases: Readonly<Record<string, string>> = {
-    relational: "prisma",
-    analytical: "clickhouse",
-    blobs: "objectStorage",
-    keyvalue: "redis",
-    logging: "logger",
-    metrics: "telemetry",
-  };
-  const result = { ...members };
-  for (const [name, value] of Object.entries(members)) {
-    const alias = aliases[name];
-    if (alias !== void 0) result[alias] = value;
-  }
-  return result;
 }
 
 export function createApp(options: CreateAppOptions): ProcessSupply {

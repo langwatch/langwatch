@@ -85,10 +85,10 @@ vi.mock("../create-product-screens.tsx", () => ({
 }));
 
 import {
-  UiCapabilityContextProvider,
+  UiHostServicesContextProvider,
   type UiDeployment,
 } from "@langwatch/browser-host/capabilities";
-import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
 import { API_KEY_PLACEHOLDER } from "@langwatch/design-system/personal-access-token-banner";
 
 import {
@@ -202,9 +202,9 @@ function renderManualSetup(host: ProductTestHost) {
   const query = { projectSlug: "acme-agent", step: "manually" };
   const tree = () => (
     <DesignSystemProvider forcedTheme="light">
-      <UiCapabilityContextProvider
+      <UiHostServicesContextProvider
         value={{
-          ...createUiCapabilitiesFromHost({
+          ...createUiHostServicesFromHost({
             route: () => ({ params: {}, query, pathname: "/onboarding/product" }),
             navigate: vi.fn(),
           }),
@@ -214,7 +214,7 @@ function renderManualSetup(host: ProductTestHost) {
         <OnboardingHostProvider value={host}>
           <ProductScreen />
         </OnboardingHostProvider>
-      </UiCapabilityContextProvider>
+      </UiHostServicesContextProvider>
     </DesignSystemProvider>
   );
   const utils = render(tree());

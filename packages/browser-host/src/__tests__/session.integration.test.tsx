@@ -2,10 +2,10 @@ import { renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 
-import { UiCapabilityContextProvider, UiSession } from "../capabilities.ts";
+import { UiHostServicesContextProvider, UiSession } from "../capabilities.ts";
 import type { UiSessionSnapshot } from "../session.ts";
 import { useSession } from "../session.ts";
-import { createUiCapabilitiesFromHost } from "../testing.ts";
+import { createUiHostServicesFromHost } from "../testing.ts";
 
 const host = { route: () => ({ params: {}, query: {} }), navigate: () => {} };
 
@@ -34,9 +34,9 @@ function withSession(reading: UiSessionSnapshot) {
   const session = new SnapshotSession(reading);
   return function SessionProvider({ children }: { children: ReactNode }) {
     return (
-      <UiCapabilityContextProvider value={createUiCapabilitiesFromHost(host, session)}>
+      <UiHostServicesContextProvider value={createUiHostServicesFromHost(host, session)}>
         {children}
-      </UiCapabilityContextProvider>
+      </UiHostServicesContextProvider>
     );
   };
 }
