@@ -59,7 +59,7 @@ Feature: Entitlement owns all counting
     When entitlement checks the organization's usage against the warning thresholds
     Then no usage warning event is recorded and the check reports nothing sent
 
-  @unit @usage @unimplemented
+  @unit @usage
   Scenario: Billing sends each recorded warning once per threshold a month
     Given a usage warning event for an organization at the 90% threshold
     When billing's subscriber handles the event twice

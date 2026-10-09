@@ -2,13 +2,11 @@
 
 import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import { moduleApi } from "@langwatch/module";
-import type { Instant } from "@langwatch/time";
 
 import type {
   BillingPricingModel,
   ResourceLimitNotifierInput,
   SubscriptionPlanInput,
-  UsageWarningDecision,
 } from "./billing-types.ts";
 import type {
   ConnectedAddCommitRequest,
@@ -75,13 +73,6 @@ export interface BillingApi {
    * subscription's own limit overrides; the free plan where none is active or off Cloud.
    */
   getActiveSubscriptionPlan(input: SubscriptionPlanInput): Promise<PlanInfo>;
-  /**
-   * Mails the organization's admins the usage warning entitlement decided, once per threshold a
-   * month. Billing counts nothing: the threshold and per-project counts arrive decided.
-   */
-  sendUsageWarning(
-    input: UsageWarningDecision,
-  ): Promise<{ sent: boolean; notificationId?: string; sentAt?: Instant }>;
   /**
    * Main's `usageLimits.notifyResourceLimitReached`: the ops Slack alert for a reached seat limit,
    * SaaS only, at most once a day per organization and limit. Never throws.

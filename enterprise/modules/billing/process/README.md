@@ -84,14 +84,6 @@ The plan an organization's active subscription grants on LangWatch Cloud, with t
 getActiveSubscriptionPlan(input: SubscriptionPlanInput): Promise<PlanInfo>;
 ```
 
-#### `sendUsageWarning`
-
-Mails the organization's admins the usage warning entitlement decided, once per threshold a month. Billing counts nothing: the threshold and per-project counts arrive decided.
-
-```typescript
-sendUsageWarning(input: UsageWarningDecision): Promise<{ sent: boolean; notificationId?: string; sentAt?: Instant }>;
-```
-
 #### `notifyResourceLimitReached`
 
 Main's `usageLimits.notifyResourceLimitReached`: the ops Slack alert for a reached seat limit, SaaS only, at most once a day per organization and limit. Never throws.

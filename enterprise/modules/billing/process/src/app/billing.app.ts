@@ -29,7 +29,6 @@ import {
   type ResourceLimitNotifierInput,
   type SubscriptionPlanInput,
   type BillingPricingModel,
-  type UsageWarningDecision,
 } from "@langwatch/enterprise-billing-contract";
 import { LicensingApi, type PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import type {
@@ -41,7 +40,7 @@ import { NotFoundError } from "@langwatch/handled-error";
 import type { MailSender } from "@langwatch/mail";
 import { NotificationService as NotificationApi } from "@langwatch/notification-contract";
 import type { FeatureSetup } from "@langwatch/process";
-import { fromDate, Temporal, type Instant } from "@langwatch/time";
+import { Temporal } from "@langwatch/time";
 
 import type { BillingStripeChannels } from "../channels/billing-stripe.channels.ts";
 import { billingSubscriptionNotifierChannels } from "../channels/billing-subscription-notifier-channels.registry.ts";
@@ -422,13 +421,13 @@ export class BillingModule
         isSaas,
       }),
       isSaas,
-      usageWarnings,
       resourceLimitAlerts,
       pricing: OrganizationPricingService.create(repositories.organizationPricing),
       reporting: BillingModule.#composeReporting({
         repositories,
         peers,
         facts,
+        usageWarnings,
         nodeEnvironment,
         usageReporting: isSaas ? usageReporting : void 0,
       }),
@@ -723,7 +722,6 @@ export class BillingModule
   readonly #isSaas: boolean;
   readonly #pricing: OrganizationPricingService;
   readonly #reporting: BillingReportingPipeline;
-  readonly #usageWarnings: UsageWarningService;
   readonly #resourceLimitAlerts: ResourceLimitAlertService;
   readonly #lifecycle: BillingLifecycleAnnouncerService | undefined;
 
@@ -737,7 +735,6 @@ export class BillingModule
     isSaas,
     pricing,
     reporting,
-    usageWarnings,
     resourceLimitAlerts,
     lifecycle,
   }: {
@@ -751,7 +748,6 @@ export class BillingModule
     isSaas: boolean;
     pricing: OrganizationPricingService;
     reporting: BillingReportingPipeline;
-    usageWarnings: UsageWarningService;
     resourceLimitAlerts: ResourceLimitAlertService;
   }) {
     this.#stripeWebhook = stripeWebhook;
@@ -763,25 +759,12 @@ export class BillingModule
     this.#isSaas = isSaas;
     this.#pricing = pricing;
     this.#reporting = reporting;
-    this.#usageWarnings = usageWarnings;
     this.#resourceLimitAlerts = resourceLimitAlerts;
     this.#lifecycle = lifecycle;
   }
 
   notifyResourceLimitReached(input: ResourceLimitNotifierInput): Promise<void> {
     return this.#resourceLimitAlerts.notifyResourceLimitReached(input);
-  }
-
-  async sendUsageWarning(
-    input: UsageWarningDecision,
-  ): Promise<{ sent: boolean; notificationId?: string; sentAt?: Instant }> {
-    const result = await this.#usageWarnings.send(input);
-    if (result.outcome === "skipped") return { sent: false };
-    return {
-      sent: true,
-      notificationId: result.notification.id,
-      sentAt: fromDate(result.notification.sentAt),
-    };
   }
 
   getPricingModel(input: {
@@ -854,6 +837,7 @@ export class BillingModule
     repositories,
     peers,
     facts,
+    usageWarnings,
     usageReporting,
     nodeEnvironment,
   }: {
@@ -863,6 +847,7 @@ export class BillingModule
     >;
     peers: Pick<ConnectedBillingPeers, "licensing">;
     facts: ConnectedCustomerFactsService;
+    usageWarnings: UsageWarningService;
     usageReporting: (() => UsageReportingService) | undefined;
     nodeEnvironment: string | undefined;
   }): BillingReportingPipeline {
@@ -883,6 +868,7 @@ export class BillingModule
     let reporter: UsageReportingService | undefined;
 
     return BillingReportingPipeline.create({
+      usageWarnings,
       organizations: repositories.reportOrganizations,
       billingCheckpoints: repositories.checkpoints,
       getUsageReportingService: () => (reporter ??= usageReporting?.()),
