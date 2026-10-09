@@ -7,6 +7,7 @@ import {
   type InsightEntry,
   type InsightFiledVia,
   type InsightFolder,
+  type InsightReplay,
   type InsightTone,
   insightEffectiveAt,
   insightExpiresAt,
@@ -25,6 +26,28 @@ export const FILED_VIA_WORDS: Record<InsightFiledVia, string> = {
   chat: "Saved from a chat with Langy",
   run: "Daily run",
 };
+
+/** "Jul 5 to Aug 3", or the one day; the window is half-open, so its last day holds `end - 1`. */
+function replayDays({ start, end }: Pick<InsightReplay, "start" | "end">): string {
+  const first = format(start, "MMM d");
+  const last = format(end - 1, "MMM d");
+  return first === last ? first : `${first} to ${last}`;
+}
+
+/** The line under the evidence chart: the fixed dates, then every value that was in force. */
+export function replayCaption({
+  replay,
+  fromBoard,
+}: {
+  replay: InsightReplay;
+  /** A window kept from a board says so; one kept from elsewhere names only its values. */
+  fromBoard: boolean;
+}): string {
+  const values = Object.entries(replay.parameters).map(([name, value]) => `${name}: ${value}`);
+  const words = [replayDays(replay), ...(replay.period ? [replay.period] : []), ...values];
+  const replayed = `Replayed with: ${words.join(" · ")}.`;
+  return fromBoard ? `${replayed} The board as it was set when Langy filed this.` : replayed;
+}
 
 /** "Today · 07:00", "Yesterday · 07:00", or "Oct 3 · 07:00". */
 export function insightWhen({ entry, now }: { entry: InsightEntry; now: number }): string {

@@ -154,6 +154,38 @@ Feature: The insights inbox
       Then the row holds the start, the end and the step as columns and the values as one JSON map
       And reading the row back gives the same window and values
 
+    @integration
+    Scenario: The card replays the query over the window it was filed with
+      Given an insight with a query and a window from Jul 5 to Aug 3
+      When a member opens the card
+      Then the query runs through the query door as that member, for that window, with the values it was filed with
+      And the values are bound beside the query, never written into its text
+
+    @integration
+    Scenario: The card says which dates and values the evidence was replayed with
+      Given an insight from a board with a query, a window from Jul 5 to Aug 3 and the period "Last 30 days"
+      When a member opens the card
+      Then under the chart it reads "Replayed with: Jul 5 to Aug 3 · Last 30 days. The board as it was set when Langy filed this."
+
+    @integration
+    Scenario: A reader the query is refused for sees the refusal, not the numbers
+      Given an insight whose query the reader may not run
+      When the card replays the query
+      Then the card shows the refusal the query door gave
+      And no chart is drawn
+
+    @integration
+    Scenario: An insight with no window draws no evidence
+      Given an insight filed with a query and no window
+      When a member opens the card
+      Then no chart is drawn and nothing is replayed
+
+    @unit
+    Scenario: The line under the chart names the dates and every value in force
+      Given a window from Jul 5 to Aug 3 with the period "Last 30 days" and a model parameter
+      When the line under the chart is written
+      Then it names the first and the last day, the period and the parameter with its value
+
   Rule: Folders are derived per reader, at read time
 
     @unit

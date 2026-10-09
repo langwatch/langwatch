@@ -8,6 +8,7 @@ import {
   CustomGraphToken,
   DashboardPointerToken,
   FilterSidebarToken,
+  LwqlReplayChartToken,
   SavedDashboardsToken,
   StarredDashboardsToken,
 } from "@langwatch/analytics-client";
@@ -120,6 +121,13 @@ export const analyticsWeb = defineBrowserModule("analytics")
     load: async () => ({
       default: (await import("./features/dashboards/ui/sections/dashboard-pointer.tsx"))
         .DashboardPointer,
+    }),
+  })
+  /** One kept statement replayed over fixed dates, lent to the insight card as its evidence. */
+  .lends(LwqlReplayChartToken, {
+    load: async () => ({
+      default: (await import("./features/dashboard-widget/ui/sections/lwql-replay-chart.tsx"))
+        .LwqlReplayChart,
     }),
   })
   /** The trace filter sidebar, lent to the evaluator's sample picker (§3.4 rule 7). */

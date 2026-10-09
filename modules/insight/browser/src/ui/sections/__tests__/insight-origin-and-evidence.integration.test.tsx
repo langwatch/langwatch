@@ -5,7 +5,12 @@
  * @see modules/insight/specs/insight-inbox.feature
  */
 
-import { DashboardPointerToken, type DashboardPointerProps } from "@langwatch/analytics-client";
+import {
+  DashboardPointerToken,
+  type DashboardPointerProps,
+  LwqlReplayChartToken,
+  type LwqlReplayChartProps,
+} from "@langwatch/analytics-client";
 import type { UiLend } from "@langwatch/browser-host/declarations";
 import type { InsightEntry } from "@langwatch/insight-contract";
 import { screen, within } from "@testing-library/react";
@@ -19,6 +24,14 @@ const BOARD = {
   name: "Checkout health",
   widget: { id: "widget-1", name: "Errors by day" },
 };
+const QUERY = "SELECT count() FROM traces WHERE model = {model:String}";
+const REPLAY = {
+  start: new Date(2026, 6, 5).getTime(),
+  end: new Date(2026, 7, 4).getTime(),
+  granularitySeconds: 86_400,
+  period: "Last 30 days",
+  parameters: { model: "gpt-5" },
+};
 
 /** Stand-ins for what analytics lends: each prints the props it was handed. */
 const ANALYTICS_LENDS: readonly UiLend[] = [
@@ -27,6 +40,14 @@ const ANALYTICS_LENDS: readonly UiLend[] = [
     load: async () => ({
       default: (props: DashboardPointerProps) => (
         <span data-testid="lent-trail">{JSON.stringify(props)}</span>
+      ),
+    }),
+  },
+  {
+    token: LwqlReplayChartToken,
+    load: async () => ({
+      default: (props: LwqlReplayChartProps) => (
+        <span data-testid="lent-chart">{JSON.stringify(props)}</span>
       ),
     }),
   },
@@ -97,6 +118,48 @@ describe("given an insight a member saved from a Langy answer", () => {
       renderInbox({ entry: insightEntry({ filedVia: "run", filedByUserId: null }) });
 
       expect((await row()).getByTestId("insight-origin")).toHaveTextContent(/^Daily run$/);
+    });
+  });
+});
+
+describe("given an insight from a board with a query, a window from Jul 5 to Aug 3 and the period Last 30 days", () => {
+  const entry = insightEntry({ board: BOARD, lwql: QUERY, replay: REPLAY });
+
+  describe("when a member opens the card", () => {
+    /** @scenario "The card says which dates and values the evidence was replayed with" */
+    it("hands the chart the query, the window and the values, and says so under it", async () => {
+      renderInbox({ entry, lends: ANALYTICS_LENDS });
+
+      const evidence = within(await (await row()).findByRole("figure", { name: "Evidence" }));
+      const chart = await evidence.findByTestId("lent-chart");
+
+      expect(JSON.parse(chart.textContent ?? "")).toEqual({
+        sql: QUERY,
+        window: { start: REPLAY.start, end: REPLAY.end, granularitySeconds: 86_400 },
+        parameters: { model: "gpt-5" },
+        name: "Errors by day",
+      });
+      expect(
+        evidence.getByText(
+          "Replayed with: Jul 5 to Aug 3 · Last 30 days · model: gpt-5. " +
+            "The board as it was set when Langy filed this.",
+        ),
+      ).toBeInTheDocument();
+    });
+  });
+});
+
+describe("given an insight filed with a query and no window", () => {
+  describe("when a member opens the card", () => {
+    /** @scenario "An insight with no window draws no evidence" */
+    it("draws no chart and no line about a replay", async () => {
+      renderInbox({ entry: insightEntry({ lwql: QUERY }), lends: ANALYTICS_LENDS });
+
+      const card = await row();
+
+      expect(card.queryByRole("figure", { name: "Evidence" })).not.toBeInTheDocument();
+      expect(card.queryByTestId("lent-chart")).not.toBeInTheDocument();
+      expect(card.queryByText(/Replayed with/)).not.toBeInTheDocument();
     });
   });
 });

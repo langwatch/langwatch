@@ -95,3 +95,22 @@ export type DashboardPointerProps = {
 
 export const DashboardPointerToken =
   uiTokens("analytics").component<DashboardPointerProps>("dashboardPointer");
+
+/**
+ * One LangWatchQL statement replayed over a fixed window and drawn as a chart, for a peer
+ * that kept the statement as evidence. Analytics runs it through its own query door as the
+ * reader, so what the reader may not see is refused here, not in the peer.
+ */
+export type LwqlReplayChartProps = {
+  /** The statement as it was kept. Values travel as `parameters`, never inside this text. */
+  sql: string;
+  /** Epoch milliseconds, half-open `[start, end)`: fixed dates that never slide with the clock. */
+  window: { start: number; end: number; granularitySeconds: number };
+  /** The statement's own named parameter values. */
+  parameters?: Readonly<Record<string, string | number | boolean>>;
+  /** How the chart is described to a reader who cannot see it. */
+  name: string;
+};
+
+export const LwqlReplayChartToken =
+  uiTokens("analytics").component<LwqlReplayChartProps>("lwqlReplayChart");

@@ -7,6 +7,7 @@ import {
   CustomGraphToken,
   DashboardPointerToken,
   FilterSidebarToken,
+  LwqlReplayChartToken,
 } from "@langwatch/analytics-client";
 import { describe, expect, it } from "vitest";
 
@@ -20,7 +21,7 @@ async function loadLent({ key }: { key: string }) {
 describe("the analytics browser declaration", () => {
   describe("when a reader looks up each token from analytics's client", () => {
     /** @scenario Each wave 2 owner lends its components by its client tokens */
-    it.each([FilterSidebarToken, CustomGraphToken, DashboardPointerToken])(
+    it.each([FilterSidebarToken, CustomGraphToken, DashboardPointerToken, LwqlReplayChartToken])(
       "loads the lent component for $key",
       async (token) => {
         const loaded = await loadLent(token);

@@ -32,6 +32,7 @@ import { useInsightHost } from "../../model/insight-host.ts";
 import { type FolderCount, FolderRail } from "../blocks/folder-rail.tsx";
 import { type InsightDensity, InsightRow } from "../blocks/insight-row.tsx";
 import { InsightBoardTrail } from "./insight-board-trail.tsx";
+import { InsightEvidence } from "./insight-evidence.tsx";
 
 const HINT = "Langy's brief: a few things worth acting on, kept fresh, never a feed.";
 
@@ -196,6 +197,7 @@ function FolderView({
                 unread={unreadThisVisit.has(entry.id)}
                 now={now}
                 boardTrail={entry.board ? <InsightBoardTrail board={entry.board} /> : void 0}
+                evidence={<InsightEvidence entry={entry} />}
                 actions={{
                   onDone: () => actions.markDone(entry.id),
                   onKeep: () => actions.keep(entry.id),

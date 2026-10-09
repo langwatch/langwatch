@@ -46,6 +46,7 @@ export function InsightRow({
   now,
   actions,
   boardTrail,
+  evidence,
 }: {
   entry: InsightEntry;
   folder: InsightFolder;
@@ -55,6 +56,8 @@ export function InsightRow({
   actions: InsightRowActions;
   /** "Board › Widget" for the pointer the insight carries; absent when it carries none. */
   boardTrail?: ReactNode;
+  /** The replayed chart under the body, shown with the body. */
+  evidence?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const expanded = density === "expanded" || open;
@@ -145,7 +148,10 @@ export function InsightRow({
           </Text>
 
           {expanded ? (
-            <InsightBody body={entry.body} />
+            <>
+              <InsightBody body={entry.body} />
+              {evidence}
+            </>
           ) : (
             <Text
               marginTop={1.5}
