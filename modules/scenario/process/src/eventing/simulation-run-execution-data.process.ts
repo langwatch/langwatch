@@ -52,7 +52,6 @@ const simulationRunExecutionPhaseSchema = z.enum([
   "evaluating",
   "terminal",
 ]);
-export type SimulationRunExecutionPhase = z.infer<typeof simulationRunExecutionPhaseSchema>;
 
 /**
  * One evaluator the run still owes a result to: the saved evaluator's id and

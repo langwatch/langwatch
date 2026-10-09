@@ -193,7 +193,7 @@ const SCENARIO_KSUID_RESOURCE = "scenario";
 const SCENARIO_TEST_SUITE_KSUID_RESOURCE = "suite";
 
 /** What the process composes this feature's application from. */
-export interface ScenarioAppDependencies {
+interface ScenarioAppDependencies {
   agentTesting: AgentTestService;
   /** One HTTP agent call from its editor, run by the workflow engine and traced. */
   httpAgentTesting: HttpAgentTestService;

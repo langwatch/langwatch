@@ -17,9 +17,7 @@ import {
  * DI and are hand-written classes in sibling *.commands.ts files.
  */
 
-export { FinishRunCommand } from "./finish-run.commands.ts";
-
-export const StartRunCommand = defineCommand({
+const StartRunCommand = defineCommand({
   commandType: "lw.simulation_run.start",
   eventType: "lw.simulation_run.started",
   eventVersion: "2026-02-01",
@@ -35,7 +33,7 @@ export const StartRunCommand = defineCommand({
   makeJobId: (d) => `${d.tenantId}:${d.scenarioRunId}:start-run`,
 });
 
-export const MessageSnapshotCommand = defineCommand({
+const MessageSnapshotCommand = defineCommand({
   commandType: "lw.simulation_run.message_snapshot",
   eventType: "lw.simulation_run.message_snapshot",
   eventVersion: "2026-02-01",
@@ -50,7 +48,7 @@ export const MessageSnapshotCommand = defineCommand({
   makeJobId: (d) => `${d.tenantId}:${d.scenarioRunId}:message-snapshot`,
 });
 
-export const TextMessageStartCommand = defineCommand({
+const TextMessageStartCommand = defineCommand({
   commandType: "lw.simulation_run.text_message_start",
   eventType: "lw.simulation_run.text_message_start",
   eventVersion: "2026-02-01",
@@ -66,7 +64,7 @@ export const TextMessageStartCommand = defineCommand({
   makeJobId: (d) => `${d.tenantId}:${d.scenarioRunId}:text-message-start:${d.messageId}`,
 });
 
-export const TextMessageEndCommand = defineCommand({
+const TextMessageEndCommand = defineCommand({
   commandType: "lw.simulation_run.text_message_end",
   eventType: "lw.simulation_run.text_message_end",
   eventVersion: "2026-02-01",
@@ -82,7 +80,7 @@ export const TextMessageEndCommand = defineCommand({
   makeJobId: (d) => `${d.tenantId}:${d.scenarioRunId}:text-message-end:${d.messageId}`,
 });
 
-export const RecordAgentInstanceCommand = defineCommand({
+const RecordAgentInstanceCommand = defineCommand({
   commandType: "lw.simulation_run.record_agent_instance",
   eventType: "lw.simulation_run.agent_instance_recorded",
   eventVersion: "2026-08-30",
@@ -97,7 +95,7 @@ export const RecordAgentInstanceCommand = defineCommand({
   makeJobId: (d) => `${d.tenantId}:${d.scenarioRunId}:record-agent-instance`,
 });
 
-export const RecordCutAtLimitCommand = defineCommand({
+const RecordCutAtLimitCommand = defineCommand({
   commandType: "lw.simulation_run.record_cut_at_limit",
   eventType: "lw.simulation_run.cut_at_limit_recorded",
   eventVersion: "2026-09-09",
@@ -111,7 +109,7 @@ export const RecordCutAtLimitCommand = defineCommand({
   makeJobId: (d) => `${d.tenantId}:${d.scenarioRunId}:record-cut-at-limit`,
 });
 
-export const CancelRunCommand = defineCommand({
+const CancelRunCommand = defineCommand({
   commandType: "lw.simulation_run.cancel",
   eventType: "lw.simulation_run.cancel_requested",
   eventVersion: "2026-04-06",
@@ -125,7 +123,7 @@ export const CancelRunCommand = defineCommand({
   makeJobId: (d) => `${d.tenantId}:${d.scenarioRunId}:cancel-run`,
 });
 
-export const DeleteRunCommand = defineCommand({
+const DeleteRunCommand = defineCommand({
   commandType: "lw.simulation_run.delete",
   eventType: "lw.simulation_run.deleted",
   eventVersion: "2026-02-01",

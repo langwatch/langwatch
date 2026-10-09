@@ -58,7 +58,7 @@ import { ScenarioModelParametersService } from "./scenario-model-parameters.serv
 import { ScenarioRunKeyService } from "./scenario-run-key.service.ts";
 import { ScenarioWorkflowHydratorService } from "./scenario-workflow-hydrator.service.ts";
 
-export type AgentTestServiceOptions = {
+type AgentTestServiceOptions = {
   agents: AgentApi;
   projects: ProjectApi;
   /** Mints the run key the test's child calls LangWatch with. */
