@@ -195,6 +195,14 @@ export type ExperimentInitOptions = {
   runId?: string;
   /** Number of parallel threads for submit() */
   threads?: number;
+  /**
+   * The id of the LangWatch-managed dataset this experiment runs against
+   * (e.g. `(await langwatch.datasets.get(slug)).id`). Recorded on the
+   * experiment so the experiments list can show which dataset it used —
+   * otherwise only the Optimization Studio workflow a run is linked to can
+   * supply that column, which an SDK-driven experiment never has.
+   */
+  datasetId?: string;
 };
 
 /**
