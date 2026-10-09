@@ -131,6 +131,24 @@ override-dependencies = [
     #   nltk: one advisory covers <=3.10.3, the current release, with no fix.
 ]
 
+# Security floors that only need to raise a version. Constraints add to the
+# requirements already in the tree; an override would replace them, extras
+# and upper bounds included.
+constraint-dependencies = [
+    "fsspec>=2026.6.0",  # fsspec advisory covering <2026.6.0
+    "datasets>=5.0.1",  # datasets advisory covering <5.0.1; 4.x also caps fsspec below its fix
+    "mako>=1.4.2",  # Mako advisory covering <=1.4.1
+    "multidict>=6.9.1",  # multidict advisory covering 6.7.0-6.9.0
+    "langgraph-sdk>=0.4.4",  # langgraph-sdk advisory covering <=0.4.3
+    # pydantic-ai: 2.30.0 is the highest floor that resolves. From 2.44.0 its
+    # openai extra needs openai>=3.8.0, whose jiter requirement every
+    # instructor release (a dependency of the notebooks and tutorials) excludes
+    # with `jiter<0.15`. The advisories fixed in 2.44.0, 2.52.0 and 2.53.0 stay
+    # open until instructor lifts that cap. Without this floor in range the
+    # resolver satisfies a higher one by walking arize-phoenix back to 14.x.
+    "pydantic-ai-slim>=2.30.0",
+]
+
 [tool.uv.workspace]
 members = [
     "langevals_core",
