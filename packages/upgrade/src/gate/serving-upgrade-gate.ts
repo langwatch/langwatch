@@ -3,7 +3,6 @@ import { setTimeout as sleep } from "node:timers/promises";
 
 import { storesOwner } from "@langwatch/process-stores/config";
 import type { ScopedSecrets } from "@langwatch/secrets";
-import { nowInstant } from "@langwatch/time";
 import pg from "pg";
 
 import { BackgroundStepsService, startBackgroundSteps } from "../background/index.ts";
@@ -14,6 +13,7 @@ import type { ReleaseTreeSteps } from "../manifest/stamp.ts";
 import type { UpgradePostgres } from "../ports.ts";
 import { UPGRADE_LEASE_NAME } from "../runner/runner-lease.ts";
 import { UpgradeRunnerRepository } from "../runner/runner-ledger.repository.ts";
+import { EXIT_CODES } from "../runner/upgrade-outcome.ts";
 import { PreRosterRepository } from "../serving-roster/pre-roster.repository.ts";
 import {
   createServingRoster,
@@ -197,11 +197,7 @@ const closesOn = (verdict: ServingVerdict) =>
 
 async function liveLeaseHolder({ runner }: { runner: UpgradeRunnerRepository }) {
   if (!(await runner.ledgerExists())) return null;
-  const lease = await runner.findLease({ name: UPGRADE_LEASE_NAME });
-  if (!lease) return null;
-  // ponytail: the row's UTC wall time parses as local; a DB-clock read belongs in the repository.
-  const expiresAtMs = lease.expiresAt.getTime() - lease.expiresAt.getTimezoneOffset() * 60_000;
-  return expiresAtMs > nowInstant().epochMilliseconds ? lease : null;
+  return runner.findLiveLease({ name: UPGRADE_LEASE_NAME });
 }
 
 /** Why the worker runs nothing yet: a live lease holder, or a failed step awaiting a Retry. */
@@ -288,14 +284,27 @@ export async function admitAfterFirstInstall({
     const { exitCode } = await firstInstall();
     ranClean = exitCode === 0;
     if (ranClean) continue;
+    // After any run a failed step waits for a Retry; a lease loser's exit is not a failure.
     mayRunPastFailure = false;
-    warn(`\`${UPGRADE_COMMAND}\` exited ${exitCode}; this worker waits for a Retry`, {
-      phase: verdict.outcome,
-      waitingOn: "a Retry",
-      next: "retry the failed step from Ops > Upgrades or the upgrade console",
-    });
+    if (exitCode !== EXIT_CODES.lease_not_acquired) warnFailedRun({ verdict, exitCode, warn });
     await wait(reAskMs);
   }
+}
+
+function warnFailedRun({
+  verdict,
+  exitCode,
+  warn,
+}: {
+  verdict: ServingVerdict;
+  exitCode: number;
+  warn: ServingGateWarn;
+}): void {
+  warn(`\`${UPGRADE_COMMAND}\` exited ${exitCode}; this worker waits for a Retry`, {
+    phase: verdict.outcome,
+    waitingOn: "a Retry",
+    next: "retry the failed step from Ops > Upgrades or the upgrade console",
+  });
 }
 
 /** The worker's background steps over the gate's own connection (round 14: framework runs). */

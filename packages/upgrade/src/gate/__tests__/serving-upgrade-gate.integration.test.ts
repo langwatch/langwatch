@@ -229,7 +229,7 @@ describe.skipIf(!DB_URL)("servingUpgradeGate over a ledger", () => {
           if (runs === 1) {
             await recordSteps({ [PRISMA]: "pending", [GOOSE]: "pending" });
             await markStep({ id: PRISMA, status: "failed" });
-            return { exitCode: 3, logTail: [] };
+            return { exitCode: 1, logTail: [] };
           }
           await markStep({ id: PRISMA, status: "done" });
           await markStep({ id: GOOSE, status: "done" });
@@ -239,7 +239,7 @@ describe.skipIf(!DB_URL)("servingUpgradeGate over a ledger", () => {
 
       await expect(gate.admit()).resolves.toMatchObject({ admitted: true });
       expect(runs).toBe(2);
-      expect(said).toContainEqual(expect.stringMatching(/`pnpm task upgrade` exited 3/));
+      expect(said).toContainEqual(expect.stringMatching(/`pnpm task upgrade` exited 1/));
       await gate.release();
     });
 

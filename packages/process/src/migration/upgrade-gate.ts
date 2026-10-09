@@ -54,6 +54,8 @@ const LEDGER = "the upgrade ledger (DATABASE_URL)";
 const LEDGER_UNREADABLE_NEXT =
   "check DATABASE_URL reaches Postgres and `pnpm task upgrade status` answers, then start this process again";
 const REFUSED_NEXT = "do what the refusal names, then start this process again";
+/** The api's phase once the schema steps are done: it boots and serves declared routes (UIW-1). */
+export const UPGRADING_PHASE = "upgrading";
 /** How often a holding or upgrading api asks the ledger again (UPGRADE-IN-WORKER). */
 const RE_ASK_MS = 10_000;
 
@@ -111,6 +113,8 @@ export function upgradeGateComponent({
   reAskMs?: number;
 }): ServerComponent {
   let admitted = false;
+  /** Set while an upgrading api serves its declared routes and asks on until current. */
+  let upgrading: Readonly<{ stop: AbortController; asking: Promise<void> }> | undefined;
   /** D1, D2: a fresh token per failed run, printed on one log line; only its hash is kept. */
   const issueConsoleToken = (): Pick<UpgradeConsole, "tokenSha256" | "tokenTtlMs"> => {
     const token = randomBytes(32).toString("base64url");
@@ -131,21 +135,6 @@ export function upgradeGateComponent({
       tokenSha256: createHash("sha256").update(token).digest("hex"),
       tokenTtlMs: UPGRADE_CONSOLE_TOKEN_TTL_MS,
     };
-  };
-  /** D5: only the console's Retry runs the upgrade again; with no console to show, it refuses. */
-  const admitThroughConsole = async (): Promise<UpgradeGateVerdict> => {
-    for (;;) {
-      const verdict = await gate.admit();
-      if (verdict.admitted || !("failedRun" in verdict) || !verdict.failedRun || !onFailed) {
-        return verdict;
-      }
-      const retried = await onFailed({
-        ...redactFailedRun(verdict.failedRun),
-        ...issueConsoleToken(),
-      });
-      if (!retried) return verdict;
-      await onHolding?.({ phase: GATE_PHASE, outstandingStepIds: [] });
-    }
   };
   const refuse = (refusal: string, next: string): never => {
     const error = new UpgradeGateRefusedError({ server, role, refusal: redactUrls(refusal) });
@@ -168,42 +157,150 @@ export function upgradeGateComponent({
         },
         `${server} (${role}): checking the upgrade ledger before serving`,
       );
-      let verdict: Exclude<UpgradeGateVerdict, UpgradeGateWaiting>;
+      let verdict: UpgradeGateVerdict;
+      const say = (fields: object, line: string) =>
+        logger.info(fields, `${server} (${role}): ${line}`);
       // Only the gate's phase: its steps are behind `admit`, and a refusal's text is never shown.
       await onHolding?.({ phase: GATE_PHASE, outstandingStepIds: [] });
       try {
         verdict = await admitWhenCurrent({
-          admit: admitThroughConsole,
+          admit: () => admitThroughConsole({ gate, onFailed, onHolding, issueConsoleToken }),
           onHolding,
           reAskMs,
-          say: (fields, line) => logger.info(fields, `${server} (${role}): ${line}`),
+          say,
+          bootsWhileUpgrading: role === "api",
         });
       } catch (error) {
+        await onHolding?.(undefined);
         const cause = `the upgrade ledger could not be read (DATABASE_URL): ${messageOf(error)}`;
         return refuse(cause, LEDGER_UNREADABLE_NEXT);
-      } finally {
-        await onHolding?.(undefined);
       }
+      const serving = () => {
+        admitted = true;
+        const elapsedMs = Math.round(performance.now() - startedAt);
+        logger.info(
+          {
+            role,
+            phase: GATE_PHASE,
+            waitingOn: "nothing",
+            elapsedMs,
+            next: "nothing to do: it serves",
+          },
+          `${server} (${role}): the installation is current for this image; serving (checked in ${elapsedMs} ms)`,
+        );
+      };
+      if (isWaiting(verdict)) {
+        // UIW-1, Q5: boot and serve the declared routes; the hold lifts at current.
+        upgrading = askInBackground({
+          admit: gate.admit,
+          onHolding,
+          reAskMs,
+          say,
+          onCurrent: serving,
+        });
+        return;
+      }
+      await onHolding?.(undefined);
       if (!verdict.admitted) {
         return refuse(verdict.refusal, REFUSED_NEXT);
       }
-      admitted = true;
-      const elapsedMs = Math.round(performance.now() - startedAt);
-      logger.info(
-        {
-          role,
-          phase: GATE_PHASE,
-          waitingOn: "nothing",
-          elapsedMs,
-          next: "nothing to do: it serves",
-        },
-        `${server} (${role}): the installation is current for this image; serving (checked in ${elapsedMs} ms)`,
-      );
+      serving();
+    },
+    ready: async () => {
+      if (!admitted)
+        throw new Error(`${server} (${role}) is upgrading; ready once the ledger is current`);
     },
     stop: async () => {
+      upgrading?.stop.abort();
+      await upgrading?.asking;
       if (admitted) await gate.release();
     },
   };
+}
+
+/** D5: only the console's Retry runs the upgrade again; with no console to show, it refuses. */
+async function admitThroughConsole({
+  gate,
+  onFailed,
+  onHolding,
+  issueConsoleToken,
+}: {
+  gate: UpgradeGate;
+  onFailed: ((upgradeConsole: UpgradeConsole) => Promise<boolean>) | undefined;
+  onHolding: ((holding: UpgradeHolding | undefined) => Promise<void>) | undefined;
+  issueConsoleToken: () => Pick<UpgradeConsole, "tokenSha256" | "tokenTtlMs">;
+}): Promise<UpgradeGateVerdict> {
+  for (;;) {
+    const verdict = await gate.admit();
+    if (verdict.admitted || !("failedRun" in verdict) || !verdict.failedRun || !onFailed) {
+      return verdict;
+    }
+    const retried = await onFailed({
+      ...redactFailedRun(verdict.failedRun),
+      ...issueConsoleToken(),
+    });
+    if (!retried) return verdict;
+    await onHolding?.({ phase: GATE_PHASE, outstandingStepIds: [] });
+  }
+}
+
+/** Asks on after start returned; `onCurrent` runs once with the hold lifted. */
+function askInBackground({
+  onCurrent,
+  onHolding,
+  ...asking
+}: Omit<Parameters<typeof askUntilCurrent>[0], "signal"> & { onCurrent: () => void }) {
+  const stop = new AbortController();
+  const current = askUntilCurrent({ ...asking, onHolding, signal: stop.signal });
+  return {
+    stop,
+    asking: current.then(async (admitted) => {
+      if (!admitted) return;
+      await onHolding?.(undefined);
+      onCurrent();
+    }),
+  };
+}
+
+/**
+ * An upgrading api asks until the ledger is current; true once admitted, false when stopped.
+ * An unreadable ledger or a refusal mid-upgrade is said and asked again: the process serves
+ * already.
+ */
+async function askUntilCurrent({
+  admit,
+  onHolding,
+  reAskMs,
+  say,
+  signal,
+}: {
+  admit: () => Promise<UpgradeGateVerdict>;
+  onHolding: ((holding: UpgradeHolding | undefined) => Promise<void>) | undefined;
+  reAskMs: number;
+  say: (fields: object, line: string) => void;
+  signal: AbortSignal;
+}): Promise<boolean> {
+  while (!signal.aborted) {
+    const verdict = await admit().catch((error: unknown): UpgradeGateVerdict => ({
+      admitted: false,
+      refusal: `the upgrade ledger could not be read: ${messageOf(error)}`,
+    }));
+    if (verdict.admitted) return true;
+    if (isWaiting(verdict)) {
+      await onHolding?.({ phase: verdict.outcome, outstandingStepIds: verdict.outstanding });
+    } else {
+      say(
+        {
+          phase: UPGRADING_PHASE,
+          waitingOn: "the upgrade ledger",
+          next: "nothing to do: it asks again",
+        },
+        redactUrls(verdict.refusal),
+      );
+    }
+    await sleep(reAskMs, undefined, { signal }).catch(() => undefined);
+  }
+  return false;
 }
 
 /** The worker runs the upgrade; the api re-asks every 10 s, holding the door meanwhile. */
@@ -212,12 +309,15 @@ async function admitWhenCurrent({
   onHolding,
   reAskMs,
   say,
+  bootsWhileUpgrading,
 }: {
   admit: () => Promise<UpgradeGateVerdict>;
   onHolding: ((holding: UpgradeHolding | undefined) => Promise<void>) | undefined;
   reAskMs: number;
   say: (fields: object, line: string) => void;
-}): Promise<Exclude<UpgradeGateVerdict, UpgradeGateWaiting>> {
+  /** An api returns at the upgrading phase instead of waiting for current. */
+  bootsWhileUpgrading: boolean;
+}): Promise<UpgradeGateVerdict> {
   let phase = "";
   for (;;) {
     const verdict = await admit();
@@ -231,6 +331,7 @@ async function admitWhenCurrent({
       phase = verdict.outcome;
     }
     await onHolding?.({ phase: verdict.outcome, outstandingStepIds: verdict.outstanding });
+    if (bootsWhileUpgrading && verdict.outcome === UPGRADING_PHASE) return verdict;
     await sleep(reAskMs);
   }
 }

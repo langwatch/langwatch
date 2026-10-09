@@ -63,6 +63,18 @@ export class UpgradeRunnerRepository {
     return rows[0] ? upgradeLeaseSchema.parse(rows[0]) : null;
   }
 
+  /** The lease while it is live, judged on the database's clock, never the host's. */
+  async findLiveLease({ name }: { name: string }): Promise<UpgradeLease | null> {
+    const { rows } = await this.query<object>(
+      (t) => `SELECT "name", "owner", "image", "host",
+              "heartbeat_at" AT TIME ZONE 'UTC' AS "heartbeatAt",
+              "expires_at" AT TIME ZONE 'UTC' AS "expiresAt"
+         FROM ${t.lease} WHERE "name" = $1 AND "expires_at" > ${NOW_UTC}`,
+      [name],
+    );
+    return rows[0] ? upgradeLeaseSchema.parse(rows[0]) : null;
+  }
+
   /**
    * Registers steps as `pending`. A step already recorded keeps its status; it gains the release
    * that shipped it, and its owner, description and `finishBy` are refreshed from the manifest.

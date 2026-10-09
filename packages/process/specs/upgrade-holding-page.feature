@@ -57,3 +57,16 @@ Feature: The liveness door holds browsers on a static page while an upgrade runs
     When a browser requests a page
     Then it sees the holding page naming the upgrade-gate phase
     And once the gate admits the process the request reaches the main thread
+
+  @unit
+  Scenario: A health route reaches the main thread while an upgrade holds the door
+    Given the liveness thread is holding for an upgrade
+    When the kubelet requests the api's health route
+    Then the request is proxied to the main thread
+
+  @unit
+  Scenario: Only a route declared to serve while upgrading passes the holding door
+    Given the liveness thread holds in upgrading mode with one route declared to serve while upgrading
+    When a request names that route's method and path, and another names a route that is not declared
+    Then the declared route reaches the main thread
+    And the other answers 503 before the main thread sees it

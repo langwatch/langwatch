@@ -101,7 +101,7 @@ Feature: The new image's worker runs its blocking upgrade while the api holds, t
     When the kubelet requests /api/health
     Then it answers 200
 
-  @unimplemented
+  @unit
   Scenario: The api serves and reports ready once the ledger is current
     Given the api is in upgrading mode
     When the worker's run records the last blocking step as done

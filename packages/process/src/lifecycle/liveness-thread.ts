@@ -36,6 +36,12 @@ export const UPGRADE_CONSOLE_WRONG_TOKENS_PER_MINUTE = 5;
 /** All the unauthenticated holding page may say (Q-U4): the phase and outstanding step ids. */
 export type UpgradeHolding = Readonly<{ phase: string; outstandingStepIds: readonly string[] }>;
 
+/**
+ * What still reaches the main thread while the door holds: exact `paths` (the health routes) and
+ * `routes`, regex sources over `METHOD /path` declared to serve while upgrading (UIW-6).
+ */
+export type UpgradePassThrough = Readonly<{ paths: readonly string[]; routes: readonly string[] }>;
+
 /** A failed upgrade run, shown only to a console session. D1: the thread gets the token's hash. */
 export type UpgradeConsole = Readonly<{
   failedSteps: readonly Readonly<{ id: string; error: string | null }>[];
@@ -125,6 +131,7 @@ const stalledMs = () => {
 };
 const target = { host: "127.0.0.1", port: workerData.proxyPort };
 let holdingPage = null;
+let passThrough = { paths: [], routes: [] };
 let consoleHold = null;
 const sessions = [];
 let wrongTokensAt = [];
@@ -138,6 +145,11 @@ const answerHolding = (req, res) => {
     "Cache-Control": "no-store",
     "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'",
   }).end(html ? holdingPage : "LangWatch is upgrading");
+};
+const passes = (req) => {
+  const path = String(req.url).split("?")[0];
+  const route = req.method + " " + path;
+  return passThrough.paths.includes(path) || passThrough.routes.some((pattern) => pattern.test(route));
 };
 const answerConsole = (res, status, page, headers) => {
   res.writeHead(status, {
@@ -237,11 +249,12 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, { "Content-Type": "text/plain" }).end("ready");
     return;
   }
-  if (consoleHold !== null) {
+  const held = holdingPage !== null && !passes(req);
+  if (held && consoleHold !== null) {
     answerFailed(req, res);
     return;
   }
-  if (holdingPage !== null) {
+  if (held) {
     answerHolding(req, res);
     return;
   }
@@ -298,6 +311,7 @@ server.on("error", (error) => {
 parentPort.on("message", (message) => {
   if (message.type === "hold") {
     holdingPage = message.page;
+    passThrough = { paths: message.paths, routes: message.routes.map((source) => new RegExp(source)) };
     consoleHold = null;
     if (message.page === null) sessions.length = 0;
     parentPort.postMessage({ type: "held" });
@@ -363,7 +377,7 @@ export type LivenessThread = Readonly<{
   /** Stops accepting, gives in-flight requests `graceMs`, destroys the rest, ends the thread. */
   close: (options: { graceMs: number }) => Promise<void>;
   /** Serves the holding page in place of the main thread until called with `undefined`. */
-  hold: (holding: UpgradeHolding | undefined) => Promise<void>;
+  hold: (holding: UpgradeHolding | undefined, passThrough?: UpgradePassThrough) => Promise<void>;
   /** Shows the failure console; true once a console session pressed Retry, false if it ended. */
   holdConsole: (upgradeConsole: UpgradeConsole) => Promise<boolean>;
 }>;
@@ -421,10 +435,15 @@ export async function startLivenessThread({
   thread.on("error", (error) => logger.error({ error }, "liveness thread failed"));
   return {
     address,
-    hold: async (holding) => {
+    hold: async (holding, passThrough = { paths: [], routes: [] }) => {
       const held = nextMessage({ thread, type: "held" });
       const page = holding === undefined ? null : renderUpgradeHoldingPage(holding);
-      thread.postMessage({ type: "hold", page });
+      thread.postMessage({
+        type: "hold",
+        page,
+        paths: passThrough.paths,
+        routes: passThrough.routes,
+      });
       await Promise.race([held, exited]);
     },
     holdConsole: async (upgradeConsole) => {

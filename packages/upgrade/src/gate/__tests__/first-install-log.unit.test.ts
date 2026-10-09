@@ -67,6 +67,31 @@ describe("admitAfterFirstInstall", () => {
     });
   });
 
+  describe("given a worker that lost the lease to a peer's run", () => {
+    describe("when its upgrade exits 3 after waiting for the lease", () => {
+      it("never counts it as a failed run and runs again once the lease is free", async () => {
+        const said: string[] = [];
+        const exits = [3, 0];
+        const answers: ServingVerdict[] = [
+          assertCurrent({ ledger: { steps: [] }, image: BEHIND_IMAGE, floor: null }),
+          assertCurrent({ ledger: { steps: [] }, image: BEHIND_IMAGE, floor: null }),
+          { admitted: true, outcome: "current" },
+        ];
+        const verdict = await admitAfterFirstInstall({
+          gate: { admit: async () => answers.shift() ?? { admitted: true, outcome: "current" } },
+          firstInstall: async () => ({ exitCode: exits.shift() ?? 0, logTail: [] }),
+          warn: (message) => void said.push(message),
+          findFailedSteps: async () => [],
+          wait: async () => undefined,
+        });
+
+        expect(verdict).toEqual({ admitted: true, outcome: "current" });
+        expect(exits).toEqual([]);
+        expect(said.filter((line) => /exited|Retry/.test(line))).toEqual([]);
+      });
+    });
+  });
+
   describe("given a worker whose release is below the ledger's floor", () => {
     /** @scenario "An image below the installation's floor runs nothing and refuses" */
     it("runs no upgrade and refuses naming the floor", async () => {

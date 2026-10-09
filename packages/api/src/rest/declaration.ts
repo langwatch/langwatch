@@ -513,6 +513,8 @@ export type RestTransportRoute<Api> = Readonly<{
   readonly operation: string;
   readonly version: DateVersion;
   readonly docs?: RestTransportDocs;
+  /** UIW-6: answers while the installation upgrades; every other route is held before the door. */
+  readonly servesWhileUpgrading?: true;
   readonly params?: z.ZodObject;
   readonly input?: SourceSchema;
   /** Present exactly when the body is a JSON array: `input` is then `{ [as]: schema }`. */
@@ -608,6 +610,7 @@ export type RestArrayBodyDeclared = Readonly<{ as: string; schema: z.ZodArray }>
 
 /** Everything a route has declared so far, before `handle` freezes it. */
 type RouteState = Readonly<{
+  servesWhileUpgrading?: true;
   params?: z.ZodObject;
   input?: SourceSchema;
   arrayBody?: RestArrayBodyDeclared;
@@ -1152,6 +1155,17 @@ class RouteBuilder<Api, S extends RouteShape> {
         ...this.state,
         version,
       },
+    });
+  }
+
+  /** Serves while the installation upgrades (UIW-6); its permission is still asked as declared. */
+  servesWhileUpgrading(): RouteBuilder<Api, S> {
+    return new RouteBuilder<Api, S>({
+      router: this.router,
+      method: this.method,
+      path: this.path,
+      operation: this.operation,
+      state: { ...this.state, servesWhileUpgrading: true },
     });
   }
 

@@ -35,7 +35,7 @@ export const upgradeOutcomeSchema = z.object({
 });
 export type UpgradeOutcome = z.infer<typeof upgradeOutcomeSchema>;
 
-const EXIT_CODES: Record<UpgradeOutcomeCode, UpgradeExitCode> = {
+export const EXIT_CODES: Record<UpgradeOutcomeCode, UpgradeExitCode> = {
   done: 0,
   refused_below_floor: 2,
   refused_image_below_floor: 2,
