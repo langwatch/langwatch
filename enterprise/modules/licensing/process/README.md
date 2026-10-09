@@ -681,11 +681,17 @@ Declared at `src/eventing/license-sync.pipeline.ts:57`.
 
 ### Pipeline `licensing_customer` (aggregate `licensing_customer`)
 
-Declared at `src/eventing/licensing-customer.pipeline.ts:29`. Events: `selfHostedCustomerLicensedEventSchema`.
+Declared at `src/eventing/licensing-customer.pipeline.ts:67`. Events: `selfHostedCustomerLicensedEventSchema`, `connectServiceSwitchedEventSchema`, `licenseSyncFinishedEventSchema`, `licenseStoredEventSchema`, `licenseClearedEventSchema`, `managedKeyRetiredEventSchema`, `managedKeyInvalidatedEventSchema`.
 
 | Kind    | Name                               | Handles | Declared at                                      |
 | ------- | ---------------------------------- | ------- | ------------------------------------------------ |
-| command | `recordSelfHostedCustomerLicensed` | –       | `src/eventing/licensing-customer.pipeline.ts:34` |
+| command | `recordSelfHostedCustomerLicensed` | –       | `src/eventing/licensing-customer.pipeline.ts:80` |
+| command | `recordConnectServiceSwitched`     | –       | `src/eventing/licensing-customer.pipeline.ts:81` |
+| command | `recordLicenseSyncFinished`        | –       | `src/eventing/licensing-customer.pipeline.ts:82` |
+| command | `recordLicenseStored`              | –       | `src/eventing/licensing-customer.pipeline.ts:83` |
+| command | `recordLicenseCleared`             | –       | `src/eventing/licensing-customer.pipeline.ts:84` |
+| command | `recordManagedKeyRetired`          | –       | `src/eventing/licensing-customer.pipeline.ts:85` |
+| command | `recordManagedKeyInvalidated`      | –       | `src/eventing/licensing-customer.pipeline.ts:86` |
 
 ### Tasks
 
@@ -699,8 +705,8 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                     | Environment variable                 | Declared at                              |
 | ------ | ------------------------ | ------------------------------------ | ---------------------------------------- |
-| secret | `instanceLicenseKey`     | `LANGWATCH_LICENSE_KEY`              | `src/app/licensing.app.ts:185`           |
-| secret | `licensePrivateKey`      | `LANGWATCH_LICENSE_PRIVATE_KEY`      | `src/app/licensing.app.ts:186`           |
+| secret | `instanceLicenseKey`     | `LANGWATCH_LICENSE_KEY`              | `src/app/licensing.app.ts:184`           |
+| secret | `licensePrivateKey`      | `LANGWATCH_LICENSE_PRIVATE_KEY`      | `src/app/licensing.app.ts:185`           |
 | config | `publicKey`              | `LANGWATCH_LICENSE_PUBLIC_KEY`       | `../contract/src/licensing.config.ts:45` |
 | config | `connectDisabled`        | `LANGWATCH_CONNECT_DISABLED`         | `../contract/src/licensing.config.ts:52` |
 | config | `connectGatewayEndpoint` | `LANGWATCH_CONNECT_GATEWAY_ENDPOINT` | `../contract/src/licensing.config.ts:53` |

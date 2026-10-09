@@ -44,12 +44,8 @@ class RecordingManagedKeys {
   readonly invalidated: string[] = [];
   readonly licensed: Parameters<ConnectManagedKeys["setLicense"]>[0][] = [];
   readonly published: { virtualKeyId: string; services: string[] }[] = [];
-  #minted = 0;
 
-  async provision(): Promise<{ id: string }> {
-    this.#minted += 1;
-    return { id: `vk-${this.#minted}` };
-  }
+  async issue(): Promise<void> {}
 
   async retire({ virtualKeyId }: { virtualKeyId: string }): Promise<void> {
     this.retired.push(virtualKeyId);

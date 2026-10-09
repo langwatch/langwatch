@@ -135,6 +135,37 @@ export class LicensingCustomerFactsService {
     });
   }
 
+  /** Gateway provisions the licence's managed key from this fact; names the token by hash only. */
+  async connectCredentialIssued({
+    organizationId,
+    licenseId,
+    issuedLicenseId,
+    instanceId,
+    tokenHash,
+    expiresAt,
+    services,
+  }: {
+    organizationId: string;
+    licenseId: string;
+    issuedLicenseId: string;
+    instanceId: string;
+    tokenHash: string;
+    expiresAt: Instant;
+    services: readonly string[];
+  }): Promise<void> {
+    await this.commands().recordConnectCredentialIssued.send({
+      tenantId: organizationId,
+      occurredAt: nowInstant().epochMilliseconds,
+      organizationId,
+      licenseId,
+      issuedLicenseId,
+      instanceId,
+      tokenHash,
+      expiresAt: expiresAt.epochMilliseconds,
+      services: [...services],
+    });
+  }
+
   private commands(): EventingCommands<LicensingCustomerPipeline> {
     if (!this.#commands) {
       throw new Error("licensing_customer pipeline senders are not connected yet");

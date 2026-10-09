@@ -1,4 +1,7 @@
 import {
+  CONNECT_CREDENTIAL_ISSUED_EVENT_TYPE,
+  connectCredentialIssuedEventDataSchema,
+  type ConnectCredentialIssuedEventData,
   CONNECT_SERVICE_SWITCHED_EVENT_TYPE,
   connectServiceSwitchedEventDataSchema,
   type ConnectServiceSwitchedEventData,
@@ -324,6 +327,52 @@ export class RecordManagedKeyInvalidatedCommand implements CommandHandler<
   }
 
   static getAggregateId(payload: ManagedKeyInvalidatedEventData): string {
+    return payload.organizationId;
+  }
+}
+
+export const RECORD_CONNECT_CREDENTIAL_ISSUED_COMMAND_TYPE =
+  "lw.licensing.record_connect_credential_issued" as const;
+
+export const connectCredentialIssuedEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(CONNECT_CREDENTIAL_ISSUED_EVENT_TYPE),
+  version: z.literal(LICENSING_CUSTOMER_EVENT_VERSION),
+  data: connectCredentialIssuedEventDataSchema,
+});
+export type ConnectCredentialIssuedEvent = z.infer<typeof connectCredentialIssuedEventSchema>;
+
+/** Records that a licence's call found no managed key; gateway provisions one from the fact. */
+export class RecordConnectCredentialIssuedCommand implements CommandHandler<
+  Command<ConnectCredentialIssuedEventData>,
+  ConnectCredentialIssuedEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_CONNECT_CREDENTIAL_ISSUED_COMMAND_TYPE,
+    connectCredentialIssuedEventDataSchema,
+    "Record that a licence's call found no managed key",
+  );
+
+  handle(command: Command<ConnectCredentialIssuedEventData>): ConnectCredentialIssuedEvent[] {
+    const data = command.data;
+    // One fact per licence per minute while pending (C3B-ISSUED-BUCKET): a lost answer self-heals.
+    const minute = Math.floor(data.occurredAt / 60_000);
+    return [
+      EventUtils.createEvent<ConnectCredentialIssuedEvent>({
+        aggregateType: LICENSING_CUSTOMER_AGGREGATE_TYPE,
+        aggregateId: data.organizationId,
+        tenantId: createTenantId(command.tenantId),
+        type: CONNECT_CREDENTIAL_ISSUED_EVENT_TYPE,
+        version: LICENSING_CUSTOMER_EVENT_VERSION,
+        data,
+        metadata: {},
+        occurredAt: data.occurredAt,
+        idempotencyKey: `${data.issuedLicenseId}:connect_credential_issued:${minute}`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: ConnectCredentialIssuedEventData): string {
     return payload.organizationId;
   }
 }
