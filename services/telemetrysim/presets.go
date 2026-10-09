@@ -7,6 +7,18 @@ import (
 // backfillPresets are the shapes a seed mixes per persona (seed design §8): RAG, multimodal, error,
 // guardrail, evaluation, browser (RUM) and wide traces. Texts are invented; names are never real.
 var backfillPresets = []Preset{
+	// One turn of a chat conversation; a seed gives many the same Part.Thread (gen_ai.conversation.id).
+	{Name: "conversation-turn", Signal: SignalTraces, Service: "northwind-assistant", Spans: []SpanShape{
+		{Name: "assistant.turn", Kind: internal, DurationMs: 1800, Attrs: []Attr{
+			{"langwatch.span.type", "agent"}, {"gen_ai.conversation.id", "$session"}, {"langwatch.user.id", "$user"},
+			{"langwatch.input", "Can you also check whether my last order shipped?"},
+			{"langwatch.output", "Your order left the warehouse this morning and should arrive in two days."},
+		}},
+		{Name: "chat gpt-4o-mini", Parent: 1, Kind: client, OffsetMs: 40, DurationMs: 1500, Attrs: []Attr{
+			{"gen_ai.operation.name", "chat"}, {"gen_ai.system", "openai"}, {"gen_ai.request.model", "gpt-4o-mini"},
+			{"gen_ai.usage.input_tokens", 640}, {"gen_ai.usage.output_tokens", 70},
+		}},
+	}},
 	{Name: "rag-trace", Signal: SignalTraces, Service: "northwind-support", Spans: []SpanShape{
 		{Name: "rag.answer", Kind: internal, DurationMs: 2100, Attrs: []Attr{
 			{"langwatch.span.type", "chain"}, {"langwatch.thread.id", "$session"}, {"langwatch.user.id", "$user"},

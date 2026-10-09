@@ -33,4 +33,7 @@ type Cell struct {
 	Spans        int       `json:"spans"`
 	Logs         int       `json:"logs"`
 	MetricPoints int       `json:"metricPoints"`
+	// Thread and Turns make the cell one conversation: Turns traces sharing gen_ai.conversation.id.
+	Thread string `json:"thread,omitempty"`
+	Turns  int    `json:"turns,omitempty"`
 }

@@ -67,7 +67,11 @@ func (p *Plan) Chunks(step Step) iter.Seq2[Action, error] {
 		cell := *step.Cell
 		c := &chunker{cell: cell, id: p.Run + "/" + strconv.FormatInt(step.Seq, 10), yield: yield,
 			seed: p.draws.Uint64("telemetry:"+cell.Project, cell.Start.Unix(), "seed")}
-		_ = c.traces() && c.records(KindLogOTLP, preset("logs"), cell.Logs) &&
+		traces := c.traces
+		if cell.Turns > 0 {
+			traces = c.conversation
+		}
+		_ = traces() && c.records(KindLogOTLP, preset("logs"), cell.Logs) &&
 			c.records(KindMetricOTLP, preset("metrics"), cell.MetricPoints)
 	}
 }
@@ -107,6 +111,18 @@ func (c *chunker) traces() bool {
 		parts, spans = append(parts, telemetrysim.Part{Preset: p, Index: i, Count: n}), spans+n
 	}
 	return len(parts) == 0 || c.send(KindTraceOTLP, parts)
+}
+
+// conversation sends the cell's turns as one chunk: one trace each, a minute or two apart, all
+// on the cell's thread. Logs and metrics follow as for any cell.
+func (c *chunker) conversation() bool {
+	turn, gap := preset("conversation-turn"), min(2*time.Minute, 55*time.Minute/time.Duration(c.cell.Turns))
+	parts := make([]telemetrysim.Part, c.cell.Turns)
+	for i := range parts {
+		parts[i] = telemetrysim.Part{Preset: turn, Index: i, Count: conversationSpans, Thread: c.cell.Thread,
+			At: c.cell.Start.Add(time.Duration(i) * gap)}
+	}
+	return c.send(KindTraceOTLP, parts)
 }
 
 // pick is the mix's preset at draw, a number below the mix's total weight.

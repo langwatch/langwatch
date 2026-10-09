@@ -48,6 +48,9 @@ func (p *Plan) Estimate() Estimate {
 			continue
 		}
 		counts["cells"]++
+		if step.Cell.Turns > 0 {
+			counts["conversations"]++
+		}
 		counts["spans"] += step.Cell.Spans
 		counts["logs"] += step.Cell.Logs
 		counts["metricPoints"] += step.Cell.MetricPoints
