@@ -863,43 +863,43 @@ Answers at `/api/ingest/otel/:sourceId`, `/api/v1/ingest/otel/:sourceId`.
 interface Params {
   sourceId: string;
 }
-// Rawbody: "bytes" (inline, src/transport/governance-ingest.rest.ts:34)
+// Rawbody: "bytes" (inline, src/transport/governance-ingest.rest.ts:35)
 type Headers = z.infer<typeof governanceIngestHeadersSchema>; // ../contract/src/features/ingestion/governance-ingest-rest.schemas.ts:27
 ```
 
 #### `POST /api/ingest/webhook/:sourceId` · `ingestSourceWebhook`
 
-Public: an ingestion source's bearer secret is resolved in-handler against IngestionSource, and the receiver answers OTLP's own partial-success body. Hidden from the OpenAPI document. Declared at `src/transport/governance-ingest.rest.ts:44`.
+Public: an ingestion source's bearer secret is resolved in-handler against IngestionSource, and the receiver answers OTLP's own partial-success body. Hidden from the OpenAPI document. Declared at `src/transport/governance-ingest.rest.ts:45`.
 
 Answers at `/api/ingest/webhook/:sourceId`, `/api/v1/ingest/webhook/:sourceId`.
 
 ```typescript
 type Params = z.infer<typeof governanceIngestSourceParamsSchema>; // ../contract/src/features/ingestion/governance-ingest-rest.schemas.ts:9
-// Rawbody: "text" (inline, src/transport/governance-ingest.rest.ts:46)
+// Rawbody: "text" (inline, src/transport/governance-ingest.rest.ts:48)
 type Headers = z.infer<typeof governanceIngestHeadersSchema>; // ../contract/src/features/ingestion/governance-ingest-rest.schemas.ts:27
 ```
 
 #### `POST /api/ingest/otel/:sourceId/v1/logs` · `ingestSourceOtlpLogs`
 
-Public: an ingestion source's bearer secret is resolved in-handler against IngestionSource, and the receiver answers OTLP's own partial-success body. Hidden from the OpenAPI document. Declared at `src/transport/governance-ingest.rest.ts:56`.
+Public: an ingestion source's bearer secret is resolved in-handler against IngestionSource, and the receiver answers OTLP's own partial-success body. Hidden from the OpenAPI document. Declared at `src/transport/governance-ingest.rest.ts:58`.
 
 Answers at `/api/ingest/otel/:sourceId/v1/logs`.
 
 ```typescript
 type Params = z.infer<typeof governanceIngestSourceParamsSchema>; // ../contract/src/features/ingestion/governance-ingest-rest.schemas.ts:9
-// Rawbody: "bytes" (inline, src/transport/governance-ingest.rest.ts:58)
+// Rawbody: "bytes" (inline, src/transport/governance-ingest.rest.ts:61)
 type Headers = z.infer<typeof governanceIngestHeadersSchema>; // ../contract/src/features/ingestion/governance-ingest-rest.schemas.ts:27
 ```
 
 #### `POST /api/ingest/otel/:sourceId/v1/metrics` · `ingestSourceOtlpMetrics`
 
-Public: an ingestion source's bearer secret is resolved in-handler against IngestionSource, and the receiver answers OTLP's own partial-success body. Hidden from the OpenAPI document. Declared at `src/transport/governance-ingest.rest.ts:68`.
+Public: an ingestion source's bearer secret is resolved in-handler against IngestionSource, and the receiver answers OTLP's own partial-success body. Hidden from the OpenAPI document. Declared at `src/transport/governance-ingest.rest.ts:71`.
 
 Answers at `/api/ingest/otel/:sourceId/v1/metrics`.
 
 ```typescript
 type Params = z.infer<typeof governanceIngestSourceParamsSchema>; // ../contract/src/features/ingestion/governance-ingest-rest.schemas.ts:9
-// Rawbody: "bytes" (inline, src/transport/governance-ingest.rest.ts:70)
+// Rawbody: "bytes" (inline, src/transport/governance-ingest.rest.ts:74)
 type Headers = z.infer<typeof governanceIngestHeadersSchema>; // ../contract/src/features/ingestion/governance-ingest-rest.schemas.ts:27
 ```
 
@@ -1748,7 +1748,7 @@ interface Input {
   kind: "personal" | "team";
   workspaceLabel?: string;
 }
-// Output: recordWorkspaceViewResultSchema, ../contract/src/admin-workspace-view-audit.ts:20
+// Output: recordWorkspaceViewResultSchema, ../contract/src/admin-workspace-view-audit.ts:34
 interface Output {
   recorded: boolean;
   auditLogId: string | null;
@@ -2126,15 +2126,26 @@ Declared at `src/eventing/coding-assistant-billing.pipeline.ts:52`. Events: `cod
 
 ### Pipeline `governance_activity_monitor` (aggregate `global`)
 
-Declared at `src/eventing/governance-activity-monitor.pipeline.ts:91`.
+Declared at `src/eventing/governance-activity-monitor.pipeline.ts:149`.
 
-| Kind            | Name                             | Handles                                                                                                                            | Declared at                                                |
-| --------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| process manager | `spendSpikeEvaluation`           | every 5 min (`SPEND_SPIKE_EVALUATION_INTERVAL_MS = 5 * 60 * 1000`); intents `pass` (outbox)                                        | `src/eventing/governance-activity-monitor.pipeline.ts:106` |
-| process manager | `anomalyAlertDelivery`           | every 1 d (`ANOMALY_ALERT_DELIVERY_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `pruneDelivered`, `requestDelivery` (outbox) | `src/eventing/governance-activity-monitor.pipeline.ts:123` |
-| process manager | `governanceTraceFacts`           | every 1 min (`GOVERNANCE_TRACE_FACTS_INTERVAL_MS = 60 * 1000`); intents `pass` (outbox)                                            | `src/eventing/governance-activity-monitor.pipeline.ts:140` |
-| peer subscriber | `seedDefaultAiToolCatalog`       | `lw.organization.created` from [organization](../../../../modules/organization/README.md)                                          | `src/eventing/governance-activity-monitor.pipeline.ts:96`  |
-| peer subscriber | `assignScimCostCenterDepartment` | `lw.scim.cost_center_changed` from [scim](../../scim/README.md)                                                                    | `src/eventing/governance-activity-monitor.pipeline.ts:101` |
+| Kind            | Name                                           | Handles                                                                                                                            | Declared at                                                |
+| --------------- | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| process manager | `spendSpikeEvaluation`                         | every 5 min (`SPEND_SPIKE_EVALUATION_INTERVAL_MS = 5 * 60 * 1000`); intents `pass` (outbox)                                        | `src/eventing/governance-activity-monitor.pipeline.ts:164` |
+| process manager | `anomalyAlertDelivery`                         | every 1 d (`ANOMALY_ALERT_DELIVERY_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `pruneDelivered`, `requestDelivery` (outbox) | `src/eventing/governance-activity-monitor.pipeline.ts:181` |
+| process manager | `governanceTraceFacts`                         | every 1 min (`GOVERNANCE_TRACE_FACTS_INTERVAL_MS = 60 * 1000`); intents `pass` (outbox)                                            | `src/eventing/governance-activity-monitor.pipeline.ts:198` |
+| process manager | `aggregateProjectReconcile`                    | every 1 d (`AGGREGATE_SWEEP_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `sweep`, `reconcile` (outbox)                             | `src/eventing/governance-activity-monitor.pipeline.ts:274` |
+| peer subscriber | `seedDefaultAiToolCatalog`                     | `lw.organization.created` from [organization](../../../../modules/organization/README.md)                                          | `src/eventing/governance-activity-monitor.pipeline.ts:154` |
+| peer subscriber | `assignScimCostCenterDepartment`               | `lw.scim.cost_center_changed` from [scim](../../scim/README.md)                                                                    | `src/eventing/governance-activity-monitor.pipeline.ts:159` |
+| peer subscriber | `reconcileAggregatesOnProjectCreated`          | `lw.project.created` from [project](../../../../modules/project/README.md)                                                         | `src/eventing/governance-activity-monitor.pipeline.ts:221` |
+| peer subscriber | `reconcileAggregatesOnProjectArchived`         | `lw.project.archived` from [project](../../../../modules/project/README.md)                                                        | `src/eventing/governance-activity-monitor.pipeline.ts:226` |
+| peer subscriber | `reconcileAggregatesOnDepartmentAssigned`      | `lw.project.department_assigned` from [project](../../../../modules/project/README.md)                                             | `src/eventing/governance-activity-monitor.pipeline.ts:231` |
+| peer subscriber | `reconcileAggregatesOnProjectRevived`          | `lw.project.revived` from [project](../../../../modules/project/README.md)                                                         | `src/eventing/governance-activity-monitor.pipeline.ts:236` |
+| peer subscriber | `reconcileAggregateOnRuleChanged`              | `lw.project.aggregate_rule_changed` from [project](../../../../modules/project/README.md)                                          | `src/eventing/governance-activity-monitor.pipeline.ts:241` |
+| peer subscriber | `reconcileAggregatesOnMemberRemoved`           | `lw.organization.member_removed` from [organization](../../../../modules/organization/README.md)                                   | `src/eventing/governance-activity-monitor.pipeline.ts:246` |
+| peer subscriber | `reconcileAggregatesOnMemberDepartmentChanged` | `lw.organization.member_department_changed` from [organization](../../../../modules/organization/README.md)                        | `src/eventing/governance-activity-monitor.pipeline.ts:251` |
+| peer subscriber | `reconcileAggregatesOnMemberDisabled`          | `lw.organization.member_disabled` from [organization](../../../../modules/organization/README.md)                                  | `src/eventing/governance-activity-monitor.pipeline.ts:257` |
+| peer subscriber | `reconcileAggregatesOnMemberEnabled`           | `lw.organization.member_enabled` from [organization](../../../../modules/organization/README.md)                                   | `src/eventing/governance-activity-monitor.pipeline.ts:263` |
+| peer subscriber | `auditAggregateRead`                           | `lw.authz.aggregate_read` from [authz](../../../../modules/authz/README.md)                                                        | `src/eventing/governance-activity-monitor.pipeline.ts:269` |
 
 ### Pipeline `ingestion_pull_reconcile` (aggregate `global`)
 
@@ -2181,7 +2192,7 @@ Declared at `src/eventing/pulled-usage.pipeline.ts:156`. Events: `pulledUsageObs
 
 | Kind   | Leaf                      | Environment variable                  | Declared at                               |
 | ------ | ------------------------- | ------------------------------------- | ----------------------------------------- |
-| secret | `–`                       | `GOVERNANCE_ERASURE_PSEUDONYM_SECRET` | `src/app/governance.app.ts:483`           |
+| secret | `–`                       | `GOVERNANCE_ERASURE_PSEUDONYM_SECRET` | `src/app/governance.app.ts:506`           |
 | config | `gatewayPublicUrl`        | `LW_GATEWAY_PUBLIC_URL`               | `../contract/src/governance.config.ts:33` |
 | config | `gatewayInternalUrl`      | `LW_GATEWAY_INTERNAL_URL`             | `../contract/src/governance.config.ts:34` |
 | config | `gatewayLegacyUrl`        | `LW_GATEWAY_BASE_URL`                 | `../contract/src/governance.config.ts:35` |
