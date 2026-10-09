@@ -318,7 +318,7 @@ type Output = z.infer<typeof codingAgentTranscriptSchema>; // ../contract/src/co
 
 // codingAgents.sessionGroups
 type Input = z.infer<typeof traceSessionGroupsInputSchema>; // ../../trace/contract/src/traces.trpc.ts:135
-type Output = z.infer<typeof tracesSessionsPageSchema>; // ../../trace/contract/src/trace.responses.ts:111
+type Output = z.infer<typeof tracesSessionsPageSchema>; // ../../trace/contract/src/trace.responses.ts:112
 ```
 
 ## Sockets
