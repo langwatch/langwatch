@@ -106,6 +106,53 @@ describe("DraggableTabsBrowserStore", () => {
       const secondTabId = state.windows[0]?.tabs[1]?.id;
       expect(state.windows[0]?.activeTabId).toBe(secondTabId);
     });
+
+    describe("when crypto.randomUUID is unavailable", () => {
+      const originalCrypto = globalThis.crypto;
+
+      beforeEach(() => {
+        // Pages served over plain HTTP keep getRandomValues but lose randomUUID.
+        vi.stubGlobal("crypto", {
+          getRandomValues: originalCrypto.getRandomValues.bind(originalCrypto),
+        });
+      });
+
+      afterEach(() => {
+        vi.stubGlobal("crypto", originalCrypto);
+      });
+
+      /** @scenario "Opening prompt tabs works without crypto.randomUUID" */
+      it("creates the first window and tab", () => {
+        store.getState().addTab({ data: createTabData() });
+
+        const [tabbedWindow] = store.getState().windows;
+        expect(tabbedWindow?.id).toMatch(/^window-./);
+        expect(tabbedWindow?.tabs[0]?.id).toMatch(/^tab-./);
+      });
+
+      /** @scenario "Opening prompt tabs works without crypto.randomUUID" */
+      it("adds a tab with its own id to the active window", () => {
+        store.getState().addTab({ data: createTabData() });
+        store.getState().addTab({ data: createTabData() });
+
+        const [firstTab, secondTab] = store.getState().windows[0]?.tabs ?? [];
+        expect(secondTab?.id).toMatch(/^tab-./);
+        expect(secondTab?.id).not.toBe(firstTab?.id);
+      });
+
+      /** @scenario "Opening prompt tabs works without crypto.randomUUID" */
+      it("splits a tab into a new window", () => {
+        store.getState().addTab({ data: createTabData() });
+        const tabId = store.getState().windows[0]?.tabs[0]?.id ?? "";
+
+        store.getState().splitTab({ tabId });
+
+        const [sourceWindow, newWindow] = store.getState().windows;
+        expect(newWindow?.id).toMatch(/^window-./);
+        expect(newWindow?.id).not.toBe(sourceWindow?.id);
+        expect(newWindow?.tabs[0]?.id).toMatch(/^tab-./);
+      });
+    });
   });
 
   describe("removeTab", () => {
