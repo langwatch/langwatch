@@ -107,6 +107,14 @@ Feature: haven seed fills a stack with every kind of data, at any size, without 
     And a malformed name, an unknown key, a plan that is not built yet or a user count out of range is refused naming --org
 
   @unit
+  Scenario: haven seed gives a test stack a second, a Free and an Enterprise org
+    When I run "haven seed --org name=sso-test-org,plan=licence,owner=admin@acme1.test --org name=free-test-org,plan=free,users=1 --org name=enterprise-test-org,plan=licence,persona=enterprise"
+    Then each licence org is issued an Enterprise licence signed by the stack's dev key, before its retention or members
+    And the free org gets no licence and holds no more full seats than the Free plan allows
+    And the sso-test-org owner is admin@acme1.test, so idpsim tenant 1 can be bound to it
+    And the seeded admin is a member of every one of them
+
+  @unit
   Scenario: haven seed --into sends telemetry into one existing project
     When I run "haven seed --into <org-id>/<project-id>"
     Then no user, org, project or membership is created

@@ -301,3 +301,65 @@ func TestConversationsShareOneIDAcrossTheirTurns(t *testing.T) {
 		}
 	}
 }
+
+// @scenario "haven seed gives a test stack a second, a Free and an Enterprise org"
+func TestTestStackOrgsCarryTheirPlans(t *testing.T) {
+	plan := mustPlan(t, "--size", "tiny", "--admin", "admin@example.test",
+		"--org", "name=sso-test-org,plan=licence,owner=admin@acme1.test",
+		"--org", "name=free-test-org,plan=free,users=1",
+		"--org", "name=enterprise-test-org,plan=licence,persona=enterprise")
+	licensed, members, owners := map[string]int{}, map[string][]string{}, map[string]string{}
+	created := map[string]bool{}
+	for step := range plan.Steps() {
+		a := step.Action
+		if a == nil {
+			continue
+		}
+		switch a.Kind {
+		case KindOrgCreate:
+			created[a.Ref] = true
+			owners[a.Ref] = a.As
+		case KindLicenseIssue:
+			if !created[a.Org] || len(members[a.Org]) > 0 || a.As != owners[a.Org] {
+				t.Fatalf("licence for %s must follow its org.create, as its owner, before any member", a.Org)
+			}
+			licensed[a.Org]++
+		case KindRetentionSet, KindProjectCreate:
+			if org := a.Org; plan.orgNamed(org).Plan == "licence" && licensed[org] != 1 {
+				t.Fatalf("%s %s runs before the org's licence", a.Kind, org)
+			}
+		case KindMemberAdd:
+			var input struct{ User string }
+			_ = json.Unmarshal(a.Input, &input)
+			members[a.Org] = append(members[a.Org], input.User)
+		}
+	}
+	want := map[string]int{"$org:sso-test-org": 1, "$org:free-test-org": 0, "$org:enterprise-test-org": 1}
+	for org, n := range want {
+		if licensed[org] != n {
+			t.Errorf("%s licences = %d, want %d", org, licensed[org], n)
+		}
+		if got := members[org]; len(got) == 0 || got[len(got)-1] != AdminRef {
+			t.Errorf("%s members %v: the seeded admin must join", org, got)
+		}
+	}
+	// FREE allows two full seats: the owner and the admin.
+	if got := members["$org:free-test-org"]; len(got) != 1 {
+		t.Errorf("free org admits %v beside its owner, want only the admin", got)
+	}
+	if owner := plan.orgNamed("$org:sso-test-org").Users[0]; owner.Email != "admin@acme1.test" {
+		t.Errorf("sso-test-org owner %s, want admin@acme1.test (idpsim tenant 1)", owner.Email)
+	}
+	if _, err := ParseFlags([]string{"--org", "name=acme,owner=nobody"}, anchor); !isFlagError(err, "org") {
+		t.Errorf("owner= without an email: want a refusal naming --org, got %v", err)
+	}
+}
+
+func (p *Plan) orgNamed(ref string) *Org {
+	for _, org := range p.Orgs {
+		if org.Ref == ref {
+			return org
+		}
+	}
+	return &Org{}
+}

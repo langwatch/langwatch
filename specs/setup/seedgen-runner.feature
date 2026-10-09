@@ -35,6 +35,13 @@ Feature: seed:apply applies seedgen's actions through installed module APIs
     And anything an earlier run created is found and returned instead of created again
 
   @unit
+  Scenario: A licence org is put on Enterprise through the licensing API
+    When seedgen sends a license.issue action for an organization
+    Then an Enterprise licence for that organization is signed by licensing with the stack's dev key and stored on it
+    And an organization already on a valid Enterprise licence keeps it and nothing is signed
+    And a licence licensing rejects is refused, so the org is never counted as Enterprise
+
+  @unit
   Scenario: A trace chunk older than 31 days asks the trace owner's backfill reach
     Given a trace.otlp action whose hour is 90 days ago
     When the action is applied

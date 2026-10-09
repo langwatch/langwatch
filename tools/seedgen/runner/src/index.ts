@@ -15,6 +15,7 @@ export function createTasks(app: BootedApplication): Task[] {
     user: app.service(seedApiTokens.user),
     organization: app.service(seedApiTokens.organization),
     project: app.service(seedApiTokens.project),
+    licensing: app.service(seedApiTokens.licensing),
   };
   return [new SeedApplyTask({ apis, input: process.stdin, output: process.stdout })];
 }
