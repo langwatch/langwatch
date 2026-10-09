@@ -24,6 +24,8 @@ import {
 export type StubAnalyticsHostOptions = {
   project?: AnalyticsHostProject | undefined;
   organizationId?: string | undefined;
+  /** "Acme" unless a test says otherwise. */
+  organizationName?: string | undefined;
   /** The signed-in member; "user-1" unless a test says otherwise. */
   userId?: string | undefined;
   permissions?: readonly string[];
@@ -33,6 +35,16 @@ export type StubAnalyticsHostOptions = {
   flags?: Readonly<Record<string, boolean | undefined>>;
   route?: AnalyticsRouteReading;
 };
+
+/** A member who reads and edits analytics; a test of a narrower role names its own grants. */
+export const ANALYTICS_MEMBER_PERMISSIONS: readonly string[] = [
+  "analytics:view",
+  "analytics:create",
+  "analytics:update",
+  "analytics:delete",
+  "cost:view",
+  "traces:view",
+];
 
 /** A host that answers from fixtures and records everything it is told. */
 export class StubAnalyticsHost extends AnalyticsHostApi {
@@ -64,14 +76,16 @@ export class StubAnalyticsHost extends AnalyticsHostApi {
     return "organizationId" in this.options ? this.options.organizationId : "org-1";
   }
 
+  organizationName(): string | undefined {
+    return "organizationName" in this.options ? this.options.organizationName : "Acme";
+  }
+
   userId(): string | undefined {
     return "userId" in this.options ? this.options.userId : "user-1";
   }
 
   hasPermission(permission: string): boolean {
-    return (this.options.permissions ?? ["analytics:view", "cost:view", "traces:view"]).includes(
-      permission,
-    );
+    return (this.options.permissions ?? ANALYTICS_MEMBER_PERMISSIONS).includes(permission);
   }
 
   isSettled(): boolean {

@@ -36,6 +36,7 @@ import { analyticsApi } from "./analytics-api.ts";
 class CapabilityAnalyticsHost extends AnalyticsHostApi {
   private readonly project_: AnalyticsHostProject | undefined;
   private readonly organizationId_: string | undefined;
+  private readonly organizationName_: string | undefined;
   private readonly session: UiSession;
   private readonly flags: Readonly<Record<AnalyticsReleaseFlag, boolean | undefined>>;
   private readonly routeCapability: UiRoute;
@@ -46,6 +47,7 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
   constructor({
     project_,
     organizationId_,
+    organizationName_,
     session,
     flags,
     routeCapability,
@@ -55,6 +57,7 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
   }: {
     project_: AnalyticsHostProject | undefined;
     organizationId_: string | undefined;
+    organizationName_: string | undefined;
     session: UiSession;
     flags: Readonly<Record<AnalyticsReleaseFlag, boolean | undefined>>;
     routeCapability: UiRoute;
@@ -65,6 +68,7 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
     super();
     this.project_ = project_;
     this.organizationId_ = organizationId_;
+    this.organizationName_ = organizationName_;
     this.session = session;
     this.flags = flags;
     this.routeCapability = routeCapability;
@@ -79,6 +83,10 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
 
   organizationId(): string | undefined {
     return this.organizationId_;
+  }
+
+  organizationName(): string | undefined {
+    return this.organizationName_;
   }
 
   userId(): string | undefined {
@@ -156,6 +164,7 @@ export default function AnalyticsHostMount({ children }: { children?: ReactNode 
   const scopeProjectId = scopeProject?.id;
   const scopeProjectSlug = scopeProject?.slug;
   const scopeProjectName = scopeProject?.name;
+  const scopeOrganizationName = session.snapshot().scope.organization?.name;
 
   const firstMessage = analyticsApi.project.getHasFirstMessage.useQuery(
     { projectId: scopeProjectId ?? "" },
@@ -179,6 +188,7 @@ export default function AnalyticsHostMount({ children }: { children?: ReactNode 
               }
             : void 0,
         organizationId_: organizationId ?? void 0,
+        organizationName_: scopeOrganizationName,
         session,
         flags: { release_dashboards: dashboardsFlag, release_langy_enabled: langyFlag },
         routeCapability: route,
@@ -193,6 +203,7 @@ export default function AnalyticsHostMount({ children }: { children?: ReactNode 
       hasFirstMessage,
       projectId,
       organizationId,
+      scopeOrganizationName,
       session,
       dashboardsFlag,
       langyFlag,

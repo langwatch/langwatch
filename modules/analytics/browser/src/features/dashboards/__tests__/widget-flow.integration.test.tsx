@@ -15,11 +15,15 @@ import { useEffect, useReducer } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import type { AnalyticsRouteReading } from "../../../model/analytics-host.ts";
-import { StubAnalyticsHost, type StubAnalyticsHostOptions } from "../../../testing.tsx";
+import {
+  ANALYTICS_MEMBER_PERMISSIONS,
+  StubAnalyticsHost,
+  type StubAnalyticsHostOptions,
+} from "../../../testing.tsx";
 import { PICKER_QUESTIONS, pickerWidgets } from "../catalogue/index.ts";
 import { WIDGET_AGENT_DOCS_URL, widgetCreatePrompt } from "../model/widget-api.ts";
 import DashboardBoardScreen from "../ui/sections/dashboard-board.screen.tsx";
-import { NO_PROCEDURES, renderDashboards } from "./render-dashboards.test-helpers.tsx";
+import { HOME_BOARD, NO_PROCEDURES, renderDashboards } from "./render-dashboards.test-helpers.tsx";
 
 type Input = Record<string, unknown>;
 type Widget = {
@@ -34,6 +38,7 @@ type Widget = {
 };
 
 const BOARD = {
+  ...HOME_BOARD,
   id: "board-1",
   name: "Weekly review",
   description: null,
@@ -131,7 +136,7 @@ function inMemoryServer() {
 type Server = ReturnType<typeof inMemoryServer>;
 
 const LANGY_ON = { release_dashboards: true, release_langy_enabled: true };
-const MEMBER = ["analytics:view", "cost:view", "traces:view"];
+const MEMBER = [...ANALYTICS_MEMBER_PERMISSIONS];
 const LANGY_MEMBER = [...MEMBER, "langy:create"];
 
 /** The host double, with an address that follows each query write as the router's does. */

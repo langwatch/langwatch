@@ -12,6 +12,9 @@ import type {
 import type { DashboardWidgetSource } from "@langwatch/analytics-contract/dashboard-widget-definition";
 import { createModuleApi, type ContractApiMap, type WireOf } from "@langwatch/api/web";
 import type {
+  DashboardScope,
+  DashboardScopeImpact,
+  DashboardScopeProjects,
   DashboardSourcePresence,
   DashboardStar,
   dashboardTrpcRowSchema,
@@ -175,7 +178,13 @@ type BorrowedProcedures = {
     };
   };
   dashboards: {
-    getAll: { query: { input: ProjectScope; output: DashboardSummaryRow[] } };
+    getAll: {
+      query: {
+        /** `includeOrganization` adds the Organization boards other projects own. */
+        input: ProjectScope & { includeOrganization?: boolean };
+        output: DashboardSummaryRow[];
+      };
+    };
     getById: {
       query: {
         input: ProjectScope & { dashboardId: string };
@@ -216,6 +225,18 @@ type BorrowedProcedures = {
         };
         output: DashboardRow;
       };
+    };
+    setScope: {
+      mutation: {
+        input: ProjectScope & { dashboardId: string; scope: DashboardScope };
+        output: DashboardRow;
+      };
+    };
+    scopeImpact: {
+      query: { input: ProjectScope & { dashboardId: string }; output: DashboardScopeImpact };
+    };
+    scopeProjects: {
+      query: { input: ProjectScope & { dashboardId: string }; output: DashboardScopeProjects };
     };
     listStarred: {
       query: { input: ProjectScope; output: StarredDashboardRow[] };
@@ -292,7 +313,13 @@ type BorrowedProcedures = {
     };
   };
   dashboardWidgets: {
-    list: { query: { input: ProjectScope; output: DashboardWidgetRow[] } };
+    list: {
+      query: {
+        /** With `dashboardId`: that board's widgets, read from the project that owns it. */
+        input: ProjectScope & { dashboardId?: string };
+        output: DashboardWidgetRow[];
+      };
+    };
     create: {
       mutation: {
         input: ProjectScope & {

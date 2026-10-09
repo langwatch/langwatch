@@ -32,10 +32,11 @@ export function BoardWidgetsGrid({
   isWriting: boolean;
   /** What each card may ask Langy; absent when Langy is not available. */
   langyFor?: (widget: BoardWidget) => WidgetCardLangy;
-  onEdit: (input: { widget: BoardWidget; withLangy: boolean }) => void;
-  onDuplicate: (widget: BoardWidget) => void;
-  onDelete: (widget: BoardWidget) => void;
-  onPlacementsCommit: (placements: ChartGridPlacement[]) => void;
+  /** These four are absent on a board the reader cannot edit: the grid is then view-only. */
+  onEdit?: (input: { widget: BoardWidget; withLangy: boolean }) => void;
+  onDuplicate?: (widget: BoardWidget) => void;
+  onDelete?: (widget: BoardWidget) => void;
+  onPlacementsCommit?: (placements: ChartGridPlacement[]) => void;
 }) {
   const byId = new Map(widgets.map((widget) => [widget.id, widget]));
 
@@ -57,9 +58,9 @@ export function BoardWidgetsGrid({
             period={period}
             isWriting={isWriting}
             {...(langyFor ? { langy: langyFor(widget) } : {})}
-            onEdit={({ withLangy }) => onEdit({ widget, withLangy })}
-            onDuplicate={() => onDuplicate(widget)}
-            onDelete={() => onDelete(widget)}
+            onEdit={onEdit && (({ withLangy }) => onEdit({ widget, withLangy }))}
+            onDuplicate={onDuplicate && (() => onDuplicate(widget))}
+            onDelete={onDelete && (() => onDelete(widget))}
           />
         );
       }}

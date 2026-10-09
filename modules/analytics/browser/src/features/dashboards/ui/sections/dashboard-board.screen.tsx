@@ -1,12 +1,12 @@
 /**
- * One stored board: its header, the ask bar, its widgets on the grid or the one empty board
- * view, and its one widget editor. "Add a widget", the footer and typing in the ask bar open
- * the picker, whose "I'll build it myself" opens the editor on a new widget.
+ * One stored board: its header with its scope, the ask bar, its widgets or the one empty board
+ * view, and its one widget editor, opened from the picker that "Add a widget" and the ask bar
+ * open. A reader who cannot edit the board gets it view-only; their copy is the sidebar's to make.
  * @see modules/dashboard/specs/dashboards-v2.feature and dashboards-widget-flow.feature
  */
 
 import { UiPageLoading, UiPageNotFound } from "@langwatch/browser/page-fallbacks";
-import { Button, Spinner, VStack } from "@langwatch/design-system/primitives";
+import { Button, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import { HandledErrorAlert } from "@langwatch/error-views";
 import { Plus } from "lucide-react";
 
@@ -21,9 +21,12 @@ import {
   useBlockPickerAddress,
   WIDGET_PICKER_QUERY_KEY,
 } from "../../behavior/use-block-picker-address.ts";
+import { useBoardAccess } from "../../behavior/use-board-access.ts";
 import { useBoardDescription } from "../../behavior/use-board-description.ts";
 import { useBoardEditor } from "../../behavior/use-board-editor.ts";
 import { useBoardPeriod } from "../../behavior/use-board-period.ts";
+import { useBoardProjects } from "../../behavior/use-board-projects.ts";
+import { useBoardScope } from "../../behavior/use-board-scope.ts";
 import { useBoardWidgets } from "../../behavior/use-board-widgets.ts";
 import { type SavedBoard, useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
 import { useLangyAsk } from "../../langy/behavior/use-board-langy.ts";
@@ -40,16 +43,47 @@ import { AddBlockCard, EmptyBoard } from "../blocks/blank-board.tsx";
 import { BoardHeader } from "../blocks/board-header.tsx";
 import { BoardPage } from "../blocks/board-page.tsx";
 import { BoardPeriodControl } from "../blocks/board-period-control.tsx";
+import { BoardProjectChip } from "../blocks/board-project-chip.tsx";
+import { BoardScopeControl } from "../blocks/board-scope-control.tsx";
+import { BoardUnavailable } from "../blocks/board-unavailable.tsx";
+import { ScopeConfirmDialog } from "../blocks/scope-confirm-dialog.tsx";
 import { BlockPickerDialog } from "./block-picker-dialog.tsx";
 import { BoardWidgetEditor } from "./board-widget-editor.tsx";
 import { BoardWidgetsGrid } from "./board-widgets-grid.tsx";
 import { DashboardsGate } from "./dashboards-gate.tsx";
 
+/** The header's one action on a board the reader may edit. */
+function AddWidgetButton({ onClick }: { onClick: () => void }) {
+  return (
+    <Button
+      variant="outline"
+      height={8}
+      paddingX={3}
+      gap={1.5}
+      borderRadius="lg"
+      borderColor="border"
+      fontSize="13px"
+      fontWeight="medium"
+      _hover={{ borderColor: "border.emphasized", background: "bg.muted" }}
+      onClick={onClick}
+    >
+      <Plus size={15} strokeWidth={2} /> Add a widget
+    </Button>
+  );
+}
+
 function OpenBoard({ board }: { board: SavedBoard }) {
   const host = useAnalyticsHost();
   const projectId = host.project()?.id ?? "";
   const saved = useSavedDashboards();
-  const boardWidgets = useBoardWidgets({ dashboardId: board.id });
+  const { access, names } = useBoardAccess(board);
+  const { canEdit } = access;
+  const scope = useBoardScope();
+  const projects = useBoardProjects({ board });
+  const boardWidgets = useBoardWidgets({
+    dashboardId: board.id,
+    isOwnedElsewhere: !access.isHome,
+  });
   const { description, saveDescription } = useBoardDescription({
     dashboardId: board.id,
     stored: board.description,
@@ -83,23 +117,28 @@ function OpenBoard({ board }: { board: SavedBoard }) {
         <BoardHeader
           name={board.name}
           description={description}
-          onDescribe={isMyDashboard ? void 0 : saveDescription}
-          action={
-            <Button
-              variant="outline"
-              height={8}
-              paddingX={3}
-              gap={1.5}
-              borderRadius="lg"
-              borderColor="border"
-              fontSize="13px"
-              fontWeight="medium"
-              _hover={{ borderColor: "border.emphasized", background: "bg.muted" }}
-              onClick={() => openPicker()}
-            >
-              <Plus size={15} strokeWidth={2} /> Add a widget
-            </Button>
+          scope={
+            <BoardScopeControl
+              scope={board.scope}
+              lock={access.scopeLock}
+              names={names}
+              onPick={(to) => scope.request({ board, names, to })}
+            />
           }
+          onDescribe={canEdit && !isMyDashboard ? saveDescription : void 0}
+          action={canEdit ? <AddWidgetButton onClick={openPicker} /> : null}
+          {...(projects.isShared
+            ? {
+                project: (
+                  <BoardProjectChip
+                    current={projects.current}
+                    ownerProject={projects.ownerProject}
+                    projects={projects.projects}
+                    onPick={projects.openIn}
+                  />
+                ),
+              }
+            : {})}
           periodControl={
             <BoardPeriodControl
               range={range}
@@ -117,8 +156,8 @@ function OpenBoard({ board }: { board: SavedBoard }) {
       <BoardLangy
         board={subject}
         period={period}
-        withSuggestions={isEmpty}
-        onOpenPicker={openPicker}
+        withSuggestions={isEmpty && canEdit}
+        {...(canEdit ? { onOpenPicker: openPicker } : {})}
       />
       {boardWidgets.status === "pending" && <Spinner size="sm" />}
       {boardWidgets.status === "error" && (
@@ -127,7 +166,12 @@ function OpenBoard({ board }: { board: SavedBoard }) {
           fallbackTitle="This dashboard could not load its widgets"
         />
       )}
-      {isEmpty && (
+      {isEmpty && !canEdit && (
+        <Text fontSize="13px" color="fg.muted">
+          This dashboard has no widgets yet.
+        </Text>
+      )}
+      {isEmpty && canEdit && (
         <EmptyBoard
           boards={CURATED_BOARDS}
           boardHref={({ templateId }) =>
@@ -160,17 +204,22 @@ function OpenBoard({ board }: { board: SavedBoard }) {
                       })
                     : undefined
                 }
-                onEdit={editor.open}
-                onDuplicate={(widget) => void boardWidgets.duplicateWidget(widget)}
-                onDelete={(widget) => void boardWidgets.removeWidget(widget)}
-                onPlacementsCommit={(placements) => void boardWidgets.commitPlacements(placements)}
+                {...(canEdit
+                  ? {
+                      onEdit: editor.open,
+                      onDuplicate: (widget) => void boardWidgets.duplicateWidget(widget),
+                      onDelete: (widget) => void boardWidgets.removeWidget(widget),
+                      onPlacementsCommit: (placements) =>
+                        void boardWidgets.commitPlacements(placements),
+                    }
+                  : {})}
               />
-              <AddBlockCard onClick={() => openPicker()} />
+              {canEdit && <AddBlockCard onClick={() => openPicker()} />}
             </VStack>
           </DashboardRefreshedAtContext.Provider>
         </DashboardRefetchIntervalContext.Provider>
       )}
-      {picker.isOpen && (
+      {canEdit && picker.isOpen && (
         <BlockPickerDialog
           board={subject}
           period={period}
@@ -181,7 +230,7 @@ function OpenBoard({ board }: { board: SavedBoard }) {
           onClose={picker.close}
         />
       )}
-      {editor.editing && (
+      {canEdit && editor.editing && (
         <BoardWidgetEditor
           key={editor.editing.widget?.id ?? "new"}
           widget={editor.editing.widget}
@@ -196,16 +245,25 @@ function OpenBoard({ board }: { board: SavedBoard }) {
           onSave={(edited) => void saveEdited(edited)}
         />
       )}
+      <ScopeConfirmDialog
+        words={scope.asking}
+        isChanging={scope.isChanging}
+        onConfirm={scope.confirm}
+        onCancel={scope.cancel}
+      />
     </BoardPage>
   );
 }
 
 function Board() {
   const dashboardId = useAnalyticsHost().route().params.dashboardId;
-  const { boards, isLoading } = useSavedDashboards();
+  const { boards, organizationBoards, isLoading, loadError } = useSavedDashboards();
   if (isLoading) return <UiPageLoading />;
-  const board = boards.find(({ id }) => id === dashboardId);
-  if (!board) return <UiPageNotFound />;
+  // A member the list refuses sees the page the flag being off shows (AC21).
+  if (loadError) return <UiPageNotFound />;
+  const board = [...boards, ...organizationBoards].find(({ id }) => id === dashboardId);
+  // A deleted board and one set to Only me read the same: the server tells neither apart.
+  if (!board) return <BoardUnavailable />;
   // Keyed so a board's in-flight edits never leak into the next board.
   return <OpenBoard key={board.id} board={board} />;
 }

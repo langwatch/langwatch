@@ -52,12 +52,22 @@ function withHidden({
   return next;
 }
 
-export function useBoardWidgets({ dashboardId }: { dashboardId: string }) {
+export function useBoardWidgets({
+  dashboardId,
+  isOwnedElsewhere = false,
+}: {
+  dashboardId: string;
+  /** An Organization board another project owns: read by board, from where it is stored. */
+  isOwnedElsewhere?: boolean;
+}) {
   const host = useAnalyticsHost();
   const projectId = host.project()?.id ?? "";
   const utils = analyticsApi.useUtils();
 
-  const list = analyticsApi.dashboardWidgets.list.useQuery({ projectId }, { enabled: !!projectId });
+  const list = analyticsApi.dashboardWidgets.list.useQuery(
+    isOwnedElsewhere ? { projectId, dashboardId } : { projectId },
+    { enabled: !!projectId },
+  );
   const create = analyticsApi.dashboardWidgets.create.useMutation();
   const update = analyticsApi.dashboardWidgets.update.useMutation();
   const updateLayout = analyticsApi.dashboardWidgets.updateLayout.useMutation();

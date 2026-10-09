@@ -1,9 +1,10 @@
 /**
  * One board in the Dashboards sidebar: a star that toggles it, one truncated line linking to
- * it, and a "⋮" menu. A stored board offers Star, Move up and Move down while starred,
- * Rename, Duplicate and Delete; a From LangWatch board offers Star and Duplicate to edit.
+ * it with its scope mark, and a "⋮" menu. A stored board offers Star and its order, then what
+ * this reader may do with it; a From LangWatch board offers Star and Duplicate to edit.
  */
 
+import type { DashboardScope } from "@langwatch/dashboard-contract";
 import { Menu } from "@langwatch/design-system/menu";
 import {
   Box,
@@ -27,8 +28,10 @@ import type { ReactNode } from "react";
 
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { opensElsewhere } from "../../../../ui/elements/analytics-menu-link.tsx";
+import type { ScopeNames } from "../../model/board-scope.ts";
 import { BoardStar } from "../elements/board-star.tsx";
 import { InlineTextField } from "../elements/inline-text-field.tsx";
+import { ScopeChoices } from "./board-scope-control.tsx";
 
 /** Star and order, shared by both kinds of row. */
 export type StarActions = {
@@ -38,49 +41,74 @@ export type StarActions = {
   move?: { onMoveUp?: () => void; onMoveDown?: () => void };
 };
 
+/**
+ * What the menu offers below the star. An entry left out is not shown: a reader who cannot
+ * edit the board sees no Rename and no Delete, and only its author sees its scope.
+ */
 export type SavedDashboardRowActions = StarActions & {
   isRenaming: boolean;
-  /** Absent for My dashboard, whose name marks it as the member's own. */
-  onRenameStart?: () => void;
+  /** The three scope choices, for the author in the project that owns the board. */
+  scope?: { value: DashboardScope; names: ScopeNames; onPick: (scope: DashboardScope) => void };
+  /** `onStart` is absent for My dashboard, whose name marks it as the member's own. */
+  rename?: { onStart?: () => void };
   onRenameCommit: (name: string) => void;
   onRenameCancel: () => void;
-  onDuplicate: () => void;
-  /** Absent for My dashboard, which cannot be deleted. */
-  onDelete?: () => void;
+  /** "Duplicate", or "Duplicate to edit" on a board this reader cannot edit. */
+  duplicate?: { label: string; onDuplicate: () => void };
+  /** `onDelete` is absent for My dashboard, which cannot be deleted. */
+  remove?: { onDelete?: () => void };
 };
 
 export function SavedDashboardRow({
   name,
   href,
   isActive,
+  mark,
   actions,
 }: {
   name: string;
   href: string;
   isActive: boolean;
+  /** The scope mark after the name: a lock or a building, none on a Project board. */
+  mark?: ReactNode;
   actions: SavedDashboardRowActions;
 }) {
   if (actions.isRenaming) return <RenameField name={name} actions={actions} />;
+  const { scope, rename, duplicate, remove } = actions;
   return (
-    <SidebarRow name={name} href={href} isActive={isActive} star={actions}>
+    <SidebarRow name={name} href={href} isActive={isActive} star={actions} mark={mark}>
       <StarItems name={name} actions={actions} />
-      <Menu.Separator />
-      <Menu.Item value="rename" disabled={!actions.onRenameStart} onClick={actions.onRenameStart}>
-        <MenuRow icon={<Pencil size={13} />}>Rename</MenuRow>
-      </Menu.Item>
-      <Menu.Item value="duplicate" onClick={actions.onDuplicate}>
-        <MenuRow icon={<Copy size={13} />}>Duplicate</MenuRow>
-      </Menu.Item>
-      <Menu.Separator />
-      <Menu.Item
-        value="delete"
-        color={actions.onDelete ? "red.fg" : void 0}
-        disabled={!actions.onDelete}
-        title={actions.onDelete ? void 0 : "Your own dashboard can't be deleted"}
-        onClick={actions.onDelete}
-      >
-        <MenuRow icon={<Trash2 size={13} />}>Delete</MenuRow>
-      </Menu.Item>
+      {scope && (
+        <>
+          <Menu.Separator />
+          <ScopeChoices scope={scope.value} names={scope.names} onPick={scope.onPick} />
+        </>
+      )}
+      {(rename || duplicate) && <Menu.Separator />}
+      {rename && (
+        <Menu.Item value="rename" disabled={!rename.onStart} onClick={rename.onStart}>
+          <MenuRow icon={<Pencil size={13} />}>Rename</MenuRow>
+        </Menu.Item>
+      )}
+      {duplicate && (
+        <Menu.Item value="duplicate" onClick={duplicate.onDuplicate}>
+          <MenuRow icon={<Copy size={13} />}>{duplicate.label}</MenuRow>
+        </Menu.Item>
+      )}
+      {remove && (
+        <>
+          <Menu.Separator />
+          <Menu.Item
+            value="delete"
+            color={remove.onDelete ? "red.fg" : void 0}
+            disabled={!remove.onDelete}
+            title={remove.onDelete ? void 0 : "Your own dashboard can't be deleted"}
+            onClick={remove.onDelete}
+          >
+            <MenuRow icon={<Trash2 size={13} />}>Delete</MenuRow>
+          </Menu.Item>
+        </>
+      )}
     </SidebarRow>
   );
 }
@@ -144,12 +172,14 @@ function SidebarRow({
   href,
   isActive,
   star,
+  mark,
   children,
 }: {
   name: string;
   href: string;
   isActive: boolean;
   star: StarActions;
+  mark?: ReactNode;
   /** The menu's items. */
   children: ReactNode;
 }) {
@@ -191,6 +221,7 @@ function SidebarRow({
         <Text as="span" truncate minWidth={0}>
           {name}
         </Text>
+        {mark}
         <Box width="24px" flexShrink={0} marginLeft="auto" />
       </ChakraLink>
       <Box

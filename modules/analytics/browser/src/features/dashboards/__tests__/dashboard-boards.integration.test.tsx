@@ -12,19 +12,20 @@ import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { StubAnalyticsHost } from "../../../testing.tsx";
+import { ANALYTICS_MEMBER_PERMISSIONS, StubAnalyticsHost } from "../../../testing.tsx";
 import { AGENT_KIND_CHIP_LABELS, PICKER_QUESTIONS, PICKER_SECTIONS } from "../catalogue/index.ts";
 import { boardSubject } from "../langy/model/board-langy.ts";
 import { BlockPickerDialog } from "../ui/sections/block-picker-dialog.tsx";
 import DashboardBoardScreen from "../ui/sections/dashboard-board.screen.tsx";
 import { SavedDashboardsSection } from "../ui/sections/saved-dashboards-section.tsx";
 import {
+  HOME_BOARD,
   NO_PROCEDURES,
   recordWidgetFrames,
   renderDashboards,
 } from "./render-dashboards.test-helpers.tsx";
 
-type Board = {
+type Board = typeof HOME_BOARD & {
   id: string;
   name: string;
   description: string | null;
@@ -112,6 +113,7 @@ function inMemoryServer({
         return Promise.resolve(state.boards.map((each) => ({ ...each })));
       case "dashboards.create": {
         const created: Board = {
+          ...HOME_BOARD,
           id: `board-new-${state.boards.length + 1}`,
           name: String(input.name),
           description: null,
@@ -223,10 +225,11 @@ const rowButtons = () =>
 
 const FLAG_ON = { release_dashboards: true };
 const LANGY_ON = { release_dashboards: true, release_langy_enabled: true };
-const MEMBER = ["analytics:view", "cost:view", "traces:view"];
+const MEMBER = [...ANALYTICS_MEMBER_PERMISSIONS];
 const LANGY_MEMBER = [...MEMBER, "langy:create"];
 const OWN_BOARDS: Board[] = [
   {
+    ...HOME_BOARD,
     id: "board-1",
     name: "Weekly review",
     description: null,
@@ -235,6 +238,7 @@ const OWN_BOARDS: Board[] = [
     updatedAt: new Date("2026-01-01"),
   },
   {
+    ...HOME_BOARD,
     id: "board-2",
     name: "Latency",
     description: null,
@@ -935,8 +939,8 @@ describe("a member's board", () => {
   });
 
   describe("given any board with the sidebar beside it", () => {
-    /** @scenario "AC159 No sharing control appears anywhere" */
-    it("offers no visibility or share control in the header or the sidebar menu", async () => {
+    /** @scenario "AC107 Sidebar menu: each board offers its actions in order" */
+    it("offers no Share action in the header or the sidebar menu", async () => {
       const user = userEvent.setup({ pointerEventsCheck: 0 });
       const server = inMemoryServer({ boards: STARRED_BOARDS });
       openBoard({ server, withSidebar: true });
@@ -946,7 +950,6 @@ describe("a member's board", () => {
 
       expect(screen.queryByRole("menuitem", { name: /share|default/i })).toBeNull();
       expect(screen.queryByRole("button", { name: /visibility|share/i })).toBeNull();
-      expect(screen.queryByText(/only me|organisation/i)).toBeNull();
     });
   });
 

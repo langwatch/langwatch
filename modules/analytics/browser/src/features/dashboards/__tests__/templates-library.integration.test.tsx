@@ -9,7 +9,11 @@ import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/re
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { renderWithAnalyticsHost, StubAnalyticsHost } from "../../../testing.tsx";
+import {
+  ANALYTICS_MEMBER_PERMISSIONS,
+  renderWithAnalyticsHost,
+  StubAnalyticsHost,
+} from "../../../testing.tsx";
 import {
   AGENT_KIND_CHIP_LABELS,
   CATALOGUE_TEMPLATES,
@@ -26,7 +30,7 @@ import {
 } from "../model/template-library.ts";
 import { TemplatePreview } from "../ui/blocks/template-preview.tsx";
 import TemplatesLibraryScreen from "../ui/sections/templates-library.screen.tsx";
-import { NO_PROCEDURES, renderDashboards } from "./render-dashboards.test-helpers.tsx";
+import { HOME_BOARD, NO_PROCEDURES, renderDashboards } from "./render-dashboards.test-helpers.tsx";
 
 /** Boards and widgets from memory; every call is kept. */
 function inMemoryServer({ boards = [] }: { boards?: { id: string; name: string }[] } = {}) {
@@ -38,6 +42,7 @@ function inMemoryServer({ boards = [] }: { boards?: { id: string; name: string }
       case "dashboards.getAll":
         return Promise.resolve(
           state.boards.map((board) => ({
+            ...HOME_BOARD,
             ...board,
             description: null,
             createdById: "user-1",
@@ -63,7 +68,7 @@ function inMemoryServer({ boards = [] }: { boards?: { id: string; name: string }
 }
 
 const LANGY_ON = { release_dashboards: true, release_langy_enabled: true };
-const LANGY_MEMBER = ["analytics:view", "cost:view", "traces:view", "langy:create"];
+const LANGY_MEMBER = [...ANALYTICS_MEMBER_PERMISSIONS, "langy:create"];
 const POOL = finderPool({});
 const READY = POOL[0]!.board;
 

@@ -1,6 +1,7 @@
 /**
- * A board's header: title (badged on a From LangWatch board) and one action, then the
- * description and period. Star and rename live in the sidebar.
+ * A board's header: title (badged on a From LangWatch board, with its scope on a stored one)
+ * and one action, then the description, the Project chip of an Organization board and the
+ * period. Star and rename live in the sidebar.
  */
 
 import {
@@ -21,17 +22,24 @@ export function BoardHeader({
   name,
   description,
   isFromLangWatch = false,
+  scope,
   onDescribe,
   action,
+  project,
   periodControl,
 }: {
   name: string;
   description: string;
   /** A live From LangWatch template rather than a stored board. */
   isFromLangWatch?: boolean;
+  /** A stored board's scope control, beside the title. */
+  scope?: ReactNode;
+  /** Absent where the reader cannot edit the board. */
   onDescribe?: (description: string) => void;
-  /** "Add a widget" on a stored board, "Duplicate to edit" on a template board. */
+  /** "Add a widget" on a board the reader may edit; null where there is nothing to offer. */
   action: ReactNode;
+  /** The Project chip of an Organization board: whose data it shows. */
+  project?: ReactNode;
   periodControl: ReactNode;
 }) {
   return (
@@ -49,12 +57,14 @@ export function BoardHeader({
             {name}
           </Heading>
           {isFromLangWatch && <FromLangWatchBadge />}
+          {scope}
         </HStack>
         <Box flexShrink={0}>{action}</Box>
       </HStack>
       <HStack columnGap={4} rowGap={2} flexWrap="wrap">
         <BoardDescription description={description} onDescribe={onDescribe} />
         <Spacer />
+        {project}
         {periodControl}
       </HStack>
     </VStack>

@@ -1,6 +1,7 @@
 /**
- * A new board for the whole project, filled and opened: from a template, "Duplicate" or
- * "Duplicate to edit". No procedure copies a board; a failure removes the half-made one.
+ * A new board in the project in view, at the scope Project, filled and opened: from a
+ * template, "Duplicate" or "Duplicate to edit". No procedure copies a board; a failure removes
+ * the half-made one.
  */
 
 import type { DashboardWidgetSource } from "@langwatch/analytics-contract/dashboard-widget-definition";
@@ -146,7 +147,10 @@ export function useBoardFromTemplate() {
       fallbackTitle: "Couldn't create the dashboard from the template",
     });
 
-  /** Copies the board and every widget on it as "<name> copy", then opens the copy. */
+  /**
+   * Copies the board and every widget on it as "<name> copy", then opens the copy. The widgets
+   * are read by board, so one another project owns is copied from where it is stored.
+   */
   const duplicateBoard = ({
     board,
     existingNames,
@@ -161,7 +165,10 @@ export function useBoardFromTemplate() {
         description: board.description,
         widgetSource: ({ definition }) => definition.source,
         widgets: async () => {
-          const stored = await utils.dashboardWidgets.list.fetch({ projectId });
+          const stored = await utils.dashboardWidgets.list.fetch({
+            projectId,
+            dashboardId: board.id,
+          });
           return boardCopyWidgets(boardWidgetsOf({ widgets: stored, dashboardId: board.id }));
         },
       },

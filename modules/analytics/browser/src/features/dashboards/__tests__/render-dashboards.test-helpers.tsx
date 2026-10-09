@@ -14,6 +14,14 @@ import type { ReactElement } from "react";
 import { analyticsApi } from "../../../behavior/analytics-api.ts";
 import { AnalyticsTestHarness, type StubAnalyticsHost } from "../../../testing.tsx";
 
+/** What a board row carries when the project in view ("proj-1") owns it, at the scope Project. */
+export const HOME_BOARD = {
+  projectId: "proj-1",
+  scope: "PROJECT",
+  organizationId: null,
+  ownerProject: null,
+} as const;
+
 /** An answer for a test that expects no procedure to run: any call fails by name. */
 export const NO_PROCEDURES: UiProcedureAnswer = ({ path }) =>
   Promise.reject(new Error(`No test answer for ${path}`));

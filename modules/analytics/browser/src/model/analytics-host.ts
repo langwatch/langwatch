@@ -86,6 +86,9 @@ export abstract class AnalyticsHostApi {
   /** The organization the project sits in, for reads scoped above a project. */
   abstract organizationId(): string | undefined;
 
+  /** That organization's name, as a sentence about the whole organization says it. */
+  abstract organizationName(): string | undefined;
+
   /** The signed-in member's id, or undefined before the session has one. */
   abstract userId(): string | undefined;
 

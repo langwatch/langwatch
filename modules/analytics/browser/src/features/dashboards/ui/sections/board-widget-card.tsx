@@ -47,10 +47,13 @@ export function BoardWidgetCard({
   period: BoardPeriod;
   isWriting: boolean;
   langy?: WidgetCardLangy;
-  /** Opens the board's editor on this widget, drafting the edit in Langy when asked to. */
-  onEdit: (input: { withLangy: boolean }) => void;
-  onDuplicate: () => void;
-  onDelete: () => void;
+  /**
+   * Opens the board's editor on this widget, drafting the edit in Langy when asked to. Absent,
+   * with the two below, on a board the reader cannot edit: the card is then view-only.
+   */
+  onEdit?: (input: { withLangy: boolean }) => void;
+  onDuplicate?: () => void;
+  onDelete?: () => void;
 }) {
   const clipboard = useWidgetClipboard({ dashboardId });
   const { periodStart, periodEnd, granularitySeconds } = period;
@@ -65,28 +68,30 @@ export function BoardWidgetCard({
       description={widget.definition.description}
       controls={
         <>
-          <Box
-            className={CHART_GRID_DRAG_HANDLE_CLASS}
-            display="flex"
-            alignItems="center"
-            justifyContent="center"
-            boxSize={6}
-            borderRadius="md"
-            cursor="grab"
-            color="fg.subtle"
-            title="Drag to move"
-            _hover={{ color: "fg", background: "bg.muted" }}
-          >
-            <GripVertical size={14} aria-hidden />
-          </Box>
+          {onEdit && (
+            <Box
+              className={CHART_GRID_DRAG_HANDLE_CLASS}
+              display="flex"
+              alignItems="center"
+              justifyContent="center"
+              boxSize={6}
+              borderRadius="md"
+              cursor="grab"
+              color="fg.subtle"
+              title="Drag to move"
+              _hover={{ color: "fg", background: "bg.muted" }}
+            >
+              <GripVertical size={14} aria-hidden />
+            </Box>
+          )}
           {langy && <AskLangyButton name={widget.name} onClick={langy.ask} />}
           <WidgetMenu
             name={widget.name}
             disabled={isWriting}
-            onEditWithLangy={langy && (() => onEdit({ withLangy: true }))}
-            onEditCode={() => onEdit({ withLangy: false })}
+            onEditWithLangy={langy && onEdit && (() => onEdit({ withLangy: true }))}
+            onEditCode={onEdit && (() => onEdit({ withLangy: false }))}
             onCopyId={() => clipboard.copyId(widget.id)}
-            onCopyApiSnippet={() => clipboard.copyApiSnippet(widget.id)}
+            onCopyApiSnippet={onEdit && (() => clipboard.copyApiSnippet(widget.id))}
             onSetAlert={langy && (() => langy.setUp("alert"))}
             onSendReport={langy && (() => langy.setUp("report"))}
             onDuplicate={onDuplicate}
