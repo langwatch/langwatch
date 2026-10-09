@@ -2742,6 +2742,17 @@ like any peer's, the enterprise owner refuses per organization, and a core calle
 entitlement before calling. There are no slots: a core screen renders the enterprise module's lent component directly, and
 the shell's upgrade modal (`globalUpgradeModal`) is licensing's declared mount (Alex, 2026-09-29).
 
+**Hosted Connect is the `connect` module** (Alex, 2026-10-09, C3a). `enterprise/modules/connect`
+serves the three `/api/internal/gateway/connect/*` routes (paths unchanged; `internal` is an unowned
+prefix) behind the gateway's `internal_secret` door, and owns the contract budget's cap, sync and reset,
+written only through `GatewayApi`; it owns no table. The install end of Connect stays in licensing. Connect
+resolves a hosted caller through `LicensingApi.findManagedKeyLicense` and reads terms through
+`getContractTerms`. Nothing depends on connect: billing would close connect -> gateway -> organization ->
+billing, so connect syncs on licensing's `contract_terms_changed` and resets on billing's
+`connected_term_renewed` / `connected_customer_onboarded` facts (the cap is not a precondition of the
+billing call), and billing reads the contract `GatewayBudget` through a declared share plus its ClickHouse
+spend share. `connect.errors.ts` stays in licensing-contract.
+
 **Seat limits are organization's to answer** (Alex, 2026-09-28).
 `licenseEnforcement.checkLimit`, `checkAllLimits` and `reportLimitBlocked`
 keep their wire path, but the contract and transport are organization's: it
