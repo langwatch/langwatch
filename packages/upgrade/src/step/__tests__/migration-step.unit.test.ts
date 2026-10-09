@@ -49,7 +49,7 @@ describe("defineMigrationStep", () => {
       const refusal = refusalOf(() =>
         defineMigrationStep({
           id: "evaluation:enrol-tenants",
-          kind: "tenant",
+          kind: "procedure",
           mode: "blocking",
           description: "Enrols every organization in the new scorer.",
           run: noReport,

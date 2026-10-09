@@ -4,9 +4,11 @@ import {
   type MigrationPassSummary,
   type SystemMigration,
   SystemMigrationRunnerService,
+  type SystemMigrationStateRepository,
   groupByTenantSource,
 } from "@langwatch/system-migrations";
 import { nowInstant } from "@langwatch/time";
+import { type TenantMigrationStep, tenantAxisSchema } from "@langwatch/upgrade/step";
 
 import type {
   OpsAppDependencies,
@@ -67,6 +69,14 @@ type SystemMigrationPassOptions = Readonly<{
    * instance it landed on. Omitted, every organization reads as shared.
    */
   dataplane?: OrganizationDataplaneResolver;
+  /**
+   * The tenant steps modules declare with `.withMigrations`, over the framework's one state table
+   * (Alex, 2026-10-09, S6-2, S6-3); beside the registered migrations until their owners move.
+   */
+  declared?: Readonly<{
+    steps: () => readonly TenantMigrationStep[];
+    state: SystemMigrationStateRepository;
+  }>;
 }>;
 
 /**
@@ -108,8 +118,71 @@ export class SystemMigrationPassService {
             lease: organization.lease,
           });
 
+    const withDeclared = await this.runDeclaredLeg({ signal, summary: merged, isSaaS });
     await this.sweepAbandonedNewborns();
+    return withDeclared;
+  }
+
+  /** Declared tenant steps: per axis, one runner per tenant source, on the framework's state. */
+  private async runDeclaredLeg({
+    signal,
+    summary,
+    isSaaS,
+  }: {
+    signal?: AbortSignal;
+    summary: MigrationPassSummary;
+    isSaaS: boolean;
+  }): Promise<MigrationPassSummary> {
+    const declared = this.options.declared;
+    if (!declared) return summary;
+    const { organizationTenants, projectTenants, userTenants, migrationLease } =
+      this.options.repositories;
+    const sources = {
+      organization: organizationTenants,
+      project: projectTenants,
+      user: userTenants,
+    };
+    let merged = summary;
+    for (const axis of tenantAxisSchema.options) {
+      const steps = declared.steps().filter((step) => step.tenants === axis);
+      const migrations = this.released({
+        migrations: steps.map((step) => ({ ...step, name: step.id })),
+        isSaaS,
+      });
+      if (migrations.length === 0) continue;
+      const cohort = await this.declaredCohort({ axis, isSaaS, migrations });
+      for (const bucket of groupByTenantSource({ migrations, everyTenant: sources[axis] })) {
+        const runner = new SystemMigrationRunnerService({
+          now: nowInstant,
+          state: declared.state,
+          lease: migrationLease,
+          tenants: bucket.tenants,
+          cohort,
+          migrations: bucket.migrations,
+        });
+        merged = mergeSummaries(merged, await runner.runPass({ signal }));
+      }
+    }
     return merged;
+  }
+
+  /** Enrolment paces every axis: a project through its organization, a user by membership. */
+  private async declaredCohort({
+    axis,
+    isSaaS,
+    migrations,
+  }: {
+    axis: TenantMigrationStep["tenants"];
+    isSaaS: boolean;
+    migrations: readonly SystemMigration[];
+  }): Promise<MigrationCohort> {
+    const enrollments = this.options.repositories.migrationEnrollments;
+    if (axis === "user") return this.userCohort({ isSaaS, enrollments, migrations });
+    const organizationCohort = await this.cohort({ isSaaS, enrollments, migrations });
+    if (axis === "organization" || !isSaaS) return organizationCohort;
+    const projects = this.options.repositories.projectTenants;
+    return async ({ tenantId, migrationName }) =>
+      organizationCohort({ tenantId: await projects.getOrganizationId(tenantId), migrationName });
   }
 
   /**
@@ -382,7 +455,8 @@ export class SystemMigrationPassService {
     routes,
     dependencies,
     passRequests,
-  }: Pick<SystemMigrationPassOptions, "repositories" | "isSaaS"> & {
+    declared,
+  }: Pick<SystemMigrationPassOptions, "repositories" | "isSaaS" | "declared"> & {
     /** The clickhouse store's private routes (§7), read when a cohort or pass asks, not at boot. */
     routes: () => ReadonlyMap<string, string>;
     dependencies: Pick<OpsAppDependencies, "identity" | "authz" | "automations" | "auditLog">;
@@ -398,6 +472,7 @@ export class SystemMigrationPassService {
     const passes = SystemMigrationPassService.create({
       repositories,
       isSaaS,
+      ...(declared ? { declared } : {}),
       migrations: organizationMigrations,
       userMigrations: () => identity.userMigrations(),
       newbornSweep: () => identity.newbornSweep().runPass(),

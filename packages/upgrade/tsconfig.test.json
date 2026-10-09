@@ -24,6 +24,12 @@
       "path": "../secrets/tsconfig.build.json"
     },
     {
+      "path": "../system-migrations/tsconfig.build.json"
+    },
+    {
+      "path": "../time/tsconfig.build.json"
+    },
+    {
       "path": "../vitest-config/tsconfig.build.json"
     }
   ]

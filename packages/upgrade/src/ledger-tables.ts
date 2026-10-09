@@ -14,6 +14,7 @@ export type LedgerTableNames = {
   target: string;
   lease: string;
   roster: string;
+  tenantState: string;
 };
 
 /** The unqualified table names inside the ledger schema. */
@@ -23,6 +24,7 @@ export const LEDGER_TABLE = {
   target: "_langwatch_upgrade_target",
   lease: "_langwatch_upgrade_lease",
   roster: "_langwatch_serving_roster",
+  tenantState: "_langwatch_upgrade_tenant_state",
 } as const;
 
 const quote = (identifier: string) => `"${identifier.replaceAll('"', '""')}"`;
@@ -43,6 +45,7 @@ export function ledgerTablesIn({ schema }: { schema: string }): LedgerTableNames
     target: qualified(LEDGER_TABLE.target),
     lease: qualified(LEDGER_TABLE.lease),
     roster: qualified(LEDGER_TABLE.roster),
+    tenantState: qualified(LEDGER_TABLE.tenantState),
   };
 }
 
@@ -140,6 +143,17 @@ export function ledgerTablesDdl({ tables }: { tables: LedgerTableNames }): reado
     "heartbeat_at" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "_langwatch_serving_roster_pkey" PRIMARY KEY ("process_id")
+)`,
+    `CREATE TABLE IF NOT EXISTS ${tables.tenantState} (
+    "step_id" TEXT NOT NULL,
+    "tenant_id" TEXT NOT NULL,
+    "status" TEXT NOT NULL,
+    "report" JSONB,
+    "held_reason" TEXT,
+    "held_since" TIMESTAMPTZ(3),
+    "updated_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "_langwatch_upgrade_tenant_state_pkey" PRIMARY KEY ("step_id", "tenant_id")
 )`,
   ];
 }

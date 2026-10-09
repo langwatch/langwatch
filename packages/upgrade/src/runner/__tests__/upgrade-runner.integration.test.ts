@@ -809,7 +809,7 @@ describe.skipIf(!DB_URL)("the upgrade runner", () => {
             }),
             defineMigrationStep({
               id: "identity:backfill",
-              kind: "tenant",
+              kind: "data",
               mode: "background",
               description: "backfills identifiers",
               needsOldWritersGone: true,

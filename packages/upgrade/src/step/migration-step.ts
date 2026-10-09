@@ -1,3 +1,4 @@
+import type { SystemMigration } from "@langwatch/system-migrations";
 import { z } from "zod";
 
 import { upgradeStepKindSchema, upgradeStepModeSchema } from "../ledger.ts";
@@ -33,6 +34,27 @@ export const migrationStepDeclarationSchema = z.object({
 });
 export type MigrationStepDeclaration = z.infer<typeof migrationStepDeclarationSchema>;
 
+/** The tenants a tenant step walks, one at a time, paged from the pass's source for each. */
+export const tenantAxisSchema = z.enum(["organization", "project", "user"]);
+export type TenantAxis = z.infer<typeof tenantAxisSchema>;
+
+const { id, mode, description, needsOldWritersGone } = migrationStepDeclarationSchema.shape;
+
+/** A tenant step's pacing, flat on its declaration and on no other kind (S6-4, 2026-10-09). */
+export const tenantMigrationStepDeclarationSchema = z.object({
+  id,
+  kind: z.literal("tenant"),
+  mode,
+  description,
+  needsOldWritersGone,
+  tenants: tenantAxisSchema,
+  title: z.string().trim().min(1),
+  requiresOperatorConfirmation: z.boolean(),
+  runsAutomaticallyOnSelfHosted: z.boolean(),
+  enrolledAutomatically: z.boolean(),
+});
+export type TenantMigrationStepDeclaration = z.infer<typeof tenantMigrationStepDeclarationSchema>;
+
 /** Where a resumed run starts and how it records progress; the runner keeps both in the ledger. */
 export interface MigrationStepCheckpoint {
   /** The report the last attempt saved, or null on a first run. */
@@ -49,6 +71,13 @@ export type MigrationStepRun = (args: {
 
 export type MigrationStep = Readonly<MigrationStepDeclaration & { run: MigrationStepRun }>;
 
+/** One tenant at a time; the framework keeps each tenant's state (Alex, 2026-10-09, S6-1). */
+type TenantStepWork = Pick<SystemMigration, "migrateTenant" | "candidateTenants">;
+
+export type TenantMigrationStep = Readonly<TenantMigrationStepDeclaration & TenantStepWork>;
+
+export type TenantMigrationStepDefinition = TenantMigrationStepDeclaration & TenantStepWork;
+
 export type MigrationStepRefusal =
   | "malformed_id"
   | "missing_description"
@@ -59,7 +88,8 @@ export type MigrationStepRefusal =
  * What a module writes: `after` names step values or, across modules, a generated `CodeStepId`
  * (Alex, 2026-10-09, STEP-AFTER-2), so a missing or mistyped step fails typecheck.
  */
-export type MigrationStepDefinition = Omit<MigrationStepDeclaration, "after"> & {
+export type MigrationStepDefinition = Omit<MigrationStepDeclaration, "after" | "kind"> & {
+  kind: Exclude<MigrationStepKind, "tenant">;
   after?: readonly (MigrationStep | CodeStepId)[];
   run: MigrationStepRun;
 };
@@ -90,7 +120,11 @@ export class MigrationStepDeclarationError extends Error {
 }
 
 /** Declares one code step; refuses by name an id, description or mode the rules forbid. */
-export function defineMigrationStep(step: MigrationStepDefinition): MigrationStep {
+export function defineMigrationStep(step: TenantMigrationStepDefinition): TenantMigrationStep;
+export function defineMigrationStep(step: MigrationStepDefinition): MigrationStep;
+export function defineMigrationStep(
+  step: TenantMigrationStepDefinition | MigrationStepDefinition,
+): TenantMigrationStep | MigrationStep {
   if (!MIGRATION_STEP_ID.test(step.id)) {
     throw new MigrationStepDeclarationError({
       step: step.id,
@@ -112,6 +146,11 @@ export function defineMigrationStep(step: MigrationStepDefinition): MigrationSte
       detail: `it is blocking but of kind "${step.kind}"; only a data step blocks (frozen SQL).`,
     });
   }
+  if (step.kind === "tenant") {
+    const declared = tenantMigrationStepDeclarationSchema.parse(step);
+    const candidates = step.candidateTenants ? { candidateTenants: step.candidateTenants } : {};
+    return Object.freeze({ ...declared, ...candidates, migrateTenant: step.migrateTenant });
+  }
   const after = step.after?.map((named) => (typeof named === "string" ? named : named.id));
   const values = step.after?.filter((named) => typeof named !== "string") ?? [];
   if (after && [step, ...values].some((each) => each.mode !== "background")) {
@@ -132,6 +171,14 @@ export function isMigrationStep(value: unknown): value is MigrationStep {
   const declared = migrationStepDeclarationSchema.safeParse(value);
   if (!declared.success) return false;
   return declared.data.mode !== "blocking" || declared.data.kind === "data";
+}
+
+/** A tenant step: its pacing parses and it migrates one tenant at a time. */
+export function isTenantMigrationStep(value: unknown): value is TenantMigrationStep {
+  if (typeof value !== "object" || value === null) return false;
+  if (!("migrateTenant" in value) || typeof value.migrateTenant !== "function") return false;
+  const declared = tenantMigrationStepDeclarationSchema.safeParse(value);
+  return declared.success && declared.data.mode !== "blocking";
 }
 
 function moduleOf(step: string): string {

@@ -326,12 +326,30 @@ Feature: Running system migrations across organizations
     When a pass runs
     Then "org_acme" is held with reason "proof"
 
-  # Gap: heldSince needs @langwatch/time in system-migrations and a stored column (handoff s5).
-  @unit @unimplemented
+  @unit
+  Scenario: A held tenant records the moment it became held
+    Given a migration whose own proof disagrees for "org_acme"
+    When a pass runs at a known moment
+    Then "org_acme" is held since that moment
+
+  @unit
   Scenario: Re-proving a held tenant keeps the moment it was first held
     Given "org_acme" has been held since an earlier pass
     When a later pass re-proves it held
     Then the moment it was first held is unchanged
+
+  # Failed is worked out on read, never stored (Alex, 2026-10-09).
+  @unit
+  Scenario: A tenant held past the threshold reads as failed
+    Given "org_acme" has been held for longer than the held threshold
+    When its record is read
+    Then it reads as failed
+
+  @unit
+  Scenario: A tenant held within the threshold does not read as failed
+    Given "org_acme" was held moments ago
+    When its record is read
+    Then it does not read as failed
 
   @unit
   Scenario: A tenant whose queued work has not drained is held as pending

@@ -1,4 +1,5 @@
 import { createLogger } from "@langwatch/observability";
+import type { Instant } from "@langwatch/time";
 
 import type { MigrationLeaseRepository } from "./lease.repository.ts";
 import {
@@ -44,6 +45,8 @@ export type SystemMigrationRunnerDeps = {
   tenants: TenantSource;
   cohort: MigrationCohort;
   migrations: readonly SystemMigration[];
+  /** The clock a held tenant's `heldSince` is read from. */
+  now: () => Instant;
   /** How long each claim grant lasts. Defaults to a minute. */
   leaseTtlMs?: number;
   /** How often a held claim renews. Must stay well inside the TTL. */
@@ -275,7 +278,7 @@ export class SystemMigrationRunnerService {
         tenantId,
         status: outcome.status,
         report: outcome.report ?? null,
-        ...heldFields({ outcome }),
+        ...heldFields({ outcome, existing, now: this.deps.now }),
       };
       const wasWritten = await state.upsertRecordUnlessRolledBack(record);
       if (!wasWritten) {
@@ -316,13 +319,19 @@ export class SystemMigrationRunnerService {
   }
 }
 
-/** Held carries why it is held; any other status drops the reason. */
+/** Held carries why and since when (the first moment, while still held); else neither. */
 function heldFields({
   outcome,
+  existing,
+  now,
 }: {
   outcome: TenantMigrationOutcome;
-}): Pick<TenantMigrationRecord, "heldReason"> {
-  return outcome.status === "migrated" ? { heldReason: outcome.heldReason ?? "proof" } : {};
+  existing: TenantMigrationRecord | undefined;
+  now: () => Instant;
+}): Pick<TenantMigrationRecord, "heldReason" | "heldSince"> {
+  if (outcome.status !== "migrated") return {};
+  const heldSince = existing?.status === "migrated" ? existing.heldSince : undefined;
+  return { heldReason: outcome.heldReason ?? "proof", heldSince: heldSince ?? now() };
 }
 
 async function recordParkedTenant({
