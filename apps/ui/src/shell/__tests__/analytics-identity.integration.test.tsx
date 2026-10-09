@@ -115,9 +115,6 @@ class PersonSession extends UiSession {
   isSettled(): boolean {
     return true;
   }
-  featureFlag(): boolean | undefined {
-    return void 0;
-  }
 }
 const ADA: UiActor = { id: "user_ada", name: "Ada", email: "ada@example.com", image: null };
 const BOB: UiActor = { id: "user_bob", name: "Bob", email: null, image: null };

@@ -42,10 +42,6 @@ class AdminSession extends UiSession {
   isSettled(): boolean {
     return true;
   }
-
-  featureFlag(): boolean | undefined {
-    return false;
-  }
 }
 
 function capabilitiesWith({ licensePaymentUrl }: { licensePaymentUrl?: string }): UiCapabilities {

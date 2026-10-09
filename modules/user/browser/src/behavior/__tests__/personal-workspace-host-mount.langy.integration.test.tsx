@@ -53,10 +53,6 @@ class LangySession extends UiSession {
   isSettled(): boolean {
     return true;
   }
-
-  featureFlag(): undefined {
-    return void 0;
-  }
 }
 
 class TestScope extends UiScope {

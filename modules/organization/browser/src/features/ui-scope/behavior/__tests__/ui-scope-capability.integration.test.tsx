@@ -134,10 +134,6 @@ class NoGrants extends UiSession {
     return true;
   }
 
-  featureFlag(): boolean {
-    return false;
-  }
-
   override snapshot(): UiSessionSnapshot {
     return {
       session: this.reading,

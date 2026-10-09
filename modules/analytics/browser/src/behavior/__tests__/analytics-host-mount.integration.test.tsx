@@ -45,10 +45,6 @@ class ProjectSession extends UiSession {
     return true;
   }
 
-  featureFlag(): boolean | undefined {
-    return false;
-  }
-
   override snapshot(): UiSessionSnapshot {
     return {
       session: { status: "anonymous", user: null },

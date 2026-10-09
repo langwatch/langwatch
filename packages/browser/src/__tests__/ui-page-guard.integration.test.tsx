@@ -69,10 +69,6 @@ class AnsweringSession extends UiSession {
   isSettled(): boolean {
     return this.answers.settled;
   }
-
-  featureFlag(flag: string): boolean | undefined {
-    return this.answers.flags[flag];
-  }
 }
 
 function capabilities(session: UiSession): UiCapabilities {

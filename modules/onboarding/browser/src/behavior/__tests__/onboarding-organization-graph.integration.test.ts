@@ -63,10 +63,6 @@ class SignedInSession extends UiSession {
   isSettled(): boolean {
     return true;
   }
-
-  featureFlag(): boolean | undefined {
-    return false;
-  }
 }
 
 const capabilities = createUiCapabilitiesFromHost(

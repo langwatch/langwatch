@@ -174,8 +174,8 @@ export type UiActor = {
 };
 
 /**
- * Who is here and what they may do — `hasPermission`, `hasOrganizationPermission`
- * and `isFeatureEnabled` answer synchronously and fail closed, so a loading screen
+ * Who is here and what they may do — `hasPermission` and `hasOrganizationPermission`
+ * answer synchronously and fail closed, so a loading screen
  * renders the same as a "no" screen. Where they are is `UiScope`, a capability of its own.
  */
 export abstract class UiSession {
@@ -209,17 +209,6 @@ export abstract class UiSession {
   refresh(): Promise<void> {
     return Promise.reject(new UiCapabilityUnavailableError("session refresh"));
   }
-
-  /**
-   * Whether a flag is on, off, or not yet answered — tri-state so a guard
-   * reading unanswered as off does not flash its fallback on first load.
-   */
-  abstract featureFlag(flag: string): boolean | undefined;
-
-  /** Fail-closed: not yet answered reads the same as off. */
-  isFeatureEnabled(flag: string): boolean {
-    return this.featureFlag(flag) === true;
-  }
 }
 
 class UnavailableUiFeedback extends UiFeedback {
@@ -246,14 +235,6 @@ class UnavailableUiSession extends UiSession {
   }
 
   isSettled(): never {
-    throw new UiCapabilityUnavailableError("session");
-  }
-
-  featureFlag(): never {
-    throw new UiCapabilityUnavailableError("session");
-  }
-
-  override isFeatureEnabled(): never {
     throw new UiCapabilityUnavailableError("session");
   }
 }

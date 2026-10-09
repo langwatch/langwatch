@@ -61,10 +61,6 @@ class Reader extends UiSession {
   isSettled(): boolean {
     return true;
   }
-
-  featureFlag(): boolean | undefined {
-    return true;
-  }
 }
 
 /** Opens the roles page the way the router does: the installed module's loader, then render. */

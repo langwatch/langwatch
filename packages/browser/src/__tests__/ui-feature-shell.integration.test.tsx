@@ -47,10 +47,6 @@ class StubSession extends UiSession {
   isSettled(): boolean {
     return true;
   }
-
-  featureFlag(): boolean | undefined {
-    return true;
-  }
 }
 
 class StubScope extends UiScope {
