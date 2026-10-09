@@ -6,6 +6,7 @@ import {
   type DiscoveryResponse,
   type FencedDiscoveryFetch,
   HttpsSsoIssuerDiscoveryChannel,
+  vouchedOriginValidator,
 } from "../http/http.sso-issuer-discovery.channel.ts";
 import { MemorySsoIssuerDiscoveryChannel } from "../memory/memory.sso-issuer-discovery.channel.ts";
 
@@ -169,6 +170,7 @@ describe("given an issuer origin an operator vouched for", () => {
   function vouchedChannel(options: {
     validateVouched: SsrfUrlValidator;
     answer: (url: string) => Promise<DiscoveryResponse>;
+    vouched?: string;
   }): { channel: HttpsSsoIssuerDiscoveryChannel; asked: string[] } {
     const asked: string[] = [];
     const fetchValidated: FencedDiscoveryFetch = async (validated, init) => {
@@ -185,7 +187,7 @@ describe("given an issuer origin an operator vouched for", () => {
     return {
       channel: HttpsSsoIssuerDiscoveryChannel.create({
         policy: POLICY,
-        dialableInternalOrigins: () => [VOUCHED],
+        dialableInternalOrigins: () => [options.vouched ?? VOUCHED],
         validate: refuseEverything,
         validateVouched: options.validateVouched,
         fetchValidated,
@@ -242,6 +244,35 @@ describe("given an issuer origin an operator vouched for", () => {
       reason: "unresolvable",
     });
     expect(asked).toEqual([]);
+  });
+
+  /** @scenario "The simulator is dialled outside production and nowhere else" */
+  it("dials a vouched origin whose name the internal-name refusal would turn away", async () => {
+    const simulator = "https://idp.worktree.langwatch.localhost:1355";
+    const { channel, asked } = vouchedChannel({
+      validateVouched: vouchedOriginValidator(async () => ["127.0.0.1"]),
+      answer: async () => respond(200, DISCOVERY_DOCUMENT),
+      vouched: simulator,
+    });
+
+    await expect(channel.discover({ issuer: `${simulator}/t/2` })).resolves.toMatchObject({
+      reachable: true,
+    });
+    expect(asked).toEqual([`${simulator}/t/2/.well-known/openid-configuration`]);
+  });
+
+  it("pins a vouched internal name to the address it resolved, or reads it as unresolved", async () => {
+    const url = "https://idp.corp.internal/.well-known/openid-configuration";
+
+    await expect(vouchedOriginValidator(async () => ["10.0.0.7"])(url)).resolves.toMatchObject({
+      type: "allowlisted",
+      hostname: "idp.corp.internal",
+      port: 443,
+      resolvedIp: "10.0.0.7",
+    });
+    await expect(
+      vouchedOriginValidator(async () => Promise.reject(new Error("ENOTFOUND")))(url),
+    ).resolves.toMatchObject({ type: "unresolved" });
   });
 
   it("leaves every other origin behind the fence", async () => {
