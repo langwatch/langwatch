@@ -92,7 +92,7 @@ func (o *Orchestrator) restartServices(slug, name string) ([]string, error) {
 	if !ok {
 		return nil, fmt.Errorf("no registered stack %q — is it up? (haven up)", slug)
 	}
-	if !o.sys.ProcessAlive(st.LauncherPID) {
+	if !o.launcherIsOurs(st) {
 		return nil, fmt.Errorf("stack %q is not running (its launcher is gone) — start it with `haven up`", slug)
 	}
 	targets := restartTargets(st, name)
@@ -103,7 +103,7 @@ func (o *Orchestrator) restartServices(slug, name string) ([]string, error) {
 	if slices.ContainsFunc(targets, isSimsTarget) {
 		if goLane, ok := o.goLaneHostingSims(st); ok {
 			targets = foldSimsIntoGoLane(targets, goLane)
-			msgs = append(msgs, fmt.Sprintf("%-10s run inside the go lane (LANGWATCH_GO_ONE_PROCESS=1), so the go lane restarts with them", SimsLane))
+			msgs = append(msgs, fmt.Sprintf("%-10s run inside the go lane (one process; LANGWATCH_DEV_ONE_PROCESS=0 splits them), so the go lane restarts with them", SimsLane))
 		}
 	}
 	for _, t := range targets {
@@ -126,7 +126,7 @@ func (o *Orchestrator) restartServices(slug, name string) ([]string, error) {
 }
 
 // goLaneHostingSims is the go lane when the process holding the simulators'
-// port also holds the go lane's: LANGWATCH_GO_ONE_PROCESS folded them in.
+// port also holds the go lane's: one process folded them in.
 func (o *Orchestrator) goLaneHostingSims(st domain.Stack) (restartTarget, bool) {
 	goLane, sims := restartTargets(st, GoLane), restartTargets(st, SimsLane)
 	if len(goLane) == 0 || len(sims) == 0 {
@@ -175,7 +175,7 @@ func restartTargets(st domain.Stack, name string) []restartTarget {
 	inGo := map[string]bool{"gateway": !mono, "nlp": !mono}
 	inSims := map[string]bool{}
 	if !mono && goLaneHostsSimulators(st.WorktreeDir) {
-		for _, sim := range []string{domain.IdPService, domain.MailService, domain.StorageService, domain.VoiceService, domain.LLMService, domain.AnalyticsService, domain.TelemetryService} {
+		for _, sim := range []string{domain.IdPService, domain.MailService, domain.StorageService, domain.VoiceService, domain.LLMService, domain.AnalyticsService, domain.OutboundService, domain.TelemetryService} {
 			inSims[sim] = true
 		}
 	}

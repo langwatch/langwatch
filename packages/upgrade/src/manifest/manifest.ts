@@ -17,6 +17,10 @@ export const manifestStepSchema = z.object({
   mode: upgradeStepModeSchema,
   owner: z.string().min(1).nullable(),
   description: z.string().min(1),
+  /** The release a background step must have finished by, as it declares it. */
+  finishBy: releaseVersionSchema.optional(),
+  /** A background step that waits until no serving process lacks it, as it declares it. */
+  needsOldWritersGone: z.boolean().optional(),
 });
 export type ManifestStep = z.infer<typeof manifestStepSchema>;
 

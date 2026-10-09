@@ -3,8 +3,8 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import type React from "react";
 import { Lock } from "react-feather";
 
-import { useOrganizationTeamProject } from "../../behavior/studio-host/use-organization-team-project.ts";
 import { useFieldRedaction } from "../../behavior/use-field-redaction.ts";
+import { useWorkflowHost } from "../../model/workflow-host.ts";
 import { default as NextLink } from "../elements/next-link.tsx";
 
 export interface RedactedFieldProps {
@@ -49,9 +49,9 @@ export const RedactedInline: React.FC<{
   visibleTo?: string | null;
   size?: "xs" | "sm";
 }> = ({ visibleTo = null, size = "sm" }) => {
-  const { hasPermission } = useOrganizationTeamProject();
+  const host = useWorkflowHost();
   const hint = audienceHint(visibleTo);
-  const canOpenSettings = hasPermission("project:view");
+  const canOpenSettings = host.hasPermission("project:view");
   return (
     <Tooltip
       interactive

@@ -195,7 +195,8 @@ build_images() {
   fi
   if [[ "$BUILD_HEAD" -eq 1 ]]; then
     log "building $HEAD_IMAGE from the working tree"
-    docker build -f "$REPO_ROOT/infra/docker/Dockerfile" -t "$HEAD_IMAGE" "$REPO_ROOT" >>"$RUN_DIR/build.log" 2>&1
+    # A rehearsal image is never shipped: unstamped, so sh-licensed can trust the test key.
+    docker build -f "$REPO_ROOT/infra/docker/Dockerfile" --build-arg LANGWATCH_RELEASE_BUILD=false -t "$HEAD_IMAGE" "$REPO_ROOT" >>"$RUN_DIR/build.log" 2>&1
   fi
 }
 

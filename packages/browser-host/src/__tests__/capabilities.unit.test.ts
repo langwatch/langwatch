@@ -67,10 +67,6 @@ class UnusableSession extends UiSession {
   isSettled(): never {
     throw new Error("the installed session should have answered");
   }
-
-  featureFlag(): never {
-    throw new Error("the installed session should have answered");
-  }
 }
 
 class StubSession extends UiSession {
@@ -84,10 +80,6 @@ class StubSession extends UiSession {
 
   isSettled(): boolean {
     return true;
-  }
-
-  featureFlag(): boolean | undefined {
-    return false;
   }
 }
 
@@ -136,9 +128,6 @@ describe("given the capability ports a screen asks instead of reaching for the b
         /"session" UI capability has no implementation/,
       );
       expect(() => capabilities.session.currentUser()).toThrow(UiCapabilityUnavailableError);
-      expect(() => capabilities.session.isFeatureEnabled("some_flag")).toThrow(
-        UiCapabilityUnavailableError,
-      );
     });
 
     it("refuses the scope by name rather than answering an unresolved one", () => {

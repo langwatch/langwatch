@@ -241,9 +241,8 @@ func TestMacOSOnlyEntriesAreNotApplicableElsewhere(t *testing.T) {
 // @scenario "A prerequisite haven cannot install itself is explained, not attempted"
 func TestHomebrewIsTheOnlyManualEntry(t *testing.T) {
 	for _, p := range Prereqs {
-		// The accept-queue setting needs sudo too, so haven prints it as well.
-		if p.Manual() != (p.Key == "brew" || p.Key == "somaxconn") {
-			t.Errorf("%s manual = %v; only Homebrew and the sudo sysctl are by hand", p.Key, p.Manual())
+		if p.Manual() != (p.Key == "brew") {
+			t.Errorf("%s manual = %v; only Homebrew is by hand", p.Key, p.Manual())
 		}
 	}
 	brew, _ := LookupPrereq("brew")

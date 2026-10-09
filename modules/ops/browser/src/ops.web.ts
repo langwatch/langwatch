@@ -84,6 +84,10 @@ export const opsWeb = defineBrowserModule("ops")
       requires: "ops:view",
       load: () => import("./features/upgrades/ui/sections/upgrades.screen.tsx"),
     },
+    "pages/ops/upgrades/preview": {
+      requires: "ops:view",
+      load: () => import("./features/upgrades/ui/sections/upgrade-preview.screen.tsx"),
+    },
     "pages/ops/upgrades/releases/[release]": {
       requires: "ops:view",
       load: () => import("./features/upgrades/ui/sections/upgrade-release.screen.tsx"),
@@ -189,12 +193,18 @@ export const opsWeb = defineBrowserModule("ops")
     },
     foundry: { load: () => import("./ui/sections/ops/ops-foundry-drawer.tsx") },
   })
-  /** The header's impersonation banner, which the shell hands to navigation's headerBanner. */
+  /** The header's impersonation and upgrade banners, handed to navigation's headerBanner. */
   .withCapabilities({
     impersonationBanner: {
       load: async () => ({
         default: (await import("./ui/sections/impersonation/impersonation-header-banner.tsx"))
           .ImpersonationHeaderBanner,
+      }),
+    },
+    upgradeBanner: {
+      load: async () => ({
+        default: (await import("./ui/sections/upgrade-banner/upgrade-header-banner.tsx"))
+          .UpgradeHeaderBanner,
       }),
     },
   });

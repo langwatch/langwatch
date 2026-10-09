@@ -173,7 +173,6 @@ const signedOnClock =
 
 describe("given a SAML connection that signs with a known key", () => {
   describe("when its identity provider's clock is off by less than the assertion's own window", () => {
-    /** @scenario "A SAML assertion from an identity provider whose clock is <offset> <direction> is <outcome>" */
     it.each([
       ["30 seconds ahead", 30],
       ["4 minutes behind", -4 * 60],
@@ -189,7 +188,6 @@ describe("given a SAML connection that signs with a known key", () => {
   });
 
   describe("when its identity provider's clock is off by more than the assertion's own window", () => {
-    /** @scenario "A SAML assertion from an identity provider whose clock is <offset> <direction> is <outcome>" */
     /** @scenario "An expired SAML assertion is refused before identity policy" */
     it("refuses the assertion from a clock 10 minutes behind, writing nothing", async () => {
       const { response, policyAsked, database } = await signInWith({
@@ -201,7 +199,6 @@ describe("given a SAML connection that signs with a known key", () => {
       nothingWritten({ database });
     });
 
-    /** @scenario "A SAML assertion from an identity provider whose clock is <offset> <direction> is <outcome>" */
     /** @scenario "A SAML assertion that is not yet valid is refused before identity policy" */
     it("refuses the assertion from a clock 10 minutes ahead, writing nothing", async () => {
       const { response, policyAsked, database } = await signInWith({

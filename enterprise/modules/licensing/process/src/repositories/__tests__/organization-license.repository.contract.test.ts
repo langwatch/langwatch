@@ -32,6 +32,8 @@ type Seed = Readonly<{
 type Backend = Readonly<{
   /** Organizations named `<prefix><suffix>` holding the given columns, and the repository over them. */
   seed: (input: Readonly<Record<string, Seed>>) => Promise<OrganizationLicenseRepository>;
+  /** Writes organization's columns, standing in for organization mirroring a licence. */
+  writeColumns: (input: Readonly<{ organizationId: string; columns: Seed }>) => Promise<void>;
   prefix: () => string;
 }>;
 
@@ -124,6 +126,42 @@ function contractCases(backend: Backend): void {
       expiresAt: null,
       validatedAt: null,
     });
+  });
+
+  it("restores the row read before a write, and deletes one that was not there", async () => {
+    const repository = await backend.seed({
+      [id("a")]: { licenseKey: null },
+      [id("b")]: { licenseKey: "column-key" },
+    });
+    const before = { licenseKey: "old-key", expiresAt: EXPIRES, validatedAt: VALIDATED };
+    const written = { licenseKey: "new-key", expiresAt: EXPIRES, validatedAt: null };
+    await repository.saveLicense({ organizationId: id("a"), license: before });
+    const [previous = null] = await repository.findLicense({ organizationId: id("a") });
+    await repository.saveLicense({ organizationId: id("a"), license: written });
+    await repository.saveLicense({ organizationId: id("b"), license: written });
+
+    await repository.restoreLicense({ organizationId: id("a"), written, previous });
+    await repository.restoreLicense({ organizationId: id("b"), written, previous: null });
+
+    const restored = await repository.findLicense({ organizationId: id("a") });
+    expect(restored.map(view)).toEqual([view(before)]);
+    await expect(repository.findLicense({ organizationId: id("b") })).resolves.toEqual([]);
+    await expect(repository.getOrganizationLicense(id("b"))).resolves.toEqual({
+      licenseKey: "column-key",
+    });
+  });
+
+  it("keeps a row written again after the write it would undo", async () => {
+    const repository = await backend.seed({ [id("a")]: { licenseKey: null } });
+    const written = { licenseKey: "first-key", expiresAt: EXPIRES, validatedAt: null };
+    const newer = { licenseKey: "second-key", expiresAt: EXPIRES, validatedAt: null };
+    await repository.saveLicense({ organizationId: id("a"), license: written });
+    await repository.saveLicense({ organizationId: id("a"), license: newer });
+
+    await repository.restoreLicense({ organizationId: id("a"), written, previous: null });
+
+    const kept = await repository.findLicense({ organizationId: id("a") });
+    expect(kept.map(view)).toEqual([view(newer)]);
   });
 
   it("clears an organization that had no row of licensing's yet", async () => {
@@ -241,6 +279,31 @@ function contractCases(backend: Backend): void {
     });
   });
 
+  it("keeps a licence written to both sides between the reads of the columns and the row", async () => {
+    const repository = await backend.seed({ [id("a")]: { licenseKey: "key-a" } });
+    const page = { afterOrganizationId: backend.prefix(), limit: 1 };
+    const before = await repository.findLicensePairs(page);
+    const newer = { licenseKey: "newer-a", expiresAt: EXPIRES, validatedAt: null };
+    await repository.saveLicense({ organizationId: id("a"), license: newer });
+    await backend.writeColumns({ organizationId: id("a"), columns: newer });
+    const after = await repository.findLicensePairs(page);
+    // Organization's columns as read before the write, licensing's row as read after it.
+    const pairs = before.map((pair, index) => ({ ...pair, own: after[index]?.own ?? null }));
+    expect(pairs.map(viewPair)).toEqual([
+      {
+        organizationId: id("a"),
+        columns: { licenseKey: "key-a", expiresAt: null, validatedAt: null },
+        own: { licenseKey: "newer-a", expiresAt: EXPIRES.toString(), validatedAt: null },
+      },
+    ]);
+
+    await expect(repository.overwriteLicenses({ pairs })).resolves.toBe(0);
+
+    await expect(repository.getOrganizationLicense(id("a"))).resolves.toEqual({
+      licenseKey: "newer-a",
+    });
+  });
+
   it("leaves the rows as they were when the same pairs are written again", async () => {
     const repository = await backend.seed({
       [id("a")]: { licenseKey: "key-a", expiresAt: EXPIRES, validatedAt: VALIDATED },
@@ -263,11 +326,24 @@ function contractCases(backend: Backend): void {
 describe("given the licence memory repository", () => {
   const prefix = `lic${randomUUID().replaceAll("-", "")}`;
 
+  let organizations = new Map<string, Seed>();
+
   contractCases({
     prefix: () => prefix,
-    seed: async (input) =>
-      MemoryOrganizationLicenseRepository.create(new Map(Object.entries(input))),
+    seed: async (input) => {
+      organizations = new Map(Object.entries(input));
+      return MemoryOrganizationLicenseRepository.create(organizations);
+    },
+    writeColumns: async ({ organizationId, columns }) => {
+      organizations.set(organizationId, columns);
+    },
   });
+});
+
+const licenseData = (columns: Seed) => ({
+  license: columns.licenseKey,
+  licenseExpiresAt: columns.expiresAt ? toDate(columns.expiresAt) : null,
+  licenseLastValidatedAt: columns.validatedAt ? toDate(columns.validatedAt) : null,
 });
 
 describe.skipIf(!TEST_DATABASE_URL)("given the licence Postgres repository", () => {
@@ -301,13 +377,17 @@ describe.skipIf(!TEST_DATABASE_URL)("given the licence Postgres repository", () 
             id: organizationId,
             name: `Licence ${organizationId}`,
             slug: organizationId,
-            license: columns.licenseKey,
-            licenseExpiresAt: columns.expiresAt ? toDate(columns.expiresAt) : null,
-            licenseLastValidatedAt: columns.validatedAt ? toDate(columns.validatedAt) : null,
+            ...licenseData(columns),
           },
         });
       }
       return PrismaOrganizationLicenseRepository.create(prisma);
+    },
+    writeColumns: async ({ organizationId, columns }) => {
+      await prisma.organization.update({
+        where: { id: organizationId },
+        data: licenseData(columns),
+      });
     },
   });
 });

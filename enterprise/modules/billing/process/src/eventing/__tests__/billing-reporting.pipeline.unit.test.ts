@@ -1,8 +1,12 @@
 import type { ReportUsageForMonthCommandData } from "@langwatch/enterprise-billing-contract";
-import { USAGE_MONTH_COUNTED_EVENT_TYPE } from "@langwatch/entitlement-contract";
+import {
+  USAGE_MONTH_COUNTED_EVENT_TYPE,
+  USAGE_THRESHOLD_CROSSED_EVENT_TYPE,
+} from "@langwatch/entitlement-contract";
 import { createTenantId, type Event, type EventSubscriberDefinition } from "@langwatch/eventing";
+import type { Notification } from "@langwatch/notification-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { BillingModule, type ConnectedBillingPeers } from "../../app/billing.app.ts";
 import { billingProcessModule } from "../../billing.module.ts";
@@ -13,9 +17,10 @@ import {
   StripeUsageReportingBuilder,
   StripeUsageReportingUnavailable,
 } from "../../services/usage-reporting.service.ts";
-import type { UsageWarningService } from "../../services/usage-warning.service.ts";
+import { UsageWarningService } from "../../services/usage-warning.service.ts";
 import {
   BILLING_MONTH_COUNTED_SUBSCRIBER_NAME,
+  BILLING_USAGE_THRESHOLD_CROSSED_SUBSCRIBER_NAME,
   BillingReportingPipeline,
   billingReportingEventing,
 } from "../billing-reporting.pipeline.ts";
@@ -26,11 +31,15 @@ const peers: ConnectedBillingPeers = {
 };
 
 const MONTH_COUNTED_LANE = `billing_reporting.${BILLING_MONTH_COUNTED_SUBSCRIBER_NAME}`;
+const THRESHOLD_CROSSED_LANE = `billing_reporting.${BILLING_USAGE_THRESHOLD_CROSSED_SUBSCRIBER_NAME}`;
 
 /** The roll-up composed as the app composes it. */
-function rollUp() {
+function rollUp(
+  usageWarnings: Pick<UsageWarningService, "send"> = createApiFixture<UsageWarningService>({}),
+) {
   const repositories = MemoryBillingRepositories.create();
   return BillingReportingPipeline.create({
+    usageWarnings,
     organizations: repositories.reportOrganizations,
     billingCheckpoints: repositories.checkpoints,
     getUsageReportingService: () => void 0,
@@ -75,6 +84,65 @@ function monthCounted(billableEvents: number): Event {
   };
 }
 
+/** The usage warning composed over a notification record that remembers what it was sent. */
+function usageWarnings() {
+  const recorded: Notification[] = [];
+  const sendUsageLimitEmail = vi.fn().mockResolvedValue(undefined);
+  const service = UsageWarningService.create({
+    records: {
+      listRecentByOrganization: async () => recorded,
+      create: async ({ organizationId, projectId, metadata, sentAt }) => {
+        const notification = {
+          id: `notif_${recorded.length + 1}`,
+          organizationId,
+          projectId: projectId ?? null,
+          metadata,
+          createdAt: sentAt,
+          updatedAt: sentAt,
+          sentAt,
+        };
+        recorded.push(notification);
+        return notification;
+      },
+    },
+    organizations: {
+      findWithAdmins: vi.fn().mockResolvedValue({
+        id: "org_1",
+        name: "Acme Corp",
+        sentPlanLimitAlert: null,
+        members: [{ user: { id: "user_1", name: "Priya", email: "priya@acme.example" } }],
+      }),
+      updateSentPlanLimitAlert: vi.fn().mockResolvedValue(undefined),
+      findProjectsWithName: vi.fn().mockResolvedValue([{ id: "project_1", name: "Support" }]),
+    },
+    emails: { sendUsageLimitEmail },
+    baseHost: "https://app.langwatch.ai",
+  });
+  return { service, recorded, sendUsageLimitEmail };
+}
+
+function thresholdCrossed(): Event {
+  return {
+    id: "evt_2",
+    aggregateId: "org_1",
+    aggregateType: "entitlement_organization",
+    tenantId: createTenantId("org_1"),
+    createdAt: 0,
+    occurredAt: 1_000,
+    type: USAGE_THRESHOLD_CROSSED_EVENT_TYPE,
+    version: "2026-01-01",
+    data: {
+      organizationId: "org_1",
+      month: "2026-09",
+      occurredAt: 1_000,
+      crossedThreshold: 90,
+      currentMonthMessagesCount: 9_000,
+      maxMonthlyUsageLimit: 10_000,
+      projectCounts: [{ projectId: "project_1", count: 9_000 }],
+    },
+  };
+}
+
 describe("the monthly billing roll-up's eventing declaration", () => {
   describe("given a deployment that is not SaaS", () => {
     /** @scenario "The monthly roll-up is registered on every install" */
@@ -103,7 +171,10 @@ describe("the monthly billing roll-up's eventing declaration", () => {
       expect(billingReportingEventing.pipeline).toBe("billing_reporting");
       expect(pipeline.metadata.name).toBe("billing_reporting");
       expect(pipeline.foldProjections.size + pipeline.mapProjections.size).toBe(0);
-      expect(pipeline.globalProjections?.map(({ name }) => name)).toEqual([MONTH_COUNTED_LANE]);
+      expect(pipeline.globalProjections?.map(({ name }) => name)).toEqual([
+        MONTH_COUNTED_LANE,
+        THRESHOLD_CROSSED_LANE,
+      ]);
     });
   });
 
@@ -180,7 +251,10 @@ describe("the monthly billing roll-up's eventing declaration", () => {
         aggregateId: "org_1",
       });
 
-      expect(definition.globalProjections?.map(({ name }) => name)).toEqual([MONTH_COUNTED_LANE]);
+      expect(definition.globalProjections?.map(({ name }) => name)).toEqual([
+        MONTH_COUNTED_LANE,
+        THRESHOLD_CROSSED_LANE,
+      ]);
       expect(subscriber?.eventTypes).toEqual([USAGE_MONTH_COUNTED_EVENT_TYPE]);
       expect(reported).toEqual([
         {
@@ -192,6 +266,32 @@ describe("the monthly billing roll-up's eventing declaration", () => {
           countedEventId: "evt_1",
         },
       ]);
+    });
+  });
+
+  describe("given entitlement records a crossed usage threshold", () => {
+    /** @scenario "Billing sends each recorded warning once per threshold a month" */
+    it("mails the admins once, naming each project, when the event arrives twice", async () => {
+      const warnings = usageWarnings();
+      const { subscribers } = peerSubscribers(rollUp(warnings.service));
+      const subscriber = subscribers.find(({ eventTypes }) =>
+        eventTypes.includes(USAGE_THRESHOLD_CROSSED_EVENT_TYPE),
+      );
+
+      const context = { tenantId: "org_1", aggregateId: "org_1" };
+      await subscriber?.handle(thresholdCrossed(), context);
+      await subscriber?.handle(thresholdCrossed(), context);
+
+      expect(warnings.sendUsageLimitEmail).toHaveBeenCalledTimes(1);
+      expect(warnings.sendUsageLimitEmail.mock.calls[0]?.[0]).toMatchObject({
+        to: "priya@acme.example",
+        usageData: {
+          crossedThreshold: 90,
+          projectUsageData: [{ id: "project_1", name: "Support", messageCount: 9_000 }],
+        },
+      });
+      expect(warnings.recorded).toHaveLength(1);
+      expect(warnings.recorded[0]?.metadata).toMatchObject({ threshold: 90 });
     });
   });
 });

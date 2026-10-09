@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -478,6 +478,20 @@ describe("the repo is a single pnpm workspace", () => {
       }
       const tasksScripts = readJson("apps/tasks/package.json").scripts as Record<string, string>;
       expect(JSON.stringify(tasksScripts)).not.toContain("ensure-built");
+    });
+
+    /** @scenario "The root migrate scripts are aliases of the upgrade command" */
+    it("makes the root migrate scripts aliases of the upgrade command whose tasks no workflow runs", () => {
+      const scripts = readJson("package.json").scripts as Record<string, string>;
+      for (const name of ["prisma:migrate", "clickhouse:migrate"]) {
+        expect(scripts[name]).toMatch(new RegExp(`^bash ${ensureBuilt} && .*task upgrade$`));
+        expect(scripts[name]).not.toMatch(/prisma-migrate|clickhouse-migrate/);
+      }
+      const workflows = join(repoRoot, ".github/workflows");
+      for (const file of readdirSync(workflows)) {
+        const source = readFileSync(join(workflows, file), "utf8");
+        expect(source, file).not.toMatch(/task\s+(prisma|clickhouse)-migrate/);
+      }
     });
 
     /** @scenario A stale SDK build is rebuilt before the browser application starts */

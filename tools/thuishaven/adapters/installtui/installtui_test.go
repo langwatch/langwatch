@@ -2,6 +2,7 @@ package installtui
 
 import (
 	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -315,7 +316,12 @@ func TestViewNamesEveryDecisionAndWhatEnterDoes(t *testing.T) {
 // @scenario "Installs run with the terminal to themselves"
 func TestBulkKeysTickAndUntickEverything(t *testing.T) {
 	m := press(newModel(missingEverything()), "a")
+	manual := 0
 	for _, r := range m.rows {
+		if isManual(r) {
+			manual++
+			continue
+		}
 		if !r.ticked {
 			t.Errorf("a must tick %q too", r.st.Key)
 		}
@@ -326,8 +332,54 @@ func TestBulkKeysTickAndUntickEverything(t *testing.T) {
 			t.Errorf("d must untick %q", r.st.Key)
 		}
 	}
-	if len(press(m, "enter").result().Install) != 0 {
-		t.Error("confirming with nothing ticked installs nothing")
+	if got := len(press(m, "enter").result().Install); got != manual {
+		t.Errorf("confirming with nothing ticked passes on only the %d manual entries, got %d", manual, got)
+	}
+}
+
+// A manual entry is one haven cannot run, so a checkbox beside it would be a
+// promise enter cannot keep: it is marked "manual" and space refuses it.
+func TestAManualEntryIsMarkedAndCannotBeTicked(t *testing.T) {
+	m := newModel(missingEverything())
+	at := -1
+	for i, r := range m.rows {
+		if isManual(r) {
+			at = i
+			break
+		}
+	}
+	if at < 0 {
+		t.Skip("no catalogue entry is manual on this platform")
+	}
+	m.cursor = at
+	if r := m.rows[at]; r.ticked || !strings.HasPrefix(stripANSI(m.mark(r)), "manual") {
+		t.Fatalf("a manual entry must start unticked and marked manual, got ticked=%v mark=%q", r.ticked, stripANSI(m.mark(r)))
+	}
+	m = press(m, " ")
+	if m.rows[at].ticked || m.note == "" {
+		t.Errorf("space on a manual entry must refuse with a note, got ticked=%v note=%q", m.rows[at].ticked, m.note)
+	}
+	if view := stripANSI(m.View()); strings.Contains(view, "[x] "+m.rows[at].st.Name) {
+		t.Errorf("a manual entry must never show a ticked box:\n%s", view)
+	}
+}
+
+// Nothing is cut off: every line fits the terminal, and each manual command
+// survives whole, wrapped onto further lines rather than truncated.
+func TestEveryLineWrapsToTheTerminalWidth(t *testing.T) {
+	m := newModel(missingEverything())
+	m.width, m.expanded = 60, true
+	view := stripANSI(m.View())
+	for _, line := range strings.Split(view, "\n") {
+		if w := lipgloss.Width(line); w > m.width {
+			t.Errorf("line is %d wide, past the %d-column terminal: %q", w, m.width, line)
+		}
+	}
+	squash := strings.NewReplacer(" ", "", "\n", "")
+	for _, r := range m.rows {
+		if _, manual := r.st.Candidates[r.candidate].InstallOn(runtime.GOOS); isManual(r) && !strings.Contains(squash.Replace(view), squash.Replace(manual)) {
+			t.Errorf("the %s command was cut off:\n%s", r.st.Name, view)
+		}
 	}
 }
 

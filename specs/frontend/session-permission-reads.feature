@@ -50,13 +50,6 @@ Feature: Permission reads come from the session, and a public page holds none
   # ---------------------------------------------------------------------------
 
   @integration
-  Scenario: An organization permission reads the same under every module host
-    Given the reader's grant in the active project lets them manage the project but not its organization
-    And the trace and scenario module hosts are mounted around the page
-    When a screen inside them asks whether the reader may manage the organization
-    Then the answer is no, as the session answers it
-
-  @integration
   Scenario: The demo project is recognised under every module host
     Given the address names the deployment's demo project
     And the trace and scenario module hosts are mounted around the page
@@ -126,7 +119,7 @@ Feature: Permission reads come from the session, and a public page holds none
   # Call sites move onto the session (plan batch 4)
   # ---------------------------------------------------------------------------
 
-  @integration @unimplemented
+  @integration
   Scenario: Agent Testing asks the session rather than sending its own grant read
     Given the session has answered the reader's grants in the active project
     When the Agent Testing page decides which actions to offer

@@ -138,6 +138,8 @@ The chart passes these environment variables to the container. Every other key i
 | `LW_GATEWAY_BASE_URL`                                  | `controlPlane.baseUrl`, else `http://<release>-app:5560`             | Control plane URL                              |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` and `OTEL_OTLP_ENDPOINT` | `otel.endpoint`, only when set                                       | OTLP/HTTP endpoint for the gateway's own spans |
 | `LW_GATEWAY_SPEND_ENABLED`                             | `spend.enabled`                                                      | Spend record emission                          |
+| `OTEL_METRICS_EXPORTER`, `OTEL_EXPORTER_PROMETHEUS_PORT` | `otlp,prometheus` and `metrics.port`, only when `metrics.enabled` is `true` | Metrics listener, default port 9464 |
+| `METRICS_API_KEY`                                      | Secret key `metrics.apiKey.secretKey` (default `METRICS_API_KEY`), in `metrics.apiKey.existingSecretName` or else `secrets.existingSecretName`, only when `metrics.enabled` is `true` | Bearer a scrape sends |
 | `SERVER_MAX_REQUEST_BODY_BYTES`                        | `security.maxRequestBodyBytes`                                       | Request body cap                               |
 | `SERVER_DRAIN_DELAY_SECONDS`                           | `shutdown.preDrainWaitSeconds`                                       | Wait after `/readyz` flips to 503              |
 | `SERVER_GRACEFUL_SECONDS`                              | `shutdown.timeoutSeconds`                                            | In-flight request budget on shutdown           |
@@ -200,7 +202,8 @@ Watch `gateway_draining` together with `gateway_in_flight_requests`. During a he
 
 | Direction | Allowed                                                                                                | Value                                                                  |
 | --------- | ------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------- |
-| Ingress   | Pods in the `ingress-nginx` namespace, and Prometheus pods in the `monitoring` namespace, to port 5563 | `networkPolicy.ingressFrom`                                            |
+| Ingress   | Pods in the `ingress-nginx` namespace, to port 5563                                                    | `networkPolicy.ingressFrom`                                            |
+| Ingress   | Prometheus pods in the `monitoring` namespace, to the metrics port, only when `metrics.enabled` is `true` | `networkPolicy.metricsFrom`                                         |
 | Egress    | DNS to `kube-system` on TCP and UDP 53                                                                 | fixed                                                                  |
 | Egress    | Pods labelled `app.kubernetes.io/name: langwatch-app` on port 5560                                     | `networkPolicy.egressToControlPlane`, `networkPolicy.controlPlanePort` |
 | Egress    | OTLP collector on port 4318, only when the list is non-empty                                           | `networkPolicy.egressToOTLP`                                           |

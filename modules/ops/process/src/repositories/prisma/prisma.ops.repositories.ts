@@ -5,6 +5,8 @@ import {
 } from "@langwatch/eventing/server";
 import { prismaRepositories } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { UpgradeRunnerRepository } from "@langwatch/upgrade/runner";
+import { TenantStepStateRepository } from "@langwatch/upgrade/step/tenant-state";
 
 import { PostgresHealthRepository } from "../datastore-health.repository.ts";
 import type { OpsRepositories } from "../ops.repositories.ts";
@@ -13,6 +15,7 @@ import { PrismaBugReportRepository } from "./prisma.bug-report.repository.ts";
 import { PrismaCredentialsResealRepository } from "./prisma.credentials-reseal.repository.ts";
 import { PrismaInstanceAdminRepository } from "./prisma.instance-admin.repository.ts";
 import { PrismaMigrationMembershipRepository } from "./prisma.migration-membership.repository.ts";
+import { PrismaOpsMigrationRepository } from "./prisma.ops-migration.repository.ts";
 import { PrismaOrganizationTenantSourceRepository } from "./prisma.organization-tenant-source.repository.ts";
 import { PrismaProjectTenantSourceRepository } from "./prisma.project-tenant-source.repository.ts";
 import { PrismaSystemMigrationEnrollmentRepository } from "./prisma.system-migration-enrollment.repository.ts";
@@ -66,6 +69,10 @@ type NotPostgres =
   | "events"
   | "storageFootprint";
 
+/** Marks the tenant step table's SQL for the tenancy guard, as the ledger repository does. */
+const LEDGER_TENANCY =
+  "-- @tenancy: the upgrade ledger describes the installation, not a tenant.\n";
+
 /**
  * The claimed rows, eventing's own process store, the migration pass's Postgres reads, and the
  * operator's reads and edits across the platform's rows.
@@ -76,12 +83,18 @@ export const PostgresOpsRepositories = {
     members: Parameters<typeof claimedOpsRepositories.create>[0],
   ): Omit<OpsRepositories, NotPostgres> => {
     const { prisma } = members;
+    const ledgerPostgres = {
+      query: async <Row extends object>(text: string, values: unknown[] = []) => ({
+        rows: await prisma.$queryRawUnsafe<Row[]>(`${LEDGER_TENANCY}${text}`, ...values),
+      }),
+    };
     return {
       ...claimedOpsRepositories.create(members),
       processStore: PrismaProcessStore.create({ database: prisma }),
       processManagerPurge: PrismaProcessPurge.create({ database: prisma }),
       credentialsReseal: PrismaCredentialsResealRepository.create({ database: prisma }),
       migrationState: PrismaSystemMigrationStateRepository.create({ prisma }),
+      migration: PrismaOpsMigrationRepository.create({ prisma }),
       migrationEnrollments: PrismaSystemMigrationEnrollmentRepository.create({ prisma }),
       migrationMemberships: PrismaMigrationMembershipRepository.create({ prisma }),
       organizationTenants: PrismaOrganizationTenantSourceRepository.create({ prisma }),
@@ -93,6 +106,8 @@ export const PostgresOpsRepositories = {
       processFleet: PrismaProcessAdmin.create({ database: prisma }),
       postgresHealth: PrismaPostgresHealthRepository.create(prisma),
       upgradeLedger: PrismaUpgradeLedgerRepository.create({ prisma }),
+      tenantStepState: TenantStepStateRepository.create({ postgres: ledgerPostgres }),
+      tenantStepLedger: UpgradeRunnerRepository.create({ postgres: ledgerPostgres }),
     };
   },
 };

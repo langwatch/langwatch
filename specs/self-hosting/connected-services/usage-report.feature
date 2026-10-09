@@ -103,7 +103,7 @@ Feature: The usage report a self-hosted install sends
 
   @unit
   Scenario: The report says whether licenses verify against the embedded key or an override
-    Given a deployment that sets LANGWATCH_LICENSE_PUBLIC_KEY
+    Given a development build that sets LANGWATCH_LICENSE_PUBLIC_KEY
     When the report is taken
     Then it carries license_key_source "override"
     But an install that sets no public key reports license_key_source "embedded"

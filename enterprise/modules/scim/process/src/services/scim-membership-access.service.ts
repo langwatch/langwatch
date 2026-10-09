@@ -101,7 +101,8 @@ export class ScimMembershipAccessService {
         ? [
             {
               principal: { userId },
-              role: "MEMBER" as TeamUserRole,
+              // A Lite Member seat (EXTERNAL) is granted view only, as an invitation maps it.
+              role: (membership?.role === "EXTERNAL" ? "VIEWER" : "MEMBER") as TeamUserRole,
               customRoleId: null,
               scopeType: "ORGANIZATION" as GrantScopeTier,
               scopeId: organizationId,

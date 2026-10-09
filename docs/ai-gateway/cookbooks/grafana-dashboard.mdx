@@ -4,7 +4,7 @@ description: An importable Grafana dashboard for the LangWatch AI Gateway, cover
 sidebarTitle: Grafana dashboard
 ---
 
-The JSON below builds nine rows that an on-call engineer reads top down, from caller impact to the cause. Every panel reads a metric the gateway registers, so it works against any Prometheus that scrapes `/metrics`.
+The JSON below builds nine rows that an on-call engineer reads top down, from caller impact to the cause. Every panel reads a metric the gateway registers, so it works against any Prometheus that scrapes the gateway's `/metrics` on the metrics port.
 
 Pair it with [Prometheus alerts](/ai-gateway/cookbooks/prometheus-alerts) for the paging rules, and [Troubleshooting](/ai-gateway/troubleshooting) for the fix behind each row.
 
@@ -27,7 +27,7 @@ Nine rows, top to bottom:
 ## Prerequisites
 
 - Grafana 10.0 or later. The JSON uses time series panels and `$__rate_interval`.
-- A Prometheus data source that scrapes the gateway's `/metrics`.
+- A Prometheus data source that scrapes the gateway's metrics port (`9464`) with the bearer `METRICS_API_KEY`.
 - `kube-state-metrics` and cAdvisor for the infrastructure row. Skip that row without them.
 
 ## Import

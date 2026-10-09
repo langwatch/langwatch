@@ -7,7 +7,6 @@ import {
 } from "@langwatch/enterprise-licensing-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
 import { planQuantities } from "@langwatch/plans";
 import { ResourceScope, type ServerRole } from "@langwatch/process";
 import { ScopedSecrets } from "@langwatch/secrets";
@@ -275,9 +274,6 @@ export function createTestLicensingApp(
       instantEval: createApiFixture<InstantEvalApi>(),
       scopes: createApiFixture<AuthzApi>(),
       gateway: createApiFixture<GatewayApi>(),
-      organizations: createApiFixture<OrganizationApi>({
-        countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),
-      }),
       ...options.dependencies,
     },
     repositories: {

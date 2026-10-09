@@ -154353,6 +154353,7 @@ type GetOrganizationMemberAccessResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *struct {
 		DirectBindings []struct {
+			CappedBySeat   bool                                                                  `json:"cappedBySeat"`
 			CustomRoleName *string                                                               `json:"customRoleName"`
 			Id             string                                                                `json:"id"`
 			Permissions    []string                                                              `json:"permissions"`
@@ -154363,6 +154364,7 @@ type GetOrganizationMemberAccessResponse struct {
 		} `json:"directBindings"`
 		Groups []struct {
 			Bindings []struct {
+				CappedBySeat   bool                                                                  `json:"cappedBySeat"`
 				CustomRoleName *string                                                               `json:"customRoleName"`
 				Id             string                                                                `json:"id"`
 				Permissions    []string                                                              `json:"permissions"`
@@ -184356,6 +184358,7 @@ func ParseGetOrganizationMemberAccessResponse(rsp *http.Response) (*GetOrganizat
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
 			DirectBindings []struct {
+				CappedBySeat   bool                                                                  `json:"cappedBySeat"`
 				CustomRoleName *string                                                               `json:"customRoleName"`
 				Id             string                                                                `json:"id"`
 				Permissions    []string                                                              `json:"permissions"`
@@ -184366,6 +184369,7 @@ func ParseGetOrganizationMemberAccessResponse(rsp *http.Response) (*GetOrganizat
 			} `json:"directBindings"`
 			Groups []struct {
 				Bindings []struct {
+					CappedBySeat   bool                                                                  `json:"cappedBySeat"`
 					CustomRoleName *string                                                               `json:"customRoleName"`
 					Id             string                                                                `json:"id"`
 					Permissions    []string                                                              `json:"permissions"`

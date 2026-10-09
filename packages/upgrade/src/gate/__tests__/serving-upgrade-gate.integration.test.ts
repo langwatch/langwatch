@@ -9,8 +9,7 @@ import { createLedgerTables } from "../../ledger-tables.ts";
 import type { ReleaseTreeSteps } from "../../manifest/stamp.ts";
 import type { FirstInstallUpgrade } from "../first-install-upgrade.ts";
 import { readImageCodeSteps } from "../image-code-steps.ts";
-import { UPGRADE_COMMAND } from "../serving-gate.ts";
-import { gatePoolConfig, upgradeGateOver } from "../serving-upgrade-gate.ts";
+import { gatePoolConfig, type ServingGateWarn, upgradeGateOver } from "../serving-upgrade-gate.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 const PRISMA_FOLDER = "20261006180000_add_column";
@@ -64,16 +63,34 @@ async function recordSteps(steps: Record<string, "done" | "pending">): Promise<v
   }
 }
 
+async function markStep({ id, status }: { id: string; status: string }): Promise<void> {
+  await scratch.postgres.query(
+    `UPDATE "_langwatch_upgrade_step" SET "status" = $2 WHERE "id" = $1`,
+    [id, status],
+  );
+}
+
+async function rosterProcessIds(): Promise<string[]> {
+  const { rows } = await scratch.postgres.query<{ process_id: string }>(
+    `SELECT "process_id" FROM "_langwatch_serving_roster"`,
+  );
+  return rows.map((row) => row.process_id);
+}
+
 function gateFor({
   role,
   withClickHouse = true,
   firstInstall = async () => ({ exitCode: 0, logTail: [] }),
   tree = TREE,
+  warn = () => undefined,
+  wait = async () => undefined,
 }: {
   role: "api" | "worker";
   withClickHouse?: boolean;
   firstInstall?: FirstInstallUpgrade;
   tree?: ReleaseTreeSteps;
+  warn?: ServingGateWarn;
+  wait?: (ms: number) => Promise<unknown>;
 }) {
   return upgradeGateOver({
     role,
@@ -87,60 +104,53 @@ function gateFor({
     withClickHouse,
     processId: `test:${role}`,
     firstInstall,
+    warn,
+    wait,
   });
 }
 
 describe.skipIf(!DB_URL)("servingUpgradeGate over a ledger", () => {
   describe("given a blocking step of this image still pending", () => {
-    /** @scenario "A serving process refuses by name when its installation is behind" */
-    it("refuses the worker by name and closes its connection", async () => {
-      await recordSteps({ [PRISMA]: "done", [GOOSE]: "pending" });
-
-      const verdict = await gateFor({ role: "worker" }).admit();
-
-      expect(verdict).toMatchObject({ admitted: false, outcome: "behind", outstanding: [GOOSE] });
-      expect(verdict.admitted ? "" : verdict.refusal).toContain(UPGRADE_COMMAND);
-      expect(scratch.closed).toBe(true);
-    });
-  });
-
-  describe("given a blocking step of this image still pending, for the api", () => {
-    /** @scenario "The api on an installation behind its image runs the upgrade once, then serves" */
-    it("runs the upgrade once for the api and admits it after", async () => {
+    /** @scenario "The worker on an installation behind its image runs the upgrade once, then takes jobs" */
+    it("runs the upgrade once for the worker and admits it after", async () => {
       await recordSteps({ [PRISMA]: "done", [GOOSE]: "pending" });
       let runs = 0;
       const gate = gateFor({
-        role: "api",
+        role: "worker",
         firstInstall: async () => {
           runs += 1;
-          await scratch.postgres.query(
-            `UPDATE "_langwatch_upgrade_step" SET "status" = 'done' WHERE "id" = $1`,
-            [GOOSE],
-          );
+          await markStep({ id: GOOSE, status: "done" });
           return { exitCode: 0, logTail: [] };
         },
       });
 
       await expect(gate.admit()).resolves.toMatchObject({ admitted: true });
       expect(runs).toBe(1);
+      expect(await rosterProcessIds()).toEqual(["test:worker"]);
       await gate.release();
     });
 
-    /** @scenario "The worker never runs the upgrade when its installation is behind" */
-    it("refuses the worker by name and runs nothing", async () => {
+    /** @scenario "The api never runs the upgrade when its installation is behind" */
+    it("answers the api upgrading, runs nothing, takes no lease and keeps its connection", async () => {
       await recordSteps({ [PRISMA]: "done", [GOOSE]: "pending" });
       let runs = 0;
       const verdict = await gateFor({
-        role: "worker",
+        role: "api",
         firstInstall: async () => {
           runs += 1;
           return { exitCode: 0, logTail: [] };
         },
       }).admit();
 
-      expect(verdict).toMatchObject({ admitted: false, outcome: "behind" });
-      expect(verdict.admitted ? "" : verdict.refusal).toContain(UPGRADE_COMMAND);
+      expect(verdict).toMatchObject({
+        admitted: false,
+        outcome: "upgrading",
+        outstanding: [GOOSE],
+      });
       expect(runs).toBe(0);
+      const leases = await scratch.postgres.query(`SELECT 1 FROM "_langwatch_upgrade_lease"`);
+      expect(leases.rows).toEqual([]);
+      expect(scratch.closed).toBe(false);
     });
   });
 
@@ -185,11 +195,11 @@ describe.skipIf(!DB_URL)("servingUpgradeGate over a ledger", () => {
   });
 
   describe("given an empty ledger on an empty schema", () => {
-    /** @scenario "The api's first boot on an empty installation runs the upgrade once" */
-    it("runs the upgrade once for the api and admits it after", async () => {
+    /** @scenario "The worker's first boot on an empty installation runs the upgrade once" */
+    it("runs the upgrade once for the worker and admits it after", async () => {
       let runs = 0;
       const gate = gateFor({
-        role: "api",
+        role: "worker",
         firstInstall: async () => {
           runs += 1;
           await recordSteps({ [PRISMA]: "done", [GOOSE]: "done" });
@@ -202,33 +212,49 @@ describe.skipIf(!DB_URL)("servingUpgradeGate over a ledger", () => {
       await gate.release();
     });
 
-    /** @scenario "The api refuses a first install whose upgrade failed" */
-    it("refuses the api with the command and the exit code when the upgrade failed", async () => {
-      const verdict = await gateFor({
-        role: "api",
-        firstInstall: async () => ({ exitCode: 3, logTail: [] }),
-      }).admit();
+    /** @scenario "After a failed run the worker waits for a Retry" */
+    it("waits while the ledger records the step failed and runs again once it is pending", async () => {
+      const said: string[] = [];
+      let runs = 0;
+      const gate = gateFor({
+        role: "worker",
+        warn: (message) => void said.push(message),
+        wait: async () => {
+          if (said.some((line) => line.includes("waits for a Retry"))) {
+            await markStep({ id: PRISMA, status: "pending" });
+          }
+        },
+        firstInstall: async () => {
+          runs += 1;
+          if (runs === 1) {
+            await recordSteps({ [PRISMA]: "pending", [GOOSE]: "pending" });
+            await markStep({ id: PRISMA, status: "failed" });
+            return { exitCode: 1, logTail: [] };
+          }
+          await markStep({ id: PRISMA, status: "done" });
+          await markStep({ id: GOOSE, status: "done" });
+          return { exitCode: 0, logTail: [] };
+        },
+      });
 
-      expect(verdict).toMatchObject({ admitted: false, outcome: "first-install" });
-      expect(verdict.admitted ? "" : verdict.refusal).toContain(UPGRADE_COMMAND);
-      expect(verdict.admitted ? "" : verdict.refusal).toContain("exited 3");
-      expect(verdict).toMatchObject({ failedRun: { failedSteps: [], logTail: [] } });
-      expect(scratch.closed).toBe(false);
+      await expect(gate.admit()).resolves.toMatchObject({ admitted: true });
+      expect(runs).toBe(2);
+      expect(said).toContainEqual(expect.stringMatching(/`pnpm task upgrade` exited 1/));
+      await gate.release();
     });
 
-    /** @scenario "The worker never runs the upgrade on a first install" */
-    it("refuses the worker and runs nothing", async () => {
+    /** @scenario "The api never runs the upgrade on a first install" */
+    it("answers the api holding and runs nothing", async () => {
       let runs = 0;
       const verdict = await gateFor({
-        role: "worker",
+        role: "api",
         firstInstall: async () => {
           runs += 1;
           return { exitCode: 0, logTail: [] };
         },
       }).admit();
 
-      expect(verdict).toMatchObject({ admitted: false, outcome: "behind" });
-      expect(verdict.admitted ? "" : verdict.refusal).toContain(UPGRADE_COMMAND);
+      expect(verdict).toMatchObject({ admitted: false, outcome: "holding", outstanding: [PRISMA] });
       expect(runs).toBe(0);
     });
   });
@@ -244,13 +270,23 @@ describe.skipIf(!DB_URL)("servingUpgradeGate over a ledger", () => {
     const doneOf = (ids: string[]) => Object.fromEntries(ids.map((id) => [id, "done" as const]));
 
     /** @scenario "A serving process over a real ledger gates on the generated code step list" */
-    it("refuses the worker naming the list's pending blocking step", async () => {
+    it("is not admitted until the list's pending blocking step is done, naming it", async () => {
       expect(blocking.length).toBeGreaterThan(0);
       await recordSteps({ ...schemaDone, ...pendingOf(blocking) });
+      const said: string[] = [];
+      const gate = gateFor({
+        role: "worker",
+        tree,
+        warn: (message) => void said.push(message),
+        firstInstall: async () => {
+          for (const id of blocking) await markStep({ id, status: "done" });
+          return { exitCode: 0, logTail: [] };
+        },
+      });
 
-      const verdict = await gateFor({ role: "worker", tree }).admit();
-
-      expect(verdict).toMatchObject({ admitted: false, outcome: "behind", outstanding: blocking });
+      await expect(gate.admit()).resolves.toMatchObject({ admitted: true });
+      expect(said[0]).toContain(`blocking steps not done: ${blocking.join(", ")}`);
+      await gate.release();
     });
 
     /** @scenario "A serving process over a real ledger gates on the generated code step list" */

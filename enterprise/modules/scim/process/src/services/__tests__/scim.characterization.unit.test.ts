@@ -15,6 +15,11 @@ import type { ScimSyncLifecycle } from "../scim-sync-lifecycle.service.ts";
 import { ScimService } from "../scim.service.ts";
 import { QuietScimSyncLifecycle } from "./support/quiet-scim-sync-lifecycle.ts";
 
+/** Every seat free, so these tests admit full members (seat-limit-at-provisioning.feature). */
+const openSeats = {
+  countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),
+};
+
 const now = new Date("2026-08-25T12:00:00.000Z");
 
 function repository(overrides: Partial<ScimRepository> = {}): ScimRepository {
@@ -115,6 +120,7 @@ function service(
     lifecycle,
     provenOffboarding: false,
     tokenPepper: "scim-test-pepper",
+    seats: openSeats,
   });
 }
 
@@ -303,6 +309,7 @@ describe("SCIM characterization: provisioning invariants", () => {
       lifecycle: new QuietScimSyncLifecycle(),
       provenOffboarding: false,
       tokenPepper: "scim-test-pepper",
+      seats: openSeats,
     });
     await scim.createUser({
       organizationId: "org_1",
@@ -389,6 +396,7 @@ describe("SCIM characterization: provisioning invariants", () => {
       lifecycle: new QuietScimSyncLifecycle(),
       provenOffboarding: false,
       tokenPepper: "scim-test-pepper",
+      seats: openSeats,
     });
     await scim.createUser({
       organizationId: "org_1",
@@ -453,6 +461,7 @@ describe("SCIM characterization: provisioning invariants", () => {
           lifecycle,
           provenOffboarding: false,
           tokenPepper: "scim-test-pepper",
+          seats: openSeats,
         });
 
         await scim.createUser({

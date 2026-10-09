@@ -152,14 +152,14 @@ describe("defineProjectionReplayStep", () => {
         {
           lane: LANE,
           replayedThrough: PROJECTION_REPLAY_FROM_START,
-          batchesDone: 1,
-          totalBatches: 2,
+          done: 1,
+          total: 2,
         },
         {
           lane: LANE,
           replayedThrough: PROJECTION_REPLAY_FROM_START,
-          batchesDone: 2,
-          totalBatches: 2,
+          done: 2,
+          total: 2,
         },
       ]);
     });

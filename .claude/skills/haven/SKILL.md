@@ -63,9 +63,11 @@ https://hub.langwatch.localhost               every stack on the machine
 
 `ui`, `api`, `go` (gateway and nlp), `sims`, `langy`. The api lane hosts the worker, so
 `haven logs api` and `haven logs worker` each show half of it. Under
-`LANGWATCH_DEV_ONE_PROCESS=1` ui, api and worker are one `app` lane: see `dev-runtime`.
-Under `LANGWATCH_GO_ONE_PROCESS=1` (a trial) the `go` lane also hosts the simulators
-and no `sims` lane runs; `haven logs <sim>` still reads each one. Langy stays its own lane.
+the default ui, api and worker are one `app` lane: see `dev-runtime`. The `go` lane
+also hosts the simulators and no `sims` lane runs; `LANGWATCH_DEV_ONE_PROCESS=0` splits
+both (`LANGWATCH_GO_ONE_PROCESS` is a deprecated alias). The Go lane rebuilds and swaps
+its child on a Go change (`haven go-watch`); `LANGWATCH_GO_WATCH=0` or `haven up --watch=false`
+turns that off; `haven logs <sim>` still reads each one. Langy stays its own lane.
 
 ```bash
 haven logs api -t                 # follow one service
@@ -132,6 +134,29 @@ not.
 | Run a heavy command under the machine slot | `haven run`, `haven slot run -- <cmd>`              |
 
 Seed presets are in `haven help db` (`demo`, `onboarding`, `post-onboarding` and more).
+
+## Feedback from the app page (the haven orb)
+
+When haven runs the stack, the app page carries the haven orb, bottom right
+(`apps/ui/vite/haven-orb/`, `specs/setup/haven-dev-orb.feature`). A reader picks an
+element or drags a region, types a note, and it lands in this stack's store. The orb also
+pushes the page's last 200 console messages and requests: method, URL without its query,
+status, duration. Never a body, a header or a cookie.
+
+While building UI, read it before you call the work done:
+
+```bash
+haven feedback list --open --agent      # notes nobody resolved yet
+haven feedback show <id> --agent        # one note: selector or region, viewport, console, requests
+haven feedback resolve <id>             # once you fixed it
+haven feedback wait --timeout 5m        # block until the reader sends the next note
+haven page console --level error --agent
+haven page network --failed --agent
+```
+
+The page buffer is whichever tab pushed last, and is empty until someone opens the app with
+the orb showing. The files live in `.haven/logs/<slug>/orb/`; `--stack <slug>` reads another
+worktree's.
 
 ## When it will not come up
 

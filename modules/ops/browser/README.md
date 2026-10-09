@@ -26,6 +26,7 @@ Installed by ui, from the app's generated module list (`pnpm generate:modules`).
 | `pages/ops/foundry`                     | `/ops/foundry` (route table)                     | –        | –       | `ops:view`   | –     |
 | `pages/ops/migrations`                  | `/ops/migrations` (route table)                  | –        | –       | `ops:view`   | –     |
 | `pages/ops/upgrades`                    | `/ops/upgrades` (route table)                    | –        | –       | `ops:view`   | –     |
+| `pages/ops/upgrades/preview`            | –                                                | –        | –       | `ops:view`   | –     |
 | `pages/ops/upgrades/releases/[release]` | `/ops/upgrades/releases/:release` (route table)  | –        | –       | `ops:view`   | –     |
 | `pages/ops/upgrades/runs/[runId]`       | `/ops/upgrades/runs/:runId` (route table)        | –        | –       | `ops:view`   | –     |
 | `pages/ops/projections/[runId]`         | `/ops/projections/:runId` (route table)          | –        | –       | `ops:view`   | –     |
@@ -60,7 +61,7 @@ Opened from lists the other modules (and `ui`, the app) whose browser source nam
 
 - Client packages (package.json): `@langwatch/api-key-client`, `@langwatch/enterprise-billing-client`, `@langwatch/prompt-client`.
 - Host APIs it requires: `OpsHostApi`, `CheckupHostApi`.
-- Capabilities: `impersonationBanner`.
+- Capabilities: `impersonationBanner`, `upgradeBanner`.
 - Config slices: `ops`, `rum`.
 
 <!-- readme:generated:end -->

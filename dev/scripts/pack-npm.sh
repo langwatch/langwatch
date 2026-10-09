@@ -288,6 +288,12 @@ done < <(node -p "require('./apps/server/distribution-files.json').join('\n')")
 # against it, so `--frozen-lockfile` fails without it.
 cp "$ROOT/package.json" "$APP/package.json"
 
+# The npx server is a release build (dev/docs/ARCHITECTURE.md, build stamp).
+stamp="$APP/packages/config/src/release-build.ts"
+sed -i.bak 's/^export const isReleaseBuild: boolean = false;$/export const isReleaseBuild: boolean = true;/' "$stamp"
+rm "$stamp.bak"
+grep -q '^export const isReleaseBuild: boolean = true;$' "$stamp" || { echo "✗ release stamp not set in $stamp" >&2; exit 1; }
+
 # The published manifest is owned by apps/server. Its entrypoint, file list and
 # module map are adjusted only for the staged layout.
 #

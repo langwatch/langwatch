@@ -11,7 +11,11 @@ import {
   opsUpgradeStepDetailSchema,
   opsUpgradeStepPageSchema,
 } from "@langwatch/ops-contract";
-import type { UpgradeRunDetail, UpgradeStepDetail } from "@langwatch/upgrade/reader";
+import type {
+  UpgradePreview,
+  UpgradeRunDetail,
+  UpgradeStepDetail,
+} from "@langwatch/upgrade/reader";
 import { describe, expect, it } from "vitest";
 
 import { MemoryUpgradeLedgerRepository } from "../../repositories/memory/memory.upgrade-ledger.repository.ts";
@@ -19,6 +23,12 @@ import { OpsUpgradeService } from "../ops-upgrade.service.ts";
 import { statusOf, stepOf } from "./support/upgrade-ledger.ts";
 
 const AT = "2026-10-06T10:00:00.000Z";
+const PLAN: Extract<UpgradePreview["plan"], { outcome: "planned" }> = {
+  outcome: "planned",
+  fresh: false,
+  releases: [],
+  notNeeded: [],
+};
 const STEP = stepOf({
   id: "clickhouse:00042",
   release: "3.23.0",
@@ -87,6 +97,8 @@ function service() {
         listRuns: async () => ({ items: [RUN_SUMMARY], cursor: "next" }),
         getRun: async () => RUN,
         preflight: async () => [],
+        preview: async () => ({ installed: null, plan: PLAN, preflight: [] }),
+        listTargets: async () => [],
       },
     }),
   });

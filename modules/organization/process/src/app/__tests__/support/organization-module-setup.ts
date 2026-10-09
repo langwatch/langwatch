@@ -8,7 +8,6 @@ import type { RoleApi } from "@langwatch/role-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant, type Instant } from "@langwatch/time";
-import type { UserApi } from "@langwatch/user-contract";
 
 import { MemoryOrganizationDatabase } from "../../../repositories/memory/memory.organization.database.ts";
 import { memoryOrganizationRepositories } from "../../../repositories/memory/memory.organization.repositories.ts";
@@ -32,7 +31,6 @@ export function organizationModuleSetup(
   return {
     dependencies: {
       permissions: peers.permissions ?? createApiFixture<AuthzApi>({}, "AuthzApi"),
-      users: peers.users ?? createApiFixture<UserApi>({}, "UserApi"),
       identity: peers.identity ?? createApiFixture<IdentityApi>({}, "IdentityApi"),
       entitlement: peers.entitlement ?? createApiFixture<EntitlementApi>({}, "EntitlementApi"),
       roles: peers.roles ?? createApiFixture<RoleApi>({}, "RoleApi"),

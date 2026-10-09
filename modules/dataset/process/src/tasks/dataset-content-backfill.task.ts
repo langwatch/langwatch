@@ -27,6 +27,12 @@ export class DatasetContentBackfillSweep {
       logger.info("Dataset chunk-layout columns are pending — skipping this migration run");
       return;
     }
+    if (result.status === "incomplete") {
+      const { failed, skippedConcurrentWrite } = result.summary;
+      throw new Error(
+        `Dataset content backfill left ${failed} failed and ${skippedConcurrentWrite} changed datasets; run it again`,
+      );
+    }
 
     logger.info(
       { ...result.summary, dryRun },

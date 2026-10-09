@@ -838,7 +838,7 @@ interface Input {
     scopeId: string;
   }[];
 }
-// Output: authzBindingMutationSuccessSchema, ../contract/src/authz.grant-management.ts:190
+// Output: authzBindingMutationSuccessSchema, ../contract/src/authz.grant-management.ts:192
 interface Output {
   success: true;
 }

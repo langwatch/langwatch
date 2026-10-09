@@ -51,6 +51,7 @@ vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => {
     }),
     currentUser: () => reading.actor,
     hasPermission: () => true,
+    isSettled: () => true,
   };
   return {
     ...original,

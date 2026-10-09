@@ -69,6 +69,17 @@ export class TenantStepStateRepository implements SystemMigrationStateRepository
     return rows.length > 0;
   }
 
+  /** A tenant the step has parked or holds (its proof disagreed, or its queued work waits). */
+  async hasUnsettledTenant({ migrationName }: { migrationName: string }): Promise<boolean> {
+    const table = await this.table();
+    const { rows } = await this.postgres.query<{ found: number }>(
+      `${TENANCY}SELECT 1 AS "found" FROM ${table}
+       WHERE "step_id" = $1 AND ("status" = 'parked' OR "held_reason" IS NOT NULL) LIMIT 1`,
+      [migrationName],
+    );
+    return rows.length > 0;
+  }
+
   /** One statement, so the rolled-back check and the write cannot interleave with another. */
   private async write({
     record,

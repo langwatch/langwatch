@@ -51,17 +51,35 @@ func (o *Orchestrator) simulatorShell(name string) string {
 // goCombinedShell runs the data-plane services in ONE Go process — the local
 // topology (ADR-004, amendment 2026-09-07). `services` names which of them this
 // stack selected, so a worktree that turned one off gets a process hosting only
-// the other rather than a second lane it has to reason about.
-//
-// Watching is air: it rebuilds the one binary on a Go change, restarts only
-// when the build succeeded, and waits out the same quiet window the Node lane
-// debounces on (LANGWATCH_DEV_WATCH_DEBOUNCE_MS).
-func goCombinedShell(repoRoot string, services []string, shouldWatch bool) string {
-	target := "service"
-	if shouldWatch {
-		target = "service-watch"
+// the other rather than a second lane it has to reason about. Watching is
+// haven's own `go-watch`; not watching runs `make service` once.
+func (p *childPlan) goCombinedShell(lane string, services []string) string {
+	repoRoot, watchArgv := p.opts.RepoRoot, p.goWatchArgv()
+	if len(watchArgv) == 0 {
+		return fmt.Sprintf("make -C %q service svc=combined args=%q", repoRoot, strings.Join(services, " "))
 	}
-	return fmt.Sprintf("make -C %q %s svc=combined args=%q", repoRoot, target, strings.Join(services, " "))
+	var b strings.Builder
+	b.WriteString("cd " + shQuote(repoRoot) + " && ")
+	// ponytail: consoles build once per lane start, as `make service-watch` did; slice 5 retires it for Vite.
+	for _, svc := range services {
+		if strings.HasSuffix(svc, "sim") {
+			fmt.Fprintf(&b, "{ pnpm exec nx run @langwatch/%s-web:build --outputStyle=static || echo '%s-web did not build; its console names the fix'; } && ", svc, svc)
+		}
+	}
+	b.WriteString(`_snap=$(export -p) && . dev/scripts/lib/load-dev-env.sh && { ! test -f .env || load_dev_env .env; } && eval "$_snap" && `)
+	b.WriteString(`. dev/scripts/lib/derive-gateway-base-url.sh && derive_gateway_base_url && export LOG_FORMAT=${LOG_FORMAT:-json} && exec`)
+	for _, arg := range append(append(append([]string{}, watchArgv...), filepath.Join(".bin", "combined", lane)), services...) {
+		b.WriteString(" " + shQuote(arg))
+	}
+	return b.String()
+}
+
+// goWatchArgv is the watch command for the go lanes, or nil when not watching.
+func (p *childPlan) goWatchArgv() []string {
+	if !p.opts.ShouldGoWatch {
+		return nil
+	}
+	return p.o.cfg.GoWatchArgv
 }
 
 // SimulatorsInGoFile is the dev-tagged file that links the simulators into the
@@ -176,7 +194,7 @@ func (o *Orchestrator) newChildPlan(st domain.Stack, opts PlanOptions, repoDir s
 	// The simulators' provider settings (mail, storage, voice, analytics, LLM),
 	// computed before `base` feeds the ui/backend lanes (and mono's own copy)
 	// below, so a monolith checkout's one lane gets them too.
-	for _, name := range []string{domain.MailService, domain.StorageService, domain.VoiceService, domain.AnalyticsService, domain.LLMService} {
+	for _, name := range []string{domain.MailService, domain.StorageService, domain.VoiceService, domain.AnalyticsService, domain.OutboundService, domain.LLMService} {
 		for _, svc := range st.Services {
 			if svc.Name == name {
 				p.base = append(p.base, simulatorBaseEnv(opts.Selection, svc, repoDir)...)
@@ -201,6 +219,8 @@ func simulatorBaseEnv(sel domain.Selection, svc domain.Service, repoDir string) 
 		return domain.VoiceProviderEnv(resolvedDevEnv(repoDir), svc.Port)
 	case svc.Name == domain.AnalyticsService && sel.Analytics && svc.Port != 0:
 		return domain.AnalyticsProviderEnv(resolvedDevEnv(repoDir), svc.URL)
+	case svc.Name == domain.OutboundService && sel.Outbound && svc.Port != 0:
+		return domain.OutboundProviderEnv(resolvedDevEnv(repoDir), svc.URL)
 	case svc.Name == domain.LLMService && sel.LLM && svc.Port != 0:
 		return domain.LLMProviderEnv(resolvedDevEnv(repoDir), svc.Port)
 	}
@@ -279,14 +299,14 @@ func (p *childPlan) goLanes(mono monolithPlan) []Child {
 	} else if len(goServices) > 0 {
 		out = append(out, Child{
 			Name: GoLane, Dir: p.opts.RepoRoot, Color: palette[2], LogPath: p.logPath(GoLane),
-			Shell: goCombinedShell(p.opts.RepoRoot, goServices, p.opts.ShouldGoWatch),
+			Shell: p.goCombinedShell(GoLane, goServices),
 			Env:   goEnv,
 		})
 	}
 	if len(sims.services) > 0 {
 		out = append(out, Child{
 			Name: SimsLane, Dir: p.opts.RepoRoot, Color: palette[8], LogPath: p.logPath(SimsLane),
-			Shell: goCombinedShell(p.opts.RepoRoot, sims.services, p.opts.ShouldGoWatch),
+			Shell: p.goCombinedShell(SimsLane, sims.services),
 			Env:   append(append(append([]string{}, p.base...), domain.LaneEnv(SimsLane)), sims.env...),
 		})
 	}
@@ -294,7 +314,7 @@ func (p *childPlan) goLanes(mono monolithPlan) []Child {
 }
 
 // retireStaleSimsCapture removes the sims capture an earlier split run left
-// when this run plans a go lane and no sims lane (LANGWATCH_GO_ONE_PROCESS):
+// when this run plans a go lane and no sims lane (the default; LANGWATCH_DEV_ONE_PROCESS=0 splits):
 // `haven logs <sim>` reads sims.log first, so a dead one would hide go.log.
 func retireStaleSimsCapture(children []Child) {
 	if slices.ContainsFunc(children, func(c Child) bool { return c.Name == SimsLane }) {
@@ -344,8 +364,8 @@ func (sp *simulatorPlan) host(binary string, env func() []string, child func() C
 
 // planSimulators places every selected simulator. The linked simulators get a
 // lane of their own, so a simulator under load cannot starve the gateway: a
-// second `service combined` process. LANGWATCH_GO_ONE_PROCESS=1 folds them
-// into the go lane instead (a trial; Langy always keeps its own lane).
+// second `service combined` process. LANGWATCH_DEV_ONE_PROCESS (on by
+// default) folds them into the go lane instead; Langy always keeps its own lane.
 func (p *childPlan) planSimulators() simulatorPlan {
 	o, st, sel, repoRoot, base := p.o, p.st, p.opts.Selection, p.opts.RepoRoot, p.base
 	sp := simulatorPlan{
@@ -376,7 +396,7 @@ func (p *childPlan) planSimulators() simulatorPlan {
 	return sp
 }
 
-// hostBundledSimulators places storage, voice, LLM, analytics and telemetry, in that order.
+// hostBundledSimulators places storage, voice, LLM, analytics, outbound and telemetry, in that order.
 func (p *childPlan) hostBundledSimulators(sp *simulatorPlan) {
 	o, st, sel, repoRoot, base := p.o, p.st, p.opts.Selection, p.opts.RepoRoot, p.base
 	for _, sim := range []struct {
@@ -389,6 +409,7 @@ func (p *childPlan) hostBundledSimulators(sp *simulatorPlan) {
 		{sel.Voice, "voicesim", func() []string { return voiceEnv(st) }, func() Child { return o.voiceChild(st, repoRoot, base) }},
 		{sel.LLM, "llmsim", func() []string { return llmEnv(st) }, func() Child { return o.llmChild(st, repoRoot, base) }},
 		{sel.Analytics, "analyticssim", func() []string { return analyticsEnv(st) }, func() Child { return o.analyticsChild(st, repoRoot, base) }},
+		{sel.Outbound, "outboundsim", func() []string { return outboundEnv(st) }, func() Child { return o.outboundChild(st, repoRoot, base) }},
 		{sel.Telemetry, "telemetrysim", func() []string { return telemetryEnv(st) }, func() Child { return o.telemetryChild(st, repoRoot, base) }},
 	} {
 		if sim.isSelected {
@@ -465,11 +486,11 @@ const (
 	// it has its own liveness, and a stack whose worker is down looks healthy
 	// from every other row.
 	WorkerLane = "worker"
-	// AppLane is the ui and api lanes run as one process (LANGWATCH_DEV_ONE_PROCESS=1).
+	// AppLane is the ui and api lanes run as one process, the default (LANGWATCH_DEV_ONE_PROCESS=0 splits them).
 	// Same name as a monolith checkout's one lane, for the same reason.
 	AppLane = domain.MonolithAppLane
 	// GoLane is the process hosting the Go data-plane services, and the
-	// simulators too when LANGWATCH_GO_ONE_PROCESS=1.
+	// simulators too unless LANGWATCH_DEV_ONE_PROCESS=0.
 	GoLane = "go"
 	// SimsLane is the second Go process, hosting the simulators a stack
 	// selected, so load on one cannot starve the gateway.

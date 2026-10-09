@@ -36,10 +36,10 @@ const ROUTING_POLICY_DRAWER = "routingPolicy" as const;
  * flag and permission policy the route table now states around it.
  */
 export function RoutingPoliciesPage() {
-  const { organization, hasAnyPermission } = useOrganizationTeamProject();
-  const organizationId = organization?.id ?? "";
+  const { organization } = useOrganizationTeamProject();
   const host = useGatewayHost();
-  const canManage = hasAnyPermission("routingPolicies:manage");
+  const organizationId = organization?.id ?? "";
+  const canManage = host.hasPermission("routingPolicies:manage");
 
   const policiesQuery = api.routingPolicy.list.useQuery(
     { organizationId },

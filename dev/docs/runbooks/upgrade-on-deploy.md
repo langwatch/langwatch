@@ -11,13 +11,13 @@
 ## Status
 
 The contract is fixed now; the pieces it names land in slices. All five have landed:
-the chart's pre-roll Job runs `upgrade`, and every admitted api and worker writes its roster entry
+the workers run `upgrade` at start (the chart's pre-roll Job does too, when upgrades are serialised), and every admitted api and worker writes its roster entry
 (15 s refresh, 60 s stale).
 
 | Piece                                           | Lands with                                                   |
 | ----------------------------------------------- | ------------------------------------------------------------ |
 | `pnpm task upgrade` (the one command)           | `mig-s3-runner`                                              |
-| The chart Job running `upgrade`                 | `mig-entry-points`                                           |
+| The workers, and the chart Job when upgrades are serialised, running `upgrade` | `mig-entry-points`, UIW slice 7 |
 | New pods refusing until current, and the roster | `mig-serving-gate`                                           |
 | The serving roster table                        | `mig-ledger-widen`                                           |
 | The "old writers gone" predicate                | `mig-cloud-presence` (`packages/upgrade/src/serving-roster`) |
@@ -28,15 +28,17 @@ the chart's pre-roll Job runs `upgrade`, and every admitted api and worker write
 1. **Run `pnpm task upgrade` from the new image, to completion, before any
    Deployment rolls.** It must be the new image: only it knows the steps the new
    build declares. A blocking step that is already `done` is skipped, so a
-   redundant run is harmless.
+   redundant run is harmless. The workers also run it at their own start and
+   the api is not ready until the installation is current, so the Job ahead
+   of the roll is the serialised-upgrades path, not the only one.
 2. **Run it once, with a deadline, and do not retry it in a loop.** A run that
    fails has a reason that a retry buries under identical failures. The chart's
    Job already has this shape: `backoffLimit: 0` and `activeDeadlineSeconds`
-   (`charts/langwatch/templates/app/migrate-pre-roll-job.yaml:74-75`).
+   (`charts/langwatch/templates/app/migrate-pre-roll-job.yaml:49-50`).
 3. **Never run it on a rollback.** Rolling back to the previous image on the
    upgraded schema is what the expand and contract rules guarantee; there is no
    down migration. The chart's Job is `pre-upgrade` only, never `pre-rollback`
-   (`migrate-pre-roll-job.yaml:29-36,63`). A deployer that runs hooks on every
+   (`migrate-pre-roll-job.yaml:38`). A deployer that runs hooks on every
    sync (ArgoCD and Flux map `pre-upgrade` to PreSync, `migrate-pre-roll-job.yaml:38-41`)
    must say so: whether a run from the older image is then a pure no-op is the
    runner's to prove, and is held until it is.

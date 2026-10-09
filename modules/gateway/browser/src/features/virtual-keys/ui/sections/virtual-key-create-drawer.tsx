@@ -21,6 +21,7 @@ import {
   useCurrentUser,
 } from "../../../../behavior/gateway-session.ts";
 import { humanizeGatewayError } from "../../../../model/gateway-error-copy.ts";
+import { useGatewayHost } from "../../../../model/gateway-host.ts";
 import {
   useRecordMintedKey,
   useVirtualKeyTourActions,
@@ -180,7 +181,8 @@ export function VirtualKeyCreateDrawer({
   onCreated,
 }: VirtualKeyCreateDrawerProps) {
   const toaster = useGatewayToaster();
-  const { organization, project, hasPermission } = useOrganizationTeamProject();
+  const { organization, project } = useOrganizationTeamProject();
+  const host = useGatewayHost();
   const currentUser = useCurrentUser();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -197,7 +199,7 @@ export function VirtualKeyCreateDrawer({
   const [expiration, setExpiration] = useState<VirtualKeyExpirationValue>(NEVER_EXPIRES);
   const [expiryFieldError, setExpiryFieldError] = useState<string | null>(null);
 
-  const canCreateShared = hasPermission("virtualKeys:manage");
+  const canCreateShared = host.hasPermission("virtualKeys:manage");
 
   const availableTeams = useMemo(
     () => organization?.teams?.map((t) => ({ id: t.id, name: t.name })) ?? [],

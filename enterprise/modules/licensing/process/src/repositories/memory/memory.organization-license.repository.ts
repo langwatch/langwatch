@@ -29,35 +29,67 @@ const rowOf = (columns: string | null | OrganizationLicenseColumns): LicenseColu
 /**
  * Licensing's rows beside organization's columns, both in memory: an
  * organization in `organizations` exists, and its own row, once written, wins.
+ * The columns are read live from the map given, so a test can write them.
  */
 export class MemoryOrganizationLicenseRepository implements OrganizationLicenseRepository {
   static create(
     licenses: ReadonlyMap<string, string | null | OrganizationLicenseColumns> = new Map(),
   ): MemoryOrganizationLicenseRepository {
-    return new MemoryOrganizationLicenseRepository(
-      new Map([...licenses].map(([organizationId, columns]) => [organizationId, rowOf(columns)])),
-    );
+    return new MemoryOrganizationLicenseRepository(licenses);
   }
 
   private readonly own = new Map<string, LicenseColumns>();
 
-  private constructor(private readonly organizations: ReadonlyMap<string, LicenseColumns>) {}
+  private constructor(
+    private readonly organizations: ReadonlyMap<string, string | null | OrganizationLicenseColumns>,
+  ) {}
+
+  private columnsOf(organizationId: string): LicenseColumns | undefined {
+    return this.organizations.has(organizationId)
+      ? rowOf(this.organizations.get(organizationId) ?? null)
+      : void 0;
+  }
 
   async getOrganizationLicense(organizationId: string): Promise<{ licenseKey: string | null }> {
-    const row = this.own.get(organizationId) ?? this.organizations.get(organizationId);
+    const row = this.own.get(organizationId) ?? this.columnsOf(organizationId);
     if (row === void 0) throw new OrganizationNotFoundError();
     return { licenseKey: row.licenseKey };
   }
 
   async findOrganizationsWithLicense(): Promise<OrganizationLicenseCandidate[]> {
-    const merged = new Map([...this.organizations, ...this.own]);
-    return [...merged].flatMap(([organizationId, row]) =>
-      row.licenseKey === null ? [] : [{ organizationId, licenseKey: row.licenseKey }],
-    );
+    const ids = new Set([...this.organizations.keys(), ...this.own.keys()]);
+    return [...ids].flatMap((organizationId) => {
+      const row = this.own.get(organizationId) ?? this.columnsOf(organizationId);
+      return row === void 0 || row.licenseKey === null
+        ? []
+        : [{ organizationId, licenseKey: row.licenseKey }];
+    });
   }
 
   async organizationExists(organizationId: string): Promise<boolean> {
     return this.organizations.has(organizationId);
+  }
+
+  async findLicense({
+    organizationId,
+  }: Readonly<{ organizationId: string }>): Promise<LicenseColumns[]> {
+    const row = this.own.get(organizationId);
+    return row === void 0 ? [] : [row];
+  }
+
+  async restoreLicense({
+    organizationId,
+    written,
+    previous,
+  }: Readonly<{
+    organizationId: string;
+    written: LicenseColumns;
+    previous: LicenseColumns | null;
+  }>): Promise<void> {
+    const held = this.own.get(organizationId);
+    if (held === void 0 || !sameLicense({ a: held, b: written })) return;
+    if (previous === null) this.own.delete(organizationId);
+    else this.own.set(organizationId, previous);
   }
 
   async saveLicense({
@@ -85,7 +117,7 @@ export class MemoryOrganizationLicenseRepository implements OrganizationLicenseR
       .slice(0, limit)
       .map(([organizationId, columns]) => ({
         organizationId,
-        columns,
+        columns: rowOf(columns),
         own: this.own.get(organizationId) ?? null,
       }));
   }
@@ -93,11 +125,15 @@ export class MemoryOrganizationLicenseRepository implements OrganizationLicenseR
   async overwriteLicenses({
     pairs,
   }: Readonly<{ pairs: readonly OrganizationLicensePair[] }>): Promise<number> {
-    const current = pairs.filter(({ organizationId, own }) => {
+    const current = pairs.filter(({ organizationId, columns, own }) => {
       const held = this.own.get(organizationId);
-      return held === void 0 || own === null
-        ? held === void 0 && own === null
-        : sameLicense({ a: held, b: own });
+      const source = this.columnsOf(organizationId);
+      if (held === void 0 || own === null) return held === void 0 && own === null;
+      return (
+        source !== void 0 &&
+        sameLicense({ a: source, b: columns }) &&
+        sameLicense({ a: held, b: own })
+      );
     });
     for (const { organizationId, columns } of current) this.own.set(organizationId, columns);
     return current.length;

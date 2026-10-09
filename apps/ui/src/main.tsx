@@ -8,12 +8,8 @@ import type {
   UiSessionCapabilities,
 } from "@langwatch/browser-host/capabilities";
 import type { UiDrawerRegistry } from "@langwatch/browser-host/drawer";
-import { BrowserUiFeedback, resolveUiFailureCopy } from "@langwatch/browser-host/feedback";
-import {
-  isChunkLoadFailure,
-  registerChunkReloadListener,
-  signalUiMounted,
-} from "@langwatch/browser-host/navigation";
+import { BrowserUiFeedback } from "@langwatch/browser-host/feedback";
+import { registerChunkReloadListener, signalUiMounted } from "@langwatch/browser-host/navigation";
 import { SessionVersionWatch, sessionVersionFetch } from "@langwatch/browser-host/session-version";
 import {
   createUiApplication,
@@ -28,11 +24,6 @@ import { installedModuleApis } from "@langwatch/browser/module-apis";
 import { installedModuleDrawers } from "@langwatch/browser/module-drawers";
 import { installedModuleHostMounts, type UiModuleHostMount } from "@langwatch/browser/module-hosts";
 import { installedModuleScreens, type UiModuleScreens } from "@langwatch/browser/module-screens";
-import {
-  UI_CHUNK_LOAD_FAILURE_COPY,
-  UiChunkLoadFailure,
-  UiPageFailure,
-} from "@langwatch/browser/page-fallbacks";
 import { readPublicAppConfig } from "@langwatch/browser/public-config";
 import { UiRuntime } from "@langwatch/browser/runtime";
 import { UiShell } from "@langwatch/browser/shell";
@@ -47,11 +38,12 @@ import { applyFeatureFlagOverridesFromSearch } from "@langwatch/feature-flag-cli
 import { configureDocsRuntime } from "@langwatch/handled-error/docs-url";
 import posthog from "posthog-js";
 import { type ReactNode, useEffect } from "react";
-import type { FallbackProps } from "react-error-boundary";
-import { useLocation, useRouteError } from "react-router";
+import { ErrorBoundary } from "react-error-boundary";
+import { useLocation } from "react-router";
 
 import { browserModules } from "./browser-modules.generated.ts";
 import { installedUiDeclarations } from "./shell/ui-declarations";
+import { uiErrorPages, type UiErrorPages } from "./shell/ui-error-page";
 import {
   composeUiDesignSystem,
   loadUiRootCapabilities,
@@ -96,42 +88,10 @@ function UiNoFooter() {
   return null;
 }
 
-/**
- * A page that threw, said properly: this renders inside the providers, so the
- * words come from the code-keyed registry rather than `error.message`.
- */
-function UiPageError({ error }: FallbackProps) {
-  if (isChunkLoadFailure(error)) return <UiChunkLoadFailure />;
-  return (
-    <UiPageFailure
-      copy={resolveUiFailureCopy({ error, fallbackTitle: "This page did not load" })}
-    />
-  );
-}
-
-/** The last resort: plain, because it must render when nothing else loaded. */
+/** The last resort: plain, for when even the branded error page cannot draw. */
 function UiBootPageError() {
   // The app answered: the boot recovery must not reload over its message.
   useEffect(signalUiMounted, []);
-  if (isChunkLoadFailure(useRouteError())) {
-    return (
-      <div role="alert" style={{ padding: "3rem", textAlign: "center" }}>
-        <h1 style={{ fontSize: "1.25rem", marginBottom: "0.5rem" }}>
-          {UI_CHUNK_LOAD_FAILURE_COPY.title}
-        </h1>
-        <p style={{ opacity: 0.7, marginBottom: "1rem" }}>
-          {UI_CHUNK_LOAD_FAILURE_COPY.description}
-        </p>
-        <button
-          type="button"
-          data-testid="chunk-load-retry"
-          onClick={() => window.location.reload()}
-        >
-          Try again
-        </button>
-      </div>
-    );
-  }
   return (
     <div role="alert" style={{ padding: "3rem", textAlign: "center" }}>
       <h1 style={{ fontSize: "1.25rem", marginBottom: "0.5rem" }}>This page did not load</h1>
@@ -174,7 +134,7 @@ function browserUiCapabilitiesHook({
       userId: sessionReading.user?.id,
     });
 
-    const scope = organization.createBrowserUiScope({ reading: scopeReading, session });
+    const scope = organization.createBrowserUiScope({ reading: scopeReading });
     const traceFilters = filtering.useUiTraceFiltersReading({
       search,
       projectId: scope.activeScope().projectId ?? void 0,
@@ -218,8 +178,10 @@ class BrowserUiShell extends UiShell {
     hostServices: UiRenderResult["hostServices"];
   }): BrowserUiShell {
     const telemetry = uiTelemetryOf(config);
-    return new BrowserUiShell(
-      createUiApplication({
+    const errorPages = uiErrorPages({ isDevelopment });
+    return new BrowserUiShell({
+      errorPages,
+      application: createUiApplication({
         sessionQueryKey: rootCapabilities.session.UI_SESSION_QUERY_KEY,
         drawers,
         features: {
@@ -266,14 +228,16 @@ class BrowserUiShell extends UiShell {
           loaders: uiUnservedPageLoaders,
           table: uiRouteTable,
           shellLayouts: uiShellLayouts({ root: rootCapabilities, config }),
-          errorFallback: UiPageError,
-          rootErrorBoundary: UiBootPageError,
+          errorFallback: errorPages.page,
+          rootErrorBoundary: errorPages.route,
         },
       }),
-    );
+    });
   }
 
-  private constructor(private readonly application: UiApplication) {
+  private constructor(
+    private readonly parts: { application: UiApplication; errorPages: UiErrorPages },
+  ) {
     super();
   }
 
@@ -284,11 +248,16 @@ class BrowserUiShell extends UiShell {
   }
 
   render(): ReactNode {
+    const { application, errorPages } = this.parts;
     return (
-      <UiApplicationShell
-        outerProvider={this.application.outerProvider}
-        router={this.application.router}
-      />
+      <ErrorBoundary FallbackComponent={UiBootPageError}>
+        <ErrorBoundary FallbackComponent={errorPages.application}>
+          <UiApplicationShell
+            outerProvider={application.outerProvider}
+            router={application.router}
+          />
+        </ErrorBoundary>
+      </ErrorBoundary>
     );
   }
 }

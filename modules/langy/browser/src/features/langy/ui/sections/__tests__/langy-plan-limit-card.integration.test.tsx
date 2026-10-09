@@ -15,7 +15,14 @@ let canManagePlan = true;
 vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project_1", slug: "acme" },
-    hasOrgPermission: (permission: string) => permission === "organization:manage" && canManagePlan,
+  }),
+}));
+
+vi.mock("../../../../../model/langy-host.ts", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useLangyHost: () => ({
+    hasOrganizationPermission: (permission: string) =>
+      permission === "organization:manage" && canManagePlan,
   }),
 }));
 

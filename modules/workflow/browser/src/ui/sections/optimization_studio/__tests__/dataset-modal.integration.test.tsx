@@ -139,7 +139,6 @@ vi.mock("../../../../behavior/studio-host/use-organization-team-project.ts", () 
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1", slug: "acme" },
     organization: { id: "org-1" },
-    hasPermission: () => true,
   }),
 }));
 

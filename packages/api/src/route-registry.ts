@@ -44,6 +44,8 @@ export interface RegisteredRoute {
    * the owner, the module serving it, why, and the plan that retires it.
    */
   readonly sharedPath?: RegisteredSharedPath;
+  /** Declared to serve while the installation upgrades (UIW-6). */
+  readonly servesWhileUpgrading?: true;
 }
 
 export type RegisteredSharedPath = RestSharedPath & Readonly<{ servedBy: string }>;
@@ -68,4 +70,64 @@ export function getRoutePolicy(method: string, path: string): RegisteredRoute | 
 
 export function allRegisteredRoutes(): RegisteredRoute[] {
   return [...registry.values()];
+}
+
+/**
+ * Every route declared to serve while upgrading, as a regex over `METHOD /path` the liveness
+ * door matches before it proxies (UIW-6). A wildcard skips the literal routes beneath it that
+ * do not declare it themselves (UIW-WILDCARD-SKIPS-LITERALS). Spec: in-app-upgrade.feature.
+ */
+export function routesServingWhileUpgrading(): string[] {
+  const routes = allRegisteredRoutes();
+  const held = routes.filter((route) => !route.servesWhileUpgrading).flatMap(addressesOf);
+  const rest = routes
+    .filter((route) => route.servesWhileUpgrading)
+    .flatMap(addressesOf)
+    .map(({ method, path }) => {
+      const pattern = `${method} ${pathPattern(path)}`;
+      if (!path.includes("*")) return `^${pattern}$`;
+      const beneath = new RegExp(`^${pattern}$`);
+      const skipped = held
+        .filter((other) => !other.path.includes("*") && beneath.test(`${other.verb} ${other.path}`))
+        .map((other) => `(?!${other.method} ${pathPattern(other.path)}$)`);
+      return `^${skipped.join("")}${pattern}$`;
+    });
+  return trpcServingWhileUpgrading.size === 0 ? rest : [...rest, trpcBatchPattern()];
+}
+
+/** A route's bare and twin paths, each with its method as a regex and as declared. */
+function addressesOf(route: RegisteredRoute): { method: string; verb: string; path: string }[] {
+  const method = route.method === "ALL" ? "[A-Z]+" : route.method;
+  const paths = [route.path, ...(route.canonicalPath ? [route.canonicalPath] : [])];
+  return paths.map((path) => ({ method, verb: route.method, path }));
+}
+
+const trpcServingWhileUpgrading = new Set<string>();
+
+/** A tRPC procedure (`namespace.name`) declared to serve while upgrading (UIW-TRPC-DECLARE). */
+export function registerTrpcServingWhileUpgrading(procedure: string): void {
+  trpcServingWhileUpgrading.add(procedure);
+}
+
+/** `/api/trpc/a,b` (TrpcHost.path) passes only when every procedure in the batch is declared. */
+function trpcBatchPattern(): string {
+  const one = `(?:${[...trpcServingWhileUpgrading].map(escapeRegex).join("|")})`;
+  return `^(?:GET|POST) /api/trpc/${one}(?:,${one})*$`;
+}
+
+function escapeRegex(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** A Hono path as a regex: `:name` one segment, `:name{re}` its own pattern, `*` the rest. */
+function pathPattern(path: string): string {
+  return path
+    .split("/")
+    .map((segment) => {
+      if (segment === "*") return ".*";
+      const param = /^:\w+(?:\{(.+)\})?\??$/.exec(segment);
+      if (param) return `(?:${param[1] ?? "[^/]+"})`;
+      return escapeRegex(segment);
+    })
+    .join("/");
 }

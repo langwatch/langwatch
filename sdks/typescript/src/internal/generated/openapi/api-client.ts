@@ -30197,6 +30197,7 @@ export interface operations {
                                 scopeId: string;
                                 scopeName: string | null;
                                 permissions: string[];
+                                cappedBySeat: boolean;
                             }[];
                         }[];
                         directBindings: {
@@ -30208,6 +30209,7 @@ export interface operations {
                             scopeId: string;
                             scopeName: string | null;
                             permissions: string[];
+                            cappedBySeat: boolean;
                         }[];
                     };
                 };

@@ -167,7 +167,14 @@ cannot be reached through its options, and the upstream change is proposed at th
 is `patches/<name>@<version>.patch`, a diff against the published files as `pnpm patch-commit` writes it,
 registered under `patchedDependencies` in `pnpm-workspace.yaml` for one exact version; an upgrade re-cuts
 or drops it. Each patch has one owning module and a test there that runs the patched path. First:
-`@better-auth/sso@1.7.1`, per-connection IdP-initiated SAML, owned by auth.
+`@better-auth/sso@1.7.1`, per-connection IdP-initiated SAML, owned by auth. Second:
+`@better-auth/core@1.7.1`, a clock tolerance on deployment-wide OIDC ID-token verification, owned by auth.
+
+**Build stamp** (Alex, 2026-10-09). `isReleaseBuild` in `packages/config/src/release-build.ts` is a
+committed `false`; the release image build sets it `true` in its builder stage (`infra/docker/Dockerfile`,
+build arg `LANGWATCH_RELEASE_BUILD`, default `true`) and `dev/scripts/pack-npm.sh` sets it on the npx
+staged copy. Runtime env cannot change it, only a rebuild can. A release build verifies licences
+against the embedded LangWatch key only and logs once, by name, that the public-key override is ignored.
 
 ---
 
@@ -818,7 +825,7 @@ preload file, and anything requiring preload is out of scope by design.
 `OTEL_EXPORTER_OTLP_ENDPOINT` is set (`OTEL_METRICS_EXPORTER=none` turns it off). A Prometheus
 `/metrics` door is off by default; `OTEL_METRICS_EXPORTER=otlp,prometheus` adds a pull reader to the
 same provider and serves it on its own port (`OTEL_EXPORTER_PROMETHEUS_PORT`, default 9464), never
-the public one, behind `METRICS_API_KEY`; production with no key leaves it unmounted.
+the public one, behind `METRICS_API_KEY`; with no key it is unmounted in every environment.
 **Telemetry is recorded, never passed** (Alex, 2026-09-23): any package or module records counters,
 histograms and gauges through `@langwatch/observability`'s instruments directly — no `*Api` operation,
 channel or member carries a metric. Telemetry is write-only: a decision the app makes at runtime (an
@@ -1353,30 +1360,60 @@ the tier the value states: opened stores state `live`, `memoryStores()` states `
 repositories whose tier nobody stated refuses boot by name (Alex, 2026-10-05). Production and dev open
 live stores; a test or dev harness hands `memoryStores()` directly and never touches env.
 
-**Migrations are not the api's job.** They run through `pnpm task upgrade` (apps/api
-`start:prepare:db`: upgrade alone; the system-migrations pass is not part of api start), before serve, from every entry
-point (ADR-173). On a self-hosted install the new image's api runs that same `upgrade` itself,
-under the runner's lease, whenever the ledger is behind it, behind the holding page; the worker
-never does (Alex, 2026-10-09, UPGRADE-FIXES). A background step names the background steps
-it runs after by their step values (`after: [step]`, STEP-AFTER); the worker waits on them, the
-upgrade inlines them before a contract, and an unknown id or a cycle refuses the plan. Prisma migrations
-live with the schema; ClickHouse migrations are goose SQL files. A serving
-process holding DDL locks is how deploys die. Because they run before any module boots, apps/tasks'
-migration-runner files (`src/*migrat*.ts`) may name process packages (Alex, 2026-09-27), and
-so may `lwql-provision.ts` and `lwql-render-access-config.ts`: LangWatchQL provisioning reads
-both schemas under the same migration lock, before serve, and the access-config render runs from
-env alone in its Helm job (Alex, 2026-09-28).
-SQL migrations stay central, and each is attributed to the owner of the table it touches; a check
-refuses a migration touching two owners' tables (Alex, 2026-10-06, round 7, D3).
+**Migrations are not the api's job.** The worker runs every upgrade step under the runner's lease:
+at boot, while the ledger is behind its image, its gate runs `pnpm task upgrade` (the tasks app's
+runner, in its own process), waits while another runner holds the lease, takes no job until the
+ledger is current, and after a failed run waits for a Retry that returns the step to `pending`
+(Alex, 2026-10-09, UPGRADE-IN-WORKER, superseding UPGRADE-FIXES' "the worker never does"). `pnpm
+task upgrade` stays a runner under the same lease for development, CI and an operator (apps/api
+`start:prepare:db`: upgrade alone; no system-migrations pass); the Helm pre-roll Job renders only
+with `serializeUpgrades`, and the compose `migrate` service is gone. The api never runs a step:
+while a Postgres schema step of its image is outstanding it serves the holding page; after that,
+until the ledger is current, it serves in upgrading mode, only sign-in and the Ops Upgrades page
+(the routes declared to serve while upgrading through a `packages/api` route declaration the door
+enforces; everything else answers the holding page), and reports not ready. A blocking step never
+touches a table owned by auth, user, organization, authz or identity; `lint:architecture` refuses
+one that does (UIW-1..11). A background step names the background steps it runs after by their step
+values (`after: [step]`, STEP-AFTER); the worker waits on them, the upgrade inlines them before a
+contract, and an unknown id or a cycle refuses the plan. Prisma migrations live with the schema;
+ClickHouse migrations are goose SQL files. A serving process holding DDL locks is how deploys die.
+Because they run before any module boots, apps/tasks' migration-runner files (`src/*migrat*.ts`) may
+name process packages (Alex, 2026-09-27), and so may `lwql-provision.ts` and
+`lwql-render-access-config.ts`: LangWatchQL provisioning reads both schemas under the same migration
+lock, before serve, and the access-config render runs from env alone in its Helm job (Alex,
+2026-09-28). SQL migrations stay central, and each is attributed to the owner of the table it
+touches; a check refuses a migration touching two owners' tables (Alex, 2026-10-06, round 7, D3). A
+migration main has released keeps main's bytes even when it touches two owners: installs hold its
+checksum, so a later idempotent migration carries the split instead, and the check names it as
+released history (Alex, 2026-10-09).
+Operator-started jobs (re-sealing credentials after a `CREDENTIALS_SECRET` rotation, moving object
+storage to another provider) are not release steps: they stay named tasks an operator starts, safe to
+run again, outside the ledger (Alex, 2026-10-09). Main's virtual-key config backfill is deleted, not
+ported: its strip migration shipped in 3.19.0, below the 3.20.1 floor (Alex, 2026-10-09). Each serving
+process's roster row records `credentialKeyFingerprint` of every credential key it accepts, never the
+key, and `credentials-reseal` refuses to apply while any live row lacks the current or the previous
+key (Alex, 2026-10-09).
 
 **In-place system migrations belong to their subject; the framework runs, ops reads and requests**
 (Alex, 2026-10-06, round 14, Q-U8 and UP-3, amending "the runner belongs to ops"). The upgrade run
 registers every declared step in the ledger, background steps run on the worker under their declaring
-module, and ops builds the upgrade and event-upcast readers over its own Postgres handle. Identity,
-authz and automation each answer the migrations they own through their `*Api` (`registeredMigrations()`, with
-identity's user-rooted `userMigrations()` beside it), and ops composes the migrations page,
-enrolment, the targeted run and the pass over its own `SystemMigration*` tables and Redis lease,
-never importing a peer's process package. The api serves the page and awaits a targeted run
+module, a background step may name the release it must finish by (`finishBy`, kept on its ledger row for
+the reader; Alex, 2026-10-09, STEP-FINISHBY), and ops builds the upgrade and event-upcast readers over its own Postgres handle. A tenant migration is a `kind: "tenant"` step its owner declares with `.withMigrations`: it
+migrates one tenant at a time (`migrateTenant`), names its axis (`tenants`: organization, project or
+user) and carries its pacing flat on the declaration (`title`, `requiresOperatorConfirmation`,
+`runsAutomaticallyOnSelfHosted`, `enrolledAutomatically`), which no other kind accepts. Every tenant
+step's per-tenant state lives in one framework-owned table beside the ledger,
+`_langwatch_upgrade_tenant_state` (Alex, 2026-10-09, UPGRADE-S6). The process hands ops the collected
+tenant steps as a framework input, as it hands a migration binder its `replayer`; the api builds tenant
+steps only, for ops' targeted run, and ops builds the state repository in its own registry. Worker boot
+accepts a tenant step and the background runner skips it; its ledger row is `done` when a pass leaves no
+tenant held or parked and reopens when one appears (Alex, 2026-10-09, S6-WIRE). Ops keeps the pass for
+now, fed that one list, paging tenant ids through the framework's `TenantSource`, and composes the
+migrations page, enrolment, the targeted run and the pass over its Redis lease, never importing a peer's
+process package. Until their owners move, identity, authz and automation still answer
+`registeredMigrations()` (identity's `userMigrations()` beside it) over ops' `SystemMigration*` tables;
+before an owner moves, its `finalized` and `rolled_back` rows are copied, never moved, into the
+framework table by a one-time expand step. The api serves the page and awaits a targeted run
 in-request, as main did; passes run on a worker (§9); apps/tasks keeps the startup convergence
 (Alex, 2026-09-28). Automation's Slack connection migration is one such pass per organization, with
 no manual task (Alex, 2026-09-30).
@@ -1619,6 +1656,9 @@ office deactivates only through user, so it keeps no picked date (Alex, 2026-10-
   API operation, and **return a plain value or throw**. No `c.json`, no
   `JSON.parse`, no manual status branches, no error envelopes, no
   `RestErrorHandler` — banned outright.
+  A route that declares its permission target (`.withPermission(perm, { at })`) also hands the
+  handler `target`, the scope the door authorised, as `.withResponse` hands it `response`
+  (DOOR-TARGET, Alex, 2026-10-09).
 - Every wire schema imports from the module's own contract. The one
   sanctioned exception: the `moduleApi<X>()` app-port interface a door
   declares for its own implementation.
@@ -2546,6 +2586,8 @@ invented:
   and its own scenarios, not a side effect of a file move. **The knot is untied as its own specced
   change** (Alex, 2026-10-05): permission reads move to the session capability, public shared pages
   get an explicit no-session host, and then the 506 call sites migrate.
+  A host's scope loading means the scope alone: the scope host answers no permission, and a screen
+  that gates on a grant waits for its own host's loading flag over the session (Alex, 2026-10-09).
 
 - **State defaults to server state**: react-query over the derived tRPC
   client is the normal answer, so cross-module client state is rare and ruled
@@ -2679,6 +2721,11 @@ owns the membership rows a seat counts and already reads the plan through
 peer), so its members refused every call and `checkLimit` answered 500.
 A seat limit reached is organization's event; billing learns it through §9's subscriber, which lives
 in billing on organization's events (Alex, 2026-09-28; placement Alex, 2026-09-29).
+
+**A Lite seat holds Lite permissions however a grant arrives** (Alex, 2026-10-09). A Lite Member
+seat holds at most a Lite Member's permissions through any grant, a direct custom role included;
+it holds an organization-wide Viewer grant however it was admitted; and a member's access listing
+marks each grant the seat narrows as `cappedBySeat`.
 
 **Usage warnings: entitlement decides, billing only sends** (Alex, 2026-09-29; usage merged into
 entitlement, Alex, 2026-10-06). Entitlement owns all counting (§3): it takes billing's billable-events
@@ -3079,9 +3126,11 @@ pushed directly to the branch; the first goal is the branch's CI green, and the 
 and the bypass guard rules (§8) come after. At most six lanes run at once, their owned paths checked
 disjoint at every spawn, and never two lanes in one module. From the main merge
 (`dev/docs/plans/main-merge-2026-10-05.md`), the developer seat (#8373) is ported now, the server half on
-Opus and the browser half on Sonnet. The webhook deploy drain is an approved operational step: before the
-last old worker stops, confirm the two deleted gateway delivery lanes have nothing queued; afterwards
-re-send blocked spend through the replay route, and governance is re-requested by hand.
+Opus and the browser half on Sonnet. The two retired gateway delivery lanes,
+`gateway_spend_processing:subscriber:pm:webhookDelivery` and
+`governance_events_processing:subscriber:pm:governanceEventsDelivery`, drain through `.withLaneAliases`
+on the webhook delivery pipeline until 3.21.0, so the new worker delivers what an old one queued; there
+is no manual drain (Alex, 2026-10-09, superseding the 2026-10-05 runbook).
 
 ## 19. The dev runtime and the sims
 

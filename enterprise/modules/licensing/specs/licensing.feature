@@ -134,6 +134,12 @@ Feature: Enterprise licensing lifecycle
       Then the copy leaves the row licensing wrote
 
     @unit
+    Scenario: The licence copy keeps a licence written to both sides between its reads
+      Given a licence copy that has read organization's columns but not yet licensing's row
+      When a live write puts the same licence on both sides before the copy reads licensing's row
+      Then the copy leaves both sides holding the licence that write put there
+
+    @unit
     Scenario: A dry run of the licence copy writes nothing
       Given organizations whose licences are only on organization's columns
       When the licence copy runs as a dry run
@@ -311,6 +317,19 @@ Feature: Enterprise licensing lifecycle
     license sync ended; organization writes its own columns from those facts.
 
     @unit
+    Scenario: Licensing records a stored or cleared licence as a fact for organization to apply
+      Given licensing stores an organization's licence and later clears it
+      When each write lands
+      Then licensing records a licence-stored fact with the key's fingerprint and its dates, never the key, then a licence-cleared fact
+      And it writes organization's licence columns through no organization operation
+
+    @unit
+    Scenario: Organization mirrors the licence licensing stored and clears it when licensing does
+      Given organization subscribes to licensing's licence facts
+      When licensing records a licence stored and then cleared
+      Then organization's licence columns hold the key read from licensing's row and the fact's dates, then hold none
+
+    @unit
     Scenario: Licensing records a hosted-service switch as a fact for organization to apply
       Given an administrator switches a hosted service off for their organisation
       When licensing records the switch
@@ -329,3 +348,17 @@ Feature: Enterprise licensing lifecycle
       Given licensing has recorded that a license sync landed and then that one failed
       When organization receives each fact in order
       Then the organisation keeps when the sync last landed and the code the latest one failed on
+
+    @unit
+    Scenario: Licensing records ending or re-resolving a licence's managed key as a fact for gateway to apply
+      Given a licence whose managed key licensing must end, and another whose install binding was reset
+      When licensing ends the first key and asks for the second to be resolved again
+      Then it records a managed-key-retired fact naming the key, its organisation and the actor
+      And a managed-key-invalidated fact naming the other key and its organisation
+
+    @unit
+    Scenario: Gateway ends or re-resolves a licence's managed key from licensing's fact, however often it arrives
+      Given gateway subscribes to licensing's managed-key facts
+      When a managed-key-retired fact arrives once and then again
+      Then gateway revokes that key under the fact's organisation and actor, the same revoke each time
+      And a managed-key-invalidated fact asks every gateway to resolve that key's licence again

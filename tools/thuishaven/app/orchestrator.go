@@ -201,7 +201,7 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		// Detected once, here, and read by everything downstream: the plan, the
 		// one-shot jobs, the lanes status reports and the names restart accepts.
 		Layout:      detectLayout(p.WorktreeDir),
-		LauncherPID: o.sys.Getpid(), RedisDB: redisDB,
+		LauncherPID: o.sys.Getpid(), LauncherStart: o.sys.ProcessStart(o.sys.Getpid()), RedisDB: redisDB,
 		APIPort: ports[nSvc], WorkerMetricsPort: ports[nSvc+1], VoiceSocketPort: ports[nSvc+4], LocalAPIKey: o.cfg.LocalAPIKey, IsBaseline: p.IsBaseline,
 		PublicURL:            o.cfg.PublicURL,
 		LangyTier:            opts.LangyTier,
@@ -774,7 +774,7 @@ func (o *Orchestrator) reconcileRunningStack(p UpParams, opts PlanOptions) (proc
 	if !ok || st.LauncherPID == o.sys.Getpid() {
 		return true, nil
 	}
-	if !o.sys.ProcessAlive(st.LauncherPID) {
+	if !o.launcherIsOurs(st) {
 		// A dead launcher's registry entry must never block up. Clean it up
 		// and take its hostnames down with it. A route that outlives its stack
 		// is worse than no route: the kernel hands that loopback port to the
@@ -899,7 +899,7 @@ func (o *Orchestrator) Down(ctx context.Context, p UpParams, force bool) error {
 		return err
 	}
 	st, ok := o.stackBySlug(slug)
-	if ok && st.LauncherPID != o.sys.Getpid() && o.sys.ProcessAlive(st.LauncherPID) {
+	if ok && st.LauncherPID != o.sys.Getpid() && o.launcherIsOurs(st) {
 		if force {
 			// -f: no grace — SIGKILL the launcher's whole process group at once,
 			// for the stack that is wedged or just needs to be gone NOW.
@@ -1149,6 +1149,8 @@ func runsLocally(name string, opts PlanOptions) bool {
 		return opts.Selection.LLM
 	case domain.AnalyticsService:
 		return opts.Selection.Analytics
+	case domain.OutboundService:
+		return opts.Selection.Outbound
 	case domain.TelemetryService:
 		return opts.Selection.Telemetry
 	default:

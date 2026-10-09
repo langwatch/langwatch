@@ -95,8 +95,12 @@ class CapabilityLangyHost extends LangyHostApi {
     return this.session.hasPermission(permission);
   }
 
+  hasOrganizationPermission(permission: string): boolean {
+    return this.session.hasOrganizationPermission(permission);
+  }
+
   isLoading(): boolean {
-    return this.session.snapshot().scope.status === "loading";
+    return !this.session.isSettled();
   }
 
   isDemoProject(): boolean {

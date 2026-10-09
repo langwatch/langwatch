@@ -4,14 +4,14 @@ Feature: An npx install makes no outbound calls beyond license sync and usage re
   So that the install does not call third parties unless I opt in
 
   @unit
-  Scenario: The app, the workers and the migrations turn off Prisma's version check
-    When the launcher starts the app, the workers or the migrations
+  Scenario: The app and the workers turn off Prisma's version check
+    When the launcher starts the app or the workers
     Then the process env carries "CHECKPOINT_DISABLE=1"
 
   @unit
   Scenario: Prisma's version check stays off whatever the user's .env says
     Given the user's .env sets CHECKPOINT_DISABLE to "0"
-    When the launcher starts the app, the workers or the migrations
+    When the launcher starts the app or the workers
     Then the process env carries "CHECKPOINT_DISABLE=1"
 
   @unit

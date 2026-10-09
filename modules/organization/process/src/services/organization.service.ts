@@ -61,6 +61,7 @@ import type {
   OrganizationTeamProject,
 } from "../repositories/organization.repository.ts";
 import type { TeamRepository } from "../repositories/team.repository.ts";
+import { fingerprintOfLicenseKey } from "../rules/organization-license.rules.ts";
 import {
   OrganizationSettingsService,
   type OrganizationSettingsNotices,
@@ -299,13 +300,23 @@ export class OrganizationService {
     return this.repository.updateConnectSyncOutcome(input);
   }
 
-  setLicense(input: {
+  /** Writes licensing's key only while its row still holds the one the fact names (C3-KEY-HASH). */
+  async setLicense({
+    organizationId,
+    licenseKeyFingerprint,
+    expiresAt,
+    validatedAt,
+  }: {
     organizationId: string;
-    licenseKey: string;
+    licenseKeyFingerprint: string;
     expiresAt: Instant;
     validatedAt: Instant | null;
   }): Promise<void> {
-    return this.repository.setLicense(input);
+    const keys = await this.repository.findLicensingLicenseKeys({ organizationId });
+    const licenseKey = keys.find((key) => fingerprintOfLicenseKey(key) === licenseKeyFingerprint);
+    // A newer store or a clear replaced it; that write's own fact follows and applies it.
+    if (licenseKey === undefined) return;
+    await this.repository.setLicense({ organizationId, licenseKey, expiresAt, validatedAt });
   }
 
   clearLicense(input: { organizationId: string }): Promise<void> {

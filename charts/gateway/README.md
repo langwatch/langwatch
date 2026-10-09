@@ -75,6 +75,7 @@ self-hosting. The values you most often override:
 | `autoscaling.minReplicas` / `maxReplicas` | HPA bounds                                                                                   |
 | `resources`                               | Pod CPU/memory requests + limits                                                             |
 | `otel.endpoint`                           | Optional OTLP HTTP exporter URL (gateway emits its own spans)                                |
+| `metrics.enabled`                         | Serves Prometheus `/metrics` on `metrics.port` (default `9464`), bearer `METRICS_API_KEY` from `metrics.apiKey` |
 | `spend.enabled`                           | Kill switch for spend emission (default `true`). Off means no budget debits are ever written |
 
 The pod ships hardened (`podSecurityContext` / `containerSecurityContext` in

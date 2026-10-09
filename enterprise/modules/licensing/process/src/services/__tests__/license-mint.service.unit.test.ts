@@ -8,10 +8,7 @@ import {
   NodeLicenseCryptographyService,
 } from "@langwatch/enterprise-license-signing";
 import { OrganizationNotFoundError } from "@langwatch/organization-contract";
-import type {
-  OrganizationApi,
-  OrganizationProvisioningSummary,
-} from "@langwatch/organization-contract";
+import type { OrganizationProvisioningSummary } from "@langwatch/organization-contract";
 import { nowInstant, Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
@@ -35,7 +32,7 @@ function untouched<T extends object>(): T {
 }
 
 /** Organizations as a store: a write to one that is gone fails as the real one does. */
-class OrganizationStore implements Pick<OrganizationApi, "setLicense" | "clearLicense"> {
+class OrganizationStore {
   readonly licenses = new Map<string, { licenseKey: string; expiresAt: Instant }>();
   readonly #rows = new Map<string, OrganizationProvisioningSummary>();
 
@@ -95,7 +92,15 @@ function harness({ goneBeforeWrite }: { goneBeforeWrite: boolean }) {
       recordIssuedLicense: (input) => registry.record(input),
     },
     organizations,
-    storage: OrganizationLicenseWriterService.create({ licenses: licenseRows, organizations }),
+    storage: OrganizationLicenseWriterService.create({
+      licenses: licenseRows,
+      // Organization's subscriber, applied inline: a gone organization refuses here.
+      facts: {
+        licenseStored: ({ organizationId, license }) =>
+          organizations.setLicense({ organizationId, ...license }),
+        licenseCleared: ({ organizationId }) => organizations.clearLicense({ organizationId }),
+      },
+    }),
     registry: repository,
   });
   return { mint, repository, organizations, licenseRows };

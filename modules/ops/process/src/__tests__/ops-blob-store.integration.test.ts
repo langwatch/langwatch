@@ -86,6 +86,10 @@ describe.skipIf(!hasRedis)("Ops blob store delete", () => {
         blobStore: BlobStoreRedisRepository.create(redis),
         anomalyState: RedisAnomalyStateRepository.create(redis),
       },
+      accounts: {
+        deactivateUser: () => Promise.reject(new Error("unreached")),
+        changeUserEmail: () => Promise.reject(new Error("unreached")),
+      },
       authz: createApiFixture<AuthzApi>(),
       audit: { record: async () => undefined },
       sessions: createApiFixture<AuthApi>(),

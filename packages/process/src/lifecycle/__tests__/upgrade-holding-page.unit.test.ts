@@ -176,3 +176,63 @@ describe("the upgrade holding page", () => {
     });
   });
 });
+
+describe("the liveness door's routing while it holds", () => {
+  describe("given the door holds with a health path and a route declared to serve while upgrading", () => {
+    const passThrough = { paths: ["/api/health"], routes: ["^POST /api/auth/(?:[^/]+)$"] };
+
+    describe("when the kubelet requests the health route", () => {
+      /** @scenario "A health route reaches the main thread while an upgrade holds the door" */
+      it("proxies it to the main thread", async () => {
+        const proxied = vi.fn();
+        const thread = await bootThread({ onProxied: proxied });
+        await thread.hold(holding, passThrough);
+
+        const response = await fetch(urlOf(thread.address, "/api/health?probe=1"));
+
+        expect(response.status).toBe(200);
+        expect(proxied).toHaveBeenCalledOnce();
+      });
+    });
+
+    describe("when a request names a declared route, then one that is not", () => {
+      /** @scenario "Only a route declared to serve while upgrading passes the holding door" */
+      it("proxies the declared route and holds the other before the main thread", async () => {
+        const proxied = vi.fn();
+        const thread = await bootThread({ onProxied: proxied });
+        await thread.hold({ phase: "upgrading", outstandingStepIds: [] }, passThrough);
+
+        const declared = await fetch(urlOf(thread.address, "/api/auth/sign-in"), {
+          method: "POST",
+        });
+        const wrongMethod = await fetch(urlOf(thread.address, "/api/auth/sign-in"));
+        const undeclared = await fetch(urlOf(thread.address, "/api/traces"), { method: "POST" });
+
+        expect(declared.status).toBe(200);
+        expect(wrongMethod.status).toBe(503);
+        expect(undeclared.status).toBe(503);
+        expect(proxied).toHaveBeenCalledOnce();
+      });
+    });
+
+    describe("when a batched tRPC call names a declared procedure beside an undeclared one", () => {
+      it("proxies a batch only when every procedure in it is declared", async () => {
+        const proxied = vi.fn();
+        const thread = await bootThread({ onProxied: proxied });
+        const batch =
+          "^(?:GET|POST) /api/trpc/(?:ops\\.plan|ops\\.retry)(?:,(?:ops\\.plan|ops\\.retry))*$";
+        await thread.hold(
+          { phase: "upgrading", outstandingStepIds: [] },
+          { paths: [], routes: [batch] },
+        );
+
+        const declared = await fetch(urlOf(thread.address, "/api/trpc/ops.plan,ops.retry?batch=1"));
+        const mixed = await fetch(urlOf(thread.address, "/api/trpc/ops.plan,traces.list?batch=1"));
+
+        expect(declared.status).toBe(200);
+        expect(mixed.status).toBe(503);
+        expect(proxied).toHaveBeenCalledOnce();
+      });
+    });
+  });
+});

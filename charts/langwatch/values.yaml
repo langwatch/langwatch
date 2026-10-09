@@ -175,9 +175,9 @@ images:
 # Core settings for the main LangWatch application service
 ## @section LangWatch app
 app:
-  ## @param app.migrations.preRoll [default: true] Apply this release's migrations in a
-  ## pre-upgrade Job on the new image, before any Deployment rolls (ADR-155). Fail-closed.
-  ## Off means you run `pnpm task upgrade` yourself first; the containers never migrate.
+  ## @param app.migrations.preRoll [default: true] With app.storedObjects.localFilesystem.serializeUpgrades
+  ## active only: apply this release's migrations in a pre-upgrade Job on the new image, before
+  ## any Deployment rolls (ADR-155). Otherwise the new worker pods run `pnpm task upgrade` themselves.
   ## @param app.migrations.preRollTimeoutSeconds [default: 2100] activeDeadlineSeconds for that Job. Run `helm upgrade --timeout 45m` (no shorter than this plus a margin): Helm's own hook timeout is 5 minutes and fails the release while the Job still runs.
   ## @param app.migrations.oldWritersGoneHook [default: false] After the app and workers finish rolling out, a post-upgrade Job records that writers from before the serving roster have stopped (pnpm task upgrade old-writers-gone). Needs a Role reading the two Deployments and its own ServiceAccount token, projected into its kubectl container only.
   ## @param app.migrations.oldWritersGoneHookTimeoutSeconds [default: 1800] How long it waits for the rollouts; past it nothing is asserted and the grace applies.
@@ -648,18 +648,8 @@ app:
   ## @extra app.license Enterprise license configuration.
   ## @param app.license.key.value [string] Signed license key or activation code issued by LangWatch.
   ## @param app.license.key.secretKeyRef [object] Secret ref holding the signed license key or activation code.
-  ## @param app.license.publicKey.value [string] Verification key, only for a private signing chain.
-  ## @param app.license.publicKey.secretKeyRef [object] Secret ref holding the verification key.
   license:
     key:
-      value: ""
-      secretKeyRef: { name: "", key: "" }
-    # Overrides the built-in verification key. Almost no deployment sets this:
-    # it exists for installs that LangWatch issues licenses to from a separate
-    # signing chain. Replacing this key does not grant an Enterprise License,
-    # and a key that verifies only against a replaced value is not one; see
-    # enterprise/LICENSE.md.
-    publicKey:
       value: ""
       secretKeyRef: { name: "", key: "" }
 
@@ -1039,7 +1029,7 @@ workers:
   otel:
     serviceName: langwatch-workers
 
-  ## @param workers.enabled [default: true] Deploy the workers Deployment + PDB.
+  ## @param workers.enabled [default: true] Deploy the workers Deployment + PDB. false runs the worker as a sidecar in each app pod.
   enabled: true
 
   # Number of worker replicas

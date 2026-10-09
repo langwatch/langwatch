@@ -53,6 +53,20 @@ Feature: A worktree's own home page at <slug>.langwatch.localhost
     And the stack restarts and its surfaces show starting then live
 
   @integration
+  Scenario: A service the stack does not run is started from its row
+    Given the stack is running and a surface shows not selected
+    When I press start on that row and press it again
+    Then the stack restarts with that service added and the row shows starting then live
+
+  @integration
+  Scenario: A stack whose database is below the upgrade floor can reset its databases from the stack home
+    Given the api is held by the upgrade floor
+    When I open the stack home
+    Then I see why the api is held and a reset databases action
+    And the reset waits until I type the stack's database name
+    And the stack's databases are dropped, migrated and seeded fresh
+
+  @integration
   Scenario: Recent errors link into the logs
     Given the api lane logged errors in the last hour
     When I open the stack home

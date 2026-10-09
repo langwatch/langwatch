@@ -54,7 +54,6 @@
     "@langwatch/secrets": "workspace:*",
     "@langwatch/task": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "@langwatch/user-contract": "workspace:*",
     "@slack/webhook": "catalog:",
     "@trpc/server": "catalog:",
     "hono": "catalog:",

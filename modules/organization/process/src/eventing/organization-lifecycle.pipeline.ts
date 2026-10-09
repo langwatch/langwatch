@@ -13,7 +13,11 @@ import {
 import {
   CONNECT_SERVICE_SWITCHED_EVENT_TYPE,
   connectServiceSwitchedEventDataSchema,
+  LICENSE_CLEARED_EVENT_TYPE,
+  LICENSE_STORED_EVENT_TYPE,
   LICENSE_SYNC_FINISHED_EVENT_TYPE,
+  licenseClearedEventDataSchema,
+  licenseStoredEventDataSchema,
   licenseSyncFinishedEventDataSchema,
   SELF_HOSTED_CUSTOMER_LICENSED_EVENT_TYPE,
   selfHostedCustomerLicensedEventDataSchema,
@@ -75,7 +79,11 @@ export type BillingFactsApplier = Pick<
 /** Where licensing's facts land: organization creates and writes the rows (C3c, R42). */
 export type LicensingFactsApplier = Pick<
   OrganizationModule,
-  "createSelfHostedCustomer" | "switchConnectService" | "updateConnectSyncOutcome"
+  | "createSelfHostedCustomer"
+  | "switchConnectService"
+  | "updateConnectSyncOutcome"
+  | "setLicense"
+  | "clearLicense"
 >;
 
 /** An organisation gone before its fact arrived has no row to apply it to. */
@@ -166,6 +174,26 @@ export function buildOrganizationLifecyclePipeline({
             error,
           }),
         ),
+    })
+    .withPeerSubscriber("organizationLicensingLicenseStored", {
+      eventType: LICENSE_STORED_EVENT_TYPE,
+      data: licenseStoredEventDataSchema,
+      handle: ({ organizationId, licenseKeyFingerprint, expiresAt, validatedAt }) =>
+        onLiveOrganization(() =>
+          licensingFacts.setLicense({
+            organizationId,
+            licenseKeyFingerprint,
+            expiresAt: Temporal.Instant.fromEpochMilliseconds(expiresAt),
+            validatedAt:
+              validatedAt === null ? null : Temporal.Instant.fromEpochMilliseconds(validatedAt),
+          }),
+        ),
+    })
+    .withPeerSubscriber("organizationLicensingLicenseCleared", {
+      eventType: LICENSE_CLEARED_EVENT_TYPE,
+      data: licenseClearedEventDataSchema,
+      handle: ({ organizationId }) =>
+        onLiveOrganization(() => licensingFacts.clearLicense({ organizationId })),
     })
     .withPeerSubscriber("organizationBillingPlanLimitAlertSent", {
       eventType: PLAN_LIMIT_ALERT_SENT_EVENT_TYPE,

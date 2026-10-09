@@ -232,12 +232,15 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // security headers, the browser inbox — specs/setup/mail-sink.feature) are
   // satisfied by Go tests and by nothing else.
   "services/mailsim",
-  // The other simulators haven runs (LLM, storage, analytics, voice) and the
-  // diff and fuzz suites: their specs/setup scenarios bind only from Go tests.
+  // The other simulators haven runs (LLM, storage, analytics, voice, outbound,
+  // telemetry) and the diff and fuzz suites: their specs/setup scenarios bind
+  // only from Go tests.
   "services/llmsim",
   "services/storagesim",
   "services/analyticssim",
   "services/voicesim",
+  "services/outboundsim",
+  "services/telemetrysim",
   "tools/diffsuite",
   "tools/fuzz",
   "tools/workerrun",
@@ -526,9 +529,6 @@ const LEGACY_INERT: string[] = [
   "specs/licensing/enforcement-hono-api.feature",
   "specs/licensing/license-lifecycle-e2e.feature",
   "specs/licensing/license-status-ui.feature",
-  // Every scenario is parked @unimplemented: the free-plan scenario-set cap this file
-  // describes has no enforcement code on this branch.
-  "specs/licensing/sdk-scenario-set-limit.feature",
   "specs/licensing/usage-page-navigation.feature",
   "specs/mcp-server/analytics-tool.feature",
   "specs/mcp-server/api-key-tools.feature",
@@ -620,8 +620,6 @@ const LEGACY_INERT: string[] = [
   "specs/skills/prompt-compiler.feature",
   "specs/studio/nlpgo-true-root-span-without-traceparent.feature",
   "specs/suites/simulations-performance.feature",
-  "modules/topic/specs/run-history.feature",
-  "modules/topic/specs/topics-source-of-truth.feature",
   "specs/trace-drawer/attribute-table.feature",
   "specs/trace-drawer/eval-chips-in-header.feature",
   "specs/trace-drawer/playground-affordance.feature",

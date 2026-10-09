@@ -2,6 +2,7 @@
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { UserApi } from "@langwatch/user-contract";
 
+import type { ScimSeatRepository } from "../repositories/scim-seat.repository.ts";
 import type { ScimRepository } from "../repositories/scim.repository.ts";
 import type { ScimCostCenterFacts } from "./scim-cost-center.service.ts";
 import type { ScimOrganizationAdministration } from "./scim-deprovision.service.ts";
@@ -20,6 +21,7 @@ export class PostgresScimService {
     users: UserApi;
     costCenterFacts: ScimCostCenterFacts;
     organization: ScimOrganizationAdministration;
+    seats: ScimSeatRepository;
     entitlements: Pick<EntitlementApi, "getActivePlan">;
     lifecycle: ScimSyncLifecycle;
     provenOffboarding: boolean;
@@ -33,6 +35,7 @@ export class PostgresScimService {
       users: options.users,
       costCenterFacts: options.costCenterFacts,
       organization: options.organization,
+      seats: options.seats,
       entitlements: options.entitlements,
       lifecycle: options.lifecycle,
       provenOffboarding: options.provenOffboarding,

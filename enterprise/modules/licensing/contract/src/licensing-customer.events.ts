@@ -39,3 +39,50 @@ export const licenseSyncFinishedEventDataSchema = z.object({
   error: z.string().min(1).nullable(),
 });
 export type LicenseSyncFinishedEventData = z.infer<typeof licenseSyncFinishedEventDataSchema>;
+
+export const LICENSE_STORED_EVENT_TYPE = "lw.licensing.license_stored" as const;
+export const LICENSE_CLEARED_EVENT_TYPE = "lw.licensing.license_cleared" as const;
+
+/**
+ * Licensing stored an organization's licence. The fact names the key by its sha256 hex
+ * fingerprint, never the key; organization reads the key from licensing's row (C3-KEY-HASH).
+ */
+export const licenseStoredEventDataSchema = z.object({
+  tenantId: z.string().min(1),
+  occurredAt: z.number().int().nonnegative(),
+  organizationId: z.string().min(1),
+  licenseKeyFingerprint: z.string().regex(/^[0-9a-f]{64}$/),
+  expiresAt: z.number().int(),
+  validatedAt: z.number().int().nullable(),
+});
+export type LicenseStoredEventData = z.infer<typeof licenseStoredEventDataSchema>;
+
+/** Licensing cleared an organization's licence; organization clears its columns. */
+export const licenseClearedEventDataSchema = z.object({
+  tenantId: z.string().min(1),
+  occurredAt: z.number().int().nonnegative(),
+  organizationId: z.string().min(1),
+});
+export type LicenseClearedEventData = z.infer<typeof licenseClearedEventDataSchema>;
+
+export const MANAGED_KEY_RETIRED_EVENT_TYPE = "lw.licensing.managed_key_retired" as const;
+export const MANAGED_KEY_INVALIDATED_EVENT_TYPE = "lw.licensing.managed_key_invalidated" as const;
+
+/** Licensing ended a licence's managed key for good; gateway revokes it, safe to repeat. */
+export const managedKeyRetiredEventDataSchema = z.object({
+  tenantId: z.string().min(1),
+  occurredAt: z.number().int().nonnegative(),
+  organizationId: z.string().min(1),
+  virtualKeyId: z.string().min(1),
+  actorId: z.string().min(1),
+});
+export type ManagedKeyRetiredEventData = z.infer<typeof managedKeyRetiredEventDataSchema>;
+
+/** Licensing changed what a managed key's licence resolves to; gateway tells every gateway. */
+export const managedKeyInvalidatedEventDataSchema = z.object({
+  tenantId: z.string().min(1),
+  occurredAt: z.number().int().nonnegative(),
+  organizationId: z.string().min(1),
+  virtualKeyId: z.string().min(1),
+});
+export type ManagedKeyInvalidatedEventData = z.infer<typeof managedKeyInvalidatedEventDataSchema>;

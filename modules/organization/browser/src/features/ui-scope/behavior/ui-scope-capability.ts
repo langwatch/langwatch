@@ -5,12 +5,8 @@
  */
 
 import { authzWebConfigSchema } from "@langwatch/authz-contract";
-import { UiScope, type UiActiveScope, type UiSession } from "@langwatch/browser-host/capabilities";
-import type {
-  UiActiveScopeReading,
-  UiPermissionsReading,
-  UiSessionReading,
-} from "@langwatch/browser-host/session";
+import { UiScope, type UiActiveScope } from "@langwatch/browser-host/capabilities";
+import type { UiActiveScopeReading, UiSessionReading } from "@langwatch/browser-host/session";
 import {
   createUiScopeHost,
   type UiScopeHost,
@@ -180,20 +176,11 @@ export class BrowserUiScope extends UiScope {
 }
 
 /**
- * The scope port, built from what this render resolved and the grants the
- * session beside it answered. Pure — every read it needs has already landed.
+ * The scope port, built from what this render resolved. Pure — every read it
+ * needs has already landed. Grants are the session's, never the scope's.
  */
-export function createBrowserUiScope({
-  reading,
-  session,
-}: {
-  reading: UiScopeReading;
-  session: UiSession;
-}): BrowserUiScope {
-  return BrowserUiScope.create({
-    reading: reading.scope,
-    scopeHost: legacyScopeHost({ reading, permissions: session.snapshot().permissions }),
-  });
+export function createBrowserUiScope({ reading }: { reading: UiScopeReading }): BrowserUiScope {
+  return BrowserUiScope.create({ reading: reading.scope, scopeHost: legacyScopeHost({ reading }) });
 }
 
 function readActiveScope({
@@ -231,22 +218,13 @@ function readActiveScope({
   };
 }
 
-function legacyScopeHost({
-  reading,
-  permissions,
-}: {
-  reading: UiScopeReading;
-  permissions: UiPermissionsReading;
-}): UiScopeHost | undefined {
+function legacyScopeHost({ reading }: { reading: UiScopeReading }): UiScopeHost | undefined {
   if (reading.scope.status === "loading") return void 0;
   return createUiScopeHost({
     project: () => reading.scope.project,
     organization: () => reading.scope.organization,
     team: () => reading.scope.team,
     organizationRole: () => reading.organizationRole,
-    hasPermission: permissions.can,
-    hasOrganizationPermission: permissions.canInOrganization,
     isDemoProject: () => reading.isDemo,
-    isLoading: () => permissions.isLoading,
   });
 }

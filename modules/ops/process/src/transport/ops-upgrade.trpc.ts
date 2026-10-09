@@ -1,6 +1,6 @@
 /**
- * The server half of the Upgrades pages' six reads and the ten system-migration operator
- * procedures, each asking its permission on the platform at the door.
+ * The Upgrades pages' eight reads and Retry serve while the installation upgrades (UIW-6); the
+ * ten system-migration procedures do not. Each asks its permission on the platform at the door.
  * Spec: modules/ops/specs/upgrades.feature
  */
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
@@ -11,30 +11,47 @@ import { opsOperatorFact } from "#transport/ops-operator.trpc";
 export const opsUpgradeTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsUpgradeTrpc> =
   defineTrpcRouter(OpsApi, opsUpgradeTrpc)
     .procedure("status")
+    .servesWhileUpgrading()
     .withPermission("ops:view", { at: "platform" })
     .handle(({ app }) => app.getUpgradeStatus())
 
     .procedure("listReleases")
+    .servesWhileUpgrading()
     .withPermission("ops:view", { at: "platform" })
     .handle(({ app }) => app.listUpgradeReleases())
 
     .procedure("listSteps")
+    .servesWhileUpgrading()
     .withPermission("ops:view", { at: "platform" })
     .handle(({ app, input }) => app.listUpgradeSteps(input))
 
     .procedure("getStep")
+    .servesWhileUpgrading()
     .withPermission("ops:view", { at: "platform" })
     .handle(({ app, input }) => app.getUpgradeStep({ id: input.id }))
 
     .procedure("listRuns")
+    .servesWhileUpgrading()
     .withPermission("ops:view", { at: "platform" })
     .handle(({ app, input }) => app.listUpgradeRuns(input))
 
     .procedure("getRun")
+    .servesWhileUpgrading()
     .withPermission("ops:view", { at: "platform" })
     .handle(({ app, input }) => app.getUpgradeRun({ id: input.id }))
 
+    .procedure("preview")
+    .servesWhileUpgrading()
+    .withPermission("ops:view", { at: "platform" })
+    .handle(({ app, input }) => app.previewUpgrade({ to: input.to }))
+
+    .procedure("listTargets")
+    .servesWhileUpgrading()
+    .withPermission("ops:view", { at: "platform" })
+    .handle(({ app }) => app.listUpgradeTargets())
+
     .procedure("retryStep")
+    .servesWhileUpgrading()
     .withPermission("ops:manage", { at: "platform" })
     .handle(({ app, input }) => app.retryUpgradeStep({ id: input.id }))
 

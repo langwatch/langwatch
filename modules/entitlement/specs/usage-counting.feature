@@ -40,26 +40,26 @@ Feature: Entitlement owns all counting
     Then the count comes from entitlement's own meter
     And no trace or billing Api is asked to count
 
-  @unit @usage @unimplemented
+  @unit @usage
   Scenario: Entitlement records a crossed warning threshold as its own event
     Given an organization at 90% of its monthly allowance
     When entitlement checks the organization's usage against the warning thresholds
     Then a usage warning event is recorded with the 90% threshold and each project's count this month
     And the month is counted once
 
-  @unit @usage @unimplemented
+  @unit @usage
   Scenario: A reading below every warning threshold records nothing and counts nothing
     Given an organization at 10% of its monthly allowance
     When entitlement checks the organization's usage against the warning thresholds
     Then no usage warning event is recorded and no project is counted
 
-  @unit @usage @unimplemented
+  @unit @usage
   Scenario: A warning whose per-project counts are unknown is not recorded
     Given an organization above a warning threshold whose per-project counts cannot be read
     When entitlement checks the organization's usage against the warning thresholds
     Then no usage warning event is recorded and the check reports nothing sent
 
-  @unit @usage @unimplemented
+  @unit @usage
   Scenario: Billing sends each recorded warning once per threshold a month
     Given a usage warning event for an organization at the 90% threshold
     When billing's subscriber handles the event twice

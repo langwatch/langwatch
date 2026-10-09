@@ -282,6 +282,24 @@
       },
       {
         "filter": {
+          "projects": ["@langwatch/outboundsim-web"]
+        },
+        "cache": true,
+        "dependsOn": ["^build"],
+        "inputs": ["production", "^production", "jsBuild"],
+        "outputs": ["{workspaceRoot}/services/outboundsim/web/dist"]
+      },
+      {
+        "filter": {
+          "projects": ["@langwatch/telemetrysim-web"]
+        },
+        "cache": true,
+        "dependsOn": ["^build"],
+        "inputs": ["production", "^production", "jsBuild"],
+        "outputs": ["{workspaceRoot}/services/telemetrysim/web/dist"]
+      },
+      {
+        "filter": {
           "plugin": "./dev/nx/go-plugin.mjs"
         },
         "cache": true,

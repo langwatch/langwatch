@@ -1,6 +1,6 @@
 import { SYSTEM_ACTORS } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
-import { releaseVersionOf } from "@langwatch/config";
+import { isReleaseBuild, releaseVersionOf } from "@langwatch/config";
 import { parseOutboundProxyConfig } from "@langwatch/egress";
 import {
   LicenseGenerationService,
@@ -70,7 +70,6 @@ import { GatewayApi } from "@langwatch/gateway-contract";
 import { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import { createLogger } from "@langwatch/observability";
 import { optionalUsageReportKeys } from "@langwatch/ops-contract";
-import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { nowInstant, Temporal } from "@langwatch/time";
 
@@ -88,9 +87,11 @@ import type { ConnectOrganizationRepository } from "../repositories/connect-orga
 import type { InstanceIdentityRepository } from "../repositories/instance-identity.repository.ts";
 import type { IssuedLicenseRepository } from "../repositories/issued-license.repository.ts";
 import type { LicensingRepositories } from "../repositories/licensing.repositories.ts";
+import type { MemberSeatRepository } from "../repositories/member-seat.repository.ts";
 import type { SelfHostedInstanceRepository } from "../repositories/self-hosted-instance.repository.ts";
 import { ACTIVATION_ATTEMPTS_LIMIT } from "../rules/activation-code.rules.ts";
 import { LICENSE_SYNCS_LIMIT } from "../rules/issued-license.rules.ts";
+import { licenseVerifyingKeyOf } from "../rules/license-verifying-key.rules.ts";
 import { ActivationCodeService } from "../services/activation-code.service.ts";
 import type { ActivationRateLimit } from "../services/activation-code.service.ts";
 import {
@@ -125,9 +126,9 @@ import { SelfHostedCrmService } from "../services/self-hosted-crm.service.ts";
 import type { SelfHostedLeadsInfrastructure } from "../services/self-hosted-crm.service.ts";
 import { SelfHostedInstanceService } from "../services/self-hosted-instance.service.ts";
 
-/** Seat counts are organization's: one peer read, the same count its own seat checks use. */
+/** Seat counts over organization's membership rows, read through its shares (R-C1f, Q9). */
 function seatCountsOver(
-  organizations: Pick<OrganizationApi, "countMemberSeats">,
+  organizations: Pick<MemberSeatRepository, "countMemberSeats">,
 ): Pick<LicensingInfrastructure["repository"], "getMemberCount" | "getMembersLiteCount"> {
   return {
     getMemberCount: async (organizationId) =>
@@ -169,8 +170,6 @@ export class LicensingModule implements LicensingApiContract {
   static readonly dependencies = {
     /** Where an install's hosted provider slot is kept: a gateway fact licensing writes. */
     gateway: GatewayApi,
-    /** Whose memberships a licence's seats are counted from. */
-    organizations: OrganizationApi,
     /** The judge a hosted classify call reaches, its price, and where its spend is recorded. */
     instantEval: InstantEvalApi,
     /** Whose team a hosted caller's project belongs to, for the budgets that apply to it. */
@@ -215,6 +214,11 @@ export class LicensingModule implements LicensingApiContract {
   /** Binds the licensing_customer pipeline's senders into the facts service. */
   connectCustomerCommands(commands: EventingCommands<LicensingCustomerPipeline>): void {
     this.#customerFacts.connect(commands);
+  }
+
+  /** The facts service those senders bind into, for the licence writes of this module's tasks. */
+  customerFactsService(): LicensingCustomerFactsService {
+    return this.#customerFacts;
   }
 
   private constructor({
@@ -280,19 +284,29 @@ export class LicensingModule implements LicensingApiContract {
       licensePrivateKey,
     }: { instanceLicenseKey: string | undefined; licensePrivateKey: string | undefined },
   ): LicensingModule {
-    const cryptography = NodeLicenseCryptographyService.create({ publicKey: config.publicKey });
+    const { publicKey, ignoredVariable } = licenseVerifyingKeyOf({
+      override: config.publicKey,
+      isReleaseBuild,
+    });
+    if (ignoredVariable) {
+      logger.warn(
+        { variable: ignoredVariable },
+        `${ignoredVariable} is ignored on a release build; licences verify against the embedded LangWatch key`,
+      );
+    }
+    const cryptography = NodeLicenseCryptographyService.create({ publicKey });
     // The variable takes a signed key or an activation code. A code is not a
     // license: it is redeemed at start and stored on an organization.
     const configured = detectLicenseInputForm(instanceLicenseKey);
     const signedInstanceKey = configured.form === "license_key" ? configured.licenseKey : undefined;
+    const customerFacts = LicensingCustomerFactsService.create();
     // The licence rows are this module's own; the seat counts are organization's
     // own membership classification (a peer, not owned here).
     const { repository, ...runtime } = LicensingInfrastructureService.create({ role }).withStorage({
       licenses: repositories.organizationLicenses,
-      organizations: dependencies.organizations,
-      ...seatCountsOver(dependencies.organizations),
+      facts: customerFacts,
+      ...seatCountsOver(repositories.memberSeats),
     });
-    const customerFacts = LicensingCustomerFactsService.create();
     const registryParts = licenseRegistryParts({
       infrastructure: licenseRegistryOver({
         repositories,
@@ -337,6 +351,7 @@ export class LicensingModule implements LicensingApiContract {
         seats: repository,
         licenses: service,
         config,
+        publicKey,
         logger,
       }),
       isSaas: config.isSaas,
@@ -344,7 +359,7 @@ export class LicensingModule implements LicensingApiContract {
       domainClaims: DomainClaimAuthorityService.create({
         isSaas: config.isSaas,
         licenses: service,
-        organizations: dependencies.organizations,
+        organizations: repositories.connectOrganizations,
       }),
     });
     // Hosted spend a gateway reported but the buffer has not written yet is written at shutdown.
@@ -895,12 +910,13 @@ function licenseRegistryOver({
     LicensingRepositories,
     "issuedLicenses" | "activationCodes" | "rateLimits" | "connectOrganizations"
   >;
-  customerFacts: Pick<LicensingCustomerFactsService, "selfHostedCustomerLicensed">;
+  customerFacts: Pick<
+    LicensingCustomerFactsService,
+    "selfHostedCustomerLicensed" | "managedKeyRetired" | "managedKeyInvalidated"
+  >;
   gateway: Pick<
     GatewayApi,
     | "provisionConnectManagedKey"
-    | "revokeManagedInternal"
-    | "invalidateManagedInternal"
     | "setManagedKeyConnectServicesInternal"
     | "setManagedKeyLicenseInternal"
   >;
@@ -923,8 +939,8 @@ function licenseRegistryOver({
           licenseId,
           actorUserId: systemActorId,
         }),
-      retire: (key) => gateway.revokeManagedInternal(key),
-      invalidate: (key) => gateway.invalidateManagedInternal(key),
+      retire: (key) => customerFacts.managedKeyRetired(key),
+      invalidate: (key) => customerFacts.managedKeyInvalidated(key),
       setConnectServices: (key) => gateway.setManagedKeyConnectServicesInternal(key),
       setLicense: (key) => gateway.setManagedKeyLicenseInternal(key),
     },
@@ -1070,6 +1086,7 @@ function connectInstallParts({
   seats,
   licenses,
   config,
+  publicKey,
   logger,
 }: {
   infrastructure: ConnectInstallInfrastructure;
@@ -1078,6 +1095,8 @@ function connectInstallParts({
   seats: LicenseStorage;
   licenses: LicenseService;
   config: LicensingServerConfig;
+  /** The key licences verify against, as the build allows it; undefined is the embedded key. */
+  publicKey: string | undefined;
   logger?: LicenseLogger;
 }): ConnectInstallParts {
   const identity = InstanceIdentityService.create({
@@ -1099,7 +1118,7 @@ function connectInstallParts({
     },
     ...(infrastructure.gateway ? { gateway: infrastructure.gateway } : {}),
     instanceLicenseKey: infrastructure.instanceLicenseKey,
-    ...(config.publicKey ? { publicKey: config.publicKey } : {}),
+    ...(publicKey ? { publicKey } : {}),
     ...(infrastructure.upstream ? { upstream: infrastructure.upstream } : {}),
     ...(logger ? { logger } : {}),
   });

@@ -43,21 +43,8 @@ export const identityProcessModule: PublishedProcessModule<
   .withEventing(joinRequestEventing)
   .withEventing(ssoConnectionEventing)
   .withMigrations(({ repositories }) => [
-    // Blocking, so it has run before a release that adopts unproven accounts serves. A state
-    // flip, idempotent: a second run finds nothing (Alex, 2026-10-06, "Adopt gap").
-    defineMigrationStep({
-      id: "identity:reopen-unproven-accounts",
-      kind: "data",
-      mode: "blocking",
-      description:
-        "Returns accounts never confirmed and never signed into to the legacy sign-in path.",
-      run: async ({ dryRun }) => {
-        const reopened = await repositories.migration.reopenUnprovenAccounts({ dryRun });
-        return dryRun ? { wouldReopen: reopened } : { reopened };
-      },
-    }),
-    // An older pod's system-migrations pass re-finalizes reopened accounts:
-    // sweep again once none serves.
+    // Background only: a blocking step may not touch a sign-in table (UIW-IDENTITY-STEP,
+    // Alex 2026-10-09). Waits for old writers, which re-finalize reopened accounts.
     defineMigrationStep({
       id: "identity:reopen-unproven-accounts-after-rollout",
       kind: "data",

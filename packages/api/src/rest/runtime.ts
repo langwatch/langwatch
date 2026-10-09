@@ -2747,6 +2747,7 @@ function mountRoute({
       credentialClass,
       credential,
       ...(sharedPath ? { sharedPath } : {}),
+      ...upgradingFlag(route),
     });
   }
 
@@ -2925,4 +2926,9 @@ function mountCredential<Api>({
   }
 
   return named;
+}
+
+/** UIW-6: the registry records a route declared to serve while upgrading. */
+function upgradingFlag<Api>(route: RestTransportRoute<Api>): { servesWhileUpgrading?: true } {
+  return route.servesWhileUpgrading ? { servesWhileUpgrading: true } : {};
 }

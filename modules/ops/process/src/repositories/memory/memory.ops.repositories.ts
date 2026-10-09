@@ -1,5 +1,9 @@
 import { type EventSourcing, type InMemoryProcessStore } from "@langwatch/eventing";
 import type { TenantSource } from "@langwatch/system-migrations";
+import {
+  MemoryTenantStepLedgerRepository,
+  MemoryTenantStepStateRepository,
+} from "@langwatch/upgrade/step/tenant-state";
 
 import type { OpsReplayRuntime } from "../../app/ops.app.ts";
 import { NullBlobStoreRepository } from "../blob-store.repository.ts";
@@ -27,6 +31,7 @@ import { MemoryImpersonationRepository } from "./memory.impersonation.repository
 import { MemoryInstanceAdminRepository } from "./memory.instance-admin.repository.ts";
 import { MemoryMigrationLeaseRepository } from "./memory.migration-lease.repository.ts";
 import { MemoryOpsMetricsRepository } from "./memory.ops-metrics.repository.ts";
+import { MemoryOpsMigrationRepository } from "./memory.ops-migration.repository.ts";
 import { MemoryOpsSnapshotRepository } from "./memory.ops-snapshot.repository.ts";
 import { MemoryOpsStore } from "./memory.ops.store.ts";
 import { MemoryProcessManagerPurgeRepository } from "./memory.process-manager-purge.repository.ts";
@@ -131,6 +136,9 @@ export class MemoryOpsRepositories {
     processStore: InMemoryProcessStore;
   }>): OpsRepositories {
     const store = MemoryOpsStore.create();
+    const migrationState = MemorySystemMigrationStateRepository.create();
+    const tenantStepState = MemoryTenantStepStateRepository.create();
+    const migrationEnrollments = MemorySystemMigrationEnrollmentRepository.create();
 
     return {
       bugReports: MemoryBugReportRepository.create({ store }),
@@ -138,8 +146,13 @@ export class MemoryOpsRepositories {
       processStore,
       processManagerPurge: MemoryProcessManagerPurgeRepository.create(),
       credentialsReseal: MemoryCredentialsResealRepository.create(),
-      migrationState: MemorySystemMigrationStateRepository.create(),
-      migrationEnrollments: MemorySystemMigrationEnrollmentRepository.create(),
+      migrationState,
+      migration: MemoryOpsMigrationRepository.create({
+        legacy: migrationState,
+        steps: tenantStepState,
+        enrolments: migrationEnrollments,
+      }),
+      migrationEnrollments,
       migrationMemberships: MemoryMigrationMembershipRepository.create(),
       migrationLease: MemoryMigrationLeaseRepository.create(),
       organizationTenants: MemoryOrganizationTenantSourceRepository.create(),
@@ -167,6 +180,8 @@ export class MemoryOpsRepositories {
       events: MemoryEventExplorerRepository.create({ store }),
       storageFootprint: MemoryStorageFootprintRepository.create(),
       upgradeLedger: MemoryUpgradeLedgerRepository.create(),
+      tenantStepState,
+      tenantStepLedger: MemoryTenantStepLedgerRepository.create(),
     };
   }
 }

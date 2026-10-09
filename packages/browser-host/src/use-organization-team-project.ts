@@ -19,8 +19,8 @@ export type UiHostOrganization = { id: string; name?: string };
 export type UiHostTeam = { id: string; name?: string };
 
 /**
- * The one thing a scope reading is asked of. Grants answer SYNCHRONOUSLY AND FAIL CLOSED: a
- * permission that flickers open while the answer is in flight is a permission that leaked.
+ * The one thing a scope reading is asked of: where the reader stands. Grants are the session's
+ * answer, read through each module's own host.
  */
 export abstract class UiScopeHost {
   abstract project(): UiHostProject | undefined;
@@ -32,18 +32,9 @@ export abstract class UiScopeHost {
   /** The reader's role in the organization, or undefined before it resolves. */
   abstract organizationRole(): string | undefined;
 
-  abstract hasPermission(permission: string): boolean;
-
-  /**
-   * The same question asked of the ORGANIZATION alone. Team and project bindings do not count,
-   * so a permission granted only below the organization reads false here; the plan and team
-   * controls read this one.
-   */
-  abstract hasOrganizationPermission(permission: string): boolean;
-
   abstract isDemoProject(): boolean;
 
-  /** Whether the scope answer is still arriving. */
+  /** Whether the scope answer is still arriving; the session's grants have their own flag. */
   abstract isLoading(): boolean;
 }
 
@@ -53,8 +44,6 @@ export type UiScopeHostReadings = {
   organization: () => UiHostOrganization | undefined;
   team: () => UiHostTeam | undefined;
   organizationRole?: () => string | undefined;
-  hasPermission: (permission: string) => boolean;
-  hasOrganizationPermission?: (permission: string) => boolean;
   isDemoProject?: () => boolean;
   isLoading?: () => boolean;
 };
@@ -70,9 +59,6 @@ export function createUiScopeHost(readings: UiScopeHostReadings): UiScopeHost {
     organization: () => readings.organization(),
     team: () => readings.team(),
     organizationRole: () => readings.organizationRole?.(),
-    hasPermission: (permission: string) => readings.hasPermission(permission),
-    hasOrganizationPermission: (permission: string) =>
-      (readings.hasOrganizationPermission ?? readings.hasPermission)(permission),
     isDemoProject: () => readings.isDemoProject?.() ?? false,
     isLoading: () => readings.isLoading?.() ?? false,
   };
@@ -95,8 +81,6 @@ export type UiScopeReading = {
   team: UiHostTeam | undefined;
   organizationRole: string | undefined;
   isDemoProject: boolean;
-  hasPermission: (permission: string) => boolean;
-  hasOrgPermission: (permission: string) => boolean;
   isLoading: boolean;
   isRefetching: boolean;
   /** False when no scope host is mounted at all, which is not the same as loading. */
@@ -110,8 +94,6 @@ const NO_SCOPE: UiScopeReading = {
   team: void 0,
   organizationRole: void 0,
   isDemoProject: false,
-  hasPermission: () => false,
-  hasOrgPermission: () => false,
   isLoading: false,
   isRefetching: false,
   isResolved: false,
@@ -136,8 +118,6 @@ export function useOrganizationTeamProject(_options?: {
       team: host.team(),
       organizationRole: host.organizationRole(),
       isDemoProject: host.isDemoProject(),
-      hasPermission: (permission: string) => host.hasPermission(permission),
-      hasOrgPermission: (permission: string) => host.hasOrganizationPermission(permission),
       isLoading: host.isLoading(),
       isRefetching: false,
       isResolved: true,

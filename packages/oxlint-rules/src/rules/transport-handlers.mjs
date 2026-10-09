@@ -209,11 +209,24 @@ function isFluentEndpointHandle(call) {
 /** What one link of a route chain hands its handler, as `@langwatch/api/rest` declares it. */
 function fieldsProducedBy(link) {
   const name = propertyName(link.callee);
+  if (name === "withPermission") return declaresPermissionTarget(link) ? ["target"] : [];
   if (name !== "withResponse") return PRODUCED_BY_DECLARATION.get(name) ?? [];
   const [kind] = link.arguments;
   const readsRequest = kind?.type === "Literal" && REQUEST_READING_KINDS.has(kind.value);
 
   return readsRequest ? ["response", "request"] : ["response"];
+}
+
+/** `.withPermission(perm, { at })` hands the handler the target its door authorised. */
+function declaresPermissionTarget(link) {
+  const options = link.arguments[1];
+
+  return (
+    options?.type === "ObjectExpression" &&
+    options.properties.some(
+      (property) => property.key?.name === "at" || property.key?.value === "at",
+    )
+  );
 }
 
 /** `.withCredential(door, { session })` hands the handler the session its schema types. */

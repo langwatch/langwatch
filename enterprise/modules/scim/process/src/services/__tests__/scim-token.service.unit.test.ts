@@ -19,6 +19,11 @@ import type { ScimUserProvisioning } from "../scim-provisioning.service.ts";
 import { ScimService } from "../scim.service.ts";
 import { QuietScimSyncLifecycle } from "./support/quiet-scim-sync-lifecycle.ts";
 
+/** Every seat free, so these tests admit full members (seat-limit-at-provisioning.feature). */
+const openSeats = {
+  countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),
+};
+
 class RecordingScimSyncLifecycle extends QuietScimSyncLifecycle {
   tokenIssued = vi.fn(async () => undefined);
   revoked = vi.fn(async () => undefined);
@@ -64,6 +69,7 @@ function service(
     lifecycle,
     provenOffboarding: false,
     tokenPepper: "scim-test-pepper",
+    seats: openSeats,
   });
 }
 

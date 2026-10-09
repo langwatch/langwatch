@@ -35,6 +35,7 @@ export {
   idpSimulatorUrl,
   LOCAL_GATEWAY_URL,
   localPasswords,
+  logSettings,
   mfaEnrollmentOpen,
   nlpCodeBlockTimeoutSeconds,
   nlpServiceUrl,
@@ -55,6 +56,7 @@ export {
   telemetryExporterEndpoint,
   trustedIdpOrigins,
 } from "./deployment-facts.ts";
+export { isReleaseBuild } from "./release-build.ts";
 export {
   environmentBooleanSchema,
   environmentExactOneSchema,

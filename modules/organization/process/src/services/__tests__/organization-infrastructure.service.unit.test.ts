@@ -189,6 +189,10 @@ class StubRepository extends OrganizationRepository {
     throw new OrganizationNotFoundError();
   }
 
+  async findLicensingLicenseKeys(): Promise<string[]> {
+    return [];
+  }
+
   async findFirstAdministratorEmail(): Promise<string | null> {
     return null;
   }

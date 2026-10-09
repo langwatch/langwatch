@@ -15,6 +15,7 @@ import { chunkImportRetry } from "./vite/chunk-import-retry";
 import { designSystemStorybook } from "./vite/design-system-storybook";
 import { createDevLogger } from "./vite/dev-logging";
 import { entryCoreChunkGroup, hostMountsChunkGroup } from "./vite/entry-core-chunks";
+import { HAVEN_SLUG_ENV, havenOrb } from "./vite/haven-orb";
 import { havenHmrGate } from "./vite/havenHmrGate";
 import { mailPreview } from "./vite/mail-preview";
 import { fetchPublicConfigFromApi } from "./vite/public-config-from-api";
@@ -193,12 +194,23 @@ function patchObjectInspectBrowserStub(): Plugin {
  * HTML shell. In development and `vite preview` (the build job's boot smoke)
  * Vite owns the shell, so it performs the same explicit boot mapping itself.
  */
-function injectDevelopmentPublicConfig(config: PublicAppConfig): Plugin {
+function injectDevelopmentPublicConfig({ apiUrl }: { apiUrl: string }): Plugin {
+  let last: PublicAppConfig | undefined;
+  // The api may boot after this server and reloads on its own: read it per page, waiting only
+  // for the first answer, then keeping the last one while a reload has it briefly down.
+  const current = async (): Promise<PublicAppConfig> => {
+    try {
+      last = await fetchPublicConfigFromApi({ apiUrl, waitMs: last ? 0 : 30_000 });
+    } catch (failure) {
+      if (!last) throw failure;
+    }
+    return last;
+  };
   return {
     name: "inject-development-public-config",
     apply: "serve",
-    transformIndexHtml(html) {
-      return injectPublicAppConfigIntoHtml({ html, config });
+    async transformIndexHtml(html) {
+      return injectPublicAppConfigIntoHtml({ html, config: await current() });
     },
     configurePreviewServer(server) {
       const shellPath = path.resolve(server.config.root, server.config.build.outDir, "index.html");
@@ -207,8 +219,10 @@ function injectDevelopmentPublicConfig(config: PublicAppConfig): Plugin {
         const isShell = pathname.endsWith(".html") || !path.extname(pathname);
         if (request.method !== "GET" || !isShell || !existsSync(shellPath)) return next();
         const html = readFileSync(shellPath, "utf8");
-        response.setHeader("Content-Type", "text/html");
-        response.end(injectPublicAppConfigIntoHtml({ html, config }));
+        void current().then((config) => {
+          response.setHeader("Content-Type", "text/html");
+          response.end(injectPublicAppConfigIntoHtml({ html, config }));
+        }, next);
       });
     },
   };
@@ -237,9 +251,6 @@ function logDevelopmentTlsState(
 
 export default defineConfig(async ({ command }): Promise<UserConfig> => {
   const devHttpsCredentials = loadDevHttpsCredentials();
-  // The api renders the page's public config; the dev server lifts it from the api's shell.
-  const publicConfig =
-    command === "serve" ? await fetchPublicConfigFromApi({ apiUrl: API_TARGET }) : undefined;
 
   // Diagnostic: when Vite hot-restarts on a config change, the https block is
   // re-evaluated but in-process TLS state can land in a broken pair (server listening,
@@ -253,8 +264,10 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
     plugins: [
       react(),
       patchObjectInspectBrowserStub(),
-      ...(publicConfig ? [injectDevelopmentPublicConfig(publicConfig)] : []),
+      // The api renders the page's public config; the dev server lifts it from the api's shell.
+      ...(command === "serve" ? [injectDevelopmentPublicConfig({ apiUrl: API_TARGET })] : []),
       havenHmrGate(),
+      havenOrb({ slug: process.env[HAVEN_SLUG_ENV] }),
       designSystemStorybook({ appPort: FRONTEND_PORT }),
       mailPreview({ appPort: FRONTEND_PORT }),
       workspaceSourcePlugin(),

@@ -55,6 +55,16 @@ export type OrganizationLicensePair = Readonly<{
  */
 export interface OrganizationLicenseRepository extends OrganizationLicenseReads {
   organizationExists(organizationId: string): Promise<boolean>;
+  /** Licensing's own row for one organization, if it has one; never organization's columns. */
+  findLicense(input: Readonly<{ organizationId: string }>): Promise<LicenseColumns[]>;
+  /** Puts `previous` back while the row still holds `written`; a null `previous` deletes it. */
+  restoreLicense(
+    input: Readonly<{
+      organizationId: string;
+      written: LicenseColumns;
+      previous: LicenseColumns | null;
+    }>,
+  ): Promise<void>;
   saveLicense(input: Readonly<{ organizationId: string; license: StoredLicense }>): Promise<void>;
   /** Keeps the row with no key, so a cleared licence never falls back to organization's columns. */
   clearLicense(input: Readonly<{ organizationId: string }>): Promise<void>;
@@ -62,7 +72,10 @@ export interface OrganizationLicenseRepository extends OrganizationLicenseReads 
   findLicensePairs(
     input: Readonly<{ afterOrganizationId: string | null; limit: number }>,
   ): Promise<OrganizationLicensePair[]>;
-  /** Writes each pair's columns only where its row is still `own`, so a newer write is kept. */
+  /**
+   * Writes each pair's columns only where its row is still `own` and organization's
+   * columns are still `columns`, so a newer write on either side is kept.
+   */
   overwriteLicenses(
     input: Readonly<{ pairs: readonly OrganizationLicensePair[] }>,
   ): Promise<number>;

@@ -269,9 +269,14 @@ export class MemoryScimRepository extends ScimRepository {
     organizationId: string;
     userId: string;
     role: string;
+    pending?: boolean;
   }): Promise<void> => {
     if (this.#isMember(input)) throw new Error("The membership already exists");
-    this.memberships.push({ ...input });
+    this.memberships.push({
+      organizationId: input.organizationId,
+      userId: input.userId,
+      role: input.role,
+    });
   };
 
   removeMembership = async (input: { organizationId: string; userId: string }): Promise<void> => {

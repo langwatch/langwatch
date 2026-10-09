@@ -776,7 +776,7 @@ function TeamCard({
   const [expanded, setExpanded] = useState(false);
   const [addingMember, setAddingMember] = useState(false);
   const { openDrawer } = useDrawer();
-  const { hasPermission } = useOrganizationTeamProject();
+  const host = useOrganizationHost();
   const queryClient = api.useUtils();
   const governanceEnabled = useOrganizationHost().isFeatureEnabled(
     FrontendFlags.release_ui_ai_governance_enabled,
@@ -982,7 +982,7 @@ function TeamCard({
                   Projects
                 </Text>
                 <Spacer />
-                {hasPermission("project:create") && (
+                {host.hasPermission("project:create") && (
                   <Button
                     size="xs"
                     variant="outline"
@@ -1037,7 +1037,8 @@ function TeamCard({
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function TeamsScreen() {
-  const { organization, hasPermission } = useOrganizationTeamProject();
+  const { organization } = useOrganizationTeamProject();
+  const host = useOrganizationHost();
   const { openDrawer } = useDrawer();
 
   const teams = api.team.getTeamsWithGrants.useQuery(
@@ -1045,7 +1046,7 @@ export default function TeamsScreen() {
     { enabled: !!organization },
   );
 
-  const canManage = hasPermission("team:manage");
+  const canManage = host.hasPermission("team:manage");
 
   if (!organization) return null;
 
@@ -1060,7 +1061,7 @@ export default function TeamsScreen() {
           </Text>
         </Box>
         <Spacer />
-        {hasPermission("project:create") && (
+        {host.hasPermission("project:create") && (
           <PageLayout.HeaderButton
             onClick={() => openDrawer(CreateProjectDrawerToken)}
             data-testid="teams-project-add"

@@ -108,7 +108,7 @@ async function composedBetterAuth(provider: ServedOidcProvider): Promise<BetterA
     }),
     dependencies: {
       projects: createApiFixture<ProjectApi>(),
-      users: new TestUserApi({}) as never,
+      users: new TestUserApi({ hasAnyAccount: async () => true }) as never,
       apiKeys: { findResolvedToken: async () => null } as never,
       featureFlags: {} as never,
       identity: identityFor(provider),

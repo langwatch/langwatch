@@ -29,6 +29,32 @@ describe("given the in-process reload trigger", () => {
       trigger.cancel();
     });
   });
+
+  describe("when edits arrive while the first boot is still running", () => {
+    /** @scenario "A change during the one-process host's boot is answered by one follow-up reload" */
+    it("waits for the boot, then reloads once with every file", async () => {
+      let finishBoot = (): void => {};
+      const run = vi.fn(
+        (files: string[]) =>
+          new Promise<void>((resolve) => {
+            if (files.length === 0) finishBoot = resolve;
+            else resolve();
+          }),
+      );
+      const trigger = createReloadTrigger({ quietMs: 2_000, maxWaitMs: 30_000, run });
+      const booted = trigger.boot();
+      trigger.note("/repo/a.ts");
+      trigger.note("/repo/b.ts");
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(run).toHaveBeenCalledTimes(1);
+      finishBoot();
+      await booted;
+      await vi.advanceTimersByTimeAsync(2_000);
+      expect(run).toHaveBeenCalledTimes(2);
+      expect(run.mock.calls[1]?.[0]).toEqual(["/repo/a.ts", "/repo/b.ts"]);
+      trigger.cancel();
+    });
+  });
 });
 
 describe("given modules the runner evaluated", () => {

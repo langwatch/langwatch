@@ -23,9 +23,6 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
     organization: { id: "org-1", slug: "acme", name: "ACME", teams: [] },
     organizations: [],
     project: undefined,
-    hasPermission: () => true,
-    hasOrgPermission: () => true,
-    hasAnyPermission: () => true,
   }),
 }));
 

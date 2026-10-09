@@ -414,6 +414,11 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     organization.licenseLastValidatedAt = null;
   }
 
+  async findLicensingLicenseKeys(input: { organizationId: string }): Promise<string[]> {
+    const licenseKey = this.memory.licensingLicenseKeys.get(input.organizationId);
+    return licenseKey ? [licenseKey] : [];
+  }
+
   async findFirstAdministratorEmail(organizationId: string): Promise<string | null> {
     const [first] = this.memory.organizationUsers
       .filter(

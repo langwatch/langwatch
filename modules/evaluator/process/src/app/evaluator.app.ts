@@ -430,7 +430,8 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
   }
 
   /** Creates an evaluator against models already resolved by the caller. */
-  createWithDefaults(input: EvaluatorCreateInput): Promise<Evaluator> {
+  async createWithDefaults(input: EvaluatorCreateInput): Promise<Evaluator> {
+    await this.#dependencies.creationCaps.assertCreationAllowed({ projectId: input.projectId });
     return this.#dependencies.evaluators.createWithDefaults(input);
   }
 

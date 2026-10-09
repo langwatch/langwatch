@@ -54,6 +54,7 @@ function initState(): TopicModelData {
 
 describe("TopicModelFoldProjection", () => {
   describe("when a replace event is recorded", () => {
+    /** @scenario "A batch clustering run replaces the topic model through the stream" */
     it("the event's topics ARE the model, ids passed through unchanged", () => {
       let state = projection.handleTopicClusteringTopicsRecorded(
         recorded({ mode: "replace", topics: [entry("old-1")] }),
@@ -73,6 +74,7 @@ describe("TopicModelFoldProjection", () => {
   });
 
   describe("when a merge event arrives", () => {
+    /** @scenario "An incremental clustering run extends the model" */
     it("upserts by id and keeps everything else", () => {
       let state = projection.handleTopicClusteringTopicsRecorded(
         recorded({ mode: "replace", topics: [entry("a"), entry("b")] }),
@@ -97,6 +99,7 @@ describe("TopicModelFoldProjection", () => {
     // seed during projection lag CAN append a second replace-mode seed with a later occurredAt.
     // Folding it would delete the clustering delta recorded in between. A seed is only
     // meaningful as the model's first record — later ones must be no-ops.
+    /** @scenario "A late duplicate seed can never remove recorded topics" */
     it("folds as a no-op instead of replacing away the clustering delta", () => {
       // Write-path seed: legacy topics onto the empty model.
       let state = projection.handleTopicClusteringTopicsRecorded(

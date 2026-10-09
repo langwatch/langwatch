@@ -114,7 +114,6 @@ describe("given a reader who may create datasets in one of their projects and no
             project: () => ({ id: "proj-1", slug: "demo", name: "Demo" }),
             organization: () => ({ id: "org-1" }),
             team: () => ({ id: "team-1" }),
-            hasPermission: () => true,
           }),
         ),
         copyTargets: lent,

@@ -55,12 +55,24 @@ Feature: storagesim, a local S3 stand-in run by haven
     Then the data directory is 0700 and each stored file 0600 under a content-addressed name
     And a GET serves it nosniff, sandboxed and as an attachment
 
-  # Pending thuishaven: haven keeps <home>/storage/<slug> today (see the storagesim README).
+  # Implemented by tools/thuishaven/app/db.go (haven db reset); awaiting a bound thuishaven test.
   @unimplemented
   Scenario: A stack's objects are discarded with its databases
     Given a stack whose storagesim holds objects
     When the developer runs "haven db reset"
     Then the stack's storagesim data directory is removed with the databases
+
+  Scenario: A client lists a bucket's keys with ListObjectsV2
+    Given a bucket holding objects under several prefixes
+    When a client sends GET /<bucket>?list-type=2, optionally with a prefix
+    Then it answers ListBucketResult with each key, size, ETag and LastModified in lexical order
+    And an unknown bucket answers 404 NoSuchBucket and a bad token or max-keys 400 InvalidArgument
+
+  Scenario: A long listing is paged with a continuation token
+    Given a bucket holding more keys than max-keys
+    When a client lists it page by page
+    Then each page is truncated with a NextContinuationToken until the last
+    And following the tokens yields every key once, with a delimiter's common prefixes never repeated
 
   Scenario: A streamed SDK upload is stored without its chunk framing
     When the server's S3 client PUTs a body with aws-chunked framing
@@ -112,6 +124,11 @@ Feature: storagesim, a local S3 stand-in run by haven
     When the console reads /_sim/api/requests
     Then it lists each request's method, key, status and time, newest first
     And it holds only the newest 500
+
+  Scenario: The console deletes one object or clears a bucket
+    Given objects in two buckets
+    When the developer deletes one object, then clears one bucket, over the console API
+    Then the deleted object reads as missing and only the other bucket's objects remain
 
   Scenario: The console serves its bundle beside the S3 paths
     When a browser opens /_sim/ on storagesim

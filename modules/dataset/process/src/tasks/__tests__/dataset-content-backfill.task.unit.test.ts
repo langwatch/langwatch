@@ -53,4 +53,22 @@ describe("given a dataset content backfill", () => {
       expect(run).toHaveBeenCalledTimes(1);
     });
   });
+
+  describe("when the migration left datasets behind", () => {
+    it("fails the task instead of reporting it finished", async () => {
+      const run = vi.fn(() =>
+        Promise.resolve({
+          status: "incomplete" as const,
+          summary: { ...migrated.summary, failed: 1 },
+        }),
+      );
+
+      await expect(
+        DatasetContentBackfillSweep.withMigration({ run }).execute({
+          skipped: false,
+          dryRun: false,
+        }),
+      ).rejects.toThrow("left 1 failed");
+    });
+  });
 });

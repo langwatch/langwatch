@@ -116,6 +116,9 @@ class FakeLangyHost extends LangyHostApi {
   currentUser() {
     return { id: "user-1", email: "staff@langwatch.ai" };
   }
+  hasOrganizationPermission() {
+    return false;
+  }
   hasPermission(permission: string) {
     return this.state.permissions.includes(permission);
   }

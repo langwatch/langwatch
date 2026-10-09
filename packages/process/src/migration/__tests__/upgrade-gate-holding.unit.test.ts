@@ -103,4 +103,38 @@ describe("the upgrade gate and the holding page", () => {
       ]);
     });
   });
+
+  describe("given an api whose gate answers holding, then upgrading, then admits", () => {
+    /** @scenario "The api never runs the upgrade when its installation is behind" */
+    it("holds the door naming each phase, boots at upgrading and lifts the hold once admitted", async () => {
+      const answers: UpgradeGateVerdict[] = [
+        { admitted: false, outcome: "holding", outstanding: ["prisma:20261006180000_add_column"] },
+        { admitted: false, outcome: "upgrading", outstanding: ["clickhouse:00042"] },
+        { admitted: true },
+      ];
+      const holds: unknown[] = [];
+      const hosted = upgradeGateComponent({
+        server: "gate-hold-test",
+        role: "api",
+        gate: {
+          admit: async () => answers.shift() ?? { admitted: true },
+          release: async () => undefined,
+        },
+        logger: createTestLogger().logger,
+        onHolding: async (holding) => void holds.push(holding),
+        reAskMs: 1,
+      });
+
+      await hosted.start?.();
+
+      expect(holds.slice(0, 3)).toEqual([
+        { phase: "upgrade-gate", outstandingStepIds: [] },
+        { phase: "holding", outstandingStepIds: ["prisma:20261006180000_add_column"] },
+        { phase: "upgrading", outstandingStepIds: ["clickhouse:00042"] },
+      ]);
+      await vi.waitFor(() => expect(holds.at(-1)).toBeUndefined());
+      await expect(hosted.ready?.()).resolves.toBeUndefined();
+      await hosted.stop?.();
+    });
+  });
 });

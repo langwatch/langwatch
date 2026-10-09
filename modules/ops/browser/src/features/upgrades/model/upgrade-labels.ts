@@ -58,6 +58,18 @@ export function phaseOutcomeLabel(outcome: string): UpgradeLabel {
     : { label: outcome, tone: "neutral" };
 }
 
+const PREFLIGHT_OUTCOMES: Record<string, UpgradeLabel> = {
+  verified: { label: "Pass", tone: "success" },
+  refused: { label: "Fail", tone: "danger" },
+};
+
+/** A preflight row's outcome in the checkup's words; anything else was not checked. */
+export function preflightLabel(outcome: string): UpgradeLabel {
+  return Object.hasOwn(PREFLIGHT_OUTCOMES, outcome)
+    ? PREFLIGHT_OUTCOMES[outcome]!
+    : { label: "Not checked", tone: "neutral" };
+}
+
 /** The order a release's step groups are shown in (UI plan W2). */
 export const UPGRADE_MODE_ORDER = ["blocking", "background", "operator"] as const;
 

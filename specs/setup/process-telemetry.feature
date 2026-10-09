@@ -48,8 +48,8 @@ Feature: One OpenTelemetry setup every process uses
 
     @unit
     Scenario: A scrape reads the process's own instruments
-      Given a process outside production whose metrics exporter lists "prometheus" and no METRICS_API_KEY
-      When its pull port is scraped at "/metrics"
+      Given a process whose metrics exporter lists "prometheus" and METRICS_API_KEY is set
+      When its pull port is scraped at "/metrics" with that bearer
       Then the exposition names the instruments this process records
 
     @unit
@@ -59,17 +59,11 @@ Feature: One OpenTelemetry setup every process uses
       Then the response is 401
 
     @unit
-    Scenario: In production an unset scrape token mounts no door
-      Given a production process whose metrics exporter lists "prometheus" and no METRICS_API_KEY
+    Scenario: An unset scrape token mounts no door
+      Given a process, in production or not, whose metrics exporter lists "prometheus" and no METRICS_API_KEY
       When its metrics are composed
-      Then no pull port is opened and the boot log names METRICS_API_KEY
-      # Fail-closed: an unset key is a misconfiguration, not an invitation. LANGWATCH_METRICS_TOKEN never shipped and opens nothing.
-
-    @unit
-    Scenario: An authenticated scrape in production reads the process's instruments
-      Given a production process whose metrics exporter lists "prometheus" and METRICS_API_KEY is set
-      When a caller scrapes the pull port with that bearer
-      Then the exposition names the instruments this process records
+      Then no pull port is opened and the boot log says to set METRICS_API_KEY
+      # Fail-closed in every environment, as the Go gateway's door is. Only METRICS_API_KEY opens it.
 
     @unit
     Scenario: Metrics are switched off entirely
@@ -91,6 +85,22 @@ Feature: One OpenTelemetry setup every process uses
       Given a process with no METRICS_API_KEY, or one whose OTEL_METRICS_EXPORTER is written
       When its metrics are composed
       Then no route is contributed at "/metrics" on the health door
+
+  Rule: A process that boots no preamble reads the same logger names
+
+    @unit
+    Scenario: A process without a preamble reads the same logger names
+      Given the tasks runner or the scenario child starts with LOG_LEVEL, a collector and OTEL_SERVICE_NAME set
+      When it configures its logger from the observability slice
+      Then the logger takes that level for both sinks, exports to the collector and uses that service name
+      And with nothing set it keeps its own name and exports nothing
+
+    @unit
+    Scenario: A process without a preamble reads main's names as warned aliases
+      Given the tasks runner or the scenario child starts with PINO_LOG_LEVEL set
+      When it configures its logger from the observability slice
+      Then the logger takes that level and the process logs one deprecation warning
+      And an old name that disagrees with its replacement refuses the start
 
   Rule: A blank optional value is absent, not a value
 
@@ -120,3 +130,13 @@ Feature: One OpenTelemetry setup every process uses
       When a second application in the same process composes its observability with that handle
       Then it is handed the same handle
       And the telemetry SDK is not set up a second time
+
+  Rule: The scenario child runs customer code and gets no collector access
+
+    @unit
+    Scenario: The child's environment carries the log settings and no collector credential
+      Given a parent whose log level, log format and old level names are set
+      And the parent's collector endpoint and OTLP headers are set
+      When the scenario child's environment is built
+      Then the log level and format names reach the child
+      And "OTEL_EXPORTER_OTLP_ENDPOINT" and "OTEL_EXPORTER_OTLP_HEADERS" do not

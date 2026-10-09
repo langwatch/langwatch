@@ -57,12 +57,14 @@ function arrange({
   memberFindUnique.mockResolvedValue(existingRole ? { role: existingRole } : null);
 }
 
-function admit() {
+async function admit() {
   return repository.createMembership({
     userId: "user_sam",
     organizationId: "org_acme",
     pendingAdmissionId: "rolebinding_pending",
     via: "sso",
+    seat: await repository.readJoinerSeat({ organizationId: "org_acme" }),
+    pending: false,
   });
 }
 
@@ -83,13 +85,18 @@ describe("given an organization whose joiner seat is Developer", () => {
     it("writes a Developer row with no organization-wide grant pending", async () => {
       arrange({ joinerRole: OrganizationUserRole.DEVELOPER });
 
-      await expect(admit()).resolves.toEqual({ outcome: "created", seat: "DEVELOPER" });
+      await expect(admit()).resolves.toEqual({
+        outcome: "created",
+        seat: "DEVELOPER",
+        pending: false,
+      });
 
       expect(memberCreate).toHaveBeenCalledWith({
         data: {
           userId: "user_sam",
           organizationId: "org_acme",
           role: OrganizationUserRole.DEVELOPER,
+          disabledAt: null,
           pendingSsoGrantId: null,
         },
       });
@@ -126,7 +133,11 @@ describe("given a Developer-joiner organization where a Full member's row alread
         existingRole: OrganizationUserRole.MEMBER,
       });
 
-      await expect(admit()).resolves.toEqual({ outcome: "already-present", seat: "MEMBER" });
+      await expect(admit()).resolves.toEqual({
+        outcome: "already-present",
+        seat: "MEMBER",
+        pending: false,
+      });
       expect(auditIntents()).toEqual([]);
     });
   });
@@ -138,7 +149,11 @@ describe("given an organization that never changed the setting", () => {
     it("writes a Full member row with the organization-wide grant pending", async () => {
       arrange({ joinerRole: OrganizationUserRole.MEMBER });
 
-      await expect(admit()).resolves.toEqual({ outcome: "created", seat: "MEMBER" });
+      await expect(admit()).resolves.toEqual({
+        outcome: "created",
+        seat: "MEMBER",
+        pending: false,
+      });
 
       expect(memberCreate).toHaveBeenCalledWith({
         data: expect.objectContaining({
@@ -164,9 +179,10 @@ describe("given a Full-seat organization and a join request made from the termin
           pendingAdmissionId: "rolebinding_pending",
           via: "join-request-approved",
           seat: "DEVELOPER",
+          pending: false,
           origin: "cli",
         }),
-      ).resolves.toEqual({ outcome: "created", seat: "DEVELOPER" });
+      ).resolves.toEqual({ outcome: "created", seat: "DEVELOPER", pending: false });
 
       expect(organizationFindUnique).not.toHaveBeenCalled();
       expect(auditIntents()).toEqual([

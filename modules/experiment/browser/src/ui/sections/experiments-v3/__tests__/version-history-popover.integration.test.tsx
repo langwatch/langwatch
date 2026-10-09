@@ -12,6 +12,11 @@ let canRestore = true;
 vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project_1", slug: "acme" },
+  }),
+}));
+
+vi.mock("../../../../model/workflow/workflow-host.ts", () => ({
+  useWorkflowHost: () => ({
     hasPermission: (permission: string) =>
       permission === "experiments:update" ? canRestore : true,
   }),

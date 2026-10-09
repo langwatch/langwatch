@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-30
 
-**Status:** Proposed
+**Status:** Accepted (2026-10-09; see the amendment "one process is the default")
 
 **Related:** [ADR-004](004-docker-dev-environment.md) (amendments 2026-09-07: the `backend` lane
 and debounced restart), [ADR-111](111-physical-application-workspaces.md) (`tools/dev-runtime`),
@@ -134,7 +134,7 @@ The shape decides reload cost; the trigger decides how often it is paid.
 - **Skip what is not loaded.** Under B1 the runner's module graph is the filter: a file outside
   it (docs, specs, browser packages, JSON the backend never imports) triggers nothing.
 
-## Decision (proposed)
+## Decision
 
 Adopt the trigger policy first, then B1 as the dev shape: one Node process per stack, hosted by
 `tools/dev-runtime`, running the UI's Vite server, the api and the worker, reloading the backend
@@ -219,6 +219,16 @@ the max wait (30 s), and the Vite plugin's burst coalescing (300 ms gap, 500 ms 
 
 Each reload disposes the old generation (`disposeGeneration`: drain worker then api, then take off process listeners it attached while serving) before the new one boots; link still precedes drop. Past `LANGWATCH_DEV_RECYCLE_GENERATIONS` (50) generations, `LANGWATCH_DEV_RECYCLE_RSS_MIB` (4096), or a failed drain, the api lane logs `backend recycling` and exits 75 so the supervisor's restart-after-ready starts a fresh process; recycling is armed only under `LANGWATCH_DEV_RELOAD=module`.
 
+## Amendment 2026-10-09: one process is the default
+
+Alex, 2026-10-09 (ruling DEV-ONE-PROCESS): local dev runs ui, api and worker as one Node
+process by default. `pnpm dev` and `haven up` start the `app` lane; `LANGWATCH_DEV_ONE_PROCESS=0`
+keeps the split `ui` and backend lanes, and `dev:api` / `dev:worker` stay. `dev:one` now runs
+under the same `dev-supervisor.mjs --watch` and `LANGWATCH_DEV_RELOAD=module` as the split
+backend lane, so recycling and restart-after-crash apply to it too. The host watches before
+its first boot and runs that boot through the trigger, so an edit landing during any boot is
+answered by one follow-up reload.
+
 ## Risks
 
 - **State leaks across generations.** Workspace packages re-evaluated by the runner must not keep
@@ -259,7 +269,8 @@ most 5 s for B1, peak RSS at most today's Node total plus 15%, flat connection c
 ## Open questions for Alex
 
 1. Is B1's one-process shape wanted even though the RSS saving is small (wrappers only) unless
-   api and worker share stores, which ADR-004 (2026-09-07) refused?
+   api and worker share stores, which ADR-004 (2026-09-07) refused? Answered 2026-10-09: yes,
+   and it is the default (see the amendment).
 2. May haven install `PostToolUse` and `Stop` hooks per worktree by default, as it does the gate? Moot: the hold was retired on 2026-10-09.
 3. Should the npx CLI (`apps/server`) also run api and worker in one process, without watch?
 4. Does "dev-env" mean the compose quickstart? If so, retire `make quickstart` and ADR-004's

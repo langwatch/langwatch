@@ -17,6 +17,11 @@ import type { ScimUserProvisioning } from "../../../services/scim-provisioning.s
 import { ScimService } from "../../../services/scim.service.ts";
 import type { ScimRepository } from "../../scim.repository.ts";
 
+/** Every seat free, so these tests admit full members (seat-limit-at-provisioning.feature). */
+const openSeats = {
+  countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),
+};
+
 const now = new Date("2026-08-25T12:00:00.000Z");
 
 function user(overrides: Partial<UserProfile> = {}): UserProfile {
@@ -83,6 +88,7 @@ function harness(
     lifecycle: new QuietScimSyncLifecycle(),
     provenOffboarding: options.provenOffboarding ?? false,
     tokenPepper: "scim-test-pepper",
+    seats: openSeats,
   });
   if (options.membership !== void 0) {
     vi.mocked(repo.findMembership).mockResolvedValue(options.membership as never);
@@ -150,6 +156,7 @@ describe("SCIM user parity", () => {
       userId: "user-1",
       organizationId: "org-1",
       role: "MEMBER",
+      pending: false,
     });
   });
 
@@ -188,6 +195,7 @@ describe("SCIM user parity", () => {
       userId: "user-1",
       organizationId: "org-2",
       role: "MEMBER",
+      pending: false,
     });
   });
 

@@ -113,7 +113,7 @@ The `/health` call returns `{"status":"ok","checks":{"gateway":"ok","control_pla
 | `/v1` | `Prefix` | `/v1/chat/completions`, `/v1/messages`, `/v1/responses`, `/v1/embeddings`, `/v1/audio/*`, `/v1/images/*`, `/v1/models`, the realtime and ElevenLabs routes |
 | `/health` | `Exact` | The public status endpoint for uptime monitors |
 
-`/healthz`, `/readyz`, `/startupz`, `/metrics`, `/debug/control-plane` and `/internal/*` stay in-cluster. The Gemini-native routes under `/v1beta` are outside the `/v1` prefix and are not published by the chart Ingress. To publish them, route `/v1beta` to the gateway Service with your own route, as described in [Routing and ingress controllers](/self-hosting/deployment/routing).
+`/healthz`, `/readyz`, `/startupz`, `/debug/control-plane` and `/internal/*` stay in-cluster. Metrics are on their own port (`9464`). The Gemini-native routes under `/v1beta` are outside the `/v1` prefix and are not published by the chart Ingress. To publish them, route `/v1beta` to the gateway Service with your own route, as described in [Routing and ingress controllers](/self-hosting/deployment/routing).
 
 ## Cloud load balancer in front of the Service
 
@@ -159,7 +159,7 @@ kubectl -n langwatch get svc langwatch-gateway \
   -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
 ```
 
-A Service of type `LoadBalancer` publishes every route, including `/metrics`, the probes and `/debug/control-plane`, which returns the resolved `LW_GATEWAY_BASE_URL` and takes no key. Put a load balancer listener rule or a security group in front of it when the address is public. Set `service.internal.enabled: true` to also render a ClusterIP Service named `langwatch-gateway-internal` for in-cluster callers, so they do not go out through the load balancer.
+A Service of type `LoadBalancer` publishes every route, including the probes and `/debug/control-plane`, which returns the resolved `LW_GATEWAY_BASE_URL` and takes no key. Put a load balancer listener rule or a security group in front of it when the address is public. Set `service.internal.enabled: true` to also render a ClusterIP Service named `langwatch-gateway-internal` for in-cluster callers, so they do not go out through the load balancer.
 
 ## Other ingress controllers
 

@@ -8,6 +8,7 @@ import type {
 } from "@langwatch/onboarding-contract";
 import type { Instant } from "@langwatch/time";
 
+import type { OrganizationAdmission } from "./admission-seat.ts";
 import type {
   GroupDetail,
   GroupListItem,
@@ -251,9 +252,10 @@ export interface OrganizationApi {
   }>;
   /**
    * Whether this address may create a new account on the installation
-   * (`SIGN_UP_MODE`, `SIGN_UP_ALLOWED_DOMAINS`). The default settings answer without a read.
+   * (`SIGN_UP_MODE`, `SIGN_UP_ALLOWED_DOMAINS`). The default settings answer without a read;
+   * `hasAnyAccount` (the caller's read) lets the first account bootstrap an invite-only one.
    */
-  checkSignUp(input: Readonly<{ email: string }>): Promise<SignUpVerdict>;
+  checkSignUp(input: Readonly<{ email: string; hasAnyAccount: boolean }>): Promise<SignUpVerdict>;
   /**
    * The invitation waiting for a caller who belongs to no organization yet, on an
    * installation where accounts are created by invitation. Only addresses the account
@@ -410,9 +412,10 @@ export interface OrganizationApi {
     }>,
   ): Promise<AuthzAccessBreakdownOutput>;
   /**
-   * Admits somebody on the joiner seat (ADR-129, ADR-171): a MEMBER's grant lands now with
-   * `admittedBy` or an SSO arrival resumes it; a DEVELOPER's row is the whole admission.
-   * `seat` is the row's role; `"already-present"` is a concurrent callback or a retry.
+   * Admits somebody on the seat the licence leaves free (ADR-129, ADR-171, admission-seat.ts): a
+   * MEMBER's grant lands now with `admittedBy` or an SSO arrival resumes it; a DEVELOPER or Lite
+   * (EXTERNAL) row is the whole admission, held `pending` when no seat is free. `seat` is the row's
+   * role; `"already-present"` is a concurrent callback or a retry, answered from the row there.
    */
   createMembership(
     input: Readonly<{
@@ -424,7 +427,7 @@ export interface OrganizationApi {
       /** Where a join request was made, written on the Developer admission audit row. */
       origin?: OrganizationJoinOrigin;
     }>,
-  ): Promise<{ outcome: "created" | "already-present"; seat: "MEMBER" | "DEVELOPER" }>;
+  ): Promise<OrganizationAdmission>;
   isMember(input: Readonly<{ organizationId: string; userId: string }>): Promise<boolean>;
   memberOrganizationIds(
     input: Readonly<{ userId: string; organizationIds: string[] }>,
@@ -559,17 +562,6 @@ export interface OrganizationApi {
   getWithAdministrators(
     input: Readonly<{ organizationId: string }>,
   ): Promise<OrganizationWithAdministrators>;
-  /** The licence and its expiry; the mint stamps `validatedAt` null, an activation now. */
-  setLicense(
-    input: Readonly<{
-      organizationId: string;
-      licenseKey: string;
-      expiresAt: Instant;
-      validatedAt: Instant | null;
-    }>,
-  ): Promise<void>;
-  /** The licence and both its dates cleared; throws `OrganizationNotFoundError`. */
-  clearLicense(input: Readonly<{ organizationId: string }>): Promise<void>;
   /** The support contact set in settings, else the longest-seated enabled administrator's email. */
   findSupportContact(input: Readonly<{ organizationId: string }>): Promise<string | null>;
   getTeam(input: GetOrganizationTeamInput): Promise<OrganizationTeam>;

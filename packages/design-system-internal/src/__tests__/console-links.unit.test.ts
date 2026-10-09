@@ -47,6 +47,16 @@ describe("consoleLinks", () => {
           group: "Sims",
         },
         {
+          label: "Outbound",
+          href: "https://outbound.feat-x.langwatch.localhost:1355",
+          group: "Sims",
+        },
+        {
+          label: "Telemetry",
+          href: "https://telemetry.feat-x.langwatch.localhost:1355",
+          group: "Sims",
+        },
+        {
           label: "Design system",
           href: "https://design-system.feat-x.langwatch.localhost:1355",
           group: "Tools",

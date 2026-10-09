@@ -59,7 +59,7 @@ README there is the full reference), console `apps/idpsim-web` (ADR-160).
 ## From a terminal or agent
 
 `haven idp <verb>` drives a running idpsim (`--json` on reads, `--stack <slug>` for another stack):
-`tenant show <t>`, `apps add|remove`, `populate`, `churn`, `user add`, `scim target set|clear`,
+`tenants` (every tenant, as the console's landing page lists them), `tenant show <t>`, `apps add|remove`, `populate`, `churn`, `user add`, `scim target set|clear`,
 `scim push|pull|sync`, `scim-event <t> <kind> [--style okta|entra] [--user] [--group] [--set k=v]`,
 `dns add|remove`, `activity`, `signin <t> --user <email>` (prints the IdP-initiated URL),
 `reset`, `samlp <t> on|off`. Full table: `services/idpsim/README.md`.

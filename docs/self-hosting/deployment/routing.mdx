@@ -19,7 +19,7 @@ LangWatch uses two hostnames. Browsers and SDKs reach the app. LLM clients and c
 
 `<release>` is the Helm release name. The gateway Service forwards port 80 to container port 5563.
 
-Do not expose any other gateway path. `/healthz`, `/readyz`, `/startupz`, `/metrics`, `/debug/control-plane` and `/internal/*` are for in-cluster use only. Gemini-native clients also need `/v1beta`. Add it as a third Prefix rule if you use them.
+Do not expose any other gateway path. `/healthz`, `/readyz`, `/startupz`, `/debug/control-plane` and `/internal/*` are for in-cluster use only. Metrics are served on a separate port (`9464`) and are not part of the gateway Service. Gemini-native clients also need `/v1beta`. Add it as a third Prefix rule if you use them.
 
 `/api/internal` on the app is the private control plane that the gateway and the Langy agent call over cluster DNS. The chart Ingress blocks it by default with `ingress.blockedPaths`. Your own routes must block it too. See [Security](/self-hosting/security#private-control-plane-paths-are-blocked-at-the-ingress).
 

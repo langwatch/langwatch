@@ -1075,7 +1075,8 @@ func (o *Orchestrator) registerPlayStack(pl PlaySandbox, ports playPorts) (domai
 	scheme, pport := o.proxy.Endpoint()
 	st := domain.Stack{
 		Slug: pl.slug, WorktreeDir: pl.Checkout, Branch: PlayBranch(pl.Number),
-		LauncherPID: o.sys.Getpid(),
+		LauncherPID:   o.sys.Getpid(),
+		LauncherStart: o.sys.ProcessStart(o.sys.Getpid()),
 		// The sandbox's Redis is dedicated, so index 0 is always free.
 		RedisDB:            0,
 		APIPort:            ports.api,

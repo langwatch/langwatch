@@ -6,11 +6,18 @@
 import {
   Config,
   grafana,
+  logSettings,
   otelResourceAttributes,
+  parseProcessConfig,
   serviceVersion,
   telemetryExporterEndpoint,
 } from "@langwatch/config";
-import { metricsScrapeTokenSecret, telemetryAliases } from "@langwatch/observability/node";
+import {
+  loggerConfiguration,
+  metricsScrapeTokenSecret,
+  resolveTelemetry,
+  telemetryAliases,
+} from "@langwatch/observability/node";
 import { telemetryExporterHeaders } from "@langwatch/secrets/shared-secrets";
 import { z } from "zod";
 
@@ -26,6 +33,9 @@ const truthy = z
   .string()
   .optional()
   .transform((value) => value === "true");
+
+/** The old log names the scenario child is handed too, so both hold the same leaf. */
+const sharedLogLeaves = new Map(Object.entries(logSettings));
 
 export const observabilityOwner = {
   name: "observability",
@@ -43,10 +53,10 @@ export const observabilityOwner = {
     /** Standard names (ADR-175); each exporter defaults to `otlp`, behind the one endpoint. */
     traces: { exporter: c.env("OTEL_TRACES_EXPORTER", optionalString) },
     logs: {
-      format: c.env("LOG_FORMAT", z.enum(["pretty", "json"]).optional()),
-      level: c.env("LOG_LEVEL", optionalString),
-      consoleLevel: c.env("LOG_CONSOLE_LEVEL", optionalString),
-      otelLevel: c.env("LOG_OTEL_LEVEL", optionalString),
+      format: logSettings.LOG_FORMAT,
+      level: logSettings.LOG_LEVEL,
+      consoleLevel: logSettings.LOG_CONSOLE_LEVEL,
+      otelLevel: logSettings.LOG_OTEL_LEVEL,
       exporter: c.env("OTEL_LOGS_EXPORTER", optionalString),
     },
     metrics: {
@@ -56,7 +66,10 @@ export const observabilityOwner = {
     },
     /** main's names, read through `telemetryAliases` with a warning until the LTS floor passes. */
     deprecated: Object.fromEntries(
-      telemetryAliases.map(({ deprecated }) => [deprecated, c.env(deprecated, optionalString)]),
+      telemetryAliases.map(({ deprecated }) => [
+        deprecated,
+        sharedLogLeaves.get(deprecated) ?? c.env(deprecated, optionalString),
+      ]),
     ),
   })),
   secrets: {
@@ -64,3 +77,27 @@ export const observabilityOwner = {
     metricsScrapeToken: metricsScrapeTokenSecret,
   },
 } as const;
+
+/**
+ * The logger a process that boots no preamble configures from this slice (tasks,
+ * the scenario child): the names, aliases and conflict refusal api and worker
+ * read. Throws `TelemetryAliasConflictError` when an old name disagrees.
+ */
+export function processLoggerConfiguration({
+  environment,
+  serviceName,
+}: {
+  environment: Readonly<Record<string, string | undefined>>;
+  serviceName: string;
+}) {
+  const settings = parseProcessConfig({ owners: [observabilityOwner], environment }).observability;
+  const resolved = resolveTelemetry(settings);
+  return {
+    configuration: loggerConfiguration({
+      settings,
+      resolved,
+      serviceName: resolved.serviceName ?? serviceName,
+    }),
+    deprecations: resolved.deprecations,
+  };
+}

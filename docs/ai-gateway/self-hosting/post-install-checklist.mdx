@@ -112,8 +112,8 @@ Expected: a `chat.completion` object from the provider. The response carries `X-
 Then confirm the request produced a spend record:
 
 ```bash
-kubectl -n langwatch run curl --rm -it --image=curlimages/curl --restart=Never \
-  -- curl -sS http://langwatch-gateway/metrics | grep -E 'gateway_spend_spool_appended_total|gateway_spend_spool_dropped_total'
+kubectl -n langwatch port-forward deploy/langwatch-gateway 9464:9464 &
+curl -sS -H "Authorization: Bearer $METRICS_API_KEY" http://localhost:9464/metrics | grep -E 'gateway_spend_spool_appended_total|gateway_spend_spool_dropped_total'
 ```
 
 Expected: `gateway_spend_spool_appended_total` is at least 1 and `gateway_spend_spool_dropped_total` is 0.

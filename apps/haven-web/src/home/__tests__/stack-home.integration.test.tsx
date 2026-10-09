@@ -51,6 +51,13 @@ describe("StackHome", () => {
   beforeEach(() => {
     writeText.mockClear();
     Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    // jsdom has no modal dialogs; open and close are what the page reads.
+    HTMLDialogElement.prototype.showModal = function showModal() {
+      this.open = true;
+    };
+    HTMLDialogElement.prototype.close = function close() {
+      this.open = false;
+    };
   });
   afterEach(() => {
     cleanup();
@@ -85,10 +92,15 @@ describe("StackHome", () => {
       ).toBeDefined();
       expect(within(surfaceRow({ name: "app" })).getByText("5560")).toBeDefined();
       expect(within(surfaceRow({ name: "worker" })).getByText("Starting")).toBeDefined();
+      expect(
+        within(surfaceRow({ name: "worker" })).getByText("waiting for :9464 to answer"),
+      ).toBeDefined();
       expect(within(surfaceRow({ name: "nlp" })).getByText("Down")).toBeDefined();
       const langy = surfaceRow({ name: "langyagent" });
       expect(within(langy).getByText("Not selected")).toBeDefined();
-      expect(within(langy).getByText("haven up +langy")).toBeDefined();
+      expect(
+        within(langy).getByText("not part of this stack; start it with haven up +langy"),
+      ).toBeDefined();
     });
   });
 
@@ -158,6 +170,73 @@ describe("StackHome", () => {
         document.dispatchEvent(new Event("visibilitychange"));
       });
       expect(await within(surfaceRow({ name: "app" })).findByText("Live")).toBeDefined();
+    });
+  });
+
+  describe("when a service is not selected", () => {
+    /** @scenario "A service the stack does not run is started from its row" */
+    it("starts it from its row after a confirming second press", async () => {
+      const daemon = serve({
+        home: () => liveHome({ now: NOW }),
+        others: (path) =>
+          path === "/api/stacks/feat-x/start-service?service=mail-room"
+            ? { body: { message: "restarting feat-x with mail-room" } }
+            : undefined,
+      });
+      await openHome({ slug: "feat-x" });
+
+      const row = surfaceRow({ name: "mail-room" });
+      fireEvent.click(within(row).getByRole("button", { name: "Start" }));
+      expect(daemon.calls.some((call) => call.method === "POST")).toBe(false);
+
+      await act(async () => {
+        fireEvent.click(within(row).getByRole("button", { name: "Start mail-room?" }));
+      });
+      expect(daemon.calls).toContainEqual({
+        method: "POST",
+        path: "/api/stacks/feat-x/start-service?service=mail-room",
+        body: undefined,
+      });
+    });
+  });
+
+  describe("when the upgrade floor holds the api", () => {
+    const message = "this installation is on 3.19.3; upgrade to 3.20.1 (LTS) first";
+    /** @scenario "A stack whose database is below the upgrade floor can reset its databases from the stack home" */
+    it("says so and resets the databases once the database name is typed", async () => {
+      const daemon = serve({
+        home: () => ({ ...liveHome({ now: NOW }), belowFloor: message }),
+        others: (path) =>
+          path === "/api/stacks/feat-x/reset-databases"
+            ? { body: { message: "resetting feat-x's databases" } }
+            : undefined,
+      });
+      await openHome({ slug: "feat-x" });
+
+      expect(screen.getByText(message, { exact: false })).toBeDefined();
+      fireEvent.click(screen.getByRole("button", { name: "Reset databases" }));
+      const dialog = await screen.findByRole("dialog");
+      const confirm = within(dialog).getByRole("button", { name: "Reset databases" });
+      expect(confirm.hasAttribute("disabled")).toBe(true);
+
+      const database = liveHome({ now: NOW }).facts.databases.postgres.name;
+      fireEvent.change(within(dialog).getByLabelText(`Type ${database} to confirm`), {
+        target: { value: database },
+      });
+      await act(async () => {
+        fireEvent.click(within(dialog).getByRole("button", { name: "Reset databases" }));
+      });
+      expect(daemon.calls).toContainEqual({
+        method: "POST",
+        path: "/api/stacks/feat-x/reset-databases",
+        body: { confirm: database },
+      });
+    });
+
+    it("shows no callout when nothing holds the api", async () => {
+      serve({ home: () => liveHome({ now: NOW }) });
+      await openHome({ slug: "feat-x" });
+      expect(screen.queryByRole("button", { name: "Reset databases" })).toBeNull();
     });
   });
 

@@ -147,6 +147,15 @@ COPY dev/tsconfig.web-declarations.json ./dev/tsconfig.web-declarations.json
 # `pnpm exec` on a TypeScript tree (the --prod
 # install below drops it, so the bundle is the only supported path in an image).
 # @see specs/scenarios/pre-compiled-child-process.feature
+# Release stamp: release builds verify licences against the embedded LangWatch key only, so the
+# image rewrites packages/config/src/release-build.ts here and runtime env cannot undo it. A
+# dev-stamped image (upgradelab's licensed shape) builds with LANGWATCH_RELEASE_BUILD=false.
+ARG LANGWATCH_RELEASE_BUILD=true
+RUN if [ "$LANGWATCH_RELEASE_BUILD" = "true" ]; then \
+      sed -i 's/^export const isReleaseBuild: boolean = false;$/export const isReleaseBuild: boolean = true;/' packages/config/src/release-build.ts \
+      && grep -q '^export const isReleaseBuild: boolean = true;$' packages/config/src/release-build.ts; \
+    fi
+
 # `build:types` first: the module contracts' declarations now come from one
 # `tsc -b` over the generated root solution rather than a compiler process per
 # package, so the filtered application builds below find their dependencies'

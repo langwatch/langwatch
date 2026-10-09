@@ -51,7 +51,6 @@ export function processMetrics(serviceName: string) {
     const settings = config.observability;
     const resolved = resolveTelemetry(settings);
     const name = resolved.serviceName ?? serviceName;
-    const production = config.process?.nodeEnvironment === "production";
 
     return secrets.into(otlpHeadersSecret, (rawHeaders) =>
       secrets.into(metricsScrapeTokenSecret, (token) =>
@@ -61,7 +60,7 @@ export function processMetrics(serviceName: string) {
           resolved,
           headers: otlpHeadersFrom(rawHeaders),
           token,
-          door: doorFor({ serviceName: name, resolved, token, production, logger }),
+          door: doorFor({ serviceName: name, resolved, token, logger }),
         }),
       ),
     );
@@ -72,22 +71,20 @@ function doorFor({
   serviceName,
   resolved,
   token,
-  production,
   logger,
 }: {
   serviceName: string;
   resolved: ResolvedTelemetry;
   token: string | undefined;
-  production: boolean;
   logger: BootLogger | undefined;
 }): Door {
   if (!resolved.metrics.enabled) return undefined;
   if (resolved.metrics.pull) {
-    // An unset key in production is a misconfiguration, not an invitation.
-    if (token !== undefined || !production) return "own";
+    // Closed without a key in every environment, as the Go gateway's door is.
+    if (token !== undefined) return "own";
     logger?.error(
       { setting: metricsScrapeTokenSecret.id },
-      `${serviceName}: /metrics is not mounted: ${metricsScrapeTokenSecret.id} is not set in production`,
+      `${serviceName}: /metrics is not mounted: set ${metricsScrapeTokenSecret.id} to serve the scrape`,
     );
     return undefined;
   }

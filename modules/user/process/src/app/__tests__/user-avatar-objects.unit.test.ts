@@ -1,3 +1,4 @@
+import { InMemoryProcessStore } from "@langwatch/eventing";
 import {
   StoredObjectNotFoundError,
   type StoredObjectApi,
@@ -13,6 +14,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { UserAvatarNotFoundError } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { MemoryUserRepositories } from "../../repositories/memory/memory.user.repositories.ts";
 import { createUserTestApp } from "./user.fixture.ts";
 
 /** The eight-byte PNG signature, which is all the codec checks. */
@@ -32,7 +34,13 @@ async function* bytesOf(chunk: Uint8Array): AsyncIterable<Uint8Array> {
 }
 
 function appOver(storedObjects: StoredObjectApi) {
-  return createUserTestApp({ dependencies: { storedObjects } });
+  const repositories = MemoryUserRepositories.create({
+    processStore: InMemoryProcessStore.createForTesting(),
+  });
+  vi.spyOn(repositories.organizationDirectory, "findPersonalProjectId").mockResolvedValue(
+    "project-1",
+  );
+  return createUserTestApp({ dependencies: { storedObjects }, repositories });
 }
 
 describe("avatar objects over the stored-object store", () => {

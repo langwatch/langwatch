@@ -123,7 +123,7 @@ export class InProcessUsageCache implements UsageCache {
 
 /** The peer the usage count prices through; traces are counted off entitlement's own meter. */
 export type EntitlementUsagePeers = Readonly<{
-  billing: Pick<BillingApi, "getPricingModel" | "sendUsageWarning">;
+  billing: Pick<BillingApi, "getPricingModel">;
 }>;
 
 /** Where the usage count finds an organisation's projects, and the organisations to sweep. */

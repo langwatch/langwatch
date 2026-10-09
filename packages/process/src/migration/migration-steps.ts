@@ -5,7 +5,7 @@
  */
 import type { InstalledFeatureState, ServerRole } from "../feature-installer.ts";
 
-/** Tasks runs the blocking steps and the worker the background ones; the api builds none. */
+/** Tasks runs blocking steps, the worker background ones; the api builds them only to feed ops. */
 export function buildsMigrationSteps(role: ServerRole): boolean {
   return role === "tasks" || role === "worker";
 }

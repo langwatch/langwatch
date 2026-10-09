@@ -243,6 +243,8 @@ export class MemoryOrganizationDatabase {
   readonly organizations = new Map<string, MemoryOrganizationRow>();
   /** Organizations marked as a self-hosted licence customer. */
   readonly selfHostedCustomers = new Set<string>();
+  /** Licensing's licence keys by organization, the twin of its share (C3-KEY-HASH). */
+  readonly licensingLicenseKeys = new Map<string, string>();
   readonly teams = new Map<string, MemoryTeamRow>();
   readonly organizationUsers: MemoryOrganizationUserRow[] = [];
   readonly projects = new Map<string, MemoryProjectRow>();

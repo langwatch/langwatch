@@ -150,6 +150,7 @@ func (f *fakeClaudeSettings) EnsureHook(repoRoot, command string) (bool, error) 
 
 type fakeSystem struct {
 	alive           map[int]bool
+	starts          map[int]string
 	terminated      []int
 	groupTerminated []int
 	groupKilled     []int
@@ -182,6 +183,7 @@ type spawnCall struct {
 func (f *fakeSystem) FreePorts(n int) ([]int, error) { return make([]int, n), nil }
 func (f *fakeSystem) PortInUse(port int) bool        { return f.portsInUse[port] }
 func (f *fakeSystem) ProcessAlive(pid int) bool      { return f.alive[pid] }
+func (f *fakeSystem) ProcessStart(pid int) string    { return f.starts[pid] }
 func (f *fakeSystem) Terminate(pid int) {
 	f.terminated = append(f.terminated, pid)
 	// A terminated launcher dies with its process group; reflect that so the

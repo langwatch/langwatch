@@ -23,6 +23,7 @@ import { MemoryConnectGatewayChannel } from "../../channels/memory/memory.connec
 import type { ConnectOrganizationRecord } from "../../repositories/connect-organization.repository.ts";
 import { MemoryConnectOrganizationRepository } from "../../repositories/memory/memory.connect-organization.repository.ts";
 import { MemoryInstanceIdentityRepository } from "../../repositories/memory/memory.instance-identity.repository.ts";
+import { licenseVerifyingKeyOf } from "../../rules/license-verifying-key.rules.ts";
 import type { ConnectUpstreamSlot } from "../connect-install.service.ts";
 import { ConnectInstallService } from "../connect-install.service.ts";
 import { InstanceIdentityService } from "../instance-identity.service.ts";
@@ -445,6 +446,22 @@ function forgedLicense(): string {
     signature: genuine.signature,
   });
 }
+
+describe("the key a release build reports", () => {
+  /** @scenario "A release build reports the embedded key in its usage report" */
+  it("reports the embedded key and its fingerprint though the override is set", async () => {
+    const { publicKey } = licenseVerifyingKeyOf({
+      override: TEST_PUBLIC_KEY,
+      isReleaseBuild: true,
+    });
+    const { service } = install({ license: null, override: publicKey !== undefined });
+
+    expect(await service.getDeployment()).toMatchObject({
+      licenseKeySource: "embedded",
+      licenseKeyFingerprint: fingerprintOf(DEFAULT_LICENSE_PUBLIC_KEY),
+    });
+  });
+});
 
 describe("the license key the usage report names", () => {
   /** @scenario "The report says whether licenses verify against the embedded key or an override" */

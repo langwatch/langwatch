@@ -22,15 +22,15 @@ func planGoLanes(t *testing.T, isOneProcess bool) []Child {
 	return o.planChildren(st, PlanOptions{Selection: sel, RepoRoot: repo, ShouldRunGoAsOneProcess: isOneProcess}, repo)
 }
 
-// @scenario "One Go process hosts the data plane and the simulators when asked"
+// @scenario "One Go process hosts the data plane and the simulators unless split"
 func TestOneGoProcessHostsTheDataPlaneAndTheSimulators(t *testing.T) {
-	t.Run("when LANGWATCH_GO_ONE_PROCESS is on", func(t *testing.T) {
+	t.Run("when the one-process switch is on", func(t *testing.T) {
 		children := planGoLanes(t, true)
 		goLane, ok := findChild(children, GoLane)
 		if !ok {
 			t.Fatal("no go lane was planned")
 		}
-		if !strings.Contains(goLane.Shell, `args="aigateway nlpgo idpsim mailsim storagesim voicesim llmsim analyticssim telemetrysim"`) {
+		if !strings.Contains(goLane.Shell, `args="aigateway nlpgo idpsim mailsim storagesim voicesim llmsim analyticssim outboundsim telemetrysim"`) {
 			t.Errorf("go lane runs %q, want the data plane and every simulator", goLane.Shell)
 		}
 		if _, ok := findChild(children, SimsLane); ok {
@@ -45,6 +45,7 @@ func TestOneGoProcessHostsTheDataPlaneAndTheSimulators(t *testing.T) {
 			"VOICESIM_ADDR":     ":45591",
 			"LLMSIM_ADDR":       ":45595",
 			"ANALYTICSSIM_ADDR": ":45596",
+			"OUTBOUNDSIM_ADDR":  ":45598",
 			"TELEMETRYSIM_ADDR": ":45597",
 		} {
 			if got := valueOf(goLane.Env, key); got != value {

@@ -14,6 +14,7 @@ export {
   type TenantMigrationStepDeclaration,
   type TenantMigrationStepDefinition,
   defineMigrationStep,
+  isDeclaredMigrationStep,
   isMigrationStep,
   isTenantMigrationStep,
   migrationStepDeclarationSchema,

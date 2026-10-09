@@ -124,6 +124,21 @@ does not rise); `pnpm lint:architecture --policies peer-cycles` (must not rise).
   (including `redacted-field.tsx`, which read the browser-host hook); trace's scope shim no longer
   offers `hasPermission`; 37 tests mock `useTraceHost` instead. Bound: "A migrated screen answers
   ... the same as before" (trace-host-permission-reads test). Batches 4b-4d not started.
+- Batch 4c landed: experiment's three readers ask `useWorkflowHost().hasPermission` (experiment requires
+  `WorkflowHostApi`); prompt's editor drawer reads `usePromptProject().hasPermission`; project already
+  read its hosts; scenario's `useCan` asks `useScenarioHost().hasPermission` and sends no
+  `authz.effectivePermissions` read. Bound: "Agent Testing asks the session ..." (use-can test).
+- Batch 4b landed: gateway's 9 and organization's 7 production permission readers ask their
+  own host (`useGatewayHost()` / `useOrganizationHost()`); `team-form.tsx`'s `hasOrgPermission`
+  reads `host.hasOrganizationPermission`. Both module shims dropped their permission fields. Bound
+  by one test per module (`*-host-permission-reads.integration.test.tsx`).
+- Batch 4d tail (SK-LANGY-ORG, Alex 2026-10-09): `LangyHostApi.hasOrganizationPermission` answers
+  from the session as organization's host does; the make-default ask and the plan limit card read
+  it; langy's scope shim dropped `hasOrgPermission`. Bound in `langy-host-mount` test. No production
+  reader of the scope host's permissions remains (`git grep`, 2026-10-09).
+- Batch 5 not started: the scope host's `isLoading` answers `permissions.isLoading` from the
+  session (`ui-scope-capability.ts` `legacyScopeHost`); dropping the session from
+  `createBrowserUiScope` needs a ruling on what it answers instead (see the sk-batch5 handoff).
 - The batch 2 outline's `apps/ui` test is blocked on a decision: apps/ui reaches a module only
   through `./declaration`, so it cannot import `useTraceHost`/`useScenarioHost` to ask the host;
   see the sk-batch4 handoff for options.
@@ -138,3 +153,10 @@ and Q2, both back to main; Q2 also drops the branch's second `authz.effectivePer
 
 Every scenario in the spec is bound and none `@unimplemented`; the scope port is built without the
 session; `UiScopeHost` names no permission; record 10.1's knot paragraph records it untied.
+
+- Batch 5 (SK-SCOPE-LOADING, Alex 2026-10-09): `UiScopeHost`, `UiScopeHostReadings` and
+  `UiScopeReading` carry no permission; `createBrowserUiScope({ reading })`; the scope's `isLoading`
+  is the scope's alone. The gates that waited on grants (langy's and trace's `useLangyVisibility`,
+  scenario's `useAgentTestingGate`, workflow's `isResolved`) wait on their host's `isLoading()`,
+  which now answers `!session.isSettled()`. The organization-permission-under-every-host scenario
+  lost its subject: see the sk-batch5b handoff.

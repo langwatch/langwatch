@@ -79,3 +79,14 @@ Feature: haven CLI surface
     And the safe categories — build artifacts and orphaned dev processes — are reclaimed in the same run
     And in agent mode it prints the report and deletes nothing
     And "haven clean --yes" applies only the safe categories, never worktree deletion
+
+  # An agent has one place to learn which simulators exist and how to drive
+  # them; the verbs come from the command table, not a second list.
+  # Bound by cmd/sims_test.go.
+  Scenario: One command lists every simulator for an agent
+    Given the worktree's stack runs mail but not llm
+    When the agent runs "haven sims --json"
+    Then there is one row per simulator: mail, idp, storage, llm, voice, analytics and telemetry
+    And mail is running with its console URL
+    And llm is not running and names "haven up +llm" to start it
+    And every row lists the verbs its "haven <name>" command takes and its skill path

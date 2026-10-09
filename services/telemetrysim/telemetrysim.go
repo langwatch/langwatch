@@ -7,6 +7,7 @@ package telemetrysim
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -20,6 +21,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/langwatch/langwatch/pkg/webconsole"
 )
 
 // Config is telemetrysim's environment-derived configuration.
@@ -28,11 +31,19 @@ type Config struct {
 	Addr string
 	// Stack is the haven stack slug it reports (TELEMETRYSIM_STACK, may be empty).
 	Stack string
+	// Endpoint and APIKey fill a run request that names neither (TELEMETRYSIM_ENDPOINT,
+	// TELEMETRYSIM_API_KEY), so the console starts a run without knowing the key.
+	// The key is never reported.
+	Endpoint string
+	APIKey   string
 }
 
 // LoadConfig reads telemetrysim's configuration from the environment.
 func LoadConfig() Config {
-	cfg := Config{Addr: os.Getenv("TELEMETRYSIM_ADDR"), Stack: os.Getenv("TELEMETRYSIM_STACK")}
+	cfg := Config{
+		Addr: os.Getenv("TELEMETRYSIM_ADDR"), Stack: os.Getenv("TELEMETRYSIM_STACK"),
+		Endpoint: os.Getenv("TELEMETRYSIM_ENDPOINT"), APIKey: os.Getenv("TELEMETRYSIM_API_KEY"),
+	}
 	if cfg.Addr == "" {
 		cfg.Addr = ":5599"
 	}
@@ -46,6 +57,7 @@ const (
 	maxCases     = 10000
 	maxRate      = 10000
 	maxDuration  = 2 * time.Hour
+	maxRecent    = 10
 )
 
 // Run states.
@@ -101,11 +113,14 @@ type RunStatus struct {
 	Mutations  []Mutation `json:"mutations,omitempty"`
 }
 
-// Status is GET /_sim/api/status.
+// Status is GET /_sim/api/status. Recent is the runs before Run, newest first,
+// without their mutations.
 type Status struct {
-	Stack   string     `json:"stack"`
-	Presets []string   `json:"presets"`
-	Run     *RunStatus `json:"run,omitempty"`
+	Stack    string      `json:"stack"`
+	Endpoint string      `json:"endpoint,omitempty"`
+	Presets  []string    `json:"presets"`
+	Run      *RunStatus  `json:"run,omitempty"`
+	Recent   []RunStatus `json:"recent"`
 }
 
 type run struct {
@@ -167,24 +182,27 @@ func (h httpSender) send(ctx context.Context, d delivery) (int, error) {
 
 // Server is the control API and the one run it drives.
 type Server struct {
-	cfg    Config
-	sender sender
-	mu     sync.Mutex
-	run    *run
-	mux    *http.ServeMux
+	cfg     Config
+	sender  sender
+	console http.Handler
+	mu      sync.Mutex
+	run     *run
+	recent  []RunStatus
+	mux     *http.ServeMux
 }
 
 // NewServer builds the control API over an OTLP/HTTP sender.
 func NewServer(cfg Config) *Server {
-	s := &Server{cfg: cfg, sender: httpSender{client: &http.Client{Timeout: 30 * time.Second}}}
+	s := &Server{
+		cfg: cfg, sender: httpSender{client: &http.Client{Timeout: 30 * time.Second}},
+		console: webconsole.New(embeddedConsole(), consoleBuildCommand),
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { writeJSON(w, http.StatusOK, map[string]bool{"ok": true}) })
 	mux.HandleFunc("GET /_sim/api/status", s.handleStatus)
 	mux.HandleFunc("POST /_sim/api/runs", s.handleStart)
 	mux.HandleFunc("DELETE /_sim/api/runs/current", s.handleStop)
-	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = fmt.Fprintln(w, "telemetrysim: drive it with `haven telemetry send|load|fuzz|status|stop`")
-	})
+	mux.HandleFunc("GET /", s.handleConsole)
 	s.mux = mux
 	return s
 }
@@ -213,10 +231,14 @@ func (s *Server) Serve(ctx context.Context) error {
 }
 
 func (s *Server) handleStatus(w http.ResponseWriter, _ *http.Request) {
-	st := Status{Stack: s.cfg.Stack, Presets: PresetNames()}
+	st := Status{Stack: s.cfg.Stack, Endpoint: s.cfg.Endpoint, Presets: PresetNames()}
 	s.mu.Lock()
 	rn := s.run
+	st.Recent = slices.Clone(s.recent)
 	s.mu.Unlock()
+	if st.Recent == nil {
+		st.Recent = []RunStatus{}
+	}
 	if rn != nil {
 		snap := rn.snapshot()
 		st.Run = &snap
@@ -229,6 +251,9 @@ func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "the run request is not JSON: "+err.Error())
 		return
+	}
+	if req.Endpoint == "" {
+		req.Endpoint, req.APIKey = s.cfg.Endpoint, cmp.Or(req.APIKey, s.cfg.APIKey)
 	}
 	p, err := req.plan()
 	if err != nil {
@@ -333,6 +358,9 @@ func (s *Server) start(p plan) (*run, error) {
 	if s.run != nil && s.run.snapshot().State == stateRunning {
 		return nil, errors.New("a run is already going; stop it first")
 	}
+	if s.run != nil {
+		s.remember(s.run.snapshot())
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	rn := &run{cancel: cancel, done: make(chan struct{}), status: RunStatus{
 		Mode: p.Mode, Preset: p.Preset, Seed: p.Seed, Endpoint: p.Endpoint, Encoding: p.Encoding,
@@ -352,6 +380,15 @@ func (s *Server) start(p plan) (*run, error) {
 		})
 	}()
 	return rn, nil
+}
+
+// remember keeps a finished run in the recent list; the caller holds s.mu.
+func (s *Server) remember(st RunStatus) {
+	st.Mutations = nil
+	s.recent = append([]RunStatus{st}, s.recent...)
+	if len(s.recent) > maxRecent {
+		s.recent = s.recent[:maxRecent]
+	}
 }
 
 func (s *Server) stop() *run {

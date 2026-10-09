@@ -17,7 +17,7 @@ await build({
   // The `__cli_url` banner constant lets every bundled module resolve
   // `import.meta.url` correctly — esbuild's CJS output otherwise leaves
   // `import.meta.url` as `undefined`, which trips `fileURLToPath(...)`
-  // call sites (services/migrate.ts, predeps/aigateway.ts, …). In ESM
+  // call sites (predeps/aigateway.ts, …). In ESM
   // tests the per-file `import.meta.url` keeps working unchanged.
   banner: {
     js: [

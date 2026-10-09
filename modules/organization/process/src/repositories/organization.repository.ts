@@ -199,6 +199,8 @@ export abstract class OrganizationRepository {
   }): Promise<void>;
   /** Clears the licence and both its dates; throws OrganizationNotFoundError. */
   abstract clearLicense(input: { organizationId: string }): Promise<void>;
+  /** Licensing's stored key, read through its share (C3-KEY-HASH); none when it holds none. */
+  abstract findLicensingLicenseKeys(input: { organizationId: string }): Promise<string[]>;
   /** The longest-seated enabled administrator's email, or null when none is. */
   abstract findFirstAdministratorEmail(organizationId: string): Promise<string | null>;
   /** The user's personal team in the organization; throws `TeamNotFoundError`. */

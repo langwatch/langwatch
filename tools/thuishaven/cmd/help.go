@@ -34,7 +34,9 @@ EXAMPLES
     haven up +langevals          # run the evaluators monitors and evaluations call
     haven up +llm                # answer every model call from llmsim, at no cost
     haven up +analytics          # catch PostHog and Customer.io calls in analyticssim
+    haven up +outbound           # catch Slack, webhook and SQS sends in outboundsim
     haven up +telemetry          # send, load or fuzz OTLP traffic with telemetrysim
+    haven sims --json            # every simulator: running here, console, verbs, skill
     haven                        # the hub: the whole machine + actions (git/cleanup/down/destroy)
     haven status                 # every stack + shared-server health, one shot
     haven logs nlp -t            # tail one service live
@@ -61,13 +63,14 @@ hostname through the portless proxy:
     nlp.portless.langwatch.localhost         NLP engine (Go)
     clickhouse.portless.langwatch.localhost  ClickHouse (this stack's own DB, HTTP)
 
-The six simulators each have a console at <name>.<slug>.langwatch.localhost: mail,
-idp and storage run by default; llm, voice and analytics come with "haven up +llm
-+voice +analytics". Read one's output with "haven logs <name>". Drive one from a
-terminal with "haven mail|llm|analytics|storage|voice <verb>" (--json on every read).
-telemetrysim ("haven up +telemetry") has no console: "haven telemetry send|load|fuzz|status|stop".
+The eight simulators each have a console at <name>.<slug>.langwatch.localhost: mail,
+idp and storage run by default; llm, voice, analytics, outbound and telemetry come with
+"haven up +llm +voice +analytics +outbound +telemetry". "haven sims --json" lists every one: running
+here or not, its console, its verbs and its skill. Read one's output with "haven logs
+<name>". Drive one from a terminal with "haven mail|idp|llm|analytics|outbound|storage|voice|telemetry
+<verb>" (--json on every read).
 
-    mail|idp|storage|llm|voice|analytics.portless.langwatch.localhost
+    mail|idp|storage|llm|voice|analytics|outbound|telemetry.portless.langwatch.localhost
 
 Two more only when the worktree asked for them ("haven up +design-system +mail-room"):
 
@@ -175,11 +178,15 @@ var envHelpText = `Environment variables.
 
   Services and data
     LANGWATCH_SEED=1             Seed the DB during up.
-    LANGWATCH_GO_WATCH=1         Hot-reload the Go services via air (else go run).
-    LANGWATCH_DEV_ONE_PROCESS=1  Run ui + api + worker as one app lane (ADR-168);
+    LANGWATCH_GO_WATCH=0         Turn off the Go watcher (default on: haven rebuilds
+                                 and swaps the Go child on a change); also
+                                 haven up --watch=false.
+    LANGWATCH_DEV_ONE_PROCESS=0  Split both defaults: the app lane (ui + api +
+                                 worker, ADR-168) into ui and api lanes, and the
+                                 go lane (data plane + sims) into go and sims.
                                  haven up -f switches a running stack.
-    LANGWATCH_GO_ONE_PROCESS=1   Host the simulators in the go lane: one Go process
-                                 for the data plane and sims (trial; Langy apart).
+                                 LANGWATCH_GO_ONE_PROCESS is a deprecated alias,
+                                 refused when it disagrees.
     HAVEN_WORKTREE_DIR=<dir>     Where haven pr creates PR worktrees (default: the
                                  sibling worktrees/ dir next to the checkout).
     LANGWATCH_LOCAL_API_KEY      Stable local dev API key haven seeds + injects

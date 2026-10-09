@@ -102,6 +102,8 @@ async function application({ plan = {} }: { plan?: Partial<Plan> } = {}) {
     userId: MEMBER_ID,
     pendingAdmissionId: "admission-member",
     via: "invite",
+    seat: "MEMBER",
+    pending: false,
   });
   await repositories.organization.ensurePersonalWorkspace({
     workspace: { userId: ADMIN_ID, organizationId: ORGANIZATION_ID, displayName: "Admin" },

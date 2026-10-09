@@ -872,7 +872,7 @@ Run by the tasks process, before serve.
 
 | Task                       | Class                        | Declared at                                     |
 | -------------------------- | ---------------------------- | ----------------------------------------------- |
-| `dataset-content-backfill` | `DatasetContentBackfillTask` | `src/tasks/dataset-content-backfill.task.ts:46` |
+| `dataset-content-backfill` | `DatasetContentBackfillTask` | `src/tasks/dataset-content-backfill.task.ts:52` |
 
 ## Configuration
 

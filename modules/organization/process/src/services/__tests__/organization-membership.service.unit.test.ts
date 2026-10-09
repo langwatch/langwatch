@@ -34,6 +34,7 @@ const personalWorkspaceArchived = vi.fn(() => Promise.resolve());
 describe("OrganizationMembershipService", () => {
   const mockRepo: OrganizationMembershipRepository = {
     createMembership: vi.fn(),
+    readJoinerSeat: vi.fn(),
     findPersonalTeamsInScopes: vi.fn(),
     findSharedTeamIds: vi.fn(),
     findTeamGrants: vi.fn(),
@@ -166,11 +167,22 @@ describe("OrganizationMembershipService", () => {
   });
 
   describe("when a join admits somebody", () => {
+    beforeEach(() => {
+      vi.mocked(mockRepo.readJoinerSeat).mockResolvedValue("MEMBER");
+      mockCheckLimit.mockResolvedValue({
+        allowed: true,
+        limitType: "members",
+        current: 0,
+        max: 99,
+      });
+    });
+
     /** @scenario The joiner seat setting is Full by default */
     it("lands the organization grant audited to the approving admin, then clears the marker", async () => {
       vi.mocked(mockRepo.createMembership).mockResolvedValue({
         outcome: "created",
         seat: "MEMBER",
+        pending: false,
       });
 
       await service.createMembership({
@@ -199,6 +211,7 @@ describe("OrganizationMembershipService", () => {
       vi.mocked(mockRepo.createMembership).mockResolvedValue({
         outcome: "already-present",
         seat: "MEMBER",
+        pending: false,
       });
 
       await service.createMembership({
@@ -213,11 +226,22 @@ describe("OrganizationMembershipService", () => {
   });
 
   describe("when a join lands somebody on a Developer seat (ADR-171)", () => {
+    beforeEach(() => {
+      vi.mocked(mockRepo.readJoinerSeat).mockResolvedValue("DEVELOPER");
+      mockCheckLimit.mockResolvedValue({
+        allowed: true,
+        limitType: "members",
+        current: 0,
+        max: 99,
+      });
+    });
+
     /** @scenario The joiner seat setting lands email joiners as Developers */
     it("attaches no grant and leaves no admission to complete", async () => {
       vi.mocked(mockRepo.createMembership).mockResolvedValue({
         outcome: "created",
         seat: "DEVELOPER",
+        pending: false,
       });
 
       const admission = await service.createMembership({
@@ -226,19 +250,105 @@ describe("OrganizationMembershipService", () => {
         admittedBy: { actor: { type: "system", id: "system:join-requests" }, commandId: "c-1" },
       });
 
-      expect(admission).toEqual({ outcome: "created", seat: "DEVELOPER" });
+      expect(admission).toEqual({ outcome: "created", seat: "DEVELOPER", pending: false });
       expect(attached).toEqual([]);
       expect(completed).toEqual([]);
       expect(vi.mocked(mockRepo.createMembership).mock.calls.at(-1)?.[0].via).toBe("domain-join");
     });
   });
 
+  describe("when a join arrives past the licence's full member seats", () => {
+    const admittedBy = {
+      actor: { type: "user" as const, id: "admin-1" },
+      commandId: "approve:jr-2",
+    };
+
+    beforeEach(() => {
+      vi.mocked(mockRepo.readJoinerSeat).mockResolvedValue("MEMBER");
+    });
+
+    /** @scenario "An approved join request given a Lite Member seat holds the organization-wide Viewer grant" */
+    it("writes a Lite Member row and lands the organization-wide Viewer grant", async () => {
+      mockCheckLimit.mockImplementation(async ({ resource }: { resource: string }) => ({
+        allowed: resource === "membersLite",
+        limitType: resource,
+        current: 1,
+        max: 1,
+      }));
+      vi.mocked(mockRepo.createMembership).mockResolvedValue({
+        outcome: "created",
+        seat: "EXTERNAL",
+        pending: false,
+      });
+
+      await service.createMembership({ organizationId: "org-123", userId: "user-456", admittedBy });
+
+      expect(vi.mocked(mockRepo.createMembership).mock.calls.at(-1)?.[0]).toMatchObject({
+        seat: "EXTERNAL",
+        pending: false,
+      });
+      const grantId = vi
+        .mocked(mockRepo.createMembership)
+        .mock.calls.at(-1)?.[0].pendingAdmissionId;
+      expect(attached).toEqual([
+        expect.objectContaining({
+          source: "join-request",
+          bindings: [
+            expect.objectContaining({
+              bindingId: grantId,
+              principal: { userId: "user-456" },
+              role: "VIEWER",
+              customRoleId: null,
+              scopeType: "ORGANIZATION",
+              scopeId: "org-123",
+            }),
+          ],
+        }),
+      ]);
+      expect(completed).toEqual([{ organizationId: "org-123", userId: "user-456", grantId }]);
+    });
+
+    /** @scenario "An arrival held pending for want of any seat is given no grant" */
+    it("holds the person pending when the Lite Member seats are used up too", async () => {
+      mockCheckLimit.mockResolvedValue({
+        allowed: false,
+        limitType: "members",
+        current: 1,
+        max: 1,
+      });
+      vi.mocked(mockRepo.createMembership).mockResolvedValue({
+        outcome: "created",
+        seat: "EXTERNAL",
+        pending: true,
+      });
+
+      await service.createMembership({ organizationId: "org-123", userId: "user-456", admittedBy });
+
+      expect(vi.mocked(mockRepo.createMembership).mock.calls.at(-1)?.[0]).toMatchObject({
+        seat: "EXTERNAL",
+        pending: true,
+      });
+      expect(attached).toEqual([]);
+    });
+  });
+
   describe("when a join is admitted by policy or approved by an administrator", () => {
+    beforeEach(() => {
+      vi.mocked(mockRepo.readJoinerSeat).mockResolvedValue("DEVELOPER");
+      mockCheckLimit.mockResolvedValue({
+        allowed: true,
+        limitType: "members",
+        current: 0,
+        max: 99,
+      });
+    });
+
     /** @scenario "Every automatic join is on the customer's audit page" */
     it("writes the same audit row either way, naming the policy as the route when no person approved", async () => {
       vi.mocked(mockRepo.createMembership).mockResolvedValue({
         outcome: "created",
         seat: "DEVELOPER",
+        pending: false,
       });
       const viaOf = async (actor: { type: "user" | "system"; id: string }) => {
         await service.createMembership({
@@ -255,10 +365,21 @@ describe("OrganizationMembershipService", () => {
   });
 
   describe("createMembership()", () => {
+    beforeEach(() => {
+      vi.mocked(mockRepo.readJoinerSeat).mockResolvedValue("MEMBER");
+      mockCheckLimit.mockResolvedValue({
+        allowed: true,
+        limitType: "members",
+        current: 0,
+        max: 99,
+      });
+    });
+
     it("mints one admission intent per membership, in the ledger's own scheme", async () => {
       vi.mocked(mockRepo.createMembership).mockResolvedValue({
         outcome: "created",
         seat: "MEMBER",
+        pending: false,
       });
 
       await service.createMembership({ organizationId: "org-123", userId: "user-456" });
@@ -274,11 +395,12 @@ describe("OrganizationMembershipService", () => {
       vi.mocked(mockRepo.createMembership).mockResolvedValue({
         outcome: "already-present",
         seat: "MEMBER",
+        pending: false,
       });
 
       await expect(
         service.createMembership({ organizationId: "org-123", userId: "user-456" }),
-      ).resolves.toEqual({ outcome: "already-present", seat: "MEMBER" });
+      ).resolves.toEqual({ outcome: "already-present", seat: "MEMBER", pending: false });
     });
   });
 

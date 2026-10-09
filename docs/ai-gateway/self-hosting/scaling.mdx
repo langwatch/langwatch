@@ -48,7 +48,7 @@ gateway:
 
 Start with CPU alone. It needs no Prometheus and it cannot create a loop between the metrics pipeline and the autoscaler.
 
-Add `lw_gateway_rps` only when you run prometheus-adapter and it scrapes the gateway's `/metrics`. Without the adapter the HPA ignores that line. `kubectl describe hpa langwatch-gateway` reports the metric as not active when the adapter is missing.
+Add `lw_gateway_rps` only when you run prometheus-adapter and it scrapes the gateway's metrics listener (port `9464`, bearer `METRICS_API_KEY`). Without the adapter the HPA ignores that line. `kubectl describe hpa langwatch-gateway` reports the metric as not active when the adapter is missing.
 
 Use `behavior` for scale-up and scale-down stabilization when the traffic shape needs it. It is passed to the HPA as written.
 

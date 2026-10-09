@@ -6,7 +6,7 @@ The server half of [gateway](../README.md). The AI Gateway: virtual keys, gatewa
 
 ## Installation
 
-`defineProcessModule("gateway").withRepositories(gatewayRepositories).withChannels(gatewayChannels).withApi(GatewayModule).withTransports(agentCacheRest, elevenLabsWebhookRest, gatewayInternalRest, gatewayBudgetTrpcTransport, gatewayCacheRuleTrpcTransport, gatewayGuardrailTrpcTransport, gatewayPlatformRest, gatewaySpendRest, gatewaySpendEventTrpcTransport, gatewayUsageTrpcTransport, virtualKeyTrpcTransport).withEventing(gatewayGovernanceEventsEventing).withEventing(gatewaySpendEventing).withEventing(gatewayRealtimeSessionEventing).withEventing(gatewayPulledUsageLedgerEventing).withEventing(gatewayInstantEvalJudgeSpendEventing).withTasks(…).withTransportFacts(…)`, `src/gateway.module.ts:52`.
+`defineProcessModule("gateway").withRepositories(gatewayRepositories).withChannels(gatewayChannels).withApi(GatewayModule).withTransports(agentCacheRest, elevenLabsWebhookRest, gatewayInternalRest, gatewayBudgetTrpcTransport, gatewayCacheRuleTrpcTransport, gatewayGuardrailTrpcTransport, gatewayPlatformRest, gatewaySpendRest, gatewaySpendEventTrpcTransport, gatewayUsageTrpcTransport, virtualKeyTrpcTransport).withEventing(gatewayGovernanceEventsEventing).withEventing(gatewaySpendEventing).withEventing(gatewayRealtimeSessionEventing).withEventing(gatewayPulledUsageLedgerEventing).withEventing(gatewayInstantEvalJudgeSpendEventing).withEventing(gatewayConnectManagedKeyEventing).withTasks(…).withTransportFacts(…)`, `src/gateway.module.ts:52`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -1783,6 +1783,15 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ## Workers
 
+### Pipeline `gateway_connect_managed_key` (aggregate `global`)
+
+Declared at `src/eventing/gateway-connect-managed-key.pipeline.ts:34`.
+
+| Kind            | Name                                  | Handles                                                                                                  | Declared at                                               |
+| --------------- | ------------------------------------- | -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| peer subscriber | `gatewayConnectManagedKeyRetired`     | `lw.licensing.managed_key_retired` from [licensing](../../../enterprise/modules/licensing/README.md)     | `src/eventing/gateway-connect-managed-key.pipeline.ts:41` |
+| peer subscriber | `gatewayConnectManagedKeyInvalidated` | `lw.licensing.managed_key_invalidated` from [licensing](../../../enterprise/modules/licensing/README.md) | `src/eventing/gateway-connect-managed-key.pipeline.ts:48` |
+
 ### Pipeline `governance_events_processing` (aggregate `governance_subject`)
 
 Declared at `src/eventing/gateway-governance-events.pipeline.ts:34`. Events: `gatewayVkLifecycleEventSchema`, `gatewayBudgetCrossingEventSchema`.
@@ -1834,18 +1843,17 @@ Declared at `src/eventing/gateway-spend.pipeline.ts:103`. Events: `gatewaySpendA
 
 Run by the tasks process, before serve.
 
-| Task                          | Class                          | Declared at                                         |
-| ----------------------------- | ------------------------------ | --------------------------------------------------- |
-| `trace-destination-report`    | `TraceDestinationReportTask`   | `src/tasks/trace-destination-report.task.ts:161`    |
-| `virtual-key-config-backfill` | `VirtualKeyConfigBackfillTask` | `src/tasks/virtual-key-config-backfill.task.ts:331` |
+| Task                       | Class                        | Declared at                                      |
+| -------------------------- | ---------------------------- | ------------------------------------------------ |
+| `trace-destination-report` | `TraceDestinationReportTask` | `src/tasks/trace-destination-report.task.ts:161` |
 
 ## Configuration
 
 | Kind   | Leaf                          | Environment variable                    | Declared at                            |
 | ------ | ----------------------------- | --------------------------------------- | -------------------------------------- |
-| secret | `internalSecret`              | `LW_GATEWAY_INTERNAL_SECRET`            | `src/app/gateway.app.ts:1137`          |
-| secret | `jwtSecret`                   | `LW_GATEWAY_JWT_SECRET`                 | `src/app/gateway.app.ts:1138`          |
-| secret | `virtualKeyPepper`            | `LW_VIRTUAL_KEY_PEPPER`                 | `src/app/gateway.app.ts:1139`          |
+| secret | `internalSecret`              | `LW_GATEWAY_INTERNAL_SECRET`            | `src/app/gateway.app.ts:1141`          |
+| secret | `jwtSecret`                   | `LW_GATEWAY_JWT_SECRET`                 | `src/app/gateway.app.ts:1142`          |
+| secret | `virtualKeyPepper`            | `LW_VIRTUAL_KEY_PEPPER`                 | `src/app/gateway.app.ts:1143`          |
 | config | `spendSettlementGraceMs`      | `LW_SPEND_SETTLEMENT_GRACE_MS`          | `../contract/src/gateway.config.ts:26` |
 | config | `internalUrl`                 | `LW_GATEWAY_INTERNAL_URL`               | `../contract/src/gateway.config.ts:28` |
 | config | `controlPlaneUrl`             | `GATEWAY_CONTROL_PLANE_URL`             | `../contract/src/gateway.config.ts:30` |

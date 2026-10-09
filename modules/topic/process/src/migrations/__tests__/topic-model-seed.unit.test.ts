@@ -251,6 +251,7 @@ describe("seedTopicModelHistory", () => {
 
   describe("given a fleet larger than one page", () => {
     describe("when the boot seed pass walks it end to end", () => {
+      /** @scenario "Seeding reaches every project that predates ownership" */
       it("records every project that owns topics, exactly once, and skips the rest", async () => {
         // 450 topic-owning projects + 50 topic-less, ids zero-padded so their
         // lexical order is the keyset order the seed pages by. 450 > the walk's
@@ -289,6 +290,7 @@ describe("seedTopicModelHistory", () => {
 
   describe("given the projection already owns a project's model", () => {
     describe("when the pass reaches it", () => {
+      /** @scenario "Seeding reaches every project that predates ownership" */
       it("skips that project instead of re-seeding it", async () => {
         const { prisma } = guardedPrismaStub({
           topicPages: [["p1", "p2"], []],

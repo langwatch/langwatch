@@ -29,8 +29,8 @@ langwatch/
 └── dev/            these docs, the scripts, the compose files
 ```
 
-Three Node applications run all the time: `ui`, `api` and `worker` — locally the
-last two share one process (the `backend` lane), and in production each is its
+Three Node applications run all the time: `ui`, `api` and `worker` — locally all
+three share one process by default (the `app` lane), and in production each is its
 own deployment. There is no in-process worker MODE and no process-role switch,
 on purpose. A stack missing the worker serves pages and quietly processes no
 jobs, which looks
@@ -101,7 +101,8 @@ one you do not paste anywhere, and module code never reads `process.env` at all
 Plain `pnpm dev` is the default for TypeScript work.
 
 ```bash
-pnpm dev            # ui + backend + go (+ langy when selected)
+pnpm dev            # app (ui + api + worker, one process) + go (+ langy when selected)
+pnpm dev:one        # the app lane alone
 pnpm dev:ui         # the browser application alone
 pnpm dev:backend    # the api and the worker in one process
 pnpm dev:go         # aigateway + nlpgo in one process
@@ -109,12 +110,14 @@ pnpm dev:api        # the API alone, its own process
 pnpm dev:worker     # the background worker alone, its own process
 ```
 
-Locally the api and the worker share ONE process — the `backend` lane — and the
-Go data-plane services share another (`go`). It is a launcher, not a process
+Locally the ui, the api and the worker share ONE process — the `app` lane — and
+the Go data-plane services share another (`go`). `LANGWATCH_DEV_ONE_PROCESS=0`
+splits the app lane into a `ui` lane and a `backend` lane (api + worker), and the Go lane into `go` and `sims`. It is a launcher, not a process
 role: each application still parses its own config and composes its own graph,
 and `dev:api` + `dev:worker` still run them apart when you need the production
-process shape. Both lanes restart on change, debounced by
-`LANGWATCH_DEV_WATCH_DEBOUNCE_MS` (2 s, at most 30 s after the first change), one restart at a time.
+process shape. A backend change reloads the api and the worker in-process and the
+ui hot-reloads through Vite, debounced by `LANGWATCH_DEV_WATCH_DEBOUNCE_MS` (2 s,
+at most 30 s after the first change), one reload at a time (ADR-168).
 
 Every port derives from `PORT` (default 5560): the ui lane binds it, the api
 `PORT + 1000`, the worker's metrics listener `PORT - 2561`, the gateway

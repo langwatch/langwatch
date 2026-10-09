@@ -1471,15 +1471,15 @@ Messages:
   - why: A route outside the framework skips its parsing, permission door, serialisation and OpenAPI document.
 - `rawContextAccess`
   - what: The handler reaches the raw request through `{{text}}`.
-  - fix: Take only `{ input, app, actor, scope, signal }` and the producer this route's own chain declares: `response` from `.withResponse(...)`, `request` from `.withResponse("protocol" | "forwarded", ...)`, `raw` from `.withRawBody(...)`, `files` from `.withMultipart(...)`; the framework resolves the session and the headers before the handler runs.
+  - fix: Take only `{ input, app, actor, scope, signal }` and the producer this route's own chain declares: `response` from `.withResponse(...)`, `request` from `.withResponse("protocol" | "forwarded", ...)`, `raw` from `.withRawBody(...)`, `files` from `.withMultipart(...)`, `target` from `.withPermission(perm, { at })`; the framework resolves the session and the headers before the handler runs.
   - why: The raw request bypasses the declared input, so the published schema no longer says what the handler reads.
 - `rawContextField`
   - what: The handler takes `{{field}}` from its context.
-  - fix: Take only `{ input, app, actor, scope, signal }` and the producer this route's own chain declares: `response` from `.withResponse(...)`, `request` from `.withResponse("protocol" | "forwarded", ...)`, `raw` from `.withRawBody(...)`, `files` from `.withMultipart(...)`; the framework resolves the session and the headers before the handler runs.
+  - fix: Take only `{ input, app, actor, scope, signal }` and the producer this route's own chain declares: `response` from `.withResponse(...)`, `request` from `.withResponse("protocol" | "forwarded", ...)`, `raw` from `.withRawBody(...)`, `files` from `.withMultipart(...)`, `target` from `.withPermission(perm, { at })`; the framework resolves the session and the headers before the handler runs.
   - why: The framework resolves the request into declared fields; a raw context read bypasses that declaration.
 - `rawContextSpread`
   - what: The handler collects the rest of its context into `{{name}}`.
-  - fix: Take only `{ input, app, actor, scope, signal }` and the producer this route's own chain declares: `response` from `.withResponse(...)`, `request` from `.withResponse("protocol" | "forwarded", ...)`, `raw` from `.withRawBody(...)`, `files` from `.withMultipart(...)`; the framework resolves the session and the headers before the handler runs.
+  - fix: Take only `{ input, app, actor, scope, signal }` and the producer this route's own chain declares: `response` from `.withResponse(...)`, `request` from `.withResponse("protocol" | "forwarded", ...)`, `raw` from `.withRawBody(...)`, `files` from `.withMultipart(...)`, `target` from `.withPermission(perm, { at })`; the framework resolves the session and the headers before the handler runs.
   - why: Collecting the raw context hands the handler transport details the framework is meant to resolve.
 - `rawHonoRoute`
   - what: This transport registers the raw Hono route `{{method}}()`.

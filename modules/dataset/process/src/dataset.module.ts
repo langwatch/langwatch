@@ -28,24 +28,12 @@ export const datasetProcessModule: PublishedProcessModule<
       mode: "background",
       description: "Moves each dataset's content out of Postgres and into object-storage chunks.",
       needsOldWritersGone: true,
-      run: async ({ checkpoint, dryRun, signal }) => {
-        const resumed = checkpoint.resumeFrom?.afterProjectId;
-        const result = await DatasetMigrationService.create({
+      run: (args) =>
+        DatasetMigrationService.create({
           repository: repositories.migration,
           storage: repositories.migrationChunks,
           projects: dependencies.projects,
-        }).run({
-          dryRun,
-          signal,
-          afterProjectId: typeof resumed === "string" ? resumed : undefined,
-          onProjectDone: (progress) =>
-            dryRun ? Promise.resolve() : checkpoint.save({ report: progress }),
-        });
-        if (result.status === "schema-pending") {
-          throw new Error("Dataset chunk-layout columns are not applied yet; the step retries");
-        }
-        return { ...result.summary, dryRun };
-      },
+        }).runStep(args),
     }),
   ])
   .withTasks(({ repositories, dependencies }) => [

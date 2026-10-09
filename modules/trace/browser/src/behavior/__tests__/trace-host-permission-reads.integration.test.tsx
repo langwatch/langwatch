@@ -6,7 +6,6 @@
 import {
   createUiScopeHost,
   UiScopeHostProvider,
-  useOrganizationTeamProject,
 } from "@langwatch/browser-host/use-organization-team-project";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
@@ -54,11 +53,9 @@ class SessionTraceHost extends TraceHostApi {
 }
 
 function Probe() {
-  const legacy = useOrganizationTeamProject();
   const canAsk = useCanAskLangy();
   return (
     <>
-      <output aria-label="legacy">{String(legacy.hasPermission("langy:create"))}</output>
       <output aria-label="migrated">{String(canAsk)}</output>
     </>
   );
@@ -71,7 +68,6 @@ const renderFor = (grants: ReadonlySet<string>) =>
         project: () => ({ id: "proj_1", slug: "acme", name: "Acme" }),
         organization: () => ({ id: "org_1" }),
         team: () => ({ id: "team_1" }),
-        hasPermission: (permission) => grants.has(permission),
       })}
     >
       <TraceHostProvider value={new SessionTraceHost(grants)}>
@@ -86,13 +82,11 @@ describe("given a signed-in reader whose role grants some permissions and not ot
   describe("when a migrated trace screen reads a permission from the trace host", () => {
     /** @scenario "A migrated screen answers a signed-in reader the same as before" */
     it.each([
-      ["held", new Set(["langy:view", "langy:create"])],
-      ["not held", new Set(["langy:view"])],
-    ])("reads a %s permission as the legacy scope hook did", (_label, grants) => {
+      ["held", new Set(["langy:view", "langy:create"]), "true"],
+      ["not held", new Set(["langy:view"]), "false"],
+    ])("reads a %s permission as the legacy scope hook did", (_label, grants, expected) => {
       renderFor(grants);
-      expect(screen.getByLabelText("migrated").textContent).toBe(
-        screen.getByLabelText("legacy").textContent,
-      );
+      expect(screen.getByLabelText("migrated").textContent).toBe(expected);
     });
   });
 });

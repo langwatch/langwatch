@@ -139,7 +139,7 @@ DEV_ENV_FILE ?= .env
 # combined_dev.go); release images build untagged. SIM_CONSOLES are the consoles
 # the run embeds (ADR-160): a simulator's own, or those `combined` hosts. Nx
 # caches each build, so an unchanged console costs a cache hit, a changed one rebuilds.
-SIMULATORS = idpsim mailsim storagesim voicesim llmsim analyticssim
+SIMULATORS = idpsim mailsim storagesim voicesim llmsim analyticssim telemetrysim outboundsim
 SIM_CONSOLES = $(if $(filter combined,$(svc)),$(if $(args),$(filter $(SIMULATORS),$(args)),$(SIMULATORS)),$(filter $(SIMULATORS),$(svc)))
 BUILD_SIM_CONSOLES = for sim in $(SIM_CONSOLES); do \
 	pnpm exec nx run @langwatch/$$sim-web:build --outputStyle=static || echo "$$sim-web did not build; its console names the fix"; done
@@ -182,7 +182,7 @@ service-watch:
 		air --build.cmd "mkdir -p .bin/$(svc) && go build -tags dev -o .bin/$(svc)/$(svc) ./cmd/service" \
 			--build.full_bin ".bin/$(svc)/$(svc) $(svc) $(args)" \
 			--build.include_ext "go" \
-			--build.delay $${LANGWATCH_DEV_WATCH_DEBOUNCE_MS:-750} \
+			--build.delay $${LANGWATCH_DEV_WATCH_DEBOUNCE_MS:-2000} \
 			--build.include_dir "cmd,pkg,services" \
 			--build.exclude_dir ".bin,tmp,vendor,node_modules,services/langyworker/node_modules"
 

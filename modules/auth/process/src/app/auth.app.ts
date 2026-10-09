@@ -98,6 +98,7 @@ import {
   type BetterAuthAccountPin,
   type BetterAuthAccountRow,
 } from "../channels/better-auth.channel.ts";
+import type { SignUpPolicy } from "../channels/http/http.better-auth-hooks.channel.ts";
 import {
   createBetterAuthTransport,
   type BetterAuthTransport,
@@ -196,7 +197,7 @@ type AuthAppPeers = Readonly<{
   featureFlags: FeatureFlagApi;
   identity: Pick<IdentityApi, "routeSignIn" | "sendOwnAddressConfirmation">;
   /** Whether the installation's sign-up policy admits an address, before its proof is spent. */
-  organizations: Pick<OrganizationApi, "checkSignUp">;
+  organizations: SignUpPolicy;
   /** The account writes auth's lifecycle doors run before ending credentials. */
   users: Pick<
     UserApi,
@@ -501,6 +502,12 @@ export class AuthModule implements AuthApiContract {
     const mailer: MailSender = { send: (content) => dependencies.notifications.sendEmail(content) };
     const now = nowInstant;
     const accountRows = repositories.betterAuthHooks;
+    /** Every sign-up door's verdict: whether any account exists, then organization's policy. */
+    const checkSignUp = async ({ email }: Readonly<{ email: string }>) =>
+      dependencies.organizations.checkSignUp({
+        email,
+        hasAnyAccount: await dependencies.users.hasAnyAccount(),
+      });
 
     const sessions = BrowserSessionService.create({
       sessions: repositories.sessions,
@@ -547,7 +554,8 @@ export class AuthModule implements AuthApiContract {
         sessions: () => cliSessions,
         directory: () => cliDeviceDirectory,
         apiKeys: () => dependencies.apiKeys,
-        ensurePersonalWorkspace: (input) => dependencies.users.ensurePersonalWorkspace(input),
+        ensurePersonalWorkspace: (input) =>
+          dependencies.organizations.ensurePersonalWorkspace(input),
         canViewProject: ({ userId, projectId }) =>
           dependencies.authz.hasProjectPermission({
             userId,
@@ -564,7 +572,7 @@ export class AuthModule implements AuthApiContract {
         now,
         users: dependencies.users,
         route: (input) => dependencies.identity.routeSignIn(input),
-        checkSignUp: (input) => dependencies.organizations.checkSignUp(input),
+        checkSignUp,
         isWithinBudget: (input) => app.isWithinBudget(input),
         revokeAllBrowserSessions: (input) => app.revokeAllBrowserSessions(input),
         isEmailUnconfigured: async () => {
@@ -578,7 +586,7 @@ export class AuthModule implements AuthApiContract {
         apiKeys: dependencies.apiKeys,
         featureFlags: dependencies.featureFlags,
         identity: dependencies.identity,
-        organizations: dependencies.organizations,
+        organizations: { checkSignUp },
         users: dependencies.users,
       },
       legacySsoAccess: LegacySsoAccessService.create({
@@ -612,7 +620,7 @@ export class AuthModule implements AuthApiContract {
         resolveDefaultMethods,
         passwordIsAllowed: async () =>
           (await app.resolveAuthProvider()) === "email" || config.localPasswords,
-        checkSignUp: (input) => dependencies.organizations.checkSignUp(input),
+        checkSignUp,
       }),
       resolveDefaultMethods,
       addressConfirmation: AddressConfirmationService.create({
@@ -727,6 +735,7 @@ export class AuthModule implements AuthApiContract {
             auth: app,
             grants: dependencies.authz,
             organizations: dependencies.organizations,
+            signUpPolicy: { checkSignUp },
             sendResetPassword: AuthModule.passwordResetSender({
               mail: passwordResetMailChannels.ses.create({ mailer }),
               publicBaseUrl: config.publicBaseUrl,
@@ -1577,17 +1586,17 @@ type BuildBetterAuthOptions = Readonly<{
   /** The grants ledger an SSO domain auto-join writes its organization binding to. */
   grants: AuthzGrantsService;
   /**
-   * Where a domain auto-join applies the pending invite an address already
-   * holds, and who the installation lets create an account.
+   * Where a domain auto-join applies the pending invite an address already holds.
    */
   organizations: Pick<
     OrganizationApi,
     | "applyPendingInvite"
-    | "checkSignUp"
     | "findBySsoDomain"
     | "createSsoDomainMembership"
     | "countMembershipsForUser"
   >;
+  /** Who the installation lets create an account: the app's composed sign-up verdict. */
+  signUpPolicy: SignUpPolicy;
   /** Sends a requested reset link; see {@link passwordResetSender}. */
   sendResetPassword: (reset: { email: string; token: string }) => Promise<void>;
   /** The same user directory the rest of this process serves from. */
@@ -1749,7 +1758,7 @@ async function buildBetterAuth(options: BuildBetterAuthOptions): Promise<BetterA
           : [{ connectionId: method.connectionId, methodId: method.id }],
       );
     },
-    signUpPolicy: options.organizations,
+    signUpPolicy: options.signUpPolicy,
     passkeySignUpEligibility: options.passkeySignUpEligibility,
     credentialGuard: CredentialSessionGuard.create(
       CredentialSignInPolicyService.create({

@@ -25,7 +25,7 @@ vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
 }));
 
 vi.mock("../../../../model/scenario-host.ts", () => ({
-  useScenarioHost: () => ({ hasPermission: () => state.permitted }),
+  useScenarioHost: () => ({ hasPermission: () => state.permitted, isLoading: () => false }),
 }));
 
 vi.mock("../../agent-testing/agent-testing-page.tsx", () => ({

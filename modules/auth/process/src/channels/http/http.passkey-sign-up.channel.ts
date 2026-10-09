@@ -2,7 +2,7 @@ import { createHmac } from "node:crypto";
 
 import { normalizeIdentifierValue } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
-import type { OrganizationApi } from "@langwatch/organization-contract";
+import type { SignUpVerdict } from "@langwatch/organization-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import type { GenericEndpointContext } from "better-auth";
 import { APIError, getSessionFromCtx } from "better-auth/api";
@@ -14,7 +14,9 @@ import type { BetterAuthAnnouncements } from "../better-auth.channel.ts";
 export type PasskeySignUpDirectory = Pick<UserApi, "findByEmail" | "createPasskeyUser">;
 
 /** Whether the installation admits a new account for an address. */
-export type PasskeySignUpPolicy = Pick<OrganizationApi, "checkSignUp">;
+export type PasskeySignUpPolicy = Readonly<{
+  checkSignUp(input: Readonly<{ email: string }>): Promise<SignUpVerdict>;
+}>;
 
 /** The mailbox proof a spent confirmation link minted: checked before the ceremony,
  *  spent after it. */

@@ -938,6 +938,8 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- $workerReplicas := 0 }}
 {{- if .Values.workers.enabled }}
   {{- $workerReplicas = int .Values.workers.replicaCount }}
+{{- else }}
+  {{- $workerReplicas = int .Values.app.replicaCount }}
 {{- end }}
 {{- $clientReplicas := add (int .Values.app.replicaCount) $workerReplicas }}
 {{- $serverNodes := int .Values.clickhouse.external.serverNodes }}
@@ -1064,13 +1066,14 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 # Telemetry - Usage analytics collection
 - name: DISABLE_USAGE_STATS
   value: {{ (not (ternary .Values.app.telemetry.usage.enabled true (hasKey .Values.app.telemetry.usage "enabled"))) | quote }}
-# Telemetry - Prometheus metrics collection. The processes push over OTLP
-# unless told to mount a /metrics scrape door; in production that door needs
-# its bearer, so an install with no key serves no /metrics at all.
+# Telemetry - Prometheus metrics collection. The processes open their own
+# scrape listener only with a prometheus exporter and METRICS_API_KEY (ADR-175).
 {{- if .Values.app.telemetry.metrics.enabled }}
-- name: LANGWATCH_METRICS_MODE
+- name: OTEL_METRICS_EXPORTER
   value: "prometheus"
-{{- include "langwatch.secretOrValue" (dict "envName" "LANGWATCH_METRICS_TOKEN" "fieldValues" .Values.app.telemetry.metrics.apiKey) }}
+- name: OTEL_EXPORTER_PROMETHEUS_PORT
+  value: {{ include "langwatch.metricsPort" . | quote }}
+{{- include "langwatch.secretOrValue" (dict "envName" "METRICS_API_KEY" "fieldValues" .Values.app.telemetry.metrics.apiKey) }}
 {{- end }}
 
 # Dataplane Object Storage (shared between datasets and stored-objects;
@@ -1205,7 +1208,6 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 # the workers too, and a worker that reads a different entitlement than the
 # app would enforce different limits on the same organization.
 {{- include "langwatch.secretOrValue" (dict "envName" "LANGWATCH_LICENSE_KEY" "fieldValues" .Values.app.license.key) }}
-{{- include "langwatch.secretOrValue" (dict "envName" "LANGWATCH_LICENSE_PUBLIC_KEY" "fieldValues" .Values.app.license.publicKey) }}
 
 {{- /* The version this install reports in its license sync and its usage
        report, so we know which release each install runs. The app image tag is
@@ -1311,6 +1313,9 @@ app.kubernetes.io/instance: {{ .Release.Name }}
      NOTE: Only .value is supported here because Prometheus bearer_token is a static
      config field in a ConfigMap, not a pod env var. secretKeyRef for the metrics API
      key is handled separately via sharedEnv for the app/worker containers. */}}
+{{/* The port the Node processes serve the Prometheus scrape on. */}}
+{{- define "langwatch.metricsPort" -}}9464{{- end -}}
+
 {{- define "langwatch.metricsApiKey" -}}
   {{- if .Values.app.telemetry.metrics.apiKey.value -}}
     {{- .Values.app.telemetry.metrics.apiKey.value -}}
@@ -1623,6 +1628,97 @@ containers:
 */}}
 {{- define "langwatch.storedObjects.upgradeFingerprint" -}}
 {{- printf "%s|%s|%s" .Chart.Version (.Chart.AppVersion | default "") (toJson .Values) | sha256sum -}}
+{{- end -}}
+
+{{/* The worker container: the workers Deployment, or a sidecar in each app pod when workers.enabled is false. */}}
+{{- define "langwatch.workersContainer" -}}
+- name: {{ .Release.Name }}-workers
+  securityContext:
+    {{- include "langwatch.containerSecurityContext" (dict "ctx" . "component" .Values.workers) | nindent 4 }}
+  image: "{{ .Values.images.app.repository }}:{{ .Values.images.app.tag }}"
+  imagePullPolicy: "{{ .Values.images.app.pullPolicy }}"
+  workingDir: /app/apps/worker
+  command: ['pnpm']
+  args: ['run', 'start']
+  env:
+    {{- include "langwatch.sharedEnv" . | nindent 4 }}
+    {{- include "langwatch.shutdownEnv" (dict "component" .Values.workers "name" "workers") | nindent 4 }}
+    # See the app deployment — named per role so worker telemetry is
+    # separable from the app's.
+    - name: OTEL_SERVICE_NAME
+      value: {{ .Values.workers.otel.serviceName | default "langwatch-workers" | quote }}
+    - name: LANGWATCH_ENDPOINT
+      value: {{ .Values.workers.upstreams.langwatch.scheme | default "http" }}://{{ .Values.workers.upstreams.langwatch.name | default (printf "%s-app" .Release.Name) }}:{{ .Values.workers.upstreams.langwatch.port | default 5560 }}
+    {{- /* Everything the app is given beyond its port and its own address:
+           the worker parses the same config over the same modules (Alex,
+           2026-09-30), including the Langy pair its turns are dispatched
+           with. app.extraEnvs reaches it too; workers.extraEnvs renders
+           after and so wins a duplicate. */}}
+    {{- include "langwatch.processEnv" . | nindent 4 }}
+    {{- with .Values.app.extraEnvs}}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- with .Values.workers.extraEnvs}}
+    {{- include "langwatch.assertNoReservedTimeoutEnvs" (dict "envs" . "path" "workers.extraEnvs") }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- $extraEnvFrom := concat (default (list) .Values.app.extraEnvFrom) (default (list) .Values.workers.extraEnvFrom) }}
+  {{- include "langwatch.envFromWithOfflineDefaults" (dict "root" $ "extraEnvFrom" $extraEnvFrom) | nindent 2 }}
+  # Probe the worker's HTTP listener (the metrics server port, 2999)
+  # rather than just PID 1 liveness — an answered request proves the
+  # event loop is turning, which `kill -0 1` cannot tell us.
+  #
+  # The probe targets /healthz, NOT /metrics. The scrape door is on its
+  # own port and opens only with METRICS_API_KEY (the default,
+  # app.telemetry.metrics.enabled is false, sets none), so a /metrics
+  # probe would fail and crash-loop the workers on a stock install. And an httpGet probe cannot read a
+  # Secret, so a key delivered via secretKeyRef could never be put in a
+  # rendered Authorization header anyway — that install would 401.
+  # /healthz is unauthenticated by design and carries no telemetry, so
+  # no bearer token is copied into this podspec.
+  # See specs/server/worker-liveness-probe.feature.
+  #
+  # 40 minutes (15s x 160), matching the app: the worker never
+  # migrates; its upgrade gate refuses to start until the ledger
+  # records this image's steps, and the pre-roll Job's upgrade can take
+  # up to ~27 minutes. See the app deployment for why a shorter budget
+  # hides the real error.
+  startupProbe:
+    httpGet:
+      path: /healthz
+      port: 2999
+    failureThreshold: 160
+    periodSeconds: 15
+    timeoutSeconds: 5
+  livenessProbe:
+    httpGet:
+      path: /healthz
+      port: 2999
+    periodSeconds: 30
+    timeoutSeconds: 5
+    failureThreshold: 3
+  resources:
+    {{- toYaml .Values.workers.resources | nindent 4 }}
+  volumeMounts:
+    {{- with .Values.workers.extraVolumeMounts}}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    - name: tmp-dir
+      mountPath: /tmp
+    {{- if eq (include "langwatch.storedObjects.localFilesystemIsActive" .) "true" }}
+    # Stored-objects local-FS mount. The off-request normalize job runs
+    # HERE (on the worker), so it must read the app's staged upload and
+    # write dataset chunks to the SAME PVC the app mounts — not the
+    # worker's own ephemeral FS (where `LANGWATCH_LOCAL_STORAGE_PATH`
+    # from sharedEnv would otherwise point, and normalize would fail to
+    # find the staged file / lose its chunk writes). Renders only when
+    # local-FS is the active backend; app + workers share this one RWO
+    # PVC, which requires them co-located on a single node — the
+    # documented single-replica/hobby topology. Use app.dataplane (S3)
+    # for any multi-node deployment.
+    - name: stored-objects-data
+      mountPath: {{ .Values.app.storedObjects.localFilesystem.path }}
+    {{- end }}
 {{- end -}}
 
 {{/* Whether the stored-objects upgrade hooks render for this release. */}}

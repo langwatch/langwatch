@@ -110,7 +110,7 @@ const settledWithin = (promise: Promise<boolean>, ms: number) =>
   ]);
 
 describe("the upgrade console", () => {
-  describe("given the api's upgrade failed", () => {
+  describe("given the ledger records a failure in the holding phase", () => {
     describe("when a browser asks for a page without a console session", () => {
       /** @scenario "The holding page of a failed upgrade asks for the token and shows no failure detail" */
       it("answers 503 asking for the token and names no step, error or host", async () => {
@@ -216,6 +216,51 @@ describe("the upgrade console", () => {
       });
     });
 
+    describe("when a page on another site or origin submits a token", () => {
+      /** @scenario "A token submitted from another site or origin is refused and not counted" */
+      it("refuses it, even the right token, and leaves the wrong-token limit untouched", async () => {
+        const thread = await bootThread();
+        await showConsole(thread);
+        const own = `http://127.0.0.1:${thread.address.port}`;
+        const fromElsewhere: Record<string, string>[] = [
+          { "Sec-Fetch-Site": "cross-site", Origin: "http://drive-by.example" },
+          { Origin: "http://drive-by.example" },
+          { Origin: "null" },
+        ];
+        const refused: Response[] = [];
+        for (const headers of fromElsewhere) {
+          refused.push(
+            await post(thread, UPGRADE_CONSOLE_PATH, { token: TOKEN }, undefined, headers),
+          );
+        }
+        for (let attempt = 0; attempt < 5; attempt += 1) {
+          const guess = await post(
+            thread,
+            UPGRADE_CONSOLE_PATH,
+            { token: `guess-${attempt}` },
+            undefined,
+            {
+              Origin: "http://drive-by.example",
+            },
+          );
+          expect(guess.status).toBe(403);
+        }
+
+        const opened = await post(thread, UPGRADE_CONSOLE_PATH, { token: TOKEN }, undefined, {
+          "Sec-Fetch-Site": "same-origin",
+          Origin: own,
+        });
+
+        expect(refused.map((response) => response.status)).toEqual([403, 403, 403]);
+        expect(refused.map((response) => response.headers.get("set-cookie"))).toEqual([
+          null,
+          null,
+          null,
+        ]);
+        expect(opened.status).toBe(303);
+      });
+    });
+
     describe("when a request asks for Retry without the console session", () => {
       /** @scenario "A console action without the console session is refused" */
       it("refuses it and asks for no run", async () => {
@@ -237,7 +282,6 @@ describe("the upgrade console", () => {
     });
 
     describe("when another site posts Retry with the console session attached", () => {
-      /** @scenario "A cross-site Retry is refused even with the console session" */
       let thread: LivenessThread;
       let retried: Promise<boolean>;
       let cookie: string;
@@ -250,6 +294,7 @@ describe("the upgrade console", () => {
         own = `http://127.0.0.1:${thread.address.port}`;
       });
 
+      /** @scenario "A cross-site Retry is refused even with the console session" */
       it("refuses a cross-site or foreign-origin Retry and runs only the same-origin one", async () => {
         const crossSite = await post(thread, UPGRADE_RETRY_PATH, {}, cookie, {
           "Sec-Fetch-Site": "same-site",
@@ -299,9 +344,9 @@ describe("the upgrade console", () => {
       });
     });
 
-    describe("when the console session presses Retry and the upgrade then succeeds", () => {
-      /** @scenario "Retry from the console runs the upgrade again and serves on success" */
-      it("asks for a run, and once the hold lifts neither the console nor its token answers", async () => {
+    describe("when the console session presses Retry and the worker's next run succeeds", () => {
+      /** @scenario "Retry from the console returns the failed step to pending and the api moves on when the worker's run succeeds" */
+      it("hands the Retry to the gate, and once the hold lifts neither the console nor its token answers", async () => {
         const thread = await bootThread();
         const { retried } = await showConsole(thread);
         const cookie = await openSession(thread);

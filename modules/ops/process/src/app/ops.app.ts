@@ -232,12 +232,15 @@ import {
   type OpsUpgradeIdInput,
   type OpsUpgradeListRunsInput,
   type OpsUpgradeListStepsInput,
+  type OpsUpgradePreview,
+  type OpsUpgradePreviewInput,
   type OpsUpgradeReleasePage,
   type OpsUpgradeRun,
   type OpsUpgradeRunPage,
   type OpsUpgradeStatus,
   type OpsUpgradeStepDetail,
   type OpsUpgradeStepPage,
+  type OpsUpgradeTargetSummary,
 } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup, ResourceOwnership, ServerRole } from "@langwatch/process";
@@ -257,6 +260,8 @@ import { StoredObjectApi } from "@langwatch/stored-object-contract";
 import type { MigrationPassSummary, SystemMigrationPass } from "@langwatch/system-migrations";
 import { type Instant, nowInstant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
+import { isTenantMigrationStep } from "@langwatch/upgrade/step";
+import { TenantStepSettleService } from "@langwatch/upgrade/step/tenant-state";
 import { UserApi, type UserApi as UserApiContract } from "@langwatch/user-contract";
 import { WorkflowApi } from "@langwatch/workflow-contract";
 
@@ -532,11 +537,7 @@ export interface OpsAppDependencies {
   /** The report schedules the operator scheduler lists and controls. */
   automations: Pick<
     AutomationApi,
-    | "findAllReportSchedules"
-    | "setReportScheduleActive"
-    | "requestReportRun"
-    | "clearReportRun"
-    | "registeredMigrations"
+    "findAllReportSchedules" | "setReportScheduleActive" | "requestReportRun" | "clearReportRun"
   >;
 }
 
@@ -795,6 +796,7 @@ export class OpsModule implements OpsApi {
     const logger = createLogger("langwatch:ops");
     const infrastructure = buildOpsInfrastructure({
       bugReportNotifier: setup.channels.bugReportNotifier,
+      declaredMigrationSteps: setup.declaredMigrationSteps,
       logger,
       config: setup.config,
       resources: setup.resources,
@@ -1947,6 +1949,14 @@ export class OpsModule implements OpsApi {
     return this.#dependencies.upgrades.getRun(input);
   }
 
+  previewUpgrade(input: OpsUpgradePreviewInput): Promise<OpsUpgradePreview> {
+    return this.#dependencies.upgrades.preview(input);
+  }
+
+  listUpgradeTargets(): Promise<OpsUpgradeTargetSummary[]> {
+    return this.#dependencies.upgrades.listTargets();
+  }
+
   retryUpgradeStep(input: OpsUpgradeIdInput): Promise<OpsUpgradeStepDetail> {
     return this.#dependencies.upgrades.retryStep(input);
   }
@@ -2270,6 +2280,8 @@ function buildOpsInfrastructure(input: {
   repositories: OpsRepositories;
   featureFlags: Pick<FeatureFlagApi, "isEnabled"> | undefined;
   cloudOps: boolean;
+  /** The kernel's feed (S6-FEED); ops keeps only the tenant steps. */
+  declaredMigrationSteps: (() => readonly unknown[]) | undefined;
 }): OpsAppInfrastructure {
   const { logger, config, resources, repositories } = input;
   const introspection = EventingIntrospectionService.create(() =>
@@ -2375,6 +2387,14 @@ function buildOpsInfrastructure(input: {
         routes: () => repositories.clickhouseRoutes.findPrivateRoutes(),
         dependencies,
         passRequests,
+        declared: {
+          steps: () => (input.declaredMigrationSteps?.() ?? []).filter(isTenantMigrationStep),
+          state: repositories.tenantStepState,
+          settle: TenantStepSettleService.create({
+            state: repositories.tenantStepState,
+            ledger: repositories.tenantStepLedger,
+          }),
+        },
       }),
     bugReportNotifier: input.bugReportNotifier,
     explainClients: explainRuntime,

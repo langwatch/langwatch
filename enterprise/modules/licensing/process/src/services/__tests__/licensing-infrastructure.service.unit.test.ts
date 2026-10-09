@@ -1,6 +1,4 @@
 import { OrganizationNotFoundError } from "@langwatch/enterprise-licensing-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
@@ -77,14 +75,14 @@ function composeWithStorage(licenses: MemoryOrganizationLicenseRepository) {
   const writes: unknown[] = [];
   const { repository } = LicensingInfrastructureService.create({ role: "api" }).withStorage({
     licenses,
-    organizations: createApiFixture<OrganizationApi>({
-      setLicense: async (input) => {
-        writes.push({ set: input });
+    facts: {
+      licenseStored: async (input) => {
+        writes.push({ stored: input });
       },
-      clearLicense: async (input) => {
-        writes.push({ clear: input });
+      licenseCleared: async (input) => {
+        writes.push({ cleared: input });
       },
-    }),
+    },
     getMemberCount: async () => 0,
     getMembersLiteCount: async () => 0,
   });
@@ -93,7 +91,7 @@ function composeWithStorage(licenses: MemoryOrganizationLicenseRepository) {
 
 describe("licensing infrastructure composed with licence storage", () => {
   /** @scenario "A stored licence lands on licensing's own row and on organization's columns" */
-  it("keeps an activation and a removal on its own row and tells organization each", async () => {
+  it("keeps an activation and a removal on its own row and records a fact for each", async () => {
     const licenses = MemoryOrganizationLicenseRepository.create(new Map([["org_acme", null]]));
     const { repository, writes } = composeWithStorage(licenses);
     const expiresAt = Temporal.Instant.from("2027-01-01T00:00:00Z");
@@ -108,21 +106,27 @@ describe("licensing infrastructure composed with licence storage", () => {
       licenseKey: null,
     });
     expect(writes).toEqual([
-      { set: { organizationId: "org_acme", licenseKey: "key", expiresAt, validatedAt } },
-      { clear: { organizationId: "org_acme" } },
+      {
+        stored: {
+          organizationId: "org_acme",
+          license: { licenseKey: "key", expiresAt, validatedAt },
+        },
+      },
+      { cleared: { organizationId: "org_acme" } },
     ]);
   });
 
   /** @scenario "A stored licence lands on licensing's own row and on organization's columns" */
-  it("keeps nothing when organization refuses the write", async () => {
+  it("keeps nothing when the fact is refused", async () => {
     const licenses = MemoryOrganizationLicenseRepository.create(new Map([["org_acme", null]]));
     const { repository } = LicensingInfrastructureService.create({ role: "api" }).withStorage({
       licenses,
-      organizations: createApiFixture<OrganizationApi>({
-        setLicense: async () => {
+      facts: {
+        licenseStored: async () => {
           throw new OrganizationNotFoundError();
         },
-      }),
+        licenseCleared: async () => void 0,
+      },
       getMemberCount: async () => 0,
       getMembersLiteCount: async () => 0,
     });
@@ -136,6 +140,34 @@ describe("licensing infrastructure composed with licence storage", () => {
     ).resolves.toMatchObject([{ organizationId: "org_acme", own: null }]);
     await expect(repository.getOrganizationLicense("org_acme")).resolves.toEqual({
       licenseKey: null,
+    });
+  });
+
+  /** @scenario "A stored licence lands on licensing's own row and on organization's columns" */
+  it("keeps the stored licence when the cleared fact is refused", async () => {
+    const licenses = MemoryOrganizationLicenseRepository.create(new Map([["org_acme", null]]));
+    const { repository } = LicensingInfrastructureService.create({ role: "api" }).withStorage({
+      licenses,
+      facts: {
+        licenseStored: async () => void 0,
+        licenseCleared: async () => {
+          throw new OrganizationNotFoundError();
+        },
+      },
+      getMemberCount: async () => 0,
+      getMembersLiteCount: async () => 0,
+    });
+    const expiresAt = Temporal.Instant.from("2027-01-01T00:00:00Z");
+    await repository.storeLicense("org_acme", { licenseKey: "key", expiresAt, validatedAt: null });
+
+    await expect(repository.removeLicense("org_acme")).rejects.toMatchObject({
+      code: "organization_not_found",
+    });
+    await expect(licenses.findLicense({ organizationId: "org_acme" })).resolves.toEqual([
+      { licenseKey: "key", expiresAt, validatedAt: null },
+    ]);
+    await expect(repository.getOrganizationLicense("org_acme")).resolves.toEqual({
+      licenseKey: "key",
     });
   });
 

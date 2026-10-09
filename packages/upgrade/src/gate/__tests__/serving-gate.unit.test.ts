@@ -21,7 +21,13 @@ function memoryServingRosterLedger(): ServingRosterLedger & {
     rows,
     writeRosterEntry: async (declaration) => {
       const at = new Date(0);
-      const row = { ...declaration, steps: [...declaration.steps], startedAt: at, heartbeatAt: at };
+      const row = {
+        ...declaration,
+        steps: [...declaration.steps],
+        credentialKeys: [...(declaration.credentialKeys ?? [])],
+        startedAt: at,
+        heartbeatAt: at,
+      };
       rows.set(row.processId, row);
       return row;
     },
@@ -152,9 +158,9 @@ describe("assertCurrent", () => {
 });
 
 describe("createUpgradeGate", () => {
-  /** @scenario "A Helm first install is detected by the api" */
-  it("answers a first install to the api on an empty ledger and an empty schema", async () => {
-    const { gate } = gateOver({ role: "api", steps: [], schemaIsEmpty: true });
+  /** @scenario "A first install is detected by the worker" */
+  it("answers a first install to the worker on an empty ledger and an empty schema", async () => {
+    const { gate } = gateOver({ role: "worker", steps: [], schemaIsEmpty: true });
     await expect(gate.admit()).resolves.toMatchObject({
       admitted: false,
       outcome: "first-install",
@@ -162,13 +168,50 @@ describe("createUpgradeGate", () => {
     });
   });
 
-  /** @scenario "A worker on a first install refuses as behind" */
-  it("refuses the worker as behind on a first install", async () => {
-    const { gate } = gateOver({ role: "worker", steps: [], schemaIsEmpty: true });
+  /** @scenario "An api on a first install holds" */
+  it("answers holding to the api on an empty ledger and an empty schema", async () => {
+    const { gate } = gateOver({ role: "api", steps: [], schemaIsEmpty: true });
+    await expect(gate.admit()).resolves.toMatchObject({ admitted: false, outcome: "holding" });
+  });
+
+  /** @scenario "An api whose image has a Postgres schema step outstanding holds" */
+  it("answers holding to the api, naming the pending Postgres schema step", async () => {
+    const { gate } = gateOver({ role: "api", steps: [{ id: PRISMA, status: "pending" }] });
+    await expect(gate.admit()).resolves.toMatchObject({
+      admitted: false,
+      outcome: "holding",
+      outstanding: [PRISMA],
+    });
+  });
+
+  /** @scenario "An api whose schema steps are done while a blocking step is outstanding is upgrading" */
+  it("answers upgrading to the api once its schema steps are done", async () => {
+    const steps = [
+      { id: PRISMA, status: "done" as const },
+      { id: GOOSE, status: "pending" as const },
+    ];
+    const { gate, rows } = gateOver({ role: "api", steps });
+    await expect(gate.admit()).resolves.toMatchObject({
+      admitted: false,
+      outcome: "upgrading",
+      outstanding: [GOOSE],
+    });
+    expect(rows.size).toBe(0);
+  });
+
+  /** @scenario "A worker on an installation behind its image is told to run the upgrade" */
+  it("answers behind to the worker, naming the step and the command", async () => {
+    const steps = [
+      { id: PRISMA, status: "done" as const },
+      { id: GOOSE, status: "pending" as const },
+    ];
+    const { gate, rows } = gateOver({ role: "worker", steps });
     await expect(gate.admit()).resolves.toMatchObject({
       outcome: "behind",
-      outstanding: [PRISMA, GOOSE],
+      outstanding: [GOOSE],
+      command: UPGRADE_COMMAND,
     });
+    expect(rows.size).toBe(0);
   });
 
   /** @scenario "The roster entry is written on start and removed on graceful stop" */

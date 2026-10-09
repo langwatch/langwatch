@@ -12,6 +12,7 @@ import { UiRouteOutlet } from "@langwatch/browser/route-objects";
 import type { ProcessWebConfig } from "@langwatch/config/public-app-config";
 
 import { UiNavigationHost } from "./navigation-host-provider";
+import { UiScreenErrorBoundary } from "./ui-error-page";
 import type { UiRootCapabilities } from "./ui-root-capabilities";
 import { useAnalyticsIdentity } from "./use-analytics-identity";
 
@@ -40,6 +41,7 @@ export default function UiAppChrome({
         scope={root.scope}
         navigationChrome={root.navigationChrome}
         fullScreen={fullScreen}
+        isDevelopment={process.mode === "development"}
       />
     </UiNavigationHost>
   );
@@ -50,13 +52,19 @@ function UiAppChromeFrame({
   scope,
   navigationChrome: { NavigationShell, useNavigationTracking },
   fullScreen,
-}: Pick<UiRootCapabilities, "scope" | "navigationChrome"> & { fullScreen: boolean }) {
+  isDevelopment,
+}: Pick<UiRootCapabilities, "scope" | "navigationChrome"> & {
+  fullScreen: boolean;
+  isDevelopment: boolean;
+}) {
   useAnalyticsIdentity();
   useNavigationTracking();
   scope.useUiOrgQueryParamSelection();
   return (
     <NavigationShell fullScreen={fullScreen}>
-      <UiRouteOutlet />
+      <UiScreenErrorBoundary isDevelopment={isDevelopment}>
+        <UiRouteOutlet />
+      </UiScreenErrorBoundary>
     </NavigationShell>
   );
 }

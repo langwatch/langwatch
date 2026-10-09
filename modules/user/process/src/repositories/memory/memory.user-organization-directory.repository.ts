@@ -10,6 +10,8 @@ type MemoryUserDirectoryOrganization = Readonly<{
   firstProjectSlugs?: Readonly<Record<string, string>>;
   /** The projects API keys belong to, as `/api/me/project` names them. */
   projects?: readonly MeProject[];
+  /** The personal-workspace project each member stores an avatar under, by user id. */
+  personalProjectIds?: Readonly<Record<string, string>>;
 }>;
 
 /** The directory's memory twin: the organizations it was seeded with, keyed by id. */
@@ -33,6 +35,13 @@ export class MemoryUserOrganizationDirectoryRepository implements UserOrganizati
     userId: string;
   }): Promise<string | null> {
     return this.organizations[input.organizationId]?.firstProjectSlugs?.[input.userId] ?? null;
+  }
+
+  async findPersonalProjectId(input: {
+    organizationId: string;
+    userId: string;
+  }): Promise<string | null> {
+    return this.organizations[input.organizationId]?.personalProjectIds?.[input.userId] ?? null;
   }
 
   async findFirstAdminEmail(organizationId: string): Promise<string | null> {

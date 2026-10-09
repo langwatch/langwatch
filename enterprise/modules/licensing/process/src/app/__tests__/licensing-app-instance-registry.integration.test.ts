@@ -1,7 +1,6 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
 import { ResourceScope } from "@langwatch/process";
 import type { RateLimiter } from "@langwatch/process-stores";
 import { ScopedSecrets } from "@langwatch/secrets";
@@ -67,7 +66,6 @@ describe.skipIf(!TEST_DATABASE_URL)("the self-hosted instance registry in produc
           instantEval: createApiFixture<InstantEvalApi>(),
           scopes: createApiFixture<AuthzApi>(),
           gateway: createApiFixture<GatewayApi>(),
-          organizations: createApiFixture<OrganizationApi>(),
         },
         repositories: LiveLicensingRepositories.create({
           prisma,

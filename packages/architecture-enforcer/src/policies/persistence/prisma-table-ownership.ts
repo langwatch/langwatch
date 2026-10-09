@@ -40,21 +40,30 @@ export const SHARED_PRISMA_TABLES: readonly SharedPrismaTable[] = [
       "authz",
     ],
     reason:
-      "entitlement reads a project's organisation and an organisation's projects, never a fold (C1, R40); billing reads an organisation's project ids and names for spend and usage warnings (round 37 D5, R40); data retention and data privacy read where a project sits to resolve its policy, never a fold (round 46 E1, R40); the Instant Evals judge and nurturing read a project's team to place it, and nurturing an organisation's earliest project creation for its cutover (DATA-NURTURING-GUARD), never a fold (round 46 E1, R40); presence reads a project's and its organisation's presence flags in one joined read for each heartbeat, never a copy (R40); organization reads its projects' ids for a trace-sharing revocation, its project grants' names, and its teams' projects for the team screens, never a copy (O1, R40); user reads the project an API key belongs to for /api/me/project, never ProjectApi (U1, R40); authz's legacy-import tenant step reads an organisation's project ids to bound its share-link read, and each project's apiKey presence and createdAt, per tenant the upgrade runner hands it, never a peer (PO-2, R40)",
+      "entitlement reads a project's organisation and an organisation's projects, never a fold (C1, R40); billing reads an organisation's project ids and names for spend and usage warnings (round 37 D5, R40); data retention and data privacy read where a project sits to resolve its policy, never a fold (round 46 E1, R40); the Instant Evals judge and nurturing read a project's team to place it, and nurturing an organisation's earliest project creation for its cutover (DATA-NURTURING-GUARD), never a fold (round 46 E1, R40); presence reads a project's and its organisation's presence flags in one joined read for each heartbeat, never a copy (R40); organization reads its projects' ids for a trace-sharing revocation, its project grants' names, and its teams' projects for the team screens, never a copy (O1, R40); user reads the project an API key belongs to for /api/me/project, never ProjectApi (U1, R40); authz's legacy-import tenant step reads an organisation's project ids to bound its share-link read, and each project's apiKey presence and createdAt, per tenant the upgrade runner hands it, never a peer (PO-2, R40); user reads the caller's personal-workspace project to store an avatar (U1-AVATAR a)",
   },
   {
     table: "Team",
     owner: "organization",
-    readers: ["data-retention", "data-privacy", "instant-eval-judge", "nurturing"],
+    readers: [
+      "data-retention",
+      "data-privacy",
+      "instant-eval-judge",
+      "nurturing",
+      "user",
+      "entitlement",
+      "scim",
+      "licensing",
+    ],
     reason:
-      "data retention and data privacy read a team's organisation to place a project or a team-level rule, never a fold (round 46 E1, R40); the Instant Evals judge and nurturing read a project's organisation through its team and an organisation's teams for its earliest project (round 46 E1, R40)",
+      "data retention and data privacy read a team's organisation to place a project or a team-level rule, never a fold (round 46 E1, R40); the Instant Evals judge and nurturing read a project's organisation through its team and an organisation's teams for its earliest project (round 46 E1, R40); user reads the caller's personal team to find the personal-workspace project an avatar is stored under, never OrganizationApi (U1-AVATAR a, R40); entitlement reads an organisation's team ids to merge Lite Members' custom-role permissions when counting seats, never OrganizationApi (R-C1f, R40); scim counts the same seats to place a provisioned person (PC-SCIM-SEAT, R40); licensing counts them for a licence's seat limits, never OrganizationApi (R-C1f, Q9, R40)",
   },
   {
     table: "OrganizationUser",
     owner: "organization",
-    readers: ["authz", "data-privacy", "billing"],
+    readers: ["authz", "data-privacy", "billing", "entitlement", "licensing"],
     reason:
-      "authz reads memberships for every decision and answers its active administrators from them (R41, R42); data privacy reads a personal project owner's department from the membership, as main did (round 53); billing reads an organisation's administrators and active members for its alerts and lifecycle facts (C2 B, R40)",
+      "authz reads memberships for every decision and answers its active administrators from them (R41, R42); data privacy reads a personal project owner's department from the membership, as main did (round 53); billing reads an organisation's administrators and active members for its alerts and lifecycle facts (C2 B, R40); entitlement counts an organisation's member seats for usage stats, never OrganizationApi (R-C1f, R40); licensing counts the same seats for a licence's seat limits (R-C1f, Q9, R40)",
     writes: [
       {
         reader: "authz",
@@ -75,7 +84,7 @@ export const SHARED_PRISMA_TABLES: readonly SharedPrismaTable[] = [
     owner: "organization",
     readers: ["scim", "entitlement", "billing", "licensing"],
     reason:
-      "scim resolves an organisation by its SSO domain and reads names for its oversight screen (R37 S1 R2, R40, R42); entitlement reads the currency and dataset limit it prices and bounds by (C1, R40); billing reads the name, Stripe customer, pricing model and licence it bills by, its other writes being facts organization applies (R42, round 46 D-b); licensing reads a licence customer's name and slug, never through OrganizationApi (C3c, R40)",
+      "scim resolves an organisation by its SSO domain and reads names for its oversight screen (R37 S1 R2, R40, R42); entitlement reads the currency and dataset limit it prices and bounds by (C1, R40); billing reads the name, Stripe customer, pricing model and licence it bills by, its other writes being facts organization applies (R42, round 46 D-b); licensing reads a licence customer's name and slug, never through OrganizationApi (C3c, R40), and how many organisations an install holds for a domain claim (Q9, R40)",
     writes: [
       {
         reader: "billing",
@@ -91,6 +100,13 @@ export const SHARED_PRISMA_TABLES: readonly SharedPrismaTable[] = [
     readers: ["billing"],
     reason:
       "billing reads its organisations' administrators' names and addresses, and which members are deactivated, never a copy (C2 B, R40)",
+  },
+  {
+    table: "OrganizationLicense",
+    owner: "licensing",
+    readers: ["organization"],
+    reason:
+      "organization's licence-stored subscriber reads the key from licensing's row, as the fact carries only the key's fingerprint, until organization's licence columns are dropped (C3-KEY-HASH, R40)",
   },
   {
     table: "Topic",

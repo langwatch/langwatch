@@ -9,6 +9,7 @@ import { useDrawer } from "../../behavior/use-drawer.ts";
 import { useInviteActions } from "../../behavior/use-invite-actions.ts";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
 import { usePublicEnv } from "../../behavior/use-public-env.ts";
+import { useOrganizationHost } from "../../model/organization-host.ts";
 import { AddMembersForm } from "./add-members-form.tsx";
 
 /** Invite drawer: stable deep-link from members page, command bar, or inline box. */
@@ -16,7 +17,8 @@ export function InviteMemberDrawer({
   open = true,
   initialEmail = "",
 }: UiInviteMemberDrawerProps): React.ReactElement | null {
-  const { organization, hasPermission } = useOrganizationTeamProject();
+  const { organization } = useOrganizationTeamProject();
+  const host = useOrganizationHost();
   const { closeDrawer } = useDrawer();
   const queryClient = api.useUtils();
   const publicEnv = usePublicEnv();
@@ -27,7 +29,7 @@ export function InviteMemberDrawer({
     { enabled: !!organization },
   );
 
-  const isAdmin = hasPermission("organization:manage");
+  const isAdmin = host.hasPermission("organization:manage");
   const teamOptions = (organization?.teams ?? []).map((team) => ({
     label: team.name,
     value: team.id,

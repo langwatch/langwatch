@@ -76,7 +76,6 @@ vi.mock("../../../behavior/use-organization-team-project.ts", () => ({
         },
       ],
     },
-    hasPermission: () => true,
   }),
 }));
 

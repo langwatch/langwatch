@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Portable User use cases exposed to process peers and transports.
 
-Peers call these through the token, declared at `../contract/src/user.api.ts:62`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/user.api.ts:56`; nothing else in this package is public.
 
 #### `findById`
 
@@ -298,18 +298,6 @@ A signed URL for an uploaded avatar; anything that is not one is refused as not 
 getAvatarUrl(input: UserAvatarRestParams): Promise<UserAvatarUrl>;
 ```
 
-#### `ensurePersonalWorkspace`
-
-```typescript
-ensurePersonalWorkspace(input: PersonalWorkspaceInput): Promise<EnsuredPersonalWorkspace>;
-```
-
-#### `findPersonalWorkspace`
-
-```typescript
-findPersonalWorkspace(input: FindPersonalWorkspaceInput): Promise<PersonalWorkspace | null>;
-```
-
 #### `findLastHomePath`
 
 ```typescript
@@ -462,7 +450,7 @@ Contract `../contract/src/user.trpc.ts:40`, router `src/transport/user.trpc.ts:3
 ```typescript
 // user.getAvatarUrl
 type Input = z.infer<typeof userAvatarRestParamsSchema>; // ../contract/src/user-rest.schemas.ts:21
-// Output: userAvatarUrlSchema, ../contract/src/user.ts:258
+// Output: userAvatarUrlSchema, ../contract/src/user.ts:256
 interface Output {
   url: string;
 }
@@ -544,7 +532,7 @@ interface Output {
 
 // user.secureAccountNudge
 type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:15
-// Output: userSecureAccountOfferSchema, ../contract/src/user.ts:350
+// Output: userSecureAccountOfferSchema, ../contract/src/user.ts:348
 interface Output {
   offer: boolean;
   passkey: boolean;
@@ -586,7 +574,7 @@ interface Input {
   organizationId: string;
   imageDataUrl: string;
 }
-// Output: userAvatarResultSchema, ../contract/src/user.ts:254
+// Output: userAvatarResultSchema, ../contract/src/user.ts:252
 interface Output {
   image: string;
 }

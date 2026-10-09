@@ -134,3 +134,29 @@ func TestConsoleServesTheBundleAndNamesTheBuildWhenMissing(t *testing.T) {
 		}
 	}
 }
+
+// @scenario "The console deletes one object or clears a bucket"
+func TestConsoleDeletesAnObjectAndClearsABucket(t *testing.T) {
+	srv := newTestServer(t)
+	put(t, srv.URL, "/uploads/a.txt", "a", "text/plain")
+	put(t, srv.URL, "/uploads/b.txt", "b", "text/plain")
+	put(t, srv.URL, "/other/c.txt", "c", "text/plain")
+
+	resp, _ := do(t, http.MethodDelete, srv.URL+"/_sim/api/object?bucket=uploads&key=a.txt", nil, nil)
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("delete object = %d", resp.StatusCode)
+	}
+	if status := getJSON(t, srv.URL+"/_sim/api/object?bucket=uploads&key=a.txt", &struct{}{}); status != http.StatusNotFound {
+		t.Fatalf("deleted object reads %d", status)
+	}
+
+	_, body := do(t, http.MethodDelete, srv.URL+"/_sim/api/objects?bucket=uploads", nil, nil)
+	if strings.TrimSpace(body) != `{"deleted":1}` {
+		t.Fatalf("clear bucket = %q", body)
+	}
+	var left struct{ Objects []objectInfo }
+	getJSON(t, srv.URL+"/_sim/api/objects", &left)
+	if len(left.Objects) != 1 || left.Objects[0].Bucket != "other" {
+		t.Fatalf("left = %+v", left.Objects)
+	}
+}

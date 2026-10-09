@@ -36,7 +36,7 @@ func (o *Orchestrator) ensureDaemon(worktreeDir string) {
 
 func (o *Orchestrator) daemonAlive() bool {
 	info, ok := o.store.Daemon()
-	if !ok || !o.sys.ProcessAlive(info.PID) {
+	if !ok || !o.pidIsOurs(info.PID, info.Start) {
 		return false
 	}
 	// PID liveness alone is unreliable: when the daemon dies its PID is recycled
@@ -65,27 +65,20 @@ func (o *Orchestrator) RunDaemon(ctx context.Context, dash Dashboard) error {
 		return err
 	}
 	port := ports[0]
-	info := DaemonInfo{PID: o.sys.Getpid(), Port: port, URL: fmt.Sprintf("http://127.0.0.1:%d", port)}
+	info := DaemonInfo{PID: o.sys.Getpid(), Start: o.sys.ProcessStart(o.sys.Getpid()), Port: port, URL: fmt.Sprintf("http://127.0.0.1:%d", port)}
 	// Atomically claim the singleton slot BEFORE wiring routes — this both makes
 	// `up` find us immediately and closes the startup race where two `up`s slip
 	// past the daemonAlive() check above (which needs the port listening) and each
-	// spawn a daemon. O_EXCL lets exactly one racer win. If we lose to a live owner
-	// we defer to it; a record left by a crashed daemon (dead PID) is cleared and
-	// the claim retried. ProcessAlive is the right liveness test here, not the
-	// port: the winner has just written its own PID and may not be listening yet.
-	for {
-		claimed, err := o.store.ClaimDaemon(info)
-		if err != nil {
-			return err
-		}
-		if claimed {
-			break
-		}
-		if owner, ok := o.store.Daemon(); ok && o.sys.ProcessAlive(owner.PID) {
-			fmt.Println("haven daemon already running")
-			return nil
-		}
-		o.store.ClearDaemon() // stale record from a crashed daemon — drop and retry
+	// spawn a daemon. The flock lets exactly one racer win and is held for life;
+	// the kernel drops it when its holder dies, so a crashed daemon's record is
+	// simply overwritten by the next claim (D9).
+	claimed, err := o.store.ClaimDaemon(info)
+	if err != nil {
+		return err
+	}
+	if !claimed {
+		fmt.Println("haven daemon already running")
+		return nil
 	}
 	defer o.store.ClearDaemon()
 
@@ -186,7 +179,7 @@ const dailyCycles = int((24 * time.Hour) / (10 * time.Second))
 func (o *Orchestrator) reapDeadStacks() {
 	now := o.sys.Now()
 	for _, s := range o.store.Stacks() {
-		dead := s.LauncherPID != 0 && !o.sys.ProcessAlive(s.LauncherPID)
+		dead := s.LauncherPID != 0 && !o.launcherIsOurs(s)
 		if stale := s.Stale(now, o.cfg.IdleTTL); dead || stale {
 			o.reapStack(s, dead, stale)
 		}
@@ -199,7 +192,7 @@ func (o *Orchestrator) reapDeadStacks() {
 // outlived the stack that owned it.
 func (o *Orchestrator) reapStack(s domain.Stack, dead, stale bool) {
 	timedOut := stale && !dead
-	if timedOut {
+	if timedOut && s.LauncherPID != 0 {
 		o.sys.Terminate(s.LauncherPID) // let the launcher stop its own children
 	}
 	if !s.PortlessDisabled {
@@ -297,7 +290,7 @@ func (o *Orchestrator) publishPressure(level domain.Pressure) {
 // the daemon, and every group operation here would then be aimed at haven
 // itself.
 func (o *Orchestrator) governable(s domain.Stack) bool {
-	return s.LauncherPID != 0 && o.sys.ProcessAlive(s.LauncherPID)
+	return s.LauncherPID != 0 && o.launcherIsOurs(s)
 }
 
 func (o *Orchestrator) restoreDemoted(stacks []domain.Stack) {
@@ -370,7 +363,7 @@ func (o *Orchestrator) recordReap(kind, target, reason string) {
 func (o *Orchestrator) fattestStack() (slug string, rss uint64) {
 	stackRSS := o.StackRSSByLauncher()
 	for _, s := range o.store.Stacks() {
-		if !o.sys.ProcessAlive(s.LauncherPID) {
+		if !o.launcherIsOurs(s) {
 			continue
 		}
 		if got := stackRSS[s.LauncherPID]; got > rss {

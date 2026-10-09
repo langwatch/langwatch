@@ -39,8 +39,8 @@ export function invalidateModules({
 
 /**
  * ADR-168's trigger policy, in-process: a quiet window with a max wait and
- * one reload at a time. Changes noted during a reload
- * wait out their own quiet window and are answered by one follow-up.
+ * one reload at a time. The first boot is a reload too (`boot`), so changes
+ * noted during any reload wait out their own quiet window and are answered by one follow-up.
  */
 export function createReloadTrigger({
   quietMs,
@@ -50,7 +50,7 @@ export function createReloadTrigger({
   quietMs: number;
   maxWaitMs: number;
   run: (files: string[]) => Promise<void>;
-}): { note(file: string): void; cancel(): void } {
+}): { boot(): Promise<void>; note(file: string): void; cancel(): void } {
   const pending = new Set<string>();
   let timer: ReturnType<typeof setTimeout> | undefined;
   let firstAt = 0;
@@ -59,18 +59,22 @@ export function createReloadTrigger({
     clearTimeout(timer);
     timer = setTimeout(fire, Math.max(0, ms));
   };
+  const start = (files: string[]): Promise<void> => {
+    isRunning = true;
+    return run(files).finally(() => {
+      isRunning = false;
+      if (pending.size > 0) arm(quietMs);
+    });
+  };
   function fire(): void {
     timer = undefined;
     if (isRunning || pending.size === 0) return;
     const files = [...pending];
     pending.clear();
-    isRunning = true;
-    void run(files).finally(() => {
-      isRunning = false;
-      if (pending.size > 0) arm(quietMs);
-    });
+    void start(files);
   }
   return {
+    boot: () => start([]),
     note(file) {
       if (pending.size === 0) firstAt = Date.now();
       pending.add(file);

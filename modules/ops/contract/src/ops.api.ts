@@ -64,12 +64,15 @@ import type {
   OpsUpgradeIdInput,
   OpsUpgradeListRunsInput,
   OpsUpgradeListStepsInput,
+  OpsUpgradePreview,
+  OpsUpgradePreviewInput,
   OpsUpgradeReleasePage,
   OpsUpgradeRun,
   OpsUpgradeRunPage,
   OpsUpgradeStatus,
   OpsUpgradeStepDetail,
   OpsUpgradeStepPage,
+  OpsUpgradeTargetSummary,
 } from "./features/migrations/ops-upgrade.ts";
 import type {
   AggregateProcessManager,
@@ -692,6 +695,9 @@ export interface OpsApi {
   listUpgradeRuns(input: OpsUpgradeListRunsInput): Promise<OpsUpgradeRunPage>;
   /** Refuses with `upgrade_not_found` when the ledger holds no such run. */
   getUpgradeRun(input: OpsUpgradeIdInput): Promise<OpsUpgradeRun>;
+  /** The plan narrowed to `to`, beside the preflight; `upgrade_plan_unavailable` when unwired. */
+  previewUpgrade(input: OpsUpgradePreviewInput): Promise<OpsUpgradePreview>;
+  listUpgradeTargets(): Promise<OpsUpgradeTargetSummary[]>;
   /** Reopens a failed step for the worker; refuses a step not failed or not in the ledger. */
   retryUpgradeStep(input: OpsUpgradeIdInput): Promise<OpsUpgradeStepDetail>;
 }

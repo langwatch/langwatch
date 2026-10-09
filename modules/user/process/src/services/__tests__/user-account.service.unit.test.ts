@@ -1,11 +1,9 @@
-import type { OrganizationApi } from "@langwatch/organization-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { UserAccountService } from "../user-account.service.ts";
 
 function createService() {
-  return UserAccountService.create({ organizations: createApiFixture<OrganizationApi>({}) });
+  return UserAccountService.create();
 }
 
 describe("UserAccountService", () => {

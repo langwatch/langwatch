@@ -13,6 +13,10 @@ data:
   # them avoids misleading operators into thinking they're tuning behavior.
   SERVER_ADDR: ":5563"
   LOG_LEVEL: {{ .Values.logging.level | quote }}
+  {{- if .Values.metrics.enabled }}
+  OTEL_METRICS_EXPORTER: "otlp,prometheus"
+  OTEL_EXPORTER_PROMETHEUS_PORT: {{ .Values.metrics.port | quote }}
+  {{- end }}
   {{/* The route back to the control plane. Derived from the release name,
        because that is what the cluster names the app Service after: a fixed
        address resolves only on an install called the same as ours, and the

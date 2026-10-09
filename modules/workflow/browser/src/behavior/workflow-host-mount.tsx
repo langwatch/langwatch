@@ -50,7 +50,7 @@ function capabilityWorkflowHost({
         projectName: project?.name,
         organizationId: scopeHost?.organization()?.id,
         teamId: scopeHost?.team()?.id,
-        isResolved: scopeHost ? !scopeHost.isLoading() : false,
+        isResolved: scopeHost ? !scopeHost.isLoading() && session.isSettled() : false,
       };
     },
 

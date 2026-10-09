@@ -41,8 +41,8 @@ type RouterDeps struct {
 	App    *app.App
 	Logger *zap.Logger
 	Health *health.Registry
-	// Metrics serves /metrics and backs the request middleware. Optional;
-	// when nil no metrics are recorded and /metrics is not mounted.
+	// Metrics backs the request middleware. Optional; when nil no metrics
+	// are recorded.
 	Metrics               *gatewaymetrics.Recorder
 	Version               string
 	TraceRegistry         *customertracebridge.Registry
@@ -148,15 +148,10 @@ func NewRouter(deps RouterDeps) http.Handler {
 	r.Get("/health", statusRoute)
 	r.Head("/health", statusRoute)
 
-	// Unauthenticated like the probes: the cluster's scraper has no
-	// virtual key, and the endpoint is kept off the public ingress by the
-	// chart rather than by a credential.
-	if deps.Metrics != nil {
-		r.Handle("/metrics", deps.Metrics.Handler())
-	}
+	// /metrics is not served here: the scrape has its own listener (ADR-175).
 
 	// Unauthenticated and kept off the public ingress the same way as the
-	// probes and /metrics above (charts/gateway/templates/ingress.yaml
+	// probes above (charts/gateway/templates/ingress.yaml
 	// allowlists only /v1 and the exact /health path). Reveals nothing but
 	// a URL: dev tooling polls it to verify an already-running gateway
 	// before trusting it on a reused port.

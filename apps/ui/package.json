@@ -42,6 +42,7 @@
     "@langwatch/data-retention-browser": "workspace:*",
     "@langwatch/dataset-browser": "workspace:*",
     "@langwatch/design-system": "workspace:*",
+    "@langwatch/design-system-internal": "workspace:*",
     "@langwatch/enterprise-billing-browser": "workspace:*",
     "@langwatch/enterprise-billing-contract": "workspace:*",
     "@langwatch/enterprise-governance-browser": "workspace:*",

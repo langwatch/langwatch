@@ -299,7 +299,7 @@ function watchBackend({ onFile }: { onFile: (file: string) => void }): void {
   }
 }
 
-/** Starts the UI (not in the api lane), then the first backend generation, then the watch. */
+/** Starts the UI (not in the api lane), then the watch, then the first backend generation. */
 export async function bootApp({ withUi }: { withUi: boolean }): Promise<void> {
   if (withUi) {
     process.chdir(UI_ROOT);
@@ -308,23 +308,24 @@ export async function bootApp({ withUi }: { withUi: boolean }): Promise<void> {
   backendVite = await startBackendVite();
   const ssr = backendVite.environments.ssr;
   runner = createServerModuleRunner(ssr, { hmr: false });
-  const run = (files: string[]): Promise<void> => {
-    reloading = reload(files);
-    return reloading;
-  };
-  await run([]);
-  if (!isWatching) return;
   const trigger = createReloadTrigger({
     quietMs: envPositive({ name: "LANGWATCH_DEV_WATCH_DEBOUNCE_MS", fallback: 2_000 }),
     maxWaitMs: envPositive({ name: "LANGWATCH_DEV_WATCH_MAX_WAIT_MS", fallback: 30_000 }),
-    run,
-  });
-  watchBackend({
-    onFile: (file) => {
-      const isLoaded = runner?.evaluatedModules.getModulesByFile(file) !== undefined;
-      if (!isLoaded && !(isRetryOwed && CODE_FILE.test(file))) return;
-      ssr.moduleGraph.onFileChange(file);
-      trigger.note(file);
+    run: (files) => {
+      reloading = reload(files);
+      return reloading;
     },
   });
+  // Watched before the first boot, so an edit landing while it runs queues one follow-up.
+  if (isWatching) {
+    watchBackend({
+      onFile: (file) => {
+        const isLoaded = runner?.evaluatedModules.getModulesByFile(file) !== undefined;
+        if (!isLoaded && !(isRetryOwed && CODE_FILE.test(file))) return;
+        ssr.moduleGraph.onFileChange(file);
+        trigger.note(file);
+      },
+    });
+  }
+  await trigger.boot();
 }

@@ -85,6 +85,21 @@ describe("<SignInError/>", () => {
     });
   });
 
+  describe("when an unsolicited single sign-on response meets a browser signed in as someone else", () => {
+    /** @scenario "An unsolicited response for another person is refused while somebody is signed in" */
+    it("asks the person to sign out, then sign in again from their identity provider", () => {
+      renderError("signed_in_as_another_user");
+      expect(
+        screen.getByText(
+          "You are already signed in as someone else. Sign out, then sign in again from your identity provider.",
+        ),
+      ).toBeTruthy();
+      expect(screen.getByRole("link", { name: "Sign out" }).getAttribute("href")).toBe(
+        FEDERATED_LOGOUT_PATH,
+      );
+    });
+  });
+
   describe("when linking is refused due to a different email (settings flow)", () => {
     it("keeps the user in settings rather than offering a logout", () => {
       renderError("DIFFERENT_EMAIL_NOT_ALLOWED");

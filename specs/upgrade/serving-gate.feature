@@ -5,8 +5,8 @@
 # application runs. It refuses to start, by name, when a blocking step its image declares is
 # not done or not-needed, or when its release is below the highest floor any upgrade run
 # recorded. Admitted, it writes its roster entry and refreshes it until a graceful stop removes it.
-# The tasks role runs `upgrade` and is never gated. On a Helm first install (empty ledger, empty
-# schema) the api detects it; running `upgrade` then is mig-entry-points' (Q10).
+# The tasks role runs `upgrade` and is never gated. Since UPGRADE-IN-WORKER (UIW-1..11) a behind
+# or first-install verdict makes the worker run `upgrade` and the api hold (in-app-upgrade.feature).
 
 Feature: Serving processes refuse to start when the installation is behind their image
   As an operator upgrading a LangWatch installation
@@ -65,19 +65,37 @@ Feature: Serving processes refuse to start when the installation is behind their
     Then making it fails, naming the release
 
   @unit
-  Scenario: A Helm first install is detected by the api
-    Given the ledger has no steps and no runs
-    And the application schema is empty
-    When the api's serving gate checks the image
-    Then the verdict is a first install naming the command "pnpm task upgrade"
-
-  @unit
-  Scenario: A worker on a first install refuses as behind
+  Scenario: A first install is detected by the worker
     Given the ledger has no steps and no runs
     And the application schema is empty
     When the worker's serving gate checks the image
-    Then the process is refused
-    And the refusal names step "clickhouse:00042"
+    Then the verdict is a first install naming the command "pnpm task upgrade"
+
+  @unit
+  Scenario: An api on a first install holds
+    Given the ledger has no steps and no runs
+    And the application schema is empty
+    When the api's serving gate checks the image
+    Then the verdict is holding
+
+  @unit
+  Scenario: An api whose image has a Postgres schema step outstanding holds
+    Given the ledger records "prisma:20261006180000_add_column" as pending
+    When the api's serving gate checks the image
+    Then the verdict is holding, naming step "prisma:20261006180000_add_column"
+
+  @unit
+  Scenario: An api whose schema steps are done while a blocking step is outstanding is upgrading
+    Given the ledger records "prisma:20261006180000_add_column" as done and "clickhouse:00042" as pending
+    When the api's serving gate checks the image
+    Then the verdict is upgrading, naming step "clickhouse:00042"
+
+  @unit
+  Scenario: A worker on an installation behind its image is told to run the upgrade
+    Given the ledger records "prisma:20261006180000_add_column" as done and "clickhouse:00042" as pending
+    When the worker's serving gate checks the image
+    Then the verdict is behind, naming step "clickhouse:00042" and the command "pnpm task upgrade"
+    And no roster entry is written
 
   @unit
   Scenario: A ledger that cannot be read refuses the start
@@ -163,7 +181,7 @@ Feature: Serving processes refuse to start when the installation is behind their
   Scenario: A serving process over a real ledger gates on the generated code step list
     Given the image's committed code step list and every schema step done
     When a worker's gate reads the ledger while the list's blocking step is pending
-    Then it is refused naming that step
+    Then it is not admitted, naming that step
     And once that step is done the api is admitted and its roster entry declares the background steps
 
   @integration

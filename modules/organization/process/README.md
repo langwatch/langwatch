@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`OrganizationApi`)
 
-Peers call these through the token, declared at `../contract/src/organization.api.ts:238`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/organization.api.ts:239`; nothing else in this package is public.
 
 #### `createAndAssign`
 
@@ -22,10 +22,10 @@ createAndAssign(input: Readonly<{ orgName?: string; phoneNumber?: string; signUp
 
 #### `checkSignUp`
 
-Whether this address may create a new account on the installation (`SIGN_UP_MODE`, `SIGN_UP_ALLOWED_DOMAINS`). The default settings answer without a read.
+Whether this address may create a new account on the installation (`SIGN_UP_MODE`, `SIGN_UP_ALLOWED_DOMAINS`). The default settings answer without a read; `hasAnyAccount` (the caller's read) lets the first account bootstrap an invite-only one.
 
 ```typescript
-checkSignUp(input: Readonly<{ email: string }>): Promise<SignUpVerdict>;
+checkSignUp(input: Readonly<{ email: string; hasAnyAccount: boolean }>): Promise<SignUpVerdict>;
 ```
 
 #### `getPendingInvitation`
@@ -282,10 +282,10 @@ getMemberAccessBreakdown(input: Readonly<{ organizationId: string; userId: strin
 
 #### `createMembership`
 
-Admits somebody on the joiner seat (ADR-129, ADR-171): a MEMBER's grant lands now with `admittedBy` or an SSO arrival resumes it; a DEVELOPER's row is the whole admission. `seat` is the row's role; `"already-present"` is a concurrent callback or a retry.
+Admits somebody on the seat the licence leaves free (ADR-129, ADR-171, admission-seat.ts): a MEMBER's grant lands now with `admittedBy` or an SSO arrival resumes it; a DEVELOPER or Lite (EXTERNAL) row is the whole admission, held `pending` when no seat is free. `seat` is the row's role; `"already-present"` is a concurrent callback or a retry, answered from the row there.
 
 ```typescript
-createMembership(input: Readonly<{ organizationId: string; userId: string; admittedBy?: Readonly<{ actor: LedgerActor; commandId: string }>; /** The seat the admitting caller decided (ADR-171 v6); absent is the joiner seat. */ seat?: "MEMBER" | "DEVELOPER"; /** Where a join request was made, written on the Developer admission audit row. */ origin?: OrganizationJoinOrigin; }>): Promise<{ outcome: "created" | "already-present"; seat: "MEMBER" | "DEVELOPER" }>;
+createMembership(input: Readonly<{ organizationId: string; userId: string; admittedBy?: Readonly<{ actor: LedgerActor; commandId: string }>; /** The seat the admitting caller decided (ADR-171 v6); absent is the joiner seat. */ seat?: "MEMBER" | "DEVELOPER"; /** Where a join request was made, written on the Developer admission audit row. */ origin?: OrganizationJoinOrigin; }>): Promise<OrganizationAdmission>;
 ```
 
 #### `isMember`
@@ -510,22 +510,6 @@ Main's `findWithAdmins`, for the usage-limit mails; throws `OrganizationNotFound
 
 ```typescript
 getWithAdministrators(input: Readonly<{ organizationId: string }>): Promise<OrganizationWithAdministrators>;
-```
-
-#### `setLicense`
-
-The licence and its expiry; the mint stamps `validatedAt` null, an activation now.
-
-```typescript
-setLicense(input: Readonly<{ organizationId: string; licenseKey: string; expiresAt: Instant; validatedAt: Instant | null; }>): Promise<void>;
-```
-
-#### `clearLicense`
-
-The licence and both its dates cleared; throws `OrganizationNotFoundError`.
-
-```typescript
-clearLicense(input: Readonly<{ organizationId: string }>): Promise<void>;
 ```
 
 #### `findSupportContact`
@@ -1270,7 +1254,7 @@ Permission `organization:view`. Entitlement `enterprise` (feature `MANAGEMENT_AP
 Answers at `/api/organization/members`, `/api/v1/organization/members`; also, undocumented, `/api/organization/2026-08-07/members`, `/api/v1/organization/2026-08-07/members`, `/api/organization/latest/members`, `/api/v1/organization/latest/members`.
 
 ```typescript
-// Query: organizationManagementRestListMembersQuerySchema, ../contract/src/organization-management.rest.ts:175
+// Query: organizationManagementRestListMembersQuerySchema, ../contract/src/organization-management.rest.ts:176
 interface Query {
   includeDisabled?: "true" | "false";
   offset?: number;
@@ -1288,7 +1272,7 @@ Permission `organization:view`. Entitlement `enterprise` (feature `MANAGEMENT_AP
 Answers at `/api/organization/members/:userId`, `/api/v1/organization/members/:userId`; also, undocumented, `/api/organization/2026-08-07/members/:userId`, `/api/v1/organization/2026-08-07/members/:userId`, `/api/organization/latest/members/:userId`, `/api/v1/organization/latest/members/:userId`.
 
 ```typescript
-// Params: organizationManagementRestUserIdParamsSchema, ../contract/src/organization-management.rest.ts:184
+// Params: organizationManagementRestUserIdParamsSchema, ../contract/src/organization-management.rest.ts:185
 interface Params {
   userId: string;
 }
@@ -1304,8 +1288,8 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_
 Answers at `/api/organization/members/:userId/access`, `/api/v1/organization/members/:userId/access`; also, undocumented, `/api/organization/2026-08-07/members/:userId/access`, `/api/v1/organization/2026-08-07/members/:userId/access`, `/api/organization/latest/members/:userId/access`, `/api/v1/organization/latest/members/:userId/access`.
 
 ```typescript
-type Params = z.infer<typeof organizationManagementRestUserIdParamsSchema>; // ../contract/src/organization-management.rest.ts:184
-type Response = z.infer<typeof organizationManagementRestAccessBreakdownSchema>; // ../contract/src/organization-management.rest.ts:91
+type Params = z.infer<typeof organizationManagementRestUserIdParamsSchema>; // ../contract/src/organization-management.rest.ts:185
+type Response = z.infer<typeof organizationManagementRestAccessBreakdownSchema>; // ../contract/src/organization-management.rest.ts:92
 ```
 
 #### `PATCH /members/:userId` · `updateOrganizationMember`
@@ -1317,7 +1301,7 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_
 Answers at `/api/organization/members/:userId`, `/api/v1/organization/members/:userId`; also, undocumented, `/api/organization/2026-08-07/members/:userId`, `/api/v1/organization/2026-08-07/members/:userId`, `/api/organization/latest/members/:userId`, `/api/v1/organization/latest/members/:userId`.
 
 ```typescript
-type Params = z.infer<typeof organizationManagementRestUserIdParamsSchema>; // ../contract/src/organization-management.rest.ts:184
+type Params = z.infer<typeof organizationManagementRestUserIdParamsSchema>; // ../contract/src/organization-management.rest.ts:185
 // Body: organizationManagementRestUpdateMemberSchema, ../contract/src/organization-management.rest.ts:50
 interface Body {
   role?: "ADMIN" | "MEMBER" | "EXTERNAL" | "DEVELOPER";
@@ -1335,8 +1319,8 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_
 Answers at `/api/organization/members/:userId`, `/api/v1/organization/members/:userId`; also, undocumented, `/api/organization/2026-08-07/members/:userId`, `/api/v1/organization/2026-08-07/members/:userId`, `/api/organization/latest/members/:userId`, `/api/v1/organization/latest/members/:userId`.
 
 ```typescript
-type Params = z.infer<typeof organizationManagementRestUserIdParamsSchema>; // ../contract/src/organization-management.rest.ts:184
-// Response: organizationManagementRestSuccessSchema, ../contract/src/organization-management.rest.ts:189
+type Params = z.infer<typeof organizationManagementRestUserIdParamsSchema>; // ../contract/src/organization-management.rest.ts:185
+// Response: organizationManagementRestSuccessSchema, ../contract/src/organization-management.rest.ts:190
 interface Response {
   success: true;
 }
@@ -1351,7 +1335,7 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_
 Answers at `/api/organization/invites`, `/api/v1/organization/invites`; also, undocumented, `/api/organization/2026-08-07/invites`, `/api/v1/organization/2026-08-07/invites`, `/api/organization/latest/invites`, `/api/v1/organization/latest/invites`.
 
 ```typescript
-type Response = z.infer<typeof organizationManagementRestInviteListSchema>; // ../contract/src/organization-management.rest.ts:171
+type Response = z.infer<typeof organizationManagementRestInviteListSchema>; // ../contract/src/organization-management.rest.ts:172
 ```
 
 #### `POST /invites` · `createOrganizationInvites`
@@ -1363,7 +1347,7 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_
 Answers at `/api/organization/invites`, `/api/v1/organization/invites`; also, undocumented, `/api/organization/2026-08-07/invites`, `/api/v1/organization/2026-08-07/invites`, `/api/organization/latest/invites`, `/api/v1/organization/latest/invites`.
 
 ```typescript
-// Body: organizationManagementRestCreateInvitesSchema, ../contract/src/organization-management.rest.ts:129
+// Body: organizationManagementRestCreateInvitesSchema, ../contract/src/organization-management.rest.ts:130
 interface Body {
   invites: {
     email: string;
@@ -1375,7 +1359,7 @@ interface Body {
     }[];
   }[];
 }
-type Response = z.infer<typeof organizationManagementRestCreatedInvitesSchema>; // ../contract/src/organization-management.rest.ts:164
+type Response = z.infer<typeof organizationManagementRestCreatedInvitesSchema>; // ../contract/src/organization-management.rest.ts:165
 ```
 
 #### `DELETE /invites/:inviteId` · `revokeOrganizationInvite`
@@ -1387,11 +1371,11 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_
 Answers at `/api/organization/invites/:inviteId`, `/api/v1/organization/invites/:inviteId`; also, undocumented, `/api/organization/2026-08-07/invites/:inviteId`, `/api/v1/organization/2026-08-07/invites/:inviteId`, `/api/organization/latest/invites/:inviteId`, `/api/v1/organization/latest/invites/:inviteId`.
 
 ```typescript
-// Params: organizationManagementRestInviteIdParamsSchema, ../contract/src/organization-management.rest.ts:185
+// Params: organizationManagementRestInviteIdParamsSchema, ../contract/src/organization-management.rest.ts:186
 interface Params {
   inviteId: string;
 }
-type Response = z.infer<typeof organizationManagementRestSuccessSchema>; // ../contract/src/organization-management.rest.ts:189
+type Response = z.infer<typeof organizationManagementRestSuccessSchema>; // ../contract/src/organization-management.rest.ts:190
 ```
 
 ### `organizationsProvisioningRest`
@@ -2232,23 +2216,23 @@ Declared at `src/eventing/organization-audit.pipeline.ts:46`. Events: `organizat
 
 ### Pipeline `organization_lifecycle` (aggregate `organization`)
 
-Declared at `src/eventing/organization-lifecycle.pipeline.ts:91`. Events: `organizationSignedUpEventSchema`, `membersInvitedEventSchema`, `inviteAcceptedEventSchema`, `integrationMethodChosenEventSchema`, `personalWorkspaceProvisionedEventSchema`, `personalTeamCreatedEventSchema`, `personalWorkspaceArchivedEventSchema`, `personalWorkspaceRevivedEventSchema`, `personalWorkspaceFeaturesChangedEventSchema`, `organizationPresenceSettingChangedEventSchema`, `organizationTraceSharingDisabledEventSchema`, `organizationMemberDisabledEventSchema`, `organizationCreatedEventSchema`.
+Declared at `src/eventing/organization-lifecycle.pipeline.ts:99`. Events: `organizationSignedUpEventSchema`, `membersInvitedEventSchema`, `inviteAcceptedEventSchema`, `integrationMethodChosenEventSchema`, `personalWorkspaceProvisionedEventSchema`, `personalTeamCreatedEventSchema`, `personalWorkspaceArchivedEventSchema`, `personalWorkspaceRevivedEventSchema`, `personalWorkspaceFeaturesChangedEventSchema`, `organizationPresenceSettingChangedEventSchema`, `organizationTraceSharingDisabledEventSchema`, `organizationMemberDisabledEventSchema`, `organizationCreatedEventSchema`.
 
 | Kind    | Name                                     | Handles | Declared at                                           |
 | ------- | ---------------------------------------- | ------- | ----------------------------------------------------- |
-| command | `recordSignedUp`                         | –       | `src/eventing/organization-lifecycle.pipeline.ts:110` |
-| command | `recordMembersInvited`                   | –       | `src/eventing/organization-lifecycle.pipeline.ts:111` |
-| command | `recordInviteAccepted`                   | –       | `src/eventing/organization-lifecycle.pipeline.ts:112` |
-| command | `recordIntegrationMethodChosen`          | –       | `src/eventing/organization-lifecycle.pipeline.ts:113` |
-| command | `recordPersonalWorkspaceProvisioned`     | –       | `src/eventing/organization-lifecycle.pipeline.ts:114` |
-| command | `recordPersonalTeamCreated`              | –       | `src/eventing/organization-lifecycle.pipeline.ts:115` |
-| command | `recordPersonalWorkspaceArchived`        | –       | `src/eventing/organization-lifecycle.pipeline.ts:116` |
-| command | `recordPersonalWorkspaceRevived`         | –       | `src/eventing/organization-lifecycle.pipeline.ts:117` |
-| command | `recordPersonalWorkspaceFeaturesChanged` | –       | `src/eventing/organization-lifecycle.pipeline.ts:118` |
-| command | `recordPresenceSettingChanged`           | –       | `src/eventing/organization-lifecycle.pipeline.ts:122` |
-| command | `recordTraceSharingDisabled`             | –       | `src/eventing/organization-lifecycle.pipeline.ts:123` |
-| command | `recordMemberDisabled`                   | –       | `src/eventing/organization-lifecycle.pipeline.ts:124` |
-| command | `recordCreated`                          | –       | `src/eventing/organization-lifecycle.pipeline.ts:125` |
+| command | `recordSignedUp`                         | –       | `src/eventing/organization-lifecycle.pipeline.ts:118` |
+| command | `recordMembersInvited`                   | –       | `src/eventing/organization-lifecycle.pipeline.ts:119` |
+| command | `recordInviteAccepted`                   | –       | `src/eventing/organization-lifecycle.pipeline.ts:120` |
+| command | `recordIntegrationMethodChosen`          | –       | `src/eventing/organization-lifecycle.pipeline.ts:121` |
+| command | `recordPersonalWorkspaceProvisioned`     | –       | `src/eventing/organization-lifecycle.pipeline.ts:122` |
+| command | `recordPersonalTeamCreated`              | –       | `src/eventing/organization-lifecycle.pipeline.ts:123` |
+| command | `recordPersonalWorkspaceArchived`        | –       | `src/eventing/organization-lifecycle.pipeline.ts:124` |
+| command | `recordPersonalWorkspaceRevived`         | –       | `src/eventing/organization-lifecycle.pipeline.ts:125` |
+| command | `recordPersonalWorkspaceFeaturesChanged` | –       | `src/eventing/organization-lifecycle.pipeline.ts:126` |
+| command | `recordPresenceSettingChanged`           | –       | `src/eventing/organization-lifecycle.pipeline.ts:130` |
+| command | `recordTraceSharingDisabled`             | –       | `src/eventing/organization-lifecycle.pipeline.ts:131` |
+| command | `recordMemberDisabled`                   | –       | `src/eventing/organization-lifecycle.pipeline.ts:132` |
+| command | `recordCreated`                          | –       | `src/eventing/organization-lifecycle.pipeline.ts:133` |
 
 ### Pipeline `organization_seat_limit` (aggregate `organization_seat_limit`)
 
@@ -2270,7 +2254,7 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                          | Environment variable      | Declared at                                 |
 | ------ | ----------------------------- | ------------------------- | ------------------------------------------- |
-| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:298`           |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:297`           |
 | config | `signUp.mode`                 | `SIGN_UP_MODE`            | `../contract/src/organization.config.ts:17` |
 | config | `signUp.allowedDomains`       | `SIGN_UP_ALLOWED_DOMAINS` | `../contract/src/organization.config.ts:18` |
 | config | `signUp.adminEmails`          | `ADMIN_EMAILS`            | `../contract/src/organization.config.ts:19` |

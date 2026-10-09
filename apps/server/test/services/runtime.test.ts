@@ -36,9 +36,6 @@ const gatewayStub = makeStub("aigateway");
 const langwatchStub = makeStub("langwatch");
 const langyStub = makeStub("langyagent");
 
-const migrateFn = vi.fn(async () => {
-  callLog.push("migrate");
-});
 const venvsFn = vi.fn(async () => {
   callLog.push("venvs");
 });
@@ -87,7 +84,6 @@ vi.mock("../../src/services/langwatch-workers.ts", () => ({
     },
   }),
 }));
-vi.mock("../../src/services/migrate.ts", () => ({ runMigrations: migrateFn }));
 vi.mock("../../src/services/venvs.ts", () => ({ syncVenvs: venvsFn }));
 vi.mock("../../src/services/node-deps.ts", () => ({
   ensureLangwatchDeps: nodeDepsFn,
@@ -162,7 +158,6 @@ describe("services/runtime", () => {
       langevalsStub.fn,
       gatewayStub.fn,
       langwatchStub.fn,
-      migrateFn,
       venvsFn,
       nodeDepsFn,
       ensureAppDirFn,
@@ -194,7 +189,7 @@ describe("services/runtime", () => {
   });
 
   describe("when startAll is called", () => {
-    it("starts infra (pg+redis+clickhouse) → migrates → starts app tier (nlp+langevals+gateway+langwatch+langyagent+workers)", async () => {
+    it("starts infra (pg+redis+clickhouse) → starts app tier with no migration phase (nlp+langevals+gateway+langwatch+langyagent+workers)", async () => {
       const ctx = fakeCtx();
       const handles = await runtime.startAll(ctx);
       expect(handles).toHaveLength(9);
@@ -208,13 +203,12 @@ describe("services/runtime", () => {
         positions["start:redis"]!,
         positions["start:clickhouse"]!,
       );
-      // Migrations strictly after infra healthy.
-      expect(positions["migrate"]).toBeGreaterThan(infraEnd);
-      // App tier strictly after migrations.
-      expect(positions["start:nlpgo"]).toBeGreaterThan(positions["migrate"]!);
-      expect(positions["start:langevals"]).toBeGreaterThan(positions["migrate"]!);
-      expect(positions["start:aigateway"]).toBeGreaterThan(positions["migrate"]!);
-      expect(positions["start:langwatch"]).toBeGreaterThan(positions["migrate"]!);
+      expect(callLog).not.toContain("migrate");
+      // App tier strictly after infra healthy.
+      expect(positions["start:nlpgo"]).toBeGreaterThan(infraEnd);
+      expect(positions["start:langevals"]).toBeGreaterThan(infraEnd);
+      expect(positions["start:aigateway"]).toBeGreaterThan(infraEnd);
+      expect(positions["start:langwatch"]).toBeGreaterThan(infraEnd);
     });
 
     it("starts the assistant alongside the rest of the app tier", async () => {

@@ -112,6 +112,7 @@ export function ledgerTablesDdl({ tables }: { tables: LedgerTableNames }): reado
 )`,
     `ALTER TABLE ${tables.step} ADD COLUMN IF NOT EXISTS "owner" TEXT`,
     `ALTER TABLE ${tables.step} ADD COLUMN IF NOT EXISTS "description" TEXT`,
+    `ALTER TABLE ${tables.step} ADD COLUMN IF NOT EXISTS "finish_by" TEXT`,
     `ALTER TABLE ${tables.run} ADD COLUMN IF NOT EXISTS "floor" TEXT`,
     `CREATE TABLE IF NOT EXISTS ${tables.target} (
     "step_id" TEXT NOT NULL,
@@ -139,11 +140,13 @@ export function ledgerTablesDdl({ tables }: { tables: LedgerTableNames }): reado
     "image" TEXT NOT NULL,
     "release" TEXT,
     "steps" JSONB NOT NULL DEFAULT '[]',
+    "credential_keys" JSONB NOT NULL DEFAULT '[]',
     "started_at" TIMESTAMP(3) NOT NULL,
     "heartbeat_at" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "_langwatch_serving_roster_pkey" PRIMARY KEY ("process_id")
 )`,
+    `ALTER TABLE ${tables.roster} ADD COLUMN IF NOT EXISTS "credential_keys" JSONB NOT NULL DEFAULT '[]'`,
     `CREATE TABLE IF NOT EXISTS ${tables.tenantState} (
     "step_id" TEXT NOT NULL,
     "tenant_id" TEXT NOT NULL,

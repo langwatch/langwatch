@@ -11,6 +11,8 @@ import type {
 import type { ConversationRoleMode, DisplayPart } from "@langwatch/trace-contract/conversation";
 import type { ComponentType, ReactElement, ReactNode } from "react";
 
+export type { RenderInputOutputProps, TraceIdPeekProps };
+
 /** What a surface hands trace's agent actions menu: copy a prompt, ask Langy, or read docs. */
 export type AgentActionsMenuProps = {
   /** Labels the default outline button. Ignored when `trigger` is given. */

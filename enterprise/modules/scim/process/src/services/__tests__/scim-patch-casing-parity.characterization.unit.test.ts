@@ -17,6 +17,11 @@ import type { ScimUserProvisioning } from "../scim-provisioning.service.ts";
 import { ScimService } from "../scim.service.ts";
 import { QuietScimSyncLifecycle } from "./support/quiet-scim-sync-lifecycle.ts";
 
+/** Every seat free, so these tests admit full members (seat-limit-at-provisioning.feature). */
+const openSeats = {
+  countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),
+};
+
 const patchSchema = "urn:ietf:params:scim:api:messages:2.0:PatchOp";
 const parse = (operations: unknown[]) =>
   scimPatchRequestSchema.parse({ schemas: [patchSchema], Operations: operations });
@@ -141,6 +146,7 @@ describe("SCIM PATCH operation casing parity", () => {
       lifecycle: new QuietScimSyncLifecycle(),
       provenOffboarding: false,
       tokenPepper: "scim-test-pepper",
+      seats: openSeats,
     });
     await service.updateUser({
       id: "user-1",

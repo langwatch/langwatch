@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Callable automation capability shared by transports and process peers.
 
-Peers call these through the token, declared at `../contract/src/automation.api.ts:71`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/automation.api.ts:70`; nothing else in this package is public.
 
 #### `getAllForProject`
 
@@ -134,14 +134,6 @@ getRecentWebhookDeliveries(input: { projectId: string; triggerId: string; limit:
 
 ```typescript
 getReportSchedules(input: { projectId: string }): Promise<ReportSchedule[]>;
-```
-
-#### `registeredMigrations`
-
-The ORGANIZATION-rooted migrations automation registers (the Slack connection move).
-
-```typescript
-registeredMigrations(): readonly SystemMigration[];
 ```
 
 #### `listSlackChannels`
@@ -976,7 +968,7 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                        | Environment variable                   | Declared at                               |
 | ------ | --------------------------- | -------------------------------------- | ----------------------------------------- |
-| secret | `unsubscribe`               | `NEXTAUTH_SECRET`                      | `src/app/automation.app.ts:404`           |
+| secret | `unsubscribe`               | `NEXTAUTH_SECRET`                      | `src/app/automation.app.ts:403`           |
 | config | `emailHourlyCap`            | `TRIGGER_EMAIL_HOURLY_CAP`             | `../contract/src/automation.config.ts:11` |
 | config | `tenantDailyCap`            | `TRIGGER_EMAIL_TENANT_DAILY_CAP`       | `../contract/src/automation.config.ts:12` |
 | config | `persistDailyCapFree`       | `TRIGGER_PERSIST_DAILY_CAP_FREE`       | `../contract/src/automation.config.ts:13` |

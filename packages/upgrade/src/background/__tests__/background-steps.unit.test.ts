@@ -5,7 +5,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { UpgradeStep } from "../../ledger.ts";
-import { defineMigrationStep, type MigrationStepRun } from "../../step/migration-step.ts";
+import {
+  defineMigrationStep,
+  type MigrationStep,
+  type MigrationStepRun,
+} from "../../step/migration-step.ts";
 import {
   type BackgroundStepsLedger,
   type BackgroundStepsLog,
@@ -53,6 +57,39 @@ describe("BackgroundStepsService", () => {
 
       expect(sweep).toEqual({ paused: true, ran: [], failed: [], waiting: [], retrying: [] });
       expect(runs).toBe(0);
+    });
+  });
+
+  describe("given a background step of kind tenant", () => {
+    it("never runs it: ops' pass walks its tenants", async () => {
+      const tenant: MigrationStep = {
+        id: "prompt:seed-default-tags",
+        kind: "tenant",
+        mode: "background",
+        description: "Seeds the default prompt tags into every organization.",
+        run: refuse,
+      };
+      const ledger: BackgroundStepsLedger = {
+        findSteps: async () => [{ id: tenant.id, status: "pending", report: null }],
+        acquireLease: refuse,
+        renewLease: refuse,
+        releaseLease: refuse,
+        markRunning: refuse,
+        setStatus: refuse,
+        saveReport: refuse,
+      };
+      const service = BackgroundStepsService.create({
+        ledger,
+        steps: [tenant],
+        serving: () => true,
+        oldWritersGoneFor: async () => true,
+        identity: { owner: "worker-1", image: "3.21.0", host: "host" },
+        log: () => undefined,
+      });
+
+      const sweep = await service.sweep({ signal: new AbortController().signal });
+
+      expect(sweep).toEqual({ paused: false, ran: [], failed: [], waiting: [], retrying: [] });
     });
   });
 

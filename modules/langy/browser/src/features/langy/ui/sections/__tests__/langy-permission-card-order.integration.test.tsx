@@ -82,6 +82,11 @@ vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   }),
 }));
 
+vi.mock("../../../../../model/langy-host.ts", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useLangyHost: () => ({ hasPermission: () => false }),
+}));
+
 vi.mock("@langwatch/feature-flag-client", () => ({
   useFeatureFlag: () => ({ enabled: false, isLoading: false }),
 }));

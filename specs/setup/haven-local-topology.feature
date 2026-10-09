@@ -173,16 +173,16 @@ Feature: The local development topology
     And the go lane keeps only the gateway and the NLP engine, so load on a simulator cannot starve them
     And no "idp", "mail", "storage", "voice", "llm" or "analytics" lane is planned
 
-  # A trial (one-dev-server step 6): one Go process for the data plane and the
-  # simulators. The split stays the default.
+  # One Go process for the data plane and the simulators is the default
+  # (HAVEN-ONE-SWITCH); LANGWATCH_DEV_ONE_PROCESS=0 splits it, with the Node app lane.
   @unit
-  Scenario: One Go process hosts the data plane and the simulators when asked
+  Scenario: One Go process hosts the data plane and the simulators unless split
     Given a checkout whose dev build links the simulators
-    And LANGWATCH_GO_ONE_PROCESS is 1
+    And the one-process switch is on
     When haven plans a stack selecting the data plane, every simulator and Langy
     Then the "go" lane hosts aigateway, nlpgo, idpsim, mailsim, storagesim, voicesim, llmsim and analyticssim, each on its own address variable
     And no "sims" lane is planned
-    And with the variable unset the "go" and "sims" lanes are planned as before
+    And with LANGWATCH_DEV_ONE_PROCESS=0 the "go" and "sims" lanes are planned as before
     And Langy keeps a lane of its own either way
 
   @unit
@@ -196,7 +196,7 @@ Feature: The local development topology
   @unit
   Scenario: One Go process retires the sims log a split run left behind
     Given an earlier split run left a sims lane capture
-    When a stack with LANGWATCH_GO_ONE_PROCESS=1 comes up with no sims lane
+    When a stack in one-process mode comes up with no sims lane
     Then the stale sims capture is removed
     And "haven logs <simulator>" reads the go lane's live capture instead
 

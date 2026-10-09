@@ -31,14 +31,14 @@ export const licensingProcessModule: PublishedProcessModule<
   ])
   .withEventing(licenseSyncEventing)
   .withEventing(licensingCustomerEventing)
-  .withTasks(({ app, dependencies, repositories }) => [
+  .withTasks(({ app, repositories }) => [
     GenerateLicenseTask.create({
       mint: LicenseMintService.create({
         licenses: app,
         organizations: repositories.connectOrganizations,
         storage: OrganizationLicenseWriterService.create({
           licenses: repositories.organizationLicenses,
-          organizations: dependencies.organizations,
+          facts: app.customerFactsService(),
         }),
         registry: repositories.issuedLicenses,
       }),

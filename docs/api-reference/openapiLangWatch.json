@@ -78644,6 +78644,9 @@
                                   "items": {
                                     "type": "string"
                                   }
+                                },
+                                "cappedBySeat": {
+                                  "type": "boolean"
                                 }
                               },
                               "required": [
@@ -78653,7 +78656,8 @@
                                 "scopeType",
                                 "scopeId",
                                 "scopeName",
-                                "permissions"
+                                "permissions",
+                                "cappedBySeat"
                               ],
                               "additionalProperties": false
                             }
@@ -78708,6 +78712,9 @@
                             "items": {
                               "type": "string"
                             }
+                          },
+                          "cappedBySeat": {
+                            "type": "boolean"
                           }
                         },
                         "required": [
@@ -78717,7 +78724,8 @@
                           "scopeType",
                           "scopeId",
                           "scopeName",
-                          "permissions"
+                          "permissions",
+                          "cappedBySeat"
                         ],
                         "additionalProperties": false
                       }

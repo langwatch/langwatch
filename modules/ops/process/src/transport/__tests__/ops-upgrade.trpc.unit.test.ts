@@ -1,3 +1,10 @@
+/**
+ * @vitest-environment node
+ * The Upgrades pages' six reads over the real runtime and a real `OpsModule`: the door asks
+ * `ops:view` on the platform, and an operator gets the reader's answers unchanged.
+ * Spec: modules/ops/specs/upgrades.feature
+ */
+import { routesServingWhileUpgrading } from "@langwatch/api";
 import {
   bindTrpcFact,
   createTrpcRuntime,
@@ -5,12 +12,6 @@ import {
   type TrpcProcedureFactory,
   type TrpcRouterMount,
 } from "@langwatch/api/trpc";
-/**
- * @vitest-environment node
- * The Upgrades pages' six reads over the real runtime and a real `OpsModule`: the door asks
- * `ops:view` on the platform, and an operator gets the reader's answers unchanged.
- * Spec: modules/ops/specs/upgrades.feature
- */
 import { InMemoryProcessStore } from "@langwatch/eventing";
 import type { OpsOperator } from "@langwatch/ops-contract";
 import type { UpgradeReader, UpgradeRunDetail, UpgradeStepDetail } from "@langwatch/upgrade/reader";
@@ -75,6 +76,12 @@ function readerOfOneRelease(): UpgradeReader {
     listRuns: vi.fn(async () => ({ items: [RUN_SUMMARY], cursor: null })),
     getRun: vi.fn(async () => RUN),
     preflight: vi.fn(async () => []),
+    preview: vi.fn(async () => ({
+      installed: "3.23.0",
+      plan: { outcome: "planned" as const, fresh: false, releases: [], notNeeded: [] },
+      preflight: [],
+    })),
+    listTargets: vi.fn(async () => []),
   };
 }
 
@@ -142,7 +149,7 @@ function boundAccess(): Record<string, string> {
 
 describe("the ops.upgrade reads", () => {
   /** @scenario "Every upgrade read asks the operator view grant at the door" */
-  it("declares each of the six reads behind ops:view at the platform scope", () => {
+  it("declares each of the eight reads behind ops:view at the platform scope", () => {
     const reads = Object.fromEntries(
       Object.entries(boundAccess()).filter(
         ([name]) => !MIGRATION_PROCEDURE_NAMES.includes(name) && name !== "ops.upgrade.retryStep",
@@ -156,6 +163,8 @@ describe("the ops.upgrade reads", () => {
       "ops.upgrade.getStep": "permission-platform:ops:view",
       "ops.upgrade.listRuns": "permission-platform:ops:view",
       "ops.upgrade.getRun": "permission-platform:ops:view",
+      "ops.upgrade.preview": "permission-platform:ops:view",
+      "ops.upgrade.listTargets": "permission-platform:ops:view",
     });
   });
 
@@ -283,5 +292,32 @@ describe("ops.upgrade.retryStep", () => {
         cause: { code: "upgrade_not_found" },
       });
     });
+  });
+});
+
+describe("given the installation upgrading", () => {
+  /** @scenario "The Upgrades reads and Retry serve while the installation upgrades and the migration procedures stay held" */
+  it("passes a batch of the eight reads and Retry, and holds any batch naming a migration procedure", () => {
+    const served = Object.keys(boundAccess()).filter(
+      (name) => !MIGRATION_PROCEDURE_NAMES.includes(name),
+    );
+    const patterns = routesServingWhileUpgrading().map((source) => new RegExp(source));
+    const passes = (route: string) => patterns.some((pattern) => pattern.test(route));
+
+    expect(served).toHaveLength(9);
+    expect(passes(`GET /api/trpc/${served.join(",")}`)).toBe(true);
+    expect(passes("POST /api/trpc/ops.upgrade.retryStep")).toBe(true);
+    for (const name of MIGRATION_PROCEDURE_NAMES) {
+      expect([name, passes(`POST /api/trpc/ops.upgrade.status,${name}`)]).toEqual([name, false]);
+    }
+  });
+
+  /** @scenario "Upgrading mode serves only the routes declared to serve while upgrading" */
+  it("still asks a declared procedure's permission at the door", async () => {
+    const reader = readerOfOneRelease();
+    const { outsider } = mount({ reader });
+
+    await expect(outsider.status()).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(reader.status).not.toHaveBeenCalled();
   });
 });

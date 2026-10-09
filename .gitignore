@@ -49,6 +49,12 @@ dist/
 !/services/analyticssim/web/dist/
 /services/analyticssim/web/dist/*
 !/services/analyticssim/web/dist/.gitkeep
+!/services/telemetrysim/web/dist/
+/services/telemetrysim/web/dist/*
+!/services/telemetrysim/web/dist/.gitkeep
+!/services/outboundsim/web/dist/
+/services/outboundsim/web/dist/*
+!/services/outboundsim/web/dist/.gitkeep
 /dev/.cache/
 
 langwatch_server/

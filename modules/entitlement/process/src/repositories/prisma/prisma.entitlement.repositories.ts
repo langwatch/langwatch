@@ -6,6 +6,7 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type { EntitlementRepositories } from "../entitlement.repositories.ts";
+import { PrismaMemberSeatRepository } from "./prisma.member-seat.repository.ts";
 import { PrismaOrganizationSpendRepository } from "./prisma.organization-spend.repository.ts";
 import { PrismaTenancyRepository } from "./prisma.tenancy.repository.ts";
 import { PrismaUsageMembershipRepository } from "./prisma.usage-membership.repository.ts";
@@ -15,9 +16,10 @@ export class PostgresEntitlementRepositories {
 
   static create(
     members: Readonly<{ prisma: PrismaClient }>,
-  ): Pick<EntitlementRepositories, "membership" | "spend" | "tenancy"> {
+  ): Pick<EntitlementRepositories, "membership" | "seats" | "spend" | "tenancy"> {
     return {
       membership: PrismaUsageMembershipRepository.create(members.prisma),
+      seats: PrismaMemberSeatRepository.create(members.prisma),
       spend: PrismaOrganizationSpendRepository.create(members.prisma),
       tenancy: PrismaTenancyRepository.create(members.prisma),
     };

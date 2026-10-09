@@ -1,21 +1,27 @@
 import { hostname } from "node:os";
+import { setTimeout as sleep } from "node:timers/promises";
 
 import { storesOwner } from "@langwatch/process-stores/config";
 import type { ScopedSecrets } from "@langwatch/secrets";
 import pg from "pg";
+import { z } from "zod";
 
 import { BackgroundStepsService, startBackgroundSteps } from "../background/index.ts";
 import { UpgradeLedgerRepository } from "../ledger.repository.ts";
+import type { UpgradeLease, UpgradeRun } from "../ledger.ts";
 import { loadReleases } from "../manifest/manifest-loader.ts";
 import type { ReleaseTreeSteps } from "../manifest/stamp.ts";
 import type { UpgradePostgres } from "../ports.ts";
+import { UPGRADE_LEASE_NAME } from "../runner/runner-lease.ts";
 import { UpgradeRunnerRepository } from "../runner/runner-ledger.repository.ts";
+import { EXIT_CODES } from "../runner/upgrade-outcome.ts";
+import { credentialKeyFingerprint } from "../serving-roster/credential-key-fingerprint.ts";
 import { PreRosterRepository } from "../serving-roster/pre-roster.repository.ts";
 import {
   createServingRoster,
   type ServingRoster,
 } from "../serving-roster/serving-roster.service.ts";
-import { isMigrationStep } from "../step/migration-step.ts";
+import { isDeclaredMigrationStep, isMigrationStep } from "../step/migration-step.ts";
 import { type FirstInstallUpgrade, spawnFirstInstallUpgrade } from "./first-install-upgrade.ts";
 import { IMAGE_CODE_STEPS_FILE, readImageCodeSteps } from "./image-code-steps.ts";
 import { imageGateSteps, readImageTree } from "./image-tree.ts";
@@ -24,11 +30,10 @@ import {
   type ServingVerdict,
   UPGRADE_COMMAND,
   type UpgradeFailedRun,
+  UPGRADE_RE_ASK_MS,
 } from "./serving-gate.ts";
+import { SERVING_ROSTER_TIMING } from "./serving-roster-timing.ts";
 import { createUpgradeGate, type UpgradeGate } from "./upgrade-gate.service.ts";
-
-/** Generous stale bound: a database blip must never take a process out of service (2026-10-09). */
-export const SERVING_ROSTER_TIMING = { staleAfterMs: 10 * 60_000, refreshEveryMs: 15_000 } as const;
 
 /** Roster entries dead this long are deleted when a process records its own (plan F-10). */
 export const SERVING_ROSTER_PRUNE_AFTER_MS = 7 * 24 * 60 * 60_000;
@@ -67,9 +72,8 @@ const emitWarning: ServingGateWarn = (message, fields) =>
   process.emitWarning(fields ? `${message} ${JSON.stringify(fields)}` : message, "UpgradeGate");
 
 /**
- * The gate over an open ledger connection: an absent ledger reads as empty, the api's first
- * install runs `upgrade` once and asks again (Q10), and the connection closes on refusal or
- * release.
+ * The gate over an open ledger connection: an absent ledger reads as empty, the worker runs
+ * `upgrade` until current (UPGRADE-IN-WORKER), and the connection closes on refusal or release.
  */
 export function upgradeGateOver({
   role,
@@ -80,7 +84,9 @@ export function upgradeGateOver({
   withClickHouse,
   processId,
   firstInstall,
+  credentialKeys,
   warn = emitWarning,
+  wait = (ms) => sleep(ms),
 }: {
   role: ServingRole;
   postgres: UpgradePostgres;
@@ -90,7 +96,10 @@ export function upgradeGateOver({
   withClickHouse: boolean;
   processId: string;
   firstInstall: FirstInstallUpgrade;
+  credentialKeys?: readonly string[];
   warn?: ServingGateWarn;
+  /** The worker's pause between asks; tests pass their own. */
+  wait?: (ms: number) => Promise<unknown>;
 }): UpgradeGate {
   const ledger = UpgradeLedgerRepository.create({ postgres });
   const runner = UpgradeRunnerRepository.create({ postgres });
@@ -120,6 +129,7 @@ export function upgradeGateOver({
       findRuns: async () => ((await runner.ledgerExists()) ? ledger.findRuns() : []),
     },
     roster,
+    credentialKeys,
     schemaIsEmpty: async () => !(await runner.prismaHistoryExists()),
     rollback: {
       reopen: (input) => runner.reopenDoneSteps(input),
@@ -133,17 +143,31 @@ export function upgradeGateOver({
       .filter((step) => step.status === "failed")
       .map(({ id, lastError }) => ({ id, error: lastError }));
   };
+  const blocking = new Set(blockingSteps);
+  const findBlockingFailures = async () =>
+    (await findFailedSteps()).filter(({ id }) => blocking.has(id));
+  const findLeaseHolder = () => liveLeaseHolder({ runner });
   let closed: Promise<void> | null = null;
   const closeOnce = () => (closed ??= close());
   return {
     async admit(): Promise<ServingVerdict> {
       try {
         const verdict =
-          role === "api"
-            ? await admitAfterFirstInstall({ gate, firstInstall, warn, findFailedSteps })
-            : await gate.admit();
-        // A failed run keeps the connection: the console's Retry asks again over it.
-        if (!verdict.admitted && !("failedRun" in verdict)) await closeOnce();
+          role === "worker"
+            ? await admitAfterFirstInstall({
+                gate,
+                firstInstall,
+                warn,
+                findFailedSteps,
+                findLeaseHolder,
+                wait,
+              })
+            : await failedRunOnHold({
+                verdict: await gate.admit(),
+                findFailedSteps: findBlockingFailures,
+                findRuns: () => ledger.findRuns(),
+              });
+        if (closesOn(verdict)) await closeOnce();
         return verdict;
       } catch (error) {
         await closeOnce();
@@ -158,6 +182,7 @@ export function upgradeGateOver({
       }
     },
     serving: () => gate.serving(),
+    ...consoleRetryFor({ role, findFailures: findBlockingFailures, runner }),
     ...(role === "worker"
       ? {
           backgroundSteps: backgroundStepsOver({
@@ -173,41 +198,166 @@ export function upgradeGateOver({
   };
 }
 
+const logTailSchema = z.array(z.string()).catch([]);
+
+/** The api's console Retry: each failed blocking step back to `pending` (UIW-7, Q10). */
+function consoleRetryFor({
+  role,
+  findFailures,
+  runner,
+}: {
+  role: ServingRole;
+  findFailures: () => Promise<UpgradeFailedRun["failedSteps"]>;
+  runner: Pick<UpgradeRunnerRepository, "retryFailedStep">;
+}) {
+  if (role !== "api") return {};
+  return {
+    retryFailedSteps: async () => {
+      for (const { id } of await findFailures()) await runner.retryFailedStep({ id });
+    },
+  };
+}
+
 /**
- * The api runs `upgrade` once and asks again, saying so first: on a first install (Q10) and on
- * any installation behind this image, behind the holding page (UPGRADE-FIXES, 2026-10-09).
- * Spec: specs/upgrade/in-app-upgrade.feature.
+ * UIW-7: a holding api reads a failure from the ledger, never from a run of its own: its image's
+ * failed blocking steps and the last failed run report's log tail. Upgrading opens no console.
+ */
+export async function failedRunOnHold({
+  verdict,
+  findFailedSteps,
+  findRuns,
+}: {
+  verdict: ServingVerdict;
+  findFailedSteps: () => Promise<UpgradeFailedRun["failedSteps"]>;
+  findRuns: () => Promise<readonly Pick<UpgradeRun, "outcome" | "report">[]>;
+}): Promise<ServingVerdict> {
+  if (verdict.outcome !== "holding") return verdict;
+  const failedSteps = await findFailedSteps();
+  if (failedSteps.length === 0) return verdict;
+  const report = (await findRuns()).findLast((run) => run.outcome === "failed")?.report;
+  return { ...verdict, failedRun: { failedSteps, logTail: logTailSchema.parse(report?.logTail) } };
+}
+
+/** Who holds the upgrade lease now, or null when it is free (a lapsed lease is free). */
+export type UpgradeLeaseHolder = () => Promise<Pick<
+  UpgradeLease,
+  "owner" | "host" | "image"
+> | null>;
+
+/** A holding or upgrading api keeps the connection: it asks again over it. */
+const closesOn = (verdict: ServingVerdict) =>
+  !verdict.admitted && verdict.outcome !== "holding" && verdict.outcome !== "upgrading";
+
+async function liveLeaseHolder({ runner }: { runner: UpgradeRunnerRepository }) {
+  if (!(await runner.ledgerExists())) return null;
+  return runner.findLiveLease({ name: UPGRADE_LEASE_NAME });
+}
+
+/** Why the worker runs nothing yet: a live lease holder, or a failed step awaiting a Retry. */
+async function waitReason({
+  findLeaseHolder,
+  findFailedSteps,
+  mayRunPastFailure,
+}: {
+  findLeaseHolder: UpgradeLeaseHolder;
+  findFailedSteps: () => Promise<UpgradeFailedRun["failedSteps"]>;
+  mayRunPastFailure: boolean;
+}): Promise<Readonly<{ line: string; waitingOn: string }> | null> {
+  const holder = await findLeaseHolder();
+  if (holder) {
+    const line = `the upgrade lease is held by ${holder.owner} on ${holder.host} (${holder.image}); this worker waits for its run`;
+    return { line, waitingOn: "the upgrade lease" };
+  }
+  if (mayRunPastFailure) return null;
+  const failed = await findFailedSteps().catch(() => []);
+  if (failed.length === 0) return null;
+  const ids = failed.map(({ id }) => id).join(", ");
+  return {
+    line: `the upgrade failed on ${ids}; this worker waits for a Retry`,
+    waitingOn: "a Retry",
+  };
+}
+
+function sayRun({ verdict, warn }: { verdict: ServingVerdict; warn: ServingGateWarn }): void {
+  const why =
+    verdict.outcome === "first-install"
+      ? "first install: the ledger and the schema are empty"
+      : `behind this image: blocking steps not done: ${"outstanding" in verdict ? verdict.outstanding.join(", ") : ""}`;
+  warn(
+    `${why}, so this worker runs \`${UPGRADE_COMMAND}\` before it takes jobs; its lines follow`,
+    {
+      phase: verdict.outcome,
+      waitingOn: `\`${UPGRADE_COMMAND}\``,
+      next: "nothing to do: the worker takes jobs when the upgrade finishes",
+    },
+  );
+}
+
+/**
+ * The worker runs `upgrade` while its installation is behind (UPGRADE-IN-WORKER): it waits while
+ * another runner holds the lease and, after a failed run, for a Retry that returns the step to
+ * `pending`; a restart is an operator act, so a new worker runs once more (UIW-3).
  */
 export async function admitAfterFirstInstall({
   gate,
   firstInstall,
   warn,
   findFailedSteps = async () => [],
+  findLeaseHolder = async () => null,
+  wait = (ms) => sleep(ms),
+  reAskMs = UPGRADE_RE_ASK_MS,
 }: {
   gate: Pick<UpgradeGate, "admit">;
   firstInstall: FirstInstallUpgrade;
   warn: ServingGateWarn;
   findFailedSteps?: () => Promise<UpgradeFailedRun["failedSteps"]>;
+  findLeaseHolder?: UpgradeLeaseHolder;
+  wait?: (ms: number) => Promise<unknown>;
+  reAskMs?: number;
 }): Promise<ServingVerdict> {
-  const verdict = await gate.admit();
-  if (verdict.outcome !== "first-install" && verdict.outcome !== "behind") return verdict;
-  const why =
-    verdict.outcome === "first-install"
-      ? "first install: the ledger and the schema are empty"
-      : `behind this image: blocking steps not done: ${verdict.outstanding.join(", ")}`;
-  warn(`${why}, so this api runs \`${UPGRADE_COMMAND}\` once before it serves; its lines follow`, {
+  let mayRunPastFailure = true;
+  let ranClean = false;
+  let lastWait = "";
+  for (;;) {
+    const verdict = await gate.admit();
+    if (verdict.outcome !== "first-install" && verdict.outcome !== "behind") return verdict;
+    const reason = await waitReason({ findLeaseHolder, findFailedSteps, mayRunPastFailure });
+    if (reason) {
+      const next = "nothing to do: this worker asks again every 10 s";
+      if (reason.line !== lastWait)
+        warn(reason.line, { phase: "upgrade-wait", waitingOn: reason.waitingOn, next });
+      lastWait = reason.line;
+      await wait(reAskMs);
+      continue;
+    }
+    lastWait = "";
+    // An exit 0 that left the ledger behind runs again only after the re-ask interval.
+    if (ranClean) await wait(reAskMs);
+    sayRun({ verdict, warn });
+    const { exitCode } = await firstInstall();
+    ranClean = exitCode === 0;
+    if (ranClean) continue;
+    // After any run a failed step waits for a Retry; a lease loser's exit is not a failure.
+    mayRunPastFailure = false;
+    if (exitCode !== EXIT_CODES.lease_not_acquired) warnFailedRun({ verdict, exitCode, warn });
+    await wait(reAskMs);
+  }
+}
+
+function warnFailedRun({
+  verdict,
+  exitCode,
+  warn,
+}: {
+  verdict: ServingVerdict;
+  exitCode: number;
+  warn: ServingGateWarn;
+}): void {
+  warn(`\`${UPGRADE_COMMAND}\` exited ${exitCode}; this worker waits for a Retry`, {
     phase: verdict.outcome,
-    waitingOn: `\`${UPGRADE_COMMAND}\``,
-    next: "nothing to do: the api serves when the upgrade finishes",
+    waitingOn: "a Retry",
+    next: "retry the failed step from Ops > Upgrades or the upgrade console",
   });
-  const { exitCode, logTail } = await firstInstall();
-  if (exitCode === 0) return gate.admit();
-  const failedSteps = await findFailedSteps().catch(() => []);
-  return {
-    ...verdict,
-    refusal: `${verdict.refusal} The api ran it; it exited ${exitCode}.`,
-    failedRun: { failedSteps, logTail },
-  };
 }
 
 /** The worker's background steps over the gate's own connection (round 14: framework runs). */
@@ -231,7 +381,7 @@ function backgroundStepsOver({
   const log = (level: "info" | "warn", message: string, fields: object) =>
     level === "warn" ? warn(message, { processId, ...fields }) : undefined;
   return {
-    isStep: isMigrationStep,
+    isStep: isDeclaredMigrationStep,
     start: (steps: readonly unknown[]) => {
       const service = BackgroundStepsService.create({
         ledger: {
@@ -290,22 +440,43 @@ export async function servingUpgradeGate({
   const release = loadReleases().manifests.at(-1)?.release ?? null;
   return secrets.into(storesOwner.secrets.database, (database) =>
     secrets.into(storesOwner.secrets.clickhouse, (clickhouse) =>
-      secrets.into(storesOwner.secrets.clickhouseRoutes, (routes) => {
-        if (!database?.trim()) return NO_LEDGER_GATE;
-        if (!clickhouse?.trim() && routes.size === 0) return NO_CLICKHOUSE_GATE;
-        const pool = new pg.Pool(gatePoolConfig({ databaseUrl: database }));
-        return upgradeGateOver({
-          role,
-          postgres: pool,
-          close: () => pool.end(),
-          tree,
-          release,
-          withClickHouse: true,
-          processId: `${hostname()}:${process.pid}:${role}`,
-          firstInstall: spawnFirstInstallUpgrade(),
-          warn,
-        });
-      }),
+      secrets.into(storesOwner.secrets.clickhouseRoutes, (routes) =>
+        withCredentialKeys(secrets, (credentialKeys) => {
+          if (!database?.trim()) return NO_LEDGER_GATE;
+          if (!clickhouse?.trim() && routes.size === 0) return NO_CLICKHOUSE_GATE;
+          const pool = new pg.Pool(gatePoolConfig({ databaseUrl: database }));
+          return upgradeGateOver({
+            role,
+            postgres: pool,
+            close: () => pool.end(),
+            tree,
+            release,
+            withClickHouse: true,
+            processId: `${hostname()}:${process.pid}:${role}`,
+            firstInstall: spawnFirstInstallUpgrade(),
+            credentialKeys,
+            warn,
+          });
+        }),
+      ),
+    ),
+  );
+}
+
+/** Fingerprints of the keys this process seals and opens credentials with (Alex, 2026-10-09). */
+function withCredentialKeys<T>(
+  secrets: ScopedSecrets,
+  build: (credentialKeys: string[]) => T | Promise<T>,
+): Promise<T> {
+  return secrets.into(storesOwner.secrets.encryption, (credentials) =>
+    secrets.into(storesOwner.secrets.encryptionFallback, (session) =>
+      secrets.into(storesOwner.secrets.encryptionPrevious, (previous) =>
+        build(
+          [(credentials ?? session)?.trim(), previous?.trim()]
+            .filter((key): key is string => Boolean(key))
+            .map((hex) => credentialKeyFingerprint({ hex })),
+        ),
+      ),
     ),
   );
 }

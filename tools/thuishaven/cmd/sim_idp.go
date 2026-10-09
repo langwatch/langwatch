@@ -81,6 +81,7 @@ const idpAppsAddUsage = "<tenant> --name <n> [--redirect <uri,...>] [--entity-id
 
 // idpVerbs maps a verb's words to its action.
 var idpVerbs = map[string]idpVerb{
+	"tenants":           {"", 0, idpTenants},
 	"tenant show":       {"<tenant>", 1, idpTenantShow},
 	"apps add":          {idpAppsAddUsage, 1, idpAppsAdd},
 	"apps remove":       {"<tenant> <client-id>", 2, idpAppsRemove},
@@ -247,6 +248,15 @@ func envSecret(inv invocation, envFlag string) (string, error) {
 		return "", fmt.Errorf("%s names %s, which is not set in this environment", envFlag, name)
 	}
 	return value, nil
+}
+
+// idpTenants prints the console's landing list: every tenant this idpsim serves.
+func idpTenants(c idpCall) error {
+	raw, err := c.api.GetRaw("/api/tenants", nil)
+	if err != nil {
+		return err
+	}
+	return printSimRaw(raw)
 }
 
 func idpTenantShow(c idpCall) error {

@@ -22,22 +22,24 @@ Predictable hostnames, not a random `happy-tiger`. Its services are reached at:
 | `nlp.<slug>.langwatch.localhost`        | NLP engine (Go)                                                             |
 | `clickhouse.<slug>.langwatch.localhost` | ClickHouse — this stack's own database                                      |
 
-The six simulators (`mail`, `idp`, `storage`, `llm`, `voice`, `analytics`) each
-serve a console at `<name>.<slug>.langwatch.localhost`. `mail`, `idp` and
-`storage` run by default; `llm`, `voice` and `analytics` need `haven up +llm
-+voice +analytics`. `haven logs <name>` reads any of them. `telemetry`
-(`haven up +telemetry`) sends OTLP traffic and has no console:
+The eight simulators (`mail`, `idp`, `storage`, `llm`, `voice`, `analytics`,
+`outbound`, `telemetry`) each serve a console at `<name>.<slug>.langwatch.localhost`.
+`mail`, `idp` and `storage` run by default; the rest need `haven up +<name>`.
+`haven logs <name>` reads any of them. `haven sims --json` is the agent's entry:
+one row per simulator with whether it runs in this stack, its console URL, the
+`haven up +<name>` it needs if off, its verbs and its skill. `telemetry` sends
+OTLP traffic:
 `haven telemetry send|load|fuzz|status|stop`.
 
 In a checkout whose dev build links the simulators (`cmd/service/combined_dev.go`),
-every selected simulator runs in the `sims` lane: a second `service combined`
+with `LANGWATCH_DEV_ONE_PROCESS=0` every selected simulator runs in the `sims` lane: a second `service combined`
 process beside the `go` lane, which keeps only the gateway and the NLP engine. A
 simulator under load can therefore not starve the gateway. `haven restart sims`
 bounces them together and `haven logs <name>` still reads each one.
-`LANGWATCH_GO_ONE_PROCESS=1` is a trial of one Go process instead: the `go` lane
+By default, one Go process: the `go` lane
 hosts the gateway, the NLP engine and every simulator, each on its own address
 and hostname, and no `sims` lane runs. A gateway edit then restarts the
-simulators too; keep the split for protocol load or reload-sensitive work.
+simulators too; `LANGWATCH_DEV_ONE_PROCESS=0` splits it (and the Node app lane) for protocol load or reload-sensitive work.
 Langy always keeps its own lane. Load drivers
 hit `127.0.0.1:<port>` (see `haven status`). Mail, storage and analytics start with
 a little sample content (`MAILSIM_SEED`, `STORAGESIM_SEED`, `ANALYTICSSIM_SEED`,
@@ -288,8 +290,8 @@ the web dashboard.
 
 After updating Haven, run `haven up --force` in an existing stack to load the
 new launcher and bundled simulators. `haven restart mail` or `haven restart idp`
-bounces a child but does not replace an older launcher. `up --watch` watches
-the application's Go services; to develop the simulators with live reload,
+bounces a child but does not replace an older launcher. The application's Go services are watched by default
+(`LANGWATCH_GO_WATCH=0` or `up --watch=false` turns it off); to develop the simulators with live reload,
 use `make service-watch svc=mailsim` or `make service-watch svc=idpsim`.
 
 **Automatic preparation.** `up` owns the whole path from a fresh machine to a

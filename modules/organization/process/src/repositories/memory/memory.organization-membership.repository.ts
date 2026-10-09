@@ -17,6 +17,7 @@ import {
   type OrganizationWithMembersAndTheirTeams,
   type TeamUserRole,
   type User,
+  type OrganizationAdmission,
 } from "@langwatch/organization-contract";
 import { nowInstant, Temporal, type Instant } from "@langwatch/time";
 
@@ -527,36 +528,48 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
       });
   }
 
+  async readJoinerSeat({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<"MEMBER" | "DEVELOPER"> {
+    return readJoinerRole(this.memory.organizations.get(organizationId)?.joinerRole);
+  }
+
   async createMembership(input: {
     organizationId: string;
     userId: string;
     pendingAdmissionId: string;
     via: DeveloperAdmissionVia;
-    /** The seat a caller decided (ADR-171 v6); absent reads the joiner seat. */
-    seat?: "MEMBER" | "DEVELOPER";
+    seat: "MEMBER" | "DEVELOPER" | "EXTERNAL";
+    pending: boolean;
     /** Where a join request was made, for the Developer admission audit row. */
     origin?: "web" | "cli";
-  }): Promise<{ outcome: "created" | "already-present"; seat: "MEMBER" | "DEVELOPER" }> {
-    const { organizationId, userId, pendingAdmissionId } = input;
+  }): Promise<OrganizationAdmission> {
+    const { organizationId, userId, pendingAdmissionId, seat, pending } = input;
     const existing = this.membershipRow({ organizationId, userId });
     if (existing) {
-      const seat = existing.role === OrganizationUserRole.DEVELOPER ? "DEVELOPER" : "MEMBER";
-      return { outcome: "already-present", seat };
+      if (existing.role === OrganizationUserRole.DEVELOPER) {
+        return { outcome: "already-present", seat: "DEVELOPER", pending: false };
+      }
+      if (existing.role === OrganizationUserRole.EXTERNAL) {
+        const held = existing.disabledAt !== null;
+        return { outcome: "already-present", seat: "EXTERNAL", pending: held };
+      }
+      return { outcome: "already-present", seat: "MEMBER", pending: false };
     }
 
-    const seat =
-      input.seat ?? readJoinerRole(this.memory.organizations.get(organizationId)?.joinerRole);
     const now = nowInstant();
     this.memory.organizationUsers.push({
       userId,
       organizationId,
       role: seat,
-      disabledAt: null,
+      disabledAt: pending ? now : null,
       createdAt: now,
       updatedAt: now,
-      pendingSsoGrantId: seat === "MEMBER" ? pendingAdmissionId : null,
+      pendingSsoGrantId: seat === "DEVELOPER" || pending ? null : pendingAdmissionId,
     });
-    return { outcome: "created", seat };
+    return { outcome: "created", seat, pending };
   }
 
   async createSsoDomainMembership({

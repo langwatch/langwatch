@@ -11,7 +11,7 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/cmd/viewer/sources"
 )
 
-const storageUsage = "usage: haven storage <buckets|objects [bucket]|object <bucket> <key> [--raw]|requests> [--json]"
+const storageUsage = "usage: haven storage <buckets|objects [bucket]|object <bucket> <key> [--raw]|delete <bucket> <key>|clear [bucket]|requests> [--json]"
 
 type storageObject struct {
 	Bucket       string    `json:"bucket"`
@@ -21,7 +21,7 @@ type storageObject struct {
 	LastModified time.Time `json:"lastModified"`
 }
 
-// runStorage is `haven storage <buckets|objects|object|requests>`.
+// runStorage is `haven storage <buckets|objects|object|delete|clear|requests>`.
 func runStorage(_ context.Context, d deps, inv invocation) error {
 	if len(inv.args) == 0 {
 		return errors.New(storageUsage)
@@ -59,6 +59,10 @@ func storageCommand(api sources.SimAPI, inv invocation, asJSON bool) error {
 		})
 	case "object":
 		return storageObjectCommand(api, inv, asJSON)
+	case "delete":
+		return storageDelete(api, inv, asJSON)
+	case "clear":
+		return storageClear(api, inv, asJSON)
 	case "requests":
 		return simGet(api, "/_sim/api/requests", nil, asJSON, func(v struct{ Requests []map[string]any }) {
 			for _, r := range v.Requests {
@@ -67,6 +71,31 @@ func storageCommand(api sources.SimAPI, inv invocation, asJSON bool) error {
 		})
 	}
 	return fmt.Errorf("unknown `haven storage` subcommand %q; %s", inv.args[0], storageUsage)
+}
+
+// storageDelete removes one object.
+func storageDelete(api sources.SimAPI, inv invocation, asJSON bool) error {
+	if err := needArgs(inv, 3, "haven storage delete <bucket> <key>"); err != nil {
+		return err
+	}
+	params := url.Values{"bucket": {inv.args[1]}, "key": {inv.args[2]}}
+	if err := api.Delete("/_sim/api/object?" + params.Encode()); err != nil {
+		return err
+	}
+	return simDone(asJSON, "deleted", "deleted "+inv.args[1]+"/"+inv.args[2])
+}
+
+// storageClear removes every object in one bucket, or in all of them.
+func storageClear(api sources.SimAPI, inv invocation, asJSON bool) error {
+	target, scope := "/_sim/api/objects", "every bucket"
+	if len(inv.args) > 1 {
+		target += "?" + url.Values{"bucket": {inv.args[1]}}.Encode()
+		scope = inv.args[1]
+	}
+	if err := api.Delete(target); err != nil {
+		return err
+	}
+	return simDone(asJSON, "cleared", "cleared "+scope)
 }
 
 // storageObjectCommand shows one object's metadata, or with --raw its bytes.

@@ -215,8 +215,12 @@ export class Server {
    * `undefined`. A door on the main loop has no thread to hold it.
    * Spec: upgrade-holding-page.feature
    */
-  async holdForUpgrade(holding: UpgradeHolding | undefined): Promise<void> {
-    await this.livenessThread?.hold(holding);
+  async holdForUpgrade(
+    holding: UpgradeHolding | undefined,
+    routes: readonly string[] = [],
+  ): Promise<void> {
+    // The health routes answer in every phase; `routes` serve while upgrading (UIW-6).
+    await this.livenessThread?.hold(holding, { paths: [...this.healthRoutes.keys()], routes });
   }
 
   /** Shows a failed upgrade's console; true on Retry, false with no thread to show it. */

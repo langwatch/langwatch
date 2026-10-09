@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"path/filepath"
+	"slices"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
@@ -30,6 +31,48 @@ func (o *Orchestrator) StartWorktreeStack(worktreeDir string) error {
 		return fmt.Errorf("a stack is already running in %s", filepath.Base(dir))
 	}
 	return o.sys.SpawnDetached(o.cfg.UpArgv, dir, filepath.Join(o.cfg.Home, "up-from-dashboard.log"))
+}
+
+// StartStackService adds one service to a running stack: `haven up +<service>`
+// detached in its worktree. The selection is sticky, so up restarts the stack
+// with the service added; progress is read from the registry, as for Start.
+func (o *Orchestrator) StartStackService(slug, service string) error {
+	if !slices.Contains(domain.SelectableServices, service) {
+		return fmt.Errorf("unknown service %q", service)
+	}
+	dir, err := o.registeredWorktree(slug)
+	if err != nil {
+		return err
+	}
+	argv := append(slices.Clone(o.cfg.UpArgv), "+"+service)
+	return o.sys.SpawnDetached(argv, dir, filepath.Join(o.cfg.Home, "up-from-dashboard.log"))
+}
+
+// ResetStackDatabases runs `haven db reset --yes` detached in a stack's
+// worktree. The slug is pinned in the child's env: an inherited LANGWATCH_SLUG
+// must not make the reset drop a different stack's databases.
+func (o *Orchestrator) ResetStackDatabases(slug string) error {
+	dir, err := o.registeredWorktree(slug)
+	if err != nil {
+		return err
+	}
+	haven := o.cfg.UpArgv[:len(o.cfg.UpArgv)-1]
+	argv := append([]string{"/usr/bin/env", "LANGWATCH_SLUG=" + slug}, haven...)
+	argv = append(argv, "db", "reset", "--yes")
+	return o.sys.SpawnDetached(argv, dir, filepath.Join(o.cfg.Home, "reset-from-dashboard.log"))
+}
+
+// registeredWorktree is the worktree a registered stack runs from, checked
+// against git's list the same way Start checks a requested directory.
+func (o *Orchestrator) registeredWorktree(slug string) (string, error) {
+	if o.sys == nil || len(o.cfg.UpArgv) == 0 {
+		return "", fmt.Errorf("this haven cannot act on another worktree's stack")
+	}
+	st, ok := o.stackBySlug(slug)
+	if !ok || st.WorktreeDir == "" {
+		return "", fmt.Errorf("no stack is registered for %q", slug)
+	}
+	return o.knownWorktree(st.WorktreeDir)
 }
 
 // knownWorktree resolves a requested directory to the canonical path git lists

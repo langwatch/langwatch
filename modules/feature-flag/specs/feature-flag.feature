@@ -177,30 +177,6 @@ Feature: Resolve a feature flag, roll it out, and let people opt into experiment
       When a signed-out browser resolves the public flags
       Then the flag's value is returned
 
-    @unit
-    Scenario: An anonymous browser id is random and carries nothing about the machine
-      When a signed-out browser needs an anonymous id
-      Then a random v4 identifier is generated and stored on its own
-      And nothing about the device, fonts, canvas or person is collected
-
-    @unit
-    Scenario: Clearing site data rotates the anonymous id
-      Given a browser that already has an anonymous id
-      When its stored site data is cleared
-      Then the next resolution uses a different id
-
-    @unit
-    Scenario: A stored anonymous id that is not a v4 identifier is replaced
-      Given the stored anonymous id has been tampered with
-      When the browser reads its anonymous id
-      Then a fresh random identifier replaces it
-
-    @unit
-    Scenario: Storage failure still yields a usable anonymous id
-      Given the browser refuses to read or write site data
-      When the browser reads its anonymous id
-      Then an identifier stable for the page is used instead of failing
-
   Rule: Authenticated targets are authorised exactly
 
     @unit

@@ -38,4 +38,18 @@ describe("given the Upgrades pages", () => {
       expect(open({ page, grants: [] })).toEqual({ kind: "forbidden", permission: "ops:view" });
     }
   });
+
+  /** @scenario "The shell renders sign-in and the Upgrades page while its other startup reads answer 503" */
+  it("opens once the grant read settles even when no feature flag ever answered", () => {
+    for (const page of UPGRADE_PAGES) {
+      const screen = opsWeb.installation.screens[page];
+      const access = resolveUiPageAccess({
+        ...(screen?.requires === void 0 ? {} : { permission: screen.requires }),
+        featureFlag: () => void 0,
+        hasPermission: (grant) => grant === "ops:view",
+        isSettled: () => true,
+      });
+      expect(access).toEqual({ kind: "open" });
+    }
+  });
 });

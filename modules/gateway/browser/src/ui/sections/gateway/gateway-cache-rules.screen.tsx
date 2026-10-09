@@ -21,6 +21,7 @@ import { useShowErrorToast } from "../../../behavior/gateway-feedback.ts";
 import { useOrganizationTeamProject } from "../../../behavior/gateway-session.ts";
 import { CacheRuleCreateDrawer } from "../../../features/cache-rules/ui/sections/cache-rule-create-drawer.tsx";
 import { CacheRuleEditDrawer } from "../../../features/cache-rules/ui/sections/cache-rule-edit-drawer.tsx";
+import { useGatewayHost } from "../../../model/gateway-host.ts";
 import { GatewayErrorPanel } from "../../../ui/elements/gateway-error-panel.tsx";
 import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
 import { ListSkeleton } from "../../elements/list-skeleton.tsx";
@@ -29,10 +30,11 @@ type CacheRuleListRow = RouterOutputs["gatewayCacheRules"]["list"][number];
 
 function CacheRulesPage() {
   const showErrorToast = useShowErrorToast();
-  const { organization, hasPermission } = useOrganizationTeamProject();
-  const canCreate = hasPermission("gatewayCacheRules:create");
-  const canUpdate = hasPermission("gatewayCacheRules:update");
-  const canDelete = hasPermission("gatewayCacheRules:delete");
+  const { organization } = useOrganizationTeamProject();
+  const host = useGatewayHost();
+  const canCreate = host.hasPermission("gatewayCacheRules:create");
+  const canUpdate = host.hasPermission("gatewayCacheRules:update");
+  const canDelete = host.hasPermission("gatewayCacheRules:delete");
 
   const listQuery = api.gatewayCacheRules.list.useQuery(
     { organizationId: organization?.id ?? "" },

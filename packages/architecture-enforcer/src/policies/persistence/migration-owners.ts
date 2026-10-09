@@ -22,13 +22,15 @@ const POLICY = "migration-owners";
 const PRISMA_MIGRATIONS = "packages/prisma-client/prisma/migrations";
 const CLICKHOUSE_MIGRATIONS = "packages/clickhouse-migrations/migrations";
 const FROZEN_BELOW = { postgres: "20260914", clickhouse: "00089" } as const;
-const SQL_COMMENT = /--[^\n]*/g;
+// Released on main above the cutoff, so their bytes are frozen too (Alex, 2026-10-09).
+const RELEASED_ON_MAIN = new Set(["20260918171002_org_sign_in_security"]);
+export const SQL_COMMENT = /--[^\n]*/g;
 const MATERIALISED_SUFFIX = /_mv$/;
 const ALLOWED =
   "Split the migration so each file touches one owner's tables; SQL stays central and each migration is attributed to its owner (Alex, 2026-10-06, D3).";
 
 const POSTGRES_NAME = `(?:"?public"?\\.)?"?([A-Za-z_]\\w*)"?`;
-const POSTGRES_TOUCH = new RegExp(
+export const POSTGRES_TOUCH = new RegExp(
   `\\b(?:CREATE\\s+TABLE(?:\\s+IF\\s+NOT\\s+EXISTS)?|ALTER\\s+TABLE(?:\\s+IF\\s+EXISTS)?(?:\\s+ONLY)?|DROP\\s+TABLE(?:\\s+IF\\s+EXISTS)?|INSERT\\s+INTO|UPDATE|TRUNCATE(?:\\s+TABLE)?|FROM|JOIN|INDEX\\s+(?:CONCURRENTLY\\s+)?(?:IF\\s+NOT\\s+EXISTS\\s+)?"?\\w+"?\\s+ON(?:\\s+ONLY)?)\\s+${POSTGRES_NAME}`,
   "gi",
 );
@@ -62,6 +64,7 @@ function prismaMigrationFiles(root: string): string[] {
 
   return readdirSync(directory, { withFileTypes: true })
     .filter((entry) => entry.isDirectory() && entry.name >= FROZEN_BELOW.postgres)
+    .filter((entry) => !RELEASED_ON_MAIN.has(entry.name))
     .map((entry) => `${PRISMA_MIGRATIONS}/${entry.name}/migration.sql`)
     .filter((file) => existsSync(join(root, file)));
 }

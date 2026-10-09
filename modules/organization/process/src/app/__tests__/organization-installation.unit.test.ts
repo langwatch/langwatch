@@ -10,7 +10,6 @@ import type { RoleApi } from "@langwatch/role-contract";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
 import { organizationProcessModule } from "../../organization.module.ts";
@@ -40,7 +39,6 @@ function process(role: "api" | "worker") {
       identity: createApiFixture<IdentityApi>(),
       notification: createApiFixture<NotificationService>(),
       role: createApiFixture<RoleApi>(),
-      user: createApiFixture<UserApi>(),
     });
 }
 

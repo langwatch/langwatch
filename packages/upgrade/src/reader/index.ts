@@ -9,6 +9,8 @@ export { UpgradeReadError, type UpgradeReadErrorCode } from "./reader.service.ts
 export { preflightFrom, type UpgradePreflightRow, upgradePreflightRowSchema } from "./preflight.ts";
 export {
   previewUpgradeTo,
+  type UpgradePreview,
+  upgradePreviewSchema,
   type UpgradeTargetRefusal,
   upgradeTargetRefusalSchema,
 } from "./preview.ts";

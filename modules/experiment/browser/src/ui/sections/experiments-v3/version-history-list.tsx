@@ -11,6 +11,7 @@ import { useState } from "react";
 
 import { experimentApi } from "../../../behavior/experiment-api.ts";
 import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
+import { useWorkflowHost } from "../../../model/workflow/workflow-host.ts";
 
 interface VersionEntry {
   version: number;
@@ -197,13 +198,9 @@ export function VersionList({
   experimentSlug: string;
   onRestored: () => void;
 }) {
-  const { project, hasPermission } = useOrganizationTeamProject();
-  /**
-   * `platform/app`'s `useCan` resolved a grant off the application's own
-   * permission table; the scope reading answers the same question from the host
-   * the composing application already resolved, so the call sites read the same.
-   */
-  const can = hasPermission;
+  const { project } = useOrganizationTeamProject();
+  const workflowHost = useWorkflowHost();
+  const can = (permission: string) => workflowHost.hasPermission(permission);
   const [confirmingVersion, setConfirmingVersion] = useState<number | null>(null);
   const workbenchVersion = useEvaluationsV3Store((state) => state.workbenchVersion);
   const { restore, restoringVersion } = useVersionRestore({

@@ -40,6 +40,7 @@ type Config struct {
 	HeartbeatEvery time.Duration // launcher heartbeat cadence
 	DaemonArgv     []string      // how to (re)launch `haven daemon`
 	SimulatorArgv  []string      // this Haven executable plus its internal simulator command
+	GoWatchArgv    []string      // this Haven executable plus its internal Go watch command
 	// UpArgv is this Haven executable plus `up`, resolved once in the composition
 	// root against the TRUSTED checkout — never against the directory a child
 	// will run in. Empty disables starting a stack from the dashboard.
@@ -120,12 +121,14 @@ type Config struct {
 
 // PlanOptions decide which services `up` runs and how.
 type PlanOptions struct {
-	ShouldGoWatch bool // air hot-reload for the Go services instead of `go run`
+	ShouldGoWatch bool // rebuild and swap the Go services (haven go-watch; air for langyagent); on unless LANGWATCH_GO_WATCH=0 or --watch=false
 	// ShouldRunOneProcess runs a modular checkout's ui and api lanes as one app
-	// lane: Vite, api and worker in one Node process (ADR-168, B1).
+	// lane: Vite, api and worker in one Node process (ADR-168, B1). On unless
+	// LANGWATCH_DEV_ONE_PROCESS=0.
 	ShouldRunOneProcess bool
 	// ShouldRunGoAsOneProcess hosts the linked simulators in the go lane, not a
-	// sims lane of their own: one Go process (LANGWATCH_GO_ONE_PROCESS=1, a trial).
+	// sims lane of their own: one Go process. Set with ShouldRunOneProcess from
+	// LANGWATCH_DEV_ONE_PROCESS (=0 splits).
 	ShouldRunGoAsOneProcess bool
 	// Selection is the worktree's sticky service choice (ADR-064): gateway,
 	// nlp, langy, idp. The three Node lanes — ui, api and workers — always run

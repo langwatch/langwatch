@@ -366,8 +366,8 @@ Exit codes, outcome codes and the log lines are in [Upgrade Guide](/self-hosting
 | Variable              | Description                       | Default |
 | --------------------- | --------------------------------- | ------- |
 | `DISABLE_USAGE_STATS` | Stop the daily usage report. See [Data and telemetry](/self-hosting/data-and-telemetry) for what it carries and the two smaller switches | `false` |
-| `LANGWATCH_METRICS_MODE` | `otlp` pushes metrics to `OTEL_EXPORTER_OTLP_ENDPOINT`; `prometheus` serves a `/metrics` scrape endpoint instead. The Helm chart sets `prometheus` when `app.telemetry.metrics.enabled` is true | `otlp` |
-| `LANGWATCH_METRICS_TOKEN` | Bearer token a Prometheus scrape must send. In production, `/metrics` is not served without it | -       |
+| `OTEL_METRICS_EXPORTER` | `otlp` pushes metrics to `OTEL_EXPORTER_OTLP_ENDPOINT`; `prometheus` serves a scrape listener on `OTEL_EXPORTER_PROMETHEUS_PORT` (default `9464`) instead. The Helm chart sets `prometheus` when `app.telemetry.metrics.enabled` is true | `otlp` |
+| `METRICS_API_KEY` | Bearer token a Prometheus scrape must send. The metrics endpoint is only mounted when it is set | -       |
 
 ## Langy (optional)
 
@@ -408,7 +408,7 @@ When using the Helm chart, configuration is set in `values.yaml` rather than env
 | `app.email.providers.resend.apiKey.value` | `RESEND_API_KEY` |
 | `app.evaluators.google.credentials.value` | `GOOGLE_APPLICATION_CREDENTIALS` when `app.evaluators.google.enabled` is on |
 | `app.telemetry.usage.enabled` | Inverse of `DISABLE_USAGE_STATS` |
-| `app.telemetry.metrics.apiKey.value` | `LANGWATCH_METRICS_TOKEN`, with `LANGWATCH_METRICS_MODE=prometheus`, when `app.telemetry.metrics.enabled` is on |
+| `app.telemetry.metrics.apiKey.value` | `METRICS_API_KEY`, with `OTEL_METRICS_EXPORTER=prometheus` on port `9464`, when `app.telemetry.metrics.enabled` is on |
 | `app.dataplane.enabled` | `STORED_OBJECTS_BACKEND=s3` (provider: `awsS3`) or `STORED_OBJECTS_BACKEND=azure` (provider: `azureBlob`) |
 | `app.dataplane.bucket` | `S3_BUCKET_NAME` |
 | `app.dataplane.providers.azureBlob.accountName.value` | `AZURE_BLOB_ACCOUNT_NAME` |
