@@ -13,6 +13,7 @@ import { MemoryScimRepository } from "../../repositories/memory/memory.scim.repo
 import { ScimOversightService } from "../../services/scim-oversight.service.ts";
 import { scimOversightTrpcTransport } from "../scim-oversight.trpc.ts";
 import { scimTestApp } from "./support/scim-app.fixture.ts";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 
 type TestContext = { actor: { id: string } };
 
@@ -24,6 +25,7 @@ function testPorts(): TrpcRuntimeMembers<TestContext> {
     identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
     authorization: {
       forRequest: () => ({
+        ...testAuthorizeDefaults,
         getDecision: async () => ({ permitted: false, organizationRole: null }),
         getProjectAnyDecision: async () => ({ permitted: false, organizationRole: null }),
         checkScopeLineage: async () => ({ kind: "consistent" }),
