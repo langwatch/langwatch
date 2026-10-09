@@ -78,13 +78,6 @@
     "needsOldWritersGone": true
   },
   {
-    "id": "identity:reopen-unproven-accounts",
-    "kind": "data",
-    "mode": "blocking",
-    "owner": "identity",
-    "description": "Returns accounts never confirmed and never signed into to the legacy sign-in path."
-  },
-  {
     "id": "identity:reopen-unproven-accounts-after-rollout",
     "kind": "data",
     "mode": "background",

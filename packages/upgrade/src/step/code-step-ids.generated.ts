@@ -10,7 +10,6 @@ export type CodeStepId =
   | "governance:record-coding-assistant-billing"
   | "governance:migrate-anomaly-webhook-destinations"
   | "governance:replay-cost-charges"
-  | "identity:reopen-unproven-accounts"
   | "identity:reopen-unproven-accounts-after-rollout"
   | "instant-eval:copy-judge-spend"
   | "licensing:copy-organization-licenses"
