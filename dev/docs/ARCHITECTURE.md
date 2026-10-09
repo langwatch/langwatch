@@ -1804,7 +1804,7 @@ office deactivates only through user, so it keeps no picked date (Alex, 2026-10-
 - The CLI token door hands a handler `session` beside `actor` (Alex, 2026-10-01): the route declares
   `.withCredential("cli_token", { session: schema })`, the framework parses it (a mismatch answers 401) and types
   the handler by `z.output`. The actor carries authz vocabulary only; logs redact `session.tokenKey` at a fixed path.
-- A legacy project key still authenticates but is never returned or displayed: no read, no rotation, no handout.
+- A legacy project key still authenticates but is never returned or displayed: no read, no rotation, no handout. Keys created on main keep main's access and new projects get no legacy key (Alex, 2026-10-09): a legacy project key or an ownerless API key reads its own project's traces on an own-only proof the door mints as the internal actor `api.rest.ownerless-project-key`; an unattended run key on a proof-bearing route answers 403.
   It migrates to an `ApiKey` row, hashed and valid until revoked, listed masked and revoke-only under a
   replace-by-deadline banner. The CLI and MCP mint a fresh key instead, a CLI login replacing that device's previous
   one, and a new project gets no customer-facing project key (Alex, 2026-09-30). No engine and no internal caller

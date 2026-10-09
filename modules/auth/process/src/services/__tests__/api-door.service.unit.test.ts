@@ -14,7 +14,6 @@ import type { Plan } from "@langwatch/entitlement-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { ApiDoorService, type ApiDoorPeers } from "../api-door.service.ts";
-import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 
 const PROJECT = {
   id: "project-1",
@@ -79,7 +78,6 @@ const peers: ApiDoorPeers = {
         : Promise.reject(new Error("a bearer bound to no project")),
   },
   authz: {
-    ...testAuthorizeDefaults,
     hasApiKeyPermission: refuseEverything,
     hasProjectPermission: refuseEverything,
     getApiKeyProjectDecision: refuseEverything,
@@ -90,6 +88,8 @@ const peers: ApiDoorPeers = {
     getSessionVersion: refuseEverything,
     getScope: refuseEverything,
     can: refuseEverything,
+    authorize: refuseEverything,
+    authorizeInternal: refuseEverything,
   },
   organizations: {
     getSettings: ({ organizationId }) =>
