@@ -153,6 +153,17 @@ ADR-096) over plain OIDC:
 curl -X POST localhost:5565/control/t/1/config -d '{"samlpSubjects":true}'
 ```
 
+### Azure AD (Entra) as a legacy provider
+
+`legacy provider <t> azure` makes the tenant an Entra v2.0 directory: issuer
+`<host>/<tenant-guid>/v2.0`, ID tokens with `oid`, `tid`, `ver: "2.0"`, an
+opaque `sub`, and no `email_verified`, `groups` or `picture` (the way a work
+account's token arrives). The authority paths (`/<guid>/oauth2/v2.0/authorize`,
+`/token`, `/discovery/v2.0/keys`, `/v2.0/.well-known/openid-configuration`) are
+served from the host root. The product's `AUTH_PROVIDER=azure-ad` hard-wires
+`https://login.microsoftonline.com`, so resolve that host to idpsim over https;
+`legacy env <t>` prints `AZURE_AD_TENANT_ID` (the GUID) instead of an issuer.
+
 ## Provisioning into LangWatch
 
 SCIM runs one way: the identity provider sends its directory to the
@@ -294,7 +305,7 @@ unchanged: it runs the standalone simulator.
 | --- | --- |
 | `tenant show <t>` | domain, issuer, SCIM token, users and applications |
 | `apps add <t> --name <n> [--redirect a,b] [--entity-id --acs-url]` / `apps remove <t> <client-id>` | register or drop an OIDC or SAML application |
-| `populate <t> --users <n> [--groups <n>] [--domain] [--seed]` / `churn <t> --join <n> --leave <n> ...` | directory size and change |
+| `populate <t> --users <n> [--groups <n>] [--domain] [--seed]` / `churn <t> --join <n> --leave <n> ...` | directory size and change; each user gets `department`, `costCenter` and `manager` from the seed, pushed under the SCIM enterprise extension (the first user has no manager) |
 | `user add <t> --email <e> [--given-name] [--family-name] [--groups a,b]` | one user |
 | `scim target set <t> --url <base> --token-env <VAR>` / `scim target clear <t>` | where the tenant provisions |
 | `scim push\|pull\|sync <t>` | sync takes `--mode`, `--with-groups`, `--dry-run`, `--concurrency`; all three take `--target <url> --token-env <VAR>` instead of the connection |
@@ -302,7 +313,7 @@ unchanged: it runs the standalone simulator.
 | `dns add <domain> <txt>...` / `dns remove <domain>` | TXT records (global, not per tenant) |
 | `activity <t>` / `signin <t> [--user <email>] [--client <id> --redirect <uri>]` | the feed; the IdP-initiated sign-in URL |
 | `reset <t>` / `samlp <t> on\|off` | seeded state; Auth0-broker `samlp\|` subjects |
-| `legacy provider <t> <generic\|auth0\|okta\|cognito\|onelogin\|show>` / `legacy env <t>` | the legacy provider and the env lines that point a stack at it |
+| `legacy provider <t> <generic\|auth0\|okta\|cognito\|onelogin\|azure\|show>` / `legacy env <t>` | the legacy provider and the env lines that point a stack at it |
 | `tamper <t> <bad-signature\|wrong-audience\|expired\|replayed-nonce\|none>` | break the next ID token, once |
 | `auth0-webhook <t> --event create\|deactivate --user <u> --target <stack-url> --secret-env <VAR>` | send one signed Auth0 SCIM event |
 

@@ -107,7 +107,7 @@ func TestControlLegacyEndpoints(t *testing.T) {
 		return rec
 	}
 	assert.Equal(t, http.StatusConflict, do(http.MethodGet, "/control/t/1/legacy-env", "").Code)
-	assert.Equal(t, http.StatusBadRequest, do(http.MethodPost, "/control/t/1/legacy-provider", `{"provider":"azure"}`).Code)
+	assert.Equal(t, http.StatusBadRequest, do(http.MethodPost, "/control/t/1/legacy-provider", `{"provider":"bogus"}`).Code)
 	require.Equal(t, http.StatusOK, do(http.MethodPost, "/control/t/1/legacy-provider", `{"provider":"okta"}`).Code)
 	assert.Equal(t, http.StatusBadRequest, do(http.MethodPost, "/control/t/1/tamper", `{"mode":"later"}`).Code)
 	assert.Equal(t, http.StatusOK, do(http.MethodPost, "/control/t/1/tamper", `{"mode":"expired"}`).Code)

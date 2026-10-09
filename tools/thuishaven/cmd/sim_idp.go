@@ -97,7 +97,7 @@ var idpVerbs = map[string]idpVerb{
 	"scim pull":         {"<tenant> [--target <url> --token-env <VAR>]", 1, idpSCIMPull},
 	"scim sync":         {"<tenant> [--mode deactivate|delete] [--with-groups] [--dry-run] [--concurrency <n>] [--target <url> --token-env <VAR>]", 1, idpSCIMSync},
 	"scim-event":        {"<tenant> <kind> [--style okta|entra] [--user <u>] [--group <g>] [--set k=v]... [--id <id>] [--member-id <id>] [--inactive] [--no-external-id] [--department|--cost-center|--manager <text>] [--target <url> --token-env <VAR>]", 2, idpSCIMEvent},
-	"legacy provider":   {"<tenant> <generic|auth0|okta|cognito|onelogin|show>", 2, idpLegacyProvider},
+	"legacy provider":   {"<tenant> <generic|auth0|okta|cognito|onelogin|azure|show>", 2, idpLegacyProvider},
 	"legacy env":        {"<tenant>", 1, idpLegacyEnv},
 	"tamper":            {"<tenant> <bad-signature|wrong-audience|expired|replayed-nonce|none>", 2, idpTamper},
 	"auth0-webhook":     {"<tenant> --event create|deactivate --user <u> --target <stack-url> --secret-env <VAR> [--token-env <VAR>]", 1, idpAuth0Webhook},

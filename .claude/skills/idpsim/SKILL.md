@@ -56,8 +56,12 @@ README there is the full reference), console `apps/idpsim-web` (ADR-160).
 `dns add|remove`, `activity`, `signin <t> --user <email>` (prints the IdP-initiated URL),
 `reset`, `samlp <t> on|off`. Full table: `services/idpsim/README.md`.
 
-- Legacy SSO: `haven idp legacy provider <t> auth0|okta|cognito|onelogin|show`, then
+- Legacy SSO: `haven idp legacy provider <t> auth0|okta|cognito|onelogin|azure|show`, then
   `haven idp legacy env <t>` for the env lines (apply with `haven down` then `haven up`).
+  `azure` is Entra: the product's authority host is hard-wired, so resolve
+  `login.microsoftonline.com` to idpsim over https; the env gives `AZURE_AD_TENANT_ID`.
+- `populate` also gives each user `department`, `costCenter` and `manager` (from `--seed`);
+  pushes carry them under the SCIM enterprise extension.
 - Negative tokens: `haven idp tamper <t> bad-signature|wrong-audience|expired|replayed-nonce`
   breaks the next ID token once.
 - Auth0 directory webhook: `haven idp auth0-webhook <t> --event create|deactivate --user <u>

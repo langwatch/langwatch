@@ -27,11 +27,12 @@ const (
 	LegacyProviderOkta     LegacyProvider = "okta"
 	LegacyProviderCognito  LegacyProvider = "cognito"
 	LegacyProviderOneLogin LegacyProvider = "onelogin"
+	LegacyProviderAzure    LegacyProvider = "azure"
 )
 
 // providerEnvPrefix names each provider's env block in packages/config deployment-facts.
 var providerEnvPrefix = map[LegacyProvider]string{
-	LegacyProviderAuth0: "AUTH0", LegacyProviderOkta: "OKTA", LegacyProviderCognito: "COGNITO", LegacyProviderOneLogin: "ONELOGIN",
+	LegacyProviderAuth0: "AUTH0", LegacyProviderOkta: "OKTA", LegacyProviderCognito: "COGNITO", LegacyProviderOneLogin: "ONELOGIN", LegacyProviderAzure: "AZURE_AD",
 }
 
 // TamperMode breaks the next ID token a tenant mints, once, so the product's
@@ -114,6 +115,8 @@ func (t *Tenant) Issuer() string {
 		return fmt.Sprintf("%s/eu-west-1_idpsimT%d", t.BaseURL, t.ID)
 	case LegacyProviderOneLogin:
 		return t.BaseURL + "/oidc/2"
+	case LegacyProviderAzure:
+		return t.root() + "/" + t.AzureTenantID() + "/v2.0"
 	case LegacyProviderGeneric:
 	}
 	return t.BaseURL
@@ -142,12 +145,11 @@ func (t *Tenant) OIDCSubject(u *User) string {
 		}
 		return "00u" + string(id)
 	case LegacyProviderCognito:
-		b := h[:16]
-		b[6] = b[6]&0x0f | 0x40
-		b[8] = b[8]&0x3f | 0x80
-		return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
+		return guidOf(h[:])
 	case LegacyProviderOneLogin:
 		return strconv.FormatUint(uint64(binary.BigEndian.Uint32(h[:4])%900000000+100000000), 10)
+	case LegacyProviderAzure:
+		return azureSubject(h)
 	case LegacyProviderGeneric:
 	}
 	return t.Subject(u)
@@ -186,6 +188,8 @@ func (t *Tenant) profileClaims(u *User, now time.Time) jwt.MapClaims {
 		claims["auth_time"] = now.Unix()
 	case LegacyProviderOneLogin:
 		claims["preferred_username"] = u.Email
+	case LegacyProviderAzure:
+		t.azureClaims(claims, u, now)
 	case LegacyProviderGeneric:
 	}
 	return claims
@@ -275,7 +279,7 @@ func (s *Server) handleControlLegacyProvider(w http.ResponseWriter, r *http.Requ
 	if body.LegacyProvider != nil {
 		f := LegacyProvider(*body.LegacyProvider)
 		if _, known := providerEnvPrefix[f]; !known && f != LegacyProviderGeneric {
-			http.Error(w, "provider must be one of generic, auth0, okta, cognito, onelogin", http.StatusBadRequest)
+			http.Error(w, "provider must be one of generic, auth0, okta, cognito, onelogin, azure", http.StatusBadRequest)
 			return
 		}
 		t.SetLegacyProvider(f)
@@ -317,7 +321,7 @@ func (s *Server) handleControlLegacyEnv(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	f := t.LegacyProvider()
-	prefix, known := providerEnvPrefix[f]
+	_, known := providerEnvPrefix[f]
 	if !known {
 		http.Error(w, "the tenant is generic: set a provider first (POST /control/t/{tenant}/legacy-provider)", http.StatusConflict)
 		return
@@ -327,13 +331,8 @@ func (s *Server) handleControlLegacyEnv(w http.ResponseWriter, r *http.Request) 
 	if _, registered := t.ApplicationByClientID(clientID); registered {
 		secret = "<the secret registered for " + clientID + " on the tenant page>"
 	}
-	var b strings.Builder
-	fmt.Fprintf(&b, "# idpsim tenant %d as a legacy %s provider; apply with haven down, then haven up\n", t.ID, f)
-	if f == LegacyProviderAuth0 {
-		b.WriteString("# auth0 keeps only the issuer host and forces https: serve idpsim over https at that host\n")
-	}
-	fmt.Fprintf(&b, "AUTH_PROVIDER=%s\n%s_CLIENT_ID=%s\n%s_CLIENT_SECRET=%s\n%s_ISSUER=%s\n",
-		f, prefix, clientID, prefix, secret, prefix, t.Issuer())
+	header := fmt.Sprintf("# idpsim tenant %d as a legacy %s provider; apply with haven down, then haven up\n", t.ID, f)
+	body := header + t.legacyEnvLines(f, clientID, secret)
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	_, _ = w.Write([]byte(b.String()))
+	_, _ = w.Write([]byte(body))
 }

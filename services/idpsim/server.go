@@ -98,7 +98,7 @@ func (s *Server) Handler() http.Handler {
 		writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "tenants": len(s.tenants)})
 	})
 	s.routeConsole(mux)
-	return s.persistChanges(mux)
+	return s.azureAuthority(s.persistChanges(mux))
 }
 
 // routeProtocols is what a tenant speaks to an application: OIDC, SAML and

@@ -27,7 +27,7 @@ func (s *Server) handleDiscovery(w http.ResponseWriter, r *http.Request) {
 
 // discoveryDocument is the metadata; a provider-shaped tenant's issuer has its provider's shape.
 func discoveryDocument(t *Tenant) map[string]any {
-	return map[string]any{
+	doc := map[string]any{
 		"issuer":                                t.Issuer(),
 		"authorization_endpoint":                t.BaseURL + "/oauth/authorize",
 		"token_endpoint":                        t.BaseURL + "/oauth/token",
@@ -45,6 +45,10 @@ func discoveryDocument(t *Tenant) map[string]any {
 			"nickname", "preferred_username", "picture", "groups",
 		},
 	}
+	if t.LegacyProvider() == LegacyProviderAzure {
+		azureDiscovery(t, doc)
+	}
+	return doc
 }
 
 // handleJWKS publishes the tenant's signing key.
