@@ -215,7 +215,7 @@ Feature: Ops shows an installation's release upgrades, read-only
     When an operator previews an upgrade to the image's release
     Then the preview is refused as "below_lts_floor" naming 3.20.1
 
-  @unimplemented
+  @integration
   Scenario: The preview page shows a skeleton while the preview loads
     When an operator opens Ops, Upgrades, Preview
     Then a loading skeleton shows until the preview answers
@@ -228,7 +228,7 @@ Feature: Ops shows an installation's release upgrades, read-only
     Then each target shows its goose version and how many steps are outstanding
     And the failed target shows its last error
 
-  @unimplemented
+  @integration
   Scenario: The dataplanes tab is hidden when no private target exists
     Given the ledger records no per-target rows
     When an operator opens Ops, Upgrades

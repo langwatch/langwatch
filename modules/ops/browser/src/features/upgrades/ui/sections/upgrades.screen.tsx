@@ -1,4 +1,5 @@
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Spacer } from "@langwatch/design-system/primitives";
 
 import { api } from "../../../../behavior/ops-api.ts";
 import { useOpsOverlay } from "../../../../behavior/ops-overlays.ts";
@@ -6,6 +7,7 @@ import { useOpsRouter } from "../../../../behavior/ops-router.ts";
 import { useOpsHost } from "../../../../model/ops-host.ts";
 import { useRetryUpgradeStep } from "../../behavior/use-retry-upgrade-step.ts";
 import { useUpgradeReadHints } from "../../behavior/use-upgrade-read-hints.ts";
+import { UpgradeDataplanesTabs } from "./upgrade-dataplanes.tsx";
 import { UpgradeReadState } from "./upgrade-read-state.tsx";
 import { UPGRADE_STEP_OVERLAY, UpgradeStepDrawer } from "./upgrade-step-drawer.tsx";
 import { UpgradesOverview } from "./upgrades-overview.tsx";
@@ -26,6 +28,7 @@ export default function UpgradesScreen() {
   const runs = api.ops.upgrade.listRuns.useQuery({ limit: RECENT_RUNS });
   const failed = api.ops.upgrade.listSteps.useQuery({ status: "failed" });
   const background = api.ops.upgrade.listSteps.useQuery({ mode: "background" });
+  const targets = api.ops.upgrade.listTargets.useQuery();
   const canManage = useOpsHost().isOpsAdmin();
   const { retryStep, retryingStepId } = useRetryUpgradeStep();
 
@@ -33,26 +36,37 @@ export default function UpgradesScreen() {
     <>
       <PageLayout.Header>
         <PageLayout.Heading>Upgrades</PageLayout.Heading>
+        <Spacer />
+        <PageLayout.HeaderButton onClick={() => router.push("/ops/upgrades/preview")}>
+          Preview upgrade
+        </PageLayout.HeaderButton>
       </PageLayout.Header>
       <PageLayout.Container>
         <UpgradeReadState read={status} failedTitle="The upgrade status could not load">
           {(current) => (
-            <UpgradesOverview
-              status={current}
-              releases={releases.data?.items ?? []}
-              runs={runs.data?.items ?? []}
-              failedSteps={failed.data?.items ?? []}
-              backgroundSteps={(background.data?.items ?? []).filter(
-                (step) => !FINISHED.has(step.status),
-              )}
-              backgroundLoading={background.isLoading}
-              onRetryStep={canManage ? retryStep : void 0}
-              retryingStepId={retryingStepId}
-              onOpenRelease={(release) =>
-                router.push(`/ops/upgrades/releases/${encodeURIComponent(release)}`)
+            <UpgradeDataplanesTabs
+              targets={targets.data ?? []}
+              overview={
+                <UpgradesOverview
+                  status={current}
+                  releases={releases.data?.items ?? []}
+                  runs={runs.data?.items ?? []}
+                  failedSteps={failed.data?.items ?? []}
+                  backgroundSteps={(background.data?.items ?? []).filter(
+                    (step) => !FINISHED.has(step.status),
+                  )}
+                  backgroundLoading={background.isLoading}
+                  onRetryStep={canManage ? retryStep : void 0}
+                  retryingStepId={retryingStepId}
+                  onOpenRelease={(release) =>
+                    router.push(`/ops/upgrades/releases/${encodeURIComponent(release)}`)
+                  }
+                  onOpenRun={(runId) =>
+                    router.push(`/ops/upgrades/runs/${encodeURIComponent(runId)}`)
+                  }
+                  onOpenStep={stepDrawer.open}
+                />
               }
-              onOpenRun={(runId) => router.push(`/ops/upgrades/runs/${encodeURIComponent(runId)}`)}
-              onOpenStep={stepDrawer.open}
             />
           )}
         </UpgradeReadState>
