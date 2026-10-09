@@ -25,7 +25,6 @@ import {
 } from "@langwatch/entitlement-contract";
 import type { EventingCommands, StaticPipelineDefinition } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import { OrganizationApi } from "@langwatch/organization-contract";
 import {
   deriveDatasetBounds,
   effectiveDatasetAttachmentMaxBytes,
@@ -122,16 +121,16 @@ type EntitlementSetup = FeatureSetup<
 type EntitlementDependencies = EntitlementSetup["dependencies"];
 
 /**
- * What the constructor actually reads off `dependencies`: seats from organization, the pricing
- * model from billing. `license` is consumed once, by `create`, to build
- * {@link EntitlementInfrastructure} — a hand-built test app needs no license source.
+ * What the constructor actually reads off `dependencies`: the pricing model from billing.
+ * `license` is consumed once, by `create`, to build {@link EntitlementInfrastructure}; a
+ * hand-built test app needs no license source.
  */
-type EntitlementCallerLookup = Pick<EntitlementDependencies, "organizations" | "billing">;
+type EntitlementCallerLookup = Pick<EntitlementDependencies, "billing">;
 
 /** The repositories the app reads directly; the meters reach it only through its usage pipeline. */
 type EntitlementReadRepositories = Pick<
   EntitlementRepositories,
-  "membership" | "spend" | "tenancy"
+  "membership" | "seats" | "spend" | "tenancy"
 >;
 
 /** The usage pipeline over the senders its process manager and subscriber call back through. */
@@ -143,7 +142,6 @@ export class EntitlementModule implements EntitlementApiContract {
   static readonly dependencies = {
     license: LicensingApi,
     billing: BillingApi,
-    organizations: OrganizationApi,
   };
   static readonly config = entitlementConfig;
 
@@ -175,7 +173,7 @@ export class EntitlementModule implements EntitlementApiContract {
     this.#plans = EntitlementService.create(infrastructure);
     this.#usage = UsageStatsService.create({
       membership: repositories.membership,
-      seats: dependencies.organizations,
+      seats: repositories.seats,
       counter: infrastructure.counter,
       plans: this.#plans,
     });

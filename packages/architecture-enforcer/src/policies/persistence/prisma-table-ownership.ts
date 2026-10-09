@@ -45,16 +45,23 @@ export const SHARED_PRISMA_TABLES: readonly SharedPrismaTable[] = [
   {
     table: "Team",
     owner: "organization",
-    readers: ["data-retention", "data-privacy", "instant-eval-judge", "nurturing", "user"],
+    readers: [
+      "data-retention",
+      "data-privacy",
+      "instant-eval-judge",
+      "nurturing",
+      "user",
+      "entitlement",
+    ],
     reason:
-      "data retention and data privacy read a team's organisation to place a project or a team-level rule, never a fold (round 46 E1, R40); the Instant Evals judge and nurturing read a project's organisation through its team and an organisation's teams for its earliest project (round 46 E1, R40); user reads the caller's personal team to find the personal-workspace project an avatar is stored under, never OrganizationApi (U1-AVATAR a, R40)",
+      "data retention and data privacy read a team's organisation to place a project or a team-level rule, never a fold (round 46 E1, R40); the Instant Evals judge and nurturing read a project's organisation through its team and an organisation's teams for its earliest project (round 46 E1, R40); user reads the caller's personal team to find the personal-workspace project an avatar is stored under, never OrganizationApi (U1-AVATAR a, R40); entitlement reads an organisation's team ids to merge Lite Members' custom-role permissions when counting seats, never OrganizationApi (R-C1f, R40)",
   },
   {
     table: "OrganizationUser",
     owner: "organization",
-    readers: ["authz", "data-privacy", "billing"],
+    readers: ["authz", "data-privacy", "billing", "entitlement"],
     reason:
-      "authz reads memberships for every decision and answers its active administrators from them (R41, R42); data privacy reads a personal project owner's department from the membership, as main did (round 53); billing reads an organisation's administrators and active members for its alerts and lifecycle facts (C2 B, R40)",
+      "authz reads memberships for every decision and answers its active administrators from them (R41, R42); data privacy reads a personal project owner's department from the membership, as main did (round 53); billing reads an organisation's administrators and active members for its alerts and lifecycle facts (C2 B, R40); entitlement counts an organisation's member seats for usage stats, never OrganizationApi (R-C1f, R40)",
     writes: [
       {
         reader: "authz",

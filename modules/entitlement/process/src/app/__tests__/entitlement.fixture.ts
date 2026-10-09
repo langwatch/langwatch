@@ -7,7 +7,6 @@ import type {
   UsageLimitWarning,
   UsageUnit,
 } from "@langwatch/entitlement-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 import type { EntitlementRepositories } from "../../repositories/entitlement.repositories.ts";
@@ -84,23 +83,18 @@ export function createEntitlementTestApp(
     repositories?: Pick<EntitlementRepositories, "membership" | "spend" | "tenancy">;
     infrastructure: Omit<EntitlementInfrastructure, "counter" | "warnings"> &
       Partial<Pick<EntitlementInfrastructure, "counter" | "warnings">>;
-    dependencies?: Partial<{ organizations: OrganizationApi; billing: BillingApi }>;
+    dependencies?: Partial<{ billing: BillingApi }>;
     config?: Pick<EntitlementConfig, "requestBounds">;
   }>,
 ): EntitlementModule {
   return EntitlementModule.createForTesting({
-    repositories: input.repositories ?? MemoryEntitlementRepositories.create(),
+    repositories: { ...MemoryEntitlementRepositories.create(), ...input.repositories },
     infrastructure: {
       ...input.infrastructure,
       counter: input.infrastructure.counter ?? TestUsageCounter.create(),
       warnings: input.infrastructure.warnings ?? TestUsageWarnings.create(),
     },
     dependencies: {
-      organizations:
-        input.dependencies?.organizations ??
-        createApiFixture<OrganizationApi>({
-          countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),
-        }),
       billing:
         input.dependencies?.billing ??
         createApiFixture<BillingApi>({ getPricingModel: async () => ({ pricingModel: null }) }),
