@@ -18,7 +18,7 @@ const secureAccountNudgeChunk = loadChunk(
 );
 const JoinYourTeamTakeover = lazy(() => joinOfferChunk);
 const SecureAccountNudge = lazy(() => secureAccountNudgeChunk);
-const TeamAccessWaiting = lazyChunk(
+const TeamAccessWaiting = lazyChunk<TeamAccessWaitingProps>(
   organizationWeb.installation.capabilities.teamAccessWaiting.load,
 );
 const organizationMfaGateChunk = loadChunk(
@@ -59,13 +59,15 @@ export function joinOffer({
   );
 }
 
+interface TeamAccessWaitingProps {
+  organizationName: string;
+  onCheckAccess: () => void;
+}
+
 export function teamAccessWaiting({
   organizationName,
   onCheckAccess,
-}: {
-  organizationName: string;
-  onCheckAccess: () => void;
-}): ReactNode {
+}: TeamAccessWaitingProps): ReactNode {
   return (
     <Suspense fallback={null}>
       <TeamAccessWaiting organizationName={organizationName} onCheckAccess={onCheckAccess} />
