@@ -1,6 +1,7 @@
 import type { ModelCostRate } from "../model-provider.ts";
 import { isCodexModel } from "./codex-restrictions.ts";
 import { llmModels } from "./model-catalog.ts";
+import type { LLMModelPricing } from "./model-catalog.types.ts";
 
 const ANTHROPIC_MODEL_ID = /^~?anthropic\//;
 const OPENAI_AUDIO_MODEL_ID = /^~?openai\/(gpt-audio|gpt-realtime)/;
@@ -44,6 +45,17 @@ export function deriveAudioOutputRate(
   return pricing.audioCostPerToken * 2;
 }
 
+/**
+ * Drops negative rates. The upstream catalog marks a router, which has no rate of its own,
+ * with -1 per token; read as a price that bills every routed token below zero. Partial
+ * because the dropped keys include the two the catalog type marks as required.
+ */
+export function withoutNegativeRates(pricing: LLMModelPricing): Partial<LLMModelPricing> {
+  return Object.fromEntries(
+    Object.entries(pricing).filter(([, rate]) => !(typeof rate === "number" && rate < 0)),
+  );
+}
+
 let cachedRates: readonly ModelCostRate[] | null = null;
 
 export function getStaticModelCostRates(): readonly ModelCostRate[] {
@@ -52,7 +64,8 @@ export function getStaticModelCostRates(): readonly ModelCostRate[] {
   }
 
   const rates = Object.entries(llmModels.models)
-    .flatMap(([modelId, model]): ModelCostRate[] => {
+    .flatMap(([modelId, catalogModel]): ModelCostRate[] => {
+      const model = { pricing: withoutNegativeRates(catalogModel.pricing) };
       if (isCodexModel(modelId) || !hasPrice(model.pricing)) {
         return [];
       }

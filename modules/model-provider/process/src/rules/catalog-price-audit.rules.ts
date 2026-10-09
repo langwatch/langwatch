@@ -11,6 +11,8 @@ const FIELD_UNITS = {
   inputCostPerToken: "token",
   outputCostPerToken: "token",
   audioCostPerToken: "token",
+  imageCostPerToken: "token",
+  imageOutputCostPerToken: "token",
   inputCacheReadPerToken: "token",
   inputCacheWritePerToken: "token",
   inputCacheWrite1hPerToken: "token",
@@ -191,9 +193,17 @@ export function auditCatalog({
   const crossSource: PriceDisagreement[] = [];
   const overriding: string[] = [];
 
+  // A generated entry the overlay overrides never bills: the overlay wins at
+  // load time, and the drift check already holds the overlay's rate against
+  // upstream. Reporting the generated rate as well would show a wrong number
+  // that is already corrected.
+  const notOverridden = Object.fromEntries(
+    Object.entries(generated).filter(([modelId]) => !overlay[modelId]),
+  );
+
   checkModels({ models: overlay, origin: "overlay", upstream, unitMismatch, into: drift });
   checkModels({
-    models: generated,
+    models: notOverridden,
     origin: "generated",
     upstream,
     unitMismatch,
@@ -227,6 +237,23 @@ export type AuditBaseline = {
   /** Model ids allowed to price a different unit than upstream. */
   unitMismatch?: Record<string, string>;
 };
+
+/**
+ * The report without the cross-source rows the baseline already accepts. Once the vendor's
+ * own page has confirmed the catalog side, repeating the row every week buries the unchecked
+ * ones. The reason stays in the baseline file.
+ */
+export function withoutAcceptedCrossSource(
+  report: AuditReport,
+  baseline: AuditBaseline,
+): AuditReport {
+  return {
+    ...report,
+    crossSource: report.crossSource.filter(
+      (d) => !baseline.disagreements?.[`${d.modelId}::${d.field}`],
+    ),
+  };
+}
 
 /**
  * Findings the baseline does not already account for. Cross-source

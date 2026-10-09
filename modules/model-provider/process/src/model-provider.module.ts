@@ -50,7 +50,12 @@ export const modelProviderProcessModule: PublishedProcessModule<
   ])
   .withTasks(async ({ secrets, repositories }) => [
     await secrets.into(ModelProviderModule.operationalSecrets.openRouter, (apiKey) =>
-      ModelRegistrySyncTask.create({ apiKey: () => apiKey }),
+      secrets.into(ModelProviderModule.operationalSecrets.doublewordCatalog, (doublewordApiKey) =>
+        ModelRegistrySyncTask.create({
+          apiKey: () => apiKey,
+          doublewordApiKey: () => doublewordApiKey,
+        }),
+      ),
     ),
     ModelProviderCustomModelsMigrateTask.create({ database: () => repositories.providers }),
   ])

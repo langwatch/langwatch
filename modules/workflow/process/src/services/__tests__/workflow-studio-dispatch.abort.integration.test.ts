@@ -117,3 +117,55 @@ describe("given a studio run that finishes before any stop", () => {
     });
   });
 });
+
+describe("given a consumer that rethrows a node failure carrying an upstream status", () => {
+  describe("when the stream reports the failure back", () => {
+    /** @scenario A provider account with no credit left is named in the playground */
+    it("re-emits the failure with the same upstream status", async () => {
+      const failedNodeFrame = {
+        type: "component_state_change",
+        payload: {
+          component_id: "node-1",
+          execution_state: {
+            status: "error",
+            error: "gateway returned non-2xx status 402",
+            upstream_status: 402,
+          },
+        },
+      };
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(
+            new TextEncoder().encode(`data: ${JSON.stringify(failedNodeFrame)}\n\n`),
+          );
+          controller.close();
+        },
+      });
+      const seen: StudioServerEvent[] = [];
+      const onEvent = vi.fn((event: StudioServerEvent) => {
+        seen.push(event);
+        if (seen.length > 1 || event.type !== "component_state_change") return;
+        const state = event.payload.execution_state;
+        if (state?.error) {
+          throw Object.assign(new Error(state.error), { upstreamStatus: state.upstream_status });
+        }
+      });
+
+      await dispatch(stream.getReader()).postEvent({
+        projectId: "project-1",
+        event: blockedCell,
+        onEvent,
+        isAborted: async () => false,
+      });
+
+      expect(onEvent).toHaveBeenCalledTimes(2);
+      expect(seen[1]).toMatchObject({
+        type: "component_state_change",
+        payload: {
+          component_id: "node-1",
+          execution_state: { status: "error", upstream_status: 402 },
+        },
+      });
+    });
+  });
+});

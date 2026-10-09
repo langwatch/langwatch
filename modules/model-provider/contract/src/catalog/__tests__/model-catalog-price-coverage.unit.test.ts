@@ -33,10 +33,24 @@ const overlayModels = overlayModelCatalog.models;
 const PRICED_ELSEWHERE = [/^openai_codex\//, /^openrouter\//];
 
 /**
+ * Whether a catalog entry is a router: it states at least one rate and every rate is negative.
+ * A router is priced by the model it routes to. One negative field next to real prices is a
+ * bad price, not a router, and has to be explained on its own.
+ */
+const isVariablePriceRouter = (entry: LLMModelEntry | undefined) => {
+  const rates = Object.values(entry?.pricing ?? {}).filter(
+    (rate): rate is number => typeof rate === "number",
+  );
+  return rates.length > 0 && rates.every((rate) => rate < 0);
+};
+
+/**
  * Models known to have no usable rate, each with the reason. This is debt, not permission.
  * Removing a line is the goal; adding one needs the reason written down.
  */
 const KNOWN_UNPRICED: Record<string, string> = {
+  "inclusionai/ling-3.1-flash":
+    "The upstream source lists it at zero per token and there is no published rate to correct it with, so no price is set here.",
   "gemini/lyria-3-clip-preview":
     "Music generation billed per 30-second clip at $0.04. Both upstream sources report zero per token and the catalog has no per-clip unit.",
   "gemini/lyria-3-pro-preview":
@@ -46,7 +60,8 @@ const KNOWN_UNPRICED: Record<string, string> = {
 };
 
 const isPricedElsewhere = (modelId: string) =>
-  PRICED_ELSEWHERE.some((pattern) => pattern.test(modelId));
+  PRICED_ELSEWHERE.some((pattern) => pattern.test(modelId)) ||
+  isVariablePriceRouter(llmModels.models[modelId]);
 
 /** One unit of every quantity the cost path can price. */
 const ONE_OF_EVERYTHING = {

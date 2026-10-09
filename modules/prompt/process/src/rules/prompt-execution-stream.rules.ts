@@ -3,11 +3,42 @@
  * delta arithmetic and run-is-over decision test without a socket: the
  * transport owns the framing, this owns the reading.
  */
-import type { PlaygroundStreamEvent } from "@langwatch/prompt-contract";
+import {
+  llmErrorTypeFromStatus,
+  type ParsedLLMError,
+  parseLLMError,
+  type PlaygroundStreamEvent,
+} from "@langwatch/prompt-contract";
 import type { StudioServerEvent } from "@langwatch/workflow-contract";
 
 import { PROMPT_NODE_ID } from "./prompt-execution-event.rules.ts";
 import { extractStreamableOutput, type OutputConfig } from "./prompt-output-format.rules.ts";
+
+/** A node failure that carries the HTTP status the model provider answered with. */
+type UpstreamLLMError = Error & { readonly upstreamStatus: number | undefined };
+
+export function upstreamLLMError({
+  message,
+  upstreamStatus,
+}: {
+  message: string;
+  upstreamStatus: number | undefined;
+}): UpstreamLLMError {
+  return Object.assign(new Error(message), { name: "UpstreamLLMError", upstreamStatus });
+}
+
+/**
+ * Parses a node failure for the chat, naming the error from the provider's
+ * HTTP status when the message alone does not say what went wrong.
+ */
+export function parseNodeError(error: unknown): ParsedLLMError {
+  const parsed = parseLLMError(error instanceof Error ? error.message : String(error));
+  const status = (error as { upstreamStatus?: unknown } | null)?.upstreamStatus;
+  if (parsed.type === "unknown" && typeof status === "number") {
+    return { ...parsed, type: llmErrorTypeFromStatus(status) };
+  }
+  return parsed;
+}
 
 /**
  * The new text since the last chunk sent. The engine reports the field's
@@ -69,7 +100,9 @@ export function handleEngineEvent({
   });
   if (delta.text) send({ type: "delta", content: delta.text });
 
-  if (state.error) throw new Error(state.error);
+  if (state.error) {
+    throw upstreamLLMError({ message: state.error, upstreamStatus: state.upstream_status });
+  }
 
   return {
     sent: delta.total,

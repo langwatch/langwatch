@@ -7,7 +7,7 @@
 #
 # The consequence is visible in any go-ci run's log:
 #
-#   Cache hit for: setup-go-Linux-x64-ubuntu24-go-1.26.6-<hash of go.sum>
+#   Cache hit for: setup-go-Linux-x64-ubuntu24-go-1.27.2-<hash of go.sum>
 #   Cache restored successfully
 #   ...
 #   Cache hit occurred on the primary key ..., not saving cache.

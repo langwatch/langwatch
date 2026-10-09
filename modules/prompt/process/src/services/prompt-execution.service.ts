@@ -3,7 +3,6 @@ import { randomBytes } from "node:crypto";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { createLogger } from "@langwatch/observability";
 import {
-  parseLLMError,
   PromptPlaygroundNotPermittedError,
   type PlaygroundStreamEvent,
   type PromptApiCaller,
@@ -20,7 +19,7 @@ import {
   buildPromptExecutionEvent,
   outputConfigsFor,
 } from "../rules/prompt-execution-event.rules.ts";
-import { handleEngineEvent } from "../rules/prompt-execution-stream.rules.ts";
+import { handleEngineEvent, parseNodeError } from "../rules/prompt-execution-stream.rules.ts";
 import type { PromptExecuteBoundsService } from "./prompt-execute-bounds.service.ts";
 
 const logger = createLogger("langwatch:prompt-playground");
@@ -119,7 +118,7 @@ async function streamPromptExecution({
     logger.error({ error, projectId }, "prompt execution failed");
     send({
       type: "error",
-      error: parseLLMError(error instanceof Error ? error.message : String(error)),
+      error: parseNodeError(error),
     });
   } finally {
     finish();

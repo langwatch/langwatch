@@ -26,6 +26,7 @@ export const modelProviderIcons: Record<keyof typeof modelProviders, React.React
   custom: designSystemIcons.custom,
   xai: designSystemIcons.xai,
   cerebras: designSystemIcons.cerebras,
+  doubleword: designSystemIcons.doubleword,
   voyage: designSystemIcons.voyage,
   azure_safety: <Azure />,
 };

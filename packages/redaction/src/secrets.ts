@@ -143,7 +143,31 @@ function isKeyShapedBody(body: string): boolean {
   }
   const { lower, upper, digit } = countCharClasses(body);
   if (lower < 2 || upper < 2 || digit < 2) return false;
+  if (isWordSlug(body)) return false;
   return shannonEntropyBits(body) >= SHAPED_TOKEN_MIN_ENTROPY;
+}
+
+const SLUG_MIN_SEGMENTS = 4;
+const SLUG_LETTERS_SEGMENT = /^[A-Za-z]{1,12}$/;
+const SLUG_TAG_SEGMENT = /^[A-Za-z0-9]{1,6}$/;
+const SLUG_WORD_SEGMENT = /^(?:[a-z]{4,}|[A-Z]{4,}|[A-Z][a-z]{3,})$/;
+
+/**
+ * Whether a body is a name built from words and short tags, such as the open-weight model id
+ * `NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4`, rather than key material. It needs four or more
+ * parts, each letters only or at most six characters, and one of them an ordinary word.
+ */
+function isWordSlug(body: string): boolean {
+  const segments = body.split(/[-_]/);
+  if (segments.length < SLUG_MIN_SEGMENTS) return false;
+  let hasWord = false;
+  for (const segment of segments) {
+    if (!SLUG_LETTERS_SEGMENT.test(segment) && !SLUG_TAG_SEGMENT.test(segment)) {
+      return false;
+    }
+    if (SLUG_WORD_SEGMENT.test(segment)) hasWord = true;
+  }
+  return hasWord;
 }
 
 /**

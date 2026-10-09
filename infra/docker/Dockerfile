@@ -3,7 +3,7 @@
 # stdlib only). Built here so the builder carries the binary and no Go
 # toolchain, and so this layer caches until those two directories change.
 # `go mod download` is skipped on purpose: the binary imports no module.
-FROM golang:1.27.1-alpine AS devscripts
+FROM golang:1.27.2-alpine AS devscripts
 WORKDIR /src
 COPY go.work go.work.sum ./
 COPY cmd/go.* cmd/

@@ -255,6 +255,16 @@ function asReachabilityError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
 }
 
+/**
+ * A consumer that rethrows a node failure from inside onEvent lands in the
+ * stream's catch too. Keeps the provider's HTTP status it carried, which is
+ * what tells an out-of-credit account from a bad key or a rate limit.
+ */
+function upstreamStatusField(error: unknown): { upstream_status?: number } {
+  const status = (error as { upstreamStatus?: unknown } | null)?.upstreamStatus;
+  return typeof status === "number" ? { upstream_status: status } : {};
+}
+
 /** Reports a stream failure to the watcher as the studio event it is. */
 function reportAsStudioEvent(error: unknown, input: WorkflowStudioDispatchInput): void {
   const message = (error as Error).message;
@@ -269,6 +279,7 @@ function reportAsStudioEvent(error: unknown, input: WorkflowStudioDispatchInput)
         execution_state: {
           status: "error",
           error: message,
+          ...upstreamStatusField(error),
           timestamps: { finished_at: nowInstant().epochMilliseconds },
         },
       },

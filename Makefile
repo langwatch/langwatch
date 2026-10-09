@@ -246,7 +246,7 @@ herrgen-check:
 # SEMGREP_VERSION is PINNED to what .github/workflows/coderabbit-config-check.yml
 # uses — rule-matching behaviour is version-sensitive. Bump both together.
 SEMGREP_VERSION  := 1.164.0
-GOLANGCI_VERSION := v2.13.2
+GOLANGCI_VERSION := v2.14.0
 
 # uvx runs the pinned version without installing it globally, so a developer
 # with a different semgrep on PATH still gets the CI behaviour.

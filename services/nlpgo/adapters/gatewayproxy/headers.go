@@ -79,12 +79,11 @@ func ParseCredentialFromHeaders(h http.Header) (domain.Credential, error) {
 		Extra:      make(map[string]string),
 	}
 
-	// Only the provider shapes that ship credentials inline today are mapped;
-	// others (e.g. ProviderVoyage) fall through with an empty Extra.
+	// Only the provider shapes that ship credentials inline today are mapped.
 	switch provider {
 	case domain.ProviderOpenAI, domain.ProviderAnthropic, domain.ProviderGemini,
 		domain.ProviderXAI, domain.ProviderGroq, domain.ProviderCerebras,
-		domain.ProviderDeepSeek:
+		domain.ProviderDeepSeek, domain.ProviderDoubleword:
 		cred.APIKey = h.Get(headerAPIKey)
 		if base := h.Get(headerAPIBase); base != "" {
 			cred.Extra["api_base"] = base
@@ -155,6 +154,9 @@ func ParseCredentialFromHeaders(h http.Header) (domain.Credential, error) {
 		if v := h.Get(headerVertexLocation); v != "" {
 			cred.Extra["vertex_location"] = v
 		}
+	case domain.ProviderVoyage, domain.ProviderCustom, domain.ProviderElevenLabs,
+		domain.ProviderLangWatch, domain.ProviderOpenAICodex:
+		// No inline credential shape: Extra stays empty.
 	}
 
 	// Populate the Azure / Bedrock / Vertex deployment map from the requested
@@ -212,6 +214,8 @@ func providerForPrefix(prefix string) (domain.ProviderID, bool) {
 		return domain.ProviderCerebras, true
 	case "deepseek":
 		return domain.ProviderDeepSeek, true
+	case "doubleword":
+		return domain.ProviderDoubleword, true
 	}
 	return "", false
 }

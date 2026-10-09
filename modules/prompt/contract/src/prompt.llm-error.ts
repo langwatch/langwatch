@@ -3,6 +3,7 @@ export type LLMErrorType =
   | "bad_request"
   | "auth"
   | "rate_limit"
+  | "out_of_credit"
   | "connection"
   | "unknown";
 
@@ -16,6 +17,7 @@ const LLM_ERROR_TYPES: ReadonlySet<string> = new Set<LLMErrorType>([
   "bad_request",
   "auth",
   "rate_limit",
+  "out_of_credit",
   "connection",
   "unknown",
 ]);
@@ -71,6 +73,20 @@ export function parseLLMError(raw: string): ParsedLLMError {
   }
 
   return { type: "unknown", message: raw };
+}
+
+/**
+ * Classifies a failure by the HTTP status the model provider answered with. The Go engine
+ * reports a provider failure as "gateway returned non-2xx status N" plus the status, which
+ * the litellm-shaped parsing above never matches.
+ */
+export function llmErrorTypeFromStatus(status: number): LLMErrorType {
+  if (status === 401 || status === 403) return "auth";
+  if (status === 402) return "out_of_credit";
+  if (status === 404) return "not_found";
+  if (status === 429) return "rate_limit";
+  if (status === 400 || status === 422) return "bad_request";
+  return "unknown";
 }
 
 function extractJsonMessage(raw: string): string {
