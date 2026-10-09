@@ -22,7 +22,6 @@ export const rumRest = defineRestRouter(RumApi)
   .withAddressing("literal", { v1Twin: false })
 
   .post(RUM_TRACES_PATH, "ingestBrowserTraces")
-  .servesWhileUpgrading()
   .withRawBody("text")
   .withBodyLimit({
     maxBytes: RUM_MAX_BODY_BYTES,
