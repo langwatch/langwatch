@@ -132,36 +132,17 @@ func browserRequest(verb string, inv invocation) (map[string]any, error) {
 		timeout = parsed
 	}
 	req := map[string]any{"lane": lane, "as": inv.value("--as"), "waitFor": inv.value("--wait-for"), "timeoutMs": timeout.Milliseconds()}
-	fields, ok := browserVerbArgs[verb]
-	if !ok {
+	if _, ok := browserVerbArgs[verb]; !ok {
 		return nil, errors.New(browserUsage)
 	}
-	given := inv.args[1:]
-	for i, field := range fields {
-		optional := strings.HasSuffix(field, "?")
-		field = strings.TrimSuffix(field, "?")
-		if i >= len(given) {
-			if !optional {
-				return nil, fmt.Errorf("haven browser %s needs <%s>", verb, field)
-			}
-			continue
-		}
-		req[field] = given[i]
-	}
-	if len(given) > len(fields) {
-		return nil, fmt.Errorf("haven browser %s takes %d argument(s)", verb, len(fields))
+	if err := fillPositionals(verb, inv.args[1:], req); err != nil {
+		return nil, err
 	}
 	if err := browserExtras(verb, inv, req); err != nil {
 		return nil, err
 	}
-	for _, field := range []string{"file", "out"} {
-		if raw, ok := req[field].(string); ok {
-			abs, err := filepath.Abs(raw)
-			if err != nil {
-				return nil, err
-			}
-			req[field] = abs
-		}
+	if err := absolutise(req); err != nil {
+		return nil, err
 	}
 	if verb == "screenshot" || verb == "record-stop" {
 		out := inv.value("--out")
@@ -179,6 +160,40 @@ func browserRequest(verb string, inv invocation) (map[string]any, error) {
 		req["out"] = abs
 	}
 	return req, nil
+}
+
+// fillPositionals copies the verb's positional arguments into req; "?" marks an optional one.
+func fillPositionals(verb string, given []string, req map[string]any) error {
+	fields := browserVerbArgs[verb]
+	for i, field := range fields {
+		optional := strings.HasSuffix(field, "?")
+		field = strings.TrimSuffix(field, "?")
+		if i >= len(given) {
+			if !optional {
+				return fmt.Errorf("haven browser %s needs <%s>", verb, field)
+			}
+			continue
+		}
+		req[field] = given[i]
+	}
+	if len(given) > len(fields) {
+		return fmt.Errorf("haven browser %s takes %d argument(s)", verb, len(fields))
+	}
+	return nil
+}
+
+// absolutise makes the file and out paths absolute: the daemon runs elsewhere.
+func absolutise(req map[string]any) error {
+	for _, field := range []string{"file", "out"} {
+		if raw, ok := req[field].(string); ok {
+			abs, err := filepath.Abs(raw)
+			if err != nil {
+				return err
+			}
+			req[field] = abs
+		}
+	}
+	return nil
 }
 
 // browserExtras maps drag's --by and snapshot's filters onto the request.
