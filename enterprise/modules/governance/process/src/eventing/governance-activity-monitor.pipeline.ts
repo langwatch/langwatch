@@ -12,8 +12,9 @@ import {
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 import {
-  ORGANIZATION_SIGNED_UP_EVENT_TYPE,
-  organizationSignedUpEventDataSchema,
+  ORGANIZATION_CREATED_EVENT_TYPE,
+  organizationCreatedEventDataSchema,
+  type OrganizationCreatedEventData,
 } from "@langwatch/organization-contract";
 import { nowInstant } from "@langwatch/time";
 
@@ -54,9 +55,20 @@ import {
 
 export const GOVERNANCE_ACTIVITY_MONITOR_PIPELINE_NAME = "governance_activity_monitor";
 
+/** Seeds only an organization with no entries, so a redelivered fact seeds nothing twice. */
+export function seedDefaultAiToolCatalog({
+  catalog,
+}: {
+  catalog: Pick<GovernanceModule, "aiToolEnsureDefaultCatalog">;
+}): (data: OrganizationCreatedEventData) => Promise<void> {
+  return async ({ organizationId }) => {
+    await catalog.aiToolEnsureDefaultCatalog({ organizationId });
+  };
+}
+
 /**
  * `global`: one pass evaluates every spend_spike rule; one pulls every tenant's governance traces.
- * A signed-up organization gets the standard AI-tool catalogue, and a SCIM cost center its
+ * A created organization gets the standard AI-tool catalogue, and a SCIM cost center its
  * department, from governance's own side (§9).
  */
 function buildGovernanceActivityMonitor({
@@ -76,83 +88,78 @@ function buildGovernanceActivityMonitor({
   >
 >): StaticPipelineDefinition<never> {
   app.connectAnomalyAlertOutbox({ processStore });
-  return (
-    definePipeline({
-      name: GOVERNANCE_ACTIVITY_MONITOR_PIPELINE_NAME,
-      aggregate: defineAggregate({ type: "global" }),
+  return definePipeline({
+    name: GOVERNANCE_ACTIVITY_MONITOR_PIPELINE_NAME,
+    aggregate: defineAggregate({ type: "global" }),
+  })
+    .withEvents([])
+    .withPeerSubscriber("seedDefaultAiToolCatalog", {
+      eventType: ORGANIZATION_CREATED_EVENT_TYPE,
+      data: organizationCreatedEventDataSchema,
+      handle: seedDefaultAiToolCatalog({ catalog: app }),
     })
-      .withEvents([])
-      // Seeds only an organization with no entries, so a redelivered sign-up seeds nothing twice.
-      .withPeerSubscriber("seedDefaultAiToolCatalog", {
-        eventType: ORGANIZATION_SIGNED_UP_EVENT_TYPE,
-        data: organizationSignedUpEventDataSchema,
-        handle: async ({ organizationId }) => {
-          await app.aiToolEnsureDefaultCatalog({ organizationId });
-        },
-      })
-      .withPeerSubscriber("assignScimCostCenterDepartment", {
-        eventType: SCIM_COST_CENTER_CHANGED_EVENT_TYPE,
-        data: scimCostCenterChangedEventDataSchema,
-        handle: assignScimCostCenterDepartment({ departments: app }),
-      })
-      .withProcessManager(SPEND_SPIKE_EVALUATION_PROCESS_NAME, (pm) =>
-        pm
-          .state(spendSpikeEvaluationStateSchema, SPEND_SPIKE_EVALUATION_INITIAL_STATE)
-          .schedule({ everyMs: SPEND_SPIKE_EVALUATION_INTERVAL_MS })
-          .onWake(spendSpikeEvaluationWake)
-          .intent(
-            "pass",
-            spendSpikeEvaluationPassSchema,
-            runSpendSpikeEvaluation({
-              evaluate: () => app.evaluateSpendSpikes(),
-              deleteDispatchedBefore: (params) => processStore.deleteDispatchedBefore(params),
-              now: () => nowInstant().epochMilliseconds,
-            }),
-          )
-          // One pass at a time; an open alert per rule keeps a repeated pass from firing twice.
-          .outbox({ maxAttempts: 1, concurrency: 1, batchSize: 1, leaseDurationMs: 5 * 60 * 1000 }),
-      )
-      .withProcessManager(ANOMALY_ALERT_DELIVERY_PROCESS_NAME, (pm) =>
-        pm
-          .state(anomalyAlertDeliveryStateSchema, ANOMALY_ALERT_DELIVERY_INITIAL_STATE)
-          .intent(
-            ANOMALY_ALERT_DELIVERY_REQUEST_INTENT,
-            anomalyAlertDeliveryIntentSchema,
-            (intent, context) => app.requestAnomalyAlertDelivery(intent, context),
-          )
-          .intent(
-            ANOMALY_ALERT_DELIVERY_PRUNE_INTENT,
-            anomalyAlertDeliveryPruneSchema,
-            pruneAnomalyAlertDeliveries(processStore),
-          )
-          .schedule({ everyMs: ANOMALY_ALERT_DELIVERY_PRUNE_INTERVAL_MS })
-          .onWake(anomalyAlertDeliveryPruneWake)
-          .outbox({ maxAttempts: ANOMALY_ALERT_DELIVERY_MAX_ATTEMPTS }),
-      )
-      .withProcessManager(GOVERNANCE_TRACE_FACTS_PROCESS_NAME, (pm) =>
-        pm
-          .state(governanceTraceFactsStateSchema, GOVERNANCE_TRACE_FACTS_INITIAL_STATE)
-          .schedule({ everyMs: GOVERNANCE_TRACE_FACTS_INTERVAL_MS })
-          .onWake(governanceTraceFactsWake)
-          .intent(
-            "pass",
-            governanceTraceFactsPassSchema,
-            runGovernanceTraceFacts({
-              pull: (window) => app.pullGovernanceTraceFacts(window),
-              deleteDispatchedBefore: (params) => processStore.deleteDispatchedBefore(params),
-              now: () => nowInstant().epochMilliseconds,
-            }),
-          )
-          // A failed window is re-driven whole; its rows replace by key.
-          .outbox({
-            maxAttempts: 10,
-            concurrency: 1,
-            batchSize: 1,
-            leaseDurationMs: 5 * 60 * 1000,
+    .withPeerSubscriber("assignScimCostCenterDepartment", {
+      eventType: SCIM_COST_CENTER_CHANGED_EVENT_TYPE,
+      data: scimCostCenterChangedEventDataSchema,
+      handle: assignScimCostCenterDepartment({ departments: app }),
+    })
+    .withProcessManager(SPEND_SPIKE_EVALUATION_PROCESS_NAME, (pm) =>
+      pm
+        .state(spendSpikeEvaluationStateSchema, SPEND_SPIKE_EVALUATION_INITIAL_STATE)
+        .schedule({ everyMs: SPEND_SPIKE_EVALUATION_INTERVAL_MS })
+        .onWake(spendSpikeEvaluationWake)
+        .intent(
+          "pass",
+          spendSpikeEvaluationPassSchema,
+          runSpendSpikeEvaluation({
+            evaluate: () => app.evaluateSpendSpikes(),
+            deleteDispatchedBefore: (params) => processStore.deleteDispatchedBefore(params),
+            now: () => nowInstant().epochMilliseconds,
           }),
-      )
-      .build()
-  );
+        )
+        // One pass at a time; an open alert per rule keeps a repeated pass from firing twice.
+        .outbox({ maxAttempts: 1, concurrency: 1, batchSize: 1, leaseDurationMs: 5 * 60 * 1000 }),
+    )
+    .withProcessManager(ANOMALY_ALERT_DELIVERY_PROCESS_NAME, (pm) =>
+      pm
+        .state(anomalyAlertDeliveryStateSchema, ANOMALY_ALERT_DELIVERY_INITIAL_STATE)
+        .intent(
+          ANOMALY_ALERT_DELIVERY_REQUEST_INTENT,
+          anomalyAlertDeliveryIntentSchema,
+          (intent, context) => app.requestAnomalyAlertDelivery(intent, context),
+        )
+        .intent(
+          ANOMALY_ALERT_DELIVERY_PRUNE_INTENT,
+          anomalyAlertDeliveryPruneSchema,
+          pruneAnomalyAlertDeliveries(processStore),
+        )
+        .schedule({ everyMs: ANOMALY_ALERT_DELIVERY_PRUNE_INTERVAL_MS })
+        .onWake(anomalyAlertDeliveryPruneWake)
+        .outbox({ maxAttempts: ANOMALY_ALERT_DELIVERY_MAX_ATTEMPTS }),
+    )
+    .withProcessManager(GOVERNANCE_TRACE_FACTS_PROCESS_NAME, (pm) =>
+      pm
+        .state(governanceTraceFactsStateSchema, GOVERNANCE_TRACE_FACTS_INITIAL_STATE)
+        .schedule({ everyMs: GOVERNANCE_TRACE_FACTS_INTERVAL_MS })
+        .onWake(governanceTraceFactsWake)
+        .intent(
+          "pass",
+          governanceTraceFactsPassSchema,
+          runGovernanceTraceFacts({
+            pull: (window) => app.pullGovernanceTraceFacts(window),
+            deleteDispatchedBefore: (params) => processStore.deleteDispatchedBefore(params),
+            now: () => nowInstant().epochMilliseconds,
+          }),
+        )
+        // A failed window is re-driven whole; its rows replace by key.
+        .outbox({
+          maxAttempts: 10,
+          concurrency: 1,
+          batchSize: 1,
+          leaseDurationMs: 5 * 60 * 1000,
+        }),
+    )
+    .build();
 }
 
 export const governanceActivityMonitorEventing = defineEventingModule({

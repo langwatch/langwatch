@@ -18,9 +18,8 @@ Feature: AI Tools Portal - Default catalog provisioning
     import recognises them instead of duplicating.
 
     Two triggers, one guarantee:
-      - onboarding initializeOrganization provisions at org creation for
-        every signup intent (non-fatal: a provisioning failure never
-        costs the user their new organization)
+      - governance provisions when the organization's creation fact
+        (lw.organization.created) arrives, whichever path created it
       - the aiTools.list read path provisions lazily before listing, so
         even an org created before this behavior (or after an onboarding
         hiccup) gets the catalog on its first portal load
@@ -42,6 +41,17 @@ Feature: AI Tools Portal - Default catalog provisioning
     Given the organization already received the standard catalog
     When provisioning runs again for the organization
     Then no new tiles appear and the catalog still has exactly 9 tiles
+
+  @unit
+  Scenario: A newly created organization is given the standard catalog from its creation fact
+    When the organization's creation fact is delivered to governance
+    Then the standard tools are provisioned for that organization
+
+  @unit
+  Scenario: A redelivered organization creation fact provisions no tile twice
+    Given the organization's creation fact was already delivered
+    When the same fact is delivered again
+    Then provisioning adds nothing and the catalog still has exactly 9 tiles
 
   @integration
   Scenario: An organization whose admin archived or disabled every entry is not re-seeded
