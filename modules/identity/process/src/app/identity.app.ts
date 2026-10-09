@@ -1,5 +1,4 @@
 import { AuditLogApi } from "@langwatch/audit-log-contract";
-import { AuthApi } from "@langwatch/auth-contract";
 import { SYSTEM_ACTORS } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
@@ -351,7 +350,7 @@ function legacySsoAccess({
   auth,
 }: {
   reads: IdentityChannels["authReads"];
-  auth: Pick<AuthApi, "retireLegacySsoAccess">;
+  auth: IdentityChannels["authCommands"];
 }): SsoLegacyAccessRetirement {
   return {
     count: (args) => reads.countLegacySsoAccess(args),
@@ -452,9 +451,6 @@ export class IdentityModule
   static readonly dependencies = {
     organizations: OrganizationApi,
     permissions: AuthzApi,
-    /** The commands left until auth's doors take them (round 48, A1-d): linking a provider
-     *  account, the two-step reset, the lookup's revokes and a cutover's sweep. */
-    auth: AuthApi,
     /** Whether somebody holds a password is the module that owns it. */
     users: UserApi,
     /** Whether an organization's plan carries the who-can-join control. */
@@ -746,7 +742,7 @@ export class IdentityModule
     const memberships = migrationMemberships(setup.dependencies.organizations);
     const legacyAccess = legacySsoAccess({
       reads: setup.channels.authReads,
-      auth: setup.dependencies.auth,
+      auth: setup.channels.authCommands,
     });
     // `directory` is unanswered here: whether provisioning has been repointed
     // is the directory module's to say, and an installation without one
@@ -851,7 +847,10 @@ export class IdentityModule
     const joinAdmissions = JoinAdmissionsService.create(setup.repositories.joinRequests);
 
     // auth's databaseHooks: a latched user's account ceremony is the adapter's alone (ADR-116 §5).
-    const bridge = BetterAuthCeremonyBridgeService.create({ ceremonies, routesToIdentity: isLatched });
+    const bridge = BetterAuthCeremonyBridgeService.create({
+      ceremonies,
+      routesToIdentity: isLatched,
+    });
     const hookCeremonies: IdentityCeremoniesApi = {
       beforeUserDelete: (user) => ceremonies.beforeUserDelete(user),
       createAccountIdentifier: (account) => bridge.createAccountIdentifier(account),
@@ -935,17 +934,23 @@ export class IdentityModule
           }),
           ledger,
           proposals: identityHistory,
-          accounts: setup.dependencies.auth,
+          accounts: setup.channels.authCommands,
         }),
         auditLog: setup.dependencies.auditLog,
         rateLimiter: setup.repositories.rateLimits,
-        sessions: setup.dependencies.auth,
+        sessions: {
+          listBrowserSessions: (args) => setup.channels.authReads.listBrowserSessions(args),
+          revokeAllBrowserSessions: (args) =>
+            setup.channels.authCommands.revokeAllBrowserSessions(args),
+          endBrowserSessionsForIdentifier: (args) =>
+            setup.channels.authCommands.endBrowserSessionsForIdentifier(args),
+        },
         invitations: setup.dependencies.organizations,
       }),
       twoStepAccounts: TwoStepAccountService.create({
         accounts: setup.repositories.twoStepVerification,
         deployment: { offersTwoStepVerification: () => setup.config.mfaEnrollmentOpen },
-        protocol: setup.dependencies.auth,
+        protocol: setup.channels.authCommands,
       }),
       organizationMfa: OrganizationMfaService.create({
         accounts: setup.repositories.twoStepVerification,

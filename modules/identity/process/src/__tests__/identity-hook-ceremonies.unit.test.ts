@@ -40,7 +40,6 @@ async function identityWithLatchedUser(): Promise<IdentityModule> {
     dependencies: {
       organizations: createApiFixture<OrganizationApi>(),
       permissions: createApiFixture<AuthzApi>(),
-      auth: createApiFixture<AuthApi>(),
       users: createApiFixture<UserApi>(),
       entitlements: createApiFixture<EntitlementApi>(),
       auditLog: createApiFixture<AuditLogApi>(),
@@ -51,7 +50,7 @@ async function identityWithLatchedUser(): Promise<IdentityModule> {
     resources: new ResourceScope(),
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
     repositories,
-    channels: { authReads: createApiFixture<AuthApi>() },
+    channels: { authReads: createApiFixture<AuthApi>(), authCommands: createApiFixture<AuthApi>() },
   });
 }
 
@@ -61,7 +60,8 @@ describe("given a latched user", () => {
     it("binds the bridge ceremonies, leaving the account attach to the adapter alone", async () => {
       const identity = await identityWithLatchedUser();
 
-      // The raw ceremony would pin the row and state the attach; with no event stack it would throw.
+      // The raw ceremony would pin the row and state the attach; with no event stack it
+      // would throw.
       await expect(identity.ceremonies().createAccountIdentifier(ACCOUNT)).resolves.toEqual({
         pinned: false,
       });

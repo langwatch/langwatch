@@ -18,21 +18,31 @@ export interface IdentityChannels {
     | "findSessionAmr"
     | "findAssertedAmrForIdentifiers"
   >;
+  /** Auth's commands whose doors stay identity's (D-IA2 B): the link, the revokes, the reset
+   *  and the sweep. */
+  readonly authCommands: Pick<
+    AuthApi,
+    | "linkProviderAccount"
+    | "revokeAllBrowserSessions"
+    | "endBrowserSessionsForIdentifier"
+    | "disableTwoStepVerification"
+    | "retireLegacySsoAccess"
+  >;
 }
 
 /**
- * Both tiers bind auth for its reads: a binding to a module is no peer (round 34; round 48,
- * A1-b and A1-c; record §5), so auth may depend on identity.
+ * Both tiers bind auth for its reads and commands: a binding to a module is no peer (round 34;
+ * round 48, A1-b and A1-c; record §5), so auth may depend on identity.
  */
 export class BoundIdentityChannels {
   static readonly requires = [] as const;
-  static readonly binds = { authReads: AuthApi } as const;
+  static readonly binds = { authReads: AuthApi, authCommands: AuthApi } as const;
 
   static create({
     bound,
   }: {
     bound: BoundApis<typeof BoundIdentityChannels.binds>;
   }): IdentityChannels {
-    return { authReads: bound.authReads };
+    return { authReads: bound.authReads, authCommands: bound.authCommands };
   }
 }
