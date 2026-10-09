@@ -352,16 +352,32 @@ export class LangWatchQLService {
       throw new LangWatchQLUnavailableError();
     }
 
-    return this.executeValidated({
+    const tenantCapability = lwqlCapability.tenantCapabilitySet({
+      secrets: projects.map((project) => project.lwqlKey),
+    });
+    const result = await this.executeValidated({
       executor,
       projects,
       protections,
       sql,
       validation,
       granularity,
-      ...(timeWindow ? { timeWindow } : {}),
+      tenantCapability,
       ...(signal ? { signal } : {}),
     });
+    // After the main query, never beside it: a refused or failed query costs no second read.
+    const completeness = await lwqlCompleteness.assess({
+      executor,
+      tenantCapability,
+      validation,
+      database: this.deps.database,
+      views: this.views,
+      timeWindow: validation.followsTimeWindow ? timeWindow : void 0,
+      granularitySeconds: granularity.followsGranularity ? granularity.granularitySeconds : void 0,
+    });
+
+    if (completeness.kind !== "reported") return result;
+    return { ...result, completeness: completeness.completeness };
   }
 
   /**
@@ -386,7 +402,7 @@ export class LangWatchQLService {
     sql,
     validation,
     granularity,
-    timeWindow,
+    tenantCapability,
     signal,
   }: {
     readonly executor: LangWatchQLExecutorRepository;
@@ -395,16 +411,13 @@ export class LangWatchQLService {
     readonly sql: string;
     readonly validation: ValidatedLangWatchQL;
     readonly granularity: LangWatchQLGranularityResolution;
-    readonly timeWindow?: LangWatchQLTimeWindow;
+    readonly tenantCapability: string;
     readonly signal?: AbortSignal;
   }): Promise<LangWatchQLQueryResult> {
     // The resolved record plus the step this run was bucketed at, when the
     // statement declares the parameter. Built unconditionally and omitted when
     // empty, so an unparameterised query keeps the request shape it had.
     const executionParameters = langWatchQLExecutionParameters({ validation, granularity });
-    const tenantCapability = lwqlCapability.tenantCapabilitySet({
-      secrets: projects.map((project) => project.lwqlKey),
-    });
 
     const execution = await executor.execute({
       // The submitted statement with one edit and no other: a default `LIMIT` when the caller
@@ -447,20 +460,6 @@ export class LangWatchQLService {
       ...(answer.appFunctions ? { appFunctions: answer.appFunctions } : {}),
     });
 
-    // After the main query, never beside it: a refused or failed query costs no second read.
-    // Only a statement bound to the window gets a report; a hard-coded range is not the period.
-    const completeness = await lwqlCompleteness.assess({
-      executor,
-      tenantCapability,
-      validation,
-      database: this.deps.database,
-      views: this.views,
-      ...(validation.followsTimeWindow && timeWindow ? { timeWindow } : {}),
-      ...(granularity.followsGranularity && granularity.granularitySeconds !== undefined
-        ? { granularitySeconds: granularity.granularitySeconds }
-        : {}),
-    });
-
     logger.info(
       {
         projectIds: projects.map((project) => project.id),
@@ -471,8 +470,6 @@ export class LangWatchQLService {
         diagnostics: diagnostics.map((diagnostic) => diagnostic.code),
         followsTimeWindow: validation.followsTimeWindow,
         followsGranularity: granularity.followsGranularity,
-        completeness:
-          completeness.kind === "reported" ? completeness.completeness.state : completeness.reason,
       },
       "LangWatchQL executed",
     );
@@ -491,7 +488,6 @@ export class LangWatchQLService {
       ...(granularity.coarsenedFromSeconds === undefined
         ? {}
         : { coarsenedFromSeconds: granularity.coarsenedFromSeconds }),
-      ...(completeness.kind === "reported" ? { completeness: completeness.completeness } : {}),
     };
   }
 }
