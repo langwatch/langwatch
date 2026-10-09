@@ -56,6 +56,7 @@ function serverSession(
 ): ConversationGroup {
   return mapSessionGroupToConversationGroup({
     conversationId: "sess-rollup",
+    projectId: "project-1",
     traceCount: 128,
     totalCost: 42.5,
     totalTokens: 2_400_000,

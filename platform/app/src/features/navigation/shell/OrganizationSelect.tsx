@@ -4,6 +4,7 @@ import { useLocalStorage } from "usehooks-ts";
 import { Menu } from "~/components/ui/menu";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { FullyLoadedOrganization } from "~/server/app-layer/organizations/repositories/organization.repository";
+import { landingProjectOf } from "~/server/app-layer/projects/project-kinds";
 import { useRouter } from "~/utils/compat/next-router";
 import { resolveOrgSwitchDestination } from "../logic/resolveOrgSwitchDestination";
 import type { ProductId } from "../products";
@@ -14,7 +15,8 @@ function firstProjectSlug(
 ): string | null {
   for (const team of organization.teams ?? []) {
     if (team.isPersonal) continue;
-    const project = team.projects?.[0];
+    // An aggregate is opened on purpose, never landed on (ADR-144 block F).
+    const project = landingProjectOf(team.projects ?? []);
     if (project) return project.slug;
   }
   return null;

@@ -24,8 +24,10 @@ Feature: License-Gated SSO
   #     Expiry is deliberately irrelevant to SSO: once a customer, never
   #     blocked. (Plan limits still expire; only login federation doesn't.)
   #   - "instance license key" = the LANGWATCH_LICENSE_KEY environment value.
-  #   - The gate is decided once at startup: license changes take effect on
-  #     the next server restart, never mid-flight.
+  #   - The gate is memoized per process. An allow is kept for the life of
+  #     the process. A deny is re-read after one minute, so an activation on
+  #     any replica turns SSO on everywhere within a minute, with no restart.
+  #     The server that stored the license sees it at once.
 
   As a LangWatch operator and as a person signing in
   I want SSO to be available only on deployments that were ever licensed, with a safe way back in
@@ -78,12 +80,26 @@ Feature: License-Gated SSO
     And this holds for the legacy provider callback paths as well
 
   @integration
-  Scenario: Activating a license takes effect at the next restart
+  Scenario: Activating a license turns SSO on without a restart
     Given an unlicensed self-hosted deployment running in email mode
     When an admin activates a genuine organization license in settings
-    Then SSO remains unavailable until the server restarts
-    And the activation flow tells the admin a restart is required
-    And after the restart SSO is available
+    Then SSO is available on the server that stored the license at once
+    And the activation flow tells the admin SSO turns on within a minute
+
+  @unit
+  Scenario: Another replica picks up an activation within a minute
+    Given a self-hosted deployment with several replicas, all denying SSO
+    When a genuine license is stored by one replica
+    Then every other replica still denies for at most one minute
+    And then allows SSO without a restart
+
+  @unit
+  Scenario: An allow is kept and a deny is not re-read on every request
+    Given the gate allowed SSO once in this process
+    Then it does not read the licensing store again
+    Given the gate denied SSO less than a minute ago
+    Then sign-in requests reuse that answer
+    And the email mode warning is logged once per process
 
   # ============================================================================
   # Recovery — the no-lockout guarantee
@@ -166,8 +182,7 @@ Feature: License-Gated SSO
     Given a fresh self-hosted deployment with no license
     When an operator signs up with email and password
     And activates an organization license in settings
-    And restarts the server
-    Then SSO is available
+    Then SSO is available without a restart
 
   # ============================================================================
   # Fail-closed and anti-takeover

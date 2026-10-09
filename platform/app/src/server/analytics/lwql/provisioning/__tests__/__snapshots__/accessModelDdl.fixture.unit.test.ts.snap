@@ -55,9 +55,6 @@ exports[`the definition-driven access DDL > given fixed names, password hash and
   "CREATE ROW POLICY OR REPLACE instant_eval_judgments_tenant ON langwatch.instant_eval_judgments
   USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
   TO langwatch_lwql",
-  "CREATE ROW POLICY OR REPLACE automation_audit_tenant ON langwatch.automation_audit
-  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
-  TO langwatch_lwql",
   "CREATE ROW POLICY OR REPLACE billable_events_tenant ON langwatch.billable_events
   USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
   TO langwatch_lwql",
@@ -414,7 +411,6 @@ exports[`the definition-driven access DDL > given fixed names, password hash and
   "GRANT SELECT(\`Agent\`, \`AgentType\`, \`Attempt\`, \`Branch\`, \`CacheCreationTokens\`, \`CacheReadTokens\`, \`CompactionTrigger\`, \`CostUsd\`, \`Decision\`, \`DecisionSource\`, \`DurationMs\`, \`ErrorType\`, \`EventKind\`, \`EventSequence\`, \`InputTokens\`, \`Model\`, \`OutputTokens\`, \`PostTokens\`, \`PreTokens\`, \`PrecomputeReuse\`, \`PromptChars\`, \`PromptId\`, \`QuerySource\`, \`RateLimitCarrier\`, \`RecordId\`, \`RepositoryHost\`, \`RepositoryName\`, \`RepositoryOwner\`, \`RequestId\`, \`RetryDurationMs\`, \`SessionId\`, \`SessionKeySource\`, \`SpanId\`, \`Speed\`, \`StatusCode\`, \`StopReason\`, \`Success\`, \`TenantId\`, \`TimeUnixMs\`, \`ToolInputBytes\`, \`ToolName\`, \`ToolResultBytes\`, \`TotalTokens\`, \`TraceId\`, \`TtftMs\`, \`UpdatedAt\`) ON langwatch.coding_agent_session_events TO langwatch_lwql",
   "GRANT SELECT(\`SpanAttributes\`, \`SpanId\`, \`SpanName\`, \`StartTime\`, \`StatusCode\`, \`TenantId\`, \`TraceId\`) ON langwatch.stored_spans TO langwatch_lwql",
   "GRANT SELECT(\`CreatedAt\`, \`Kind\`, \`Label\`, \`OccurredAt\`, \`Passed\`, \`Probabilities\`, \`Probability\`, \`QuestionId\`, \`RunId\`, \`Score\`, \`SpanId\`, \`Status\`, \`TenantId\`, \`ThreadId\`, \`TraceId\`, \`UpdatedAt\`) ON langwatch.instant_eval_judgments TO langwatch_lwql",
-  "GRANT SELECT(\`ActionClass\`, \`EventId\`, \`OccurredAt\`, \`ProjectedAt\`, \`TenantId\`, \`TraceId\`, \`TriggerId\`, \`_retention_days\`, \`_size_bytes\`) ON langwatch.automation_audit TO langwatch_lwql",
   "GRANT SELECT(\`CreatedAt\`, \`DeduplicationKey\`, \`DeduplicationKeyHash\`, \`EventId\`, \`EventTimestamp\`, \`EventType\`, \`OrganizationId\`, \`TenantId\`, \`UpdatedAt\`) ON langwatch.billable_events TO langwatch_lwql",
   "GRANT SELECT(\`OccurredAt\`, \`SessionId\`, \`TenantId\`, \`TraceId\`, \`UpdatedAt\`, \`_retention_days\`) ON langwatch.coding_agent_trace_sessions TO langwatch_lwql",
   "GRANT SELECT(\`CreatedAt\`, \`Examples\`, \`ExperimentId\`, \`Id\`, \`InsertedAt\`, \`Label\`, \`LlmCalls\`, \`LlmCallsTotal\`, \`LlmCallsTotalCost\`, \`LlmCallsTotalTokens\`, \`OptimizerName\`, \`OptimizerParameters\`, \`Predictors\`, \`RunId\`, \`Score\`, \`StepIndex\`, \`TenantId\`, \`UpdatedAt\`, \`WorkflowVersionId\`, \`_retention_days\`, \`_size_bytes\`) ON langwatch.dspy_steps TO langwatch_lwql",
@@ -544,7 +540,6 @@ exports[`the definition-driven access DDL > given fixed names, password hash and
   "GRANT SELECT ON langwatch.coding_session_events TO langwatch_lwql",
   "GRANT SELECT ON langwatch.coding_tool_results TO langwatch_lwql",
   "GRANT SELECT ON langwatch.judgments TO langwatch_lwql",
-  "GRANT SELECT ON langwatch.automation_events TO langwatch_lwql",
   "GRANT SELECT ON langwatch.billing_events TO langwatch_lwql",
   "GRANT SELECT ON langwatch.coding_trace_sessions TO langwatch_lwql",
   "GRANT SELECT ON langwatch.dspy_optimizer_steps TO langwatch_lwql",

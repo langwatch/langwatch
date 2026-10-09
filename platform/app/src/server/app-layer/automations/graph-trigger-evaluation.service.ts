@@ -23,14 +23,11 @@
  * `lastRunAt`).
  */
 
-import {
-  type SlackActionParams,
-  slackDeliveryMethodOf,
-} from "@langwatch/automations/providers/slack";
 import { buildGraphAlertTemplateContext } from "@langwatch/automations/templating/templateContext";
 import { createLogger } from "@langwatch/observability";
 import type { CustomGraphInput } from "~/components/analytics/CustomGraph";
 import type { CustomGraph, Project, Trigger } from "~/generated/prisma/client";
+import { isSeriesPercentageUnsupported } from "~/server/analytics/errors";
 import type {
   SeriesInputType,
   TimeseriesInputType,
@@ -47,7 +44,10 @@ import {
   type GraphAlertDispatchResult,
   graphAlertFireDigest,
 } from "~/server/app-layer/automations/dispatch/graphAlertActionDispatch";
-import { decryptSlackBotToken } from "~/server/app-layer/automations/providers/slack/server";
+import {
+  type SlackDestinationResolver,
+  slackConnectionMissingDispatchError,
+} from "~/server/app-layer/automations/slack-integration/slack-destination-resolver";
 import type { ActionParams } from "~/server/app-layer/automations/trigger.types";
 import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import {
@@ -58,6 +58,10 @@ import type {
   GraphTriggerSentRepository,
   OpenGraphTriggerSent,
 } from "./repositories/trigger.repository";
+import type {
+  EvaluationSkipCode,
+  RecordEvaluationInput,
+} from "./repositories/trigger-latest-evaluation.repository";
 import { parseSeriesIndex } from "./seriesName";
 
 const logger = createLogger("langwatch:graph-trigger-evaluation");
@@ -78,24 +82,20 @@ export type GraphTriggerEvaluationReason =
  *
  * A threshold evaluation collapses the whole result to ONE number
  * (`aggregateSeriesValues`), and the alert template's sparkline needs only the
- * time axis. But the query it issues carries the graph's `groupBy`, so
- * ClickHouse returns `buckets x distinct group values` and
- * `extractSeriesPoints` sums the group axis away in the worker — after every
- * row has been materialised as a JS object.
+ * time axis. The query used to carry the graph's `groupBy`, so ClickHouse
+ * returned `buckets x distinct group values`; a `groupBy` on something like a
+ * user id made the result grow without limit while the answer stayed one
+ * scalar. That killed the worker outright — the process died mid-read, so the
+ * job never completed and never failed; three of those in a row and the poison
+ * guard parked the tenant's whole graph-trigger lane, which is how one
+ * project's misconfigured graph silently stopped ALL of its alerts for 19 hours
+ * on 2026-08-09.
  *
- * The time axis is already capped at 1,000 buckets
- * (`adjustTimeScaleForBucketCap`). Cardinality is not capped and cannot be:
- * it comes from the data, so a `groupBy` on something like a user id makes the
- * result grow without limit while the answer stays one scalar. That is what
- * killed the worker outright — the process dies mid-read, so the job never
- * completes and never fails; three of those in a row and the poison guard
- * parks the tenant's whole graph-trigger lane, which is how one project's
- * misconfigured graph silently stopped ALL of its alerts for 19 hours on
- * 2026-08-09.
- *
- * 10,000 rows is 10x the bucket cap, so any single-group-per-bucket read
- * passes with room to spare, while a genuinely unbounded cardinality fails
- * fast and cheap — server-side, before anything is materialised here.
+ * The read no longer groups, and the time axis is capped at 1,000 buckets
+ * (`adjustTimeScaleForBucketCap`). The ceiling stays as the backstop: 10,000
+ * rows is 10x the bucket cap, so a normal read passes with room to spare, while
+ * anything that still fans out fails fast and cheap — server-side, before
+ * anything is materialised here.
  */
 export const GRAPH_TRIGGER_MAX_RESULT_ROWS = 10_000;
 
@@ -132,6 +132,12 @@ export interface EvaluateGraphTriggerResult {
   status: GraphTriggerEvaluationStatus;
   /** Skip reason / breach value diagnostics for logs and tests. */
   detail?: string;
+  /**
+   * The stable code for a skip, alongside the human `detail`. `detail` is
+   * developer prose and changes freely; this is what the recorded evaluation
+   * stores and the drawer turns into customer copy, so it must stay stable.
+   */
+  skipCode?: EvaluationSkipCode;
   /** Current metric value; null when there were no buckets at all. */
   value?: number;
   /** Whether a provider call actually carried the alert to a customer. Only
@@ -143,10 +149,7 @@ export interface EvaluateGraphTriggerResult {
   missingVariables?: string[];
 }
 
-export type StoredGraphConfig = Pick<
-  CustomGraphInput,
-  "series" | "groupBy" | "groupByKey" | "timeScale"
->;
+export type StoredGraphConfig = Pick<CustomGraphInput, "series" | "timeScale">;
 
 /**
  * Notification dispatcher hook (ADR-034 Phase 8.1). Implemented in the
@@ -179,6 +182,19 @@ export interface GraphTriggerEvaluationDeps {
     projectId: string;
   }): Promise<void>;
   notifier: GraphTriggerNotifier;
+  /**
+   * Record what this evaluation observed and decided, so the automation's
+   * view can answer "why is this alert not firing?".
+   *
+   * Optional: the evaluation is the product, the record is an observation of
+   * it, and every existing test double predates it. Where it is wired (the
+   * composition root always wires it), the implementation must never throw —
+   * `TriggerLatestEvaluationService.record` swallows its own failures — so a
+   * recording problem cannot suppress an alert.
+   */
+  recordEvaluation?(input: RecordEvaluationInput): Promise<void>;
+  /** ADR-093 §5a: where a Slack delivery goes (connection, else legacy secret). */
+  resolveSlackDestination: SlackDestinationResolver;
   /** Base host for building deep links inside rendered templates
    *  (ADR-034 Phase 8.1). Injected, not read from env, so this service
    *  stays pure and testable. */
@@ -187,26 +203,123 @@ export interface GraphTriggerEvaluationDeps {
 }
 
 /**
- * Evaluate (and possibly fire / resolve) one custom-graph trigger.
+ * Evaluate (and possibly fire / resolve) one custom-graph trigger, and record
+ * what the evaluation observed.
  *
  * Returns a typed result so callers can plumb telemetry. Throws only
  * on genuine infrastructure errors; soft failures (trigger missing,
  * graph missing, no series) return a `skipped` result.
+ *
+ * The recording hop is deliberately a thin wrapper around the unchanged
+ * evaluation, so there is exactly one write site instead of one per return
+ * branch, and no branch can be added later that forgets to record. A thrown
+ * evaluation records nothing: the throw is redelivered by the outbox, and the
+ * retry's own outcome is the one worth showing.
  */
-export async function evaluateGraphTrigger({
-  deps,
-  triggerId,
-  projectId,
-  reason,
-}: {
+export async function evaluateGraphTrigger(params: {
   deps: GraphTriggerEvaluationDeps;
   triggerId: string;
   projectId: string;
   reason: GraphTriggerEvaluationReason;
 }): Promise<EvaluateGraphTriggerResult> {
+  // The condition the check ran against, captured by the evaluation as soon
+  // as it is known. Recorded alongside the observed value so the snapshot
+  // stays truthful after someone edits the alert's threshold.
+  const observed: ObservedCondition = { condition: null, evaluatedAt: null };
+  const result = await runGraphTriggerEvaluation({ ...params, observed });
+  if (params.deps.recordEvaluation) {
+    try {
+      await params.deps.recordEvaluation(
+        evaluationRecordOf({
+          result,
+          condition: observed.condition,
+          // A branch that returns before the window clock is read (trigger
+          // gone, rule unreadable) still gets a fresh instant.
+          evaluatedAt: observed.evaluatedAt ?? params.deps.now(),
+        }),
+      );
+    } catch (error) {
+      // An observation of the alert must never become a way to break the
+      // alert. A throw here would be redelivered by the outbox and
+      // re-evaluate a trigger that has already fired and already dispatched.
+      // The recording service swallows its own failures too; this is the
+      // guarantee for any other implementation of the hook.
+      logger.warn(
+        {
+          projectId: params.projectId,
+          triggerId: params.triggerId,
+          status: result.status,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "failed to record the alert's latest evaluation — the evaluation itself is unaffected",
+      );
+    }
+  }
+  return result;
+}
+
+interface ObservedCondition {
+  condition: {
+    threshold: number;
+    operator: string;
+    timePeriodMinutes: number;
+  } | null;
+  /** The instant the metric was read — the same `now` that closed the
+   *  window, not a later clock read taken after dispatch. */
+  evaluatedAt: Date | null;
+}
+
+/**
+ * The snapshot one evaluation leaves behind. `already_firing` and
+ * `not_delivered` keep their own verdicts rather than collapsing into
+ * "fired": the reader's question is what happened on THIS check, and
+ * "the threshold was crossed but nothing was delivered" is the single most
+ * useful thing the product can say about a silent alert.
+ */
+function evaluationRecordOf({
+  result,
+  condition,
+  evaluatedAt,
+}: {
+  result: EvaluateGraphTriggerResult;
+  condition: ObservedCondition["condition"];
+  evaluatedAt: Date;
+}): RecordEvaluationInput {
+  return {
+    triggerId: result.triggerId,
+    projectId: result.projectId,
+    evaluatedAt,
+    verdict: result.status,
+    observedValue: result.value ?? null,
+    threshold: condition?.threshold ?? null,
+    operator: condition?.operator ?? null,
+    timePeriodMinutes: condition?.timePeriodMinutes ?? null,
+    skipCode: result.skipCode ?? null,
+  };
+}
+
+async function runGraphTriggerEvaluation({
+  deps,
+  triggerId,
+  projectId,
+  reason,
+  observed,
+}: {
+  deps: GraphTriggerEvaluationDeps;
+  triggerId: string;
+  projectId: string;
+  reason: GraphTriggerEvaluationReason;
+  observed: ObservedCondition;
+}): Promise<EvaluateGraphTriggerResult> {
   const trigger = await deps.loadTrigger({ triggerId, projectId });
   if (!trigger) {
-    return skipped({ triggerId, projectId, reason, detail: "trigger missing" });
+    return skipped({
+      triggerId,
+      projectId,
+      reason,
+      detail: "trigger missing",
+      code: "subject_missing",
+    });
   }
   if (!trigger.active) {
     return skipped({
@@ -214,6 +327,7 @@ export async function evaluateGraphTrigger({
       projectId,
       reason,
       detail: "trigger inactive",
+      code: "inactive",
     });
   }
   const customGraphId = trigger.customGraphId;
@@ -223,6 +337,7 @@ export async function evaluateGraphTrigger({
       projectId,
       reason,
       detail: "trigger has no customGraphId",
+      code: "subject_missing",
     });
   }
 
@@ -241,6 +356,7 @@ export async function evaluateGraphTrigger({
       projectId,
       reason,
       detail: "missing threshold / operator / timePeriod",
+      code: "incomplete_configuration",
     });
   }
   if (!seriesName) {
@@ -249,12 +365,27 @@ export async function evaluateGraphTrigger({
       projectId,
       reason,
       detail: "missing seriesName",
+      code: "incomplete_configuration",
     });
   }
+  // The condition is now known. Everything from here — a fire, a resolve, a
+  // quiet not-breached, or a skip on the graph itself — is an evaluation of
+  // THIS condition, and records it alongside whatever value it observed.
+  observed.condition = {
+    threshold,
+    operator,
+    timePeriodMinutes: timePeriod,
+  };
 
   const customGraph = await deps.loadCustomGraph({ customGraphId, projectId });
   if (!customGraph) {
-    return skipped({ triggerId, projectId, reason, detail: "graph not found" });
+    return skipped({
+      triggerId,
+      projectId,
+      reason,
+      detail: "graph not found",
+      code: "subject_missing",
+    });
   }
 
   const graphData = customGraph.graph as unknown as StoredGraphConfig | null;
@@ -264,6 +395,7 @@ export async function evaluateGraphTrigger({
       projectId,
       reason,
       detail: "graph has no series",
+      code: "incomplete_configuration",
     });
   }
 
@@ -278,6 +410,7 @@ export async function evaluateGraphTrigger({
       projectId,
       reason,
       detail: `series index ${seriesIndex} not in graph`,
+      code: "incomplete_configuration",
     });
   }
   const series = graphData.series[seriesIndex];
@@ -287,10 +420,12 @@ export async function evaluateGraphTrigger({
       projectId,
       reason,
       detail: "invalid series configuration",
+      code: "incomplete_configuration",
     });
   }
 
   const now = deps.now();
+  observed.evaluatedAt = now;
   const endDate = now;
   const startDate = new Date(endDate.getTime() - timePeriod * 60 * 1000);
 
@@ -312,7 +447,10 @@ export async function evaluateGraphTrigger({
       unknown
     > as TimeseriesInputType["filters"],
     series: [seriesInput],
-    groupBy: graphData.groupBy as TimeseriesInputType["groupBy"],
+    // Not the graph's `groupBy`: the threshold is checked against one number,
+    // and only the database can compute that number across every group. Adding
+    // per-group values back together gave a sum of averages for an `avg`
+    // series, and counted a trace once per label for an array grouping.
     timeScale: graphData.timeScale ?? 60,
     timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
   };
@@ -323,31 +461,60 @@ export async function evaluateGraphTrigger({
       maxResultRows: GRAPH_TRIGGER_MAX_RESULT_ROWS,
     });
   } catch (error) {
-    if (!isResultTooLarge(error)) throw error;
-    // A configuration fault, not an outage: this graph's `groupBy` has more
-    // distinct values than a threshold read can carry. Retrying re-asks the
-    // identical question, so this must NOT reach the caller's failure count —
-    // an evaluation that throws is redelivered, and a permanently oversized
-    // trigger would then re-fail on every delivery until it quarantined its
-    // tenant's whole lane, taking every OTHER trigger in that project down
-    // with it. Skipping isolates the damage to the one misconfigured trigger.
-    logger.error(
-      {
-        projectId,
+    if (isResultTooLarge(error)) {
+      // A configuration fault, not an outage: the read fans out to more rows
+      // than a threshold read can carry. Retrying re-asks the
+      // identical question, so this must NOT reach the caller's failure count —
+      // an evaluation that throws is redelivered, and a permanently oversized
+      // trigger would then re-fail on every delivery until it quarantined its
+      // tenant's whole lane, taking every OTHER trigger in that project down
+      // with it. Skipping isolates the damage to the one misconfigured trigger.
+      logger.error(
+        {
+          projectId,
+          triggerId,
+          reason,
+          timePeriodMinutes: timePeriod,
+          maxResultRows: GRAPH_TRIGGER_MAX_RESULT_ROWS,
+        },
+        "graph trigger evaluation skipped: timeseries result exceeds the row ceiling",
+      );
+      return skipped({
         triggerId,
+        projectId,
         reason,
-        groupBy: graphData.groupBy,
-        timePeriodMinutes: timePeriod,
-        maxResultRows: GRAPH_TRIGGER_MAX_RESULT_ROWS,
-      },
-      "graph trigger evaluation skipped: timeseries result exceeds the row ceiling",
-    );
-    return skipped({
-      triggerId,
-      projectId,
-      reason,
-      detail: "timeseries result exceeds the row ceiling",
-    });
+        detail: "timeseries result exceeds the row ceiling",
+        code: "result_too_large",
+      });
+    }
+    if (isSeriesPercentageUnsupported(error)) {
+      // Same class, same treatment: the saved series asks for a percentage of a
+      // per-entity measurement, which the query builder refuses because the
+      // unfiltered denominator would be taken over a different set of entities.
+      // Re-asking cannot change the answer, so rethrowing would redeliver this
+      // trigger forever and quarantine its tenant's lane. The series' metric
+      // rides in the log line rather than on the error, since this is the one
+      // caller that needs to know WHICH series has to be edited.
+      logger.error(
+        {
+          projectId,
+          triggerId,
+          reason,
+          seriesIndex,
+          seriesMetric: series.metric,
+          seriesAggregation: series.aggregation,
+        },
+        "graph trigger evaluation skipped: series cannot be shown as a percentage",
+      );
+      return skipped({
+        triggerId,
+        projectId,
+        reason,
+        detail: "series cannot be shown as a percentage",
+        code: "series_percentage_unsupported",
+      });
+    }
+    throw error;
   }
   // The stored `seriesName` identifies WHICH series the trigger watches
   // (`{index}/{key|metric}/{aggregation}` — parsed above via
@@ -361,12 +528,10 @@ export async function evaluateGraphTrigger({
   const currentPoints = extractSeriesPoints(
     timeseriesResult.currentPeriod,
     bucketKey,
-    graphData.groupBy,
   );
   const previousPoints = extractSeriesPoints(
     timeseriesResult.previousPeriod,
     bucketKey,
-    graphData.groupBy,
   );
   const currentValue = aggregateSeriesValues(
     currentPoints.map((point) => point.value),
@@ -420,6 +585,7 @@ export async function evaluateGraphTrigger({
         projectId,
         reason,
         detail: "project not found",
+        code: "subject_missing",
       });
     }
 
@@ -455,27 +621,34 @@ export async function evaluateGraphTrigger({
       baseHost: deps.baseHost,
     });
 
-    // ADR-041: a bot connection posts via the Web API (gated blocks render);
-    // extract + decrypt the token here so the dispatch helper stays crypto-free.
-    //
-    // An unresolvable bot connection FAILS LOUD. Falling through to the webhook
-    // branch would be worse than useless: bot params carry no `slackWebhook`, so
-    // the dispatcher would log "no Slack webhook configured", report didSend
-    // false, and the customer would never learn their alert is broken. A
-    // non-retryable DispatchError dead-letters the row with an actionable signal.
+    // ADR-093 §5a: the connection's kind decides bot or webhook; the token or
+    // URL is resolved here so the dispatch helper stays crypto-free. Nothing to
+    // deliver with FAILS LOUD: a non-retryable DispatchError dead-letters the
+    // row with an actionable signal instead of a silent didSend false.
     let botDestination: { token: string; channel: string } | null = null;
+    let slackWebhook: string | null = null;
     if (trigger.action === "SEND_SLACK_MESSAGE") {
-      const slackParams = (trigger.actionParams ?? {}) as SlackActionParams;
-      if (slackDeliveryMethodOf(slackParams) === "bot") {
-        const token = decryptSlackBotToken(slackParams);
-        const channel = slackParams.slackChannelId?.trim();
-        if (!token || !channel) {
-          throw new DispatchError({
-            message: `Slack bot connection for alert "${trigger.name}" is missing its token or channel — the alert cannot be delivered.`,
-            retryable: false,
-          });
-        }
-        botDestination = { token, channel };
+      const destination = await deps.resolveSlackDestination({
+        projectId,
+        actionParams: trigger.actionParams,
+      });
+      if (!destination) {
+        throw slackConnectionMissingDispatchError({
+          triggerName: trigger.name,
+        });
+      }
+      if (destination.kind === "webhook") {
+        slackWebhook = destination.url;
+      } else if (!destination.channel) {
+        throw new DispatchError({
+          message: `Slack bot connection for alert "${trigger.name}" is missing its channel — the alert cannot be delivered.`,
+          retryable: false,
+        });
+      } else {
+        botDestination = {
+          token: destination.token,
+          channel: destination.channel,
+        };
       }
     }
 
@@ -535,7 +708,7 @@ export async function evaluateGraphTrigger({
         project,
         context,
         recipients: params.members ?? [],
-        slackWebhook: params.slackWebhook ?? null,
+        slackWebhook,
         botDestination,
         fireDigest: graphAlertFireDigest({
           triggerId,
@@ -659,13 +832,24 @@ function skipped({
   projectId,
   reason,
   detail,
+  code,
 }: {
   triggerId: string;
   projectId: string;
   reason: GraphTriggerEvaluationReason;
   detail: string;
+  /** The stable counterpart to `detail`, recorded on the evaluation so the
+   *  automation's view can explain the skip in the customer's words. */
+  code: EvaluationSkipCode;
 }): EvaluateGraphTriggerResult {
-  return { triggerId, projectId, reason, status: "skipped", detail };
+  return {
+    triggerId,
+    projectId,
+    reason,
+    status: "skipped",
+    detail,
+    skipCode: code,
+  };
 }
 
 function noteIfNoData(operator: string, threshold: number): string | undefined {

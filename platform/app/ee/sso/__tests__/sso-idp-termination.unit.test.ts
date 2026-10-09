@@ -394,8 +394,10 @@ describe("how many identity providers an organization may register", () => {
       context: {
         deployment: "hosted",
         licensed: true,
-        licenseActivatedSinceStart: false,
+        licenseActivationPending: false,
         optedIn: true,
+        singleOrganization: false,
+        actorIsPlatformOperator: false,
       },
       now: () => 1_756_000_000_000,
     });

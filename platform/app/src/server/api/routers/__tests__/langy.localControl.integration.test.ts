@@ -183,6 +183,9 @@ beforeAll(async () => {
         organizationRole: "ADMIN",
       }),
     },
+    // An admin's mutation first asks whether the project is an aggregate,
+    // which refuses writes (ADR-144 decision 8). This one is a plain project.
+    projectKinds: { kindOf: async () => "application" },
     langy: {
       conversations: {
         findByIdVisible: async ({ id }: { id: string }) =>

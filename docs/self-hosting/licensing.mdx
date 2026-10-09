@@ -34,7 +34,9 @@ You never need a license just to run LangWatch. A license adds the enterprise ca
 <Note>
 An Enterprise license is priced per seat, so it carries the number of members you bought and the deployment enforces it. Everything else stays uncapped: volume, history, projects, teams, and every experimentation resource. Need more seats? [Talk to us](mailto:enterprise@langwatch.ai) and we reissue the license.
 
-Seats come in two kinds, and which one a person occupies follows from what they can do rather than from a billing switch: someone who can change things holds a **full seat**, someone who can only read what the team produces holds a **lite seat**. Lite seats are counted separately, so read-only reviewers do not consume a full one. See [Seats](/platform/members-and-teams#lite-members).
+Seats come in three kinds. Which of the first two a person occupies follows from what they can do rather than from a billing switch: someone who can change things holds a **full seat**, someone who can only read what the team produces holds a **lite seat**. Lite seats are counted separately, so read-only reviewers do not consume a full one.
+
+The third, a **Developer seat**, is for somebody who works in a project of their own and sees no shared project; it is counted but never limited by the license. See [Seats](/platform/members-and-teams#lite-members) and [Developers](/platform/members-and-teams#developers).
 </Note>
 
 <Note>
@@ -77,20 +79,31 @@ Those accounts have no password, so the door back in is **Forgot password**, and
 If you are already in this position, setting `LANGWATCH_LICENSE_KEY` and restarting is the recovery. It needs only the key, as long as the identity provider variables that were already working are still in place: the key licenses SSO, it does not configure it.
 </Warning>
 
+## Two forms of license
+
+LangWatch issues a license in one of two forms, and the install tells them apart by shape:
+
+| Form | Looks like | Network |
+|---|---|---|
+| **Activation code** | `LW-XXXX-XXXX-XXXX-XXXX` | The install redeems it over outbound HTTPS to `connect.langwatch.ai` for a signed license and stores that on the organization. It works only with outbound access to that host. |
+| **Signed license key** | A long base64 string, also delivered as a `.langwatch-license` file | Verified locally. It works offline. |
+
+In configuration, one setting takes both: the `LANGWATCH_LICENSE_KEY` variable or the Helm value `app.license.key`. There is no separate variable for activation codes. On **Settings → License**, choose **Enter activation code** for a code, and **Enter license key** or **Upload license file** for a signed license key. The page detects the form, so a value pasted under the other option is still accepted. See [Connect](/self-hosting/connect#activate-with-a-code) for what redemption sends.
+
 ## Activating a license
 
 <Steps>
 <Step title="Get a license">
-Email [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai) or [talk to sales](https://langwatch.ai/get-a-demo). You receive a signed license key.
+Email [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai) or [talk to sales](https://langwatch.ai/get-a-demo). You receive an activation code or a signed license key.
 </Step>
 
 <Step title="Activate it">
-In the platform, go to **Settings → License**, paste the key or upload the license file, and choose **Activate License**.
+In the platform, go to **Settings → License**, choose **Enter activation code** and paste the code, or choose **Enter license key** or **Upload license file** for a signed license key, then choose **Activate License**.
 
-Prefer configuration over a UI step? Set the key as an environment variable instead:
+Prefer configuration over a UI step? Set the code or key as an environment variable instead:
 
 ```bash
-LANGWATCH_LICENSE_KEY=<your signed license key>
+LANGWATCH_LICENSE_KEY=<your activation code or signed license key>
 ```
 
 On Helm, the chart takes it inline or from a Secret you already manage:
@@ -104,13 +117,25 @@ app:
         key: license
 ```
 
-Set through configuration, the license entitles the whole instance, so it does not have to be activated again for each organization the deployment hosts. It is also the recovery path for a deployment whose only administrators sign in through SSO: it needs no working login to take effect.
+A signed license key set through configuration entitles the whole instance, so it does not have to be activated again for each organization the deployment hosts. It is also the recovery path for a deployment whose only administrators sign in through SSO: it needs no working login to take effect.
 </Step>
 
-<Step title="Restart the deployment">
-The SSO decision is made once at startup. Plan entitlements apply immediately, but **SSO only turns on after a restart**. The activation confirmation in the UI says so too.
+<Step title="SSO turns on">
+Plan entitlements apply immediately. SSO turns on at once on the server that stored the license, and within a minute on every other replica, with no restart. The activation confirmation in the UI says so too.
+
+`LANGWATCH_LICENSE_KEY` and `app.license.key` are read at startup, so a change to the variable takes a restart.
 </Step>
 </Steps>
+
+## An activation code in the variable
+
+When `LANGWATCH_LICENSE_KEY` or `app.license.key` holds an activation code and an organization exists, the app redeems it at startup, before it decides SSO. It stores the signed license on the organization, the oldest one if there are several, so SSO is on in that same boot.
+
+- If an organization already holds a license, the code is not redeemed again, so a restart is a no-op. To change the license later, use **Settings → License** or put the signed license key in the variable.
+- On a fresh install with no organization yet, the code is redeemed when the first organization is created, and SSO turns on without a restart.
+- If redemption is refused, the app logs the reason and still starts. Causes: an unknown, expired or already used code, a code bound to another install, no outbound access to `connect.langwatch.ai`, or `LANGWATCH_CONNECT_DISABLED` set.
+
+The startup log names the form it found in the variable and what it did with it.
 
 ## Expiry
 

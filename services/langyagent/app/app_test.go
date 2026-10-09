@@ -9,7 +9,11 @@ import (
 	"time"
 
 	"go.opentelemetry.io/otel/trace"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 
+	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
 	"github.com/langwatch/langwatch/services/langyagent/internal/frames"
@@ -279,6 +283,38 @@ func TestApp_StartTurn_AtCapacityReturnsMaxWorkers(t *testing.T) {
 	_, err := newTestApp(pool, &fakeRelay{}).StartTurn(context.Background(), req())
 	if err == nil || !herr.IsCode(err, domain.ErrMaxWorkers) {
 		t.Fatalf("at capacity must return herr(ErrMaxWorkers) (transport → 503), got %v", err)
+	}
+}
+
+// @scenario "A keyless dispatch that needs a spawn is logged as the fallback, not an error"
+func TestApp_StartTurn_KeylessSpawnLogsTheFallbackNotAnError(t *testing.T) {
+	core, logs := observer.New(zapcore.DebugLevel)
+	ctx := clog.Set(context.Background(), zap.New(core))
+	pool := &fakePool{acquireErr: herr.New(ctx, domain.ErrCredentialsRequired, nil,
+		errors.New("a worker must be spawned for this conversation, but no session key was supplied"))}
+
+	_, err := newTestApp(pool, &fakeRelay{}).StartTurn(ctx, req())
+
+	if err == nil || !herr.IsCode(err, domain.ErrCredentialsRequired) {
+		t.Fatalf("a keyless spawn must still return herr(ErrCredentialsRequired) (transport → 428), got %v", err)
+	}
+	if n := logs.FilterLevelExact(zapcore.ErrorLevel).Len(); n != 0 {
+		t.Errorf("the mint-and-retry fallback must not log at error level, got %d error lines", n)
+	}
+	if n := logs.FilterLevelExact(zapcore.InfoLevel).Len(); n != 1 {
+		t.Errorf("the fallback must be logged once at info, got %d info lines", n)
+	}
+}
+
+func TestApp_StartTurn_OtherAcquireFailuresLogAtError(t *testing.T) {
+	core, logs := observer.New(zapcore.DebugLevel)
+	ctx := clog.Set(context.Background(), zap.New(core))
+	pool := &fakePool{acquireErr: herr.New(ctx, domain.ErrWorkerSpawn, nil)}
+
+	_, _ = newTestApp(pool, &fakeRelay{}).StartTurn(ctx, req())
+
+	if n := logs.FilterMessage("acquire worker failed").FilterLevelExact(zapcore.ErrorLevel).Len(); n != 1 {
+		t.Errorf("a failed spawn must log at error level, got %d error lines", n)
 	}
 }
 

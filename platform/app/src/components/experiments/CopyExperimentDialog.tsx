@@ -7,6 +7,7 @@ import {
 } from "@chakra-ui/react";
 import { useState } from "react";
 import { showErrorToast } from "~/features/errors";
+import type { ExperimentType } from "~/generated/prisma/client";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useProjectsForCopy } from "../../hooks/useProjectsForCopy";
 import { api } from "../../utils/api";
@@ -14,17 +15,20 @@ import { Checkbox } from "../ui/checkbox";
 import { Dialog } from "../ui/dialog";
 import { Select } from "../ui/select";
 import { toaster } from "../ui/toaster";
+import { replicateReferencesNote } from "./replicateReferencesNote";
 
 export const CopyExperimentDialog = ({
   open,
   onClose,
   experimentId,
   experimentName,
+  experimentType,
 }: {
   open: boolean;
   onClose: () => void;
   experimentId: string;
   experimentName: string;
+  experimentType: ExperimentType;
 }) => {
   const { project } = useOrganizationTeamProject();
   const utils = api.useUtils();
@@ -42,6 +46,12 @@ export const CopyExperimentDialog = ({
 
   const projectCollection = createListCollection({
     items: projects,
+  });
+
+  const note = replicateReferencesNote({
+    experimentType,
+    sourceProjectId: project?.id,
+    targetProjectId: selectedProjectId[0],
   });
 
   const handleCopy = async () => {
@@ -136,6 +146,11 @@ export const CopyExperimentDialog = ({
             >
               Replicate associated dataset
             </Checkbox>
+            {note && (
+              <Text fontSize="sm" color="fg.muted">
+                {note}
+              </Text>
+            )}
           </VStack>
         </Dialog.Body>
         <Dialog.Footer>

@@ -48,8 +48,14 @@ vi.mock(
 vi.mock("~/components/ui/color-mode", () => ({
   useColorMode: () => ({ colorMode: "light" }),
 }));
+const publicEnvState = vi.hoisted(() => ({ hasEmailProvider: true }));
 vi.mock("~/utils/api", () => ({
   api: {
+    publicEnv: {
+      useQuery: () => ({
+        data: { HAS_EMAIL_PROVIDER_KEY: publicEnvState.hasEmailProvider },
+      }),
+    },
     team: {
       getTeamWithMembers: {
         useQuery: () => ({ data: { members: [] }, isLoading: false }),
@@ -208,6 +214,46 @@ describe("EmailConfigForm default wording", () => {
       renderForm(makeCtx());
 
       expect(screen.queryByText(/cadence/i)).not.toBeInTheDocument();
+    });
+  });
+});
+
+describe("EmailConfigForm on an installation without email", () => {
+  afterEach(() => {
+    cleanup();
+    publicEnvState.hasEmailProvider = true;
+  });
+
+  describe("given no email provider is configured", () => {
+    /** @scenario "Email delivery setup warns when the installation cannot send email" */
+    it("warns that this installation cannot send email", () => {
+      publicEnvState.hasEmailProvider = false;
+      renderForm();
+
+      expect(screen.getByTestId("email-provider-missing")).toHaveTextContent(
+        /cannot send email/i,
+      );
+    });
+
+    it("still lets the automation be saved once it has a recipient", () => {
+      publicEnvState.hasEmailProvider = false;
+
+      expect(
+        emailClient.isComplete({
+          ...emailClient.initialSlice(),
+          members: ["someone@example.com"],
+        }),
+      ).toBe(true);
+    });
+  });
+
+  describe("given an email provider is configured", () => {
+    it("shows no warning", () => {
+      renderForm();
+
+      expect(
+        screen.queryByTestId("email-provider-missing"),
+      ).not.toBeInTheDocument();
     });
   });
 });

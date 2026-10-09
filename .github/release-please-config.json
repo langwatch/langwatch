@@ -363,6 +363,9 @@
           "jsonpath": "$.appVersion"
         },
         "charts/langwatch/values.yaml",
+        "docs/self-hosting/deployment/argocd.mdx",
+        "docs/self-hosting/deployment/docker-images.mdx",
+        "docs/self-hosting/upgrade.mdx",
         {
           "type": "yaml",
           "path": "charts/gateway/Chart.yaml",

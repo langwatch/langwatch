@@ -12,6 +12,7 @@ import { builtinRoleGrants, builtinRolePermissions } from "./roles";
 import type { ScopeChainLink } from "./scope";
 import type {
   AuthzDecision,
+  AuthzDenialReason,
   AuthzPrincipalRef,
   AuthzScopeRef,
   CollectedBinding,
@@ -167,15 +168,28 @@ export function denyStep({
   }
 
   const hadAnyPath = grants.isOrgMember || chainBindings.length > 0;
+  const seatReason = seatRestrictedReason(grants);
 
   return {
     ...base,
     allowed: false,
     denialReason:
-      grants.organizationRole === "EXTERNAL"
-        ? "lite-member-restricted"
-        : hadAnyPath
-          ? "no-binding"
-          : "no-membership",
+      seatReason ?? (hadAnyPath ? "no-binding" : "no-membership"),
   };
+}
+
+/**
+ * The seat itself is the reason, when it is one. A Lite Member or a Developer
+ * (ADR-143) is a member with a ceiling, and naming the ceiling is what lets
+ * the person act on it: ask for a different seat, not for a binding.
+ */
+function seatRestrictedReason(
+  grants: CollectedGrants,
+): Extract<
+  AuthzDenialReason,
+  "lite-member-restricted" | "developer-restricted"
+> | null {
+  if (grants.organizationRole === "EXTERNAL") return "lite-member-restricted";
+  if (grants.organizationRole === "DEVELOPER") return "developer-restricted";
+  return null;
 }

@@ -369,13 +369,18 @@ func reachableProviders(bundle *domain.Bundle) func(domain.ProviderID) bool {
 	}
 }
 
-// soleCredentialProviderID returns the credential chain's provider when
-// every credential shares one, and "" when the chain is empty or spans
-// more than one provider (nothing to unambiguously attribute to).
+// soleCredentialProviderID returns the provider a bare model name would be
+// dispatched to when every credential that serves bare names shares one, and
+// "" when there is none or they span more than one provider (nothing to
+// unambiguously attribute to). The LangWatch-managed models slot never serves
+// a bare name, so it never claims one here either.
 func soleCredentialProviderID(creds []domain.Credential) domain.ProviderID {
 	var providerID domain.ProviderID
-	for i, cred := range creds {
-		if i == 0 {
+	for _, cred := range creds {
+		if !cred.ServesBareModels() {
+			continue
+		}
+		if providerID == "" {
 			providerID = cred.ProviderID
 			continue
 		}

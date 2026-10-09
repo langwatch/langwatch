@@ -134,6 +134,12 @@ export interface SsoPlatformOperatorRepository {
 export interface SsoLicenseAuthorityRepository {
   /** True when the licence may stand in for a LangWatch operator's approval. */
   licenseAuthorizesDomainClaims(): Promise<boolean>;
+  /**
+   * True when the installation holds exactly one organization. The licence
+   * speaks for whoever runs the installation, so with one organization its
+   * administrator is that person; with several, only a platform operator is.
+   */
+  hostsSingleOrganization(): Promise<boolean>;
 }
 
 /**

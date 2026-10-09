@@ -1,6 +1,7 @@
 import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { buildGuidedKickoffParts } from "~/features/guided-onboarding/kickoff";
+import { AggregateProjectIsReadOnlyError } from "~/server/app-layer/projects/errors";
 import { featureFlagService } from "~/server/featureFlag";
 import {
   LangyAgentUnavailableError,
@@ -13,6 +14,7 @@ import {
 } from "../errors";
 import {
   __resetLangyTurnOverrideCacheForTests,
+  composeLangyTurnPrompt,
   LangyTurnService,
   type LangyTurnServiceDeps,
   langyTurnIdentity,
@@ -99,6 +101,7 @@ function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
       conversations as unknown as LangyTurnServiceDeps["conversations"],
     credentials: credentials as unknown as LangyTurnServiceDeps["credentials"],
     resolveModel: vi.fn(async () => ({ modelId: "openai/gpt-5-mini" })),
+    projectKinds: { kindOf: vi.fn(async () => "application") },
     worker: { probe, dispatch },
     reservePermit,
     releasePermit,
@@ -381,6 +384,30 @@ describe("LangyTurnService.startConversationTurn", () => {
     );
   });
 
+  /** @scenario The warm and the turn's probe carry the same disabled skills */
+  it("probes for a worker with the same disabled skills the dispatch sends", async () => {
+    // Flag off => `dashboard-widgets` is gated off for every turn.
+    const flags = vi
+      .spyOn(featureFlagService, "isEnabled")
+      .mockResolvedValue(false);
+    try {
+      await LangyTurnService.create(deps).startConversationTurn(input());
+
+      const probeArgs = mocks.probe.mock.calls[0]![0] as {
+        disabledSkillIds?: string[];
+      };
+      const dispatched = (mocks.dispatch.mock.calls[0] as unknown[])[0] as {
+        credentials: { disabledSkillIds?: string[] };
+      };
+      expect(probeArgs.disabledSkillIds).toContain("dashboard-widgets");
+      expect(probeArgs.disabledSkillIds).toEqual(
+        dispatched.credentials.disabledSkillIds,
+      );
+    } finally {
+      flags.mockRestore();
+    }
+  });
+
   it("finalizes the GitHub permit before probing the worker signature", async () => {
     const order: string[] = [];
     (
@@ -545,6 +572,36 @@ describe("LangyTurnService.startConversationTurn", () => {
     ).rejects.toBeInstanceOf(LangyModelNotConfiguredError);
 
     expect(mocks.claim).not.toHaveBeenCalled();
+  });
+
+  describe("when the project is an aggregate", () => {
+    /** @scenario "Langy refuses to start on an aggregate with the read-only refusal" */
+    it("refuses as read only before resolving a model or a key, or writing a conversation", async () => {
+      // An aggregate has no Langy model or key, so either lookup would fail
+      // first and answer with a conflict; the kind check comes before both.
+      (deps.projectKinds.kindOf as ReturnType<typeof vi.fn>).mockResolvedValue(
+        "aggregate",
+      );
+      (deps.resolveModel as ReturnType<typeof vi.fn>).mockRejectedValue(
+        new Error("no model"),
+      );
+
+      const refusal = await LangyTurnService.create(deps)
+        .startConversationTurn(input())
+        .then(() => null)
+        .catch((error: unknown) => error);
+
+      expect(refusal).toBeInstanceOf(AggregateProjectIsReadOnlyError);
+      expect(refusal).toMatchObject({
+        code: "aggregate_project_is_read_only",
+        httpStatus: 403,
+      });
+      expect(deps.resolveModel).not.toHaveBeenCalled();
+      expect(deps.credentials.getOrProvision).not.toHaveBeenCalled();
+      expect(mocks.ensureConversation).not.toHaveBeenCalled();
+      expect(mocks.claim).not.toHaveBeenCalled();
+      expect(mocks.mintSessionKey).not.toHaveBeenCalled();
+    });
   });
 
   it("revokes the key, releases the permit, and aborts when acceptance fails", async () => {
@@ -1042,6 +1099,7 @@ describe("LangyTurnService.stopTurn", () => {
       } as unknown as LangyTurnServiceDeps["conversations"],
       credentials: {} as unknown as LangyTurnServiceDeps["credentials"],
       resolveModel: vi.fn(),
+      projectKinds: { kindOf: vi.fn(async () => "application") },
       worker: { cancel } as unknown as LangyTurnServiceDeps["worker"],
       tokenBuffer: over.noBuffer
         ? null
@@ -1410,5 +1468,33 @@ describe("when the first message adopts a warmed conversation id", () => {
     expect(mocks.dispatch).toHaveBeenCalledWith(
       expect.objectContaining({ conversationId: "conv-warmed" }),
     );
+  });
+});
+
+describe("composeLangyTurnPrompt", () => {
+  describe("when the viewer has an email", () => {
+    it('names the viewer so "email me" needs no question', () => {
+      const { prompt } = composeLangyTurnPrompt({
+        viewer: { id: "u1", name: "Ada", email: "ada@example.com" },
+        contextBlock: null,
+        capNote: "",
+        userText: "email me on thumbs-down",
+      });
+      expect(prompt).toContain("You are talking to Ada <ada@example.com>.");
+      expect(prompt.endsWith("email me on thumbs-down")).toBe(true);
+    });
+  });
+
+  describe("when the viewer has no email", () => {
+    it("leaves the prompt as the bare user text", () => {
+      expect(
+        composeLangyTurnPrompt({
+          viewer: { id: "u1" },
+          contextBlock: null,
+          capNote: "",
+          userText: "hi",
+        }),
+      ).toEqual({ prompt: "hi", labelled: false });
+    });
   });
 });

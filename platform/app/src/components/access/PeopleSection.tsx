@@ -460,6 +460,11 @@ function MemberListRow({
               Lite Member
             </Badge>
           )}
+          {member.role === "DEVELOPER" && (
+            <Badge colorPalette="teal" size="sm">
+              Developer
+            </Badge>
+          )}
           {member.user.deactivatedAt && (
             <Badge colorPalette="red" size="sm">
               Deactivated

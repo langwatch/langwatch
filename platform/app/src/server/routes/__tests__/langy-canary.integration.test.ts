@@ -293,6 +293,36 @@ describe("GET /api/health/langy", () => {
     });
   });
 
+  describe("given the canary reports turn_failed caused by insufficient_quota", () => {
+    beforeEach(() => {
+      mockRunLangyHealthCanary.mockResolvedValue({
+        healthy: false,
+        reason: "turn_failed",
+        cause: "insufficient_quota",
+        conversationId: "conv-1",
+        turnId: "turn-1",
+        durationMs: 4321,
+      });
+    });
+
+    describe("when GET /api/health/langy is called", () => {
+      /** @scenario "The Langy probe answers 503 with the cause beside the reason" */
+      it("responds 503 carrying reason and cause", async () => {
+        const res = await getHealth();
+
+        expect(res.status).toBe(503);
+        expect(await res.json()).toEqual({
+          status: "unhealthy",
+          reason: "turn_failed",
+          cause: "insufficient_quota",
+          conversationId: "conv-1",
+          turnId: "turn-1",
+          durationMs: 4321,
+        });
+      });
+    });
+  });
+
   describe("given the canary reports busy", () => {
     beforeEach(() => {
       mockRunLangyHealthCanary.mockResolvedValue({ busy: true });

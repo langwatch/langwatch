@@ -114,6 +114,9 @@ function userDatabaseHooks({
   return {
     create: {
       before: async (user, context) => {
+        await hooks().refuseRestrictedSignUp({
+          user: user as { email: string },
+        });
         const refusal = await hooks().beforeUserCreate({
           user: user as {
             email: string;

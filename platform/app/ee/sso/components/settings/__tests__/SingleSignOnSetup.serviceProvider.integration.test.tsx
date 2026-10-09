@@ -138,6 +138,28 @@ describe("given an organization that may set single sign-on up and has no connec
     expect(theirs).toBeGreaterThan(ours ?? 0);
   });
 
+  /** @scenario "The deployment's own sign-in redirect address is named beside the connection's" */
+  it("names the deployment's Microsoft sign-in and its redirect address under OpenID Connect", () => {
+    setupRef.current = {
+      ...(setupRef.current as object),
+      serviceProviderBeforeRegistration: {
+        ...SERVICE_PROVIDER,
+        deploymentSignIn: {
+          name: "Microsoft",
+          redirectUrl: "https://app.test/api/auth/callback/azure-ad",
+        },
+      },
+    };
+    renderSetup();
+    pickOkta();
+
+    expect(screen.getByText(SERVICE_PROVIDER.redirectUrl)).toBeDefined();
+    expect(
+      screen.getByText("https://app.test/api/auth/callback/azure-ad"),
+    ).toBeDefined();
+    expect(screen.getByText(/also offers Microsoft/)).toBeDefined();
+  });
+
   /** @scenario "LangWatch's own details are shown before the identity provider's are asked for" */
   it("shows the SAML addresses once SAML is chosen, and only those", () => {
     renderSetup();
