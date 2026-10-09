@@ -1,5 +1,6 @@
 import {
   AGENT_SANDBOX_API_KEY_NAME,
+  CLI_LOGIN_KEY_NAME_PREFIX,
   HIDDEN_SYSTEM_KEY_NAMES,
   WORKFLOW_RUN_API_KEY_NAME,
 } from "@langwatch/api-key-contract";
@@ -167,6 +168,37 @@ describe("given the memory API-key repository", () => {
       expect(swept).toBe(1);
       expect((await keys.findById({ id: minted.id }))?.revokedAt).not.toBeNull();
       expect((await keys.findById({ id: customers.id }))?.revokedAt).toBeNull();
+    });
+  });
+
+  describe("when elapsed CLI login keys are read", () => {
+    async function seedTwoOrganizations() {
+      const { repository: keys } = repository();
+      const past = fromDate(new Date(Date.now() - 60_000));
+      const login = (organizationId: string) =>
+        record({ name: `${CLI_LOGIN_KEY_NAME_PREFIX}laptop`, organizationId, expiresAt: past });
+      const mine = await keys.create(login(ORGANIZATION));
+      const theirs = await keys.create(login("org_2"));
+      return { keys, mine, theirs };
+    }
+
+    it("answers one organization's keys and never another organization's", async () => {
+      const { keys, mine } = await seedTwoOrganizations();
+
+      const found = await keys.findElapsedLoginKeys({
+        organizationId: ORGANIZATION,
+        now: fromDate(new Date()),
+      });
+
+      expect(found.map((key) => key.id)).toEqual([mine.id]);
+    });
+
+    it("sweeps every organization's elapsed keys", async () => {
+      const { keys, mine, theirs } = await seedTwoOrganizations();
+
+      const swept = await keys.sweepElapsedLoginKeys({ before: fromDate(new Date()) });
+
+      expect(swept.map((key) => key.id).toSorted()).toEqual([mine.id, theirs.id].toSorted());
     });
   });
 });

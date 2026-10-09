@@ -223,21 +223,22 @@ export class PrismaApiKeyRepository implements ApiKeyRepository {
     };
   }
   async findElapsedLoginKeys(input: {
+    organizationId: string;
     now: Instant;
-    organizationId?: string;
   }): Promise<{ id: string; userId: string | null; organizationId: string }[]> {
-    const now = toDate(input.now);
-    if (input.organizationId) {
-      return this.database.apiKey.findMany({
-        where: {
-          organizationId: input.organizationId,
-          name: { startsWith: CLI_LOGIN_KEY_NAME_PREFIX },
-          revokedAt: null,
-          expiresAt: { not: null, lte: now },
-        },
-        select: { id: true, userId: true, organizationId: true },
-      });
-    }
+    return this.database.apiKey.findMany({
+      where: {
+        organizationId: input.organizationId,
+        name: { startsWith: CLI_LOGIN_KEY_NAME_PREFIX },
+        revokedAt: null,
+        expiresAt: { not: null, lte: toDate(input.now) },
+      },
+      select: { id: true, userId: true, organizationId: true },
+    });
+  }
+  async sweepElapsedLoginKeys(input: {
+    before: Instant;
+  }): Promise<{ id: string; userId: string | null; organizationId: string }[]> {
     return this.database.$queryRaw<{ id: string; userId: string | null; organizationId: string }[]>`
       -- @tenancy: fleet-wide sweep of CLI login keys; create refuses a customer key under the prefix.
       SELECT "id", "userId", "organizationId"
@@ -245,7 +246,7 @@ export class PrismaApiKeyRepository implements ApiKeyRepository {
        WHERE starts_with("name", ${CLI_LOGIN_KEY_NAME_PREFIX})
          AND "revokedAt" IS NULL
          AND "expiresAt" IS NOT NULL
-         AND "expiresAt" <= ${now}
+         AND "expiresAt" <= ${toDate(input.before)}
     `;
   }
   async extendLoginKeyExpiry(input: {

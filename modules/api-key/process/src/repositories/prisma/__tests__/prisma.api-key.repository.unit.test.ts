@@ -153,7 +153,7 @@ describe("PrismaApiKeyRepository", () => {
     it("keeps an organization's lookup inside that organization, off raw SQL", async () => {
       const { repository, findMany, query } = repositoryWithLoginSpies();
 
-      await repository.findElapsedLoginKeys({ now: nowInstant(), organizationId: "org-1" });
+      await repository.findElapsedLoginKeys({ organizationId: "org-1", now: nowInstant() });
 
       expect(findMany.mock.calls[0]?.[0]).toMatchObject({ where: { organizationId: "org-1" } });
       expect(query).not.toHaveBeenCalled();
@@ -163,7 +163,7 @@ describe("PrismaApiKeyRepository", () => {
       const { repository, findMany, query } = repositoryWithLoginSpies();
       const now = Temporal.Instant.from("2026-01-01T00:00:00.000Z");
 
-      await repository.findElapsedLoginKeys({ now });
+      await repository.sweepElapsedLoginKeys({ before: now });
 
       const [sql, ...values] = query.mock.calls[0] ?? [];
       const text = sql?.join("?") ?? "";
