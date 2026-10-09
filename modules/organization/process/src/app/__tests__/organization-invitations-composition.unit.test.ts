@@ -10,6 +10,7 @@ import type { OrganizationCaller } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
+import { SesOrganizationInviteMailChannel } from "../../channels/ses/ses.organization-invite-mail.channel.ts";
 import type { RecordSeatLimitReachedCommandData } from "../../eventing/seat-limit.events.ts";
 import { InviteSendThrottleService } from "../../features/invite/services/invite-send-throttle.service.ts";
 import type { InviteService } from "../../features/invite/services/invite.service.ts";
@@ -73,7 +74,14 @@ async function application(options: { plan?: Partial<Plan> } = {}) {
     teamSlug: "engineering",
     pricingModel: "SEAT_EVENT",
   });
-  const app = await OrganizationModule.create(setup);
+  // Invitation mail goes through notification, whose fixture names no gateway.
+  const inviteMail = SesOrganizationInviteMailChannel.create({
+    notifications: setup.dependencies.notifications,
+  });
+  const app = await OrganizationModule.create({
+    ...setup,
+    channels: { ...setup.channels, inviteMail },
+  });
   const recorded: RecordSeatLimitReachedCommandData[] = [];
   app.connectSeatLimit({
     recordSeatLimitReached: {

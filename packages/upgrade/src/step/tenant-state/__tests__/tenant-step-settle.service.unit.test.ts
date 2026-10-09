@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { MemoryTenantStepStateRepository } from "../memory.tenant-state.repository.ts";
-import { MemoryTenantStepLedgerRepository } from "../memory.tenant-step-ledger.repository.ts";
+import {
+  MemoryTenantStepLedgerRepository,
+  MemoryTenantStepStateRepository,
+} from "../memory.tenant-state.repository.ts";
 import { TenantStepSettleService } from "../tenant-step-settle.service.ts";
 
 const STEP = "prompt:seed-default-tags";

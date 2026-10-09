@@ -1561,6 +1561,7 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       licenseTokenHash: "omit", // secret
       LicenseInstanceId: { source: "licenseInstanceId" },
       LicenseExpiresAt: { source: "licenseExpiresAt" },
+      licenseId: "omit", // not offered until gateway decides how its licence columns read
     },
   }),
   webhook_endpoint_deliveries: defineTableCatalogue({

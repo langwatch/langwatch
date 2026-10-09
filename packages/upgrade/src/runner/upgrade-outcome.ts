@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import type { UpgradePlan } from "../plan/plan-upgrade.ts";
+import type { ContractArchiveEntry } from "./contract-archive/contract-archive.service.ts";
 
 export const upgradeOutcomeCodeSchema = z.enum([
   "done",
@@ -79,9 +80,11 @@ export class UpgradeRunFailure extends Error {
 export function formatPlan({
   installed,
   plan,
+  archives = [],
 }: {
   installed: string | null;
   plan: UpgradePlan;
+  archives?: readonly ContractArchiveEntry[];
 }): string {
   if (plan.outcome === "refused") return `Refused (${plan.code}): ${plan.message}`;
   const lines = [
@@ -99,6 +102,11 @@ export function formatPlan({
       ...list("background, on the worker", release.background),
       ...list("operator", release.operator),
     );
+  }
+  if (archives.length > 0) lines.push(`Archived before a contract drops it (${archives.length}):`);
+  for (const { step, table, archive, state, rows, reason } of archives) {
+    const detail = reason ?? `${rows ?? "no"} rows`;
+    lines.push(`  ${step}: ${table} -> ${archive} (${state}, ${detail})`);
   }
   if (plan.notNeeded.length > 0)
     lines.push(`Not needed on a fresh install: ${plan.notNeeded.length}`);

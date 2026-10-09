@@ -5,10 +5,10 @@ import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 
 import {
-  resolveUiCapabilities,
-  UiCapabilityContextProvider,
+  resolveUiHostServices,
+  UiHostServicesContextProvider,
   UNAVAILABLE_UI_SESSION,
-  type UiCapabilities,
+  type UiHostServices,
 } from "../capabilities.ts";
 import {
   INERT_UI_ANALYTICS,
@@ -16,7 +16,7 @@ import {
   useUiAnalytics,
   type UiAnalyticsEvent,
 } from "../telemetry/analytics.ts";
-import { createUiCapabilitiesFromHost } from "../testing.ts";
+import { createUiHostServicesFromHost } from "../testing.ts";
 
 class RecordingUiAnalytics extends UiAnalytics {
   readonly tracked: UiAnalyticsEvent[] = [];
@@ -34,10 +34,10 @@ class RecordingUiAnalytics extends UiAnalytics {
 
 const host = { route: () => ({ params: {}, query: {} }), navigate: () => {} };
 
-function mount(capabilities: UiCapabilities) {
+function mount(capabilities: UiHostServices) {
   return renderHook(() => useUiAnalytics(), {
     wrapper: ({ children }: { children: ReactNode }) => (
-      <UiCapabilityContextProvider value={capabilities}>{children}</UiCapabilityContextProvider>
+      <UiHostServicesContextProvider value={capabilities}>{children}</UiHostServicesContextProvider>
     ),
   });
 }
@@ -45,7 +45,7 @@ function mount(capabilities: UiCapabilities) {
 describe("the UI analytics capability", () => {
   it("hands a module the destination the shell composed", () => {
     const analytics = new RecordingUiAnalytics();
-    const { result } = mount({ ...createUiCapabilitiesFromHost(host), analytics });
+    const { result } = mount({ ...createUiHostServicesFromHost(host), analytics });
 
     result.current.track({ name: "project", action: "created", boundary: "onboarding" });
 
@@ -56,7 +56,7 @@ describe("the UI analytics capability", () => {
 
   it("carries the emitting module's own attributes through untouched", () => {
     const analytics = new RecordingUiAnalytics();
-    const { result } = mount({ ...createUiCapabilitiesFromHost(host), analytics });
+    const { result } = mount({ ...createUiHostServicesFromHost(host), analytics });
 
     result.current.track({ name: "trace", attributes: { count: 3, source: "explorer" } });
 
@@ -71,11 +71,11 @@ describe("the UI analytics capability", () => {
   });
 
   it("reads a composition that installed no destination as the inert one", () => {
-    const resolved = resolveUiCapabilities({
+    const resolved = resolveUiHostServices({
       install: {},
-      documentTitle: createUiCapabilitiesFromHost(host).documentTitle,
-      navigation: createUiCapabilitiesFromHost(host).navigation,
-      route: createUiCapabilitiesFromHost(host).route,
+      documentTitle: createUiHostServicesFromHost(host).documentTitle,
+      navigation: createUiHostServicesFromHost(host).navigation,
+      route: createUiHostServicesFromHost(host).route,
       session: UNAVAILABLE_UI_SESSION,
     });
     const { result } = mount(resolved);
@@ -85,11 +85,11 @@ describe("the UI analytics capability", () => {
 
   it("keeps an installed destination ahead of the inert default", () => {
     const analytics = new RecordingUiAnalytics();
-    const resolved = resolveUiCapabilities({
+    const resolved = resolveUiHostServices({
       install: { analytics },
-      documentTitle: createUiCapabilitiesFromHost(host).documentTitle,
-      navigation: createUiCapabilitiesFromHost(host).navigation,
-      route: createUiCapabilitiesFromHost(host).route,
+      documentTitle: createUiHostServicesFromHost(host).documentTitle,
+      navigation: createUiHostServicesFromHost(host).navigation,
+      route: createUiHostServicesFromHost(host).route,
       session: UNAVAILABLE_UI_SESSION,
     });
 

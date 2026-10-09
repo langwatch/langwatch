@@ -1,5 +1,5 @@
-import { UiCapabilityContextProvider } from "@langwatch/browser-host/capabilities";
-import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import { UiHostServicesContextProvider } from "@langwatch/browser-host/capabilities";
+import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
 /**
  * @vitest-environment jsdom
  * @vitest-environment-options { "url": "https://app.langwatch.ai/" }
@@ -89,11 +89,11 @@ const descriptor = resolveCapability("langwatch.simulation-run.get")!;
 function renderCard(output: unknown) {
   return render(
     <DesignSystemProvider forcedTheme="light">
-      <UiCapabilityContextProvider value={createUiCapabilitiesFromHost(host)}>
+      <UiHostServicesContextProvider value={createUiHostServicesFromHost(host)}>
         <LangyHostProvider value={host}>
           <LangyEvalRunCard descriptor={descriptor} input={{}} output={output} projectSlug="acme" />
         </LangyHostProvider>
-      </UiCapabilityContextProvider>
+      </UiHostServicesContextProvider>
     </DesignSystemProvider>,
   );
 }

@@ -37,7 +37,6 @@ import type {
   EventingParticipation,
 } from "@langwatch/eventing";
 import { NotFoundError } from "@langwatch/handled-error";
-import type { MailSender } from "@langwatch/mail";
 import { NotificationService as NotificationApi } from "@langwatch/notification-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { Temporal } from "@langwatch/time";
@@ -47,12 +46,8 @@ import { billingSubscriptionNotifierChannels } from "../channels/billing-subscri
 import type { BillingSubscriptionNotifier } from "../channels/billing-subscription-notifier.channel.ts";
 import { billingWebhookHostChannels } from "../channels/billing-webhook-host-channels.registry.ts";
 import type { BillingWebhookHost } from "../channels/billing-webhook-host.channel.ts";
-import { connectedStatementMailChannels } from "../channels/connected-statement-mail-channels.registry.ts";
+import type { BillingChannels } from "../channels/billing.channels.ts";
 import type { ConnectedStatementMailChannel } from "../channels/connected-statement-mail.channel.ts";
-import { composeHttpBillingStripe } from "../channels/http/http.billing-stripe.channels.ts";
-import { licenseEmailChannels } from "../channels/license-email-channels.registry.ts";
-import { stripeWebhooksChannels } from "../channels/stripe-webhooks-channels.registry.ts";
-import { usageLimitEmailChannels } from "../channels/usage-limit-email-channels.registry.ts";
 import type { BillingLifecyclePipeline } from "../eventing/billing-lifecycle.pipeline.ts";
 import {
   type BillingReportingDefinition,
@@ -111,7 +106,8 @@ const DEFAULT_PUBLIC_BASE_URL = "https://app.langwatch.ai";
 type BillingSetup = FeatureSetup<
   typeof BillingModule.dependencies,
   BillingServerConfig,
-  BillingRepositories
+  BillingRepositories,
+  BillingChannels
 >;
 
 /** The license registry's view of a customer's terms, budget, seats and hosted spend. */
@@ -189,13 +185,7 @@ export class BillingModule
   } as const;
 
   static async create(setup: BillingSetup): Promise<BillingModule> {
-    const mailer: MailSender = {
-      send: (content) => setup.dependencies.notifications.sendEmail(content),
-    };
-    const webhooks = await setup.secrets.into(
-      BillingModule.secrets.stripeWebhookSecret,
-      (signingSecret) => stripeWebhooksChannels.http.create({ signingSecret }),
-    );
+    const { channels } = setup;
     const notices = await BillingModule.#composeNotices(setup);
     // Licensing holds the signing key and refuses a purchase it cannot sign.
     const licensePurchase = LicensePurchaseService.create({
@@ -204,7 +194,7 @@ export class BillingModule
       }),
       delivery: LicensePurchaseDeliveryService.create({
         licensing: setup.dependencies.licensing,
-        mail: licenseEmailChannels.ses.create(mailer),
+        mail: channels.licenseEmail,
         notices,
       }),
     });
@@ -221,48 +211,31 @@ export class BillingModule
       billingOrganizations: setup.repositories.reportOrganizations,
     });
     const { nodeEnvironment } = setup.config;
-    return setup.secrets.into(BillingModule.secrets.stripeSecretKey, (secretKey) => {
-      const stripe = secretKey
-        ? BillingModule.#composeStripe({ secretKey, webhooks, nodeEnvironment })
-        : void 0;
-      return BillingModule.assemble({
-        repositories: setup.repositories,
-        config: setup.config,
-        peers: setup.dependencies,
-        stripe,
-        usageReporting: () =>
-          StripeUsageReportingBuilder.create({
-            meters: stripe?.channels.meters,
-            nodeEnvironment,
-          }).build(),
-        statementMail: connectedStatementMailChannels.ses.create(mailer),
-        usageWarnings: BillingModule.#composeUsageWarnings(setup, notices, stamps),
-        resourceLimitAlerts,
-        lifecycle,
-        webhook: {
-          host: billingWebhookHostChannels.slack.create({ notices }),
-          licenses: setup.dependencies.licensing,
-          licensePurchase,
-        },
-        subscription: {
-          notifier: billingSubscriptionNotifierChannels.slack.create({ notices }),
-          facts: lifecycle,
-        },
-      });
+    const stripe = channels.stripe ? { channels: channels.stripe } : void 0;
+    return BillingModule.assemble({
+      repositories: setup.repositories,
+      config: setup.config,
+      peers: setup.dependencies,
+      stripe,
+      usageReporting: () =>
+        StripeUsageReportingBuilder.create({
+          meters: stripe?.channels.meters,
+          nodeEnvironment,
+        }).build(),
+      statementMail: channels.statementMail,
+      usageWarnings: BillingModule.#composeUsageWarnings(setup, notices, stamps),
+      resourceLimitAlerts,
+      lifecycle,
+      webhook: {
+        host: billingWebhookHostChannels.slack.create({ notices }),
+        licenses: setup.dependencies.licensing,
+        licensePurchase,
+      },
+      subscription: {
+        notifier: billingSubscriptionNotifierChannels.slack.create({ notices }),
+        facts: lifecycle,
+      },
     });
-  }
-
-  /** Every Stripe subject channel billing has, over the one client the http bundle builds. */
-  static #composeStripe({
-    secretKey,
-    webhooks,
-    nodeEnvironment,
-  }: {
-    secretKey: string;
-    webhooks: BillingStripeChannels["webhooks"];
-    nodeEnvironment: string | undefined;
-  }): BillingStripe {
-    return { channels: { webhooks, ...composeHttpBillingStripe({ secretKey, nodeEnvironment }) } };
   }
 
   /** Main's Slack, HubSpot and usage-limit mail notices; each Slack webhook is a secret. */
@@ -286,9 +259,9 @@ export class BillingModule
                   hubspotReachedLimitFormId: config.hubspotReachedLimitFormId,
                   hubspotFormId: config.hubspotFormId,
                 },
-                usageLimitEmail: usageLimitEmailChannels.ses.create({
-                  send: (content) => setup.dependencies.notifications.sendEmail(content),
-                }),
+                slack: setup.channels.alerts,
+                hubspotForms: setup.channels.hubspotForms,
+                usageLimitEmail: setup.channels.usageLimitEmail,
               }),
             ),
           ),

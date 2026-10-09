@@ -8,6 +8,7 @@ import type { TraceApi, TraceServerConfig } from "@langwatch/trace-contract";
 import { defineMigrationStep } from "@langwatch/upgrade/step";
 
 import { TraceModule } from "./app/trace.app.ts";
+import { traceChannels } from "./channels/trace-channels.registry.ts";
 import { traceProcessingEventing } from "./eventing/trace-processing.pipeline.ts";
 import { traceProjectMilestonesEventing } from "./eventing/trace-project-milestones.pipeline.ts";
 import { traceCollectorEvaluationsEventing } from "./features/ingestion/eventing/trace-collector-evaluations.pipeline.ts";
@@ -33,6 +34,7 @@ import { trackedEventLegacyPathRest, trackedEventRest } from "./transport/tracke
 export const traceProcessModule: PublishedProcessModule<"trace", TraceApi, TraceServerConfig> =
   defineProcessModule("trace")
     .withRepositories(traceRepositories)
+    .withChannels(traceChannels)
     .withApi(TraceModule)
     .withTransports(
       tracesTrpcTransport,

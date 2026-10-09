@@ -5,7 +5,7 @@
  */
 
 import {
-  useUiCapabilities,
+  useUiHostServices,
   useUiScope,
   type UiFeedback,
   type UiRoute,
@@ -91,7 +91,7 @@ class CapabilityDataRetentionHost extends DataRetentionHostApi {
  * is what `mounts.load` resolves.
  */
 export default function DataRetentionHostMount({ children }: { children?: ReactNode }) {
-  const { session, feedback, route } = useUiCapabilities();
+  const { session, feedback, route } = useUiHostServices();
   const uiScope = useUiScope();
   const { organizationId, projectId } = uiScope.activeScope();
   const teamId = uiScope.scopeHost()?.team()?.id;

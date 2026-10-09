@@ -42,6 +42,7 @@ export function InvoicesBlock({
 
   return (
     <SettingsSection
+      divided={false}
       data-testid="invoices-block"
       icon={<Receipt size={18} />}
       title="Invoices"

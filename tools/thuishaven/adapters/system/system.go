@@ -166,7 +166,10 @@ func (System) SpawnDetached(argv []string, dir, logPath string) error {
 	if ferr == nil {
 		_ = f.Close()
 	}
-	return cmd.Process.Release()
+	// Reaped, not released: a long-lived parent (the daemon respawning a keeper)
+	// would otherwise keep a dead child as a zombie that still answers kill 0.
+	go func() { _ = cmd.Wait() }()
+	return nil
 }
 
 // Now returns the current time. Getpid returns this process's pid.

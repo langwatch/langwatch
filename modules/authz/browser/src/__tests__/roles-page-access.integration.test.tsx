@@ -34,9 +34,9 @@ vi.mock("../behavior/authz-api.ts", () => ({ authzApi: api }));
 
 // Isolation is off: reload so the screen binds this file's mock, not a sibling suite's.
 vi.resetModules();
-const { UiCapabilityContextProvider, UiSession } =
+const { UiHostServicesContextProvider, UiSession } =
   await import("@langwatch/browser-host/capabilities");
-const { createUiCapabilitiesFromHost } = await import("@langwatch/browser-host/testing");
+const { createUiHostServicesFromHost } = await import("@langwatch/browser-host/testing");
 const { renderWithDesignSystem } = await import("@langwatch/design-system/testing");
 const { installedModuleScreens } = await import("@langwatch/browser/module-screens");
 const { authzWeb } = await import("../authz.web.ts");
@@ -70,8 +70,8 @@ async function openRolesPage(grants: readonly string[]) {
   const { default: Page } = await load();
 
   return renderWithDesignSystem(
-    <UiCapabilityContextProvider
-      value={createUiCapabilitiesFromHost(
+    <UiHostServicesContextProvider
+      value={createUiHostServicesFromHost(
         { route: () => ({ params: {}, query: {} }), navigate: () => {} },
         new Reader(grants),
       )}
@@ -79,7 +79,7 @@ async function openRolesPage(grants: readonly string[]) {
       <AuthzHostProvider value={new FakeAuthzHost()}>
         <Page />
       </AuthzHostProvider>
-    </UiCapabilityContextProvider>,
+    </UiHostServicesContextProvider>,
   );
 }
 

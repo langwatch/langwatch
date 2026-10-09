@@ -48,7 +48,9 @@ async function appForCliSessions(repositories: MemoryAuthRepositories): Promise<
       users: createApiFixture<UserApi>(),
       apiKeys: createApiFixture<ApiKeyApi>(),
       featureFlags: createApiFixture<FeatureFlagApi>(),
-      identity: createApiFixture<IdentityApi>({ createStorageAdapter: ({ legacyEngine }) => legacyEngine }),
+      identity: createApiFixture<IdentityApi>({
+        createStorageAdapter: ({ legacyEngine }) => legacyEngine,
+      }),
       organizations: createApiFixture<OrganizationApi>(),
       entitlements: createApiFixture<EntitlementApi>(),
       licensing: createApiFixture<LicensingApi>(),
@@ -59,7 +61,9 @@ async function appForCliSessions(repositories: MemoryAuthRepositories): Promise<
         record: async () => ({ id: "audit", occurredAt: 0 }),
       }),
     },
-    channels: MemoryAuthChannels.create(),
+    channels: MemoryAuthChannels.create({
+      bound: { notifications: createApiFixture<NotificationService>() },
+    }),
     resources: new ResourceScope(),
     secrets: new ScopedSecrets(async (_handle, build) => build(void 0)),
   });

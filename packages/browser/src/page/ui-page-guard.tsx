@@ -2,7 +2,7 @@
  * Whether a routed page opens at all.
  */
 
-import { useUiCapabilities } from "@langwatch/browser-host/capabilities";
+import { useUiHostServices } from "@langwatch/browser-host/capabilities";
 import { useUiFlags } from "@langwatch/browser-host/feature-flag";
 import type { ReleaseFlagToken } from "@langwatch/module";
 import type { ComponentType } from "react";
@@ -65,7 +65,7 @@ export function resolveUiPageAccess({
 export function withUiPageGuard({ flags, permission, fallbacks }: UiPageGuardInstall) {
   return function guard<P extends object>(Page: ComponentType<P>): ComponentType<P> {
     const Guarded = (props: P) => {
-      const { session } = useUiCapabilities();
+      const { session } = useUiHostServices();
       const uiFlags = useUiFlags();
       const access = resolveUiPageAccess({
         ...(flags ? { flags } : {}),

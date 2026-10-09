@@ -11,10 +11,12 @@ import { ClickHouseRoutesRepository } from "../clickhouse.routes.repository.ts";
 import { EventingPipelineDefinitionsRepository } from "../eventing/eventing.pipeline-definitions.repository.ts";
 import type { MigrationMembershipRepository } from "../migration-membership.repository.ts";
 import type { OpsRepositories } from "../ops.repositories.ts";
-import type { OrganizationTenantSourceRepository } from "../organization-tenant-source.repository.ts";
-import type { ProjectTenantSourceRepository } from "../project-tenant-source.repository.ts";
 import { NullQueueRepository } from "../queue.repository.ts";
 import { ReplayRuntimeRepository } from "../replay-runtime.repository.ts";
+import type {
+  OrganizationTenantSourceRepository,
+  ProjectTenantSourceRepository,
+} from "../tenant-source.repository.ts";
 import { MemoryAnomalyRateTrackerRepository } from "./memory.anomaly-rate-tracker.repository.ts";
 import { MemoryAnomalyStateRepository } from "./memory.anomaly-state.repository.ts";
 import { MemoryBugReportRateLimitRepository } from "./memory.bug-report-rate-limit.repository.ts";

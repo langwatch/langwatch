@@ -1003,11 +1003,11 @@ jobs:
         # task reads it as "no datastore here" and returns without migrating.
         run: |
           for i in 1 2 3; do
-            if env -u BUILD_TIME pnpm task clickhouse-migrate; then
+            if env -u BUILD_TIME pnpm task upgrade; then
               exit 0
             fi
             if [ "$i" -lt 3 ]; then
-              echo "clickhouse-migrate attempt $i failed; sleeping 5s and retrying"
+              echo "upgrade attempt $i failed; sleeping 5s and retrying"
               sleep 5
             fi
           done

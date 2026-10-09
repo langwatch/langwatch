@@ -2209,14 +2209,6 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     return this.#dependencies.virtualKeys.revoke(input);
   }
 
-  provisionConnectManagedKey(input: {
-    organizationId: string;
-    licenseId: string;
-    actorUserId: string;
-  }): Promise<{ id: string }> {
-    return this.#connectManagedKeyService().provision(input);
-  }
-
   revokeManagedInternal(input: {
     virtualKeyId: string;
     organizationId: string;

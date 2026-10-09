@@ -1,6 +1,6 @@
 import { TERMINAL_TENANT_STATUSES, type TenantSource } from "@langwatch/system-migrations";
 
-import type { OrganizationTenantSourceRepository } from "../organization-tenant-source.repository.ts";
+import type { OrganizationTenantSourceRepository } from "../tenant-source.repository.ts";
 
 /** The rows this source walks, and nothing else it could reach. */
 export type PrismaOrganizationTenantDatabase = {

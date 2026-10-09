@@ -3,15 +3,26 @@
  * the current scope's flags are `useUiFlags()` from browser-host.
  */
 
+import { type ContractApiMap, createModuleApi, type ModuleApi } from "@langwatch/api/web";
 import {
   type FeatureFlagTargetId,
   type FrontendFeatureFlag,
+  type featureFlagTrpc,
   NOT_TARGETED,
 } from "@langwatch/feature-flag-contract";
 import type { ReleaseFlagToken } from "@langwatch/module";
 
-import { CLIENT_FLAG_STALE_TIME_MS, featureFlagClient } from "./feature-flag-client.ts";
 import { useFeatureFlagOverrides } from "./feature-flag-overrides.ts";
+
+type FeatureFlagApiMap = ContractApiMap<typeof featureFlagTrpc>;
+
+/** The hooks feature flags' own contract generates. */
+export const featureFlagClient: ModuleApi<FeatureFlagApiMap> = createModuleApi<FeatureFlagApiMap>();
+
+// The service caches operator rows for five seconds. Refetching every mounted
+// read at that cadence adds traffic without making a decision fresher, so the
+// browser keeps a resolved value for five minutes.
+export const CLIENT_FLAG_STALE_TIME_MS = 5 * 60_000;
 
 /**
  * Targeting identity for one flag read. `projectId`/`organizationId` are

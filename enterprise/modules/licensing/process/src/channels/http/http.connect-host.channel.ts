@@ -8,6 +8,7 @@ import type { OutboundProxyConfig } from "@langwatch/egress";
 import {
   type ConnectCredential,
   ConnectBudgetExhaustedError,
+  ConnectCredentialPendingError,
   ConnectUnreachableError,
   HostedServiceUnavailableError,
 } from "@langwatch/enterprise-licensing-contract";
@@ -208,6 +209,8 @@ async function refusalOf(response: ConnectHostResponse): Promise<HandledError> {
   const error = parsed.data;
   const code = error.code ?? error.type;
   if (code === "budget_exceeded") return new ConnectBudgetExhaustedError(capUsdIn(error.meta));
+  // A pending managed key is the host's own 503; the install retries on its code.
+  if (code === "connect_credential_pending") return new ConnectCredentialPendingError();
   if (code === "hosted_service_unavailable" || response.status >= 500) {
     return new HostedServiceUnavailableError({ reasons: [new Error(error.message)] });
   }

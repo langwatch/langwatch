@@ -6,11 +6,11 @@
 
 import type { NavigationOrganization, NavigationTeam } from "@langwatch/navigation-contract";
 
-import type { UiRootCapabilities } from "./ui-root-capabilities";
+import type { UiRootHostServices } from "./ui-root-host-services";
 
 /** Organization's team rules, handed in from its loaded scope capability. */
 export type NavigationTeamRules = Pick<
-  UiRootCapabilities["scope"],
+  UiRootHostServices["scope"],
   "selectAmbientTeam" | "userCanOpenTeam"
 >;
 

@@ -27,3 +27,17 @@ export function isOrganizationNewer({
     Temporal.Instant.compare(organizationUpdatedAt, licenseUpdatedAt) > 0
   );
 }
+
+type DatedKey = Readonly<{ licenseKey: string | null; updatedAt: Instant }>;
+
+/** The licence while dual writes last: organization's column where newer, else the row's. */
+export function newerLicense({
+  columns,
+  own,
+}: Readonly<{ columns: DatedKey; own: DatedKey | null }>): Readonly<{ licenseKey: string | null }> {
+  const organizationWins = isOrganizationNewer({
+    organizationUpdatedAt: columns.updatedAt,
+    licenseUpdatedAt: own?.updatedAt ?? null,
+  });
+  return { licenseKey: organizationWins ? columns.licenseKey : (own?.licenseKey ?? null) };
+}

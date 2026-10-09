@@ -15,6 +15,8 @@ import {
 import { loadConfigFromFile } from "vite";
 import { describe, expect, it } from "vitest";
 
+import { WAITING_FOR_API_PAGE } from "../public-config-from-api";
+
 const apiConfig = {
   process: {
     appBaseUrl: "http://localhost:5560",
@@ -146,6 +148,40 @@ describe("given the apps/ui Vite config", () => {
         }),
       );
     });
+  });
+});
+
+describe("given no api answering yet", () => {
+  describe("when the dev server serves a page", () => {
+    /** @scenario "The api is unreachable when the dev server starts" */
+    it("loads its config and serves the self-reloading waiting page", async () => {
+      const dead = createServer();
+      await new Promise<void>((resolve) => dead.listen(0, "127.0.0.1", resolve));
+      const address = dead.address();
+      await new Promise((resolve) => dead.close(resolve));
+      if (address === null || typeof address === "string") throw new Error("no port bound");
+      const { port } = address;
+      const html = await withoutEnv("LANGWATCH_PORTLESS", () =>
+        withEnv("LANGWATCH_API_URL", `http://127.0.0.1:${port}`, async () => {
+          const loaded = await loadConfigFromFile(
+            { command: "serve", mode: "development" },
+            "vite.config.ts",
+            packageRoot,
+            undefined,
+            undefined,
+            configLoaderOf(requiredScript("dev")),
+          );
+          const inject = loaded?.config.plugins
+            ?.flat()
+            .find(
+              (plugin) =>
+                plugin && "name" in plugin && plugin.name === "inject-development-public-config",
+            );
+          return transformIndexHtmlOf(inject)("<html><head></head><body></body></html>");
+        }),
+      );
+      expect(html).toBe(WAITING_FOR_API_PAGE);
+    }, 15_000);
   });
 });
 

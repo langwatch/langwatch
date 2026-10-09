@@ -5,7 +5,7 @@
  */
 
 import {
-  useUiCapabilities,
+  useUiHostServices,
   useUiDeployment,
   useUiScope,
   type UiFeedback,
@@ -145,7 +145,7 @@ class CapabilityLangyHost extends LangyHostApi {
  * has no `defineBrowserModule` to hang `.withHosts()` off — see the handoff.
  */
 export default function LangyHostMount({ children }: { children?: ReactNode }) {
-  const { session, navigation, route, feedback } = useUiCapabilities();
+  const { session, navigation, route, feedback } = useUiHostServices();
   const deployment = useUiDeployment();
   const organizationRole = useUiScope().scopeHost()?.organizationRole();
   const projectSlug = session.snapshot().scope.project?.slug;

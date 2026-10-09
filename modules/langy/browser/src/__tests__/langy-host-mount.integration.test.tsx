@@ -30,7 +30,7 @@ vi.mock("@langwatch/feature-flag-client", () => ({
 
 vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  useUiCapabilities: () => ({ session, navigation: {}, route: {}, feedback: {} }),
+  useUiHostServices: () => ({ session, navigation: {}, route: {}, feedback: {} }),
   useUiDeployment: () => ({ isSaaS, demoProjectSlug: "demo" }),
   useUiScope: () => ({ scopeHost: () => ({ organizationRole: () => role }) }),
 }));

@@ -14,8 +14,10 @@ Feature: The dev UI takes its public config from the api's shell
   @unit
   Scenario: The api is unreachable when the dev server starts
     Given nothing answers on the api's address
-    When the dev server starts
-    Then it fails naming the api address it tried and that the api must be running
+    When the dev server starts and serves a page
+    Then its config loads without asking the api
+    And the page is a waiting page that reloads itself until the api answers
+    And the log names the api address it tried and that the api must be running
 
   @unit
   Scenario: The api answers a shell without the config meta tag

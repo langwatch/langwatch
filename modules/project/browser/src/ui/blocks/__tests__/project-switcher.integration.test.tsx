@@ -1,10 +1,10 @@
 import {
-  UiCapabilityContextProvider,
+  UiHostServicesContextProvider,
   UiScope,
   type UiActiveScope,
-  type UiCapabilities,
+  type UiHostServices,
 } from "@langwatch/browser-host/capabilities";
-import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
 // @vitest-environment jsdom
 /**
  * Project's lent switcher, as main's `ProjectSelector` drew it beside Add Secret.
@@ -50,8 +50,8 @@ class TestScope extends UiScope {
 
 function renderSwitcher({ projectId, pathname }: { projectId: string | null; pathname: string }) {
   const visited: string[] = [];
-  const capabilities: UiCapabilities = {
-    ...createUiCapabilitiesFromHost({
+  const capabilities: UiHostServices = {
+    ...createUiHostServicesFromHost({
       route: () => ({ params: {}, query: {}, pathname }),
       navigate: (to) => visited.push(to),
     }),
@@ -59,9 +59,9 @@ function renderSwitcher({ projectId, pathname }: { projectId: string | null; pat
   };
   render(
     <DesignSystemProvider forcedTheme="light">
-      <UiCapabilityContextProvider value={capabilities}>
+      <UiHostServicesContextProvider value={capabilities}>
         <ProjectSwitcher />
-      </UiCapabilityContextProvider>
+      </UiHostServicesContextProvider>
     </DesignSystemProvider>,
   );
   return { visited };

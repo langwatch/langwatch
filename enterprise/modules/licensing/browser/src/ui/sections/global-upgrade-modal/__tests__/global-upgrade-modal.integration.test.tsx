@@ -2,9 +2,9 @@
  * @vitest-environment jsdom
  * @see specs/licensing/proration-preview.feature
  */
-import { UiCapabilityContextProvider } from "@langwatch/browser-host/capabilities";
+import { UiHostServicesContextProvider } from "@langwatch/browser-host/capabilities";
 import { uiDeclarations } from "@langwatch/browser-host/declarations";
-import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import {
   SeatProrationPreviewToken,
@@ -25,7 +25,7 @@ function LentPrice({ variant }: SeatProrationPreviewProps) {
 }
 
 const billingLendsThePrice = {
-  ...createUiCapabilitiesFromHost({ route: () => ({ params: {}, query: {} }), navigate: () => {} }),
+  ...createUiHostServicesFromHost({ route: () => ({ params: {}, query: {} }), navigate: () => {} }),
   declarations: uiDeclarations([
     {
       name: "billing",
@@ -144,9 +144,9 @@ describe("<GlobalUpgradeModal/>", () => {
   describe("when a seat update waits to be confirmed and billing lends the price", () => {
     it("renders billing's lent preview with the seats the change asks for", async () => {
       renderWithDesignSystem(
-        <UiCapabilityContextProvider value={billingLendsThePrice}>
+        <UiHostServicesContextProvider value={billingLendsThePrice}>
           <GlobalUpgradeModal isSaaS={true} />
-        </UiCapabilityContextProvider>,
+        </UiHostServicesContextProvider>,
       );
 
       openSevenSeats();

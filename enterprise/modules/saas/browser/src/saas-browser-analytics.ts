@@ -2,34 +2,11 @@ import type { SaasBrowserScope, SaasBrowserUser } from "@langwatch/enterprise-sa
 
 type PollCancel = () => void;
 
-export type PostHogIdentify = (distinctId: string, properties: Record<string, unknown>) => void;
-
 export class SaasBrowserAnalytics {
-  private constructor(
-    private readonly identifyPostHog: PostHogIdentify,
-    private readonly intervalMs: number,
-  ) {}
+  private constructor(private readonly intervalMs: number) {}
 
-  static create(options: {
-    identifyPostHog: PostHogIdentify;
-    intervalMs?: number;
-  }): SaasBrowserAnalytics {
-    return new SaasBrowserAnalytics(options.identifyPostHog, options.intervalMs ?? 200);
-  }
-
-  identifyPostHogUser(input: {
-    user: SaasBrowserUser;
-    organization?: SaasBrowserScope;
-    project?: SaasBrowserScope;
-  }): void {
-    this.identifyPostHog(input.user.id, {
-      email: input.user.email,
-      name: input.user.name,
-      organization_id: input.organization?.id,
-      organization_name: input.organization?.name,
-      project_id: input.project?.id,
-      project_name: input.project?.name,
-    });
+  static create({ intervalMs }: { intervalMs?: number }): SaasBrowserAnalytics {
+    return new SaasBrowserAnalytics(intervalMs ?? 200);
   }
 
   identifyReo(input: {

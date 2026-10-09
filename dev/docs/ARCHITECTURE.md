@@ -819,8 +819,11 @@ base security headers) and sends `/api/**` through to the api package.
 OTel export variant can sit beside it without any main changing shape).
 **Telemetry initializes immediately after the config parse** (ruled
 2026-09-18): one named call, `initializeTelemetry(process.observability)`,
-wires traces, logs and metrics from config alone — no `instrumentation.node`
-preload file, and anything requiring preload is out of scope by design.
+wires traces, logs and metrics from config alone. The one exception is library patching
+(OTEL-PRELOAD, Alex, round 57): the image start command preloads
+`--import @langwatch/observability/register`, which patches aws-sdk and openai by default (ioredis
+opt-in) under `OTEL_NODE_ENABLED_INSTRUMENTATIONS` / `OTEL_NODE_DISABLED_INSTRUMENTATIONS`, and
+records into the provider that call registers. No other preload.
 **Metrics are pushed and may also be pulled** (ADR-175): every process pushes over OTLP when
 `OTEL_EXPORTER_OTLP_ENDPOINT` is set (`OTEL_METRICS_EXPORTER=none` turns it off). A Prometheus
 `/metrics` door is off by default; `OTEL_METRICS_EXPORTER=otlp,prometheus` adds a pull reader to the
@@ -1446,6 +1449,14 @@ host clocks differ, which is the accepted ceiling (Alex, 2026-10-09).
 A step that moves a stored value to a new shape annotates the old shape (an inline anomaly webhook
 destination gains an optional `endpointId`) so a rolled-back image still reads it, and a contract step
 after the floor rewrites it to the new shape (Alex, 2026-10-09, D1-A).
+
+**A contract step never drops unarchived data** (Alex, 2026-10-09, ARCHIVE-OR-FAIL). Archive-or-fail
+lives in `packages/upgrade`: a contract's SQL names each table it retires with `-- archive: <table>`
+beside its `-- contract: retired in <release>` note, and before any schema apply the runner copies each
+such table still ahead into `_retired_<table>_<release>` and checks the copy holds the source's rows,
+or marks the contract step failed and applies nothing. A re-run copies only a stale archive; `upgrade
+plan` reports what would be archived. Only Postgres contracts archive so far; a goose contract that
+asks fails. A contract with no archive note behaves as before.
 
 **An LTS is an upgrade stop, never a maintained line** (Alex, 2026-10-09, LTS-SCHEDULE). An LTS is
 named every April and October; the first is 3.20.1 (2026-10-06), the next April 2027. Only the
@@ -2738,6 +2749,17 @@ Enterprise is a licence, not a separate app (§3): a core module imports an ente
 like any peer's, the enterprise owner refuses per organization, and a core caller never re-checks
 entitlement before calling. There are no slots: a core screen renders the enterprise module's lent component directly, and
 the shell's upgrade modal (`globalUpgradeModal`) is licensing's declared mount (Alex, 2026-09-29).
+
+**Hosted Connect is the `connect` module** (Alex, 2026-10-09, C3a). `enterprise/modules/connect`
+serves the three `/api/internal/gateway/connect/*` routes (paths unchanged; `internal` is an unowned
+prefix) behind the gateway's `internal_secret` door, and owns the contract budget's cap, sync and reset,
+written only through `GatewayApi`; it owns no table. The install end of Connect stays in licensing. Connect
+resolves a hosted caller through `LicensingApi.findManagedKeyLicense` and reads terms through
+`getContractTerms`. Nothing depends on connect: billing would close connect -> gateway -> organization ->
+billing, so connect syncs on licensing's `contract_terms_changed` and resets on billing's
+`connected_term_renewed` / `connected_customer_onboarded` facts (the cap is not a precondition of the
+billing call), and billing reads the contract `GatewayBudget` through a declared share plus its ClickHouse
+spend share. `connect.errors.ts` stays in licensing-contract.
 
 **Seat limits are organization's to answer** (Alex, 2026-09-28).
 `licenseEnforcement.checkLimit`, `checkAllLimits` and `reportLimitBlocked`

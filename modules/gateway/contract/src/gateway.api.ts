@@ -783,16 +783,6 @@ export interface GatewayApi extends GatewayInternalProtocol {
   revokeVirtualKey(input: GatewayVirtualKeyCommand): Promise<GatewayVirtualKeyRecord>;
 
   /**
-   * The managed key a license resolves to (ADR-156 section 3): one per
-   * license, on the customer's hidden governance project, its secret
-   * discarded. Repeating this mints a second key; the registry calls it once.
-   */
-  provisionConnectManagedKey(input: {
-    organizationId: string;
-    licenseId: string;
-    actorUserId: string;
-  }): Promise<{ id: string }>;
-  /**
    * Ends a managed key for the feature that owns it; customer-facing revocation
    * refuses one. A key already gone is left alone, so this is safe to repeat,
    * which is what makes revoking a license retryable.

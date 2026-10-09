@@ -25,7 +25,7 @@ interface ConnectCredentialOptions {
   repository: IssuedLicenseRepository;
   managedKeys: ConnectManagedKeys;
   cryptography: LicenseCryptography;
-  /** Attributed as the actor when a managed key lost the race and is ended. */
+  /** Attributed as the actor when a provisioned key lost the attach and is ended. */
   systemActorId: string;
   now: () => Instant;
 }
@@ -126,9 +126,8 @@ export class ConnectCredentialService {
   }
 
   /**
-   * The license's managed key, created on first use. The status check in
-   * `resolve` ran before this key existed, so the attach carries that state
-   * into the write instead, and a lost write never returns a key.
+   * The license's managed key. Without one, gateway is asked to provision it
+   * (C3B-ORDER) and the call is told to retry; the key arrives seconds later.
    */
   private async managedKey({
     row,
@@ -141,58 +140,46 @@ export class ConnectCredentialService {
   }): Promise<ManagedKeyOutcome> {
     if (row.virtualKeyId) return { ok: true, virtualKeyId: row.virtualKeyId };
 
-    const created = await this.options.managedKeys.provision({
+    await this.options.managedKeys.issue({
       organizationId,
       licenseId: row.licenseId,
+      issuedLicenseId: row.id,
+      instanceId,
+      tokenHash: row.tokenHash,
+      expiresAt: row.expiresAt,
+      services: entitledConnectServices(row.services),
     });
-    let attached: boolean;
-    try {
-      attached = await this.options.repository.attachVirtualKey({
-        id: row.id,
-        virtualKeyId: created.id,
-        requires: { organizationId, instanceId, activeAt: this.options.now() },
-      });
-    } catch (error) {
-      await this.retire({ virtualKeyId: created.id, organizationId });
-      throw error;
-    }
-    if (attached) {
-      await this.options.managedKeys.setConnectServices({
-        virtualKeyId: created.id,
-        organizationId,
-        services: entitledConnectServices(row.services),
-      });
-      return { ok: true, virtualKeyId: created.id };
-    }
-
-    // This key authenticated nothing, so it is ended either way: a concurrent
-    // first call attached its own, or the license stopped being this install's
-    // active license. One key per license is what lets a spend row name it.
-    await this.retire({ virtualKeyId: created.id, organizationId });
-    return this.afterLostAttach({ id: row.id, organizationId, instanceId });
+    return { ok: false, code: "connect_credential_pending" };
   }
 
-  private async afterLostAttach({
-    id,
+  /**
+   * Gateway's answer to an issued fact. The attach admits the key only while the
+   * row has none and is this install's active license; a key that lost is ended,
+   * and the attached key is never ended here. Safe to repeat.
+   */
+  async attachProvisioned({
+    issuedLicenseId,
     organizationId,
-    instanceId,
+    virtualKeyId,
   }: {
-    id: string;
+    issuedLicenseId: string;
     organizationId: string;
-    instanceId: string;
-  }): Promise<ManagedKeyOutcome> {
-    const current = await this.options.repository.findById(id);
-    if (!current) return { ok: false, code: "connect_license_not_registered" };
-    if (current.organizationId !== organizationId) {
-      return { ok: false, code: "connect_license_not_registered" };
-    }
-    const settled = this.refusalForStatus(current);
-    if (settled) return { ok: false, code: settled };
-    if (current.instanceId !== instanceId) return { ok: false, code: "connect_wrong_instance" };
-    if (!current.virtualKeyId) {
-      throw new Error(`license ${id} has no managed key after a lost attach race`);
-    }
-    return { ok: true, virtualKeyId: current.virtualKeyId };
+    virtualKeyId: string;
+  }): Promise<void> {
+    const row = await this.options.repository.findById(issuedLicenseId);
+    if (row?.virtualKeyId === virtualKeyId) return;
+    const attached =
+      row?.organizationId === organizationId && row.instanceId !== null
+        ? await this.options.repository.attachVirtualKey({
+            id: row.id,
+            virtualKeyId,
+            requires: { organizationId, instanceId: row.instanceId, activeAt: this.options.now() },
+          })
+        : false;
+    if (attached) return;
+    const current = await this.options.repository.findById(issuedLicenseId);
+    if (current?.virtualKeyId === virtualKeyId) return;
+    await this.retire({ virtualKeyId, organizationId });
   }
 
   /** Why the license as stored now admits no call, or null when it does. */

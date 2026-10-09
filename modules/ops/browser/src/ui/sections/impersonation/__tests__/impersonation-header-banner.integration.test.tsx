@@ -11,7 +11,7 @@ import { ADMIN_PANEL_PATH, ImpersonationHeaderBanner } from "../impersonation-he
 
 const { hardRedirect, failed } = vi.hoisted(() => ({ hardRedirect: vi.fn(), failed: vi.fn() }));
 vi.mock("@langwatch/browser-host/capabilities", () => ({
-  useUiCapabilities: () => ({ feedback: { failed } }),
+  useUiHostServices: () => ({ feedback: { failed } }),
 }));
 vi.mock("../../../../behavior/hard-redirect.ts", () => ({ hardRedirect }));
 

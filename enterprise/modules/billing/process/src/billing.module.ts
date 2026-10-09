@@ -8,6 +8,7 @@ import { defineMigrationStep } from "@langwatch/upgrade/step";
  * behind these stays private — composition states substrates, never classes.
  */
 import { BillingModule } from "./app/billing.app.ts";
+import { billingChannels } from "./channels/billing-channels.registry.ts";
 import { composeHttpBillingStripe } from "./channels/http/http.billing-stripe.channels.ts";
 import { billingLifecycleEventing } from "./eventing/billing-lifecycle.pipeline.ts";
 import { billingReportingEventing } from "./eventing/billing-reporting.pipeline.ts";
@@ -40,6 +41,7 @@ export const billingProcessModule: PublishedProcessModule<
   BillingServerConfig
 > = defineProcessModule("billing")
   .withRepositories(billingRepositories)
+  .withChannels(billingChannels)
   .withApi(BillingModule)
   .withTransports(
     connectedBillingTrpcTransport,
