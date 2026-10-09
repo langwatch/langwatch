@@ -102,7 +102,7 @@ function offloadedLlmRow({
 
 const tenantsRead = (): string[] =>
   eventLogReads.mock.calls.map(
-    (call) => (call[0] as { tenantId: string }).tenantId,
+    (call: unknown[]) => (call[0] as { tenantId: string }).tenantId,
   );
 
 beforeAll(async () => {
