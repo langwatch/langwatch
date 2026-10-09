@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { HttpLangevalsChannel } from "../http/http.langevals.channel.ts";
 import {
   type LangevalsPayloadStaging,
+  type LangevalsPost,
   type LangevalsPostConfig,
   PayloadTooLargeError,
   STAGED_PAYLOAD_HEADER,
@@ -72,8 +73,10 @@ beforeEach(() => {
 });
 
 describe("given a deployment that parks payloads over a threshold", () => {
-  const adapterWith = (staging: RecordingStaging) =>
-    HttpLangevalsChannel.create({ config: CONFIG, staging });
+  const adapterWith = (staging: RecordingStaging) => ({
+    post: (input: Omit<LangevalsPost, "staging">) =>
+      HttpLangevalsChannel.create({ config: CONFIG }).post({ ...input, staging }),
+  });
 
   describe("when the body is below the staging threshold", () => {
     /** @scenario "Small eval payload posts inline" */
@@ -203,10 +206,10 @@ describe("given a deployment that configured no staging threshold", () => {
           evaluationMaxPayloadBytes: 50_000,
           topicClusteringMaxPayloadBytes: 500_000,
         },
-        staging,
       });
 
       await adapter.post({
+        staging,
         url: "https://langevals.test/topics/batch_clustering",
         body: { traces: "x".repeat(20_000) },
         projectId: "project_unit_e",

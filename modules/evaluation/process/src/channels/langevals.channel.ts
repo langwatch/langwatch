@@ -67,6 +67,8 @@ export type LangevalsPost = Readonly<{
   /** Absent for a tenantless call, always posted inline: no project to stage under. */
   projectId?: string | undefined;
   kind: LangevalsCallKind;
+  /** Parks an over-threshold body; the service owns it, over the module's own store. */
+  staging: LangevalsPayloadStaging;
   headers?: Readonly<Record<string, string>> | undefined;
   signal?: AbortSignal | undefined;
 }>;

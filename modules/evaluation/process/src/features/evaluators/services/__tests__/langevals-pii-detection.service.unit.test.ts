@@ -1,6 +1,8 @@
 import { LangevalsPiiDetectionError } from "@langwatch/evaluation-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
+import type { LangevalsPayloadStaging } from "../../../../channels/langevals.channel.ts";
 import { MemoryLangevalsChannel } from "../../../../channels/memory/memory.langevals.channel.ts";
 import { LangevalsPiiDetectionService } from "../langevals-pii-detection.service.ts";
 
@@ -12,9 +14,14 @@ const PROCESSED = {
 } as const;
 const SKIPPED = { status: "skipped", details: "nothing found" } as const;
 
+const staging = createApiFixture<LangevalsPayloadStaging>();
+
 function setup(endpoint: string | undefined) {
   const langevals = MemoryLangevalsChannel.create();
-  return { langevals, service: LangevalsPiiDetectionService.create({ endpoint, langevals }) };
+  return {
+    langevals,
+    service: LangevalsPiiDetectionService.create({ endpoint, langevals, staging }),
+  };
 }
 
 function request(texts: string[]) {
@@ -59,6 +66,7 @@ describe("LangevalsPiiDetectionService", () => {
           },
           projectId: "project-1",
           kind: "evaluation",
+          staging,
           signal: input.signal,
         },
       ]);

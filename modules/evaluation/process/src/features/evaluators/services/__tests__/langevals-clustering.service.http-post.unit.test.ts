@@ -46,12 +46,12 @@ describe("LangevalsClusteringService over the live langevals channel", () => {
             evaluationMaxPayloadBytes: 50_000,
             topicClusteringMaxPayloadBytes: 500_000,
           },
-          staging: {
-            stage: async () => {
-              throw new Error("a page that is posted directly is never parked");
-            },
-          },
         }),
+        staging: {
+          stage: async () => {
+            throw new Error("a page that is posted directly is never parked");
+          },
+        },
       });
 
       await service.request({

@@ -222,10 +222,12 @@ export function createEvaluationTestApp(
       LangevalsClusteringService.create({
         endpoint: undefined,
         langevals: MemoryLangevalsChannel.create(),
+        staging: repositories.langevalsStaging,
       }),
     piiDetection: LangevalsPiiDetectionService.create({
       endpoint: undefined,
       langevals: MemoryLangevalsChannel.create(),
+      staging: repositories.langevalsStaging,
     }),
     executionIntent: {
       execute: () => Promise.reject(new Error("this test composed no evaluation execution intent")),

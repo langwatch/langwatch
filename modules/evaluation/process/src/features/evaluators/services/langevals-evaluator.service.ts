@@ -12,6 +12,7 @@ import { createLogger } from "@langwatch/observability";
 
 import {
   type LangevalsChannel,
+  type LangevalsPayloadStaging,
   PayloadTooLargeError,
 } from "../../../channels/langevals.channel.ts";
 import { toLangevalsContexts } from "../../../rules/langevals-contexts.rules.ts";
@@ -67,21 +68,30 @@ type LangevalsRuntimeConfig = Readonly<{
   timeoutMs: number;
 }>;
 
+interface LangevalsEvaluatorInput {
+  readonly config: LangevalsRuntimeConfig;
+  readonly langevals: LangevalsChannel;
+  readonly staging: LangevalsPayloadStaging;
+  readonly telemetry?: Pick<EvaluationExecutionMetricsService, "record"> | undefined;
+}
+
 /** Runs one installed evaluator over the langevals channel: retry, timeout and result mapping. */
 export class LangevalsEvaluatorService {
-  static create(input: {
-    config: LangevalsRuntimeConfig;
-    langevals: LangevalsChannel;
-    telemetry?: Pick<EvaluationExecutionMetricsService, "record">;
-  }): LangevalsEvaluatorService {
-    return new LangevalsEvaluatorService(input.config, input.langevals, input.telemetry);
+  static create(input: LangevalsEvaluatorInput): LangevalsEvaluatorService {
+    return new LangevalsEvaluatorService(input);
   }
 
-  private constructor(
-    private readonly config: LangevalsRuntimeConfig,
-    private readonly langevals: LangevalsChannel,
-    private readonly telemetry: Pick<EvaluationExecutionMetricsService, "record"> | undefined,
-  ) {}
+  private readonly config: LangevalsRuntimeConfig;
+  private readonly langevals: LangevalsChannel;
+  private readonly staging: LangevalsPayloadStaging;
+  private readonly telemetry: Pick<EvaluationExecutionMetricsService, "record"> | undefined;
+
+  private constructor(input: LangevalsEvaluatorInput) {
+    this.config = input.config;
+    this.langevals = input.langevals;
+    this.staging = input.staging;
+    this.telemetry = input.telemetry;
+  }
 
   async evaluate(params: LangevalsEvaluateParams): Promise<SingleEvaluationResult> {
     return this.evaluateWithRetry(params, this.config.maxRetries);
@@ -102,6 +112,7 @@ export class LangevalsEvaluatorService {
       response = await this.langevals.post({
         url,
         kind: "evaluation",
+        staging: this.staging,
         headers: idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {},
         signal: withCallerSignal({ own: controller.signal, caller: signal }),
         body: evaluationBody({ data, settings, env }),

@@ -6,7 +6,10 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { topicClusteringResponseSchema } from "@langwatch/topic-contract";
 
-import type { LangevalsChannel } from "../../../channels/langevals.channel.ts";
+import type {
+  LangevalsChannel,
+  LangevalsPayloadStaging,
+} from "../../../channels/langevals.channel.ts";
 
 const logger = createLogger("langwatch:evaluation:langevals-clustering");
 
@@ -29,13 +32,15 @@ export class LangevalsClusteringService {
   static create(input: {
     endpoint: string | undefined;
     langevals: LangevalsChannel;
+    staging: LangevalsPayloadStaging;
   }): LangevalsClusteringService {
-    return new LangevalsClusteringService(input.endpoint, input.langevals);
+    return new LangevalsClusteringService(input.endpoint, input.langevals, input.staging);
   }
 
   private constructor(
     private readonly endpoint: string | undefined,
     private readonly langevals: LangevalsChannel,
+    private readonly staging: LangevalsPayloadStaging,
   ) {}
 
   async request(input: TopicClusteringRequest): Promise<TopicClusteringOutcome> {
@@ -53,6 +58,7 @@ export class LangevalsClusteringService {
       body: input.params,
       projectId: input.projectId,
       kind: route.kind,
+      staging: this.staging,
       signal: input.signal,
     });
 

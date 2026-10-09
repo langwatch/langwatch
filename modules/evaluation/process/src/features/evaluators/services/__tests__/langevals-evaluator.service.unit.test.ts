@@ -30,8 +30,8 @@ function httpService(): LangevalsEvaluatorService {
         evaluationMaxPayloadBytes: 1_000_000,
         topicClusteringMaxPayloadBytes: 1_000_000,
       },
-      staging: createApiFixture<LangevalsPayloadStaging>(),
     }),
+    staging: createApiFixture<LangevalsPayloadStaging>(),
   });
 }
 
@@ -169,8 +169,8 @@ describe("LangevalsEvaluatorService", () => {
             evaluationMaxPayloadBytes: 1_000_000,
             topicClusteringMaxPayloadBytes: 1_000_000,
           },
-          staging: createApiFixture<LangevalsPayloadStaging>(),
         }),
+        staging: createApiFixture<LangevalsPayloadStaging>(),
       });
       const caller = new AbortController();
 
@@ -190,6 +190,7 @@ describe("LangevalsEvaluatorService", () => {
       const service = LangevalsEvaluatorService.create({
         config: { endpoint: undefined, maxRetries: 0, timeoutMs: 10 },
         langevals: NullLangevalsChannel.create(),
+        staging: createApiFixture<LangevalsPayloadStaging>(),
       });
 
       await expect(service.evaluate(params)).resolves.toMatchObject({ status: "skipped" });

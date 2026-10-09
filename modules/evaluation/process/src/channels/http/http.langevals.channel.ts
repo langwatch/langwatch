@@ -3,7 +3,6 @@ import { createLogger } from "@langwatch/observability";
 import {
   type LangevalsCallKind,
   type LangevalsChannel,
-  type LangevalsPayloadStaging,
   type LangevalsPost,
   type LangevalsPostConfig,
   PayloadTooLargeError,
@@ -35,20 +34,14 @@ function maxBytesForKind(kind: LangevalsCallKind, config: LangevalsPostConfig): 
 
 /** A port of main's `stagedLangevalsFetch` (`server/langevals/stagedFetch.ts`). */
 export class HttpLangevalsChannel implements LangevalsChannel {
-  static create(input: {
-    config: LangevalsPostConfig;
-    staging: LangevalsPayloadStaging;
-  }): HttpLangevalsChannel {
-    return new HttpLangevalsChannel(input.config, input.staging);
+  static create(input: { config: LangevalsPostConfig }): HttpLangevalsChannel {
+    return new HttpLangevalsChannel(input.config);
   }
 
-  private constructor(
-    private readonly config: LangevalsPostConfig,
-    private readonly staging: LangevalsPayloadStaging,
-  ) {}
+  private constructor(private readonly config: LangevalsPostConfig) {}
 
   async post(input: LangevalsPost): Promise<Response> {
-    const { url, body, projectId, kind, headers = {}, signal } = input;
+    const { url, body, projectId, kind, staging, headers = {}, signal } = input;
     const serialized = Buffer.from(JSON.stringify(body), "utf-8");
     const bytes = serialized.byteLength;
     const limit = maxBytesForKind(kind, this.config);
@@ -79,7 +72,7 @@ export class HttpLangevalsChannel implements LangevalsChannel {
     }
 
     const ttlSeconds = this.config.stagingTtlSeconds;
-    const staged = await this.staging.stage({
+    const staged = await staging.stage({
       projectId,
       keyPrefix: `${STAGING_PREFIX}/${projectId}/${kind}`,
       serialized,
