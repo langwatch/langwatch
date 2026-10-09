@@ -17,7 +17,8 @@ Run it from the workspace root. `make haven <sub>` forwards to the CLI (`dev/hav
 `make haven install` puts plain `haven` on your PATH and installs what the machine
 needs. With no TTY it runs `haven install --yes` (no prompts; on macOS also the
 native tier: `brew install grafana prometheus loki` and the pinned ClickHouse,
-Tempo and Alloy downloads). colima is optional. A failed non-required row is
+Tempo and Alloy downloads). macOS needs no colima: the install list leaves the
+runtime off and Langy runs on the host tier by default (`up` says it is unsandboxed). A failed non-required row is
 logged and the run carries on. Re-running is a no-op;
 `haven install --list --agent` reports without installing.
 

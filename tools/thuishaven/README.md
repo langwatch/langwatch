@@ -88,7 +88,8 @@ everything else haven drives — node, pnpm, go, the brew formulae behind the
 shared Postgres and Redis, on macOS the native tier (Grafana, Prometheus and
 Loki from Homebrew, the pinned ClickHouse, Tempo and Alloy downloads), and an
 optional container runtime (colima only backs the container fallback, `haven
-play` and sandboxed langy) — and offers to install what is missing. With no
+play` and sandboxed langy; macOS needs none, so its report leaves the row off and
+`haven install runtime=colima` installs it on request) — and offers to install what is missing. With no
 terminal (`make haven install` from an agent) it runs `--yes`: no prompts, one
 line per step, already-installed rows left alone, and only a missing required
 prerequisite fails. In a terminal nothing is installed without being ticked, and anything declined with
@@ -187,8 +188,8 @@ haven install    check this MACHINE for what haven drives but does not own —
                  portless, node, pnpm, go, the brew formulae behind the shared
                  Postgres and Redis, a container runtime, the ClickHouse
                  client, rtk — and offer to install what is missing. A terminal gets a
-                 picker (space ticks, `n` is never-ask-again, ←/→ picks between
-                 colima and Docker Desktop); a pipe or an agent gets the report
+                 picker (space ticks, `n` is never-ask-again; the runtime row
+                 is off the macOS list, install it by name); a pipe or an agent gets the report
                  and the commands. --yes installs what haven needs without
                  asking, --list only reports, --reset-skips forgets every
                  never-ask-again. Naming one installs exactly that:
@@ -709,10 +710,15 @@ The daemon's JSON, which the console reads:
   the ui lane which port it is on (`LANGWATCH_STORYBOOK_PORT`), so opening
   `/design-system` in the app frames the Storybook the stack is already running
   instead of starting a second one.
-- **Sandboxed Langy worker (by default).** The langyagent worker runs the Langy
-  agent, so haven isolates it like production rather than letting a test model run
-  as your own user. Two env flags pick one of three tiers:
-  - _neither_ (default): the worker runs in the shared colima VM with the
+- **Langy worker isolation (sandboxed off macOS, host on macOS).** The langyagent
+  worker runs the Langy agent, so off macOS haven isolates it like production
+  rather than letting a test model run as your own user. On macOS haven wants no
+  colima: a development stack runs the worker on the host tier by default and
+  `up` prints `Langy runs unsandboxed on this machine (macOS runs langyagent on
+  the host); set LANGY_UNSAFE_HOST_ACCESS=0 to run it sandboxed in colima`. The
+  container tiers below stay as an explicit opt-in there. Two env flags pick one
+  of three tiers:
+  - _neither_ (default off macOS): the worker runs in the shared colima VM with the
     per-worker UID sandbox on (production-like); nothing it does can touch your
     real filesystem. haven builds `langyagent:dev` into colima on first `up`
     (minutes once; the image tag is content-addressed, so it rebuilds by itself

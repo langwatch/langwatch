@@ -413,12 +413,10 @@ func optionsFromEnv(repoRoot string) app.PlanOptions {
 		ShouldRunOneProcess:     isOneProcess,
 		ShouldRunGoAsOneProcess: isOneProcess,
 		ShouldSeed:              os.Getenv("LANGWATCH_SEED") == "1",
-		// What the langyagent worker's local isolation posture is resolved from;
-		// `up` settles it against this machine before it builds the stack. Default
-		// (neither flag) is the sandboxed, production-like tier: the worker runs in
-		// colima with the per-worker UID sandbox on. LANGY_UNSAFE_CONTAINER relaxes
-		// the sandbox inside the VM; LANGY_UNSAFE_HOST_ACCESS drops the VM and runs
-		// it on the host, and set to a falsey value refuses the host tier outright.
+		// The langyagent isolation request; `up` settles it against this machine
+		// (domain.ResolveLangyTier). Off macOS the default is the sandboxed tier in
+		// colima; on macOS it is the host tier. LANGY_UNSAFE_CONTAINER relaxes the
+		// sandbox inside the VM; LANGY_UNSAFE_HOST_ACCESS=1 picks the host, =0 refuses it.
 		LangyTierRequest: langyTierRequest(),
 		IsStub:           os.Getenv("HAVEN_STUB") == "1",
 		RepoRoot:         repoRoot,
@@ -474,6 +472,7 @@ func langyTierRequest() domain.LangyTierRequest {
 		UnsafeHostAccess:  hostAccessSet && isTruthy,
 		HostAccessRefused: hostAccessSet && !isTruthy,
 		IsDevelopment:     domain.IsDevelopmentEnvironment(devEnv("NODE_ENV"), devEnv("ENVIRONMENT")),
+		IsMacOS:           runtime.GOOS == "darwin",
 	}
 }
 

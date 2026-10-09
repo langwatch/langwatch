@@ -77,7 +77,7 @@ hostname. It drifts back after `wsl --shutdown`; the durable fix is
 
 ## Gotcha 3: langy on the host needs `opencode`, and its egress refuses cleartext
 
-With `LANGY_UNSAFE_HOST_ACCESS=1` the langy worker runs as a bare host process, so the
+With `LANGY_UNSAFE_HOST_ACCESS=1`, and by default on macOS, the langy worker runs as a bare host process, so the
 `opencode` binary baked into the container image is absent. Symptom:
 `POST /worker/create` logs `error=start opencode`, `.cause=exec: "opencode"`. Install the
 version and hash `infra/docker/Dockerfile.langyagent` currently pins; read them from the
@@ -94,7 +94,7 @@ find ~/.langwatch/portless/langyagent -iname opencode.log 2>/dev/null | xargs ta
 # look for: AI_APICallError: failed to execute HTTP request to provider API
 ```
 
-Fix, config only, and only alongside `LANGY_UNSAFE_HOST_ACCESS=1` (that tier has already
+Fix, config only, and only on the host tier (`LANGY_UNSAFE_HOST_ACCESS=1` or the macOS default; that tier has already
 accepted reduced isolation): `LANGY_EGRESS_REQUIRE_TLS=false` (read in
 `services/langyagent/config.go`).
 

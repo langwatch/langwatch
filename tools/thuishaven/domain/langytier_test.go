@@ -83,6 +83,36 @@ func TestResolveLangyTier(t *testing.T) {
 		})
 	})
 
+	t.Run("given a development stack on macOS", func(t *testing.T) {
+		mac := dev
+		mac.IsMacOS = true
+
+		t.Run("resolves to the host tier without colima, and says so", func(t *testing.T) {
+			got, notice := ResolveLangyTier(mac)
+			if got != LangyTierHostUnsafe || notice != LangyMacHostNotice {
+				t.Fatalf("got %v %q, want host-unsafe with the macOS notice", got, notice)
+			}
+		})
+
+		t.Run("keeps the container tiers as an explicit opt-in", func(t *testing.T) {
+			refused, relaxed := mac, mac
+			refused.HostAccessRefused = true
+			relaxed.UnsafeContainer = true
+			if got, _ := ResolveLangyTier(refused); got != LangyTierSandboxed {
+				t.Fatalf("refused host: got %v, want sandboxed", got)
+			}
+			if got, _ := ResolveLangyTier(relaxed); got != LangyTierContainerUnsafe {
+				t.Fatalf("container flag: got %v, want container-unsafe", got)
+			}
+		})
+
+		t.Run("keeps a non-development stack sandboxed", func(t *testing.T) {
+			if got, _ := ResolveLangyTier(LangyTierRequest{IsMacOS: true}); got != LangyTierSandboxed {
+				t.Fatalf("got %v, want sandboxed", got)
+			}
+		})
+	})
+
 	t.Run("given a stack that is not development", func(t *testing.T) {
 		t.Run("keeps the sandboxed tier even with no container runtime", func(t *testing.T) {
 			got, notice := ResolveLangyTier(LangyTierRequest{})

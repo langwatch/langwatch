@@ -134,6 +134,9 @@ type Prereq struct {
 	// story. Elsewhere they are reported not-applicable rather than missing,
 	// because "missing" implies haven could fix it.
 	DarwinOnly bool
+	// UnlistedOnDarwin keeps an entry off the macOS report and picker; it is
+	// installed there only when named (`haven install runtime=colima`).
+	UnlistedOnDarwin bool
 }
 
 // Manual reports whether no candidate can be installed by haven, so the only
@@ -362,12 +365,13 @@ var Prereqs = []Prereq{{
 		Install: "download the pinned ClickHouse, Tempo, Alloy and Pyroscope releases",
 	}},
 }, {
-	Key:         "runtime",
-	Name:        "Container runtime",
-	Summary:     "optional on macOS: the container fallback, haven play and sandboxed langy — pick one",
-	Requirement: PrereqOptional,
-	After:       []string{"brew"},
-	DarwinOnly:  true,
+	Key:              "runtime",
+	Name:             "Container runtime",
+	Summary:          "optional on macOS: the container fallback, haven play and sandboxed langy — pick one",
+	Requirement:      PrereqOptional,
+	After:            []string{"brew"},
+	DarwinOnly:       true,
+	UnlistedOnDarwin: true,
 	Detail: "Nothing in the day-to-day loop needs one, and answering \"none\" is a\n" +
 		"    supported answer rather than a refusal: on macOS ClickHouse and the\n" +
 		"    telemetry stack (traces included) run natively either way, and langy\n" +

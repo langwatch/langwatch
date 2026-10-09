@@ -260,15 +260,16 @@ var envHelpText = `Environment variables.
                                  LW_OBS_OTLP_GRPC_PORT=4317).
     LANGY_UNSAFE_CONTAINER=1     Run the langyagent worker in colima with the
                                  per-worker UID sandbox off. Default (neither
-                                 flag) keeps the sandbox on, mirroring production.
+                                 flag) keeps the sandbox on off macOS; on macOS
+                                 the default is the host tier, no colima.
     LANGY_UNSAFE_HOST_ACCESS=1   Run the langyagent worker as a bare host process
                                  with no colima and no VM boundary, so it has
                                  full host access. The fast-iteration tier.
-                                 A development stack with no container runtime
-                                 resolves to it on its own and says so on "up";
-                                 LANGY_UNSAFE_HOST_ACCESS=0 refuses that and
-                                 keeps the sandboxed tier (langy then does not
-                                 start without a runtime).
+                                 A development stack on macOS, or with no
+                                 container runtime, resolves to it on its own
+                                 and says so on "up"; LANGY_UNSAFE_HOST_ACCESS=0
+                                 refuses that and keeps the sandboxed tier in
+                                 colima (langy does not start without a runtime).
     HAVEN_LANGY_IMAGE_REGISTRY   Registry ref (e.g. ghcr.io/langwatch/langyagent)
                                  to pull a CI-published langy image for the
                                  current content hash instead of building.

@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -70,7 +71,11 @@ func (o *Orchestrator) CheckPrereqs(ctx context.Context) []domain.PrereqStatus {
 			found[c.Key] = o.probeCandidate(ctx, c)
 		}
 	}
-	return domain.PlanPrereqs(found, o.PrereqSkips(), o.platform())
+	report := domain.PlanPrereqs(found, o.PrereqSkips(), o.platform())
+	if o.platform() != "darwin" {
+		return report
+	}
+	return slices.DeleteFunc(report, func(st domain.PrereqStatus) bool { return st.UnlistedOnDarwin })
 }
 
 // probeCandidate answers one candidate. portless is the one entry with no

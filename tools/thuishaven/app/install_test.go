@@ -130,10 +130,26 @@ func TestCheckPrereqsNeedsEveryBinaryOfACandidate(t *testing.T) {
 	}
 	tools := &fakeTools{binaries: map[string]bool{"colima": true}}
 	o := installOrchestrator(tools, &fakeStore{}, &fakeProxy{})
-	st := reportEntry(t, o.CheckPrereqs(context.Background()), "runtime")
-	if st.State != domain.PrereqMissing {
-		t.Errorf("runtime = %v, want missing — colima without docker is not a runtime", st.State)
+	colima, _ := domain.LookupCandidate(prereqByKey(t, "runtime"), "colima")
+	if o.probeCandidate(context.Background(), colima).Present {
+		t.Errorf("colima probed present, want missing — colima without docker is not a runtime")
 	}
+}
+
+// macOS needs no container runtime (HAVEN-NO-COLIMA-MAC), so the report and
+// picker leave it off there; `haven install runtime=colima` still installs it.
+func TestCheckPrereqsLeavesTheRuntimeOffTheMacReport(t *testing.T) {
+	o := installOrchestrator(&fakeTools{}, &fakeStore{}, &fakeProxy{})
+	for _, st := range o.CheckPrereqs(context.Background()) {
+		if st.Key == "runtime" {
+			t.Fatalf("runtime listed on macOS as %v, want it left off", st.State)
+		}
+	}
+	if _, err := ResolvePrereqNames([]string{"runtime=colima"}); err != nil {
+		t.Fatalf("runtime=colima must stay installable by name: %v", err)
+	}
+	o.goos = "linux"
+	reportEntry(t, o.CheckPrereqs(context.Background()), "runtime")
 }
 
 // @scenario "Installs run with the terminal to themselves"
