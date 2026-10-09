@@ -58,7 +58,6 @@ import {
   type UiRootCapabilities,
 } from "./shell/ui-root-capabilities";
 import { uiRouteTable } from "./shell/ui-route-table";
-import { UiSaasFooter } from "./shell/ui-saas-footer";
 import { uiShellLayouts } from "./shell/ui-shell-layouts";
 import { uiUnservedPageLoaders } from "./shell/ui-unserved-pages";
 import { lentFirstTouchAttribution } from "./shell/use-analytics-identity";
@@ -90,6 +89,11 @@ const useAttributionCapture =
 function UiAttributionCapture({ children }: { children: ReactNode }) {
   useAttributionCapture();
   return <>{children}</>;
+}
+
+/** The SaaS footer has not moved here yet, and self-hosted never had one. */
+function UiNoFooter() {
+  return null;
 }
 
 /**
@@ -230,7 +234,7 @@ class BrowserUiShell extends UiShell {
           // session read throws instead of answering. See ARCHITECTURE.md 10.1.
           session: browserUiCapabilitiesHook(rootCapabilities),
           hostServices,
-          footer: UiSaasFooter,
+          footer: UiNoFooter,
           capabilities: {
             feedback: BrowserUiFeedback.create(),
             deployment,
