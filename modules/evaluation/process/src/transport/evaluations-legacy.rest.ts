@@ -198,13 +198,13 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
     tags: ["Evaluations"],
     responses: EVALUATE_RESPONSES,
   })
-  .handle(async ({ app, input, scope, response }) =>
+  .handle(async ({ app, input: { evaluator, ...body }, scope, response }) =>
     response.write(
       await handleEvaluatorCall({
         app,
-        body: input,
+        body,
         projectId: scope.id,
-        evaluatorSlug: input.evaluator,
+        evaluatorSlug: evaluator,
         asGuardrail: false,
       }),
     ),
@@ -231,13 +231,13 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
     tags: ["Evaluations"],
     responses: EVALUATE_RESPONSES,
   })
-  .handle(async ({ app, input, scope, response }) =>
+  .handle(async ({ app, input: { evaluator, subpath, ...body }, scope, response }) =>
     response.write(
       await handleEvaluatorCall({
         app,
-        body: input,
+        body,
         projectId: scope.id,
-        evaluatorSlug: `${input.evaluator}/${input.subpath}`,
+        evaluatorSlug: `${evaluator}/${subpath}`,
         asGuardrail: false,
       }),
     ),
@@ -260,13 +260,13 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
     tags: ["Evaluations"],
     responses: EVALUATE_RESPONSES,
   })
-  .handle(async ({ app, input, scope, response }) =>
+  .handle(async ({ app, input: { evaluator, ...body }, scope, response }) =>
     response.write(
       await handleEvaluatorCall({
         app,
-        body: input,
+        body,
         projectId: scope.id,
-        evaluatorSlug: input.evaluator,
+        evaluatorSlug: evaluator,
         asGuardrail: true,
       }),
     ),

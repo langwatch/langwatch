@@ -108,3 +108,39 @@ describe("given an evaluate door and a body that is JSON but not an evaluation",
     });
   });
 });
+
+describe("given an evaluate door reached with the evaluator in the path", () => {
+  it.each([
+    ["/api/evaluations/basic/evaluate", "basic"],
+    ["/api/evaluations/langevals/valid_format/evaluate", "langevals/valid_format"],
+    ["/api/guardrails/basic/evaluate", "basic"],
+  ])("resolves %s from the path value alone", async (path, slug) => {
+    const findMonitorBySlug = vi.fn(() => Promise.resolve(null));
+    const runtime = createRestRuntime({
+      identity: {
+        authenticate: () => ({
+          actor: { type: "user", id: "user-1" },
+          scope: { tier: "project", id: PROJECT_ID },
+        }),
+      },
+    });
+    const app = runtime.mount(evaluationsLegacyRest.router(), {
+      app: () =>
+        createApiFixture<EvaluationApi>({
+          findMonitorBySlug,
+          listCustomEvaluators: () => Promise.resolve([]),
+        }),
+      onError: (error, context) => context.json({ error: String(error) }, 500),
+    });
+
+    await app.fetch(
+      new Request(`http://api.test${path}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ data: { input: "hi" } }),
+      }),
+    );
+
+    expect(findMonitorBySlug).toHaveBeenCalledWith(expect.objectContaining({ slug }));
+  });
+});
