@@ -41,6 +41,7 @@ import {
   type TwoStepVerificationApi,
   type VerifiedEmailsResolution,
   type IdentityStorageAdapterInput,
+  type IdentityCeremoniesApi,
 } from "@langwatch/identity-contract";
 import type { MailSender } from "@langwatch/mail";
 import { NotificationService } from "@langwatch/notification-contract";
@@ -172,6 +173,7 @@ import { LocalDoorBreakGlassBindingRepository } from "../repositories/local/loca
 import { newIdentityCommandId } from "../rules/identity-command-id.rules.ts";
 import { AccountIdentifiersService } from "../services/account-identifiers.service.ts";
 import { BetterAuthAccountBranchService } from "../services/better-auth-account-branch.service.ts";
+import { BetterAuthCeremonyBridgeService } from "../services/better-auth-ceremony-bridge.service.ts";
 import { IdentityCeremoniesService } from "../services/better-auth-identity-ceremonies.service.ts";
 import { BetterAuthIdentityRoutingService } from "../services/better-auth-identity-routing.service.ts";
 import { BetterAuthIdentityStorageService } from "../services/better-auth-identity-storage.service.ts";
@@ -212,7 +214,7 @@ type IdentitySetup = FeatureSetup<typeof IdentityModule.dependencies, IdentitySe
 
 type IdentityAppParts = {
   emails: IdentityEmailService;
-  ceremonies: IdentityCeremoniesService;
+  ceremonies: IdentityCeremoniesApi;
   storage: (input: IdentityStorageAdapterInput) => AdapterFactory<BetterAuthOptions>;
   identityGuards: IdentityGuardsService;
   mfaGuards: MfaGuardsService;
@@ -848,9 +850,17 @@ export class IdentityModule
 
     const joinAdmissions = JoinAdmissionsService.create(setup.repositories.joinRequests);
 
+    // auth's databaseHooks: a latched user's account ceremony is the adapter's alone (ADR-116 §5).
+    const bridge = BetterAuthCeremonyBridgeService.create({ ceremonies, routesToIdentity: isLatched });
+    const hookCeremonies: IdentityCeremoniesApi = {
+      beforeUserDelete: (user) => ceremonies.beforeUserDelete(user),
+      createAccountIdentifier: (account) => bridge.createAccountIdentifier(account),
+      beforeAccountDelete: (account) => bridge.beforeAccountDelete(account),
+    };
+
     return new IdentityModule({
       emails,
-      ceremonies,
+      ceremonies: hookCeremonies,
       storage,
       identityGuards,
       mfaGuards,
@@ -1161,7 +1171,7 @@ export class IdentityModule
     return this.#parts.identity;
   }
 
-  ceremonies(): IdentityCeremoniesService {
+  ceremonies(): IdentityCeremoniesApi {
     return this.#parts.ceremonies;
   }
 

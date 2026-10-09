@@ -33,7 +33,7 @@ import type { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { twoFactor } from "better-auth/plugins/two-factor";
 
 import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";
-import type { BetterAuthStorageRepository } from "../../repositories/better-auth-storage.repository.ts";
+import type { AdapterFactory } from "better-auth/adapters";
 import { findRegisteredRefusals } from "../../rules/better-auth-error-code.rules.ts";
 import {
   findSubmittedAddresses,
@@ -363,7 +363,7 @@ export const createAuthOptions = ({
 }: {
   repo: BetterAuthHooksRepository;
   deployment: BetterAuthDeploymentConfiguration;
-  storage: BetterAuthStorageRepository;
+  storage: AdapterFactory<BetterAuthOptions>;
   federation: BetterAuthFederation;
   identity: BetterAuthIdentityCeremonies;
   shadow: SignInRouterShadow;
@@ -410,7 +410,7 @@ export const createAuthOptions = ({
    * The identity storage adapter (ADR-116 §1) — one `database:` entry,
    * forever.
    */
-  database: storage.adapter() as NonNullable<BetterAuthOptions["database"]>,
+  database: storage,
 
   /**
    * The only header BetterAuth's rate limiter (and session IP tracking) reads, with no
@@ -868,8 +868,8 @@ type BetterAuthTransportOptions = Readonly<{
   idTokenIssuerRefusals?: IdTokenIssuerRefusalChannel;
   /** The persistence boundary every database hook reads and writes through. */
   database: BetterAuthHooksRepository;
-  /** The instance's storage engine — see {@link BetterAuthStorageRepository}. */
-  storage: BetterAuthStorageRepository;
+  /** better-auth's whole `database:` entry: identity's storage adapter (ADR-116 §1). */
+  storage: AdapterFactory<BetterAuthOptions>;
   deployment: BetterAuthDeploymentConfiguration;
   federation: BetterAuthFederation;
   identity: BetterAuthIdentityCeremonies;

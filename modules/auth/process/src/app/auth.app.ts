@@ -516,6 +516,7 @@ export class AuthModule implements AuthApiContract {
     });
 
     const cliSessions = CliDeviceSessionService.create({
+      refreshTokenTtlSeconds: config.cliRefreshTokenTtlSeconds,
       store: repositories.cliSessions,
       settlements: channels.cliSettlements,
     });
@@ -1638,9 +1639,9 @@ async function buildBetterAuth(options: BuildBetterAuthOptions): Promise<BetterA
 
   logger.warn(
     {
-      absent: ["identity-pipeline", "sign-in-router-shadow"],
+      absent: ["sign-in-router-shadow"],
     },
-    "Better Auth composed by the auth module: it runs the stock Prisma storage engine and it runs no sign-in router shadow",
+    "Better Auth composed by the auth module: it runs identity's storage adapter and it runs no sign-in router shadow",
   );
 
   const providerMounted = isNamedProviderMounted(options.signInProviders);
@@ -1663,7 +1664,9 @@ async function buildBetterAuth(options: BuildBetterAuthOptions): Promise<BetterA
     database: options.repositories.betterAuthHooks,
     secondaryStorage: options.repositories.betterAuthSecondaryStorage,
     sharedStorage: options.sharedStorage,
-    storage: options.repositories.betterAuthStorage,
+    storage: options.identityApi.createStorageAdapter(
+      options.repositories.betterAuthStorage.engines(),
+    ),
     deployment: {
       baseUrl: identity.baseUrl,
       publicBaseUrl: identity.publicBaseUrl,

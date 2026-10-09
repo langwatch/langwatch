@@ -74,6 +74,7 @@ const CONTINUING = collaboratorsAnswering({ action: "continue" });
 function identityAnswering(identifierId: string | null) {
   const asked: SessionClaimsMintInput[] = [];
   const identity = createApiFixture<IdentityApi>({
+    createStorageAdapter: ({ legacyEngine }) => legacyEngine,
     claimsForMint: async (input) => {
       asked.push(input);
       const local =

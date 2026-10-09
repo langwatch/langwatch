@@ -6,7 +6,7 @@ The server half of [auth](../README.md). Signing in and staying signed in: the b
 
 ## Installation
 
-`defineProcessModule("auth").withRepositories(authRepositories).withChannels(authChannels).withApi(AuthModule).withTransports(authTrpcTransport, signInSecurityTrpcTransport, authCliDeviceFlowRest, authRest).withEventing(authEventing).withEventing(authLifecycleEventing).withTasks(…).withTransportFacts(…)`, `src/auth.module.ts:22`.
+`defineProcessModule("auth").withRepositories(authRepositories).withChannels(authChannels).withApi(AuthModule).withTransports(authTrpcTransport, signInSecurityTrpcTransport, authCliDeviceFlowRest, authRest).withEventing(authEventing).withEventing(authLifecycleEventing).withTasks(…).withTransportFacts(…)`, `src/auth.module.ts:24`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Everything the auth module does for a caller: the signed-in browser session, and the signed-out front door that stands before they have one — one interface because it is one module, meeting at the same person.
 
-Peers call these through the token, declared at `../contract/src/auth.api.ts:101`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/auth.api.ts:105`; nothing else in this package is public.
 
 #### `offersPasskeys`
 
@@ -208,6 +208,30 @@ Writes the address through user, then ends every session that cached the old one
 
 ```typescript
 changeUserEmail(input: UpdateUserEmailInput): Promise<UserProfile>;
+```
+
+#### `setOwnFirstPassword`
+
+Fills an empty credential slot through user, then ends every other session (D-A1U-4).
+
+```typescript
+setOwnFirstPassword(input: SetOwnFirstPasswordInput): Promise<void>;
+```
+
+#### `changeOwnPassword`
+
+Verifies the current password and replaces it, then ends every other session.
+
+```typescript
+changeOwnPassword(input: ChangeOwnPasswordInput): Promise<void>;
+```
+
+#### `registerCredentialAccount`
+
+The signup form's door (D-A1U-2): the origin, the mode, the throttle and the sign-up policy, then the address proof is spent and user mints the account.
+
+```typescript
+registerCredentialAccount(input: RegisterCredentialAccountInput): Promise<CreatedUser>;
 ```
 
 #### `isWithinBudget`
@@ -455,7 +479,7 @@ countUsageForMembers(input: { memberUserIds: readonly string[]; at: number; }): 
 
 #### `POST /api/auth/cli/device-code` · `startCliDeviceCode`
 
-Public: the device flow authenticates the caller inside its own handlers — the CLI half by device code and refresh token, the browser half by the session cookie the process resolves — and answers its own 401, 403 and RFC 8628 refusals. Declared at `src/transport/auth-cli-device-flow.rest.ts:93`.
+Public: the device flow authenticates the caller inside its own handlers (the CLI half by device code and refresh token, the browser half by the session cookie the process resolves) and answers its own 401, 403 and RFC 8628 refusals. Declared at `src/transport/auth-cli-device-flow.rest.ts:93`.
 
 Answers at `/api/auth/cli/device-code`, `/api/v1/auth/cli/device-code`.
 
@@ -467,7 +491,7 @@ type Response = unknown;
 
 #### `POST /api/auth/cli/exchange` · `exchangeCliDeviceCode`
 
-Public: the device flow authenticates the caller inside its own handlers — the CLI half by device code and refresh token, the browser half by the session cookie the process resolves — and answers its own 401, 403 and RFC 8628 refusals. Declared at `src/transport/auth-cli-device-flow.rest.ts:102`.
+Public: the device flow authenticates the caller inside its own handlers (the CLI half by device code and refresh token, the browser half by the session cookie the process resolves) and answers its own 401, 403 and RFC 8628 refusals. Declared at `src/transport/auth-cli-device-flow.rest.ts:102`.
 
 Answers at `/api/auth/cli/exchange`, `/api/v1/auth/cli/exchange`.
 
@@ -479,7 +503,7 @@ type Response = unknown;
 
 #### `POST /api/auth/cli/refresh` · `refreshCliDeviceSession`
 
-Public: the device flow authenticates the caller inside its own handlers — the CLI half by device code and refresh token, the browser half by the session cookie the process resolves — and answers its own 401, 403 and RFC 8628 refusals. Declared at `src/transport/auth-cli-device-flow.rest.ts:111`.
+Public: the device flow authenticates the caller inside its own handlers (the CLI half by device code and refresh token, the browser half by the session cookie the process resolves) and answers its own 401, 403 and RFC 8628 refusals. Declared at `src/transport/auth-cli-device-flow.rest.ts:111`.
 
 Answers at `/api/auth/cli/refresh`, `/api/v1/auth/cli/refresh`.
 
@@ -491,7 +515,7 @@ type Response = unknown;
 
 #### `GET /api/auth/cli/lookup` · `lookupCliDeviceCode`
 
-Public: the device flow authenticates the caller inside its own handlers — the CLI half by device code and refresh token, the browser half by the session cookie the process resolves — and answers its own 401, 403 and RFC 8628 refusals. Declared at `src/transport/auth-cli-device-flow.rest.ts:125`.
+Public: the device flow authenticates the caller inside its own handlers (the CLI half by device code and refresh token, the browser half by the session cookie the process resolves) and answers its own 401, 403 and RFC 8628 refusals. Declared at `src/transport/auth-cli-device-flow.rest.ts:125`.
 
 Answers at `/api/auth/cli/lookup`, `/api/v1/auth/cli/lookup`.
 
@@ -506,7 +530,7 @@ type Response = unknown;
 
 #### `POST /api/auth/cli/approve` · `approveCliDeviceCode`
 
-Public: the device flow authenticates the caller inside its own handlers — the CLI half by device code and refresh token, the browser half by the session cookie the process resolves — and answers its own 401, 403 and RFC 8628 refusals. Declared at `src/transport/auth-cli-device-flow.rest.ts:133`.
+Public: the device flow authenticates the caller inside its own handlers (the CLI half by device code and refresh token, the browser half by the session cookie the process resolves) and answers its own 401, 403 and RFC 8628 refusals. Declared at `src/transport/auth-cli-device-flow.rest.ts:133`.
 
 Answers at `/api/auth/cli/approve`, `/api/v1/auth/cli/approve`.
 
@@ -518,7 +542,7 @@ type Response = unknown;
 
 #### `POST /api/auth/cli/deny` · `denyCliDeviceCode`
 
-Public: the device flow authenticates the caller inside its own handlers — the CLI half by device code and refresh token, the browser half by the session cookie the process resolves — and answers its own 401, 403 and RFC 8628 refusals. Declared at `src/transport/auth-cli-device-flow.rest.ts:142`.
+Public: the device flow authenticates the caller inside its own handlers (the CLI half by device code and refresh token, the browser half by the session cookie the process resolves) and answers its own 401, 403 and RFC 8628 refusals. Declared at `src/transport/auth-cli-device-flow.rest.ts:142`.
 
 Answers at `/api/auth/cli/deny`, `/api/v1/auth/cli/deny`.
 
@@ -530,7 +554,7 @@ type Response = unknown;
 
 #### `POST /api/auth/cli/logout` · `endCliDeviceSession`
 
-Public: the device flow authenticates the caller inside its own handlers — the CLI half by device code and refresh token, the browser half by the session cookie the process resolves — and answers its own 401, 403 and RFC 8628 refusals. Declared at `src/transport/auth-cli-device-flow.rest.ts:156`.
+Public: the device flow authenticates the caller inside its own handlers (the CLI half by device code and refresh token, the browser half by the session cookie the process resolves) and answers its own 401, 403 and RFC 8628 refusals. Declared at `src/transport/auth-cli-device-flow.rest.ts:156`.
 
 Answers at `/api/auth/cli/logout`, `/api/v1/auth/cli/logout`.
 
@@ -542,7 +566,7 @@ type Response = unknown;
 
 #### `GET /api/auth/cli/device-approval` · `watchCliDeviceApproval`
 
-Public: the device flow authenticates the caller inside its own handlers — the CLI half by device code and refresh token, the browser half by the session cookie the process resolves — and answers its own 401, 403 and RFC 8628 refusals. Declared at `src/transport/auth-cli-device-flow.rest.ts:170`.
+Public: the device flow authenticates the caller inside its own handlers (the CLI half by device code and refresh token, the browser half by the session cookie the process resolves) and answers its own 401, 403 and RFC 8628 refusals. Declared at `src/transport/auth-cli-device-flow.rest.ts:170`.
 
 Answers at `/api/auth/cli/device-approval`, `/api/v1/auth/cli/device-approval`.
 
@@ -627,19 +651,24 @@ type Response = unknown;
 
 ### `auth`
 
-Contract `../contract/src/auth.trpc.ts:28`, router `src/transport/auth.trpc.ts:86`.
+Contract `../contract/src/auth.trpc.ts:40`, router `src/transport/auth.trpc.ts:89`.
 
-| Procedure                        | Kind     | Gate                                                                                                                                                                                                                | Input                            | Output                            |
-| -------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- | --------------------------------- |
-| `auth.signUpEnrollment`          | mutation | Public: returns enrollment methods only to a visitor holding this address's proof                                                                                                                                   | `signUpEnrollmentInputSchema`    | `signUpEnrollmentSchema`          |
-| `auth.route`                     | mutation | Public: answers where a signed-out visitor should sign in; org-level routing only, and the engine reads no user data at all                                                                                         | `frontDoorRouteInputSchema`      | `routingDecisionSchema`           |
-| `auth.requestSignUpVerification` | mutation | Public: starts a signed-out visitor's own sign-up; no tenant scope exists before an account does                                                                                                                    | `signUpVerificationInputSchema`  | `signUpVerificationRequestSchema` |
-| `auth.inviteLanding`             | query    | Public: reads the invitation the caller holds the code for; the code is the authorization, and the answer names no person and no address                                                                            | `frontDoorInviteCodeInputSchema` | `inviteLandingSchema`             |
-| `auth.requestFreshInvite`        | mutation | Public: asks the holder of an expired code's organization to send a new one; mints nothing, names nobody, and is throttled per code and per IP                                                                      | `frontDoorInviteCodeInputSchema` | `frontDoorAskedSchema`            |
-| `auth.myAddressConfirmation`     | query    | No permission: reads the session user's own address confirmation state; no tenant scope is involved and no other account is reachable                                                                               | inline                           | `addressConfirmationSchema`       |
-| `auth.sendMyAddressConfirmation` | mutation | No permission: sends the session user's own address confirmation; no tenant scope is involved                                                                                                                       | `frontDoorOwnAddressInputSchema` | `frontDoorOwnAddressSentSchema`   |
-| `auth.priorSession`              | query    | Public: classifies the caller's OWN session cookie so an expired session can carry its address to the sign-in screen; takes no input, names nobody the caller is not already holding a token for, and mints nothing | inline                           | `priorSessionSchema`              |
-| `auth.deactivate`                | mutation | No permission: self-service for the named account; the application enforces self-or-operator itself, against the platform operator list rather than a tenant                                                        | `userApiUserInputSchema`         | `userApiSuccessSchema`            |
+| Procedure                        | Kind     | Gate                                                                                                                                                                                                                | Input                              | Output                            |
+| -------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | --------------------------------- |
+| `auth.signUpEnrollment`          | mutation | Public: returns enrollment methods only to a visitor holding this address's proof                                                                                                                                   | `signUpEnrollmentInputSchema`      | `signUpEnrollmentSchema`          |
+| `auth.route`                     | mutation | Public: answers where a signed-out visitor should sign in; org-level routing only, and the engine reads no user data at all                                                                                         | `frontDoorRouteInputSchema`        | `routingDecisionSchema`           |
+| `auth.requestSignUpVerification` | mutation | Public: starts a signed-out visitor's own sign-up; no tenant scope exists before an account does                                                                                                                    | `signUpVerificationInputSchema`    | `signUpVerificationRequestSchema` |
+| `auth.inviteLanding`             | query    | Public: reads the invitation the caller holds the code for; the code is the authorization, and the answer names no person and no address                                                                            | `frontDoorInviteCodeInputSchema`   | `inviteLandingSchema`             |
+| `auth.requestFreshInvite`        | mutation | Public: asks the holder of an expired code's organization to send a new one; mints nothing, names nobody, and is throttled per code and per IP                                                                      | `frontDoorInviteCodeInputSchema`   | `frontDoorAskedSchema`            |
+| `auth.myAddressConfirmation`     | query    | No permission: reads the session user's own address confirmation state; no tenant scope is involved and no other account is reachable                                                                               | inline                             | `addressConfirmationSchema`       |
+| `auth.sendMyAddressConfirmation` | mutation | No permission: sends the session user's own address confirmation; no tenant scope is involved                                                                                                                       | `frontDoorOwnAddressInputSchema`   | `frontDoorOwnAddressSentSchema`   |
+| `auth.priorSession`              | query    | Public: classifies the caller's OWN session cookie so an expired session can carry its address to the sign-in screen; takes no input, names nobody the caller is not already holding a token for, and mints nothing | inline                             | `priorSessionSchema`              |
+| `auth.deactivate`                | mutation | No permission: self-service for the named account; the application enforces self-or-operator itself, against the platform operator list rather than a tenant                                                        | `userApiUserInputSchema`           | `userApiSuccessSchema`            |
+| `auth.browserSessions`           | query    | No permission: operates on the session user's own account, so no tenant scope applies                                                                                                                               | inline                             | inline                            |
+| `auth.endBrowserSession`         | mutation | No permission: operates on the session user's own account, so no tenant scope applies                                                                                                                               | `endBrowserSessionInputSchema`     | `browserSessionsEndedSchema`      |
+| `auth.setPassword`               | mutation | No permission: operates on the session user's own account, so no tenant scope applies                                                                                                                               | `userApiSetPasswordInputSchema`    | `userApiSuccessSchema`            |
+| `auth.changePassword`            | mutation | No permission: operates on the session user's own account, so no tenant scope applies                                                                                                                               | `userApiChangePasswordInputSchema` | `userApiSuccessSchema`            |
+| `auth.register`                  | mutation | Public: the signup form's own backend: it mints the account a caller would otherwise need to already hold                                                                                                           | `userApiRegisterInputSchema`       | `createdUserSchema`               |
 
 ```typescript
 // auth.signUpEnrollment
@@ -694,7 +723,7 @@ interface Output {
 }
 
 // auth.myAddressConfirmation
-// Input: inline, ../contract/src/auth.trpc.ts:56
+// Input: inline, ../contract/src/auth.trpc.ts:68
 type Input = unknown;
 // Output: addressConfirmationSchema, ../contract/src/front-door.responses.ts:62
 interface Output {
@@ -715,7 +744,7 @@ interface Output {
 }
 
 // auth.priorSession
-// Input: inline, ../contract/src/auth.trpc.ts:65
+// Input: inline, ../contract/src/auth.trpc.ts:77
 type Input = unknown;
 // Output: priorSessionSchema, ../contract/src/front-door.responses.ts:72
 type Output =
@@ -728,13 +757,68 @@ type Output =
     };
 
 // auth.deactivate
-// Input: userApiUserInputSchema, ../../user/contract/src/user.schemas.ts:63
+// Input: userApiUserInputSchema, ../../user/contract/src/user.schemas.ts:58
 interface Input {
   userId: string;
 }
 // Output: userApiSuccessSchema, ../../user/contract/src/user.responses.ts:9
 interface Output {
   success: true;
+}
+
+// auth.browserSessions
+// Input: inline, ../contract/src/auth.trpc.ts:90
+type Input = Record<string, unknown>;
+// Output: inline, ../contract/src/auth.trpc.ts:91
+type Output = {
+  sessionId: string;
+  identifierId: string | null;
+  method: string;
+  secondFactorProven: boolean;
+  ipAddress: string | null;
+  userAgent: string | null;
+  signedInAt: string;
+  lastActiveAt: string;
+  expiresAt: string;
+  current: boolean;
+}[];
+
+// auth.endBrowserSession
+// Input: endBrowserSessionInputSchema, ../contract/src/browser-session.ts:106
+interface Input {
+  sessionId: string;
+}
+// Output: browserSessionsEndedSchema, ../contract/src/browser-session.ts:109
+interface Output {
+  ended: number;
+}
+
+// auth.setPassword
+// Input: userApiSetPasswordInputSchema, ../../user/contract/src/user.schemas.ts:46
+interface Input {
+  password: string;
+}
+type Output = z.infer<typeof userApiSuccessSchema>; // ../../user/contract/src/user.responses.ts:9
+
+// auth.changePassword
+// Input: userApiChangePasswordInputSchema, ../../user/contract/src/user.schemas.ts:48
+interface Input {
+  currentPassword: string;
+  newPassword: string;
+}
+type Output = z.infer<typeof userApiSuccessSchema>; // ../../user/contract/src/user.responses.ts:9
+
+// auth.register
+// Input: userApiRegisterInputSchema, ../../user/contract/src/user.schemas.ts:29
+interface Input {
+  name?: string;
+  email: string;
+  password: string;
+  addressProof: string;
+}
+// Output: createdUserSchema, ../../user/contract/src/user.ts:82
+interface Output {
+  id: string;
 }
 ```
 
@@ -797,13 +881,13 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `auth_lifecycle` (aggregate `user`)
 
-Declared at `src/eventing/auth-lifecycle.pipeline.ts:24`. Events: `sessionStartedEventSchema`, `ssoAutoAddedEventSchema`, `signedUpEventSchema`.
+Declared at `src/eventing/auth-lifecycle.pipeline.ts:29`. Events: `sessionStartedEventSchema`, `ssoAutoAddedEventSchema`, `signedUpEventSchema`.
 
 | Kind    | Name                   | Handles | Declared at                                  |
 | ------- | ---------------------- | ------- | -------------------------------------------- |
-| command | `recordSessionStarted` | –       | `src/eventing/auth-lifecycle.pipeline.ts:29` |
-| command | `recordSsoAutoAdded`   | –       | `src/eventing/auth-lifecycle.pipeline.ts:30` |
-| command | `recordSignedUp`       | –       | `src/eventing/auth-lifecycle.pipeline.ts:31` |
+| command | `recordSessionStarted` | –       | `src/eventing/auth-lifecycle.pipeline.ts:34` |
+| command | `recordSsoAutoAdded`   | –       | `src/eventing/auth-lifecycle.pipeline.ts:35` |
+| command | `recordSignedUp`       | –       | `src/eventing/auth-lifecycle.pipeline.ts:36` |
 
 ### Pipeline `sign_in_lock_maintenance` (aggregate `global`)
 
@@ -823,32 +907,33 @@ Run by the tasks process, before serve.
 
 ## Configuration
 
-| Kind   | Leaf                          | Environment variable       | Declared at                                          |
-| ------ | ----------------------------- | -------------------------- | ---------------------------------------------------- |
-| secret | `session`                     | `NEXTAUTH_SECRET`          | `src/app/auth.app.ts:216`                            |
-| secret | `googleClientSecret`          | `GOOGLE_CLIENT_SECRET`     | `../../../packages/secrets/src/shared-secrets.ts:52` |
-| secret | `githubClientSecret`          | `GITHUB_CLIENT_SECRET`     | `../../../packages/secrets/src/shared-secrets.ts:53` |
-| secret | `gitlabClientSecret`          | `GITLAB_CLIENT_SECRET`     | `../../../packages/secrets/src/shared-secrets.ts:54` |
-| secret | `azureAdClientSecret`         | `AZURE_AD_CLIENT_SECRET`   | `../../../packages/secrets/src/shared-secrets.ts:55` |
-| secret | `auth0ClientSecret`           | `AUTH0_CLIENT_SECRET`      | `../../../packages/secrets/src/shared-secrets.ts:56` |
-| secret | `oktaClientSecret`            | `OKTA_CLIENT_SECRET`       | `../../../packages/secrets/src/shared-secrets.ts:57` |
-| secret | `cognitoClientSecret`         | `COGNITO_CLIENT_SECRET`    | `../../../packages/secrets/src/shared-secrets.ts:58` |
-| secret | `oneLoginClientSecret`        | `ONELOGIN_CLIENT_SECRET`   | `../../../packages/secrets/src/shared-secrets.ts:59` |
-| secret | `oidcClientSecret`            | `OIDC_CLIENT_SECRET`       | `../../../packages/secrets/src/shared-secrets.ts:60` |
-| secret | `auth0ManagementSecret`       | `AUTH0_MGMT_CLIENT_SECRET` | `src/app/auth.app.ts:219`                            |
-| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`    | `src/app/auth.app.ts:221`                            |
-| config | `sessionUrl`                  | `NEXTAUTH_URL`             | `../contract/src/auth.config.ts:19`                  |
-| config | `mfaEnrollmentOpen`           | `MFA_ENROLLMENT_OPEN`      | `../contract/src/auth.config.ts:21`                  |
-| config | `passkeysEnabled`             | `PASSKEYS_ENABLED`         | `../contract/src/auth.config.ts:22`                  |
-| config | `passkeyHandleSecret`         | `PASSKEY_HANDLE_SECRET`    | `../contract/src/auth.config.ts:24`                  |
-| config | `trustedIdpOrigins`           | `SSO_TRUSTED_IDP_ORIGINS`  | `../contract/src/auth.config.ts:26`                  |
-| config | `idpSimulatorUrl`             | `LANGWATCH_IDPSIM_URL`     | `../contract/src/auth.config.ts:27`                  |
-| config | `localPasswords`              | `LOCAL_PASSWORDS_ENABLED`  | `../contract/src/auth.config.ts:29`                  |
-| config | `auth0ManagementClientId`     | `AUTH0_MGMT_CLIENT_ID`     | `../contract/src/auth.config.ts:34`                  |
-| config | `signInProviders`             | `AUTH_PROVIDER`            | `../contract/src/auth.config.ts:36`                  |
-| config | `isSaas`                      | `IS_SAAS`                  | `../contract/src/auth.config.ts:38`                  |
-| config | `signUpMode`                  | `SIGN_UP_MODE`             | `../contract/src/auth.config.ts:40`                  |
-| config | `publicBaseUrl`               | `BASE_HOST`                | `../contract/src/auth.config.ts:42`                  |
-| config | `nodeEnvironment`             | `NODE_ENV`                 | `../contract/src/auth.config.ts:43`                  |
+| Kind   | Leaf                          | Environment variable                      | Declared at                                          |
+| ------ | ----------------------------- | ----------------------------------------- | ---------------------------------------------------- |
+| secret | `session`                     | `NEXTAUTH_SECRET`                         | `src/app/auth.app.ts:278`                            |
+| secret | `googleClientSecret`          | `GOOGLE_CLIENT_SECRET`                    | `../../../packages/secrets/src/shared-secrets.ts:52` |
+| secret | `githubClientSecret`          | `GITHUB_CLIENT_SECRET`                    | `../../../packages/secrets/src/shared-secrets.ts:53` |
+| secret | `gitlabClientSecret`          | `GITLAB_CLIENT_SECRET`                    | `../../../packages/secrets/src/shared-secrets.ts:54` |
+| secret | `azureAdClientSecret`         | `AZURE_AD_CLIENT_SECRET`                  | `../../../packages/secrets/src/shared-secrets.ts:55` |
+| secret | `auth0ClientSecret`           | `AUTH0_CLIENT_SECRET`                     | `../../../packages/secrets/src/shared-secrets.ts:56` |
+| secret | `oktaClientSecret`            | `OKTA_CLIENT_SECRET`                      | `../../../packages/secrets/src/shared-secrets.ts:57` |
+| secret | `cognitoClientSecret`         | `COGNITO_CLIENT_SECRET`                   | `../../../packages/secrets/src/shared-secrets.ts:58` |
+| secret | `oneLoginClientSecret`        | `ONELOGIN_CLIENT_SECRET`                  | `../../../packages/secrets/src/shared-secrets.ts:59` |
+| secret | `oidcClientSecret`            | `OIDC_CLIENT_SECRET`                      | `../../../packages/secrets/src/shared-secrets.ts:60` |
+| secret | `auth0ManagementSecret`       | `AUTH0_MGMT_CLIENT_SECRET`                | `src/app/auth.app.ts:281`                            |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`                   | `src/app/auth.app.ts:283`                            |
+| config | `sessionUrl`                  | `NEXTAUTH_URL`                            | `../contract/src/auth.config.ts:20`                  |
+| config | `mfaEnrollmentOpen`           | `MFA_ENROLLMENT_OPEN`                     | `../contract/src/auth.config.ts:22`                  |
+| config | `passkeysEnabled`             | `PASSKEYS_ENABLED`                        | `../contract/src/auth.config.ts:23`                  |
+| config | `passkeyHandleSecret`         | `PASSKEY_HANDLE_SECRET`                   | `../contract/src/auth.config.ts:25`                  |
+| config | `trustedIdpOrigins`           | `SSO_TRUSTED_IDP_ORIGINS`                 | `../contract/src/auth.config.ts:27`                  |
+| config | `idpSimulatorUrl`             | `LANGWATCH_IDPSIM_URL`                    | `../contract/src/auth.config.ts:28`                  |
+| config | `localPasswords`              | `LOCAL_PASSWORDS_ENABLED`                 | `../contract/src/auth.config.ts:30`                  |
+| config | `auth0ManagementClientId`     | `AUTH0_MGMT_CLIENT_ID`                    | `../contract/src/auth.config.ts:35`                  |
+| config | `signInProviders`             | `AUTH_PROVIDER`                           | `../contract/src/auth.config.ts:37`                  |
+| config | `isSaas`                      | `IS_SAAS`                                 | `../contract/src/auth.config.ts:39`                  |
+| config | `signUpMode`                  | `SIGN_UP_MODE`                            | `../contract/src/auth.config.ts:41`                  |
+| config | `publicBaseUrl`               | `BASE_HOST`                               | `../contract/src/auth.config.ts:43`                  |
+| config | `nodeEnvironment`             | `NODE_ENV`                                | `../contract/src/auth.config.ts:44`                  |
+| config | `cliRefreshTokenTtlSeconds`   | `LANGWATCH_CLI_REFRESH_TOKEN_TTL_SECONDS` | `../contract/src/auth.config.ts:49`                  |
 
 <!-- readme:generated:end -->

@@ -1,8 +1,10 @@
+import type { IdentityStorageAdapterInput } from "@langwatch/identity-contract";
+
 /**
- * Better Auth's storage engine, one per tier. Typed as the library option (an
- * adapter factory, not a client) so the instance never learns which store it has.
+ * Better Auth's storage engine, one per tier: the stock engine and one real
+ * transaction over it, which identity's storage adapter routes between.
  */
 export abstract class BetterAuthStorageRepository {
-  /** The value handed to `betterAuth({ database })`. */
-  abstract adapter(): unknown;
+  /** What `IdentityApi.createStorageAdapter` takes. */
+  abstract engines(): IdentityStorageAdapterInput;
 }

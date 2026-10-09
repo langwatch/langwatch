@@ -62,7 +62,7 @@ function transportOver({ db }: { db: MemoryDb }) {
   const transport = betterAuthTransportFor(
     {},
     {
-      storage: { adapter: () => memoryAdapter(db) } as never,
+      storage: memoryAdapter(db),
       database: createApiFixture<BetterAuthHooksRepository>({
         getUserForHooks: async ({ userId }) => ({
           id: userId,

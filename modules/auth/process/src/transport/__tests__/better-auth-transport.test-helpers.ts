@@ -52,10 +52,13 @@ export function betterAuthTransportFor(
   return createBetterAuthTransport({
     auth: {} as never,
     database: {} as never,
-    storage: {
-      adapter: () =>
-        memoryAdapter({ user: [], session: [], account: [], verification: [], ssoProvider: [] }),
-    } as never,
+    storage: memoryAdapter({
+      user: [],
+      session: [],
+      account: [],
+      verification: [],
+      ssoProvider: [],
+    }),
     deployment: deployment(overrides),
     federation: {
       federationCapable: () => false,

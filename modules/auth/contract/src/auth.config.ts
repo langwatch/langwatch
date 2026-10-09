@@ -6,6 +6,7 @@ import {
   mfaEnrollmentOpen,
   nodeEnvironment,
   passkeysEnabled,
+  positiveSafeIntegerOrUndefined,
   publicBaseUrl,
   signInProviders,
   signUpMode,
@@ -41,6 +42,14 @@ export const authServerConfig = Config.define((c) => ({
   /** Process facts (§3.3): where links point, and what is trusted outside production only. */
   publicBaseUrl,
   nodeEnvironment,
+  /**
+   * How long an idle CLI refresh token lives, in seconds. Unset or unreadable keeps the
+   * service's default quarter, as main did; shorten it so a stolen CLI config goes stale sooner.
+   */
+  cliRefreshTokenTtlSeconds: c.env(
+    "LANGWATCH_CLI_REFRESH_TOKEN_TTL_SECONDS",
+    z.string().optional().transform(positiveSafeIntegerOrUndefined),
+  ),
 }));
 
 /**

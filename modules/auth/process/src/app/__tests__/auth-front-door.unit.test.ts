@@ -66,7 +66,7 @@ function withRateLimits(
 
 async function appFor(
   limiter: ReturnType<typeof countingLimiter>["rateLimiter"],
-  identity: IdentityApi = createApiFixture<IdentityApi>(),
+  identity: IdentityApi = createApiFixture<IdentityApi>({ createStorageAdapter: ({ legacyEngine }) => legacyEngine }),
   mailDelivery: { provider?: string; misconfigured?: boolean } = { provider: "smtp" },
 ): Promise<AuthModule> {
   return AuthModule.create({
@@ -79,6 +79,7 @@ async function appFor(
       idpSimulatorUrl: undefined,
       localPasswords: false,
       auth0ManagementClientId: undefined,
+      cliRefreshTokenTtlSeconds: undefined,
       isSaas: false,
       signInProviders: NO_SIGN_IN_PROVIDERS,
       signUpMode: "open",
@@ -173,6 +174,7 @@ describe("given a signed-in caller asking for their own confirmation link", () =
       const app = await appFor(
         rateLimiter,
         createApiFixture<IdentityApi>({
+    createStorageAdapter: ({ legacyEngine }) => legacyEngine,
           sendOwnAddressConfirmation: async (input) => {
             started.push(input);
             return { identifierId: "idf_own" };
@@ -197,7 +199,7 @@ describe("given a signed-in caller asking for their own confirmation link", () =
     /** @scenario "Without a way to send email, the address confirmation nudge stays silent" */
     it("says a confirmation cannot be sent", async () => {
       const { rateLimiter } = countingLimiter();
-      const app = await appFor(rateLimiter, createApiFixture<IdentityApi>(), {});
+      const app = await appFor(rateLimiter, createApiFixture<IdentityApi>({ createStorageAdapter: ({ legacyEngine }) => legacyEngine }), {});
 
       await expect(app.getMyAddressConfirmation({ email: null })).resolves.toEqual({
         email: null,
@@ -209,7 +211,7 @@ describe("given a signed-in caller asking for their own confirmation link", () =
     /** @scenario "Without a way to send email, the address confirmation nudge stays silent" */
     it("refuses to send with a named error before spending budget or starting a ceremony", async () => {
       const { rateLimiter, windows } = countingLimiter();
-      const app = await appFor(rateLimiter, createApiFixture<IdentityApi>(), {});
+      const app = await appFor(rateLimiter, createApiFixture<IdentityApi>({ createStorageAdapter: ({ legacyEngine }) => legacyEngine }), {});
 
       await expect(
         app.sendMyAddressConfirmation({

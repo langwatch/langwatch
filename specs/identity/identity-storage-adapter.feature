@@ -571,21 +571,13 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
   # no-op ceremonies runs the legacy branch for everybody, latched or not, and
   # says nothing about it: the gate reads closed for a reason nobody chose.
 
-  # Alex 2026-10-06: never built. The API composes the stock Prisma engine only; the identity
-  # adapter is exercised by its own test stack and no process composes it (Phase 2).
-  @unit @unimplemented
+  @unit
   Scenario: The API process composes the identity branch when it has an event stack
     Given an API process that registered its identity pipeline
     When it composes better-auth
     Then better-auth's storage is the identity adapter rather than the stock engine
     And the account ceremonies it binds are the bridge ceremonies
 
-  @unit
-  Scenario: The API composes the stock engine and reports the absent pipeline once
-    Given an API process with a browser-session identity
-    When it composes better-auth, however many callers ask for it
-    Then better-auth's storage is the stock engine
-    And the absent identity pipeline is reported once
   # ---------------------------------------------------------------------------
   # Transactions - what the adapter can promise, and what it must not
   # ---------------------------------------------------------------------------

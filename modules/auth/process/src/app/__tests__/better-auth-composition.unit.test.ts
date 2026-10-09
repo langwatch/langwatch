@@ -92,6 +92,7 @@ async function appFor(
       idpSimulatorUrl: undefined,
       localPasswords: false,
       auth0ManagementClientId: undefined,
+      cliRefreshTokenTtlSeconds: undefined,
       isSaas: false,
       signInProviders: { ...NO_SIGN_IN_PROVIDERS, ...providers.config },
       signUpMode: "open",
@@ -104,7 +105,7 @@ async function appFor(
       users: new TestUserApi({}) as never,
       apiKeys: { findResolvedToken: async () => null } as never,
       featureFlags: {} as never,
-      identity: providers.identity ?? createApiFixture<IdentityApi>(),
+      identity: providers.identity ?? createApiFixture<IdentityApi>({ createStorageAdapter: ({ legacyEngine }) => legacyEngine }),
       organizations: createApiFixture<OrganizationApi>(),
       entitlements: createApiFixture<EntitlementApi>(),
       licensing: createApiFixture<LicensingApi>(),
@@ -166,8 +167,8 @@ describe("given a deployment that named one", () => {
   });
 
   describe("when several callers ask for Better Auth", () => {
-    /** @scenario "The API composes the stock engine and reports the absent pipeline once" */
-    it("composes the stock Prisma engine and reports the absent identity pipeline once", async () => {
+    /** @scenario "The API process composes the identity branch when it has an event stack" */
+    it("hands the stock Prisma engine to identity's storage adapter and reports the absent shadow once", async () => {
       authLog.lines.length = 0;
       const app = await appFor(true, {
         // The API composes the live tier; its storage queries nothing until a request reaches it.
@@ -187,7 +188,7 @@ describe("given a deployment that named one", () => {
       expect(absences).toHaveLength(1);
       expect(absences[0]).toMatchObject({
         level: 40,
-        absent: ["identity-pipeline", "sign-in-router-shadow"],
+        absent: ["sign-in-router-shadow"],
       });
     });
   });
@@ -232,6 +233,7 @@ describe("when Better Auth deletes a user", () => {
     const erased: { id: string }[] = [];
     const app = await appFor(true, {
       identity: createApiFixture<IdentityApi>({
+    createStorageAdapter: ({ legacyEngine }) => legacyEngine,
         ceremonies: () => ({
           beforeUserDelete: async (user) => void erased.push(user),
           createAccountIdentifier: async () => ({ pinned: false }),
@@ -341,6 +343,7 @@ describe("given enterprise SSO answers the deployment's sign-in providers", () =
     const askedFor: MountsRequest[] = [];
     const moved: unknown[] = [];
     const identity = createApiFixture<IdentityApi>({
+    createStorageAdapter: ({ legacyEngine }) => legacyEngine,
       moveLegacyMicrosoftAccountKey: async ({ profile }) => {
         moved.push(profile);
       },

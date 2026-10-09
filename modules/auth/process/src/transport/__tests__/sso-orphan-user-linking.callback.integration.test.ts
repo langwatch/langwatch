@@ -152,7 +152,7 @@ async function completeSignIn({ db, email }: { db: MemoryDb; email: string }) {
       ],
     },
     {
-      storage: { adapter: () => memoryAdapter(db) } as never,
+      storage: memoryAdapter(db),
       database: hooksRepositoryOver({ db }),
       organizations: {
         findBySsoDomain: async () => ({ id: "org_example", name: "Example", ssoProvider: "okta" }),

@@ -54,6 +54,7 @@ const decisionsAsked: { providerId: string; email: string | null | undefined }[]
 
 function identityFor(provider: ServedOidcProvider): IdentityApi {
   return createApiFixture<IdentityApi>({
+    createStorageAdapter: ({ legacyEngine }) => legacyEngine,
     ssoIssuers: () => ({
       findIssuersForConnection: async () => [provider.issuer],
       findIssuersForDomain: async () => [provider.issuer],
@@ -92,6 +93,7 @@ async function composedBetterAuth(provider: ServedOidcProvider): Promise<BetterA
       idpSimulatorUrl: undefined,
       localPasswords: false,
       auth0ManagementClientId: undefined,
+      cliRefreshTokenTtlSeconds: undefined,
       isSaas: false,
       signInProviders: NO_SIGN_IN_PROVIDERS,
       signUpMode: "open",

@@ -1,17 +1,21 @@
 import {
   sealedProviderConfigCipher,
+  type BetterAuthLegacyEngine,
+  type IdentityStorageAdapterInput,
   type SsoProviderConfigCipher,
 } from "@langwatch/identity-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { Encryption } from "@langwatch/process-stores";
 import { prismaAdapter } from "better-auth/adapters/prisma";
-import type { BetterAuthOptions } from "better-auth/types";
 
 import { openingSsoProviderConfigs } from "../../rules/sso-provider-config.rules.ts";
 import { BetterAuthStorageRepository } from "../better-auth-storage.repository.ts";
 
 /** The client Better Auth's storage engine dials. */
 export type AuthDatabase = PrismaClient;
+
+/** Main's budget for the adapter's one transaction. */
+const TRANSACTION_BUDGET = { maxWait: 5_000, timeout: 20_000 } as const;
 
 /** Better Auth's storage engine: the stock Prisma adapter over the module's
  *  own client, with the engine's sealed dialing documents opened on the way
@@ -34,12 +38,26 @@ export class PrismaBetterAuthStorageRepository extends BetterAuthStorageReposito
     super();
   }
 
-  adapter(): unknown {
-    // The SSO plugin refuses every callback when a `resolveUser` is set and the
-    // adapter has no native transactions.
-    const engine = prismaAdapter(this.database, { provider: "postgresql", transaction: true });
+  engines(): IdentityStorageAdapterInput {
+    return {
+      // Native transactions kept from the stock engine: harmless under identity's
+      // adapter, which supplies its own, and what a passthrough test fixture needs.
+      legacyEngine: this.opening(
+        prismaAdapter(this.database, { provider: "postgresql", transaction: true }),
+      ),
+      // The SSO plugin resolves a user only over a real transaction; the
+      // rebound engine opens provider configs exactly as the plain one does.
+      postgresTransaction: (work) =>
+        this.database.$transaction(
+          (transactional) =>
+            work(this.opening(prismaAdapter(transactional, { provider: "postgresql" }))),
+          TRANSACTION_BUDGET,
+        ),
+    };
+  }
+
+  private opening(engine: BetterAuthLegacyEngine): BetterAuthLegacyEngine {
     const cipher = this.providerConfig;
-    return (options: BetterAuthOptions) =>
-      openingSsoProviderConfigs({ adapter: engine(options), cipher });
+    return (options) => openingSsoProviderConfigs({ adapter: engine(options), cipher });
   }
 }

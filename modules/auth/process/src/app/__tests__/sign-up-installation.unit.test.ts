@@ -54,6 +54,7 @@ async function bootAuth({
         idpSimulatorUrl: undefined,
         localPasswords: false,
         auth0ManagementClientId: undefined,
+        cliRefreshTokenTtlSeconds: undefined,
         isSaas: false,
         signInProviders: NO_SIGN_IN_PROVIDERS,
         signUpMode: "open",
@@ -67,6 +68,7 @@ async function bootAuth({
       "api-key": createApiFixture<ApiKeyApi>(),
       "feature-flag": createApiFixture<FeatureFlagApi>(),
       identity: createApiFixture<IdentityApi>({
+    createStorageAdapter: ({ legacyEngine }) => legacyEngine,
         routeSignIn: async () => ({
           outcome: "route_to_signup",
           methodSet: [],

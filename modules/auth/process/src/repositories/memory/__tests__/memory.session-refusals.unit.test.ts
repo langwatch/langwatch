@@ -45,7 +45,7 @@ async function memoryTier() {
   const transport = betterAuthTransportFor(
     {},
     {
-      storage: { adapter: () => memoryAdapter(memory.db) } as never,
+      storage: memoryAdapter(memory.db),
       database: MemoryBetterAuthHooksRepository.create({ memory }),
       ssoMigration: createApiFixture<SsoMigrationCallbackApi>({
         decideAccountLink: async () => ({ kind: "not_migrating" }),

@@ -86,7 +86,7 @@ Spec: `specs/identity/identifier-model.feature`,
 
 ## Installation
 
-`defineProcessModule("identity").withRepositories(identityRepositories).withApi(IdentityModule).withTransports(identityLookupTrpcTransport, identityTrpcTransport, joinRequestTrpcTransport, twoStepVerificationTrpcTransport).withTransportFacts(…).withEventing(identityEventing).withEventing(identityPipelineEventing).withEventing(joinRequestEventing).withEventing(ssoConnectionEventing).withMigrations(…)`, `src/identity.module.ts:24`.
+`defineProcessModule("identity").withRepositories(identityRepositories).withChannels(identityChannels).withApi(IdentityModule).withTransports(identityLookupTrpcTransport, identityTrpcTransport, joinRequestTrpcTransport, twoStepVerificationTrpcTransport).withTransportFacts(…).withEventing(identityEventing).withEventing(identityPipelineEventing).withEventing(joinRequestEventing).withEventing(ssoConnectionEventing).withMigrations(…)`, `src/identity.module.ts:25`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -309,7 +309,7 @@ interface Output {
 // identity.myTestArrival
 // Input: emptyInputSchema, ../contract/src/identity.trpc.ts:14
 type Input = Record<string, unknown>;
-// Output: ssoTestArrivalStandingSchema, ../contract/src/features/sso-arrival/sso-admission.ts:71
+// Output: ssoTestArrivalStandingSchema, ../contract/src/features/sso-arrival/sso-admission.ts:73
 type Output =
   | {
       testing: true;
@@ -652,17 +652,17 @@ Declared at `src/eventing/user-identity.pipeline.ts:90`. Events: `identifierAtta
 
 ### Pipeline `join-requests` (aggregate `join_request`)
 
-Declared at `src/features/join-request/eventing/join-request.pipeline.ts:94`. Events: `joinRequestedEventSchema`, `joinApprovedEventSchema`, `joinRejectedEventSchema`, `joinExpiredEventSchema`, `joinWithdrawnEventSchema`.
+Declared at `src/features/join-request/eventing/join-request.pipeline.ts:92`. Events: `joinRequestedEventSchema`, `joinApprovedEventSchema`, `joinRejectedEventSchema`, `joinExpiredEventSchema`, `joinWithdrawnEventSchema`.
 
 | Kind                | Name                                                                                | Handles | Declared at                                                       |
 | ------------------- | ----------------------------------------------------------------------------------- | ------- | ----------------------------------------------------------------- |
-| command             | –                                                                                   | –       | `src/features/join-request/eventing/join-request.pipeline.ts:112` |
-| command             | –                                                                                   | –       | `src/features/join-request/eventing/join-request.pipeline.ts:117` |
-| command             | –                                                                                   | –       | `src/features/join-request/eventing/join-request.pipeline.ts:122` |
-| command             | –                                                                                   | –       | `src/features/join-request/eventing/join-request.pipeline.ts:127` |
-| command             | –                                                                                   | –       | `src/features/join-request/eventing/join-request.pipeline.ts:132` |
-| process manager     | `joinRequestLifecycle`                                                              | –       | `src/features/join-request/eventing/join-request.pipeline.ts:139` |
-| Postgres projection | `≈ new JoinRequestStateFoldProjection({ store: deps.joinRequestProjectionStore, })` | –       | `src/features/join-request/eventing/join-request.pipeline.ts:107` |
+| command             | –                                                                                   | –       | `src/features/join-request/eventing/join-request.pipeline.ts:110` |
+| command             | –                                                                                   | –       | `src/features/join-request/eventing/join-request.pipeline.ts:115` |
+| command             | –                                                                                   | –       | `src/features/join-request/eventing/join-request.pipeline.ts:120` |
+| command             | –                                                                                   | –       | `src/features/join-request/eventing/join-request.pipeline.ts:125` |
+| command             | –                                                                                   | –       | `src/features/join-request/eventing/join-request.pipeline.ts:130` |
+| process manager     | `joinRequestLifecycle`                                                              | –       | `src/features/join-request/eventing/join-request.pipeline.ts:137` |
+| Postgres projection | `≈ new JoinRequestStateFoldProjection({ store: deps.joinRequestProjectionStore, })` | –       | `src/features/join-request/eventing/join-request.pipeline.ts:105` |
 
 ### Pipeline `sso-connections` (aggregate `sso_connection`)
 
@@ -703,9 +703,12 @@ Declared at `src/features/sso-connection/eventing/sso-connection.pipeline.ts:188
 
 | Kind   | Leaf                          | Environment variable           | Declared at                             |
 | ------ | ----------------------------- | ------------------------------ | --------------------------------------- |
-| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`        | `src/app/identity.app.ts:455`           |
-| config | `ssoDomainProofDnsServers`    | `SSO_DOMAIN_PROOF_DNS_SERVERS` | `../contract/src/identity.config.ts:20` |
-| config | `isSaas`                      | `IS_SAAS`                      | `../contract/src/identity.config.ts:22` |
-| config | `publicBaseUrl`               | `BASE_HOST`                    | `../contract/src/identity.config.ts:24` |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`        | `src/app/identity.app.ts:472`           |
+| config | `ssoDomainProofDnsServers`    | `SSO_DOMAIN_PROOF_DNS_SERVERS` | `../contract/src/identity.config.ts:28` |
+| config | `isSaas`                      | `IS_SAAS`                      | `../contract/src/identity.config.ts:30` |
+| config | `publicBaseUrl`               | `BASE_HOST`                    | `../contract/src/identity.config.ts:32` |
+| config | `passkeysEnabled`             | `PASSKEYS_ENABLED`             | `../contract/src/identity.config.ts:34` |
+| config | `mfaEnrollmentOpen`           | `MFA_ENROLLMENT_OPEN`          | `../contract/src/identity.config.ts:35` |
+| config | `localPasswords`              | `LOCAL_PASSWORDS_ENABLED`      | `../contract/src/identity.config.ts:36` |
 
 <!-- readme:generated:end -->

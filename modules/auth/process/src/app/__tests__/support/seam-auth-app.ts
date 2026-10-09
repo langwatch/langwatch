@@ -36,6 +36,7 @@ export async function composedAuth({ repositories }: { repositories: AuthReposit
       idpSimulatorUrl: undefined,
       localPasswords: true,
       auth0ManagementClientId: undefined,
+      cliRefreshTokenTtlSeconds: undefined,
       isSaas: false,
       signInProviders: NO_SIGN_IN_PROVIDERS,
       signUpMode: "open",
@@ -49,6 +50,7 @@ export async function composedAuth({ repositories }: { repositories: AuthReposit
       apiKeys: { findResolvedToken: async () => null } as never,
       featureFlags: {} as never,
       identity: createApiFixture<IdentityApi>({
+    createStorageAdapter: ({ legacyEngine }) => legacyEngine,
         ceremonies: () => ({
           beforeUserDelete: async () => undefined,
           createAccountIdentifier: async () => ({ pinned: false }),
