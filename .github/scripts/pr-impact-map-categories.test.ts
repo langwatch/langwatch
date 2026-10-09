@@ -40,7 +40,7 @@ void describe("pr-impact-map categories", () => {
     ["modules/prompt/client/src/index.ts", "Modules · client"],
     ["modules/prompt/README.md", "Generated"],
     ["modules/prompt/process/README.md", "Generated"],
-    ["modules/prompt/browser/README.md", "Docs"],
+    ["modules/prompt/browser/README.md", "Generated"],
     ["apps/api/src/process-modules.generated.ts", "Generated"],
     ["sdks/typescript/src/internal/generated/openapi/api-client.ts", "Generated"],
     ["dev/docs/lint-rules.md", "Generated"],

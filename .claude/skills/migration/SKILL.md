@@ -129,7 +129,7 @@ Kinds and modes are `upgradeStepKindSchema` and `upgradeStepModeSchema` in
 | `defineMigrationStep` and `.withMigrations` collection                     | landed (`packages/upgrade/src/step/migration-step.ts`, `packages/process/src/migration/migration-steps.ts`)           |
 | The upgrade task running declared blocking steps                           | landed (`app.migrationSteps(isMigrationStep)`, `apps/tasks/src/upgrade.ts`)                                           |
 | The worker running background steps after the serving roster allows it     | landed (`packages/upgrade/src/background/background-steps.service.ts`, `packages/process/src/process-server.ts`)      |
-| `.withUpcasts` read-time upcast, drain, one ledger step per upcast         | landed (`packages/upgrade/src/ledger.ts`, `packages/eventing/specs/event-upcast.feature`)                       |
+| `.withUpcasts` read-time upcast, drain, one ledger step per upcast         | landed (`packages/upgrade/src/ledger.ts`, `packages/eventing/specs/event-upcast.feature`)                             |
 | Upcast rewrite step                                                        | **not landed** (three `@unimplemented` scenarios in `packages/eventing/specs/event-upcast.feature`)                   |
 | Drain-age lint (a drain older than one release)                            | **not landed** (record §9 names it; no rule or policy in `packages/oxlint-rules` or the enforcer)                     |
 | Re-runnable migration policy and the runner's auto-resolve                 | landed (`packages/upgrade/src/stepping/rerunnable-migrations.ts`)                                                     |

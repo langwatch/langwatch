@@ -27,7 +27,7 @@ docs/self-hosting/usage-report-dictionary.mdx linguist-generated=true
 services/langyagent/internal/assets/skills/** linguist-generated=true
 **/__snapshots__/**                     linguist-generated=true
 mcp/typescript/src/__tests__/fixtures/*.json linguist-generated=true
-# pnpm generate:readmes (tools/readmegen): index pages, module pages, process pages.
+# pnpm generate:readmes (tools/readmegen): index pages, module pages, process and browser pages.
 modules/README.md                       linguist-generated=true
 packages/README.md                      linguist-generated=true
 apps/README.md                          linguist-generated=true
@@ -36,8 +36,10 @@ enterprise/modules/README.md            linguist-generated=true
 enterprise/packages/README.md           linguist-generated=true
 modules/*/README.md                     linguist-generated=true
 modules/*/process/README.md             linguist-generated=true
+modules/*/browser/README.md             linguist-generated=true
 enterprise/modules/*/README.md          linguist-generated=true
 enterprise/modules/*/process/README.md  linguist-generated=true
+enterprise/modules/*/browser/README.md  linguist-generated=true
 # pnpm --filter @langwatch/architecture-enforcer docs
 dev/docs/lint-rules.md                  linguist-generated=true
 # pnpm sync:references writes the root build solution whole (package tsconfigs only in part).
