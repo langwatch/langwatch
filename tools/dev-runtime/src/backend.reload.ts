@@ -82,3 +82,32 @@ export function createReloadTrigger({
     },
   };
 }
+
+/** ADR-168 step 5's bounds on one host process; past either, a fresh process is cheaper. */
+export type RecycleLimits = Readonly<{ maxGenerations: number; maxRssMiB: number }>;
+
+/**
+ * Why the next reload should be a fresh process instead of a re-link, or
+ * undefined while re-linking stays safe. Module-level state leaks a little per
+ * generation, and a generation that did not drain may still hold its pools.
+ */
+export function recycleReason({
+  generation,
+  rssMiB,
+  isDrainFailed = false,
+  limits,
+}: {
+  generation: number;
+  rssMiB: number;
+  isDrainFailed?: boolean;
+  limits: RecycleLimits;
+}): string | undefined {
+  if (isDrainFailed) return `generation ${generation} did not drain`;
+  if (generation >= limits.maxGenerations) {
+    return `generation ${generation} reached the limit of ${limits.maxGenerations}`;
+  }
+  if (rssMiB > limits.maxRssMiB) {
+    return `rss ${rssMiB} MiB passed the ceiling of ${limits.maxRssMiB} MiB`;
+  }
+  return undefined;
+}

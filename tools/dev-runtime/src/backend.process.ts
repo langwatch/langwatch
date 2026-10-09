@@ -91,3 +91,61 @@ export async function startBackend(options: BackendStartOptions): Promise<Backen
     throw error;
   }
 }
+
+/** A process listener, as `EventEmitter.listeners` hands it back. */
+type Listener = ReturnType<NodeJS.EventEmitter["listeners"]>[number];
+type ListenerHost = {
+  eventNames(): (string | symbol)[];
+  listeners(event: string | symbol): Listener[];
+  off(event: string | symbol, listener: Listener): unknown;
+};
+export type ListenerSnapshot = ReadonlyMap<string | symbol, ReadonlySet<Listener>>;
+export type AddedListener = readonly [event: string | symbol, listener: Listener];
+
+/** The listeners attached right now, per event: taken just before a generation boots. */
+export function snapshotListeners(emitter: ListenerHost): ListenerSnapshot {
+  return new Map(emitter.eventNames().map((event) => [event, new Set(emitter.listeners(event))]));
+}
+
+/** What was attached after `before`: a generation's own listeners, taken before the next link. */
+export function listenersAddedSince({
+  emitter,
+  before,
+}: {
+  emitter: ListenerHost;
+  before: ListenerSnapshot;
+}): AddedListener[] {
+  return emitter.eventNames().flatMap((event) =>
+    emitter
+      .listeners(event)
+      .filter((listener) => !before.get(event)?.has(listener))
+      .map((listener): AddedListener => [event, listener]),
+  );
+}
+
+/**
+ * Dispose one generation (ADR-168 step 5): drain it, worker then api, so its
+ * stores, queues and pools close; then take off the listeners it added while
+ * serving that its own close left behind. Answers how many it took off.
+ */
+export async function disposeGeneration({
+  halves,
+  emitter,
+  added,
+}: {
+  halves: BackendHalves;
+  emitter: ListenerHost;
+  added: readonly AddedListener[];
+}): Promise<number> {
+  let removed = 0;
+  try {
+    await drainBackend(halves);
+  } finally {
+    for (const [event, listener] of added) {
+      if (!emitter.listeners(event).includes(listener)) continue;
+      emitter.off(event, listener);
+      removed += 1;
+    }
+  }
+  return removed;
+}

@@ -213,6 +213,10 @@ marker in the UI's Vite plugin, and the hold scenarios. What stays is the quiet 
 the max wait (30 s), and the Vite plugin's burst coalescing (300 ms gap, 500 ms settle).
 `haven hmr` remains as a no-op that says it is retired, so old hooks still exit 0; remove them.
 
+## Amendment 2026-10-09: step 5, as shipped
+
+Each reload disposes the old generation (`disposeGeneration`: drain worker then api, then take off process listeners it attached while serving) before the new one boots; link still precedes drop. Past `LANGWATCH_DEV_RECYCLE_GENERATIONS` (50) generations, `LANGWATCH_DEV_RECYCLE_RSS_MIB` (4096), or a failed drain, the api lane logs `backend recycling` and exits 75 so the supervisor's restart-after-ready starts a fresh process; recycling is armed only under `LANGWATCH_DEV_RELOAD=module`.
+
 ## Risks
 
 - **State leaks across generations.** Workspace packages re-evaluated by the runner must not keep

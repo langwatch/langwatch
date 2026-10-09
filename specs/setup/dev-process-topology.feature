@@ -201,6 +201,41 @@ Feature: The local development process topology
     When the process exits non-zero
     Then the supervisor starts it again after the quiet window, without waiting for a change
 
+  # ADR-168 step 5: a generation's own close is what releases its stores,
+  # queues and pools, so it runs before the next generation boots.
+  @unit
+  Scenario: A reload disposes the previous generation before the next one boots
+    Given the api lane reloading in-process under the supervisor
+    And a generation serving that attached process listeners while it ran
+    When a module edit links the next generation
+    Then the old generation drains, worker first and then the api
+    And the listeners it left attached are taken off after the drain
+    And listeners the next generation attached while linking stay attached
+
+  # Module-level state leaks a little per generation; a fresh process bounds it.
+  @unit
+  Scenario: The in-process api lane hands over to a fresh process after enough generations
+    Given the api lane reloading in-process under the supervisor
+    And it has served LANGWATCH_DEV_RECYCLE_GENERATIONS generations (50 by default)
+    When the next module edit arrives
+    Then the host logs "backend recycling" with the generation limit as its reason
+    And it drains and exits non-zero, so the supervisor starts a fresh process
+
+  @unit
+  Scenario: The in-process api lane hands over to a fresh process once its memory passes the ceiling
+    Given the api lane reloading in-process under the supervisor
+    And its RSS is above LANGWATCH_DEV_RECYCLE_RSS_MIB (4096 by default)
+    When the next module edit arrives
+    Then the host logs "backend recycling" with the RSS ceiling as its reason
+    And it drains and exits non-zero, so the supervisor starts a fresh process
+
+  @unit
+  Scenario: A generation that did not drain is replaced by a fresh process
+    Given the api lane reloading in-process under the supervisor
+    When the old generation's drain fails during a reload
+    Then the host does not boot the next generation beside it
+    And it logs "backend recycling" and exits non-zero, so the supervisor starts a fresh process
+
   # Only the packages the backend can load matter. pnpm resolves declared
   # dependencies only, so a workspace package that no backend dependency reaches
   # (design-system, browser-host) cannot be on its import graph.

@@ -19,10 +19,10 @@ trial, and the four open questions at the foot of the ADR are Alex's, not answer
 
 ## The two shapes
 
-| Shape               | Node processes                                                   | Start                                                           | Reload                                                          |
-| ------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | --------------------------------------------------------------- |
-| Split (default)     | `ui` lane (Vite) + `backend` lane (api and worker in one `node`) | `pnpm dev`                                                      | re-links only what a change reaches, in process (see below)     |
-| One process (trial) | one `app` lane: Vite, api and worker                             | `LANGWATCH_DEV_ONE_PROCESS=1 pnpm dev`, or `pnpm dev:one` alone | re-links only what a change reaches, in process                 |
+| Shape               | Node processes                                                   | Start                                                           | Reload                                                      |
+| ------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | ----------------------------------------------------------- |
+| Split (default)     | `ui` lane (Vite) + `backend` lane (api and worker in one `node`) | `pnpm dev`                                                      | re-links only what a change reaches, in process (see below) |
+| One process (trial) | one `app` lane: Vite, api and worker                             | `LANGWATCH_DEV_ONE_PROCESS=1 pnpm dev`, or `pnpm dev:one` alone | re-links only what a change reaches, in process             |
 
 - `pnpm dev` is `dev-supervisor.mjs` over `dev/scripts/dev-stack.sh`, which runs the lanes
   through `concurrently`: `ui`, `go`, `langy`, then `backend` (or `app`). It migrates once
@@ -41,7 +41,7 @@ trial, and the four open questions at the foot of the ADR are Alex's, not answer
 - `app.entrypoint.main.ts`: starts the UI's Vite server (`apps/ui/vite.config.ts`,
   unchanged, `/api` still proxied) and loads api and worker through a Vite module runner.
 - `app.entrypoint.ts --backend-only`: the split shape's api lane (`pnpm --filter
-  @langwatch/dev-runtime dev`), the same host without the UI's Vite server. The supervisor
+@langwatch/dev-runtime dev`), the same host without the UI's Vite server. The supervisor
   keeps the process: it restarts it only for a `package.json`, a file in the host's own
   `src/` (Node loaded both natively), or a crash after `backend ready`.
 - `backend.entrypoint.main.ts`: api and worker in one Node process with no reload
@@ -58,12 +58,14 @@ generation serving. A failed boot waits for the next change. Each generation log
 
 ## Reload knobs
 
-| Variable                          | Effect                                                              |
-| --------------------------------- | ------------------------------------------------------------------- |
-| `LANGWATCH_DEV_WATCH=0`           | one-shot, no reload (diff tools measure a stack that must not move) |
-| `LANGWATCH_DEV_WATCH_DEBOUNCE_MS` | quiet window before a reload (2000)                                 |
-| `LANGWATCH_DEV_WATCH_MAX_WAIT_MS` | never defer longer than this after the first change (30000)         |
-| `LANGWATCH_DEV_RELOAD=process`    | api lane: back to the supervisor's whole-process restart per change |
+| Variable                            | Effect                                                                         |
+| ----------------------------------- | ------------------------------------------------------------------------------ |
+| `LANGWATCH_DEV_WATCH=0`             | one-shot, no reload (diff tools measure a stack that must not move)            |
+| `LANGWATCH_DEV_WATCH_DEBOUNCE_MS`   | quiet window before a reload (2000)                                            |
+| `LANGWATCH_DEV_WATCH_MAX_WAIT_MS`   | never defer longer than this after the first change (30000)                    |
+| `LANGWATCH_DEV_RELOAD=process`      | api lane: back to the supervisor's whole-process restart per change            |
+| `LANGWATCH_DEV_RECYCLE_GENERATIONS` | api lane: after this many generations, the next edit restarts the process (50) |
+| `LANGWATCH_DEV_RECYCLE_RSS_MIB`     | api lane: past this RSS, the next edit restarts the process (4096)             |
 
 There is no agent-turn hold (retired 2026-10-09, ADR-168): the debounce alone coalesces a
 turn's edits, and `haven hmr` is a no-op. A skipped change is `.md`, `.mdx`, `.feature`, a `tsconfig*.json`,
@@ -82,7 +84,7 @@ two `PORT`s (5570, 5580, ...). A held port stops the launcher with a line saying
 - A reload storm after a burst of agent writes: raise `LANGWATCH_DEV_WATCH_DEBOUNCE_MS`;
   the log names the changed files per generation.
 - `backend did not link` after an edit: the old generation keeps serving. `boot failed;
-  waiting for a change`: the old one is drained and the next change retries. Fix the file;
+waiting for a change`: the old one is drained and the next change retries. Fix the file;
   do not restart the lane.
 - Memory growing over many generations: note `rssMiB` per `backend ready` line; a restart
   is the guardrail. Report it, since it is an ADR-168 risk.
