@@ -819,8 +819,11 @@ base security headers) and sends `/api/**` through to the api package.
 OTel export variant can sit beside it without any main changing shape).
 **Telemetry initializes immediately after the config parse** (ruled
 2026-09-18): one named call, `initializeTelemetry(process.observability)`,
-wires traces, logs and metrics from config alone — no `instrumentation.node`
-preload file, and anything requiring preload is out of scope by design.
+wires traces, logs and metrics from config alone. The one exception is library patching
+(OTEL-PRELOAD, Alex, round 57): the image start command preloads
+`--import @langwatch/observability/register`, which patches aws-sdk and openai by default (ioredis
+opt-in) under `OTEL_NODE_ENABLED_INSTRUMENTATIONS` / `OTEL_NODE_DISABLED_INSTRUMENTATIONS`, and
+records into the provider that call registers. No other preload.
 **Metrics are pushed and may also be pulled** (ADR-175): every process pushes over OTLP when
 `OTEL_EXPORTER_OTLP_ENDPOINT` is set (`OTEL_METRICS_EXPORTER=none` turns it off). A Prometheus
 `/metrics` door is off by default; `OTEL_METRICS_EXPORTER=otlp,prometheus` adds a pull reader to the

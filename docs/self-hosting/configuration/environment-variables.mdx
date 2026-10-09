@@ -368,6 +368,8 @@ Exit codes, outcome codes and the log lines are in [Upgrade Guide](/self-hosting
 | `DISABLE_USAGE_STATS` | Stop the daily usage report. See [Data and telemetry](/self-hosting/data-and-telemetry) for what it carries and the two smaller switches | `false` |
 | `OTEL_METRICS_EXPORTER` | `otlp` pushes metrics to `OTEL_EXPORTER_OTLP_ENDPOINT`; `prometheus` serves a scrape listener on `OTEL_EXPORTER_PROMETHEUS_PORT` (default `9464`) instead. The Helm chart sets `prometheus` when `app.telemetry.metrics.enabled` is true | `otlp` |
 | `METRICS_API_KEY` | Bearer token a Prometheus scrape must send. The metrics endpoint is only mounted when it is set | -       |
+| `OTEL_NODE_ENABLED_INSTRUMENTATIONS` | Comma-separated library patches the app and worker load at start, replacing the default list. Known names: `aws-sdk`, `openai`, `ioredis`. Add `ioredis` to trace Redis commands (high volume next to a job queue) | `aws-sdk,openai` |
+| `OTEL_NODE_DISABLED_INSTRUMENTATIONS` | Comma-separated library patches to turn off, applied after the enabled list. Set `aws-sdk,openai` to load none | - |
 
 ## Langy (optional)
 
