@@ -6,7 +6,7 @@ The server half of [scenario](../README.md). Scenarios and simulations: authored
 
 ## Installation
 
-`defineProcessModule("scenario").withRepositories(scenarioRepositories).withApi(ScenarioModule).withTransports(…, …, …, scenarioAgentTestRest, scenarioEventsRest, scenarioGenerateRest, scenarioRunExportRest, scenarioVoiceRest, scenarioTrpcTransport).withTransportFacts(…).withEventing(scenarioLifecycleEventing).withEventing(simulationProcessingEventing).withTasks(…)`, `src/scenario.module.ts:25`.
+`defineProcessModule("scenario").withRepositories(scenarioRepositories).withApi(ScenarioModule).withTransports(…, …, …, scenarioAgentTestRest, scenarioEventsRest, scenarioGenerateRest, scenarioRunExportRest, scenarioVoiceRest, scenarioTrpcTransport).withTransportFacts(…).withEventing(scenarioLifecycleEventing).withEventing(simulationProcessingEventing).withTasks(…)`, `src/scenario.module.ts:30`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The scenario application: what every scenario door calls, and what peer features such as Suite reach it by.
 
-Peers call these through the token, declared at `../contract/src/scenario.api.ts:246`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/scenario.api.ts:249`; nothing else in this package is public.
 
 #### `generateScenario`
 
@@ -651,7 +651,7 @@ Permission `scenarios:view`. Declared at `src/transport/scenario-run-export.rest
 Answers at `/api/export/scenario-runs/download`.
 
 ```typescript
-// Body: scenarioRunExportRequestSchema, ../contract/src/scenario-run-export.ts:17
+// Body: scenarioRunExportRequestSchema, ../contract/src/features/run/scenario-run-export.ts:17
 interface Body {
   projectId: string;
   mode: "full" | "criteria";
@@ -928,7 +928,7 @@ Permission `scenarios:view`. Declared at `src/transport/simulation-run.rest.ts:5
 Answers at `/api/simulation-runs`, `/api/v1/simulation-runs`; also, undocumented, `/api/simulation-runs/2026-08-07`, `/api/v1/simulation-runs/2026-08-07`, `/api/simulation-runs/latest`, `/api/v1/simulation-runs/latest`.
 
 ```typescript
-// Query: simulationRunListQuerySchema, ../contract/src/simulation-run.schemas.ts:112
+// Query: simulationRunListQuerySchema, ../contract/src/features/simulation/simulation-run.schemas.ts:112
 interface Query {
   scenarioSetId?: string;
   batchRunId?: string;
@@ -936,7 +936,7 @@ interface Query {
   cursor?: string;
   include?: "messages";
 }
-type Response = z.infer<typeof simulationRunListResponseSchema>; // ../contract/src/simulation-run.schemas.ts:134
+type Response = z.infer<typeof simulationRunListResponseSchema>; // ../contract/src/features/simulation/simulation-run.schemas.ts:134
 ```
 
 #### `GET /:scenarioRunId` · `getApiSimulationRunsByScenarioRunId`
@@ -948,11 +948,11 @@ Permission `scenarios:view`. Declared at `src/transport/simulation-run.rest.ts:7
 Answers at `/api/simulation-runs/:scenarioRunId`, `/api/v1/simulation-runs/:scenarioRunId`; also, undocumented, `/api/simulation-runs/2026-08-07/:scenarioRunId`, `/api/v1/simulation-runs/2026-08-07/:scenarioRunId`, `/api/simulation-runs/latest/:scenarioRunId`, `/api/v1/simulation-runs/latest/:scenarioRunId`.
 
 ```typescript
-// Params: scenarioRunIdParamsSchema, ../contract/src/simulation-run.schemas.ts:131
+// Params: scenarioRunIdParamsSchema, ../contract/src/features/simulation/simulation-run.schemas.ts:131
 interface Params {
   scenarioRunId: string;
 }
-type Response = z.infer<typeof scenarioRunRestResponseWithPlatformUrlSchema>; // ../contract/src/simulation-run.schemas.ts:79
+type Response = z.infer<typeof scenarioRunRestResponseWithPlatformUrlSchema>; // ../contract/src/features/simulation/simulation-run.schemas.ts:79
 ```
 
 #### `GET /batches/list` · `getApiSimulationRunsBatchesList`
@@ -964,13 +964,13 @@ Permission `scenarios:view`. Declared at `src/transport/simulation-run.rest.ts:9
 Answers at `/api/simulation-runs/batches/list`, `/api/v1/simulation-runs/batches/list`; also, undocumented, `/api/simulation-runs/2026-08-07/batches/list`, `/api/v1/simulation-runs/2026-08-07/batches/list`, `/api/simulation-runs/latest/batches/list`, `/api/v1/simulation-runs/latest/batches/list`.
 
 ```typescript
-// Query: simulationBatchQuerySchema, ../contract/src/simulation-run.schemas.ts:125
+// Query: simulationBatchQuerySchema, ../contract/src/features/simulation/simulation-run.schemas.ts:125
 interface Query {
   scenarioSetId: string;
   limit?: number;
   cursor?: string;
 }
-type Response = z.infer<typeof simulationBatchListResponseSchema>; // ../contract/src/simulation-run.schemas.ts:140
+type Response = z.infer<typeof simulationBatchListResponseSchema>; // ../contract/src/features/simulation/simulation-run.schemas.ts:140
 ```
 
 #### `GET /batches/:batchRunId` · `getApiSimulationRunsBatchesByBatchRunId`
@@ -982,11 +982,11 @@ Permission `scenarios:view`. Declared at `src/transport/simulation-run.rest.ts:1
 Answers at `/api/simulation-runs/batches/:batchRunId`, `/api/v1/simulation-runs/batches/:batchRunId`; also, undocumented, `/api/simulation-runs/2026-08-07/batches/:batchRunId`, `/api/v1/simulation-runs/2026-08-07/batches/:batchRunId`, `/api/simulation-runs/latest/batches/:batchRunId`, `/api/v1/simulation-runs/latest/batches/:batchRunId`.
 
 ```typescript
-// Params: batchRunIdParamsSchema, ../contract/src/simulation-run.schemas.ts:132
+// Params: batchRunIdParamsSchema, ../contract/src/features/simulation/simulation-run.schemas.ts:132
 interface Params {
   batchRunId: string;
 }
-type Response = z.infer<typeof simulationBatchSummaryRestSchema>; // ../contract/src/simulation-run.schemas.ts:84
+type Response = z.infer<typeof simulationBatchSummaryRestSchema>; // ../contract/src/features/simulation/simulation-run.schemas.ts:84
 ```
 
 ## tRPC transport
@@ -1202,7 +1202,7 @@ interface Input {
   startDate?: number;
   endDate?: number;
 }
-type Output = z.infer<typeof simulationAllSuitesRunDataSchema>; // ../contract/src/simulation.ts:222
+type Output = z.infer<typeof simulationAllSuitesRunDataSchema>; // ../contract/src/features/simulation/simulation.ts:222
 
 // scenarios.getLastResultSummaries
 // Input: inline, ../contract/src/scenario.trpc.ts:291
@@ -1222,7 +1222,7 @@ interface Input {
   startDate?: number;
   endDate?: number;
 }
-// Output: simulationRunFreshnessSchema, ../contract/src/simulation.ts:252
+// Output: simulationRunFreshnessSchema, ../contract/src/features/simulation/simulation.ts:252
 interface Output {
   lastUpdatedAt: number;
 }
@@ -1237,7 +1237,7 @@ interface Input {
   startDate?: number;
   endDate?: number;
 }
-type Output = z.infer<typeof simulationScenarioSetRunDataSchema>; // ../contract/src/simulation.ts:245
+type Output = z.infer<typeof simulationScenarioSetRunDataSchema>; // ../contract/src/features/simulation/simulation.ts:245
 
 // scenarios.getAllScenarioSetRunData
 // Input: inline, ../contract/src/scenario.trpc.ts:332
@@ -1255,7 +1255,7 @@ interface Input {
   projectId: string;
   scenarioRunId: string;
 }
-type Output = z.infer<typeof simulationRunDataSchema>; // ../contract/src/simulation.ts:114
+type Output = z.infer<typeof simulationRunDataSchema>; // ../contract/src/features/simulation/simulation.ts:114
 
 // scenarios.getScenarioSetBatchRunCount
 // Input: inline, ../contract/src/scenario.trpc.ts:340
@@ -1265,7 +1265,7 @@ interface Input {
   startDate?: number;
   endDate?: number;
 }
-// Output: simulationBatchRunCountSchema, ../contract/src/simulation.ts:255
+// Output: simulationBatchRunCountSchema, ../contract/src/features/simulation/simulation.ts:255
 interface Output {
   count: number;
 }
@@ -1280,7 +1280,7 @@ interface Input {
   startDate?: number;
   endDate?: number;
 }
-type Output = z.infer<typeof simulationBatchHistorySchema>; // ../contract/src/simulation.ts:202
+type Output = z.infer<typeof simulationBatchHistorySchema>; // ../contract/src/features/simulation/simulation.ts:202
 
 // scenarios.getBatchRunData
 // Input: inline, ../contract/src/scenario.trpc.ts:359
@@ -1291,7 +1291,7 @@ interface Input {
   sinceTimestamp?: number;
   runTimestamps?: Record<string, number>;
 }
-type Output = z.infer<typeof simulationBatchRunDataSchema>; // ../contract/src/simulation.ts:211
+type Output = z.infer<typeof simulationBatchRunDataSchema>; // ../contract/src/features/simulation/simulation.ts:211
 
 // scenarios.getExternalSetSummaries
 // Input: inline, ../contract/src/scenario.trpc.ts:377
@@ -1318,7 +1318,7 @@ interface Input {
   startDate?: number;
   endDate?: number;
 }
-type Output = z.infer<typeof simulationAllSuitesRunDataSchema>; // ../contract/src/simulation.ts:222
+type Output = z.infer<typeof simulationAllSuitesRunDataSchema>; // ../contract/src/features/simulation/simulation.ts:222
 
 // scenarios.onSimulationUpdate
 // Input: inline, ../contract/src/scenario.trpc.ts:399
@@ -1327,7 +1327,7 @@ interface Input {
   tabKey?: string;
   tabId?: string;
 }
-// Output: simulationStreamFrameSchema, ../contract/src/simulation.ts:262
+// Output: simulationStreamFrameSchema, ../contract/src/features/simulation/simulation.ts:262
 interface Output {
   event: unknown;
   timestamp?: number;
@@ -1487,33 +1487,34 @@ Run by the tasks process, before serve.
 | secret | `voiceSessionSigning`                                 | `CREDENTIALS_SECRET`                      | `src/app/scenario.app.ts:272`            |
 | secret | `voiceSessionSigningFallback`                         | `NEXTAUTH_SECRET`                         | `src/app/scenario.app.ts:273`            |
 | secret | `nlpInternal`                                         | `LANGWATCH_NLP_INTERNAL_SECRET`           | `src/app/scenario.app.ts:275`            |
-| config | `langwatchEndpoint`                                   | `LANGWATCH_ENDPOINT`                      | `../contract/src/scenario.config.ts:85`  |
-| config | `voicePublicBaseUrl`                                  | `VOICE_PUBLIC_BASE_URL`                   | `../contract/src/scenario.config.ts:87`  |
-| config | `voiceTunnel`                                         | `VOICE_TUNNEL`                            | `../contract/src/scenario.config.ts:89`  |
-| config | `isSaas`                                              | `IS_SAAS`                                 | `../contract/src/scenario.config.ts:91`  |
-| config | `nodeEnvironment`                                     | `NODE_ENV`                                | `../contract/src/scenario.config.ts:93`  |
-| config | `voiceWorkerOnly`                                     | `VOICE_WORKER_ONLY`                       | `../contract/src/scenario.config.ts:95`  |
-| config | `consumedResourceClasses`                             | `SCENARIO_CONSUMED_RESOURCE_CLASSES`      | `../contract/src/scenario.config.ts:97`  |
-| config | `slotBudget`                                          | `SCENARIO_SLOT_BUDGET`                    | `../contract/src/scenario.config.ts:99`  |
-| config | `voiceCallMaxSeconds`                                 | `VOICE_CALL_MAX_SECONDS`                  | `../contract/src/scenario.config.ts:101` |
-| config | `allowLoopbackVoiceProviders`                         | `VOICE_UNSAFE_ALLOW_LOOPBACK_PROVIDERS`   | `../contract/src/scenario.config.ts:103` |
-| config | `blockLocalHttpCalls`                                 | `BLOCK_LOCAL_HTTP_CALLS`                  | `../contract/src/scenario.config.ts:104` |
-| config | `allowedProxyHosts`                                   | `ALLOWED_PROXY_HOSTS`                     | `../contract/src/scenario.config.ts:105` |
-| config | `defaultModel`                                        | `LANGWATCH_DEFAULT_MODEL`                 | `../contract/src/scenario.config.ts:106` |
-| config | `nlpServiceUrl`                                       | `LANGWATCH_NLP_SERVICE`                   | `../contract/src/scenario.config.ts:108` |
-| config | `nlpCodeBlockTimeoutSeconds`                          | `NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS` | `../contract/src/scenario.config.ts:110` |
-| config | `publicBaseUrl`                                       | `BASE_HOST`                               | `../contract/src/scenario.config.ts:112` |
-| config | `rawSocketPort`                                       | `VOICE_WS_PORT`                           | `../contract/src/scenario.config.ts:114` |
-| config | `nlpTimeouts.maxTimeoutMs`                            | `NLP_FETCH_MAX_TIMEOUT_MS`                | `../contract/src/scenario.config.ts:117` |
-| config | `childParentEnvironment.path`                         | `PATH`                                    | `../contract/src/scenario.config.ts:120` |
-| config | `childParentEnvironment.home`                         | `HOME`                                    | `../contract/src/scenario.config.ts:121` |
-| config | `childParentEnvironment.user`                         | `USER`                                    | `../contract/src/scenario.config.ts:122` |
-| config | `childParentEnvironment.shell`                        | `SHELL`                                   | `../contract/src/scenario.config.ts:123` |
-| config | `childParentEnvironment.lang`                         | `LANG`                                    | `../contract/src/scenario.config.ts:124` |
-| config | `childParentEnvironment.lcAll`                        | `LC_ALL`                                  | `../contract/src/scenario.config.ts:125` |
-| config | `childParentEnvironment.term`                         | `TERM`                                    | `../contract/src/scenario.config.ts:126` |
-| config | `childParentEnvironment.nodeCompileCache`             | `NODE_COMPILE_CACHE`                      | `../contract/src/scenario.config.ts:127` |
-| config | `childParentEnvironment.corepackEnableDownloadPrompt` | `COREPACK_ENABLE_DOWNLOAD_PROMPT`         | `../contract/src/scenario.config.ts:128` |
-| config | `childParentEnvironment.nodeExtraCaCerts`             | `NODE_EXTRA_CA_CERTS`                     | `../contract/src/scenario.config.ts:129` |
+| config | `langwatchEndpoint`                                   | `LANGWATCH_ENDPOINT`                      | `../contract/src/scenario.config.ts:94`  |
+| config | `voicePublicBaseUrl`                                  | `VOICE_PUBLIC_BASE_URL`                   | `../contract/src/scenario.config.ts:96`  |
+| config | `voiceTunnel`                                         | `VOICE_TUNNEL`                            | `../contract/src/scenario.config.ts:98`  |
+| config | `isSaas`                                              | `IS_SAAS`                                 | `../contract/src/scenario.config.ts:100` |
+| config | `nodeEnvironment`                                     | `NODE_ENV`                                | `../contract/src/scenario.config.ts:102` |
+| config | `voiceWorkerOnly`                                     | `VOICE_WORKER_ONLY`                       | `../contract/src/scenario.config.ts:104` |
+| config | `consumedResourceClasses`                             | `SCENARIO_CONSUMED_RESOURCE_CLASSES`      | `../contract/src/scenario.config.ts:106` |
+| config | `slotBudget`                                          | `SCENARIO_SLOT_BUDGET`                    | `../contract/src/scenario.config.ts:108` |
+| config | `generateTimeoutMs`                                   | `SCENARIO_GENERATE_TIMEOUT_MS`            | `../contract/src/scenario.config.ts:110` |
+| config | `voiceCallMaxSeconds`                                 | `VOICE_CALL_MAX_SECONDS`                  | `../contract/src/scenario.config.ts:112` |
+| config | `allowLoopbackVoiceProviders`                         | `VOICE_UNSAFE_ALLOW_LOOPBACK_PROVIDERS`   | `../contract/src/scenario.config.ts:114` |
+| config | `blockLocalHttpCalls`                                 | `BLOCK_LOCAL_HTTP_CALLS`                  | `../contract/src/scenario.config.ts:115` |
+| config | `allowedProxyHosts`                                   | `ALLOWED_PROXY_HOSTS`                     | `../contract/src/scenario.config.ts:116` |
+| config | `defaultModel`                                        | `LANGWATCH_DEFAULT_MODEL`                 | `../contract/src/scenario.config.ts:117` |
+| config | `nlpServiceUrl`                                       | `LANGWATCH_NLP_SERVICE`                   | `../contract/src/scenario.config.ts:119` |
+| config | `nlpCodeBlockTimeoutSeconds`                          | `NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS` | `../contract/src/scenario.config.ts:121` |
+| config | `publicBaseUrl`                                       | `BASE_HOST`                               | `../contract/src/scenario.config.ts:123` |
+| config | `rawSocketPort`                                       | `VOICE_WS_PORT`                           | `../contract/src/scenario.config.ts:125` |
+| config | `nlpTimeouts.maxTimeoutMs`                            | `NLP_FETCH_MAX_TIMEOUT_MS`                | `../contract/src/scenario.config.ts:128` |
+| config | `childParentEnvironment.path`                         | `PATH`                                    | `../contract/src/scenario.config.ts:131` |
+| config | `childParentEnvironment.home`                         | `HOME`                                    | `../contract/src/scenario.config.ts:132` |
+| config | `childParentEnvironment.user`                         | `USER`                                    | `../contract/src/scenario.config.ts:133` |
+| config | `childParentEnvironment.shell`                        | `SHELL`                                   | `../contract/src/scenario.config.ts:134` |
+| config | `childParentEnvironment.lang`                         | `LANG`                                    | `../contract/src/scenario.config.ts:135` |
+| config | `childParentEnvironment.lcAll`                        | `LC_ALL`                                  | `../contract/src/scenario.config.ts:136` |
+| config | `childParentEnvironment.term`                         | `TERM`                                    | `../contract/src/scenario.config.ts:137` |
+| config | `childParentEnvironment.nodeCompileCache`             | `NODE_COMPILE_CACHE`                      | `../contract/src/scenario.config.ts:138` |
+| config | `childParentEnvironment.corepackEnableDownloadPrompt` | `COREPACK_ENABLE_DOWNLOAD_PROMPT`         | `../contract/src/scenario.config.ts:139` |
+| config | `childParentEnvironment.nodeExtraCaCerts`             | `NODE_EXTRA_CA_CERTS`                     | `../contract/src/scenario.config.ts:140` |
 
 <!-- readme:generated:end -->
