@@ -43,7 +43,6 @@ export default function AuthenticationSettingsScreen() {
     <>
       <SectionNavigationFrame
         label="Authentication"
-        hideTitle
         header={
           <PageLayout.Header>
             <PageLayout.Heading>Authentication</PageLayout.Heading>
