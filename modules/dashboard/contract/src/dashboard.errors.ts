@@ -146,6 +146,21 @@ export class SavedWorkbenchChartSpecificationRefusedError extends HandledError {
   }
 }
 
+/** A widget definition the service refuses to write; the stored one stays. */
+export class DashboardWidgetDefinitionRefusedError extends HandledError {
+  declare readonly code: "dashboard_widget_definition_refused";
+
+  constructor(widgetId: string, options: { reasons?: readonly Error[] } = {}) {
+    super("dashboard_widget_definition_refused", "This dashboard widget's definition is invalid.", {
+      httpStatus: 422,
+      fault: "customer",
+      meta: { widgetId },
+      ...options,
+    });
+    this.name = "DashboardWidgetDefinitionRefusedError";
+  }
+}
+
 export class SavedWorkbenchChartDefinitionInvalidError extends HandledError {
   declare readonly code: "saved_workbench_chart_definition_invalid";
 

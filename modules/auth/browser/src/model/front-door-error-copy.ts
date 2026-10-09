@@ -291,12 +291,6 @@ export const FRONT_DOOR_ERROR_COPY: Readonly<Record<string, FrontDoorErrorEntry>
     title: "Not found",
     describe: () => "It may have been deleted. Reload to see the current list.",
   },
-
-  registration_not_available: {
-    // A sign-up refused because the address must use its organization's sign-in method.
-    title: "You can't create an account here",
-    describe: () => "This workspace signs you in through your organization. Use that sign-in.",
-  },
 };
 
 /** The copy for a code the front door knows, or `null` for one it does not. */

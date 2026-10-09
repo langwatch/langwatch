@@ -558,6 +558,10 @@ const presentations = {
     title: "This dashboard widget can't be opened",
     describe: () => "We can't read what was stored for it. Rebuild the widget and save it again.",
   },
+  dashboard_widget_definition_refused: {
+    title: "This dashboard widget can't be saved",
+    describe: () => "Its definition isn't valid. Check the widget's queries and try again.",
+  },
 
   // ---- dashboards, graphs & saved views ----
   // The reorder pair reads the same to a customer whichever list they were
@@ -1068,17 +1072,6 @@ const presentations = {
     // not the account's, which leaves exactly two moves worth naming.
     title: "That email already has an account",
     describe: () => "Sign in with it, or reset the password if you don't have it.",
-  },
-  registration_not_available: {
-    // This install signs people in through its own identity provider, so there
-    // is no password account to create here. Naming the provider is the
-    // operator's job, not ours: we do not know what they called it.
-    title: "You can't create an account here",
-    describe: () => "This workspace signs you in through your organization. Use that sign-in.",
-  },
-  signup_throttled: {
-    title: "Too many signup attempts",
-    describe: () => "Wait a few minutes, then try again.",
   },
   password_auth_not_available: {
     title: "Passwords aren't used here",

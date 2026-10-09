@@ -34,7 +34,7 @@ describe("given the dashboard widget service over the memory repository", () => 
           projectId: "project-1",
           input: { name: "Traces", code: CODE, queries: INVALID },
         }),
-      ).rejects.toMatchObject({ code: "dashboard_widget_definition_invalid" });
+      ).rejects.toMatchObject({ code: "dashboard_widget_definition_refused", httpStatus: 422 });
       expect(await repository.findAll({ projectId: "project-1" })).toEqual([]);
     });
 
@@ -51,7 +51,7 @@ describe("given the dashboard widget service over the memory repository", () => 
           id: created.id,
           input: { queries: INVALID },
         }),
-      ).rejects.toMatchObject({ code: "dashboard_widget_definition_invalid" });
+      ).rejects.toMatchObject({ code: "dashboard_widget_definition_refused", httpStatus: 422 });
       const read = await service.getById({ projectId: "project-1", id: created.id });
       expect(read.definition.queries).toEqual(VALID);
     });

@@ -28,5 +28,5 @@ Feature: Dashboard widget definitions are validated before they are stored
   Scenario: The widget service refuses an invalid definition before writing it
     Given the dashboard widget service over the memory repository
     When it is asked to create a widget, or to update one, with a parameter named "prototype"
-    Then it throws DashboardWidgetDefinitionInvalidError
+    Then it throws DashboardWidgetDefinitionRefusedError, a 422 customer refusal
     And the repository holds no invalid definition

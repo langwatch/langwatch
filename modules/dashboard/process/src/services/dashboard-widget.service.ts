@@ -7,7 +7,10 @@ import {
   DASHBOARD_WIDGET_DEFINITION_VERSION,
   dashboardWidgetDefinitionSchema,
 } from "@langwatch/analytics-contract/dashboard-widget-definition";
-import { DASHBOARD_WIDGET_KSUID_RESOURCE } from "@langwatch/dashboard-contract";
+import {
+  DASHBOARD_WIDGET_KSUID_RESOURCE,
+  DashboardWidgetDefinitionRefusedError,
+} from "@langwatch/dashboard-contract";
 import { generate } from "@langwatch/ksuid";
 
 import type {
@@ -96,7 +99,7 @@ export class DashboardWidgetService {
     parsed: { success: true } | { success: false; error: Error },
   ): void {
     if (!parsed.success) {
-      throw new DashboardWidgetDefinitionInvalidError(widgetId, { reasons: [parsed.error] });
+      throw new DashboardWidgetDefinitionRefusedError(widgetId, { reasons: [parsed.error] });
     }
   }
 

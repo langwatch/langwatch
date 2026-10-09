@@ -29,8 +29,8 @@ const SIGN_UP_RESTRICTED = "auth_sign_up_restricted";
 /** The passkey sign-up's 403 for an address that must use its organization's sign-in. */
 const REGISTRATION_NOT_ALLOWED = "REGISTRATION_NOT_ALLOWED";
 
-/** The registry's code for that refusal: "You can't create an account here". */
-const REGISTRATION_NOT_AVAILABLE = "registration_not_available";
+/** Main's code for that refusal: "Accounts here are created by your identity provider". */
+const DIRECT_REGISTRATION_UNAVAILABLE = "auth_direct_registration_unavailable";
 
 /**
  * The `code` off a client error, where it carried one — the ceremony's own
@@ -93,7 +93,7 @@ function readRefusal(error: { status: number } & object): Refusal {
   }
   // Routed to single sign-on, or offered no passkey: not a passkey fault, so not that copy.
   if (code === REGISTRATION_NOT_ALLOWED) {
-    return { kind: "report", error: { error: REGISTRATION_NOT_AVAILABLE } };
+    return { kind: "report", error: { error: DIRECT_REGISTRATION_UNAVAILABLE } };
   }
   // Saying "went wrong" about a cancelled prompt would scold somebody for
   // deciding. But only the explicit abort is that: a status-less client

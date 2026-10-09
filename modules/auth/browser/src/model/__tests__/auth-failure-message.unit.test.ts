@@ -120,16 +120,19 @@ describe("authFailureMessage", () => {
 
   describe("when a passkey sign-up is refused for an address that must use its organization's sign-in", () => {
     it("says an account cannot be created here, and never that the passkey failed", () => {
-      expect(registryCopy("registration_not_available")).toBe("You can't create an account here");
       expect(
         frontDoorErrorCopy({
-          code: "registration_not_available",
+          code: "auth_direct_registration_unavailable",
           httpStatus: 403,
           meta: {},
           tips: [],
           traceId: undefined,
-        })?.description,
-      ).toBe("This workspace signs you in through your organization. Use that sign-in.");
+        }),
+      ).toEqual({
+        title: "Accounts here are created by your identity provider",
+        description:
+          "Use the sign-in method your organization set up. Ask an administrator if you are not sure which one that is.",
+      });
     });
   });
 

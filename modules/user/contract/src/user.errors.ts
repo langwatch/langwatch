@@ -128,34 +128,6 @@ export class PersonalUsageKeyMismatchError extends HandledError {
   }
 }
 
-/** This deployment federates sign-in, so it mints no password accounts (ADR-027). */
-export class UserRegistrationNotAvailableError extends HandledError {
-  declare readonly code: "registration_not_available";
-
-  constructor() {
-    super(
-      "registration_not_available",
-      "Direct registration is not available for this sign-in method",
-      { httpStatus: 400, fault: "customer" },
-    );
-    this.name = "UserRegistrationNotAvailableError";
-  }
-}
-
-/** Mirrors the sign-up budget the hosted sign-in path meters, per address. */
-export class UserSignupThrottledError extends HandledError {
-  declare readonly code: "signup_throttled";
-
-  constructor() {
-    super("signup_throttled", "Too many signup attempts from this address", {
-      httpStatus: 429,
-      fault: "customer",
-      retryable: true,
-    });
-    this.name = "UserSignupThrottledError";
-  }
-}
-
 /** The password does not live here: the deployment's identity provider holds it. */
 export class UserPasswordAuthUnavailableError extends HandledError {
   declare readonly code: "password_auth_not_available";
