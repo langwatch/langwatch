@@ -374,7 +374,7 @@ export function useUiApiWait({
  * `ui/sections`); what's left here is the shape of the tree itself.
  */
 
-export type UiRouter = ReturnType<typeof createBrowserRouter>;
+export type UiBrowserRouter = ReturnType<typeof createBrowserRouter>;
 
 export type UiRouterOptions = {
   /** The application's routes, in match order. */
@@ -398,7 +398,7 @@ export function createUiRouter({
   routes,
   rootComponent,
   rootErrorBoundary,
-}: UiRouterOptions): UiRouter {
+}: UiRouterOptions): UiBrowserRouter {
   return createBrowserRouter([
     {
       Component: rootComponent,
