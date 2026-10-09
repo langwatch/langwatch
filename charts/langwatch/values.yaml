@@ -1029,7 +1029,7 @@ workers:
   otel:
     serviceName: langwatch-workers
 
-  ## @param workers.enabled [default: true] Deploy the workers Deployment + PDB.
+  ## @param workers.enabled [default: true] Deploy the workers Deployment + PDB. Must stay true: the workers run the upgrade, so the chart refuses false.
   enabled: true
 
   # Number of worker replicas

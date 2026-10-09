@@ -61,7 +61,7 @@ expect_env "managed override" "$managed" CLICKHOUSE_MAX_OPEN_CONNECTIONS 12
 
 external=$(render_component app \
   --set app.replicaCount=2 \
-  --set workers.enabled=false \
+  --set workers.replicaCount=0 \
   --set clickhouse.chartManaged=false \
   --set-string clickhouse.external.url.value=http://clickhouse:8123/langwatch \
   --set clickhouse.external.serverNodes=5 \

@@ -1248,14 +1248,12 @@ test_install_minimal() {
     -f "${CHART_DIR}/tests/values-e2e.yaml"
   pass "helm install (minimal + nodeport)"
 
-  # values-e2e.yaml is passed last and sets workers.enabled=false, so this
-  # asserts the ENABLE GATE still removes the Deployment. It is not a statement
-  # about size-minimal, which enables workers — the label used to say otherwise
-  # and only stayed green by accident of the -f ordering.
+  # The chart refuses workers.enabled=false (the workers run the upgrade), so
+  # values-e2e.yaml keeps the Deployment at replicaCount 0.
   if kc get deployment "${RELEASE}-workers" &>/dev/null; then
-    fail "workers.enabled=false should remove the Workers Deployment"
+    pass "Workers Deployment present (replicaCount=0 via values-e2e)"
   else
-    pass "Workers Deployment absent (workers.enabled=false via values-e2e)"
+    fail "the Workers Deployment is missing"
   fi
 
   # ClickHouse should be a single pod

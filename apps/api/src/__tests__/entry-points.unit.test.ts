@@ -59,6 +59,35 @@ describe("the entry points", () => {
       expect(lines).toContain("          workingDir: /app/apps/api");
       expect(lines.filter((line) => /pre-install|pre-rollback/.test(line))).toEqual([]);
     });
+
+    /** @scenario "A Helm upgrade without serialised upgrades renders no pre-roll Job; the new workers run the upgrade" */
+    it("treats serialised upgrades as off when the knob is off or a dataplane is configured", () => {
+      const helpers = uncommented(readFromRoot("charts/langwatch/templates/_helpers.tpl"));
+
+      expect(helpers).toContain(
+        "{{- if and .Values.app.storedObjects.localFilesystem.enabled (not .Values.app.dataplane.enabled) -}}",
+      );
+      expect(helpers).toContain(
+        '{{- if and (eq (include "langwatch.storedObjects.localFilesystemIsActive" .) "true") .Values.workers.enabled .Values.app.storedObjects.localFilesystem.serializeUpgrades -}}',
+      );
+    });
+  });
+
+  describe("given the chart without workers", () => {
+    /** @scenario "The chart refuses a release without workers, because the workers run the upgrade" */
+    it("fails the render from the app Deployment, naming workers.enabled", () => {
+      const helpers = readFromRoot("charts/langwatch/templates/_helpers.tpl");
+      const guard = helpers.slice(
+        helpers.indexOf('{{- define "langwatch.workersRequiredGuard" -}}'),
+      );
+
+      expect(guard).toMatch(
+        /^\{\{- define "langwatch\.workersRequiredGuard" -\}\}\n\{\{- if not \.Values\.workers\.enabled \}\}\n\{\{- fail "workers\.enabled must be true: the workers run the upgrade/,
+      );
+      expect(readFromRoot("charts/langwatch/templates/app/deployment.yaml").split("\n")[1]).toBe(
+        '{{- include "langwatch.workersRequiredGuard" . }}',
+      );
+    });
   });
 
   describe("given the self-hosted compose file", () => {

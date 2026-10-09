@@ -235,11 +235,11 @@ test_resources() {
     fail "Deployment ${RELEASE}-app missing"
   fi
 
-  # Workers Deployment absent (enabled: false)
+  # Workers Deployment present with no pod (the chart refuses enabled: false)
   if kc get deployment "${RELEASE}-workers" &>/dev/null; then
-    fail "Workers Deployment should not exist (enabled=false)"
+    pass "Deployment ${RELEASE}-workers (replicaCount=0)"
   else
-    pass "Workers Deployment absent (enabled=false)"
+    fail "Deployment ${RELEASE}-workers missing"
   fi
 }
 

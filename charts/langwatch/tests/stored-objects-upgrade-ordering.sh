@@ -428,9 +428,27 @@ test_dataplane_renders_no_hook() {
   echo "ok   [dataplane] no stored-objects PVC and no hooks"
 }
 
-# @scenario "An install without workers gets no upgrade steps"
-test_no_workers_renders_no_hook() {
-  expect_no_hook "workers off" "--set workers.enabled=false"
+# The upgrade runs on the workers, so a release without them is refused at render.
+# specs/upgrade/entry-points.feature binds the scenarios; this renders them.
+test_no_workers_is_refused() {
+  local out
+  # shellcheck disable=SC2086
+  if out=$(helm template lw . $BASE --set workers.enabled=false 2>&1); then
+    fail "workers off" "the chart rendered a release without workers"
+    return
+  fi
+  expect_contains "workers off" "$out" "workers.enabled must be true: the workers run the upgrade" || return 0
+  echo "ok   [workers off] the chart refuses a release without workers"
+}
+
+test_no_pre_roll_job_without_serialised_upgrades() {
+  local label flags
+  for label in knob-off dataplane; do
+    flags="--set app.storedObjects.localFilesystem.serializeUpgrades=false"
+    [ "$label" = dataplane ] && flags="$DATAPLANE"
+    expect_absent "$label" "$(render "$flags")" "langwatch/templates/app/migrate-pre-roll-job.yaml" || return 0
+  done
+  echo "ok   [pre-roll] no pre-roll Job with the knob off or a dataplane configured"
 }
 
 # @scenario "An operator can turn the upgrade steps off"
@@ -792,7 +810,8 @@ test_wait_outlasts_the_grace_period
 test_workers_come_back_after_the_app_rollout
 test_rollout_check_waits_for_the_new_pod
 test_dataplane_renders_no_hook
-test_no_workers_renders_no_hook
+test_no_workers_is_refused
+test_no_pre_roll_job_without_serialised_upgrades
 test_knob_off_renders_no_hook
 test_hook_rbac_is_scoped
 test_hook_is_upgrade_only_and_tolerates_a_missing_deployment

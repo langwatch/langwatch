@@ -32,12 +32,18 @@ Feature: The worker runs the upgrade from every entry point; the api never migra
     When an entry point runs it
     Then it runs `pnpm task upgrade` and no system-migrations pass
 
-  @unimplemented
-  Scenario: A Helm upgrade renders no pre-roll Job; the new workers run the upgrade
-    Given the chart with default values
+  @unit
+  Scenario: A Helm upgrade without serialised upgrades renders no pre-roll Job; the new workers run the upgrade
+    Given the chart with `app.storedObjects.localFilesystem.serializeUpgrades` off, or a dataplane configured
     When a release is upgraded
     Then no pre-roll Job is rendered
     And the new api pods report not ready until the ledger is current, so old pods keep serving
+
+  @unit
+  Scenario: The chart refuses a release without workers, because the workers run the upgrade
+    Given the chart with `workers.enabled` false
+    When it renders
+    Then it fails, naming `workers.enabled` and saying the workers run the upgrade
 
   @unit
   Scenario: The Helm pre-roll Job renders only when upgrades are serialised

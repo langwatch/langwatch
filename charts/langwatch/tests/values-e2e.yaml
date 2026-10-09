@@ -40,9 +40,10 @@ app:
     skipEnvValidation: true
 
 workers:
-  # e2e.sh asserts the workers Deployment is absent when enabled=false
-  # (validates the gate added in c74fb13a3).
-  enabled: false
+  # The chart refuses enabled: false (the workers run the upgrade), so the
+  # e2e profile keeps the Deployment and runs no pod.
+  enabled: true
+  replicaCount: 0
 
 langwatch_nlp:
   replicaCount: 0

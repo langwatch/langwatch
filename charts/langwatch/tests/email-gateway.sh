@@ -146,7 +146,6 @@ test_extra_environment_variables_are_an_accepted_source() {
   local cases=(
     "extra-envs-on-both|--set app.email.provider=smtp $both"
     "extra-env-from-on-both|--set app.email.provider=ses --set app.extraEnvFrom[0].secretRef.name=aws-mailer --set workers.extraEnvFrom[0].secretRef.name=aws-mailer"
-    "app-only-with-workers-off|--set app.email.provider=smtp --set workers.enabled=false --set app.extraEnvs[0].name=SMTP_URL --set app.extraEnvs[0].value=smtp://relay.internal:587"
   )
   for entry in "${cases[@]}"; do
     label="${entry%%|*}"

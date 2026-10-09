@@ -1628,6 +1628,13 @@ containers:
 {{- printf "%s|%s|%s" .Chart.Version (.Chart.AppVersion | default "") (toJson .Values) | sha256sum -}}
 {{- end -}}
 
+{{/* The workers run the upgrade (specs/upgrade/entry-points.feature), so a release without them never upgrades. */}}
+{{- define "langwatch.workersRequiredGuard" -}}
+{{- if not .Values.workers.enabled }}
+{{- fail "workers.enabled must be true: the workers run the upgrade at every release, and the app holds until it has run, so without them LangWatch never serves. Remove workers.enabled: false." }}
+{{- end }}
+{{- end -}}
+
 {{/* Whether the stored-objects upgrade hooks render for this release. */}}
 {{- define "langwatch.storedObjects.serializeUpgradesActive" -}}
 {{- if and (eq (include "langwatch.storedObjects.localFilesystemIsActive" .) "true") .Values.workers.enabled .Values.app.storedObjects.localFilesystem.serializeUpgrades -}}
