@@ -26,3 +26,9 @@ Feature: The team settings page reads as main's does
     When Create is pressed with the name left blank
     Then the name field says it is required, as on main
     And no team is sent to be created
+
+  @integration
+  Scenario: Renaming a team saves the new name
+    Given a team the reader may edit, with one admin member
+    When a new name is typed into the name field and Enter is pressed
+    Then the team is saved with the new name and its members unchanged, with no save button
