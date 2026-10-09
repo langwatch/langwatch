@@ -4,7 +4,7 @@ The browser half of [organization](../README.md). What a browser installs when i
 
 <!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
 
-Declared in `src/organization.web.ts:23` (`defineBrowserModule("organization")`), exported as `organizationWeb` at `./declaration`.
+Declared in `src/organization.web.ts:24` (`defineBrowserModule("organization")`), exported as `organizationWeb` at `./declaration`.
 
 Installed by ui, from the app's generated module list (`pnpm generate:modules`).
 
