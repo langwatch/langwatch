@@ -44,6 +44,8 @@ Plan, inventory and before/after tables: `dev/docs/plans/telemetry-env-2026-10-0
    the same `MeterProvider`; the push keeps running. The door listens on its own port (default
    `9464`), never the public one. Its bearer is `METRICS_API_KEY`; in production an unset key leaves
    the door unmounted with one boot error, as on main.
+   2026-10-09 (TS-METRICS-NO-KEY): an unset key leaves the door unmounted in every environment, as
+   the Go gateway's does, and the bearer is compared in constant time.
 4. **One log level.** `LOG_LEVEL` sets every sink; `LOG_CONSOLE_LEVEL` and `LOG_OTEL_LEVEL` override
    one sink each and default to `LOG_LEVEL`. `LOG_FORMAT` stays. TS, Go and langevals read the same
    names.

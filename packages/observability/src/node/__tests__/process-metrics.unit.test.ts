@@ -73,16 +73,14 @@ function bootLog() {
 async function compose({
   over,
   values = {},
-  nodeEnvironment,
   logger,
 }: {
   over: Partial<TelemetrySettings>;
   values?: Record<string, string>;
-  nodeEnvironment?: string;
   logger?: ReturnType<typeof bootLog>["logger"];
 }) {
   const contributions = await processMetrics("langwatch-test")({
-    config: { observability: settings(over), process: { nodeEnvironment } },
+    config: { observability: settings(over) },
     secrets: secretsAnswering(values),
     ...(logger === undefined ? {} : { logger }),
   });
@@ -96,11 +94,19 @@ const routeIn = (contributions: readonly Contribution[]) =>
 const listenerIn = (contributions: readonly Contribution[]) =>
   contributions.find((contribution) => "start" in contribution);
 
-/** A pull door on a port of its own: started, then scraped there. */
-async function pullDoor({ exporter = "otlp,prometheus", ...rest }: PullOptions = {}) {
+const KEYED = { METRICS_API_KEY: "scrape-me" };
+const BEARER = "Bearer scrape-me";
+
+/** A pull door on a port of its own, keyed unless told otherwise: started, then scraped there. */
+async function pullDoor({
+  exporter = "otlp,prometheus",
+  values = KEYED,
+  ...rest
+}: PullOptions = {}) {
   const port = await freePort();
   const contributions = await compose({
     ...rest,
+    values,
     over: {
       metrics: { exporter, prometheusHost: "127.0.0.1", prometheusPort: port },
       ...rest.over,
@@ -158,7 +164,7 @@ describe("the process metrics transport", () => {
       const { contributions, scrape } = await pullDoor({ over: { otlpEndpoint: endpoint } });
       counter({ name: "langwatch_test_jobs", description: "jobs" }).inc(void 0, 3);
 
-      const response = await scrape();
+      const response = await scrape(BEARER);
       expect(response.status).toBe(200);
       expect(await response.text()).toContain("langwatch_test_jobs_total 3");
 
@@ -167,13 +173,13 @@ describe("the process metrics transport", () => {
     });
   });
 
-  describe("given the Prometheus exporter outside production", () => {
+  describe("given the Prometheus exporter and METRICS_API_KEY", () => {
     /** @scenario "A scrape reads the process's own instruments" */
-    it("serves this process's own instruments with no key set", async () => {
+    it("serves this process's own instruments to a scrape carrying the key", async () => {
       const { scrape } = await pullDoor();
       counter({ name: "langwatch_test_jobs", description: "jobs" }).inc(void 0, 2);
 
-      const response = await scrape();
+      const response = await scrape(BEARER);
 
       expect(response.status).toBe(200);
       expect(await response.text()).toContain("langwatch_test_jobs_total 2");
@@ -181,42 +187,25 @@ describe("the process metrics transport", () => {
 
     /** @scenario "The scrape door is gated by the configured token" */
     it("refuses a scrape with no bearer or the wrong one", async () => {
-      const { scrape } = await pullDoor({ values: { METRICS_API_KEY: "scrape-me" } });
+      const { scrape } = await pullDoor();
 
       expect((await scrape()).status).toBe(401);
       expect((await scrape("Bearer wrong")).status).toBe(401);
+      expect((await scrape("Bearer scrape-mf")).status).toBe(401);
     });
   });
 
-  describe("given the Prometheus exporter in production", () => {
-    /** @scenario "In production an unset scrape token mounts no door" */
-    it("mounts no door without METRICS_API_KEY, the deleted name opening nothing", async () => {
+  describe("given the Prometheus exporter and no METRICS_API_KEY", () => {
+    /** @scenario "An unset scrape token mounts no door" */
+    it("mounts no door, the deleted name opening nothing, and logs the fix", async () => {
       const { lines, logger } = bootLog();
-      const { door } = await pullDoor({
-        values: { LANGWATCH_METRICS_TOKEN: "scrape-me" },
-        nodeEnvironment: "production",
-        logger,
-      });
+      const { door } = await pullDoor({ values: { LANGWATCH_METRICS_TOKEN: "scrape-me" }, logger });
 
       expect(door).toBeUndefined();
       expect(lines).toContainEqual({
         level: "error",
-        msg: expect.stringContaining("METRICS_API_KEY"),
+        msg: expect.stringContaining("set METRICS_API_KEY"),
       });
-    });
-
-    /** @scenario "An authenticated scrape in production reads the process's instruments" */
-    it("serves a scrape that carries METRICS_API_KEY as its bearer", async () => {
-      const { scrape } = await pullDoor({
-        values: { METRICS_API_KEY: "scrape-me" },
-        nodeEnvironment: "production",
-      });
-      counter({ name: "langwatch_test_jobs", description: "jobs" }).inc(void 0, 1);
-
-      const response = await scrape("Bearer scrape-me");
-
-      expect(response.status).toBe(200);
-      expect(await response.text()).toContain("langwatch_test_jobs_total 1");
     });
   });
 
@@ -273,7 +262,7 @@ describe("the process metrics transport", () => {
       await stopAll(live.pop() ?? first.contributions);
 
       const { scrape } = await pullDoor();
-      const response = await scrape();
+      const response = await scrape(BEARER);
 
       expect(response.status).toBe(200);
       expect(await response.text()).not.toContain("langwatch_test_stale");

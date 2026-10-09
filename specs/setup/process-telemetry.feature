@@ -48,8 +48,8 @@ Feature: One OpenTelemetry setup every process uses
 
     @unit
     Scenario: A scrape reads the process's own instruments
-      Given a process outside production whose metrics exporter lists "prometheus" and no METRICS_API_KEY
-      When its pull port is scraped at "/metrics"
+      Given a process whose metrics exporter lists "prometheus" and METRICS_API_KEY is set
+      When its pull port is scraped at "/metrics" with that bearer
       Then the exposition names the instruments this process records
 
     @unit
@@ -59,17 +59,11 @@ Feature: One OpenTelemetry setup every process uses
       Then the response is 401
 
     @unit
-    Scenario: In production an unset scrape token mounts no door
-      Given a production process whose metrics exporter lists "prometheus" and no METRICS_API_KEY
+    Scenario: An unset scrape token mounts no door
+      Given a process, in production or not, whose metrics exporter lists "prometheus" and no METRICS_API_KEY
       When its metrics are composed
-      Then no pull port is opened and the boot log names METRICS_API_KEY
-      # Fail-closed: an unset key is a misconfiguration, not an invitation. LANGWATCH_METRICS_TOKEN never shipped and opens nothing.
-
-    @unit
-    Scenario: An authenticated scrape in production reads the process's instruments
-      Given a production process whose metrics exporter lists "prometheus" and METRICS_API_KEY is set
-      When a caller scrapes the pull port with that bearer
-      Then the exposition names the instruments this process records
+      Then no pull port is opened and the boot log says to set METRICS_API_KEY
+      # Fail-closed in every environment, as the Go gateway's door is. LANGWATCH_METRICS_TOKEN never shipped and opens nothing.
 
     @unit
     Scenario: Metrics are switched off entirely
