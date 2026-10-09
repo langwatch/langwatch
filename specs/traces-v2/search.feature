@@ -2439,7 +2439,7 @@ Rule: Event rows drill down into their metric values
     And the "thumbs_up_down" row carries its vote values with their counts
     And rows for events without metric values carry no drilldown values
 
-  @integration
+  @regression @integration
   Scenario: The Event name section loads when events carry large payloads
     Given most of the project's events carry large attribute payloads and no metric values
     When the sidebar loads the Event name section

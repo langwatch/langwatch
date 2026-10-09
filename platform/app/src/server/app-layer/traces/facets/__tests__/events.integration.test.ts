@@ -22,6 +22,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { wrapWithDefaultSettings } from "~/server/clickhouse/safeClickhouseClient";
+import { expandStatementForProject } from "~/test-utils/authorizationProofs";
 import {
   cleanupTestData,
   getTestClickHouseClient,
@@ -34,6 +35,16 @@ import { buildEventsFacetQuery } from "../events";
 import { baseParams, buildTimeWhere } from "../helpers";
 
 const TENANT_ID = "facet-events-metric-gate-test";
+
+/** The facet query as the authorized reader would send it for this tenant. */
+function forTenant(query: { sql: string; params: Record<string, unknown> }) {
+  const expanded = expandStatementForProject({
+    query: query.sql,
+    queryParams: query.params,
+    projectId: TENANT_ID,
+  });
+  return { sql: expanded.query, params: expanded.queryParams };
+}
 
 // Small in rows, lopsided in shape. Every span carries heavy payload events
 // with no metric keys; one span in VOTE_EVERY also carries a vote event. What
@@ -221,7 +232,6 @@ describe("events facet integration", () => {
   });
 
   const ctx = {
-    tenantId: TENANT_ID,
     // Wide window: seeded spans land within a few minutes of now.
     timeRange: { from: Date.now() - 60 * 60 * 1000, to: Date.now() + 60_000 },
     limit: 1000,
@@ -231,7 +241,8 @@ describe("events facet integration", () => {
   async function runFacet(
     settings: Record<string, string> = {},
   ): Promise<FacetRow[]> {
-    const query = buildEventsFacetQuery(ctx);
+    const built = buildEventsFacetQuery(ctx);
+    const query = { ...built, ...forTenant(built) };
     const result = await ch.query({
       query: query.sql,
       query_params: query.params,
@@ -288,13 +299,16 @@ describe("events facet integration", () => {
 
       /** @scenario The Event name section loads when events carry large payloads */
       it("exceeds the same budget with the single-pass shape it replaced", async () => {
-        const sql = formerSinglePassSql(buildTimeWhere("StartTime"));
+        const former = forTenant({
+          sql: formerSinglePassSql(buildTimeWhere("StartTime")),
+          params: baseParams(ctx),
+        });
 
         await expect(
           ch
             .query({
-              query: sql,
-              query_params: baseParams(ctx),
+              query: former.sql,
+              query_params: former.params,
               format: "JSONEachRow",
               clickhouse_settings: { max_memory_usage: MEMORY_CAP },
             })

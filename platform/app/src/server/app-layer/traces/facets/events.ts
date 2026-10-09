@@ -48,6 +48,14 @@ const METRIC_VALUES_TOP_N = 10;
  * reads every payload beside it. A span without such a key contributes nothing
  * to `sumMap` in either shape, so the gate cannot change a bucket.
  *
+ * Splitting has one cost. When a search filter is active, the trace-scope
+ * predicate is a membership test against `trace_summaries`, and ClickHouse
+ * builds an identical `IN` subquery once per place it appears, so that scope
+ * read now runs twice per load of this facet instead of once. It reads narrow
+ * columns of `trace_summaries` only, the same read every other span facet in
+ * the sidebar already makes once each, and the unfiltered load has no scope
+ * to repeat.
+ *
  * The facet key is `event` (matching the search-bar field) so toggles
  * round-trip cleanly with the `event:` filter handler.
  */

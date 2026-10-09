@@ -112,12 +112,12 @@ describe("buildEventsFacetQuery", () => {
         );
         const prewhere = metrics.slice(
           metrics.indexOf("PREWHERE"),
-          metrics.indexOf("WHERE TenantId"),
+          metrics.indexOf("WHERE {{tenantScope"),
         );
         // Only the metric-key gate belongs there; the tenant, time and scope
         // predicates stay in WHERE as in every other facet builder.
         expect(prewhere).toMatch(/`Events\.Attributes`\.keys/);
-        expect(prewhere).not.toContain("TenantId");
+        expect(prewhere).not.toContain("tenantScope");
         expect(prewhere).not.toContain(scope);
       });
 
