@@ -375,6 +375,7 @@ func (o *Orchestrator) DownAll(ctx context.Context) error {
 		o.ch.Stop()
 		fmt.Println("stopped managed clickhouse-server (data kept)")
 	}
+	o.stopColimaIfIdle(ctx)
 	if info, ok := o.store.Daemon(); ok && o.pidIsOurs(info.PID, info.Start) {
 		o.sys.Terminate(info.PID)
 		o.store.ClearDaemon()

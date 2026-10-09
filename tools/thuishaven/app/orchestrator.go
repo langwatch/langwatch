@@ -1015,6 +1015,7 @@ func (o *Orchestrator) Down(ctx context.Context, p UpParams, force bool) error {
 	}
 	removeKeeperPlan(p.WorktreeDir, slug)
 	fmt.Printf("stack %q torn down (databases kept — `haven db reset` for fresh ones)\n", slug)
+	o.stopColimaIfIdle(ctx)
 	return nil
 }
 
