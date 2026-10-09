@@ -24,7 +24,8 @@ function installation({ runs = [lastRun] }: { runs?: readonly (typeof lastRun)[]
   const ledger = {
     findSteps: async () =>
       [...status].map(
-        ([id, each]) => ({ id, status: each, mode: "background", release: null }) as const,
+        ([id, each]) =>
+          ({ id, kind: "data", status: each, mode: "background", release: null }) as const,
       ),
     findRuns: async () => runs,
   };
@@ -119,6 +120,23 @@ describe("rollback detection from the serving roster", () => {
     expect(errors).toHaveLength(1);
   });
 
+  /** @scenario "An upcast step is never reopened by a serving process" */
+  it("never reopens a done upcast step, which no roster row declares", () => {
+    const row = {
+      processId: "AFRs-MacBook-Pro.local:48310:worker",
+      image: "unreleased",
+      release: null,
+      steps: [STEP],
+      startedAt: new Date(RUN_FINISHED.getTime() + 1),
+    };
+    const upcast = "upcast:entitlement:lw.usage.month_counted";
+    const steps = [
+      { id: STEP, kind: "data", status: "done", mode: "background", release: null },
+      { id: upcast, kind: "event-upcast", status: "done", mode: "background", release: null },
+    ] as const;
+    expect(detectRollbacks({ runs: [lastRun], steps, live: [row] })).toEqual([]);
+  });
+
   it("ignores a row that started before the last run, and a step retired below the image", () => {
     const row = {
       processId: "p",
@@ -128,8 +146,8 @@ describe("rollback detection from the serving roster", () => {
       startedAt: RUN_FINISHED,
     };
     const steps = [
-      { id: STEP, status: "done", mode: "background", release: null },
-      { id: "old:retired", status: "done", mode: "background", release: "3.19.0" },
+      { id: STEP, kind: "data", status: "done", mode: "background", release: null },
+      { id: "old:retired", kind: "data", status: "done", mode: "background", release: "3.19.0" },
     ] as const;
     expect(detectRollbacks({ runs: [lastRun], steps, live: [row] })).toEqual([]);
     const later = { ...row, startedAt: new Date(RUN_FINISHED.getTime() + 1) };

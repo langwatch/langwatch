@@ -66,7 +66,12 @@ function gateOver({
     },
     ledger: {
       findSteps: async () =>
-        steps.map((step) => ({ ...step, mode: "blocking" as const, release: null })),
+        steps.map((step) => ({
+          ...step,
+          kind: "data" as const,
+          mode: "blocking" as const,
+          release: null,
+        })),
       findRuns: async () =>
         runs.map((run, index) => ({
           ...run,
