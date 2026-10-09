@@ -20,11 +20,18 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { SearchInput } from "@langwatch/design-system/search-input";
-import { Coins, MoreVertical, Plus, SearchX } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Coins, MoreVertical, Plus, SearchX } from "lucide-react";
 import { useState } from "react";
 
 import { modelProviderApi } from "../../behavior/model-provider-api.ts";
-import { toLLMModelCostRow, type LLMModelCostRow } from "../../model/llm-model-cost-row.ts";
+import { toLLMModelCostRow } from "../../model/llm-model-cost-row.ts";
+import {
+  filterAndSortCosts,
+  nextSort,
+  providerOf,
+  type ModelCostSort,
+  type ModelCostSortKey,
+} from "../../model/model-cost-table.ts";
 import {
   MODEL_COST_MANAGE_PERMISSION,
   useModelProviderHost,
@@ -47,9 +54,27 @@ function RateCell({ rate, isCustom }: { rate: number | undefined; isCustom: bool
   );
 }
 
-/** The provider is the part of the model name before its first "/". */
-function providerOf(row: LLMModelCostRow): string {
-  return row.model.includes("/") ? row.model.split("/")[0]! : "other";
+function SortHeader(props: {
+  label: string;
+  sortKey: ModelCostSortKey;
+  sort: ModelCostSort | null;
+  onSort: (key: ModelCostSortKey) => void;
+  minWidth?: string;
+}) {
+  const active = props.sort?.key === props.sortKey ? props.sort.direction : null;
+  const Icon = active === "asc" ? ArrowUp : active === "desc" ? ArrowDown : ArrowUpDown;
+  return (
+    <Table.ColumnHeader
+      minWidth={props.minWidth}
+      whiteSpace="nowrap"
+      aria-sort={active === "asc" ? "ascending" : active === "desc" ? "descending" : "none"}
+    >
+      <Button size="xs" variant="ghost" onClick={() => props.onSort(props.sortKey)}>
+        {props.label}
+        <Icon size={12} />
+      </Button>
+    </Table.ColumnHeader>
+  );
 }
 
 function countLine(args: { loaded: boolean; isFiltering: boolean; shown: number; total: number }) {
@@ -124,21 +149,16 @@ export default function ModelCostsScreen() {
   const [search, setSearch] = useState("");
   const [provider, setProvider] = useState("");
   const [customOnly, setCustomOnly] = useState(false);
+  const [sort, setSort] = useState<ModelCostSort | null>(null);
+  const onSort = (key: ModelCostSortKey) => setSort((current) => nextSort({ current, key }));
 
   const rows = (llmModelCosts.data ?? []).map(toLLMModelCostRow);
   const providerCounts = new Map<string, number>();
   for (const row of rows) {
     providerCounts.set(providerOf(row), (providerCounts.get(providerOf(row)) ?? 0) + 1);
   }
-  const needle = search.trim().toLowerCase();
-  const visibleRows = rows.filter(
-    (row) =>
-      (!needle ||
-        row.model.toLowerCase().includes(needle) ||
-        row.regex.toLowerCase().includes(needle)) &&
-      (!provider || providerOf(row) === provider) &&
-      (!customOnly || !!row.id),
-  );
+  const visibleRows = filterAndSortCosts({ rows, search, provider, customOnly, sort });
+  const needle = search.trim();
   const isFiltering = !!needle || !!provider || customOnly;
   const noCosts = llmModelCosts.data?.length === 0;
   const noMatches = rows.length > 0 && visibleRows.length === 0;
@@ -211,10 +231,26 @@ export default function ModelCostsScreen() {
                 <Table.Header width="full">
                   <Table.Row width="full">
                     {/* Rates run to nine decimals: headers and values never wrap. */}
-                    <Table.ColumnHeader minWidth="160px">Model name</Table.ColumnHeader>
+                    <SortHeader
+                      label="Model name"
+                      sortKey="model"
+                      sort={sort}
+                      onSort={onSort}
+                      minWidth="160px"
+                    />
                     <Table.ColumnHeader minWidth="160px">Regex match rule</Table.ColumnHeader>
-                    <Table.ColumnHeader whiteSpace="nowrap">Input cost</Table.ColumnHeader>
-                    <Table.ColumnHeader whiteSpace="nowrap">Output cost</Table.ColumnHeader>
+                    <SortHeader
+                      label="Input cost"
+                      sortKey="inputCostPerToken"
+                      sort={sort}
+                      onSort={onSort}
+                    />
+                    <SortHeader
+                      label="Output cost"
+                      sortKey="outputCostPerToken"
+                      sort={sort}
+                      onSort={onSort}
+                    />
                     <Table.ColumnHeader whiteSpace="nowrap">Cache read</Table.ColumnHeader>
                     <Table.ColumnHeader whiteSpace="nowrap">
                       Cache write (5 minutes)
