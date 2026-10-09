@@ -131,7 +131,7 @@ async function approve({
     throw new PermissionDeniedError({
       permission: "apiKeys:create",
       scope: { type: "organization", id: organization_id },
-      denialReason: "no-binding",
+      denialReason: "no-grant",
     });
   }
 

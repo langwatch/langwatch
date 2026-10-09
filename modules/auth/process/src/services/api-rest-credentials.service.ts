@@ -434,7 +434,7 @@ function keyPermissionRefusal(input: {
       input.reach !== "organization" && projectId
         ? { type: "project", id: projectId }
         : { type: "organization", id: organizationId },
-    denialReason: "no-binding",
+    denialReason: "no-grant",
   });
 }
 
