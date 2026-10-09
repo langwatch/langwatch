@@ -72,8 +72,8 @@ const otlpOutcome = (result: { outcome: "collected" } | { outcome: "unavailable"
   result.outcome === "unavailable" ? { retry: "otlp_unavailable" } : applied;
 
 /**
- * Each kind seedgen may send, mapped to one installed `*Api` call. Grants are attached as the
- * `system` caller: the tasks process holds the operator's authority (ARCHITECTURE §4, Tasks).
+ * Each kind seedgen may send, mapped to one installed `*Api` call. A grant with an `as` user is
+ * bounded by what that user holds; only one with none is the tasks operator's `system` write.
  */
 export const SEED_KINDS: Readonly<Record<string, SeedKind>> = {
   "grant.attach": async ({ action, apis }) => {
@@ -82,8 +82,9 @@ export const SEED_KINDS: Readonly<Record<string, SeedKind>> = {
     const outcome = await apis.authz.attachBindings({
       organizationId: org,
       bindings: grants,
-      caller: { type: "system" },
-      actor: { type: "system", id: null },
+      ...(action.as
+        ? { caller: { type: "user", id: action.as }, actor: { type: "user", id: action.as } }
+        : { caller: { type: "system" }, actor: { type: "system", id: null } }),
       onDuplicate: "skip",
       awaitProjection: true,
     });

@@ -292,7 +292,23 @@ func (org *Org) actions(days int) []Action {
 	for _, user := range org.Users[1:] {
 		actions = append(actions, userAction(org, user, org.Ref))
 	}
+	for _, user := range org.Users {
+		if user.State == "accepted" {
+			actions = append(actions, grantAction(org, user, owner.Ref))
+		}
+	}
 	return actions
+}
+
+// grantAction gives an accepted user its role at the org and on the main team, as the owner.
+func grantAction(org *Org, user User, as string) Action {
+	grant := func(scopeType, scopeID string) Grant {
+		return Grant{Principal: map[string]string{"userId": user.Ref}, Role: user.Role, ScopeType: scopeType,
+			ScopeID: scopeID}
+	}
+	encoded, _ := json.Marshal(GrantAttachInput{Grants: []Grant{
+		grant("ORGANIZATION", org.Ref), grant("TEAM", "$team:"+org.Name+"/main")}})
+	return Action{Kind: KindGrantAttach, Org: org.Ref, As: as, Key: user.Email, Input: encoded}
 }
 
 func userAction(org *Org, user User, orgRef string) Action {

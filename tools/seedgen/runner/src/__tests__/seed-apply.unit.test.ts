@@ -176,6 +176,23 @@ describe("seed:apply", () => {
     );
   });
 
+  /** @scenario "Each action kind calls its one module API operation" */
+  it("bounds a grant by the user it is attached as", async () => {
+    const apis = seedApis();
+    await applyLines({
+      apis,
+      lines: [
+        { id: "r/1", kind: "grant.attach", org: "org_1", as: "user_0", input: { grants: [grant] } },
+      ],
+    });
+    expect(apis.authz.attachBindings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        caller: { type: "user", id: "user_0" },
+        actor: { type: "user", id: "user_0" },
+      }),
+    );
+  });
+
   /** @scenario "An acknowledged grant returns its minted id as a reference" */
   it("returns a reference for each attached grant and none for a held one", async () => {
     const apis = seedApis({

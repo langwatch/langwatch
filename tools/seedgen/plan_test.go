@@ -149,3 +149,33 @@ func itoa(n int) string {
 	encoded, _ := json.Marshal(n)
 	return string(encoded)
 }
+
+func TestAcceptedUsersAreGrantedTheirRoleByTheOwnerAfterTheTeamExists(t *testing.T) {
+	plan := mustPlan(t, "--size", "tiny")
+	org := plan.Orgs[0]
+	teamCreated, granted := false, map[string]GrantAttachInput{}
+	for step := range plan.Steps() {
+		a := step.Action
+		if a == nil || a.Org != org.Ref {
+			continue
+		}
+		teamCreated = teamCreated || a.Kind == KindTeamCreate
+		if a.Kind != KindGrantAttach {
+			continue
+		}
+		var input GrantAttachInput
+		if err := json.Unmarshal(a.Input, &input); err != nil || !teamCreated || a.As != org.Users[0].Ref {
+			t.Fatalf("grant %s: err %v, after team %v, as %q", a.Key, err, teamCreated, a.As)
+		}
+		granted[input.Grants[0].Principal["userId"]] = input
+	}
+	for _, user := range org.Users {
+		input, ok := granted[user.Ref]
+		if ok != (user.State == "accepted") {
+			t.Fatalf("%s (%s): granted %v", user.Ref, user.State, ok)
+		}
+		if ok && (len(input.Grants) != 2 || input.Grants[0].Role != user.Role || input.Grants[1].ScopeType != "TEAM") {
+			t.Fatalf("%s: grants %+v", user.Ref, input.Grants)
+		}
+	}
+}

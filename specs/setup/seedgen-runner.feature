@@ -20,7 +20,7 @@ Feature: seed:apply applies seedgen's actions through installed module APIs
   @unit
   Scenario: Each action kind calls its one module API operation
     When seedgen sends grant.attach, retention.set, trace.otlp, log.otlp and metric.otlp actions
-    Then grants are attached through the authz API as the system caller, skipping held ones
+    Then grants are attached through the authz API as the action's user, or as the system caller when it names none, skipping held ones
     And retention is set through the data-retention API for every category of the organization
     And each telemetry export goes to its owner's batched ingest operation for the action's project
     And every action is acknowledged with its id
