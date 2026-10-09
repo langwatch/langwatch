@@ -13,7 +13,7 @@ import type {
 import type { OrganizationInviteRepository } from "../../../repositories/organization-invite.repository.ts";
 import type { OrganizationUserDirectoryRepository } from "../../../repositories/organization-user-directory.repository.ts";
 import { resolveInviteDisplayStatus } from "../../../rules/invite-display-status.rules.ts";
-import { buildInviteAcceptUrl } from "../../../rules/invite-link.rules.ts";
+import { buildInviteAcceptUrl, buildMembersSettingsUrl } from "../../../rules/invite-link.rules.ts";
 import type {
   SeatLimitNoticeService,
   SeatLimitReached,
@@ -105,6 +105,14 @@ export interface OrganizationInvitations {
   findByCode(
     input: Readonly<{ inviteCode: string }>,
   ): Promise<OrganizationInviteWithOrganization | null>;
+  /** {@link findByCode}, with the name of whoever sent the invitation. */
+  findLandingByCode(
+    input: Readonly<{ inviteCode: string }>,
+  ): Promise<
+    (OrganizationInviteWithOrganization & Readonly<{ inviterName: string | null }>) | null
+  >;
+  /** Mails an expired invitation's admins that somebody is waiting; mints nothing. */
+  requestFresh(input: Readonly<{ inviteCode: string }>): Promise<void>;
   /**
    * Whether ANY of the signed-in person's VERIFIED identifiers holds the
    * invited address, and which one vouched. Somebody not yet on identifiers
@@ -278,6 +286,34 @@ export class OrganizationInvitationsService implements OrganizationInvitations {
 
     const { organization, ...invite } = found;
     return { ...invite, organization: { id: organization.id, name: organization.name } };
+  }
+
+  async findLandingByCode(
+    input: Readonly<{ inviteCode: string }>,
+  ): Promise<
+    (OrganizationInviteWithOrganization & Readonly<{ inviterName: string | null }>) | null
+  > {
+    const found = await this.options.repository
+      .getInviteLandingByCode(input)
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "invite_not_found") return undefined;
+        throw error;
+      });
+    if (found === undefined || found.organization === null) return null;
+
+    const { organization, requestedByUser, ...invite } = found;
+    return {
+      ...invite,
+      organization: { id: organization.id, name: organization.name },
+      inviterName: requestedByUser?.name ?? null,
+    };
+  }
+
+  async requestFresh(input: Readonly<{ inviteCode: string }>): Promise<void> {
+    await this.options.invites.requestFreshInvite({
+      inviteCode: input.inviteCode,
+      membersSettingsUrl: buildMembersSettingsUrl(this.options.baseHost),
+    });
   }
 
   async matchToAcceptor(
