@@ -5,6 +5,7 @@ import {
   Config,
   isSaas,
   langwatchDefaultModel,
+  logSettings,
   nlpCodeBlockTimeoutSeconds,
   nlpServiceUrl,
   nodeEnvironment,
@@ -139,16 +140,7 @@ export const scenarioConfig = Config.define((c) => ({
     corepackEnableDownloadPrompt: c.env("COREPACK_ENABLE_DOWNLOAD_PROMPT", passthrough),
     nodeExtraCaCerts: c.env("NODE_EXTRA_CA_CERTS", passthrough),
     /** Level and format only (TEL-CHILD-ENV): never an endpoint, header or credential. */
-    logSettings: {
-      LOG_LEVEL: c.env("LOG_LEVEL", passthrough),
-      LOG_CONSOLE_LEVEL: c.env("LOG_CONSOLE_LEVEL", passthrough),
-      LOG_OTEL_LEVEL: c.env("LOG_OTEL_LEVEL", passthrough),
-      LOG_FORMAT: c.env("LOG_FORMAT", passthrough),
-      PINO_LOG_LEVEL: c.env("PINO_LOG_LEVEL", passthrough),
-      _LOG_LEVEL: c.env("_LOG_LEVEL", passthrough),
-      PINO_CONSOLE_LEVEL: c.env("PINO_CONSOLE_LEVEL", passthrough),
-      PINO_OTEL_LEVEL: c.env("PINO_OTEL_LEVEL", passthrough),
-    },
+    logSettings,
   },
 }));
 

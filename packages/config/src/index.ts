@@ -35,6 +35,7 @@ export {
   idpSimulatorUrl,
   LOCAL_GATEWAY_URL,
   localPasswords,
+  logSettings,
   mfaEnrollmentOpen,
   nlpCodeBlockTimeoutSeconds,
   nlpServiceUrl,

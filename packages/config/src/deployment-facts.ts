@@ -10,6 +10,25 @@ import { environmentExactOneSchema, environmentOneOrTrueSchema } from "./env-sch
 
 const positiveInteger = z.coerce.number().int().positive();
 
+const optionalSetting = z.preprocess(
+  (value) => (value === "" ? undefined : value),
+  z.string().min(1).optional(),
+);
+
+/** Log level and format: observability reads them, the scenario child is handed them. */
+export const { logSettings } = Config.define((c) => ({
+  logSettings: {
+    LOG_LEVEL: c.env("LOG_LEVEL", optionalSetting),
+    LOG_CONSOLE_LEVEL: c.env("LOG_CONSOLE_LEVEL", optionalSetting),
+    LOG_OTEL_LEVEL: c.env("LOG_OTEL_LEVEL", optionalSetting),
+    LOG_FORMAT: c.env("LOG_FORMAT", z.enum(["pretty", "json"]).optional()),
+    PINO_LOG_LEVEL: c.env("PINO_LOG_LEVEL", optionalSetting),
+    _LOG_LEVEL: c.env("_LOG_LEVEL", optionalSetting),
+    PINO_CONSOLE_LEVEL: c.env("PINO_CONSOLE_LEVEL", optionalSetting),
+    PINO_OTEL_LEVEL: c.env("PINO_OTEL_LEVEL", optionalSetting),
+  },
+}));
+
 /** Whether this deployment is the hosted product; gateway's browser projection reads it too. */
 export const { isSaas } = Config.define((c) => ({
   isSaas: c.env("IS_SAAS", environmentOneOrTrueSchema),
