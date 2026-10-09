@@ -12,7 +12,7 @@ import {
   BOARD_GRID_ROW_HEIGHT_PX,
   BOARD_MIN_ROW_SPAN,
 } from "../../model/board-grid.ts";
-import type { BoardPeriod } from "../../model/board-period.ts";
+import type { BoardScope } from "../../model/board-period.ts";
 import type { BoardTemplateWidget } from "../../templates/index.ts";
 import { AskLangyButton } from "../blocks/ask-langy-button.tsx";
 import { WidgetCardShell, widgetBodyHeightPx } from "../blocks/widget-card-shell.tsx";
@@ -29,11 +29,11 @@ export function CuratedWidgetsGrid({
   projectSlug: string;
   templateId: string;
   widgets: readonly BoardTemplateWidget[];
-  period: BoardPeriod;
+  period: BoardScope;
   /** Drafts a prompt about the widget in Langy; absent when Langy is not available. */
   onAskLangy?: (widget: BoardTemplateWidget) => void;
 }) {
-  const { periodStart, periodEnd, granularitySeconds } = period;
+  const { periodStart, periodEnd, granularitySeconds, excludeOrigins } = period;
   const timeWindow = useMemo(
     () => ({ start: periodStart, end: periodEnd }),
     [periodStart, periodEnd],
@@ -69,6 +69,7 @@ export function CuratedWidgetsGrid({
               maxHeight={widgetBodyHeightPx(rowSpan)}
               timeWindow={timeWindow}
               granularitySeconds={granularitySeconds}
+              excludeOrigins={excludeOrigins}
             />
           </WidgetCardShell>
         );

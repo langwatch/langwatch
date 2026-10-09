@@ -76,10 +76,13 @@ export function DashboardWidgetFrameOverWindow({
   widgetName,
   timeWindow,
   granularitySeconds,
+  excludeOrigins,
   onAskLangyToSetUp,
 }: DashboardWidgetFrameProps & {
   readonly timeWindow: { start: number; end: number };
   readonly granularitySeconds?: LangWatchQLAcceptedGranularityStep;
+  /** Trace origins the board leaves out of every query this widget runs. */
+  readonly excludeOrigins?: readonly string[];
   /** Drafts the step that sends a field no trace carries; absent, the setup view has no button. */
   readonly onAskLangyToSetUp?: (missing: { field: string; label: string }) => void;
 }) {
@@ -96,7 +99,11 @@ export function DashboardWidgetFrameOverWindow({
   const { executeQuery: runQuery, params: hostParams } = useDashboardWidgetExecutor(
     projectId,
     definition.queries,
-    granularitySeconds === void 0 ? { timeWindow } : { timeWindow, granularitySeconds },
+    {
+      timeWindow,
+      ...(granularitySeconds === void 0 ? {} : { granularitySeconds }),
+      ...(excludeOrigins ? { excludeOrigins } : {}),
+    },
   );
   const { executeQuery, records, reset } = useWidgetQueryRecords({ executeQuery: runQuery });
   const face = useMemo(() => widgetFace(records), [records]);

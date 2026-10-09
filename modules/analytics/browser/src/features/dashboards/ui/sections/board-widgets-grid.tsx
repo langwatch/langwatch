@@ -7,7 +7,7 @@
 import type { ChartGridPlacement } from "../../../../model/chart-grid.ts";
 import { ChartGrid } from "../../../../ui/sections/chart-grid.tsx";
 import { BOARD_GRID_ROW_HEIGHT_PX, BOARD_MIN_ROW_SPAN } from "../../model/board-grid.ts";
-import type { BoardPeriod } from "../../model/board-period.ts";
+import type { BoardScope } from "../../model/board-period.ts";
 import type { BoardWidget } from "../../model/board-widgets.ts";
 import { BoardWidgetCard, type WidgetCardLangy } from "./board-widget-card.tsx";
 
@@ -28,7 +28,7 @@ export function BoardWidgetsGrid({
   projectSlug: string;
   dashboardId: string;
   widgets: readonly BoardWidget[];
-  period: BoardPeriod;
+  period: BoardScope;
   isWriting: boolean;
   /** What each card may ask Langy; absent when Langy is not available. */
   langyFor?: (widget: BoardWidget) => WidgetCardLangy;

@@ -12,7 +12,7 @@ import { CHART_GRID_DRAG_HANDLE_CLASS } from "../../../../ui/sections/chart-grid
 import { DashboardWidgetFrameOverWindow } from "../../../../ui/sections/dashboard-widget-frame.tsx";
 import { useWidgetClipboard } from "../../behavior/use-widget-clipboard.ts";
 import type { WidgetSetup } from "../../langy/model/board-langy.ts";
-import type { BoardPeriod } from "../../model/board-period.ts";
+import type { BoardScope } from "../../model/board-period.ts";
 import type { BoardWidget } from "../../model/board-widgets.ts";
 import { AskLangyButton } from "../blocks/ask-langy-button.tsx";
 import { WidgetCardShell, widgetBodyHeightPx } from "../blocks/widget-card-shell.tsx";
@@ -44,7 +44,7 @@ export function BoardWidgetCard({
   projectId: string;
   projectSlug: string;
   dashboardId: string;
-  period: BoardPeriod;
+  period: BoardScope;
   isWriting: boolean;
   langy?: WidgetCardLangy;
   /** Opens the board's editor on this widget, drafting the edit in Langy when asked to. */
@@ -53,7 +53,7 @@ export function BoardWidgetCard({
   onDelete: () => void;
 }) {
   const clipboard = useWidgetClipboard({ dashboardId });
-  const { periodStart, periodEnd, granularitySeconds } = period;
+  const { periodStart, periodEnd, granularitySeconds, excludeOrigins } = period;
   const timeWindow = useMemo(
     () => ({ start: periodStart, end: periodEnd }),
     [periodStart, periodEnd],
@@ -105,6 +105,7 @@ export function BoardWidgetCard({
         maxHeight={widgetBodyHeightPx(widget.placement.rowSpan)}
         timeWindow={timeWindow}
         granularitySeconds={granularitySeconds}
+        excludeOrigins={excludeOrigins}
         {...(langy ? { onAskLangyToSetUp: langy.setUpMissing } : {})}
       />
     </WidgetCardShell>

@@ -23,6 +23,7 @@ export function useWidgetPreview({
   projectSlug,
   timeWindow,
   granularitySeconds,
+  excludeOrigins,
   widgetId,
   dashboardId,
   widgetName,
@@ -34,6 +35,8 @@ export function useWidgetPreview({
   timeWindow?: { start: number; end: number };
   /** The step the reserved parameters carry; the executor's hourly default when absent. */
   granularitySeconds?: LangWatchQLAcceptedGranularityStep;
+  /** Trace origins the board leaves out, so the preview draws what the card will. */
+  excludeOrigins?: readonly string[];
   widgetId?: string;
   dashboardId?: string;
   widgetName?: string;
@@ -66,7 +69,13 @@ export function useWidgetPreview({
   } = useDashboardWidgetExecutor(
     projectId,
     previewQueries,
-    timeWindow ? { timeWindow, ...(granularitySeconds ? { granularitySeconds } : {}) } : undefined,
+    timeWindow
+      ? {
+          timeWindow,
+          ...(granularitySeconds ? { granularitySeconds } : {}),
+          ...(excludeOrigins ? { excludeOrigins } : {}),
+        }
+      : undefined,
   );
 
   const paramsSnapshot = useMemo(() => declaredParamDefaults(previewQueries), [previewQueries]);

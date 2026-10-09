@@ -15,6 +15,7 @@ import { Temporal } from "@langwatch/time";
 
 import type { LangWatchQLExecutorRepository } from "../repositories/langwatch-ql-executor.repository.ts";
 import { resolveTableReferences } from "../rules/langwatch-ql-diagnostics-shape.rules.ts";
+import { scopeLangWatchQLToOrigins } from "../rules/langwatch-ql-origin-scope.rules.ts";
 import type { AcceptedLangWatchQL } from "../rules/langwatch-ql-validation-shape.rules.ts";
 import type {
   LangWatchQLViewColumn,
@@ -66,6 +67,8 @@ export interface LangWatchQLCompletenessInput {
   readonly validation: AcceptedLangWatchQL;
   readonly database: string;
   readonly views: readonly LangWatchQLViewDefinition[];
+  /** The origins the main query left out, so the report counts the same rows. */
+  readonly excludeOrigins?: readonly string[];
   /** The window the query was bound to. No window, no report: a whole history is not a period. */
   readonly timeWindow?: LangWatchQLTimeWindow;
   /** The step the query buckets by, when it follows the board granularity. */
@@ -89,7 +92,13 @@ export class LangWatchQLCompletenessService {
 
     try {
       const execution = await input.executor.execute({
-        sql: completenessSql({ plan, isBucketed: granularitySeconds !== undefined }),
+        sql: scopeLangWatchQLToOrigins({
+          sql: completenessSql({ plan, isBucketed: granularitySeconds !== undefined }),
+          excludeOrigins: input.excludeOrigins ?? [],
+          database: input.database,
+          views: input.views,
+          timeWindow,
+        }),
         parameters: {
           [START_PARAMETER]: formatLangWatchQLDateTimeParameter(timeWindow.start),
           [END_PARAMETER]: formatLangWatchQLDateTimeParameter(timeWindow.end),

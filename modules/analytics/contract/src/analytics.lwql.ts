@@ -236,6 +236,8 @@ export type LangWatchQLRunContext = Readonly<{
   timeWindow?: LangWatchQLTimeWindow;
   granularitySeconds?: number;
   onBudgetOverflow?: LangWatchQLBudgetOverflowMode;
+  /** Trace origins the surface leaves out of every view the statement reads; none when absent. */
+  excludeOrigins?: readonly string[];
 }>;
 
 /** Input shared by every restricted LangWatchQL execution surface. */

@@ -1,6 +1,6 @@
 /**
- * The period every widget on a board reads over, from the address's `range`
- * and `grain`, and the writes the header control makes. One reading per
+ * The one scope every widget on a board reads over: the period from the address's `range` and
+ * `grain`, the origins it leaves out, and the writes the header control makes. One reading per
  * board, so every widget updates together (AC13). Live rolls on the minute.
  */
 
@@ -9,12 +9,13 @@ import { useMemo } from "react";
 
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
 import {
-  type BoardPeriod,
+  type BoardScope,
   boardGrainFits,
   boardPeriodBounds,
   boardPeriodGranularity,
   type BoardPeriodGrain,
   type BoardPeriodRange,
+  DEFAULT_BOARD_EXCLUDED_ORIGINS,
   parseBoardPeriodGrain,
   parseBoardPeriodRange,
 } from "../model/board-period.ts";
@@ -32,11 +33,12 @@ export function useBoardPeriod() {
     () => boardPeriodBounds({ range, now: liveEnd || nowInstant().epochMilliseconds }),
     [range, liveEnd],
   );
-  const period: BoardPeriod = useMemo(
+  const period: BoardScope = useMemo(
     () => ({
       periodStart,
       periodEnd,
       granularitySeconds: boardPeriodGranularity({ grain, periodStart, periodEnd }),
+      excludeOrigins: DEFAULT_BOARD_EXCLUDED_ORIGINS,
     }),
     [grain, periodStart, periodEnd],
   );

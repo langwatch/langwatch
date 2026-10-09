@@ -27,6 +27,7 @@ import type {
   LangWatchQLExecutorRepository,
   LangWatchQLResultLimits,
 } from "../repositories/langwatch-ql-executor.repository.ts";
+import { scopeLangWatchQLToOrigins } from "../rules/langwatch-ql-origin-scope.rules.ts";
 import { langWatchQLPassSql } from "../rules/langwatch-ql-pass-sql.rules.ts";
 import { DEFAULT_LWQL_RESULT_LIMITS } from "../rules/langwatch-ql-result-limits.rules.ts";
 import { appendDefaultRowLimit } from "../rules/langwatch-ql-row-limit.rules.ts";
@@ -320,6 +321,7 @@ export class LangWatchQLService {
     timeWindow,
     granularitySeconds,
     onBudgetOverflow,
+    excludeOrigins,
     isInstantEvalsEnabled,
   }: LangWatchQLProjectSetExecuteInput & LangWatchQLEvalGate): Promise<LangWatchQLQueryResult> {
     const projectIds = projects.map((project) => project.id);
@@ -361,6 +363,7 @@ export class LangWatchQLService {
       validation,
       granularity,
       ...(timeWindow ? { timeWindow } : {}),
+      excludeOrigins: excludeOrigins ?? [],
     });
   }
 
@@ -397,6 +400,25 @@ export class LangWatchQLService {
       : sql;
   }
 
+  /** The statement with the surface's excluded origins left out of every view it reads. */
+  private originScopedSql({
+    sql,
+    excludeOrigins,
+    timeWindow,
+  }: {
+    readonly sql: string;
+    readonly excludeOrigins: readonly string[];
+    readonly timeWindow?: LangWatchQLTimeWindow;
+  }): string {
+    return scopeLangWatchQLToOrigins({
+      sql,
+      excludeOrigins,
+      database: this.deps.database,
+      views: this.views,
+      ...(timeWindow ? { timeWindow } : {}),
+    });
+  }
+
   private async executeValidated({
     executor,
     projects,
@@ -404,6 +426,7 @@ export class LangWatchQLService {
     validation,
     granularity,
     timeWindow,
+    excludeOrigins,
   }: {
     readonly executor: LangWatchQLExecutorRepository;
     readonly projects: readonly LangWatchQLCaller[];
@@ -411,6 +434,7 @@ export class LangWatchQLService {
     readonly validation: ValidatedLangWatchQL;
     readonly granularity: LangWatchQLGranularityResolution;
     readonly timeWindow?: LangWatchQLTimeWindow;
+    readonly excludeOrigins: readonly string[];
   }): Promise<LangWatchQLQueryResult> {
     // The resolved record plus the step this run was bucketed at, when the
     // statement declares the parameter. Built unconditionally and omitted when
@@ -421,9 +445,15 @@ export class LangWatchQLService {
     });
 
     const execution = await executor.execute({
-      // The submitted statement with one edit and no other: a default `LIMIT` when the caller
-      // named none, so an unbounded query is capped rather than streamed.
-      sql: this.rowLimitedSql({ sql, validation }),
+      // The submitted statement with a default `LIMIT` when the caller named none, so an
+      // unbounded query is capped rather than streamed, and the origins the surface left out.
+      sql: this.originScopedSql({
+        sql: this.rowLimitedSql({ sql, validation }),
+        excludeOrigins,
+        // Only a statement that follows the window reads within it; one with its own range,
+        // such as month to date, would lose Langy traces older than the window.
+        ...(validation.followsTimeWindow && timeWindow ? { timeWindow } : {}),
+      }),
       // The resolved record, not the caller's: it is the one carrying the
       // window this surface injected AND the step this run was bucketed at.
       // `validation.boundParameters` is the wrong half — it predates the
@@ -456,6 +486,7 @@ export class LangWatchQLService {
       validation,
       database: this.deps.database,
       views: this.views,
+      excludeOrigins,
       ...(validation.followsTimeWindow && timeWindow ? { timeWindow } : {}),
       ...(granularity.followsGranularity && granularity.granularitySeconds !== undefined
         ? { granularitySeconds: granularity.granularitySeconds }
@@ -472,6 +503,7 @@ export class LangWatchQLService {
         diagnostics: diagnostics.map((diagnostic) => diagnostic.code),
         followsTimeWindow: validation.followsTimeWindow,
         followsGranularity: granularity.followsGranularity,
+        excludeOrigins,
         completeness:
           completeness.kind === "reported" ? completeness.completeness.state : completeness.reason,
       },

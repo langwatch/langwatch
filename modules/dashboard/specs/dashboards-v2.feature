@@ -1157,6 +1157,61 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     # Owner list, 2026-10-08
 
   # ---------------------------------------------------------------------------
+  # Dashboards show your agent, not Langy's work for you
+  # ---------------------------------------------------------------------------
+  # Why: Langy's own turns trace into the member's project with origin "langy" (ADR-061).
+  # Counted, they move volume, cost, latency and error widgets because the member used Langy.
+  # The project home and the Explorer already leave them out; Dashboards follow (owner, 2026-10-09).
+
+  @unit @integration @unimplemented
+  Scenario: AC170 Langy: every widget on a board leaves out Langy's conversations by default
+    Given a project with traces from its own agent and traces with origin "langy"
+    When a member opens any board, My dashboard and From LangWatch boards included
+    Then every widget counts only the traces whose origin is not "langy"
+    And so do the spans, evaluations and other rows that belong to those traces
+    And the widget editor's preview counts the same rows as the card
+    # Why one place: the board's query scope sets it, so no widget can forget it, whether it
+    # comes from the catalogue, from Langy or from the code editor
+
+  @unit @unimplemented
+  Scenario: AC171 Langy: a widget's own origin filter keeps its meaning
+    Given a widget that already reads only production origins, such as Running costs
+    When it runs on a board that leaves out Langy's conversations
+    Then it reads the same rows it read before
+    # Why: the scope removes Langy rows first; a row that passes it still meets the widget's own
+    # filter, so the scope never widens or reverses a deliberate filter
+
+  @unit @unimplemented
+  Scenario: AC172 Langy: data that is Langy's own is not filtered
+    Given a widget that reads Langy's own usage events or conversation messages
+    When it runs on a board
+    Then it still reads every row
+    # Why: those rows are about Langy itself, not traces in the member's project
+
+  @unit @unimplemented
+  Scenario: AC173 Langy: the board scope is a list of origins a board parameter can set later
+    Given the board's query scope
+    Then it names the origins it leaves out as a list, "langy" by default
+    And an empty list makes every widget read Langy's conversations too
+    # Why a list: the board parameters planned for the header can then pick origins without a
+    # new shape on the wire
+
+  @integration @unimplemented
+  Scenario: AC174 Langy: the Traces list is unchanged
+    Given a project with traces with origin "langy"
+    When a member opens the Traces list
+    Then it shows every trace, as before this change
+    # Why: the rule is for Dashboards only; the Explorer keeps its own rule
+
+  @unit @unimplemented
+  Scenario: AC175 Langy: per-minute rollups cannot leave Langy out yet
+    Given a widget that reads trace_metrics_by_minute or model_usage_by_minute
+    When it runs on a board
+    Then it still counts Langy's spans
+    # Known gap: the rollups are written per span before a trace's origin is known, so they
+    # carry no origin; a follow-up would add one
+
+  # ---------------------------------------------------------------------------
   # Guard rails
   # ---------------------------------------------------------------------------
 
@@ -1209,3 +1264,4 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # AC 120-123: "Ask Langy: hand any widget to Langy with a ready draft" → Scenario: AC120 Ask Langy: each widget card offers Ask Langy only when Langy is available; Scenario: AC120b Ask Langy: every widget on every board has Ask Langy, From LangWatch boards included; Scenario: AC121 Ask Langy: clicking drafts the widget's prompt with its name, queries and the period; Scenario: AC122 Ask Langy: a widget without a stored prompt gets a fallback; Scenario: AC123 Ask Langy: the prompt is stored on built widgets and kept on edit and duplicate
   # AC 130-138: "Picker filters: 'Add a widget' narrows like the templates finder" → Scenario: AC130 Picker filters: the picker offers the finder's search and chips; Scenario: AC131 Picker filters: chips narrow the widgets by category and agent type; Scenario: AC132 Picker filters: each chip counts the widgets it would show; Scenario: AC133 Picker filters: search matches the question, line, prompt, branch and agent kinds; Scenario: AC134 Picker filters: sections are branches in tree order, coloured by trunk; Scenario: AC135 Picker filters: a widget picked from a filtered list is added and drafts its Langy prompt; Scenario: AC136 Picker filters: the filters reset when the picker closes; Scenario: AC137 Picker filters: no match says so and offers to clear the search and filters; Scenario: AC138 Picker filters: a row names the agent types its widget is made for
   # AC 140-145: "Product direction: templates and widgets hand off to Langy; alerts and reports are widget actions" → Scenario: AC140 Template pick: the new board opens with the template's report drafted in Langy; Scenario: AC140b Template pick: without Langy the board is made and nothing is drafted; Scenario: AC141 Picker add: a picked widget drafts its own prompt with the widget, as Ask Langy does; Scenario: AC142 Widget menu: Set an alert drafts Langy to alert on that widget; Scenario: AC143 Widget menu: Send as a report drafts Langy to schedule that widget; Scenario: AC143b Widget menu: without Langy the menu offers no alert or report; Scenario: AC144 Template card: the primary button reads Add to this project; Scenario: AC145 Template card: a template already added shows Added, linking to its board
+  # AC 170-175: "Dashboards show your agent, not Langy's work for you" (owner, 2026-10-09) → Scenario: AC170 Langy: every widget on a board leaves out Langy's conversations by default; Scenario: AC171 Langy: a widget's own origin filter keeps its meaning; Scenario: AC172 Langy: data that is Langy's own is not filtered; Scenario: AC173 Langy: the board scope is a list of origins a board parameter can set later; Scenario: AC174 Langy: the Traces list is unchanged; Scenario: AC175 Langy: per-minute rollups cannot leave Langy out yet
