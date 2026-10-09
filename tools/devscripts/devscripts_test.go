@@ -3,7 +3,9 @@ package devscripts
 import (
 	"bytes"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -317,4 +319,27 @@ func ensureRepoRoot(b testing.TB) string {
 		b.Skip("not inside the repository")
 	}
 	return root
+}
+
+func TestLockWorkspaceClearsALockWhoseHolderExited(t *testing.T) {
+	lock := filepath.Join(t.TempDir(), ".ensure-built.lock")
+	if err := os.Mkdir(lock, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	dead := exec.Command("true")
+	if err := dead.Run(); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(lock, "pid"), []byte(strconv.Itoa(dead.Process.Pid)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	start := time.Now()
+	release := lockWorkspace(lock)
+	defer release()
+	if waited := time.Since(start); waited > time.Second {
+		t.Fatalf("waited %s on a lock whose holder had exited", waited)
+	}
+	if !holderAlive(lock) {
+		t.Fatal("the lock should now name this process as its holder")
+	}
 }

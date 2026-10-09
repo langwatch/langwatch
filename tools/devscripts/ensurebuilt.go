@@ -10,7 +10,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -128,10 +130,8 @@ func buildOne(root string, target buildTarget, stderr io.Writer) error {
 // acquireBuildLock takes the build lock, clearing a stale one first. When
 // another build holds it, it waits for that build and reports false.
 func acquireBuildLock(lock string) bool {
-	if info, err := os.Stat(lock); err == nil && time.Since(info.ModTime()) > staleLock {
-		_ = os.RemoveAll(lock)
-	}
-	if os.Mkdir(lock, 0o755) == nil {
+	clearStaleLock(lock)
+	if takeLock(lock) {
 		return true
 	}
 	for i := 0; i < lockPolls && exists(lock); i++ {
@@ -177,16 +177,50 @@ func buildWithNx(root string, selected []buildTarget, stderr io.Writer) int {
 // lockWorkspace waits for a holder to finish, clearing a lock a killed run left,
 // and returns the release; a lock it never took is left alone.
 func lockWorkspace(lock string) func() {
-	if info, err := os.Stat(lock); err == nil && time.Since(info.ModTime()) > staleLock {
-		_ = os.RemoveAll(lock)
-	}
 	for i := 0; i < lockPolls; i++ {
-		if os.Mkdir(lock, 0o755) == nil {
+		clearStaleLock(lock)
+		if takeLock(lock) {
 			return func() { _ = os.RemoveAll(lock) }
 		}
 		time.Sleep(lockInterval)
 	}
 	return func() {}
+}
+
+// takeLock creates the lock directory and records this process as its holder.
+func takeLock(lock string) bool {
+	if os.Mkdir(lock, 0o755) != nil {
+		return false
+	}
+	_ = os.WriteFile(filepath.Join(lock, "pid"), []byte(strconv.Itoa(os.Getpid())), 0o644)
+	return true
+}
+
+// clearStaleLock removes a lock older than staleLock or whose recorded holder
+// has exited, so a killed build never stalls the next one.
+func clearStaleLock(lock string) {
+	info, err := os.Stat(lock)
+	if err != nil {
+		return
+	}
+	if time.Since(info.ModTime()) > staleLock || !holderAlive(lock) {
+		_ = os.RemoveAll(lock)
+	}
+}
+
+// holderAlive reports whether the lock's recorded holder still runs; a lock
+// with no pid yet (just created) counts as held.
+func holderAlive(lock string) bool {
+	raw, err := os.ReadFile(filepath.Join(lock, "pid"))
+	if err != nil {
+		return true
+	}
+	pid, err := strconv.Atoi(strings.TrimSpace(string(raw)))
+	if err != nil {
+		return false
+	}
+	proc, err := os.FindProcess(pid)
+	return err == nil && proc.Signal(syscall.Signal(0)) == nil
 }
 
 // EnsureBuilt builds each requested (default all) dist through Nx when the
