@@ -113,7 +113,11 @@ import {
   LangWatchQLService as LangWatchQLServiceClass,
 } from "../services/langwatch-ql.service.ts";
 import { WorkbenchProtectionsService } from "../services/workbench-protections.service.ts";
-import { convergeLwqlAccessModel } from "../tasks/lwql-provision.task.ts";
+import {
+  convergeLwqlAccessModel,
+  fillLwqlProjectKeys,
+  type LwqlProjectKeyFillReport,
+} from "../tasks/lwql-provision.task.ts";
 import type {
   AnalyticsLegacyApi,
   AnalyticsLegacyTimeseriesAnswer,
@@ -201,14 +205,16 @@ type AnalyticsDependencies = Readonly<{
 type LwqlProvisioningOperations = Readonly<{
   probeOwner: () => Promise<LwqlAccessModelOwner>;
   converge: () => Promise<void>;
+  fillProjectKeys: (input: { dryRun: boolean }) => Promise<LwqlProjectKeyFillReport>;
 }>;
 
 const LWQL_UNAVAILABLE: LwqlProvisioningOperations = {
   probeOwner: () => Promise.resolve("none"),
   converge: () => Promise.resolve(),
+  fillProjectKeys: () => Promise.resolve({ inserted: 0, blankKeys: 0 }),
 };
 
-/** The reconvergence watch's two operations over the stores' admin seam (ADR-159). */
+/** The reconvergence watch's operations and the key-map fill, over the admin seam (ADR-159). */
 function lwqlProvisioningOperations({
   admin,
   postgres,
@@ -216,6 +222,7 @@ function lwqlProvisioningOperations({
   connection,
   readerPassword,
   settings,
+  projectKeys,
 }: {
   admin: Extract<LangWatchQlSupply["admin"], { configured: true }>;
   postgres: Extract<LangWatchQlSupply["postgres"], { configured: true }>;
@@ -223,6 +230,7 @@ function lwqlProvisioningOperations({
   connection: LangWatchQLConnection;
   readerPassword: string | undefined;
   settings: AnalyticsServerConfig["langwatchQl"];
+  projectKeys: ProjectApi;
 }): LwqlProvisioningOperations {
   const names = LangWatchQLProductionProvisioningService.create().names({ connection });
   const openRepository = () =>
@@ -260,6 +268,14 @@ function lwqlProvisioningOperations({
         },
       });
     },
+    fillProjectKeys: ({ dryRun }) =>
+      fillLwqlProjectKeys({
+        openRepository,
+        projectKeys,
+        names,
+        sourceDatabase: admin.target.database,
+        dryRun,
+      }),
   };
 }
 
@@ -378,6 +394,7 @@ export class AnalyticsModule
                 connection,
                 readerPassword: typeof readerPassword === "string" ? readerPassword : undefined,
                 settings: lwqlConfig,
+                projectKeys: setup.dependencies.projects,
               }),
           )
         : LWQL_UNAVAILABLE;
@@ -460,6 +477,11 @@ export class AnalyticsModule
   /** Re-provisions the access model once a config store released it (SQL mode only). */
   convergeLwqlAccessModel(): Promise<void> {
     return this.#dependencies.lwqlProvisioning.converge();
+  }
+
+  /** The `analytics:fill-lwql-project-keys` step's body: each project's missing key-map row. */
+  fillLwqlProjectKeys(input: { dryRun: boolean }): Promise<LwqlProjectKeyFillReport> {
+    return this.#dependencies.lwqlProvisioning.fillProjectKeys(input);
   }
 
   /** Writes a created project's key-map row; throws on a failed insert so the queue retries. */

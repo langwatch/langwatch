@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { LwqlProvisionTask, type LwqlProvisioningDatabase } from "../lwql-provision.task.ts";
 
 function untouchedDatabase(): LwqlProvisioningDatabase {
-  return { $executeRawUnsafe: vi.fn(), $transaction: vi.fn(), project: { findMany: vi.fn() } };
+  return { $executeRawUnsafe: vi.fn(), $transaction: vi.fn() };
 }
 
 describe("LwqlProvisionTask", () => {
@@ -18,7 +18,6 @@ describe("LwqlProvisionTask", () => {
       await task.run({ args: [], signal: controller.signal });
 
       expect(database.$executeRawUnsafe).not.toHaveBeenCalled();
-      expect(database.project.findMany).not.toHaveBeenCalled();
     });
   });
 
@@ -35,7 +34,6 @@ describe("LwqlProvisionTask", () => {
       await task.run({ args: [], signal: new AbortController().signal });
 
       expect(database.$executeRawUnsafe).not.toHaveBeenCalled();
-      expect(database.project.findMany).not.toHaveBeenCalled();
     });
   });
 
@@ -55,7 +53,6 @@ describe("LwqlProvisionTask", () => {
 
       expect(database.$transaction).not.toHaveBeenCalled();
       expect(database.$executeRawUnsafe).not.toHaveBeenCalled();
-      expect(database.project.findMany).not.toHaveBeenCalled();
     });
   });
 

@@ -65,6 +65,7 @@
     "@langwatch/task": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/upgrade": "workspace:*",
     "@opentelemetry/api": "catalog:",
     "@trpc/server": "catalog:",
     "hono": "catalog:",

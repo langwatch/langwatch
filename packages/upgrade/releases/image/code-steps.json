@@ -1,5 +1,12 @@
 [
   {
+    "id": "analytics:fill-lwql-project-keys",
+    "kind": "data",
+    "mode": "background",
+    "owner": "analytics",
+    "description": "Fills LangWatchQL's key map with every project's key that it lacks."
+  },
+  {
     "id": "automation:reconcile-report-schedules",
     "kind": "data",
     "mode": "background",
