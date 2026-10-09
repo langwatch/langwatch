@@ -331,7 +331,7 @@ export class DatasetModule implements DatasetApi {
       throw new PermissionDeniedError({
         permission: "datasets:create",
         scope: { type: "project", id: input.sourceProjectId },
-        denialReason: "no-binding",
+        denialReason: "no-grant",
       });
     }
 
