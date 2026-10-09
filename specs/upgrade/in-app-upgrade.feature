@@ -76,17 +76,35 @@ Feature: The new image's worker runs its blocking upgrade while the api holds, t
   Scenario: The api holds while a Postgres schema step of its image is outstanding
     Given the worker is running the upgrade and a Postgres schema step of the api's image is pending
     When a browser requests any page, the sign-in page included
-    Then it answers the holding page
+    Then the request waits up to the hold window for the schema step to finish
+    And it answers the holding page only if the step is still pending when the window ends
     And the api reports not ready
 
   @unimplemented
-  Scenario: Once the schema steps are done the api serves sign-in and the Upgrades page only
+  Scenario: Once the schema steps are done the api serves sign-in, the Upgrades page and ingestion only
     Given every Postgres schema step of the api's image is done
     And a ClickHouse schema step, a blocking data step or reconcile is still outstanding
     When a browser signs in and opens Ops > Upgrades
     Then both are served
     And any other page answers the holding page and any other request 503 with Retry-After 10
     And the api reports not ready
+
+  # API-UP-DURING-UPGRADE (Alex, 2026-10-09): the api is up while the worker upgrades; ingestion
+  # enqueues for the worker and is never dropped. Dev boot order: specs/setup/haven-local-topology.feature.
+  @unit
+  Scenario: An SDK posting traces while the installation upgrades is answered by the api
+    Given the api is upgrading and a ClickHouse schema step or a blocking data step is outstanding
+    When an SDK posts traces over OTLP, the collector or a tracked event
+    Then the request passes the holding door to its route
+    And a trace read still answers as held
+
+  @unimplemented
+  Scenario: A trace posted during an upgrade appears once the worker finishes
+    Given the api accepted an SDK's traces with 2xx while a blocking ClickHouse step was outstanding
+    And the api wrote no ClickHouse row for them: its spans were enqueued for the worker
+    When the worker finishes the upgrade and takes jobs
+    Then the trace appears, and no span the api accepted is missing
+    # Proven end to end by tools/upgradelab's "no dropped traces" invariant (not landed).
 
   @unit
   Scenario: Upgrading mode serves only the routes declared to serve while upgrading
