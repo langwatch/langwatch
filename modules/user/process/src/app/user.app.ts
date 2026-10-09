@@ -3,13 +3,6 @@ import { AuthzApi } from "@langwatch/authz-contract";
 import type { MailSender } from "@langwatch/mail";
 import { NotificationService } from "@langwatch/notification-contract";
 import { createLogger } from "@langwatch/observability";
-import { OrganizationApi } from "@langwatch/organization-contract";
-import type {
-  EnsuredPersonalWorkspace,
-  FindPersonalWorkspaceInput,
-  PersonalWorkspace,
-  PersonalWorkspaceInput,
-} from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import type { ProjectIdentity } from "@langwatch/project-contract";
 import { StoredObjectApi } from "@langwatch/stored-object-contract";
@@ -114,7 +107,6 @@ const CREDENTIAL_ISSUER = "local:credential";
 /** The peer capabilities this module calls, resolved by the kernel at boot. */
 interface UserAppDependencies {
   authz: AuthzApi;
-  organizations: OrganizationApi;
   /** Where avatar bytes are kept, as user-owned objects in a personal project. */
   storedObjects: Pick<StoredObjectApi, "storeFromBytes" | "readById" | "getReadUrlForPurpose">;
 }
@@ -149,12 +141,10 @@ export class UserModule implements UserApi {
   static readonly dependencies: {
     authz: typeof AuthzApi;
     notifications: typeof NotificationService;
-    organizations: typeof OrganizationApi;
     storedObjects: typeof StoredObjectApi;
   } = {
     authz: AuthzApi,
     notifications: NotificationService,
-    organizations: OrganizationApi,
     storedObjects: StoredObjectApi,
   };
 
@@ -204,7 +194,7 @@ export class UserModule implements UserApi {
     return new UserModule({
       users: UserService.create({
         repository: repositories.users,
-        organizations: dependencies.organizations,
+        personalProjects: repositories.organizationDirectory,
         auth: { getSsoSetupStatus: (input) => channels.authReads.getSsoSetupStatus(input) },
         avatarStorage: avatarObjects,
         credentialIssuer: CREDENTIAL_ISSUER,
@@ -269,7 +259,7 @@ export class UserModule implements UserApi {
     this.#lifecycle = input.lifecycle;
     this.#createdFactBackfill = input.createdFactBackfill;
     this.#credentials = input.credentials;
-    this.#account = UserAccountService.create(input.dependencies);
+    this.#account = UserAccountService.create();
     this.#peers = input.dependencies;
     this.#authReads = input.channels.authReads;
     this.#directory = input.directory;
@@ -584,16 +574,6 @@ export class UserModule implements UserApi {
   }
 
   // -- the /me dashboard -----------------------------------------------------
-
-  /** The user's personal workspace in one organization, creating it if absent. */
-  ensurePersonalWorkspace(input: PersonalWorkspaceInput): Promise<EnsuredPersonalWorkspace> {
-    return this.#account.ensurePersonalWorkspace(input);
-  }
-
-  /** The user's personal workspace in one organization, or null if none yet. */
-  findPersonalWorkspace(input: FindPersonalWorkspaceInput): Promise<PersonalWorkspace | null> {
-    return this.#account.findPersonalWorkspace(input);
-  }
 
   /** The path this user pinned as their home, or null if they pinned none. */
   findLastHomePath(input: UserIdInput): Promise<string | null> {

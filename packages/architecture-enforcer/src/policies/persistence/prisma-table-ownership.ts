@@ -40,14 +40,14 @@ export const SHARED_PRISMA_TABLES: readonly SharedPrismaTable[] = [
       "authz",
     ],
     reason:
-      "entitlement reads a project's organisation and an organisation's projects, never a fold (C1, R40); billing reads an organisation's project ids and names for spend and usage warnings (round 37 D5, R40); data retention and data privacy read where a project sits to resolve its policy, never a fold (round 46 E1, R40); the Instant Evals judge and nurturing read a project's team to place it, and nurturing an organisation's earliest project creation for its cutover (DATA-NURTURING-GUARD), never a fold (round 46 E1, R40); presence reads a project's and its organisation's presence flags in one joined read for each heartbeat, never a copy (R40); organization reads its projects' ids for a trace-sharing revocation, its project grants' names, and its teams' projects for the team screens, never a copy (O1, R40); user reads the project an API key belongs to for /api/me/project, never ProjectApi (U1, R40); authz's legacy-import tenant step reads an organisation's project ids to bound its share-link read, and each project's apiKey presence and createdAt, per tenant the upgrade runner hands it, never a peer (PO-2, R40)",
+      "entitlement reads a project's organisation and an organisation's projects, never a fold (C1, R40); billing reads an organisation's project ids and names for spend and usage warnings (round 37 D5, R40); data retention and data privacy read where a project sits to resolve its policy, never a fold (round 46 E1, R40); the Instant Evals judge and nurturing read a project's team to place it, and nurturing an organisation's earliest project creation for its cutover (DATA-NURTURING-GUARD), never a fold (round 46 E1, R40); presence reads a project's and its organisation's presence flags in one joined read for each heartbeat, never a copy (R40); organization reads its projects' ids for a trace-sharing revocation, its project grants' names, and its teams' projects for the team screens, never a copy (O1, R40); user reads the project an API key belongs to for /api/me/project, never ProjectApi (U1, R40); authz's legacy-import tenant step reads an organisation's project ids to bound its share-link read, and each project's apiKey presence and createdAt, per tenant the upgrade runner hands it, never a peer (PO-2, R40); user reads the caller's personal-workspace project to store an avatar (U1-AVATAR a)",
   },
   {
     table: "Team",
     owner: "organization",
-    readers: ["data-retention", "data-privacy", "instant-eval-judge", "nurturing"],
+    readers: ["data-retention", "data-privacy", "instant-eval-judge", "nurturing", "user"],
     reason:
-      "data retention and data privacy read a team's organisation to place a project or a team-level rule, never a fold (round 46 E1, R40); the Instant Evals judge and nurturing read a project's organisation through its team and an organisation's teams for its earliest project (round 46 E1, R40)",
+      "data retention and data privacy read a team's organisation to place a project or a team-level rule, never a fold (round 46 E1, R40); the Instant Evals judge and nurturing read a project's organisation through its team and an organisation's teams for its earliest project (round 46 E1, R40); user reads the caller's personal team to find the personal-workspace project an avatar is stored under, never OrganizationApi (U1-AVATAR a, R40)",
   },
   {
     table: "OrganizationUser",

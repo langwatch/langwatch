@@ -547,7 +547,8 @@ export class AuthModule implements AuthApiContract {
         sessions: () => cliSessions,
         directory: () => cliDeviceDirectory,
         apiKeys: () => dependencies.apiKeys,
-        ensurePersonalWorkspace: (input) => dependencies.users.ensurePersonalWorkspace(input),
+        ensurePersonalWorkspace: (input) =>
+          dependencies.organizations.ensurePersonalWorkspace(input),
         canViewProject: ({ userId, projectId }) =>
           dependencies.authz.hasProjectPermission({
             userId,

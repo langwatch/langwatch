@@ -149,13 +149,6 @@ export class TestUserApi implements UserApi {
   getAvatarUrl: UserApi["getAvatarUrl"] = (input) =>
     this.overrides.getAvatarUrl?.(input) ?? this.unimplemented("getAvatarUrl");
 
-  ensurePersonalWorkspace: UserApi["ensurePersonalWorkspace"] = (input) =>
-    this.overrides.ensurePersonalWorkspace?.(input) ??
-    this.unimplemented("ensurePersonalWorkspace");
-
-  findPersonalWorkspace: UserApi["findPersonalWorkspace"] = (input) =>
-    this.overrides.findPersonalWorkspace?.(input) ?? this.unimplemented("findPersonalWorkspace");
-
   findLastHomePath: UserApi["findLastHomePath"] = (input) =>
     this.overrides.findLastHomePath?.(input) ?? this.unimplemented("findLastHomePath");
 

@@ -7,7 +7,6 @@ import type { AuthzApi } from "@langwatch/authz-contract";
  * @see modules/user/specs/user.feature
  */
 import { InMemoryProcessStore } from "@langwatch/eventing";
-import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { fromDate } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
@@ -29,7 +28,7 @@ async function unfinishedAccount({ signedIn = false }: { signedIn?: boolean } = 
   const credentials = MemoryUserCredentialRepository.create({ database });
   const service = UserService.create({
     repository: users,
-    organizations: createApiFixture<OrganizationApi>({}),
+    personalProjects: { findPersonalProjectId: async () => null },
     auth: createApiFixture<AuthApi>({}),
     avatarStorage: createApiFixture<UserAvatarStorage>({}),
     credentialIssuer: "credential",

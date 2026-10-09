@@ -196,7 +196,6 @@ export function createUserTestApp(
     dependencies?: Partial<{
       auth: AuthApi;
       authz: AuthzApi;
-      organizations: OrganizationApi;
       storedObjects: StoredObjectApi;
     }>;
     facts?: Partial<UserFacts>;
@@ -217,7 +216,6 @@ export function createUserTestApp(
     ...(input.now ? { now: input.now } : {}),
     dependencies: {
       authz: input.dependencies?.authz ?? createUserTestAuthorization(),
-      organizations: input.dependencies?.organizations ?? createUserTestOrganizations(),
       storedObjects: input.dependencies?.storedObjects ?? createUserTestStoredObjects(),
     },
   });

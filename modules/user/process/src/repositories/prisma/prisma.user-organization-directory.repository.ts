@@ -48,6 +48,22 @@ export class PrismaUserOrganizationDirectoryRepository implements UserOrganizati
     return project?.slug ?? null;
   }
 
+  async findPersonalProjectId(input: {
+    organizationId: string;
+    userId: string;
+  }): Promise<string | null> {
+    const project = await this.database.project.findFirst({
+      where: {
+        isPersonal: true,
+        ownerUserId: input.userId,
+        archivedAt: null,
+        team: { organizationId: input.organizationId, isPersonal: true },
+      },
+      select: { id: true },
+    });
+    return project?.id ?? null;
+  }
+
   /** The organization's first administrator, by seat age. */
   async findFirstAdminEmail(organizationId: string): Promise<string | null> {
     const admin = await this.database.organizationUser.findFirst({

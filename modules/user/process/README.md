@@ -298,18 +298,6 @@ A signed URL for an uploaded avatar; anything that is not one is refused as not 
 getAvatarUrl(input: UserAvatarRestParams): Promise<UserAvatarUrl>;
 ```
 
-#### `ensurePersonalWorkspace`
-
-```typescript
-ensurePersonalWorkspace(input: PersonalWorkspaceInput): Promise<EnsuredPersonalWorkspace>;
-```
-
-#### `findPersonalWorkspace`
-
-```typescript
-findPersonalWorkspace(input: FindPersonalWorkspaceInput): Promise<PersonalWorkspace | null>;
-```
-
 #### `findLastHomePath`
 
 ```typescript
