@@ -401,20 +401,6 @@ export interface OrganizationApi {
   findRepresentatives(input: {
     organizationId: string;
   }): Promise<{ userId: string; organizationName: string }[]>;
-  /**
-   * Provisions an organization end to end: it, its first team, a bootstrap
-   * admin key, the summary. A failure past creation deletes the organization
-   * and reports a failed compensation rather than raising it over the cause.
-   */
-  createForProvisioningWithAdminKey(input: {
-    name: string;
-    slug?: string;
-    adminApiKeyName?: string;
-  }): Promise<{
-    organization: { id: string; name: string; slug: string };
-    team: { id: string; slug: string; name: string };
-    adminApiKey: { id: string; token: string };
-  }>;
   /** The authorization feature's per-member access breakdown, organization's own door onto it. */
   getMemberAccessBreakdown(
     input: Readonly<{

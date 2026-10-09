@@ -1,20 +1,8 @@
 /**
- * The wire shapes the `/api/organizations` REST family publishes: instance
- * administrator provisioning, self-hosted only.
+ * The wire shapes organization's `/api/organizations` reads publish, self-hosted
+ * only; api-key's contract holds the provisioning POST's shapes (R3).
  */
 import { z } from "zod";
-
-export const organizationsProvisioningRestCreateSchema = z.object({
-  name: z.string().trim().min(1).max(255),
-  slug: z
-    .string()
-    .trim()
-    .min(1)
-    .max(255)
-    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "must be lowercase letters, numbers and single hyphens")
-    .optional(),
-  adminApiKeyName: z.string().trim().min(1).max(100).optional(),
-});
 
 export const organizationsProvisioningRestParamsSchema = z.object({
   organizationId: z.string().min(1),
@@ -26,20 +14,6 @@ export const organizationsProvisioningRestSummarySchema = z.object({
   name: z.string(),
   slug: z.string(),
   createdAt: z.date(),
-});
-
-export const organizationsProvisioningRestCreatedSchema = z.object({
-  organization: z.object({
-    id: z.string().min(1),
-    name: z.string(),
-    slug: z.string(),
-  }),
-  team: z.object({
-    id: z.string().min(1),
-    name: z.string(),
-    slug: z.string(),
-  }),
-  adminApiKey: z.object({ id: z.string().min(1), token: z.string().min(1) }),
 });
 
 export const organizationsProvisioningRestListSchema = z.object({

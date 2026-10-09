@@ -1,4 +1,3 @@
-import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { type LedgerActor, SYSTEM_ACTORS } from "@langwatch/authorization";
 import {
   AuthzApi,
@@ -218,8 +217,6 @@ export interface ServerOrganizationAppDependencies {
   groups: OrganizationGroupScopeService;
   /** The one permission service every door on this application asks. */
   permissions: AuthzApi;
-  /** Mints the bootstrap admin service key a provisioned organization needs. */
-  apiKeys: ApiKeyApi;
 }
 
 /** The module's own logger; a part names itself after the colon. */
@@ -280,7 +277,6 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   static readonly dependencies = {
     permissions: AuthzApi,
     users: UserApi,
-    apiKeys: ApiKeyApi,
     /** Identity application that answers for the caller's verified addresses. */
     identity: IdentityApi,
     /**
@@ -353,7 +349,6 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       membership,
       groups,
       permissions: setup.dependencies.permissions,
-      apiKeys: setup.dependencies.apiKeys,
     });
 
     application.#infrastructure = infrastructure;
@@ -789,68 +784,6 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     }>,
   ): Promise<AuthzAccessBreakdownOutput> {
     return this.#dependencies.permissions.getAccessBreakdown(input);
-  }
-
-  /**
-   * Provisions an organization + bootstrap admin key + summary read, for
-   * self-hosted admins only. A failure past creation deletes the org
-   * (unreachable without its key); the caller sees the ORIGINAL failure.
-   */
-  async createForProvisioningWithAdminKey(input: {
-    name: string;
-    slug?: string;
-    adminApiKeyName?: string;
-  }): Promise<{
-    organization: { id: string; name: string; slug: string };
-    team: { id: string; slug: string; name: string };
-    adminApiKey: { id: string; token: string };
-  }> {
-    const created = await this.createForProvisioning({
-      name: input.name,
-      ...(input.slug !== undefined ? { slug: input.slug } : {}),
-    });
-
-    try {
-      const adminKey = await this.#dependencies.apiKeys.create({
-        name: input.adminApiKeyName ?? "Provisioning admin",
-        userId: null,
-        createdByUserId: null,
-        organizationId: created.organization.id,
-        permissionMode: "all",
-        bindings: [{ role: "ADMIN", scopeType: "ORGANIZATION", scopeId: created.organization.id }],
-      });
-
-      const summary = await this.findProvisioningSummary(created.organization.id);
-      if (!summary) {
-        // The slug is the natural key an members-as-code caller
-        // stores; answering success with a blank one moves the failure far
-        // from its cause.
-        throw new Error(
-          `provisioned organization ${created.organization.id} could not be read back`,
-        );
-      }
-
-      return {
-        organization: {
-          id: created.organization.id,
-          name: created.organization.name,
-          slug: summary.slug,
-        },
-        team: created.team,
-        adminApiKey: { id: adminKey.apiKey.id, token: adminKey.token },
-      };
-    } catch (error) {
-      try {
-        await this.deleteProvisionedOrganization({ organizationId: created.organization.id });
-      } catch (compensationError) {
-        this.#infrastructure.signals.reportError(
-          compensationError instanceof Error
-            ? compensationError
-            : new Error(String(compensationError)),
-        );
-      }
-      throw error;
-    }
   }
 
   createSelfHostedCustomer(input: { organizationId: string; name: string }): Promise<void> {

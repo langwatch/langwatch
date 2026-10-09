@@ -141,3 +141,35 @@ export const projectRestCreateSchema = z
   .refine((data) => data.teamId || data.newTeamName, {
     message: "Either teamId or newTeamName must be provided",
   });
+
+/** `POST /api/organizations`, served by api-key at organization's path (R3, R10). */
+export const organizationsProvisioningRestCreateSchema = z.object({
+  name: z.string().trim().min(1).max(255),
+  slug: z
+    .string()
+    .trim()
+    .min(1)
+    .max(255)
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "must be lowercase letters, numbers and single hyphens")
+    .optional(),
+  adminApiKeyName: z.string().trim().min(1).max(100).optional(),
+});
+
+export const organizationsProvisioningRestCreatedSchema = z.object({
+  organization: z.object({
+    id: z.string().min(1),
+    name: z.string(),
+    slug: z.string(),
+  }),
+  team: z.object({
+    id: z.string().min(1),
+    name: z.string(),
+    slug: z.string(),
+  }),
+  adminApiKey: z.object({ id: z.string().min(1), token: z.string().min(1) }),
+});
+
+export type OrganizationProvisioningRequest = z.infer<
+  typeof organizationsProvisioningRestCreateSchema
+>;
+export type ProvisionedOrganization = z.infer<typeof organizationsProvisioningRestCreatedSchema>;

@@ -1,4 +1,3 @@
-import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { BillingApi } from "@langwatch/enterprise-billing-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
@@ -35,7 +34,6 @@ function process(role: "api" | "worker") {
       },
     })
     .provide({
-      "api-key": createApiFixture<ApiKeyApi>(),
       authz: createApiFixture<AuthzApi>(),
       billing: createApiFixture<BillingApi>(),
       entitlement: createApiFixture<EntitlementApi>(),

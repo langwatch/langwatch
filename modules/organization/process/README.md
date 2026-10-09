@@ -278,14 +278,6 @@ The organization's longest-standing member, the person a customer's CRM traits a
 findRepresentatives(input: { organizationId: string; }): Promise<{ userId: string; organizationName: string }[]>;
 ```
 
-#### `createForProvisioningWithAdminKey`
-
-Provisions an organization end to end: it, its first team, a bootstrap admin key, the summary. A failure past creation deletes the organization and reports a failed compensation rather than raising it over the cause.
-
-```typescript
-createForProvisioningWithAdminKey(input: { name: string; slug?: string; adminApiKeyName?: string; }): Promise<{ organization: { id: string; name: string; slug: string }; team: { id: string; slug: string; name: string }; adminApiKey: { id: string; token: string }; }>;
-```
-
 #### `getMemberAccessBreakdown`
 
 The authorization feature's per-member access breakdown, organization's own door onto it.
@@ -1412,40 +1404,22 @@ type Response = z.infer<typeof organizationManagementRestSuccessSchema>; // ../c
 
 |             |                                                    |
 | ----------- | -------------------------------------------------- |
-| Declared at | `src/transport/organizations.rest.ts:21`           |
+| Declared at | `src/transport/organizations.rest.ts:19`           |
 | Base URL    | `/api/organizations`, twin `/api/v1/organizations` |
 | Addressing  | dated                                              |
 | Credential  | instance_admin                                     |
 | Versions    | `2026-08-07`                                       |
 
-#### `POST /` · `provisionOrganization`
-
-Provision a new organization with its first team and a bootstrap admin service key, self-hosted instance administrators only.
-
-Authenticated: Holding the instance administrator bearer key is the only authority this door checks; there is no tenant to ask a permission of. Declared at `src/transport/organizations.rest.ts:26`.
-
-Answers at `/api/organizations`, `/api/v1/organizations`; also, undocumented, `/api/organizations/2026-08-07`, `/api/v1/organizations/2026-08-07`, `/api/organizations/latest`, `/api/v1/organizations/latest`.
-
-```typescript
-// Body: organizationsProvisioningRestCreateSchema, ../contract/src/organizations-provisioning.rest.ts:7
-interface Body {
-  name: string;
-  slug?: string;
-  adminApiKeyName?: string;
-}
-type Response = z.infer<typeof organizationsProvisioningRestCreatedSchema>; // ../contract/src/organizations-provisioning.rest.ts:31
-```
-
 #### `GET /` · `listOrganizations`
 
 List every organization this instance hosts, self-hosted instance administrators only.
 
-Authenticated: Holding the instance administrator bearer key is the only authority this door checks; there is no tenant to ask a permission of. Declared at `src/transport/organizations.rest.ts:50`.
+Authenticated: Holding the instance administrator bearer key is the only authority this door checks; there is no tenant to ask a permission of. Declared at `src/transport/organizations.rest.ts:24`.
 
 Answers at `/api/organizations`, `/api/v1/organizations`; also, undocumented, `/api/organizations/2026-08-07`, `/api/v1/organizations/2026-08-07`, `/api/organizations/latest`, `/api/v1/organizations/latest`.
 
 ```typescript
-// Response: organizationsProvisioningRestListSchema, ../contract/src/organizations-provisioning.rest.ts:45
+// Response: organizationsProvisioningRestListSchema, ../contract/src/organizations-provisioning.rest.ts:19
 interface Response {
   organizations: {
     id: string;
@@ -1460,16 +1434,16 @@ interface Response {
 
 Read one organization's provisioning summary, self-hosted instance administrators only.
 
-Authenticated: Holding the instance administrator bearer key is the only authority this door checks; there is no tenant to ask a permission of. Declared at `src/transport/organizations.rest.ts:69`.
+Authenticated: Holding the instance administrator bearer key is the only authority this door checks; there is no tenant to ask a permission of. Declared at `src/transport/organizations.rest.ts:43`.
 
 Answers at `/api/organizations/:organizationId`, `/api/v1/organizations/:organizationId`; also, undocumented, `/api/organizations/2026-08-07/:organizationId`, `/api/v1/organizations/2026-08-07/:organizationId`, `/api/organizations/latest/:organizationId`, `/api/v1/organizations/latest/:organizationId`.
 
 ```typescript
-// Params: organizationsProvisioningRestParamsSchema, ../contract/src/organizations-provisioning.rest.ts:19
+// Params: organizationsProvisioningRestParamsSchema, ../contract/src/organizations-provisioning.rest.ts:7
 interface Params {
   organizationId: string;
 }
-// Response: organizationsProvisioningRestGotOneSchema, ../contract/src/organizations-provisioning.rest.ts:49
+// Response: organizationsProvisioningRestGotOneSchema, ../contract/src/organizations-provisioning.rest.ts:23
 interface Response {
   organization: {
     id: string;
@@ -2302,7 +2276,7 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                          | Environment variable      | Declared at                                 |
 | ------ | ----------------------------- | ------------------------- | ------------------------------------------- |
-| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:302`           |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:298`           |
 | config | `signUp.mode`                 | `SIGN_UP_MODE`            | `../contract/src/organization.config.ts:17` |
 | config | `signUp.allowedDomains`       | `SIGN_UP_ALLOWED_DOMAINS` | `../contract/src/organization.config.ts:18` |
 | config | `signUp.adminEmails`          | `ADMIN_EMAILS`            | `../contract/src/organization.config.ts:19` |
