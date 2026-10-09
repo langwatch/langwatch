@@ -253,8 +253,8 @@ function throughSubquery({
 
 /**
  * Reports an `OR` that can disjoin a tenant predicate away (in or enclosing its group), unless
- * beneath a fencing set, enclosing none, with no subquery between (else refused). An `OR` enclosing
- * none is left to the unbound-read check, whatever its depth (WEB-985). Unbalanced: depth.
+ * beneath a fencing set, enclosing none, with no subquery between (else refused). An `OR` reaching
+ * none in its own scope is left to the unbound-read check (WEB-985, WEB-5300). Unbalanced: depth.
  */
 function hasWeakeningDisjunction({
   masked,
@@ -289,7 +289,12 @@ function hasWeakeningDisjunction({
     const group = groupOf(each.index);
     if (inSubqueryBeneathFence(group)) return true;
     if (fenced(group)) return false;
-    return tenantGroups.some((inner) => encloses({ parent, outer: group, inner }));
+    // A predicate inside a subquery scopes only that subquery's read; an outer OR cannot reach it.
+    return tenantGroups.some(
+      (inner) =>
+        encloses({ parent, outer: group, inner }) &&
+        !throughSubquery({ parent, subqueries, outer: group, inner }),
+    );
   });
 }
 
@@ -695,9 +700,16 @@ export function checkTenantScope({
       actual: supplied,
     };
   }
-  const binds = matchesOf({ pattern: BOUND_TENANT_PREDICATE, masked: statement }).filter(
-    (match) => params?.[match[1] as string] === tenantId,
-  );
+  const binds = [
+    ...matchesOf({ pattern: BOUND_TENANT_PREDICATE, masked: statement }).filter(
+      (match) => params?.[match[1] as string] === tenantId,
+    ),
+    // A fence the proof expanded to the caller's own project alone binds exactly as `= {t}` does.
+    ...matchesOf({ pattern: BOUND_TENANT_SET, masked: statement }).filter((match) => {
+      const values = boundBy({ match, params });
+      return values.length > 0 && values.every((value) => value === tenantId);
+    }),
+  ];
   return hasUnboundRead({ shape, binds }) ? { kind: "unbound-read" } : null;
 }
 

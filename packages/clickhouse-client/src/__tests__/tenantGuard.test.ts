@@ -134,10 +134,6 @@ describe("checkTenantScope", () => {
           "precedence confusion, which is how this reaches production",
           "SELECT 1 FROM t WHERE TenantId = {t:String} AND A = 1 OR B = 2",
         ],
-        [
-          "an OR in the outer query above a scoped subquery",
-          "SELECT * FROM (SELECT Id FROM t WHERE TenantId = {t:String}) WHERE a = 1 OR b = 2",
-        ],
       ])("refuses %s", (_label, sql) => {
         expect(checkTenantScope({ sql, params: { t: TENANT }, tenantId: TENANT })).toEqual({
           kind: "weakening-disjunction",
@@ -148,10 +144,6 @@ describe("checkTenantScope", () => {
     describe("when the OR shares a bracket group with a tenant predicate or encloses one", () => {
       /** @scenario "An OR that can disjoin a tenant predicate away is refused" */
       it.each([
-        [
-          "an OR around a scoped IN subquery",
-          "SELECT 1 FROM t WHERE Id IN (SELECT Id FROM u WHERE TenantId = {t:String}) OR 1 = 1",
-        ],
         [
           "an OR leading the predicate",
           "SELECT 1 FROM t WHERE Status = 'x' OR TenantId = {t:String}",
@@ -167,10 +159,6 @@ describe("checkTenantScope", () => {
         [
           "an OR disjoining a scalar subquery's predicate",
           "SELECT (SELECT count() FROM u WHERE TenantId = {t:String} OR 1 = 1) AS n FROM t WHERE TenantId = {t:String}",
-        ],
-        [
-          "an OR around a bracket that holds a later predicate",
-          "SELECT 1 FROM t WHERE TenantId = {t:String} AND (Id IN (SELECT Id FROM u WHERE TenantId = {t:String}) OR 1 = 1)",
         ],
         [
           "an OR after an unbalanced bracket",
@@ -197,6 +185,10 @@ describe("checkTenantScope", () => {
           "an OR beneath a predicate bound to another tenant",
           "SELECT if(Id IN (SELECT Id FROM u WHERE TenantId = {t:String}), 1, 0) AS f FROM v WHERE (TenantId = {other:String} AND (a = 1 OR b = 2))",
         ],
+        [
+          "an OR around a scoped IN subquery",
+          "SELECT 1 FROM t WHERE Id IN (SELECT Id FROM u WHERE TenantId = {t:String}) OR 1 = 1",
+        ],
       ])("still refuses %s, as the read it is", (_label, sql) => {
         expect(
           checkTenantScope({
@@ -208,7 +200,7 @@ describe("checkTenantScope", () => {
       });
     });
 
-    describe("when the OR encloses no tenant predicate and the first predicate sits deeper (WEB-985)", () => {
+    describe("when the OR reaches no tenant predicate of its own scope (WEB-985, WEB-5300)", () => {
       it.each([
         [
           "a select-list OR beside a predicate three brackets deep",
@@ -217,6 +209,14 @@ describe("checkTenantScope", () => {
         [
           "an OR in a joined subquery's WHERE that is itself scoped",
           "SELECT 1 FROM (SELECT Id FROM t WHERE (TenantId = {t:String})) a JOIN (SELECT Id FROM u WHERE TenantId = {t:String} AND (x = 1 OR y = 2)) b USING Id",
+        ],
+        [
+          "an OR in the outer query, filtering a scoped subquery's rows (WEB-5300)",
+          "SELECT * FROM (SELECT Id FROM t WHERE TenantId = {t:String}) WHERE a = 1 OR b = 2",
+        ],
+        [
+          "an OR around a subquery that binds its own read, beside the outer predicate (WEB-5300)",
+          "SELECT 1 FROM t WHERE TenantId = {t:String} AND (Id IN (SELECT Id FROM u WHERE TenantId = {t:String}) OR 1 = 1)",
         ],
       ])("accepts %s", (_label, sql) => {
         expect(checkTenantScope({ sql, params: { t: TENANT }, tenantId: TENANT })).toBeNull();
@@ -448,5 +448,30 @@ describe("TenantGuard", () => {
         expect(next).toHaveBeenCalledTimes(1);
       });
     });
+  });
+});
+
+describe("checkTenantScope with a subquery fenced to the caller's own project (WEB-5300)", () => {
+  const sql =
+    "SELECT uniq(TraceId) FROM trace_summaries ts WHERE ts.TenantId = {tenantId:String} AND (Name ILIKE {q:String} OR ((TenantId, TraceId) IN (SELECT DISTINCT TenantId, TraceId FROM stored_spans WHERE (TenantId IN ({own:Array(String)})) AND SpanName ILIKE {q:String})))";
+
+  it("accepts a fence holding only the claimed tenant, as it binds as `= {t}` does", () => {
+    expect(
+      checkTenantScope({
+        sql,
+        params: { tenantId: TENANT, q: "%x%", own: [TENANT] },
+        tenantId: TENANT,
+      }),
+    ).toBeNull();
+  });
+
+  it.each([
+    ["another tenant beside the claimed one", [TENANT, "project_other"]],
+    ["another tenant alone", ["project_other"]],
+    ["no tenant at all", []],
+  ])("refuses a fence holding %s, as a read nothing binds", (_label, own) => {
+    expect(
+      checkTenantScope({ sql, params: { tenantId: TENANT, q: "%x%", own }, tenantId: TENANT }),
+    ).toEqual({ kind: "unbound-read" });
   });
 });
