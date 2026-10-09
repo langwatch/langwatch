@@ -21,10 +21,10 @@ Feature: Single-session lookups read only the data that can hold the session
 
   @integration
   Scenario: Looking up a session that does not exist reads nothing
-    Given the project's sessions sort either side of the requested id in one block
+    Given the project holds other sessions from the same week as the requested id would fall in
     When the session is looked up by its id
-    Then no rows are read
-    And the same lookup with the index disabled does read that block
+    Then nothing is found
+    And none of the project's stored sessions are read to establish that
 
   @integration
   Scenario: Looking up a session returns the version that folded the most

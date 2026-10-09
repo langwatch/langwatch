@@ -62,7 +62,7 @@ const tag = `t${nanoid(8)}`;
  * hold with no skip index at all. FAR_SESSION sits in another partition so the
  * read still spans more than one.
  */
-const TENANTS = ["a", "b", "c", "d", "e"] as const;
+const TENANTS = ["a", "b", "c", "d"] as const;
 const tenantIdFor = (suffix: (typeof TENANTS)[number]) =>
   `${tag}-tenant-${suffix}`;
 
@@ -106,21 +106,38 @@ async function insertSessions({ fixtures }: { fixtures: SessionFixture[] }) {
       UpdatedAt: session.updatedAt,
       Agent: "claude_code",
       ModelCalls: session.modelCalls ?? 0,
+      // No retention TTL: the fixture dates are fixed, and rows written
+      // already past the table's default retention could be removed by a TTL
+      // merge while the suite runs.
+      _retention_days: 0,
     })),
     format: "JSONEachRow",
     clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
   });
 }
 
+interface MeasuredLookup {
+  /** What the repository returned. */
+  found: unknown;
+  /** How many of the tagged queries system.query_log recorded as finished. */
+  finishedQueries: number;
+  /** Rows those queries read, the dedup subquery included. */
+  rowsRead: number;
+}
+
 /**
- * Rows ClickHouse read to answer the repository's own `findBySessionId`, the
- * dedup subquery included. The repository runs its real SQL against a client
- * that only tags each query with an id (and optionally turns skip indexes off),
- * and the count comes from system.query_log for those ids. Zero means every
- * granule was skipped; a granule that is read still counts here even though
+ * Runs the repository's own `findBySessionId` and reports what ClickHouse read
+ * to answer it. The repository issues its real SQL against a client that only
+ * tags each query with an id (and optionally turns skip indexes off), and the
+ * figures come from system.query_log for those ids.
+ *
+ * `finishedQueries` is returned alongside `rowsRead` because a sum over no
+ * log rows is also zero: a caller asserting "read nothing" must first see that
+ * the query was recorded at all. Zero rows read with a recorded query means
+ * every granule was skipped; a granule that is read still counts even though
  * its rows are filtered out afterwards.
  */
-async function rowsReadForSessionLookup({
+async function measureSessionLookup({
   tenantId,
   sessionId,
   useSkipIndexes = true,
@@ -128,7 +145,7 @@ async function rowsReadForSessionLookup({
   tenantId: string;
   sessionId: string;
   useSkipIndexes?: boolean;
-}): Promise<number> {
+}): Promise<MeasuredLookup> {
   const queryIds: string[] = [];
   const tagged = new Proxy(ch, {
     get(target, prop) {
@@ -153,21 +170,27 @@ async function rowsReadForSessionLookup({
   const measured = new CodingAgentSessionClickHouseRepository(
     async () => tagged,
   );
-  expect(await measured.findBySessionId({ tenantId, sessionId })).toBeNull();
+  const found = await measured.findBySessionId({ tenantId, sessionId });
 
   await ch.command({ query: "SYSTEM FLUSH LOGS" });
   const result = await ch.query({
     query: `
-      SELECT sum(read_rows) AS rows
+      SELECT count() AS finished, sum(read_rows) AS rows
       FROM system.query_log
       WHERE type = 'QueryFinish' AND query_id IN {queryIds:Array(String)}
     `,
     query_params: { queryIds },
     format: "JSONEachRow",
   });
-  const [row] = await result.json<{ rows: number | string }>();
-  expect(queryIds).toHaveLength(1);
-  return Number(row?.rows ?? -1);
+  const [row] = await result.json<{
+    finished: number | string;
+    rows: number | string;
+  }>();
+  return {
+    found,
+    finishedQueries: Number(row?.finished ?? 0),
+    rowsRead: Number(row?.rows ?? 0),
+  };
 }
 
 beforeAll(async () => {
@@ -231,56 +254,27 @@ describe("given the coding_agent_sessions SessionId skip-index", () => {
 
       // With skip indexes off, the granule is still eligible and gets read:
       // the primary key cannot exclude an id inside its range. This is what
-      // makes the assertion below about the bloom filter and nothing else.
-      expect(
-        await rowsReadForSessionLookup({
-          tenantId,
-          sessionId: ABSENT_SESSION,
-          useSkipIndexes: false,
-        }),
-      ).toBeGreaterThan(0);
-
-      expect(
-        await rowsReadForSessionLookup({ tenantId, sessionId: ABSENT_SESSION }),
-      ).toBe(0);
-    });
-  });
-
-  describe("when the same lookup filters a column with no skip index", () => {
-    it("reads rows, which is what the SessionId case is being measured against", async () => {
-      // Control for the assertion above. UserId has no index and is not in the
-      // sort key, so an absent value cannot be skipped and the rows must be
-      // read and filtered. If this ever returns 0 as well, the zero above has
-      // stopped meaning "the bloom filter skipped the granule".
-      const tenantId = tenantIdFor("e");
-      await insertSessions({
-        fixtures: [
-          {
-            tenantId,
-            sessionId: BRACKET_LOW,
-            startedAt: BRACKET_WEEK_A,
-            updatedAt: new Date(BRACKET_WEEK_A.getTime() + 1000),
-          },
-          {
-            tenantId,
-            sessionId: FAR_SESSION,
-            startedAt: FAR_WEEK,
-            updatedAt: new Date(FAR_WEEK.getTime() + 1000),
-          },
-        ],
+      // makes the assertion below about the bloom filter and nothing else,
+      // and it shows a non-zero count is reachable through the same
+      // measurement.
+      const withoutIndex = await measureSessionLookup({
+        tenantId,
+        sessionId: ABSENT_SESSION,
+        useSkipIndexes: false,
       });
-      const result = await ch.query({
-        query: `
-          SELECT count() FROM coding_agent_sessions
-          WHERE TenantId = {tenantId:String} AND UserId = {userId:String}
-        `,
-        query_params: { tenantId, userId: `${tag}-nobody` },
-        format: "JSON",
+      expect(withoutIndex.found).toBeNull();
+      expect(withoutIndex.finishedQueries).toBe(1);
+      expect(withoutIndex.rowsRead).toBeGreaterThan(0);
+
+      const withIndex = await measureSessionLookup({
+        tenantId,
+        sessionId: ABSENT_SESSION,
       });
-      const body = (await result.json()) as {
-        statistics?: { rows_read?: number };
-      };
-      expect(body.statistics?.rows_read ?? 0).toBeGreaterThan(0);
+      expect(withIndex.found).toBeNull();
+      // The lookup was recorded, so the zero below is a measurement and not
+      // a missing log row.
+      expect(withIndex.finishedQueries).toBe(1);
+      expect(withIndex.rowsRead).toBe(0);
     });
   });
 
