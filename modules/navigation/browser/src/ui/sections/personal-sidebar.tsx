@@ -15,7 +15,6 @@ import {
   Sparkles,
   SquareTerminal,
 } from "lucide-react";
-import { useMemo } from "react";
 
 import { navigationApi, type NavigationApiMap } from "../../behavior/navigation-api.ts";
 import { isOnlineEvaluationsActivePath } from "../../model/navigation-active-state.ts";
@@ -101,11 +100,13 @@ function usePersonalWorkspace(): {
   // main's `findPersonalProject({ organizationId })` fix added.
   const host = useNavigationHost();
   const openableTeams = host.openableTeams();
+  const userId = host.currentUser()?.id;
 
-  const personalProject = useMemo(
-    () => openableTeams.find((team) => team.isPersonal)?.projects[0] ?? null,
-    [openableTeams],
-  );
+  // Own team only (main's findPersonalProject): an admin also sees members' personal teams.
+  const personalProject =
+    openableTeams.find(
+      (team) => team.isPersonal && team.ownerUserId === userId && !!team.projects[0],
+    )?.projects[0] ?? null;
 
   const personalProjectId = personalProject?.id ?? null;
   const featuresQuery = navigationApi.personalWorkspaceFeatures.get.useQuery(
