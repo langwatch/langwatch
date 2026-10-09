@@ -20,16 +20,20 @@
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
+import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { wrapWithDefaultSettings } from "~/server/clickhouse/safeClickhouseClient";
 import { expandStatementForProject } from "~/test-utils/authorizationProofs";
+import { seedSpans } from "../../../../analytics/clickhouse/__tests__/test-utils/clickhouse-fixtures";
 import {
   cleanupTestData,
   getTestClickHouseClient,
 } from "../../../../event-sourcing/__tests__/integration/testContainers";
 import { buildEventAttributeKeysFacetQuery } from "../event-attribute-keys";
 
-const TENANT_ID = "facet-event-attr-keys-test";
+// Unique per run: cleanup is an asynchronous mutation, so a fixed tenant could
+// still hold a previous run's rows when the next one counts.
+const TENANT_ID = `facet-event-attr-keys-test-${nanoid(8)}`;
 
 /** The facet query as the authorized reader would send it for this tenant. */
 function forTenant<T extends { sql: string; params: Record<string, unknown> }>(
@@ -55,76 +59,43 @@ const VALUE_SIZE = 4096;
 
 const EXPECTED_DISTINCT_KEYS = KEYS_PER_EVENT;
 
-// Tight enough that dragging in the values column OOMs, loose enough that the
-// keys-only read completes. Tuned against CH 25.10 on the seed below.
-const MEMORY_CAP = "40000000"; // 40 MB
+// Most events carry every key with a heavy value, which is the workload the
+// memory comparison needs. On every SPARSE_EVERY-th span the first event
+// carries no attributes at all and the second carries only the first key, so
+// the counts below are per (span, event) occurrence and not one flat number.
+const SPARSE_EVERY = 10;
+const SPARSE_SPANS = SPAN_COUNT / SPARSE_EVERY;
+const TOTAL_EVENTS = SPAN_COUNT * EVENTS_PER_SPAN;
+/** Missing only from the empty events. */
+const FIRST_KEY_OCCURRENCES = TOTAL_EVENTS - SPARSE_SPANS;
+/** Missing from the empty events and from the single-key ones. */
+const OTHER_KEY_OCCURRENCES = TOTAL_EVENTS - 2 * SPARSE_SPANS;
+
+// Between what the two reads need. Measured on CH 25.10 with the seed below:
+// the keys-only read peaks near 4 MiB, the whole-Map read near 28 MiB.
+const MEMORY_CAP = "12000000"; // 12 MB
 
 type FacetRow = { facet_value: string; cnt: string; total_distinct: string };
 
-async function seedSpansWithEvents({
-  ch,
+const heavyValue = "v".repeat(VALUE_SIZE);
+const everyKey = Object.fromEntries(
+  Array.from({ length: KEYS_PER_EVENT }, (_, k) => [
+    `event_key_${k}`,
+    heavyValue,
+  ]),
+);
+
+function eventAttributesFor({
+  spanIndex,
+  eventIndex,
 }: {
-  ch: ClickHouseClient;
-}): Promise<void> {
-  const now = Date.now();
-  const value = "v".repeat(VALUE_SIZE);
-  const eventAttributes = Object.fromEntries(
-    Array.from({ length: KEYS_PER_EVENT }, (_, k) => [`event_key_${k}`, value]),
-  );
-
-  const rows: Array<Record<string, unknown>> = [];
-  for (let i = 0; i < SPAN_COUNT; i++) {
-    rows.push({
-      ProjectionId: `proj-event-attr-${i}`,
-      TenantId: TENANT_ID,
-      TraceId: `${TENANT_ID}-trace-${i % 200}`,
-      SpanId: `span-${i}`,
-      ParentSpanId: null,
-      ParentTraceId: null,
-      ParentIsRemote: null,
-      Sampled: 1,
-      StartTime: new Date(now - i * 10),
-      EndTime: new Date(now - i * 10 + 5),
-      DurationMs: 5,
-      SpanName: "test-span",
-      SpanKind: 1,
-      ServiceName: "test-service",
-      ResourceAttributes: {},
-      SpanAttributes: {},
-      StatusCode: 1,
-      StatusMessage: "",
-      ScopeName: "",
-      ScopeVersion: null,
-      "Events.Timestamp": Array.from(
-        { length: EVENTS_PER_SPAN },
-        () => new Date(now - i * 10),
-      ),
-      "Events.Name": Array.from(
-        { length: EVENTS_PER_SPAN },
-        (_, e) => `event-${e}`,
-      ),
-      "Events.Attributes": Array.from(
-        { length: EVENTS_PER_SPAN },
-        () => eventAttributes,
-      ),
-      "Links.TraceId": [],
-      "Links.SpanId": [],
-      "Links.Attributes": [],
-      DroppedAttributesCount: 0,
-      DroppedEventsCount: 0,
-      DroppedLinksCount: 0,
-    });
-  }
-
-  const BATCH = 200;
-  for (let i = 0; i < rows.length; i += BATCH) {
-    await ch.insert({
-      table: "stored_spans",
-      values: rows.slice(i, i + BATCH),
-      format: "JSONEachRow",
-      clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
-    });
-  }
+  spanIndex: number;
+  eventIndex: number;
+}): Record<string, string> {
+  if (spanIndex % SPARSE_EVERY !== 0) return everyKey;
+  if (eventIndex === 0) return {};
+  if (eventIndex === 1) return { event_key_0: heavyValue };
+  return everyKey;
 }
 
 describe("event-attribute-keys facet integration", () => {
@@ -134,7 +105,13 @@ describe("event-attribute-keys facet integration", () => {
     const rawClient = getTestClickHouseClient();
     if (!rawClient) throw new Error("ClickHouse client not available");
     ch = wrapWithDefaultSettings(rawClient);
-    await seedSpansWithEvents({ ch });
+    await seedSpans(ch, {
+      tenantId: TENANT_ID,
+      count: SPAN_COUNT,
+      attributeKeys: 0,
+      traceCount: 200,
+      events: { perSpan: EVENTS_PER_SPAN, attributesFor: eventAttributesFor },
+    });
   }, 180_000);
 
   afterAll(async () => {
@@ -142,8 +119,12 @@ describe("event-attribute-keys facet integration", () => {
   });
 
   const ctx = {
-    // Wide window: seeded spans land within a few minutes of now.
-    timeRange: { from: Date.now() - 60 * 60 * 1000, to: Date.now() + 60_000 },
+    // An hour either side of registration: the seed is stamped when setup
+    // runs, which can be well after this line is evaluated.
+    timeRange: {
+      from: Date.now() - 60 * 60 * 1000,
+      to: Date.now() + 60 * 60 * 1000,
+    },
     limit: 1000,
     offset: 0,
   };
@@ -181,9 +162,18 @@ describe("event-attribute-keys facet integration", () => {
         });
         const rows = await result.json<FacetRow>();
 
-        for (const row of rows) {
-          expect(Number(row.cnt)).toBe(SPAN_COUNT * EVENTS_PER_SPAN);
-        }
+        const counts = Object.fromEntries(
+          rows.map((row) => [row.facet_value, Number(row.cnt)]),
+        );
+        expect(counts).toEqual({
+          event_key_0: FIRST_KEY_OCCURRENCES,
+          ...Object.fromEntries(
+            Array.from({ length: KEYS_PER_EVENT - 1 }, (_, k) => [
+              `event_key_${k + 1}`,
+              OTHER_KEY_OCCURRENCES,
+            ]),
+          ),
+        });
       });
     });
 

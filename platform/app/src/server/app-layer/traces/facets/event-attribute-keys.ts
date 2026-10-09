@@ -24,9 +24,8 @@ import { baseParams, buildTimeWhere, KEY_DISCOVERY_SETTINGS } from "./helpers";
  *     column the projection already needs.
  *
  * This is the same trap `span-attribute-keys.ts` and `metadata-keys.ts`
- * document for their flat Maps. It survived here longer because the
- * subcolumn has to be reached through the outer array, so the fix does not
- * look identical to theirs. Untreated it is worth 2 GiB+ on a tenant with
+ * document for their flat Maps; here the subcolumn is reached through the
+ * outer array. Reading the Map instead is worth 2 GiB+ on a tenant with
  * busy events, which is MEMORY_LIMIT_EXCEEDED against the ceiling in
  * KEY_DISCOVERY_SETTINGS.
  *

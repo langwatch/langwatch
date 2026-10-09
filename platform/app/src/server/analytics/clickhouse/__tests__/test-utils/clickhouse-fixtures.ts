@@ -21,6 +21,16 @@ interface SeedSpansOptions {
   traceCount: number;
   /** If set, each trace gets this TotalCost for result verification */
   knownCost?: number;
+  /** Events carried by every span. Omitted, spans carry none. */
+  events?: {
+    /** Number of events on each span, named `event-0`..`event-N` */
+    perSpan: number;
+    /** The attribute map of one event, by its span and its position on it */
+    attributesFor: (position: {
+      spanIndex: number;
+      eventIndex: number;
+    }) => Record<string, string>;
+  };
 }
 
 /**
@@ -59,6 +69,7 @@ export async function seedSpans(
     attributeValueSize = 100,
     traceCount,
     knownCost,
+    events,
   } = opts;
 
   const now = Date.now();
@@ -135,6 +146,7 @@ export async function seedSpans(
 
   const spanRows: Array<Record<string, unknown>> = [];
   let spanIndex = 0;
+  let widestEventsBytes = 0;
 
   for (let t = 0; t < traceCount; t++) {
     const traceId = traceIds[t]!;
@@ -142,6 +154,17 @@ export async function seedSpans(
     if (spansForThisTrace <= 0) continue;
 
     for (let s = 0; s < spansForThisTrace; s++) {
+      const eventAttributes = events
+        ? Array.from({ length: events.perSpan }, (_, eventIndex) =>
+            events.attributesFor({ spanIndex, eventIndex }),
+          )
+        : [];
+      if (events) {
+        widestEventsBytes = Math.max(
+          widestEventsBytes,
+          Buffer.byteLength(JSON.stringify(eventAttributes)),
+        );
+      }
       spanRows.push({
         ProjectionId: `proj-${nanoid()}`,
         TenantId: tenantId,
@@ -163,9 +186,9 @@ export async function seedSpans(
         StatusMessage: "",
         ScopeName: "",
         ScopeVersion: null,
-        "Events.Timestamp": [],
-        "Events.Name": [],
-        "Events.Attributes": [],
+        "Events.Timestamp": eventAttributes.map(() => new Date(now - t * 1000)),
+        "Events.Name": eventAttributes.map((_, e) => `event-${e}`),
+        "Events.Attributes": eventAttributes,
         "Links.TraceId": [],
         "Links.SpanId": [],
         "Links.Attributes": [],
@@ -181,7 +204,10 @@ export async function seedSpans(
   const attributesBytes = Buffer.byteLength(JSON.stringify(spanAttributes));
   const spanBatchSize = Math.max(
     1,
-    Math.min(BATCH_SIZE, Math.floor(10_000_000 / (attributesBytes + 2_000))),
+    Math.min(
+      BATCH_SIZE,
+      Math.floor(10_000_000 / (attributesBytes + widestEventsBytes + 2_000)),
+    ),
   );
   for (let i = 0; i < spanRows.length; i += spanBatchSize) {
     const batch = spanRows.slice(i, i + spanBatchSize);
