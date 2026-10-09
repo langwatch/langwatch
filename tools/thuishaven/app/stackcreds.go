@@ -60,14 +60,16 @@ func (o *Orchestrator) credentialEnv(slug, worktreeDir string) []string {
 			zap.String("slug", slug), zap.Error(err))
 		return nil
 	}
-	return domain.StackCredentialsEnv(stored, resolvedDevEnv(worktreeDir))
+	resolved := resolvedDevEnv(worktreeDir)
+	return append(domain.StackCredentialsEnv(stored, resolved), o.licenceEnv(slug, resolved, false)...)
 }
 
-// removeStackCredentials forgets a destroyed stack's credentials, with the
-// data they sealed.
+// removeStackCredentials forgets a destroyed stack's credentials and licence
+// key, with the data they sealed.
 func (o *Orchestrator) removeStackCredentials(slug string) {
-	if o.cfg.Home != "" {
+	if o.cfg.Home != "" && slug != "" {
 		_ = os.Remove(o.stackCredentialsPath(slug))
+		_ = os.RemoveAll(filepath.Dir(o.stackLicenceKeyPath(slug)))
 	}
 }
 

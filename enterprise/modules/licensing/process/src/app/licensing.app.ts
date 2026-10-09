@@ -275,7 +275,7 @@ export class LicensingModule implements LicensingApiContract {
       licensePrivateKey,
     }: { instanceLicenseKey: string | undefined; licensePrivateKey: string | undefined },
   ): LicensingModule {
-    const { publicKey, ignoredVariable } = licenseVerifyingKeyOf({
+    const { publicKey, ignoredVariable, refuseDevStack } = licenseVerifyingKeyOf({
       override: config.publicKey,
       isReleaseBuild,
     });
@@ -285,7 +285,7 @@ export class LicensingModule implements LicensingApiContract {
         `${ignoredVariable} is ignored on a release build; licences verify against the embedded LangWatch key`,
       );
     }
-    const cryptography = NodeLicenseCryptographyService.create({ publicKey });
+    const cryptography = NodeLicenseCryptographyService.create({ publicKey, refuseDevStack });
     // The variable takes a signed key or an activation code. A code is not a
     // license: it is redeemed at start and stored on an organization.
     const configured = detectLicenseInputForm(instanceLicenseKey);

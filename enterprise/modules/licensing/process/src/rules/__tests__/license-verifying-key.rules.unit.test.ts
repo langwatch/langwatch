@@ -6,6 +6,7 @@ import {
   LicenseGenerationService,
   NodeLicenseCryptographyService,
 } from "@langwatch/enterprise-license-signing";
+import { LICENSE_ERRORS } from "@langwatch/enterprise-licensing-contract";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -27,6 +28,16 @@ function signedWith({ privateKey }: { privateKey: string }): string {
   }).licenseKey;
 }
 
+/** A licence carrying the `devStack` claim, signed as a haven stack signs it. */
+function devStackSignedWith({ privateKey }: { privateKey: string }): string {
+  const cryptography = NodeLicenseCryptographyService.create();
+  const signed = cryptography.parseLicenseKey(signedWith({ privateKey }));
+  if (!signed) throw new Error("fixture licence did not parse");
+  return cryptography.encodeLicenseKey(
+    cryptography.signLicense({ ...signed.data, devStack: true }, privateKey),
+  );
+}
+
 /** Whether the signature verifies under the key a build picks; expiry is out of scope. */
 function verifies({
   licenseKey,
@@ -37,8 +48,8 @@ function verifies({
   override: string | undefined;
   isReleaseBuild: boolean;
 }): boolean {
-  const { publicKey } = licenseVerifyingKeyOf({ override, isReleaseBuild });
-  const cryptography = NodeLicenseCryptographyService.create({ publicKey });
+  const { publicKey, refuseDevStack } = licenseVerifyingKeyOf({ override, isReleaseBuild });
+  const cryptography = NodeLicenseCryptographyService.create({ publicKey, refuseDevStack });
   const signed = cryptography.parseLicenseKey(licenseKey);
   return signed !== null && cryptography.verifySignature(signed);
 }
@@ -131,5 +142,48 @@ describe("the key a development build verifies licences with", () => {
         isReleaseBuild: false,
       }),
     ).toBe(false);
+  });
+});
+
+describe("a dev stack licence", () => {
+  /** @scenario "A release build refuses a dev stack licence whatever key signed it" */
+  it("is refused by a release build even when its verifying key signed it", () => {
+    const { refuseDevStack } = licenseVerifyingKeyOf({
+      override: TEST_PUBLIC_KEY,
+      isReleaseBuild: true,
+    });
+    const cryptography = NodeLicenseCryptographyService.create({
+      publicKey: TEST_PUBLIC_KEY,
+      refuseDevStack,
+    });
+
+    expect(refuseDevStack).toBe(true);
+    expect(
+      cryptography.validateLicense({
+        licenseKey: devStackSignedWith({ privateKey: TEST_PRIVATE_KEY }),
+      }),
+    ).toEqual({ valid: false, error: LICENSE_ERRORS.INVALID_SIGNATURE });
+  });
+
+  /** @scenario "A development build accepts a dev stack licence signed by its override key" */
+  it("is accepted by a development build under the override key", () => {
+    expect(
+      verifies({
+        licenseKey: devStackSignedWith({ privateKey: TEST_PRIVATE_KEY }),
+        override: TEST_PUBLIC_KEY,
+        isReleaseBuild: false,
+      }),
+    ).toBe(true);
+  });
+
+  /** @scenario "A verifier that is not told its build refuses a dev stack licence" */
+  it("is refused by a verifier constructed without the build's answer", () => {
+    const cryptography = NodeLicenseCryptographyService.create({ publicKey: TEST_PUBLIC_KEY });
+    const signed = cryptography.parseLicenseKey(
+      devStackSignedWith({ privateKey: TEST_PRIVATE_KEY }),
+    );
+
+    expect(signed?.data.devStack).toBe(true);
+    expect(signed && cryptography.verifySignature(signed)).toBe(false);
   });
 });

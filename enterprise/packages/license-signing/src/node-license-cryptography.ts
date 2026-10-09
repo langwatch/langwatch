@@ -50,16 +50,24 @@ const PEM_BODY_LINE = /.{1,64}/g;
 
 export type NodeLicenseCryptographyServiceOptions = {
   publicKey?: string;
+  /** Refuses licences carrying the `devStack` claim; only a dev build may pass `false`. */
+  refuseDevStack?: boolean;
 };
 
 /** Node RSA implementation. It owns no environment lookup or global state. */
 export class NodeLicenseCryptographyService implements LicenseCryptography {
-  private constructor(private readonly publicKey: string) {}
+  private constructor(
+    private readonly publicKey: string,
+    private readonly refuseDevStack: boolean,
+  ) {}
 
   static create(
     options: NodeLicenseCryptographyServiceOptions = {},
   ): NodeLicenseCryptographyService {
-    return new NodeLicenseCryptographyService(options.publicKey ?? DEFAULT_LICENSE_PUBLIC_KEY);
+    return new NodeLicenseCryptographyService(
+      options.publicKey ?? DEFAULT_LICENSE_PUBLIC_KEY,
+      options.refuseDevStack ?? true,
+    );
   }
 
   /**
@@ -121,6 +129,7 @@ export class NodeLicenseCryptographyService implements LicenseCryptography {
       return false;
     }
     if (REVOKED_LICENSE_IDS.has(signedLicense.data.licenseId)) return false;
+    if (this.refuseDevStack && signedLicense.data.devStack) return false;
 
     try {
       const verify = crypto.createVerify("SHA256");

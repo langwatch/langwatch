@@ -65,6 +65,9 @@ export const licenseDataSchema = z.object({
   // before it existed must re-serialize byte for byte. Absent means the install
   // calls nothing, which an air-gapped operator proves from the blob itself.
   connectServices: z.array(z.string()).optional(),
+  // Signed by a haven dev stack's own key; a release build refuses it whatever key
+  // signed it (specs/licensing/license-signing-key.feature). Last for the same reason.
+  devStack: z.literal(true).optional(),
 });
 
 export type LicenseData = z.infer<typeof licenseDataSchema>;
