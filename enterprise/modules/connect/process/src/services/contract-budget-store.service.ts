@@ -38,6 +38,7 @@ export class ContractBudgetStoreService implements ContractBudgetStore {
       id: budget.id,
       limitUsdCents: Math.round(Number(budget.limitUsd.toString()) * CENTS),
       capSetByCustomer: metadata.success && metadata.data[CAP_SET_BY] === "customer",
+      lastResetAt: budget.lastResetAt,
     };
   }
 

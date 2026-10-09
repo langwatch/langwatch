@@ -1,6 +1,5 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
-import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import { ResourceScope } from "@langwatch/process";
 import type { RateLimiter } from "@langwatch/process-stores";
 import { ScopedSecrets } from "@langwatch/secrets";
@@ -40,7 +39,6 @@ describe.skipIf(!TEST_DATABASE_URL)("the install's hosted provider slot in produ
       const cleared: string[] = [];
       const app = await LicensingModule.create({
         dependencies: {
-          instantEval: createApiFixture<InstantEvalApi>(),
           scopes: createApiFixture<AuthzApi>(),
           gateway: createApiFixture<GatewayApi>({
             clearConnectUpstreamInternal: async ({ organizationId }) => {

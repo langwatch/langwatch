@@ -1,5 +1,6 @@
 import type { RestIdentity } from "@langwatch/api/hosting";
 import { BearerIdentity, RestHost } from "@langwatch/api/rest";
+import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { GatewayApi, GatewayInternalAuthenticationError } from "@langwatch/gateway-contract";
 import { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import { ResourceScope } from "@langwatch/process";
@@ -7,17 +8,13 @@ import { ScopedSecrets } from "@langwatch/secrets";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * @vitest-environment node
- * @see enterprise/modules/licensing/specs/licensing.feature
+ * @see enterprise/modules/connect/specs/connect.feature
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
-import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
-import { TEST_LICENSING_CONFIG } from "../../__tests__/testing.ts";
-import { licensingProcessModule } from "../../licensing.module.ts";
-import type { IssuedLicenseRecord } from "../../repositories/issued-license.repository.ts";
-import { MemoryIssuedLicenseRepository } from "../../repositories/memory/memory.issued-license.repository.ts";
+import { connectProcessModule } from "../../connect.module.ts";
 import { connectHostedRest } from "../../transport/connect-hosted.rest.ts";
 
 const SIGNED = "signed-with-the-gateway-secret";
@@ -39,61 +36,15 @@ const gatewayDoor: RestIdentity = {
   },
 };
 
-const AT = Temporal.Instant.from("2026-01-01T00:00:00.000Z");
-
-/** A licence of the organization that carries the instant-eval service on a managed key. */
-function licenceOnManagedKey(): IssuedLicenseRecord {
-  return {
-    id: "license-1",
-    licenseId: "lic-1",
-    tokenHash: "hash-1",
-    organizationId: "org-acme",
-    organizationName: "ACME",
-    email: "ops@example.com",
-    planType: "ENTERPRISE",
-    maxMembers: 50,
-    maxMembersLite: 0,
-    issuedAt: AT,
-    expiresAt: Temporal.Instant.from("2099-01-01T00:00:00.000Z"),
-    source: "BACKOFFICE",
-    issuedById: "operator-1",
-    revokedAt: null,
-    revokedById: null,
-    revokedReason: null,
-    supersededAt: null,
-    replacesId: null,
-    pendingDeliveryLicense: null,
-    services: ["instant_evals"],
-    seatRateCents: null,
-    seatCurrency: null,
-    commitUsdCents: 100_000,
-    overageEnabled: false,
-    overageMaxUsdCents: null,
-    instanceId: "instance-1",
-    instanceBoundAt: AT,
-    lastSyncAt: null,
-    lastSyncVersion: null,
-    reportedMembers: null,
-    reportedMembersLite: null,
-    virtualKeyId: "vk-unlicensed",
-    seatsRaisedFrom: null,
-    createdAt: AT,
-    updatedAt: AT,
-  };
-}
-
-async function hostedFamily(
-  options: { licence?: IssuedLicenseRecord; instantEval?: InstantEvalApi } = {},
-) {
-  // The memory tier's own licence rows: none carries the calling key, unless the test names one.
-  const findByVirtualKeyId = vi
-    .spyOn(MemoryIssuedLicenseRepository.prototype, "findByVirtualKeyId")
-    .mockResolvedValue(options.licence ?? null);
+async function hostedFamily(options: { licensed?: boolean; instantEval?: InstantEvalApi } = {}) {
+  // Licensing names no active licence behind the calling key, unless the test says so.
+  const findManagedKeyLicense = vi.fn<LicensingApi["findManagedKeyLicense"]>(async () =>
+    options.licensed ? [{ services: ["instant_evals"] }] : [],
+  );
   const resources = new ResourceScope();
-  const state = await licensingProcessModule.install({
+  const state = await connectProcessModule.install({
     resources,
-    config: { ...TEST_LICENSING_CONFIG, isSaas: true },
-    repositorySelection: { tier: "memory", members: {} },
+    config: undefined,
     role: "api",
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
     resolve: (token) => {
@@ -101,6 +52,7 @@ async function hostedFamily(
         return createApiFixture<GatewayApi>({ internalDoor: () => gatewayDoor });
       }
       if (token === InstantEvalApi && options.instantEval) return options.instantEval;
+      if (token === LicensingApi) return createApiFixture<LicensingApi>({ findManagedKeyLicense });
       return createApiFixture<never>();
     },
   });
@@ -120,9 +72,9 @@ async function hostedFamily(
   });
   runtime.mount(connectHostedRest.router(), () => state.provided, { facts: state.facts });
 
-  const call = (signature: string) =>
+  const call = (signature: string, operation = "instant-evals-classify") =>
     runtime.app.request(
-      new Request("http://api.test/api/internal/gateway/connect/instant-evals-classify", {
+      new Request(`http://api.test/api/internal/gateway/connect/${operation}`, {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -135,24 +87,22 @@ async function hostedFamily(
           payload: {
             text: "the customer wrote in",
             questions: [{ id: "q1", kind: "boolean", instructions: "Is it polite?" }],
+            cap_usd: 500,
           },
         }),
       }),
     );
   return {
     call,
-    findByVirtualKeyId,
-    close: async () => {
-      findByVirtualKeyId.mockRestore();
-      await resources.close();
-    },
+    findManagedKeyLicense,
+    close: () => resources.close(),
   };
 }
 
 describe("the hosted Connect family behind the gateway's own door", () => {
   describe("given a hosted call whose signature the gateway does not accept", () => {
     /** @scenario "A hosted call with a bad signature is refused before any route runs" */
-    it("answers 401 and never reads a licence", async () => {
+    it("answers 401 and never asks licensing for a licence", async () => {
       const family = await hostedFamily();
 
       try {
@@ -160,7 +110,7 @@ describe("the hosted Connect family behind the gateway's own door", () => {
 
         expect(response.status).toBe(401);
         await expect(response.json()).resolves.toMatchObject({ code: "permission_denied" });
-        expect(family.findByVirtualKeyId).not.toHaveBeenCalled();
+        expect(family.findManagedKeyLicense).not.toHaveBeenCalled();
       } finally {
         await family.close();
       }
@@ -179,7 +129,10 @@ describe("the hosted Connect family behind the gateway's own door", () => {
         await expect(response.json()).resolves.toMatchObject({
           code: "connect_service_not_entitled",
         });
-        expect(family.findByVirtualKeyId).toHaveBeenCalledWith("vk-unlicensed");
+        expect(family.findManagedKeyLicense).toHaveBeenCalledWith({
+          virtualKeyId: "vk-unlicensed",
+          organizationId: "org-acme",
+        });
       } finally {
         await family.close();
       }
@@ -202,7 +155,7 @@ describe("the hosted Connect family behind the gateway's own door", () => {
           recorded.push(entry);
         },
       });
-      const family = await hostedFamily({ licence: licenceOnManagedKey(), instantEval });
+      const family = await hostedFamily({ licensed: true, instantEval });
 
       let response: Response;
       try {
@@ -222,6 +175,26 @@ describe("the hosted Connect family behind the gateway's own door", () => {
         costUsd: 1,
         priceUsd: 1.4,
       });
+    });
+  });
+
+  describe("given the three hosted Connect paths main served", () => {
+    /** @scenario "The hosted routes answer at their unchanged paths behind the gateway secret" */
+    it("refuses an unsigned call at each path and answers a signed one by its route", async () => {
+      const family = await hostedFamily();
+
+      try {
+        for (const operation of ["instant-evals-classify", "usage", "budget"]) {
+          expect((await family.call("forged", operation)).status).toBe(401);
+        }
+        const budget = await family.call(SIGNED, "budget");
+
+        expect(budget.status).toBe(403);
+        await expect(budget.json()).resolves.toMatchObject({ code: "connect_license_required" });
+        expect(family.findManagedKeyLicense).toHaveBeenCalledOnce();
+      } finally {
+        await family.close();
+      }
     });
   });
 });

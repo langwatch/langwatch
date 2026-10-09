@@ -4,7 +4,7 @@ The browser half of [organization](../README.md). What a browser installs when i
 
 <!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
 
-Declared in `src/organization.web.ts:23` (`defineBrowserModule("organization")`), exported as `organizationWeb` at `./declaration`.
+Declared in `src/organization.web.ts:24` (`defineBrowserModule("organization")`), exported as `organizationWeb` at `./declaration`.
 
 Installed by ui, from the app's generated module list (`pnpm generate:modules`).
 
@@ -36,7 +36,7 @@ Opened from lists the other modules (and `ui`, the app) whose browser source nam
 
 - `withApi(organizationApi)`, tRPC contracts: `organization.*`, `plan.*`.
 - Client packages (package.json): `@langwatch/enterprise-billing-client`, `@langwatch/enterprise-licensing-client`, `@langwatch/enterprise-scim-client`, `@langwatch/identity-client`, `@langwatch/organization-client`, `@langwatch/project-client`.
-- Lends: `JoinOfferToken`, `PendingJoinRequestsToken`, `ProjectDepartmentFieldToken`.
+- Lends: `JoinOfferToken`, `JoinInsteadToken`, `PendingJoinRequestsToken`, `ProjectDepartmentFieldToken`.
 - Host APIs it requires: `OrganizationHostApi`.
 - Capabilities: `scope`, `copyTargets`, `organizationFacts`, `teamAccessWaiting`.
 

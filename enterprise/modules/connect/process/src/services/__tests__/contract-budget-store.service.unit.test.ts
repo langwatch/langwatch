@@ -1,12 +1,7 @@
-import type {
-  CreateGatewayBudgetInput,
-  GatewayApi,
-  GatewayBudgetWithSeats,
-  GatewayMoney,
-} from "@langwatch/gateway-contract";
+import type { GatewayApi, GatewayBudgetWithSeats, GatewayMoney } from "@langwatch/gateway-contract";
 /**
  * @vitest-environment node
- * @see enterprise/modules/licensing/specs/licensing.feature
+ * @see enterprise/modules/connect/specs/connect.feature
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
@@ -53,7 +48,9 @@ function budget(overrides: Partial<GatewayBudgetWithSeats>): GatewayBudgetWithSe
 }
 
 function storeOver(budgets: GatewayBudgetWithSeats[]) {
-  const created: CreateGatewayBudgetInput[] = [];
+  const updated: Parameters<GatewayApi["updateBudget"]>[0][] = [];
+  const created: Parameters<GatewayApi["createBudget"]>[0][] = [];
+  const resets: Parameters<GatewayApi["resetBudget"]>[0][] = [];
   const store = ContractBudgetStoreService.create({
     gateway: createApiFixture<GatewayApi>({
       listBudgetsWithHealth: async () => ({
@@ -66,9 +63,17 @@ function storeOver(budgets: GatewayBudgetWithSeats[]) {
         created.push(input);
         return budget({});
       },
+      updateBudget: async (input) => {
+        updated.push(input);
+        return budget({});
+      },
+      resetBudget: async (input) => {
+        resets.push(input);
+        return budget({});
+      },
     }),
   });
-  return { store, created };
+  return { store, updated, created, resets };
 }
 
 describe("the contract budget kept in the gateway's budget table", () => {
@@ -81,6 +86,7 @@ describe("the contract budget kept in the gateway's budget table", () => {
         id: "budget-1",
         limitUsdCents: 125050,
         capSetByCustomer: true,
+        lastResetAt: null,
       });
     });
   });
@@ -94,8 +100,33 @@ describe("the contract budget kept in the gateway's budget table", () => {
     });
   });
 
+  describe("when the customer sets its own cap", () => {
+    /** @scenario "A customer lowers its own cap" */
+    it("writes the cap in dollars and marks it as the customer's", async () => {
+      const { store, updated } = storeOver([budget({})]);
+
+      await store.setLimit({
+        organizationId: "org-1",
+        id: "budget-1",
+        limitUsdCents: 25050,
+        capSetByCustomer: true,
+        actorId: "system:connect-license",
+      });
+
+      expect(updated).toEqual([
+        {
+          id: "budget-1",
+          organizationId: "org-1",
+          limitUsd: "250.50",
+          metadata: { connect_cap_set_by: "customer" },
+          actorUserId: "system:connect-license",
+        },
+      ]);
+    });
+  });
+
   describe("when the contract budget is created", () => {
-    /** @scenario "The contract budget is the organization's live gateway budget named by the contract's id" */
+    /** @scenario "A new contract budget is a blocking organization budget under the contract's id" */
     it("writes a blocking organization budget under the contract's id, capped by LangWatch", async () => {
       const { store, created } = storeOver([]);
 
@@ -113,6 +144,18 @@ describe("the contract budget kept in the gateway's budget table", () => {
           allowUnreachable: true,
           actorUserId: "op-1",
         },
+      ]);
+    });
+  });
+
+  describe("when a new window starts", () => {
+    it("resets that budget through the gateway, acting as the operator", async () => {
+      const { store, resets } = storeOver([budget({})]);
+
+      await store.reset({ organizationId: "org-1", id: "budget-1", actorId: "operator-1" });
+
+      expect(resets).toEqual([
+        { id: "budget-1", organizationId: "org-1", actorUserId: "operator-1" },
       ]);
     });
   });

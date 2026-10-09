@@ -4,6 +4,7 @@ export * from "./billing-types.ts";
 export * from "./billing-report.commands.ts";
 export * from "./connected-billing.ts";
 export * from "./connected-billing.errors.ts";
+export * from "./connected-billing.events.ts";
 export * from "./connected-billing.schemas.ts";
 export * from "./connected-billing.trpc.ts";
 export * from "./currency.trpc.ts";

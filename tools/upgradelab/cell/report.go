@@ -15,6 +15,7 @@ type Report struct {
 	Shape      string           `json:"shape"`
 	Release    string           `json:"release"`
 	Head       string           `json:"head"`
+	HeadCommit string           `json:"headCommit"` // the commit head ran, plus its local changes
 	Started    string           `json:"started"`
 	Error      string           `json:"error,omitempty"`
 	Timings    []Timing         `json:"timings"`
@@ -74,6 +75,7 @@ type QueueSummary struct {
 	PeakAtMs  int64         `json:"peakAtMs"`
 	DrainedMs int64         `json:"drainedAfterWorkerMs"` // -1: never drained
 	TopKeys   string        `json:"topKeysAtEnd"`
+	ByKind    string        `json:"byKindAtEnd"` // waiting group-queue jobs per job kind, with when they are due
 }
 
 // Shot is one screenshot and the Upgrades page state it showed.
@@ -188,7 +190,7 @@ func statusName(call Call) string {
 // Markdown is the cell's result table and the traffic behind it.
 func (report *Report) Markdown() string {
 	var text strings.Builder
-	fmt.Fprintf(&text, "# upgradelab cell %s\n\n%s x %s x %s, from %s to %s, started %s\n\n", report.Cell, report.Deployment, report.Tier, report.Shape, report.Release, report.Head, report.Started)
+	fmt.Fprintf(&text, "# upgradelab cell %s\n\n%s x %s x %s, from %s to %s, started %s\n\n", report.Cell, report.Deployment, report.Tier, report.Shape, report.Release, report.HeadCommit, report.Started)
 	if report.Error != "" {
 		fmt.Fprintf(&text, "**Stopped:** %s\n\n", report.Error)
 	}
@@ -204,6 +206,9 @@ func (report *Report) Markdown() string {
 	report.writeTimeline(&text)
 	fmt.Fprintf(&text, "\nMarks (ms from start): %v\n\nQueue: baseline %d, peak %d at %d ms, drained %d ms after head's worker started\n\n",
 		report.Marks, report.Queue.Baseline, report.Queue.Peak, report.Queue.PeakAtMs, report.Queue.DrainedMs)
+	if report.Queue.ByKind != "" {
+		fmt.Fprintf(&text, "Waiting at the end, by job kind:\n\n```\n%s\n```\n\n", report.Queue.ByKind)
+	}
 	for _, shot := range report.Shots {
 		fmt.Fprintf(&text, "- shot %s at %d ms: %s state %q %s\n", shot.Phase, shot.AtMs, shot.File, shot.State, shot.Error)
 	}

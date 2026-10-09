@@ -1,31 +1,15 @@
-import {
-  ConnectLicenseRequiredError,
-  connectUsageAnswerSchema,
-  ConnectServiceNotEntitledError,
-  type ContractTerms,
-  type HostedCaller,
-} from "@langwatch/enterprise-licensing-contract";
-import { ValidationError } from "@langwatch/handled-error";
-import type { InstantEvalJudgement } from "@langwatch/instant-eval-judge-contract";
+/**
+ * @see enterprise/modules/licensing/specs/licensing.feature
+ */
 import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import type { IssuedLicenseRecord } from "../../repositories/issued-license.repository.ts";
 import { MemoryIssuedLicenseRepository } from "../../repositories/memory/memory.issued-license.repository.ts";
-import type { ConnectSpendEntry } from "../connect-spend-buffer.service.ts";
-import type { HostedJudge } from "../hosted-services.service.ts";
 import { HostedServicesService } from "../hosted-services.service.ts";
-import type { HostedBudgetUsage } from "../hosted-usage-reader.service.ts";
 
 const NOW: Instant = Temporal.Instant.from("2026-01-01T00:00:00.000Z");
-
-const CALLER: HostedCaller = {
-  virtualKeyId: "vk-managed",
-  organizationId: "org-acme",
-  projectId: "project-hidden",
-};
-
-const QUESTION = { id: "q1", kind: "boolean" as const, instructions: "Is it polite?" };
+const KEY = { virtualKeyId: "vk-managed", organizationId: "org-acme" };
 
 function rowFor(overrides: Partial<IssuedLicenseRecord> = {}): IssuedLicenseRecord {
   return {
@@ -68,317 +52,64 @@ function rowFor(overrides: Partial<IssuedLicenseRecord> = {}): IssuedLicenseReco
   };
 }
 
-const TERMS: ContractTerms = {
-  commitUsdCents: 100_000,
-  maximumUsdCents: 100_000,
-  overageEnabled: false,
-  services: ["instant_evals"],
-  termEndsAt: "2027-01-01T00:00:00Z",
-  termStartsAt: "2025-12-01T00:00:00Z",
-};
-
-class RecordingJudge implements HostedJudge {
-  readonly seen: { projectId: string; text: string }[] = [];
-  readonly signals: (AbortSignal | undefined)[] = [];
-
-  constructor(private readonly judgement: InstantEvalJudgement) {}
-
-  async classify(
-    input: { projectId: string; text: string },
-    signal?: AbortSignal,
-  ): Promise<InstantEvalJudgement> {
-    this.seen.push({ projectId: input.projectId, text: input.text });
-    this.signals.push(signal);
-    return this.judgement;
-  }
-
-  priceOf({ inputTokens }: { inputTokens: number }) {
-    const costUsd = (inputTokens / 1_000_000) * 0.042;
-    return { costUsd, priceUsd: costUsd * 1.3 };
-  }
-}
-
-function budget(overrides: Partial<HostedBudgetUsage> = {}): HostedBudgetUsage {
-  return {
-    id: "budget-contract",
-    scope: "organization",
-    window: "manual",
-    limitUsd: 1000,
-    spentUsd: 120,
-    onBreach: "block",
-    periodStartedAt: Temporal.Instant.from("2025-12-01T00:00:00.000Z"),
-    isContract: true,
-    ...overrides,
-  };
-}
-
-function harness(options: {
-  rows?: IssuedLicenseRecord[];
-  judgement?: InstantEvalJudgement;
-  budgets?: HostedBudgetUsage[];
-  spendAvailable?: boolean;
-  terms?: ContractTerms;
-}) {
-  const spend: ConnectSpendEntry[] = [];
-  const judge = new RecordingJudge(
-    options.judgement ?? { verdicts: [], inputTokens: 1_000_000, isTextTruncated: false },
-  );
-  const caps: { organizationId: string; capUsdCents: number }[] = [];
-  const service = HostedServicesService.create({
-    licenses: MemoryIssuedLicenseRepository.create(options.rows ?? [rowFor()]),
-    judge,
-    spend: { add: (entry) => void spend.push(entry) },
+function serviceOver(rows: IssuedLicenseRecord[]) {
+  return HostedServicesService.create({
+    licenses: MemoryIssuedLicenseRepository.create(rows),
     usage: {
-      read: async () => ({
-        budgets: options.budgets ?? [budget()],
-        spendAvailable: options.spendAvailable ?? true,
-        readAt: NOW,
-      }),
+      read: async () => ({ budgets: [], spendAvailable: true, readAt: NOW }),
     },
     contractBudgets: {
-      termsOf: async () => options.terms ?? TERMS,
-      setCap: async (input) => {
-        caps.push(input);
-        return { capUsdCents: input.capUsdCents, maximumUsdCents: TERMS.maximumUsdCents };
-      },
+      termsOf: async () => ({
+        commitUsdCents: 100_000,
+        maximumUsdCents: 100_000,
+        overageEnabled: false,
+        services: ["instant_evals"],
+        termEndsAt: null,
+        termStartsAt: null,
+      }),
     },
     now: () => NOW,
   });
-  return { service, spend, judge, caps };
 }
 
-describe("HostedServicesService.classify", () => {
-  /** @scenario "The customer is charged the list rate and never sees the provider cost" */
-  it("charges the list rate and never states the provider cost", async () => {
-    const { service, spend } = harness({});
-
-    const answer = await service.classify({
-      caller: CALLER,
-      payload: { text: "hello", questions: [QUESTION] },
-    });
-
-    expect(answer.charged_usd).toBeCloseTo(0.042 * 1.3, 10);
-    expect(answer).not.toHaveProperty("cost_usd");
-    expect(spend[0]?.costUsd).toBeCloseTo(0.042, 10);
-    expect(spend[0]?.priceUsd).toBeCloseTo(0.042 * 1.3, 10);
-  });
-
-  /** @scenario "A connected customer is governed by its contract budget, not the free allowance" */
-  it("judges for a customer far past any free allowance while its contract budget has headroom", async () => {
-    const { service, judge } = harness({ budgets: [budget({ spentUsd: 900, limitUsd: 1000 })] });
-
-    await expect(
-      service.classify({ caller: CALLER, payload: { text: "hello", questions: [QUESTION] } }),
-    ).resolves.toMatchObject({ input_tokens: 1_000_000 });
-    expect(judge.seen).toHaveLength(1);
-  });
-
-  /** @scenario A hosted judgement stops when the calling install hangs up */
-  it("hands the judge the signal of the call it was given", async () => {
-    const { service, judge } = harness({});
-    const hangUp = new AbortController();
-
-    await service.classify({
-      caller: CALLER,
-      payload: { text: "hello", questions: [QUESTION] },
-      signal: hangUp.signal,
-    });
-
-    expect(judge.signals).toEqual([hangUp.signal]);
-  });
-
-  /** @scenario Each license gets its own managed key */
-  it("meters each install's spend under its own managed key, both on the one organization", async () => {
-    const { service, spend } = harness({
-      rows: [
-        rowFor(),
-        rowFor({
-          id: "license-2",
-          licenseId: "lic-2",
-          tokenHash: "hash-2",
-          virtualKeyId: "vk-second",
-          instanceId: "instance-2",
-        }),
-      ],
-    });
-    const second: HostedCaller = { ...CALLER, virtualKeyId: "vk-second" };
-
-    for (const caller of [CALLER, second]) {
-      await service.classify({ caller, payload: { text: "hello", questions: [QUESTION] } });
-    }
-
-    expect(spend.map((entry) => entry.virtualKeyId)).toEqual(["vk-managed", "vk-second"]);
-    expect(new Set(spend.map((entry) => entry.projectId))).toEqual(new Set(["project-hidden"]));
-  });
-
-  /** @scenario "A license without the entitlement is refused" */
-  it("refuses a license the service is not part of, judging nothing", async () => {
-    const { service, spend, judge } = harness({ rows: [rowFor({ services: ["managed_models"] })] });
-
-    await expect(
-      service.classify({ caller: CALLER, payload: { text: "hello", questions: [QUESTION] } }),
-    ).rejects.toBeInstanceOf(ConnectServiceNotEntitledError);
-    expect(judge.seen).toEqual([]);
-    expect(spend).toEqual([]);
-  });
-
-  /** @scenario "A judge that skips reports the reason and costs nothing" */
-  it("reports the skip reason and meters nothing", async () => {
-    const { service, spend } = harness({
-      judgement: {
-        verdicts: [],
-        skippedReason: "classifier_rate_limited",
-        inputTokens: 0,
-        isTextTruncated: false,
-      },
-    });
-
-    const answer = await service.classify({
-      caller: CALLER,
-      payload: { text: "hello", questions: [QUESTION] },
-    });
-
-    expect(answer.skipped_reason).toBe("classifier_rate_limited");
-    expect(spend).toEqual([]);
-  });
-
-  /** @scenario "Judged text is not stored" */
-  it("meters token counts and cost only, never the judged text", async () => {
-    const { service, spend } = harness({});
-
-    await service.classify({
-      caller: CALLER,
-      payload: { text: "a private sentence", questions: [QUESTION] },
-    });
-
-    expect(Object.keys(spend[0] ?? {}).toSorted()).toEqual([
-      "costUsd",
-      "inputTokens",
-      "priceUsd",
-      "projectId",
-      "virtualKeyId",
+describe("the active licence behind a managed key", () => {
+  /** @scenario "findManagedKeyLicense answers the active licence behind a managed key, empty otherwise" */
+  it("answers one entry with the entitled services for an active licence of the organization", async () => {
+    await expect(serviceOver([rowFor()]).findManagedKeyLicense(KEY)).resolves.toEqual([
+      { services: ["instant_evals"] },
     ]);
   });
 
-  it("refuses a payload that is not a classify request", async () => {
-    const { service } = harness({});
+  /** @scenario "findManagedKeyLicense answers the active licence behind a managed key, empty otherwise" */
+  it("answers nothing for a revoked, expired or other organization's licence, or no licence", async () => {
+    const answers = await Promise.all(
+      [
+        [rowFor({ revokedAt: NOW })],
+        [rowFor({ expiresAt: Temporal.Instant.from("2025-12-31T00:00:00.000Z") })],
+        [rowFor({ organizationId: "org-other" })],
+        [],
+      ].map((rows) => serviceOver(rows).findManagedKeyLicense(KEY)),
+    );
 
-    await expect(
-      service.classify({ caller: CALLER, payload: { text: "", questions: [] } }),
-    ).rejects.toBeInstanceOf(ValidationError);
+    expect(answers).toEqual([[], [], [], []]);
   });
 
-  it("judges for the key itself when the caller names no project", async () => {
-    const { service, judge } = harness({});
-
-    await service.classify({
-      caller: { ...CALLER, projectId: null },
-      payload: { text: "hello", questions: [QUESTION] },
-    });
-
-    expect(judge.seen[0]?.projectId).toBe("vk-managed");
+  /** @scenario "findManagedKeyLicense answers the active licence behind a managed key, empty otherwise" */
+  it("answers an active licence entitled to no hosted service as one entry with no services", async () => {
+    await expect(
+      serviceOver([rowFor({ services: ["future_service"] })]).findManagedKeyLicense(KEY),
+    ).resolves.toEqual([{ services: [] }]);
   });
 });
 
-describe("HostedServicesService.usage", () => {
-  /** @scenario The install parses the usage answer it is given */
-  it("answers a body the install's own usage schema parses, contract and budgets included", async () => {
-    const { service } = harness({});
+describe("the hosted usage billing reads through licensing", () => {
+  it("names the contract's services only where the key's licence is active", async () => {
+    const caller = { ...KEY, projectId: null };
 
-    const answer = await service.usage({ caller: CALLER });
-    const parsed = connectUsageAnswerSchema.safeParse(answer);
+    const licensed = await serviceOver([rowFor()]).usage({ caller });
+    const unlicensed = await serviceOver([]).usage({ caller });
 
-    expect(parsed.success).toBe(true);
-    expect(parsed.data?.contract).not.toBeNull();
-    expect(parsed.data?.budgets).not.toEqual([]);
-  });
-
-  /** @scenario "A connected install reads its usage" */
-  it("states what was spent, the cap, what remains and the entitled services", async () => {
-    const { service } = harness({});
-
-    const answer = await service.usage({ caller: CALLER });
-
-    expect(answer.contract).toMatchObject({
-      cap_usd: 1000,
-      spent_usd: 120,
-      remaining_usd: 880,
-      commit_usd: 1000,
-      period_started_at: "2025-12-01T00:00:00Z",
-    });
-    expect(answer.services).toEqual(["instant_evals"]);
-  });
-
-  /** @scenario "A virtual key reads its usage too" */
-  it("answers a plain virtual key with its budgets and no entitled services", async () => {
-    const { service } = harness({ rows: [] });
-
-    const answer = await service.usage({ caller: CALLER });
-
-    expect(answer.services).toEqual([]);
-    expect(answer.contract).toBeNull();
-    expect(answer.budgets).toHaveLength(1);
-  });
-
-  /** @scenario "Usage says so when live spend is not available" */
-  it("marks spend unavailable rather than reporting zero", async () => {
-    const { service } = harness({
-      spendAvailable: false,
-      budgets: [budget({ spentUsd: null })],
-    });
-
-    const answer = await service.usage({ caller: CALLER });
-
-    expect(answer.spend_available).toBe(false);
-    expect(answer.contract?.spent_usd).toBeNull();
-    expect(answer.contract?.remaining_usd).toBeNull();
-  });
-
-  /** @scenario "Usage without any budget reports no cap" */
-  it("reports no contract where the organization has no budget", async () => {
-    const { service } = harness({ budgets: [] });
-
-    const answer = await service.usage({ caller: CALLER });
-
-    expect(answer.contract).toBeNull();
-    expect(answer.budgets).toEqual([]);
-  });
-});
-
-describe("HostedServicesService.setBudget", () => {
-  /** @scenario "A virtual key cannot change a budget through this route" */
-  it("refuses a caller that holds no license", async () => {
-    const { service } = harness({ rows: [] });
-
-    await expect(
-      service.setBudget({ caller: CALLER, payload: { cap_usd: 500 } }),
-    ).rejects.toBeInstanceOf(ConnectLicenseRequiredError);
-  });
-
-  /** @scenario "A cap that is not a positive amount is refused" */
-  it("refuses a cap that is not a positive amount", async () => {
-    const { service } = harness({});
-
-    await expect(
-      service.setBudget({ caller: CALLER, payload: { cap_usd: 0 } }),
-    ).rejects.toBeInstanceOf(ValidationError);
-  });
-
-  /** @scenario A customer lowers its own cap */
-  it("moves the cap to the cent and answers the maximum it may reach", async () => {
-    const { service, caps } = harness({});
-
-    const answer = await service.setBudget({ caller: CALLER, payload: { cap_usd: 250.5 } });
-
-    expect(caps).toEqual([{ organizationId: "org-acme", capUsdCents: 25_050 }]);
-    expect(answer).toEqual({ cap_usd: 250.5, maximum_cap_usd: 1000 });
-  });
-
-  it("treats a license of another customer as no license at all", async () => {
-    const { service } = harness({ rows: [rowFor({ organizationId: "org-other" })] });
-
-    await expect(
-      service.setBudget({ caller: CALLER, payload: { cap_usd: 500 } }),
-    ).rejects.toBeInstanceOf(ConnectLicenseRequiredError);
+    expect(licensed.services).toEqual(["instant_evals"]);
+    expect(unlicensed.services).toEqual([]);
   });
 });

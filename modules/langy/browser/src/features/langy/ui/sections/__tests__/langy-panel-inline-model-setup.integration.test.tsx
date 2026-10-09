@@ -4,7 +4,7 @@
  * `langyNeedsModel` gate over `api.modelProvider.getResolvedDefault`.
  */
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
-import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -21,6 +21,10 @@ if (typeof window !== "undefined" && !window.ResizeObserver) {
       disconnect() {}
     },
   });
+}
+
+if (typeof Element !== "undefined" && !Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = () => undefined;
 }
 
 const sendMessage = vi.hoisted(() => vi.fn());
@@ -56,8 +60,20 @@ vi.mock("../../elements/langy-model-pill.tsx", () => ({
 // tested where it lives, and dragging its whole hook tree into jsdom would
 // test the model-provider feature instead.
 vi.mock("../../../../../behavior/lent-edit-model-provider-form.tsx", () => ({
-  LentEditModelProviderForm: ({ onSaved }: { onSaved?: () => void }) => (
-    <div data-testid="edit-model-provider-form">
+  LentEditModelProviderForm: ({
+    onSaved,
+    providerKey,
+    embedded,
+  }: {
+    onSaved?: () => void;
+    providerKey: string;
+    embedded?: boolean;
+  }) => (
+    <div
+      data-testid="edit-model-provider-form"
+      data-provider={providerKey}
+      data-embedded={String(Boolean(embedded))}
+    >
       <label>
         Provider API Key
         <input aria-label="Provider API Key" />
@@ -233,12 +249,71 @@ describe("given a project with no model provider configured", () => {
 
       // A provider to choose and a key to paste, both in the panel.
       expect(
-        screen.getByRole("button", { name: /Codex \(OpenAI account\), recommended/ }),
+        screen.getByRole("button", { name: "Codex (OpenAI account), Recommended" }),
       ).toBeInTheDocument();
       expect(screen.getByLabelText("Provider API Key")).toBeInTheDocument();
 
       // It replaces the ordinary empty state rather than sitting beside it.
       expect(screen.queryByText(/Just type away/)).not.toBeInTheDocument();
+    });
+  });
+});
+
+describe("given the Langy panel is showing the inline model setup", () => {
+  describe("when it first renders", () => {
+    /** @scenario "The inline setup offers provider marks with Codex first and recommended" */
+    it("shows the provider marks in order with Codex first, badged and selected", async () => {
+      resolvedDefaultRef.current = { data: { model: null }, isLoading: false, isError: false };
+      renderPanel();
+      await screen.findByText("Langy needs a model to get started");
+
+      expect(
+        screen.getByText(
+          "Langy uses this model to chat with you and help you work across the platform.",
+        ),
+      ).toBeInTheDocument();
+      const cards = within(screen.getByRole("group", { name: "Model provider" })).getAllByRole(
+        "button",
+        { pressed: false },
+      );
+      const codex = screen.getByRole("button", { name: "Codex (OpenAI account), Recommended" });
+      expect(codex).toHaveAttribute("aria-pressed", "true");
+      expect(cards.map((card) => card.getAttribute("aria-label"))).toEqual([
+        "OpenAI",
+        "Anthropic",
+        "Google Gemini",
+        "Azure OpenAI",
+        "AWS Bedrock",
+        "DeepSeek",
+        "Groq",
+        "Grok (xAI)",
+        "Google Vertex AI",
+        "Cerebras",
+        "Custom, OpenAI-compatible",
+      ]);
+      const form = screen.getByTestId("edit-model-provider-form");
+      expect(form).toHaveAttribute("data-provider", "openai_codex");
+      expect(form).toHaveAttribute("data-embedded", "true");
+    });
+  });
+
+  describe("when the user picks OpenAI", () => {
+    /** @scenario "The inline setup offers provider marks with Codex first and recommended" */
+    it("selects it and hands its key to the embedded form", async () => {
+      resolvedDefaultRef.current = { data: { model: null }, isLoading: false, isError: false };
+      renderPanel();
+      await screen.findByText("Langy needs a model to get started");
+
+      await userEvent.setup().click(screen.getByRole("button", { name: "OpenAI" }));
+
+      expect(screen.getByRole("button", { name: "OpenAI" })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+      expect(screen.getByTestId("edit-model-provider-form")).toHaveAttribute(
+        "data-provider",
+        "openai",
+      );
     });
   });
 });

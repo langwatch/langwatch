@@ -53,6 +53,7 @@ import {
   type BillingReportingDefinition,
   BillingReportingPipeline,
 } from "../eventing/billing-reporting.pipeline.ts";
+import type { ConnectedBillingPipeline } from "../eventing/connected-billing.pipeline.ts";
 import { ConnectedBillingOverviewService } from "../features/connected-billing/services/connected-billing-overview.service.ts";
 import { ConnectedBillingTickService } from "../features/connected-billing/services/connected-billing-tick.service.ts";
 import { ConnectedBillingService } from "../features/connected-billing/services/connected-billing.service.ts";
@@ -115,8 +116,6 @@ type ConnectedLicensing = Pick<
   LicensingApi,
   | "getContractTerms"
   | "raiseContractCommit"
-  | "syncContractBudget"
-  | "resetContractBudget"
   | "getConnectedSeats"
   | "getHostedUsage"
   | "findSeatChanges"
@@ -425,8 +424,6 @@ export class BillingModule
         raiseCommit: async (input) => {
           await licensing.raiseContractCommit(input);
         },
-        syncBudget: (input) => licensing.syncContractBudget(input),
-        resetBudget: (input) => licensing.resetContractBudget(input),
       },
       isSaas,
       bankDetails: () => config.bankDetails ?? null,
@@ -778,6 +775,11 @@ export class BillingModule
       throw new Error("This billing app was composed without a lifecycle pipeline");
     }
     await this.#lifecycle.pricingModelChanged(input);
+  }
+
+  /** Binds the connected_billing pipeline's senders; nothing to bind off the payment provider. */
+  connectConnectedBillingCommands(commands: EventingCommands<ConnectedBillingPipeline>): void {
+    this.#connected?.billing.connect(commands);
   }
 
   /** Binds the lifecycle pipeline's own senders. */

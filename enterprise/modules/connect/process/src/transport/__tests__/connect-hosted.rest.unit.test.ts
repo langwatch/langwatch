@@ -2,10 +2,8 @@ import { createHash, createHmac } from "node:crypto";
 
 import type { RestIdentity } from "@langwatch/api/hosting";
 import { createCanonicalFamilyErrorHandler, createRestRuntime } from "@langwatch/api/rest";
-import {
-  ConnectServiceNotEntitledError,
-  type LicensingApi,
-} from "@langwatch/enterprise-licensing-contract";
+import type { ConnectApi } from "@langwatch/enterprise-connect-contract";
+import { ConnectServiceNotEntitledError } from "@langwatch/enterprise-licensing-contract";
 import { GatewayInternalAuthenticationError } from "@langwatch/gateway-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
@@ -65,13 +63,13 @@ const signedDoor: RestIdentity = {
   },
 };
 
-function mount(app: Partial<LicensingApi>, door: RestIdentity = gatewayDoor) {
+function mount(app: Partial<ConnectApi>, door: RestIdentity = gatewayDoor) {
   const hono = createRestRuntime({
     authorization: restTestAuthorization(),
     identity: door,
     doors: { internal_secret: door },
   }).mount(connectHostedRest.router(), {
-    app: () => createApiFixture<LicensingApi>(app),
+    app: () => createApiFixture<ConnectApi>(app),
     onError: createCanonicalFamilyErrorHandler({
       loggerName: "langwatch:test:connect-hosted",
       label: "Hosted Connect",

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"maps"
 	"net/http"
 	"os"
 	"os/exec"
@@ -33,6 +34,7 @@ func (cell *run) checks(ctx context.Context) error {
 	}
 	cell.report.Traffic, cell.report.Timeline = Summarize(cell.allCalls(), ServedTimeline(cell.report.Phases, cell.marks["switched"]), visible)
 	cell.report.Queue = cell.queueSummary(ctx)
+	cell.report.Notes = append(cell.report.Notes, lostByPhase(cell.allCalls(), cell.report.Phases, visible)...)
 	cell.report.Verdicts = append(cell.report.Verdicts,
 		cell.holdingVerdict(), ledgerVerdict(final), reopenedVerdict(cell.atReady, final), cell.rosterVerdict(ctx),
 		cell.copyVerdict(ctx), cell.readBackVerdict(ctx), cell.secondRunVerdict(ctx, final), cell.logVerdict(),
@@ -222,6 +224,32 @@ func droppedVerdict(summaries []KindSummary) Verdict {
 	return verdict("N2", failed == 0, fmt.Sprintf("%d of %d failed: %v; %d upgrade_in_progress retries, longest retry window %d ms", failed, sent, detail, retries, window))
 }
 
+// lostByPhase notes, per kind, which api phase each lost write was sent in, and its first and last ms.
+func lostByPhase(calls []Call, phases []PhaseChange, visible map[string]bool) []string {
+	type span struct {
+		phases      map[string]int
+		first, last int64
+	}
+	lost := map[string]*span{}
+	for _, call := range calls {
+		if !call.Write || !call.ok() || visible[call.Kind+"/"+call.ID] {
+			continue
+		}
+		each := lost[call.Kind]
+		if each == nil {
+			each = &span{phases: map[string]int{}, first: call.AtMs}
+			lost[call.Kind] = each
+		}
+		each.phases[PhaseAt(phases, call.AtMs)]++
+		each.first, each.last = min(each.first, call.AtMs), max(each.last, call.AtMs)
+	}
+	var notes []string
+	for _, kind := range slices.Sorted(maps.Keys(lost)) {
+		notes = append(notes, fmt.Sprintf("lost %s by phase sent %v, sent from %d to %d ms", kind, lost[kind].phases, lost[kind].first, lost[kind].last))
+	}
+	return notes
+}
+
 func lostVerdict(summaries []KindSummary) Verdict {
 	lost := 0
 	var detail []string
@@ -238,7 +266,7 @@ func (cell *run) queueSummary(ctx context.Context) QueueSummary {
 	cell.queueMu.Lock()
 	samples := append([]QueueSample(nil), cell.queue...)
 	cell.queueMu.Unlock()
-	summary := QueueSummary{Samples: samples, DrainedMs: -1, TopKeys: TopQueueKeys(ctx, cell.stores.RedisPort)}
+	summary := QueueSummary{Samples: samples, DrainedMs: -1, TopKeys: TopQueueKeys(ctx, cell.stores.RedisPort), ByKind: QueueByKind(ctx, cell.stores.RedisPort)}
 	worker := cell.marks["headWorkerStarted"]
 	for _, sample := range samples {
 		if sample.AtMs < cell.marks["fromWorkerPaused"] {

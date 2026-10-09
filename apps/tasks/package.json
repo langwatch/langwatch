@@ -46,6 +46,7 @@
     "@langwatch/enterprise-governance-process": "workspace:*",
     "@langwatch/enterprise-license-signing": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*",
+    "@langwatch/enterprise-connect-process": "workspace:*",
     "@langwatch/enterprise-licensing-process": "workspace:*",
     "@langwatch/enterprise-managed-provider-process": "workspace:*",
     "@langwatch/enterprise-nurturing-process": "workspace:*",

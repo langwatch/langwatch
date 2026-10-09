@@ -40,6 +40,9 @@ function connectedFacts() {
       recordManagedKeyInvalidated: createApiFixture<Senders["recordManagedKeyInvalidated"]>({
         send: async (payload) => void sent.push(payload),
       }),
+      recordContractTermsChanged: createApiFixture<Senders["recordContractTermsChanged"]>({
+        send: async (payload) => void sent.push(payload),
+      }),
     }),
   );
   return { facts, sent };
@@ -141,6 +144,24 @@ describe("licensing's Connect facts", () => {
           occurredAt: expect.any(Number),
           organizationId: ORGANIZATION,
           virtualKeyId: "vk-new",
+        },
+      ]);
+    });
+  });
+
+  describe("when a licence change may have moved a customer's contract terms", () => {
+    /** @scenario "Issuing, revoking, changing terms or linking a licence records contract_terms_changed" */
+    it("records the organization and the operator for connect to sync from", async () => {
+      const { facts, sent } = connectedFacts();
+
+      await facts.contractTermsChanged({ organizationId: ORGANIZATION, operatorId: "operator-1" });
+
+      expect(sent).toEqual([
+        {
+          tenantId: ORGANIZATION,
+          occurredAt: expect.any(Number),
+          organizationId: ORGANIZATION,
+          operatorId: "operator-1",
         },
       ]);
     });

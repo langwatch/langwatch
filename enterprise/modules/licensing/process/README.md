@@ -6,7 +6,7 @@ The server half of [licensing](../README.md). Licences: validating and storing a
 
 ## Installation
 
-`defineProcessModule("licensing").withRepositories(licensingRepositories).withApi(LicensingModule).withTransports(licenseTrpcTransport, connectTrpcTransport, connectHostedRest, connectHostRest).withTransportFacts(…).withEventing(licenseSyncEventing).withEventing(licensingCustomerEventing).withTasks(…).withMigrations(…)`, `src/licensing.module.ts:23`.
+`defineProcessModule("licensing").withRepositories(licensingRepositories).withApi(LicensingModule).withTransports(licenseTrpcTransport, connectTrpcTransport, connectHostRest).withEventing(licenseSyncEventing).withEventing(licensingCustomerEventing).withTasks(…).withMigrations(…)`, `src/licensing.module.ts:21`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The portable signed-license capability supplied to process peers.
 
-Peers call these through the token, declared at `../contract/src/licensing.api.ts:66`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/licensing.api.ts:64`; nothing else in this package is public.
 
 #### `resolve`
 
@@ -316,28 +316,12 @@ What a customer switched off in the usage report; an absent switch is left alone
 setUsageReportSwitches(input: { optionalMetricsOptOut?: boolean; hostnameOptOut?: boolean; }): Promise<void>;
 ```
 
-#### `classifyForHostedCaller`
-
-The hosted end of Connect (ADR-156 §5), which only LangWatch Cloud composes: whether the calling key belongs to an entitled license.
-
-```typescript
-classifyForHostedCaller(input: { caller: HostedCaller; payload: unknown; /** The calling install's request: a judgement it no longer waits for is abandoned. */ signal?: AbortSignal; }): Promise<HostedClassifyAnswer>;
-```
-
 #### `getHostedUsage`
 
-What the caller spent against every budget that applies to it.
+What the caller spent against each budget that applies to it, for billing's contract spend.
 
 ```typescript
 getHostedUsage(input: { caller: HostedCaller }): Promise<HostedUsageAnswer>;
-```
-
-#### `setHostedBudgetCap`
-
-The customer moves its own hosted cap, up to the contract maximum.
-
-```typescript
-setHostedBudgetCap(input: { caller: HostedCaller; payload: unknown }): Promise<HostedCapAnswer>;
 ```
 
 #### `getContractTerms`
@@ -372,28 +356,20 @@ Raises the prepaid commit a renewal or top-up invoice agreed.
 raiseContractCommit(input: { organizationId: string; byUsdCents: number; operatorId: string; }): Promise<IssuedLicenseView>;
 ```
 
-#### `syncContractBudget`
-
-Re-derives the contract budget's cap from the license terms.
-
-```typescript
-syncContractBudget(input: { organizationId: string; operatorId: string }): Promise<void>;
-```
-
-#### `resetContractBudget`
-
-Starts a new budget window: spend so far no longer counts.
-
-```typescript
-resetContractBudget(input: { organizationId: string; operatorId: string }): Promise<void>;
-```
-
 #### `findConnectServicesForManagedKey`
 
 The hosted services the active license behind one managed key is entitled to, empty when no active license names that key. The gateway resolves a CONNECT key's scope through this and never reads `IssuedLicense` itself.
 
 ```typescript
 findConnectServicesForManagedKey(input: { virtualKeyId: string; organizationId: string; }): Promise<ConnectService[]>;
+```
+
+#### `findManagedKeyLicense`
+
+The active license behind one managed key in one organization, as the hosted routes check it: one entry naming its entitled services (possibly none), or empty where no active license of that organization holds the key.
+
+```typescript
+findManagedKeyLicense(input: { virtualKeyId: string; organizationId: string; }): Promise<{ services: ConnectService[] }[]>;
 ```
 
 #### `issueActivationCode`
@@ -495,52 +471,6 @@ interface Response {
   maxMembers: number;
   expiresAt: string;
   services: string[];
-}
-```
-
-### `connectHostedRest`
-
-|             |                                           |
-| ----------- | ----------------------------------------- |
-| Declared at | `src/transport/connect-hosted.rest.ts:63` |
-| Base URL    | none: each route's path is its address    |
-| Addressing  | literal                                   |
-| Credential  | internal_secret                           |
-
-#### `POST /api/internal/gateway/connect/instant-evals-classify` · `classifyForHostedCaller`
-
-Authenticated: the Go data plane signs every call with the deployment's own gateway secret, and the hosted Connect door verifies it under this family's paths before any route runs. Hidden from the OpenAPI document. Declared at `src/transport/connect-hosted.rest.ts:69`.
-
-Answers at `/api/internal/gateway/connect/instant-evals-classify`.
-
-```typescript
-// Rawbody: "text" (inline, src/transport/connect-hosted.rest.ts:70)
-type Response = z.infer<typeof hostedClassifyAnswerSchema>; // ../contract/src/connect-hosted.ts:107
-```
-
-#### `POST /api/internal/gateway/connect/usage` · `getHostedUsage`
-
-Authenticated: the Go data plane signs every call with the deployment's own gateway secret, and the hosted Connect door verifies it under this family's paths before any route runs. Hidden from the OpenAPI document. Declared at `src/transport/connect-hosted.rest.ts:84`.
-
-Answers at `/api/internal/gateway/connect/usage`.
-
-```typescript
-// Rawbody: "text" (inline, src/transport/connect-hosted.rest.ts:85)
-type Response = z.infer<typeof hostedUsageAnswerSchema>; // ../contract/src/connect-hosted.ts:83
-```
-
-#### `POST /api/internal/gateway/connect/budget` · `setHostedBudgetCap`
-
-Authenticated: the Go data plane signs every call with the deployment's own gateway secret, and the hosted Connect door verifies it under this family's paths before any route runs. Hidden from the OpenAPI document. Declared at `src/transport/connect-hosted.rest.ts:92`.
-
-Answers at `/api/internal/gateway/connect/budget`.
-
-```typescript
-// Rawbody: "text" (inline, src/transport/connect-hosted.rest.ts:93)
-// Response: hostedCapAnswerSchema, ../contract/src/connect-hosted.ts:115
-interface Response {
-  cap_usd: number;
-  maximum_cap_usd: number;
 }
 ```
 
@@ -675,19 +605,20 @@ Declared at `src/eventing/license-sync.pipeline.ts:57`.
 
 ### Pipeline `licensing_customer` (aggregate `licensing_customer`)
 
-Declared at `src/eventing/licensing-customer.pipeline.ts:83`. Events: `selfHostedCustomerLicensedEventSchema`, `connectServiceSwitchedEventSchema`, `licenseSyncFinishedEventSchema`, `licenseStoredEventSchema`, `licenseClearedEventSchema`, `managedKeyRetiredEventSchema`, `managedKeyInvalidatedEventSchema`, `connectCredentialIssuedEventSchema`.
+Declared at `src/eventing/licensing-customer.pipeline.ts:89`. Events: `selfHostedCustomerLicensedEventSchema`, `connectServiceSwitchedEventSchema`, `licenseSyncFinishedEventSchema`, `licenseStoredEventSchema`, `licenseClearedEventSchema`, `managedKeyRetiredEventSchema`, `managedKeyInvalidatedEventSchema`, `connectCredentialIssuedEventSchema`, `contractTermsChangedEventSchema`.
 
 | Kind            | Name                               | Handles                                                                                    | Declared at                                       |
 | --------------- | ---------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------- |
-| command         | `recordSelfHostedCustomerLicensed` | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:97`  |
-| command         | `recordConnectServiceSwitched`     | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:98`  |
-| command         | `recordLicenseSyncFinished`        | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:99`  |
-| command         | `recordLicenseStored`              | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:100` |
-| command         | `recordLicenseCleared`             | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:101` |
-| command         | `recordManagedKeyRetired`          | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:102` |
-| command         | `recordManagedKeyInvalidated`      | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:103` |
-| command         | `recordConnectCredentialIssued`    | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:104` |
-| peer subscriber | `licensingManagedKeyProvisioned`   | `lw.gateway.managed_key_provisioned` from [gateway](../../../../modules/gateway/README.md) | `src/eventing/licensing-customer.pipeline.ts:106` |
+| command         | `recordSelfHostedCustomerLicensed` | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:104` |
+| command         | `recordConnectServiceSwitched`     | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:105` |
+| command         | `recordLicenseSyncFinished`        | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:106` |
+| command         | `recordLicenseStored`              | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:107` |
+| command         | `recordLicenseCleared`             | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:108` |
+| command         | `recordManagedKeyRetired`          | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:109` |
+| command         | `recordManagedKeyInvalidated`      | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:110` |
+| command         | `recordConnectCredentialIssued`    | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:111` |
+| command         | `recordContractTermsChanged`       | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:112` |
+| peer subscriber | `licensingManagedKeyProvisioned`   | `lw.gateway.managed_key_provisioned` from [gateway](../../../../modules/gateway/README.md) | `src/eventing/licensing-customer.pipeline.ts:114` |
 
 ### Tasks
 
@@ -701,8 +632,8 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                     | Environment variable                 | Declared at                              |
 | ------ | ------------------------ | ------------------------------------ | ---------------------------------------- |
-| secret | `instanceLicenseKey`     | `LANGWATCH_LICENSE_KEY`              | `src/app/licensing.app.ts:184`           |
-| secret | `licensePrivateKey`      | `LANGWATCH_LICENSE_PRIVATE_KEY`      | `src/app/licensing.app.ts:185`           |
+| secret | `instanceLicenseKey`     | `LANGWATCH_LICENSE_KEY`              | `src/app/licensing.app.ts:175`           |
+| secret | `licensePrivateKey`      | `LANGWATCH_LICENSE_PRIVATE_KEY`      | `src/app/licensing.app.ts:176`           |
 | config | `publicKey`              | `LANGWATCH_LICENSE_PUBLIC_KEY`       | `../contract/src/licensing.config.ts:45` |
 | config | `connectDisabled`        | `LANGWATCH_CONNECT_DISABLED`         | `../contract/src/licensing.config.ts:52` |
 | config | `connectGatewayEndpoint` | `LANGWATCH_CONNECT_GATEWAY_ENDPOINT` | `../contract/src/licensing.config.ts:53` |

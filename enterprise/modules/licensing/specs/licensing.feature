@@ -190,23 +190,30 @@ Feature: Enterprise licensing lifecycle
       When an operator lists the self-hosted instances
       Then the install is listed with no organization name
 
-  Rule: Every deployment composes the licence registry from its own stores
+  Rule: Licensing records that a customer's contract terms moved
 
-    Main built the licence registry, activation codes and licence sync from
-    Postgres on every deployment. The managed keys and the contract budget are
-    the gateway's, reached through its operations.
-
-    @unit
-    Scenario: The contract budget is the organization's live gateway budget named by the contract's id
-      Given the organization's gateway budgets include one carrying the contract's external id
-      When licensing reads the organization's contract budget
-      Then it answers that budget's limit in cents and whether the customer set the cap
+    The contract budget follows the customer's terms, and the budget is connect's. Licensing says only
+    that the terms moved, as a fact on the licensing_customer aggregate keyed by the organization;
+    connect syncs the budget from it, seconds later.
 
     @unit
-    Scenario: An archived contract budget is no contract budget
-      Given the organization's only contract budget is archived
-      When licensing reads the organization's contract budget
-      Then it answers none
+    Scenario: Issuing, revoking, changing terms or linking a licence records contract_terms_changed
+      Given a licence registry that records licensing's customer facts
+      When an operator issues, revokes, changes the terms of, or links a licence to an organization
+      Then each change records a contract_terms_changed fact for the licence's organization
+      And moving a licence between organizations records one for the organization it left as well
+
+    @unit
+    Scenario: A licence linked to no organization records no contract_terms_changed fact
+      Given a licence that no organization carries
+      When an operator revokes it or changes its terms
+      Then no contract_terms_changed fact is recorded
+
+    @unit
+    Scenario: Each contract_terms_changed fact is its own message
+      Given the same operator changes the same organization's terms twice, a moment apart
+      When both facts are recorded
+      Then they carry different idempotency keys, so neither is dropped as a repeat
 
   Rule: Licensing owns the licence signing key
 
@@ -225,70 +232,18 @@ Feature: Enterprise licensing lifecycle
       When a peer asks licensing to sign a licence
       Then it is refused as license_signing_not_configured
 
-  Rule: Every deployment composes the hosted Connect services from their owners
+  Rule: Licensing answers which active licence a managed key runs under
 
-    Main composed the hosted services on every deployment: instant-eval judges a hosted call,
-    prices it at its judge's rate and records the spend under the calling key; the gateway keeps
-    the budgets a connected install reads.
-
-    @integration
-    Scenario: A hosted judgement is priced at the rate of the judge that made it
-      Given LangWatch Cloud judges hosted calls with a judge at its own rate and markup
-      When licensing asks what a judgement's input tokens were worth
-      Then it is told the cost and the customer price at that judge's rate
-
-    @integration
-    Scenario: A hosted judgement stops when the calling install hangs up
-      Given a hosted classify call is being judged
-      When the calling install's request is abandoned
-      Then the judge is handed that request's signal
-
-    @integration
-    Scenario: Hosted spend is billed to the calling key on the spend spine
-      Given the spend spine is registered
-      When a hosted call's spend is recorded
-      Then one outcome at the customer price is recorded under the project's organization and the calling key
-
-    @integration
-    Scenario: Hosted spend is refused while the spend spine is not registered
-      Given the spend spine is not registered
-      When a hosted call's spend is recorded
-      Then the record is refused, so the caller keeps the spend and tries again
+    The hosted Connect routes are the connect module's; whether the calling key belongs to an
+    active licence of the calling organization, and what that licence is entitled to, is licensing's.
 
     @unit
-    Scenario: Hosted usage lists only the budgets that apply to the calling key
-      Given the organization has budgets of which only some apply to the calling key
-      When a connected install reads its hosted usage
-      Then only the applicable budgets are listed, and the contract budget is marked as the contract
-
-    @unit
-    Scenario: Hosted usage resolves no team for a project authz does not know
-      Given the calling key names a project authz holds no scope for
-      When a connected install reads its hosted usage
-      Then the budgets are resolved with no team rather than the read failing
-
-    @unit
-    Scenario: Hosted usage reports spend as unknown when live spend cannot be read
-      Given live spend cannot be read
-      When a connected install reads its hosted usage
-      Then each budget's spend is unknown rather than zero
-
-  Rule: The hosted Connect routes answer behind the gateway's own signed-call door
-
-    Main mounted the hosted routes behind the gateway's signature check. The gateway hands its
-    door out through its Api, so the hosted family verifies the same signature, never a copy.
-
-    @unit
-    Scenario: A hosted call with a bad signature is refused before any route runs
-      Given the Go data plane's call is not signed with the gateway's secret
-      When it reaches a hosted Connect route
-      Then it is refused as unauthenticated and no licence is read
-
-    @unit
-    Scenario: A signed hosted call from a key without a licence is refused by its code
-      Given a correctly signed hosted call from a key no licence carries
-      When it asks for a hosted judgement
-      Then it passes the gateway's door and is refused as connect_service_not_entitled
+    Scenario: findManagedKeyLicense answers the active licence behind a managed key, empty otherwise
+      Given licences held by managed keys, some revoked, expired or of another organization
+      When a peer asks which active licence of an organization holds one managed key
+      Then an active licence of that organization answers as one entry naming its entitled services
+      And an active licence entitled to no hosted service answers as one entry with no services
+      And a revoked, expired or other organization's licence, or none, answers empty
 
   @unit
   Scenario: A hosted service's state names which half said no

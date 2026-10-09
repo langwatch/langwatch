@@ -121,3 +121,15 @@ func TestUpgradeInProgressIsRetriedAfterRetryAfter(t *testing.T) {
 		t.Errorf("call = %+v, want 200 after one retry about a second later", call)
 	}
 }
+
+// @scenario "Traffic is seeded and judged per kind and per api phase"
+func TestQueueKindsGroupWaitingJobs(t *testing.T) {
+	out := "{event-sourcing/jobs}:gq:group:p1/fold/traceSummary/reactor/deferredOriginResolution/trace:a:jobs 1 1000 1000\n" +
+		"{event-sourcing/jobs}:gq:group:p2/fold/traceSummary/reactor/deferredOriginResolution/trace:b:jobs 2 3000 61000\n" +
+		"{event-sourcing/jobs}:gq:group:p1/command/recordDataPoint/metric:metric:3:jobs 12 0 0\n"
+	got := groupQueueKinds(out, 1000)
+	want := "command/recordDataPoint: 12 jobs in 1 groups, due -1 s to -1 s\nfold/traceSummary/reactor/deferredOriginResolution: 3 jobs in 2 groups, due +0 s to +60 s"
+	if got != want {
+		t.Errorf("got\n%s\nwant\n%s", got, want)
+	}
+}

@@ -2,7 +2,7 @@ import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 import { Link } from "@langwatch/browser-host/link";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { RawCheckbox as Checkbox } from "@langwatch/design-system/checkbox";
-import { Alert, Field, Icon, Input, Text, VStack } from "@langwatch/design-system/primitives";
+import { Field, Icon, Input, VStack } from "@langwatch/design-system/primitives";
 import { ExternalLink } from "lucide-react";
 import type React from "react";
 import { Suspense, useMemo } from "react";
@@ -18,8 +18,6 @@ import {
   type RoleType,
   type UsageStyle,
 } from "../../behavior/types.ts";
-import { useJoinLookup } from "../../behavior/use-join-lookup.ts";
-import { extractJoinInsteadNames, formatJoinInsteadNames } from "../../model/join-instead.ts";
 import { joinOriginOf } from "../../model/join-origin.ts";
 import { useOnboardingHost } from "../../model/onboarding-host.ts";
 import { IconCheckboxCardGroup } from "../elements/forms/icon-checkbox-card-group.tsx";
@@ -28,42 +26,11 @@ import { BasicInfoConditionalFields } from "./basic-info-conditional-fields.tsx"
 import { useOnboardingFormContext } from "./form-context.tsx";
 import { IntentSelectionScreen } from "./intent-selection-screen.tsx";
 
-/**
- * "Acme is already here — join instead?" (D12). Nudged, never blocked: nothing
- * is disabled and the form below still completes. Renders nothing when nothing
- * is open to the reader's own verified address, which is most people.
- */
-function JoinInsteadNotice({ lookup }: { lookup: unknown }) {
-  const names = extractJoinInsteadNames(lookup);
-  if (names.length === 0) return null;
-
-  return (
-    <Alert.Root status="info" width="full" size="sm" data-testid="join-instead-notice">
-      <Alert.Indicator />
-      <Alert.Content>
-        <Alert.Description>
-          <Text>
-            {formatJoinInsteadNames(names)} {names.length === 1 ? "is" : "are"} already on LangWatch
-            with your email domain.{" "}
-            <Link href="/auth/join" variant="underline" fontWeight="medium">
-              Join instead
-            </Link>
-            , or carry on and create a new one.
-          </Text>
-        </Alert.Description>
-      </Alert.Content>
-    </Alert.Root>
-  );
-}
-
 // Module-scope screen components and their props
 const OrganizationScreen: React.FC<OnboardingScreenProps> = ({ surface }) => {
   const { organizationName, agreement, setOrganizationName, setAgreement } =
     useOnboardingFormContext();
   const analytics = useUiAnalytics();
-  // Answers only for the caller's OWN verified address, so no organization
-  // name reaches the browser before the domain is proved.
-  const joinLookup = useJoinLookup();
   const joinOffers = useOnboardingHost().joinOffers();
   // A request made on behalf of `langwatch login`'s device page lands a Developer (ADR-171 v6).
   const { query } = useRouter();
@@ -84,8 +51,6 @@ const OrganizationScreen: React.FC<OnboardingScreenProps> = ({ surface }) => {
           />
         </Suspense>
       ))}
-      {/* For somebody who already declined for this domain: the sentence, not the screen. */}
-      <JoinInsteadNotice lookup={joinLookup.data} />
       <Field.Root colorPalette="orange" w="full">
         <Input
           aria-label="Organization name"
@@ -145,6 +110,27 @@ const OrganizationScreen: React.FC<OnboardingScreenProps> = ({ surface }) => {
         </Checkbox.Root>
       </Field.Root>
     </VStack>
+  );
+};
+
+/** Once the offer was declined: one quiet action under the step, not the screen again. */
+const OrganizationScreenFooter: React.FC<OnboardingScreenProps> = () => {
+  const joinOffers = useOnboardingHost().joinOffers();
+  const { query } = useRouter();
+  const origin = joinOriginOf({
+    returnTo: typeof query.return_to === "string" ? query.return_to : null,
+  });
+
+  return (
+    <>
+      {joinOffers.map(({ key, JoinInstead }) =>
+        JoinInstead ? (
+          <Suspense key={key} fallback={null}>
+            <JoinInstead origin={origin} />
+          </Suspense>
+        ) : null,
+      )}
+    </>
   );
 };
 
@@ -259,6 +245,7 @@ export const useCreateWelcomeScreens = ({ flow }: IntroScreensProps): Onboarding
         heading: "Welcome aboard",
         subHeading: "Let's kick off by creating your organization",
         component: OrganizationScreen,
+        footer: OrganizationScreenFooter,
       },
       [OnboardingScreenIndex.INTENT]: {
         id: "intent",

@@ -235,7 +235,7 @@ phase0_products() {
 # Phase 2 reads every seeded kind back through head's api with the same account.
 collect_products() {
   [[ -s "$RUN_DIR/evidence/product-seeds.json" ]] || return 0
-  APP_BASE="http://localhost:${HEAD_API_PORT}" SEED_EMAIL="$SEED_EMAIL" SEED_PASSWORD="$SEED_PASSWORD" \
+  APP_BASE="http://localhost:${HEAD_API_PORT}" APP_ORIGIN="http://localhost:${OLD_APP_PORT}" SEED_EMAIL="$SEED_EMAIL" SEED_PASSWORD="$SEED_PASSWORD" \
     SEEDS="$RUN_DIR/evidence/product-seeds.json" OUT="$RUN_DIR/evidence/product-readback.json" \
     node "$HERE/seed/product.mjs" readback >"$RUN_DIR/evidence/logs/product-readback.log" 2>&1 ||
     log "phase 2: product read-back failed (logs/product-readback.log)"
@@ -361,12 +361,14 @@ phase1_overlap() {
 # rows means the platform default, so privacy and retention both follow placement) and a folded trace
 # summary (ClickHouse trace_summaries, TenantId = project id), read-only.
 collect_resolution() {
-  local projects folded
-  projects="$(psql_json "SELECT p.id AS \"projectId\", placed AS privacy, placed AS retention FROM (SELECT p.id, t.id IS NOT NULL AND (NOT t.\"isPersonal\" OR EXISTS (SELECT 1 FROM mydb.\"OrganizationUser\" ou WHERE ou.\"organizationId\" = t.\"organizationId\" AND ou.\"userId\" = t.\"ownerUserId\")) AS placed FROM mydb.\"Project\" p LEFT JOIN mydb.\"Team\" t ON t.id = p.\"teamId\" WHERE p.id LIKE 'rh\\_${RUN_ID}\\_%') p ORDER BY p.id")"
-  folded="$(compose exec -T clickhouse clickhouse-client --password langwatch --database langwatch --query "SELECT DISTINCT TenantId FROM trace_summaries WHERE TenantId LIKE 'rh\\_${RUN_ID}\\_%' FORMAT JSONEachRow" 2>/dev/null || true)"
+  # Files, not argv: at --scale the project list overflows the argument limit.
+  local projects="$RUN_DIR/evidence/resolution-projects.json" folded="$RUN_DIR/evidence/resolution-folded.jsonl"
+  psql_json "SELECT p.id AS \"projectId\", placed AS privacy, placed AS retention FROM (SELECT p.id, t.id IS NOT NULL AND (NOT t.\"isPersonal\" OR EXISTS (SELECT 1 FROM mydb.\"OrganizationUser\" ou WHERE ou.\"organizationId\" = t.\"organizationId\" AND ou.\"userId\" = t.\"ownerUserId\")) AS placed FROM mydb.\"Project\" p LEFT JOIN mydb.\"Team\" t ON t.id = p.\"teamId\" WHERE p.id LIKE 'rh\\_${RUN_ID}\\_%') p ORDER BY p.id" >"$projects"
+  compose exec -T clickhouse clickhouse-client --password langwatch --database langwatch --query "SELECT DISTINCT TenantId FROM trace_summaries WHERE TenantId LIKE 'rh\\_${RUN_ID}\\_%' FORMAT JSONEachRow" >"$folded" 2>/dev/null || true
   node -e '
-    const projects = JSON.parse(process.argv[1]);
-    const folded = new Set(process.argv[2].split("\n").filter(Boolean).map((l) => JSON.parse(l).TenantId));
+    const fs = require("node:fs");
+    const projects = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+    const folded = new Set(fs.readFileSync(process.argv[2], "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l).TenantId));
     const rows = projects.map((p) => ({ projectId: p.projectId, privacy: p.privacy, retention: p.retention, folded: folded.has(p.projectId) }));
     process.stdout.write(JSON.stringify(rows));
   ' "$projects" "$folded" >"$RUN_DIR/evidence/resolution.json"
