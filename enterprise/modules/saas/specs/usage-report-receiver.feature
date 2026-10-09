@@ -58,3 +58,16 @@ Feature: LangWatch Cloud receives the daily usage report
     Given a report whose proxy header names the sender by an IPv6 address, written short or in full
     When the receiver reads the sender's address
     Then the report is counted against that address's limit
+
+  @unit
+  Scenario: Cloud's answer names the latest release with its commit, and the floor
+    Given Cloud is configured with a latest release, the commit it was built from and a floor
+    When it accepts a report
+    Then the answer names the latest release with its commit, and the floor
+    And a build of the same release from another commit can tell it is not the latest
+
+  @unit
+  Scenario: Cloud names no release when none is configured
+    Given Cloud is configured with no latest release and no floor
+    When it accepts a report
+    Then the answer is only "Event captured", as before

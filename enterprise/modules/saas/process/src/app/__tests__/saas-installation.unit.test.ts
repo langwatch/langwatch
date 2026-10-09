@@ -24,7 +24,9 @@ function boot({
   return createApp({ role: "api" })
     .withModules([saasProcessModule])
     .withStores(memoryStores())
-    .withConfig({ saas: { isSaas } })
+    .withConfig({
+      saas: { isSaas, latestRelease: void 0, latestReleaseCommit: void 0, releaseFloor: void 0 },
+    })
     .provide({
       ops: createApiFixture<OpsApi>({
         findProductAnalyticsTargets: () => {

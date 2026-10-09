@@ -56,6 +56,7 @@ export class SaasModule implements SaasApiContract {
         registry: dependencies.licensing,
         analytics,
         logger,
+        release: config,
       }),
     );
   }

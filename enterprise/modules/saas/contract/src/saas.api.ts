@@ -17,8 +17,18 @@ export const senderAddressHeadersSchema = z.object({
   "true-client-ip": z.string().optional(),
 });
 
-/** What an accepted usage report is answered with, on either door. */
-export const usageReportReceiptSchema = z.object({ message: z.literal("Event captured") });
+/** A release as Cloud names it: the release name and the commit it was built from. */
+export const releaseIdentitySchema = z.object({
+  release: z.string(),
+  commit: z.string().nullable(),
+});
+
+/** What an accepted usage report is answered with, on either door; release fields only when configured. */
+export const usageReportReceiptSchema = z.object({
+  message: z.literal("Event captured"),
+  latest_release: releaseIdentitySchema.optional(),
+  floor: z.string().optional(),
+});
 
 export type UsageReportReceipt = z.infer<typeof usageReportReceiptSchema>;
 
