@@ -6,6 +6,7 @@ import {
   workspacePathOf,
 } from "./classify.mjs";
 import { defineRule, renderMessage, renderTemplate } from "./define-rule.mjs";
+import { accessEscapeKindRule } from "./rules/access-escape-kind.rule.mjs";
 import { bannedTestModelNamesRule } from "./rules/banned-test-model-names.rule.mjs";
 import { bannedVerbPrefixRule } from "./rules/banned-verb-prefix.rule.mjs";
 import { browserStoreContainmentRule } from "./rules/browser-store-containment.rule.mjs";
@@ -122,6 +123,7 @@ const HOUSE_RULES = [
   noBootHookOutsideGuardRule,
   noHandRolledPlanGateRule,
   noHonoHttpExceptionRule,
+  accessEscapeKindRule,
   noAmbientContextRule,
   requestDeliveryFromAnIntentRule,
   noInlineDynamicImportRule,
@@ -218,6 +220,7 @@ export {
   noBootHookOutsideGuardRule,
   noHandRolledPlanGateRule,
   noHonoHttpExceptionRule,
+  accessEscapeKindRule,
   noAmbientContextRule,
   requestDeliveryFromAnIntentRule,
   noInlineDynamicImportRule,
