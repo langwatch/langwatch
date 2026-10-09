@@ -12,6 +12,7 @@ import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { describe, expect, it } from "vitest";
 
 import { shareViewerFact, sharedTraceTrpcTransport } from "../shared-trace.trpc.ts";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 
 type SharedTraceRead = Parameters<TraceApi["getSharedTrace"]>[0];
 
@@ -20,7 +21,8 @@ async function readShared({ socketAddress }: { socketAddress: string }): Promise
   const refuse = () => Promise.reject(new Error("no decision is asked here"));
   const trpc = TrpcHost.create({
     sessions: SessionReader.unverified(),
-    authz: { getDecision: refuse, getProjectAnyDecision: refuse, checkScopeLineage: refuse },
+    authz: {
+  ...testAuthorizeDefaults, getDecision: refuse, getProjectAnyDecision: refuse, checkScopeLineage: refuse },
   });
   trpc.mount(
     composeTrpcRouters("sharedTrace", [sharedTraceTrpcTransport]),
