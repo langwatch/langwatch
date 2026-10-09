@@ -49,7 +49,7 @@ vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => {
   };
   return {
     ...original,
-    useUiCapabilities: () => capabilities,
+    useUiHostServices: () => capabilities,
     useUiDeployment: () => deployment,
   };
 });

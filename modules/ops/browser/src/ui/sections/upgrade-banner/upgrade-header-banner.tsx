@@ -1,4 +1,4 @@
-import { useUiCapabilities } from "@langwatch/browser-host/capabilities";
+import { useUiHostServices } from "@langwatch/browser-host/capabilities";
 
 import { api } from "../../../behavior/ops-api.ts";
 import { UpgradeBanner } from "./upgrade-banner.tsx";
@@ -11,14 +11,14 @@ export const UPGRADES_PATH = "/ops/upgrades";
 
 /** The banner ops lends to the header: an operator's `ops.upgrade.status`, when it needs them. */
 export function UpgradeHeaderBanner() {
-  const { session } = useUiCapabilities();
+  const { session } = useUiHostServices();
   if (!session.hasPermission(OPS_VIEW_PERMISSION)) return null;
   return <OperatorUpgradeBanner />;
 }
 
 /** Split out so a non-operator never issues the status read at all. */
 function OperatorUpgradeBanner() {
-  const { navigation } = useUiCapabilities();
+  const { navigation } = useUiHostServices();
   const status = api.ops.upgrade.status.useQuery();
   return (
     <UpgradeBanner

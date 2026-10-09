@@ -5,7 +5,7 @@
  */
 
 import {
-  useUiCapabilities,
+  useUiHostServices,
   useUiScope,
   type UiFeedback,
   type UiNavigation,
@@ -105,7 +105,7 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
  * that is what `mounts.load` resolves.
  */
 export default function AnalyticsHostMount({ children }: { children?: ReactNode }) {
-  const { session, navigation, route, feedback } = useUiCapabilities();
+  const { session, navigation, route, feedback } = useUiHostServices();
   const { organizationId, projectId } = useUiScope().activeScope();
   const scopeProject = session.snapshot().scope.project;
   const scopeProjectId = scopeProject?.id;

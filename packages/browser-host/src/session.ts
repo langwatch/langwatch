@@ -1,5 +1,5 @@
 import type { UiActor } from "./capabilities.ts";
-import { useUiCapabilities } from "./capabilities.ts";
+import { useUiHostServices } from "./capabilities.ts";
 
 export type UiSessionStatus = "loading" | "authenticated" | "anonymous" | "offline" | "error";
 
@@ -56,6 +56,6 @@ export function useActiveScope(): UiActiveScopeReading {
 }
 
 function useUiSessionSnapshot(): UiSessionSnapshot {
-  const { session } = useUiCapabilities();
+  const { session } = useUiHostServices();
   return session.snapshot();
 }

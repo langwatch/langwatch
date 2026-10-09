@@ -146,4 +146,22 @@ Feature: Sockets are declared like routes and mounted by the process
     @unit
     Scenario: An upgrade to the local folder's socket reaches langy with the session key
       When the command line upgrades with its session key and x-project-id
-      Then the langy application accepts the connection with the key and the project
+      Then langy's session key door is asked before the socket opens
+      And the langy application accepts the connection with what the door resolved, reading no header
+
+    @unit
+    Scenario: An upgrade to the local folder's socket with a refused key answers main's refused frame
+      When the command line upgrades with no key, an invalid key, the wrong kind of key or a key bound to no conversation
+      Then the socket opens and carries main's refused frame with its code and message
+      And it closes with code 1008 naming the refusal code
+
+  Rule: A socket may sit behind its module's own session key door (Alex, round 86, E2)
+
+    @unit
+    Scenario: A socket behind the session key door is admitted by the module's own door
+      Given a protocol that declares the session key door and a module that bound one
+      When a client upgrades with a session key
+      Then the module's door is asked before the socket opens
+      And the handler is handed the door's session, parsed by the protocol's schema
+      And a refused key still opens the socket and is handed to the protocol's own refuse
+      And an upgrade to a protocol whose module bound no session key door is answered 503

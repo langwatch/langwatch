@@ -5,8 +5,8 @@
  */
 
 import {
-  resolveUiCapabilities,
-  UiCapabilityContextProvider,
+  resolveUiHostServices,
+  UiHostServicesContextProvider,
   UiDocumentTitle,
   UiNavigation,
   UiRoute,
@@ -100,8 +100,8 @@ function openAt(path: string): { address: () => string } {
   );
   const view = render(
     <QueryClientProvider client={new QueryClient()}>
-      <UiCapabilityContextProvider
-        value={resolveUiCapabilities({
+      <UiHostServicesContextProvider
+        value={resolveUiHostServices({
           install: {},
           documentTitle: new InertUiDocumentTitle(),
           navigation: new InertUiNavigation(),
@@ -110,7 +110,7 @@ function openAt(path: string): { address: () => string } {
         })}
       >
         <RouterProvider router={router} />
-      </UiCapabilityContextProvider>
+      </UiHostServicesContextProvider>
     </QueryClientProvider>,
   );
   dispose = () => {

@@ -10,7 +10,7 @@ import {
   UiNavigation,
   UiRoute,
   UNAVAILABLE_UI_SESSION,
-  type UiCapabilities,
+  type UiHostServices,
   type UiFailureNotice,
   type UiRouteReadingValues,
   type UiSession,
@@ -100,10 +100,10 @@ class HostUiFeedback extends UiFeedback {
 }
 
 /** The capabilities a screen under test reads, answered by the host double. */
-export function createUiCapabilitiesFromHost(
+export function createUiHostServicesFromHost(
   host: UiTestHost,
   session: UiSession = UNAVAILABLE_UI_SESSION,
-): UiCapabilities {
+): UiHostServices {
   return {
     documentTitle: BrowserUiDocumentTitle.create(),
     session,

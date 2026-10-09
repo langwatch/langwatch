@@ -5,7 +5,7 @@ import { createBrowserUiAnalytics } from "@langwatch/browser-host/browser-analyt
 import type {
   UiDeployment,
   UiFeedback,
-  UiSessionCapabilities,
+  UiSessionHostServices,
 } from "@langwatch/browser-host/capabilities";
 import type { UiDrawerRegistry } from "@langwatch/browser-host/drawer";
 import { BrowserUiFeedback } from "@langwatch/browser-host/feedback";
@@ -46,9 +46,9 @@ import { installedUiDeclarations } from "./shell/ui-declarations";
 import { uiErrorPages, type UiErrorPages } from "./shell/ui-error-page";
 import {
   composeUiDesignSystem,
-  loadUiRootCapabilities,
-  type UiRootCapabilities,
-} from "./shell/ui-root-capabilities";
+  loadUiRootHostServices,
+  type UiRootHostServices,
+} from "./shell/ui-root-host-services";
 import { uiRouteTable } from "./shell/ui-route-table";
 import { UiSaasFooter } from "./shell/ui-saas-footer";
 import { uiShellLayouts } from "./shell/ui-shell-layouts";
@@ -98,19 +98,19 @@ function UiBootPageError() {
  * Where the two capabilities meet, and the only place they do — in the order
  * record 10.1 rules. `auth` and `organization` never import each other.
  */
-function browserUiCapabilitiesHook({
+function browserUiHostServicesHook({
   session: auth,
   scope: organization,
   copyTargets: lending,
   traceFilters: filtering,
-}: UiRootCapabilities) {
-  return function useBrowserUiCapabilities({
+}: UiRootHostServices) {
+  return function useBrowserUiHostServices({
     transport,
     feedback,
   }: {
     transport: UiFeatureApiTransport;
     feedback: UiFeedback;
-  }): UiSessionCapabilities {
+  }): UiSessionHostServices {
     const { pathname, search } = useLocation();
     const isPublicRoute = organization.isUiPublicRoute(pathname);
     const sessionReading = auth.useUiSessionReading({ feedback, isPublicRoute });
@@ -168,7 +168,7 @@ class BrowserUiShell extends UiShell {
     sessionVersions: SessionVersionWatch;
     hosts: readonly UiModuleHostMount[];
     failures: readonly UiFailureInterceptor[];
-    rootCapabilities: UiRootCapabilities;
+    rootCapabilities: UiRootHostServices;
     hostServices: UiRenderResult["hostServices"];
   }): BrowserUiShell {
     const telemetry = uiTelemetryOf(config);
@@ -188,7 +188,7 @@ class BrowserUiShell extends UiShell {
           sessionVersions,
           // Without these the shell resolves the REFUSING defaults, so the first
           // session read throws instead of answering. See ARCHITECTURE.md 10.1.
-          session: browserUiCapabilitiesHook(rootCapabilities),
+          session: browserUiHostServicesHook(rootCapabilities),
           hostServices,
           footer: UiSaasFooter,
           capabilities: {
@@ -273,7 +273,7 @@ export async function startUi(): Promise<void> {
     fetch: sessionVersionFetch({ watch: sessionVersions }),
     isDevelopment: process.mode === "development",
   });
-  const rootCapabilities = await loadUiRootCapabilities();
+  const rootCapabilities = await loadUiRootHostServices();
   const installed = await createUi({ document, mount: "root" })
     .withModules(browserModules)
     .withTransport(transport)

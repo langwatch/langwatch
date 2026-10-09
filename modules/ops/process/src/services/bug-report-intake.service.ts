@@ -4,8 +4,10 @@ import { BugReportRateLimitedError, type SubmitBugReport } from "@langwatch/ops-
 import { redactReportText, redactSessionJsonl } from "@langwatch/redaction";
 
 import type { BugReportNotifier } from "../app/ops.app.ts";
-import type { BugReportRateLimitRepository } from "../repositories/bug-report-rate-limit.repository.ts";
-import type { BugReportRepository } from "../repositories/bug-report.repository.ts";
+import type {
+  BugReportRateLimitRepository,
+  BugReportRepository,
+} from "../repositories/bug-report.repository.ts";
 
 const logger = createLogger("langwatch:bug-reports");
 

@@ -20,6 +20,7 @@ import {
   langyControlPollAnswerSchema,
   langyControlPollQuerySchema,
   langyControlRegisterAnswerSchema,
+  localControlCredentialSchema,
 } from "@langwatch/langy-contract";
 import { z } from "zod";
 
@@ -60,7 +61,7 @@ function localControlConnectRest(mount: LangyControlMount) {
     .withAddressing("literal", { v1Twin: true })
 
     .post(`/api/langy/control${mount}/connect/register`, "langyControlConnectRegister")
-    .withCredential("session_key")
+    .withCredential("session_key", { session: localControlCredentialSchema })
     .withAccess(
       anyAuthenticated({
         reason:
@@ -68,7 +69,6 @@ function localControlConnectRest(mount: LangyControlMount) {
       }),
     )
     .withInput(registerFrameSchema)
-    .withHeaders(z.object({ authorization: z.string() }))
     .withResponse("protocol", {
       produces: JSON_MEDIA_TYPE,
       because: BECAUSE,
@@ -82,7 +82,7 @@ function localControlConnectRest(mount: LangyControlMount) {
         responses: documentedResponses({ 200: langyControlRegisterAnswerSchema }),
       }),
     )
-    .handle(async ({ app, input, actor, scope, response }, headers) =>
+    .handle(async ({ app, input, actor, scope, session, response }) =>
       response.write({
         status: 200,
         mediaType: JSON_MEDIA_TYPE,
@@ -90,7 +90,7 @@ function localControlConnectRest(mount: LangyControlMount) {
           await app.registerLocalControlSession({
             actor,
             projectId: scope.id,
-            authorization: headers.authorization,
+            credential: session,
             frame: input,
           }),
         ),

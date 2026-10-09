@@ -86,8 +86,10 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("GET /api/stacks/{slug}/orb", s.handleOrbFacts)
 	mux.HandleFunc("POST /api/stacks/{slug}/orb/feedback", s.handleOrbFeedback)
 	mux.HandleFunc("POST /api/stacks/{slug}/orb/page", s.handleOrbPage)
+	mux.HandleFunc("OPTIONS /api/stacks/{slug}/orb", s.handleOrbPreflight)
 	mux.HandleFunc("OPTIONS /api/stacks/{slug}/orb/", s.handleOrbPreflight)
 	mux.HandleFunc("/api/stacks/{slug}/restart", s.handleRestart)
+	mux.HandleFunc("/api/stacks/{slug}/start", s.handleStartKeeper)
 	mux.HandleFunc("/api/stacks/{slug}/down", s.handleDown)
 	mux.HandleFunc("/api/stacks/{slug}/destroy", s.handleDestroy)
 	mux.HandleFunc("/api/stacks/{slug}/start-service", s.handleStartService)
@@ -103,7 +105,7 @@ func (s *Server) routes() *http.ServeMux {
 
 // Serve runs the HTTP surface until the context is canceled.
 func (s *Server) Serve(ctx context.Context, port int) error {
-	srv := &http.Server{Addr: fmt.Sprintf("127.0.0.1:%d", port), Handler: s.guardHost(s.routes()), ReadHeaderTimeout: 5 * time.Second}
+	srv := &http.Server{Addr: fmt.Sprintf("127.0.0.1:%d", port), Handler: s.guardHost(s.serveWaiting(s.routes())), ReadHeaderTimeout: 5 * time.Second}
 	go func() {
 		<-ctx.Done()
 		sctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)

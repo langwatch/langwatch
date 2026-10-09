@@ -5,7 +5,7 @@
  */
 
 import {
-  useUiCapabilities,
+  useUiHostServices,
   useUiCopyTargets,
   useUiScope,
   type UiCopyTargets,
@@ -90,7 +90,7 @@ function capabilityWorkflowHost({
  * because that is what `mounts.load` resolves.
  */
 export default function WorkflowHostMount({ children }: { children?: ReactNode }) {
-  const { session, navigation, route, feedback } = useUiCapabilities();
+  const { session, navigation, route, feedback } = useUiHostServices();
   const lent = useUiCopyTargets();
   const scopeHost = useUiScope().scopeHost();
   const [published, setPublished] = useState(false);

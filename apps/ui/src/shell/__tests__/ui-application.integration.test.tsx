@@ -1,4 +1,4 @@
-import { UiSession, useUiCapabilities } from "@langwatch/browser-host/capabilities";
+import { UiSession, useUiHostServices } from "@langwatch/browser-host/capabilities";
 import { createUiApplication, type UiApplicationInstall } from "@langwatch/browser/application";
 import {
   type UiFeatureInstall,
@@ -118,7 +118,7 @@ describe("given an application composed of pages apps/ui serves and pages the ho
         return <div data-testid="page">host</div>;
       }
       function OwnHome() {
-        return <div data-testid="page">own:{useUiCapabilities().session.currentUser()?.id}</div>;
+        return <div data-testid="page">own:{useUiHostServices().session.currentUser()?.id}</div>;
       }
 
       const application = applicationOf({

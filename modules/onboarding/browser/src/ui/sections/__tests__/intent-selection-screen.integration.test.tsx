@@ -1,6 +1,6 @@
 import { UiAnalytics, type UiAnalyticsEvent } from "@langwatch/browser-host/analytics";
-import { UiCapabilityContextProvider } from "@langwatch/browser-host/capabilities";
-import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import { UiHostServicesContextProvider } from "@langwatch/browser-host/capabilities";
+import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
 import "@testing-library/jest-dom/vitest";
 /**
  * @vitest-environment jsdom
@@ -73,13 +73,13 @@ function renderScreen({
 
   render(
     <DesignSystemProvider forcedTheme="light">
-      <UiCapabilityContextProvider value={{ ...createUiCapabilitiesFromHost(host), analytics }}>
+      <UiHostServicesContextProvider value={{ ...createUiHostServicesFromHost(host), analytics }}>
         <OnboardingFormProvider
           value={contextValue as Parameters<typeof OnboardingFormProvider>[0]["value"]}
         >
           <IntentSelectionScreen surface={SURFACE} />
         </OnboardingFormProvider>
-      </UiCapabilityContextProvider>
+      </UiHostServicesContextProvider>
     </DesignSystemProvider>,
   );
   return { setIntent, analytics };

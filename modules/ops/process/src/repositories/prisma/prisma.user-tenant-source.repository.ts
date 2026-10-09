@@ -4,7 +4,7 @@ import { TERMINAL_TENANT_STATUSES, type TenantSource } from "@langwatch/system-m
 import type {
   OrganizationMemberTenantSourceRepository,
   UserTenantSourceRepository,
-} from "../user-tenant-source.repository.ts";
+} from "../tenant-source.repository.ts";
 
 /** The rows this source walks, and nothing else it could reach. */
 export type PrismaUserTenantDatabase = {

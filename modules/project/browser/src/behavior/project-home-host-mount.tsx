@@ -4,7 +4,7 @@
  * not the application. ARCHITECTURE.md §10.1.
  */
 
-import { useUiCapabilities, useUiDeployment } from "@langwatch/browser-host/capabilities";
+import { useUiHostServices, useUiDeployment } from "@langwatch/browser-host/capabilities";
 import type { ReleaseFlagToken } from "@langwatch/browser-host/declarations";
 import { useUiFlags } from "@langwatch/browser-host/feature-flag";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
@@ -140,7 +140,7 @@ class CapabilityProjectHomeHost extends ProjectHomeHost {
  * is what `mounts.load` resolves.
  */
 export default function ProjectHomeHostMount({ children }: { children?: ReactNode }) {
-  const { session, navigation, route } = useUiCapabilities();
+  const { session, navigation, route } = useUiHostServices();
   const returnTo = route.reading().query.return_to;
   const deployment = useUiDeployment();
   const reducedMotion = useReducedMotion();

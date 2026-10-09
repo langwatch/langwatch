@@ -4,14 +4,14 @@
  * Spec: modules/analytics/specs/analytics-overview-setup-prompt.feature
  */
 import {
-  UiCapabilityContextProvider,
+  UiHostServicesContextProvider,
   UiScope,
   UiSession,
   type UiActiveScope,
-  type UiCapabilities,
+  type UiHostServices,
 } from "@langwatch/browser-host/capabilities";
 import type { UiSessionSnapshot } from "@langwatch/browser-host/session";
-import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
 import { render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -60,17 +60,17 @@ class ProjectSession extends UiSession {
 }
 
 function Harness({ children }: { children: ReactNode }) {
-  const capabilities: UiCapabilities = {
-    ...createUiCapabilitiesFromHost(
+  const capabilities: UiHostServices = {
+    ...createUiHostServicesFromHost(
       { route: () => ({ params: {}, query: {} }), navigate: () => void 0 },
       new ProjectSession(),
     ),
     scope: new TestScope(),
   };
   return (
-    <UiCapabilityContextProvider value={capabilities}>
+    <UiHostServicesContextProvider value={capabilities}>
       <AnalyticsHostMount>{children}</AnalyticsHostMount>
-    </UiCapabilityContextProvider>
+    </UiHostServicesContextProvider>
   );
 }
 

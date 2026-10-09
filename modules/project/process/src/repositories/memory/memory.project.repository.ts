@@ -24,6 +24,7 @@ import {
   type ProjectIdPageInput,
   type ProjectLwqlKeyPage,
   type ProjectOrganizationPage,
+  type ProjectPrivateS3Page,
   type ProjectUsageCount,
 } from "@langwatch/project-contract";
 import { nowInstant, toDate, type Instant } from "@langwatch/time";
@@ -362,6 +363,20 @@ export class MemoryProjectRepository implements ProjectRepository {
         const organizationId = this.#database.findTeam(project.teamId)?.organizationId;
         return organizationId === undefined ? [] : [{ id: project.id, organizationId }];
       });
+    if (limit === undefined || projects.length <= limit) return { projects, next: null };
+    const page = projects.slice(0, limit);
+    return { projects: page, next: page[page.length - 1]?.id ?? null };
+  }
+
+  async listAllWithPrivateS3({
+    after,
+    limit,
+  }: ProjectIdPageInput = {}): Promise<ProjectPrivateS3Page> {
+    const projects = this.#database
+      .projects()
+      .filter((project) => after === undefined || project.id > after)
+      .toSorted((left, right) => (left.id < right.id ? -1 : 1))
+      .map((project) => ({ id: project.id, privateS3: !!project.s3Bucket }));
     if (limit === undefined || projects.length <= limit) return { projects, next: null };
     const page = projects.slice(0, limit);
     return { projects: page, next: page[page.length - 1]?.id ?? null };

@@ -114,7 +114,7 @@ func TestAwaitKeeperReturnsOnCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	start := time.Now()
-	if err := o.awaitKeeper(ctx, "feat-x", time.Minute); err == nil || time.Since(start) > time.Second {
+	if err := o.awaitKeeper(ctx, "feat-x", keptProvisioner); err == nil || time.Since(start) > time.Second {
 		t.Errorf("err=%v after %s", err, time.Since(start))
 	}
 }
@@ -141,4 +141,31 @@ func TestUpClearingADeadKeeperRemovesItsPlan(t *testing.T) {
 			t.Errorf("%s outlived the dead keeper's record (err=%v)", p, err)
 		}
 	}
+}
+
+// @scenario "The daemon starts a keeper only for a stack waiting to be handed over"
+func TestStartKeeperOnlyForAStackMidHandOver(t *testing.T) {
+	t.Run("a stack a live keeper already holds", func(t *testing.T) {
+		o, _, sys := keptStackOrch(t, 0, map[int]bool{keptKeeper: true, keptProvisioner: true}, time.Now())
+		if err := o.StartKeeper(context.Background(), "feat-x"); err == nil || len(sys.spawned) != 0 {
+			t.Errorf("err=%v spawned=%v", err, sys.spawned)
+		}
+	})
+
+	t.Run("a provisioner that died before asking", func(t *testing.T) {
+		o, store, sys := keptStackOrch(t, 0, map[int]bool{}, time.Now())
+		store.stacks[0].LauncherPID = keptProvisioner
+		if err := o.StartKeeper(context.Background(), "feat-x"); err == nil || len(sys.spawned) != 0 {
+			t.Errorf("err=%v spawned=%v", err, sys.spawned)
+		}
+	})
+
+	t.Run("a stack with no plan", func(t *testing.T) {
+		o, store, sys := keptStackOrch(t, 0, map[int]bool{keptProvisioner: true}, time.Now())
+		store.stacks[0].LauncherPID = keptProvisioner
+		removeKeeperPlan(store.stacks[0].WorktreeDir, "feat-x")
+		if err := o.StartKeeper(context.Background(), "feat-x"); err == nil || len(sys.spawned) != 0 {
+			t.Errorf("err=%v spawned=%v", err, sys.spawned)
+		}
+	})
 }

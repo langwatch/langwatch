@@ -4,13 +4,13 @@
  * null where none: modules/project/specs/project-switcher-lend.feature.
  */
 import {
-  UiCapabilityContextProvider,
+  UiHostServicesContextProvider,
   UiScope,
   type UiActiveScope,
-  type UiCapabilities,
+  type UiHostServices,
 } from "@langwatch/browser-host/capabilities";
 import { uiDeclarations, type UiDeclarations } from "@langwatch/browser-host/declarations";
-import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
 import { ProjectSwitcherToken } from "@langwatch/project-client";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
@@ -40,8 +40,8 @@ class ProjectInScope extends UiScope {
 }
 
 function renderMounted({ declarations }: { declarations?: UiDeclarations }) {
-  const capabilities: UiCapabilities = {
-    ...createUiCapabilitiesFromHost({
+  const capabilities: UiHostServices = {
+    ...createUiHostServicesFromHost({
       route: () => ({ params: {}, query: {} }),
       navigate: () => void 0,
     }),
@@ -49,11 +49,11 @@ function renderMounted({ declarations }: { declarations?: UiDeclarations }) {
     ...(declarations ? { declarations } : {}),
   };
   return render(
-    <UiCapabilityContextProvider value={capabilities}>
+    <UiHostServicesContextProvider value={capabilities}>
       <SecretHostMount>
         <SwitcherReader />
       </SecretHostMount>
-    </UiCapabilityContextProvider>,
+    </UiHostServicesContextProvider>,
   );
 }
 

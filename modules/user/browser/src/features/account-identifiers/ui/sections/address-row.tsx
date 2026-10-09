@@ -1,4 +1,5 @@
-import { Button, HStack, Spacer, VStack } from "@langwatch/design-system/primitives";
+import { Button, Spacer, VStack } from "@langwatch/design-system/primitives";
+import { SettingsSectionRow } from "@langwatch/design-system/settings-section";
 
 import { useResendBackoff } from "../../behavior/use-resend-backoff.ts";
 import { AddressBadges } from "../elements/address-badges.tsx";
@@ -43,14 +44,7 @@ export function AddressRow({
   const backoff = useResendBackoff();
 
   return (
-    <HStack
-      width="full"
-      gap={3}
-      paddingY={2}
-      borderBottomWidth="1px"
-      borderColor="border.muted"
-      data-testid="email-identifier-row"
-    >
+    <SettingsSectionRow data-testid="email-identifier-row">
       <VStack align="start" gap={0} minWidth={0}>
         <AddressBadges value={row.value} isPrimary={row.isPrimary} confirmed={row.confirmed} />
         <AddressRowNote
@@ -88,6 +82,6 @@ export function AddressRow({
           onRemove={onRemove}
         />
       )}
-    </HStack>
+    </SettingsSectionRow>
   );
 }

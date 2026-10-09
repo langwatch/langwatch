@@ -36,6 +36,7 @@ import {
   type ProjectIdPageInput,
   type ProjectLwqlKeyPage,
   type ProjectOrganizationPage,
+  type ProjectPrivateS3Page,
   type ProjectUsageCount,
 } from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
@@ -328,6 +329,10 @@ export class ProjectService {
 
   listAllWithOrganization(input?: ProjectIdPageInput): Promise<ProjectOrganizationPage> {
     return this.repository.listAllWithOrganization(input);
+  }
+
+  listAllWithPrivateS3(input?: ProjectIdPageInput): Promise<ProjectPrivateS3Page> {
+    return this.repository.listAllWithPrivateS3(input);
   }
 
   listLwqlKeys(input?: ProjectIdPageInput): Promise<ProjectLwqlKeyPage> {

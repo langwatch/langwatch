@@ -32,6 +32,8 @@ type Orchestrator struct {
 	obs   Observability
 	hyg   Hygiene
 	sem   Semaphore
+	// daemon is the up's line to the daemon, which starts every keeper.
+	daemon DaemonClient
 	// keeperRespawns is when the daemon last respawned each slug's keeper, for
 	// the backoff and the crash-loop give-up (D3). Daemon tick only.
 	keeperRespawns map[string][]time.Time
@@ -89,6 +91,7 @@ type Deps struct {
 	Obs       Observability
 	Hyg       Hygiene
 	Sem       Semaphore
+	Daemon    DaemonClient
 	Container ContainerRuntime
 	Janitor   ContainerJanitor
 	Jobs      JobScratch
@@ -111,7 +114,7 @@ func New(d Deps) *Orchestrator {
 	}
 	return &Orchestrator{
 		cfg: d.Cfg, proxy: d.Proxy, store: d.Store, sup: d.Sup, sys: d.Sys,
-		ch: d.CH, pg: d.PG, rds: d.RDS, obs: d.Obs, hyg: d.Hyg, sem: d.Sem,
+		ch: d.CH, pg: d.PG, rds: d.RDS, obs: d.Obs, hyg: d.Hyg, sem: d.Sem, daemon: d.Daemon,
 		container: d.Container, janitor: d.Janitor, jobs: d.Jobs, claudeState: d.State, procTel: d.ProcTel, claude: d.Claude, codex: d.Codex,
 		prereqs: d.Prereqs, log: d.Log,
 	}

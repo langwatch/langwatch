@@ -4,7 +4,7 @@
  * imports posthog, gtag or a tracing SDK; the shell composes the destinations.
  */
 
-import { useOptionalUiCapabilities } from "../capabilities.ts";
+import { useOptionalUiHostServices } from "../capabilities.ts";
 
 /**
  * One thing a reader did, as the emitting module knows it. The destination
@@ -74,5 +74,5 @@ export const INERT_UI_ANALYTICS: UiAnalytics = new InertUiAnalytics();
  * {@link useUiDeployment} degrades.
  */
 export function useUiAnalytics(): UiAnalytics {
-  return useOptionalUiCapabilities()?.analytics ?? INERT_UI_ANALYTICS;
+  return useOptionalUiHostServices()?.analytics ?? INERT_UI_ANALYTICS;
 }

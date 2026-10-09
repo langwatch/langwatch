@@ -125,6 +125,7 @@ describe("given an email deployment", () => {
       renderSection();
 
       expect(screen.getByTestId("password-action")).toHaveTextContent("Change Password");
+      expect(screen.getByTestId("password-row")).toBeTruthy();
       expect(screen.queryByLabelText(/^New Password$/i)).toBeNull();
     });
 
@@ -253,6 +254,7 @@ describe("given an email deployment", () => {
       renderSection();
 
       expect(screen.getByTestId("password-action")).toHaveTextContent("Set a password");
+      expect(screen.getByTestId("password-empty")).toHaveTextContent("No password set");
 
       await userEvent.click(screen.getByTestId("password-action"));
 

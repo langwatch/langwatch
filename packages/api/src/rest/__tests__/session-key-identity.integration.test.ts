@@ -200,3 +200,58 @@ describe("the session key door", () => {
     });
   });
 });
+
+describe("a route that declares the session key door's session", () => {
+  const sessionSchema = z.object({ projectId: z.string(), conversationId: z.string() });
+  const sessionRoutes = defineRestRouter(Api)
+    .withNamespace("session-key-session")
+    .withVersion(MANAGEMENT_API_VERSION)
+    .withAddressing("literal", { v1Twin: false })
+    .withCredential("session_key")
+    .get("/api/session-key/session", "sessionKeySession")
+    .withCredential("session_key", { session: sessionSchema })
+    .withAccess(anyAuthenticated({ reason: "the session key door fixture" }))
+    .withOutput(z.object({ session: sessionSchema }))
+    .handle(({ session }) => ({ session }))
+    .build();
+
+  /** @scenario "The session key door hands its holder as the route's session" */
+  it("hands the handler what the minting module said of the key, parsed by its schema", async () => {
+    const closed = BearerIdentity.create({ name: "unconfigured", token: void 0 });
+    const host = RestHost.create({
+      identities: {
+        project: closed,
+        organization: closed,
+        api_key: closed,
+        scim_token: closed,
+        instance_admin: closed,
+        browser: closed,
+      },
+      bearers: () => closed,
+      audit: { record: async () => {} },
+    });
+    const door = SessionKeyIdentity.create({
+      instanceTokenHeader: INSTANCE_HEADER,
+      verify: async () => {
+        const holder = {
+          actor: { type: "user" as const, id: "user-1" },
+          projectId: "project-1",
+          conversationId: "conversation-1",
+        };
+        return holder;
+      },
+    });
+    host.mount(sessionRoutes.router(), () => ({}), {
+      facts: [bindRestCredential("session_key", () => door)],
+    });
+
+    const response = await host.app.request("/api/session-key/session", {
+      headers: { authorization: "Bearer sk-lw-session-live", "x-project-id": "project-1" },
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      session: { projectId: "project-1", conversationId: "conversation-1" },
+    });
+  });
+});

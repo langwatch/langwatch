@@ -16,7 +16,7 @@ const { navigate, statusRead, grants } = vi.hoisted(() => ({
   grants: new Set<string>(),
 }));
 vi.mock("@langwatch/browser-host/capabilities", () => ({
-  useUiCapabilities: () => ({
+  useUiHostServices: () => ({
     session: { hasPermission: (grant: string) => grants.has(grant) },
     navigation: { navigate },
   }),

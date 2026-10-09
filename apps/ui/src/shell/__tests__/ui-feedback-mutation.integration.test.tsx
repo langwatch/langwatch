@@ -4,12 +4,12 @@
  */
 
 import {
-  UiCapabilityContextProvider,
-  useUiCapabilities,
-  type UiCapabilities,
+  UiHostServicesContextProvider,
+  useUiHostServices,
+  type UiHostServices,
 } from "@langwatch/browser-host/capabilities";
 import { BrowserUiFeedback } from "@langwatch/browser-host/feedback";
-import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
 import { UiErrorToaster } from "@langwatch/browser/error-toaster";
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { toaster } from "@langwatch/design-system/toaster";
@@ -48,7 +48,7 @@ function serviceUnavailable(): Error {
 
 /** A screen with one action, wired the way every moved family wires theirs. */
 function RunButton() {
-  const { feedback } = useUiCapabilities();
+  const { feedback } = useUiHostServices();
   const start = useMutation({
     mutationFn: () => Promise.reject(serviceUnavailable()),
     retry: false,
@@ -63,8 +63,8 @@ function RunButton() {
 }
 
 function mount() {
-  const capabilities: UiCapabilities = {
-    ...createUiCapabilitiesFromHost({
+  const capabilities: UiHostServices = {
+    ...createUiHostServicesFromHost({
       route: () => ({ params: {}, query: {} }),
       navigate: () => undefined,
     }),
@@ -73,10 +73,10 @@ function mount() {
 
   return renderWithDesignSystem(
     <QueryClientProvider client={new QueryClient()}>
-      <UiCapabilityContextProvider value={capabilities}>
+      <UiHostServicesContextProvider value={capabilities}>
         <RunButton />
         <UiErrorToaster />
-      </UiCapabilityContextProvider>
+      </UiHostServicesContextProvider>
     </QueryClientProvider>,
   );
 }

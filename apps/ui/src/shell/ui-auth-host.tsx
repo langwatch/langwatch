@@ -9,13 +9,13 @@ import type {
   AuthPublicEnvironment,
   AuthRouteReading,
 } from "@langwatch/auth-contract";
-import { useOptionalUiCapabilities } from "@langwatch/browser-host/capabilities";
+import { useOptionalUiHostServices } from "@langwatch/browser-host/capabilities";
 import { UiRouteOutlet } from "@langwatch/browser/route-objects";
 import { useMemo, type ComponentType } from "react";
 import { useLocation, useParams, useSearchParams } from "react-router";
 
 import type { UiFeatureConfig } from "../ui-feature-config";
-import type { UiRootCapabilities } from "./ui-root-capabilities";
+import type { UiRootHostServices } from "./ui-root-host-services";
 
 /** Auth restates the public shape to break a cycle, so the projection lives here. */
 function authPublicEnvironment(config: UiFeatureConfig): AuthPublicEnvironment {
@@ -44,7 +44,7 @@ export function uiAuthHost({
   auth,
   config,
 }: {
-  auth: UiRootCapabilities["authHost"];
+  auth: UiRootHostServices["authHost"];
   config: UiFeatureConfig;
 }): ComponentType {
   class ShellAuthHost extends auth.AuthHostApi {
@@ -70,7 +70,7 @@ export function uiAuthHost({
   }
 
   return function UiAuthHost() {
-    const capabilities = useOptionalUiCapabilities();
+    const capabilities = useOptionalUiHostServices();
     const location = useLocation();
     const params = useParams();
     const [search] = useSearchParams();

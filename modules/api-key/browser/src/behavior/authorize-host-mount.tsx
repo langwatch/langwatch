@@ -5,7 +5,7 @@
  */
 
 import { ApiKeyScopeViolationError } from "@langwatch/api-key-contract";
-import { useUiCapabilities, useUiScope } from "@langwatch/browser-host/capabilities";
+import { useUiHostServices, useUiScope } from "@langwatch/browser-host/capabilities";
 import { useLent } from "@langwatch/browser-host/lent";
 import { ProjectSwitcherToken } from "@langwatch/project-client";
 import type { ProjectSwitcherProps } from "@langwatch/project-contract";
@@ -118,7 +118,7 @@ class CapabilityAuthorizeHost extends AuthorizeHostApi {
 }
 
 export default function AuthorizeHostMount({ children }: { children?: ReactNode }) {
-  const { session, feedback, navigation } = useUiCapabilities();
+  const { session, feedback, navigation } = useUiHostServices();
   const activeScope = useUiScope().activeScope();
   const location = useLocation();
   const graph = useApiKeyOrganizationGraph({

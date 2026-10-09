@@ -125,8 +125,7 @@ import { RoleApi } from "@langwatch/role-contract";
 import { internalSlackSignupsWebhook } from "@langwatch/secrets";
 import type { Instant } from "@langwatch/time";
 
-import { organizationInviteMailChannels } from "../channels/organization-invite-mail-channels.registry.ts";
-import { signupAnnouncementChannels } from "../channels/signup-announcement-channels.registry.ts";
+import type { OrganizationChannels } from "../channels/organization.channels.ts";
 import type { RecordAuditCommandData } from "../eventing/organization-audit.commands.ts";
 import type { OrganizationAuditSender } from "../eventing/organization-audit.intent.ts";
 import {
@@ -225,7 +224,8 @@ const logger = createLogger("langwatch:organization");
 type OrganizationSetup = FeatureSetup<
   typeof OrganizationModule.dependencies,
   OrganizationServerConfig,
-  OrganizationRepositories
+  OrganizationRepositories,
+  OrganizationChannels
 >;
 
 export type OrganizationInfrastructure = Readonly<{
@@ -298,15 +298,11 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   #dependencies: ServerOrganizationAppDependencies;
 
   static async create(setup: OrganizationSetup): Promise<OrganizationModule> {
-    const signupAnnouncements = await setup.secrets.into(
-      OrganizationModule.secrets.internalSlackSignupsWebhook,
-      (webhookUrl) =>
-        SignupAnnouncementService.create({
-          channel: webhookUrl ? signupAnnouncementChannels.live.create({ webhookUrl }) : undefined,
-          publicBaseUrl: setup.config.publicBaseUrl,
-          logger,
-        }),
-    );
+    const signupAnnouncements = SignupAnnouncementService.create({
+      channel: setup.channels.signupAnnouncements,
+      publicBaseUrl: setup.config.publicBaseUrl,
+      logger,
+    });
     const infrastructure = OrganizationModule.#composeInfrastructure({
       setup,
       signupAnnouncements,
@@ -431,9 +427,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       roles: dependencies.roles,
       throttle,
       baseHost,
-      mail: organizationInviteMailChannels.ses.create({
-        notifications: dependencies.notifications,
-      }),
+      mail: setup.channels.inviteMail,
     });
 
     return {

@@ -9,6 +9,7 @@ import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant, type Instant } from "@langwatch/time";
 
+import { MemoryOrganizationChannels } from "../../../channels/memory/memory.organization.channels.ts";
 import { MemoryOrganizationDatabase } from "../../../repositories/memory/memory.organization.database.ts";
 import { memoryOrganizationRepositories } from "../../../repositories/memory/memory.organization.repositories.ts";
 import type { OrganizationModule } from "../../organization.app.ts";
@@ -45,6 +46,7 @@ export function organizationModuleSetup(
     resources: new ResourceScope(),
     secrets: noSecrets,
     repositories: memoryOrganizationRepositories({ memory }),
+    channels: MemoryOrganizationChannels.create(),
   };
 }
 

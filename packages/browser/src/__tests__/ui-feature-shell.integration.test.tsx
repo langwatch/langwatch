@@ -1,4 +1,4 @@
-import { UiScope, UiSession, useUiCapabilities } from "@langwatch/browser-host/capabilities";
+import { UiScope, UiSession, useUiHostServices } from "@langwatch/browser-host/capabilities";
 import type { UiQueryStore } from "@langwatch/browser-host/query-persistence";
 import { SessionVersionWatch } from "@langwatch/browser-host/session-version";
 import {
@@ -124,7 +124,7 @@ describe("given the shell apps/ui mounts around every routed page", () => {
       });
 
       function Page() {
-        return <div data-testid="who">{useUiCapabilities().session.currentUser()?.id}</div>;
+        return <div data-testid="who">{useUiHostServices().session.currentUser()?.id}</div>;
       }
 
       const view = renderShell(shell, <Page />);
@@ -162,7 +162,7 @@ describe("given the shell apps/ui mounts around every routed page", () => {
     /** @scenario "The composition's footer reads the capabilities a screen does" */
     it("draws it inside the capabilities, so it reads them as a screen does", () => {
       function Footer() {
-        return <div data-testid="footer">{useUiCapabilities().session.currentUser()?.id}</div>;
+        return <div data-testid="footer">{useUiHostServices().session.currentUser()?.id}</div>;
       }
       const shell = createUiFeatureShell({
         sessionQueryKey: TEST_SESSION_QUERY_KEY,

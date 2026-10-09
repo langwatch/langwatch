@@ -179,3 +179,37 @@ Feature: haven lifecycle usability
     When "haven status --json" runs without --reveal
     Then the overlay's credentials are masked and its plain deployment facts, like the slug, are not
     And with --reveal the credentials print in clear
+
+  # The daemon is the one place that starts a keeper (ruling D-S4c-1): `haven up`
+  # writes the plan, then asks over POST /api/stacks/{slug}/start. Bound by
+  # app/keeper_process_test.go and adapters/dashboard/actions_test.go.
+  @integration
+  Scenario: Up hands its stack to a keeper the daemon starts
+    Given the haven daemon is running
+    And the up has provisioned the stack and written its plan
+    When the up asks the daemon to start the stack's keeper
+    Then the daemon starts "haven keep" for that stack
+    And the up returns once the keeper holds the stack's record
+
+  @integration
+  Scenario: Up starts the daemon first when none is running
+    Given no haven daemon is running
+    When the up hands its provisioned stack over
+    Then it starts the daemon in the background
+    And that daemon starts the stack's keeper
+
+  @unit
+  Scenario: The daemon refuses to start a keeper for a stack it does not know
+    When the start route names a slug with no registered stack
+    Then it answers 404 and starts nothing
+
+  @unit
+  Scenario: The daemon starts a keeper only for a stack waiting to be handed over
+    Given a stack whose record names a launcher other than its plan's live provisioner
+    When the start route names that stack
+    Then the daemon refuses and starts no keeper
+
+  @unit
+  Scenario: A page on the app's origin cannot start a keeper
+    When a page on the stack's app origin posts to the start route
+    Then the daemon answers 403 and starts nothing

@@ -5,7 +5,7 @@
  */
 
 import {
-  useUiCapabilities,
+  useUiHostServices,
   useUiCopyTargets,
   useUiScope,
   type UiCopyTargets,
@@ -114,7 +114,7 @@ class CapabilityMonitorHost extends MonitorHostApi {
  * is what `mounts.load` resolves.
  */
 export default function MonitorHostMount({ children }: { children?: ReactNode }) {
-  const { session, navigation, route, feedback } = useUiCapabilities();
+  const { session, navigation, route, feedback } = useUiHostServices();
   const lent = useUiCopyTargets();
   const scopeHost = useUiScope().scopeHost();
 

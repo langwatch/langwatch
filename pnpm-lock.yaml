@@ -2867,6 +2867,9 @@ importers:
       '@langwatch/scenario-contract':
         specifier: workspace:*
         version: link:../../../../modules/scenario/contract
+      '@langwatch/secrets':
+        specifier: workspace:*
+        version: link:../../../../packages/secrets
       '@langwatch/task':
         specifier: workspace:*
         version: link:../../../../packages/task

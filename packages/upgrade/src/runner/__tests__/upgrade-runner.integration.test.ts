@@ -171,6 +171,51 @@ const ledger = () => UpgradeLedgerRepository.create({ postgres: scratch.postgres
 const statusOf = async (id: string) =>
   (await ledger().findSteps()).find((s) => s.id === id)?.status;
 
+const ARCHIVE_DROP = "prisma:20261003000000_drop_old";
+const ARCHIVE_MANIFESTS: ReleaseManifest[] = [
+  ...MANIFESTS.slice(0, 2),
+  {
+    release: "3.22.0",
+    previous: "3.21.0",
+    cutAt: "2026-10-04T09:00:00+02:00",
+    steps: [step(ARCHIVE_DROP, "postgres-schema")],
+  },
+];
+const ARCHIVED_TABLE = "_retired_LegacyKey_3_22_0";
+const rowsIn = async (table: string) =>
+  Number(
+    (await scratch.postgres.query<{ n: string }>(`SELECT count(*)::text AS n FROM "${table}"`))
+      .rows[0]?.n,
+  );
+/** Records each apply with the archive's rows at that moment, then drops the table. */
+const dropping = (order: string[]): UpgradeSchemaApplier => ({
+  async apply({ release }) {
+    const { rows } = await scratch.postgres.query<{ found: boolean }>(
+      `SELECT to_regclass('"${ARCHIVED_TABLE}"') IS NOT NULL AS found`,
+    );
+    order.push(
+      `schema ${release} archive ${rows[0]?.found ? await rowsIn(ARCHIVED_TABLE) : "none"}`,
+    );
+    const ids = ARCHIVE_MANIFESTS.filter((m) => release === null || m.release <= release).flatMap(
+      (m) => m.steps.map((s) => s.id),
+    );
+    for (const id of ids.filter((each) => each.startsWith("prisma:"))) {
+      await scratch.postgres.query(
+        `INSERT INTO "_prisma_migrations" ("migration_name", "finished_at")
+         SELECT $1::text, now() WHERE NOT EXISTS (SELECT 1 FROM "_prisma_migrations" WHERE "migration_name" = $1::text)`,
+        [id.slice("prisma:".length)],
+      );
+    }
+    if (ids.includes(ARCHIVE_DROP))
+      await scratch.postgres.query(`DROP TABLE IF EXISTS "LegacyKey"`);
+    const goose = new Set(ids.filter((each) => each.startsWith("clickhouse:")));
+    return [
+      { engine: "postgres", target: "postgres", ok: true, error: null },
+      { engine: "clickhouse", target: "shared", ok: true, error: null, applied: goose },
+    ];
+  },
+});
+
 describe.skipIf(!DB_URL)("the upgrade runner", () => {
   describe("when another runner holds a live lease", () => {
     /** @scenario "A second runner waits for the lease, then exits naming the holder" */
@@ -875,6 +920,56 @@ describe.skipIf(!DB_URL)("the upgrade runner", () => {
       const outcome = await run(runnerFor({ release: "3.21.0", applier, upcasts }));
       expect(outcome.code).toBe("failed");
       expect(outcome.message).toContain("Connection refused");
+    });
+  });
+
+  describe("when a contract release archives a table it drops", () => {
+    const upgradeTo = ({ order, table }: { order: string[]; table: string }) =>
+      run(
+        runnerFor({
+          release: "3.22.0",
+          applier: dropping(order),
+          image: { release: "3.22.0", steps: ARCHIVE_MANIFESTS.flatMap((m) => m.steps) },
+          releases: { manifests: ARCHIVE_MANIFESTS, floor: FLOOR },
+          contracts: new Map([[ARCHIVE_DROP, []]]),
+          archives: new Map([[ARCHIVE_DROP, [table]]]),
+        }),
+      );
+
+    beforeEach(async () => {
+      await run(runnerFor({ release: "3.21.0", applier: fakeApplier({ release: "3.21.0" }) }));
+      await scratch.postgres.query(`CREATE TABLE "LegacyKey" ("id" TEXT PRIMARY KEY)`);
+      await scratch.postgres.query(`INSERT INTO "LegacyKey" VALUES ('a'), ('b')`);
+    });
+
+    /** @scenario "An archived contract release applies its schema after the copy" */
+    it("copies the table before the schema drops it, and a second run copies nothing", async () => {
+      const order: string[] = [];
+      const outcome = await upgradeTo({ order, table: "LegacyKey" });
+      expect(outcome).toMatchObject({
+        code: "done",
+        detail: { archived: [{ table: "LegacyKey", archive: ARCHIVED_TABLE, rows: 2 }] },
+      });
+      expect(order).toEqual(["schema 3.22.0 archive 2"]);
+      expect(await rowsIn(ARCHIVED_TABLE)).toBe(2);
+
+      const again = await upgradeTo({ order: [], table: "LegacyKey" });
+      expect(again).toMatchObject({ code: "done" });
+      expect(again.detail).not.toMatchObject({ archived: [{}] });
+      expect(await rowsIn(ARCHIVED_TABLE)).toBe(2);
+    });
+
+    /** @scenario "A failed archive fails the contract step and leaves the schema unapplied" */
+    it("fails the contract step and never applies the schema", async () => {
+      const order: string[] = [];
+      const outcome = await upgradeTo({ order, table: `LegacyKey${"x".repeat(50)}` });
+      expect(outcome).toMatchObject({
+        code: "step_failed",
+        detail: { step: ARCHIVE_DROP, error: "contract_archive_failed" },
+      });
+      expect(order).toEqual([]);
+      expect(await statusOf(ARCHIVE_DROP)).toBe("failed");
+      expect(await rowsIn("LegacyKey")).toBe(2);
     });
   });
 });

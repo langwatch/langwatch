@@ -5,7 +5,7 @@
 
 import { useUiAddress } from "@langwatch/browser-host/address";
 import {
-  useOptionalUiCapabilities,
+  useOptionalUiHostServices,
   useUiDeployment,
   useUiRpc,
 } from "@langwatch/browser-host/capabilities";
@@ -17,7 +17,7 @@ import { lazy, Suspense, useCallback, useMemo } from "react";
 const ExtraFooterComponents = lazy(saasWeb.installation.capabilities.extraFooterComponents.load);
 
 export function UiSaasFooter() {
-  return useOptionalUiCapabilities() ? <UiSaasFooterReading /> : null;
+  return useOptionalUiHostServices() ? <UiSaasFooterReading /> : null;
 }
 
 function UiSaasFooterReading() {

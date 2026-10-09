@@ -3,7 +3,7 @@ import type { ProtocolConnection } from "@langwatch/api";
 import { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { RestIdentity } from "@langwatch/api/hosting";
 import { BearerIdentity, SessionKeyIdentity } from "@langwatch/api/rest";
-import type { SessionKeyHolder, SessionKeyPresented } from "@langwatch/authorization";
+import type { SessionKeyPresented } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { DatasetApi } from "@langwatch/dataset-contract";
@@ -63,7 +63,8 @@ import {
   type LangyServerConfig,
   type LangyUsageCount,
   type LangyRelayConnection,
-  type LocalControlConnectCredentials,
+  type LocalControlConnectionOpened,
+  type LocalControlKeyHolder,
   type RelayTally,
   type LangyConversationDetailDto,
   type LangyConversationEventPageDto,
@@ -761,7 +762,7 @@ export class LangyModule implements LangyApiContract {
   }
 
   /** What the local doors reach beyond `LangyApi`. */
-  verifyLocalControlSessionKey(presented: SessionKeyPresented): Promise<SessionKeyHolder> {
+  verifyLocalControlSessionKey(presented: SessionKeyPresented): Promise<LocalControlKeyHolder> {
     return this.dependencies.longPoll.verifySessionKey(presented);
   }
 
@@ -779,9 +780,9 @@ export class LangyModule implements LangyApiContract {
 
   acceptLocalControlConnection(
     connection: ProtocolConnection,
-    credentials: LocalControlConnectCredentials,
+    opened: LocalControlConnectionOpened,
   ): Promise<void> {
-    return this.dependencies.sockets.accept(connection, credentials);
+    return this.dependencies.sockets.accept(connection, opened);
   }
 
   get localControl(): LangyLocalControl {

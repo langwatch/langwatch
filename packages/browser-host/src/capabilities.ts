@@ -33,13 +33,13 @@ export abstract class UiTraceFilters {
 }
 
 /** The composition never filled this port, and something asked it to work. */
-export class UiCapabilityUnavailableError extends Error {
-  constructor(readonly capability: string) {
+export class UiHostServiceUnavailableError extends Error {
+  constructor(readonly hostService: string) {
     super(
-      `The ${JSON.stringify(capability)} UI capability has no implementation in this composition. ` +
+      `The ${JSON.stringify(hostService)} UI host service has no implementation in this composition. ` +
         "Supply it through createUiApplication({ features: { capabilities } }).",
     );
-    this.name = "UiCapabilityUnavailableError";
+    this.name = "UiHostServiceUnavailableError";
   }
 }
 
@@ -193,7 +193,7 @@ export abstract class UiSession {
    * scope's grant answers, as on main (scope knot Q2). Ports that cannot answer it fail by name.
    */
   hasOrganizationPermission(_permission: string): boolean {
-    throw new UiCapabilityUnavailableError("session organization permission");
+    throw new UiHostServiceUnavailableError("session organization permission");
   }
 
   /**
@@ -208,54 +208,54 @@ export abstract class UiSession {
    * not publish it fail by name instead of fabricating an auth state.
    */
   snapshot(): UiSessionSnapshot {
-    throw new UiCapabilityUnavailableError("session snapshot");
+    throw new UiHostServiceUnavailableError("session snapshot");
   }
 
   /** Reads the signed-in reader again, e.g. after their name or photo changed. */
   refresh(): Promise<void> {
-    return Promise.reject(new UiCapabilityUnavailableError("session refresh"));
+    return Promise.reject(new UiHostServiceUnavailableError("session refresh"));
   }
 }
 
 class UnavailableUiFeedback extends UiFeedback {
   succeeded(): never {
-    throw new UiCapabilityUnavailableError("feedback");
+    throw new UiHostServiceUnavailableError("feedback");
   }
 
   failed(): never {
-    throw new UiCapabilityUnavailableError("feedback");
+    throw new UiHostServiceUnavailableError("feedback");
   }
 }
 
 class UnavailableUiSession extends UiSession {
   currentUser(): never {
-    throw new UiCapabilityUnavailableError("session");
+    throw new UiHostServiceUnavailableError("session");
   }
 
   hasPermission(): never {
-    throw new UiCapabilityUnavailableError("session");
+    throw new UiHostServiceUnavailableError("session");
   }
 
   override hasOrganizationPermission(): never {
-    throw new UiCapabilityUnavailableError("session");
+    throw new UiHostServiceUnavailableError("session");
   }
 
   isSettled(): never {
-    throw new UiCapabilityUnavailableError("session");
+    throw new UiHostServiceUnavailableError("session");
   }
 }
 
 class UnavailableUiRpc extends UiRpc {
   query(): never {
-    throw new UiCapabilityUnavailableError("rpc");
+    throw new UiHostServiceUnavailableError("rpc");
   }
 
   mutate(): never {
-    throw new UiCapabilityUnavailableError("rpc");
+    throw new UiHostServiceUnavailableError("rpc");
   }
 
   subscribe(): never {
-    throw new UiCapabilityUnavailableError("rpc");
+    throw new UiHostServiceUnavailableError("rpc");
   }
 }
 
@@ -337,7 +337,7 @@ const PRODUCTION_UI_DEPLOYMENT: UiDeployment = {
 };
 
 /** Every capability a screen can ask for, all of them answered. */
-export type UiCapabilities = {
+export type UiHostServices = {
   /**
    * Where every module's named events go. Absent and "installed no
    * destination" are the same reading — `useUiAnalytics` degrades to the
@@ -353,7 +353,7 @@ export type UiCapabilities = {
   declarations?: UiDeclarations;
   /**
    * Optional so a hand-built capability set stays valid without one;
-   * {@link resolveUiCapabilities} always fills it, production when absent.
+   * {@link resolveUiHostServices} always fills it, production when absent.
    */
   deployment?: UiDeployment;
   documentTitle: UiDocumentTitle;
@@ -380,10 +380,10 @@ export type UiCapabilities = {
 };
 
 /** What the composing application chose to answer itself. */
-export type UiCapabilityInstall = Partial<UiCapabilities>;
+export type UiHostServiceInstall = Partial<UiHostServices>;
 
-export type UiCapabilityResolution = {
-  install: UiCapabilityInstall;
+export type UiHostServiceResolution = {
+  install: UiHostServiceInstall;
   /** The default only the browser can build. */
   documentTitle: UiDocumentTitle;
   /** The defaults only router context can build. */
@@ -411,7 +411,7 @@ export type UiCapabilityResolution = {
  * The install, completed. An installed port always wins over a default, so a
  * host that has a real toaster or a real session never gets the refusing one.
  */
-export function resolveUiCapabilities({
+export function resolveUiHostServices({
   install,
   documentTitle,
   navigation,
@@ -421,7 +421,7 @@ export function resolveUiCapabilities({
   copyTargets,
   traceFilters,
   session,
-}: UiCapabilityResolution): UiCapabilities {
+}: UiHostServiceResolution): UiHostServices {
   return {
     analytics: install.analytics,
     copyTargets: install.copyTargets ?? copyTargets,
@@ -439,18 +439,18 @@ export function resolveUiCapabilities({
   };
 }
 
-const UiCapabilityContext = createContext<UiCapabilities | undefined>(void 0);
+const UiHostServicesContext = createContext<UiHostServices | undefined>(void 0);
 
 /** Publishes the resolved capabilities to everything a screen renders. */
-export const UiCapabilityContextProvider = UiCapabilityContext.Provider;
+export const UiHostServicesContextProvider = UiHostServicesContext.Provider;
 
 /**
  * The capabilities above this screen, or undefined where none are mounted.
  * The hooks this package publishes over the ports read this one rather than
- * {@link useUiCapabilities}, degrading to an inert reading instead of a crash.
+ * {@link useUiHostServices}, degrading to an inert reading instead of a crash.
  */
-export function useOptionalUiCapabilities(): UiCapabilities | undefined {
-  return useContext(UiCapabilityContext);
+export function useOptionalUiHostServices(): UiHostServices | undefined {
+  return useContext(UiHostServicesContext);
 }
 
 /**
@@ -458,12 +458,12 @@ export function useOptionalUiCapabilities(): UiCapabilities | undefined {
  * it reads production, the same fail-closed reading every other port gives.
  */
 export function useUiDeployment(): UiDeployment {
-  return useOptionalUiCapabilities()?.deployment ?? PRODUCTION_UI_DEPLOYMENT;
+  return useOptionalUiHostServices()?.deployment ?? PRODUCTION_UI_DEPLOYMENT;
 }
 
 /** What installed modules declared, degrading to none outside a shell. */
 export function useUiDeclarations(): UiDeclarations {
-  return useOptionalUiCapabilities()?.declarations ?? NO_UI_DECLARATIONS;
+  return useOptionalUiHostServices()?.declarations ?? NO_UI_DECLARATIONS;
 }
 
 /**
@@ -472,15 +472,15 @@ export function useUiDeclarations(): UiDeclarations {
  * ambient React context as a cross-module transport.
  */
 export function useUiRpc(): UiRpc {
-  return useOptionalUiCapabilities()?.rpc ?? UNAVAILABLE_UI_RPC;
+  return useOptionalUiHostServices()?.rpc ?? UNAVAILABLE_UI_RPC;
 }
 
 /**
  * Missing means the screen was mounted outside the application shell — a
  * composition fault, not something the screen can degrade around.
  */
-export function useUiCapabilities(): UiCapabilities {
-  const capabilities = useContext(UiCapabilityContext);
+export function useUiHostServices(): UiHostServices {
+  const capabilities = useContext(UiHostServicesContext);
   if (!capabilities) {
     throw new Error(
       "No UI capabilities are mounted above this screen; render it inside the application shell.",
@@ -490,7 +490,7 @@ export function useUiCapabilities(): UiCapabilities {
 }
 
 /** What a composition's session read yields; copy targets only where organization lent them. */
-export type UiSessionCapabilities = {
+export type UiSessionHostServices = {
   session: UiSession;
   scope: UiScope;
   copyTargets?: UiCopyTargets;
@@ -506,7 +506,7 @@ export type UiSessionSource = (input: {
   transport: ModuleApiClient<ModuleApiMap>;
   /** Where a refused session read is told, since nobody else sees it. */
   feedback: UiFeedback;
-}) => UiSessionCapabilities;
+}) => UiSessionHostServices;
 
 /** What every host service's source is called with, on each render (ARCHITECTURE.md §10.1). */
 export type UiHostServiceInput = Readonly<{
@@ -543,7 +543,7 @@ function isSourceValue<Source extends UiHostServiceSource<unknown>>(
 
 class UnavailableUiScope extends UiScope {
   activeScope(): never {
-    throw new UiCapabilityUnavailableError("scope");
+    throw new UiHostServiceUnavailableError("scope");
   }
 }
 
@@ -555,20 +555,20 @@ export const UNAVAILABLE_UI_SCOPE: UiScope = new UnavailableUiScope();
  * port, which names the missing capability rather than inventing a scope.
  */
 export function useUiScope(): UiScope {
-  return useOptionalUiCapabilities()?.scope ?? UNAVAILABLE_UI_SCOPE;
+  return useOptionalUiHostServices()?.scope ?? UNAVAILABLE_UI_SCOPE;
 }
 
 /** Where this reader could replicate a thing to; absent where no lender is installed. */
 export function useUiCopyTargets(): UiCopyTargets {
-  return useOptionalUiCapabilities()?.copyTargets ?? ABSENT_UI_COPY_TARGETS;
+  return useOptionalUiHostServices()?.copyTargets ?? ABSENT_UI_COPY_TARGETS;
 }
 
 /** The support chat, or undefined where this deployment installed none. */
 export function useUiSupportChat(): UiSupportChat | undefined {
-  return useOptionalUiCapabilities()?.supportChat;
+  return useOptionalUiHostServices()?.supportChat;
 }
 
 /** The trace filters this reader applied; undefined where no lender is installed. */
 export function useUiTraceFilters(): UiTraceFilters | undefined {
-  return useOptionalUiCapabilities()?.traceFilters;
+  return useOptionalUiHostServices()?.traceFilters;
 }

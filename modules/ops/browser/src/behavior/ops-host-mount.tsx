@@ -5,7 +5,7 @@
  */
 
 import {
-  useUiCapabilities,
+  useUiHostServices,
   useUiDeployment,
   useUiScope,
   type UiFeedback,
@@ -101,7 +101,7 @@ class CapabilityOpsHost extends OpsHostApi {
  * is what `mounts.load` resolves.
  */
 export default function OpsHostMount({ children }: { children?: ReactNode }) {
-  const { session, navigation, route, feedback } = useUiCapabilities();
+  const { session, navigation, route, feedback } = useUiHostServices();
   const { isSaaS, hasCloudOps } = useUiDeployment();
   const { projectId } = useUiScope().activeScope();
   const location = useLocation();

@@ -221,14 +221,14 @@ Feature: The local development process topology
     Then only that module and the modules importing it are evaluated again
     And the supervisor does not restart the process, so its pid stays the same
 
-  # Node loaded a package.json's resolution and the host's own source natively,
-  # so no module runner can drop them: those still need a new process.
+  # Node loaded the host's own source natively, so no module runner can drop it;
+  # restarting for it took the whole stack down, so it waits for a manual restart.
   @unit
-  Scenario: Only what Node loaded natively restarts the in-process api lane
+  Scenario: An edit never restarts the in-process api lane
     Given the api lane reloading in-process under the supervisor
-    When a package.json or a file of the host's own source changes
-    Then the supervisor restarts the process
-    And a module edit elsewhere is left to the in-process reload
+    When a package.json or a module file changes
+    Then it is left to the in-process reload and the supervisor does not restart the process
+    And a file of the host's own source only logs that it applies on the next restart
 
   # A bad edit never exits an in-process host (the old generation keeps
   # serving), so an exit after it said "backend ready" is a crash.
@@ -240,7 +240,8 @@ Feature: The local development process topology
     Then the supervisor starts it again after the quiet window, without waiting for a change
 
   # ADR-168 step 5: a generation's own close is what releases its stores,
-  # queues and pools, so it runs before the next generation boots.
+  # queues and pools, so it runs before the next worker boots (the next api
+  # boots beside it on its own port, see the swap scenarios below).
   @unit
   Scenario: A reload disposes the previous generation before the next one boots
     Given the api lane reloading in-process under the supervisor
@@ -271,7 +272,7 @@ Feature: The local development process topology
   Scenario: A generation that did not drain is replaced by a fresh process
     Given the api lane reloading in-process under the supervisor
     When the old generation's drain fails during a reload
-    Then the host does not boot the next generation beside it
+    Then the host does not start the next worker beside it
     And it logs "backend recycling" and exits non-zero, so the supervisor starts a fresh process
 
   # --- One process is the default (ADR-168, amendment 2026-10-09) ---
@@ -423,3 +424,30 @@ Feature: The local development process topology
     Then the mail preview is hosted in the dev server's own process
     When the developer sets "LANGWATCH_MAIL_PREVIEW_SPAWN=1"
     Then the mail preview starts as its own process on the first visit
+
+  # --- A reload never closes the api's port ---
+
+  # A shared checkout reloads the backend many times an hour; draining before
+  # booting left API_PORT closed for the whole boot, so every page was a 502.
+  # The host holds API_PORT and forwards it; the worker binds fixed ports
+  # (metrics, voice raw socket), so it still stops before its successor starts.
+  @unit
+  Scenario: A reload swaps the api without closing its port
+    Given the in-process host forwarding API_PORT to a serving generation
+    When a module edit links the next generation
+    Then the next api boots on its own port while the old one still answers
+    And API_PORT is moved to the next api before the old generation drains
+    And the next worker starts only after the old worker has drained
+
+  @unit
+  Scenario: An api that refuses boot keeps the old generation serving
+    Given the in-process host forwarding API_PORT to a serving generation
+    When the next api throws while booting
+    Then API_PORT stays with the old generation and nothing is drained
+
+  @unit
+  Scenario: A worker that refuses boot leaves the new api serving
+    Given the in-process host forwarding API_PORT to a serving generation
+    When the next worker throws while booting after the old one drained
+    Then the new api keeps serving and the worker's failure is logged by name
+    And the next code change retries the boot

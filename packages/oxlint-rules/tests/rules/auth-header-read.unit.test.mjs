@@ -4,7 +4,10 @@ import { authHeaderReadRule } from "../../src/rules/auth-header-read.rule.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
 const workspace = createFixtureWorkspace({
-  features: { agent: { layoutVersion: 0, roles: { process: {} } } },
+  features: {
+    agent: { layoutVersion: 0, roles: { process: {} } },
+    auth: { layoutVersion: 0, roles: { process: {} } },
+  },
 });
 
 afterAll(() => workspace.cleanup());
@@ -64,11 +67,34 @@ describe("given a module transport, app or module file", () => {
   });
 });
 
+describe("given a route that declares its scope header", () => {
+  describe("when `.withPermission` names the header the door reads", () => {
+    /** @scenario "The scope header a permission declares is not this rule's business" */
+    it("reports nothing", () => {
+      expect(
+        report(
+          'route.withPermission("playground:view", { at: "header", param: "projectId", header: "x-project-id" });',
+          "modules/agent/process/src/transport/agent.rest.ts",
+        ),
+      ).toEqual([]);
+    });
+  });
+});
+
 describe("given a module service", () => {
   describe("when it names an auth header", () => {
     /** @scenario "A service naming an auth header is not this rule's business" */
     it("reports nothing", () => {
       expect(report(READ, "modules/agent/process/src/services/agent.service.ts")).toEqual([]);
+    });
+  });
+});
+
+describe("given the auth module, which binds the door", () => {
+  describe("when its transport reads an auth header", () => {
+    /** @scenario "The module that binds the door is not this rule's business" */
+    it("reports nothing", () => {
+      expect(report(READ, "modules/auth/process/src/transport/auth.rest.ts")).toEqual([]);
     });
   });
 });

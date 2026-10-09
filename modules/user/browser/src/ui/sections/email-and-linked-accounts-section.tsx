@@ -14,6 +14,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { SettingsSection, SettingsSectionRow } from "@langwatch/design-system/settings-section";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { AtSign, KeyRound, X } from "lucide-react";
 
@@ -36,17 +37,13 @@ export function EmailAndLinkedAccountsSection() {
   const hasSsoProvider = !!host.organization()?.ssoProvider;
 
   return (
-    <VStack align="start" gap={4} width="full" data-testid="email-and-linked-accounts-section">
-      <VStack align="start" gap={1}>
-        <HStack gap={2}>
-          <AtSign size={18} />
-          <Text fontWeight={600}>Linked Accounts</Text>
-        </HStack>
-        <Text color="fg.muted" fontSize="sm">
-          The addresses this account is known by, and the identity providers that vouch for it.
-        </Text>
-      </VStack>
-
+    <SettingsSection
+      anchorId="email-and-linked-accounts"
+      icon={<AtSign size={18} />}
+      title="Linked Accounts"
+      hint="The addresses this account is known by, and the identity providers that vouch for it."
+      data-testid="email-and-linked-accounts-section"
+    >
       {hasSsoProvider && (
         <Text fontSize="xs" color="fg.muted">
           You sign in via your company&apos;s SSO provider. Additional sign-in methods can&apos;t be
@@ -64,7 +61,7 @@ export function EmailAndLinkedAccountsSection() {
           ) : null
         }
       />
-    </VStack>
+    </SettingsSection>
   );
 }
 
@@ -118,14 +115,18 @@ function LinkedAccountRows({ hasSsoProvider }: { hasSsoProvider: boolean }) {
 
   const linked = accounts.data ?? [];
   return (
-    <VStack align="stretch" gap={1} width="full">
+    <VStack align="stretch" gap={2} width="full">
       {linked.map((account) => {
         const name = providerDisplayName(account.provider, account.providerAccountId);
         const verdict = removal.verdictFor(account.id);
         return (
-          <HStack key={account.id} width="full" gap={2} paddingY={2}>
-            <KeyRound size={16} />
-            <Text fontSize="sm">{name}</Text>
+          <SettingsSectionRow key={account.id} data-testid="linked-account-row">
+            <Box color="fg.muted" display="flex">
+              <KeyRound size={16} />
+            </Box>
+            <Text fontSize="sm" fontWeight={500}>
+              {name}
+            </Text>
             <Spacer />
             {verdict ? (
               <UnlinkMethodButton
@@ -138,7 +139,7 @@ function LinkedAccountRows({ hasSsoProvider }: { hasSsoProvider: boolean }) {
                 }
               />
             ) : null}
-          </HStack>
+          </SettingsSectionRow>
         );
       })}
       <RemoveSignInMethodDialog

@@ -249,6 +249,7 @@ function LangyLauncher({ isOpen, onOpen }: { isOpen: boolean; onOpen: () => void
         ref={orbRef}
         type="button"
         className="langy-root"
+        data-langy-orb=""
         onClick={() => {
           // Fire the bloom while the orb is still mounted (reads its rect), then
           // open — the bloom outlives the unmount on its own.

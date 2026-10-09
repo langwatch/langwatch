@@ -400,6 +400,13 @@ Feature: Transport declaration split
     And a door that resolves no key cannot declare it: refused by the compiler and where it is written
 
   @integration
+  Scenario: The session key door hands its holder as the route's session
+    Given a route behind the session key door declares a session schema (Alex, round 86, E1)
+    When a caller presents a minted session key the minting module accepts
+    Then the handler is handed what the module said of the key, parsed by the route's schema
+    And the handler reads none of the key's headers
+
+  @integration
   Scenario: A route admits only the key kinds it names
     Given a route behind the project door names the key kinds it admits (Alex, 2026-10-05, E7)
     When a caller presents a key of a kind the route does not name
