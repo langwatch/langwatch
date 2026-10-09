@@ -15,14 +15,16 @@ import { PROMPT_NODE_ID } from "./prompt-execution-event.rules.ts";
 import { extractStreamableOutput, type OutputConfig } from "./prompt-output-format.rules.ts";
 
 /** A node failure that carries the HTTP status the model provider answered with. */
-export class UpstreamLLMError extends Error {
-  readonly upstreamStatus: number | undefined;
+type UpstreamLLMError = Error & { readonly upstreamStatus: number | undefined };
 
-  constructor(message: string, upstreamStatus: number | undefined) {
-    super(message);
-    this.name = "UpstreamLLMError";
-    this.upstreamStatus = upstreamStatus;
-  }
+export function upstreamLLMError({
+  message,
+  upstreamStatus,
+}: {
+  message: string;
+  upstreamStatus: number | undefined;
+}): UpstreamLLMError {
+  return Object.assign(new Error(message), { name: "UpstreamLLMError", upstreamStatus });
 }
 
 /**
@@ -98,7 +100,9 @@ export function handleEngineEvent({
   });
   if (delta.text) send({ type: "delta", content: delta.text });
 
-  if (state.error) throw new UpstreamLLMError(state.error, state.upstream_status);
+  if (state.error) {
+    throw upstreamLLMError({ message: state.error, upstreamStatus: state.upstream_status });
+  }
 
   return {
     sent: delta.total,

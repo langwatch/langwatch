@@ -46,15 +46,9 @@ export function deriveAudioOutputRate(
 }
 
 /**
- * A router picks another model per request and has no rate of its own. The
- * upstream catalog marks that with a rate of -1 per token, which read as a
- * price would bill every routed token at minus one dollar. A negative rate is
- * therefore dropped here, treated as no rate: a router whose rates are all
- * negative gets no registry entry, so it is costed like any model the
- * catalog cannot price (zero, or no cost at all) and never below zero.
- *
- * Partial because the dropped keys include the two the catalog type marks as
- * required, so every read after this has to allow for a missing rate.
+ * Drops negative rates. The upstream catalog marks a router, which has no rate of its own,
+ * with -1 per token; read as a price that bills every routed token below zero. Partial
+ * because the dropped keys include the two the catalog type marks as required.
  */
 export function withoutNegativeRates(pricing: LLMModelPricing): Partial<LLMModelPricing> {
   return Object.fromEntries(

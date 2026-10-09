@@ -10,7 +10,7 @@ import { PROMPT_NODE_ID } from "../prompt-execution-event.rules.ts";
 import {
   handleEngineEvent,
   parseNodeError,
-  UpstreamLLMError,
+  upstreamLLMError,
 } from "../prompt-execution-stream.rules.ts";
 
 const failedNode = (upstreamStatus: number | undefined): StudioServerEvent =>
@@ -41,8 +41,7 @@ describe("handleEngineEvent", () => {
     it("throws a failure that carries the status", () => {
       const error = thrownBy(failedNode(402));
 
-      expect(error).toBeInstanceOf(UpstreamLLMError);
-      expect((error as UpstreamLLMError).upstreamStatus).toBe(402);
+      expect(error).toMatchObject({ name: "UpstreamLLMError", upstreamStatus: 402 });
     });
 
     /** @scenario A provider account with no credit left is named in the playground */
@@ -71,10 +70,10 @@ describe("handleEngineEvent", () => {
 describe("parseNodeError", () => {
   describe("when the message already names the failure", () => {
     it("keeps the type the message gave over the status", () => {
-      const error = new UpstreamLLMError(
-        "litellm.RateLimitError: GroqException - slow down",
-        402,
-      );
+      const error = upstreamLLMError({
+        message: "litellm.RateLimitError: GroqException - slow down",
+        upstreamStatus: 402,
+      });
 
       expect(parseNodeError(error).type).toBe("rate_limit");
     });

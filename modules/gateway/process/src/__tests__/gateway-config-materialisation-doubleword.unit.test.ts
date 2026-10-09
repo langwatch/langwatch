@@ -8,6 +8,7 @@ import type { ModelProvider } from "@langwatch/gateway-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import { PrismaGatewayScopeResolutionRepository } from "../repositories/prisma/prisma.gateway-scope-resolution.repository.ts";
@@ -26,8 +27,34 @@ const credentialsPort: GatewayModelProviderCredentials = {
   readCustomKeys: (stored: unknown) => stored as Record<string, unknown>,
 };
 
-const doublewordRow = (customKeys: Record<string, string>): ModelProvider =>
-  ({ id: "mp_doubleword", provider: "doubleword", customKeys }) as unknown as ModelProvider;
+const AT = Temporal.Instant.from("2026-10-01T00:00:00.000Z");
+
+const doublewordRow = (customKeys: Record<string, string>): ModelProvider => ({
+  id: "mp_doubleword",
+  name: "doubleword",
+  provider: "doubleword",
+  routingHandle: null,
+  enabled: true,
+  customKeys,
+  extraHeaders: null,
+  customModels: null,
+  customEmbeddingsModels: null,
+  deploymentMapping: null,
+  rateLimitRpm: null,
+  rateLimitTpm: null,
+  rateLimitRpd: null,
+  rotationPolicy: "MANUAL",
+  providerConfig: null,
+  fallbackPriorityGlobal: null,
+  langySkipPermissionsModels: null,
+  healthStatus: "HEALTHY",
+  circuitOpenedAt: null,
+  lastHealthCheckAt: null,
+  disabledAt: null,
+  createdAt: AT,
+  updatedAt: AT,
+  organizationId: "org_doubleword",
+});
 
 describe("buildCredentials for doubleword", () => {
   describe("given a credential saved with an API key", () => {

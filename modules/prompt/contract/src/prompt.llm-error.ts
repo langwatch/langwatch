@@ -76,12 +76,9 @@ export function parseLLMError(raw: string): ParsedLLMError {
 }
 
 /**
- * Classifies a failure by the HTTP status the model provider answered with.
- *
- * The Go engine reports a provider failure as "gateway returned non-2xx
- * status N" plus the status itself, so the litellm-shaped parsing above never
- * matches it. The status is the one detail that decides what the customer
- * should do: fix a key, wait, add credit, or change the request.
+ * Classifies a failure by the HTTP status the model provider answered with. The Go engine
+ * reports a provider failure as "gateway returned non-2xx status N" plus the status, which
+ * the litellm-shaped parsing above never matches.
  */
 export function llmErrorTypeFromStatus(status: number): LLMErrorType {
   if (status === 401 || status === 403) return "auth";

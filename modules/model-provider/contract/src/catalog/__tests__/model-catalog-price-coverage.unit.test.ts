@@ -33,11 +33,9 @@ const overlayModels = overlayModelCatalog.models;
 const PRICED_ELSEWHERE = [/^openai_codex\//, /^openrouter\//];
 
 /**
- * Whether a catalog entry is a router: it states at least one rate, and every
- * rate it states is negative. A router is priced by whichever model it routes
- * to, whatever its vendor prefix, and the cost registry treats a negative rate
- * as no rate. An entry with a single negative field next to real prices is not
- * a router; it is a bad price and has to be explained on its own.
+ * Whether a catalog entry is a router: it states at least one rate and every rate is negative.
+ * A router is priced by the model it routes to. One negative field next to real prices is a
+ * bad price, not a router, and has to be explained on its own.
  */
 const isVariablePriceRouter = (entry: LLMModelEntry | undefined) => {
   const rates = Object.values(entry?.pricing ?? {}).filter(
