@@ -5808,7 +5808,7 @@ description: An importable Grafana dashboard for the LangWatch AI Gateway, cover
 sidebarTitle: Grafana dashboard
 ---
 
-The JSON below builds nine rows that an on-call engineer reads top down, from caller impact to the cause. Every panel reads a metric the gateway registers, so it works against any Prometheus that scrapes `/metrics`.
+The JSON below builds nine rows that an on-call engineer reads top down, from caller impact to the cause. Every panel reads a metric the gateway registers, so it works against any Prometheus that scrapes the gateway's `/metrics` on the metrics port.
 
 Pair it with [Prometheus alerts](/ai-gateway/cookbooks/prometheus-alerts) for the paging rules, and [Troubleshooting](/ai-gateway/troubleshooting) for the fix behind each row.
 
@@ -5831,7 +5831,7 @@ Nine rows, top to bottom:
 ## Prerequisites
 
 - Grafana 10.0 or later. The JSON uses time series panels and `$__rate_interval`.
-- A Prometheus data source that scrapes the gateway's `/metrics`.
+- A Prometheus data source that scrapes the gateway's metrics port (`9464`) with the bearer `METRICS_API_KEY`.
 - `kube-state-metrics` and cAdvisor for the infrastructure row. Skip that row without them.
 
 ## Import
@@ -6883,7 +6883,7 @@ description: A PromQL ruleset for the LangWatch AI Gateway, covering reliability
 sidebarTitle: Prometheus alerts
 ---
 
-The gateway serves `/metrics` on its own port for any Prometheus setup to scrape. Copy the ruleset below into `alerts/langwatch-gateway.yml`, or into a `PrometheusRule` resource if you run the Prometheus Operator, then reload Prometheus.
+The gateway serves `/metrics` on its own metrics port (`9464` by default) for any Prometheus setup to scrape. Send the bearer `METRICS_API_KEY` as `Authorization: Bearer <key>` in the scrape job's `authorization` block. Copy the ruleset below into `alerts/langwatch-gateway.yml`, or into a `PrometheusRule` resource if you run the Prometheus Operator, then reload Prometheus.
 
 Every metric name and label here comes from the gateway's registry. See [Observability](/ai-gateway/observability#metrics-prometheus) for the full list.
 
@@ -7396,7 +7396,7 @@ The LangWatch AI Gateway is two processes. The gateway service is a Go binary on
 
 | Component | Where it runs | What it does |
 |---|---|---|
-| Gateway service | The `aigateway` Go binary, port `5563` by default | Serves `/v1/chat/completions`, `/v1/messages`, `/v1/responses`, `/v1/embeddings`, `/v1/audio/speech`, `/v1/audio/transcriptions`, `/v1/images/generations`, `/v1/images/edits`, `/v1/models`, and a Gemini passthrough under `/v1beta`. Health on `/healthz`, `/readyz`, `/startupz` and `/health`; Prometheus metrics on `/metrics`. |
+| Gateway service | The `aigateway` Go binary, port `5563` by default | Serves `/v1/chat/completions`, `/v1/messages`, `/v1/responses`, `/v1/embeddings`, `/v1/audio/speech`, `/v1/audio/transcriptions`, `/v1/images/generations`, `/v1/images/edits`, `/v1/models`, and a Gemini passthrough under `/v1beta`. Health on `/healthz`, `/readyz`, `/startupz` and `/health`; Prometheus metrics on `/metrics` of the metrics listener (port `9464`, bearer `METRICS_API_KEY`, opt-in). |
 | Request pipeline | Inside the gateway service | Runs each request through interceptors in this order: spend admission, rate limit, policy rules, model resolution, cache rules, budget precheck, guardrails, trace span, then the provider dispatch. |
 | Provider dispatch | Inside the gateway service | Sends the request to the first credential in the routing chain through Bifrost and falls through to the next credential on a provider failure. A per-credential circuit breaker opens after 10 failures in 30 seconds and lets one probe through every 60 seconds. |
 | Auth cache | Inside the gateway service | Caches resolved virtual keys in an in-memory LRU of 10,000 entries. See [Auth cache](#auth-cache). |
@@ -8257,7 +8257,7 @@ Every request through `/v1` produces three things you can read. The one exceptio
 | ------------------ | --------------------------------------------------------------------------------------------- |
 | Trace span         | Trace Explorer, in the project the virtual key writes its traces to                           |
 | Response headers   | On the HTTP response your client already receives                                             |
-| Prometheus metrics | `GET /metrics` on the gateway port (`5563` by default), the same listener that serves `/v1/*` |
+| Prometheus metrics | `GET /metrics` on the metrics port (`9464` by default), when enabled. See [Metrics](#metrics-prometheus) |
 
 The gateway starts one span per dispatched request and exports it to the project the virtual key names. The span is named `gen_ai.<operation>`, for example `gen_ai.chat`.
 
@@ -8342,7 +8342,7 @@ The `Traceparent` response header names that span. Forward it to the next hop in
 
 ## Metrics (Prometheus)
 
-`GET /metrics` needs no authentication and runs on the same port as the API. Scrape it with a `ServiceMonitor` or a plain scrape config. See [Self-hosting: Helm](/ai-gateway/self-hosting/helm).
+The gateway serves `GET /metrics` on its own listener, separate from the API port. Set `OTEL_METRICS_EXPORTER=otlp,prometheus` and `METRICS_API_KEY` to turn it on. The listener binds `OTEL_EXPORTER_PROMETHEUS_HOST:OTEL_EXPORTER_PROMETHEUS_PORT`, which default to every interface and `9464`. Each scrape sends `Authorization: Bearer <METRICS_API_KEY>`. Without `METRICS_API_KEY` the listener does not start and the gateway logs `aigateway_metrics_door_unmounted`. In the Helm chart, set `metrics.enabled=true` and keep the key in a Secret. See [Self-hosting: Helm](/ai-gateway/self-hosting/helm).
 
 ### Traffic and lifecycle
 
@@ -10667,7 +10667,9 @@ Time spans are a plain count of seconds on a `_SECONDS` or `_S` variable: `300`,
 
 | Var                                        | Default             | Purpose                                                                                                                                                                                                                                                                                                                                                                         |
 | ------------------------------------------ | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `SERVER_ADDR`                              | `:5563`             | HTTP listen address for the API, the probes and `/metrics`                                                                                                                                                                                                                                                                                                                      |
+| `SERVER_ADDR`                              | `:5563`             | HTTP listen address for the API and the probes                                                                                                                                                                                                                                                                                                                      |
+| `OTEL_METRICS_EXPORTER`, `OTEL_EXPORTER_PROMETHEUS_PORT` | `otlp,prometheus` and `metrics.port`, only when `metrics.enabled` is `true` | Metrics listener, default port 9464 |
+| `METRICS_API_KEY`                                      | Secret key `metrics.apiKey.secretKey` (default `METRICS_API_KEY`), in `metrics.apiKey.existingSecretName` or else `secrets.existingSecretName`, only when `metrics.enabled` is `true` | Bearer a scrape sends |
 | `SERVER_MAX_REQUEST_BODY_BYTES`            | `33554432` (32 MiB) | Request body cap. A larger body answers `413 payload_too_large` before any provider is contacted. The `/v1/audio/transcriptions` and `/v1/speech-to-text` uploads have their own fixed cap of 26 MB                                                                                                                                                                             |
 | `SERVER_DRAIN_DELAY_SECONDS`               | `3`                 | Wait between flipping `/readyz` to 503 and closing the listener. Must be zero or positive. The chart sets it from `shutdown.preDrainWaitSeconds`                                                                                                                                                                                                                                |
 | `SERVER_GRACEFUL_SECONDS`                  | `900`               | Budget for in-flight requests after the listener closes. Starts after the drain delay, so size the pod grace period above the sum of the two. Must be zero or positive. The chart sets it from `shutdown.timeoutSeconds`. Below 45 the gateway logs `graceful_shutdown_shorter_than_heartbeat_interval`; below 840 it logs `graceful_shutdown_shorter_than_max_stream_duration` |
@@ -10758,6 +10760,10 @@ These variables configure the gateway's own spans and metrics. Customer traces g
 | `OTEL_TRACES_SAMPLER`                 | `parentbased_always_on` | One of `always_on`, `always_off`, `traceidratio`, `parentbased_always_on`, `parentbased_always_off`, `parentbased_traceidratio`                                   |
 | `OTEL_TRACES_SAMPLER_ARG`             | empty                   | Ratio between 0 and 1. Required by the two `traceidratio` samplers                                                                                                |
 | `OTEL_SDK_DISABLED`                   | `false`                 | `true` turns every exporter off                                                                                                                                   |
+| `OTEL_METRICS_EXPORTER`               | empty                   | Comma list. `prometheus` turns on the metrics listener, which also needs `METRICS_API_KEY`                                          |
+| `OTEL_EXPORTER_PROMETHEUS_HOST`       | every interface        | Address the metrics listener binds                                                                                                  |
+| `OTEL_EXPORTER_PROMETHEUS_PORT`       | `9464`                  | Port the metrics listener binds                                                                                                     |
+| `METRICS_API_KEY`                     | empty                   | Bearer a scrape sends to `/metrics`. Empty leaves the metrics listener off                                                          |
 | `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT` | empty                   | Read only to warn. Metrics always go to the base endpoint plus `/v1/metrics`                                                                                      |
 | `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT`    | empty                   | Read only to warn. OTLP logs go to the debug collector only                                                                                                       |
 | `OTEL_DEBUG_COLLECTOR_ENDPOINT`       | empty                   | Second collector for local development. Must resolve to this machine (`localhost`, `127.0.0.1`, `::1`, `*.localhost` or `host.docker.internal`), or startup stops |
@@ -10919,7 +10925,7 @@ The `/health` call returns `{"status":"ok","checks":{"gateway":"ok","control_pla
 | `/v1` | `Prefix` | `/v1/chat/completions`, `/v1/messages`, `/v1/responses`, `/v1/embeddings`, `/v1/audio/*`, `/v1/images/*`, `/v1/models`, the realtime and ElevenLabs routes |
 | `/health` | `Exact` | The public status endpoint for uptime monitors |
 
-`/healthz`, `/readyz`, `/startupz`, `/metrics`, `/debug/control-plane` and `/internal/*` stay in-cluster. The Gemini-native routes under `/v1beta` are outside the `/v1` prefix and are not published by the chart Ingress. To publish them, route `/v1beta` to the gateway Service with your own route, as described in [Routing and ingress controllers](/self-hosting/deployment/routing).
+`/healthz`, `/readyz`, `/startupz`, `/debug/control-plane` and `/internal/*` stay in-cluster. Metrics are on their own port (`9464`). The Gemini-native routes under `/v1beta` are outside the `/v1` prefix and are not published by the chart Ingress. To publish them, route `/v1beta` to the gateway Service with your own route, as described in [Routing and ingress controllers](/self-hosting/deployment/routing).
 
 ## Cloud load balancer in front of the Service
 
@@ -10965,7 +10971,7 @@ kubectl -n langwatch get svc langwatch-gateway \
   -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
 ```
 
-A Service of type `LoadBalancer` publishes every route, including `/metrics`, the probes and `/debug/control-plane`, which returns the resolved `LW_GATEWAY_BASE_URL` and takes no key. Put a load balancer listener rule or a security group in front of it when the address is public. Set `service.internal.enabled: true` to also render a ClusterIP Service named `langwatch-gateway-internal` for in-cluster callers, so they do not go out through the load balancer.
+A Service of type `LoadBalancer` publishes every route, including the probes and `/debug/control-plane`, which returns the resolved `LW_GATEWAY_BASE_URL` and takes no key. Put a load balancer listener rule or a security group in front of it when the address is public. Set `service.internal.enabled: true` to also render a ClusterIP Service named `langwatch-gateway-internal` for in-cluster callers, so they do not go out through the load balancer.
 
 ## Other ingress controllers
 
@@ -11036,7 +11042,7 @@ The gateway serves its probes on the same port as the API (`5563`, the container
 | `/readyz`              | `readinessProbe`                     | The pod is not draining                                                                                                                                 |
 | `/startupz`            | `startupProbe`                       | Startup is complete. The process marks startup complete before it opens the listener, so this endpoint answers 200 on the first request that reaches it |
 | `/health`              | Uptime monitors, through the ingress | The process is up and the control plane answered the signed probe within the last 60 seconds                                                            |
-| `/metrics`             | Prometheus                           | Always. See [Observability](/ai-gateway/observability#metrics-prometheus)                                                                               |
+| `/metrics` on port 9464 | Prometheus                          | When the metrics listener is enabled, with the bearer `METRICS_API_KEY`. See [Observability](/ai-gateway/observability#metrics-prometheus)               |
 | `/debug/control-plane` | Operators, in-cluster                | Always. Returns `{"control_plane_base_url":"..."}`, the resolved `LW_GATEWAY_BASE_URL`                                                                  |
 
 None of these endpoints requires a key. With the chart's ClusterIP Service and `ingress.gateway.host` set, `/health` is the only one published and the rest stay in-cluster. A Service of type `LoadBalancer` publishes all of them, `/debug/control-plane` included.
@@ -11297,6 +11303,8 @@ The chart passes these environment variables to the container. Every other key i
 | `LW_GATEWAY_BASE_URL`                                  | `controlPlane.baseUrl`, else `http://<release>-app:5560`             | Control plane URL                              |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` and `OTEL_OTLP_ENDPOINT` | `otel.endpoint`, only when set                                       | OTLP/HTTP endpoint for the gateway's own spans |
 | `LW_GATEWAY_SPEND_ENABLED`                             | `spend.enabled`                                                      | Spend record emission                          |
+| `OTEL_METRICS_EXPORTER`, `OTEL_EXPORTER_PROMETHEUS_PORT` | `otlp,prometheus` and `metrics.port`, only when `metrics.enabled` is `true` | Metrics listener, default port 9464 |
+| `METRICS_API_KEY`                                      | Secret key `metrics.apiKey.secretKey` (default `METRICS_API_KEY`), in `metrics.apiKey.existingSecretName` or else `secrets.existingSecretName`, only when `metrics.enabled` is `true` | Bearer a scrape sends |
 | `SERVER_MAX_REQUEST_BODY_BYTES`                        | `security.maxRequestBodyBytes`                                       | Request body cap                               |
 | `SERVER_DRAIN_DELAY_SECONDS`                           | `shutdown.preDrainWaitSeconds`                                       | Wait after `/readyz` flips to 503              |
 | `SERVER_GRACEFUL_SECONDS`                              | `shutdown.timeoutSeconds`                                            | In-flight request budget on shutdown           |
@@ -11359,7 +11367,8 @@ Watch `gateway_draining` together with `gateway_in_flight_requests`. During a he
 
 | Direction | Allowed                                                                                                | Value                                                                  |
 | --------- | ------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------- |
-| Ingress   | Pods in the `ingress-nginx` namespace, and Prometheus pods in the `monitoring` namespace, to port 5563 | `networkPolicy.ingressFrom`                                            |
+| Ingress   | Pods in the `ingress-nginx` namespace, to port 5563                                                    | `networkPolicy.ingressFrom`                                            |
+| Ingress   | Prometheus pods in the `monitoring` namespace, to the metrics port, only when `metrics.enabled` is `true` | `networkPolicy.metricsFrom`                                         |
 | Egress    | DNS to `kube-system` on TCP and UDP 53                                                                 | fixed                                                                  |
 | Egress    | Pods labelled `app.kubernetes.io/name: langwatch-app` on port 5560                                     | `networkPolicy.egressToControlPlane`, `networkPolicy.controlPlanePort` |
 | Egress    | OTLP collector on port 4318, only when the list is non-empty                                           | `networkPolicy.egressToOTLP`                                           |
@@ -11518,8 +11527,8 @@ Expected: a `chat.completion` object from the provider. The response carries `X-
 Then confirm the request produced a spend record:
 
 ```bash
-kubectl -n langwatch run curl --rm -it --image=curlimages/curl --restart=Never \
-  -- curl -sS http://langwatch-gateway/metrics | grep -E 'gateway_spend_spool_appended_total|gateway_spend_spool_dropped_total'
+kubectl -n langwatch port-forward deploy/langwatch-gateway 9464:9464 &
+curl -sS -H "Authorization: Bearer $METRICS_API_KEY" http://localhost:9464/metrics | grep -E 'gateway_spend_spool_appended_total|gateway_spend_spool_dropped_total'
 ```
 
 Expected: `gateway_spend_spool_appended_total` is at least 1 and `gateway_spend_spool_dropped_total` is 0.
@@ -11598,7 +11607,7 @@ gateway:
 
 Start with CPU alone. It needs no Prometheus and it cannot create a loop between the metrics pipeline and the autoscaler.
 
-Add `lw_gateway_rps` only when you run prometheus-adapter and it scrapes the gateway's `/metrics`. Without the adapter the HPA ignores that line. `kubectl describe hpa langwatch-gateway` reports the metric as not active when the adapter is missing.
+Add `lw_gateway_rps` only when you run prometheus-adapter and it scrapes the gateway's metrics listener (port `9464`, bearer `METRICS_API_KEY`). Without the adapter the HPA ignores that line. `kubectl describe hpa langwatch-gateway` reports the metric as not active when the adapter is missing.
 
 Use `behavior` for scale-up and scale-down stabilization when the traffic shape needs it. It is passed to the HPA as written.
 
@@ -65393,7 +65402,7 @@ LangWatch uses two hostnames. Browsers and SDKs reach the app. LLM clients and c
 
 `<release>` is the Helm release name. The gateway Service forwards port 80 to container port 5563.
 
-Do not expose any other gateway path. `/healthz`, `/readyz`, `/startupz`, `/metrics`, `/debug/control-plane` and `/internal/*` are for in-cluster use only. Gemini-native clients also need `/v1beta`. Add it as a third Prefix rule if you use them.
+Do not expose any other gateway path. `/healthz`, `/readyz`, `/startupz`, `/debug/control-plane` and `/internal/*` are for in-cluster use only. Metrics are served on a separate port (`9464`) and are not part of the gateway Service. Gemini-native clients also need `/v1beta`. Add it as a third Prefix rule if you use them.
 
 `/api/internal` on the app is the private control plane that the gateway and the Langy agent call over cluster DNS. The chart Ingress blocks it by default with `ingress.blockedPaths`. Your own routes must block it too. See [Security](/self-hosting/security#private-control-plane-paths-are-blocked-at-the-ingress).
 

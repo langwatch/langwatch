@@ -12,7 +12,7 @@ Every request through `/v1` produces three things you can read. The one exceptio
 | ------------------ | --------------------------------------------------------------------------------------------- |
 | Trace span         | Trace Explorer, in the project the virtual key writes its traces to                           |
 | Response headers   | On the HTTP response your client already receives                                             |
-| Prometheus metrics | `GET /metrics` on the gateway port (`5563` by default), the same listener that serves `/v1/*` |
+| Prometheus metrics | `GET /metrics` on the metrics port (`9464` by default), when enabled. See [Metrics](#metrics-prometheus) |
 
 The gateway starts one span per dispatched request and exports it to the project the virtual key names. The span is named `gen_ai.<operation>`, for example `gen_ai.chat`.
 
@@ -97,7 +97,7 @@ The `Traceparent` response header names that span. Forward it to the next hop in
 
 ## Metrics (Prometheus)
 
-`GET /metrics` needs no authentication and runs on the same port as the API. Scrape it with a `ServiceMonitor` or a plain scrape config. See [Self-hosting: Helm](/ai-gateway/self-hosting/helm).
+The gateway serves `GET /metrics` on its own listener, separate from the API port. Set `OTEL_METRICS_EXPORTER=otlp,prometheus` and `METRICS_API_KEY` to turn it on. The listener binds `OTEL_EXPORTER_PROMETHEUS_HOST:OTEL_EXPORTER_PROMETHEUS_PORT`, which default to every interface and `9464`. Each scrape sends `Authorization: Bearer <METRICS_API_KEY>`. Without `METRICS_API_KEY` the listener does not start and the gateway logs `aigateway_metrics_door_unmounted`. In the Helm chart, set `metrics.enabled=true` and keep the key in a Secret. See [Self-hosting: Helm](/ai-gateway/self-hosting/helm).
 
 ### Traffic and lifecycle
 

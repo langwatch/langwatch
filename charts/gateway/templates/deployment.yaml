@@ -43,6 +43,11 @@ spec:
             - name: http
               containerPort: 5563
               protocol: TCP
+            {{- if .Values.metrics.enabled }}
+            - name: metrics
+              containerPort: {{ .Values.metrics.port }}
+              protocol: TCP
+            {{- end }}
           envFrom:
             - configMapRef:
                 name: {{ include "gateway.fullname" . }}
@@ -57,6 +62,13 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.secrets.existingSecretName }}
                   key: {{ .Values.secrets.jwtSecretKey }}
+            {{- if .Values.metrics.enabled }}
+            - name: METRICS_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.metrics.apiKey.existingSecretName | default .Values.secrets.existingSecretName }}
+                  key: {{ .Values.metrics.apiKey.secretKey }}
+            {{- end }}
             {{- if .Values.secrets.jwtSecretPreviousKey }}
             - name: LW_GATEWAY_JWT_SECRET_PREVIOUS
               valueFrom:
