@@ -338,7 +338,11 @@ export class Server {
       return;
     }
 
-    void this.answer("application", () => this.whenStarted(application, request, response), response);
+    void this.answer(
+      "application",
+      () => this.whenStarted(application, request, response),
+      response,
+    );
   }
 
   /**
@@ -351,7 +355,10 @@ export class Server {
     response: ServerResponse,
   ): Promise<void> {
     if (!this.started) {
-      const started = await this.listening?.then(() => true, () => false);
+      const started = await this.listening?.then(
+        () => true,
+        () => false,
+      );
       if (started === false) {
         response.writeHead(503, { "Content-Type": "text/plain" }).end(`${this.name} did not start`);
         return;
