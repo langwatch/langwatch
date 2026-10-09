@@ -463,6 +463,14 @@ Feature: Dataset editor
     Then the rows are removed from the table
     And the deletion is saved to the dataset
 
+  @integration
+  Scenario: Bulk delete removes exactly the ticked rows
+    Given a saved dataset with two rows
+    And a third row typed into the trailing row and saved
+    When only the third row is ticked and deleted
+    Then the deletion sent names the third row's own id
+    And the second row stays in the table
+
   # Rows added in the editor persist to the database under their
   # client-generated id, so deleting them must send a real server deletion
   # too. Treating any client-generated id as "never saved" left deleted rows
