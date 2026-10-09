@@ -121,7 +121,10 @@ async function readProjectSpanForPromptStudio({
   const protections = await getUserProtectionsForProject(ctx, {
     projectId: input.projectId,
   });
-  const traceService = TraceService.create(ctx.prisma);
+  const traceService = TraceService.create(
+    ctx.prisma,
+    buildTraceBlobResolutionDeps(),
+  );
   return traceService.getSpanForPromptStudio(
     input.projectId,
     input.spanId,
@@ -131,8 +134,10 @@ async function readProjectSpanForPromptStudio({
 
 /**
  * The playground's read through the proof: every span of the named trace,
- * from the tenants the proof reads, with attributes as stored (so values
- * match the span-only read), resolved to the llm span to load.
+ * from the tenants the proof reads, with attributes as stored, resolved to
+ * the llm span to load. Offloaded IO is not restored here, so a prompt over
+ * the offload threshold loads as its stored preview, unlike the span-only
+ * read.
  */
 async function readTraceSpanForPromptStudio({
   authorization,
