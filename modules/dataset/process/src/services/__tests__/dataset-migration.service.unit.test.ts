@@ -1,5 +1,6 @@
 import { memoryObjectStorage } from "@langwatch/process-stores";
 import { PROJECT_ID_PAGE_LIMIT, type ProjectIdPageInput } from "@langwatch/project-contract";
+import type { MigrationStepReport } from "@langwatch/upgrade/step";
 import { describe, expect, it, vi } from "vitest";
 
 import type {
@@ -70,11 +71,24 @@ describe("DatasetMigrationService project scan", () => {
 });
 
 /** One postgres-layout dataset per project, each holding one record. */
-function step(input: { abortAfterProject?: string } = {}) {
+function step(
+  input: {
+    abortAfterProject?: string;
+    /** This project's first commit throws, as a row the move cannot write. */
+    failOnceProject?: string;
+    /** This project's first commit finds its records changed meanwhile. */
+    changedOnceProject?: string;
+  } = {},
+) {
   const controller = new AbortController();
+  const attempted = new Set<string>();
   const commit = vi.fn(
     async ({ projectId }: { projectId: string }): Promise<DatasetMigrationOutcome> => {
       if (projectId === input.abortAfterProject) controller.abort();
+      const first = !attempted.has(projectId);
+      attempted.add(projectId);
+      if (first && projectId === input.failOnceProject) throw new Error("row unreadable");
+      if (first && projectId === input.changedOnceProject) return "skipped-concurrent-write";
       return "migrated";
     },
   );
@@ -100,7 +114,23 @@ function step(input: { abortAfterProject?: string } = {}) {
   const onProjectDone = async ({ afterProjectId }: { afterProjectId: string }) => {
     saved.push(afterProjectId);
   };
-  return { migration, commit, write, saved, onProjectDone, signal: controller.signal };
+  const reports: MigrationStepReport[] = [];
+  const checkpoint = (resumeFrom: MigrationStepReport | null) => ({
+    resumeFrom,
+    save: async ({ report }: { report: MigrationStepReport }) => {
+      reports.push(report);
+    },
+  });
+  return {
+    migration,
+    commit,
+    write,
+    saved,
+    onProjectDone,
+    signal: controller.signal,
+    reports,
+    checkpoint,
+  };
 }
 
 describe("DatasetMigrationService as an upgrade step", () => {
@@ -145,6 +175,59 @@ describe("DatasetMigrationService as an upgrade step", () => {
       });
       expect(write).not.toHaveBeenCalled();
       expect(commit).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a dataset in project_c fails to move", () => {
+    /** @scenario "A dataset that fails to move keeps the content move unfinished" */
+    it("rejects the step and never checkpoints past project_b", async () => {
+      const { migration, reports, checkpoint } = step({ failOnceProject: "project_c" });
+
+      await expect(
+        migration.runStep({
+          checkpoint: checkpoint(null),
+          dryRun: false,
+          signal: new AbortController().signal,
+        }),
+      ).rejects.toThrow("1 datasets failed");
+      expect(reports).toEqual([{ afterProjectId: "project_a" }, { afterProjectId: "project_b" }]);
+    });
+
+    /** @scenario "A retry of an unfinished content move completes it" */
+    it("completes on the retry from the saved checkpoint", async () => {
+      const { migration, commit, reports, checkpoint } = step({ failOnceProject: "project_c" });
+      const signal = new AbortController().signal;
+      await expect(
+        migration.runStep({ checkpoint: checkpoint(null), dryRun: false, signal }),
+      ).rejects.toThrow("1 datasets failed");
+      commit.mockClear();
+
+      await expect(
+        migration.runStep({
+          checkpoint: checkpoint(reports.at(-1) ?? null),
+          dryRun: false,
+          signal,
+        }),
+      ).resolves.toMatchObject({ failed: 0, skippedConcurrentWrite: 0 });
+      expect(commit.mock.calls.map(([call]) => call.projectId)).toEqual([
+        "project_c",
+        "project_d",
+        "project_e",
+      ]);
+      expect(reports.at(-1)).toEqual({ afterProjectId: "project_e" });
+    });
+  });
+
+  describe("given a dataset in project_c changed while it moved", () => {
+    /** @scenario "A dataset skipped for a concurrent write keeps the content move unfinished" */
+    it("reports the run incomplete and never checkpoints past project_b", async () => {
+      const { migration, saved, onProjectDone } = step({ changedOnceProject: "project_c" });
+
+      await expect(migration.run({ onProjectDone })).resolves.toMatchObject({
+        status: "incomplete",
+        summary: { skippedConcurrentWrite: 1 },
+      });
+      expect(saved).toEqual(["project_a", "project_b"]);
     });
   });
 });

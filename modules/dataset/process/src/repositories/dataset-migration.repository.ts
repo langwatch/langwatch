@@ -14,8 +14,10 @@ export type DatasetMigrationSummary = {
   failed: number;
 };
 
+/** `incomplete`: some dataset failed or changed mid-move; the checkpoint never passed it. */
 export type DatasetMigrationRunResult =
   | { status: "completed"; summary: DatasetMigrationSummary }
+  | { status: "incomplete"; summary: DatasetMigrationSummary }
   | { status: "schema-pending" };
 
 /** How many records a dataset holds and when the newest changed: the concurrent-write check. */
