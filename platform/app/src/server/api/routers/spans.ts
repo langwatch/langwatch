@@ -4,8 +4,9 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import {
+  promptStudioLlmRowFromTrace,
   promptStudioRowFromStoredSpan,
-  promptStudioSpanFromTrace,
+  promptStudioSpanFromLlmRow,
 } from "~/server/traces/prompt-studio-span";
 import { TraceService } from "~/server/traces/trace.service";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
@@ -14,7 +15,10 @@ import {
   spanReadHintShape,
   traceDetailAuthorization,
 } from "../trace-detail-authorization";
-import { getUserProtectionsForProject } from "../utils";
+import {
+  getUserProtectionsForProject,
+  getVisibilityCutoffMsForProject,
+} from "../utils";
 
 export const spansRouter = createTRPCRouter({
   getAllForTrace: protectedProcedure
@@ -90,6 +94,7 @@ export const spansRouter = createTRPCRouter({
                 ctx,
                 input: { traceId: input.traceId, tenantId: input.tenantId },
               }),
+              projectId: input.projectId,
               traceId: input.traceId,
               spanId: input.spanId,
               ...occurredAtFromInput(input),
@@ -134,18 +139,20 @@ async function readProjectSpanForPromptStudio({
 
 /**
  * The playground's read through the proof: every span of the named trace,
- * from the tenants the proof reads, with attributes as stored, resolved to
- * the llm span to load. Offloaded IO is not restored here, so a prompt over
- * the offload threshold loads as its stored preview, unlike the span-only
- * read.
+ * from the tenants the proof reads, resolved to the llm span to load. That
+ * span's offloaded IO is restored only when the proof reads one project and
+ * the span is inside the plan's visibility window; otherwise the stored
+ * preview loads.
  */
 async function readTraceSpanForPromptStudio({
   authorization,
+  projectId,
   traceId,
   spanId,
   occurredAtMs,
 }: {
   authorization: Authorization;
+  projectId: string;
   traceId: string;
   spanId: string;
   occurredAtMs?: number;
@@ -155,8 +162,17 @@ async function readTraceSpanForPromptStudio({
     traceId,
     ...(occurredAtMs !== undefined ? { occurredAtMs } : {}),
   });
-  return promptStudioSpanFromTrace({
-    rows: spans.map(promptStudioRowFromStoredSpan),
-    spanId,
-  });
+  const rows = spans.map(promptStudioRowFromStoredSpan);
+  const row = promptStudioLlmRowFromTrace({ rows, spanId });
+  if (!row) return null;
+  // rows is index-aligned with spans, and the llm row is one of rows.
+  const stored = spans[rows.indexOf(row)];
+  if (!stored) throw new Error("llm row has no stored span");
+  const SpanAttributes =
+    await getApp().traces.spans.restoreStoredSpanAttributes({
+      authorization,
+      span: stored,
+      visibilityCutoffMs: await getVisibilityCutoffMsForProject(projectId),
+    });
+  return promptStudioSpanFromLlmRow({ row: { ...row, SpanAttributes }, rows });
 }

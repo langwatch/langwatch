@@ -2,8 +2,9 @@ import { describe, expect, it } from "vitest";
 import type { StoredTraceSpan } from "~/server/app-layer/traces/repositories/span-storage.repository";
 import {
   type PromptStudioSpanRow,
+  promptStudioLlmRowFromTrace,
   promptStudioRowFromStoredSpan,
-  promptStudioSpanFromTrace,
+  promptStudioSpanFromLlmRow,
 } from "../prompt-studio-span";
 
 function row({
@@ -33,7 +34,19 @@ function row({
 
 const llm = { "langwatch.span.type": "llm" };
 
-describe("promptStudioSpanFromTrace()", () => {
+/** The playground's view of a span: pick the llm row, then extract it. */
+function promptStudioSpanFromTrace({
+  rows,
+  spanId,
+}: {
+  rows: PromptStudioSpanRow[];
+  spanId: string;
+}) {
+  const llmRow = promptStudioLlmRowFromTrace({ rows, spanId });
+  return llmRow ? promptStudioSpanFromLlmRow({ row: llmRow, rows }) : null;
+}
+
+describe("promptStudioLlmRowFromTrace() and promptStudioSpanFromLlmRow()", () => {
   describe("when the requested span is not in the trace", () => {
     it("returns null", () => {
       expect(
