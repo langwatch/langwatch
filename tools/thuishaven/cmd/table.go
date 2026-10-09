@@ -395,6 +395,28 @@ var baseTable = []commandSpec{
 		run: runOutbound,
 	},
 	{
+		name:    "feedback",
+		summary: "notes readers sent from the haven orb in the app page: list | show | resolve | wait",
+		args:    "<list|show|resolve|wait> [id]",
+		maxArgs: 2,
+		flags: simFlags(
+			flagSpec{long: "--open", summary: "list: only feedback nobody resolved"},
+			flagSpec{long: "--timeout", takesValue: true, value: "<dur>", summary: "wait: how long to block for new feedback (default 30s)"},
+		),
+		run: runFeedback,
+	},
+	{
+		name:    "page",
+		summary: "the app page's recent console messages and requests, as the haven orb saw them: console | network",
+		args:    "<console|network>",
+		maxArgs: 1,
+		flags: simFlags(
+			flagSpec{long: "--level", takesValue: true, value: "<level>", summary: "console: only this level (error, warn, info, log, debug)"},
+			flagSpec{long: "--failed", summary: "network: only requests that failed"},
+		),
+		run: runPage,
+	},
+	{
 		name:    "storage",
 		summary: "storagesim's S3: buckets | objects [bucket] | object <bucket> <key> [--raw] | presign <bucket> <key> | delete | clear [bucket] | seed | requests",
 		args:    "<buckets|objects|object|presign|delete|clear|seed|requests> [bucket] [key]",

@@ -135,6 +135,29 @@ not.
 
 Seed presets are in `haven help db` (`demo`, `onboarding`, `post-onboarding` and more).
 
+## Feedback from the app page (the haven orb)
+
+When haven runs the stack, the app page carries the haven orb, bottom right
+(`apps/ui/vite/haven-orb/`, `specs/setup/haven-dev-orb.feature`). A reader picks an
+element or drags a region, types a note, and it lands in this stack's store. The orb also
+pushes the page's last 200 console messages and requests: method, URL without its query,
+status, duration. Never a body, a header or a cookie.
+
+While building UI, read it before you call the work done:
+
+```bash
+haven feedback list --open --agent      # notes nobody resolved yet
+haven feedback show <id> --agent        # one note: selector or region, viewport, console, requests
+haven feedback resolve <id>             # once you fixed it
+haven feedback wait --timeout 5m        # block until the reader sends the next note
+haven page console --level error --agent
+haven page network --failed --agent
+```
+
+The page buffer is whichever tab pushed last, and is empty until someone opens the app with
+the orb showing. The files live in `.haven/logs/<slug>/orb/`; `--stack <slug>` reads another
+worktree's.
+
 ## When it will not come up
 
 `troubleshooting.md` (same folder) covers: a stack that is already up, the portless
