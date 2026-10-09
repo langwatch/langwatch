@@ -23,6 +23,7 @@
   "LICENSE.md",
   "pnpm-workspace.yaml",
   "pnpm-lock.yaml",
+  "patches/",
   "vendor/",
   "tsconfig.base.json",
   "tsconfig.shared.json",
