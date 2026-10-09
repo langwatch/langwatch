@@ -608,7 +608,9 @@ function GraphContainer({
   // A row of figures draws its own compact error per figure (see SummaryGraph): it often sits
   // in a tab header or a small card.
   const failedOutright = Boolean(timeseries.error) && !timeseries.data && graphType !== "summary";
-  const showEmpty = isEmpty && graphType !== "monitor_graph";
+  // A summary draws its own empty figures (see SummaryGraph); the chart placeholder overflows a tab header.
+  const showEmpty =
+    isEmpty && graphType !== "monitor_graph" && (graphType !== "summary" || Boolean(emptyState));
   return (
     <Box width="full" height="full" position="relative">
       {timeseries.isLoading && graphType !== "summary" && (
@@ -676,6 +678,11 @@ function SummaryGraph({
         {timeseries.isLoading &&
           Object.entries(seriesSet).map(([key, series]) => (
             <SummaryMetric key={key} label={series.name} titleProps={titleProps} />
+          ))}
+        {Boolean(timeseries.data) &&
+          summaryData.current.length === 0 &&
+          Object.entries(seriesSet).map(([key, series]) => (
+            <SummaryMetric key={key} label={series.name} current={0} titleProps={titleProps} />
           ))}
         {summaryData.current.slice(0, 10).map((entry) => (
           <SummaryMetric

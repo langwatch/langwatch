@@ -252,3 +252,34 @@ describe("<DocumentsCountsTable /> when its query fails", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });
+
+describe("<CustomGraph /> summary in a tab header when its query returns no data", () => {
+  beforeEach(() => {
+    queryState.timeseries = {
+      data: { previousPeriod: [], currentPeriod: [] },
+      error: null,
+      isLoading: false,
+      isFetching: false,
+      refetch: vi.fn(),
+    };
+  });
+
+  /** @scenario "An empty summary keeps its figure labels inside its own bounds" */
+  it("shows the figure label with the no-data figure, not the chart placeholder", () => {
+    renderWithHost(
+      <Tabs.Root defaultValue="llmCalls">
+        <Tabs.List>
+          <Tabs.Trigger value="llmCalls">
+            <CustomGraph input={{ ...lineGraph, graphType: "summary" }} />
+          </Tabs.Trigger>
+        </Tabs.List>
+        <Tabs.Content value="llmCalls" />
+      </Tabs.Root>,
+    );
+
+    const tab = screen.getByRole("tab");
+    expect(within(tab).getByText("LLM Calls")).toBeInTheDocument();
+    expect(within(tab).getByText("No data yet")).toBeInTheDocument();
+    expect(screen.queryByText("No data. Try adjusting the date range.")).not.toBeInTheDocument();
+  });
+});
