@@ -14,8 +14,8 @@ import type {
 import { createTrpcRuntime, redactAuditArgs } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authorization";
 import type { TrpcContract } from "@langwatch/module";
-import { initTRPC } from "@trpc/server";
 import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
+import { initTRPC } from "@trpc/server";
 
 type TestContext = object;
 type TestActor = { type: "user"; id: string; impersonatorId?: string };

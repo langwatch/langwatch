@@ -5,10 +5,10 @@
 import { PermissionDeniedError } from "@langwatch/authorization";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { authorizeDefaults } from "../../__tests__/api-double.ts";
 import { decide, type AccessDenial, type Authorize, type Caller } from "../access.ts";
 import type * as decisionRecordModule from "../decision-record.ts";
 import { permissionDecisionRecord, recordPermissionDecision } from "../decision-record.ts";
-import { authorizeDefaults } from "../../__tests__/api-double.ts";
 
 vi.mock("../decision-record.ts", async (importOriginal) => {
   const actual = await importOriginal<typeof decisionRecordModule>();

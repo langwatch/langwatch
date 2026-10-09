@@ -11,6 +11,7 @@ import {
   UnauthorizedError,
 } from "@langwatch/api/rest";
 import { LocalFeatureApis } from "@langwatch/process";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 
 import { projectRest, projectRestCaller, ProjectManagementApi } from "../project.rest.ts";
 import { TestProjectManagementApi } from "./support/test-project-management-api.ts";
@@ -84,6 +85,7 @@ export function mountProjectRestApplication(
   };
 
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       identify: ({ request }) => admit(request),
       authenticate: ({ request, permission }) => {

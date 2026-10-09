@@ -6,6 +6,7 @@ import { defineTrpcContract, moduleApi } from "@langwatch/module";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { authorizeDefaults } from "../../__tests__/api-double.ts";
 import type { AccessActor } from "../../access/access.ts";
 import {
   createTrpcRuntime,
@@ -13,7 +14,6 @@ import {
   TrpcRootDefinition,
   type TrpcRuntimeMembers,
 } from "../runtime.ts";
-import { authorizeDefaults } from "../../__tests__/api-double.ts";
 
 interface RowsApi {
   create(input: { projectId: string }): Promise<{ created: boolean }>;

@@ -9,6 +9,7 @@ import { Readable } from "node:stream";
 import { createRestRuntime } from "@langwatch/api/rest";
 import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
 import type { PermissionDecision } from "@langwatch/authorization";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 import { initTRPC } from "@trpc/server";
 import type { ErrorHandler } from "hono";
 import { describe, expect, it } from "vitest";
@@ -21,7 +22,6 @@ import {
 import { MemoryStoredObjectSealRepository } from "../../repositories/memory/memory.stored-object-seal.repository.ts";
 import { storedObjectRest } from "../stored-object.rest.ts";
 import { storedObjectTrpcTransport } from "../stored-object.trpc.ts";
-import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 
 const PROJECT = "project_1";
 const OTHER_PROJECT = "project_2";

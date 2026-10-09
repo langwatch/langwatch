@@ -10,6 +10,7 @@ import {
   type TrpcRuntimeMembers,
 } from "@langwatch/api/trpc";
 import type { AuthzScopeLineageResult } from "@langwatch/authorization";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -17,7 +18,6 @@ import {
   TestPresenceEmitters,
 } from "../../app/__tests__/presence.fixture.ts";
 import { presenceSessionPersonFact, presenceTrpcTransport } from "../presence.trpc.ts";
-import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 
 type DoorContext = { actor: { id: string } | null };
 

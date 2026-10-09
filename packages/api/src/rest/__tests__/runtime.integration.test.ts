@@ -11,6 +11,7 @@ import { generateSpecs } from "hono-openapi";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import { authorizationPort } from "../../__tests__/api-double.ts";
 import {
   anyAuthenticated,
   deferredScope,
@@ -29,7 +30,6 @@ import { documentedResponses, securityForCredentialClass } from "../openapi.ts";
 import { bindRestHeader, bindRestMiddleware, defineRestMiddleware } from "../request.ts";
 import { declined } from "../response.ts";
 import { createRestRuntime, type RestDeprecationLog } from "../runtime.ts";
-import { authorizationPort } from "../../__tests__/api-double.ts";
 
 /**
  * The runtime's loggers are created at module scope, so spying on `createLogger` calls never

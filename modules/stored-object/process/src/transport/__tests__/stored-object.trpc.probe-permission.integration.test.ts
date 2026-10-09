@@ -11,6 +11,7 @@ import type {
   PermissionDecision,
 } from "@langwatch/authorization";
 import { StoredObjectNotFoundError } from "@langwatch/stored-object-contract";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 
@@ -24,7 +25,6 @@ import type {
 } from "../../rules/stored-object-file-access.rules.ts";
 import type { StoredObjectFileReader } from "../../services/stored-objects.service.ts";
 import { storedObjectTrpcTransport } from "../stored-object.trpc.ts";
-import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 
 const PROJECT = "project_1";
 

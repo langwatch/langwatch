@@ -7,6 +7,7 @@ import { TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import { authorizeDefaults } from "../../__tests__/api-double.ts";
 import { RateLimitedError } from "../../errors.ts";
 import {
   createTrpcRuntime,
@@ -16,7 +17,6 @@ import {
   type TrpcRuntimeMembers,
 } from "../runtime.ts";
 import type { TrpcThrottle, TrpcThrottlePolicy } from "../throttle.ts";
-import { authorizeDefaults } from "../../__tests__/api-double.ts";
 
 vi.mock("@langwatch/observability", async (importOriginal) => ({
   ...((await importOriginal()) as object),

@@ -7,12 +7,12 @@ import { TrpcHost } from "@langwatch/api/trpc";
 import { AuditLogApi, type RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { describe, expect, it } from "vitest";
 
 import { auditLogProcessModule } from "../../audit-log.module.ts";
 import { homeTrpcTransport } from "../home.trpc.ts";
-import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 
 const ACTOR = { id: "user-1" };
 const PROJECT_ID = "project_1";

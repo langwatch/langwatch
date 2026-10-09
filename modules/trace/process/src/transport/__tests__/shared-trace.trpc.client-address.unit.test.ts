@@ -7,12 +7,12 @@ import { ClientAddress } from "@langwatch/api/policy";
 import { bindTrpcFact, composeTrpcRouters, TrpcHost } from "@langwatch/api/trpc";
 import { ShareReadRateLimitedError } from "@langwatch/share-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { describe, expect, it } from "vitest";
 
 import { shareViewerFact, sharedTraceTrpcTransport } from "../shared-trace.trpc.ts";
-import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 
 type SharedTraceRead = Parameters<TraceApi["getSharedTrace"]>[0];
 
@@ -22,7 +22,11 @@ async function readShared({ socketAddress }: { socketAddress: string }): Promise
   const trpc = TrpcHost.create({
     sessions: SessionReader.unverified(),
     authz: {
-  ...testAuthorizeDefaults, getDecision: refuse, getProjectAnyDecision: refuse, checkScopeLineage: refuse },
+      ...testAuthorizeDefaults,
+      getDecision: refuse,
+      getProjectAnyDecision: refuse,
+      checkScopeLineage: refuse,
+    },
   });
   trpc.mount(
     composeTrpcRouters("sharedTrace", [sharedTraceTrpcTransport]),

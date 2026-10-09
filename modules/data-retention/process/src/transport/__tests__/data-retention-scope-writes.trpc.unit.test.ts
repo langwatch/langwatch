@@ -10,6 +10,7 @@ import {
 } from "@langwatch/api/trpc";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -23,7 +24,6 @@ import type { DataRetentionModule } from "../../app/data-retention.app.ts";
 import { MemoryDataRetentionProjectScopeRepository } from "../../repositories/memory/memory.data-retention-project-scope.repository.ts";
 import { MemoryDataRetentionRepositories } from "../../repositories/memory/memory.data-retention.repositories.ts";
 import { dataRetentionTrpcTransport } from "../data-retention.trpc.ts";
-import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 
 type DoorContext = { actor: { id: string } };
 type Asked = { permission: string; scope: { tier: string; id: string } };

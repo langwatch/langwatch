@@ -7,11 +7,11 @@ import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contrac
  * (platform/app/ee/governance/routers/departments.ts on origin/main).
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 
 import { departmentsTrpcTransport } from "../departments.trpc.ts";
-import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 
 type TestContext = { actor: { id: string } };
 

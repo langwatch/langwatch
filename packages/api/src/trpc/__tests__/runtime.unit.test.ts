@@ -10,6 +10,7 @@ import type { TRPCDefaultErrorShape } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import { authorizeDefaults } from "../../__tests__/api-double.ts";
 import { publicRoute } from "../../access/access.ts";
 import {
   bindTrpcFact,
@@ -25,7 +26,6 @@ import {
   type TrpcRuntimeAuditEntry,
   type TrpcRuntimeMembers,
 } from "../runtime.ts";
-import { authorizeDefaults } from "../../__tests__/api-double.ts";
 
 const logged: unknown[] = [];
 

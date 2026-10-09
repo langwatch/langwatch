@@ -2,6 +2,7 @@ import { defineTrpcContract, moduleApi } from "@langwatch/module";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { authorizeDefaults } from "../../__tests__/api-double.ts";
 import { jsonTextField } from "../../json-text-field.ts";
 import {
   createTrpcRuntime,
@@ -9,7 +10,6 @@ import {
   TrpcRootDefinition,
   type TrpcRuntimeMembers,
 } from "../runtime.ts";
-import { authorizeDefaults } from "../../__tests__/api-double.ts";
 
 // Rulings 2026-10-06, round 7 (Q39): JSON text is parsed at the door, not in the handler.
 

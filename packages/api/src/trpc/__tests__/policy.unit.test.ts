@@ -14,6 +14,7 @@ import {
 import { TRPCError } from "@trpc/server";
 import { describe, expect, it, type Mock, vi } from "vitest";
 
+import { authorizeDefaults } from "../../__tests__/api-double.ts";
 import type { Authorize } from "../../access/access.ts";
 import { findAuthzDeclaration } from "../../access/declared-middleware.ts";
 import {
@@ -24,7 +25,8 @@ import {
   type TrpcDeclaredAuthzMembers,
   type TrpcMiddlewareContext,
 } from "../policy.ts";
-import { authorizeDefaults } from "../../__tests__/api-double.ts";
+
+type MockedMember = "getDecision" | "getProjectAnyDecision" | "checkScopeLineage";
 
 /**
  * `actorId: undefined` is the anonymous caller, so it cannot be a destructuring
@@ -41,8 +43,8 @@ function makePorts(
     >;
   } = {},
 ): TrpcDeclaredAuthzMembers<TrpcDeclaredAuthzContext> & {
-  decisions: Authorize & {
-    [K in "getDecision" | "getProjectAnyDecision" | "checkScopeLineage"]: Mock<Authorize[K]>;
+  decisions: Omit<Authorize, MockedMember> & {
+    [K in MockedMember]: Mock<Authorize[K]>;
   };
 } {
   const actorId = "actorId" in options ? options.actorId : "alice";

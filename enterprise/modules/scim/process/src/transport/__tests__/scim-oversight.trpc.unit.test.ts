@@ -6,6 +6,7 @@
  * prober. enterprise/modules/scim/specs/scim-reconciliation-surfaces.feature
  */
 import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 
@@ -13,7 +14,6 @@ import { MemoryScimRepository } from "../../repositories/memory/memory.scim.repo
 import { ScimOversightService } from "../../services/scim-oversight.service.ts";
 import { scimOversightTrpcTransport } from "../scim-oversight.trpc.ts";
 import { scimTestApp } from "./support/scim-app.fixture.ts";
-import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 
 type TestContext = { actor: { id: string } };
 

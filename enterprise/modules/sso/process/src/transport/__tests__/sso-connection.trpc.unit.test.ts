@@ -11,6 +11,7 @@ import type {
   SsoSetupApi,
 } from "@langwatch/identity-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -22,7 +23,6 @@ import {
   RecordingSsoSetupCommands,
 } from "../../app/__tests__/sso.fixture.ts";
 import { ssoConnectionTrpcTransport } from "../sso-connection.trpc.ts";
-import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 
 const STAFF_ID = "user_olive";
 const CUSTOMER_ID = "user_customer";

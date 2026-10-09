@@ -5,11 +5,11 @@ import type { RestCaller } from "@langwatch/api/hosting";
 import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import { resolveRequestBound } from "@langwatch/plans";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { workflowStudioRest } from "../workflow-studio.rest.ts";
-import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 
 const signedIn: RestCaller = { actor: { type: "user", id: "user_1" }, scope: null };
 
@@ -35,7 +35,7 @@ function mount({
   };
   const authorize = vi.fn(({ permission }: { permission: string }) => ({
     permitted: granted.includes(permission),
-    organizationRole: null,
+    organizationRole: "ADMIN" as const,
   }));
   const runtime = createRestRuntime({
     identity: {

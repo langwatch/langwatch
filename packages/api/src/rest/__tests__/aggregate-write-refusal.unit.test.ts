@@ -6,12 +6,12 @@ import { moduleApi } from "@langwatch/module";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { authorizeDefaults } from "../../__tests__/api-double.ts";
 import type { Authorize } from "../../access/access.ts";
 import { createErrorHandler } from "../../errors.ts";
 import type { RestIdentity } from "../../hosting/api-door.ts";
 import { defineRestRouter } from "../declaration.ts";
 import { createRestRuntime } from "../runtime.ts";
-import { authorizeDefaults } from "../../__tests__/api-double.ts";
 
 type RunsApi = { run(): Promise<{ ran: boolean }> };
 

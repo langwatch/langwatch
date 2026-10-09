@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
-import { initTRPC } from "@trpc/server";
 import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
+import { initTRPC } from "@trpc/server";
 
 export type GovernanceTrpcTestContext = { actor: { id: string; impersonatorId?: string } };
 

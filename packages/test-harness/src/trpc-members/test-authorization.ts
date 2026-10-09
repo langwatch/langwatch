@@ -14,7 +14,7 @@ export const mintTestAuthorization: NonNullable<Authorize["authorization"]> = as
 }) =>
   sealAuthorization({
     actor,
-    principal: actor,
+    principal: actor.type === "api_key" ? { type: "apiKey", id: actor.id } : actor,
     scope: { organizationId: TEST_ORGANIZATION_ID },
     grants: [{ projectId, permissions: [permission], via: [], kind: "own" }],
     expiresAt: nowInstant().epochMilliseconds + TEST_PROOF_LIFETIME_MS,

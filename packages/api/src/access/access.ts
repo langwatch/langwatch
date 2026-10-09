@@ -179,9 +179,7 @@ export interface Authorize {
   getProjectAnyDecision(input: AuthzGetProjectAnyDecisionInput): Promise<PermissionDecision>;
   checkScopeLineage(input: AuthzScopeLineageInput): Promise<AuthzScopeLineageResult>;
   /** The organization holding a project or team (AuthzApi.getScope); null when unknown. */
-  organizationOf(
-    scope: Readonly<{ tier: "project" | "team"; id: string }>,
-  ): Promise<string | null>;
+  organizationOf(scope: Readonly<{ tier: "project" | "team"; id: string }>): Promise<string | null>;
   /** Whether this user holds a platform-tier permission at the PLATFORM (E4). */
   getPlatformDecision(input: {
     userId: string;

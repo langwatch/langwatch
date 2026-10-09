@@ -12,12 +12,12 @@ import { ProjectApi } from "@langwatch/project-contract";
  * @see specs/projects/projects-browser-door.feature
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { describe, expect, it } from "vitest";
 
 import { projectProcessModule } from "../../project.module.ts";
 import { projectTrpcTransport } from "../project.trpc.ts";
-import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 
 const ACTOR = { id: "user-1" };
 const PROJECT_ID = "project_1";

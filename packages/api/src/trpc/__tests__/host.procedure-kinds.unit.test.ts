@@ -7,11 +7,11 @@ import { defineTrpcContract, moduleApi } from "@langwatch/module";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { authorizeDefaults } from "../../__tests__/api-double.ts";
 import { SessionReader } from "../../hosting/session-reader.ts";
 import { composeTrpcRouters } from "../compose.ts";
 import { TrpcHost } from "../host.ts";
 import { defineTrpcRouter } from "../runtime.ts";
-import { authorizeDefaults } from "../../__tests__/api-double.ts";
 
 interface ReviewApi {
   read(input: { id: string }): { id: string };

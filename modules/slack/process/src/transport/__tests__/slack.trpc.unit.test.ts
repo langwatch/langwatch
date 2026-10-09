@@ -5,6 +5,7 @@
  * @see modules/slack/specs/slack-connections.feature
  */
 import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 
@@ -17,7 +18,6 @@ import {
   composeSlackApi,
 } from "../../services/__tests__/slack-connection.fixture.ts";
 import { slackIntegrationTrpcTransport } from "../slack.trpc.ts";
-import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 
 type Context = { actor: { id: string } | null };
 

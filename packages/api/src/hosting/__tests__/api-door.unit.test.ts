@@ -4,6 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 
+import { authorizeDefaults } from "../../__tests__/api-double.ts";
 import {
   type ApiDoor,
   bindApiDoor,
@@ -12,7 +13,6 @@ import {
   openApiDoor,
   type RestIdentity,
 } from "../api-door.ts";
-import { authorizeDefaults } from "../../__tests__/api-double.ts";
 
 const refuse = () => Promise.reject(new Error("this door decides nothing"));
 const nobody: RestIdentity = { authenticate: refuse, identify: refuse };

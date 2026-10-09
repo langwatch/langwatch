@@ -7,13 +7,13 @@ import { defineTrpcContract, moduleApi } from "@langwatch/module";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { authorizeDefaults } from "../../__tests__/api-double.ts";
 import {
   createTrpcRuntime,
   defineTrpcRouter,
   TrpcRootDefinition,
   type TrpcRuntimeMembers,
 } from "../runtime.ts";
-import { authorizeDefaults } from "../../__tests__/api-double.ts";
 
 interface OpsApi {
   listQueues(input: unknown): Promise<{ queues: string[] }>;

@@ -6,12 +6,12 @@
 import { SessionReader } from "@langwatch/api/hosting";
 import { composeTrpcRouters, defineTrpcRouter, TrpcHost } from "@langwatch/api/trpc";
 import { defineTrpcContract, moduleApi, schemaHashesOf } from "@langwatch/module";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 import { beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { inertApiDoor } from "../../__tests__/support/api-door.ts";
 import { composeApiApplication } from "../api-surface.ts";
-import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 
 interface ProfileApi {
   motto(): { motto: string };

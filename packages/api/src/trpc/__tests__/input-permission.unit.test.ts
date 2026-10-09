@@ -7,6 +7,7 @@ import { defineTrpcContract, moduleApi } from "@langwatch/module";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import { authorizeDefaults } from "../../__tests__/api-double.ts";
 import { permissionBy } from "../../access/input-permission.ts";
 import {
   createTrpcRuntime,
@@ -14,7 +15,6 @@ import {
   TrpcRootDefinition,
   type TrpcRuntimeMembers,
 } from "../runtime.ts";
-import { authorizeDefaults } from "../../__tests__/api-double.ts";
 
 /** The refusal a process gives for the webhook endpoints capability. */
 class NoWebhookEndpointsError extends HandledError {

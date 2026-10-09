@@ -10,6 +10,7 @@ import type { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import { authorizationPort } from "../../__tests__/api-double.ts";
 import { anyAuthenticated } from "../../access/access.ts";
 import { createErrorHandler, ProjectInvalidCredentialsError } from "../../errors.ts";
 import { allRegisteredRoutes } from "../../route-registry.ts";
@@ -17,7 +18,6 @@ import { defineRestRouter } from "../declaration.ts";
 import { securityForCredentialClass } from "../openapi.ts";
 import { createRestRuntime } from "../runtime.ts";
 import { assertEveryRouteDeclared, undeclaredRoutes } from "../security.ts";
-import { authorizationPort } from "../../__tests__/api-double.ts";
 
 const VERSION = "2026-09-08";
 const ORGANIZATION = { tier: "organization", id: "organization-1" } as const;

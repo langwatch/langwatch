@@ -12,11 +12,11 @@ import {
 import type { EnterpriseOpsApi } from "@langwatch/enterprise-ops-contract";
 import type { OpsOperator } from "@langwatch/ops-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
 import { licenseRegistryTrpcTransport, operatorFact } from "../license-registry.trpc.ts";
 import { selfHostedInstancesTrpcTransport } from "../self-hosted-instance.trpc.ts";
-import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 
 type Context = { actor: { type: "user"; id: string } | null; operator: OpsOperator | null };
 

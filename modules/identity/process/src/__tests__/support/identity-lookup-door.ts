@@ -6,9 +6,9 @@ import {
 } from "@langwatch/api/trpc";
 import type { IdentityLookupApi } from "@langwatch/identity-contract";
 import type { OpsOperator } from "@langwatch/ops-contract";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 
 import { identityLookupTrpcTransport, operatorFact } from "../../transport/identity-lookup.trpc.ts";
-import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 
 type Context = { actor: { type: "user"; id: string } | null; operator: OpsOperator | null };
 

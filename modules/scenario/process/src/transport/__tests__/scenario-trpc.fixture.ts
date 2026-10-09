@@ -12,8 +12,8 @@ import { createTrpcRuntime, redactAuditArgs } from "@langwatch/api/trpc";
 import type { Actor, AuthzPermission } from "@langwatch/authorization";
 import type { TrpcContract } from "@langwatch/module";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
-import { initTRPC } from "@trpc/server";
 import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
+import { initTRPC } from "@trpc/server";
 
 type TestContext = object;
 

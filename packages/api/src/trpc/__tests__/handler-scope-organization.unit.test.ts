@@ -6,6 +6,7 @@ import { defineTrpcContract, moduleApi } from "@langwatch/module";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { authorizeDefaults } from "../../__tests__/api-double.ts";
 import { permissionBy } from "../../access/input-permission.ts";
 import {
   createTrpcRuntime,
@@ -13,7 +14,6 @@ import {
   TrpcRootDefinition,
   type TrpcRuntimeMembers,
 } from "../runtime.ts";
-import { authorizeDefaults } from "../../__tests__/api-double.ts";
 
 interface ScopeApi {
   seen(input: unknown): Promise<unknown>;

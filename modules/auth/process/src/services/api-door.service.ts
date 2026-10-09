@@ -55,7 +55,10 @@ export type ApiDoorPeers = Readonly<{
   /** Where a project-bound CLI access token is read back to its person and project. */
   cliProjects: ApiRestCredentialPeers["cliProjects"];
   /** The decisions both transports authorize through, and the key ceilings the key doors ask. */
-  authz: ApiDoor["authz"] &
+  authz: Pick<
+    ApiDoor["authz"],
+    "getDecision" | "getProjectAnyDecision" | "checkScopeLineage" | "getSessionVersion"
+  > &
     ApiRestCredentialPeers["authz"] &
     Pick<AuthzApi, "getScope" | "can" | "authorize">;
   organizations: Pick<

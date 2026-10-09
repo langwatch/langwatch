@@ -7,6 +7,7 @@
 import { BlankScopeIdError, PermissionDeniedError } from "@langwatch/authorization";
 import { describe, expect, it } from "vitest";
 
+import { authorizeDefaults } from "../../__tests__/api-double.ts";
 import { ScopeInputMismatchError } from "../../errors.ts";
 import {
   AccessWiringError,
@@ -19,7 +20,6 @@ import {
   type Authorize,
   type Caller,
 } from "../access.ts";
-import { authorizeDefaults } from "../../__tests__/api-double.ts";
 
 const reviewer: Caller = { actor: { type: "user", id: "reviewer-1" } };
 

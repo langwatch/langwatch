@@ -1762,6 +1762,11 @@ office deactivates only through user, so it keeps no picked date (Alex, 2026-10-
 - A permission is asked where its scope location says: `{ at: "route" }`, `{ at: "header" }`, or
   `{ at: "body"; param; schema; field? }` for a raw text JSON body, which the door's runtime parses and validates
   against `schema` after the credential (400, then 422), then asks at the project its field names (merge #8487).
+- **Authorization fails closed** (Alex, 2026-10-09): a missing member, proof or decision refuses; a wrapper that
+  rebuilds an access object must fail to compile when the object gains a member. Every `Authorize` member is
+  required, a wrapper returns `Required<...>`, and what a type cannot express refuses at boot or at the request,
+  then by a lint rule. The aggregate admin gate (ADR-177 decision 5) applies wherever a door decides at a project,
+  a REST route's own scope included.
 - The exception is a hidden family, whose 404 comes before the credential or the body: `instance_admin` with no key
   set or on SaaS, and `/api/admin/*` for a caller who is not an admin (as main, 2026-09-30).
 - REST runs in three steps: the credential and identity checks that read no body (the door, and a public route's

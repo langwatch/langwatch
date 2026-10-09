@@ -6,6 +6,7 @@
 import { type PermissionDecision, sealAuthorization } from "@langwatch/authorization";
 import { describe, expect, it } from "vitest";
 
+import { authorizeDefaults } from "../../__tests__/api-double.ts";
 import {
   decide,
   declaredPermissions,
@@ -15,7 +16,6 @@ import {
   type Authorize,
   type Caller,
 } from "../access.ts";
-import { authorizeDefaults } from "../../__tests__/api-double.ts";
 
 const sam: Caller = { actor: { type: "user", id: "user_sam" } };
 const PROOF = sealAuthorization({

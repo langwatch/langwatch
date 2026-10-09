@@ -11,6 +11,7 @@ import {
   VoiceSessionInvalidError,
 } from "@langwatch/scenario-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 
 import { scenarioVoiceRest } from "../scenario-voice.rest.ts";
@@ -112,6 +113,7 @@ describe("the voice-session procedures", () => {
 function audioDoor(stream: ScenarioApi["streamVoiceSessionAudio"]) {
   const streamVoiceSessionAudio = vi.fn(stream);
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({ actor: null, scope: null }),
       identify: () => ({ actor: { type: "user", id: "user_1" }, scope: null }),
@@ -169,6 +171,7 @@ describe("GET /api/voice/session/:conversationId/audio", () => {
 function runAudioDoor(stream: ScenarioApi["streamVoiceRunAudio"]) {
   const streamVoiceRunAudio = vi.fn(stream);
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({ actor: null, scope: null }),
       identify: () => ({ actor: { type: "user", id: "user_1" }, scope: null }),
@@ -233,6 +236,7 @@ function sessionDoor({
   signedIn?: boolean;
 }) {
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({ actor: null, scope: null }),
       identify: () => {

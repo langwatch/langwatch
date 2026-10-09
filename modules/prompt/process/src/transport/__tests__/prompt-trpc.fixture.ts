@@ -6,8 +6,8 @@ import { createTrpcRuntime } from "@langwatch/api/trpc";
  * building one.
  */
 import type { Actor, AuthzPermission } from "@langwatch/authorization";
-import { initTRPC } from "@trpc/server";
 import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
+import { initTRPC } from "@trpc/server";
 
 type TestContext = object;
 

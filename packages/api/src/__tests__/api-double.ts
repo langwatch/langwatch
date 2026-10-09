@@ -1,5 +1,6 @@
-import type { Authorize } from "../access/access.ts";
 import { PermissionDeniedError } from "@langwatch/authorization";
+
+import type { Authorize } from "../access/access.ts";
 
 /** Missing methods throw when called, so adding a dependency cannot silently pass a test. */
 export function createApiDouble<Api extends object>(

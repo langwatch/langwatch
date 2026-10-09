@@ -12,10 +12,10 @@ import {
 import type { BillingApi } from "@langwatch/enterprise-billing-contract";
 import type { OpsOperator } from "@langwatch/ops-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
 import { connectedBillingTrpcTransport, operatorFact } from "../connected-billing.trpc.ts";
-import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 
 type Context = { actor: { type: "user"; id: string } | null; operator: OpsOperator | null };
 
