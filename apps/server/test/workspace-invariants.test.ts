@@ -462,6 +462,14 @@ describe("the repo is a single pnpm workspace", () => {
       expect(scripts["ensure:built"]).toContain(ensureBuilt);
     });
 
+    /** @scenario A fresh worktree prepares its databases without a manual SDK build */
+    it("builds the SDK before the root database preparation, which production does not run", () => {
+      const scripts = readJson("package.json").scripts as Record<string, string>;
+      expect(scripts["start:prepare:db"]).toMatch(new RegExp(`^bash ${ensureBuilt} langwatch && `));
+      const apiScripts = readJson("apps/api/package.json").scripts as Record<string, string>;
+      expect(apiScripts["start:prepare:db"]).not.toContain("ensure-built");
+    });
+
     /** @scenario A stale SDK build is rebuilt before the browser application starts */
     it("decides by comparing the bundle against the source it was built from", () => {
       const source = readFileSync(join(repoRoot, ensureBuiltSource), "utf8");

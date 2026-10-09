@@ -253,6 +253,7 @@ fi
 # starting at once serialise rather than rebuilding a schema underneath one
 # another, then the system-migrations pass (specs/upgrade/entry-points.feature).
 echo "  → preparing the databases (once for this stack)"
+bash "$REPO_ROOT/dev/scripts/devscripts.sh" ensure-built langwatch
 pnpm --silent -C "$REPO_ROOT/apps/api" run start:prepare:db
 
 # --- the lanes -------------------------------------------------------------

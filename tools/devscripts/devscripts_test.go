@@ -236,6 +236,46 @@ func TestEnsureBuilt(t *testing.T) {
 	})
 }
 
+// @scenario "A fresh worktree prepares its databases without a manual SDK build"
+func TestEnsureBuiltSDKStaleness(t *testing.T) {
+	built := func(t *testing.T, root string, at time.Time) {
+		t.Helper()
+		entry := filepath.Join(root, "sdks", "typescript", "dist", "index.mjs")
+		writeTree(t, root, map[string]string{"sdks/typescript/dist/index.mjs": ""})
+		if err := os.Chtimes(entry, at, at); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cases := []struct {
+		name      string
+		prepare   func(t *testing.T, root string)
+		wantBuild bool
+	}{
+		{"builds when the dist was never built", func(*testing.T, string) {}, true},
+		{"builds when the dist is older than its sources", func(t *testing.T, root string) {
+			t.Helper()
+			built(t, root, time.Now().Add(-time.Hour))
+		}, true},
+		{"builds nothing when the dist is newer than its sources", func(t *testing.T, root string) {
+			t.Helper()
+			built(t, root, time.Now().Add(time.Hour))
+		}, false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			root, calls := ensureBuiltFixture(t), fakePnpm(t)
+			c.prepare(t, root)
+			if code := EnsureBuilt(root, []string{"langwatch"}, &bytes.Buffer{}); code != 0 {
+				t.Fatalf("code %d", code)
+			}
+			got, _ := os.ReadFile(calls)
+			if built := string(got) == "--filter langwatch build\n"; built != c.wantBuild {
+				t.Errorf("pnpm calls = %q, want build %v", got, c.wantBuild)
+			}
+		})
+	}
+}
+
 func BenchmarkGenerateModules(b *testing.B) {
 	root := ensureRepoRoot(b)
 	b.ReportAllocs()
