@@ -11,6 +11,7 @@ import { initTRPC } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 
 import { departmentsTrpcTransport } from "../departments.trpc.ts";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 
 type TestContext = { actor: { id: string } };
 
@@ -27,6 +28,7 @@ function members(asked: string[]): TrpcRuntimeMembers<TestContext> {
     identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
     authorization: {
       forRequest: () => ({
+        ...testAuthorizeDefaults,
         getDecision: async ({ permission }) => {
           asked.push(permission);
           return { permitted: permission === "governance:view", organizationRole: null };
