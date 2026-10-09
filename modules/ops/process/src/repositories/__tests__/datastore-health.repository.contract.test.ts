@@ -1,10 +1,11 @@
+import type { QueryRequest } from "@langwatch/clickhouse-client";
 /**
  * @vitest-environment node
  * The checkup's ClickHouse ping as ops' registries build it: the live one over the
  * routed member, the memory one with no ClickHouse at all.
  * @see modules/ops/specs/ops-store-seams.feature
  */
-import type { QueryRequest } from "@langwatch/clickhouse-client";
+import { InMemoryProcessStore } from "@langwatch/eventing";
 import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it } from "vitest";
 
@@ -16,7 +17,10 @@ describe("given ops' ClickHouse health repository", () => {
     /** @scenario "The checkup's ClickHouse ping is answered by ops' registry" */
     it("answers the ping with no ClickHouse client composed", async () => {
       await expect(
-        MemoryOpsRepositories.create({ eventing: { definitions: [] } }).clickhouseHealth.ping(),
+        MemoryOpsRepositories.create({
+          eventing: { definitions: [] },
+          processStore: InMemoryProcessStore.createForTesting(),
+        }).clickhouseHealth.ping(),
       ).resolves.toBeUndefined();
     });
   });

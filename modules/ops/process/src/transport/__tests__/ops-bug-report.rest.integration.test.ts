@@ -77,7 +77,10 @@ describe.skipIf(!DB_URL)("bug reports intake", () => {
   ) {
     const { app } = createOpsTestApp({
       repositories: {
-        ...MemoryOpsRepositories.create({ eventing: { definitions: [] } }),
+        ...MemoryOpsRepositories.create({
+          eventing: { definitions: [] },
+          processStore: InMemoryProcessStore.createForTesting(),
+        }),
         bugReports: repository,
         processStore: InMemoryProcessStore.createForTesting(),
       },

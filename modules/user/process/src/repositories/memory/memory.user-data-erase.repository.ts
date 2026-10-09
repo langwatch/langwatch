@@ -68,8 +68,9 @@ export class MemoryGdprUserDataEraseRepository implements GdprUserDataEraseRepos
   async eraseUserAndOwnedResources({ userId }: { userId: string }): Promise<void> {
     this.database.deleteUser(userId);
     const occurredAt = nowInstant().epochMilliseconds;
-    this.database.appendFacts([
-      { type: "recordErased", data: { tenantId: userId, userId, occurredAt } },
-    ]);
+    await this.database.appendFacts({
+      userId,
+      intents: [{ type: "recordErased", data: { tenantId: userId, userId, occurredAt } }],
+    });
   }
 }

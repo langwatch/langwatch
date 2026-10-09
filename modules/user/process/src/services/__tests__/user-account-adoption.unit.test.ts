@@ -1,11 +1,12 @@
+import type { AuthApi } from "@langwatch/auth-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 /**
  * @vitest-environment node
  * Adoption by an address proof over the memory twins: what goes and what stays. Auth ends the
  * adopted account's sessions (modules/auth/specs/sign-up.feature).
  * @see modules/user/specs/user.feature
  */
-import type { AuthApi } from "@langwatch/auth-contract";
-import type { AuthzApi } from "@langwatch/authz-contract";
+import { InMemoryProcessStore } from "@langwatch/eventing";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { fromDate } from "@langwatch/time";
@@ -21,7 +22,9 @@ import { UserService } from "../user.service.ts";
 const EMAIL = "sam@acme.com";
 
 async function unfinishedAccount({ signedIn = false }: { signedIn?: boolean } = {}) {
-  const database = MemoryUserDatabase.create();
+  const database = MemoryUserDatabase.create({
+    processStore: InMemoryProcessStore.createForTesting(),
+  });
   const users = MemoryUserRepository.create({ database });
   const credentials = MemoryUserCredentialRepository.create({ database });
   const service = UserService.create({

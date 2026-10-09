@@ -1,5 +1,5 @@
 import { parseProcessConfig } from "@langwatch/config";
-import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
+import { EventSourcing } from "@langwatch/eventing";
 import {
   createBlobMaintenancePipeline,
   createProcessManagerMaintenancePipeline,
@@ -69,10 +69,11 @@ async function bootTasks() {
   );
   await resolver.preflight(declared);
 
+  const stores = memoryStores();
   const eventing = new EventSourcing({
     enabled: false,
     participation: "produce",
-    processStore: InMemoryProcessStore.createForTesting(),
+    processStore: stores.processStore,
     maintenance: () => [
       createBlobMaintenancePipeline({ cleanup: unreachable<BlobCleanupDeps>("blob sweep") }),
       createProcessManagerMaintenancePipeline({
@@ -87,7 +88,7 @@ async function bootTasks() {
   const runtime = await supply
     .withModules(processModules)
     .withConfig(config)
-    .withStores(memoryStores())
+    .withStores(stores)
     .withMembers({
       logger: createTestLogger().logger,
       clock: systemClock(),
@@ -172,6 +173,7 @@ describe("the tasks process installation", () => {
         "stalled-runs-backfill",
         "topic-clustering-run",
         "user-data-erase",
+        "webhook-signature-vectors",
         "backfill-http-credentials-to-secrets",
       ]);
     } finally {

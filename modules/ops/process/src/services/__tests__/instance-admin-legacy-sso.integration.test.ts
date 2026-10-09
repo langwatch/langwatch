@@ -7,6 +7,7 @@ import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { AutomationApi } from "@langwatch/automation-contract";
+import { InMemoryProcessStore } from "@langwatch/eventing";
 import { explainHandledError } from "@langwatch/handled-error/presentation";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -41,7 +42,10 @@ const refuseEveryQuery = new Proxy(
 function buildInstanceAdmin(connectionDecides = true) {
   return OpsOperations.create({
     repositories: {
-      ...MemoryOpsRepositories.create({ eventing: { definitions: [] } }),
+      ...MemoryOpsRepositories.create({
+        eventing: { definitions: [] },
+        processStore: InMemoryProcessStore.createForTesting(),
+      }),
       instanceAdmin: PrismaInstanceAdminRepository.create(refuseEveryQuery as never),
     },
     audit: new AuditStub(),

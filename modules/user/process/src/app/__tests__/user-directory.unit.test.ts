@@ -3,6 +3,7 @@
  * The user application as the API process's user directory.
  * @see specs/server/api-process-auth.feature
  */
+import { InMemoryProcessStore } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 
 import { MemoryUserRepositories } from "../../repositories/memory/memory.user.repositories.ts";
@@ -11,7 +12,9 @@ import { createUserTestApp, TEST_CREDENTIAL_ISSUER } from "./user.fixture.ts";
 const ADDRESS = "sam@acme.com";
 
 function directory() {
-  const repositories = MemoryUserRepositories.create();
+  const repositories = MemoryUserRepositories.create({
+    processStore: InMemoryProcessStore.createForTesting(),
+  });
   return { repositories, app: createUserTestApp({ repositories }) };
 }
 

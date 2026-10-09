@@ -4,7 +4,7 @@
  * image's code steps this way (coordinator ruling R1, 2026-10-08).
  */
 import { parseProcessConfig } from "@langwatch/config";
-import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
+import { EventSourcing } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { memoryStores, systemClock } from "@langwatch/process-stores";
 import { refuseDoubleClaims, SecretsChain, SecretsResolver } from "@langwatch/secrets";
@@ -60,10 +60,11 @@ export async function migrationStepsOverMemory<Step extends { readonly id: strin
   const declared = owners.flatMap((owner) => Object.values(owner.secrets ?? {}));
   await resolver.preflight(declared);
   const settings = config.process;
+  const stores = memoryStores();
   const eventing = new EventSourcing({
     enabled: false,
     participation: "produce",
-    processStore: InMemoryProcessStore.createForTesting(),
+    processStore: stores.processStore,
   });
   // The installed registries' store clients, as the tasks installation test supplies them
   // (apps/tasks/src/__tests__/tasks-installation...).
@@ -74,7 +75,7 @@ export async function migrationStepsOverMemory<Step extends { readonly id: strin
   const runtime = await supply
     .withModules(modules)
     .withConfig(config)
-    .withStores(memoryStores())
+    .withStores(stores)
     .withMembers({
       logger: createLogger(`${name}:migration-steps`),
       clock: systemClock(),

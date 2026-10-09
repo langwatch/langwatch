@@ -1,3 +1,5 @@
+import type { InMemoryProcessStore } from "@langwatch/eventing";
+
 import type { UserRepositories } from "../user.repositories.ts";
 import { MemoryGdprUserDataEraseRepository } from "./memory.user-data-erase.repository.ts";
 import { MemoryUserOrganizationDirectoryRepository } from "./memory.user-organization-directory.repository.ts";
@@ -20,9 +22,11 @@ export function memoryUserRepositoriesOver({
 }
 
 export class MemoryUserRepositories {
-  static readonly requires = [] as const;
+  static readonly requires = ["processStore"] as const;
 
-  static create(): UserRepositories {
-    return memoryUserRepositoriesOver({ database: MemoryUserDatabase.create() });
+  static create({
+    processStore,
+  }: Readonly<{ processStore: InMemoryProcessStore }>): UserRepositories {
+    return memoryUserRepositoriesOver({ database: MemoryUserDatabase.create({ processStore }) });
   }
 }

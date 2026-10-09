@@ -271,6 +271,9 @@
       "path": "../../packages/test-harness/tsconfig.build.json"
     },
     {
+      "path": "../../modules/user/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../packages/vitest-config/tsconfig.build.json"
     }
   ]

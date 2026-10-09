@@ -1,7 +1,7 @@
 import { readdirSync } from "node:fs";
 
 import { parseProcessConfig } from "@langwatch/config";
-import { EventSourcing, InMemoryProcessStore, laneAliasesPastWindow } from "@langwatch/eventing";
+import { EventSourcing, laneAliasesPastWindow } from "@langwatch/eventing";
 import {
   createBlobMaintenancePipeline,
   createProcessManagerMaintenancePipeline,
@@ -84,10 +84,11 @@ async function bootWorker({ live = false, saas = false }: { live?: boolean; saas
   );
   await resolver.preflight(declared);
 
+  const stores = memoryStores();
   const eventing = new EventSourcing({
     ...(live ? { eventStore: EventStoreMemory.createForTesting() } : { enabled: false }),
     participation: "consume",
-    processStore: InMemoryProcessStore.createForTesting(),
+    processStore: stores.processStore,
     maintenance: () => [
       createBlobMaintenancePipeline({ cleanup: unreachable<BlobCleanupDeps>("blob sweep") }),
       createProcessManagerMaintenancePipeline({
@@ -102,7 +103,7 @@ async function bootWorker({ live = false, saas = false }: { live?: boolean; saas
   const runtime = await supply
     .withModules(processModules)
     .withConfig(config)
-    .withStores(memoryStores())
+    .withStores(stores)
     .withMembers({
       logger: createTestLogger().logger,
       clock: systemClock(),

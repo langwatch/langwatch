@@ -4,6 +4,7 @@
  * administrator, linking the gateway's budgets page on this deployment.
  * @see specs/ai-governance/cli-wrappers/request-increase.feature, modules/user/specs/user.feature
  */
+import { InMemoryProcessStore } from "@langwatch/eventing";
 import type { EmailContent, MailSender } from "@langwatch/mail";
 import { UserBudgetRequestNotDeliveredError } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
@@ -44,7 +45,10 @@ async function requestIncrease(input: {
     },
   });
   const app = createUserTestApp({
-    repositories: { ...MemoryUserRepositories.create(), organizationDirectory },
+    repositories: {
+      ...MemoryUserRepositories.create({ processStore: InMemoryProcessStore.createForTesting() }),
+      organizationDirectory,
+    },
     budgetRequests: SesUserBudgetRequestMailChannel.create({
       mailer: mail,
       baseUrl: input.publicBaseUrl,

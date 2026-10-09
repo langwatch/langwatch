@@ -1,7 +1,9 @@
+import type { InMemoryProcessStore } from "@langwatch/eventing";
+import { nowInstant } from "@langwatch/time";
 import type { Instant } from "@langwatch/time";
 import type { UserNotificationChoice } from "@langwatch/user-contract";
 
-import { type UserFactIntent, userFactKey } from "../../rules/user-lifecycle-outbox.rules.ts";
+import { type UserFactIntent, userFactsAppend } from "../../rules/user-lifecycle-outbox.rules.ts";
 
 /**
  * The rows the two user repositories share — one store rather than two,
@@ -47,14 +49,15 @@ type MemoryUserPasskeyRow = {
 
 export class MemoryUserDatabase {
   #users = new Map<string, MemoryUserRow>();
-  #factOutbox = new Map<string, UserFactIntent>();
   #accounts = new Map<string, MemoryUserAccountRow>();
   #passkeys = new Map<string, MemoryUserPasskeyRow>();
 
-  private constructor() {}
+  private constructor(private readonly processStore: InMemoryProcessStore) {}
 
-  static create(): MemoryUserDatabase {
-    return new MemoryUserDatabase();
+  static create({
+    processStore,
+  }: Readonly<{ processStore: InMemoryProcessStore }>): MemoryUserDatabase {
+    return new MemoryUserDatabase(processStore);
   }
 
   /** Every stored user, for the install-wide usage report. */
@@ -80,17 +83,13 @@ export class MemoryUserDatabase {
     this.#users.set(row.id, row);
   }
 
-  /** The fact outbox's twin: one intent per key, as the outbox's unique message key keeps. */
-  appendFacts(intents: readonly UserFactIntent[]): void {
-    for (const intent of intents) {
-      const key = userFactKey(intent);
-      if (!this.#factOutbox.has(key)) this.#factOutbox.set(key, intent);
-    }
-  }
-
-  /** Every fact intent appended, in order, for a test to read what a write committed. */
-  factOutbox(): UserFactIntent[] {
-    return [...this.#factOutbox.values()];
+  /** User's facts into the shared process store's outbox, as the Prisma twin appends them. */
+  async appendFacts({
+    userId,
+    intents,
+  }: Readonly<{ userId: string; intents: readonly UserFactIntent[] }>): Promise<void> {
+    const now = nowInstant().epochMilliseconds;
+    await this.processStore.appendIntents(userFactsAppend({ userId, intents, now }));
   }
 
   /** Drops the user with every account and passkey it holds, as the erasure does. */

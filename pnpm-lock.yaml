@@ -2494,6 +2494,9 @@ importers:
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../packages/test-harness
+      '@langwatch/user-contract':
+        specifier: workspace:*
+        version: link:../../modules/user/contract
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../../packages/vitest-config

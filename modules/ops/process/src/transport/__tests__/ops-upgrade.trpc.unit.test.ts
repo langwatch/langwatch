@@ -1,9 +1,3 @@
-/**
- * @vitest-environment node
- * The Upgrades pages' six reads over the real runtime and a real `OpsModule`: the door asks
- * `ops:view` on the platform, and an operator gets the reader's answers unchanged.
- * Spec: modules/ops/specs/upgrades.feature
- */
 import {
   bindTrpcFact,
   createTrpcRuntime,
@@ -11,6 +5,13 @@ import {
   type TrpcProcedureFactory,
   type TrpcRouterMount,
 } from "@langwatch/api/trpc";
+/**
+ * @vitest-environment node
+ * The Upgrades pages' six reads over the real runtime and a real `OpsModule`: the door asks
+ * `ops:view` on the platform, and an operator gets the reader's answers unchanged.
+ * Spec: modules/ops/specs/upgrades.feature
+ */
+import { InMemoryProcessStore } from "@langwatch/eventing";
 import type { OpsOperator } from "@langwatch/ops-contract";
 import type { UpgradeReader, UpgradeRunDetail, UpgradeStepDetail } from "@langwatch/upgrade/reader";
 import { describe, expect, it, vi } from "vitest";
@@ -92,7 +93,10 @@ const MIGRATION_PROCEDURE_NAMES = [
 function mount({ reader }: { reader?: UpgradeReader } = {}) {
   const holders = { [OPERATOR.id]: ["ops:view"] } as const;
   const repositories = {
-    ...MemoryOpsRepositories.create({ eventing: { definitions: [] } }),
+    ...MemoryOpsRepositories.create({
+      eventing: { definitions: [] },
+      processStore: InMemoryProcessStore.createForTesting(),
+    }),
     upgradeLedger: MemoryUpgradeLedgerRepository.create(reader ? { reader } : {}),
   };
   const { app } = createOpsTestApp({ repositories });

@@ -1,4 +1,4 @@
-import { type EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
+import { type EventSourcing, type InMemoryProcessStore } from "@langwatch/eventing";
 import type { TenantSource } from "@langwatch/system-migrations";
 
 import type { OpsReplayRuntime } from "../../app/ops.app.ts";
@@ -121,17 +121,21 @@ class MemoryClickHouseRoutesRepository extends ClickHouseRoutesRepository {
  */
 export class MemoryOpsRepositories {
   /** Introspection reads the registered pipelines in memory too (Q212). */
-  static readonly requires = ["eventing"] as const;
+  static readonly requires = ["eventing", "processStore"] as const;
 
   static create({
     eventing,
-  }: Readonly<{ eventing: Pick<EventSourcing, "definitions"> }>): OpsRepositories {
+    processStore,
+  }: Readonly<{
+    eventing: Pick<EventSourcing, "definitions">;
+    processStore: InMemoryProcessStore;
+  }>): OpsRepositories {
     const store = MemoryOpsStore.create();
 
     return {
       bugReports: MemoryBugReportRepository.create({ store }),
       bugReportRateLimit: MemoryBugReportRateLimitRepository.create(),
-      processStore: InMemoryProcessStore.createForLocalDevelopment(),
+      processStore,
       processManagerPurge: MemoryProcessManagerPurgeRepository.create(),
       credentialsReseal: MemoryCredentialsResealRepository.create(),
       migrationState: MemorySystemMigrationStateRepository.create(),
