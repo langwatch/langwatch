@@ -12,12 +12,19 @@ const LANDING_PATH = /^\/(?!\/)[\w\-.~!$&'()*+,;=:@/?]*$/;
 
 /** Whether an administrator may list this as a landing page: a path on LangWatch itself. */
 export function isAllowableLandingTarget(target: string): boolean {
-  return target.length <= MAX_TARGET_LENGTH && LANDING_PATH.test(target);
+  const [path = ""] = target.split("?");
+  const segments = path.split("/");
+  return (
+    target.length <= MAX_TARGET_LENGTH &&
+    LANDING_PATH.test(target) &&
+    !target.includes("//") &&
+    !segments.some((segment) => segment === "." || segment === "..")
+  );
 }
 
 const landingTargetSchema = z.string().refine((target) => isAllowableLandingTarget(target));
 
-/** A SAML connection's opt-in to sign-ins its identity provider starts; older documents parse as off. */
+/** A SAML connection's opt-in to sign-ins its IdP starts; older documents parse as off. */
 export const ssoSamlIdpInitiatedSchema = z
   .object({
     enabled: z.boolean().default(false),

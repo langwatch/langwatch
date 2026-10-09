@@ -43,6 +43,10 @@ Feature: Signing in from the identity provider's own portal through a SAML conne
         | /acme%2Fmessages          |
         | javascript:alert(1)       |
         | acme/messages             |
+        | /acme//messages           |
+        | /acme/../admin            |
+        | /./acme                   |
+        | /acme?next=https://elsewhere.example |
       And "/acme/messages?tab=all" is accepted as a landing page
 
   Rule: a response nobody asked for signs in only through an opted-in connection

@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  idpInitiatedLanding,
-  isAllowableLandingTarget,
-} from "../sso-idp-initiated-landing.ts";
+import { idpInitiatedLanding, isAllowableLandingTarget } from "../sso-idp-initiated-landing.ts";
 
 const appOrigin = "https://app.langwatch.example";
 const defaultTarget = "/";
@@ -27,6 +24,11 @@ describe("isAllowableLandingTarget", () => {
     "/acme#fragment",
     "/acme messages",
     `/${"a".repeat(2048)}`,
+    "/acme//messages",
+    "/acme/../admin",
+    "/./acme",
+    "/acme/..",
+    "/acme?next=https://elsewhere.example",
   ])("refuses %s", (entry) => {
     expect(isAllowableLandingTarget(entry)).toBe(false);
   });
