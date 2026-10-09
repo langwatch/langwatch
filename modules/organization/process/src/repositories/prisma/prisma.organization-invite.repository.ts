@@ -20,6 +20,7 @@ import {
 import {
   OrganizationInviteRepository,
   type InviteWithOrganization,
+  type InviteWithOrganizationAndRequester,
   type InviteWithRequester,
   type WriteInviteInput,
 } from "../organization-invite.repository.ts";
@@ -318,6 +319,21 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
     if (invite === null) throw new InviteNotFoundError("Invitation not found");
 
     return inviteWithOrganizationFromRecord(invite);
+  }
+
+  async getInviteLandingByCode({
+    inviteCode,
+  }: {
+    inviteCode: string;
+  }): Promise<InviteWithOrganizationAndRequester> {
+    const found = await this.prisma.organizationInvite.findUnique({
+      where: { inviteCode },
+      include: { organization: true, requestedByUser: { select: { name: true } } },
+    });
+    if (found === null) throw new InviteNotFoundError("Invitation not found");
+
+    const { requestedByUser, ...invite } = found;
+    return { ...inviteWithOrganizationFromRecord(invite), requestedByUser };
   }
 
   async findAdminEmails({ organizationId }: { organizationId: string }): Promise<string[]> {

@@ -19,6 +19,7 @@ import {
 import {
   OrganizationInviteRepository,
   type InviteWithOrganization,
+  type InviteWithOrganizationAndRequester,
   type InviteWithRequester,
   type WriteInviteInput,
 } from "../organization-invite.repository.ts";
@@ -198,6 +199,14 @@ export class MemoryOrganizationInviteRepository extends OrganizationInviteReposi
     );
     if (!invite) throw new InviteNotFoundError("Invitation not found");
     return this.#withOrganization(invite);
+  }
+
+  async getInviteLandingByCode(input: {
+    inviteCode: string;
+  }): Promise<InviteWithOrganizationAndRequester> {
+    const invite = await this.getInviteByCodeWithOrganization(input);
+    const requester = invite.requestedBy ? this.memory.users.get(invite.requestedBy) : undefined;
+    return { ...invite, requestedByUser: requester ? { name: requester.name } : null };
   }
 
   async findAdminEmails(input: { organizationId: string }): Promise<string[]> {
