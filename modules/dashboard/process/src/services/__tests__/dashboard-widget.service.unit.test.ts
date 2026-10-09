@@ -7,18 +7,24 @@ import { describe, expect, it } from "vitest";
 
 import { createDashboardTestAnalytics } from "../../app/__tests__/dashboard.fixture.ts";
 import { MemoryDashboardWidgetRepository } from "../../repositories/memory/memory.dashboard-widget.repository.ts";
-import { DashboardWidgetService } from "../dashboard-widget.service.ts";
+import {
+  DashboardWidgetService,
+  type DashboardBoardExistence,
+} from "../dashboard-widget.service.ts";
 
 const CODE = "export default function Widget() { return null; }";
 const QUERY = { name: "traces", sql: "SELECT count() AS value FROM analytics.traces" };
 const VALID = [QUERY];
 const INVALID = [{ ...QUERY, parameters: [{ name: "prototype", type: "string" as const }] }];
+/** No widget here is placed on a board. */
+const NO_BOARDS: DashboardBoardExistence = { boardExists: () => Promise.resolve(false) };
 
 function setUp() {
   const repository = MemoryDashboardWidgetRepository.create();
   const service = DashboardWidgetService.create({
     repository,
     analytics: createDashboardTestAnalytics(),
+    boards: NO_BOARDS,
   });
   return { repository, service };
 }
