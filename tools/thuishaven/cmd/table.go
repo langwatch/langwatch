@@ -378,6 +378,7 @@ var baseTable = []commandSpec{
 		},
 		run: runLogsCmd,
 	},
+	querySpec(),
 	{
 		name:    "status",
 		summary: "one-shot report: every stack, service health, shared servers, RAM",

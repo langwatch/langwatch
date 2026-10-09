@@ -35,6 +35,7 @@ logged and the run carries on. Re-running is a no-op;
 | Slow or failing traces                      | `haven traces --min-duration 500ms --errors`    |
 | Full info/debug stream from Loki            | `haven logs api --loki --since 1h --grep boom`  |
 | Logs for one trace                          | `haven logs --trace <trace-id>`                 |
+| Raw query, this worktree only               | `haven query promql 'up' --agent`               |
 
 - Bare `haven up` without a TTY never returns and dies with your shell. Always `-d`.
 - `--agent` (or `HAVEN_AGENT=1`) makes output plain: no colour, no redraws.
@@ -89,6 +90,18 @@ haven logs --trace <trace-id>                           # Loki lines carrying th
 substrings of the OTel service name. `--grep` also filters the plain captured read.
 `--trace` finds only lines whose structured metadata carries `trace_id`; when none do,
 it is empty, so fall back to `--since` around the trace's start time.
+
+When the flags cannot ask it, `haven query traceql|logql|promql '<query>'` sends a raw
+query (`--since` default 1h, `--limit` default 100, `--stack <slug>`, `--json`/`--agent`
+returns `{query, grafana, data}` with the backend's own answer). Every selector gets this
+worktree's filter forced in before sending, so results never mix stacks; the scoped
+query is echoed in `query`.
+
+```bash
+haven query traceql '{ status = error && duration > 1s }'
+haven query logql 'sum by (service_name) (count_over_time({service_name=~".+"} |= "timeout" [5m]))'
+haven query promql 'rate(http_server_request_duration_count[5m])' --since 30m
+```
 
 Only `haven down` followed by `haven up` reloads a changed `.env`. `haven restart` does
 not.
