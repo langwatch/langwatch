@@ -6,11 +6,13 @@
 import {
   UiCapabilityContextProvider,
   UiScope,
+  UiHostServiceProvider,
   UiSession,
   type UiActiveScope,
   type UiActor,
   type UiCapabilities,
 } from "@langwatch/browser-host/capabilities";
+import { UiFlagsService } from "@langwatch/browser-host/feature-flag";
 import { defineSlice } from "@langwatch/browser-host/global-store";
 import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
 import {
@@ -52,8 +54,8 @@ class LangySession extends UiSession {
     return true;
   }
 
-  featureFlag(flag: string): boolean | undefined {
-    return this.grant.rolledOut && flag === "release_langy_enabled";
+  featureFlag(): undefined {
+    return void 0;
   }
 }
 
@@ -84,7 +86,11 @@ function renderWith(grant: { permission: boolean; rolledOut: boolean }) {
   function Harness({ children }: { children: ReactNode }) {
     return (
       <UiCapabilityContextProvider value={capabilities}>
-        <PersonalWorkspaceHostMount>{children}</PersonalWorkspaceHostMount>
+        <UiHostServiceProvider
+          value={new Map([[UiFlagsService.name, { flag: () => grant.rolledOut }]])}
+        >
+          <PersonalWorkspaceHostMount>{children}</PersonalWorkspaceHostMount>
+        </UiHostServiceProvider>
       </UiCapabilityContextProvider>
     );
   }

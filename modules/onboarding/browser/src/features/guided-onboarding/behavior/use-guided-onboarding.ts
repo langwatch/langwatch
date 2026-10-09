@@ -2,6 +2,7 @@
  * The guided onboarding as the client sees it: is this organization in the
  * guided variant, and what its state says. @see specs/features/onboarding/guided-tour.feature
  */
+import { FrontendFlags } from "@langwatch/feature-flag-contract";
 import type {
   GuidedOnboardingStateWithVariant,
   OnboardingVariant,
@@ -10,7 +11,7 @@ import type {
 import { onboardingApi } from "../../../behavior/onboarding-api.ts";
 import { useOnboardingHost } from "../../../model/onboarding-host.ts";
 
-export const GUIDED_ONBOARDING_FLAG = "experiment_onboarding_langy_guided";
+export const GUIDED_ONBOARDING_FLAG = FrontendFlags.experiment_onboarding_langy_guided;
 
 export interface GuidedOnboardingFlagView {
   /** The guided variant is on for this organization. */

@@ -108,9 +108,6 @@ export abstract class GatewayHostApi {
   /** Fails closed: an answer that has not arrived reads as no. */
   abstract hasPermission(permission: string): boolean;
 
-  /** Fails closed the same way. */
-  abstract isFeatureEnabled(flag: string): boolean;
-
   abstract plan(): GatewayPlan;
 
   /** What kind of deployment this is, and where its gateway answers. */

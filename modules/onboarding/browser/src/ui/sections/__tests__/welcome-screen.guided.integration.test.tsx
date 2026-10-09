@@ -4,6 +4,7 @@
  * a reload resumes from the organization's state.
  * Spec: specs/features/onboarding/guided-welcome-takeover.feature
  */
+import type { ReleaseFlagToken } from "@langwatch/browser-host/declarations";
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -168,8 +169,8 @@ class WelcomeTestHost extends OnboardingHostApi {
     hardRedirects.push(to);
   }
   setQuery() {}
-  featureFlag(flag: string): OnboardingFlagReading {
-    return { enabled: flags[flag] ?? false, isLoading: false };
+  featureFlag({ name }: ReleaseFlagToken): OnboardingFlagReading {
+    return { enabled: flags[name] ?? false, isLoading: false };
   }
   signOut() {}
   succeeded() {}

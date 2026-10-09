@@ -170,9 +170,6 @@ export abstract class PersonalWorkspaceHostApi {
   /** Fails closed: an answer that has not arrived reads as no. */
   abstract hasPermission(permission: string): boolean;
 
-  /** Fails closed the same way. */
-  abstract isFeatureEnabled(flag: string): boolean;
-
   /** What kind of deployment this is, and where it answers. */
   abstract deployment(): PersonalDeployment;
 

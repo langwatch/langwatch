@@ -6,6 +6,8 @@
 
 import { useUiAddress } from "@langwatch/browser-host/address";
 import { useUiCapabilities, useUiScope } from "@langwatch/browser-host/capabilities";
+import type { ReleaseFlagToken } from "@langwatch/browser-host/declarations";
+import { useUiFlags } from "@langwatch/browser-host/feature-flag";
 import { useLent, useLentHooks } from "@langwatch/browser-host/lent";
 import { SampleChoiceToken } from "@langwatch/enterprise-governance-client";
 import { GuidedOnboardingToken, type LangyGuidedOnboarding } from "@langwatch/langy-client";
@@ -107,7 +109,7 @@ class CapabilityOnboardingHost extends OnboardingHostApi {
         next: Readonly<Record<string, string | undefined>>,
         options?: { replace?: boolean },
       ) => void;
-      featureFlag: (flag: string) => boolean | undefined;
+      featureFlag: (flag: ReleaseFlagToken) => boolean | undefined;
       succeeded: (notice: OnboardingSuccessNotice) => void;
       failed: (failure: OnboardingFailureNotice) => void;
       langy: OnboardingLangyCapability;
@@ -155,7 +157,7 @@ class CapabilityOnboardingHost extends OnboardingHostApi {
     this.deps.setQuery(next, options);
   }
 
-  featureFlag(flag: string): OnboardingFlagReading {
+  featureFlag(flag: ReleaseFlagToken): OnboardingFlagReading {
     const value = this.deps.featureFlag(flag);
     return { enabled: value === true, isLoading: value === void 0 };
   }
@@ -226,6 +228,7 @@ export default function OnboardingHostMount({ children }: { children?: ReactNode
   const langy = useMemo(() => langyCapabilityOf(lentLangy), [lentLangy]);
 
   const sidebar = useLentHooks(SidebarToken) ?? INERT_SIDEBAR;
+  const flags = useUiFlags();
 
   const governance = useLentHooks(SampleChoiceToken) ?? INERT_GOVERNANCE;
 
@@ -257,7 +260,7 @@ export default function OnboardingHostMount({ children }: { children?: ReactNode
         navigate: (to) => navigation.navigate(to),
         replace: (to) => navigation.replace(to),
         setQuery: (next, options) => route.setQuery(next, options),
-        featureFlag: (flag) => session.featureFlag(flag),
+        featureFlag: (flag) => flags.flag(flag),
         succeeded: (notice) => feedback.succeeded(notice),
         failed: (failure) => feedback.failed(failure),
         langy,
@@ -269,6 +272,7 @@ export default function OnboardingHostMount({ children }: { children?: ReactNode
       scope,
       sessionActor,
       session,
+      flags,
       location.pathname,
       asPath,
       params,

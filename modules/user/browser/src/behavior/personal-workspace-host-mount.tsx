@@ -13,7 +13,9 @@ import {
   type UiRoute,
   type UiSession,
 } from "@langwatch/browser-host/capabilities";
+import { useUiFlags, type UiFlags } from "@langwatch/browser-host/feature-flag";
 import { readSlice } from "@langwatch/browser-host/global-store";
+import { FrontendFlags } from "@langwatch/feature-flag-contract";
 import {
   LANGY_ABSENT_SURFACE,
   LANGY_STORE_SLICE,
@@ -48,9 +50,8 @@ const NO_TWO_STEP_CEREMONIES: { ok: false; error: unknown } = {
   error: new Error("Two-step verification ceremonies are not installed"),
 };
 
-/** Starting a Langy turn, not reading one; and the rollout that reveals Langy at all. */
+/** Starting a Langy turn, not reading one. */
 const LANGY_CREATE_PERMISSION = "langy:create";
-const LANGY_RELEASE_FLAG = "release_langy_enabled";
 
 /** Langy's panel state, read like any peer's slice; Langy owns the writes. */
 const useLangyStore = readSlice<LangySliceSurface>({
@@ -102,6 +103,7 @@ function projectOf(
 
 class CapabilityPersonalWorkspaceHost extends PersonalWorkspaceHostApi {
   private readonly session: UiSession;
+  private readonly flags: UiFlags;
   private readonly navigationCapability: UiNavigation;
   private readonly routeCapability: UiRoute;
   private readonly feedback: UiFeedback;
@@ -115,6 +117,7 @@ class CapabilityPersonalWorkspaceHost extends PersonalWorkspaceHostApi {
 
   constructor({
     session,
+    flags,
     navigationCapability,
     routeCapability,
     feedback,
@@ -127,6 +130,7 @@ class CapabilityPersonalWorkspaceHost extends PersonalWorkspaceHostApi {
     askLangy,
   }: {
     session: UiSession;
+    flags: UiFlags;
     navigationCapability: UiNavigation;
     routeCapability: UiRoute;
     feedback: UiFeedback;
@@ -140,6 +144,7 @@ class CapabilityPersonalWorkspaceHost extends PersonalWorkspaceHostApi {
   }) {
     super();
     this.session = session;
+    this.flags = flags;
     this.navigationCapability = navigationCapability;
     this.routeCapability = routeCapability;
     this.feedback = feedback;
@@ -178,10 +183,6 @@ class CapabilityPersonalWorkspaceHost extends PersonalWorkspaceHostApi {
 
   hasPermission(permission: string): boolean {
     return this.session.hasPermission(permission);
-  }
-
-  isFeatureEnabled(flag: string): boolean {
-    return this.session.isFeatureEnabled(flag);
   }
 
   deployment(): PersonalDeployment {
@@ -266,7 +267,7 @@ class CapabilityPersonalWorkspaceHost extends PersonalWorkspaceHostApi {
   canAskAssistant(): boolean {
     return (
       this.session.hasPermission(LANGY_CREATE_PERMISSION) &&
-      this.session.isFeatureEnabled(LANGY_RELEASE_FLAG)
+      this.flags.flag(FrontendFlags.release_langy_enabled) === true
     );
   }
 
@@ -290,6 +291,7 @@ class CapabilityPersonalWorkspaceHost extends PersonalWorkspaceHostApi {
  */
 export default function PersonalWorkspaceHostMount({ children }: { children?: ReactNode }) {
   const { session, navigation, route, feedback } = useUiCapabilities();
+  const flags = useUiFlags();
   const scope = useUiScope();
   const activeScope = scope.activeScope();
   const organizationRole = scope.scopeHost()?.organizationRole();
@@ -320,6 +322,7 @@ export default function PersonalWorkspaceHostMount({ children }: { children?: Re
     () =>
       new CapabilityPersonalWorkspaceHost({
         session,
+        flags,
         navigationCapability: navigation,
         routeCapability: route,
         feedback,
@@ -339,6 +342,7 @@ export default function PersonalWorkspaceHostMount({ children }: { children?: Re
       }),
     [
       session,
+      flags,
       navigation,
       route,
       feedback,

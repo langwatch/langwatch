@@ -3,6 +3,7 @@
  * key is separate to avoid spreading credentials across unrelated surfaces.
  */
 
+import type { ReleaseFlagToken } from "@langwatch/browser-host/declarations";
 import type { LangyKickoffBrief } from "@langwatch/langy-contract";
 import type { JoinOfferProps } from "@langwatch/organization-client";
 import type { TimeInput } from "@langwatch/time";
@@ -154,7 +155,7 @@ export abstract class OnboardingHostApi {
 
   /** Deployment config is not here: it is the shell's `useUiDeployment()` capability. */
 
-  abstract featureFlag(flag: string): OnboardingFlagReading;
+  abstract featureFlag(flag: ReleaseFlagToken): OnboardingFlagReading;
 
   abstract signOut(): void;
 
