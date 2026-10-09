@@ -148,7 +148,7 @@ export const createManyDatasetRecords = async ({
   datasetRecords,
   tx,
   dataset: providedDataset,
-  skipDuplicates,
+  shouldSkipDuplicates,
 }: {
   datasetId: string;
   projectId: string;
@@ -168,7 +168,7 @@ export const createManyDatasetRecords = async ({
   // (P2002). Only the postgres layout honors it; the s3_jsonl and legacy
   // useS3 layouts append and do not dedupe against stored rows. The record id
   // is a global primary key, so an id existing in ANY dataset is skipped.
-  skipDuplicates?: boolean;
+  shouldSkipDuplicates?: boolean;
 }) => {
   const db = tx ?? prisma;
   const dataset =
@@ -185,7 +185,7 @@ export const createManyDatasetRecords = async ({
   }
 
   if (
-    skipDuplicates &&
+    shouldSkipDuplicates &&
     (dataset.contentLayout === "s3_jsonl" || dataset.useS3)
   ) {
     logger.warn(
@@ -195,7 +195,7 @@ export const createManyDatasetRecords = async ({
         contentLayout: dataset.contentLayout,
         useS3: dataset.useS3,
       },
-      "skipDuplicates is not supported on this dataset layout; existing rows may be duplicated",
+      "shouldSkipDuplicates is not supported on this dataset layout; existing rows may be duplicated",
     );
   }
 
@@ -235,10 +235,10 @@ export const createManyDatasetRecords = async ({
 
   const result = await db.datasetRecord.createMany({
     data: recordData as (DatasetRecord & { entry: any })[],
-    skipDuplicates,
+    skipDuplicates: shouldSkipDuplicates,
   });
 
-  if (skipDuplicates && result.count < recordData.length) {
+  if (shouldSkipDuplicates && result.count < recordData.length) {
     logger.info(
       {
         datasetId,

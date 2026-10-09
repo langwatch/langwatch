@@ -16,7 +16,30 @@ vi.mock("../../../datasets/dataset-storage", () => ({
   getDatasetStorage: (...a: unknown[]) => getDatasetStorage(...a),
 }));
 
-import { getFullDataset, readDatasetHeadS3Jsonl } from "../datasetRecord.utils";
+const loggerWarn = vi.hoisted(() => vi.fn());
+vi.mock("@langwatch/observability", () => ({
+  createLogger: () => ({ info: vi.fn(), error: vi.fn(), warn: loggerWarn }),
+}));
+
+const appendS3JsonlRecords = vi.fn();
+vi.mock("../../../datasets/dataset-mutations", () => ({
+  appendS3JsonlRecords: (...a: unknown[]) => appendS3JsonlRecords(...a),
+}));
+
+const storageGetObject = vi.fn();
+const storagePutObject = vi.fn();
+vi.mock("../../../storage", () => ({
+  StorageService: class {
+    getObject = (...a: unknown[]) => storageGetObject(...a);
+    putObject = (...a: unknown[]) => storagePutObject(...a);
+  },
+}));
+
+import {
+  createManyDatasetRecords,
+  getFullDataset,
+  readDatasetHeadS3Jsonl,
+} from "../datasetRecord.utils";
 
 const baseDataset = {
   id: "dataset_1",
@@ -596,6 +619,70 @@ describe("readDatasetHeadS3Jsonl()", () => {
         status: "failed",
       });
       expect(readChunk).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("createManyDatasetRecords()", () => {
+  const createMany = vi.fn();
+  const db = { datasetRecord: { createMany } } as never;
+  const unsupportedWarning =
+    "shouldSkipDuplicates is not supported on this dataset layout; existing rows may be duplicated";
+
+  const addWithFlag = (dataset: Record<string, unknown>) =>
+    createManyDatasetRecords({
+      datasetId: "dataset_1",
+      projectId: "p1",
+      datasetRecords: [{ id: "r1", a: 1 }],
+      dataset: { ...baseDataset, ...dataset } as never,
+      shouldSkipDuplicates: true,
+      tx: db,
+    });
+
+  beforeEach(() => {
+    createMany.mockResolvedValue({ count: 1 });
+    appendS3JsonlRecords.mockResolvedValue(undefined);
+    storageGetObject.mockResolvedValue(undefined);
+    storagePutObject.mockResolvedValue(undefined);
+  });
+
+  describe("when shouldSkipDuplicates is requested on an s3_jsonl dataset", () => {
+    it("warns that the layout does not support it", async () => {
+      await addWithFlag({ contentLayout: "s3_jsonl", useS3: false });
+
+      expect(loggerWarn).toHaveBeenCalledWith(
+        expect.objectContaining({ contentLayout: "s3_jsonl" }),
+        unsupportedWarning,
+      );
+    });
+  });
+
+  describe("when shouldSkipDuplicates is requested on a legacy useS3 dataset", () => {
+    it("warns that the layout does not support it", async () => {
+      await addWithFlag({ contentLayout: "postgres", useS3: true }).catch(
+        () => undefined,
+      );
+
+      expect(loggerWarn).toHaveBeenCalledWith(
+        expect.objectContaining({ useS3: true }),
+        unsupportedWarning,
+      );
+    });
+  });
+
+  describe("when shouldSkipDuplicates is requested on a postgres dataset", () => {
+    it("does not warn", async () => {
+      await addWithFlag({ contentLayout: "postgres", useS3: false });
+
+      expect(loggerWarn).not.toHaveBeenCalled();
+    });
+
+    it("passes the flag to Prisma as skipDuplicates", async () => {
+      await addWithFlag({ contentLayout: "postgres", useS3: false });
+
+      expect(createMany).toHaveBeenCalledWith(
+        expect.objectContaining({ skipDuplicates: true }),
+      );
     });
   });
 });

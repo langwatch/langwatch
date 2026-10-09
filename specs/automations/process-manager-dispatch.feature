@@ -193,7 +193,7 @@ Feature: Automation dispatch on the process-manager substrate
 
   @integration
   Scenario: A dataset row that already exists counts as added
-    Given an automation that adds matching traces to a dataset
+    Given an automation that adds matching traces to a dataset stored in Postgres
     And a trace whose rows were already added to the dataset by an earlier attempt
     When the automation adds the same trace's rows again
     Then the dataset holds one copy of each row

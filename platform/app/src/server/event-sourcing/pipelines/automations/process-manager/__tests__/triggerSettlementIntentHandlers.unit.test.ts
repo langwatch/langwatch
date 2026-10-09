@@ -755,7 +755,7 @@ describe("trigger settlement intent handlers integration", () => {
     describe("when one trace's rows already exist and another fails retryably once", () => {
       type Params = {
         datasetRecords: { id: string }[];
-        skipDuplicates?: boolean;
+        shouldSkipDuplicates?: boolean;
       };
 
       const setup = () => {
@@ -767,7 +767,7 @@ describe("trigger settlement intent handlers integration", () => {
         store.set("trigger-1-trace-1-0", { id: "trigger-1-trace-1-0" });
         let traceTwoFailures = 0;
         made.raw.addToDataset.mockImplementation(
-          async ({ datasetRecords, skipDuplicates }: Params) => {
+          async ({ datasetRecords, shouldSkipDuplicates }: Params) => {
             const first = datasetRecords[0]!.id;
             dispatchedTraces.push(
               first.includes("trace-1") ? "trace-1" : "trace-2",
@@ -780,7 +780,7 @@ describe("trigger settlement intent handlers integration", () => {
             }
             for (const record of datasetRecords) {
               if (store.has(record.id)) {
-                if (skipDuplicates) continue;
+                if (shouldSkipDuplicates) continue;
                 throw Object.assign(new Error("Unique constraint failed"), {
                   code: "P2002",
                 });
@@ -869,7 +869,6 @@ describe("trigger settlement intent handlers integration", () => {
         it("does not dispatch the claimed trace again", async () => {
           const { retry, dispatchedTraces } = await runBoth();
           await retry;
-          // first run: trace-1 + trace-2; retry: trace-2 only
           expect(dispatchedTraces).toEqual(["trace-1", "trace-2", "trace-2"]);
         });
       });

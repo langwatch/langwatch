@@ -1,6 +1,8 @@
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
+import { TriggerAction } from "~/generated/prisma/client";
+import { dispatchTriggerAction } from "~/server/app-layer/automations/dispatch/triggerActionDispatch";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { createManyDatasetRecords } from "../datasetRecord.utils";
@@ -68,7 +70,7 @@ describe("createManyDatasetRecords duplicate ids (integration)", () => {
   });
 
   describe("given rows that already exist in a Postgres dataset", () => {
-    describe("when the same ids are added again with skipDuplicates", () => {
+    describe("when the same ids are added again with shouldSkipDuplicates", () => {
       let ids: string[];
       let result: Promise<unknown>;
 
@@ -84,12 +86,11 @@ describe("createManyDatasetRecords duplicate ids (integration)", () => {
           datasetId,
           projectId,
           datasetRecords: rowsFor(ids),
-          skipDuplicates: true,
+          shouldSkipDuplicates: true,
         });
         await result.catch(() => undefined);
       });
 
-      /** @scenario "A dataset row that already exists counts as added" */
       it("resolves without error", async () => {
         await expect(result).resolves.toMatchObject({ count: 0 });
       });
@@ -103,7 +104,7 @@ describe("createManyDatasetRecords duplicate ids (integration)", () => {
       });
     });
 
-    describe("when a batch mixes existing and new ids with skipDuplicates", () => {
+    describe("when a batch mixes existing and new ids with shouldSkipDuplicates", () => {
       it("inserts the new row", async () => {
         await newDataset();
         const existing = `trigger-${nanoid()}-0`;
@@ -118,14 +119,14 @@ describe("createManyDatasetRecords duplicate ids (integration)", () => {
           datasetId,
           projectId,
           datasetRecords: rowsFor([existing, fresh]),
-          skipDuplicates: true,
+          shouldSkipDuplicates: true,
         });
 
         expect(await countRows(fresh)).toBe(1);
       });
     });
 
-    describe("when a retry adds a grown batch with skipDuplicates", () => {
+    describe("when a retry adds a grown batch with shouldSkipDuplicates", () => {
       let a: string;
       let b: string;
       let c: string;
@@ -159,7 +160,7 @@ describe("createManyDatasetRecords duplicate ids (integration)", () => {
             { id: b, input: "original b" },
             { id: c, input: "new c" },
           ],
-          skipDuplicates: true,
+          shouldSkipDuplicates: true,
         });
         await result.catch(() => undefined);
       });
@@ -181,7 +182,7 @@ describe("createManyDatasetRecords duplicate ids (integration)", () => {
       });
     });
 
-    describe("when the same ids are added again without skipDuplicates", () => {
+    describe("when the same ids are added again without shouldSkipDuplicates", () => {
       it("rejects, keeping upload semantics", async () => {
         await newDataset();
         const ids = [`upload-${nanoid()}-0`];
@@ -198,6 +199,90 @@ describe("createManyDatasetRecords duplicate ids (integration)", () => {
             datasetRecords: rowsFor(ids),
           }),
         ).rejects.toMatchObject({ code: "P2002" });
+      });
+    });
+  });
+
+  describe("given the add-to-dataset automation action", () => {
+    describe("when it dispatches the same trace twice", () => {
+      let dispatchedDatasetId: string;
+      let triggerId: string;
+      let secondDispatch: Promise<unknown>;
+
+      beforeAll(async () => {
+        await newDataset();
+        dispatchedDatasetId = datasetId;
+        triggerId = `trigger_${nanoid()}`;
+        const traceId = `trace-${nanoid()}`;
+        const trigger = {
+          id: triggerId,
+          projectId,
+          name: "dup",
+          action: TriggerAction.ADD_TO_DATASET,
+          actionParams: {
+            datasetId,
+            datasetMapping: {
+              mapping: {
+                input: { source: "input", key: "", subkey: "" },
+                trace_id: { source: "trace_id", key: "", subkey: "" },
+              },
+              expansions: [],
+            },
+          },
+        } as never;
+        const trace = {
+          trace_id: traceId,
+          project_id: projectId,
+          input: { value: "hello" },
+          timestamps: { started_at: Date.now() },
+          metadata: {},
+          spans: [
+            {
+              span_id: "s1",
+              trace_id: traceId,
+              type: "llm",
+              timestamps: { started_at: Date.now(), finished_at: Date.now() },
+            },
+          ],
+        };
+        // addToDataset is wired exactly as automationDispatch.wiring.ts does;
+        // the production dispatcher supplies shouldSkipDuplicates itself.
+        const deps = {
+          triggers: { updateLastRunAt: async () => undefined },
+          projects: {
+            getById: (id: string) =>
+              prisma.project.findUnique({ where: { id } }),
+          },
+          traceById: async () => trace,
+          addToAnnotationQueue: async () => undefined,
+          addToDataset: async (params: never) => {
+            await createManyDatasetRecords(params);
+          },
+        } as never;
+        const dispatch = () =>
+          dispatchTriggerAction({
+            deps,
+            trigger,
+            traceId,
+            tenantId: projectId,
+            foldState: {} as never,
+          });
+        await dispatch();
+        secondDispatch = dispatch();
+        await secondDispatch.catch(() => undefined);
+      });
+
+      /** @scenario "A dataset row that already exists counts as added" */
+      it("resolves the second dispatch and keeps one row per trace", async () => {
+        await expect(secondDispatch).resolves.toBeUndefined();
+
+        const rows = await prisma.datasetRecord.findMany({
+          where: { datasetId: dispatchedDatasetId, projectId },
+          select: { id: true },
+        });
+        expect(rows.map((row) => row.id)).toEqual([
+          expect.stringMatching(new RegExp(`^${triggerId}-trace-.*-0$`)),
+        ]);
       });
     });
   });
