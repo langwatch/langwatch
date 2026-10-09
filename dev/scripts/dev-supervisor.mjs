@@ -752,9 +752,13 @@ class WatchSupervisor {
     const settled = new Promise((resolve) => {
       settle = resolve;
     });
-    const timer = setTimeout(settle, this.config.bootSettleMs);
-    timer.unref?.();
     const handle = { child, stopping: false, isReady: false, settle, settled };
+    const timer = setTimeout(() => {
+      // With no ready pattern, outliving the boot window is as ready as it gets.
+      if (this.ready === null) handle.isReady = true;
+      settle();
+    }, this.config.bootSettleMs);
+    timer.unref?.();
     this.handle = handle;
     if (child.stdout) wireStdout(child.stdout, this.crashOptions);
     if (child.stderr) wireStderr(child.stderr, this.crashOptions);
@@ -786,8 +790,9 @@ class WatchSupervisor {
       return;
     }
     this.handle = null;
-    // A child that reloads in-process never exits for a bad edit: after boot, this is a crash.
-    if (this.config.reloadsInChild && wasReady) {
+    // A booted child exiting non-zero is a requested restart (haven restart, a drain that
+    // overran its deadline) or an in-process crash; either way start it again.
+    if (wasReady) {
       stderr(`${PREFIX} exited with code ${code} after booting; starting it again\n`);
       setTimeout(() => void this.queue.request([]), this.config.debounceMs);
       return;
