@@ -213,7 +213,9 @@ export class EntitlementModule implements EntitlementApiContract {
       traceMeter: repositories.traces,
     });
     const warnings = UsageWarningService.create({
-      billing: dependencies.billing,
+      // The module is built below; the warning records only once its pipeline is connected.
+      record: (data) =>
+        entitlement.#senders().recordUsageWarning({ ...data, tenantId: data.organizationId }),
       counter,
       plans,
       tenancy: repositories.tenancy,
@@ -239,7 +241,7 @@ export class EntitlementModule implements EntitlementApiContract {
         })
       : undefined;
 
-    return new EntitlementModule({
+    const entitlement: EntitlementModule = new EntitlementModule({
       repositories,
       infrastructure: { ...sources, counter, warnings },
       dependencies,
@@ -253,6 +255,7 @@ export class EntitlementModule implements EntitlementApiContract {
           send,
         }),
     });
+    return entitlement;
   }
 
   /**
@@ -375,20 +378,21 @@ export class EntitlementModule implements EntitlementApiContract {
   usagePipeline(): UsagePipelineDefinition {
     const build = this.#buildUsagePipeline;
     if (!build) throw new Error("Entitlement was composed without its usage pipeline.");
-    return build(() => {
-      if (!this.#usageSenders) {
-        throw new Error(
-          "Entitlement cannot send usage commands before its pipeline is registered.",
-        );
-      }
-      return this.#usageSenders;
-    });
+    return build(() => this.#senders());
+  }
+
+  #senders(): UsageSenders {
+    if (!this.#usageSenders) {
+      throw new Error("Entitlement cannot send usage commands before its pipeline is registered.");
+    }
+    return this.#usageSenders;
   }
 
   connectUsageCommands(commands: EventingCommands<UsagePipelineDefinition>): void {
     this.#usageSenders = {
       countMonth: (data) => commands.countMonth.send(data),
       recordLimitDecision: (data) => commands.recordLimitDecision.send(data),
+      recordUsageWarning: (data) => commands.recordUsageWarning.send(data),
     };
   }
 

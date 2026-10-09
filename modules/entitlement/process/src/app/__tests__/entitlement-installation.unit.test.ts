@@ -7,13 +7,16 @@ import {
   type Plan,
   type ProjectSpendRollup,
 } from "@langwatch/entitlement-contract";
+import { defineAggregate, definePipeline, EventSourcing } from "@langwatch/eventing";
+import { EventStoreMemory, testEventSchema } from "@langwatch/eventing/testing";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { TraceApi } from "@langwatch/trace-contract";
+import { SPAN_RECEIVED_EVENT_TYPE, TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import { entitlementProcessModule } from "../../entitlement.module.ts";
 import { MemoryEntitlementDatabase } from "../../repositories/memory/memory.entitlement.database.ts";
@@ -51,6 +54,22 @@ class RecordingSpendRepository implements OrganizationSpendRepository {
   }
 }
 
+/** The role's eventing, with trace's pipeline standing in as the owner of span_received. */
+function eventingFor(role: "api" | "worker"): EventSourcing {
+  const eventing = new EventSourcing({
+    eventStore: EventStoreMemory.createForTesting(),
+    executionTarget: role,
+    consumersEnabled: false,
+    processManagerMode: "producer-only",
+  });
+  eventing.register(
+    definePipeline({ name: "trace_stand_in", aggregate: defineAggregate({ type: "trace" }) })
+      .withEvents([testEventSchema(SPAN_RECEIVED_EVENT_TYPE, z.object({}))])
+      .build(),
+  );
+  return eventing;
+}
+
 describe("entitlement's dependencies", () => {
   /** @scenario "Trace is no longer asked to count usage" */
   it("names no TraceApi: traces are counted off entitlement's own meter", () => {
@@ -75,20 +94,16 @@ describe("entitlement app installation", () => {
     "installs a working capability in the %s role, with no enterprise sources composed",
     async (role) => {
       const { logger } = createTestLogger();
-      const warned: Parameters<BillingApi["sendUsageWarning"]>[0][] = [];
       const runtime = await createApp({ role })
         .withModules([entitlementProcessModule])
         .withConfig({ entitlement: { requestBounds: undefined, isSaas: true } })
         .withStores(memoryStores())
+        .withEventing(eventingFor(role))
         .withObservability((observability) => observability.withLogging(logger))
         .provide({
           billing: createApiFixture<BillingApi>({
             getActiveSubscriptionPlan: async () => free,
             getPricingModel: async () => ({ pricingModel: null }),
-            sendUsageWarning: async (input) => {
-              warned.push(input);
-              return { sent: true, notificationId: "notification-1" };
-            },
           }),
           organization: createApiFixture<OrganizationApi>({
             countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),
@@ -117,24 +132,14 @@ describe("entitlement app installation", () => {
           usageUnit: "events",
         });
 
-        // Entitlement decides the threshold and counts in the organization's meter; billing sends.
+        // Entitlement records the crossed threshold through its own pipeline; billing mails it.
         await expect(
           app.sendUsageLimitWarning({
             organizationId: "organization-1",
             currentMonthMessagesCount: 900,
             maxMonthlyUsageLimit: 1_000,
           }),
-        ).resolves.toEqual({ sent: true, notificationId: "notification-1" });
-        expect(warned).toEqual([
-          {
-            organizationId: "organization-1",
-            currentMonthMessagesCount: 900,
-            maxMonthlyUsageLimit: 1_000,
-            crossedThreshold: 90,
-            // The memory stores hold no Project rows, so the organisation owns none yet.
-            projectCounts: [],
-          },
-        ]);
+        ).resolves.toEqual({ sent: true });
       } finally {
         await runtime.stop();
       }

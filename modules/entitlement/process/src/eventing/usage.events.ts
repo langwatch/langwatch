@@ -5,7 +5,9 @@ import {
   USAGE_LIMIT_CLEARED_EVENT_TYPE,
   USAGE_LIMIT_REACHED_EVENT_TYPE,
   USAGE_MONTH_COUNTED_EVENT_TYPE,
+  USAGE_THRESHOLD_CROSSED_EVENT_TYPE,
   usageMonthSchema,
+  usageThresholdCrossedEventDataSchema,
 } from "@langwatch/entitlement-contract";
 import { EventSchema } from "@langwatch/eventing";
 import { z } from "zod";
@@ -31,10 +33,17 @@ export const limitClearedEventSchema = z.object({
   version: z.literal(USAGE_EVENT_VERSION),
   data: limitClearedEventDataSchema,
 });
+export const usageThresholdCrossedEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(USAGE_THRESHOLD_CROSSED_EVENT_TYPE),
+  version: z.literal(USAGE_EVENT_VERSION),
+  data: usageThresholdCrossedEventDataSchema,
+});
 export type UsageEvent =
   | z.infer<typeof monthCountedEventSchema>
   | z.infer<typeof limitReachedEventSchema>
-  | z.infer<typeof limitClearedEventSchema>;
+  | z.infer<typeof limitClearedEventSchema>
+  | z.infer<typeof usageThresholdCrossedEventSchema>;
 
 export const countMonthCommandDataSchema = z.object({
   tenantId: z.string().min(1),
@@ -50,3 +59,9 @@ export const recordLimitDecisionCommandDataSchema = z.object({
   decision: z.enum(["reached", "cleared"]),
 });
 export type RecordLimitDecisionCommandData = z.infer<typeof recordLimitDecisionCommandDataSchema>;
+
+export const recordUsageWarningCommandDataSchema = z.object({
+  ...usageThresholdCrossedEventDataSchema.shape,
+  tenantId: z.string().min(1),
+});
+export type RecordUsageWarningCommandData = z.infer<typeof recordUsageWarningCommandDataSchema>;
