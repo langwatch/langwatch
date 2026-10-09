@@ -52,13 +52,18 @@ Feature: OTLP ingestion doors refuse what they cannot safely hold
       Then the export is refused as too large
       And nothing is recorded
 
-    # Gap: the governance routes declare no body limit, so the whole body is
-    # held before the source is resolved and the decoder refuses it.
-    @integration @unimplemented
+    @unit
     Scenario: The governance OTLP doors refuse a body over the wire cap before holding it
       Given an ingestion source with a bearer secret
       When a body larger than the bulk wire cap is posted to its trace, log or metric door
       Then the export is refused as too large before the body is read
+      And nothing is recorded
+
+    @unit
+    Scenario: The governance webhook door refuses a body over the JSON wire cap before holding it
+      Given an ingestion source with a bearer secret
+      When a body larger than the JSON wire cap is posted to its webhook door
+      Then the delivery is refused as too large before the body is read
       And nothing is recorded
 
   Rule: Only OTLP over HTTP is served

@@ -3349,6 +3349,9 @@ importers:
       '@langwatch/otlp':
         specifier: workspace:*
         version: link:../../../../packages/otlp
+      '@langwatch/plans':
+        specifier: workspace:*
+        version: link:../../../../packages/plans
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../../packages/prisma-client

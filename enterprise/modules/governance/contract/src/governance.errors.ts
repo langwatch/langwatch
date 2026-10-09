@@ -320,7 +320,7 @@ export class IngestionWrongEndpointError extends HandledError {
   }
 }
 
-/** Nothing was durably accepted; the exporter retries the whole request. */
+/** Not all of the request was taken; the exporter resends it whole and what was taken dedupes. */
 export class IngestionReceiverUnavailableError extends HandledError {
   declare readonly code: "ingestion_receiver_unavailable";
 

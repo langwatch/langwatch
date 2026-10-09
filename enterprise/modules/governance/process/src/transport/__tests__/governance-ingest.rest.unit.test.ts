@@ -5,6 +5,7 @@ import type {
 } from "@langwatch/enterprise-governance-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
+import { resolveRequestBound } from "@langwatch/plans";
 import type { ProjectApi } from "@langwatch/project-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
@@ -30,6 +31,9 @@ import type { IngestionSourceService } from "../../features/ingestion-source/ser
 import type { GovernanceRateLimitRepository } from "../../repositories/governance-rate-limit.repository.ts";
 import { MemoryGovernanceRateLimitRepository } from "../../repositories/memory/memory.governance-rate-limit.repository.ts";
 import { governanceIngestRest } from "../governance-ingest.rest.ts";
+
+const BULK_WIRE_CAP = resolveRequestBound("bodyLimitBulkBytes", "ENTERPRISE");
+const JSON_WIRE_CAP = resolveRequestBound("bodyLimitJsonBytes", "ENTERPRISE");
 
 const SECRET = "lw_is_abcdef123";
 const SOURCE_ID = "src_1";
@@ -353,6 +357,42 @@ describe("the ingestion-source receivers", () => {
       await expect(response.json()).resolves.toMatchObject({ accepted: true, bytes: 15 });
       expect(logCollection).toHaveBeenCalledTimes(1);
       expect(api.ingestionSourceRecordEventReceived).toHaveBeenCalledWith(SOURCE_ID);
+    });
+  });
+
+  describe("when a body over the bulk wire cap reaches an OTLP door", () => {
+    /** @scenario "The governance OTLP doors refuse a body over the wire cap before holding it" */
+    it("refuses it as too large before the source is looked up, on every signal", async () => {
+      const oversized = "x".repeat(BULK_WIRE_CAP + 1);
+
+      for (const path of ["", "/v1/logs", "/v1/metrics"]) {
+        const api = mountIngest();
+
+        const response = await api.post(`/api/ingest/otel/${SOURCE_ID}${path}`, oversized);
+
+        expect(response.status).toBe(413);
+        await expect(response.json()).resolves.toMatchObject({ code: "payload_too_large" });
+        expect(api.findIngestionSourceByIngestSecret).not.toHaveBeenCalled();
+        expect(api.ingestionSourceRecordEventReceived).not.toHaveBeenCalled();
+      }
+    });
+  });
+
+  describe("when a body over the JSON wire cap reaches the webhook door", () => {
+    /** @scenario "The governance webhook door refuses a body over the JSON wire cap before holding it" */
+    it("refuses it as too large before the source is looked up", async () => {
+      const logCollection = vi.fn().mockResolvedValue(void 0);
+      const api = mountIngest({ source: { ...SOURCE, sourceType: "workato" }, logCollection });
+
+      const response = await api.post(
+        `/api/ingest/webhook/${SOURCE_ID}`,
+        "x".repeat(JSON_WIRE_CAP + 1),
+      );
+
+      expect(response.status).toBe(413);
+      await expect(response.json()).resolves.toMatchObject({ code: "payload_too_large" });
+      expect(api.findIngestionSourceByIngestSecret).not.toHaveBeenCalled();
+      expect(logCollection).not.toHaveBeenCalled();
     });
   });
 });
