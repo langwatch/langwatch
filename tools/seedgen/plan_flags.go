@@ -41,6 +41,13 @@ const MaxSpans = 2_000_000
 // MaxDays bounds --days.
 const MaxDays = 365
 
+// MaxConversations and MaxTurns bound the long threads: one conversation is one chunk in one hour.
+const (
+	MaxConversations = 20
+	MaxTurns         = 50
+	DefaultTurns     = 15 // a conversation view virtualizes from twelve turns (WEB-5701)
+)
+
 // MaxReach is how far back telemetry may start: the trace backfill ceiling
 // (SPAN_BACKFILL_MAX_PAST_DAYS); --age plus --days stays within it.
 const MaxReach = 365
@@ -59,6 +66,10 @@ type Flags struct {
 	Admin string `json:"admin,omitempty"`
 	// Orgs, when set, replace the tier's shared orgs (--org, repeatable).
 	Orgs []OrgSpec `json:"orgs,omitempty"`
+	// Conversations is how many long threads each project gets, of Turns traces sharing one
+	// gen_ai.conversation.id; they come out of the span budget.
+	Conversations int `json:"conversations"`
+	Turns         int `json:"turns"`
 	// Into sends telemetry only, into one existing ORG_ID/PROJECT_ID; no identity is created.
 	Into   string `json:"into,omitempty"`
 	DryRun bool   `json:"-"`
@@ -140,6 +151,8 @@ func ParseFlags(args []string, anchor time.Time) (Flags, error) {
 	seed := set.Int64("seed", 1, "")
 	anchorText := set.String("anchor", "", "")
 	age := set.String("age", "0d", "")
+	conversations := set.Int("conversations", 1, "")
+	turns := set.Int("turns", DefaultTurns, "")
 	shape := set.String("shape", "saas", "")
 	admin := set.String("admin", "", "")
 	into := set.String("into", "", "")
@@ -158,7 +171,8 @@ func ParseFlags(args []string, anchor time.Time) (Flags, error) {
 		return Flags{}, fmt.Errorf("unexpected argument %q", set.Arg(0))
 	}
 	flags := Flags{Size: *size, Spans: *spans, Days: *days, Private: *private, Seed: *seed, Shape: *shape,
-		DryRun: *dryRun, Anchor: anchor.UTC(), Admin: *admin, Orgs: orgs, Into: *into}
+		DryRun: *dryRun, Anchor: anchor.UTC(), Admin: *admin, Orgs: orgs, Into: *into,
+		Conversations: *conversations, Turns: *turns}
 	if *anchorText != "" {
 		parsed, err := time.Parse(time.RFC3339, *anchorText)
 		if err != nil {
@@ -190,6 +204,7 @@ func (f Flags) withDefaults() (Flags, error) {
 	if f.Private == -1 {
 		f.Private = tier.Private
 	}
+	f.Turns = cmp.Or(f.Turns, DefaultTurns)
 	personas, refusals := f.validate()
 	f.Personas = personas
 	return f, errors.Join(refusals...)
@@ -205,6 +220,13 @@ func (f Flags) validate() ([]string, []error) {
 	if f.Days < 1 || f.Days > MaxDays {
 		refusals = append(refusals, &FlagError{Flag: "days", Value: fmt.Sprint(f.Days),
 			Accepts: fmt.Sprintf("1 to %d", MaxDays)})
+	}
+	if f.Conversations < 0 || f.Conversations > MaxConversations {
+		refusals = append(refusals, &FlagError{Flag: "conversations", Value: fmt.Sprint(f.Conversations),
+			Accepts: fmt.Sprintf("0 to %d per project", MaxConversations)})
+	}
+	if f.Turns < 1 || f.Turns > MaxTurns {
+		refusals = append(refusals, &FlagError{Flag: "turns", Value: fmt.Sprint(f.Turns), Accepts: fmt.Sprintf("1 to %d", MaxTurns)})
 	}
 	if f.Private < 0 {
 		refusals = append(refusals, &FlagError{Flag: "private", Value: fmt.Sprint(f.Private), Accepts: "0 or more"})

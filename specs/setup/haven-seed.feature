@@ -121,6 +121,14 @@ Feature: haven seed fills a stack with every kind of data, at any size, without 
     And an age that is negative, not whole days, or reaching past 365 days with --days is refused naming --age
 
   @unit
+  Scenario: Each project gets long conversations whose turns share one conversation id
+    When I run "haven seed --conversations 2 --turns 15"
+    Then each project gets two conversations of fifteen turns, one trace per turn, minutes apart
+    And every turn carries its conversation's gen_ai.conversation.id
+    And their spans come out of the span budget, so the span count stays exact
+    And a budget too small for them seeds none, and bad counts are refused naming the flag
+
+  @unit
   Scenario: haven seed refuses a stack that is not up
     Given the stack's api or worker is not running
     When I run "haven seed"

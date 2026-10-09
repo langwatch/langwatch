@@ -22,6 +22,8 @@ type Plan struct {
 	hours  int
 	start  time.Time
 	totals []float64
+	// conversations per project actually planned: none when the span budget cannot hold them.
+	conversations int
 }
 
 // Org is one seeded organization. A private org is not created by the plan: storage-seed writes it
@@ -146,18 +148,26 @@ func (p *Plan) fill(org *Org, projects, users int) {
 	}
 }
 
-// allocate splits the spans over projects by drawn weights and sums each project's hourly curve.
+// allocate keeps the conversations' spans aside, splits the rest over projects by drawn weights
+// and sums each project's hourly curve.
 func (p *Plan) allocate() {
 	var projects []*Project
 	for i, org := range p.Orgs {
 		org.curve = newCurve(p.draws, int64(i), p.Flags.Days)
 		projects = append(projects, org.Projects...)
 	}
+	budget := p.Flags.Spans
+	p.conversations = p.Flags.Conversations
+	if reserved := len(projects) * p.conversations * p.Flags.Turns * conversationSpans; 2*reserved <= budget {
+		budget -= reserved
+	} else {
+		p.conversations = 0 // shortcut: a budget too small for them seeds none, rather than fewer turns
+	}
 	weights := make([]float64, len(projects))
 	for i := range projects {
 		weights[i] = 0.5 + 1.5*p.draws.Float("project", int64(i), "weight")
 	}
-	split(p.Flags.Spans, weights, func(i, n int) { projects[i].Spans = n })
+	split(budget, weights, func(i, n int) { projects[i].Spans = n })
 	p.totals = make([]float64, len(projects))
 	for i, project := range projects {
 		for hour := range p.hours {
@@ -210,7 +220,7 @@ func RetentionDays(persona string, days int) int {
 func (p *Plan) Steps() iter.Seq[Step] {
 	return func(yield func(Step) bool) {
 		walk := &walker{plan: p, yield: yield}
-		_ = walk.identity() && walk.telemetry()
+		_ = walk.identity() && walk.telemetry() && walk.conversations()
 	}
 }
 
@@ -259,6 +269,31 @@ func (w *walker) telemetry() bool {
 		for i := range stream.projects {
 			if cell, ok := stream.cell(i, hour); ok && !w.emit(Step{Cell: &cell}) {
 				return false
+			}
+		}
+	}
+	return true
+}
+
+// conversationSpans is the spans of one turn (telemetrysim's conversation-turn preset).
+const conversationSpans = 2
+
+// conversations emits each project's long threads, one cell each, on the days before the anchor
+// at 14:00, every turn a trace sharing the thread's gen_ai.conversation.id.
+func (w *walker) conversations() bool {
+	plan := w.plan
+	for _, org := range plan.Orgs {
+		for _, project := range org.Projects {
+			for k := range plan.conversations {
+				day := plan.Flags.Days - 1 - k%plan.Flags.Days
+				spans := plan.Flags.Turns * conversationSpans
+				cell := Cell{Persona: org.Persona, Org: org.Ref, Project: project.Ref, Private: org.Private,
+					Start: plan.start.Add(time.Duration(day)*24*time.Hour + 14*time.Hour),
+					Spans: spans, Logs: spans, MetricPoints: 2 * spans, Turns: plan.Flags.Turns,
+					Thread: fmt.Sprintf("s%d-%s-%s-conversation-%d", plan.Flags.Seed, org.Key, project.Key, k+1)}
+				if !w.emit(Step{Cell: &cell}) {
+					return false
+				}
 			}
 		}
 	}

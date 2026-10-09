@@ -175,3 +175,29 @@ func TestLargePlanWalkStaysUnder256MB(t *testing.T) {
 		t.Fatalf("walking the large plan took %d MB from the OS", peak>>20)
 	}
 }
+
+// BenchmarkChunks walks and encodes a small plan's whole stream: 50,000 spans, logs to match and
+// twice the metric points. Profile with -cpuprofile/-memprofile.
+func BenchmarkChunks(b *testing.B) {
+	flags, err := ParseFlags([]string{"--size", "small", "--private", "0"}, anchor)
+	if err != nil {
+		b.Fatal(err)
+	}
+	plan, err := NewPlan(flags)
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.ReportAllocs()
+	for b.Loop() {
+		bytes := 0
+		for step := range plan.Steps() {
+			for chunk, err := range plan.Chunks(step) {
+				if err != nil {
+					b.Fatal(err)
+				}
+				bytes += len(chunk.Input)
+			}
+		}
+		b.SetBytes(int64(bytes))
+	}
+}

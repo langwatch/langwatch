@@ -264,3 +264,40 @@ func TestAgeMovesTheHistoryBack(t *testing.T) {
 		}
 	}
 }
+
+// @scenario "Each project gets long conversations whose turns share one conversation id"
+func TestConversationsShareOneIDAcrossTheirTurns(t *testing.T) {
+	plan := mustPlan(t, "--size", "tiny", "--days", "30", "--conversations", "2", "--turns", "15")
+	threads := map[string]int{}
+	for step := range plan.Steps() {
+		cell := step.Cell
+		if cell == nil || cell.Turns == 0 {
+			continue
+		}
+		for chunk, err := range plan.Chunks(step) {
+			if err != nil {
+				t.Fatal(err)
+			}
+			threads[cell.Thread] += strings.Count(string(chunk.Input), `"key":"gen_ai.conversation.id","value":{"stringValue":"`+cell.Thread+`"}`)
+		}
+	}
+	if len(threads) != 2*6 {
+		t.Fatalf("%d conversations, want 2 for each of the tiny tier's 6 projects", len(threads))
+	}
+	for thread, turns := range threads {
+		if turns != 15 {
+			t.Errorf("%s has %d turns carrying its id, want 15", thread, turns)
+		}
+	}
+	if counts := plan.Estimate().Counts; counts["spans"] != 1_500 || counts["conversations"] != 12 {
+		t.Errorf("counts %v: the conversations come out of the 1500-span budget", counts)
+	}
+	if small := mustPlan(t, "--spans", "10"); small.Estimate().Counts["conversations"] != 0 {
+		t.Error("a budget too small for the conversations still plans them")
+	}
+	for flag, args := range map[string][]string{"turns": {"--turns", "-1"}, "conversations": {"--conversations", "-1"}} {
+		if _, err := ParseFlags(args, anchor); !isFlagError(err, flag) {
+			t.Errorf("%v: want a refusal naming --%s, got %v", args, flag, err)
+		}
+	}
+}
