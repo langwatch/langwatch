@@ -233,7 +233,7 @@ export const VariableInsertMenu = ({
       }}
       // Only allow auto-focus when in editable mode (has search input)
       // When onQueryChange is NOT provided (readonly mode), don't steal focus
-
+      {...(onQueryChange ? {} : { autoFocus: false })}
       lazyMount
       unmountOnExit
     >
