@@ -172,6 +172,9 @@ const traceReads = defineTrpcRouter(
     .query("newCount")
     .withInput(z.object({ projectId: z.string() }))
     .withOutput(z.object({ count: z.number() }))
+    .mutation("annotate")
+    .withInput(z.object({ projectId: z.string() }))
+    .withOutput(z.object({ count: z.number() }))
     .build(),
 )
   .procedure("newCount")
@@ -179,6 +182,9 @@ const traceReads = defineTrpcRouter(
   .handle(({ app, input, authorization }) =>
     app.count({ projectId: input.projectId, proofPresent: authorization !== null }),
   )
+  .procedure("annotate")
+  .withPermission("annotations:manage")
+  .handle(({ app, input }) => app.count({ projectId: input.projectId, proofPresent: false }))
   .build();
 
 function servedTraceReads({
@@ -219,12 +225,18 @@ function servedTraceReads({
       return { count: 3 };
     },
   }));
-  const call = async () => {
-    const request = new Request(
-      `http://api.test${TrpcHost.path}/traces.newCount?input=${encodeURIComponent(
-        JSON.stringify({ projectId: "p1" }),
-      )}`,
-    );
+  const input = JSON.stringify({ projectId: "p1" });
+  const call = async (procedure: "newCount" | "annotate" = "newCount") => {
+    const request =
+      procedure === "newCount"
+        ? new Request(
+            `http://api.test${TrpcHost.path}/traces.newCount?input=${encodeURIComponent(input)}`,
+          )
+        : new Request(`http://api.test${TrpcHost.path}/traces.annotate`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: input,
+          });
     const response = await fetchRequestHandler({
       endpoint: TrpcHost.path,
       req: request,
@@ -267,6 +279,31 @@ describe("given a request whose procedure reads traces on one project", () => {
       const answer = await call();
 
       expect(answer.result).toBeUndefined();
+      expect(answer.error).toMatchObject({
+        data: {
+          code: "FORBIDDEN",
+          error: { code: "permission_denied", meta: { denialReason: "no-grant" } },
+        },
+      });
+      expect(proofsSeen).toEqual([]);
+      expect(kindReads).toEqual(["p1"]);
+    });
+  });
+
+  describe("when an admin writes on an aggregate project", () => {
+    /** @scenario "Shared decisions still refuse a write on an aggregate project" */
+    it("refuses the write as read only before the handler runs", async () => {
+      const { call, proofsSeen, kindReads } = servedTraceReads({
+        organizationRole: "ADMIN",
+        kind: "aggregate",
+      });
+
+      const answer = await call("annotate");
+
+      expect(answer.result).toBeUndefined();
+      expect(answer.error).toMatchObject({
+        data: { code: "FORBIDDEN", error: { code: "aggregate_project_is_read_only" } },
+      });
       expect(proofsSeen).toEqual([]);
       expect(kindReads).toEqual(["p1"]);
     });

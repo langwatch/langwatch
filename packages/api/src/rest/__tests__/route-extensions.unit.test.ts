@@ -17,6 +17,7 @@ import type { RestCaller, RestIdentity } from "../../hosting/api-door.ts";
 import { allRegisteredRoutes } from "../../route-registry.ts";
 import { defineRestRouter } from "../declaration.ts";
 import { createRestRuntime } from "../runtime.ts";
+import { authorizationPort } from "../../__tests__/api-double.ts";
 
 /** The refusal a process gives for the webhook endpoints capability. */
 class NoWebhookEndpointsError extends HandledError {
@@ -91,7 +92,10 @@ function mount(
   identity: RestIdentity,
   entitlements?: Entitlements,
 ) {
-  return createRestRuntime({ identity, ...(entitlements ? { entitlements } : {}) }).mount(router, {
+  return createRestRuntime({
+    identity,
+    authorization: authorizationPort,
+    ...(entitlements ? { entitlements } : {}) }).mount(router, {
     app: () => runsApp,
     onError: createErrorHandler(),
   });
@@ -386,7 +390,7 @@ describe("a route that chooses its permission from its parsed input", () => {
       .router();
 
     expect(() =>
-      createRestRuntime({ identity, doors: { browser: identity } }).mount(browser, {
+      createRestRuntime({ identity, doors: { browser: identity }, authorization: authorizationPort }).mount(browser, {
         app: () => runsApp,
         onError: createErrorHandler(),
       }),

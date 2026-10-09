@@ -554,7 +554,7 @@ export async function decide({
   const credentialScope = caller.scope ?? null;
   assertInputScope({ input, scope: credentialScope });
 
-  await assertScopeLineage({ declaration, input, authorize });
+  if (authorize) await assertScopeLineage({ declaration, input, authorize });
 
   const decision = await decideDeclared({ declaration, caller, input, authorize, denials });
   for (const scope of secondFactorScopes({ declaration, input, decision })) {
@@ -665,7 +665,7 @@ export async function scopeWithOrganization({
   if (scope === null) return null;
   if (scope.tier === "organization") return { ...scope, organizationId: scope.id };
 
-  if (!authorize) throw new Error("a scope's organization needs an authorization port");
+  if (!authorize) return { ...scope, organizationId: null };
 
   const organizationId = await authorize.organizationOf({ tier: scope.tier, id: scope.id });
   if (scope.tier === "team") return { ...scope, organizationId };
@@ -1078,14 +1078,11 @@ async function assertScopeLineage({
 }: {
   declaration: AccessDeclaration;
   input: unknown;
-  authorize: Authorize | undefined;
+  authorize: Authorize;
 }): Promise<void> {
-  if (typeof input !== "object" || input === null) return;
-  const named = SCOPE_INPUT_FIELDS.some((field) => Object.hasOwn(input, field));
-  if (!named) return;
-  if (!authorize) throw new Error("a scope named in the input needs an authorization port");
-
-  const lineage = await authorize.checkScopeLineage(input as AuthzScopeLineageInput);
+  const lineage = await authorize.checkScopeLineage(
+    typeof input === "object" && input !== null ? (input as AuthzScopeLineageInput) : {},
+  );
 
   if (lineage.kind === "consistent") return;
 

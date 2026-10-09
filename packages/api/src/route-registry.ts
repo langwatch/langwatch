@@ -51,7 +51,7 @@ export interface RegisteredRoute {
 /** Why a route cannot serve until the ledger is current: what it would get wrong mid-upgrade. */
 export type UpgradeHoldReason = Readonly<{ because: string }>;
 
-/** A hold names what the route would get wrong mid-upgrade; a blank reason is refused at declaration. */
+/** A hold names what the route would get wrong mid-upgrade; a blank reason is refused. */
 export function assertHoldReason({
   address,
   reason,

@@ -16,7 +16,7 @@ const EventsApi = moduleApi<EventsApi>()("workflow");
 
 function mounted({ signedIn = true, granted = true, kind = "application" } = {}) {
   const post = vi.fn(async (_input: { raw: string }) => ({ ran: true }));
-  const authorizeDoor = vi.fn(() => ({ permitted: granted, organizationRole: null }));
+  const authorizeDoor = vi.fn(() => ({ permitted: granted, organizationRole: "ADMIN" as const }));
   const authorize: Authorize = {
     ...authorizeDefaults,
     getDecision: async () => ({ permitted: true, organizationRole: "ADMIN" }),

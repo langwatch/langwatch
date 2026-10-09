@@ -17,6 +17,7 @@ import { defineRestRouter } from "../declaration.ts";
 import { securityForCredentialClass } from "../openapi.ts";
 import { createRestRuntime } from "../runtime.ts";
 import { assertEveryRouteDeclared, undeclaredRoutes } from "../security.ts";
+import { authorizationPort } from "../../__tests__/api-double.ts";
 
 const VERSION = "2026-09-08";
 const ORGANIZATION = { tier: "organization", id: "organization-1" } as const;
@@ -49,6 +50,7 @@ const forwarder = defineRestRouter(GateApi)
 
 function forwarderApp(): Hono {
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: () => ({ actor: null, scope: ORGANIZATION }),
       identify: ({ request }) => {
@@ -127,6 +129,7 @@ function notesApp({ getNote }: { getNote?: GateApi["getNote"] } = {}) {
   const getReport = vi.fn(async ({ projectId }: { projectId: string }) => ({ projectId }));
 
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: () => ({ actor: { type: "api_key", id: "key-1" }, scope: ORGANIZATION }),
       authorize,

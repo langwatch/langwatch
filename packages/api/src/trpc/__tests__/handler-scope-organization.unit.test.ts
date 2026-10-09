@@ -116,7 +116,9 @@ describe("a handler's scope", () => {
 
       await expect(
         call.byScope({ scope: { scopeType: "PROJECT", scopeId: "project-1" } }),
-      ).resolves.toEqual({ scope: { tier: "project", id: "project-1", organizationId: "org-1" } });
+      ).resolves.toEqual({
+        scope: { tier: "project", id: "project-1", organizationId: "org-1", kind: "application" },
+      });
       expect(asked).toEqual([{ tier: "project", id: "project-1" }]);
     });
   });
@@ -153,7 +155,9 @@ describe("a handler's scope", () => {
 
       await expect(
         call.byScope({ scope: { scopeType: "PROJECT", scopeId: "project-1" } }),
-      ).resolves.toEqual({ scope: { tier: "project", id: "project-1", organizationId: null } });
+      ).resolves.toEqual({
+        scope: { tier: "project", id: "project-1", organizationId: null, kind: "application" },
+      });
     });
   });
 

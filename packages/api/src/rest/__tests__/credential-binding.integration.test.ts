@@ -9,6 +9,7 @@ import { BearerIdentity } from "../bearer-identity.ts";
 import { defineRestRouter } from "../declaration.ts";
 import { RestHost } from "../host.ts";
 import { bindRestCredential } from "../request.ts";
+import { authorizationPort } from "../../__tests__/api-double.ts";
 
 const Api = moduleApi<{ read(): { ok: boolean } }>()("langy");
 function family(namespace: string, path: string) {
@@ -37,6 +38,7 @@ function host(browser?: RestIdentity) {
     },
     bearers: () => closed,
     audit: { record: async () => {} },
+    authz: authorizationPort.forRequest(),
   });
 }
 const app = () => ({ read: () => ({ ok: true }) });

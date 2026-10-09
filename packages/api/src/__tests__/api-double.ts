@@ -40,3 +40,13 @@ export const authorizeDefaults = {
   },
   assertSecondFactor: async () => {},
 } satisfies Omit<Authorize, "getDecision" | "getProjectAnyDecision" | "checkScopeLineage">;
+
+/** An authorization port that permits every decision on an ordinary project. */
+export const authorizationPort = {
+  forRequest: (): Authorize => ({
+    ...authorizeDefaults,
+    getDecision: async () => ({ permitted: true, organizationRole: null }),
+    getProjectAnyDecision: async () => ({ permitted: true, organizationRole: null }),
+    checkScopeLineage: async () => ({ kind: "consistent" }),
+  }),
+};
