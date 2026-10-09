@@ -133,3 +133,18 @@ Feature: Prompt service
     Given an organization already seeded with the production and staging prompt tags
     When the creation fact is delivered again
     Then the organization still has exactly one production and one staging tag
+
+  @unit
+  Scenario: The deploy backfill seeds prompt tags only for organizations with none
+    Given one organization has no prompt tags and another holds only a custom tag
+    When the tag backfill runs over both organizations twice
+    Then the untagged organization has the production and staging prompt tags
+    And the organization with a custom tag is left as it was
+    And the second pass seeds nothing
+
+  @unit
+  Scenario: A dry run of the deploy backfill writes no prompt tag
+    Given an organization has no prompt tags
+    When the tag backfill runs over it as a dry run
+    Then it reports the organization would be seeded
+    And the organization still has no prompt tags
