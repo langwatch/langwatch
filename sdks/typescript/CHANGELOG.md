@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.20.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.19.0...typescript-sdk@v1.20.0) (2026-10-08)
+
+
+### Features
+
+* **members:** developer seat, a member who owns a personal project and nothing shared ([#8373](https://github.com/langwatch/langwatch/issues/8373)) ([30ff7ea](https://github.com/langwatch/langwatch/commit/30ff7ea74a4caba95afb76d59ca9a6906b6f613e))
+
+
+### Bug Fixes
+
+* 3.19.0 self-host dogfood findings (model id on Studio spans, mirror markers, Langy turns in CLI analytics) ([#8370](https://github.com/langwatch/langwatch/issues/8370)) ([5d70883](https://github.com/langwatch/langwatch/commit/5d708830634f2b63b0743970ddefa2a71b45e577))
+* **annotations:** serialize annotation commands per trace and 404 on unknown delete ([#8400](https://github.com/langwatch/langwatch/issues/8400)) ([7606bf6](https://github.com/langwatch/langwatch/commit/7606bf6a6641e03912b2e16bbafbe0021f681bb8))
+* **triggers:** refuse a different customGraphId on PATCH instead of ignoring it ([#8433](https://github.com/langwatch/langwatch/issues/8433)) ([0ad8ad2](https://github.com/langwatch/langwatch/commit/0ad8ad2e1ae6981c130c4c2877bbd5e2722e8dd6))
+
 ## [1.19.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.18.0...typescript-sdk@v1.19.0) (2026-09-30)
 
 
