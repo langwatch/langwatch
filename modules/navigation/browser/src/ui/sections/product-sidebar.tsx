@@ -128,9 +128,13 @@ function SidebarBottomBlock({
  * tab, else the remembered product's home (settings-shell-v2.feature).
  */
 function SettingsBackEntry({ showLabel }: { showLabel: boolean }) {
-  const organization = useNavigationHost().organization();
+  const host = useNavigationHost();
+  const organization = host.organization();
   const { reachableProducts } = useReachableProducts();
   const projectSlug = useLlmOpsProjectSlug();
+  // Refused /ops view: the remembered product is not where the viewer came from.
+  const isRefusedOps = isPathUnder({ pathname: host.pathname(), base: "/ops" });
+  if (isRefusedOps && !host.opsAccess().hasAccess) return null;
   const target = resolveSettingsBackTarget({
     organizationId: organization?.id ?? null,
     rememberedProduct: organization

@@ -130,6 +130,18 @@ describe("the settings shell in a new navigation mode", () => {
     });
   });
 
+  describe("when /ops is refused for lack of ops access", () => {
+    it("offers no back entry to the last product visited", () => {
+      captureSettingsReturnPath({
+        organizationId: ORGANIZATION.id,
+        pathname: "/gateway/budgets",
+      });
+      renderSettingsSidebar({ pathname: "/ops", hasOpsAccess: false });
+
+      expect(screen.queryByRole("link", { name: /^Back/ })).not.toBeInTheDocument();
+    });
+  });
+
   describe("when the settings menu renders in a v2 mode", () => {
     /** @scenario The settings menu is grouped with its gates kept */
     it("shows the groups with the current addresses", () => {
