@@ -65,24 +65,27 @@ export class UpgradeRunnerRepository {
 
   /**
    * Registers steps as `pending`. A step already recorded keeps its status; it gains the release
-   * that shipped it, and its owner and description are refreshed from the manifest.
+   * that shipped it, and its owner, description and `finishBy` are refreshed from the manifest.
    */
   async registerSteps({ steps }: { steps: readonly RegisteredStep[] }): Promise<void> {
     if (steps.length === 0) return;
     await this.query(
       (t) => `INSERT INTO ${t.step} AS step
-              ("id", "kind", "mode", "release", "owner", "description", "status", "inferred", "updated_at")
+              ("id", "kind", "mode", "release", "owner", "description", "finish_by", "status", "inferred",
+               "updated_at")
        SELECT source.id, source.kind, source.mode, source.release, source.owner, source.description,
-              'pending', false, ${NOW_UTC}
-         FROM unnest($1::text[], $2::text[], $3::text[], $4::text[], $5::text[], $6::text[])
-              AS source(id, kind, mode, release, owner, description)
+              source.finish_by, 'pending', false, ${NOW_UTC}
+         FROM unnest($1::text[], $2::text[], $3::text[], $4::text[], $5::text[], $6::text[], $7::text[])
+              AS source(id, kind, mode, release, owner, description, finish_by)
        ON CONFLICT ("id") DO UPDATE
           SET "release" = COALESCE(EXCLUDED."release", step."release"),
               "owner" = COALESCE(EXCLUDED."owner", step."owner"),
-              "description" = EXCLUDED."description"
+              "description" = EXCLUDED."description",
+              "finish_by" = EXCLUDED."finish_by"
         WHERE step."release" IS DISTINCT FROM COALESCE(EXCLUDED."release", step."release")
            OR step."owner" IS DISTINCT FROM COALESCE(EXCLUDED."owner", step."owner")
-           OR step."description" IS DISTINCT FROM EXCLUDED."description"`,
+           OR step."description" IS DISTINCT FROM EXCLUDED."description"
+           OR step."finish_by" IS DISTINCT FROM EXCLUDED."finish_by"`,
       [
         steps.map((step) => step.id),
         steps.map((step) => step.kind),
@@ -90,6 +93,7 @@ export class UpgradeRunnerRepository {
         steps.map((step) => step.release),
         steps.map((step) => step.owner),
         steps.map((step) => step.description),
+        steps.map((step) => step.finishBy ?? null),
       ],
     );
   }

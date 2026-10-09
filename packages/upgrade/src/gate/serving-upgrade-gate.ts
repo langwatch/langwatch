@@ -15,7 +15,7 @@ import {
   createServingRoster,
   type ServingRoster,
 } from "../serving-roster/serving-roster.service.ts";
-import { isMigrationStep } from "../step/migration-step.ts";
+import { isDeclaredMigrationStep, isMigrationStep } from "../step/migration-step.ts";
 import { type FirstInstallUpgrade, spawnFirstInstallUpgrade } from "./first-install-upgrade.ts";
 import { IMAGE_CODE_STEPS_FILE, readImageCodeSteps } from "./image-code-steps.ts";
 import { imageGateSteps, readImageTree } from "./image-tree.ts";
@@ -231,7 +231,7 @@ function backgroundStepsOver({
   const log = (level: "info" | "warn", message: string, fields: object) =>
     level === "warn" ? warn(message, { processId, ...fields }) : undefined;
   return {
-    isStep: isMigrationStep,
+    isStep: isDeclaredMigrationStep,
     start: (steps: readonly unknown[]) => {
       const service = BackgroundStepsService.create({
         ledger: {

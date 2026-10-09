@@ -80,12 +80,13 @@ export function defineProjectionReplayStep({
           : {}),
       };
       let saving: Promise<void> = Promise.resolve();
+      // `done` and `total` are the step-progress keys the ledger reader shows (STEP-PROGRESS).
       const save = (report: MigrationStepReport) => {
         if (dryRun) return;
         saving = saving.then(() => checkpoint.save({ report }));
       };
       const onBatchComplete = (batch: { batchNum: number; totalBatches: number }) =>
-        save({ ...progress, batchesDone: batch.batchNum, totalBatches: batch.totalBatches });
+        save({ ...progress, done: batch.batchNum, total: batch.totalBatches });
       const onTenantComplete = (done: { tenantId: string; replayedThrough: string }) => {
         progress = {
           lane,

@@ -105,7 +105,10 @@ export class BackgroundStepsService {
   async sweep({ signal }: { signal: AbortSignal }): Promise<BackgroundSweep> {
     const sweep = { ran: [] as string[], failed: [] as string[], waiting: [] as string[] };
     const retrying: string[] = [];
-    const declared = this.options.steps.filter((step) => step.mode === "background");
+    // A tenant step's pass runs in ops; its ledger row follows the pass (S6-WIRE, 2026-10-09).
+    const declared = this.options.steps.filter(
+      (step) => step.mode === "background" && step.kind !== "tenant",
+    );
     if (declared.length === 0) return { paused: false, ...sweep, retrying };
     const rows = new Map((await this.options.ledger.findSteps()).map((row) => [row.id, row]));
     const by = { done: sweep.ran, failed: sweep.failed, waiting: sweep.waiting, retrying };

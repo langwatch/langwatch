@@ -586,8 +586,9 @@ export const installedCodeSteps: DeclaredCodeSteps = (use) =>
 
 /** A declared step as the image's tree names it: its owner is the module its id starts with. */
 export function codeStepOf(step: MigrationStep): ManifestStep {
-  const { id, kind, mode, description } = step;
-  return { id, kind, mode, owner: id.slice(0, id.indexOf(":")), description };
+  const { id, kind, mode, description, finishBy } = step;
+  const owner = id.slice(0, id.indexOf(":"));
+  return { id, kind, mode, owner, description, ...(finishBy === undefined ? {} : { finishBy }) };
 }
 
 /**

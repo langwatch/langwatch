@@ -1372,11 +1372,23 @@ refuses a migration touching two owners' tables (Alex, 2026-10-06, round 7, D3).
 **In-place system migrations belong to their subject; the framework runs, ops reads and requests**
 (Alex, 2026-10-06, round 14, Q-U8 and UP-3, amending "the runner belongs to ops"). The upgrade run
 registers every declared step in the ledger, background steps run on the worker under their declaring
-module, and ops builds the upgrade and event-upcast readers over its own Postgres handle. Identity,
-authz and automation each answer the migrations they own through their `*Api` (`registeredMigrations()`, with
-identity's user-rooted `userMigrations()` beside it), and ops composes the migrations page,
-enrolment, the targeted run and the pass over its own `SystemMigration*` tables and Redis lease,
-never importing a peer's process package. The api serves the page and awaits a targeted run
+module, a background step may name the release it must finish by (`finishBy`, kept on its ledger row for
+the reader; Alex, 2026-10-09, STEP-FINISHBY), and ops builds the upgrade and event-upcast readers over its own Postgres handle. A tenant migration is a `kind: "tenant"` step its owner declares with `.withMigrations`: it
+migrates one tenant at a time (`migrateTenant`), names its axis (`tenants`: organization, project or
+user) and carries its pacing flat on the declaration (`title`, `requiresOperatorConfirmation`,
+`runsAutomaticallyOnSelfHosted`, `enrolledAutomatically`), which no other kind accepts. Every tenant
+step's per-tenant state lives in one framework-owned table beside the ledger,
+`_langwatch_upgrade_tenant_state` (Alex, 2026-10-09, UPGRADE-S6). The process hands ops the collected
+tenant steps as a framework input, as it hands a migration binder its `replayer`; the api builds tenant
+steps only, for ops' targeted run, and ops builds the state repository in its own registry. Worker boot
+accepts a tenant step and the background runner skips it; its ledger row is `done` when a pass leaves no
+tenant held or parked and reopens when one appears (Alex, 2026-10-09, S6-WIRE). Ops keeps the pass for
+now, fed that one list, paging tenant ids through the framework's `TenantSource`, and composes the
+migrations page, enrolment, the targeted run and the pass over its Redis lease, never importing a peer's
+process package. Until their owners move, identity, authz and automation still answer
+`registeredMigrations()` (identity's `userMigrations()` beside it) over ops' `SystemMigration*` tables;
+before an owner moves, its `finalized` and `rolled_back` rows are copied, never moved, into the
+framework table by a one-time expand step. The api serves the page and awaits a targeted run
 in-request, as main did; passes run on a worker (§9); apps/tasks keeps the startup convergence
 (Alex, 2026-09-28). Automation's Slack connection migration is one such pass per organization, with
 no manual task (Alex, 2026-09-30).
