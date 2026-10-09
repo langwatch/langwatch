@@ -679,6 +679,7 @@ func (state *bootState) branchTree() string {
 // already carries the developer's own haven stack, and `haven up` there
 // replaced its registration.
 func (state *bootState) bootHaven(ctx context.Context, booted *Booted) error {
+	state.sweepOnHaven(ctx)
 	booted.A.Dir = state.branchDir
 	if err := state.prepareHavenInstances(ctx, booted); err != nil {
 		return err
@@ -1270,9 +1271,15 @@ func psqlDatabaseURL(serverURL, database string) (string, error) {
 
 // chAdmin runs one ClickHouse statement over the HTTP interface.
 func (state *bootState) chAdmin(ctx context.Context, query string) error {
+	_, err := state.chQuery(ctx, query)
+	return err
+}
+
+// chQuery runs one ClickHouse statement and returns the response body.
+func (state *bootState) chQuery(ctx context.Context, query string) (string, error) {
 	endpoint, err := url.Parse(state.infra.chServer)
 	if err != nil {
-		return err
+		return "", err
 	}
 	// A server URL may carry a database as its path; administrative
 	// statements address the server itself.
@@ -1280,19 +1287,19 @@ func (state *bootState) chAdmin(ctx context.Context, query string) error {
 	endpoint.RawQuery = "query=" + url.QueryEscape(query)
 	request, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), nil)
 	if err != nil {
-		return err
+		return "", err
 	}
 	client := &http.Client{Timeout: 30 * time.Second}
 	response, err := client.Do(request)
 	if err != nil {
-		return fmt.Errorf("clickhouse %q: %w", query, err)
+		return "", fmt.Errorf("clickhouse %q: %w", query, err)
 	}
 	defer response.Body.Close()
-	body, _ := io.ReadAll(io.LimitReader(response.Body, 4096))
+	body, _ := io.ReadAll(io.LimitReader(response.Body, 1<<20))
 	if response.StatusCode != http.StatusOK {
-		return fmt.Errorf("clickhouse %q: status %d: %s", query, response.StatusCode, strings.TrimSpace(string(body)))
+		return "", fmt.Errorf("clickhouse %q: status %d: %s", query, response.StatusCode, strings.TrimSpace(string(body)))
 	}
-	return nil
+	return strings.TrimSpace(string(body)), nil
 }
 
 // prepareDatabases recreates both instances' databases unless -keep is set.

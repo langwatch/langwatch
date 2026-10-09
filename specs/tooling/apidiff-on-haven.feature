@@ -402,8 +402,8 @@ Feature: apidiff boots its instances through haven
 
     @unit
     Scenario: Stale apidiff databases are swept, and nothing else
-      Given the shared Postgres server holds apidiff databases of crashed and kept runs
-      When a run starts, or apidiff -sweep-databases runs, with -sweep-days at 2
+      Given the shared Postgres and ClickHouse servers hold apidiff databases of crashed and kept runs
+      When a run starts on the haven path or not, or apidiff -sweep-databases runs, with -sweep-days at 2
       Then each apidiff_<run>_branch or _main database older than 2 days is dropped
       And a database without the apidiff_ prefix is never touched
       And with -dry-run the databases that would be dropped are printed and none is dropped

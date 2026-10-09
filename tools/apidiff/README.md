@@ -58,16 +58,17 @@ deterministic summary, or the machine report with `-json` (optionally to
 ## Sweeping leftover databases
 
 Crashed and `-keep` runs leave `apidiff_<runid>_branch|main` databases on the
-Postgres server. Every non-dry `run` that provisions databases first drops
+Postgres and ClickHouse servers. Every non-dry `run` (haven path included) first drops
 those older than `-sweep-days` (default 2, 0 disables), and
-`apidiff -sweep-databases [-sweep-days N] [-dry-run] [-pg-url URL]` does the
-same on demand (default server: haven's host Postgres). Only names shaped
+`apidiff -sweep-databases [-sweep-days N] [-dry-run] [-pg-url URL] [-ch-url URL]` does the
+same on demand (default servers: haven's host Postgres and ClickHouse). Only names shaped
 `apidiff_<runid>_branch|main` are candidates. A run writes `run.pid` in its
 work root; a database whose `.apidiff/<run>/run.pid` names a live process, and
 the current run's, are kept. A run using a `-work-root` outside `.apidiff` is
 protected only by the age floor. Age is the database's creation time, read
-with `pg_stat_file` (needs a superuser role). ClickHouse databases are not
-swept.
+with `pg_stat_file` (needs a superuser role); in ClickHouse it is the
+oldest table's `metadata_modification_time`, so a database with no tables is
+left alone. The same prefix, shape, age and live-run rules apply to both.
 
 ## Boot details
 

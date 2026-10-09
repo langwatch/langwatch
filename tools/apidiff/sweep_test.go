@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -53,5 +54,34 @@ func TestParseSweepCandidatesSkipsMalformedLines(t *testing.T) {
 	got := parseSweepCandidates("apidiff_a_main|1760000000\nnoise\napidiff_b_main|x\n")
 	if len(got) != 1 || got[0].name != "apidiff_a_main" || got[0].created.Unix() != 1760000000 {
 		t.Fatalf("candidates = %v", got)
+	}
+}
+
+// @scenario "Stale apidiff databases are swept, and nothing else"
+func TestSweepSelectsClickHouseDatabasesByTheSameRules(t *testing.T) {
+	now := time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC)
+	old := now.Add(-72 * time.Hour)
+	candidates := parseSweepCandidates("apidiff_old_main|" + strconv.FormatInt(old.Unix(), 10) + "\ndefault|" + strconv.FormatInt(old.Unix(), 10) + "\nlw_slug|" + strconv.FormatInt(old.Unix(), 10) + "\napidiff_live_branch|" + strconv.FormatInt(old.Unix(), 10) + "\napidiff_new_branch|" + strconv.FormatInt(now.Unix(), 10) + "\n")
+	got := selectStaleDatabases(staleSelection{candidates: candidates, now: now, maxAge: 48 * time.Hour, liveRuns: map[string]bool{"live": true}})
+	if want := []string{"apidiff_old_main"}; !slices.Equal(got, want) {
+		t.Fatalf("selected %v, want %v", got, want)
+	}
+}
+
+func TestClickHouseServerResolutionOrder(t *testing.T) {
+	if got := clickHouseServerOf("http://u:p@127.0.0.1:58123/lw_x?a=b"); got != "http://u:p@127.0.0.1:58123" {
+		t.Fatalf("database path must be dropped, got %q", got)
+	}
+	if clickHouseServerOf("") != "" || clickHouseServerOf("not a url") != "" {
+		t.Fatal("an unusable URL names no server")
+	}
+	if got := resolveClickHouseServer("http://flag", "http://haven"); got != "http://flag" {
+		t.Fatalf("explicit wins, got %q", got)
+	}
+	if got := resolveClickHouseServer("", "http://haven"); got != "http://haven" {
+		t.Fatalf("haven beats the constant, got %q", got)
+	}
+	if got := resolveClickHouseServer("", ""); got != hostClickHouseURL {
+		t.Fatalf("fallback is the constant, got %q", got)
 	}
 }

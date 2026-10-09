@@ -1,21 +1,30 @@
 package apidiff
 
 import (
+	"cmp"
 	"context"
+	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
+	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/langwatch/langwatch/tools/havenrun"
 )
 
 const (
-	sweepPrefix      = "apidiff_"
-	runPIDFile       = "run.pid"
-	defaultSweepDays = 2
+	// hostClickHouseURL is the fallback when no haven names its ClickHouse.
+	hostClickHouseURL = "http://" + chUser + ":" + chPass + "@127.0.0.1:8123"
+	sweepPrefix       = "apidiff_"
+	runPIDFile        = "run.pid"
+	defaultSweepDays  = 2
 )
 
 var safeDatabaseName = regexp.MustCompile(`^[a-z0-9_]+$`)
@@ -103,28 +112,120 @@ func parseSweepCandidates(output string) []sweepCandidate {
 }
 
 // sweepStaleDatabases drops (or, with dryRun, lists) apidiff_* databases on
-// the Postgres server that are older than maxAge and owned by no live run.
+// the Postgres server and, when one is known, the ClickHouse server that are
+// older than maxAge and owned by no live run.
 func (state *bootState) sweepStaleDatabases(ctx context.Context, maxAge time.Duration, dryRun bool) error {
-	// The database's creation time is the mtime of its PG_VERSION file.
-	output, err := state.pgQuery(ctx, `SELECT datname || '|' || extract(epoch from (pg_stat_file('base/' || oid || '/PG_VERSION')).modification)::bigint FROM pg_database WHERE datname LIKE 'apidiff\_%'`)
-	if err != nil {
-		return fmt.Errorf("sweep: list databases: %w", err)
-	}
 	live := liveRunIDs(state.cfg.BranchDir, processAlive)
 	if state.runID != "" {
 		live[state.runID] = true
 	}
-	for _, database := range selectStaleDatabases(staleSelection{candidates: parseSweepCandidates(output), now: time.Now(), maxAge: maxAge, liveRuns: live}) {
-		if dryRun {
-			state.logf("sweep: would drop %s", database)
+	// The database's creation time is the mtime of its PG_VERSION file.
+	pg := serverSweep{
+		kind:  "postgres",
+		list:  `SELECT datname || '|' || extract(epoch from (pg_stat_file('base/' || oid || '/PG_VERSION')).modification)::bigint FROM pg_database WHERE datname LIKE 'apidiff\_%'`,
+		query: state.pgQuery,
+		drop: func(ctx context.Context, name string) error {
+			return state.pgAdmin(ctx, fmt.Sprintf("DROP DATABASE IF EXISTS %s WITH (FORCE)", name))
+		},
+	}
+	errs := []error{state.sweepServer(ctx, pg, sweepPolicy{maxAge: maxAge, live: live, dryRun: dryRun})}
+	if state.infra.chServer != "" {
+		// ClickHouse has no database creation time; the oldest table stands in
+		// (an empty database holds nothing and is left alone).
+		ch := serverSweep{
+			kind:  "clickhouse",
+			list:  `SELECT concat(database, '|', toString(toUnixTimestamp(min(metadata_modification_time)))) FROM system.tables WHERE database LIKE 'apidiff\\_%' GROUP BY database`,
+			query: state.chQuery,
+			drop: func(ctx context.Context, name string) error {
+				return state.chAdmin(ctx, "DROP DATABASE IF EXISTS "+name+" SYNC")
+			},
+		}
+		errs = append(errs, state.sweepServer(ctx, ch, sweepPolicy{maxAge: maxAge, live: live, dryRun: dryRun}))
+	}
+	return errors.Join(errs...)
+}
+
+// serverSweep is how to list and drop apidiff_* databases on one server.
+type serverSweep struct {
+	kind  string
+	list  string
+	query func(context.Context, string) (string, error)
+	drop  func(context.Context, string) error
+}
+
+// sweepPolicy is which databases count as stale and whether to drop them.
+type sweepPolicy struct {
+	maxAge time.Duration
+	live   map[string]bool
+	dryRun bool
+}
+
+func (state *bootState) sweepServer(ctx context.Context, server serverSweep, policy sweepPolicy) error {
+	output, err := server.query(ctx, server.list)
+	if err != nil {
+		return fmt.Errorf("sweep: list %s databases: %w", server.kind, err)
+	}
+	for _, database := range selectStaleDatabases(staleSelection{candidates: parseSweepCandidates(output), now: time.Now(), maxAge: policy.maxAge, liveRuns: policy.live}) {
+		if policy.dryRun {
+			state.logf("sweep: would drop %s %s", server.kind, database)
 			continue
 		}
-		state.logf("sweep: drop %s", database)
-		if err := state.pgAdmin(ctx, fmt.Sprintf("DROP DATABASE IF EXISTS %s WITH (FORCE)", database)); err != nil {
-			return fmt.Errorf("sweep: drop %s: %w", database, err)
+		state.logf("sweep: drop %s %s", server.kind, database)
+		if err := server.drop(ctx, database); err != nil {
+			return fmt.Errorf("sweep: drop %s %s: %w", server.kind, database, err)
 		}
 	}
 	return nil
+}
+
+// havenClickHouseServer is the ClickHouse server (no database) haven's
+// overlay names in CLICKHOUSE_URL, with its credentials, so a native server on
+// another port is found. Empty when haven is absent or names none.
+func havenClickHouseServer(ctx context.Context, dir string) string {
+	if !havenrun.OnPath() {
+		return ""
+	}
+	command := exec.CommandContext(ctx, havenrun.Command, "env", "--json", "--reveal") //nolint:gosec // fixed haven binary and arguments
+	command.Dir = dir
+	out, err := command.Output()
+	if err != nil {
+		return ""
+	}
+	overlay := map[string]string{}
+	if json.Unmarshal(out, &overlay) != nil {
+		return ""
+	}
+	return clickHouseServerOf(overlay["CLICKHOUSE_URL"])
+}
+
+// clickHouseServerOf drops the database path from a CLICKHOUSE_URL.
+func clickHouseServerOf(raw string) string {
+	parsed, err := url.Parse(raw)
+	if raw == "" || err != nil || parsed.Host == "" {
+		return ""
+	}
+	parsed.Path, parsed.RawQuery = "", ""
+	return parsed.String()
+}
+
+// resolveClickHouseServer prefers the explicit URL, then haven's, then the
+// constant.
+func resolveClickHouseServer(explicit, fromHaven string) string {
+	return cmp.Or(explicit, fromHaven, hostClickHouseURL)
+}
+
+// sweepOnHaven sweeps the host servers on the haven path, which never reaches
+// prepareDatabases. A failed sweep is logged and never fails the run.
+func (state *bootState) sweepOnHaven(ctx context.Context) {
+	if state.cfg.SweepDays <= 0 {
+		return
+	}
+	state.hostPostgres = true
+	state.infra.pgServer = cmp.Or(state.infra.pgServer, hostPostgresURL)
+	state.infra.chServer = resolveClickHouseServer(state.infra.chServer, havenClickHouseServer(ctx, state.cfg.BranchDir))
+	if err := state.sweepStaleDatabases(ctx, time.Duration(state.cfg.SweepDays)*24*time.Hour, false); err != nil {
+		state.logf("%v", err)
+	}
 }
 
 // runSweepSubcommand is `apidiff -sweep-databases`.
@@ -135,6 +236,7 @@ func runSweepSubcommand(ctx context.Context, args []string, out streams) int {
 	days := flags.Int("sweep-days", defaultSweepDays, "drop apidiff_* databases older than this many days")
 	flags.StringVar(&cfg.BranchDir, "branch-dir", ".", "checkout whose .apidiff directory records the live runs")
 	flags.StringVar(&cfg.PGURL, "pg-url", "", "Postgres server URL (default haven's host server)")
+	flags.StringVar(&cfg.CHURL, "ch-url", "", "ClickHouse server URL (default haven's host server)")
 	flags.BoolVar(&cfg.DryRun, "dry-run", false, "print the databases that would be dropped and drop none")
 	if err := flags.Parse(args); err != nil {
 		return exitError
@@ -144,6 +246,7 @@ func runSweepSubcommand(ctx context.Context, args []string, out streams) int {
 	if state.infra.pgServer == "" {
 		state.infra.pgServer = hostPostgresURL
 	}
+	state.infra.chServer = resolveClickHouseServer(cfg.CHURL, havenClickHouseServer(ctx, cfg.BranchDir))
 	if err := state.sweepStaleDatabases(ctx, time.Duration(*days)*24*time.Hour, cfg.DryRun); err != nil {
 		fmt.Fprintln(out.stderr, err)
 		return exitError
