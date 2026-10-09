@@ -13,6 +13,8 @@ export type CodingAgentActivityHost = {
   ): void;
   navigate(to: string): void;
   succeeded(notice: { title: string; description?: string; id?: string }): void;
+  warned(notice: { title: string; description?: string; id?: string }): void;
+  informed(notice: { title: string; description?: string; id?: string }): void;
   failed(failure: { error: unknown; fallbackTitle: string; id?: string }): void;
 };
 

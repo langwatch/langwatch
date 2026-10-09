@@ -148,7 +148,12 @@ async function waitForReload() {
 beforeEach(() => {
   vi.clearAllMocks();
   failed = [];
-  setUiFeedbackHost({ succeeded: () => {}, failed: (notice) => void failed.push(notice) });
+  setUiFeedbackHost({
+    succeeded: () => {},
+    warned: () => {},
+    informed: () => {},
+    failed: (notice) => void failed.push(notice),
+  });
   localStorage.clear();
   client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },

@@ -80,6 +80,14 @@ class HostServiceDataRetentionHost extends DataRetentionHostApi {
     this.deps.feedback.succeeded(notice);
   }
 
+  warned(notice: RetentionSuccessNotice): void {
+    this.deps.feedback.warned(notice);
+  }
+
+  informed(notice: RetentionSuccessNotice): void {
+    this.deps.feedback.informed(notice);
+  }
+
   failed(failure: RetentionFailureNotice): void {
     this.deps.feedback.failed(failure);
   }

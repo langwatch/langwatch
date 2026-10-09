@@ -10,7 +10,7 @@ import type { DataRetentionHostApi } from "../model/data-retention-host.ts";
 import { formatDays } from "../model/retention-format.ts";
 import type { RetentionScopeGroup } from "../model/retention-grouping.ts";
 
-type Notices = Pick<DataRetentionHostApi, "succeeded" | "failed">;
+type Notices = Pick<DataRetentionHostApi, "succeeded" | "warned" | "informed" | "failed">;
 
 type CategoryOutcome =
   | { ok: true; category: RetentionCategory }
@@ -68,7 +68,7 @@ function reportRetentionSave({
     return { success: true };
   }
   if (failed.length < pairs.length) {
-    notices.succeeded({
+    notices.warned({
       title: `Saved ${pairs.length - failed.length} of ${pairs.length} updates`,
     });
   }
@@ -117,7 +117,7 @@ async function applyRetentionToExisting({
   const applied = Array.from(
     new Set(outcomes.flatMap((entry) => (entry.ok ? [entry.applied] : []))),
   );
-  notices.succeeded({
+  notices.informed({
     title: "Applying retention to existing data…",
     description: rewriteDescription(applied),
   });

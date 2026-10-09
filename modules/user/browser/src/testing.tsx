@@ -50,6 +50,8 @@ export type PersonalHostRecording = {
   sessionRefreshes: number;
   queries: { next: PersonalQuery; replace: boolean }[];
   successes: PersonalSuccessNotice[];
+  warnings: PersonalSuccessNotice[];
+  infos: PersonalSuccessNotice[];
   failures: PersonalFailureNotice[];
   /** The questions a screen handed to the assistant. */
   assistantPrompts: string[];
@@ -138,6 +140,8 @@ export class FakePersonalWorkspaceHost extends PersonalWorkspaceHostApi {
         sessionRefreshes: 0,
         queries: [],
         successes: [],
+        warnings: [],
+        infos: [],
         failures: [],
         assistantPrompts: [],
       },
@@ -313,6 +317,14 @@ export class FakePersonalWorkspaceHost extends PersonalWorkspaceHostApi {
 
   succeeded(notice: PersonalSuccessNotice): void {
     this.recording.successes.push(notice);
+  }
+
+  warned(notice: PersonalSuccessNotice): void {
+    this.recording.warnings.push(notice);
+  }
+
+  informed(notice: PersonalSuccessNotice): void {
+    this.recording.infos.push(notice);
   }
 
   failed(failure: PersonalFailureNotice): void {

@@ -29,3 +29,10 @@ Feature: Toasts stack in place
     When a toast with a lifetime is raised
     Then it draws a bar for its lifetime
     And a toast that stays until dismissed draws none
+
+  @unit
+  Scenario: A warning or information toast keeps its tone
+    Given a feature raises a toast through the shared toaster
+    When the toast is a warning or information, as on main
+    Then it reaches the feedback port as a warning or information
+    And it is never drawn as a success

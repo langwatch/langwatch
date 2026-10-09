@@ -14,6 +14,8 @@ import {
 
 export class FakeTopicHost extends TopicHostApi {
   readonly successes: TopicSuccessNotice[] = [];
+  readonly warnings: TopicSuccessNotice[] = [];
+  readonly infos: TopicSuccessNotice[] = [];
   readonly failures: TopicFailureNotice[] = [];
 
   constructor(private readonly options: { project?: TopicHostProject | null } = {}) {
@@ -27,6 +29,14 @@ export class FakeTopicHost extends TopicHostApi {
 
   succeeded(notice: TopicSuccessNotice): void {
     this.successes.push(notice);
+  }
+
+  warned(notice: TopicSuccessNotice): void {
+    this.warnings.push(notice);
+  }
+
+  informed(notice: TopicSuccessNotice): void {
+    this.infos.push(notice);
   }
 
   failed(failure: TopicFailureNotice): void {

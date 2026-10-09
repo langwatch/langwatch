@@ -33,6 +33,8 @@ class TestHost extends LicensingHostApi {
   }
   refreshPlanDerivedState() {}
   succeeded() {}
+  warned() {}
+  informed() {}
   failed() {}
   canManageOrganization() {
     return true;

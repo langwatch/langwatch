@@ -231,6 +231,12 @@ export abstract class PersonalWorkspaceHostApi {
 
   abstract succeeded(notice: PersonalSuccessNotice): void;
 
+  /** A caution that is not a failure, drawn as a warning. */
+  abstract warned(notice: PersonalSuccessNotice): void;
+
+  /** A plain fact, drawn as information. */
+  abstract informed(notice: PersonalSuccessNotice): void;
+
   abstract failed(failure: PersonalFailureNotice): void;
 }
 

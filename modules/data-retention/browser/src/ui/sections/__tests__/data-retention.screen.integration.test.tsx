@@ -107,6 +107,8 @@ const availableScopes: RetentionAvailableScopes = {
 class TestRetentionHost extends DataRetentionHostApi {
   readonly writes: Readonly<Record<string, string | undefined>>[] = [];
   readonly successes: RetentionSuccessNotice[] = [];
+  readonly warnings: RetentionSuccessNotice[] = [];
+  readonly infos: RetentionSuccessNotice[] = [];
   readonly failures: RetentionFailureNotice[] = [];
 
   constructor(
@@ -148,6 +150,14 @@ class TestRetentionHost extends DataRetentionHostApi {
 
   succeeded(notice: RetentionSuccessNotice): void {
     this.successes.push(notice);
+  }
+
+  warned(notice: RetentionSuccessNotice): void {
+    this.warnings.push(notice);
+  }
+
+  informed(notice: RetentionSuccessNotice): void {
+    this.infos.push(notice);
   }
 
   failed(failure: RetentionFailureNotice): void {

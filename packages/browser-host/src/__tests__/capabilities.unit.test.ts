@@ -49,6 +49,14 @@ class RecordingFeedback extends UiFeedback {
     this.notices.push(notice);
   }
 
+  warned(notice: UiSuccessNotice): void {
+    this.notices.push(notice);
+  }
+
+  informed(notice: UiSuccessNotice): void {
+    this.notices.push(notice);
+  }
+
   failed(failure: UiFailureNotice): void {
     this.notices.push(failure);
   }

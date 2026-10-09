@@ -90,6 +90,14 @@ class CapabilityOpsHost extends OpsHostApi {
     this.deps.feedback.succeeded(notice);
   }
 
+  warned(notice: OpsSuccessNotice): void {
+    this.deps.feedback.warned(notice);
+  }
+
+  informed(notice: OpsSuccessNotice): void {
+    this.deps.feedback.informed(notice);
+  }
+
   failed(failure: OpsFailureNotice): void {
     this.deps.feedback.failed(failure);
   }

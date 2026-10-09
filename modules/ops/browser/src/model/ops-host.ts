@@ -82,6 +82,12 @@ export abstract class OpsHostApi {
 
   abstract succeeded(notice: OpsSuccessNotice): void;
 
+  /** A caution that is not a failure, drawn as a warning. */
+  abstract warned(notice: OpsSuccessNotice): void;
+
+  /** A plain fact, drawn as information. */
+  abstract informed(notice: OpsSuccessNotice): void;
+
   abstract failed(failure: OpsFailureNotice): void;
 }
 

@@ -22,6 +22,8 @@ export type OpsHostRecording = {
   navigations: string[];
   queries: { next: OpsQuery; replace: boolean }[];
   successes: OpsSuccessNotice[];
+  warnings: OpsSuccessNotice[];
+  infos: OpsSuccessNotice[];
   failures: OpsFailureNotice[];
 };
 
@@ -52,7 +54,14 @@ export class FakeOpsHost extends OpsHostApi {
   static create(options: FakeOpsHostOptions = {}): FakeOpsHost {
     return new FakeOpsHost({
       options,
-      recording: { navigations: [], queries: [], successes: [], failures: [] },
+      recording: {
+        navigations: [],
+        queries: [],
+        successes: [],
+        warnings: [],
+        infos: [],
+        failures: [],
+      },
       query: options.query ?? {},
     });
   }
@@ -145,6 +154,14 @@ export class FakeOpsHost extends OpsHostApi {
 
   succeeded(notice: OpsSuccessNotice): void {
     this.recording.successes.push(notice);
+  }
+
+  warned(notice: OpsSuccessNotice): void {
+    this.recording.warnings.push(notice);
+  }
+
+  informed(notice: OpsSuccessNotice): void {
+    this.recording.infos.push(notice);
   }
 
   failed(failure: OpsFailureNotice): void {

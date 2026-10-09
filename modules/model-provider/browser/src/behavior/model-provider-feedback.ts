@@ -19,7 +19,7 @@ export type ModelProviderToast = {
 
 export type ModelProviderToaster = { create: (toast: ModelProviderToast) => void };
 
-/** A warning is a failure, not a quieter success: both leave through `failed`. */
+/** Routes one toast to the host by its type: error, warning, info, else success. */
 function emitToast({
   host,
   toast,
@@ -27,8 +27,7 @@ function emitToast({
   host: ReturnType<typeof useModelProviderHost>;
   toast: ModelProviderToast;
 }): void {
-  const isFailure = toast.type === "error" || toast.type === "warning";
-  if (isFailure) {
+  if (toast.type === "error") {
     host.failed({
       error: void 0,
       fallbackTitle: toast.description ? `${toast.title}. ${toast.description}` : toast.title,
@@ -37,11 +36,14 @@ function emitToast({
     return;
   }
 
-  host.succeeded({
+  const notice = {
     title: toast.title,
     ...(toast.description ? { description: toast.description } : {}),
     ...(toast.id ? { id: toast.id } : {}),
-  });
+  };
+  if (toast.type === "warning") host.warned(notice);
+  else if (toast.type === "info") host.informed(notice);
+  else host.succeeded(notice);
 }
 
 export function useModelProviderToaster(): ModelProviderToaster {
