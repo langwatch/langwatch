@@ -11,7 +11,6 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 import {
   buildGatewayCanonicalString,
-  canonicalGatewayPath,
   computeGatewaySignature,
 } from "../../../rules/gateway-internal-identity.rules.ts";
 import { GatewayInternalDoorService } from "../../../services/gateway-internal-door.service.ts";
@@ -111,12 +110,9 @@ export function signedGatewayRequest(input: {
   const url = new URL(`http://api.test${input.path}`);
   const signature = computeGatewaySignature(
     secret,
-    buildGatewayCanonicalString({
-      method: input.method,
-      path: canonicalGatewayPath(url),
-      timestamp,
-      body,
-    }),
+    // The canonical string covers the PATH only — the query string is not
+    // signed, which is what the data plane does and what the verifier reads.
+    buildGatewayCanonicalString({ method: input.method, path: url.pathname, timestamp, body }),
   );
 
   return new Request(url, {

@@ -28,12 +28,6 @@ export const virtualKeyApiKeyInputSchema = z.object({
   id: z.string(),
 });
 
-/** Rotating a key; `endPreviousSecret` cuts the old secret off now, for a suspected leak. */
-export const virtualKeyApiRotateInputSchema = z.object({
-  ...virtualKeyApiKeyInputSchema.shape,
-  endPreviousSecret: z.boolean().optional(),
-});
-
 /** Disabling a key, with the optional operator note recorded against it. */
 export const virtualKeyApiDisableInputSchema = z.object({
   ...virtualKeyApiKeyInputSchema.shape,

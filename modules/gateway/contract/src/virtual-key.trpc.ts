@@ -18,7 +18,6 @@ import {
   virtualKeyApiDisableInputSchema,
   virtualKeyApiKeyInputSchema,
   virtualKeyApiOrganizationInputSchema,
-  virtualKeyApiRotateInputSchema,
   virtualKeyApiUpdateInputSchema,
 } from "./virtual-key.schemas.ts";
 
@@ -50,7 +49,7 @@ export const virtualKeyTrpc = defineTrpcContract("virtualKeys")
   .withOutput(virtualKeyCamelDtoSchema)
 
   .mutation("rotate")
-  .withInput(virtualKeyApiRotateInputSchema)
+  .withInput(virtualKeyApiKeyInputSchema)
   .withOutput(virtualKeyMintedSchema)
 
   .mutation("revoke")

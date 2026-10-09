@@ -325,10 +325,8 @@ export const gatewayUpdateCacheRuleSchema = z.object({
 
 export const gatewayIdParamsSchema = z.object({ id: z.string().min(1) });
 
-/** The virtual key travels in the path; `end_previous_secret` cuts the old secret off now. */
-export const gatewayRotateVirtualKeyBodySchema = z.object({
-  end_previous_secret: z.boolean().optional(),
-});
+/** A rotate takes no body: the virtual key travels in the path. */
+export const gatewayRotateVirtualKeyBodySchema = z.object({});
 
 /** An enable takes no body: the virtual key travels in the path. */
 export const gatewayEnableVirtualKeyBodySchema = z.object({});

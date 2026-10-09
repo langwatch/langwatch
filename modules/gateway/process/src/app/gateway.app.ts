@@ -2193,6 +2193,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
       keyId: minted.virtualKey.id,
       preview,
       secret: minted.secret,
+      recipientUserId: input.principalUserId ?? input.actorUserId,
     });
     return { ...minted, reveal: { revealId, preview } };
   }
@@ -2520,7 +2521,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
       throw new PermissionDeniedError({
         permission,
         scope: { type: "organization", id: caller.organizationId },
-        denialReason: "no-binding",
+        denialReason: "no-grant",
       });
     }
 
@@ -2899,6 +2900,6 @@ function refuseImpersonatedMint(input: {
   throw new PermissionDeniedError({
     permission: input.permission,
     scope: { type: "organization", id: input.organizationId },
-    denialReason: "no-binding",
+    denialReason: "no-grant",
   });
 }
