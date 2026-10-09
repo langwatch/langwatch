@@ -437,6 +437,9 @@ function decidingOnce(authz: Authorize): Authorize {
   const askOrganization = authz.organizationOf?.bind(authz);
   const secondFactors = new Map<string, Promise<void>>();
   const askSecondFactor = authz.assertSecondFactor?.bind(authz);
+  const kinds = new Map<string, Promise<string | null>>();
+  const askKind = authz.projectKindOf?.bind(authz);
+  const mint = authz.authorization?.bind(authz);
 
   return {
     getDecision: (input) =>
@@ -471,6 +474,12 @@ function decidingOnce(authz: Authorize): Authorize {
               () => askSecondFactor(input),
             ),
         }),
+    // Dropping either silently opens the aggregate gate or refuses every proof-bearing read.
+    ...(askKind === void 0
+      ? {}
+      : { projectKindOf: (projectId) => askOnce(kinds, projectId, () => askKind(projectId)) }),
+    // Each proof names its route, so one is minted per procedure, never shared.
+    ...(mint === void 0 ? {} : { authorization: mint }),
   };
 }
 
