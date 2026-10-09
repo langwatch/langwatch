@@ -1,12 +1,10 @@
 /**
- * @vitest-environment jsdom
- * Team settings: the page main served at /settings/teams/:team.
+ * Real-Chromium team settings: typing a new name autosaves it.
  * @see specs/team-settings.feature
  */
-import "@testing-library/jest-dom/vitest";
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { userEvent } from "vitest/browser";
 
 const { updateTeam } = vi.hoisted(() => ({ updateTeam: vi.fn() }));
 
@@ -62,20 +60,9 @@ class TeamAddressHost extends FakeOrganizationHost {
   }
 }
 
-describe("given the team settings page", () => {
+describe("given the team settings page in a real browser", () => {
   afterEach(() => {
     cleanup();
-  });
-
-  describe("when it opens for a team the reader may edit", () => {
-    /** @scenario "The team settings page offers the organization's members as a link" */
-    it("offers Manage organization members as a link, as main does", async () => {
-      renderWithOrganizationHost(<TeamDetailScreen />, new TeamAddressHost());
-
-      const link = await screen.findByRole("link", { name: "Manage organization members" });
-
-      expect(link).toHaveAttribute("href", "/settings/members");
-    });
   });
 
   describe("when the reader renames the team", () => {
@@ -84,8 +71,8 @@ describe("given the team settings page", () => {
       renderWithOrganizationHost(<TeamDetailScreen />, new TeamAddressHost());
       const name = await screen.findByTestId("team-form-name");
 
-      fireEvent.input(name, { target: { value: "Renamed Team" } });
-      await userEvent.type(name, "{Enter}");
+      await userEvent.fill(name, "Renamed Team");
+      await userEvent.keyboard("{Enter}");
 
       await waitFor(() =>
         expect(updateTeam).toHaveBeenLastCalledWith(
