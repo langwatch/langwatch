@@ -422,7 +422,7 @@ type audience struct{ ClientID, Nonce string }
 // mintIDToken signs the tenant's ID token with the standard claims the app's
 // profile mapping reads (email, picture, and the name-fallback family).
 func (s *Server) mintIDToken(t *Tenant, user *User, aud audience) (string, error) {
-	now := s.now()
+	now := s.now().Add(t.Skew())
 	claims := t.profileClaims(user, now)
 	claims["iss"] = t.Issuer()
 	claims["aud"] = aud.ClientID

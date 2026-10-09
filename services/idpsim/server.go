@@ -141,6 +141,8 @@ func (s *Server) routeControl(mux *http.ServeMux) {
 	// Legacy SSO (legacy.go, webhook.go): provider, one-shot token breaks, env lines, Auth0 webhook.
 	mux.HandleFunc("POST /control/t/{tenant}/legacy-provider", s.handleControlLegacyProvider)
 	mux.HandleFunc("POST /control/t/{tenant}/tamper", s.handleControlTamper)
+	mux.HandleFunc("POST /control/t/{tenant}/user-active", s.handleControlUserActive)
+	mux.HandleFunc("POST /control/t/{tenant}/saml/unsolicited", s.handleControlSAMLUnsolicited)
 	mux.HandleFunc("GET /control/t/{tenant}/legacy-env", s.handleControlLegacyEnv)
 	mux.HandleFunc("POST /control/t/{tenant}/auth0-webhook", s.handleControlAuth0Webhook)
 	mux.HandleFunc("PUT /control/t/{tenant}/scim-target", s.handleControlSCIMTarget)

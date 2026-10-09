@@ -53,7 +53,9 @@ const wrongAudience = "idpsim-wrong-audience"
 
 func parseTamper(s string) (TamperMode, bool) {
 	switch m := TamperMode(s); m {
-	case TamperNone, TamperBadSignature, TamperWrongAudience, TamperExpired, TamperReplayedNonce:
+	case TamperNone, TamperBadSignature, TamperWrongAudience, TamperExpired, TamperReplayedNonce,
+		TamperSAMLBadSignature, TamperSAMLUnsigned, TamperSAMLWrongAudience, TamperSAMLWrongRecipient,
+		TamperSAMLExpired, TamperSAMLNotYetValid, TamperSAMLReplayed, TamperSAMLWrongInResponseTo:
 		return m, true
 	case "none":
 		return TamperNone, true
@@ -85,13 +87,17 @@ func (t *Tenant) ArmTamper(m TamperMode) {
 	t.tamper = m
 }
 
-// takeTamper disarms and returns the armed mode, with the nonce of the token
-// minted before this one, and remembers this token's nonce for the next.
+// takeTamper disarms and returns an armed OIDC mode (a SAML one stays armed),
+// with the nonce of the token minted before this one, and remembers this token's nonce.
 func (t *Tenant) takeTamper(nonce string) (TamperMode, string) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	mode, previous := t.tamper, t.lastNonce
-	t.tamper = TamperNone
+	if isSAMLTamper(mode) {
+		mode = TamperNone
+	} else {
+		t.tamper = TamperNone
+	}
 	if nonce != "" {
 		t.lastNonce = nonce
 	}
@@ -216,7 +222,8 @@ func breakClaims(claims jwt.MapClaims, b tokenBreak) {
 			nonce = "idpsim-replayed-nonce"
 		}
 		claims["nonce"] = nonce
-	case TamperNone, TamperBadSignature:
+	case TamperNone, TamperBadSignature, TamperSAMLBadSignature, TamperSAMLUnsigned, TamperSAMLWrongAudience,
+		TamperSAMLWrongRecipient, TamperSAMLExpired, TamperSAMLNotYetValid, TamperSAMLReplayed, TamperSAMLWrongInResponseTo:
 	}
 }
 
@@ -289,7 +296,7 @@ func (s *Server) handleControlLegacyProvider(w http.ResponseWriter, r *http.Requ
 	})
 }
 
-// handleControlTamper arms a one-shot break of the next ID token (body {"mode": "expired"}).
+// handleControlTamper arms a one-shot break of the next ID token or SAML response (body {"mode": "saml-expired"}).
 func (s *Server) handleControlTamper(w http.ResponseWriter, r *http.Request) {
 	t, ok := s.tenantFor(r)
 	if !ok {
@@ -305,10 +312,13 @@ func (s *Server) handleControlTamper(w http.ResponseWriter, r *http.Request) {
 	}
 	mode, known := parseTamper(body.Mode)
 	if !known {
-		http.Error(w, "mode must be one of none, bad-signature, wrong-audience, expired, replayed-nonce", http.StatusBadRequest)
+		http.Error(w, "mode must be one of none, bad-signature, wrong-audience, expired, replayed-nonce, "+
+			"saml-bad-signature, saml-unsigned, saml-wrong-audience, saml-wrong-recipient, saml-expired, "+
+			"saml-not-yet-valid, saml-replayed-assertion, saml-wrong-in-response-to", http.StatusBadRequest)
 		return
 	}
 	t.ArmTamper(mode)
+	s.record(t, Event{Kind: "fault.tamper", Outcome: OutcomeOK, Detail: "armed a one-shot break of the next response: " + string(mode)})
 	writeJSON(w, http.StatusOK, map[string]any{"armed": mode})
 }
 

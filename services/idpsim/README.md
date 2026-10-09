@@ -314,7 +314,10 @@ unchanged: it runs the standalone simulator.
 | `activity <t>` / `signin <t> [--user <email>] [--client <id> --redirect <uri>]` | the feed; the IdP-initiated sign-in URL |
 | `reset <t>` / `samlp <t> on\|off` | seeded state; Auth0-broker `samlp\|` subjects |
 | `legacy provider <t> <generic\|auth0\|okta\|cognito\|onelogin\|azure\|show>` / `legacy env <t>` | the legacy provider and the env lines that point a stack at it |
-| `tamper <t> <bad-signature\|wrong-audience\|expired\|replayed-nonce\|none>` | break the next ID token, once |
+| `tamper <t> <mode>` | break the next ID token (`bad-signature`, `wrong-audience`, `expired`, `replayed-nonce`) or SAML response (`saml-bad-signature`, `saml-unsigned`, `saml-wrong-audience`, `saml-wrong-recipient`, `saml-expired`, `saml-not-yet-valid`, `saml-replayed-assertion`, `saml-wrong-in-response-to`), once; `none` disarms |
+| `skew <t> <seconds>` | run the tenant's clock ahead (positive) or behind (negative) for every token and assertion |
+| `user disable <t> <email>` / `user enable <t> <email>` | refuse (or allow again) that user's sign-in at the IdP, over OIDC and SAML |
+| `saml unsolicited <t> --acs-url <url> --email <e> [--entity-id <id>] [--relay-state <s>]` | an IdP-initiated response (no InResponseTo): prints the URL, SAMLResponse and RelayState to post |
 | `auth0-webhook <t> --event create\|deactivate --user <u> --target <stack-url> --secret-env <VAR>` | send one signed Auth0 SCIM event |
 
 Secrets are never flag values. `--token-env` and `--secret-env` name a variable in

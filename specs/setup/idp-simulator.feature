@@ -328,3 +328,73 @@ Feature: Local IdP simulator (idpsim)
     Given one tenant with a registered application and several without
     When the landing page lists the providers
     Then only that tenant is marked, because it is the one being come back to
+
+  # --- Faults: SAML tampers, clock skew, IdP-initiated, disabled users ---
+  # Driven through the control API and `haven idp`, never a page. Every
+  # fault is recorded in the tenant's activity.
+
+  @unit
+  Scenario: A SAML response can be broken once in each way a service provider must refuse
+    Given a tenant armed with one of the SAML tamper modes
+      | mode                      | what the next response carries                 |
+      | saml-bad-signature        | signatures that no longer verify               |
+      | saml-unsigned             | no signature on the response or the assertion  |
+      | saml-wrong-audience       | an audience that is not the service provider   |
+      | saml-wrong-recipient      | a recipient that is not the ACS URL            |
+      | saml-expired              | a validity window that has already closed      |
+      | saml-not-yet-valid        | a validity window that has not opened yet      |
+      | saml-wrong-in-response-to | an InResponseTo naming no request it was sent  |
+    When a service provider signs in through the tenant twice
+    Then the first response is refused by a service provider that checks it
+    And the second response verifies, because the break is one-shot
+    And the tenant's activity shows the mode being armed and the response it broke
+
+  @unit
+  Scenario: A replayed SAML assertion repeats the previous assertion's ID
+    Given a tenant that has already signed one assertion
+    When the tenant is armed with saml-replayed-assertion and signs another
+    Then the new assertion carries the previous assertion's ID
+    And refusing the replay is left to the service provider
+
+  @unit
+  Scenario: An unknown tamper mode is refused
+    When a tenant is armed with a mode it does not know
+    Then the request is refused as a bad request listing the modes it does know
+    And nothing is armed
+
+  @unit
+  Scenario: A tenant's clock can run ahead of or behind the service provider's
+    Given a tenant whose clock is skewed by a number of seconds
+    When a service provider signs in through the tenant
+    Then a skew of ten minutes ahead is refused as not yet valid
+    And a skew of ten minutes behind is refused as expired
+    And a skew of thirty seconds is accepted inside the usual tolerance
+    And the same skew moves the issued-at and expiry of the tenant's ID tokens
+    And the tenant's activity shows the skew being set
+
+  @unit
+  Scenario: An unsolicited SAML response carries the chosen RelayState and no InResponseTo
+    Given a tenant with an active user
+    When the control API is asked for an unsolicited response to an ACS URL with a RelayState
+    Then it returns the ACS URL, the signed response and the RelayState to post
+    And the response names no request it answers
+    And a service provider that accepts only solicited responses refuses it
+    And one that allows IdP-initiated sign-in accepts it for that user
+    And the tenant's activity records the RelayState it was sent with
+
+  @unit
+  Scenario: An unsolicited SAML response needs an ACS URL and an active user
+    When an unsolicited response is asked for without an ACS URL
+    Then the request is refused as a bad request
+    When one is asked for a user the tenant does not have
+    Then the request is refused as forbidden
+    And the tenant's activity records the refusal
+
+  @unit
+  Scenario: A user disabled at the IdP is refused at sign-in
+    Given a tenant whose user has been disabled through the control API
+    When that user signs in over SAML, over OIDC or through an unsolicited response
+    Then the tenant refuses each one itself, before anything reaches the service provider
+    And the tenant's activity shows the user being disabled
+    And a change naming no active flag is refused as a bad request
+    And a change naming an unknown user is refused as not found

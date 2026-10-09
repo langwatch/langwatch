@@ -37,6 +37,13 @@ README there is the full reference), console `apps/idpsim-web` (ADR-160).
   `GET /control/t/<n>/activity`, or the tenant page's activity tab. Read it first when a
   login fails: it says whether the request even arrived.
 
+## Faults
+
+- `POST /control/t/<n>/tamper {"mode":"saml-bad-signature|saml-unsigned|saml-wrong-audience|saml-wrong-recipient|saml-expired|saml-not-yet-valid|saml-replayed-assertion|saml-wrong-in-response-to"}` breaks the next SAML response once (`haven idp tamper <n> <mode>`).
+- `POST /control/t/<n>/config {"skewSeconds":600}` runs the tenant clock ahead (negative = behind) for ID tokens and SAML assertions (`haven idp skew <n> <seconds>`).
+- `POST /control/t/<n>/user-active {"user":"<email>","active":false}` disables a user at the IdP; OIDC and SAML sign-in refuse them (`haven idp user disable|enable <n> <email>`).
+- `POST /control/t/<n>/saml/unsolicited {"acsUrl","email","entityId?","relayState?"}` returns `{url, samlResponse, relayState}` for an IdP-initiated post (`haven idp saml unsolicited <n> --acs-url <u> --email <e> [--relay-state <s>]`).
+
 ## Provisioning and domains
 
 - SCIM out: `PUT /control/t/<n>/scim-target {"baseUrl","token"}` (the token is the one

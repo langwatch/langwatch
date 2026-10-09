@@ -177,6 +177,34 @@ func idpTamper(c idpCall) error {
 	return c.postTenant("tamper", map[string]string{"mode": c.rest[1]})
 }
 
+// idpSkew runs the tenant's clock ahead (positive) or behind (negative) by whole seconds.
+func idpSkew(c idpCall) error {
+	seconds, err := strconv.Atoi(c.rest[1])
+	if err != nil {
+		return fmt.Errorf("usage: haven idp skew <tenant> <seconds>, got %q", c.rest[1])
+	}
+	return c.postTenant("config", map[string]int{"skewSeconds": seconds})
+}
+
+func idpUserDisable(c idpCall) error { return idpUserActive(c, false) }
+
+func idpUserEnable(c idpCall) error { return idpUserActive(c, true) }
+
+func idpUserActive(c idpCall, active bool) error {
+	return c.postTenant("user-active", map[string]any{"user": c.rest[1], "active": active})
+}
+
+// idpSAMLUnsolicited asks for an IdP-initiated response and prints the form fields to post.
+func idpSAMLUnsolicited(c idpCall) error {
+	if c.inv.value("--acs-url") == "" || c.inv.value("--email") == "" {
+		return fmt.Errorf("usage: haven idp saml unsolicited <tenant> --acs-url <url> --email <e>")
+	}
+	return c.postTenant("saml/unsolicited", map[string]string{
+		"acsUrl": c.inv.value("--acs-url"), "email": c.inv.value("--email"),
+		"entityId": c.inv.value("--entity-id"), "relayState": c.inv.value("--relay-state"),
+	})
+}
+
 // idpAuth0Webhook sends one signed Auth0 log-stream event; the secret comes from the
 // environment only and idpsim never echoes it.
 func idpAuth0Webhook(c idpCall) error {
