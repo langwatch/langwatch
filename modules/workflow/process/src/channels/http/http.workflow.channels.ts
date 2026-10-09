@@ -12,7 +12,11 @@ import { AwsNlpLambdaArnResolverChannel } from "../aws.nlp-lambda-arn-resolver.c
 import { AwsNlpLambdaFleetChannel } from "../aws.nlp-lambda-fleet.channel.ts";
 import { AwsNlpLambdaInvokeChannel } from "../aws.nlp-lambda-invoke.channel.ts";
 import { AwsNlpLambdaStreamInvokeChannel } from "../aws.nlp-lambda-stream-invoke.channel.ts";
-import { nlpLambdaFleetSecret, type WorkflowChannels } from "../workflow.channels.ts";
+import {
+  nlpLambdaFleetSecret,
+  s3KeySaltSecret,
+  type WorkflowChannels,
+} from "../workflow.channels.ts";
 import {
   HttpWorkflowNlpRuntimeAdapter,
   UnconfiguredWorkflowNlpRuntimeAdapter,
@@ -62,6 +66,7 @@ export class HttpWorkflowChannels {
 
     // The engine hop's shared credential (ADR-132); the process holds the same handle.
     const internalSecret = await secrets.into(nlpInternalSecret, (secret) => secret);
+    const cacheKeySalt = await secrets.into(s3KeySaltSecret, (salt) => salt);
     if (named.data) {
       const fields = named.data;
       const lambdaConfig = buildStudioLambdaConfig({
@@ -114,6 +119,7 @@ export class HttpWorkflowChannels {
           stagingThresholdBytes: lambdaConfig.stagingThresholdBytes,
           stagingTtlSeconds: lambdaConfig.stagingTtlSeconds,
           internalSecret,
+          cacheKeySalt,
           close: () => {
             lambda.destroy();
             invokeLambda.destroy();
@@ -138,7 +144,11 @@ export class HttpWorkflowChannels {
     return {
       engine: {
         kind: "single",
-        stream: HttpWorkflowStudioStreamAdapter.create({ serviceUrl, internalSecret }),
+        stream: HttpWorkflowStudioStreamAdapter.create({
+          serviceUrl,
+          internalSecret,
+          cacheKeySalt,
+        }),
         runtime: HttpWorkflowNlpRuntimeAdapter.create({ serviceUrl, internalSecret }),
         perProjectEngines: false,
       },

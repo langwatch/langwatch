@@ -84,7 +84,11 @@ import type {
   NlpLambdaFunctionReader,
   WorkflowStudioStream,
 } from "../channels/nlp-lambda.channel.ts";
-import { nlpLambdaFleetSecret, type WorkflowChannels } from "../channels/workflow.channels.ts";
+import {
+  nlpLambdaFleetSecret,
+  s3KeySaltSecret,
+  type WorkflowChannels,
+} from "../channels/workflow.channels.ts";
 import {
   buildWorkflowAgentArchiveCascadePipeline,
   type WorkflowAgentArchiveCascadePipeline,
@@ -350,7 +354,7 @@ function composeEngine(setup: WorkflowSetup): WorkflowEngine {
     arnFor: ({ projectId }) => arns.resolveArn(projectId),
   };
   const staging = setup.repositories.payloadStaging;
-  const { stagingThresholdBytes, stagingTtlSeconds, internalSecret } = engine;
+  const { stagingThresholdBytes, stagingTtlSeconds, internalSecret, cacheKeySalt } = engine;
 
   return {
     stream: LambdaWorkflowStudioStreamChannel.create({
@@ -360,6 +364,7 @@ function composeEngine(setup: WorkflowSetup): WorkflowEngine {
       stagingThresholdBytes,
       stagingTtlSeconds,
       internalSecret,
+      cacheKeySalt,
     }),
     runtime: HttpWorkflowNlpRuntimeAdapter.onProjectFunctions({
       functions,
@@ -492,6 +497,7 @@ export class WorkflowModule implements WorkflowApi, WorkflowBrowserApi {
   static readonly secrets = {
     nlpLambdaFleet: nlpLambdaFleetSecret,
     nlpInternal: nlpInternalSecret,
+    s3KeySalt: s3KeySaltSecret,
   } as const;
 
   static async create(setup: WorkflowSetup): Promise<WorkflowModule> {
