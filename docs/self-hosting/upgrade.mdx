@@ -224,7 +224,7 @@ Every `1` is safe to retry: the ledger remembers what is done.
 
 ### When a PostgreSQL migration fails
 
-PostgreSQL applies a migration one statement at a time, so a statement cancelled by the 10 second `lock_timeout` leaves its earlier statements applied and a failed row in `_prisma_migrations`. Every migration written after `20261006180001_gateway_realtime_session_metering` is written to survive a second run. For those, `upgrade` marks the failed row rolled back itself (`prisma migrate resolve --rolled-back <migration>`), waits and applies it again, up to 3 attempts with a 2 second then 4 second wait.
+PostgreSQL applies a migration one statement at a time, so a statement cancelled by the 2 second `lock_timeout` leaves its earlier statements applied and a failed row in `_prisma_migrations`. Every migration written after `20261006180001_gateway_realtime_session_metering` is written to survive a second run. For those, `upgrade` marks the failed row rolled back itself (`prisma migrate resolve --rolled-back <migration>`), waits and applies it again, up to 3 attempts with a 2 second then 4 second wait.
 
 A failed row an earlier run left is cleared the same way before the schema is applied.
 
@@ -234,7 +234,7 @@ An older migration, or a failed one this image does not ship, stops the run with
 
 Two schema changes touch a whole large table while the upgrade runs.
 
-- **`AuditLog` unique index** (`170500_audit_log_idempotency_key`): PostgreSQL builds it in place and holds a lock that blocks audit writes for the build. On a large table the build can outlast the 10 second `lock_timeout` and fail. Build the index yourself first, during a quiet period, with `CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS` using the index name the migration declares. The migration then finds it and moves on.
+- **`AuditLog` unique index** (`170500_audit_log_idempotency_key`): PostgreSQL builds it in place and holds a lock that blocks audit writes for the build. On a large table the build can outlast the 2 second `lock_timeout` and fail. Build the index yourself first, during a quiet period, with `CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS` using the index name the migration declares. The migration then finds it and moves on.
 - **ClickHouse `trace_summaries` index** (`00103_trace_summaries_updated_at_index`): the index is added and then materialised over every existing row. The mutation runs in the background and competes with merges for IO, and later `ALTER` statements on that table queue behind it. Watch `system.mutations` and run the upgrade at a quiet time on a large table.
 
 ### What the upgrade does
@@ -248,7 +248,7 @@ Two schema changes touch a whole large table while the upgrade runs.
   Migrations the image ships that no release lists yet are applied in one pass at the end. A ClickHouse target that fails is reported after the others have run, and fails the upgrade.
 - **Its own record first.** The upgrade keeps its ledger, its lease and the list of running processes in their own PostgreSQL schema, `<your schema>_upgrade_ledger` (`public_upgrade_ledger` by default), which it creates before anything else. The database user in `DATABASE_URL` needs `CREATE` on the database for that; if it has none, create the schema beforehand with that user as its owner.
 - **Never below the floor.** Each release names a long-term-support floor. An installation older than the floor is refused by name (exit code `2`): upgrade to the floor release first, then to this one. [Releases and support](/self-hosting/releases) explains the LTS schedule and which LTS to stop at.
-- **Short locks and retries.** PostgreSQL statements run with a 10 second `lock_timeout`. A statement that waits longer fails instead of blocking your traffic. The upgrade makes up to 3 attempts at a failed schema apply (waiting 2 seconds, then 4), then exits; the previous version keeps serving, and running it again resumes where it stopped.
+- **Short locks and retries.** PostgreSQL statements run with a 2 second `lock_timeout`. A statement that waits longer fails instead of blocking your traffic. The upgrade makes up to 3 attempts at a failed schema apply (waiting 2 seconds, then 4), then exits; the previous version keeps serving, and running it again resumes where it stopped.
 - **One run at a time.** The upgrade holds a lease in its ledger, renews it every 15 seconds and loses it after 60 seconds without a renewal. A second run waits up to 10 minutes for a live holder, saying so every 30 seconds, then exits `3`.
 - **Background steps.** Data copies that do not block the release run on the workers after the upgrade. A step that must not run while an older version still writes waits until every running app and worker is on a version that knows it.
 
