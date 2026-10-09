@@ -282,6 +282,33 @@ not produce a response longer than the directory.
 `population` caps at 50,000 users and 500 groups. Resetting a tenant puts the
 seeded two back.
 
+## From the command line
+
+Every console action has a `haven idp <verb>` twin that talks to the running
+simulator's control API. Tenants are numbers (`1`, `2`, ...). Reads take `--json`
+(agent mode implies it); `--stack <slug>` aims at another worktree's stack. A
+stopped simulator says `start it with haven up +idp`. Bare `haven idp` is
+unchanged: it runs the standalone simulator.
+
+| Verb | Does |
+| --- | --- |
+| `tenant show <t>` | domain, issuer, SCIM token, users and applications |
+| `apps add <t> --name <n> [--redirect a,b] [--entity-id --acs-url]` / `apps remove <t> <client-id>` | register or drop an OIDC or SAML application |
+| `populate <t> --users <n> [--groups <n>] [--domain] [--seed]` / `churn <t> --join <n> --leave <n> ...` | directory size and change |
+| `user add <t> --email <e> [--given-name] [--family-name] [--groups a,b]` | one user |
+| `scim target set <t> --url <base> --token-env <VAR>` / `scim target clear <t>` | where the tenant provisions |
+| `scim push\|pull\|sync <t>` | sync takes `--mode`, `--with-groups`, `--dry-run`, `--concurrency`; all three take `--target <url> --token-env <VAR>` instead of the connection |
+| `scim-event <t> <kind> [--style okta\|entra] [--user] [--group] [--set k=v]...` | one SCIM event on demand; kinds: `user.lookup\|create\|replace\|patch\|deactivate\|reactivate\|delete`, `group.lookup\|create\|add-member\|remove-member\|rename\|delete` |
+| `dns add <domain> <txt>...` / `dns remove <domain>` | TXT records (global, not per tenant) |
+| `activity <t>` / `signin <t> [--user <email>] [--client <id> --redirect <uri>]` | the feed; the IdP-initiated sign-in URL |
+| `reset <t>` / `samlp <t> on\|off` | seeded state; Auth0-broker `samlp\|` subjects |
+| `legacy provider <t> <generic\|auth0\|okta\|cognito\|onelogin\|show>` / `legacy env <t>` | the legacy provider and the env lines that point a stack at it |
+| `tamper <t> <bad-signature\|wrong-audience\|expired\|replayed-nonce\|none>` | break the next ID token, once |
+| `auth0-webhook <t> --event create\|deactivate --user <u> --target <stack-url> --secret-env <VAR>` | send one signed Auth0 SCIM event |
+
+Secrets are never flag values. `--token-env` and `--secret-env` name a variable in
+your shell; the value is sent to the simulator and not printed or recorded.
+
 ## Domain verification
 
 DNS: point the verifier's resolver at the DNS listener —

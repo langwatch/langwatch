@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/dashboard"
@@ -290,29 +289,11 @@ var baseTable = []commandSpec{
 	},
 	{
 		name:    "idp",
-		summary: "run the standalone IdP simulator; --json inspects this stack's identity providers",
-		flags: []flagSpec{
-			{long: "--tenants", takesValue: true, value: "<n>", summary: "tenant range size (default 3)"},
-			{long: "--json", summary: "read this stack's identity provider summaries"},
-			{long: "--stack", takesValue: true, value: "<slug>", summary: "with --json: inspect another stack"},
-		},
-		run: func(ctx context.Context, d deps, inv invocation) error {
-			if inv.has("--json") {
-				return printSimulator(d, inv, "idp")
-			}
-			if inv.value("--stack") != "" {
-				return fmt.Errorf("--stack requires --json")
-			}
-			tenants := 0
-			if raw := inv.value("--tenants"); raw != "" {
-				n, err := strconv.Atoi(raw)
-				if err != nil || n < 1 {
-					return fmt.Errorf("--tenants needs a positive integer, got %q", raw)
-				}
-				tenants = n
-			}
-			return d.orch.RunIdPSolo(ctx, tenants)
-		},
+		summary: "idpsim: bare runs the standalone IdP simulator; with a verb it drives this stack's (tenant show | apps | populate | churn | user add | scim ... | dns | activity | signin | reset | samlp | legacy | tamper | auth0-webhook | scim-event)",
+		args:    "[verb] [tenant] [args]",
+		maxArgs: -1,
+		flags:   simFlags(idpFlags...),
+		run:     runIdP,
 	},
 	{
 		name:    "limits",

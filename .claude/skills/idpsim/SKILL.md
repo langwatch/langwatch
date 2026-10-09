@@ -48,6 +48,23 @@ README there is the full reference), console `apps/idpsim-web` (ADR-160).
 - Domain proof: `dig @127.0.0.1 -p 15353 TXT acme1.test`; HTTP: any `/.well-known/<file>`.
   More domains: `PUT /control/dns/txt`, `PUT /control/verification`.
 
+## From a terminal or agent
+
+`haven idp <verb>` drives a running idpsim (`--json` on reads, `--stack <slug>` for another stack):
+`tenant show <t>`, `apps add|remove`, `populate`, `churn`, `user add`, `scim target set|clear`,
+`scim push|pull|sync`, `scim-event <t> <kind> [--style okta|entra] [--user] [--group] [--set k=v]`,
+`dns add|remove`, `activity`, `signin <t> --user <email>` (prints the IdP-initiated URL),
+`reset`, `samlp <t> on|off`. Full table: `services/idpsim/README.md`.
+
+- Legacy SSO: `haven idp legacy provider <t> auth0|okta|cognito|onelogin|show`, then
+  `haven idp legacy env <t>` for the env lines (apply with `haven down` then `haven up`).
+- Negative tokens: `haven idp tamper <t> bad-signature|wrong-audience|expired|replayed-nonce`
+  breaks the next ID token once.
+- Auth0 directory webhook: `haven idp auth0-webhook <t> --event create|deactivate --user <u>
+  --target <stack-url> --secret-env <VAR>`. The secret comes from your environment only; never
+  put it in a flag, a file in the tree or a message.
+- Bare `haven idp` still runs the standalone simulator.
+
 ## Reset
 
 - Resetting a tenant restores its seeded users and keeps its SCIM target.
