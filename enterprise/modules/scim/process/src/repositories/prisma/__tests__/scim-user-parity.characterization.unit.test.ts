@@ -81,9 +81,12 @@ function harness(
     recordCostCenterChanged: vi.fn(async () => undefined),
   };
   const writer = new GrantsFake();
+  // Main's behaviour, which still holds where the organization proved the address's domain.
+  const connections = HeldConnectionsFake.of();
+  connections.hold({ connectionId: "okta", verifiedDomains: ["acme.com"] });
   const service = ScimService.create({
     members,
-    connections: HeldConnectionsFake.of(),
+    connections,
     prisma: repo,
     writer,
     users,

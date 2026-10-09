@@ -98,6 +98,7 @@ export class ScimService {
       authority: this.identities,
       seats,
       plans: entitlements,
+      connections,
     });
     this.tokens = ScimTokenService.create({
       repository: prisma,

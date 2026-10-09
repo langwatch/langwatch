@@ -90,6 +90,8 @@ function world() {
       return store.users.get(created.id)!;
     }),
   } satisfies ScimUserProvisioning;
+  const connections = HeldConnectionsFake.of([OKTA, ENTRA]);
+  connections.hold({ connectionId: OKTA, verifiedDomains: ["acme.test"] });
   const service = ScimService.create({
     // Organization owns the membership row; a delete asks it to remove the member.
     members: {
@@ -99,8 +101,9 @@ function world() {
         );
         if (at !== -1) store.memberships.splice(at, 1);
       }),
+      createInvitations: vi.fn(async () => []),
     },
-    connections: HeldConnectionsFake.of([OKTA, ENTRA]),
+    connections,
     prisma: store,
     writer,
     users,

@@ -19,7 +19,10 @@ import type {
 } from "../repositories/scim.repository.ts";
 import { ScimCostCenterService, type ScimCostCenterFacts } from "./scim-cost-center.service.ts";
 import type { ScimOrganizationAdministration } from "./scim-deprovision.service.ts";
-import type { ScimDirectoryIdentityService } from "./scim-directory-identity.service.ts";
+import type {
+  ScimDirectoryIdentityService,
+  ScimHeldConnections,
+} from "./scim-directory-identity.service.ts";
 import type { ScimGrantsService } from "./scim-grants.service.ts";
 import { ScimMembershipAccessService } from "./scim-membership-access.service.ts";
 import { ScimUserListingService } from "./scim-user-listing.service.ts";
@@ -57,6 +60,7 @@ export class ScimProvisioningService {
   private readonly authority: Pick<ScimDirectoryIdentityService, "assertWritable">;
   private readonly seats: ScimSeatRepository;
   private readonly plans: Pick<EntitlementApi, "getActivePlan">;
+  private readonly connections: ScimHeldConnections;
 
   private constructor({
     prisma,
@@ -71,6 +75,7 @@ export class ScimProvisioningService {
     authority,
     seats,
     plans,
+    connections,
   }: {
     prisma: ScimRepository;
     writer: AuthzGrantsService;
@@ -84,8 +89,10 @@ export class ScimProvisioningService {
     authority: Pick<ScimDirectoryIdentityService, "assertWritable">;
     seats: ScimSeatRepository;
     plans: Pick<EntitlementApi, "getActivePlan">;
+    connections: ScimHeldConnections;
   }) {
     this.prisma = prisma;
+    this.connections = connections;
     this.authority = authority;
     this.seats = seats;
     this.plans = plans;
@@ -119,6 +126,7 @@ export class ScimProvisioningService {
     authority: Pick<ScimDirectoryIdentityService, "assertWritable">;
     seats: ScimSeatRepository;
     plans: Pick<EntitlementApi, "getActivePlan">;
+    connections: ScimHeldConnections;
   }): ScimProvisioningService {
     return new ScimProvisioningService(options);
   }
@@ -237,6 +245,14 @@ export class ScimProvisioningService {
         });
       }
       returning = previous !== null && previous.deletedAt === null;
+      // An account another domain vouches for is never adopted by a push.
+      if (!returning && !(await this.isOnProvenDomain({ organizationId, user: existingUser }))) {
+        return this.scimError({
+          status: "409",
+          scimType: "uniqueness",
+          detail: "User name is held by an account outside this organization's verified domains",
+        });
+      }
     }
 
     await this.assertUserNameIsFree({
@@ -249,7 +265,6 @@ export class ScimProvisioningService {
     // Minting the account is the only global state a directory push writes.
     const user = existingUser ?? (await this.userService.create({ name, email: request.userName }));
     const active = request.active !== false;
-
     if (active && !returning) {
       await this.admit({ userId: user.id, organizationId });
       await this.costCenters.sync({
@@ -268,6 +283,25 @@ export class ScimProvisioningService {
     });
 
     return scimUserOf(user, resource);
+  }
+
+  /** Whether the account's address is on a domain one of the organization's connections proved. */
+  private async isOnProvenDomain({
+    organizationId,
+    user,
+  }: {
+    organizationId: string;
+    user: UserProfile;
+  }): Promise<boolean> {
+    const email = (user.email ?? "").trim().toLowerCase();
+    const at = email.lastIndexOf("@");
+    if (at < 0) return false;
+    const domain = email.slice(at + 1);
+    const connections = await this.connections.findHeldConnections({ organizationId });
+
+    return connections.some((connection) =>
+      connection.verifiedDomains.some((proven) => proven.toLowerCase() === domain),
+    );
   }
 
   /** A retried create still repairs the grant beside an existing membership. */

@@ -68,6 +68,26 @@ Feature: Enterprise SCIM package boundary
       When the webhook is delivered
       Then the response does not distinguish the path from one that was never served
 
+  Rule: An existing account joins through the directory only on a domain the organization proved
+
+    A directory may mint a new account, and may link an existing account whose
+    address is on a domain one of the organization's connections has proved.
+    Any other existing account is invited instead: it joins only once the
+    person accepts, and until then the directory reads it as inactive.
+
+    @unit
+    Scenario: A pushed address on an unproven domain that already has an account becomes a pending invitation
+      Given an account already exists for an address on a domain the organization has not proved
+      When the directory creates that user
+      Then the organization invites the address and grants no membership
+      And the directory reads the user back with active false
+
+    @unit
+    Scenario: A pushed address on a proven domain that already has an account is linked directly
+      Given an account already exists for an address on a domain one of the organization's connections proved
+      When the directory creates that user
+      Then the account becomes a member at once and no invitation is sent
+
   Rule: A name is patched one half at a time
 
     SCIM carries a name as two parts and this product stores one string, so a
