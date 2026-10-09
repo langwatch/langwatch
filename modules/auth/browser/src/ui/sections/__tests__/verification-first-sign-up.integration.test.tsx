@@ -202,7 +202,9 @@ describe("given the sign-up screen", () => {
     it("offers a credential for the confirmed address and signs nobody in yet", async () => {
       const { container } = renderScreen();
 
-      expect((await screen.findByTestId("verified-address")).textContent).toContain("sam@acme.com");
+      expect((await screen.findByTestId("signup-identifier")).textContent).toContain(
+        "sam@acme.com",
+      );
       expect(container.querySelector('input[type="password"]')).not.toBeNull();
       expect(registerMock).not.toHaveBeenCalled();
       expect(signInMock).not.toHaveBeenCalled();
@@ -293,6 +295,31 @@ describe("given the sign-up screen", () => {
 
       expect(await screen.findByText(/the two passwords are not the same/i)).toBeTruthy();
       expect(registerMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a password is being typed", () => {
+    beforeEach(() => {
+      searchParamsRef.current = new URLSearchParams("verify=a-token");
+      completeVerificationMock.mockResolvedValue({
+        email: "sam@acme.com",
+        accountCreated: false,
+        accountExists: false,
+        addressProof: "proof-1",
+      });
+    });
+
+    /** @scenario "A sign-up form does not judge a field while it is being typed in" */
+    it("shows no error until the field is left", async () => {
+      renderScreen();
+      await screen.findByTestId("signup-identifier");
+
+      await userEvent.type(screen.getByLabelText(/^password$/i), "short");
+      expect(screen.queryByText(/use at least 8 characters/i)).toBeNull();
+      expect(screen.queryByText(/the two passwords are not the same/i)).toBeNull();
+
+      await userEvent.tab();
+      expect(await screen.findByText(/use at least 8 characters/i)).toBeTruthy();
     });
   });
 
@@ -489,7 +516,7 @@ describe("given the sign-up screen", () => {
 
       const { container } = renderScreen();
 
-      expect(await screen.findByTestId("verified-address")).toHaveTextContent(/sam@acme\.com/);
+      expect(await screen.findByTestId("signup-identifier")).toHaveTextContent(/sam@acme\.com/);
       expect(await screen.findByTestId("method-picker")).toBeTruthy();
       await waitFor(() => {
         expect(container.querySelector('input[type="password"]')).not.toBeNull();

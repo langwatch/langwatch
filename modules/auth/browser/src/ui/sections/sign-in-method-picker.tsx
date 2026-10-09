@@ -22,6 +22,7 @@ import { PasskeySignInButton } from "./passkey-sign-in-button.tsx";
 export function SignInMethodPicker({
   methodSet,
   reasonCode,
+  showGuidance = true,
   lastUsedMethodId,
   onFederatedMethodChosen,
   renderLocalMethod,
@@ -33,6 +34,8 @@ export function SignInMethodPicker({
 }: {
   methodSet: readonly SignInMethod[];
   reasonCode: string;
+  /** False where the screen's heading already says why the picker is shown. */
+  showGuidance?: boolean;
   /** The method this browser last got in with, badged where it appears. */
   lastUsedMethodId?: string | null;
   onFederatedMethodChosen: (method: SignInMethod) => void;
@@ -48,7 +51,7 @@ export function SignInMethodPicker({
   /** The ceremony ended without a session. */
   onPasskeyDeclined?: () => void;
 }) {
-  const guidance = signInRoutingReasonCopy(reasonCode);
+  const guidance = showGuidance ? signInRoutingReasonCopy(reasonCode) : null;
   // The server's ranking with this browser's last-used method promoted: one
   // promotion, never a re-sort.
   const ordered = rankMethodsForBrowser({ methodSet, lastUsedMethodId });
@@ -60,7 +63,7 @@ export function SignInMethodPicker({
   const [passkeyIsBusy, setPasskeyIsBusy] = useState(false);
 
   return (
-    <VStack width="full" align="stretch" gap={4} data-testid="method-picker">
+    <VStack width="full" align="stretch" gap={3} data-testid="method-picker">
       {guidance ? (
         <Alert.Root
           status="info"
