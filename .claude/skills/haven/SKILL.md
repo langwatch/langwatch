@@ -18,7 +18,9 @@ Run it from the workspace root. `make haven <sub>` forwards to the CLI (`dev/hav
 needs. With no TTY it runs `haven install --yes` (no prompts; on macOS also the
 native tier: `brew install grafana prometheus loki` and the pinned ClickHouse,
 Tempo and Alloy downloads). macOS needs no colima: the install list leaves the
-runtime off and Langy runs on the host tier by default (`up` says it is unsandboxed). A failed non-required row is
+runtime off and Langy runs on the host tier by default (`up` says it is unsandboxed). 
+haven starts the Colima VM only when a selected lane runs in a container (container ClickHouse or observability, sandboxed Langy, `haven play`). When it starts the VM it records that in its home (`colima-<profile>.json`), and `haven down` or the daemon stops it once no stack needs a container and none is running; `haven status` then adds "stopped by haven". A VM you started yourself is never stopped.
+A failed non-required row is
 logged and the run carries on. Re-running is a no-op;
 `haven install --list --agent` reports without installing. `haven install --build` builds the
 consoles the binary embeds in one cached, parallel `nx run-many` (the `haven-console` project tag
@@ -78,6 +80,8 @@ haven logs api -t                 # follow one service
 haven logs go --since 5m --level error
 haven restart sims                # bounce one lane; nothing else restarts
 haven restart api                 # restart the whole lane
+haven up --watch=false -f         # hold the stack (sticky): no backend reload on a file change
+haven reload [app|api|worker]     # apply changes to a held stack in place; waits for "reload finished"
 ```
 
 ## The stack's own traces and logs

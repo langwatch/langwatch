@@ -279,6 +279,19 @@ func (o *Orchestrator) ResolveMode(worktreeDir string, sel domain.Selection, req
 	return sel, mode, nil
 }
 
+// ResolveHold applies `up --watch[=false]` to the sticky selection: a held
+// stack's Node host does not reload on a file change. Persists only a change.
+func (o *Orchestrator) ResolveHold(worktreeDir string, sel domain.Selection, held bool) (domain.Selection, error) {
+	if sel.Held == held {
+		return sel, nil
+	}
+	sel.Held = held
+	if err := o.store.WriteSelection(worktreeDir, sel); err != nil {
+		return sel, fmt.Errorf("saving the hold: %w", err)
+	}
+	return sel, nil
+}
+
 // restartObservability stops and re-ensures the shared LGTM stack, re-routing
 // its hostname. Telemetry starts fresh — the stack keeps no volume by design.
 func (o *Orchestrator) restartObservability(ctx context.Context) error {

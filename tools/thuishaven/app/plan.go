@@ -259,6 +259,9 @@ func (p *childPlan) nodeEnv(lane string) []string {
 	env := append(domain.LaneDatabaseEnv(p.base, lane),
 		"NODE_ENV=development", "DOTENV_CONFIG_QUIET=true", domain.LaneEnv(lane),
 		p.o.compileCacheEnv(p.st.Slug))
+	if p.opts.Selection.Held {
+		env = append(env, "LANGWATCH_DEV_WATCH=0")
+	}
 	if lane == "ui" || lane == AppLane {
 		env = append(env, "LANGWATCH_VITE_NO_POLLING=1")
 		if v := os.Getenv("LANGWATCH_DEV_TOOLS_IDLE"); v != "" {

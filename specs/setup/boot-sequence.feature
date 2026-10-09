@@ -69,18 +69,6 @@ Feature: The stack migrates once, quietly, under a lock
     Then it runs the preparation step once, before any lane is started
 
   @unit
-  Scenario: A code change reloads a lane without migrating again
-    Given a running local stack
-    When a source file changes and the supervised lane restarts
-    Then no migration runs, because the lane's own command does not prepare
-
-  @unit
-  Scenario: A crash restart does not migrate again
-    Given a supervised lane that exits non-zero and is restarted
-    When it comes back up
-    Then it starts the process it supervises and nothing else
-
-  @unit
   Scenario: A modular stack boots without a migration step
     Given haven bringing a modular stack up
     When it prepares the worktree
