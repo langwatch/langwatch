@@ -14,7 +14,11 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { createDashboardTestAnalytics } from "../../../app/__tests__/dashboard.fixture.ts";
+import {
+  createDashboardTestAnalytics,
+  createDashboardTestProjects,
+} from "../../../app/__tests__/dashboard.fixture.ts";
+import { DashboardAccessService } from "../../../services/dashboard-access.service.ts";
 import type { WorkbenchAccess } from "../../../services/dashboard.service.ts";
 import { DashboardService } from "../../../services/dashboard.service.ts";
 import { SavedWorkbenchChartPolicyService } from "../../../services/saved-workbench-chart-policy.service.ts";
@@ -54,9 +58,11 @@ let teamId = "";
 let projectId = "";
 
 function graphs(): DashboardService {
+  const repository = PrismaDashboardRepository.create({ prisma: database() });
   return DashboardService.create({
-    repository: PrismaDashboardRepository.create({ prisma: database() }),
+    repository,
     workbenchAccess: new WorkbenchOn(),
+    access: DashboardAccessService.create({ repository, projects: createDashboardTestProjects() }),
   });
 }
 

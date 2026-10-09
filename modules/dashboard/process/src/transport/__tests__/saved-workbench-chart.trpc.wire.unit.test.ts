@@ -67,7 +67,7 @@ describe("the saved workbench chart tRPC namespace", () => {
   });
 
   describe("given a chart placed on a board another member created", () => {
-    /** @scenario "AC18 Saved charts on any board are reachable to every member" */
+    /** @scenario "AC18 Saved charts on a Project board are reachable to every member" */
     it("lists it for the signed-in member and serves it by id", async () => {
       const repositories = MemoryDashboardRepositories.create();
       const app = createDashboardTestApp({ repositories });

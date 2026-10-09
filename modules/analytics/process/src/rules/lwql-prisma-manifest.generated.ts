@@ -713,6 +713,8 @@ export interface LwqlPrismaRows {
     readonly order: "Int";
     readonly description: "String?";
     readonly createdById: "String?";
+    readonly scope: "DashboardScope";
+    readonly organizationId: "String?";
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
   };

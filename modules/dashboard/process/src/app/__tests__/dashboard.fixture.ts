@@ -6,9 +6,10 @@ import type {
   LangWatchQLValidationInput,
 } from "@langwatch/analytics-contract";
 import { EVERY_CATALOGUE_PERMISSION } from "@langwatch/analytics-process/testing";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { AutomationApi, Trigger } from "@langwatch/automation-contract";
 import { ResourceScope } from "@langwatch/process";
-import type { Project, ProjectApi } from "@langwatch/project-contract";
+import type { Project, ProjectApi, ProjectIdentity } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { vi } from "vitest";
 
@@ -69,12 +70,52 @@ export function createDashboardTestAutomation(triggers: Trigger[] = []): Automat
 export const TEST_TEAM_ID = "team-1";
 export const TEST_ORGANIZATION_ID = "organization-1";
 
-export function createDashboardTestProjects(input: Readonly<{ slug?: string }> = {}): ProjectApi {
+/**
+ * The project peer over a fixed directory. Every project sits in `TEST_ORGANIZATION_ID` unless
+ * `organizations` names another for it, so a test can stand two projects in one organization
+ * or in two.
+ */
+export function createDashboardTestProjects(
+  input: Readonly<{ slug?: string; organizations?: Readonly<Record<string, string>> }> = {},
+): ProjectApi {
   const slug = input.slug ?? "project-one";
+  const organizationOf = (projectId: string) =>
+    input.organizations?.[projectId] ?? TEST_ORGANIZATION_ID;
+  const identity = (id: string): ProjectIdentity => ({
+    id,
+    name: `Project ${id}`,
+    slug: `slug-${id}`,
+    teamId: TEST_TEAM_ID,
+    organizationId: organizationOf(id),
+    isPersonal: false,
+    ownerUserId: null,
+  });
   return createApiFixture<ProjectApi>({
     findSummaryById: async () => ({ name: "Project One", slug }),
     findById: async (id: string) => ({ id, teamId: TEST_TEAM_ID }) as Project,
-    getOrganizationId: async () => TEST_ORGANIZATION_ID,
+    getOrganizationId: async (projectId: string) => organizationOf(projectId),
+    findOrganizationId: async (projectId: string) => organizationOf(projectId),
+    listNamesByIds: async ({ projectIds }) => projectIds.map(identity),
+    findLiveNonGovernanceIdsByOrganization: async ({ organizationId }) =>
+      Object.keys(input.organizations ?? {}).filter((id) => organizationOf(id) === organizationId),
+  });
+}
+
+/** The authz peer, opening `analytics:view` on the projects named; on every project by default. */
+export function createDashboardTestAuthz(
+  input: Readonly<{ openProjectIds?: readonly string[] }> = {},
+): AuthzApi {
+  return createApiFixture<AuthzApi>({
+    canBatchByIds: async ({ projects }) => ({
+      teams: new Map(),
+      projects: new Map(
+        projects.map(({ projectId }) => [
+          projectId,
+          input.openProjectIds === undefined || input.openProjectIds.includes(projectId),
+        ]),
+      ),
+      organizationRole: null,
+    }),
   });
 }
 
@@ -84,6 +125,7 @@ export function createDashboardTestApp(
     publicBaseUrl?: string;
     dependencies?: Partial<{
       analytics: AnalyticsApi;
+      authz: AuthzApi;
       automation: AutomationApi;
       projects: ProjectApi;
     }>;
@@ -93,6 +135,7 @@ export function createDashboardTestApp(
     repositories: input.repositories ?? MemoryDashboardRepositories.create(),
     dependencies: {
       analytics: input.dependencies?.analytics ?? createDashboardTestAnalytics(),
+      authz: input.dependencies?.authz ?? createDashboardTestAuthz(),
       automation: input.dependencies?.automation ?? createDashboardTestAutomation(),
       projects: input.dependencies?.projects ?? createDashboardTestProjects(),
     },

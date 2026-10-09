@@ -2189,8 +2189,18 @@ model DatasetRecord {
   @@index([projectId, datasetId])
 }
 
+/// Who sees a dashboard, named as the prompt scope is, with one more level.
+enum DashboardScope {
+  /// Its author alone: "Only me".
+  PRIVATE
+  PROJECT
+  /// Every project of the owning project's organization, each with its own data.
+  ORGANIZATION
+}
+
 model Dashboard {
   id        String        @id @default(nanoid())
+  /// The project that owns the board; only there can it be edited.
   projectId String
   project   Project       @relation(fields: [projectId], references: [id])
   name      String
@@ -2203,12 +2213,20 @@ model Dashboard {
   description String?
   /// The member who created it; null for boards that predate the column.
   createdById String?
+  /// Who sees it. Only the author changes it; a board with no author stays PROJECT.
+  scope          DashboardScope @default(PROJECT)
+  /// The owning project's organization, stamped when the board is first set to
+  /// ORGANIZATION; null before. No relation, per the database rule.
+  organizationId String?
   createdAt DateTime      @default(now())
   updatedAt DateTime      @default(now()) @updatedAt
   graphs    CustomGraph[]
 
   @@index([projectId])
   @@index([projectId, order])
+  // A project's list also reads the organization's shared boards; scope in the
+  // index keeps that lookup selective, as on LlmPromptConfig.
+  @@index([organizationId, scope])
   @@map("Dashboard")
 }
 

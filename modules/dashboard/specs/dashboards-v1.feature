@@ -142,25 +142,27 @@ Feature: Dashboards v1
     Then Langy opens with that question and the current board as context
 
   @integration
-  Scenario: AC18 Every board in the project is visible to every member
-    Given a project with boards created by different members
+  Scenario: AC18 Every Project board is visible to every member of the project
+    Given a project with boards created by different members, at the scope Project
     When any member with analytics:view lists dashboards
     Then every board is listed
     And each board opens for them
+    # A board's scope decides who sees it: dashboards-v2.feature AC170 to AC186
 
   @integration
-  Scenario: AC18 Blocks on any board are reachable to every member
-    Given a board holding blocks
+  Scenario: AC18 Blocks on a Project board are reachable to every member
+    Given a board at the scope Project holding blocks
     When any member with analytics:view lists, adds, moves or deletes blocks on it
     Then its blocks are listed and writable, subject only to the analytics permissions
     And a project credential reaches the blocks on every board
 
   @unit
-  Scenario: AC18 Saved charts on any board are reachable to every member
-    Given a saved chart placed on a board
+  Scenario: AC18 Saved charts on a Project board are reachable to every member
+    Given a saved chart placed on a board at the scope Project
     When any member with analytics:view lists, opens, runs, edits or deletes saved charts
     Then that chart is reachable, subject only to the analytics permissions
-    And a project credential reaches the charts on every board and on no board
+    And a project credential reaches the charts on every such board and on no board
+    # A chart placed on an Only me board is its author's alone: dashboards-v2.feature AC171
 
   # ---------------------------------------------------------------------------
   # Guard rails
@@ -277,8 +279,8 @@ Feature: Dashboards v1
     And once one row exists for Your coding agents the widget shows data
 
   @integration
-  Scenario: AC26 Any member with the edit permission can edit any board
-    Given a board created by another member
+  Scenario: AC26 Any member with the edit permission can edit any board they can see
+    Given a board created by another member, at the scope Project
     And a member with analytics:update
     When that member renames, edits or deletes the board
     Then the server accepts each write
@@ -306,7 +308,7 @@ Feature: Dashboards v1
   # AC 15: "Widget menu" (changed: Edit code, Copy widget id, Copy API snippet, Duplicate, Delete; no move to another board) → Scenario: AC15 Widget menu actions persist after reload
   # AC 16: "Ask Langy from the board" → Scenario: AC16 Ask Langy from the board
   # AC 17: "Langy insights on a block" (withdrawn: a widget's result lives in its sandboxed frame; no scenario until it can be read)
-  # AC 18: "Sharing removed: every board is visible to every project member" (changed by langwatch/tasks#911) -> Scenario: AC18 Every board in the project is visible to every member; Scenario: AC18 Blocks on any board are reachable to every member; Scenario: AC18 Saved charts on any board are reachable to every member
+  # AC 18: "Every Project board is visible to every project member" (changed by langwatch/tasks#911; scope added on 2026-10-09, dashboards-v2.feature AC170-186) -> Scenario: AC18 Every Project board is visible to every member of the project; Scenario: AC18 Blocks on a Project board are reachable to every member; Scenario: AC18 Saved charts on a Project board are reachable to every member
   # AC 19: "LWQL only" → Scenario: AC19 Every dashboard data request goes to LWQL and none to legacy analytics
   # AC 20: "Legacy analytics untouched" → Scenario: AC20 Legacy analytics files are untouched; Scenario: AC20 Legacy analytics pages behave exactly as before
   # AC 21: "Permissions" (sharpened) → Scenario: AC21 A member without analytics:view is refused; Scenario: AC21 A refused member sees the same not-found page
@@ -314,4 +316,4 @@ Feature: Dashboards v1
   # AC 23: "A failing query does not take the board down" → Scenario: AC23 A failing query does not take the board down
   # AC 24: "Boards created before this change keep working" (sharpened) → Scenario: AC24 Boards created before this change keep working
   # AC 25: "Every optional source has its own call to action" → Scenario: AC25 Scenario results shows its own call to action before any row exists; Scenario: AC25 Quality signal shows its own call to action before any row exists; Scenario: AC25 User feedback shows its own call to action before any row exists; Scenario: AC25 Gateway routing shows its own call to action before any row exists; Scenario: AC25 Your coding agents shows its own call to action before any row exists
-  # AC 26: "Sharing removed: any member may edit any board, subject to the analytics permissions" (changed by langwatch/tasks#911) -> Scenario: AC26 Any member with the edit permission can edit any board; Scenario: AC26 Deleting a board removes it from every members stars
+  # AC 26: "Any member may edit any board they can see, subject to the analytics permissions" (changed by langwatch/tasks#911; scope added on 2026-10-09) -> Scenario: AC26 Any member with the edit permission can edit any board they can see; Scenario: AC26 Deleting a board removes it from every members stars

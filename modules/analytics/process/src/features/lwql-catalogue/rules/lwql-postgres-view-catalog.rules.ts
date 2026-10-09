@@ -360,6 +360,8 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       Order: { source: "order" },
       Description: { source: "description", content: "output" },
       CreatedById: { source: "createdById" },
+      scope: "omit", // an Only me board is not in the view at all; see the visibility overrides
+      organizationId: "omit", // set only once a board is shared with the organization
       CreatedAt: { source: "createdAt" },
       UpdatedAt: { source: "updatedAt" },
     },

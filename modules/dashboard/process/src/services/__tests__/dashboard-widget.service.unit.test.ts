@@ -5,8 +5,13 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { createDashboardTestAnalytics } from "../../app/__tests__/dashboard.fixture.ts";
+import {
+  createDashboardTestAnalytics,
+  createDashboardTestProjects,
+} from "../../app/__tests__/dashboard.fixture.ts";
 import { MemoryDashboardWidgetRepository } from "../../repositories/memory/memory.dashboard-widget.repository.ts";
+import { MemoryDashboardRepository } from "../../repositories/memory/memory.dashboard.repository.ts";
+import { DashboardAccessService } from "../dashboard-access.service.ts";
 import { DashboardWidgetService } from "../dashboard-widget.service.ts";
 
 const CODE = "export default function Widget() { return null; }";
@@ -19,6 +24,10 @@ function setUp() {
   const service = DashboardWidgetService.create({
     repository,
     analytics: createDashboardTestAnalytics(),
+    boards: DashboardAccessService.create({
+      repository: MemoryDashboardRepository.create(),
+      projects: createDashboardTestProjects(),
+    }),
   });
   return { repository, service };
 }

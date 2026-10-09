@@ -36,7 +36,11 @@ export const dashboardWidgetTrpcTransport: TrpcRouterDeclaration<
   .withPermission("analytics:view")
   .handle(async ({ app, input, actor }) =>
     (
-      await app.listDashboardWidgets({ projectId: input.projectId, viewer: { userId: actor.id } })
+      await app.listDashboardWidgets({
+        projectId: input.projectId,
+        viewer: { userId: actor.id },
+        ...(input.dashboardId === undefined ? {} : { dashboardId: input.dashboardId }),
+      })
     ).map(wireRow),
   )
 

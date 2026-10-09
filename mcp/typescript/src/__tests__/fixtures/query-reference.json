@@ -9595,7 +9595,7 @@
         },
         {
           "name": "analytics.custom_graphs",
-          "description": "Rows of the CustomGraph table, one row per CustomGraphId.",
+          "description": "Rows of the CustomGraph table, one row per CustomGraphId. Rows placed on a dashboard set to Only me are not queryable.",
           "grain": "one row per CustomGraphId",
           "joinKeys": [
             "TenantId",
@@ -9811,7 +9811,7 @@
         },
         {
           "name": "analytics.dashboards",
-          "description": "Rows of the Dashboard table, one row per DashboardId.",
+          "description": "Rows of the Dashboard table, one row per DashboardId. Dashboards set to Only me are not queryable.",
           "grain": "one row per DashboardId",
           "joinKeys": [
             "TenantId",

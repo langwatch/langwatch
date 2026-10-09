@@ -239,4 +239,30 @@ describe("given the derived Postgres catalog's overrides", () => {
       }
     });
   });
+
+  describe("when a board's author set it to Only me", () => {
+    const statementOf = (baseRelation: string) => {
+      const view = byModel.get(baseRelation)!;
+      return postgresViews
+        .approvedViewStatements({ schema: "public" })
+        .find((entry) => entry.includes(`"${view.postgres!.approvedView}"`));
+    };
+
+    /** @scenario "AC171 Scope: an Only me board exists for its author alone" */
+    it("leaves the board out of the dashboards view, for every caller", () => {
+      expect(statementOf("Dashboard")).toContain(`\nWHERE ("m"."scope" <> 'PRIVATE')`);
+    });
+
+    /** @scenario "AC171 Scope: an Only me board exists for its author alone" */
+    it("leaves what is placed on it out of the custom graphs view, and keeps what is on no board", () => {
+      expect(statementOf("CustomGraph")).toContain(
+        `\nWHERE ("m"."dashboardId" IS NULL OR NOT EXISTS (\n` +
+          `  SELECT 1 FROM "public"."Dashboard" AS "d"\n` +
+          `  WHERE "d"."id" = "m"."dashboardId"\n` +
+          `    AND "d"."projectId" = "m"."projectId"\n` +
+          `    AND "d"."scope" = 'PRIVATE'\n` +
+          `))`,
+      );
+    });
+  });
 });

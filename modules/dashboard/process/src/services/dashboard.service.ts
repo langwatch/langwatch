@@ -6,7 +6,6 @@ import {
   DASHBOARD_KSUID_RESOURCE,
   dashboardCreateInputSchema,
   dashboardIdSchema,
-  dashboardStarSchema,
   dashboardRenameInputSchema,
   dashboardReorderInputSchema,
   DashboardNotFoundError,
@@ -19,12 +18,11 @@ import {
   GraphNotFoundError,
   graphUpdateInputSchema,
   MY_DASHBOARD_NAME,
+  newDashboardScope,
   projectIdSchema,
   type Dashboard,
   type DashboardGraphCountScope,
-  type DashboardStar,
   type DashboardSummary,
-  type StarredDashboard,
   type DashboardViewer,
   type Graph,
   type GraphLayout,
@@ -36,6 +34,7 @@ import type {
   DashboardGraphKind,
   DashboardRepository,
 } from "../repositories/dashboard.repository.ts";
+import type { DashboardAccessService } from "./dashboard-access.service.ts";
 
 const defaultLayout: GraphLayout = {
   gridColumn: 0,
@@ -53,34 +52,43 @@ export interface WorkbenchAccess {
 }
 
 /**
- * The project's dashboards, the chart-builder graphs placed on them, and each
- * member's starred boards. Every board is visible to and editable by everyone
- * in the project; the analytics permissions alone gate writes.
+ * The project's dashboards and the chart-builder graphs placed on them. Who sees a board is its
+ * scope's to say (dashboards-v2.feature AC170 to AC173); who may write one the reader sees is
+ * the analytics permissions', asked at the door.
  */
 export class DashboardService {
   #repository: DashboardRepository;
   #workbenchAccess: WorkbenchAccess;
+  #access: DashboardAccessService;
 
-  private constructor(repository: DashboardRepository, workbenchAccess: WorkbenchAccess) {
-    this.#repository = repository;
-    this.#workbenchAccess = workbenchAccess;
+  private constructor(options: {
+    repository: DashboardRepository;
+    workbenchAccess: WorkbenchAccess;
+    access: DashboardAccessService;
+  }) {
+    this.#repository = options.repository;
+    this.#workbenchAccess = options.workbenchAccess;
+    this.#access = options.access;
   }
 
   static create(options: {
     repository: DashboardRepository;
     workbenchAccess: WorkbenchAccess;
+    access: DashboardAccessService;
   }): DashboardService {
-    return new DashboardService(options.repository, options.workbenchAccess);
+    return new DashboardService(options);
   }
 
   countUsage(input: { projectIds: readonly string[] }): Promise<DashboardUsageCount> {
     return this.#repository.countUsage(input);
   }
 
+  /** The project's boards the viewer may see; `includeOrganization` adds the organization's. */
   async getAll(input: {
     projectId: string;
     graphCountScope: DashboardGraphCountScope;
     viewer?: DashboardViewer;
+    includeOrganization?: boolean;
   }): Promise<DashboardSummary[]> {
     const projectId = projectIdSchema.parse(input.projectId);
 
@@ -89,14 +97,25 @@ export class DashboardService {
         ? (["builder"] as const)
         : await this.#placeableKinds(projectId);
 
-    const [dashboards, starred] = await Promise.all([
-      this.#repository.findAllDashboards({ projectId, graphKinds }),
-      this.#starredIds({ projectId, viewer: input.viewer }),
-    ]);
+    const listed = await this.#access.listBoards({ projectId, viewer: input.viewer, graphKinds });
+    const guests = input.includeOrganization === true ? listed.guests : [];
+    const sharedProjectIds = [...new Set(guests.map((board) => board.projectId))];
 
-    return dashboards.map((dashboard) => ({ ...dashboard, isStarred: starred.has(dashboard.id) }));
+    const [starred, owners] = await Promise.all([
+      this.#starredIds({ projectId, viewer: input.viewer, sharedProjectIds }),
+      this.#access.findProjects({ projectIds: sharedProjectIds }),
+    ]);
+    const ownerById = new Map(owners.map((owner) => [owner.id, owner]));
+
+    return [...listed.home, ...guests].map((dashboard) => ({
+      ...dashboard,
+      isStarred: starred.has(dashboard.id),
+      ownerProject:
+        dashboard.projectId === projectId ? null : (ownerById.get(dashboard.projectId) ?? null),
+    }));
   }
 
+  /** One board the viewer may open here, the project's own or the organization's. */
   async getById(input: {
     projectId: string;
     dashboardId: string;
@@ -104,13 +123,16 @@ export class DashboardService {
   }): Promise<Dashboard & { graphs: Graph[] }> {
     const parsed = dashboardRef(input);
 
-    const dashboard = await this.#repository.findDashboard(parsed);
+    const dashboard = await this.#access.findWithGraphs({ ...parsed, viewer: input.viewer });
     if (!dashboard) throw new DashboardNotFoundError(parsed.projectId);
 
     return dashboard;
   }
 
-  /** A new board after the last; only a member's own My dashboard starts starred, for them. */
+  /**
+   * A new board after the last, at the scope Project. A member's own My dashboard alone starts
+   * at Only me and starred, for them.
+   */
   async create(input: {
     projectId: string;
     name: string;
@@ -128,6 +150,7 @@ export class DashboardService {
       name: parsed.name,
       order: (last?.order ?? -1) + 1,
       createdById: createdById ?? null,
+      scope: newDashboardScope({ name: parsed.name, createdById }),
     });
     // Stored as an ordinary star, so unstarring it later removes it for good.
     if (createdById !== undefined && parsed.name === MY_DASHBOARD_NAME) {
@@ -147,13 +170,14 @@ export class DashboardService {
     name: string;
     viewer?: DashboardViewer;
   }): Promise<Dashboard> {
-    const { viewer: _viewer, ...fields } = input;
+    const { viewer, ...fields } = input;
     const parsed = dashboardRenameInputSchema.parse(fields);
 
     return this.updateDetails({
       projectId: parsed.projectId,
       dashboardId: parsed.dashboardId,
       name: parsed.name,
+      viewer,
     });
   }
 
@@ -166,7 +190,7 @@ export class DashboardService {
     viewer?: DashboardViewer;
   }): Promise<Dashboard> {
     const ref = dashboardRef(input);
-    await this.#requireBoard(ref);
+    await this.#access.getWritable({ ...ref, viewer: input.viewer });
     const details = dashboardDetailsUpdateSchema.parse({
       ...(input.name === undefined ? {} : { name: input.name }),
       ...(input.description === undefined ? {} : { description: input.description }),
@@ -188,25 +212,26 @@ export class DashboardService {
     viewer?: DashboardViewer;
   }): Promise<Dashboard> {
     const ref = dashboardRef(input);
-    await this.#requireBoard(ref);
+    await this.#access.getWritable({ ...ref, viewer: input.viewer });
 
     return this.#repository.deleteDashboard(ref);
   }
 
-  /** Writes the legacy `order` column; the REST reorder endpoint is the only caller. */
+  /**
+   * Writes the legacy `order` column; the REST reorder endpoint is the only caller. A board the
+   * viewer may not see counts as an unknown id.
+   */
   async reorder(input: {
     projectId: string;
     dashboardIds: string[];
     viewer?: DashboardViewer;
   }): Promise<{ success: true }> {
-    const { viewer: _viewer, ...fields } = input;
+    const { viewer, ...fields } = input;
     const parsed = dashboardReorderInputSchema.parse(fields);
 
-    const found = await this.#repository.findDashboardIds({
-      projectId: parsed.projectId,
-      dashboardIds: parsed.dashboardIds,
-    });
-    const reachable = new Set(found);
+    const hidden = await this.#access.findHiddenBoardIds({ projectId: parsed.projectId, viewer });
+    const found = await this.#repository.findDashboards(parsed);
+    const reachable = new Set(found.map(({ id }) => id).filter((id) => !hidden.has(id)));
     const missingIds = parsed.dashboardIds.filter((id) => !reachable.has(id));
     if (missingIds.length > 0) throw new DashboardReorderUnknownIdsError(missingIds);
 
@@ -215,78 +240,26 @@ export class DashboardService {
     return { success: true as const };
   }
 
-  /** The project's first board, or a new one after the last. */
+  /** The project's first board the viewer may see, or a new one after the last. */
   async getOrCreateFirst(input: {
     projectId: string;
     viewer?: DashboardViewer;
   }): Promise<Dashboard> {
     const projectId = projectIdSchema.parse(input.projectId);
 
-    const first = await this.#repository.findFirstDashboard({ projectId });
-    if (first) return first;
+    const boards = await this.#repository.findAllDashboards({ projectId, graphKinds: [] });
+    const hidden = await this.#access.findHiddenBoardIds({ projectId, viewer: input.viewer });
+    const first = boards.find(({ id }) => !hidden.has(id));
+    if (first) {
+      const { graphCount: _graphCount, ...dashboard } = first;
+      return dashboard;
+    }
 
     return this.create({
       projectId,
       name: "Reports",
       ...(input.viewer === undefined ? {} : { createdById: input.viewer.userId }),
     });
-  }
-
-  // -- favourites ------------------------------------------------------------
-
-  /** The member's stars for this project, boards and templates, in their own order. */
-  async listStarred(input: { projectId: string; userId: string }): Promise<StarredDashboard[]> {
-    const projectId = projectIdSchema.parse(input.projectId);
-    return this.#repository.findStarred({ projectId, userId: input.userId });
-  }
-
-  /** Stars a board (it must exist) or a template (unchecked: the catalogue is browser-side). */
-  async star(input: {
-    projectId: string;
-    userId: string;
-    star: DashboardStar;
-  }): Promise<{ success: true }> {
-    const projectId = projectIdSchema.parse(input.projectId);
-    const star = dashboardStarSchema.parse(input.star);
-    if (star.kind === "board")
-      await this.#requireBoard({ projectId, dashboardId: star.dashboardId });
-    await this.#repository.addStar({ projectId, userId: input.userId, star });
-    return { success: true as const };
-  }
-
-  async unstar(input: {
-    projectId: string;
-    userId: string;
-    star: DashboardStar;
-  }): Promise<{ success: true }> {
-    const projectId = projectIdSchema.parse(input.projectId);
-    const star = dashboardStarSchema.parse(input.star);
-    await this.#repository.removeStar({ projectId, userId: input.userId, star });
-    return { success: true as const };
-  }
-
-  async reorderStars(input: {
-    projectId: string;
-    userId: string;
-    stars: DashboardStar[];
-  }): Promise<{ success: true }> {
-    const projectId = projectIdSchema.parse(input.projectId);
-    await this.#repository.reorderStars({
-      projectId,
-      userId: input.userId,
-      stars: input.stars.map((star) => dashboardStarSchema.parse(star)),
-    });
-    return { success: true as const };
-  }
-
-  /** Whether the project holds this board, for a peer placing a card on it. */
-  async boardExists(input: { projectId: string; dashboardId: string }): Promise<boolean> {
-    const ref = dashboardRef(input);
-    const [found] = await this.#repository.findDashboardIds({
-      projectId: ref.projectId,
-      dashboardIds: [ref.dashboardId],
-    });
-    return found !== undefined;
   }
 
   // -- graphs ----------------------------------------------------------------
@@ -297,11 +270,16 @@ export class DashboardService {
     viewer?: DashboardViewer;
   }): Promise<Graph[]> {
     const projectId = projectIdSchema.parse(input.projectId);
-    if (input.dashboardId !== undefined) {
-      const dashboardId = dashboardIdSchema.parse(input.dashboardId);
-      return this.#repository.findAllGraphs({ projectId, dashboardId });
-    }
-    return this.#repository.findAllGraphs({ projectId });
+    const hidden = await this.#access.findHiddenBoardIds({ projectId, viewer: input.viewer });
+    const graphs =
+      input.dashboardId === undefined
+        ? await this.#repository.findAllGraphs({ projectId })
+        : await this.#repository.findAllGraphs({
+            projectId,
+            dashboardId: dashboardIdSchema.parse(input.dashboardId),
+          });
+    // A graph on another member's Only me board is not there for this viewer.
+    return graphs.filter(({ dashboardId }) => dashboardId === null || !hidden.has(dashboardId));
   }
 
   async getGraph(input: {
@@ -313,6 +291,11 @@ export class DashboardService {
 
     const graph = await this.#repository.findGraph(parsed);
     if (!graph) throw new GraphNotFoundError(parsed.projectId);
+    const onBoard = graph.dashboardId;
+    const hidden =
+      onBoard !== null &&
+      (await this.#access.isHidden({ ...parsed, dashboardId: onBoard, viewer: input.viewer }));
+    if (hidden) throw new GraphNotFoundError(parsed.projectId);
 
     return graph;
   }
@@ -330,7 +313,7 @@ export class DashboardService {
     // schema is strict and flattens the grid onto the row, so spreading
     // `input` whole would offer it the `layout` key it refuses.
     // An empty `dashboardId` places the graph on no dashboard, as main's `&&` did.
-    const { layout: requestedLayout, viewer: _viewer, dashboardId, ...withoutLayout } = input;
+    const { layout: requestedLayout, viewer, dashboardId, ...withoutLayout } = input;
     const parsed = graphCreateInputSchema.parse({
       ...withoutLayout,
       ...requestedLayout,
@@ -338,7 +321,11 @@ export class DashboardService {
     });
 
     if (parsed.dashboardId !== undefined) {
-      await this.#requireBoard({ projectId: parsed.projectId, dashboardId: parsed.dashboardId });
+      await this.#access.getWritable({
+        projectId: parsed.projectId,
+        dashboardId: parsed.dashboardId,
+        viewer,
+      });
     }
 
     const nextGridRow =
@@ -374,10 +361,10 @@ export class DashboardService {
     filters?: Record<string, unknown>;
     viewer?: DashboardViewer;
   }): Promise<Graph> {
-    const { viewer: _viewer, ...fields } = input;
+    const { viewer, ...fields } = input;
     const parsed = graphUpdateInputSchema.parse(fields);
 
-    await this.getGraph({ projectId: parsed.projectId, graphId: parsed.graphId });
+    await this.getGraph({ projectId: parsed.projectId, graphId: parsed.graphId, viewer });
 
     return this.#repository.updateGraph({
       projectId: parsed.projectId,
@@ -395,7 +382,7 @@ export class DashboardService {
   }): Promise<Graph> {
     const parsed = graphRef(input);
 
-    await this.getGraph(parsed);
+    await this.getGraph({ ...parsed, viewer: input.viewer });
 
     return this.#repository.deleteGraph(parsed);
   }
@@ -410,7 +397,7 @@ export class DashboardService {
 
     const ref = graphRef(input);
 
-    await this.getGraph(ref);
+    await this.getGraph({ ...ref, viewer: input.viewer });
 
     return this.#repository.updateGraphLayout({ ...ref, layout });
   }
@@ -428,7 +415,7 @@ export class DashboardService {
     }));
 
     for (const item of layouts) {
-      await this.getGraph({ projectId, graphId: item.graphId });
+      await this.getGraph({ projectId, graphId: item.graphId, viewer: input.viewer });
     }
 
     await this.#repository.updateGraphLayouts({ projectId, layouts });
@@ -436,24 +423,17 @@ export class DashboardService {
     return { success: true as const };
   }
 
-  /** Raises the feature's own absence when the project holds no such board. */
-  async #requireBoard(ref: { projectId: string; dashboardId: string }): Promise<void> {
-    const [found] = await this.#repository.findDashboardIds({
-      projectId: ref.projectId,
-      dashboardIds: [ref.dashboardId],
-    });
-    if (found === undefined) throw new DashboardNotFoundError(ref.projectId);
-  }
-
   async #starredIds(input: {
     projectId: string;
     viewer?: DashboardViewer;
+    sharedProjectIds: readonly string[];
   }): Promise<ReadonlySet<string>> {
     if (input.viewer === undefined) return new Set();
     return new Set(
       await this.#repository.findStarredDashboardIds({
         projectId: input.projectId,
         userId: input.viewer.userId,
+        sharedProjectIds: input.sharedProjectIds,
       }),
     );
   }

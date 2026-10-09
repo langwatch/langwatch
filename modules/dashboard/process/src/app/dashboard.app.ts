@@ -15,6 +15,7 @@ import {
   type LangWatchQLQueryResult,
   type LangWatchQLTimeWindow,
 } from "@langwatch/analytics-contract";
+import { AuthzApi } from "@langwatch/authz-contract";
 import {
   AutomationApi,
   type AutomationApi as AutomationApiContract,
@@ -24,8 +25,12 @@ import {
   DashboardApi,
   DashboardsNotEnabledError,
   SavedWorkbenchChartDashboardNotFoundError,
+  SavedWorkbenchChartNotFoundError,
   dashboardConfig,
   type Dashboard,
+  type DashboardScope,
+  type DashboardScopeImpact,
+  type DashboardScopeProjects,
   type DashboardStar,
   type StarredDashboard,
   type DashboardGraphCountScope,
@@ -47,6 +52,9 @@ import { ProjectApi, type ProjectApi as ProjectApiContract } from "@langwatch/pr
 
 import type { DashboardRepositories } from "../repositories/dashboard.repositories.ts";
 import { dashboardPlatformUrl } from "../rules/dashboard-platform-url.rules.ts";
+import { DashboardAccessService } from "../services/dashboard-access.service.ts";
+import { DashboardScopeService } from "../services/dashboard-scope.service.ts";
+import { DashboardStarService } from "../services/dashboard-star.service.ts";
 import { DashboardWidgetService } from "../services/dashboard-widget.service.ts";
 import { DashboardService, type WorkbenchAccess } from "../services/dashboard.service.ts";
 import { SavedViewService } from "../services/saved-view.service.ts";
@@ -56,6 +64,7 @@ import { SourcePresenceService } from "../services/source-presence.service.ts";
 
 type DashboardDependencies = Readonly<{
   analytics: typeof AnalyticsApi;
+  authz: typeof AuthzApi;
   automation: typeof AutomationApi;
   projects: typeof ProjectApi;
 }>;
@@ -129,6 +138,7 @@ export class DashboardModule implements DashboardApi {
   static readonly contract = DashboardApi;
   static readonly dependencies = {
     analytics: AnalyticsApi,
+    authz: AuthzApi,
     automation: AutomationApi,
     projects: ProjectApi,
   };
@@ -136,6 +146,9 @@ export class DashboardModule implements DashboardApi {
   static readonly config = dashboardConfig;
 
   #dashboards: DashboardService;
+  #access: DashboardAccessService;
+  #stars: DashboardStarService;
+  #scopes: DashboardScopeService;
   #charts: SavedWorkbenchChartService;
   #savedViews: SavedViewService;
   #widgets: DashboardWidgetService;
@@ -157,6 +170,9 @@ export class DashboardModule implements DashboardApi {
   }: Readonly<{
     services: Readonly<{
       dashboards: DashboardService;
+      access: DashboardAccessService;
+      stars: DashboardStarService;
+      scopes: DashboardScopeService;
       charts: SavedWorkbenchChartService;
       savedViews: SavedViewService;
       widgets: DashboardWidgetService;
@@ -172,6 +188,9 @@ export class DashboardModule implements DashboardApi {
     publicBaseUrl: string | undefined;
   }>) {
     this.#dashboards = services.dashboards;
+    this.#access = services.access;
+    this.#stars = services.stars;
+    this.#scopes = services.scopes;
     this.#charts = services.charts;
     this.#savedViews = services.savedViews;
     this.#widgets = services.widgets;
@@ -189,14 +208,16 @@ export class DashboardModule implements DashboardApi {
     const analytics: AnalyticsApiContract = setup.dependencies.analytics;
     const workbenchAccess = new AnalyticsWorkbenchAccess(analytics);
     const workbenchCaller = new AnalyticsWorkbenchCaller(analytics);
-    const dashboards = DashboardService.create({
-      repository: setup.repositories.dashboards,
-      workbenchAccess,
-    });
+    const repository = setup.repositories.dashboards;
+    const { projects, authz } = setup.dependencies;
+    const access = DashboardAccessService.create({ repository, projects });
 
     return new DashboardModule({
       services: {
-        dashboards,
+        dashboards: DashboardService.create({ repository, workbenchAccess, access }),
+        access,
+        stars: DashboardStarService.create({ repository, access }),
+        scopes: DashboardScopeService.create({ repository, access, projects, authz }),
         charts: SavedWorkbenchChartService.create({
           repository: setup.repositories.dashboards,
           policy: SavedWorkbenchChartPolicyService.create({ analytics }),
@@ -206,7 +227,7 @@ export class DashboardModule implements DashboardApi {
         widgets: DashboardWidgetService.create({
           repository: setup.repositories.dashboardWidgets,
           analytics,
-          boards: dashboards,
+          boards: access,
         }),
         sourcePresence: SourcePresenceService.create({ analytics }),
       },
@@ -233,6 +254,7 @@ export class DashboardModule implements DashboardApi {
     projectId: string;
     graphCountScope: DashboardGraphCountScope;
     viewer?: DashboardViewer;
+    includeOrganization?: boolean;
   }): Promise<DashboardSummary[]> {
     return this.#dashboards.getAll(input);
   }
@@ -286,7 +308,7 @@ export class DashboardModule implements DashboardApi {
 
   /** The member's stars (boards and templates) for this project, in their own order. */
   listStarred(input: { projectId: string; userId: string }): Promise<StarredDashboard[]> {
-    return this.#dashboards.listStarred(input);
+    return this.#stars.listStarred(input);
   }
 
   /** Stars a board or template for the member; appends at the end and is idempotent. */
@@ -295,7 +317,7 @@ export class DashboardModule implements DashboardApi {
     userId: string;
     star: DashboardStar;
   }): Promise<{ success: true }> {
-    return this.#dashboards.star(input);
+    return this.#stars.star(input);
   }
 
   unstar(input: {
@@ -303,7 +325,7 @@ export class DashboardModule implements DashboardApi {
     userId: string;
     star: DashboardStar;
   }): Promise<{ success: true }> {
-    return this.#dashboards.unstar(input);
+    return this.#stars.unstar(input);
   }
 
   /** Rewrites the member's star order from the stars given, in the order given. */
@@ -312,7 +334,7 @@ export class DashboardModule implements DashboardApi {
     userId: string;
     stars: DashboardStar[];
   }): Promise<{ success: true }> {
-    return this.#dashboards.reorderStars(input);
+    return this.#stars.reorderStars(input);
   }
 
   /** Where a reader opens each of these dashboards. */
@@ -347,6 +369,37 @@ export class DashboardModule implements DashboardApi {
   }): Promise<Dashboard> {
     await this.#requireDashboardsEnabled(input.projectId);
     return this.#dashboards.updateDetails(input);
+  }
+
+  /** Who sees a board: the author's call alone, made in the project that owns it. */
+  async setDashboardScope(input: {
+    projectId: string;
+    dashboardId: string;
+    scope: DashboardScope;
+    viewer: DashboardViewer;
+  }): Promise<Dashboard> {
+    await this.#requireDashboardsEnabled(input.projectId);
+    return this.#scopes.setScope(input);
+  }
+
+  /** How many other members starred the author's board, for the confirmation that asks first. */
+  async getDashboardScopeImpact(input: {
+    projectId: string;
+    dashboardId: string;
+    viewer: DashboardViewer;
+  }): Promise<DashboardScopeImpact> {
+    await this.#requireDashboardsEnabled(input.projectId);
+    return this.#scopes.getImpact(input);
+  }
+
+  /** The projects an Organization board opens under for this member. */
+  async listDashboardScopeProjects(input: {
+    projectId: string;
+    dashboardId: string;
+    viewer: DashboardViewer;
+  }): Promise<DashboardScopeProjects> {
+    await this.#requireDashboardsEnabled(input.projectId);
+    return this.#scopes.listProjects(input);
   }
 
   /** Whether each Flight Deck source ever recorded a row, as this member reads the project. */
@@ -450,9 +503,10 @@ export class DashboardModule implements DashboardApi {
     return this.#analytics.assertCustomChartPlaygroundEnabled(input);
   }
 
-  /** The project's custom chart widgets. */
+  /** The project's custom chart widgets, or one board's, the organization's boards included. */
   listDashboardWidgets(input: {
     projectId: string;
+    dashboardId?: string;
     viewer?: DashboardViewer;
   }): Promise<DashboardWidget[]> {
     return this.#widgets.getAll(input);
@@ -608,7 +662,11 @@ export class DashboardModule implements DashboardApi {
   }): Promise<SavedWorkbenchChart[]> {
     await this.#requireWorkbench(input.projectId);
 
-    return this.#charts.getAll({ projectId: input.projectId });
+    const [charts, hidden] = await Promise.all([
+      this.#charts.getAll({ projectId: input.projectId }),
+      this.#access.findHiddenBoardIds(input),
+    ]);
+    return charts.filter(({ dashboardId }) => dashboardId === null || !hidden.has(dashboardId));
   }
 
   /** One saved chart, with its query, parameters and specification. */
@@ -734,7 +792,7 @@ export class DashboardModule implements DashboardApi {
   }): Promise<SavedWorkbenchChart> {
     const { viewer, ...placement } = input;
     const { projectId, chartId, dashboardId } = placement;
-    if (!(await this.#dashboards.boardExists({ projectId, dashboardId }))) {
+    if (!(await this.#access.isWritable({ projectId, dashboardId, viewer }))) {
       throw new SavedWorkbenchChartDashboardNotFoundError();
     }
     await this.#getVisibleChart({ projectId, chartId, viewer });
@@ -754,13 +812,19 @@ export class DashboardModule implements DashboardApi {
     return this.#charts.unplace({ projectId: input.projectId, chartId: input.chartId });
   }
 
-  /** A chart the project does not hold reads as not there. */
+  /** A chart placed on a board the viewer may not see reads as one that is not there. */
   async #getVisibleChart(input: {
     projectId: string;
     chartId: string;
     viewer?: DashboardViewer;
   }): Promise<SavedWorkbenchChart> {
-    return this.#charts.getById({ projectId: input.projectId, chartId: input.chartId });
+    const { projectId, viewer } = input;
+    const chart = await this.#charts.getById({ projectId, chartId: input.chartId });
+    const { dashboardId } = chart;
+    if (dashboardId !== null && (await this.#access.isHidden({ projectId, dashboardId, viewer }))) {
+      throw new SavedWorkbenchChartNotFoundError();
+    }
+    return chart;
   }
 
   /** Runs one saved chart for a member, over the period the surface asks for. */

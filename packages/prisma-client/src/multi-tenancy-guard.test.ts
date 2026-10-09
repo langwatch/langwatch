@@ -1513,3 +1513,44 @@ describe("guardOrganizationId — organizationId as an operator or a composite k
     });
   });
 });
+
+/** The shapes the dashboard repository reads an Organization board with (dashboards-v2 AC172). */
+describe("guardProjectId — Dashboard scope reads", () => {
+  const reach = [{ projectId: "project_a" }, { organizationId: "org_a", scope: "ORGANIZATION" }];
+
+  describe("when a read reaches the project's boards and its organization's shared ones", () => {
+    it.each([
+      ["findMany", { OR: reach }],
+      ["findFirst", { id: "dashboard_1", OR: reach }],
+      ["findMany", { id: { in: ["dashboard_1"] }, OR: reach }],
+    ])("permits Dashboard.%s where %o", async (action, where) => {
+      await expect(runGuard({ model: "Dashboard", action, args: { where } })).resolves.toBe("ok");
+    });
+
+    it("permits a member's stars across the projects that own the listed boards", async () => {
+      const where = {
+        userId: "user_1",
+        OR: [
+          { projectId: "project_a" },
+          { projectId: { in: ["project_a", "project_b"] }, dashboardId: { not: null } },
+        ],
+      };
+
+      await expect(
+        runGuard({ model: "DashboardFavourite", action: "findMany", args: { where } }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("when one alternative names no tenant", () => {
+    it.each([
+      ["Dashboard", { OR: [{ projectId: "project_a" }, { scope: "ORGANIZATION" }] }],
+      ["Dashboard", { id: "dashboard_1" }],
+      ["DashboardFavourite", { userId: "user_1", OR: [{ projectId: "p" }, { dashboardId: "d" }] }],
+    ])("refuses %s where %o", async (model, where) => {
+      await expect(runGuard({ model, action: "findMany", args: { where } })).rejects.toThrow(
+        /projectId/,
+      );
+    });
+  });
+});

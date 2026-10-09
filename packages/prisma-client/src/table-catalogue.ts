@@ -1033,6 +1033,8 @@ export const prismaModelFieldCatalogue = {
     "order",
     "description",
     "createdById",
+    "scope",
+    "organizationId",
     "createdAt",
     "updatedAt",
     "graphs"

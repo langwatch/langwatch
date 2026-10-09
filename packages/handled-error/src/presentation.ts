@@ -578,6 +578,15 @@ const presentations = {
     title: "Dashboard not found",
     describe: () => "It may have been deleted. Reload to see the current list.",
   },
+  dashboard_read_only_here: {
+    title: "This dashboard is read-only here",
+    describe: () =>
+      "Another project owns it, so it can be changed only there. Duplicate it to get a copy you can edit in this project.",
+  },
+  dashboard_scope_author_only: {
+    title: "Only the person who made this dashboard can change its scope",
+    describe: () => "Ask them to change who can see it, or duplicate it to get your own copy.",
+  },
   dashboards_not_enabled: {
     title: "Dashboards aren't switched on here",
     describe: () => "This project doesn't have Dashboards enabled yet.",

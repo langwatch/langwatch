@@ -1,7 +1,7 @@
 /**
  * The server half of `dashboards.*`. Reading takes `analytics:view`; creating
- * `analytics:create`, editing `analytics:update`, removing `analytics:delete`.
- * Starring is personal, so it takes only `analytics:view` and names the actor.
+ * `analytics:create`, editing `analytics:update`, removing `analytics:delete`. Starring is
+ * personal: `analytics:view`, naming the actor. Scope is an edit; the service asks for the author.
  */
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { DashboardApi, dashboardTrpc } from "@langwatch/dashboard-contract";
@@ -15,6 +15,7 @@ export const dashboardTrpcTransport: TrpcRouterDeclaration<DashboardApi, typeof 
         projectId: input.projectId,
         graphCountScope: "builder",
         viewer: { userId: actor.id },
+        ...(input.includeOrganization === true ? { includeOrganization: true } : {}),
       });
 
       return dashboards.map(({ graphCount, ...dashboard }) => ({
@@ -85,6 +86,37 @@ export const dashboardTrpcTransport: TrpcRouterDeclaration<DashboardApi, typeof 
         viewer: { userId: actor.id },
         ...(input.name === undefined ? {} : { name: input.name }),
         ...(input.description === undefined ? {} : { description: input.description }),
+      }),
+    )
+
+    .procedure("setScope")
+    .withPermission("analytics:update")
+    .handle(async ({ app, input, actor }) =>
+      app.setDashboardScope({
+        projectId: input.projectId,
+        dashboardId: input.dashboardId,
+        scope: input.scope,
+        viewer: { userId: actor.id },
+      }),
+    )
+
+    .procedure("scopeImpact")
+    .withPermission("analytics:view")
+    .handle(async ({ app, input, actor }) =>
+      app.getDashboardScopeImpact({
+        projectId: input.projectId,
+        dashboardId: input.dashboardId,
+        viewer: { userId: actor.id },
+      }),
+    )
+
+    .procedure("scopeProjects")
+    .withPermission("analytics:view")
+    .handle(async ({ app, input, actor }) =>
+      app.listDashboardScopeProjects({
+        projectId: input.projectId,
+        dashboardId: input.dashboardId,
+        viewer: { userId: actor.id },
       }),
     )
 
