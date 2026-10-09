@@ -31,7 +31,13 @@ afterEach(async () => {
   }
 });
 
-async function bootThread({ onProxied }: { onProxied: () => void }): Promise<LivenessThread> {
+async function bootThread({
+  onProxied,
+  holdWindowMs = 20,
+}: {
+  onProxied: () => void;
+  holdWindowMs?: number;
+}): Promise<LivenessThread> {
   const listener = http.createServer((_req, res) => {
     onProxied();
     res.writeHead(200, { "Content-Type": "text/plain" }).end("main");
@@ -47,6 +53,7 @@ async function bootThread({ onProxied }: { onProxied: () => void }): Promise<Liv
     heartbeat: heartbeat.buffer,
     proxyPort: address.port,
     logger,
+    holdWindowMs,
   });
   threads.push(thread);
   return thread;
@@ -133,6 +140,49 @@ describe("the upgrade holding page", () => {
         const response = await fetch(urlOf(thread.address, LIVENESS_PATH));
 
         expect(response.status).toBe(200);
+      });
+    });
+
+    describe("when a request arrives and the hold lifts within the hold window", () => {
+      /** @scenario "A held request waits for the hold to lift and then reaches the main thread" */
+      it("parks the request and proxies it once the hold lifts", async () => {
+        const onProxied = vi.fn();
+        const thread = await bootThread({ onProxied, holdWindowMs: 5_000 });
+        await thread.hold(holding);
+
+        const pending = fetch(urlOf(thread.address, "/api/otel/v1/traces"), {
+          method: "POST",
+          body: "spans",
+        });
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        expect(onProxied).not.toHaveBeenCalled();
+        await thread.hold(undefined);
+        const response = await pending;
+
+        expect(response.status).toBe(200);
+        expect(await response.text()).toBe("main");
+        expect(onProxied).toHaveBeenCalledOnce();
+      });
+    });
+
+    describe("when the hold moves to upgrading and the parked request's route is declared", () => {
+      /** @scenario "A held request is released once its route serves while upgrading" */
+      it("proxies the declared request and keeps holding the undeclared one", async () => {
+        const onProxied = vi.fn();
+        const thread = await bootThread({ onProxied, holdWindowMs: 300 });
+        await thread.hold(holding);
+
+        const ingest = fetch(urlOf(thread.address, "/api/otel/v1/traces"), { method: "POST" });
+        const other = fetch(urlOf(thread.address, "/api/datasets"), { method: "POST" });
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        await thread.hold(
+          { phase: UPGRADING_PHASE, outstandingStepIds: ["clickhouse:00042"] },
+          { paths: [], routes: ["^POST /api/otel/v1/traces$"] },
+        );
+
+        expect((await ingest).status).toBe(200);
+        expect((await other).status).toBe(503);
+        expect(onProxied).toHaveBeenCalledOnce();
       });
     });
 

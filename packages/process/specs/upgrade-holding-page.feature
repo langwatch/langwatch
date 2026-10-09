@@ -4,12 +4,16 @@ Feature: The liveness door holds browsers on a static page while an upgrade runs
   upgrade run ends. The early liveness door serves an unauthenticated static
   "LangWatch is upgrading" page naming the phase and the outstanding step ids
   only: no tenant, error, hostname or version detail (Q-U4, plan
-  dev/docs/plans/upgrade-ui-2026-10-06.md).
+  dev/docs/plans/upgrade-ui-2026-10-06.md). A held request first waits up to
+  the hold window (30 s) for the hold to lift or its route to serve, so a short
+  schema step drops nothing (Alex, 2026-10-09, API-UP-DURING-UPGRADE); only a
+  request still held when the window ends sees the page or the 503.
 
   @unit
   Scenario: A browser sees the holding page while an upgrade holds the door
     Given the liveness thread is holding for an upgrade in the "schema" phase with two outstanding steps
     When a browser requests any page with an Accept header naming text/html
+    And the hold window ends with the hold still in place
     Then it answers 503 with an HTML page naming the phase and both step ids
     And it carries a Retry-After header and is never cached
 
@@ -17,6 +21,7 @@ Feature: The liveness door holds browsers on a static page while an upgrade runs
   Scenario: An API caller keeps a plain 503 with a retry header while an upgrade holds the door
     Given the liveness thread is holding for an upgrade
     When a JSON client requests an API path
+    And the hold window ends with the hold still in place
     Then it answers 503 in plain text with a Retry-After header
     And the main thread never sees the request
 
@@ -77,3 +82,18 @@ Feature: The liveness door holds browsers on a static page while an upgrade runs
     When a request names that route's method and path, and another names a route that is not declared
     Then the declared route reaches the main thread
     And the other answers 503 before the main thread sees it
+
+  @unit
+  Scenario: A held request waits for the hold to lift and then reaches the main thread
+    Given the liveness thread is holding for an upgrade
+    When an SDK posts traces and the hold lifts within the hold window
+    Then the request reaches the main thread and its answer is the main thread's
+    And the SDK never sees the holding answer
+
+  @unit
+  Scenario: A held request is released once its route serves while upgrading
+    Given the liveness thread is holding in the schema phase
+    And an SDK has posted traces and a client has posted to an undeclared route
+    When the hold moves to the upgrading phase with the trace route declared
+    Then the trace request reaches the main thread
+    And the undeclared request is answered 503 when the hold window ends

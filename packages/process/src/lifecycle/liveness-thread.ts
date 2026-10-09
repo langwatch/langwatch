@@ -22,6 +22,8 @@ export const MAIN_THREAD_PROXY_TIMEOUT_MS = 10_000;
 const BIND_HANDOVER_MS = 10_000;
 /** How long a caller held off by an upgrade waits before trying again; the page refreshes on it. */
 export const UPGRADE_RETRY_AFTER_SECONDS = 10;
+/** A held request waits this long for its route to pass before it is answered held (API-UP). */
+export const UPGRADE_HOLD_WINDOW_MS = 30_000;
 
 /** The failure console's forms (UPGRADE-CONSOLE, 2026-10-09); answered only while it shows. */
 export const UPGRADE_CONSOLE_PATH = "/_upgrade/console";
@@ -155,6 +157,28 @@ const answerHolding = (req, res) => {
     "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'",
   }).end(html ? holdingPage : "LangWatch is upgrading");
 };
+const parked = new Set();
+const releaseParked = () => {
+  for (const release of [...parked]) release();
+};
+// API-UP-DURING-UPGRADE: a held request waits for the hold to lift or its route to pass.
+const park = (req, res) => {
+  const release = () => {
+    if (holdingPage !== null && !passes(req) && consoleHold === null) return;
+    settle();
+    serveOrHold(req, res);
+  };
+  const timer = setTimeout(() => {
+    settle();
+    serveOrHold(req, res);
+  }, workerData.holdWindowMs);
+  const settle = () => {
+    clearTimeout(timer);
+    parked.delete(release);
+  };
+  parked.add(release);
+  res.on("close", settle);
+};
 const passes = (req) => {
   const path = String(req.url).split("?")[0];
   const route = req.method + " " + path;
@@ -258,13 +282,16 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, { "Content-Type": "text/plain" }).end("ready");
     return;
   }
-  const held = holdingPage !== null && !passes(req);
-  if (held && consoleHold !== null) {
-    answerFailed(req, res);
+  if (holdingPage !== null && !passes(req) && consoleHold === null) {
+    park(req, res);
     return;
   }
-  if (held) {
-    answerHolding(req, res);
+  serveOrHold(req, res);
+});
+const serveOrHold = (req, res) => {
+  if (holdingPage !== null && !passes(req)) {
+    if (consoleHold !== null) answerFailed(req, res);
+    else answerHolding(req, res);
     return;
   }
   const upstream = http.request({ ...target, method: req.method, path: req.url, headers: req.headers, agent: false });
@@ -288,7 +315,7 @@ const server = http.createServer((req, res) => {
     unavailable(res, "main thread did not answer");
   });
   req.pipe(upstream);
-});
+};
 server.on("upgrade", (req, socket, head) => {
   if (holdingPage !== null) {
     socket.end("HTTP/1.1 503 Service Unavailable\\r\\nRetry-After: " + workerData.retryAfterSeconds + "\\r\\nConnection: close\\r\\nContent-Length: 0\\r\\n\\r\\n");
@@ -323,6 +350,7 @@ parentPort.on("message", (message) => {
     passThrough = { paths: message.paths, routes: message.routes.map((source) => new RegExp(source)) };
     consoleHold = null;
     if (message.page === null) sessions.length = 0;
+    releaseParked();
     parentPort.postMessage({ type: "held" });
     return;
   }
@@ -338,6 +366,7 @@ parentPort.on("message", (message) => {
       expiresAt: Date.now() + message.tokenTtlMs,
       used: false,
     };
+    releaseParked();
     return;
   }
   if (message.type !== "close") return;
@@ -400,6 +429,7 @@ export async function startLivenessThread({
   logger,
   stallBudgetMs = HEARTBEAT_STALL_BUDGET_MS,
   proxyTimeoutMs = MAIN_THREAD_PROXY_TIMEOUT_MS,
+  holdWindowMs = UPGRADE_HOLD_WINDOW_MS,
 }: {
   port: number;
   heartbeat: SharedArrayBuffer;
@@ -410,6 +440,8 @@ export async function startLivenessThread({
   logger: LivenessLogger;
   stallBudgetMs?: number;
   proxyTimeoutMs?: number;
+  /** How long a held request waits for its route to pass (UPGRADE_HOLD_WINDOW_MS). */
+  holdWindowMs?: number;
 }): Promise<LivenessThread> {
   const thread = new Worker(LIVENESS_THREAD_SOURCE, {
     eval: true,
@@ -425,6 +457,7 @@ export async function startLivenessThread({
       readinessPath: READINESS_PATH,
       handoverMs: BIND_HANDOVER_MS,
       retryAfterSeconds: UPGRADE_RETRY_AFTER_SECONDS,
+      holdWindowMs,
       consolePath: UPGRADE_CONSOLE_PATH,
       retryPath: UPGRADE_RETRY_PATH,
       consoleCookie: UPGRADE_CONSOLE_COOKIE,
