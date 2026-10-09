@@ -132,6 +132,13 @@ does not rise); `pnpm lint:architecture --policies peer-cycles` (must not rise).
   own host (`useGatewayHost()` / `useOrganizationHost()`); `team-form.tsx`'s `hasOrgPermission`
   reads `host.hasOrganizationPermission`. Both module shims dropped their permission fields. Bound
   by one test per module (`*-host-permission-reads.integration.test.tsx`).
+- Batch 4d tail (SK-LANGY-ORG, Alex 2026-10-09): `LangyHostApi.hasOrganizationPermission` answers
+  from the session as organization's host does; the make-default ask and the plan limit card read
+  it; langy's scope shim dropped `hasOrgPermission`. Bound in `langy-host-mount` test. No production
+  reader of the scope host's permissions remains (`git grep`, 2026-10-09).
+- Batch 5 not started: the scope host's `isLoading` answers `permissions.isLoading` from the
+  session (`ui-scope-capability.ts` `legacyScopeHost`); dropping the session from
+  `createBrowserUiScope` needs a ruling on what it answers instead (see the sk-batch5 handoff).
 - The batch 2 outline's `apps/ui` test is blocked on a decision: apps/ui reaches a module only
   through `./declaration`, so it cannot import `useTraceHost`/`useScenarioHost` to ask the host;
   see the sk-batch4 handoff for options.

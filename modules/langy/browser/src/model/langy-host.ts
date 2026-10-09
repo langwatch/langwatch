@@ -59,6 +59,9 @@ export abstract class LangyHostApi {
 
   abstract hasPermission(permission: string): boolean;
 
+  /** Asked of the organization alone: a grant held only on a team or project reads false. */
+  abstract hasOrganizationPermission(permission: string): boolean;
+
   abstract isLoading(): boolean;
 
   /**

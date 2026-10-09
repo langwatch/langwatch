@@ -21,7 +21,7 @@ type ResolvedDefault = Parameters<typeof makeDefaultOffer>[0]["resolvedDefault"]
  * current default lives at, and only to someone who can manage that scope.
  */
 export function useLangyMakeDefault({ resolvedDefault }: { resolvedDefault: ResolvedDefault }) {
-  const { organization, team, project, hasOrgPermission } = useOrganizationTeamProject();
+  const { organization, team, project } = useOrganizationTeamProject();
   const langyHost = useLangyHost();
   const projectId = project?.id;
   const utils = api.useUtils();
@@ -39,7 +39,7 @@ export function useLangyMakeDefault({ resolvedDefault }: { resolvedDefault: Reso
       picked,
       resolvedDefault,
       canManage: {
-        organization: hasOrgPermission("organization:manage"),
+        organization: langyHost.hasOrganizationPermission("organization:manage"),
         team: langyHost.hasPermission("team:manage"),
         project: langyHost.hasPermission("project:update"),
       },
