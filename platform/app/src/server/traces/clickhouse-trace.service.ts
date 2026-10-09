@@ -1830,14 +1830,20 @@ export class ClickHouseTraceService {
           "lower(ifNull(ts.TraceName, ''))",
         ];
 
-        // Non-root span names live in `stored_spans`, probed with the same
-        // correlated EXISTS shape the span filters in `filter-conditions.ts`
-        // use. The StartTime bound keeps it partition-pruned instead of
-        // cold-scanning every weekly partition, matching `buildSpanTimeBound`.
-        const spanNameSearch = `EXISTS (
-                    SELECT 1 FROM stored_spans sp
-                    WHERE sp.TenantId = ts.TenantId
-                      AND sp.TraceId = ts.TraceId
+        // Non-root span names live in `stored_spans`. The matching trace ids
+        // are collected as a set, not probed with a correlated EXISTS as the
+        // span filters in `filter-conditions.ts` are. Those filters are ANDed,
+        // while this branch is ORed with the text matches, and ClickHouse turns
+        // a correlated EXISTS under an OR into a join whose filter runs after
+        // it: every trace in the window is then read with its full captured
+        // input and output and carried through the join before a single row is
+        // dropped. A set keeps the whole search a predicate on trace_summaries
+        // alone, so it is applied as the rows are read. The StartTime bound
+        // keeps the span read partition-pruned instead of cold-scanning every
+        // weekly partition, matching `buildSpanTimeBound`.
+        const spanNameSearch = `ts.TraceId IN (
+                    SELECT sp.TraceId FROM stored_spans sp
+                    WHERE sp.TenantId = {tenantId:String}
                       AND sp.StartTime >= fromUnixTimestamp64Milli({startDate:UInt64})
                       AND sp.StartTime <= fromUnixTimestamp64Milli({endDate:UInt64})
                       AND lower(sp.SpanName) LIKE {searchQuery:String}

@@ -613,9 +613,17 @@ describe("ClickHouseTraceService", () => {
         const sql = mockClickHouseQuery.mock.calls[callIdx as number]![0].query;
         expect(sql).toContain("FROM stored_spans sp");
         expect(sql).toContain("lower(sp.SpanName) LIKE {searchQuery:String}");
-        // Correlated on the outer row and bounded, so it prunes partitions
-        // instead of cold-scanning every weekly partition.
-        expect(sql).toContain("sp.TraceId = ts.TraceId");
+        // A set of matching trace ids rather than a correlated EXISTS: under
+        // the OR, a correlated probe becomes a join that carries every trace's
+        // captured input and output before filtering.
+        expect(sql).toMatch(
+          /ts\.TraceId IN \(\s*SELECT sp\.TraceId FROM stored_spans sp/,
+        );
+        expect(sql).not.toContain("EXISTS");
+        expect(sql).not.toContain("sp.TraceId = ts.TraceId");
+        // Tenant-scoped and time-bounded, so it prunes partitions instead of
+        // cold-scanning every weekly partition.
+        expect(sql).toContain("sp.TenantId = {tenantId:String}");
         expect(sql).toContain(
           "sp.StartTime >= fromUnixTimestamp64Milli({startDate:UInt64})",
         );
@@ -644,16 +652,16 @@ describe("ClickHouseTraceService", () => {
         // Presence alone would pass just as happily if the branches were
         // AND-joined, which is the actual regression to fear: an AND of four
         // substring tests matches nothing. Pin the join operator. The slice
-        // stops at EXISTS so the span subquery's own internal ANDs (its tenant,
-        // trace and time predicates) stay out of the assertion.
+        // stops at the span-name set so the subquery's own internal ANDs (its
+        // tenant and time predicates) stay out of the assertion.
         const columnBranches = sql.slice(
           sql.indexOf("lower(ifNull(ts.ComputedInput, ''))"),
-          sql.indexOf("EXISTS ("),
+          sql.indexOf("ts.TraceId IN ("),
         );
         expect(columnBranches).toContain(" OR ");
         expect(columnBranches).not.toContain(" AND ");
         // ...and the span branch is OR-ed onto them, not AND-ed.
-        expect(sql).toContain("OR EXISTS (");
+        expect(sql).toContain("OR ts.TraceId IN (");
       });
 
       // The 3-char floor exists because the ngrambf_v1 skip indexes are
