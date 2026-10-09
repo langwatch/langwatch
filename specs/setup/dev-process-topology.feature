@@ -174,9 +174,10 @@ Feature: The local development process topology
 
   # haven's own watch replaced air: it builds ./cmd/service into
   # .bin/combined/<lane> and runs `combined` from it. Tests are not watched.
+  # It is on by default (HAVEN-WATCH-DEFAULT); LANGWATCH_GO_WATCH=0 or --watch=false turns it off.
   @unit
   Scenario: A watched go lane runs haven's own Go watch, not air
-    Given a stack started with LANGWATCH_GO_WATCH=1 or --watch
+    Given a stack started with no watch setting
     When haven plans the go lane
     Then the lane runs "haven go-watch" with the lane's binary path and services
     And no lane runs "make service-watch"
@@ -200,6 +201,12 @@ Feature: The local development process topology
     When a Go change does not compile
     Then the compile error is written to the go lane's log
     And the running child keeps serving until a later change builds
+
+  @unit
+  Scenario: The Go watcher is on unless switched off
+    Given LANGWATCH_GO_WATCH is unset
+    Then haven watches the Go services
+    And LANGWATCH_GO_WATCH=0 or "haven up --watch=false" runs them without a watcher
 
   # --- The api lane reloads in-process (ADR-168, B1) ---
 
@@ -271,11 +278,21 @@ Feature: The local development process topology
 
   # Plain `pnpm dev` and `haven up` run the ui's Vite server, the api and the
   # worker as one `app` lane; LANGWATCH_DEV_ONE_PROCESS=0 is the opt-out.
+  @unit
   Scenario: A local stack runs the ui, the api and the worker in one process unless split
     Given a contributor starts a stack with plain pnpm dev or haven up
     When LANGWATCH_DEV_ONE_PROCESS is unset
     Then one app lane hosts the ui's Vite server, the api and the worker
     And setting LANGWATCH_DEV_ONE_PROCESS=0 runs a ui lane and a backend lane instead
+    And the same switch folds the simulators into the go lane, and =0 gives them a sims lane
+
+  # HAVEN-ONE-SWITCH: the old Go name is read only while the new one is unset.
+  @unit
+  Scenario: LANGWATCH_GO_ONE_PROCESS is a warned alias of the one switch
+    Given LANGWATCH_DEV_ONE_PROCESS is unset and LANGWATCH_GO_ONE_PROCESS is set
+    When haven up reads its options
+    Then the alias value is used and one deprecation warning names LANGWATCH_DEV_ONE_PROCESS
+    And haven up refuses to start when both are set and disagree
 
   # The one-process host debounces exactly as the split backend lane does: its
   # watch is live before the first boot, and that boot is a reload too.

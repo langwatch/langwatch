@@ -112,7 +112,7 @@ pnpm dev:worker     # the background worker alone, its own process
 
 Locally the ui, the api and the worker share ONE process — the `app` lane — and
 the Go data-plane services share another (`go`). `LANGWATCH_DEV_ONE_PROCESS=0`
-splits the app lane into a `ui` lane and a `backend` lane (api + worker). It is a launcher, not a process
+splits the app lane into a `ui` lane and a `backend` lane (api + worker), and the Go lane into `go` and `sims`. It is a launcher, not a process
 role: each application still parses its own config and composes its own graph,
 and `dev:api` + `dev:worker` still run them apart when you need the production
 process shape. A backend change reloads the api and the worker in-process and the

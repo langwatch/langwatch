@@ -21,14 +21,15 @@ trial, and the four open questions at the foot of the ADR are Alex's, not answer
 
 | Shape               | Node processes                                                   | Start                                                           | Reload                                                      |
 | ------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | ----------------------------------------------------------- |
-| Split (default)     | `ui` lane (Vite) + `backend` lane (api and worker in one `node`) | `pnpm dev`                                                      | re-links only what a change reaches, in process (see below) |
-| One process (trial) | one `app` lane: Vite, api and worker                             | `LANGWATCH_DEV_ONE_PROCESS=1 pnpm dev`, or `pnpm dev:one` alone | re-links only what a change reaches, in process             |
+| Split               | `ui` lane (Vite) + `backend` lane (api and worker in one `node`) | `LANGWATCH_DEV_ONE_PROCESS=0 pnpm dev`                          | re-links only what a change reaches, in process (see below) |
+| One process (default) | one `app` lane: Vite, api and worker                             | `pnpm dev`, or `pnpm dev:one` alone                             | re-links only what a change reaches, in process             |
 
 - `pnpm dev` is `dev-supervisor.mjs` over `dev/scripts/dev-stack.sh`, which runs the lanes
   through `concurrently`: `ui`, `go`, `langy`, then `backend` (or `app`). It migrates once
   before any lane starts. Run it from the root.
-- Under haven the same switch applies: `LANGWATCH_DEV_ONE_PROCESS=1` in the environment or
-  `.env`, then `haven up -f`. `haven logs ui|api|worker` then read the one `app` capture,
+- Under haven the same switch applies, and it also folds the simulators into the Go lane:
+  `LANGWATCH_DEV_ONE_PROCESS=0` in the environment or `.env`, then `haven up -f`, splits both.
+  `LANGWATCH_GO_ONE_PROCESS` is a deprecated alias (warned; refused if it disagrees). `haven logs ui|api|worker` then read the one `app` capture,
   and `haven restart ui` or `api` restarts the whole process (`dev/docs/LOCAL_STACK.md`,
   section "One process").
 - Other scripts in the root `package.json`: `dev:ui`, `dev:api`, `dev:worker`,

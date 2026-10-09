@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -403,10 +404,11 @@ func observabilityLimits(ram uint64, cpus int) domain.ObservabilityLimits {
 }
 
 func optionsFromEnv(repoRoot string) app.PlanOptions {
+	isOneProcess, _, _ := readOneProcess()
 	return app.PlanOptions{
-		ShouldGoWatch:           devEnv("LANGWATCH_GO_WATCH") == "1",
-		ShouldRunOneProcess:     devEnv("LANGWATCH_DEV_ONE_PROCESS") != "0",
-		ShouldRunGoAsOneProcess: devEnv("LANGWATCH_GO_ONE_PROCESS") == "1",
+		ShouldGoWatch:           devEnv("LANGWATCH_GO_WATCH") != "0",
+		ShouldRunOneProcess:     isOneProcess,
+		ShouldRunGoAsOneProcess: isOneProcess,
 		ShouldSeed:              os.Getenv("LANGWATCH_SEED") == "1",
 		// What the langyagent worker's local isolation posture is resolved from;
 		// `up` settles it against this machine before it builds the stack. Default
@@ -418,6 +420,43 @@ func optionsFromEnv(repoRoot string) app.PlanOptions {
 		IsStub:           os.Getenv("HAVEN_STUB") == "1",
 		RepoRoot:         repoRoot,
 	}
+}
+
+// readOneProcess reads the one switch that splits (=0) or folds both the Node
+// app lane and the Go lane: LANGWATCH_DEV_ONE_PROCESS, with the old
+// LANGWATCH_GO_ONE_PROCESS read only when the new name is unset.
+func readOneProcess() (isOneProcess, isAlias bool, err error) {
+	newVal, _ := dotenvLookup("LANGWATCH_DEV_ONE_PROCESS")
+	oldVal, _ := dotenvLookup("LANGWATCH_GO_ONE_PROCESS")
+	return resolveOneProcess(newVal, oldVal)
+}
+
+// resolveOneProcess is the pure rule: an empty value is unset, "0" splits and
+// anything else folds; the alias is refused when it disagrees with the new name.
+func resolveOneProcess(newVal, oldVal string) (isOneProcess, isAlias bool, err error) {
+	if !isSet(oldVal) {
+		return newVal != "0", false, nil
+	}
+	if !isSet(newVal) {
+		return oldVal != "0", true, nil
+	}
+	if (newVal != "0") != (oldVal != "0") {
+		return newVal != "0", true, fmt.Errorf(
+			"LANGWATCH_DEV_ONE_PROCESS=%s and LANGWATCH_GO_ONE_PROCESS=%s disagree — LANGWATCH_DEV_ONE_PROCESS is the one switch for the Node app lane and the Go lane; remove LANGWATCH_GO_ONE_PROCESS",
+			newVal, oldVal,
+		)
+	}
+	return newVal != "0", true, nil
+}
+
+// checkOneProcessEnv refuses a disagreeing pair and warns once that the old
+// name is deprecated.
+func checkOneProcessEnv(warn io.Writer) error {
+	_, isAlias, err := readOneProcess()
+	if isAlias && err == nil {
+		fmt.Fprintln(warn, "haven: LANGWATCH_GO_ONE_PROCESS is deprecated; LANGWATCH_DEV_ONE_PROCESS=0 now splits both the Node app lane and the Go lane")
+	}
+	return err
 }
 
 // langyTierRequest reads the two isolation knobs and the environment this

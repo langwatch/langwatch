@@ -195,7 +195,11 @@ unchanged, still proxying `/api`) and loads the api and worker through a Vite
 module runner, under the same `dev-supervisor.mjs --watch` as the split backend
 lane. `LANGWATCH_DEV_ONE_PROCESS=0` (plain `pnpm dev`, or `haven up -f` with it
 exported or in `.env`) splits it back into a `ui` lane and a `backend` lane
-(haven: `api`). Ports are the same either way.
+(haven: `api`). Ports are the same either way. Under haven the same switch also
+folds the simulators into the `go` lane (`=0` gives them a `sims` lane);
+`LANGWATCH_GO_ONE_PROCESS` is a deprecated alias, warned once and refused when it
+disagrees. The Go lane is watched by default (`haven go-watch` rebuilds and swaps
+the child); `LANGWATCH_GO_WATCH=0` or `haven up --watch=false` turns it off.
 
 A backend edit that touches a loaded file re-links only what it reaches, then
 drains the old generation (worker, then api) and boots the new one; the browser

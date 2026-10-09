@@ -178,12 +178,15 @@ var envHelpText = `Environment variables.
 
   Services and data
     LANGWATCH_SEED=1             Seed the DB during up.
-    LANGWATCH_GO_WATCH=1         Hot-reload the Go services via air (else go run).
-    LANGWATCH_DEV_ONE_PROCESS=0  Split the default app lane (ui + api + worker in
-                                 one process, ADR-168) into ui and api lanes;
+    LANGWATCH_GO_WATCH=0         Turn off the Go watcher (default on: haven rebuilds
+                                 and swaps the Go child on a change); also
+                                 haven up --watch=false.
+    LANGWATCH_DEV_ONE_PROCESS=0  Split both defaults: the app lane (ui + api +
+                                 worker, ADR-168) into ui and api lanes, and the
+                                 go lane (data plane + sims) into go and sims.
                                  haven up -f switches a running stack.
-    LANGWATCH_GO_ONE_PROCESS=1   Host the simulators in the go lane: one Go process
-                                 for the data plane and sims (trial; Langy apart).
+                                 LANGWATCH_GO_ONE_PROCESS is a deprecated alias,
+                                 refused when it disagrees.
     HAVEN_WORKTREE_DIR=<dir>     Where haven pr creates PR worktrees (default: the
                                  sibling worktrees/ dir next to the checkout).
     LANGWATCH_LOCAL_API_KEY      Stable local dev API key haven seeds + injects

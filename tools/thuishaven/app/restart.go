@@ -103,7 +103,7 @@ func (o *Orchestrator) restartServices(slug, name string) ([]string, error) {
 	if slices.ContainsFunc(targets, isSimsTarget) {
 		if goLane, ok := o.goLaneHostingSims(st); ok {
 			targets = foldSimsIntoGoLane(targets, goLane)
-			msgs = append(msgs, fmt.Sprintf("%-10s run inside the go lane (LANGWATCH_GO_ONE_PROCESS=1), so the go lane restarts with them", SimsLane))
+			msgs = append(msgs, fmt.Sprintf("%-10s run inside the go lane (one process; LANGWATCH_DEV_ONE_PROCESS=0 splits them), so the go lane restarts with them", SimsLane))
 		}
 	}
 	for _, t := range targets {
@@ -126,7 +126,7 @@ func (o *Orchestrator) restartServices(slug, name string) ([]string, error) {
 }
 
 // goLaneHostingSims is the go lane when the process holding the simulators'
-// port also holds the go lane's: LANGWATCH_GO_ONE_PROCESS folded them in.
+// port also holds the go lane's: one process folded them in.
 func (o *Orchestrator) goLaneHostingSims(st domain.Stack) (restartTarget, bool) {
 	goLane, sims := restartTargets(st, GoLane), restartTargets(st, SimsLane)
 	if len(goLane) == 0 || len(sims) == 0 {

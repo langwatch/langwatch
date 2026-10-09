@@ -22,9 +22,9 @@ func planGoLanes(t *testing.T, isOneProcess bool) []Child {
 	return o.planChildren(st, PlanOptions{Selection: sel, RepoRoot: repo, ShouldRunGoAsOneProcess: isOneProcess}, repo)
 }
 
-// @scenario "One Go process hosts the data plane and the simulators when asked"
+// @scenario "One Go process hosts the data plane and the simulators unless split"
 func TestOneGoProcessHostsTheDataPlaneAndTheSimulators(t *testing.T) {
-	t.Run("when LANGWATCH_GO_ONE_PROCESS is on", func(t *testing.T) {
+	t.Run("when the one-process switch is on", func(t *testing.T) {
 		children := planGoLanes(t, true)
 		goLane, ok := findChild(children, GoLane)
 		if !ok {

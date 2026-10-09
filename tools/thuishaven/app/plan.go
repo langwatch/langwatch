@@ -314,7 +314,7 @@ func (p *childPlan) goLanes(mono monolithPlan) []Child {
 }
 
 // retireStaleSimsCapture removes the sims capture an earlier split run left
-// when this run plans a go lane and no sims lane (LANGWATCH_GO_ONE_PROCESS):
+// when this run plans a go lane and no sims lane (the default; LANGWATCH_DEV_ONE_PROCESS=0 splits):
 // `haven logs <sim>` reads sims.log first, so a dead one would hide go.log.
 func retireStaleSimsCapture(children []Child) {
 	if slices.ContainsFunc(children, func(c Child) bool { return c.Name == SimsLane }) {
@@ -364,8 +364,8 @@ func (sp *simulatorPlan) host(binary string, env func() []string, child func() C
 
 // planSimulators places every selected simulator. The linked simulators get a
 // lane of their own, so a simulator under load cannot starve the gateway: a
-// second `service combined` process. LANGWATCH_GO_ONE_PROCESS=1 folds them
-// into the go lane instead (a trial; Langy always keeps its own lane).
+// second `service combined` process. LANGWATCH_DEV_ONE_PROCESS (on by
+// default) folds them into the go lane instead; Langy always keeps its own lane.
 func (p *childPlan) planSimulators() simulatorPlan {
 	o, st, sel, repoRoot, base := p.o, p.st, p.opts.Selection, p.opts.RepoRoot, p.base
 	sp := simulatorPlan{
@@ -490,7 +490,7 @@ const (
 	// Same name as a monolith checkout's one lane, for the same reason.
 	AppLane = domain.MonolithAppLane
 	// GoLane is the process hosting the Go data-plane services, and the
-	// simulators too when LANGWATCH_GO_ONE_PROCESS=1.
+	// simulators too unless LANGWATCH_DEV_ONE_PROCESS=0.
 	GoLane = "go"
 	// SimsLane is the second Go process, hosting the simulators a stack
 	// selected, so load on one cannot starve the gateway.

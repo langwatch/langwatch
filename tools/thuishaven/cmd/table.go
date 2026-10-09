@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/dashboard"
@@ -23,6 +24,7 @@ type flagSpec struct {
 	long       string // "--follow"
 	short      string // "-f" or "" — a short means ONE thing across the CLI
 	takesValue bool
+	isSwitch   bool   // bare means on; "--flag=false" turns it off (a default-on switch)
 	value      string // help placeholder for the value, e.g. "<dur>"
 	summary    string
 }
@@ -104,8 +106,13 @@ func parse(spec commandSpec, rest []string) (invocation, error) {
 				return inv, fmt.Errorf("haven %s: unknown flag %q%s", spec.name, name, flagHint(spec))
 			}
 			if hasEmbedded {
-				if !f.takesValue {
+				if !f.takesValue && !f.isSwitch {
 					return inv, fmt.Errorf("haven %s: %s takes no value", spec.name, f.long)
+				}
+				if f.isSwitch {
+					if _, err := strconv.ParseBool(embedded); err != nil {
+						return inv, fmt.Errorf("haven %s: %s=%s is not true or false", spec.name, f.long, embedded)
+					}
 				}
 				inv.flags[f.long] = embedded
 				continue
@@ -219,7 +226,7 @@ var baseTable = []commandSpec{
 		maxArgs:   -1,
 		minusArgs: true,
 		flags: []flagSpec{
-			{long: "--watch", short: "-w", summary: "air hot-reload for the Go services"},
+			{long: "--watch", short: "-w", isSwitch: true, summary: "rebuild and swap the Go services on a change (the default; --watch=false turns it off)"},
 			{long: "--detach", short: "-d", summary: "run in the background without the log view"},
 			{long: "--force", short: "-f", summary: "restart the stack even when it already matches"},
 			{long: "--rebuild", summary: "rebuild container images even when unchanged"},
@@ -227,6 +234,9 @@ var baseTable = []commandSpec{
 		},
 		run: func(ctx context.Context, d deps, inv invocation) error {
 			if err := rejectRemovedSelectionEnv(); err != nil {
+				return err
+			}
+			if err := checkOneProcessEnv(os.Stderr); err != nil {
 				return err
 			}
 			sel, err := d.orch.ResolveSelection(d.worktree, inv.args)
@@ -242,7 +252,7 @@ var baseTable = []commandSpec{
 			}
 			d.opts.Selection = sel
 			if inv.has("--watch") {
-				d.opts.ShouldGoWatch = true
+				d.opts.ShouldGoWatch = inv.value("--watch") != "false" && inv.value("--watch") != "0"
 			}
 			d.opts.ShouldRebuildImages = inv.has("--rebuild")
 			d.opts.ShouldForce = inv.has("--force")
