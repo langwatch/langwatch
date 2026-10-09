@@ -140,12 +140,14 @@ export function SignUpCredentialForm({
 
     setIsSigningIn(true);
     let message: string | null = null;
+    let leaving = false;
     try {
       const response = await signIn("credentials", {
         email,
         password: values.password,
         callbackUrl,
       });
+      leaving = response?.ok === true;
       message =
         credentialSignInFailure({
           response,
@@ -154,7 +156,8 @@ export function SignUpCredentialForm({
     } catch {
       message = authFailureMessage({ fallback: ACCOUNT_CREATED_FALLBACK });
     } finally {
-      setIsSigningIn(false);
+      // A signed-in account is loading its next page; the button stays busy until it has (WEB-708).
+      if (!leaving) setIsSigningIn(false);
     }
 
     if (message) {

@@ -245,6 +245,43 @@ describe("given the sign-up screen", () => {
       expect(sendConfirmationMock).not.toHaveBeenCalled();
     });
 
+    /** @scenario "Creating an account shows progress until the next page has loaded" */
+    it("keeps Create account busy after signing in, while the browser leaves for the next page", async () => {
+      registerMock.mockResolvedValue({ id: "user_1" });
+      signInMock.mockResolvedValue({ ok: true });
+
+      const { container } = renderScreen();
+      await screen.findByTestId("signup-identifier");
+
+      await fillPasswordPair(container, "a-good-password");
+      await userEvent.click(screen.getByRole("button", { name: /create account/i }));
+
+      await waitFor(() => {
+        expect(signInMock).toHaveBeenCalled();
+      });
+      expect(
+        (screen.getByRole("button", { name: /create account/i }) as HTMLButtonElement).disabled,
+      ).toBe(true);
+    });
+
+    /** @scenario "Creating an account shows progress until the next page has loaded" */
+    it("frees Create account again when signing in fails", async () => {
+      registerMock.mockResolvedValue({ id: "user_1" });
+      signInMock.mockResolvedValue({ ok: false, error: "CredentialsSignin", status: 401 });
+
+      const { container } = renderScreen();
+      await screen.findByTestId("signup-identifier");
+
+      await fillPasswordPair(container, "a-good-password");
+      await userEvent.click(screen.getByRole("button", { name: /create account/i }));
+
+      await waitFor(() => {
+        expect(
+          (screen.getByRole("button", { name: /create account/i }) as HTMLButtonElement).disabled,
+        ).toBe(false);
+      });
+    });
+
     /** @scenario "Mismatched passwords say so" */
     it("says the two passwords differ and creates nothing", async () => {
       renderScreen();

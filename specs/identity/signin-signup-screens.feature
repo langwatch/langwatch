@@ -427,6 +427,15 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
     And no account exists while I am checking that inbox
     And the returned proof is required by the account-creation call
 
+  # Signing in is answered before the next page has loaded, and a slow load read as nothing
+  # happening: testers left and lost the account (WEB-708).
+  @integration
+  Scenario: Creating an account shows progress until the next page has loaded
+    Given I have opened the link and chosen a password
+    When I create the account and it signs me in
+    Then the Create account button stays busy while the browser loads the next page
+    And it is free again if signing in fails, with the failure shown
+
   # The one thing the log-in door must NOT do on the way is bank the password
   # that was typed at it. That field is spelled `current-password`, is asked
   # for once, and is held to no length — an account created from it could be
