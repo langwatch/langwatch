@@ -21,7 +21,7 @@ import type {
 const logger = createLogger("langwatch:billing:webhook-subscription-adapter");
 
 /** The one organization column the port carries that the repository does not select. */
-export type BillingWebhookTrialLicenseDatabase = Pick<PrismaClient, "organization">;
+type BillingWebhookTrialLicenseDatabase = Pick<PrismaClient, "organization">;
 
 export class PrismaBillingWebhookSubscriptionRepository extends BillingWebhookSubscriptionRepository {
   private constructor(

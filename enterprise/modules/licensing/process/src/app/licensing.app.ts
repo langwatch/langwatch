@@ -155,7 +155,7 @@ export type LicensingInfrastructure = Readonly<{
   reportSigningFailure: (entry: Readonly<{ organizationId: string; error: Error }>) => void;
 }>;
 
-export type LicensingRuntime = Readonly<Omit<LicensingInfrastructure, "repository">>;
+type LicensingRuntime = Readonly<Omit<LicensingInfrastructure, "repository">>;
 
 const logger = createLogger("langwatch:licensing");
 

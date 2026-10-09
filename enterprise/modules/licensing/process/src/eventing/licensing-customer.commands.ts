@@ -30,7 +30,7 @@ import type { Command, CommandHandler } from "@langwatch/eventing";
 import { createTenantId, defineCommandSchema, EventSchema, EventUtils } from "@langwatch/eventing";
 import { z } from "zod";
 
-export const RECORD_SELF_HOSTED_CUSTOMER_LICENSED_COMMAND_TYPE =
+const RECORD_SELF_HOSTED_CUSTOMER_LICENSED_COMMAND_TYPE =
   "lw.licensing.record_self_hosted_customer_licensed" as const;
 
 export const selfHostedCustomerLicensedEventSchema = z.object({
@@ -74,9 +74,9 @@ export class RecordSelfHostedCustomerLicensedCommand implements CommandHandler<
   }
 }
 
-export const RECORD_CONNECT_SERVICE_SWITCHED_COMMAND_TYPE =
+const RECORD_CONNECT_SERVICE_SWITCHED_COMMAND_TYPE =
   "lw.licensing.record_connect_service_switched" as const;
-export const RECORD_LICENSE_SYNC_FINISHED_COMMAND_TYPE =
+const RECORD_LICENSE_SYNC_FINISHED_COMMAND_TYPE =
   "lw.licensing.record_license_sync_finished" as const;
 
 export const connectServiceSwitchedEventSchema = z.object({
@@ -161,8 +161,8 @@ export class RecordLicenseSyncFinishedCommand implements CommandHandler<
   }
 }
 
-export const RECORD_LICENSE_STORED_COMMAND_TYPE = "lw.licensing.record_license_stored" as const;
-export const RECORD_LICENSE_CLEARED_COMMAND_TYPE = "lw.licensing.record_license_cleared" as const;
+const RECORD_LICENSE_STORED_COMMAND_TYPE = "lw.licensing.record_license_stored" as const;
+const RECORD_LICENSE_CLEARED_COMMAND_TYPE = "lw.licensing.record_license_cleared" as const;
 
 export const licenseStoredEventSchema = z.object({
   ...EventSchema.shape,
@@ -244,9 +244,8 @@ export class RecordLicenseClearedCommand implements CommandHandler<
   }
 }
 
-export const RECORD_MANAGED_KEY_RETIRED_COMMAND_TYPE =
-  "lw.licensing.record_managed_key_retired" as const;
-export const RECORD_MANAGED_KEY_INVALIDATED_COMMAND_TYPE =
+const RECORD_MANAGED_KEY_RETIRED_COMMAND_TYPE = "lw.licensing.record_managed_key_retired" as const;
+const RECORD_MANAGED_KEY_INVALIDATED_COMMAND_TYPE =
   "lw.licensing.record_managed_key_invalidated" as const;
 
 export const managedKeyRetiredEventSchema = z.object({
@@ -331,7 +330,7 @@ export class RecordManagedKeyInvalidatedCommand implements CommandHandler<
   }
 }
 
-export const RECORD_CONNECT_CREDENTIAL_ISSUED_COMMAND_TYPE =
+const RECORD_CONNECT_CREDENTIAL_ISSUED_COMMAND_TYPE =
   "lw.licensing.record_connect_credential_issued" as const;
 
 export const connectCredentialIssuedEventSchema = z.object({

@@ -7,12 +7,12 @@ import {
 import Stripe from "stripe";
 
 import type { BillingStripeChannels } from "../billing-stripe.channels.ts";
-import { connectedInvoicingChannels } from "../connected-invoicing-channels.registry.ts";
-import { stripeCustomersChannels } from "../stripe-customers-channels.registry.ts";
-import { stripeInvoicesChannels } from "../stripe-invoices-channels.registry.ts";
-import { stripeMetersChannels } from "../stripe-meters-channels.registry.ts";
-import { stripePricesChannels } from "../stripe-prices-channels.registry.ts";
-import { stripeSubscriptionsChannels } from "../stripe-subscriptions-channels.registry.ts";
+import { HttpConnectedInvoicingChannel } from "./http.connected-invoicing.channel.ts";
+import { HttpStripeCustomersChannel } from "./http.stripe-customers.channel.ts";
+import { HttpStripeInvoicesChannel } from "./http.stripe-invoices.channel.ts";
+import { HttpStripeMetersChannel } from "./http.stripe-meters.channel.ts";
+import { HttpStripePricesChannel } from "./http.stripe-prices.channel.ts";
+import { HttpStripeSubscriptionsChannel } from "./http.stripe-subscriptions.channel.ts";
 
 /** Stripe API version billing's one client speaks; meter event shapes are frozen to it. */
 const STRIPE_API_VERSION = "2024-04-10";
@@ -34,12 +34,12 @@ export function composeHttpBillingStripe({
 }): HttpBillingStripeSubjects {
   const stripe = new Stripe(secretKey, { apiVersion: STRIPE_API_VERSION });
   return {
-    customers: stripeCustomersChannels.http.create({ stripe }),
-    subscriptions: stripeSubscriptionsChannels.http.create({ stripe }),
-    invoices: stripeInvoicesChannels.http.create({ stripe }),
-    prices: stripePricesChannels.http.create({ stripe }),
-    meters: stripeMetersChannels.http.create({ stripe }),
-    connectedInvoicing: connectedInvoicingChannels.http.create({
+    customers: HttpStripeCustomersChannel.create({ stripe }),
+    subscriptions: HttpStripeSubscriptionsChannel.create({ stripe }),
+    invoices: HttpStripeInvoicesChannel.create({ stripe }),
+    prices: HttpStripePricesChannel.create({ stripe }),
+    meters: HttpStripeMetersChannel.create({ stripe }),
+    connectedInvoicing: HttpConnectedInvoicingChannel.create({
       stripe,
       usagePriceId: () =>
         BillingPriceCatalogue.create(getStripeEnvironmentFromNodeEnv(nodeEnvironment)).prices

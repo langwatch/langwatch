@@ -12,7 +12,7 @@ import {
  * Only what this repository touches, so composition names the slice it needs
  * rather than the whole generated client.
  */
-export type BillingReportOrganizationDatabase = Pick<
+type BillingReportOrganizationDatabase = Pick<
   PrismaClient,
   "organization" | "connectedBillingAccount"
 >;

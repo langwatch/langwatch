@@ -51,7 +51,7 @@ import {
   type SelfHostedCustomerLicensedEvent,
 } from "./licensing-customer.commands.ts";
 
-export const LICENSING_CUSTOMER_PIPELINE_NAME = "licensing_customer";
+const LICENSING_CUSTOMER_PIPELINE_NAME = "licensing_customer";
 
 export type LicensingCustomerPipeline = StaticPipelineDefinition<
   | SelfHostedCustomerLicensedEvent
