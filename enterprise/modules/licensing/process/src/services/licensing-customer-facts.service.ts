@@ -1,5 +1,5 @@
 import type { EventingCommands } from "@langwatch/eventing";
-import { nowInstant } from "@langwatch/time";
+import { type Instant, nowInstant } from "@langwatch/time";
 
 import type { LicensingCustomerPipeline } from "../eventing/licensing-customer.pipeline.ts";
 
@@ -26,14 +26,55 @@ export class LicensingCustomerFactsService {
     organizationId: string;
     name: string;
   }): Promise<void> {
-    if (!this.#commands) {
-      throw new Error("licensing_customer pipeline senders are not connected yet");
-    }
-    await this.#commands.recordSelfHostedCustomerLicensed.send({
+    await this.commands().recordSelfHostedCustomerLicensed.send({
       tenantId: organizationId,
       occurredAt: nowInstant().epochMilliseconds,
       organizationId,
       name,
     });
+  }
+
+  /** Organization keeps the refusal list on its own row from this fact, seconds later. */
+  async connectServiceSwitched({
+    organizationId,
+    service,
+    enabled,
+  }: {
+    organizationId: string;
+    service: string;
+    enabled: boolean;
+  }): Promise<void> {
+    await this.commands().recordConnectServiceSwitched.send({
+      tenantId: organizationId,
+      occurredAt: nowInstant().epochMilliseconds,
+      organizationId,
+      service,
+      enabled,
+    });
+  }
+
+  /** Organization writes when the sync landed, or the code it failed on, from this fact. */
+  async licenseSyncFinished({
+    organizationId,
+    at,
+    error,
+  }: {
+    organizationId: string;
+    at: Instant;
+    error: string | null;
+  }): Promise<void> {
+    await this.commands().recordLicenseSyncFinished.send({
+      tenantId: organizationId,
+      occurredAt: at.epochMilliseconds,
+      organizationId,
+      error,
+    });
+  }
+
+  private commands(): EventingCommands<LicensingCustomerPipeline> {
+    if (!this.#commands) {
+      throw new Error("licensing_customer pipeline senders are not connected yet");
+    }
+    return this.#commands;
   }
 }

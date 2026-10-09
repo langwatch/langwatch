@@ -19,6 +19,7 @@ import { MemoryInstanceIdentityRepository } from "../../repositories/memory/memo
 import { ConnectInstallService } from "../connect-install.service.ts";
 import { InstanceIdentityService } from "../instance-identity.service.ts";
 import { LicenseRefreshService } from "../license-refresh.service.ts";
+import { appliedConnectFacts } from "./support/applied-connect-facts.ts";
 
 const NOW: Instant = Temporal.Instant.from("2026-01-01T00:00:00.000Z");
 const ORGANIZATION = "org-acme";
@@ -80,6 +81,7 @@ function refresher({
   const organizations = MemoryConnectOrganizationRepository.create({ rows });
   const install = ConnectInstallService.create({
     organizations,
+    facts: appliedConnectFacts(rows),
     identity: InstanceIdentityService.create({
       repository: MemoryInstanceIdentityRepository.create({ now: () => NOW }),
       newInstanceId: () => "instance-1",
@@ -98,7 +100,7 @@ function refresher({
   const service = LicenseRefreshService.create({
     install,
     instanceId: async () => "instance-1",
-    organizations,
+    facts: appliedConnectFacts(rows),
     seats: {
       getMemberCount: async () => 53,
       getMembersLiteCount: async () => 7,

@@ -305,3 +305,27 @@ Feature: Enterprise licensing lifecycle
       Given organization has applied licensing's self-hosted customer fact once
       When the same fact is delivered again
       Then there is still exactly one organisation, the one the first delivery created
+
+  Rule: Organization keeps licensing's Connect facts on its own row
+    Licensing records that an administrator switched a hosted service and how a
+    license sync ended; organization writes its own columns from those facts.
+
+    @unit
+    Scenario: Licensing records a hosted-service switch as a fact for organization to apply
+      Given an administrator switches a hosted service off for their organisation
+      When licensing records the switch
+      Then it records a fact naming the organisation, the service and the switch
+      And it writes nothing to organization's row
+
+    @unit
+    Scenario: Organization keeps a hosted service an administrator switched off
+      Given licensing has recorded that an administrator switched a hosted service off
+      When organization receives the fact, once or more than once
+      Then the organisation's switched-off services name it exactly once
+      And switching it back on removes it
+
+    @unit
+    Scenario: Organization keeps how the last license sync ended
+      Given licensing has recorded that a license sync landed and then that one failed
+      When organization receives each fact in order
+      Then the organisation keeps when the sync last landed and the code the latest one failed on

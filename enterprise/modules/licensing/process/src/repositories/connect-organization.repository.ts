@@ -31,16 +31,4 @@ export interface ConnectOrganizationRepository {
 
   /** Every organization on this install with its stored license, oldest first. */
   findAllOldestFirst(): Promise<{ organizationId: string; license: string | null }[]>;
-
-  setServicesDisabled(params: {
-    organizationId: string;
-    servicesDisabled: readonly string[];
-  }): Promise<void>;
-
-  /** What the last sync left behind: the moment it landed, or why it did not. */
-  recordSyncOutcome(params: {
-    organizationId: string;
-    at: Instant;
-    error: string | null;
-  }): Promise<void>;
 }

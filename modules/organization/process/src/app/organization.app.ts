@@ -1086,6 +1086,24 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     return this.#dependencies.organizations.updatePricingModel(input);
   }
 
+  /** Licensing's hosted-service switch, applied from its fact by the lifecycle subscriber. */
+  switchConnectService(input: {
+    organizationId: string;
+    service: string;
+    enabled: boolean;
+  }): Promise<void> {
+    return this.#dependencies.organizations.switchConnectService(input);
+  }
+
+  /** How licensing's last sync ended, applied from its fact by the lifecycle subscriber. */
+  updateConnectSyncOutcome(input: {
+    organizationId: string;
+    at: Instant;
+    error: string | null;
+  }): Promise<void> {
+    return this.#dependencies.organizations.updateConnectSyncOutcome(input);
+  }
+
   setLicense(input: {
     organizationId: string;
     licenseKey: string;

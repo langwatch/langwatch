@@ -273,6 +273,32 @@ export class OrganizationService {
     return this.repository.updatePricingModel(input);
   }
 
+  /** Licensing's switch, from its fact: the switched-off list gains or loses one name. */
+  async switchConnectService({
+    organizationId,
+    service,
+    enabled,
+  }: {
+    organizationId: string;
+    service: string;
+    enabled: boolean;
+  }): Promise<void> {
+    const current = await this.repository.findConnectServicesDisabled(organizationId);
+    const servicesDisabled = enabled
+      ? current.filter((name) => name !== service)
+      : [...new Set([...current, service])];
+    await this.repository.updateConnectServicesDisabled({ organizationId, servicesDisabled });
+  }
+
+  /** How licensing's last sync ended, from its fact. */
+  updateConnectSyncOutcome(input: {
+    organizationId: string;
+    at: Instant;
+    error: string | null;
+  }): Promise<void> {
+    return this.repository.updateConnectSyncOutcome(input);
+  }
+
   setLicense(input: {
     organizationId: string;
     licenseKey: string;

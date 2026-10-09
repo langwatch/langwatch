@@ -1,4 +1,8 @@
-import type { SelfHostedCustomerLicensedEventData } from "@langwatch/enterprise-licensing-contract";
+import type {
+  ConnectServiceSwitchedEventData,
+  LicenseSyncFinishedEventData,
+  SelfHostedCustomerLicensedEventData,
+} from "@langwatch/enterprise-licensing-contract";
 import { LICENSING_CUSTOMER_AGGREGATE_TYPE } from "@langwatch/enterprise-licensing-contract";
 import {
   defineAggregate,
@@ -11,6 +15,12 @@ import {
 
 import type { LicensingModule } from "../app/licensing.app.ts";
 import {
+  type ConnectServiceSwitchedEvent,
+  connectServiceSwitchedEventSchema,
+  type LicenseSyncFinishedEvent,
+  licenseSyncFinishedEventSchema,
+  RecordConnectServiceSwitchedCommand,
+  RecordLicenseSyncFinishedCommand,
   RecordSelfHostedCustomerLicensedCommand,
   selfHostedCustomerLicensedEventSchema,
   type SelfHostedCustomerLicensedEvent,
@@ -19,9 +29,11 @@ import {
 export const LICENSING_CUSTOMER_PIPELINE_NAME = "licensing_customer";
 
 export type LicensingCustomerPipeline = StaticPipelineDefinition<
-  SelfHostedCustomerLicensedEvent,
+  SelfHostedCustomerLicensedEvent | ConnectServiceSwitchedEvent | LicenseSyncFinishedEvent,
   Record<string, Projection>,
-  { name: "recordSelfHostedCustomerLicensed"; payload: SelfHostedCustomerLicensedEventData }
+  | { name: "recordSelfHostedCustomerLicensed"; payload: SelfHostedCustomerLicensedEventData }
+  | { name: "recordConnectServiceSwitched"; payload: ConnectServiceSwitchedEventData }
+  | { name: "recordLicenseSyncFinished"; payload: LicenseSyncFinishedEventData }
 >;
 
 /** licensing_customer: facts about licensing's customers that organization applies (R42). */
@@ -30,8 +42,14 @@ export function buildLicensingCustomerPipeline(): LicensingCustomerPipeline {
     name: LICENSING_CUSTOMER_PIPELINE_NAME,
     aggregate: defineAggregate({ type: LICENSING_CUSTOMER_AGGREGATE_TYPE }),
   })
-    .withEvents([selfHostedCustomerLicensedEventSchema])
+    .withEvents([
+      selfHostedCustomerLicensedEventSchema,
+      connectServiceSwitchedEventSchema,
+      licenseSyncFinishedEventSchema,
+    ])
     .withCommand("recordSelfHostedCustomerLicensed", RecordSelfHostedCustomerLicensedCommand)
+    .withCommand("recordConnectServiceSwitched", RecordConnectServiceSwitchedCommand)
+    .withCommand("recordLicenseSyncFinished", RecordLicenseSyncFinishedCommand)
     .build();
 }
 

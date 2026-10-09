@@ -1,5 +1,3 @@
-import type { Instant } from "@langwatch/time";
-
 import type {
   ConnectOrganizationRecord,
   ConnectOrganizationRepository,
@@ -51,35 +49,5 @@ export class MemoryConnectOrganizationRepository implements ConnectOrganizationR
       organizationId: row.organizationId,
       license: row.license,
     }));
-  }
-
-  /** Refuses an unknown organization the way the unique key does. */
-  async setServicesDisabled({
-    organizationId,
-    servicesDisabled,
-  }: {
-    organizationId: string;
-    servicesDisabled: readonly string[];
-  }): Promise<void> {
-    const row = this.#rows.get(organizationId);
-    if (!row) throw new Error(`no organization ${organizationId}`);
-    this.#rows.set(organizationId, { ...row, servicesDisabled: [...servicesDisabled] });
-  }
-
-  async recordSyncOutcome({
-    organizationId,
-    at,
-    error,
-  }: {
-    organizationId: string;
-    at: Instant;
-    error: string | null;
-  }): Promise<void> {
-    const row = this.#rows.get(organizationId);
-    if (!row) throw new Error(`no organization ${organizationId}`);
-    this.#rows.set(
-      organizationId,
-      error ? { ...row, lastSyncError: error } : { ...row, lastSyncAt: at, lastSyncError: null },
-    );
   }
 }

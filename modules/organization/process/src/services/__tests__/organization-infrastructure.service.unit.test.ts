@@ -169,6 +169,18 @@ class StubRepository extends OrganizationRepository {
     throw new OrganizationNotFoundError();
   }
 
+  async findConnectServicesDisabled(): Promise<string[]> {
+    return [];
+  }
+
+  async updateConnectServicesDisabled(): Promise<void> {
+    throw new OrganizationNotFoundError();
+  }
+
+  async updateConnectSyncOutcome(): Promise<void> {
+    throw new OrganizationNotFoundError();
+  }
+
   async setLicense(): Promise<void> {
     throw new OrganizationNotFoundError();
   }

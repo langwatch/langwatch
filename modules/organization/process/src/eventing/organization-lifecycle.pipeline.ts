@@ -11,6 +11,10 @@ import {
   seatCheckoutsAbandonedEventDataSchema,
 } from "@langwatch/enterprise-billing-contract";
 import {
+  CONNECT_SERVICE_SWITCHED_EVENT_TYPE,
+  connectServiceSwitchedEventDataSchema,
+  LICENSE_SYNC_FINISHED_EVENT_TYPE,
+  licenseSyncFinishedEventDataSchema,
   SELF_HOSTED_CUSTOMER_LICENSED_EVENT_TYPE,
   selfHostedCustomerLicensedEventDataSchema,
 } from "@langwatch/enterprise-licensing-contract";
@@ -68,8 +72,11 @@ export type BillingFactsApplier = Pick<
   | "cancelPaymentPendingInvites"
 >;
 
-/** Where licensing's customer facts land: organization creates the rows (C3c, R42). */
-export type LicensingFactsApplier = Pick<OrganizationModule, "createSelfHostedCustomer">;
+/** Where licensing's facts land: organization creates and writes the rows (C3c, R42). */
+export type LicensingFactsApplier = Pick<
+  OrganizationModule,
+  "createSelfHostedCustomer" | "switchConnectService" | "updateConnectSyncOutcome"
+>;
 
 /** An organisation gone before its fact arrived has no row to apply it to. */
 async function onLiveOrganization(apply: () => Promise<void>): Promise<void> {
@@ -139,6 +146,26 @@ export function buildOrganizationLifecyclePipeline({
       data: selfHostedCustomerLicensedEventDataSchema,
       handle: ({ organizationId, name }) =>
         licensingFacts.createSelfHostedCustomer({ organizationId, name }),
+    })
+    .withPeerSubscriber("organizationLicensingConnectServiceSwitched", {
+      eventType: CONNECT_SERVICE_SWITCHED_EVENT_TYPE,
+      data: connectServiceSwitchedEventDataSchema,
+      handle: ({ organizationId, service, enabled }) =>
+        onLiveOrganization(() =>
+          licensingFacts.switchConnectService({ organizationId, service, enabled }),
+        ),
+    })
+    .withPeerSubscriber("organizationLicensingLicenseSyncFinished", {
+      eventType: LICENSE_SYNC_FINISHED_EVENT_TYPE,
+      data: licenseSyncFinishedEventDataSchema,
+      handle: ({ organizationId, occurredAt, error }) =>
+        onLiveOrganization(() =>
+          licensingFacts.updateConnectSyncOutcome({
+            organizationId,
+            at: Temporal.Instant.fromEpochMilliseconds(occurredAt),
+            error,
+          }),
+        ),
     })
     .withPeerSubscriber("organizationBillingPlanLimitAlertSent", {
       eventType: PLAN_LIMIT_ALERT_SENT_EVENT_TYPE,

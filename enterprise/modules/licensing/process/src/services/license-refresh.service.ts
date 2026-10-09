@@ -17,8 +17,8 @@ import { HandledError } from "@langwatch/handled-error";
 import type { Instant } from "@langwatch/time";
 
 import type { ConnectLicenseChannel } from "../channels/connect-license.channel.ts";
-import type { ConnectOrganizationRepository } from "../repositories/connect-organization.repository.ts";
 import type { ConnectInstallService } from "./connect-install.service.ts";
+import type { LicensingCustomerFactsService } from "./licensing-customer-facts.service.ts";
 
 /** The seats in use, counted the way the seat guard counts them. */
 interface LicenseSeatCounter {
@@ -38,7 +38,8 @@ interface LicenseApplication {
 
 interface LicenseRefreshServiceDependencies {
   readonly install: ConnectInstallService;
-  readonly organizations: ConnectOrganizationRepository;
+  /** Where a sync's outcome is recorded; organization writes it to its own row. */
+  readonly facts: Pick<LicensingCustomerFactsService, "licenseSyncFinished">;
   readonly seats: LicenseSeatCounter;
   readonly licenses: LicenseApplication;
   readonly cryptography: LicenseCryptography;
@@ -198,11 +199,7 @@ export class LicenseRefreshService {
     organizationId: string;
     error: string | null;
   }): Promise<void> {
-    await this.deps.organizations.recordSyncOutcome({
-      organizationId,
-      at: this.deps.now(),
-      error,
-    });
+    await this.deps.facts.licenseSyncFinished({ organizationId, at: this.deps.now(), error });
   }
 
   /** A failed sync names its code, so Settings shows what to fix. */

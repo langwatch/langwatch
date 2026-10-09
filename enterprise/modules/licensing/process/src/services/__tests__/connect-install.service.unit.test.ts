@@ -26,6 +26,7 @@ import { MemoryInstanceIdentityRepository } from "../../repositories/memory/memo
 import type { ConnectUpstreamSlot } from "../connect-install.service.ts";
 import { ConnectInstallService } from "../connect-install.service.ts";
 import { InstanceIdentityService } from "../instance-identity.service.ts";
+import { appliedConnectFacts } from "./support/applied-connect-facts.ts";
 
 const NOW: Instant = Temporal.Instant.from("2026-01-01T00:00:00.000Z");
 const ORGANIZATION = "org-acme";
@@ -102,6 +103,7 @@ function install({
   const organizations = MemoryConnectOrganizationRepository.create({ rows });
   const service = ConnectInstallService.create({
     organizations,
+    facts: appliedConnectFacts(rows),
     identity: InstanceIdentityService.create({
       repository: MemoryInstanceIdentityRepository.create({ now: () => NOW }),
       newInstanceId: () => "instance-1",

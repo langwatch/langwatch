@@ -177,6 +177,19 @@ export abstract class OrganizationRepository {
     organizationId: string;
     pricingModel: PricingModel;
   }): Promise<void>;
+  /** The hosted services switched off on licensing's facts; none for an unknown organisation. */
+  abstract findConnectServicesDisabled(organizationId: string): Promise<string[]>;
+  /** Throws OrganizationNotFoundError. */
+  abstract updateConnectServicesDisabled(input: {
+    organizationId: string;
+    servicesDisabled: readonly string[];
+  }): Promise<void>;
+  /** A failure keeps the last success's moment; throws OrganizationNotFoundError. */
+  abstract updateConnectSyncOutcome(input: {
+    organizationId: string;
+    at: Instant;
+    error: string | null;
+  }): Promise<void>;
   /** Throws OrganizationNotFoundError. */
   abstract setLicense(input: {
     organizationId: string;

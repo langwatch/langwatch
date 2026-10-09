@@ -332,6 +332,7 @@ export class LicensingModule implements LicensingApiContract {
       registry: registryParts,
       install: connectInstallParts({
         infrastructure: connectInfrastructure,
+        customerFacts,
         cryptography,
         seats: repository,
         licenses: service,
@@ -1064,6 +1065,7 @@ function connectInstallOver({
 
 function connectInstallParts({
   infrastructure,
+  customerFacts,
   cryptography,
   seats,
   licenses,
@@ -1071,6 +1073,7 @@ function connectInstallParts({
   logger,
 }: {
   infrastructure: ConnectInstallInfrastructure;
+  customerFacts: LicensingCustomerFactsService;
   cryptography: LicenseCryptography;
   seats: LicenseStorage;
   licenses: LicenseService;
@@ -1086,6 +1089,7 @@ function connectInstallParts({
   });
   const install = ConnectInstallService.create({
     organizations: infrastructure.organizations,
+    facts: customerFacts,
     identity,
     cryptography,
     deployment: {
@@ -1105,7 +1109,7 @@ function connectInstallParts({
     refresh: LicenseRefreshService.create({
       instanceId: () => identity.getInstanceId(),
       install,
-      organizations: infrastructure.organizations,
+      facts: customerFacts,
       seats,
       licenses,
       cryptography,
