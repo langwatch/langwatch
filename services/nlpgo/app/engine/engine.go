@@ -747,8 +747,11 @@ func (e *Engine) runSignature(ctx context.Context, node *dsl.Node, inputs map[st
 		req.Temperature = llmCfg.Temperature
 		req.MaxTokens = llmCfg.MaxTokens
 		req.TopP = llmCfg.TopP
-		if llmCfg.Reasoning != nil {
-			req.ReasoningEffort = *llmCfg.Reasoning
+		for _, reasoning := range []*string{llmCfg.Reasoning, llmCfg.ReasoningEffort, llmCfg.ThinkingLevel, llmCfg.Effort} {
+			if reasoning != nil && *reasoning != "" {
+				req.ReasoningEffort = *reasoning
+				break
+			}
 		}
 		req.LiteLLMParams = make(map[string]any, len(llmCfg.LiteLLMParams))
 		for k, v := range llmCfg.LiteLLMParams {
