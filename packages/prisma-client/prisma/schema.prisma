@@ -4827,6 +4827,8 @@ model VirtualKey {
   licenseTokenHash  String?   @unique
   licenseInstanceId String?
   licenseExpiresAt  DateTime?
+  // The licence a CONNECT key serves; gateway finds the key by it before minting one (C3b).
+  licenseId         String?
 
   @@unique([hashedSecret])
   @@unique([organizationId, externalId])

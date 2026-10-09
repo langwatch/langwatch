@@ -1,3 +1,4 @@
+import type { GatewayManagedKeyProvisionedEventData } from "@langwatch/gateway-contract";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
@@ -45,6 +46,12 @@ class RecordingWrites implements ConnectManagedKeyWrites {
     input: Parameters<ConnectManagedKeyWrites["setLicenseFactsInternal"]>[0],
   ): Promise<void> {
     this.licensesSet.push(input);
+  }
+
+  existing: string[] = [];
+
+  async findConnectKeyIdsForLicenseInternal(): Promise<string[]> {
+    return this.existing;
   }
 }
 
@@ -152,5 +159,88 @@ describe("the managed key of a self-hosted license", () => {
         expiresAt,
       },
     ]);
+  });
+});
+
+const ISSUED = {
+  tenantId: "org-1",
+  occurredAt: Date.UTC(2026, 9, 9),
+  organizationId: "org-1",
+  licenseId: "lic-1",
+  issuedLicenseId: "issued-1",
+  instanceId: "instance-1",
+  tokenHash: "hash-1",
+  expiresAt: Date.UTC(2027, 9, 9),
+  services: ["llm"],
+};
+
+function provisioning({ existing }: { existing: string[] }) {
+  const { writes, service } = harness();
+  writes.existing = existing;
+  const sent: { data: GatewayManagedKeyProvisionedEventData; writesBefore: number }[] = [];
+  service.connect({
+    recordManagedKeyProvisioned: {
+      send: async (data) =>
+        void sent.push({
+          data,
+          writesBefore: writes.servicesSet.length + writes.licensesSet.length,
+        }),
+    },
+  });
+  return { writes, service, sent };
+}
+
+describe("given licensing records a connect credential issued", () => {
+  describe("when the licence has no managed key yet", () => {
+    /** @scenario "Gateway provisions one managed key per licence from licensing's issued fact" */
+    it("mints one, writes its services and licence, and only then records it provisioned", async () => {
+      const { writes, service, sent } = provisioning({ existing: [] });
+
+      await service.provisionForLicense(ISSUED);
+
+      expect(writes.created).toHaveLength(1);
+      expect(writes.created[0]).toMatchObject({
+        name: "Connect lic-1",
+        purpose: "CONNECT",
+        actorUserId: "system:connect-license",
+      });
+      expect(writes.servicesSet).toEqual([
+        { id: "vk-1", organizationId: "org-1", services: ["llm"] },
+      ]);
+      expect(writes.licensesSet[0]).toMatchObject({
+        id: "vk-1",
+        organizationId: "org-1",
+        licenseId: "lic-1",
+        tokenHash: "hash-1",
+        instanceId: "instance-1",
+      });
+      expect(writes.licensesSet[0]?.expiresAt?.epochMilliseconds).toBe(ISSUED.expiresAt);
+      expect(sent).toEqual([
+        {
+          writesBefore: 2,
+          data: {
+            tenantId: "org-1",
+            occurredAt: expect.any(Number),
+            organizationId: "org-1",
+            licenseId: "lic-1",
+            issuedLicenseId: "issued-1",
+            virtualKeyId: "vk-1",
+          },
+        },
+      ]);
+    });
+  });
+
+  describe("when the licence already holds a key, as on a repeated fact", () => {
+    /** @scenario "Gateway provisions one managed key per licence from licensing's issued fact" */
+    it("mints none and records the oldest key it found", async () => {
+      const { writes, service, sent } = provisioning({ existing: ["vk-existing", "vk-later"] });
+
+      await service.provisionForLicense(ISSUED);
+
+      expect(writes.created).toEqual([]);
+      expect(writes.licensesSet[0]).toMatchObject({ id: "vk-existing", licenseId: "lic-1" });
+      expect(sent.map(({ data }) => data.virtualKeyId)).toEqual(["vk-existing"]);
+    });
   });
 });

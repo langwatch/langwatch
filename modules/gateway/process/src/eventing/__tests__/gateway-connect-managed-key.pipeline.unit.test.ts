@@ -5,6 +5,9 @@
  * @see enterprise/modules/licensing/specs/licensing.feature
  */
 import {
+  CONNECT_CREDENTIAL_ISSUED_EVENT_TYPE,
+  type ConnectCredentialIssuedEventData,
+  connectCredentialIssuedEventDataSchema,
   LICENSING_CUSTOMER_AGGREGATE_TYPE,
   LICENSING_CUSTOMER_EVENT_VERSION,
   MANAGED_KEY_INVALIDATED_EVENT_TYPE,
@@ -41,6 +44,11 @@ function licensingStandIn() {
     .withEvents([
       z.object({
         ...EventSchema.shape,
+        type: z.literal(CONNECT_CREDENTIAL_ISSUED_EVENT_TYPE),
+        data: connectCredentialIssuedEventDataSchema,
+      }),
+      z.object({
+        ...EventSchema.shape,
         type: z.literal(MANAGED_KEY_RETIRED_EVENT_TYPE),
         data: managedKeyRetiredEventDataSchema,
       }),
@@ -56,6 +64,7 @@ function licensingStandIn() {
 function harness() {
   const retired: unknown[] = [];
   const invalidated: unknown[] = [];
+  const issued: unknown[] = [];
   const eventing = new EventSourcing({
     eventStore: EventStoreMemory.createForTesting(),
     processStore: InMemoryProcessStore.createForTesting(),
@@ -64,6 +73,7 @@ function harness() {
   eventing.register(
     buildGatewayConnectManagedKeyPipeline({
       managedKeys: {
+        provisionForLicense: async (input) => void issued.push(input),
         retire: async (input) => void retired.push(input),
         invalidate: async (input) => void invalidated.push(input),
       },
@@ -75,6 +85,10 @@ function harness() {
   }: {
     id: string;
     fact:
+      | {
+          type: typeof CONNECT_CREDENTIAL_ISSUED_EVENT_TYPE;
+          data: ConnectCredentialIssuedEventData;
+        }
       | { type: typeof MANAGED_KEY_RETIRED_EVENT_TYPE; data: ManagedKeyRetiredEventData }
       | { type: typeof MANAGED_KEY_INVALIDATED_EVENT_TYPE; data: ManagedKeyInvalidatedEventData };
   }) =>
@@ -93,7 +107,7 @@ function harness() {
       ],
       { tenantId: createTenantId(ORGANIZATION_ID) },
     );
-  return { eventing, append, retired, invalidated };
+  return { eventing, append, retired, invalidated, issued };
 }
 
 const facts = {
@@ -142,6 +156,34 @@ describe("given gateway's managed-key pipeline beside licensing's facts", () => 
       await vi.waitFor(() => expect(invalidated).toHaveLength(1));
 
       expect(invalidated).toEqual([{ virtualKeyId: KEY_ID, organizationId: ORGANIZATION_ID }]);
+      expect(retired).toEqual([]);
+      await eventing.close();
+    });
+  });
+
+  describe("when licensing records a connect credential issued", () => {
+    /** @scenario "Gateway provisions one managed key per licence from licensing's issued fact" */
+    it("asks the managed-key service to provision that licence's key from the fact", async () => {
+      const { eventing, append, issued, retired } = harness();
+      const fact = {
+        tenantId: ORGANIZATION_ID,
+        occurredAt: OCCURRED_AT,
+        organizationId: ORGANIZATION_ID,
+        licenseId: "lic-1",
+        issuedLicenseId: "issued-1",
+        instanceId: "instance-1",
+        tokenHash: "hash-1",
+        expiresAt: OCCURRED_AT + 86_400_000,
+        services: ["llm"],
+      };
+
+      await append({
+        id: "evt-issued-1",
+        fact: { type: CONNECT_CREDENTIAL_ISSUED_EVENT_TYPE, data: fact },
+      });
+      await vi.waitFor(() => expect(issued).toHaveLength(1));
+
+      expect(issued).toEqual([fact]);
       expect(retired).toEqual([]);
       await eventing.close();
     });

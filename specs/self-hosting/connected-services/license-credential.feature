@@ -175,3 +175,10 @@ Feature: The license is the credential for hosted services
     Given a license token whose managed key the control plane answers as pending
     When the install calls the gateway three times with it
     Then the gateway asks the control plane each time and answers connect_credential_pending
+
+  @unit
+  Scenario: Gateway provisions one managed key per licence from licensing's issued fact
+    Given a linked licence whose call found no managed key
+    When licensing records the connect credential issued, once and then again
+    Then gateway mints one key for that licence and finds the same key on the repeat
+    And it writes the key's services and licence before it records the key provisioned

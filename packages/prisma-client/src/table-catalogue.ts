@@ -2156,7 +2156,8 @@ export const prismaModelFieldCatalogue = {
     "connectServices",
     "licenseTokenHash",
     "licenseInstanceId",
-    "licenseExpiresAt"
+    "licenseExpiresAt",
+    "licenseId"
   ],
   "VirtualKeyScope": [
     "id",

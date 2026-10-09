@@ -86,3 +86,25 @@ export const managedKeyInvalidatedEventDataSchema = z.object({
   virtualKeyId: z.string().min(1),
 });
 export type ManagedKeyInvalidatedEventData = z.infer<typeof managedKeyInvalidatedEventDataSchema>;
+
+export const CONNECT_CREDENTIAL_ISSUED_EVENT_TYPE =
+  "lw.licensing.connect_credential_issued" as const;
+
+/**
+ * A licence's call found no managed key; gateway provisions one, writes these facts on it, then
+ * records `lw.gateway.managed_key_provisioned`. Names the token by its registry hash, never a secret.
+ */
+export const connectCredentialIssuedEventDataSchema = z.object({
+  tenantId: z.string().min(1),
+  occurredAt: z.number().int().nonnegative(),
+  organizationId: z.string().min(1),
+  licenseId: z.string().min(1),
+  issuedLicenseId: z.string().min(1),
+  instanceId: z.string().min(1),
+  tokenHash: z.string().min(1),
+  expiresAt: z.number().int(),
+  services: z.array(z.string().min(1)),
+});
+export type ConnectCredentialIssuedEventData = z.infer<
+  typeof connectCredentialIssuedEventDataSchema
+>;

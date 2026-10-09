@@ -4,8 +4,13 @@
  * revocation work as for any key. Its secret is dropped as it is minted.
  */
 
-import type { GatewayVirtualKeyScope } from "@langwatch/gateway-contract";
-import type { Instant } from "@langwatch/time";
+import { SYSTEM_ACTORS } from "@langwatch/authorization";
+import type { ConnectCredentialIssuedEventData } from "@langwatch/enterprise-licensing-contract";
+import type {
+  GatewayManagedKeyProvisionedEventData,
+  GatewayVirtualKeyScope,
+} from "@langwatch/gateway-contract";
+import { type Instant, nowInstant, Temporal } from "@langwatch/time";
 
 /** The key writes this service makes, narrower than the full key capability. */
 export type ConnectManagedKeyWrites = Readonly<{
@@ -33,10 +38,23 @@ export type ConnectManagedKeyWrites = Readonly<{
   setLicenseFactsInternal(input: {
     id: string;
     organizationId: string;
+    licenseId?: string;
     tokenHash: string;
     instanceId: string | null;
     expiresAt: Instant | null;
   }): Promise<void>;
+  /** Unrevoked CONNECT keys of one licence in the organization, oldest first. */
+  findConnectKeyIdsForLicenseInternal(input: {
+    organizationId: string;
+    licenseId: string;
+  }): Promise<string[]>;
+}>;
+
+/** The sender the provisioned fact goes out through, bound once the pipeline connects. */
+export type ManagedKeyProvisionedSender = Readonly<{
+  recordManagedKeyProvisioned: {
+    send(data: GatewayManagedKeyProvisionedEventData): Promise<unknown>;
+  };
 }>;
 
 /**
@@ -49,6 +67,8 @@ export type ConnectManagedKeyHome = Readonly<{
 }>;
 
 export class ConnectManagedKeyService {
+  #commands: ManagedKeyProvisionedSender | undefined;
+
   private constructor(
     private readonly virtualKeys: ConnectManagedKeyWrites,
     private readonly home: ConnectManagedKeyHome,
@@ -79,6 +99,49 @@ export class ConnectManagedKeyService {
     });
 
     return { id: virtualKey.id };
+  }
+
+  /** Binds the gateway_connect_managed_key pipeline's own sender. */
+  connect(commands: ManagedKeyProvisionedSender): void {
+    this.#commands = commands;
+  }
+
+  /**
+   * One key per licence: finds it or mints it, writes its services and licence, and only then
+   * records the provisioned fact, so licensing attaches a key that already resolves (C3B-ORDER).
+   */
+  async provisionForLicense(issued: ConnectCredentialIssuedEventData): Promise<void> {
+    const { organizationId, licenseId } = issued;
+    const [found] = await this.virtualKeys.findConnectKeyIdsForLicenseInternal({
+      organizationId,
+      licenseId,
+    });
+    const virtualKeyId =
+      found ??
+      (
+        await this.provision({
+          organizationId,
+          licenseId,
+          actorUserId: SYSTEM_ACTORS.connectLicense,
+        })
+      ).id;
+    await this.setConnectServices({ virtualKeyId, organizationId, services: issued.services });
+    await this.virtualKeys.setLicenseFactsInternal({
+      id: virtualKeyId,
+      organizationId,
+      licenseId,
+      tokenHash: issued.tokenHash,
+      instanceId: issued.instanceId,
+      expiresAt: Temporal.Instant.fromEpochMilliseconds(issued.expiresAt),
+    });
+    await this.provisionedSender().recordManagedKeyProvisioned.send({
+      tenantId: organizationId,
+      occurredAt: nowInstant().epochMilliseconds,
+      organizationId,
+      licenseId,
+      issuedLicenseId: issued.issuedLicenseId,
+      virtualKeyId,
+    });
   }
 
   /** Ends the key for good. Safe to repeat. */
@@ -130,5 +193,12 @@ export class ConnectManagedKeyService {
       id: input.virtualKeyId,
       organizationId: input.organizationId,
     });
+  }
+
+  private provisionedSender(): ManagedKeyProvisionedSender {
+    if (!this.#commands) {
+      throw new Error("gateway_connect_managed_key pipeline senders are not connected yet");
+    }
+    return this.#commands;
   }
 }
