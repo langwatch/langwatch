@@ -93,6 +93,55 @@ const createDatasetRecords = ({
   });
 };
 
+const appendLegacyS3Records = async ({
+  db,
+  datasetId,
+  projectId,
+  datasetRecords,
+}: {
+  db: Prisma.TransactionClient | typeof prisma;
+  datasetId: string;
+  projectId: string;
+  datasetRecords: DatasetRecordInput[];
+}) => {
+  const recordData = createDatasetRecords({
+    entries: datasetRecords,
+    datasetId,
+    projectId,
+    useS3: true,
+  });
+
+  let existingRecords: any[] = [];
+  try {
+    const { records: fetchedRecords } = await storageService.getObject(
+      projectId,
+      datasetId,
+    );
+    existingRecords = fetchedRecords;
+  } catch (error) {
+    if ((error as any).name !== "NoSuchKey") {
+      captureException(toError(error));
+      throw error;
+    }
+  }
+
+  // Combine existing and new records
+  const allRecords = [...existingRecords, ...recordData];
+
+  await storageService.putObject(
+    projectId,
+    datasetId,
+    JSON.stringify(allRecords),
+  );
+
+  await db.dataset.update({
+    where: { id: datasetId, projectId },
+    data: { s3RecordCount: allRecords.length },
+  });
+
+  return { success: true };
+};
+
 export const createManyDatasetRecords = async ({
   datasetId,
   projectId,
@@ -135,6 +184,21 @@ export const createManyDatasetRecords = async ({
     });
   }
 
+  if (
+    skipDuplicates &&
+    (dataset.contentLayout === "s3_jsonl" || dataset.useS3)
+  ) {
+    logger.warn(
+      {
+        datasetId,
+        projectId,
+        contentLayout: dataset.contentLayout,
+        useS3: dataset.useS3,
+      },
+      "skipDuplicates is not supported on this dataset layout; existing rows may be duplicated",
+    );
+  }
+
   // ADR-032 rung 6b: an s3_jsonl dataset appends to chunk objects (new chunks
   // from `chunkCount`) under the per-dataset advisory lock (Decision 9), not the
   // PG table (I-PG). A caller-supplied row id is HONORED via `forcedIds` (parity
@@ -149,17 +213,6 @@ export const createManyDatasetRecords = async ({
       const { id: _id, ...entryWithoutId } = entry;
       return entryWithoutId;
     });
-    if (skipDuplicates) {
-      logger.warn(
-        {
-          datasetId,
-          projectId,
-          contentLayout: dataset.contentLayout,
-          useS3: dataset.useS3,
-        },
-        "skipDuplicates is not supported on this dataset layout; existing rows may be duplicated",
-      );
-    }
     await appendS3JsonlRecords({
       prisma,
       dataset,
@@ -171,78 +224,32 @@ export const createManyDatasetRecords = async ({
   }
 
   if (dataset.useS3) {
-    if (skipDuplicates) {
-      logger.warn(
-        {
-          datasetId,
-          projectId,
-          contentLayout: dataset.contentLayout,
-          useS3: dataset.useS3,
-        },
-        "skipDuplicates is not supported on this dataset layout; existing rows may be duplicated",
-      );
-    }
-    const recordData = createDatasetRecords({
-      entries: datasetRecords,
-      datasetId,
-      projectId,
-      useS3: true,
-    });
-
-    let existingRecords: any[] = [];
-    try {
-      const { records: fetchedRecords } = await storageService.getObject(
-        projectId,
-        datasetId,
-      );
-      existingRecords = fetchedRecords;
-    } catch (error) {
-      if ((error as any).name !== "NoSuchKey") {
-        captureException(toError(error));
-        throw error;
-      }
-    }
-
-    // Combine existing and new records
-    const allRecords = [...existingRecords, ...recordData];
-
-    await storageService.putObject(
-      projectId,
-      datasetId,
-      JSON.stringify(allRecords),
-    );
-
-    await db.dataset.update({
-      where: { id: datasetId, projectId },
-      data: { s3RecordCount: allRecords.length },
-    });
-
-    return { success: true };
-  } else {
-    const recordData = createDatasetRecords({
-      entries: datasetRecords,
-      datasetId,
-      projectId,
-    });
-
-    const result = await db.datasetRecord.createMany({
-      data: recordData as (DatasetRecord & { entry: any })[],
-      skipDuplicates,
-    });
-
-    if (skipDuplicates && result.count < recordData.length) {
-      logger.info(
-        {
-          datasetId,
-          projectId,
-          skipped: recordData.length - result.count,
-        },
-        "skipped dataset records that already exist",
-      );
-    }
-
-    return result;
+    return appendLegacyS3Records({ db, datasetId, projectId, datasetRecords });
   }
+
+  const recordData = createDatasetRecords({
+    entries: datasetRecords,
+    datasetId,
+    projectId,
+  });
+
+  const result = await db.datasetRecord.createMany({
+    data: recordData as (DatasetRecord & { entry: any })[],
+    skipDuplicates,
+  });
+
+  if (skipDuplicates && result.count < recordData.length) {
+    logger.info(
+      {
+        datasetId,
+        projectId,
+        skipped: recordData.length - result.count,
+      },
+      "skipped dataset records that already exist",
+    );
+  }
+
+  return result;
 };
 
 const processBatchedRecords = ({
