@@ -209,8 +209,8 @@ date**. **Needs attention** means a failed step: Retry is on that page (`ops:man
 | Ruling or check | Pass | Cell id | State |
 | --- | --- | --- | --- |
 | Api up during the upgrade | head api answers from its first second; no `down` beyond process start; `/healthz` in every phase | I0, N1 | ✅ judged |
-| Ingest serves while upgrading | every OTLP, collector and track post answers 2xx; a 503 with Retry-After only inside a Postgres schema phase longer than 30 s | N1, N2 | ✅ judged |
-| Requests held ≤ 30 s in blocking schema steps | no held call over `UPGRADE_HOLD_WINDOW_MS` (30 s, `packages/process/src/lifecycle/liveness-thread.ts:26`); `-hold 35s` counts a longer one as failed | N2 | ✅ judged |
+| Ingest serves while upgrading | every OTLP, collector and track post answers 2xx, or a 503 `upgrade_in_progress` with Retry-After that succeeds on retry | N1, N2 | ✅ judged |
+| No holds | nothing is held; a call that reaches a schema still behind answers 503 `upgrade_in_progress` (Retry-After 10 s) and the client retries; no unanswered call | N2 | ✅ judged |
 | 0 failed calls | `Failed` = 0 for every kind (eventually consistent: a retried 503 that later succeeds is not a failure) | N2 | ✅ |
 | 0 lost writes, 0 dropped traces | `Lost` = 0: every 2xx write is visible after settle | N3 | ✅ |
 | Queued work drains | jobs queued at the cut drain on head's worker | N4 | ✅ |
