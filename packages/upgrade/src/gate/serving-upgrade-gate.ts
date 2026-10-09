@@ -120,13 +120,14 @@ export function upgradeGateOver({
       warn("roster refresh failed", { processId, error: messageOf(error) }),
     onPruneError: (error) => warn("roster prune failed", { processId, error: messageOf(error) }),
   });
+  const findRuns = async () => ((await runner.ledgerExists()) ? ledger.findRuns() : []);
   const gate = createUpgradeGate({
     role,
     processId,
     image: { release, blockingSteps, name: release ?? "unreleased", declaredSteps },
     ledger: {
       findSteps: async () => ((await runner.ledgerExists()) ? ledger.findSteps() : []),
-      findRuns: async () => ((await runner.ledgerExists()) ? ledger.findRuns() : []),
+      findRuns,
     },
     roster,
     credentialKeys,
@@ -165,7 +166,7 @@ export function upgradeGateOver({
             : await failedFirstInstallRun({
                 verdict: await gate.admit(),
                 findFailedSteps: findBlockingFailures,
-                findRuns: () => ledger.findRuns(),
+                findRuns,
               });
         if (closesOn(verdict)) await closeOnce();
         return verdict;
