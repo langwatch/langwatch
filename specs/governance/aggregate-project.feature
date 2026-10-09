@@ -663,6 +663,17 @@ Feature: An aggregate project reads its member projects
     And a member whose name ana's project list lacks is shown by its id
     And a plain project's trace list has no Project column
 
+  @unit
+  Scenario: An empty aggregate says only a department rule starts at the join date
+    Given an aggregate project whose trace list is empty for the current window
+    When ana opens its Trace Explorer
+    Then the empty state says an aggregate built from a department lists a member's traces from the day it joined
+    And it says older traces stay in the member project
+    And it never claims an all-personal or explicit aggregate starts at the join date
+    And it gives that explanation on every lens, with or without filters
+    And it still offers a wider time window
+    And a plain project's empty state says nothing about aggregates
+
   @integration
   Scenario: The app marks the aggregate and offers no way to add data to it
     When ana opens the project switcher

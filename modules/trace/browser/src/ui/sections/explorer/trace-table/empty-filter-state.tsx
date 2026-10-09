@@ -7,6 +7,7 @@ import {
   Stack,
   Text,
 } from "@langwatch/design-system/primitives";
+import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { nowInstant } from "@langwatch/time";
 import type React from "react";
 
@@ -39,7 +40,17 @@ const MINUTES_PER_HOUR = 60;
 interface EmptyContent {
   title: string;
   description: string;
+  /** A second line that explains what this kind of project can list at all. */
+  note?: string;
 }
+
+/**
+ * Only a department aggregate starts a member at its join date; the others read
+ * the whole history (ADR-177 decision 3). The browser does not read the rule,
+ * so the sentence holds whichever rule the aggregate has.
+ */
+export const AGGREGATE_HISTORY_NOTE =
+  "An aggregate built from a department lists each member's traces from the day that member joined it. Older traces stay in the member project.";
 
 /**
  * What an empty table says about the eval chip in the query, or null when no
@@ -95,6 +106,7 @@ export function emptyContent({
   rangeHours,
   isJudging,
   hasUnjudgedEval = false,
+  isAggregate = false,
 }: {
   activeLensId: string;
   hasFilters: boolean;
@@ -103,9 +115,26 @@ export function emptyContent({
   isJudging: boolean;
   /** An eval chip has no run for this window, lens and filter. */
   hasUnjudgedEval?: boolean;
+  /** The open project is an aggregate, which reads its members' traces. */
+  isAggregate?: boolean;
 }): EmptyContent {
   const judging = instantEvalEmptyContent({ isJudging, hasUnjudgedEval });
+  // A run still judging, or not started, explains the empty table on its own.
   if (judging) return judging;
+  const content = lensEmptyContent({ activeLensId, hasFilters, rangeHours });
+  return isAggregate ? { ...content, note: AGGREGATE_HISTORY_NOTE } : content;
+}
+
+/** What the lens, the filter and the window say about an empty table. */
+function lensEmptyContent({
+  activeLensId,
+  hasFilters,
+  rangeHours,
+}: {
+  activeLensId: string;
+  hasFilters: boolean;
+  rangeHours: number;
+}): EmptyContent {
   if (activeLensId === "errors") {
     return {
       title: "No errors here, lucky you",
@@ -251,6 +280,7 @@ export const EmptyFilterState: React.FC = () => {
   const setTimeRange = useExplorerStore((s) => s.setTimeRange);
   const activeLensId = useExplorerStore((s) => s.activeLensId);
   const selectLens = useExplorerStore((s) => s.selectLens);
+  const { project } = useOrganizationTeamProject();
 
   const { instantEval } = useExplorerCounts();
   const isJudging = instantEval !== null;
@@ -266,6 +296,7 @@ export const EmptyFilterState: React.FC = () => {
     rangeHours,
     isJudging,
     hasUnjudgedEval: Boolean(unjudgedChip),
+    isAggregate: isAggregateProjectKind(project?.kind),
   });
 
   const actions = emptyStateActions({
@@ -294,6 +325,11 @@ export const EmptyFilterState: React.FC = () => {
           <Text textStyle="sm" color="fg.muted" lineHeight="1.6">
             {content.description}
           </Text>
+          {content.note && (
+            <Text textStyle="xs" color="fg.subtle" lineHeight="1.6">
+              {content.note}
+            </Text>
+          )}
         </Stack>
 
         {hasFilters && looksLikeEmail(queryText) && <EmailRedactionNotice />}

@@ -17,6 +17,10 @@ import { EmptyFilterState } from "../empty-filter-state.tsx";
 
 const QUERY = 'status:error AND eval:"is the user annoyed"';
 
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
+  useOrganizationTeamProject: () => ({ project: { id: "project-1", kind: "application" } }),
+}));
+
 vi.mock("../../../../../features/explorer/behavior/use-explorer-counts.ts", () => ({
   useExplorerCounts: () => ({ instantEval: null }),
 }));
