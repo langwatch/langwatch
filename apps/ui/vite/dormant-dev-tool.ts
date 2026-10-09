@@ -14,6 +14,8 @@ export const DEV_TOOLS_IDLE_ENV = "LANGWATCH_DEV_TOOLS_IDLE";
 const DEFAULT_IDLE_MS = 30 * 60_000;
 const START_TIMEOUT_MS = 5 * 60_000;
 const KILL_GRACE_MS = 5_000;
+const BIND_RETRY_MS = 250;
+const BIND_RETRIES = 20;
 const EXIT_SIGNALS = ["SIGINT", "SIGTERM", "SIGHUP"] as const;
 const UNIT_MS: Record<string, number> = { s: 1_000, m: 60_000, h: 3_600_000 };
 
@@ -41,6 +43,7 @@ interface Lane {
   innerPort?: number;
   starting?: Promise<number>;
   isExternal: boolean;
+  closed?: boolean;
   inflight: number;
   lastSeen: number;
 }
@@ -71,7 +74,13 @@ export function startDormantTool(options: DormantToolOptions): DormantTool {
   server.on("upgrade", (req: http.IncomingMessage, socket: Duplex, head: Buffer) =>
     handleUpgrade({ lane, req, socket, head }),
   );
-  server.on("error", (error) => {
+  let retries = 0;
+  server.on("error", (error: NodeJS.ErrnoException) => {
+    // A restarting dev server may not have released the port yet; retry briefly.
+    if (error.code === "EADDRINUSE" && !lane.closed && retries++ < BIND_RETRIES) {
+      setTimeout(() => server.listen(options.port, "127.0.0.1"), BIND_RETRY_MS).unref();
+      return;
+    }
     lane.isExternal = true;
     options.log(
       `${options.name}: :${options.port} is taken (${error.message}); using what answers there`,
@@ -80,8 +89,10 @@ export function startDormantTool(options: DormantToolOptions): DormantTool {
   server.listen(options.port, "127.0.0.1");
   const reaper = options.idleAfterMs > 0 ? startReaper({ lane }) : undefined;
   const stopTool = () => {
+    lane.closed = true;
     clearInterval(reaper);
     server.close();
+    server.closeAllConnections();
     stopLane({ lane, reason: "dev server stopped" });
   };
   const unhook = stopOnExit({ stop: stopTool });
@@ -267,7 +278,8 @@ function proxyRequest({
   req.pipe(upstream);
 }
 
-/** A socket to a stopped tool is refused; the tab reloads to wake it. */
+/** A socket to a stopped tool wakes it and is refused; the open tab's client retries and
+ * reconnects once the tool answers. */
 function handleUpgrade({
   lane,
   req,
@@ -281,7 +293,8 @@ function handleUpgrade({
 }): void {
   const port = lane.innerPort;
   if (port === undefined) {
-    socket.end("HTTP/1.1 503 Service Unavailable\r\nconnection: close\r\n\r\n");
+    void wake({ lane }).catch(() => undefined);
+    socket.end("HTTP/1.1 503 Service Unavailable\r\nretry-after: 2\r\nconnection: close\r\n\r\n");
     return;
   }
   const upstream = net.connect({ port, host: "127.0.0.1" }, () => {

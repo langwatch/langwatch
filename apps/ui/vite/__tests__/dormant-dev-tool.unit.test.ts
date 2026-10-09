@@ -1,5 +1,7 @@
 // @vitest-environment node
 import { mkdtemp, readFile } from "fs/promises";
+import http from "http";
+import net from "net";
 import os from "os";
 import path from "path";
 import { setTimeout as delay } from "timers/promises";
@@ -124,6 +126,48 @@ describe("dormant developer tool", () => {
     expect(await (await fetch(url)).text()).toBe("tool");
     expect(starts).toHaveLength(2);
   }, 20_000);
+
+  /** @scenario "A stopped developer tool revives for a tab left open" */
+  it("wakes the tool on a refused websocket upgrade so the tab's retry succeeds", async () => {
+    const { tool, url, starts } = await fakeTool({ idleAfterMs: 0 });
+
+    const status = await new Promise<number>((resolve, reject) => {
+      const req = http.request(url, { headers: { connection: "Upgrade", upgrade: "websocket" } });
+      req.on("response", (answer) => resolve(answer.statusCode ?? 0));
+      req.on("error", reject);
+      req.end();
+    });
+
+    expect(status).toBe(503);
+    await eventually({ check: () => tool.state() === "ready" });
+    expect(starts).toHaveLength(1);
+  }, 15_000);
+
+  /** @scenario "A restarted dev server takes its developer tool port back" */
+  it("retries the bind until a restarting dev server releases the port", async () => {
+    const port = await freeLoopbackPort();
+    const holder = net.createServer().listen(port, "127.0.0.1");
+    await new Promise((resolve) => holder.once("listening", resolve));
+    const tool = startDormantTool({
+      name: "fake",
+      port,
+      cwd: os.tmpdir(),
+      idleAfterMs: 0,
+      log: () => undefined,
+      command: () => ({ file: "true", args: [] }),
+    });
+    tools.push(tool);
+    await delay(400);
+    holder.close();
+
+    await eventually({
+      check: async () =>
+        (await fetch(`http://127.0.0.1:${port}/`, { method: "HEAD" }).catch(() => undefined))
+          ?.status === 200,
+    });
+
+    expect(tool.state()).toBe("dormant");
+  }, 15_000);
 
   describe("when the developer pins the tools open", () => {
     /** @scenario "A pinned developer tool stays running when idle" */

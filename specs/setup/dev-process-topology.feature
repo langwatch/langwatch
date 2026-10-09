@@ -293,3 +293,17 @@ Feature: The local development process topology
     Given the developer pinned the tools open with "LANGWATCH_DEV_TOOLS_IDLE=off"
     When a visited tool sits idle
     Then it keeps running
+
+  @unit
+  Scenario: A stopped developer tool revives for a tab left open
+    Given a developer tool that was stopped while its page stayed open in a tab
+    When the tab's websocket reconnects
+    Then the connection is refused with a retry hint and the tool is started
+    And the tab's next attempt reaches the running tool
+
+  @unit
+  Scenario: A restarted dev server takes its developer tool port back
+    Given the dev server restarts while the old server still holds a tool's port
+    When the new dev server binds the port
+    Then it retries until the port is released
+    And the tool is not reported as external
