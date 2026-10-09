@@ -627,7 +627,7 @@ function secondFactorScopes({
   });
 }
 
-async function assertSecondFactor({
+export async function assertSecondFactor({
   caller,
   scope,
   authorize,

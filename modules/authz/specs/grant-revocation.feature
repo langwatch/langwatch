@@ -24,3 +24,16 @@ Feature: A revoke ends a grant only inside its own organization
     Given a binding whose current role confers nothing beyond the caller's standing
     When the caller changes that binding to a lesser role
     Then the binding takes the new role
+
+  @unit
+  Scenario: Revoking a binding above the caller's own standing is refused
+    Given a binding whose role confers a permission the caller does not hold
+    When the caller revokes that binding, alone or in a member's batch
+    Then the revoke is refused as beyond the caller's permissions
+    And the binding stays in place
+
+  @unit
+  Scenario: Revoking a binding within the caller's own standing is allowed
+    Given a binding whose role confers nothing beyond the caller's standing
+    When the caller revokes that binding
+    Then the binding is revoked

@@ -45,7 +45,7 @@ export const authzTrpc = defineTrpcContract("authz")
   .withOutput(grantSchema)
 
   .mutation("revokeGrant")
-  .withInput(authzRevokeGrantByIdInputSchema.omit({ actor: true }))
+  .withInput(authzRevokeGrantByIdInputSchema.omit(IMPLIED_BY_SESSION))
   .withOutput(grantRevokedSchema)
 
   .query("listManagedGrants")
@@ -109,7 +109,7 @@ export const authzTrpcTransport: TrpcRouterDeclaration<AuthzApi, typeof authzTrp
     .procedure("revokeGrant")
     .withPermission("organization:manage")
     .handle(async ({ app, input, actor }) =>
-      app.revokeGrant({ ...input, actor: toLedgerActor(actor) }),
+      app.revokeGrant({ ...input, caller: callerOf(actor), actor: toLedgerActor(actor) }),
     )
 
     /** Every grant in the organization with its principal and scope named. */

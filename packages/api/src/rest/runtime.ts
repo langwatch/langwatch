@@ -27,6 +27,7 @@ import {
 } from "../access-policy.ts";
 import {
   assertRouteScopePermission,
+  assertSecondFactor,
   chosenPermission,
   decide,
   decideEntitlement,
@@ -37,6 +38,7 @@ import {
   refuseWriteUnderAggregate,
   routeScopeOf,
   scopeWithOrganization,
+  type AccessActor,
   type AccessDenial,
   type Authorize,
   type Credential,
@@ -1257,6 +1259,24 @@ function refuseRepeatedKey({
   throw new TypeError(`REST input field "${key}" is declared by multiple sources`);
 }
 
+/** The organization's second-factor requirement, asked where the permit was (as tRPC does). */
+async function assertRouteSecondFactor({
+  caller,
+  actor,
+  scope,
+  authorize,
+}: {
+  caller: RestCaller;
+  actor: AccessActor | null;
+  scope: AuthzDeclaredScopeId | null;
+  authorize: Authorize | undefined;
+}): Promise<void> {
+  if (!scope || !authorize) return;
+
+  const browserSession = caller.browserSession ? { browserSession: caller.browserSession } : {};
+  await assertSecondFactor({ caller: { actor, ...browserSession }, scope, authorize });
+}
+
 /** Authenticate, decide, handle, check the answer, respond. */
 function decideRouteCaller<Api>({
   route,
@@ -1370,6 +1390,9 @@ function handlerMiddleware<Api>({
     // one, and the door's own otherwise. Both the plan question and the
     // idempotency tenancy are asked about exactly this scope.
     const resolved = target ?? decision.scope;
+    const authorize = ports.authorization?.forRequest(context.req.raw);
+
+    await assertRouteSecondFactor({ caller, actor: decision.actor, scope: resolved, authorize });
 
     if (!planFirst(route)) await checkEntitlement({ route, ports, scope: resolved, input, family });
     await refuseAggregateWrite({ route, ports, scope: resolved, request: context.req.raw });
@@ -1387,7 +1410,7 @@ function handlerMiddleware<Api>({
       permission: route.permission,
       actor,
       scope: resolved,
-      authorize: ports.authorization?.forRequest(context.req.raw),
+      authorize,
       route: `${family}.${route.operation}`,
     });
 

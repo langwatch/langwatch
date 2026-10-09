@@ -188,6 +188,7 @@ export const authzRoleBindingRest: Readonly<{
       organizationId: organization.organizationId,
       bindingId: input.id,
       actor: organization.actor,
+      caller: organization.caller,
     });
 
     return { success: true as const };

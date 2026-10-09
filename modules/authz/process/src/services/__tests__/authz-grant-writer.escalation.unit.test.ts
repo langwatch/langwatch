@@ -115,7 +115,14 @@ function setup({
     },
   });
 
-  return { writer, attachBindings, changeBindingRole, revokeBindings, findPermissionsBeyondCaller };
+  return {
+    writer,
+    bindings,
+    attachBindings,
+    changeBindingRole,
+    revokeBindings,
+    findPermissionsBeyondCaller,
+  };
 }
 
 describe("given the binding writer every door writes through", () => {
@@ -250,7 +257,7 @@ describe("given the binding writer every door writes through", () => {
       const { writer, revokeBindings } = setup({ rows: lastAdmin, existing });
 
       await expect(
-        writer.delete({ organizationId: ORG, bindingId: "rb-1", actor }),
+        writer.delete({ organizationId: ORG, bindingId: "rb-1", actor, caller: self }),
       ).rejects.toMatchObject({ code: "cannot_remove_last_admin" });
       expect(revokeBindings).not.toHaveBeenCalled();
     });
@@ -278,7 +285,7 @@ describe("given the binding writer every door writes through", () => {
       ];
       const { writer, revokeBindings } = setup({ rows, existing });
 
-      await writer.delete({ organizationId: ORG, bindingId: "rb-1", actor });
+      await writer.delete({ organizationId: ORG, bindingId: "rb-1", actor, caller: self });
 
       expect(revokeBindings).toHaveBeenCalledOnce();
     });
@@ -358,6 +365,62 @@ describe("given a caller changing a binding that already exists", () => {
           customRoleId: null,
         }),
       ).resolves.toBeUndefined();
+    });
+  });
+});
+
+describe("given a caller revoking a binding that already exists", () => {
+  const above = { id: "rb-1", scopeType: "TEAM" as const, role: "ADMIN" as const };
+
+  describe("when the binding's role confers what the caller lacks", () => {
+    /** @scenario Revoking a binding above the caller's own standing is refused */
+    it("refuses the revoke and leaves the binding", async () => {
+      const { writer, revokeBindings } = setup({ lacks: ["project:delete"], existing: above });
+
+      await expect(
+        writer.delete({ organizationId: ORG, bindingId: "rb-1", actor, caller: self }),
+      ).rejects.toMatchObject({ code: "grant_exceeds_caller_permissions" });
+      expect(revokeBindings).not.toHaveBeenCalled();
+    });
+
+    it("refuses a member-dialog batch that revokes it", async () => {
+      const { writer, bindings, revokeBindings } = setup({ lacks: ["project:delete"] });
+      bindings.findDirectUserBindings.mockResolvedValue([
+        {
+          id: "rb-1",
+          organizationId: ORG,
+          userId: "user-2",
+          groupId: null,
+          apiKeyId: null,
+          role: "ADMIN",
+          customRoleId: null,
+          scopeType: "TEAM",
+          scopeId: "team-1",
+        },
+      ]);
+
+      await expect(
+        writer.applyMemberBindings({
+          organizationId: ORG,
+          userId: "user-2",
+          bindingIdsToDelete: ["rb-1"],
+          bindingsToCreate: [],
+          actor,
+          caller: self,
+        }),
+      ).rejects.toMatchObject({ code: "grant_exceeds_caller_permissions" });
+      expect(revokeBindings).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the binding's role confers nothing beyond the caller's standing", () => {
+    /** @scenario Revoking a binding within the caller's own standing is allowed */
+    it("revokes it", async () => {
+      const { writer, revokeBindings } = setup({ lacks: ["project:delete"] });
+
+      await writer.delete({ organizationId: ORG, bindingId: "rb-1", actor, caller: self });
+
+      expect(revokeBindings).toHaveBeenCalledOnce();
     });
   });
 });

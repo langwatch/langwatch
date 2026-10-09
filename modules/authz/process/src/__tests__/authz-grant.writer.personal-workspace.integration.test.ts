@@ -235,7 +235,7 @@ describe.skipIf(!DB_URL)("given a personal workspace in an organization", () => 
     /** @scenario Taking the owner's access to their own workspace away is refused */
     it("refuses the deletion of the owner's binding", async () => {
       await expect(
-        writer.delete({ organizationId, bindingId: ownerBindingId, actor }),
+        writer.delete({ organizationId, bindingId: ownerBindingId, actor, caller: TEST_CALLER }),
       ).rejects.toMatchObject({ code: "personal_workspace_not_managed_here" });
 
       await expect(bindingsOnPersonalTeam()).resolves.toEqual([

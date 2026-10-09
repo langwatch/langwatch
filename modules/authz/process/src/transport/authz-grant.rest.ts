@@ -135,6 +135,7 @@ export const authzGrantRest: Readonly<{
     app.revokeGrant({
       organizationId: facts.organizationId,
       grantId: input.grantId,
+      caller: facts.caller,
       actor: facts.actor,
     }),
   )
