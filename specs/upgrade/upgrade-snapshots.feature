@@ -60,3 +60,35 @@ Feature: A system state is captured to a snapshot and restored from it unchanged
     Then every key and body is restored unchanged and the fingerprints are equal
     And a restore into a bucket not named "upgradelab-" is refused, naming the prefix
     And an object body holding an "sk-" style key is refused, naming the object key but never the value
+
+  # The S3 client (lane UPGRADELAB-S3): hand-rolled SigV4, no SDK, path-style or virtual-host addressing.
+
+  @unit
+  Scenario: Capture lists and reads every object in an S3 bucket
+    Given an S3 bucket holding more objects than one list page returns
+    When the bucket is captured through the signed S3 client
+    Then every page of the listing is followed to its end
+    And every object is read and counted in the manifest
+
+  @unit
+  Scenario: Restore into S3 refuses a bucket whose name lacks the upgradelab- prefix
+    Given an S3 bucket named "langwatch"
+    When a snapshot is restored into it through the S3 client
+    Then the restore refuses, naming the dedicated prefix
+    And no object is written to the bucket
+
+  @unit
+  Scenario: Restore into S3 refuses a bucket that is not empty
+    Given an S3 bucket named "upgradelab-objects" that already holds an object
+    When a snapshot is restored into it through the S3 client
+    Then the restore refuses, naming the bucket as not empty
+    And no object is written to the bucket
+
+  @unit
+  Scenario: A signing failure or a refused request names the bucket and key, never the credentials
+    When the S3 client has no secret key to sign with
+    Then the request is not sent
+    And the error names the bucket and the key
+    When the S3 server answers 403 with a body that echoes the request signature
+    Then the error names the bucket, the key and the status code
+    And the error contains neither the access key, the secret key nor the signature
