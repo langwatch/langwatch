@@ -105,7 +105,7 @@ func (s *Server) routes() *http.ServeMux {
 
 // Serve runs the HTTP surface until the context is canceled.
 func (s *Server) Serve(ctx context.Context, port int) error {
-	srv := &http.Server{Addr: fmt.Sprintf("127.0.0.1:%d", port), Handler: s.guardHost(s.routes()), ReadHeaderTimeout: 5 * time.Second}
+	srv := &http.Server{Addr: fmt.Sprintf("127.0.0.1:%d", port), Handler: s.guardHost(s.serveWaiting(s.routes())), ReadHeaderTimeout: 5 * time.Second}
 	go func() {
 		<-ctx.Done()
 		sctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)

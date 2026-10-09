@@ -102,6 +102,8 @@ func (o *Orchestrator) RunDaemon(ctx context.Context, dash Dashboard, after int)
 		zap.Int("port", port),
 		zap.String("dashboard", o.cfg.Naming.URL(domain.HubService, "", scheme, pport)))
 	go o.monitorLoop(ctx)
+	defer o.reconcileWaitRoutes(port, true)
+	go o.waitRouteLoop(ctx, port)
 	return dash.Serve(ctx, port)
 }
 
