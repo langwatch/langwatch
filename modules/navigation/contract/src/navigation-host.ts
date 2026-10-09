@@ -5,6 +5,8 @@ export type NavigationProject = {
   id: string;
   name: string;
   slug: string;
+  /** The project's kind (ADR-177): the switcher marks an aggregate, a landing skips one. */
+  kind?: string;
   isPersonal?: boolean | null;
   /** Last coding-agent telemetry timestamp; sessions/PR destinations kept while recent */
   lastCodingAgentSessionAt?: string | null;

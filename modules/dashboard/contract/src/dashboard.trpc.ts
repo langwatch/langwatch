@@ -61,10 +61,10 @@ export const dashboardTrpc = defineTrpcContract("dashboards")
   .withInput(z.object({ ...projectScopeSchema.shape, dashboardIds: z.array(z.string()) }))
   .withOutput(dashboardReorderResponseSchema)
 
-  /** Every project has at least one dashboard once this has been asked. */
+  /** The first dashboard, created on demand; `null` on an aggregate with none, as on main. */
   .query("getOrCreateFirst")
   .withInput(projectScopeSchema)
-  .withOutput(dashboardTrpcRowSchema)
+  .withOutput(dashboardTrpcRowSchema.nullable())
 
   /**
    * Dashboards area only, like the two below: refused while `release_dashboards`

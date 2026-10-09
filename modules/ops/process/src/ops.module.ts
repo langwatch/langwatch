@@ -121,9 +121,11 @@ export const opsProcessModule: PublishedProcessModule<"ops", OpsApi, OpsServerCo
 function extractRequestCredential(
   request: Request,
 ): { token: string; projectId: string | null } | null {
+  /* oxlint-disable langwatch/auth-header-read -- the project key a bug report may carry */
   const authorization = request.headers.get("authorization");
   const xAuthToken = request.headers.get("x-auth-token");
   const xProjectId = request.headers.get("x-project-id");
+  /* oxlint-enable langwatch/auth-header-read */
 
   if (authorization?.toLowerCase().startsWith("basic ")) {
     const parsed = parseBasicCredential(authorization.slice(6));

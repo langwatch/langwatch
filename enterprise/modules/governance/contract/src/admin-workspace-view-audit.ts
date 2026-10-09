@@ -6,15 +6,29 @@ export const ADMIN_WORKSPACE_VIEW_DEDUP_MS = 5 * 60 * 1_000;
 export const adminWorkspaceKindSchema = z.enum(["personal", "team"]);
 export type AdminWorkspaceKind = z.infer<typeof adminWorkspaceKindSchema>;
 
-export const recordWorkspaceViewInputSchema = z
-  .object({
-    actorUserId: z.string().min(1),
-    organizationId: z.string().min(1),
-    targetTeamId: z.string().min(1),
-    kind: adminWorkspaceKindSchema,
-    workspaceLabel: z.string().optional(),
-  })
-  .strict();
+const workspaceViewerShape = {
+  actorUserId: z.string().min(1),
+  organizationId: z.string().min(1),
+  workspaceLabel: z.string().optional(),
+};
+
+/** A personal or team workspace is a team; an aggregate project is the project itself (ADR-177). */
+export const recordWorkspaceViewInputSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      ...workspaceViewerShape,
+      kind: adminWorkspaceKindSchema,
+      targetTeamId: z.string().min(1),
+    })
+    .strict(),
+  z
+    .object({
+      ...workspaceViewerShape,
+      kind: z.literal("aggregate"),
+      targetProjectId: z.string().min(1),
+    })
+    .strict(),
+]);
 export type RecordWorkspaceViewInput = z.infer<typeof recordWorkspaceViewInputSchema>;
 
 export const recordWorkspaceViewResultSchema = z

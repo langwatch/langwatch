@@ -44,8 +44,23 @@ export interface RegisteredRoute {
    * the owner, the module serving it, why, and the plan that retires it.
    */
   readonly sharedPath?: RegisteredSharedPath;
-  /** Declared to serve while the installation upgrades (UIW-6). */
-  readonly servesWhileUpgrading?: true;
+  /** Every route serves while the installation upgrades; this one holds, and says why (API-UP). */
+  readonly holdsWhileUpgrading?: UpgradeHoldReason;
+}
+
+/** Why a route cannot serve until the ledger is current: what it would get wrong mid-upgrade. */
+export type UpgradeHoldReason = Readonly<{ because: string }>;
+
+/** A hold names what the route would get wrong mid-upgrade; a blank reason is refused. */
+export function assertHoldReason({
+  address,
+  reason,
+}: {
+  address: string;
+  reason: UpgradeHoldReason;
+}): void {
+  if (reason.because.trim() !== "") return;
+  throw new Error(`${address} holds while upgrading without saying why: name it in \`because\``);
 }
 
 export type RegisteredSharedPath = RestSharedPath & Readonly<{ servedBy: string }>;
@@ -73,26 +88,26 @@ export function allRegisteredRoutes(): RegisteredRoute[] {
 }
 
 /**
- * Every route declared to serve while upgrading, as a regex over `METHOD /path` the liveness
- * door matches before it proxies (UIW-6). A wildcard skips the literal routes beneath it that
- * do not declare it themselves (UIW-WILDCARD-SKIPS-LITERALS). Spec: in-app-upgrade.feature.
+ * Every route declared to hold while upgrading, as a regex over `METHOD /path` the liveness door
+ * matches before it proxies; every other route serves (API-UP default-on). A held wildcard skips
+ * the literal routes beneath it that do not hold themselves. Spec: in-app-upgrade.feature.
  */
-export function routesServingWhileUpgrading(): string[] {
+export function routesHeldWhileUpgrading(): string[] {
   const routes = allRegisteredRoutes();
-  const held = routes.filter((route) => !route.servesWhileUpgrading).flatMap(addressesOf);
+  const serving = routes.filter((route) => !route.holdsWhileUpgrading).flatMap(addressesOf);
   const rest = routes
-    .filter((route) => route.servesWhileUpgrading)
+    .filter((route) => route.holdsWhileUpgrading)
     .flatMap(addressesOf)
     .map(({ method, path }) => {
       const pattern = `${method} ${pathPattern(path)}`;
       if (!path.includes("*")) return `^${pattern}$`;
       const beneath = new RegExp(`^${pattern}$`);
-      const skipped = held
+      const skipped = serving
         .filter((other) => !other.path.includes("*") && beneath.test(`${other.verb} ${other.path}`))
         .map((other) => `(?!${other.method} ${pathPattern(other.path)}$)`);
       return `^${skipped.join("")}${pattern}$`;
     });
-  return trpcServingWhileUpgrading.size === 0 ? rest : [...rest, trpcBatchPattern()];
+  return trpcHeldWhileUpgrading.size === 0 ? rest : [...rest, ...trpcHeldPatterns()];
 }
 
 /** A route's bare and twin paths, each with its method as a regex and as declared. */
@@ -102,17 +117,19 @@ function addressesOf(route: RegisteredRoute): { method: string; verb: string; pa
   return paths.map((path) => ({ method, verb: route.method, path }));
 }
 
-const trpcServingWhileUpgrading = new Set<string>();
+const trpcHeldWhileUpgrading = new Set<string>();
 
-/** A tRPC procedure (`namespace.name`) declared to serve while upgrading (UIW-TRPC-DECLARE). */
-export function registerTrpcServingWhileUpgrading(procedure: string): void {
-  trpcServingWhileUpgrading.add(procedure);
+/** A tRPC procedure (`namespace.name`) declared to hold while upgrading. */
+export function registerTrpcHeldWhileUpgrading(procedure: string): void {
+  trpcHeldWhileUpgrading.add(procedure);
 }
 
-/** `/api/trpc/a,b` (TrpcHost.path) passes only when every procedure in the batch is declared. */
-function trpcBatchPattern(): string {
-  const one = `(?:${[...trpcServingWhileUpgrading].map(escapeRegex).join("|")})`;
-  return `^(?:GET|POST) /api/trpc/${one}(?:,${one})*$`;
+/** A tRPC batch (TrpcHost.path) holds when any procedure in it holds; a subscription on SSE too. */
+function trpcHeldPatterns(): string[] {
+  const procedures = [...trpcHeldWhileUpgrading];
+  const one = `(?:${procedures.map(escapeRegex).join("|")})`;
+  const stream = `(?:${procedures.map((name) => name.split(".").map(escapeRegex).join("[./]")).join("|")})`;
+  return [`^(?:GET|POST) /api/trpc/(?:[^/]*,)?${one}(?:,[^/]*)?$`, `^GET /api/sse/${stream}$`];
 }
 
 function escapeRegex(text: string): string {

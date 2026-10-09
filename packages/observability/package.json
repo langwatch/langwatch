@@ -1,6 +1,5 @@
 {
   "name": "@langwatch/observability",
-  "langwatch": { "group": "telemetry" },
   "version": "0.0.1",
   "private": true,
   "description": "Logging, context propagation, and OpenTelemetry utilities for LangWatch services",

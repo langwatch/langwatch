@@ -4,7 +4,11 @@
  * ADR-092 §6 step RECORD — denials emit one structured log line here. That
  */
 import {
+  AccessNotGrantedError,
   PermissionDeniedError,
+  type Actor,
+  type Authorization,
+  type AuthorizationPurpose,
   type AuthzDeclaredScopeId,
   type AuthzGetDecisionInput,
   type AuthzGetProjectAnyDecisionInput,
@@ -15,6 +19,7 @@ import {
   type PermissionDecision,
   type PermissionScopeArg,
   type TierOfScopeArg,
+  isAggregateProjectKind,
 } from "@langwatch/authorization";
 import {
   AuthzEngine,
@@ -63,6 +68,7 @@ import {
   AuthzScopeNotFoundError,
   type AuthzFindPermissionsBeyondCallerInput,
 } from "@langwatch/authz-contract";
+import { createLogger } from "@langwatch/observability";
 import type { Instant } from "@langwatch/time";
 import { z } from "zod";
 
@@ -72,6 +78,8 @@ import type { AuthzListingRepository } from "../repositories/authz-listing.repos
 import type { AuthzManagedGrantRepository } from "../repositories/authz-managed-grant.repository.ts";
 import type { AuthzReadRepository } from "../repositories/authz-read.repository.ts";
 import { findPermissionsBeyondHeld } from "../rules/grant-escalation.rules.ts";
+import { AuthorizationService } from "./authorization.service.ts";
+import type { AuthzAggregateReadAuditService } from "./authz-aggregate-read-audit.service.ts";
 import { AuthzCollectorService } from "./authz-collector.service.ts";
 import { AuthzDecisionService } from "./authz-decision.service.ts";
 import { AuthzGrantReaderService } from "./authz-grant-reader.service.ts";
@@ -123,9 +131,13 @@ export type AuthzServiceOptions = {
   findEngineCutoverAt?: (organizationId: string) => Promise<Instant | null>;
   /** Answers `can` at the platform; omitted = every platform question is refused. */
   platformOperators?: Pick<AuthzPlatformOperatorsService, "can">;
+  /** Records a user's read of an aggregate (ADR-177 decision 9); omitted = not audited. */
+  aggregateReads?: Pick<AuthzAggregateReadAuditService, "record">;
 };
 
 const rolePermissionListSchema = z.array(z.string());
+
+const aggregateReadAudit = createLogger("langwatch:authz:aggregate-read-audit");
 
 export class AuthzService {
   static create(options: AuthzServiceOptions): AuthzService {
@@ -163,6 +175,7 @@ export class AuthzService {
   private readonly bindingReader: AuthzGrantReaderService;
   private readonly scopeLineage: AuthzScopeLineageService;
   private readonly options: AuthzServiceOptions;
+  private readonly proofs: AuthorizationService;
 
   private constructor({
     collector,
@@ -181,6 +194,14 @@ export class AuthzService {
     this.bindingReader = bindingReader;
     this.scopeLineage = scopeLineage;
     this.options = options;
+    const { epoch } = options;
+    this.proofs = AuthorizationService.create({
+      authz: this,
+      collector,
+      sharedReads: options.repository,
+      ...(epoch ? { epochReader: (input) => epoch.findEpoch(input) } : {}),
+      ...(options.cacheEnabled ? { cacheEnabled: options.cacheEnabled } : {}),
+    });
     this.decisionCore = AuthzDecisionService.create({ engine: this.engine, snapshots });
     this.idDecisions = AuthzIdDecisionsService.create({
       engine: this.engine,
@@ -243,30 +264,96 @@ export class AuthzService {
     principal,
     permission,
     scope,
+    proof,
   }: {
     principal: AuthzPrincipalRef;
     permission: Permission;
     scope: Extract<AuthzScopeRef, { type: Tier }>;
-  }): Promise<Authorized<Tier, Permission>> {
+    proof?: Readonly<{ actor: Actor; purpose: AuthorizationPurpose }>;
+  }): Promise<Authorized<Tier, Permission> & Readonly<{ authorization: Authorization | null }>> {
+    const resolved: AuthzScopeRef = scope;
+    if (proof && resolved.type === "project") {
+      // One engine pass decides and mints; the door does not evaluate the grants twice.
+      const authorization = await this.proofs
+        .authorize({
+          actor: proof.actor,
+          principal,
+          permission,
+          scope: { projectId: resolved.id },
+          purpose: proof.purpose,
+        })
+        .catch((error: unknown) => {
+          if (!(error instanceof AccessNotGrantedError)) throw error;
+          throw new PermissionDeniedError({ permission, scope, denialReason: "no-grant" });
+        });
+      const witness = this.mintAuthorizationWitness({
+        tier: "project",
+        id: resolved.id,
+        permission,
+      });
+      await this.auditAggregateRead({ actor: proof.actor, authorization, projectId: resolved.id });
+
+      return { ...(witness as Authorized<Tier, Permission>), authorization };
+    }
+
     const decision = await this.check({ principal, permission, scope });
     if (!decision.allowed) {
       throw new PermissionDeniedError({
         permission,
         scope,
-        denialReason: decision.denialReason ?? "no-binding",
+        denialReason: decision.denialReason ?? "no-grant",
       });
     }
 
     const authorizedScope = scope as { type: Tier; id: string };
 
-    return this.mintAuthorizationWitness({
-      tier: authorizedScope.type,
-      id: authorizedScope.id,
-      permission,
-    });
+    return {
+      ...this.mintAuthorizationWitness({
+        tier: authorizedScope.type,
+        id: authorizedScope.id,
+        permission,
+      }),
+      authorization: null,
+    };
+  }
+
+  /**
+   * A user's read that crosses shared grants into an aggregate is audited. The audit never fails
+   * the read: a failure is logged and the read carries on.
+   */
+  private async auditAggregateRead({
+    actor,
+    authorization,
+    projectId,
+  }: {
+    actor: Actor;
+    authorization: Authorization;
+    projectId: string;
+  }): Promise<void> {
+    const audit = this.options.aggregateReads;
+    if (!audit || actor.type !== "user") return;
+    if (!authorization.grants.some((grant) => grant.kind === "shared")) return;
+    try {
+      const scope = await this.collector.findScopeRef({ projectId });
+      if (scope?.type !== "project" || !isAggregateProjectKind(scope.kind)) return;
+      await audit.record({
+        actorUserId: actor.id,
+        organizationId: authorization.scope.organizationId,
+        aggregateProjectId: projectId,
+      });
+    } catch (error) {
+      aggregateReadAudit.warn(
+        { error, projectId },
+        "aggregate read audit failed; the read carries on",
+      );
+    }
   }
 
   /** The only minter of a witness; the contract publishes the type and no factory. */
+  /** The own-only proof for platform code reading its own project; nothing is evaluated. */
+  authorizeInternal: AuthorizationService["authorizeInternal"] = (args) =>
+    this.proofs.authorizeInternal(args);
+
   private mintAuthorizationWitness<
     Tier extends DeclaredScopeTier,
     Permission extends AuthzPermission,

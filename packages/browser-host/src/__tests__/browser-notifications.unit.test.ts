@@ -1,5 +1,5 @@
 /**
- * The browser notifications capability over a stubbed Notification API.
+ * The browser notifications host service over a stubbed Notification API.
  * @see specs/langy/langy-notifications.feature
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

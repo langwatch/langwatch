@@ -14,7 +14,12 @@ import {
 } from "@langwatch/api/rest";
 import { recordAuditLogCommandSchema, type AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
-import { AuthzScopeNotFoundError, type AuthzApi } from "@langwatch/authz-contract";
+import type { Actor, Authorization } from "@langwatch/authorization";
+import {
+  AuthzScopeNotFoundError,
+  type AuthzApi,
+  type AuthzPrincipalRef,
+} from "@langwatch/authz-contract";
 import {
   EnterprisePlanRequiredError,
   isEnterpriseTier,
@@ -50,7 +55,12 @@ export type ApiDoorPeers = Readonly<{
   /** Where a project-bound CLI access token is read back to its person and project. */
   cliProjects: ApiRestCredentialPeers["cliProjects"];
   /** The decisions both transports authorize through, and the key ceilings the key doors ask. */
-  authz: ApiDoor["authz"] & ApiRestCredentialPeers["authz"] & Pick<AuthzApi, "getScope" | "can">;
+  authz: Pick<
+    ApiDoor["authz"],
+    "getDecision" | "getProjectAnyDecision" | "checkScopeLineage" | "getSessionVersion"
+  > &
+    ApiRestCredentialPeers["authz"] &
+    Pick<AuthzApi, "getScope" | "can" | "authorize">;
   organizations: Pick<
     OrganizationApi,
     "getSettings" | "getOrganizationIdByTeamId" | "findPersonalTeamOwners"
@@ -101,7 +111,7 @@ export class ApiDoorService {
   }
 
   /** The decisions both transports ask, and the platform grant asked of the operator (E4). */
-  #authorize(): ApiDoor["authz"] {
+  #authorize(): Required<ApiDoor["authz"]> {
     const authz = this.#peers.authz;
 
     return {
@@ -124,8 +134,42 @@ export class ApiDoorService {
         });
         return resolved?.type === scope.tier ? resolved.organizationId : null;
       },
+      projectKindOf: (projectId) => this.#projectKindOf(projectId),
+      authorization: (input) => this.#mintProof(input),
       assertSecondFactor: (input) => this.#assertSecondFactor(input),
     };
+  }
+
+  /** A project's kind, read with its scope (ADR-177); an unknown project has none. */
+  async #projectKindOf(projectId: string): Promise<string | null> {
+    const resolved = await this.#peers.authz.getScope({ projectId }).catch((error: unknown) => {
+      if (AuthzScopeNotFoundError.is(error)) return null;
+      throw error;
+    });
+
+    return resolved?.type === "project" ? (resolved.kind ?? null) : null;
+  }
+
+  /** The route's sealed proof, minted by AuthzApi.authorize after the door admitted the call. */
+  async #mintProof({
+    actor,
+    permission,
+    projectId,
+    purpose,
+  }: Parameters<NonNullable<ApiDoor["authz"]["authorization"]>>[0]): Promise<Authorization> {
+    const { authz } = this.#peers;
+    const scope = await authz.getScope({ projectId });
+    if (scope.type !== "project") throw new Error(`${projectId} resolved to no project`);
+
+    const { authorization } = await authz.authorize({
+      principal: proofPrincipalOf(actor),
+      permission,
+      scope,
+      proof: { actor, purpose },
+    });
+    if (!authorization) throw new Error("authz minted no proof for a project read");
+
+    return authorization;
   }
 
   /**
@@ -435,4 +479,11 @@ function ownedCaller({
   markUsed: () => void;
 }): RestCaller {
   return { actor: userId ? { type: "user", id: userId } : null, scope, markUsed };
+}
+
+/** Whom a door-minted proof is asked for: the person (impersonated, as decided) or the key. */
+function proofPrincipalOf(actor: Actor): AuthzPrincipalRef {
+  if (actor.type === "user") return { type: "user", id: actor.id };
+  if (actor.type === "api_key") return { type: "apiKey", id: actor.id };
+  throw new Error(`a ${actor.type} actor reached a door that mints a route proof`);
 }

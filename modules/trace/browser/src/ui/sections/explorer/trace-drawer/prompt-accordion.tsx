@@ -1,5 +1,5 @@
-import { Link } from "@langwatch/browser-host/link";
 import { useDrawer } from "@langwatch/browser-host/drawer";
+import { Link } from "@langwatch/browser-host/link";
 import {
   Badge,
   Box,
@@ -14,7 +14,7 @@ import type { SpanDetail } from "@langwatch/trace-contract";
 import { useMemo } from "react";
 import { LuCopy, LuExternalLink, LuPencil } from "react-icons/lu";
 
-import { useGoToSpanInPlaygroundTabUrlBuilder } from "../../../../behavior/prompts/use-load-span-into-prompt-playground.ts";
+import { useSpanPlaygroundHref } from "../../../../behavior/prompts/use-span-playground-href.ts";
 import { usePromptByHandle } from "../../../../features/trace-drawer/behavior/use-prompt-by-handle.ts";
 import { extractPromptReference, hasPromptMetadata } from "../../../../model/prompt-attributes.ts";
 
@@ -32,7 +32,8 @@ interface PromptAccordionProps {
 export function PromptAccordion({ span }: PromptAccordionProps) {
   const { openDrawer } = useDrawer();
   const ref = useMemo(() => extractPromptReference(span.params), [span]);
-  const { buildUrl } = useGoToSpanInPlaygroundTabUrlBuilder();
+  const playgroundHrefFor = useSpanPlaygroundHref();
+  const playgroundHref = playgroundHrefFor(span.spanId);
   // SDK sometimes emits the opaque slug-id (`prompt_xxx`) instead of the
   // human handle (`pizza-prompt`) on `langwatch.prompt.id`. Resolve to the
   // friendlier handle for display while keeping the raw value for the
@@ -172,8 +173,8 @@ export function PromptAccordion({ span }: PromptAccordionProps) {
           </Button>
           {/* Single smart-default button: opens the existing prompt at its traced version when
               linked, else creates a fresh tab — matches the IOViewer header's affordance. */}
-          {buildUrl(span.spanId) && (
-            <Link href={buildUrl(span.spanId)?.toString() ?? ""} isExternal variant="plain">
+          {playgroundHref && (
+            <Link href={playgroundHref} isExternal variant="plain">
               <Button size="xs" variant="ghost" gap={1}>
                 <Icon as={LuExternalLink} boxSize={3} />
                 Open in Playground

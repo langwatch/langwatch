@@ -23,6 +23,9 @@
       "path": "../../packages/observability/tsconfig.build.json"
     },
     {
+      "path": "../../packages/process/tsconfig.build.json"
+    },
+    {
       "path": "../../packages/time/tsconfig.build.json"
     },
     {

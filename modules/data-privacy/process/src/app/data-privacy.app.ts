@@ -13,6 +13,7 @@ import {
   type DataPrivacyScopeTarget,
   type DataPrivacyServerConfig,
   type DataPrivacySnapshot,
+  type PrivacyPolicyRequestMemo,
   type ResolvedDataPrivacy,
   type SpanContentDropResult,
 } from "@langwatch/data-privacy-contract";
@@ -200,6 +201,13 @@ export class DataPrivacyModule implements DataPrivacyApi {
 
   getResolvedForProject(input: { projectId: string }): Promise<ResolvedDataPrivacy> {
     return this.#privacy.getResolvedForProject(input);
+  }
+
+  getResolvedForProjects(input: {
+    projectIds: readonly string[];
+    memo?: PrivacyPolicyRequestMemo;
+  }): Promise<ResolvedDataPrivacy> {
+    return this.#privacy.getResolvedForProjects(input);
   }
 
   listOrganizationRules(input: { organizationId: string }): Promise<DataPrivacyPolicy[]> {

@@ -7,6 +7,7 @@
 import { BlankScopeIdError, PermissionDeniedError } from "@langwatch/authorization";
 import { describe, expect, it } from "vitest";
 
+import { authorizeDefaults } from "../../__tests__/api-double.ts";
 import { ScopeInputMismatchError } from "../../errors.ts";
 import {
   AccessWiringError,
@@ -33,6 +34,7 @@ function authorize(
   seen: { decisions: unknown[] } = { decisions: [] },
 ): Authorize {
   return {
+    ...authorizeDefaults,
     getDecision: async (input) => {
       seen.decisions.push(input);
 
@@ -153,6 +155,7 @@ describe("deciding access for one call", () => {
   describe("given the scope ids do not share one organization", () => {
     it("refuses before any permission is checked", async () => {
       const mismatched = authorize({
+        ...authorizeDefaults,
         checkScopeLineage: async () => ({
           kind: "mismatch",
           widest: { tier: "organization", id: "organization-2" },

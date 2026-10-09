@@ -25,6 +25,7 @@ export const CONNECT_TEST_CREDENTIAL: RestResolvedProjectCredential = {
     organizationId: "org_test",
     isPersonal: false,
     ownerUserId: null,
+    kind: "application",
   },
 };
 

@@ -5,7 +5,6 @@ import { EVENT_FACET } from "../clickhouse.trace-facet-events.repository.ts";
 
 function ctx(overrides: Partial<FacetQueryContext> = {}): FacetQueryContext {
   return {
-    tenantId: "project_test",
     timeRange: { from: 0, to: 1 },
     limit: 25,
     offset: 0,

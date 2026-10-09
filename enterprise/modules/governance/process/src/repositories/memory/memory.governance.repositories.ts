@@ -5,6 +5,7 @@ import type { GovernanceTenantRow } from "../governance-tenant-history.repositor
 import type { GovernanceRepositories } from "../governance.repositories.ts";
 import { SuppressionSnapshotRepository } from "../suppression-snapshot.repository.ts";
 import { MemoryActivityMonitorRepository } from "./memory.activity-monitor.repository.ts";
+import { MemoryAggregateReconcileLockRepository } from "./memory.aggregate-reconcile-lock.repository.ts";
 import { MemoryAiToolCatalogRepository } from "./memory.ai-tool-catalog.repository.ts";
 import { MemoryAnomalyRuleRepository } from "./memory.anomaly-rule.repository.ts";
 import { MemoryAnomalySpendRepository } from "./memory.anomaly-spend.repository.ts";
@@ -62,6 +63,7 @@ export class MemoryGovernanceRepositories {
 
     return {
       activityMonitor: MemoryActivityMonitorRepository.create(),
+      aggregateReconcileLock: MemoryAggregateReconcileLockRepository.create(),
       aiTools: MemoryAiToolCatalogRepository.create(),
       anomalyRules: MemoryAnomalyRuleRepository.create(store),
       costAttributionPolicies: MemoryCostAttributionPolicyRepository.create(),

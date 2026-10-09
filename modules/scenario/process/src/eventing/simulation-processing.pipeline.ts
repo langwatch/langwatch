@@ -57,7 +57,7 @@ import {
   type TraceSpanMetricsSyncDeps,
 } from "./trace-metrics-sync.subscriber.ts";
 
-export interface SimulationProcessingPipelineDeps {
+interface SimulationProcessingPipelineDeps {
   simulationRunStore: FoldProjectionStore<SimulationRunStateData>;
   /**
    * The metrics map projection's own append seat, named as the PORT it is.

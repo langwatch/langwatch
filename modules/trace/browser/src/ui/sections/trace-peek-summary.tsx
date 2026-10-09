@@ -16,16 +16,24 @@ type TracePeekSummaryProps = {
    * partition-pruning hint.
    */
   occurredAtMs?: number;
+  /** The member that owns the trace on an aggregate (ADR-177 block F); null on a plain project. */
+  tenantId?: string | null;
 };
 
 /**
  * The compact trace summary a hover-peek shows.
  */
-export function TracePeekSummary({ projectId, traceId, occurredAtMs }: TracePeekSummaryProps) {
+export function TracePeekSummary({
+  projectId,
+  traceId,
+  occurredAtMs,
+  tenantId,
+}: TracePeekSummaryProps) {
   const { header: trace, isLoading } = useTraceHeader({
     projectId,
     traceId,
     occurredAtMs,
+    tenantId,
     full: false,
   });
 

@@ -17,6 +17,8 @@ export type ProjectHomeProject = {
    * same fact can lag or never arrive, since it's permission-gated.
    */
   firstMessage?: boolean | null;
+  /** The project's kind (`application`, `aggregate`, ...), when the shell has read it. */
+  kind?: string;
 };
 
 /** The organization it sits in. */
@@ -87,8 +89,8 @@ export abstract class ProjectHomeHost {
   /** Whether the reader asked their system for less motion. */
   abstract reducedMotion(): boolean;
 
-  /** Sends the reader somewhere else in the application. */
-  abstract navigate(to: string): void;
+  /** Sends the reader somewhere else; `replace` swaps the current history entry instead. */
+  abstract navigate(to: string, options?: { replace?: boolean }): void;
 
   /** The address's `return_to`, unchecked: where a project switch asked to land after home. */
   returnTo(): string | undefined {

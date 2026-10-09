@@ -200,7 +200,9 @@ const TeamIdsDisplay = ({ teamIds, teams }: TeamIdsDisplayProps) => {
         return (
           <Link href={`/settings/teams/${team.slug}`} key={teamId}>
             <Badge size="sm" variant="surface">
-              {team.name}
+              <Text as="span" truncate maxWidth="200px" title={team.name}>
+                {team.name}
+              </Text>
             </Badge>
           </Link>
         );

@@ -4,7 +4,9 @@
  * door's own. @see specs/auth/auth-rest-family-mounted.feature
  */
 import { publicRoute } from "@langwatch/api/access";
+import { BrowserOriginGuard } from "@langwatch/api/policy";
 import {
+  BrowserOriginRefusedError,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
   type RestAnswer,
@@ -104,7 +106,6 @@ export const authRest = defineRestRouter(AuthDoorApi)
 
   .get("/api/auth/session", "readBrowserAuthSession")
   .withAccess(AUTH_DOOR)
-  .servesWhileUpgrading()
   .withHeaders(COOKIE_HEADERS)
   .withResponse("protocol", { produces: JSON_MEDIA_TYPE, because: SESSION_POLL_WIRE })
   .handle(async ({ app, response }, headers) =>
@@ -113,13 +114,11 @@ export const authRest = defineRestRouter(AuthDoorApi)
 
   .get("/api/auth/logout", "endBrowserSessionAndRedirect")
   .withAccess(AUTH_DOOR)
-  .servesWhileUpgrading()
   .withResponse("forwarded", { produces: AUTH_ANSWER, because: BETTER_AUTH_FORWARDS })
   .handle(async ({ app, request, response }) => response.pass(await endSession({ app, request })))
 
   .post("/api/auth/logout", "endBrowserSession")
   .withAccess(AUTH_DOOR)
-  .servesWhileUpgrading()
   .withResponse("forwarded", { produces: JSON_MEDIA_TYPE, because: BETTER_AUTH_FORWARDS })
   .handle(async ({ app, request, response }) => response.pass(await endSession({ app, request })))
 
@@ -130,7 +129,6 @@ export const authRest = defineRestRouter(AuthDoorApi)
    */
   .get("/api/auth/*", "betterAuthHandshake")
   .withAccess(AUTH_DOOR)
-  .servesWhileUpgrading()
   .withResponse("forwarded", { produces: AUTH_ANSWER, because: BETTER_AUTH_FORWARDS })
   .anyMethod()
   .handle(async ({ app, request, response }) =>
@@ -151,6 +149,13 @@ async function endSession({
   app: AuthDoorApi;
   request: Request;
 }): Promise<Response> {
+  // Old browsers send neither header on a navigation; any browser that does must be on our pages.
+  const header = (name: string) => request.headers.get(name) ?? undefined;
+  const signalled = header("sec-fetch-site") ?? header("origin");
+  if (signalled !== undefined && !BrowserOriginGuard.isFromOwnOrigin({ req: { header } })) {
+    throw new BrowserOriginRefusedError();
+  }
+
   await app.revokeSessionFromCookies({ cookie: request.headers.get("cookie") ?? undefined });
   const headers = clearedCookies();
 

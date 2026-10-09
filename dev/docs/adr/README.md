@@ -96,6 +96,7 @@ Reusable framework decisions live with their packages:
 | [171](./171-developer-seat.md)                                         | The Developer seat, a member who owns a personal project and nothing shared                                                | Accepted                  |
 | [172](./172-oversized-payloads-live-under-expirable-prefixes.md)       | Oversized payloads live under expirable prefixes, never in a stored object                                                 | Accepted                  |
 | [174](./174-instant-evals-judge-call-is-metered.md)                    | An LLM judge on Instant Evals is one metered, budget-checked call answered by a leaf module                                | Accepted                  |
+| [177](./177-aggregate-project-reads-member-projects-through-grants.md) | An aggregate project reads its member projects through shared grants                                                       | Accepted                  |
 
 Package-local decisions are indexed beside their owners. The framework
 records are the [Eventing ADR index](../../../packages/eventing/adrs/README.md)

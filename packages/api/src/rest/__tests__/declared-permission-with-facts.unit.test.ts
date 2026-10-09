@@ -32,7 +32,7 @@ function mounted({ refuses }: { refuses: readonly AuthzPermission[] }) {
       throw new PermissionDeniedError({
         permission,
         scope: { type: "project", id: "project-1" },
-        denialReason: "no-binding",
+        denialReason: "no-grant",
       });
     }
 

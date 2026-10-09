@@ -6,12 +6,12 @@
 
 import { createUiRootLayout } from "@langwatch/browser/root-layout";
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
-import { act, cleanup, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { createMemoryRouter, Outlet, RouterProvider } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { UiScreenErrorBoundary, uiErrorPages } from "../shell/ui-error-page";
+import { UiErrorPage, UiScreenErrorBoundary, uiErrorPages } from "../shell/ui-error-page";
 
 const THROWN = "host mount exploded";
 
@@ -110,6 +110,48 @@ describe("given the reader is on a screen inside the application chrome", () => 
       expect(await screen.findByText("fine screen")).toBeTruthy();
       expect(screen.queryByTestId("app-error-page")).toBeNull();
       expect(screen.getByText("sidebar and top bar")).toBeTruthy();
+    });
+  });
+});
+
+describe("given a screen that throws an error carrying a trace id", () => {
+  describe("when the reader chooses Copy error details", () => {
+    /** @scenario "The reader copies the error to hand to support" */
+    it("puts the message, trace id, address, time and stack on the clipboard", async () => {
+      const writeText = vi.fn((_text: string) => Promise.resolve());
+      Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+      const error = Object.assign(new Error(THROWN), { data: { traceId: "trace-abc" } });
+
+      renderWithDesignSystem(<UiErrorPage error={error} isDevelopment={false} />);
+      fireEvent.click(screen.getByRole("button", { name: "Copy error details" }));
+
+      expect(await screen.findByRole("button", { name: "Copied" })).toBeTruthy();
+      const report = writeText.mock.calls[0]?.[0] ?? "";
+      expect(report).toContain(`Error: ${THROWN}`);
+      expect(report).toContain("Trace id: trace-abc");
+      expect(report).toContain(`URL: ${window.location.href}`);
+      expect(report).toMatch(/Time: \d{4}-\d{2}-\d{2}T/);
+      expect(report).toContain(error.stack ?? "no stack");
+      expect(screen.getByText("Trace id: trace-abc")).toBeTruthy();
+    });
+  });
+});
+
+describe("given the application runs in development", () => {
+  describe("when a screen throws while rendering", () => {
+    /** @scenario "On a developer's own stack the error details start collapsed" */
+    it("hides the stack until the reader opens Error details, then scrolls it in the card", async () => {
+      renderWithDesignSystem(<UiErrorPage error={new Error(THROWN)} isDevelopment />);
+
+      const isOpen = () =>
+        screen.queryByTestId("app-error-stack")?.closest('[data-state="open"]') != null;
+      expect(isOpen()).toBe(false);
+
+      fireEvent.click(screen.getByRole("button", { name: "Error details" }));
+
+      expect(await screen.findByTestId("app-error-stack")).toBeTruthy();
+      expect(isOpen()).toBe(true);
+      expect(screen.getByTestId("app-error-stack").textContent).toContain(THROWN);
     });
   });
 });

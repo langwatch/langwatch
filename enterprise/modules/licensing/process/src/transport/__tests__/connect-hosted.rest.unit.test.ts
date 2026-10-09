@@ -1,9 +1,12 @@
+import { createHash, createHmac } from "node:crypto";
+
 import type { RestIdentity } from "@langwatch/api/hosting";
 import { createCanonicalFamilyErrorHandler, createRestRuntime } from "@langwatch/api/rest";
 import {
   ConnectServiceNotEntitledError,
   type LicensingApi,
 } from "@langwatch/enterprise-licensing-contract";
+import { GatewayInternalAuthenticationError } from "@langwatch/gateway-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * @vitest-environment node
@@ -28,10 +31,43 @@ const gatewayDoor: RestIdentity = {
   }),
 };
 
-function mount(app: Partial<LicensingApi>) {
+const SECRET = "the-deployment-gateway-secret";
+
+/** hex(hmac_sha256(secret, METHOD\nPATH\nTS\nhex(sha256(body)))), as the Go signer and door compute it. */
+function signatureOf({ path, timestamp, body }: { path: string; timestamp: string; body: string }) {
+  const bodyHash = createHash("sha256").update(body).digest("hex");
+  return createHmac("sha256", SECRET)
+    .update(`POST\n${path}\n${timestamp}\n${bodyHash}`)
+    .digest("hex");
+}
+
+/** The gateway's door: admits a call only when the signature covers the bytes the runtime hands it. */
+const signedDoor: RestIdentity = {
+  authenticate: () => {
+    throw new GatewayInternalAuthenticationError("invalid_signature", "unsigned");
+  },
+  identify: ({ request, rawBody }) => {
+    const body = typeof rawBody === "string" ? rawBody : new TextDecoder().decode(rawBody);
+    const expected = signatureOf({
+      path: new URL(request.url).pathname,
+      timestamp: request.headers.get("X-LangWatch-Gateway-Timestamp") ?? "",
+      body,
+    });
+    if (request.headers.get("X-LangWatch-Gateway-Signature") !== expected) {
+      throw new GatewayInternalAuthenticationError("invalid_signature", "signature mismatch");
+    }
+    return {
+      actor: null,
+      scope: null,
+      internal: { type: "internalSecret" as const, secretName: "LW_GATEWAY_INTERNAL_SECRET" },
+    };
+  },
+};
+
+function mount(app: Partial<LicensingApi>, door: RestIdentity = gatewayDoor) {
   const hono = createRestRuntime({
-    identity: gatewayDoor,
-    doors: { internal_secret: gatewayDoor },
+    identity: door,
+    doors: { internal_secret: door },
   }).mount(connectHostedRest.router(), {
     app: () => createApiFixture<LicensingApi>(app),
     onError: createCanonicalFamilyErrorHandler({
@@ -39,15 +75,26 @@ function mount(app: Partial<LicensingApi>) {
       label: "Hosted Connect",
     }),
   });
-  return (operation: string, body: unknown, signal?: AbortSignal) =>
+  return (operation: string, body: unknown, signal?: AbortSignal, signed?: string) =>
     hono.fetch(
       new Request(`http://api.test/api/internal/gateway/connect/${operation}`, {
         method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(body),
+        headers: { "content-type": "application/json", ...gatewayHeaders(operation, signed) },
+        body: typeof body === "string" ? body : JSON.stringify(body),
         signal,
       }),
     );
+}
+
+/** The headers the Go data plane sets, its signature over `signed` (none when not given). */
+function gatewayHeaders(operation: string, signed: string | undefined): Record<string, string> {
+  if (signed === undefined) return {};
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const path = `/api/internal/gateway/connect/${operation}`;
+  return {
+    "X-LangWatch-Gateway-Timestamp": timestamp,
+    "X-LangWatch-Gateway-Signature": signatureOf({ path, timestamp, body: signed }),
+  };
 }
 
 const CALLER = {
@@ -158,5 +205,50 @@ describe("a hosted call on the gateway's control plane", () => {
     const response = await call("everything", { ...CALLER, payload: {} });
 
     expect(response.status).toBe(404);
+  });
+
+  describe("when the gateway signs the call over its body", () => {
+    const usage = {
+      services: ["instant_evals"],
+      spend_available: true,
+      read_at: "2026-09-19T12:00:00.000Z",
+      contract: null,
+      budgets: [],
+    };
+    // Go's json.Marshal of hostedServiceEnvelope: compact, in field order.
+    const body = JSON.stringify({ ...CALLER, payload: { cap_usd: 400 } });
+
+    it("admits a call whose signature covers the body it sent", async () => {
+      const getHostedUsage = vi.fn().mockResolvedValue(usage);
+      const call = mount({ getHostedUsage }, signedDoor);
+
+      const response = await call("usage", body, undefined, body);
+
+      expect(response.status).toBe(200);
+      expect(getHostedUsage).toHaveBeenCalledWith({
+        caller: { virtualKeyId: "vk-license-acme", organizationId: "org-acme", projectId: null },
+      });
+    });
+
+    it("refuses a signature over an empty body sent beside a non-empty one", async () => {
+      const getHostedUsage = vi.fn().mockResolvedValue(usage);
+      const call = mount({ getHostedUsage }, signedDoor);
+
+      const response = await call("usage", body, undefined, "");
+
+      expect(response.status).toBe(401);
+      expect(getHostedUsage).not.toHaveBeenCalled();
+    });
+
+    it("refuses a signed envelope that names no caller, reaching no operation", async () => {
+      const getHostedUsage = vi.fn().mockResolvedValue(usage);
+      const call = mount({ getHostedUsage }, signedDoor);
+      const nameless = JSON.stringify({ payload: {} });
+
+      const response = await call("usage", nameless, undefined, nameless);
+
+      expect(response.status).toBe(422);
+      expect(getHostedUsage).not.toHaveBeenCalled();
+    });
   });
 });

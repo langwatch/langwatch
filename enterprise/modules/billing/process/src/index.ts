@@ -27,15 +27,12 @@ export {
 export type { BillingReportOrganization } from "./repositories/billing-report-organization.repository.ts";
 export type { BillingOrganizationCacheRedis } from "./repositories/redis/redis.billing-organization-cache.repository.ts";
 export { BillingSubscriptionNotifier } from "./channels/billing-subscription-notifier.channel.ts";
-export { billingSubscriptionNotifierChannels } from "./channels/billing-subscription-notifier-channels.registry.ts";
 export { UsageLimitEmailChannel } from "./channels/usage-limit-email.channel.ts";
-export { usageLimitEmailChannels } from "./channels/usage-limit-email-channels.registry.ts";
 export {
   ConnectedInvoicingChannel,
   type ConnectedInvoiceLine,
   type ProviderInvoice,
 } from "./channels/connected-invoicing.channel.ts";
-export { connectedInvoicingChannels } from "./channels/connected-invoicing-channels.registry.ts";
 export type {
   ConnectedBillingAccountRecord,
   ConnectedCreditGrantRecord,
@@ -54,7 +51,6 @@ export type {
   StatementSpendLine,
 } from "./features/connected-billing/services/connected-monthly-statement.service.ts";
 export { ConnectedStatementMailChannel } from "./channels/connected-statement-mail.channel.ts";
-export { connectedStatementMailChannels } from "./channels/connected-statement-mail-channels.registry.ts";
 /**
  * What a process composes billing's process-side work from. The repositories
  * and services behind these stay private to this feature server.
@@ -81,7 +77,6 @@ export type {
 // The Stripe webhook, moved off
 // `platform/app/src/server/app-layer/billing/`.
 export { BillingWebhookHost } from "./channels/billing-webhook-host.channel.ts";
-export { billingWebhookHostChannels } from "./channels/billing-webhook-host-channels.registry.ts";
 export type {
   CancelledSubscription,
   SubscriptionWithOrg,

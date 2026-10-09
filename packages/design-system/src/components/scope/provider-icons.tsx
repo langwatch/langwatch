@@ -51,13 +51,7 @@ export function isProviderKey(value: string): value is ProviderKey {
  * no `fill`, defaulting to SVG black), near-invisible on the dark theme.
  * Coloured-brand icons are left alone; they already read well in both modes.
  */
-export const MONOCHROME_PROVIDER_ICONS = new Set<ProviderKey>([
-  "openai",
-  "anthropic",
-  "voyage",
-  "custom",
-  "twilio",
-]);
+export const MONOCHROME_PROVIDER_ICONS = new Set<ProviderKey>(["openai", "anthropic", "voyage"]);
 
 /**
  * Wraps a `modelProviderIcons[provider]` glyph so it stays legible in dark

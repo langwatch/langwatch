@@ -13,6 +13,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
+	"maps"
 	"net"
 	"net/http"
 	"net/url"
@@ -36,6 +38,8 @@ type Config struct {
 	// The key is never reported.
 	Endpoint string
 	APIKey   string
+	// Project names the project the key belongs to, for the setup view (TELEMETRYSIM_PROJECT).
+	Project string
 }
 
 // LoadConfig reads telemetrysim's configuration from the environment.
@@ -43,6 +47,7 @@ func LoadConfig() Config {
 	cfg := Config{
 		Addr: os.Getenv("TELEMETRYSIM_ADDR"), Stack: os.Getenv("TELEMETRYSIM_STACK"),
 		Endpoint: os.Getenv("TELEMETRYSIM_ENDPOINT"), APIKey: os.Getenv("TELEMETRYSIM_API_KEY"),
+		Project: os.Getenv("TELEMETRYSIM_PROJECT"),
 	}
 	if cfg.Addr == "" {
 		cfg.Addr = ":5599"
@@ -93,6 +98,7 @@ type Mutation struct {
 // RunStatus is a run's settings and counters. Sent counts batches; each ends
 // once as acked (2xx), refused (any other answer) or failed (no answer).
 type RunStatus struct {
+	ID         string     `json:"id"`
 	Mode       string     `json:"mode"`
 	Preset     string     `json:"preset"`
 	Seed       uint64     `json:"seed"`
@@ -111,23 +117,33 @@ type RunStatus struct {
 	Late       int64      `json:"late"` // load ticks skipped because maxInFlight sends were still out
 	LastError  string     `json:"lastError,omitempty"`
 	Mutations  []Mutation `json:"mutations,omitempty"`
+	// Answers counts every attempt's status, retries included; no answer is counted in Failed.
+	Answers        map[int]int64 `json:"answers,omitempty"`
+	RetryAfterSeen int64         `json:"retryAfterSeen,omitempty"`
+	LastRetryAfter string        `json:"lastRetryAfter,omitempty"`
+	Latency        *Latency      `json:"latency,omitempty"`
 }
 
 // Status is GET /_sim/api/status. Recent is the runs before Run, newest first,
-// without their mutations.
+// without their mutations. KeyHint shows the configured key's ends, never the key.
 type Status struct {
-	Stack    string      `json:"stack"`
-	Endpoint string      `json:"endpoint,omitempty"`
-	Presets  []string    `json:"presets"`
-	Run      *RunStatus  `json:"run,omitempty"`
-	Recent   []RunStatus `json:"recent"`
+	Stack     string      `json:"stack"`
+	Endpoint  string      `json:"endpoint,omitempty"`
+	KeySource string      `json:"keySource,omitempty"`
+	KeyHint   string      `json:"keyHint,omitempty"`
+	Project   string      `json:"project,omitempty"`
+	Presets   []string    `json:"presets"`
+	Run       *RunStatus  `json:"run,omitempty"`
+	Recent    []RunStatus `json:"recent"`
 }
 
 type run struct {
-	mu     sync.Mutex
-	status RunStatus
-	cancel context.CancelFunc
-	done   chan struct{}
+	mu      sync.Mutex
+	status  RunStatus
+	samples []float64 // attempt latencies in ms, the newest maxSamples
+	next    int
+	cancel  context.CancelFunc
+	done    chan struct{}
 }
 
 func (r *run) update(f func(*RunStatus)) {
@@ -141,6 +157,8 @@ func (r *run) snapshot() RunStatus {
 	defer r.mu.Unlock()
 	s := r.status
 	s.Mutations = slices.Clone(s.Mutations)
+	s.Answers = maps.Clone(s.Answers)
+	s.Latency = latencyOf(r.samples)
 	return s
 }
 
@@ -151,18 +169,28 @@ type delivery struct {
 	payload Payload
 }
 
-// sender delivers one batch and answers the door's status. httpSender is
+// answer is how the door answered one attempt (status 0: no answer).
+type answer struct {
+	status      int
+	retryAfter  string
+	contentType string
+	body        []byte // the first answerBodyLimit bytes
+}
+
+const answerBodyLimit = 4 << 10
+
+// sender delivers one batch and answers the door's answer. httpSender is
 // OTLP/HTTP; an OTLP/gRPC sender joins it once the gRPC receiver exists.
 type sender interface {
-	send(ctx context.Context, d delivery) (int, error)
+	send(ctx context.Context, d delivery) (answer, error)
 }
 
 type httpSender struct{ client *http.Client }
 
-func (h httpSender) send(ctx context.Context, d delivery) (int, error) {
+func (h httpSender) send(ctx context.Context, d delivery) (answer, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, d.url, bytes.NewReader(d.payload.Body))
 	if err != nil {
-		return 0, err
+		return answer{}, err
 	}
 	req.Header.Set("Content-Type", d.payload.ContentType)
 	if d.payload.Gzip {
@@ -173,35 +201,46 @@ func (h httpSender) send(ctx context.Context, d delivery) (int, error) {
 	}
 	resp, err := h.client.Do(req)
 	if err != nil {
-		return 0, err
+		return answer{}, err
 	}
 	defer func() { _ = resp.Body.Close() }()
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, answerBodyLimit))
 	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<20))
-	return resp.StatusCode, nil
+	return answer{
+		status: resp.StatusCode, retryAfter: resp.Header.Get("Retry-After"),
+		contentType: resp.Header.Get("Content-Type"), body: body,
+	}, nil
 }
 
 // Server is the control API and the one run it drives.
 type Server struct {
-	cfg     Config
-	sender  sender
-	console http.Handler
-	mu      sync.Mutex
-	run     *run
-	recent  []RunStatus
-	mux     *http.ServeMux
+	cfg      Config
+	sender   sender
+	console  http.Handler
+	fixtures fs.FS
+	mu       sync.Mutex
+	run      *run
+	runs     int // runs started, for ids
+	recent   []RunStatus
+	mux      *http.ServeMux
 }
 
 // NewServer builds the control API over an OTLP/HTTP sender.
 func NewServer(cfg Config) *Server {
 	s := &Server{
 		cfg: cfg, sender: httpSender{client: &http.Client{Timeout: 30 * time.Second}},
-		console: webconsole.New(embeddedConsole(), consoleBuildCommand),
+		console: webconsole.New(embeddedConsole(), consoleBuildCommand), fixtures: embeddedFixtures(),
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { writeJSON(w, http.StatusOK, map[string]bool{"ok": true}) })
 	mux.HandleFunc("GET /_sim/api/status", s.handleStatus)
 	mux.HandleFunc("POST /_sim/api/runs", s.handleStart)
 	mux.HandleFunc("DELETE /_sim/api/runs/current", s.handleStop)
+	mux.HandleFunc("GET /_sim/api/runs", s.handleRuns)
+	mux.HandleFunc("GET /_sim/api/runs/{id}", s.handleRun)
+	mux.HandleFunc("POST /_sim/api/send-one", s.handleSendOne)
+	mux.HandleFunc("GET /_sim/api/fixtures", s.handleFixtures)
+	mux.HandleFunc("GET /_sim/api/fixtures/{name...}", s.handleFixture)
 	mux.HandleFunc("GET /", s.handleConsole)
 	s.mux = mux
 	return s
@@ -231,18 +270,12 @@ func (s *Server) Serve(ctx context.Context) error {
 }
 
 func (s *Server) handleStatus(w http.ResponseWriter, _ *http.Request) {
-	st := Status{Stack: s.cfg.Stack, Endpoint: s.cfg.Endpoint, Presets: PresetNames()}
-	s.mu.Lock()
-	rn := s.run
-	st.Recent = slices.Clone(s.recent)
-	s.mu.Unlock()
-	if st.Recent == nil {
-		st.Recent = []RunStatus{}
+	st := Status{Stack: s.cfg.Stack, Endpoint: s.cfg.Endpoint, Project: s.cfg.Project, Presets: PresetNames(), KeyHint: keyHint(s.cfg.APIKey)}
+	if s.cfg.APIKey != "" {
+		st.KeySource = "TELEMETRYSIM_API_KEY"
 	}
-	if rn != nil {
-		snap := rn.snapshot()
-		st.Run = &snap
-	}
+	current, recent := s.runsNow()
+	st.Run, st.Recent = current, withoutMutations(recent)
 	writeJSON(w, http.StatusOK, st)
 }
 
@@ -304,14 +337,26 @@ func (req RunRequest) plan() (plan, error) {
 }
 
 func (p *plan) checkWire() error {
-	if u, err := url.Parse(p.Endpoint); err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
-		return fmt.Errorf("endpoint %q is not an http(s) URL", p.Endpoint)
+	if err := checkEndpoint(p.Endpoint); err != nil {
+		return err
 	}
-	if p.Encoding == "" {
-		p.Encoding = EncodingProtobuf
+	return checkEncoding(&p.Encoding)
+}
+
+func checkEndpoint(endpoint string) error {
+	if u, err := url.Parse(endpoint); err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return fmt.Errorf("endpoint %q is not an http(s) URL", endpoint)
 	}
-	if p.Encoding != EncodingProtobuf && p.Encoding != EncodingJSON {
-		return fmt.Errorf("encoding %q is neither protobuf nor json", p.Encoding)
+	return nil
+}
+
+// checkEncoding defaults an unset encoding to protobuf and refuses any other than the two.
+func checkEncoding(enc *Encoding) error {
+	if *enc == "" {
+		*enc = EncodingProtobuf
+	}
+	if *enc != EncodingProtobuf && *enc != EncodingJSON {
+		return fmt.Errorf("encoding %q is neither protobuf nor json", *enc)
 	}
 	return nil
 }
@@ -362,8 +407,9 @@ func (s *Server) start(p plan) (*run, error) {
 		s.remember(s.run.snapshot())
 	}
 	ctx, cancel := context.WithCancel(context.Background())
+	s.runs++
 	rn := &run{cancel: cancel, done: make(chan struct{}), status: RunStatus{
-		Mode: p.Mode, Preset: p.Preset, Seed: p.Seed, Endpoint: p.Endpoint, Encoding: p.Encoding,
+		ID: fmt.Sprintf("run-%d", s.runs), Mode: p.Mode, Preset: p.Preset, Seed: p.Seed, Endpoint: p.Endpoint, Encoding: p.Encoding,
 		Gzip: !p.NoGzip, State: stateRunning, StartedAt: time.Now().UTC(), TargetRate: p.Rate,
 	}}
 	s.run = rn
@@ -382,9 +428,8 @@ func (s *Server) start(p plan) (*run, error) {
 	return rn, nil
 }
 
-// remember keeps a finished run in the recent list; the caller holds s.mu.
+// remember keeps a finished run, mutations and all, in the recent list; the caller holds s.mu.
 func (s *Server) remember(st RunStatus) {
-	st.Mutations = nil
 	s.recent = append([]RunStatus{st}, s.recent...)
 	if len(s.recent) > maxRecent {
 		s.recent = s.recent[:maxRecent]
@@ -492,15 +537,18 @@ func (s *Server) fuzzOne(ctx context.Context, task fuzzTask) {
 // maxRetries times, and counts how it ended.
 func (s *Server) send(ctx context.Context, rn *run, d delivery) (int, error) {
 	rn.update(func(st *RunStatus) { st.Sent++ })
-	var status int
+	var a answer
 	var err error
 	for attempt := 0; ; attempt++ {
-		status, err = s.sender.send(ctx, d)
-		if attempt == maxRetries || !retryable(status, err) || !sleep(ctx, retryBackoff*time.Duration(attempt+1)) {
+		began := time.Now()
+		a, err = s.sender.send(ctx, d)
+		rn.record(a, time.Since(began))
+		if attempt == maxRetries || !retryable(a.status, err) || !sleep(ctx, retryBackoff*time.Duration(attempt+1)) {
 			break
 		}
 		rn.update(func(st *RunStatus) { st.Retried++ })
 	}
+	status := a.status
 	rn.update(func(st *RunStatus) {
 		switch {
 		case err != nil:

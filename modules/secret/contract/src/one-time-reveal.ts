@@ -27,6 +27,8 @@ export const stashRevealInputSchema = z
     /** What a masked render shows in place of the secret, never the secret. */
     preview: z.string(),
     secret: z.string().min(1),
+    /** The only person the reveal is served to; anyone else is told it expired. */
+    recipientUserId: z.string().min(1),
   })
   .strict();
 export type StashRevealInput = z.infer<typeof stashRevealInputSchema>;

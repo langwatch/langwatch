@@ -12,6 +12,7 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
+import { ownProofAuthorizer } from "../../../../__tests__/support/authorization-proofs.fixture.ts";
 import { traceReadMapperPorts } from "../../../../rules/trace-read-mapper-ports.rules.ts";
 import { TraceSharedReadService } from "../trace-shared-read.service.ts";
 
@@ -150,6 +151,7 @@ function setup(options: Setup = {}) {
     },
   });
   const service = TraceSharedReadService.create({
+    authorize: ownProofAuthorizer,
     reads,
     share: shareApi,
     projects: {

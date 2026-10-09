@@ -13,7 +13,7 @@ type ProjectFactsBackfillPeers = Readonly<{
   preview?: (input: { organizationId: string }) => Promise<number>;
 }>;
 
-export type ProjectFactsBackfillReport = {
+type ProjectFactsBackfillReport = {
   afterOrganizationId: string | null;
   organizations: number;
   projects: number;

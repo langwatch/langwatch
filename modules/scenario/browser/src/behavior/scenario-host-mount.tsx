@@ -1,6 +1,6 @@
 /**
  * Scenario's answer to the port its screens declare: every method projects a
- * `@langwatch/browser-host` capability, so the module mounts it, not the
+ * `@langwatch/browser-host` host service, so the module mounts it, not the
  * application. ARCHITECTURE.md §10.1.
  */
 
@@ -40,7 +40,7 @@ type ScenarioHostActions = {
   readonly failed: (failure: ScenarioFailureNotice) => void;
 };
 
-class CapabilityScenarioHost extends ScenarioHostApi {
+class HostServiceScenarioHost extends ScenarioHostApi {
   constructor(
     private readonly readings: ScenarioHostReadings,
     private readonly actions: ScenarioHostActions,
@@ -132,7 +132,7 @@ export default function ScenarioHostMount({ children }: { children?: ReactNode }
 
   const host = useMemo(
     () =>
-      new CapabilityScenarioHost(
+      new HostServiceScenarioHost(
         {
           project:
             projectId === void 0

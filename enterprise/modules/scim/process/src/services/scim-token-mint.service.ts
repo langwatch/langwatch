@@ -30,7 +30,7 @@ export class ScimTokenMintService {
       throw new PermissionDeniedError({
         permission: "sso:manage",
         scope: { type: "organization", id: organizationId },
-        denialReason: "no-binding",
+        denialReason: "no-grant",
       });
     }
     const missing = await this.authz.findPermissionsBeyondCaller({

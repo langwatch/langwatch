@@ -227,7 +227,7 @@ func (doors *ComposeDoors) Invocations(plan Plan, step Step) ([]Invocation, erro
 	case "tenancy-sql":
 		return []Invocation{doors.psql(plan.TenancyS)}, nil
 	case "product-seeds":
-		return []Invocation{doors.psql(accountSQL(doors.seed))}, nil
+		return []Invocation{doors.psql(AccountSQL(doors.seed))}, nil
 	case "traffic", "traffic-at-cut":
 		return []Invocation{doors.traffic(step)}, nil
 	case "pause-worker":
@@ -254,22 +254,22 @@ func (doors *ComposeDoors) psql(sql string) Invocation {
 	return invocation
 }
 
-// seedProducts signs in as the account accountSQL wrote and creates each product kind through the old app's doors.
+// seedProducts signs in as the account AccountSQL wrote and creates each product kind through the old app's doors.
 func (doors *ComposeDoors) seedProducts(ctx context.Context) error {
-	email, password := seedAccount(doors.seed)
+	email, password := SeedAccount(doors.seed)
 	doors.seeder = seed.NewSeeder(seed.ProductInput{AppURL: doors.options.Ports.appURL(), Email: email, Password: password, Label: doors.project})
 	return doors.seeder.Seed(ctx)
 }
 
-// seedAccount is the seed's credential account; seed-derived so a restored copy can sign in again.
-func seedAccount(seedValue int64) (email, password string) {
+// SeedAccount is the seed's credential account; seed-derived so a restored copy can sign in again.
+func SeedAccount(seedValue int64) (email, password string) {
 	n := strconv.FormatInt(seedValue, 10)
 	return "seed+" + n + "@snapshot.test", "snapshot-test-seed-password-" + n
 }
 
-// accountSQL hashes in a scratch pgcrypto schema it drops in the same transaction, so the old schema keeps no extension.
-func accountSQL(seedValue int64) string {
-	email, password := seedAccount(seedValue)
+// AccountSQL hashes in a scratch pgcrypto schema it drops in the same transaction, so the old schema keeps no extension.
+func AccountSQL(seedValue int64) string {
+	email, password := SeedAccount(seedValue)
 	user := sqlString(fmt.Sprintf("snap_seed_user_%d", seedValue))
 	return "SET search_path TO mydb;\nBEGIN;\nCREATE SCHEMA upgradelab_crypto;\nCREATE EXTENSION pgcrypto SCHEMA upgradelab_crypto;\n" +
 		`INSERT INTO "User" (id, name, email, "emailVerified") VALUES (` + user + `, 'Snapshot seed', ` + sqlString(email) + ", true);\n" +
@@ -413,7 +413,7 @@ func (doors *ComposeDoors) redact(err error) error {
 	}
 	secrets := map[string]string{}
 	maps.Copy(secrets, doors.env.Secrets)
-	_, secrets["SEED_PASSWORD"] = seedAccount(doors.seed)
+	_, secrets["SEED_PASSWORD"] = SeedAccount(doors.seed)
 	names := slices.SortedFunc(maps.Keys(secrets), func(a, b string) int { return len(secrets[b]) - len(secrets[a]) })
 	text := err.Error()
 	for _, name := range names {

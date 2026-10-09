@@ -164,6 +164,32 @@ served from the host root. The product's `AUTH_PROVIDER=azure-ad` hard-wires
 `https://login.microsoftonline.com`, so resolve that host to idpsim over https;
 `legacy env <t>` prints `AZURE_AD_TENANT_ID` (the GUID) instead of an issuer.
 
+### Social sign-in (Google, GitHub, GitLab, Microsoft)
+
+Every tenant also plays the four social providers the sign-in page offers,
+under `/t/<n>/social/<provider>`, in each provider's own path layout and
+response shapes, signing in as the tenant's users. Any client id and secret
+are accepted, as for an unregistered OIDC client.
+
+| Provider  | Base (`<b>` = `…/t/<n>/social/<provider>`) | Endpoints under it                                                                                                    |
+| --------- | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
+| Google    | `<b>` is the issuer                        | `/.well-known/openid-configuration`, `/o/oauth2/v2/auth`, `/token`, `/oauth2/v3/userinfo`, `/oauth2/v3/certs`         |
+| GitHub    | `<b>`                                      | `/login/oauth/authorize`, `/login/oauth/access_token` (a form unless `Accept` asks for JSON), `/user`, `/user/emails` |
+| GitLab    | `<b>` is Better Auth's `issuer`            | `/oauth/authorize`, `/oauth/token`, `/api/v4/user`                                                                    |
+| Microsoft | `<b>` is Better Auth's `authority`         | `/<directory>/oauth2/v2.0/authorize`, `/<directory>/oauth2/v2.0/token`, `/<directory>/discovery/v2.0/keys`            |
+
+Google and Microsoft return a signed ID token (a 21-digit Google `sub`; Entra
+v2.0 `oid`, `tid`, `ver` under the issuer `<b>/<tenant GUID>/v2.0`). GitHub and
+GitLab return numeric account ids, and GitHub's emails call answers one primary
+verified address. Better Auth's built-in Google and GitHub providers hard-wire
+their hosts, so the app side needs its own switch to reach these.
+
+Without a login hint the authorize endpoint serves the account picker, which
+names the provider it plays and has a **Cancel** button: that sends the client
+`error=access_denied` with its state (scripts: `cancel=1` on the authorize
+request). Every step lands in the tenant's activity feed as
+`social.<provider>.authorize|token|userinfo` (and `social.github.emails`).
+
 ## Provisioning into LangWatch
 
 SCIM runs one way: the identity provider sends its directory to the
@@ -301,25 +327,25 @@ simulator's control API. Tenants are numbers (`1`, `2`, ...). Reads take `--json
 stopped simulator says `start it with haven up +idp`. Bare `haven idp` is
 unchanged: it runs the standalone simulator.
 
-| Verb | Does |
-| --- | --- |
-| `tenant show <t>` | domain, issuer, SCIM token, users and applications |
-| `apps add <t> --name <n> [--redirect a,b] [--entity-id --acs-url]` / `apps remove <t> <client-id>` | register or drop an OIDC or SAML application |
-| `populate <t> --users <n> [--groups <n>] [--domain] [--seed]` / `churn <t> --join <n> --leave <n> ...` | directory size and change; each user gets `department`, `costCenter` and `manager` from the seed, pushed under the SCIM enterprise extension (the first user has no manager) |
-| `user add <t> --email <e> [--given-name] [--family-name] [--groups a,b]` | one user |
-| `scim target set <t> --url <base> --token-env <VAR>` / `scim target clear <t>` | where the tenant provisions |
-| `scim push\|pull\|sync <t>` | sync takes `--mode`, `--with-groups`, `--dry-run`, `--concurrency`; all three take `--target <url> --token-env <VAR>` instead of the connection |
-| `scim-event <t> <kind> [--style okta\|entra] [--user] [--group] [--set k=v]...` | one SCIM event on demand; kinds: `user.lookup\|create\|replace\|patch\|deactivate\|reactivate\|delete`, `group.lookup\|create\|add-member\|remove-member\|rename\|delete` |
-| `dns add <domain> <txt>...` / `dns remove <domain>` | TXT records (global, not per tenant) |
-| `activity <t>` / `signin <t> [--user <email>] [--client <id> --redirect <uri>]` | the feed; the IdP-initiated sign-in URL |
-| `reset <t>` / `samlp <t> on\|off` | seeded state; Auth0-broker `samlp\|` subjects |
-| `legacy provider <t> <generic\|auth0\|okta\|cognito\|onelogin\|azure\|show>` / `legacy env <t>` | the legacy provider and the env lines that point a stack at it |
-| `tamper <t> <mode>` | break the next ID token (`bad-signature`, `wrong-audience`, `expired`, `replayed-nonce`) or SAML response (`saml-bad-signature`, `saml-unsigned`, `saml-wrong-audience`, `saml-wrong-recipient`, `saml-expired`, `saml-not-yet-valid`, `saml-replayed-assertion`, `saml-wrong-in-response-to`), once; `none` disarms |
-| `skew <t> <seconds>` | run the tenant's clock ahead (positive) or behind (negative) for every token and assertion |
-| `rotate-key <t> [--drop-previous]` | make a fresh signing key current while JWKS and SAML metadata still publish the previous one; `--drop-previous` then stops publishing it |
-| `user disable <t> <email>` / `user enable <t> <email>` | refuse (or allow again) that user's sign-in at the IdP, over OIDC and SAML |
-| `saml unsolicited <t> --acs-url <url> --email <e> [--entity-id <id>] [--relay-state <s>]` | an IdP-initiated response (no InResponseTo): prints the URL, SAMLResponse and RelayState to post |
-| `auth0-webhook <t> --event create\|deactivate --user <u> --target <stack-url> --secret-env <VAR>` | send one signed Auth0 SCIM event |
+| Verb                                                                                                   | Does                                                                                                                                                                                                                                                                                                                 |
+| ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tenant show <t>`                                                                                      | domain, issuer, SCIM token, users and applications                                                                                                                                                                                                                                                                   |
+| `apps add <t> --name <n> [--redirect a,b] [--entity-id --acs-url]` / `apps remove <t> <client-id>`     | register or drop an OIDC or SAML application                                                                                                                                                                                                                                                                         |
+| `populate <t> --users <n> [--groups <n>] [--domain] [--seed]` / `churn <t> --join <n> --leave <n> ...` | directory size and change; each user gets `department`, `costCenter` and `manager` from the seed, pushed under the SCIM enterprise extension (the first user has no manager)                                                                                                                                         |
+| `user add <t> --email <e> [--given-name] [--family-name] [--groups a,b]`                               | one user                                                                                                                                                                                                                                                                                                             |
+| `scim target set <t> --url <base> --token-env <VAR>` / `scim target clear <t>`                         | where the tenant provisions                                                                                                                                                                                                                                                                                          |
+| `scim push\|pull\|sync <t>`                                                                            | sync takes `--mode`, `--with-groups`, `--dry-run`, `--concurrency`; all three take `--target <url> --token-env <VAR>` instead of the connection                                                                                                                                                                      |
+| `scim-event <t> <kind> [--style okta\|entra] [--user] [--group] [--set k=v]...`                        | one SCIM event on demand; kinds: `user.lookup\|create\|replace\|patch\|deactivate\|reactivate\|delete`, `group.lookup\|create\|add-member\|remove-member\|rename\|delete`                                                                                                                                            |
+| `dns add <domain> <txt>...` / `dns remove <domain>`                                                    | TXT records (global, not per tenant)                                                                                                                                                                                                                                                                                 |
+| `activity <t>` / `signin <t> [--user <email>] [--client <id> --redirect <uri>]`                        | the feed; the IdP-initiated sign-in URL                                                                                                                                                                                                                                                                              |
+| `reset <t>` / `samlp <t> on\|off`                                                                      | seeded state; Auth0-broker `samlp\|` subjects                                                                                                                                                                                                                                                                        |
+| `legacy provider <t> <generic\|auth0\|okta\|cognito\|onelogin\|azure\|show>` / `legacy env <t>`        | the legacy provider and the env lines that point a stack at it                                                                                                                                                                                                                                                       |
+| `tamper <t> <mode>`                                                                                    | break the next ID token (`bad-signature`, `wrong-audience`, `expired`, `replayed-nonce`) or SAML response (`saml-bad-signature`, `saml-unsigned`, `saml-wrong-audience`, `saml-wrong-recipient`, `saml-expired`, `saml-not-yet-valid`, `saml-replayed-assertion`, `saml-wrong-in-response-to`), once; `none` disarms |
+| `skew <t> <seconds>`                                                                                   | run the tenant's clock ahead (positive) or behind (negative) for every token and assertion                                                                                                                                                                                                                           |
+| `rotate-key <t> [--drop-previous]`                                                                     | make a fresh signing key current while JWKS and SAML metadata still publish the previous one; `--drop-previous` then stops publishing it                                                                                                                                                                             |
+| `user disable <t> <email>` / `user enable <t> <email>`                                                 | refuse (or allow again) that user's sign-in at the IdP, over OIDC and SAML                                                                                                                                                                                                                                           |
+| `saml unsolicited <t> --acs-url <url> --email <e> [--entity-id <id>] [--relay-state <s>]`              | an IdP-initiated response (no InResponseTo): prints the URL, SAMLResponse and RelayState to post                                                                                                                                                                                                                     |
+| `auth0-webhook <t> --event create\|deactivate --user <u> --target <stack-url> --secret-env <VAR>`      | send one signed Auth0 SCIM event                                                                                                                                                                                                                                                                                     |
 
 Secrets are never flag values. `--token-env` and `--secret-env` name a variable in
 your shell; the value is sent to the simulator and not printed or recorded.

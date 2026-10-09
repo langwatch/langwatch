@@ -3,6 +3,7 @@
  * logs as other trace reads.
  */
 
+import type { Authorization } from "@langwatch/authorization";
 import {
   buildCodingAgentTranscript,
   type CodingAgentTranscript,
@@ -35,7 +36,7 @@ export type TracesReadMembers = Readonly<{
 /** The span, log and transcript reads this service stands on; the trace app answers them. */
 type TraceTranscriptReads = Readonly<{
   readSpans(input: {
-    projectId: string;
+    authorization: Authorization;
     traceId: string;
     occurredAtMs?: number;
     visibilityCutoffMs?: number | null;
@@ -62,6 +63,7 @@ async function loadSpansFullWithProtections({
   reads,
   ports,
   projectId,
+  authorization,
   traceId,
   occurredAtMs,
   protections,
@@ -69,12 +71,13 @@ async function loadSpansFullWithProtections({
   reads: TraceTranscriptReads;
   ports: TracesReadMembers;
   projectId: string;
+  authorization: Authorization;
   traceId: string;
   occurredAtMs?: number;
   protections: Protections;
 }): Promise<SpanDetail[]> {
   const storedSpans = await reads.readSpans({
-    projectId,
+    authorization,
     traceId,
     occurredAtMs,
     visibilityCutoffMs: (await ports.getVisibilityWindow(projectId)).visibilityCutoffMs,
@@ -146,6 +149,7 @@ export class TraceTranscriptReadService {
     reads,
     ports,
     projectId,
+    authorization,
     traceId,
     occurredAtMs,
     protections,
@@ -153,11 +157,12 @@ export class TraceTranscriptReadService {
     reads: TraceTranscriptReads;
     ports: TracesReadMembers;
     projectId: string;
+    authorization: Authorization;
     traceId: string;
     occurredAtMs?: number;
     protections: Protections;
   }): Promise<CodingAgentTranscript> {
-    const args = { reads, ports, projectId, traceId, occurredAtMs, protections };
+    const args = { reads, ports, projectId, authorization, traceId, occurredAtMs, protections };
     const [spans, logs] = await Promise.all([
       loadSpansFullWithProtections(args),
       loadTraceLogsWithProtections(args),

@@ -1,6 +1,6 @@
 /**
  * Langy's answer to the port its dock declares: every method projects a
- * `@langwatch/browser-host` capability, so the module mounts it, not the
+ * `@langwatch/browser-host` host service, so the module mounts it, not the
  * application. ARCHITECTURE.md §10.1.
  */
 
@@ -29,7 +29,7 @@ import {
   type LangySuccessNotice,
 } from "../model/langy-host.ts";
 
-class CapabilityLangyHost extends LangyHostApi {
+class HostServiceLangyHost extends LangyHostApi {
   private readonly session: UiSession;
   private readonly navigationCapability: UiNavigation;
   private readonly routeCapability: UiRoute;
@@ -156,7 +156,7 @@ export default function LangyHostMount({ children }: { children?: ReactNode }) {
 
   const host = useMemo(
     () =>
-      new CapabilityLangyHost({
+      new HostServiceLangyHost({
         session,
         navigation,
         route,

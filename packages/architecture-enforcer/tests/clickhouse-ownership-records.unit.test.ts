@@ -35,7 +35,7 @@ const CATALOGUE: FeatureCatalogueEntry[] = [
 ];
 
 const SUBQUERY_FILE =
-  "modules/trace/process/src/features/query/rules/trace-query-subquery.rules.ts";
+  "modules/trace/process/src/features/query/repositories/clickhouse/clickhouse.trace-query-subquery.mapper.ts";
 
 const DECLARED: DeclaredOwnership = {
   records: [

@@ -62,7 +62,17 @@ describe("PrismaTopicRepository", () => {
     const { database, topicFindMany } = makeDatabase();
     const repository = PrismaTopicRepository.create({ prisma: database });
 
-    await expect(repository.findNamesByIds({ projectId: "project-1", ids: [] })).resolves.toEqual(
+    await expect(
+      repository.findNamesByIds({ projectIds: ["project-1"], ids: [] }),
+    ).resolves.toEqual(new Map());
+    expect(topicFindMany).not.toHaveBeenCalled();
+  });
+
+  it("names nothing and asks nothing when no project is named", async () => {
+    const { database, topicFindMany } = makeDatabase({});
+    const repository = PrismaTopicRepository.create({ prisma: database });
+
+    await expect(repository.findNamesByIds({ projectIds: [], ids: ["topic-2"] })).resolves.toEqual(
       new Map(),
     );
     expect(topicFindMany).not.toHaveBeenCalled();
@@ -76,10 +86,10 @@ describe("PrismaTopicRepository", () => {
     const repository = PrismaTopicRepository.create({ prisma: database });
 
     await expect(
-      repository.findNamesByIds({ projectId: "project-1", ids: ["topic-2", "topic-absent"] }),
+      repository.findNamesByIds({ projectIds: ["project-1"], ids: ["topic-2", "topic-absent"] }),
     ).resolves.toEqual(new Map([["topic-2", "Payments"]]));
     expect(topicFindMany).toHaveBeenCalledWith({
-      where: { projectId: "project-1", id: { in: ["topic-2", "topic-absent"] } },
+      where: { projectId: { in: ["project-1"] }, id: { in: ["topic-2", "topic-absent"] } },
       select: { id: true, name: true },
     });
   });

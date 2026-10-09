@@ -1,4 +1,4 @@
-import { storedScopeTierSchema } from "@langwatch/authorization";
+import { grantConditionSchema, storedScopeTierSchema } from "@langwatch/authorization";
 import type { StoredScopeTier } from "@langwatch/authorization";
 import {
   AUTHZ_SHARE_PERMISSION,
@@ -84,6 +84,9 @@ export interface GrantRowShape {
   createdByUserId: string | null;
   expiresAt: Instant | null;
   maxViews: number | null;
+  /** The shared grant's window (ADR-177); absent on own grants. Read back untyped,
+   *  so {@link grantRowToFact} parses it. */
+  condition?: unknown;
   occurredAt: Instant;
 }
 
@@ -105,6 +108,7 @@ export const GRANT_ROW_COLUMNS = {
   createdByUserId: true,
   expiresAt: true,
   maxViews: true,
+  condition: true,
   occurredAt: true,
 } as const;
 
@@ -127,6 +131,7 @@ const storedGrantRowSchema = z
     createdByUserId: z.string().nullable(),
     expiresAt: z.date().nullable(),
     maxViews: z.number().nullable(),
+    condition: z.unknown().optional(),
     occurredAt: z.date(),
   })
   .strict();
@@ -248,6 +253,7 @@ export function grantFactToRow({
     createdByUserId: grant.resource?.createdByUserId ?? null,
     expiresAt: expiresAtMs != null ? Temporal.Instant.fromEpochMilliseconds(expiresAtMs) : null,
     maxViews: grant.resource?.maxViews ?? null,
+    ...(grant.condition !== undefined ? { condition: grant.condition } : {}),
     occurredAt: Temporal.Instant.fromEpochMilliseconds(grant.occurredAtMs),
   };
 }
@@ -279,6 +285,10 @@ export function grantRowToFact(row: GrantRowShape): GrantFact {
     source: row.source as GrantEventSource,
     occurredAtMs: row.occurredAt.epochMilliseconds,
   };
+  // A malformed stored window parses to no condition, so the minter leaves the row out of
+  // every proof.
+  const condition = grantConditionSchema.safeParse(row.condition);
+  if (condition.success) fact.condition = condition.data;
   if (row.legacyRole != null) {
     fact.legacyRole = row.legacyRole as LegacyBindingRole;
   }

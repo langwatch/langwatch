@@ -7,7 +7,6 @@
 import { bindTrpcFact, createTrpcRuntime, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import type { TrpcContract } from "@langwatch/module";
 import type { OpsApi, OpsOperator } from "@langwatch/ops-contract";
-import type { OpsCapability } from "../../app/ops.app.ts";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
@@ -17,6 +16,7 @@ import {
   OPS_STAFF_ADDRESS,
   platformOperatorAuthz,
 } from "../../app/__tests__/ops.fixture.ts";
+import type { OpsCapability } from "../../app/ops.app.ts";
 import type { OpsReplayRunner } from "../../app/ops.app.ts";
 import { opsDashboardTrpcTransport } from "../ops-dashboard.trpc.ts";
 import { opsEventLogTrpcTransport } from "../ops-event-log.trpc.ts";

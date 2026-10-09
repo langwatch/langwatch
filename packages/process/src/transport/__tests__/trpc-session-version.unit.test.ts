@@ -7,6 +7,7 @@ import type { Authorize } from "@langwatch/api/access";
 import { SessionReader, type TrpcSessionVersions } from "@langwatch/api/hosting";
 import { composeTrpcRouters, defineTrpcRouter, TrpcHost } from "@langwatch/api/trpc";
 import { defineTrpcContract, moduleApi } from "@langwatch/module";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 import { beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 
@@ -61,6 +62,7 @@ describe("given a tRPC surface reading session versions from authz", () => {
       ["user_bo", "Bo"],
     ]);
     const authz: Authorize & TrpcSessionVersions = {
+      ...testAuthorizeDefaults,
       ...inertApiDoor().authz,
       getSessionVersion: async () => {
         reads += 1;

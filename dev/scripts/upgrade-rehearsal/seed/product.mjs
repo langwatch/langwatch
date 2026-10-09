@@ -14,6 +14,7 @@ const SLACK_WEBHOOK = "https://hooks.slack.com/services/T0000000/B0000000/rehear
 /**
  * One entry per seeded kind: `create` writes it on the old image, `read` asks head for it and
  * `marker` is the text head's answer must contain. `unseedable` names why a kind has no seed.
+ * A `bulk` kind is written ctx.perKind times; `create` and `marker` take its index `i`.
  */
 export const PRODUCT_KINDS = [
   {
@@ -121,6 +122,104 @@ export const PRODUCT_KINDS = [
     marker: ({ ctx }) => `rehearsal suite ${ctx.label}`,
   },
   {
+    kind: "dataset",
+    bulk: true,
+    create: ({ ctx, i }) => ({
+      path: "dataset.upsert",
+      input: {
+        projectId: ctx.projectId,
+        name: `rehearsal dataset ${ctx.label} ${nth(i)}`,
+        columnTypes: [
+          { name: "input", type: "string" },
+          { name: "expected_output", type: "string" },
+        ],
+        datasetRecords: [
+          { input: "alpha", expected_output: "a" },
+          { input: "beta", expected_output: "b" },
+          { input: "gamma", expected_output: "g" },
+        ],
+      },
+    }),
+    read: ({ ctx }) => ({ path: "dataset.getAll", input: { projectId: ctx.projectId } }),
+    marker: ({ ctx, i }) => `rehearsal dataset ${ctx.label} ${nth(i)}`,
+  },
+  {
+    kind: "evaluator",
+    bulk: true,
+    create: ({ ctx, i }) => ({
+      path: "evaluators.create",
+      input: {
+        projectId: ctx.projectId,
+        name: `rehearsal evaluator ${ctx.label} ${nth(i)}`,
+        type: "evaluator",
+        config: {
+          evaluatorType: "langevals/exact_match",
+          settings: { caseSensitive: false },
+        },
+      },
+    }),
+    read: ({ ctx }) => ({ path: "evaluators.getAll", input: { projectId: ctx.projectId } }),
+    marker: ({ ctx, i }) => `rehearsal evaluator ${ctx.label} ${nth(i)}`,
+  },
+  {
+    kind: "prompt",
+    bulk: true,
+    create: ({ ctx, i }) => ({
+      path: "prompts.create",
+      input: {
+        projectId: ctx.projectId,
+        data: {
+          scope: "PROJECT",
+          handle: promptHandle({ ctx, i }),
+          prompt: "rehearsal seed",
+        },
+      },
+    }),
+    read: ({ ctx }) => ({
+      path: "prompts.getAllPromptsForProject",
+      input: { projectId: ctx.projectId },
+    }),
+    marker: ({ ctx, i }) => promptHandle({ ctx, i }),
+  },
+  {
+    kind: "monitor",
+    bulk: true,
+    create: ({ ctx, i }) => ({
+      path: "monitors.create",
+      input: {
+        projectId: ctx.projectId,
+        name: `rehearsal monitor ${ctx.label} ${nth(i)}`,
+        checkType: "langevals/exact_match",
+        preconditions: [],
+        settings: { caseSensitive: false },
+        sample: 1,
+        executionMode: "ON_MESSAGE",
+        evaluatorId: ctx.created?.evaluator?.[i]?.id,
+      },
+    }),
+    read: ({ ctx }) => ({
+      path: "monitors.getAllForProject",
+      input: { projectId: ctx.projectId },
+    }),
+    marker: ({ ctx, i }) => `rehearsal monitor ${ctx.label} ${nth(i)}`,
+  },
+  {
+    kind: "scenario",
+    bulk: true,
+    create: ({ ctx, i }) => ({
+      path: "scenarios.create",
+      input: {
+        projectId: ctx.projectId,
+        name: `rehearsal scenario ${ctx.label} ${nth(i)}`,
+        situation: "A customer asks for a refund.",
+        criteria: [],
+        labels: [],
+      },
+    }),
+    read: ({ ctx }) => ({ path: "scenarios.getAll", input: { projectId: ctx.projectId } }),
+    marker: ({ ctx, i }) => `rehearsal scenario ${ctx.label} ${nth(i)}`,
+  },
+  {
     kind: "licence",
     unseedable: ({ ctx }) =>
       ctx.licenceKey ? null : "no REHEARSAL_LICENSE_KEY: the old image accepts only a signed key",
@@ -187,6 +286,13 @@ async function prepare({ wire, ctx }) {
   });
 }
 
+/** A bulk kind's zero-padded index, so no marker is a prefix of another. */
+export const nth = (i) => String(i).padStart(5, "0");
+
+/** Lowercase handle for a bulk prompt; main's handle regex allows only [a-z0-9_-]. */
+const promptHandle = ({ ctx, i }) =>
+  `rehearsal-prompt-${ctx.label}-${nth(i)}`.toLowerCase().replace(/[^a-z0-9_-]/g, "-");
+
 /** Writes every seedable kind on the old image; one failure never stops the others. */
 export async function seedProducts({ wire, ctx }) {
   await prepare({ wire, ctx });
@@ -197,14 +303,34 @@ export async function seedProducts({ wire, ctx }) {
       kinds.push({ kind: entry.kind, seeded: false, reason });
       continue;
     }
-    try {
-      await wire.mutate(entry.create({ ctx }));
-      kinds.push({ kind: entry.kind, seeded: true });
-    } catch (error) {
-      kinds.push({ kind: entry.kind, seeded: false, reason: String(error.message ?? error) });
+    const total = entry.bulk ? (ctx.perKind ?? 1) : 1;
+    let created = 0;
+    let error = null;
+    for (let i = 0; i < total; i++) {
+      try {
+        ((ctx.created ??= {})[entry.kind] ??= [])[i] = await wire.mutate(entry.create({ ctx, i }));
+        created++;
+      } catch (caught) {
+        error ??= String(caught.message ?? caught);
+      }
     }
+    kinds.push(
+      created > 0
+        ? {
+            kind: entry.kind,
+            seeded: true,
+            ...(entry.bulk && { created, failed: total - created }),
+          }
+        : { kind: entry.kind, seeded: false, reason: error },
+    );
   }
-  const { email: _email, password: _password, licenceKey: _key, ...context } = ctx;
+  const {
+    email: _email,
+    password: _password,
+    licenceKey: _key,
+    created: _created,
+    ...context
+  } = ctx;
   return { context, kinds };
 }
 
@@ -213,13 +339,29 @@ export async function readBack({ wire, ctx, seeds }) {
   await wire.signIn({ email: ctx.email, password: ctx.password });
   const seeded = { ...ctx, ...seeds.context };
   const kinds = [];
-  for (const { kind } of seeds.kinds.filter((each) => each.seeded)) {
-    const entry = PRODUCT_KINDS.find((each) => each.kind === kind);
+  for (const seed of seeds.kinds.filter((each) => each.seeded)) {
+    const entry = PRODUCT_KINDS.find((each) => each.kind === seed.kind);
     try {
       const answer = await wire.query(entry.read({ ctx: seeded }));
-      kinds.push({ kind, found: holdsMarker({ answer, marker: entry.marker({ ctx: seeded }) }) });
+      if (!entry.bulk) {
+        kinds.push({
+          kind: seed.kind,
+          found: holdsMarker({ answer, marker: entry.marker({ ctx: seeded }) }),
+        });
+        continue;
+      }
+      let foundCount = 0;
+      for (let i = 0; i < seed.created + seed.failed; i++) {
+        if (holdsMarker({ answer, marker: entry.marker({ ctx: seeded, i }) })) foundCount++;
+      }
+      kinds.push({
+        kind: seed.kind,
+        found: foundCount >= seed.created,
+        foundCount,
+        created: seed.created,
+      });
     } catch (error) {
-      kinds.push({ kind, found: false, error: String(error.message ?? error) });
+      kinds.push({ kind: seed.kind, found: false, error: String(error.message ?? error) });
     }
   }
   return { kinds };
@@ -232,6 +374,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
     password: process.env.SEED_PASSWORD,
     label: process.env.SEED_LABEL ?? "rehearsal",
     licenceKey: process.env.REHEARSAL_LICENSE_KEY,
+    perKind: Number(process.env.SEED_PER_KIND ?? 1),
   };
   const wire = createWire({ appBase: process.env.APP_BASE });
   const result =

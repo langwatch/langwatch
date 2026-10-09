@@ -4,7 +4,7 @@
  * `ops:view` on the platform, and an operator gets the reader's answers unchanged.
  * Spec: modules/ops/specs/upgrades.feature
  */
-import { routesServingWhileUpgrading } from "@langwatch/api";
+import { routesHeldWhileUpgrading } from "@langwatch/api";
 import {
   bindTrpcFact,
   createTrpcRuntime,
@@ -296,23 +296,20 @@ describe("ops.upgrade.retryStep", () => {
 });
 
 describe("given the installation upgrading", () => {
-  /** @scenario "The Upgrades reads and Retry serve while the installation upgrades and the migration procedures stay held" */
-  it("passes a batch of the eight reads and Retry, and holds any batch naming a migration procedure", () => {
-    const served = Object.keys(boundAccess()).filter(
-      (name) => !MIGRATION_PROCEDURE_NAMES.includes(name),
-    );
-    const patterns = routesServingWhileUpgrading().map((source) => new RegExp(source));
-    const passes = (route: string) => patterns.some((pattern) => pattern.test(route));
+  /** @scenario "The Upgrades and system-migration procedures serve while the installation upgrades" */
+  it("passes a batch of every Upgrades read, Retry and each migration procedure", () => {
+    const names = Object.keys(boundAccess());
+    const held = routesHeldWhileUpgrading().map((source) => new RegExp(source));
+    const passes = (route: string) => !held.some((pattern) => pattern.test(route));
 
-    expect(served).toHaveLength(9);
-    expect(passes(`GET /api/trpc/${served.join(",")}`)).toBe(true);
-    expect(passes("POST /api/trpc/ops.upgrade.retryStep")).toBe(true);
+    expect(names).toHaveLength(9 + MIGRATION_PROCEDURE_NAMES.length);
+    expect(passes(`GET /api/trpc/${names.join(",")}`)).toBe(true);
     for (const name of MIGRATION_PROCEDURE_NAMES) {
-      expect([name, passes(`POST /api/trpc/ops.upgrade.status,${name}`)]).toEqual([name, false]);
+      expect([name, passes(`POST /api/trpc/ops.upgrade.status,${name}`)]).toEqual([name, true]);
     }
   });
 
-  /** @scenario "Upgrading mode serves only the routes declared to serve while upgrading" */
+  /** @scenario "Every route serves while upgrading unless it holds, naming why" */
   it("still asks a declared procedure's permission at the door", async () => {
     const reader = readerOfOneRelease();
     const { outsider } = mount({ reader });

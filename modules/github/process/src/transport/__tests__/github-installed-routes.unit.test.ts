@@ -98,6 +98,7 @@ function restHost(): RestHost {
 
 /** GitHub's redirect back to `/setup`, carrying a state the flow signed for user-1. */
 async function setupAfterSignedFlow(runtime: Awaited<ReturnType<typeof installedGithub>>) {
+  await runtime.service(GithubApi).registerInstallNonce({ nonce: "flow-nonce", ttlSec: 600 });
   const state = runtime.service(GithubApi).signInstallState({
     userId: "user-1",
     organizationId: "org-1",
@@ -105,7 +106,7 @@ async function setupAfterSignedFlow(runtime: Awaited<ReturnType<typeof installed
     returnTo: "/settings/github",
     issuedAt: Date.now(),
     nonce: "flow-nonce",
-    nonceRegistered: false,
+    nonceRegistered: true,
   });
   const host = restHost();
   host.mount(githubInstallRest.router(), () => runtime.module(githubProcessModule).provided);

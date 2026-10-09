@@ -1,3 +1,4 @@
+import type { Authorization } from "@langwatch/authorization";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { nowInstant } from "@langwatch/time";
 import {
@@ -38,6 +39,8 @@ import {
 } from "@langwatch/trace-contract";
 
 import type { TraceQueryFieldValuesRepository } from "../features/query/repositories/query-field-values.repository.ts";
+import type { TraceQueryClassifier } from "../features/query/services/trace-query-classification.service.ts";
+import { TraceQueryFieldCatalogueService } from "../features/query/services/trace-query-field-catalogue.service.ts";
 import type { TraceFullRecordRepository } from "../repositories/trace-full-record.repository.ts";
 import {
   type TraceProjectedReadRepository,
@@ -45,8 +48,6 @@ import {
 } from "../repositories/trace-projected-read.repository.ts";
 import type { TraceRecordRepository } from "../repositories/trace-record.repository.ts";
 import type { TraceSummaryReaderRepository } from "../repositories/trace-summary-reader.repository.ts";
-import type { TraceQueryClassifier } from "../features/query/services/trace-query-classification.service.ts";
-import { TraceQueryFieldCatalogueService } from "../features/query/services/trace-query-field-catalogue.service.ts";
 
 export interface TraceEventDerivation {
   derive(input: TraceDerivedEventsInput): Promise<DerivedTraceEvent[]>;
@@ -127,10 +128,13 @@ export class TraceService {
     return this.composition.repository.findEvaluationEvents(parsed);
   }
 
-  async getSpanTreePage(input: SpanTreeInput): Promise<SpanTreePage> {
+  async getSpanTreePage({
+    authorization,
+    ...input
+  }: SpanTreeInput & { authorization: Authorization }): Promise<SpanTreePage> {
     const parsed = spanTreeInputSchema.parse(input);
     const page = await this.composition.repository.listSummaryPage({
-      tenantId: parsed.projectId,
+      authorization,
       traceId: parsed.traceId,
       limit: parsed.limit,
       cursor: parsed.cursor,
@@ -153,9 +157,11 @@ export class TraceService {
     });
   }
 
-  async getSpanTreeDelta(input: SpanTreeDeltaInput): Promise<SpanTreeNode[]> {
+  async getSpanTreeDelta(
+    input: SpanTreeDeltaInput & { authorization: Authorization },
+  ): Promise<SpanTreeNode[]> {
     const rows = await this.composition.repository.findSummarySince({
-      tenantId: input.projectId,
+      authorization: input.authorization,
       traceId: input.traceId,
       sinceUpdatedAtMs: input.sinceUpdatedAtMs,
     });
@@ -168,9 +174,15 @@ export class TraceService {
     );
   }
 
-  async buildQueryFieldCatalogue(input: TraceQueryFieldCatalogueInput): Promise<string> {
+  async buildQueryFieldCatalogue({
+    input,
+    authorization,
+  }: {
+    input: TraceQueryFieldCatalogueInput;
+    authorization: Authorization;
+  }): Promise<string> {
     const parsed = traceQueryFieldCatalogueInputSchema.parse(input);
-    const catalogue = await this.queryFieldCatalogue.build(parsed);
+    const catalogue = await this.queryFieldCatalogue.build({ input: parsed, authorization });
 
     return traceQueryFieldCatalogueOutputSchema.parse(catalogue);
   }

@@ -18,7 +18,7 @@ export class HttpWebhookChannels {
       outboundProxy: sqsProxyResolver(parseOutboundProxyConfig(config.outboundProxy)),
     });
     return {
-      http: HttpDestinationChannel.create({ tls: { rejectUnauthorized: config.isSaas } }),
+      http: HttpDestinationChannel.create({ permitsSelfSignedOptIn: !config.isSaas }),
       sqs: SqsWebhookDestinationChannel.create({ awsClientConfig: (input) => aws.build(input) }),
     };
   }

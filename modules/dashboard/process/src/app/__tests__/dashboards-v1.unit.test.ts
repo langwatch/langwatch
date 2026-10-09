@@ -258,7 +258,7 @@ describe("Dashboards v1 on the server", () => {
 
       await expect(
         app.getOrCreateFirst({ projectId: PROJECT, viewer: CREATOR }),
-      ).resolves.toMatchObject({ name: "Reports", createdById: CREATOR.userId });
+      ).resolves.toMatchObject([{ name: "Reports", createdById: CREATOR.userId }]);
     });
   });
 

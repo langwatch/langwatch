@@ -5,6 +5,7 @@ import { ChartCard } from "../../../ui/elements/chart-card.tsx";
 import AnalyticsLayout from "../../../ui/sections/analytics-layout.tsx";
 import { CustomGraph, type CustomGraphInput } from "../../../ui/sections/custom-graph.tsx";
 import { FilterSidebar } from "../../../ui/sections/filter-sidebar.tsx";
+import { withAggregateAnalyticsGate } from "../aggregate-analytics-gate.tsx";
 
 // Time unit conversion constants
 const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day
@@ -291,4 +292,4 @@ function MetricsContent() {
  * stated once in `analytics-routes.tsx`, in front of the same loader
  * registry, and the chrome belongs to the route tree these screens sit in.
  */
-export default MetricsContent;
+export default withAggregateAnalyticsGate("LLM Metrics", MetricsContent);

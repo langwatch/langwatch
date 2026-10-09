@@ -10,6 +10,7 @@ import {
 } from "@langwatch/trace-contract";
 import { z } from "zod";
 
+import type { TraceFullIo } from "../../features/read/services/trace-read-full-io.service.ts";
 import {
   applyTraceFullReadProtections,
   internalTraceFullReadProtections,
@@ -25,7 +26,6 @@ import {
   mapTraceMetadata,
   withoutEventReferences,
 } from "../../rules/trace-full-record.rules.ts";
-import type { TraceFullIo } from "../../features/read/services/trace-read-full-io.service.ts";
 import { TraceFullRecordRepository } from "../trace-full-record.repository.ts";
 import type { TracePayloadReaderRepository } from "../trace-payload-reader.repository.ts";
 import type {

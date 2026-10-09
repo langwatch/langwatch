@@ -2,6 +2,7 @@ import { Kbd } from "@langwatch/design-system/kbd";
 import { MenuContent, MenuItem, MenuRoot, MenuTrigger } from "@langwatch/design-system/menu";
 import { Box, Button, HStack, Tabs, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { ChevronDown, PanelLeftOpen, RotateCcw } from "lucide-react";
 import type React from "react";
 import { startTransition, useMemo, useRef, useState } from "react";
@@ -9,6 +10,7 @@ import { startTransition, useMemo, useRef, useState } from "react";
 import { useViewStore } from "../../../../behavior/explorer.store.ts";
 import { useOverflowVisibility } from "../../../../behavior/explorer/use-overflow-visibility.ts";
 import { useUIStore } from "../../../../behavior/ui.store.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import {
   type LensConfig,
   COST_LENS_IDS,
@@ -48,6 +50,8 @@ export const LensTabs: React.FC = () => {
   const revertLens = useViewStore((s) => s.revertLens);
   const isDraft = useViewStore((s) => s.isDraft);
   const errorCount = useErrorCount();
+  const { project } = useOrganizationTeamProject();
+  const canSaveLenses = !isAggregateProjectKind(project?.kind);
 
   const [pendingLensId, setPendingLensId] = useState<string | null>(null);
   // Save-as-new from the unsaved-changes prompt routes through the shared
@@ -254,7 +258,7 @@ export const LensTabs: React.FC = () => {
       <UnsavedLensDialog
         open={pendingLensId !== null}
         lensName={activeLens?.name ?? ""}
-        onSaveAsNew={resolvePendingSaveAsNew}
+        onSaveAsNew={canSaveLenses ? resolvePendingSaveAsNew : undefined}
         onDiscard={resolvePendingDiscard}
         onCancel={() => setPendingLensId(null)}
       />

@@ -73,7 +73,7 @@ describe("given the application's router", () => {
   });
 });
 
-describe("given the navigation capability over a router", () => {
+describe("given the navigation host service over a router", () => {
   describe("when a screen moves the address bar", () => {
     it("pushes for a navigate and replaces for a replace", () => {
       const navigate = vi.fn();
@@ -101,7 +101,7 @@ describe("given the navigation capability over a router", () => {
 });
 
 describe("given a screen rendered inside the application's router", () => {
-  describe("when it asks for the navigation capability", () => {
+  describe("when it asks for the navigation host service", () => {
     it("moves the router the page is actually mounted in", () => {
       let navigation: UiNavigation | undefined;
 

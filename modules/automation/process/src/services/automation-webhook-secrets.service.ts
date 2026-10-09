@@ -64,7 +64,7 @@ const webhookStoredActionParamsSchema = z
   })
   .strict();
 
-export type WebhookStoredActionParams = AutomationWebhookStoredParams;
+type WebhookStoredActionParams = AutomationWebhookStoredParams;
 
 /** Owns webhook secret persistence and redaction; the trigger repository
  * seals and opens each stored secret (ARCHITECTURE.md §3.2). */

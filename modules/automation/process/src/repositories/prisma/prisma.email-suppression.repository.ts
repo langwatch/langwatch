@@ -7,7 +7,7 @@ const map = (row: unknown): EmailSuppression => emailSuppressionSchema.parse(row
  * Only what this repository touches, so composition names the slice it needs
  * rather than the whole generated client.
  */
-export type EmailSuppressionDatabase = Pick<PrismaClient, "emailSuppression">;
+type EmailSuppressionDatabase = Pick<PrismaClient, "emailSuppression">;
 
 export class PrismaEmailSuppressionRepository extends EmailSuppressionRepository {
   private constructor(private readonly database: EmailSuppressionDatabase) {

@@ -100,6 +100,8 @@ type AuthzMemoryProjectRow = {
   name: string;
   isPersonal: boolean;
   apiKey: string;
+  /** `Project.kind`; absent reads as "application", the column's default. */
+  kind?: string;
   createdAt: Instant;
   archivedAt?: Instant | null;
 };

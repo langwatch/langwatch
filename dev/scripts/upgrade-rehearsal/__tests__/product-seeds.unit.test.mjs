@@ -51,6 +51,11 @@ void describe("product seeds", () => {
       "slack",
       "report",
       "suite",
+      "dataset",
+      "evaluator",
+      "prompt",
+      "monitor",
+      "scenario",
     ]);
 
     const head = fakeWire({ failReads: ["suites.getAll"] });
@@ -64,6 +69,25 @@ void describe("product seeds", () => {
     const suite = byId(findings, "suite");
     assert.equal(suite.verdict, VERDICT.reproduced);
     assert.match(suite.detail, /suites\.getAll answered 500/);
+  });
+
+  /** @scenario "Product kinds seeded through the old image are read back through head" */
+  void it("writes a bulk kind perKind times and counts each one head reads back", async () => {
+    const old = fakeWire();
+    const seeds = await seedProducts({ wire: old, ctx: { ...ctx, perKind: 3 } });
+    assert.deepEqual(
+      seeds.kinds.find((k) => k.kind === "dataset"),
+      { kind: "dataset", seeded: true, created: 3, failed: 0 },
+    );
+    const head = fakeWire();
+    head.written.push(...old.written.filter((input) => !/dataset run1 00002/.test(input.name)));
+    const readback = await readBack({ wire: head, ctx: { ...ctx }, seeds });
+    const dataset = byId(
+      seedFindings({ productSeeds: seeds, productReadback: readback }),
+      "dataset",
+    );
+    assert.equal(dataset.verdict, VERDICT.reproduced);
+    assert.match(dataset.detail, /\(2 of 3\)/);
   });
 
   /** @scenario "A product kind with no seed or no read-back is inconclusive" */

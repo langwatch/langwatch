@@ -68,6 +68,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/authorization": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"

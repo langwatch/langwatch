@@ -24,7 +24,6 @@ import {
   type OrganizationCurrency,
 } from "@langwatch/organization-contract";
 import { Prisma, type PrismaClient, type Team } from "@langwatch/prisma-client/generated";
-import { PROJECT_KIND } from "@langwatch/project-contract";
 import { fromDate, toDate, type Instant } from "@langwatch/time";
 
 import {
@@ -643,13 +642,14 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
 
   async findProjects(input: {
     organizationId: string;
+    hiddenKinds: readonly string[];
     teamId?: string;
     limit?: number;
   }): Promise<OrganizationTeamProject[]> {
     return this.database.project.findMany({
       where: {
         archivedAt: null,
-        kind: { not: PROJECT_KIND.INTERNAL_GOVERNANCE },
+        kind: { notIn: [...input.hiddenKinds] },
         team: { organizationId: input.organizationId },
         ...(input.teamId ? { teamId: input.teamId } : {}),
       },

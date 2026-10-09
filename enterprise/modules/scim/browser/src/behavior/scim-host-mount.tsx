@@ -1,6 +1,6 @@
 /**
  * SCIM's answer to the port its screen declares: every method projects a
- * `@langwatch/browser-host` capability. ARCHITECTURE.md §10.1.
+ * `@langwatch/browser-host` host service. ARCHITECTURE.md §10.1.
  */
 
 import {
@@ -24,7 +24,7 @@ import {
   type ScimSuccessNotice,
 } from "../model/scim-host.ts";
 
-class CapabilityScimHost extends ScimHostApi {
+class HostServiceScimHost extends ScimHostApi {
   private readonly orgId: string | undefined;
   private readonly appBaseUrl: string;
   private readonly feedback: UiFeedback;
@@ -112,7 +112,7 @@ export default function ScimHostMount({ children }: { children?: ReactNode }) {
 
   const host = useMemo(
     () =>
-      new CapabilityScimHost({
+      new HostServiceScimHost({
         orgId: organizationId ?? void 0,
         appBaseUrl,
         feedback,

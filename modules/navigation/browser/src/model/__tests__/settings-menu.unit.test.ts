@@ -157,6 +157,11 @@ describe("given an operator", () => {
       expect(hrefsIn({ hasOpsAccess: true })).toContain("/ops/event-sourcing");
     });
 
+    it("offers Feature Flags only where ops offers cloud ops", () => {
+      expect(hrefsIn({ hasOpsAccess: true })).not.toContain("/ops/feature-flags");
+      expect(hrefsIn({ hasOpsAccess: true, hasCloudOps: true })).toContain("/ops/feature-flags");
+    });
+
     it("offers instance administration only to a platform administrator", () => {
       expect(groupIdsIn({ hasOpsAccess: true })).not.toContain("settings-ops-instance");
       expect(groupIdsIn({ hasOpsAccess: true, isPlatformAdmin: true })).toContain(

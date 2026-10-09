@@ -1,3 +1,4 @@
+import type { Authorization } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { ManagedProviderApi } from "@langwatch/enterprise-managed-provider-contract";
@@ -461,6 +462,7 @@ export class ModelProviderModule implements ModelProviderApi {
     });
     this.#playground = ModelProviderPlaygroundService.create({
       modelProviders: this,
+      projects: dependencies.projects,
       executionProxyBaseUrl,
       nlpInternalSecret,
     });
@@ -849,12 +851,15 @@ export class ModelProviderModule implements ModelProviderApi {
    */
   previewCostRuleMatchingSpans(
     input: ModelCostPreviewRequest,
+    { authorization }: { authorization?: Authorization } = {},
   ): Promise<CostRuleMatchingSpansPreview> {
     const spans = this.#spans;
 
-    if (!isPreviewSpanReader(spans)) throw new ModelCostPreviewUnavailableError();
+    if (!isPreviewSpanReader(spans) || !authorization) {
+      throw new ModelCostPreviewUnavailableError();
+    }
 
-    return this.#costPreview.previewCostRuleMatchingSpans({ spans, input });
+    return this.#costPreview.previewCostRuleMatchingSpans({ spans, input, authorization });
   }
 
   // ── translation ────────────────────────────────────────────────────────────

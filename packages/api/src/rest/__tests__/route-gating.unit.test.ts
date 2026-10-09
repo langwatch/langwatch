@@ -10,6 +10,7 @@ import type { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import { authorizationPort } from "../../__tests__/api-double.ts";
 import { anyAuthenticated } from "../../access/access.ts";
 import { createErrorHandler, ProjectInvalidCredentialsError } from "../../errors.ts";
 import { allRegisteredRoutes } from "../../route-registry.ts";
@@ -49,6 +50,7 @@ const forwarder = defineRestRouter(GateApi)
 
 function forwarderApp(): Hono {
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: () => ({ actor: null, scope: ORGANIZATION }),
       identify: ({ request }) => {
@@ -127,6 +129,7 @@ function notesApp({ getNote }: { getNote?: GateApi["getNote"] } = {}) {
   const getReport = vi.fn(async ({ projectId }: { projectId: string }) => ({ projectId }));
 
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: {
       authenticate: () => ({ actor: { type: "api_key", id: "key-1" }, scope: ORGANIZATION }),
       authorize,

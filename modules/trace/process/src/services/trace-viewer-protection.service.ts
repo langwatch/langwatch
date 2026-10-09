@@ -1,4 +1,4 @@
-import type { PrincipalRef } from "@langwatch/authorization";
+import type { Authorization, PrincipalRef } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   describeAudience,
@@ -14,6 +14,7 @@ import { createLogger, type Logger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { Protections } from "@langwatch/trace-contract";
 
+import { policyProjectIdsOf } from "../rules/policy-project-ids.rules.ts";
 import { VisibilityWindowService } from "./trace-visibility-window.service.ts";
 
 export type TraceViewerProtectionOptions = Readonly<{
@@ -96,7 +97,13 @@ export class TraceViewerProtectionService {
   }
 
   async resolve(
-    input: Readonly<{ projectId: string; userId: string | undefined; publiclyShared: boolean }>,
+    input: Readonly<{
+      projectId: string;
+      userId: string | undefined;
+      publiclyShared: boolean;
+      /** The read's proof: the policy is the strictest across it and `projectId` (ADR-177 d9). */
+      authorization?: Authorization;
+    }>,
   ): Promise<Protections> {
     const [canSeeCosts, isMember, isAdmin, isProjectOwner, { visibilityCutoffMs }] =
       await Promise.all([
@@ -109,7 +116,12 @@ export class TraceViewerProtectionService {
 
     let policy: ResolvedDataPrivacy;
     try {
-      policy = await this.options.dataPrivacy.getResolvedForProject({ projectId: input.projectId });
+      policy = await this.options.dataPrivacy.getResolvedForProjects({
+        projectIds: policyProjectIdsOf({
+          projectId: input.projectId,
+          authorization: input.authorization,
+        }),
+      });
     } catch (error) {
       this.logger.error(
         { error, projectId: input.projectId },

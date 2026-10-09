@@ -5,6 +5,7 @@ import AnalyticsLayout from "../../../ui/sections/analytics-layout.tsx";
 import { CustomGraph, type CustomGraphInput } from "../../../ui/sections/custom-graph.tsx";
 import { FilterSidebar } from "../../../ui/sections/filter-sidebar.tsx";
 import { TopicsSelector } from "../../../ui/sections/topics-selector.tsx";
+import { withAggregateAnalyticsGate } from "../aggregate-analytics-gate.tsx";
 
 // Time unit conversion constants
 const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day
@@ -97,4 +98,4 @@ function TopicsContent() {
  * `analytics-routes.tsx` wraps these in `withPermissionGuard("analytics:view")`
  * (and `DashboardLayout` on two), in the composing app's own route tree.
  */
-export default TopicsContent;
+export default withAggregateAnalyticsGate("Topics", TopicsContent);

@@ -12,6 +12,7 @@ import {
 import type { EnterpriseOpsApi } from "@langwatch/enterprise-ops-contract";
 import type { OpsOperator } from "@langwatch/ops-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
 import { licenseRegistryTrpcTransport, operatorFact } from "../license-registry.trpc.ts";
@@ -30,6 +31,7 @@ function members(): TrpcRuntimeMembers<Context> {
     identity: { caller: (ctx) => ({ actor: ctx.actor }) },
     authorization: {
       forRequest: () => ({
+        ...testAuthorizeDefaults,
         getDecision: async () => ({ permitted: false, organizationRole: null }),
         getProjectAnyDecision: async () => ({ permitted: false, organizationRole: null }),
         checkScopeLineage: async () => ({ kind: "consistent" }),

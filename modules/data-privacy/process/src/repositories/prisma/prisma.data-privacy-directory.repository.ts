@@ -12,7 +12,7 @@ import {
 } from "../../app/data-privacy.app.ts";
 
 /** Only what this repository touches. */
-export type DataPrivacyDirectoryDatabase = Pick<
+type DataPrivacyDirectoryDatabase = Pick<
   PrismaClient,
   "project" | "team" | "department" | "group" | "organization"
 >;

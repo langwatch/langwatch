@@ -47,6 +47,7 @@ const DELIVERABLE: WebhookEndpointView = {
   maxBatchSize: 3,
   maxBatchDelayMs: 1_000,
   maxInFlight: 2,
+  allowSelfSignedCertificate: false,
   createdAt: new Date(0),
   updatedAt: new Date(0),
 };

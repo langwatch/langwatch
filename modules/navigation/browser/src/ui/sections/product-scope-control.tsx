@@ -7,6 +7,7 @@
 import { Menu } from "@langwatch/design-system/menu";
 import { Badge, Box, Button, HStack, Portal, Text } from "@langwatch/design-system/primitives";
 import { CreateProjectDrawerToken } from "@langwatch/organization-client";
+import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { Check, ChevronsUpDown, Plus } from "lucide-react";
 
 import { useProjectPickGroups } from "../../behavior/use-project-pick-groups.ts";
@@ -15,7 +16,7 @@ import { isProjectScopedProduct, type ProductId } from "../../model/products.ts"
 import type { ProjectPickGroup } from "../../model/project-pick-items.ts";
 import { ProjectSwitcherCombobox } from "../blocks/project-switcher-combobox.tsx";
 import { NavigationLink } from "../elements/navigation-link.tsx";
-import { ProjectAvatar } from "../elements/project-avatar.tsx";
+import { AggregateProjectAvatar, ProjectAvatar } from "../elements/project-avatar.tsx";
 
 function ScopeDivider() {
   return (
@@ -73,6 +74,7 @@ function ProjectScopeMenu() {
 
   const projectCount = groups.reduce((count, group) => count + group.projects.length, 0);
   const showTeamHeaders = groups.length > 1;
+  const currentProjectIsAggregate = isAggregateProjectKind(project.kind);
 
   return (
     <>
@@ -82,6 +84,7 @@ function ProjectScopeMenu() {
           groups={groups}
           currentProjectId={project.id}
           currentProjectName={project.name}
+          currentProjectIsAggregate={currentProjectIsAggregate}
           showTeamHeaders={showTeamHeaders}
           onCreateProjectForTeam={onCreateProjectForTeam}
         />
@@ -90,6 +93,7 @@ function ProjectScopeMenu() {
           groups={groups}
           currentProjectId={project.id}
           currentProjectName={project.name}
+          currentProjectIsAggregate={currentProjectIsAggregate}
           showTeamHeaders={showTeamHeaders}
           onCreateProjectForTeam={onCreateProjectForTeam}
         />
@@ -103,12 +107,14 @@ function ProjectMenu({
   groups,
   currentProjectId,
   currentProjectName,
+  currentProjectIsAggregate,
   showTeamHeaders,
   onCreateProjectForTeam,
 }: {
   groups: ProjectPickGroup[];
   currentProjectId: string;
   currentProjectName: string;
+  currentProjectIsAggregate: boolean;
   showTeamHeaders: boolean;
   onCreateProjectForTeam: ({ teamId, orgId }: { teamId: string; orgId: string }) => void;
 }) {
@@ -126,15 +132,22 @@ function ProjectMenu({
           height="32px"
           color="fg"
           gap={2}
+          minWidth={0}
+          maxWidth="280px"
+          title={currentProjectName}
           _hover={{ backgroundColor: "bg.muted" }}
         >
-          <ProjectAvatar name={currentProjectName} />
-          <Text whiteSpace="nowrap">{currentProjectName}</Text>
+          {currentProjectIsAggregate ? (
+            <AggregateProjectAvatar name={currentProjectName} />
+          ) : (
+            <ProjectAvatar name={currentProjectName} />
+          )}
+          <Text truncate>{currentProjectName}</Text>
           <ChevronsUpDown size={12} color="var(--chakra-colors-fg-muted)" />
         </Button>
       </Menu.Trigger>
       <Portal>
-        <Menu.Content minWidth="240px">
+        <Menu.Content minWidth="240px" maxWidth="min(360px, 90vw)">
           {groups.map(({ team, projects: teamProjects }) => (
             <Menu.ItemGroup key={team.teamId} title={showTeamHeaders ? team.label : "Projects"}>
               {teamProjects.map((candidate) => (
@@ -146,8 +159,14 @@ function ProjectMenu({
                 >
                   <NavigationLink href={candidate.href} _hover={{ textDecoration: "none" }}>
                     <HStack gap={2} width="full">
-                      <ProjectAvatar name={candidate.label} />
-                      <Text flex={1}>{candidate.label}</Text>
+                      {candidate.isAggregate ? (
+                        <AggregateProjectAvatar name={candidate.label} />
+                      ) : (
+                        <ProjectAvatar name={candidate.label} />
+                      )}
+                      <Text flex={1} minWidth={0} truncate title={candidate.label}>
+                        {candidate.label}
+                      </Text>
                       {candidate.projectId === currentProjectId && (
                         <Check size={13} aria-label="Current project" />
                       )}

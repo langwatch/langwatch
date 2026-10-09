@@ -1,4 +1,4 @@
-/** Router for personal-workspace screens, bound through host's route capability. */
+/** Router for personal-workspace screens, bound through route host service. */
 
 import { useMemo } from "react";
 

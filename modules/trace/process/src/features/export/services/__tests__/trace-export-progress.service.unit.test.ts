@@ -6,8 +6,8 @@ import { EventEmitter } from "node:events";
 
 import { describe, expect, it, vi } from "vitest";
 
-import { TraceExportProgressService } from "../trace-export-progress.service.ts";
 import { TraceTenantUpdateStreamService } from "../../../../services/trace-tenant-update-stream.service.ts";
+import { TraceExportProgressService } from "../trace-export-progress.service.ts";
 
 const PROJECT_ID = "project-1";
 

@@ -12,6 +12,7 @@ export const PROJECT_IDENTITY_SELECT = {
   teamId: true,
   isPersonal: true,
   ownerUserId: true,
+  kind: true,
   team: { select: { organizationId: true } },
 } as const;
 
@@ -22,6 +23,7 @@ type ProjectIdentityRow = {
   teamId: string;
   isPersonal: boolean;
   ownerUserId: string | null;
+  kind: string;
   team: { organizationId: string };
 };
 
@@ -34,5 +36,6 @@ export function mapProjectIdentityRow(row: ProjectIdentityRow): ProjectIdentity 
     organizationId: row.team.organizationId,
     isPersonal: row.isPersonal,
     ownerUserId: row.ownerUserId,
+    kind: row.kind,
   };
 }

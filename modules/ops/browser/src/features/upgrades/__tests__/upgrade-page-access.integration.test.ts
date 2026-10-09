@@ -39,7 +39,7 @@ describe("given the Upgrades pages", () => {
     }
   });
 
-  /** @scenario "The shell renders sign-in and the Upgrades page while its other startup reads answer 503" */
+  /** @scenario "The Upgrades page opens once its grant read settles, even when no feature flag answers" */
   it("opens once the grant read settles even when no feature flag ever answered", () => {
     for (const page of UPGRADE_PAGES) {
       const screen = opsWeb.installation.screens[page];

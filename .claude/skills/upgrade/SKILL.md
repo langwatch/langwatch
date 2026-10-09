@@ -22,9 +22,9 @@ new image ─► worker boot ─► gate.admit (behind or first install)
                  ▼
              ledger current ─► takes jobs ─► background steps (per-step leases)
 
-new image ─► api boot ─► never runs a step
-   a Postgres schema step outstanding ─► HOLDING (holding page, not ready)
-   schema done, blocking steps left   ─► UPGRADING (routes declared servesWhileUpgrading only)
+new image ─► api boot (beside the worker, never after it) ─► never runs a step
+   a Postgres schema step outstanding ─► HOLDING (requests wait ≤30 s, then holding page / 503)
+   schema done, blocking steps left   ─► UPGRADING (servesWhileUpgrading routes: sign-in, Ops, ingest)
    ledger current (re-read every 10 s) ─► SERVING ─► roster row every 15 s
 ```
 
@@ -115,12 +115,14 @@ It runs `pnpm task upgrade steps --json` and writes the committed step list plus
 
 While the api is upgrading it answers only routes declared to serve: a REST or tRPC declaration
 carries `.servesWhileUpgrading()` (`packages/api`; auth's sign-in, authz's permissions read and the
-scope graph, ops' upgrade reads and `retryStep`), and a declared wildcard skips undeclared literals.
+scope graph, ops' upgrade reads and `retryStep`, and every ingest route: they only enqueue for the
+worker, so nothing is dropped), and a declared wildcard skips undeclared literals. A held request
+waits up to `UPGRADE_HOLD_WINDOW_MS` (30 s) for the hold to lift or its route to pass first.
 The bundle's assets, sign-in and the Upgrades paths pass too; a tRPC batch passes only if every
 procedure declares it. Anything else answers the holding page (HTML) or 503 with `Retry-After: 10`;
 liveness answers in every phase. The holding page links "Sign in to follow the upgrade" to
 `UPGRADE_SIGN_IN_HREF`, returning to Ops > Upgrades. A blocking step may not touch a sign-in table
-(`upgrade-sign-in-tables` policy). The door still asks each declared permission.
+or ingest table (`upgrade-sign-in-tables` policy). The door still asks each declared permission.
 Specs: `specs/upgrade/in-app-upgrade.feature`, `packages/process/specs/upgrade-holding-page.feature`.
 
 ## Serving gate, roster and rollback

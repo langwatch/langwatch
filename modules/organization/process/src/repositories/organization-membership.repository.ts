@@ -15,6 +15,7 @@ import type {
   User,
   OrganizationAdmission,
 } from "@langwatch/organization-contract";
+import type { Instant } from "@langwatch/time";
 
 import type { DeveloperAdmissionVia } from "../rules/admission-audit.rules.ts";
 import type { TeamRoleUpdateOrigin } from "../services/compute-effective-team-role-updates.service.ts";
@@ -307,6 +308,7 @@ export abstract class OrganizationMembershipRepository {
     {
       userId: string;
       departmentId: string | null;
+      disabledAt: Instant | null;
       user: { name: string | null; email: string | null };
     }[]
   >;

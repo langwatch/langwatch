@@ -10,7 +10,7 @@ import { moduleApi } from "@langwatch/module";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import { createApiDouble } from "../../__tests__/api-double.ts";
+import { createApiDouble, authorizationPort } from "../../__tests__/api-double.ts";
 import { anyAuthenticated, type Authorize } from "../../access/access.ts";
 import {
   createErrorHandler,
@@ -109,7 +109,10 @@ function notesApp() {
     return { actor: null, scope: ORGANIZATION };
   });
 
-  const runtime = createRestRuntime({ identity: { authenticate, identify, authorize } });
+  const runtime = createRestRuntime({
+    identity: { authenticate, identify, authorize },
+    authorization: authorizationPort,
+  });
 
   const hono = runtime.mount(notes.router(), { app: () => api, onError: createErrorHandler() });
 

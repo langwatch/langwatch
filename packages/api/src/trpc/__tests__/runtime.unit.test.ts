@@ -10,6 +10,7 @@ import type { TRPCDefaultErrorShape } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import { authorizeDefaults } from "../../__tests__/api-double.ts";
 import { publicRoute } from "../../access/access.ts";
 import {
   bindTrpcFact,
@@ -153,6 +154,7 @@ function harness() {
     },
     authorization: {
       forRequest: () => ({
+        ...authorizeDefaults,
         getDecision: async ({ permission, scope }) => {
           steps.push(`decide:${permission}:${scope.tier}:${scope.id}`);
 
@@ -248,8 +250,20 @@ describe("a mounted contract procedure", () => {
       await caller.getById({ projectId: "project-1", id: "annotation-1" });
 
       const args = seen[0]!;
-      expect(Object.keys(args).toSorted()).toEqual(["actor", "app", "input", "scope", "signal"]);
-      expect(args.scope).toEqual({ tier: "project", id: "project-1", organizationId: null });
+      expect(Object.keys(args).toSorted()).toEqual([
+        "actor",
+        "app",
+        "authorization",
+        "input",
+        "scope",
+        "signal",
+      ]);
+      expect(args.scope).toEqual({
+        tier: "project",
+        id: "project-1",
+        organizationId: null,
+        kind: "application",
+      });
       expect(args.actor).toEqual({ type: "user", id: "reviewer-1" });
       expect(args.input).toEqual({ projectId: "project-1", id: "annotation-1" });
       expect(Object.keys(args.input as object)).not.toContain("scope");
@@ -615,6 +629,7 @@ function accountHarness({
     },
     authorization: {
       forRequest: () => ({
+        ...authorizeDefaults,
         getDecision: async ({ permission }) => {
           asked.push(permission);
 
@@ -968,6 +983,7 @@ describe("a procedure that asks whether its tenant holds an entitlement", () => 
       identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
       authorization: {
         forRequest: () => ({
+          ...authorizeDefaults,
           getDecision: async () => ({ permitted: true, organizationRole: null }),
           getProjectAnyDecision: async () => ({ permitted: true, organizationRole: null }),
           checkScopeLineage: async () => ({ kind: "consistent" }),
@@ -1139,6 +1155,7 @@ describe("a procedure declared as minting a credential", () => {
         identity: { caller: (ctx) => ({ actor: { type: "user", ...ctx.actor } }) },
         authorization: {
           forRequest: () => ({
+            ...authorizeDefaults,
             getDecision: async () => ({ permitted: true, organizationRole: null }),
             getProjectAnyDecision: async () => ({ permitted: true, organizationRole: null }),
             checkScopeLineage: async () => ({ kind: "consistent" }),

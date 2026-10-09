@@ -1,6 +1,6 @@
 /**
  * Automation's answer to the port its screens declare: every method projects
- * a `@langwatch/browser-host` capability. The org/team graph and this
+ * a `@langwatch/browser-host` host service. The org/team graph and this
  * application's own address read honestly empty: no capability yet. §10.1.
  */
 
@@ -66,7 +66,7 @@ type AutomationOrganizationGraph = {
 /** A stable reference, so a query still loading never re-triggers a memo below it. */
 const NO_ORGANIZATIONS: readonly AutomationOrganizationGraph[] = [];
 
-class CapabilityAutomationHost extends AutomationHost {
+class HostServiceAutomationHost extends AutomationHost {
   constructor(
     private readonly members: {
       hostScope: AutomationScope;
@@ -229,7 +229,7 @@ export default function AutomationHostMount({ children }: { children?: ReactNode
 
   const host = useMemo(
     () =>
-      new CapabilityAutomationHost({
+      new HostServiceAutomationHost({
         hostScope,
         currentProject: project,
         session,

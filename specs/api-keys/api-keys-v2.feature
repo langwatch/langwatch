@@ -90,6 +90,13 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
       Then the legacy key status is not read
       And no banner and no error is shown
 
+    @integration
+    Scenario: A project that never had a legacy key shows no banner
+      Given project "gamma" was created after project keys were retired, so it never had a legacy key
+      When "ada" opens the API keys of project "gamma"
+      Then the legacy key status answers absent
+      And no banner is shown
+
     @unimplemented
     Scenario: The banner offers to revoke the project key
       Given project "alpha" still has a live legacy key

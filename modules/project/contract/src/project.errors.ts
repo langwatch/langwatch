@@ -229,3 +229,49 @@ export class ProjectS3SecretRequiredError extends HandledError {
     this.name = "ProjectS3SecretRequiredError";
   }
 }
+
+/** A write was aimed at an aggregate project, which is read only (ADR-177 decision 8). */
+export class AggregateProjectIsReadOnlyError extends HandledError {
+  declare readonly code: "aggregate_project_is_read_only";
+
+  constructor() {
+    super(
+      "aggregate_project_is_read_only",
+      "This project reads traces from other projects, so no data can be added to it",
+      { httpStatus: 403, fault: "customer" },
+    );
+    this.name = "AggregateProjectIsReadOnlyError";
+  }
+}
+
+/** Someone not an organisation admin asked to create an aggregate or edit its rule (ADR-177 decision 5). */
+export class AggregateProjectAdminOnlyError extends HandledError {
+  declare readonly code: "aggregate_project_admin_only";
+
+  constructor() {
+    super(
+      "aggregate_project_admin_only",
+      "Only organization admins can open an aggregate project",
+      { httpStatus: 403, fault: "customer" },
+    );
+    this.name = "AggregateProjectAdminOnlyError";
+  }
+}
+
+/**
+ * A rule named a project or department outside this organisation, or one an
+ * aggregate cannot read. One code for every case, so a guessed id is never
+ * confirmed to exist elsewhere.
+ */
+export class AggregateRuleOutsideOrganizationError extends HandledError {
+  declare readonly code: "aggregate_rule_outside_organization";
+
+  constructor() {
+    super(
+      "aggregate_rule_outside_organization",
+      "The rule names a project or department outside this organization",
+      { httpStatus: 400 },
+    );
+    this.name = "AggregateRuleOutsideOrganizationError";
+  }
+}

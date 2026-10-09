@@ -25,6 +25,12 @@ Feature: The organization tRPC outputs declare exactly what they send
     And no member carries team memberships
 
   @unit
+  Scenario: An organization read never carries the licence or its dates
+    Given an organization whose stored row still mirrors a licence key, its expiry and its validated stamp
+    When the organization is read for any member
+    Then it carries none of the three
+
+  @unit
   Scenario: The team reads return only the fields the pickers show
     Given a team whose projects carry more fields than a picker shows
     When the teams are read with their projects

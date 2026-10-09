@@ -32,6 +32,7 @@ export type MemoryWebhookEndpointRow = {
   maxBatchSize: number;
   maxBatchDelayMs: number;
   maxInFlight: number;
+  allowSelfSignedCertificate?: boolean;
   archivedAt: Instant | null;
   createdAt: Instant;
   updatedAt: Instant;

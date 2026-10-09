@@ -3,7 +3,9 @@ import type { AuthzApi, AuthzServerConfig } from "@langwatch/authz-contract";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 
 import { AuthzModule } from "./app/authz.app.ts";
+import { authzAggregateReadEventing } from "./eventing/authz-aggregate-read.pipeline.ts";
 import { authzEventing } from "./eventing/authz-grant.pipeline.ts";
+import { authzMemberOffboardedEventing } from "./eventing/authz-member-offboarded.pipeline.ts";
 import { authzRepositories } from "./repositories/authz-repositories.registry.ts";
 import { authzGrantRest, grantRestFacts } from "./transport/authz-grant.rest.ts";
 import { authzRoleBindingRest, roleBindingRestFacts } from "./transport/authz-role-binding.rest.ts";
@@ -40,4 +42,6 @@ export const authzProcessModule: PublishedProcessModule<"authz", AuthzApi, Authz
         organizationFactsOf(organizationCredentialOfRequest(context.req.raw)),
       ),
     ])
-    .withEventing(authzEventing);
+    .withEventing(authzEventing)
+    .withEventing(authzAggregateReadEventing)
+    .withEventing(authzMemberOffboardedEventing);

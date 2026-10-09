@@ -65,6 +65,8 @@ COPY feature-map.json ./feature-map.json
 # the TypeScript SDK's e2e suites, the skills compiler and apps/server (the npx
 # self-host CLI, which is published separately) never enter the image.
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json .npmrc ./
+# pnpm-workspace.yaml patchedDependencies reads these at install.
+COPY patches ./patches
 # The lockfile resolves @langwatch/scenario to a vendored tarball.
 # Every package tsconfig extends the root ones, and build:types builds tsconfig.build.json.
 COPY tsconfig.base.json tsconfig.shared.json tsconfig.build.json tsconfig.emit.json ./

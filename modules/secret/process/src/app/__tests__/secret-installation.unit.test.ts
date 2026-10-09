@@ -100,12 +100,16 @@ describe("secret app installation", () => {
         keyId: "vk_1",
         preview: "sk-\u20264f2a",
         secret: "sk-live-9f2c",
+        recipientUserId: "user_jane",
       });
+      const jane = { id: "user_jane" };
 
-      await expect(app.revealOnce({ organizationId: "org_acme", revealId })).resolves.toMatchObject(
-        { secret: "sk-live-9f2c" },
-      );
-      await expect(app.revealOnce({ organizationId: "org_acme", revealId })).rejects.toMatchObject({
+      await expect(
+        app.revealOnce({ organizationId: "org_acme", revealId }, jane),
+      ).resolves.toMatchObject({ secret: "sk-live-9f2c" });
+      await expect(
+        app.revealOnce({ organizationId: "org_acme", revealId }, jane),
+      ).rejects.toMatchObject({
         code: "secret_already_revealed",
       });
     } finally {

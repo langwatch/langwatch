@@ -1,8 +1,7 @@
 /**
  * @vitest-environment jsdom
- * specs/automations/list-pages.feature, specs/automations/source-merge.feature
- * The list-page defects of #6716 (no delete confirmation, the wrong noun, row
- * actions with no accessible name) on the merged list (ADR-093 §1).
+ * specs/automations/list-pages.feature, specs/automations/source-merge.feature (#6716 defects,
+ * ADR-093 §1); an aggregate (ADR-177) offers no create: specs/governance/aggregate-project.feature.
  */
 import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -14,9 +13,16 @@ import { AutomationsPage } from "../automations-screen.tsx";
 import type * as ListPagesFixture from "./list-pages.fixture.ts";
 import { listPagesMocks } from "./list-pages.fixture.ts";
 
+const { projectKind } = vi.hoisted(() => ({ projectKind: { current: "application" } }));
+
 vi.mock("../../../behavior/automation-session.ts", () => ({
   useOrganizationTeamProject: () => ({
-    project: { id: "proj-1", slug: "test-project", name: "Test Project" },
+    project: {
+      id: "proj-1",
+      slug: "test-project",
+      name: "Test Project",
+      kind: projectKind.current,
+    },
     organization: { id: "org-1" },
     team: { slug: "team-1" },
   }),
@@ -46,10 +52,23 @@ async function openDeleteDialog({ rowName, itemName }: { rowName: string; itemNa
 describe("given the unified automations table", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    projectKind.current = "application";
   });
 
   afterEach(() => {
     cleanup();
+  });
+
+  describe("when the open project is an aggregate reached by its address", () => {
+    /** @scenario "The app marks the aggregate and offers no way to add data to it" */
+    it("says data can't be added and offers no way to create an automation", () => {
+      projectKind.current = "aggregate";
+
+      renderPage("automations");
+
+      expect(screen.getByText("Data can't be added to this project")).toBeInTheDocument();
+      expect(screen.queryByText("New automation")).toBeNull();
+    });
   });
 
   describe("when the project has automations watching a filter and a graph", () => {

@@ -6,13 +6,13 @@ import { mintStoredObjectUri } from "@langwatch/stored-object-contract";
 
 import type { TraceLegacySpool } from "../../../channels/trace-legacy-spool.channel.ts";
 import type { TracePayloadReaderRepository } from "../../../repositories/trace-payload-reader.repository.ts";
+import { TraceStreamBufferService } from "../../../services/trace-stream-buffer.service.ts";
 import {
   assertLegacySpoolKeyBelongsTo,
   buildSpoolObjectPath,
   isLegacySpoolRef,
   SPOOL_REF_V2,
 } from "../../ingestion/rules/trace-spool-location.rules.ts";
-import { TraceStreamBufferService } from "../../../services/trace-stream-buffer.service.ts";
 
 /**
  * Cap on a spool object read. The spool holds one over-threshold command and the attribute cap

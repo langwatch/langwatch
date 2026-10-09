@@ -21,14 +21,27 @@ const keeperHandover = 10 * time.Second
 // secrets included: the file is 0600, removed on down and never logged. The
 // provisioner is the up that wrote it, the one launcher a keeper may replace.
 type KeeperPlan struct {
-	Children         []Child   `json:"children"`
-	Env              []string  `json:"env"`
-	StartedAt        time.Time `json:"startedAt"`
-	ProvisionerPID   int       `json:"provisionerPid"`
-	ProvisionerStart string    `json:"provisionerStart,omitempty"`
-	OwnerPID         int       `json:"ownerPid,omitempty"`
-	OwnerStart       string    `json:"ownerStart,omitempty"`
+	Children         []Child     `json:"children"`
+	Env              []string    `json:"env"`
+	StartedAt        time.Time   `json:"startedAt"`
+	ProvisionerPID   int         `json:"provisionerPid"`
+	ProvisionerStart string      `json:"provisionerStart,omitempty"`
+	OwnerPID         int         `json:"ownerPid,omitempty"`
+	OwnerStart       string      `json:"ownerStart,omitempty"`
+	Seed             *KeeperSeed `json:"seed,omitempty"`
 }
+
+// KeeperSeed is the up's seed, run by the keeper once ReadyURL answers: the
+// api reports ready only when the worker's upgrade left the ledger current.
+// Since is when the up began, so the keeper's progress lines keep its clock.
+type KeeperSeed struct {
+	Job      onceJob   `json:"job"`
+	ReadyURL string    `json:"readyUrl"`
+	Since    time.Time `json:"since"`
+}
+
+// upgradeNotice is how often a keeper still waiting on the upgrade says so.
+const upgradeNotice = 30 * time.Second
 
 // keeperPlanPath sits in an owner-only run dir beside the logs, never in the
 // log dir people browse (ruling R1, 2026-10-09).
@@ -155,11 +168,45 @@ func (o *Orchestrator) Keep(ctx context.Context, slug string, plan KeeperPlan) e
 		o.heartbeat(ctx, st)
 		cancel() // the record was removed or taken: stop the lanes, never resurrect it
 	}()
+	if plan.Seed != nil {
+		go o.seedWhenReady(ctx, *plan.Seed)
+	}
 	o.sup.Supervise(ctx, plan.Children)
 	cancel()
 	<-beat
 	o.dropKeptStack(st)
 	return nil
+}
+
+// seedWhenReady waits for the api to report ready, saying every upgradeNotice
+// that the worker's upgrade still runs, then seeds. A stopped keeper never seeds.
+func (o *Orchestrator) seedWhenReady(ctx context.Context, seed KeeperSeed) {
+	sayPhase(seed.Since, "upgrade: the worker runs it; the seed waits for the api to report ready")
+	waiting, stopNotices := context.WithCancel(ctx)
+	go func() {
+		tick := time.NewTicker(upgradeNotice)
+		defer tick.Stop()
+		for {
+			select {
+			case <-waiting.Done():
+				return
+			case <-tick.C:
+				sayPhase(seed.Since, "upgrade: still running (`haven logs api` shows the worker's lines)")
+			}
+		}
+	}()
+	isReady := o.sup.WaitReady(ctx, "seed", seed.ReadyURL)
+	stopNotices()
+	if !isReady {
+		return
+	}
+	sayPhase(seed.Since, "upgrade done: the api reports ready")
+	sayPhase(seed.Since, "seed")
+	if o.runSeedJob(ctx, seed.Job) {
+		sayPhase(seed.Since, "seed done")
+		return
+	}
+	sayPhase(seed.Since, "seed failed (continuing); `haven db seed` runs it again")
 }
 
 // dropKeptStack is the keeper's teardown. A record that names another launcher

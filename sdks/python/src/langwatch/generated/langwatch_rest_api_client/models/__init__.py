@@ -7144,6 +7144,10 @@ from .post_api_v1_query_response_403 import PostApiV1QueryResponse403
 from .post_api_v1_query_response_403_fault import PostApiV1QueryResponse403Fault
 from .post_api_v1_query_response_403_meta import PostApiV1QueryResponse403Meta
 from .post_api_v1_query_response_403_trace import PostApiV1QueryResponse403Trace
+from .post_api_v1_query_response_404 import PostApiV1QueryResponse404
+from .post_api_v1_query_response_404_fault import PostApiV1QueryResponse404Fault
+from .post_api_v1_query_response_404_meta import PostApiV1QueryResponse404Meta
+from .post_api_v1_query_response_404_trace import PostApiV1QueryResponse404Trace
 from .post_api_v1_query_response_422 import PostApiV1QueryResponse422
 from .post_api_v1_query_response_422_fault import PostApiV1QueryResponse422Fault
 from .post_api_v1_query_response_422_meta import PostApiV1QueryResponse422Meta
@@ -12091,6 +12095,10 @@ __all__ = (
     "PostApiV1QueryResponse403Fault",
     "PostApiV1QueryResponse403Meta",
     "PostApiV1QueryResponse403Trace",
+    "PostApiV1QueryResponse404",
+    "PostApiV1QueryResponse404Fault",
+    "PostApiV1QueryResponse404Meta",
+    "PostApiV1QueryResponse404Trace",
     "PostApiV1QueryResponse422",
     "PostApiV1QueryResponse422Fault",
     "PostApiV1QueryResponse422Meta",

@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The complete callable Evaluation capability shared by process peers.
 
-Peers call these through the token, declared at `../contract/src/evaluation.api.ts:51`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/evaluation.api.ts:52`; nothing else in this package is public.
 
 #### `listEvaluators`
 
@@ -86,8 +86,10 @@ findRunsByTraceId(input: EvaluationRunsByTraceQuery): Promise<EvaluationRunData[
 
 #### `findInputs`
 
+Read through the proof; null when none are stored or the viewer may not read content.
+
 ```typescript
-findInputs(input: EvaluationInputsQuery): Promise<Record<string, unknown> | null>;
+findInputs(input: EvaluationInputsQuery & { authorization: Authorization; userId: string | null }): Promise<Record<string, unknown> | null>;
 ```
 
 #### `getMonitorPerformance`
@@ -321,11 +323,11 @@ type Output = {
 }[];
 
 // evaluations.runEvaluation
-type Input = z.infer<typeof runTraceEvaluationInputSchema>; // ../contract/src/evaluation-trpc.schemas.ts:40
+type Input = z.infer<typeof runTraceEvaluationInputSchema>; // ../contract/src/evaluation-trpc.schemas.ts:42
 type Output = z.infer<typeof evaluationRunOutcomeSchema>; // ../contract/src/evaluation.responses.ts:39
 
 // evaluations.warmupLambda
-// Input: warmupEvaluatorsInputSchema, ../contract/src/evaluation-trpc.schemas.ts:49
+// Input: warmupEvaluatorsInputSchema, ../contract/src/evaluation-trpc.schemas.ts:51
 interface Input {
   projectId: string;
   count?: number;
@@ -356,8 +358,9 @@ type Output = {
 interface Input {
   projectId: string;
   evaluationId: string;
+  tenantId?: string;
 }
-// Output: evaluationInputsSchema, ../contract/src/evaluation-trpc.schemas.ts:19
+// Output: evaluationInputsSchema, ../contract/src/evaluation-trpc.schemas.ts:21
 type Output = Record<string, unknown> | null;
 ```
 
@@ -399,8 +402,8 @@ Declared at `src/eventing/evaluation-processing-definition.pipeline.ts:125`. Eve
 
 | Kind   | Leaf                             | Environment variable                 | Declared at                               |
 | ------ | -------------------------------- | ------------------------------------ | ----------------------------------------- |
-| secret | `openAi`                         | `OPENAI_API_KEY`                     | `src/app/evaluation.app.ts:273`           |
-| secret | `azureContentSafety`             | `AZURE_CONTENT_SAFETY_KEY`           | `src/app/evaluation.app.ts:274`           |
+| secret | `openAi`                         | `OPENAI_API_KEY`                     | `src/app/evaluation.app.ts:277`           |
+| secret | `azureContentSafety`             | `AZURE_CONTENT_SAFETY_KEY`           | `src/app/evaluation.app.ts:278`           |
 | config | `langevalsEndpoint`              | `LANGEVALS_ENDPOINT`                 | `../contract/src/evaluation.config.ts:27` |
 | config | `stagingThresholdBytes`          | `LANGEVALS_STAGING_THRESHOLD_BYTES`  | `../contract/src/evaluation.config.ts:28` |
 | config | `stagingTtlSeconds`              | `LANGEVALS_STAGING_TTL_SECONDS`      | `../contract/src/evaluation.config.ts:29` |

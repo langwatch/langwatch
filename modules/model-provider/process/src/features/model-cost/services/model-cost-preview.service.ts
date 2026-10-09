@@ -1,3 +1,4 @@
+import type { Authorization } from "@langwatch/authorization";
 import { ValidationError } from "@langwatch/handled-error";
 /**
  * The cost-rule drawer's live preview, and the span detail's "you have no rate
@@ -36,12 +37,12 @@ const MAX_UNMATCHED_MODELS = 8;
  */
 export type ModelCostPreviewSpanReader = Readonly<{
   getModelUsageStats(input: {
-    tenantId: string;
+    authorization: Authorization;
     fromMs: number;
     limit: number;
   }): Promise<{ model: string; spanCount: number; lastSeenMs: number }[]>;
   getRecentSpansByModels(input: {
-    tenantId: string;
+    authorization: Authorization;
     models: string[];
     fromMs: number;
     perModelLimit: number;
@@ -103,9 +104,12 @@ export class ModelCostPreviewService {
   async previewCostRuleMatchingSpans({
     spans,
     input,
+    authorization,
   }: {
     spans: ModelCostPreviewSpanReader;
     input: CostRulePreviewInput;
+    /** The route's proof; the model inventory and samples read through it. */
+    authorization: Authorization;
   }): Promise<CostRuleMatchingSpansPreview> {
     if (!this.regexSafety.isSafeRegex(input.regex)) {
       throw new ValidationError("Invalid or unsafe regular expression");
@@ -114,7 +118,7 @@ export class ModelCostPreviewService {
     const candidate = candidateRate(input);
     const fromMs = nowInstant().epochMilliseconds - PREVIEW_WINDOW_DAYS * 24 * 60 * 60 * 1000;
     const stats = await spans.getModelUsageStats({
-      tenantId: input.projectId,
+      authorization,
       fromMs,
       limit: MAX_DISTINCT_MODELS,
     });
@@ -132,7 +136,7 @@ export class ModelCostPreviewService {
     let sampleSpans: CostRulePreviewSampleSpan[] = [];
     if (matchedModels.length > 0) {
       const rows = await spans.getRecentSpansByModels({
-        tenantId: input.projectId,
+        authorization,
         models: matchedModels.map((m) => m.model),
         fromMs,
         perModelLimit: PER_MODEL_SAMPLE_LIMIT,

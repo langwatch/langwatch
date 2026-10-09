@@ -48,16 +48,19 @@ function project(input: {
     langyEgressAllowlist: null,
     lastCodingAgentSessionAt: null,
     lastCodingAgentPullRequestAt: null,
+    aggregateRule: null,
   };
 }
 
 function setup(...rows: Project[]) {
   const memory = MemoryProjectDatabase.create();
   for (const row of rows) memory.putProject(row);
+  const revived: { projectId: string; organizationId: string }[] = [];
   const service = PersonalProjectService.create({
     projects: MemoryProjectRepository.create({ memory }),
+    lifecycle: { revived: async (input) => void revived.push(input) },
   });
-  return { service, row: (id: string) => memory.findProject(id) };
+  return { service, revived, row: (id: string) => memory.findProject(id) };
 }
 
 describe("PersonalProjectService", () => {
@@ -88,13 +91,15 @@ describe("PersonalProjectService", () => {
 
   /** @scenario "A revived personal team revives its personal project" */
   it("revives the archived personal project in the revived team", async () => {
-    const { service, row } = setup(
+    const { service, row, revived } = setup(
       project({ id: "personal", teamId: "team-personal", isPersonal: true, archivedAt: at }),
     );
 
-    await service.revive({ teamId: "team-personal" });
+    await service.revive({ teamId: "team-personal", organizationId: "org_acme" });
+    await service.revive({ teamId: "team-personal", organizationId: "org_acme" });
 
     expect(row("personal")?.archivedAt).toBeNull();
+    expect(revived).toEqual([{ projectId: "personal", organizationId: "org_acme" }]);
   });
 
   /** @scenario "A personal workspace's feature switches land on its personal project" */

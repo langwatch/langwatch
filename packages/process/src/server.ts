@@ -217,10 +217,11 @@ export class Server {
    */
   async holdForUpgrade(
     holding: UpgradeHolding | undefined,
-    routes: readonly string[] = [],
+    held?: readonly string[],
   ): Promise<void> {
-    // The health routes answer in every phase; `routes` serve while upgrading (UIW-6).
-    await this.livenessThread?.hold(holding, { paths: [...this.healthRoutes.keys()], routes });
+    // The health routes answer in every phase; given `held`, every other route serves (API-UP).
+    const paths = [...this.healthRoutes.keys()];
+    await this.livenessThread?.hold(holding, held === undefined ? { paths } : { paths, held });
   }
 
   /** Shows a failed upgrade's console; true on Retry, false with no thread to show it. */
@@ -337,7 +338,33 @@ export class Server {
       return;
     }
 
-    void this.answer("application", () => application(request, response), response);
+    void this.answer(
+      "application",
+      () => this.whenStarted(application, request, response),
+      response,
+    );
+  }
+
+  /**
+   * A request the upgrade hold released while the components still start waits for them, so no
+   * handler runs before the runtime it calls into (API-UP); a start that failed answers 503.
+   */
+  private async whenStarted(
+    application: ApplicationHandler,
+    request: IncomingMessage,
+    response: ServerResponse,
+  ): Promise<void> {
+    if (!this.started) {
+      const started = await this.listening?.then(
+        () => true,
+        () => false,
+      );
+      if (started === false) {
+        response.writeHead(503, { "Content-Type": "text/plain" }).end(`${this.name} did not start`);
+        return;
+      }
+    }
+    await application(request, response);
   }
 
   private async answerReadiness(response: ServerResponse): Promise<void> {

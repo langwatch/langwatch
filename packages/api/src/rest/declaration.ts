@@ -5,11 +5,13 @@
  */
 import type {
   Actor,
+  Authorization,
   AuthzDeclaredScopeId,
   AuthzPermission,
   CliTokenActor,
   PlatformTierPermission,
   ScopeTierField,
+  ProofBearingPermission,
 } from "@langwatch/authorization";
 import type { ModuleApiToken, ModuleName } from "@langwatch/module";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
@@ -38,6 +40,7 @@ import {
 } from "../access/input-permission.ts";
 import { PayloadTooLargeError } from "../errors.ts";
 import type { ApiHandlerArguments } from "../handler-arguments.ts";
+import { assertHoldReason, type UpgradeHoldReason } from "../route-registry.ts";
 import {
   assertAddressingOptions,
   assertVersionLabel,
@@ -249,6 +252,10 @@ type SessionArguments<Session extends RouteSession> = Session extends z.ZodType
 type KeyArguments<Key extends boolean> = Key extends true
   ? { readonly key: RestKeyCredential }
   : unknown;
+/** A route that declared a proof-bearing permission is handed the door's proof, never null. */
+type ProofArguments<Proof extends boolean> = Proof extends true
+  ? { readonly authorization: Authorization }
+  : unknown;
 /**
  * What a route's own door may be told: the session it hands, whether the handler reads the key
  * (key doors only, E5), and the key kinds it admits (the project door only, E7).
@@ -334,6 +341,7 @@ export type StoredHandlerArguments<Api> = Readonly<{
   actor: Actor | null;
   scope: AuthzDeclaredScopeId | null;
   target: AuthzDeclaredScopeId | null;
+  authorization: Authorization | null;
   /** The door's session parsed against the route's schema; undefined when it declared none. */
   session: unknown;
   /** The key the door resolved, for a route that declared it reads it; undefined elsewhere. */
@@ -495,7 +503,8 @@ type RawResponseArguments<Output extends RouteAnswer> = Output extends RestRawAn
  */
 export type RestPermissionTarget =
   | Readonly<{ at: "route"; param: ScopeTierField; field?: string }>
-  | Readonly<{ at: "header"; param: ScopeTierField; header: string }>;
+  | Readonly<{ at: "header"; param: ScopeTierField; header: string }>
+  | Readonly<{ at: "body"; param: ScopeTierField; schema: z.ZodObject; field?: string }>;
 
 /** A platform-tier permission asked of the operator's PLATFORM grant (E4). */
 export type RestPermissionPlatform = PlatformPermissionTarget;
@@ -513,8 +522,8 @@ export type RestTransportRoute<Api> = Readonly<{
   readonly operation: string;
   readonly version: DateVersion;
   readonly docs?: RestTransportDocs;
-  /** UIW-6: answers while the installation upgrades; every other route is held before the door. */
-  readonly servesWhileUpgrading?: true;
+  /** Held before the door until the ledger is current; every other route serves (API-UP). */
+  readonly holdsWhileUpgrading?: UpgradeHoldReason;
   readonly params?: z.ZodObject;
   readonly input?: SourceSchema;
   /** Present exactly when the body is a JSON array: `input` is then `{ [as]: schema }`. */
@@ -610,7 +619,7 @@ export type RestArrayBodyDeclared = Readonly<{ as: string; schema: z.ZodArray }>
 
 /** Everything a route has declared so far, before `handle` freezes it. */
 type RouteState = Readonly<{
-  servesWhileUpgrading?: true;
+  holdsWhileUpgrading?: UpgradeHoldReason;
   params?: z.ZodObject;
   input?: SourceSchema;
   arrayBody?: RestArrayBodyDeclared;
@@ -707,6 +716,8 @@ type RouteShape = Readonly<{
   answer: RouteAnswer;
   /** Whether the route has said how it is reached - a permission or an access kind. */
   permission: boolean;
+  /** Whether that permission mints the proof the handler is handed (ADR-166). */
+  proof: boolean;
   middleware: readonly RestTransportMiddleware[];
   access: RouteAccessKind;
   /** The family's door, which a route may narrow to its own. */
@@ -1043,6 +1054,11 @@ class RouteBuilder<Api, S extends RouteShape> {
     });
   }
 
+  /** A proof-bearing permission: the door mints the proof and the handler is handed it. */
+  withPermission(
+    permission: ProofBearingPermission,
+    target?: RestPermissionTarget,
+  ): RouteBuilder<Api, With<S, { permission: true; proof: true }>>;
   /**
    * The permission this route demands, and where it is asked. `{ at: "route", param }` asks at
    * the scope the route's own path names, for a credential one tier wider than the resource.
@@ -1158,14 +1174,15 @@ class RouteBuilder<Api, S extends RouteShape> {
     });
   }
 
-  /** Serves while the installation upgrades (UIW-6); its permission is still asked as declared. */
-  servesWhileUpgrading(): RouteBuilder<Api, S> {
+  /** Every route serves while upgrading; this one holds until the ledger is current (API-UP). */
+  holdsWhileUpgrading(reason: UpgradeHoldReason): RouteBuilder<Api, S> {
+    assertHoldReason({ address: `${this.method.toUpperCase()} ${this.path}`, reason });
     return new RouteBuilder<Api, S>({
       router: this.router,
       method: this.method,
       path: this.path,
       operation: this.operation,
-      state: { ...this.state, servesWhileUpgrading: true },
+      state: { ...this.state, holdsWhileUpgrading: { because: reason.because } },
     });
   }
 
@@ -1394,6 +1411,7 @@ class RouteBuilder<Api, S extends RouteShape> {
         S["session"]
       > &
         KeyArguments<S["key"]> &
+        ProofArguments<S["proof"]> &
         RawBodyArguments<S["body"]> &
         MultipartArguments<S["body"]> &
         RawResponseArguments<S["answer"]> &
@@ -1645,7 +1663,7 @@ function doorParts(state: RouteState): Partial<RestTransportRoute<unknown>> {
   return {
     ...(state.entitlement ? { entitlement: state.entitlement } : {}),
     ...(state.mintsCredential ? { mintsCredential: state.mintsCredential } : {}),
-    ...(state.servesWhileUpgrading ? { servesWhileUpgrading: true as const } : {}),
+    ...(state.holdsWhileUpgrading ? { holdsWhileUpgrading: state.holdsWhileUpgrading } : {}),
     ...(state.credential ? { credential: state.credential } : {}),
     ...(state.key ? { key: state.key } : {}),
     ...(state.keyKinds ? { keyKinds: state.keyKinds } : {}),
@@ -1671,6 +1689,7 @@ type OpenRoute<
     query: Missing;
     answer: Missing;
     permission: false;
+    proof: false;
     middleware: [];
     access: "scoped";
     family: Door;
@@ -2443,6 +2462,7 @@ function assertPermissionTarget({
     params?: z.ZodObject;
     query?: z.ZodObject;
     input?: SourceSchema;
+    rawBody?: RestRawBody;
     permissionTarget?: RestPermissionTarget;
     middleware?: readonly RestTransportMiddleware[];
   }>;
@@ -2461,6 +2481,19 @@ function assertPermissionTarget({
     if (!declared)
       throw new Error(
         `REST ${operation} checks header "${target.header}" without declaring it withHeaders()`,
+      );
+
+    return;
+  }
+
+  // A raw JSON body is validated against the location's own schema, after the door (§8).
+  if (target.at === "body") {
+    const field = target.field ?? param;
+
+    if (state.rawBody?.form !== "text" || !sourceKeys(target.schema).includes(field))
+      throw new Error(
+        `REST ${operation} checks its permission at the body's "${field}" and needs a raw text ` +
+          "body and a schema that parses that field",
       );
 
     return;

@@ -5,17 +5,22 @@
  */
 import { anyAuthenticated } from "@langwatch/api/access";
 import {
+  defineRestMiddleware,
   defineRestRouter,
   ForbiddenError,
   MANAGEMENT_API_VERSION,
   NotFoundError,
 } from "@langwatch/api/rest";
+import type { PrincipalRef } from "@langwatch/authorization";
 import type {
   DataPrivacyApi,
   DataPrivacyPiiRedactionLevel,
 } from "@langwatch/data-privacy-contract";
 import { moduleApi } from "@langwatch/module";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import {
+  isAggregateProjectRouteRefused,
+  isAggregateProjectKind,
   isGovernanceProject,
   PersonalProjectProtectedError,
   projectApiKeyRotationSchema,
@@ -31,6 +36,7 @@ import {
   type ProjectWithTeam,
   type UpdateProjectInput,
 } from "@langwatch/project-contract";
+import { z } from "zod";
 
 const PROJECT_INVALID_TOKEN: Readonly<{ status: 401; description: string }> = {
   status: 401,
@@ -53,14 +59,20 @@ const PROJECT_NOT_FOUND: Readonly<{ status: 404; description: string }> = {
 export interface ProjectManagementApi
   extends
     Pick<ProjectApi, "findWithTeam">,
-    Pick<DataPrivacyApi, "getPiiRedactionLevel" | "setPiiRedactionLevel"> {
+    Pick<DataPrivacyApi, "getPiiRedactionLevel" | "setPiiRedactionLevel">,
+    Pick<OrganizationApi, "isMember" | "getMember"> {
   /**
    * Writes exactly the fields the request carried, scoped to the organization
    * the credential resolved — never to the project's own organization, which
    * would let a token issued for one organization write to another's project.
    */
   updateInOrganization(
-    input: Readonly<{ projectId: string; organizationId: string; data: UpdateProjectInput }>,
+    input: Readonly<{
+      projectId: string;
+      organizationId: string;
+      data: UpdateProjectInput;
+      by: PrincipalRef;
+    }>,
   ): Promise<Project>;
   /**
    * Archives one of this organization's projects, answering with the row it
@@ -73,6 +85,12 @@ export interface ProjectManagementApi
 }
 
 export const ProjectManagementApi = moduleApi<ProjectManagementApi>()("project");
+
+/** The member an organization credential acts for; null for a service key, which acts as nobody. */
+export const projectRestCaller = defineRestMiddleware(
+  "projectRestCaller",
+  z.object({ userId: z.string().nullable(), apiKeyId: z.string() }),
+);
 
 /**
  * The two base-key routes answer nothing rather than check a permission —
@@ -104,8 +122,14 @@ export const projectRest = defineRestRouter(ProjectManagementApi)
     description: "Get a project by ID. Requires project:view permission.",
     errors: [PROJECT_INVALID_TOKEN, PROJECT_INSUFFICIENT_PERMISSIONS, PROJECT_NOT_FOUND],
   })
-  .handle(async ({ app, input, scope }) => {
-    const project = await projectInOrganization({ app, id: input.id, organizationId: scope.id });
+  .withMiddleware(projectRestCaller)
+  .handle(async ({ app, input, scope }, caller) => {
+    const project = await projectInOrganization({
+      app,
+      id: input.id,
+      organizationId: scope.id,
+      caller,
+    });
 
     return {
       ...projectResponse(project),
@@ -128,7 +152,17 @@ export const projectRest = defineRestRouter(ProjectManagementApi)
       PROJECT_NOT_FOUND,
     ],
   })
-  .handle(({ app, input, scope }) => updateProject({ app, input, organizationId: scope.id }))
+  .withMiddleware(projectRestCaller)
+  .handle(async ({ app, input, scope }, caller) => {
+    await assertAggregateWritable({ app, id: input.id, organizationId: scope.id, caller });
+
+    return updateProject({
+      app,
+      input,
+      organizationId: scope.id,
+      by: { type: "apiKey", id: caller.apiKeyId },
+    });
+  })
 
   .delete("/:id", "archiveProject")
   .withParams(projectRestParamsSchema)
@@ -144,7 +178,9 @@ export const projectRest = defineRestRouter(ProjectManagementApi)
       PROJECT_NOT_FOUND,
     ],
   })
-  .handle(async ({ app, input, scope }) => {
+  .withMiddleware(projectRestCaller)
+  .handle(async ({ app, input, scope }, caller) => {
+    await assertAggregateWritable({ app, id: input.id, organizationId: scope.id, caller });
     const project = await archiveProject({ app, id: input.id, organizationId: scope.id });
 
     return { id: project.id, name: project.name, archivedAt: project.archivedAt };
@@ -216,24 +252,27 @@ function projectResponse(
 
 /**
  * The project this route addresses, refusing anything outside the organization.
- * The hidden governance project reads as absent: it is left out of every list,
- * so answering a read would be the one thing left that confirms it exists.
+ * The hidden governance project, and an aggregate to anyone but an organisation
+ * admin (ADR-177 decision 5), read as absent: answering would confirm they exist.
  */
 async function projectInOrganization({
   app,
   id,
   organizationId,
+  caller,
 }: {
   app: ProjectManagementApi;
   id: string;
   organizationId: string;
+  caller: Readonly<{ userId: string | null }>;
 }): Promise<ProjectWithTeam> {
   const project = await app.findWithTeam(id);
 
   if (
     !project ||
     project.team.organizationId !== organizationId ||
-    isGovernanceProject(project.kind)
+    isGovernanceProject(project.kind) ||
+    (await isAggregateHidden({ app, kind: project.kind, organizationId, caller }))
   ) {
     throw new NotFoundError("Project not found");
   }
@@ -241,11 +280,55 @@ async function projectInOrganization({
   return project;
 }
 
+/** Whether the credential's owner may not see this aggregate: only organisation admins may. */
+async function isAggregateHidden({
+  app,
+  kind,
+  organizationId,
+  caller,
+}: {
+  app: ProjectManagementApi;
+  kind: string;
+  organizationId: string;
+  caller: Readonly<{ userId: string | null }>;
+}): Promise<boolean> {
+  if (!isAggregateProjectKind(kind)) return false;
+  const { userId } = caller;
+  // A service key acts for nobody, so it is never an organisation admin.
+  if (!userId || !(await app.isMember({ organizationId, userId }))) return true;
+  const { role } = await app.getMember({ organizationId, userId });
+
+  return isAggregateProjectRouteRefused({ kind, organizationRole: role });
+}
+
+/**
+ * A write to an aggregate reads as not found to anyone but an organisation admin:
+ * these routes ask at the organisation, so an organisation-tier custom role would
+ * otherwise rename or archive one. Other kinds are the service's own refusals.
+ */
+async function assertAggregateWritable({
+  app,
+  id,
+  organizationId,
+  caller,
+}: {
+  app: ProjectManagementApi;
+  id: string;
+  organizationId: string;
+  caller: Readonly<{ userId: string | null }>;
+}): Promise<void> {
+  const project = await app.findWithTeam(id);
+  if (project && (await isAggregateHidden({ app, kind: project.kind, organizationId, caller }))) {
+    throw new NotFoundError("Project not found");
+  }
+}
+
 /** The update, then the PII level if one was sent, answering the level read back. */
 async function updateProject({
   app,
   input,
   organizationId,
+  by,
 }: {
   app: ProjectManagementApi;
   input: Readonly<{
@@ -257,10 +340,12 @@ async function updateProject({
     piiRedactionLevel?: DataPrivacyPiiRedactionLevel | undefined;
   }>;
   organizationId: string;
+  by: PrincipalRef;
 }) {
   const project = await app.updateInOrganization({
     projectId: input.id,
     organizationId,
+    by,
     data: {
       ...(input.name !== undefined && { name: input.name }),
       ...(input.language !== undefined && { language: input.language }),

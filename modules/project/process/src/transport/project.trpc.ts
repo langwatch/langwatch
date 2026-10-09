@@ -10,7 +10,12 @@ import {
   ProjectCreateDeniedError,
   ProjectCreateTargetMissingError,
   TraceSharingDeniedError,
+  hasTracesToShow,
+  isAggregateProjectKind,
   projectTrpc,
+  type AggregateMemberCandidate,
+  type AggregateRule,
+  type AggregateRuleMembers,
   type ProjectApi,
 } from "@langwatch/project-contract";
 
@@ -48,6 +53,17 @@ export interface ProjectBrowserApi {
   getLegacyKeyStatus(input: { projectId: string }): Promise<{ present: boolean }>;
   /** Revokes the legacy project key for good, audited; no key is returned. */
   revokeProjectApiKey(input: { projectId: string; by: Readonly<{ id: string }> }): Promise<void>;
+  /** ADR-177: an organisation admin replaces an aggregate's rule; its members answer pending. */
+  updateAggregateRule(input: {
+    projectId: string;
+    aggregateRule: AggregateRule;
+    by: Readonly<{ id: string }>;
+  }): Promise<AggregateRuleMembers>;
+  /** ADR-177: what an explicit rule may name, owners included; organisation admins only. */
+  aggregateMemberCandidates(input: {
+    organizationId: string;
+    by: Readonly<{ id: string }>;
+  }): Promise<AggregateMemberCandidate[]>;
 }
 
 export const ProjectBrowserApi = moduleApi<ProjectBrowserApi>()("project");
@@ -88,6 +104,8 @@ export const projectTrpcTransport: TrpcRouterDeclaration<ProjectBrowserApi, type
           name: input.name,
           language: input.language,
           framework: input.framework,
+          kind: input.kind,
+          aggregateRule: input.aggregateRule,
         },
         actor,
       );
@@ -100,7 +118,7 @@ export const projectTrpcTransport: TrpcRouterDeclaration<ProjectBrowserApi, type
     .handle(async ({ app, input }) => {
       const project = await app.projects().findById(input.projectId);
 
-      return { firstMessage: project?.firstMessage ?? false };
+      return { firstMessage: project ? hasTracesToShow(project) : false };
     })
 
     .procedure("getLegacyKeyStatus")
@@ -159,6 +177,25 @@ export const projectTrpcTransport: TrpcRouterDeclaration<ProjectBrowserApi, type
 
       return { success: true as const, alreadyArchived };
     })
+
+    /** The service refuses anyone but an organisation admin (ADR-177 decision 5). */
+    .procedure("updateAggregateRule")
+    .withPermission("organization:manage")
+    .handle(async ({ app, input, actor }) => {
+      const members = await app.updateAggregateRule({
+        projectId: input.projectId,
+        aggregateRule: input.aggregateRule,
+        by: actor,
+      });
+
+      return { success: true as const, members };
+    })
+
+    .procedure("aggregateMemberCandidates")
+    .withPermission("organization:manage")
+    .handle(({ app, input, actor }) =>
+      app.aggregateMemberCandidates({ organizationId: input.organizationId, by: actor }),
+    )
     .build();
 
 /**
@@ -176,22 +213,25 @@ async function createStanding({
     organizationId: string;
     teamId?: string | undefined;
     newTeamName?: string | undefined;
+    kind?: string | undefined;
   }>;
   actor: Readonly<{ id: string }>;
 }): Promise<void> {
   if (!input.teamId && !input.newTeamName) throw new ProjectCreateTargetMissingError();
 
-  const permitted = input.teamId
-    ? await app.probePermission({
-        permission: "project:create",
-        scope: { tier: "team", id: input.teamId },
-        by: actor,
-      })
-    : await app.probePermission({
-        permission: "organization:manage",
-        scope: { tier: "organization", id: input.organizationId },
-        by: actor,
-      });
+  // An aggregate reads other people's personal projects: it asks the organization wherever it sits.
+  const permitted =
+    input.teamId && !isAggregateProjectKind(input.kind)
+      ? await app.probePermission({
+          permission: "project:create",
+          scope: { tier: "team", id: input.teamId },
+          by: actor,
+        })
+      : await app.probePermission({
+          permission: "organization:manage",
+          scope: { tier: "organization", id: input.organizationId },
+          by: actor,
+        });
 
   if (!permitted) throw new ProjectCreateDeniedError();
 }

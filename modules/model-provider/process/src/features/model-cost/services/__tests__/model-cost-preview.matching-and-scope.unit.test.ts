@@ -1,3 +1,4 @@
+import { type Authorization, sealAuthorization } from "@langwatch/authorization";
 // The span reader is a structural port, so matching and tenant scoping are testable with a fake
 // reader instead of live ClickHouse. Spec: model-cost-matching-spans-preview.feature
 import { describe, expect, it } from "vitest";
@@ -30,14 +31,30 @@ function fakeReader(overrides: {
 }): ModelCostPreviewSpanReader {
   return {
     async getModelUsageStats(input) {
-      overrides.tenantIdsSeen.push(input.tenantId);
+      overrides.tenantIdsSeen.push(
+        ...input.authorization.grants.map((grant) => grant.projectId ?? ""),
+      );
       return overrides.stats ?? [];
     },
     async getRecentSpansByModels(input) {
-      overrides.tenantIdsSeen.push(input.tenantId);
+      overrides.tenantIdsSeen.push(
+        ...input.authorization.grants.map((grant) => grant.projectId ?? ""),
+      );
       return overrides.spans ?? [];
     },
   };
+}
+
+/** The proof a project route mints for the preview: one own grant on that project. */
+function proofFor(projectId: string): Authorization {
+  return sealAuthorization({
+    actor: { type: "user", id: "test-user" },
+    principal: { type: "user", id: "test-user" },
+    scope: { organizationId: "test-organization" },
+    grants: [{ projectId, permissions: ["traces:view"], via: [], kind: "own" }],
+    expiresAt: Date.now() + 60_000,
+    purpose: { kind: "route", route: "test" },
+  });
 }
 
 describe("ModelCostPreviewService.previewCostRuleMatchingSpans", () => {
@@ -55,6 +72,7 @@ describe("ModelCostPreviewService.previewCostRuleMatchingSpans", () => {
       const preview = await service.previewCostRuleMatchingSpans({
         spans,
         input: { projectId: "project_1", regex: "anthropic/claude-sonnet-4-6" },
+        authorization: proofFor("project_1"),
       });
 
       expect(preview.matchedModels.map((m) => m.model)).toContain(
@@ -89,6 +107,7 @@ describe("ModelCostPreviewService.previewCostRuleMatchingSpans", () => {
       await service.previewCostRuleMatchingSpans({
         spans,
         input: { projectId: "project_1", regex: "^gpt-5-mini$" },
+        authorization: proofFor("project_1"),
       });
 
       // The reader is only ever asked for the calling project's own tenant id

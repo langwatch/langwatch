@@ -1,4 +1,4 @@
-import { actorSchema, ledgerActorSchema } from "@langwatch/authorization";
+import { actorSchema, grantConditionSchema, ledgerActorSchema } from "@langwatch/authorization";
 import { z } from "zod";
 
 import {
@@ -66,6 +66,8 @@ export const attachGrantEntrySchema = z
     roleKey: z.string().min(1).nullable(),
     scope: ledgerScopeSchema,
     resource: resourceGrantTermsSchema.optional(),
+    /** Present only on a shared project-reader grant (ADR-177). */
+    condition: grantConditionSchema.optional(),
     legacyRole: legacyBindingRoleSchema.optional(),
     expiresAtMs: z.number().int().positive().optional(),
     source: grantEventSourceSchema,
@@ -346,6 +348,62 @@ export const authzRevokeResourceGrantsInputSchema = z
 export type AuthzRevokeResourceGrantsInput = z.infer<typeof authzRevokeResourceGrantsInputSchema>;
 export const authzRevokeResourceGrantsOutputSchema = z.void();
 export type AuthzRevokeResourceGrantsOutput = z.infer<typeof authzRevokeResourceGrantsOutputSchema>;
+
+/** One reader project's live shared reads (ADR-177), one per member project. */
+export const authzFindLiveSharedProjectGrantsInputSchema = z
+  .object({ organizationId: z.string().min(1), readerProjectId: z.string().min(1) })
+  .strict();
+export type AuthzFindLiveSharedProjectGrantsInput = z.infer<
+  typeof authzFindLiveSharedProjectGrantsInputSchema
+>;
+export const authzSharedProjectGrantSchema = z.object({
+  grantId: z.string().min(1),
+  memberProjectId: z.string().min(1),
+});
+export type AuthzSharedProjectGrant = z.infer<typeof authzSharedProjectGrantSchema>;
+
+export const authzAttachSharedProjectGrantInputSchema = z
+  .object({
+    organizationId: z.string().min(1),
+    readerProjectId: z.string().min(1),
+    memberProjectId: z.string().min(1),
+    condition: grantConditionSchema,
+    actor: ledgerActorSchema,
+    source: grantEventSourceSchema.optional(),
+    commandId: z.string().min(1).optional(),
+    awaitProjection: z.boolean().optional(),
+  })
+  .strict();
+export type AuthzAttachSharedProjectGrantInput = z.infer<
+  typeof authzAttachSharedProjectGrantInputSchema
+>;
+export const authzAttachSharedProjectGrantOutputSchema = z.object({
+  grantId: z.string().min(1),
+  wasAttached: z.boolean(),
+});
+export type AuthzAttachSharedProjectGrantOutput = z.infer<
+  typeof authzAttachSharedProjectGrantOutputSchema
+>;
+
+export const authzAwaitSharedProjectGrantsInputSchema = z
+  .object({ organizationId: z.string().min(1), grantIds: z.array(z.string().min(1)) })
+  .strict();
+export type AuthzAwaitSharedProjectGrantsInput = z.infer<
+  typeof authzAwaitSharedProjectGrantsInputSchema
+>;
+
+export const authzRevokeSharedProjectGrantsInputSchema = z
+  .object({
+    organizationId: z.string().min(1),
+    readerProjectId: z.string().min(1),
+    memberProjectIds: z.array(z.string().min(1)).optional(),
+    actor: ledgerActorSchema,
+    reason: z.string().min(1).optional(),
+  })
+  .strict();
+export type AuthzRevokeSharedProjectGrantsInput = z.infer<
+  typeof authzRevokeSharedProjectGrantsInputSchema
+>;
 
 export const authzChangeBindingRoleInputSchema = z
   .object({

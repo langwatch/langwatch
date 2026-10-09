@@ -167,10 +167,10 @@ checkout are Nx targets with honest inputs and outputs:
   copies files from outside its package (the evaluator catalogue, the trace
   schemas, the skills, the OpenAPI document, the redaction sources), so its
   entry in `targetDefaults` names each of them and treats
-  `src/internal/generated` as output, not input. `ensure-built` hands the set
-  to `nx run-many -t build` whenever the workspace has Nx (amended 2026-09-30):
-  its old fast path compared `dist` with `src/` alone and so never saw the
-  SDK's outside inputs change. The mtime path stays only for a tree without Nx.
+  `src/internal/generated` as output, not input. `ensure-built` no longer calls Nx (amended 2026-10-09): every predev paid
+  the graph and hash cost, 5 to 45 s with the daemon off. It hashes each
+  package's content plus the outside inputs this entry names (a test holds the
+  two lists together) and runs only the stale package's own build script.
 
 `generate:modules`, the two Langy generators and the evaluator-catalogue copy
 stay uncached: each costs less than an Nx task's own start-up, and

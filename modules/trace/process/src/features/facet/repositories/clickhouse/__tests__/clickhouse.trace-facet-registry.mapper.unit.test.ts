@@ -1,3 +1,4 @@
+import { tenantScope } from "@langwatch/clickhouse-client";
 import { SEARCH_FIELDS } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
@@ -8,8 +9,10 @@ import {
 } from "../../../rules/trace-facet-registry.rules.ts";
 import { FACET_REGISTRY, TABLE_TIME_COLUMNS } from "../clickhouse.trace-facet-registry.mapper.ts";
 
+/** Every windowed marker starts with this; the column follows. */
+const TENANT_MARKER_PREFIX = tenantScope("OccurredAt").split("OccurredAt")[0]!;
+
 const baseCtx = {
-  tenantId: "tenant-X",
   timeRange: { from: 1_700_000_000_000, to: 1_700_000_086_400_000 },
   limit: 50,
   offset: 0,
@@ -140,16 +143,17 @@ describe("FACET_REGISTRY shape", () => {
 
 describe("each query-builder facet", () => {
   it.each(queryBuilders.map((def) => [def.key, def]))(
-    "[%s] pins the query to TenantId before any other predicate",
+    "[%s] pins the query to the tenant marker before any other predicate",
     (_key, def) => {
       const { sql } = def.queryBuilder(baseCtx);
-      const idxTenant = sql.indexOf("TenantId");
+      const idxTenant = sql.indexOf(TENANT_MARKER_PREFIX);
       expect(
         idxTenant,
-        "every facet query must include TenantId — multitenancy invariant",
+        "every facet query must carry the tenant marker the reader expands: multitenancy invariant",
       ).toBeGreaterThan(-1);
-      // No other predicate should land before TenantId in the WHERE clause.
-      // We use a coarse check: TenantId must appear before the first
+      expect(sql, "a facet never names the tenant itself").not.toMatch(/TenantId\s*=/);
+      // No other predicate should land before the marker in the WHERE clause.
+      // We use a coarse check: the marker must appear before the first
       // partition-key (`OccurredAt` / `StartTime` / `ScheduledAt`) reference.
       const timeColumnIndexes = Object.values(TABLE_TIME_COLUMNS).map((col) => sql.indexOf(col));
       expect(timeColumnIndexes.every((idxCol) => idxCol === -1 || idxTenant < idxCol)).toBe(true);
@@ -157,11 +161,11 @@ describe("each query-builder facet", () => {
   );
 
   it.each(queryBuilders.map((def) => [def.key, def]))(
-    "[%s] binds the standard tenant + time + limit + offset params",
+    "[%s] binds the standard time + limit + offset params and no tenant",
     (_key, def) => {
       const { params } = def.queryBuilder(baseCtx);
+      expect(params).not.toHaveProperty("tenantId");
       expect(params).toMatchObject({
-        tenantId: "tenant-X",
         timeFrom: 1_700_000_000_000,
         timeTo: 1_700_000_086_400_000,
         limit: 50,

@@ -81,6 +81,7 @@ function stepOf(step: UpgradeStepView): OpsUpgradeStep {
     statusLabel: step.statusLabel,
     owner: step.owner,
     description: step.description,
+    finishBy: step.finishBy,
     recorded: step.recorded,
     inferred: step.inferred,
     attempt: step.attempt,

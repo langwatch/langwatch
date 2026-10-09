@@ -63,7 +63,7 @@ function RunButton() {
 }
 
 function mount() {
-  const capabilities: UiHostServices = {
+  const hostServices: UiHostServices = {
     ...createUiHostServicesFromHost({
       route: () => ({ params: {}, query: {} }),
       navigate: () => undefined,
@@ -73,7 +73,7 @@ function mount() {
 
   return renderWithDesignSystem(
     <QueryClientProvider client={new QueryClient()}>
-      <UiHostServicesContextProvider value={capabilities}>
+      <UiHostServicesContextProvider value={hostServices}>
         <RunButton />
         <UiErrorToaster />
       </UiHostServicesContextProvider>
@@ -82,7 +82,7 @@ function mount() {
 }
 
 describe("given a mutation that fails with a coded handled error", () => {
-  describe("when the screen hands it to the feedback capability", () => {
+  describe("when the screen hands it to the feedback host service", () => {
     it("shows the registry's copy for the code, not the screen's fallback", async () => {
       mount();
 

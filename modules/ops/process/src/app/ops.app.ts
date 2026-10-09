@@ -381,7 +381,7 @@ const ADMIN_RESOURCE_NAMES: Readonly<Record<string, string>> = {
 };
 
 /** One process ref, the triple every process-manager read is keyed by. */
-export type OpsProcessRef = {
+type OpsProcessRef = {
   processName: string;
   projectId: string;
   processKey: string;
@@ -625,12 +625,12 @@ export interface OpsPipelineRegistry {
 }
 
 /** The bound on an event-log search, as this deployment is configured. */
-export interface OpsEventLogWindowReader {
+interface OpsEventLogWindowReader {
   read(): OpsEventLogSearchWindow;
 }
 
 /** Grafana deep-link configuration, or null where no Grafana is configured. */
-export interface OpsGrafanaLinks {
+interface OpsGrafanaLinks {
   findLinkConfig(): OpsGrafanaLinkConfig;
 }
 
@@ -718,7 +718,7 @@ type OpsSetup = FeatureSetup<
 >;
 
 /** The badge's two integers, and when they were computed. */
-export interface OpsBadgeReading {
+interface OpsBadgeReading {
   blockedCount: number;
   dlqCount: number;
   /** Null when no snapshot collector is running: "we cannot say", not "all clear". */
@@ -2427,7 +2427,7 @@ function organizationSsoRouting(identity: OpsAppDependencies["identity"]): Organ
   };
 }
 
-export interface OpsOperationsOptions {
+interface OpsOperationsOptions {
   authz: AdminAccessServiceOptions["authz"];
   /** The stores the operations read and edit, as the registry built them. */
   repositories: Pick<

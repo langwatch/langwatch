@@ -1,6 +1,6 @@
 /**
  * Model Provider's answer to the port its screens declare: every method
- * projects a `@langwatch/browser-host` capability. `availableScopes` reads
+ * projects a `@langwatch/browser-host` host service. `availableScopes` reads
  * the caller's reach from `organization.getScopeGraph`, as main did. §10.1.
  */
 
@@ -73,7 +73,7 @@ function openDrawerAddress({
   route.setQuery(next);
 }
 
-class CapabilityModelProviderHost extends ModelProviderHostApi {
+class HostServiceModelProviderHost extends ModelProviderHostApi {
   private readonly hostScope: ModelProviderHostScope;
   private readonly scopeHost: UiScopeHost | undefined;
   private readonly session: UiSession;
@@ -191,7 +191,7 @@ export default function ModelProviderHostMount({ children }: { children?: ReactN
 
   const host = useMemo(
     () =>
-      new CapabilityModelProviderHost({
+      new HostServiceModelProviderHost({
         hostScope,
         scopeHost,
         session,

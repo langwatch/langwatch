@@ -33,14 +33,19 @@ import type {
 } from "./organization-seat-license.service.ts";
 
 /**
- * Records a seat taken away. User ends the person's browser sessions from that fact (§9, R7);
- * a disable this cannot record is refused, not half-performed.
+ * Records a seat taken away or given back. User ends the person's browser sessions from the
+ * first (§9, R7); a disable this cannot record is refused, not half-performed.
  */
 export interface OrganizationSeatRevocationNotice {
   memberDisabled(input: {
     organizationId: string;
     userId: string;
     disabledByUserId: string | null;
+  }): Promise<void>;
+  memberEnabled(input: {
+    organizationId: string;
+    userId: string;
+    enabledByUserId: string | null;
   }): Promise<void>;
 }
 
@@ -147,6 +152,13 @@ export class OrganizationMemberRoleService {
         organizationId,
         userId,
         disabledByUserId: actingUser?.id ?? null,
+      });
+    } else {
+      // M8487-MEMBER-ENABLED: governance puts the person's personal project back in aggregates.
+      await this.dependencies.seatNotices.memberEnabled({
+        organizationId,
+        userId,
+        enabledByUserId: actingUser?.id ?? null,
       });
     }
 

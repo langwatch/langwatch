@@ -60,12 +60,13 @@ export const promptStudioSpanSchema = z
       .object({
         model: z.string().nullable(),
         systemPrompt: chatMessageSchema.shape.content,
-        temperature: z.number().nullable(),
+        // Stored attribute text passes through as main hands it ("1.50", "0042").
+        temperature: z.union([z.number(), z.string()]).nullable(),
         maxTokens: z.number().nullable(),
         topP: z.number().nullable(),
         frequencyPenalty: z.number().nullable(),
         presencePenalty: z.number().nullable(),
-        seed: z.number().nullable(),
+        seed: z.union([z.number(), z.string()]).nullable(),
         topK: z.number().nullable(),
         minP: z.number().nullable(),
         repetitionPenalty: z.number().nullable(),

@@ -198,9 +198,8 @@ func (s Stack) OverlayEnv() []string {
 		"LANGWATCH_ADMIN_PASSWORD="+DefaultAdminPassword,
 		"LANGWATCH_PRIVATE_ACCESS_TOKEN="+DefaultPrivateAccessToken,
 		"LANGWATCH_PUBLIC_ACCESS_TOKEN="+DefaultPublicAccessToken,
-		// ee/admin/isAdmin.ts gates platform-admin (impersonation etc.) on this
-		// comma-separated list. The seeded admin needs to be in it, or logging in
-		// as DefaultAdminEmail gets a normal user, not a platform admin.
+		// Feeds only ops's one-time platform-operator seed (skipped when IS_SAAS
+		// is on); the seed shell grants the seeded admin the role directly.
 		"ADMIN_EMAILS="+DefaultAdminEmail,
 	)
 	// langyagent (the worker manager): the control plane dials it at its loopback

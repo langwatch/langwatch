@@ -152,10 +152,10 @@ describe("the workflow module's transport declarations", () => {
       expect(workflowRunRest.router().addressing).toBe("literal");
     });
 
-    it("asks code completion's permission at the door and keeps the event door's own order", () => {
+    it("asks both studio doors' workflows:manage at the door", () => {
       expect(routesOf(workflowStudioRest)).toEqual([
         ["POST", "/api/workflows/code-completion", "completeWorkflowCode", "workflows:manage"],
-        ["POST", "/api/workflows/post_event", "postWorkflowStudioEvent", "optional"],
+        ["POST", "/api/workflows/post_event", "postWorkflowStudioEvent", "workflows:manage"],
       ]);
       expect(workflowStudioRest.router().credential).toBe("browser");
     });

@@ -1,8 +1,5 @@
 {
   "name": "@langwatch/upgrade",
-  "langwatch": {
-    "group": "framework"
-  },
   "version": "0.1.0",
   "private": true,
   "description": "The upgrade runner's own ledger: the runner-owned ledger tables in their own Postgres schema (<schema>_upgrade_ledger), and their first seeding from those two records. Storage-engine-free: the caller hands in the Postgres and ClickHouse connections.",
@@ -48,5 +45,8 @@
     "@types/pg": "^8.20.3",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "langwatch": {
+    "group": "framework"
   }
 }

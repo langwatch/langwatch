@@ -150,7 +150,7 @@ export function findResourceGrantStep({
 }
 
 /** The seat is the reason when it is one: a Lite Member or a Developer (ADR-171) asks
- *  for a different seat, not for a binding. */
+ *  for a different seat, not for a grant. */
 function unreachedDenialReason({
   organizationRole,
   hadAnyPath,
@@ -159,18 +159,18 @@ function unreachedDenialReason({
   hadAnyPath: boolean;
 }): Extract<
   AuthzDenialReason,
-  "lite-member-restricted" | "developer-restricted" | "no-binding" | "no-membership"
+  "lite-member-restricted" | "developer-restricted" | "no-grant" | "no-membership"
 > {
   if (organizationRole === "EXTERNAL") return "lite-member-restricted";
   if (organizationRole === "DEVELOPER") return "developer-restricted";
-  return hadAnyPath ? "no-binding" : "no-membership";
+  return hadAnyPath ? "no-grant" : "no-membership";
 }
 
 /** No step granted: name the gate the caller can act on. */
 export function denyStep({ grants, chainBindings, base }: DecideContext): AuthzDecision {
   // Checked before everything else: a disabled seat is the reason NO path
   // exists, so reporting the absence it causes ("no membership", "no
-  // binding") would name the symptom. On a resource scope this is the only
+  // grant") would name the symptom. On a resource scope this is the only
   // step that runs, because the membership gate defers there to keep share
   // links reachable.
   if (grants.membershipDisabled) {

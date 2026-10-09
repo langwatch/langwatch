@@ -83,17 +83,22 @@ func TestPrepareJobsShareTheStackCompileCache(t *testing.T) {
 	sup := &fakeSupervisor{}
 	o := &Orchestrator{cfg: Config{Home: home, Naming: domain.DefaultNaming("")}, sup: sup, sys: &fakeSystem{}, log: zap.NewNop()}
 
-	if err := o.prepareWorktree(context.Background(), UpParams{WorktreeDir: wt}, domain.Stack{Slug: "feat-x", WorktreeDir: wt}); err != nil {
+	st := domain.Stack{Slug: "feat-x", WorktreeDir: wt, PostgresPort: 5432, PostgresDatabase: "feat_x"}
+	seed, err := o.prepareWorktree(context.Background(), UpParams{WorktreeDir: wt}, st)
+	if err != nil {
 		t.Fatalf("prepareWorktree: %v", err)
 	}
 
 	want := "NODE_COMPILE_CACHE=" + filepath.Join(home, "node-compile-cache", "feat-x")
 	if len(sup.shells) < 2 {
-		t.Fatalf("ran %v, want at least codegen and prepare", sup.shells)
+		t.Fatalf("ran %v, want at least codegen and build", sup.shells)
 	}
 	for i, shell := range sup.shells {
 		if !slices.Contains(sup.envs[i], want) {
 			t.Errorf("%q ran without the stack's compile cache (%s)", shell, want)
 		}
+	}
+	if seed == nil || !slices.Contains(seed.Job.Env, want) {
+		t.Errorf("the keeper's seed runs without the stack's compile cache (%s)", want)
 	}
 }

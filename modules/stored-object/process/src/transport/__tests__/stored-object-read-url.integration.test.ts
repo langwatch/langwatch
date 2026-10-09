@@ -9,6 +9,7 @@ import { Readable } from "node:stream";
 import { createRestRuntime } from "@langwatch/api/rest";
 import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
 import type { PermissionDecision } from "@langwatch/authorization";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 import { initTRPC } from "@trpc/server";
 import type { ErrorHandler } from "hono";
 import { describe, expect, it } from "vitest";
@@ -56,11 +57,12 @@ function installed() {
     },
     authorization: {
       forRequest: () => ({
+        ...testAuthorizeDefaults,
         getDecision: async () => ({ permitted: true, organizationRole: "MEMBER" }),
         getProjectAnyDecision: async (input): Promise<PermissionDecision> =>
           input.projectId === PROJECT && input.permissions.includes("traces:view")
             ? { permitted: true, organizationRole: "MEMBER" }
-            : { permitted: false, organizationRole: "MEMBER", denialReason: "no-binding" },
+            : { permitted: false, organizationRole: "MEMBER", denialReason: "no-grant" },
         checkScopeLineage: async () => ({ kind: "consistent" }),
       }),
     },

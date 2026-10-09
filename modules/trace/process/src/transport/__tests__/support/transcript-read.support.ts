@@ -9,8 +9,10 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { buildDisplayInput, stringifySpanIO } from "@langwatch/trace-contract";
 import { vi } from "vitest";
 
+import { ownProofAuthorizer } from "../../../__tests__/support/authorization-proofs.fixture.ts";
 import { createTraceAppHarness } from "../../../app/__tests__/support/trace-app.harness.ts";
 import type { TraceLogRecordReader, TracesSpanReader } from "../../../app/trace.app.ts";
+import type { TracesReadMembers } from "../../../features/read/services/trace-transcript-read.service.ts";
 import {
   DERIVED_INPUT_ATTR_PREFIX,
   DERIVED_OUTPUT_ATTR_PREFIX,
@@ -22,7 +24,6 @@ import {
   extractRedactionsFromAllSpanOutputs,
   redactObject,
 } from "../../../rules/trace-read-redaction.rules.ts";
-import type { TracesReadMembers } from "../../../features/read/services/trace-transcript-read.service.ts";
 import type { TraceViewerProtectionService } from "../../../services/trace-viewer-protection.service.ts";
 
 // Real TraceModule required: readSpans decides tenant key and visibility cutoff.
@@ -30,6 +31,7 @@ export function createTranscriptApp(protections?: Partial<TraceViewerProtectionS
   const getSpansByTraceId = vi.fn<TracesSpanReader["getSpansByTraceId"]>();
   const getLogsByTraceId = vi.fn<TraceLogRecordReader["getLogsByTraceId"]>();
   const app = createTraceAppHarness({
+    authorizeRead: ownProofAuthorizer,
     ...(protections
       ? { protections: createApiFixture<TraceViewerProtectionService>(protections, "protections") }
       : {}),

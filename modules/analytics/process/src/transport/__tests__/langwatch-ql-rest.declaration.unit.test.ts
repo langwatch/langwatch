@@ -125,6 +125,21 @@ describe("given the query REST family", () => {
       expect(runDescription).toContain("UNION");
     });
 
+    /** @scenario "The run door publishes projectId as the way to narrow a run to one project" */
+    it("accepts an optional projectId on the run door only, and documents its refusal", () => {
+      const input = routeOf("postApiV1Query")?.input;
+      const sql = "SELECT 1";
+
+      expect(input?.safeParse({ sql, projectId: "project-a" }).data).toMatchObject({
+        projectId: "project-a",
+      });
+      expect(input?.validate({ sql })).toBe(true);
+      expect(routeOf("getApiV1QuerySchema")?.input).toBeUndefined();
+      expect(runDescription).toContain("`projectId`");
+      expect(runDescription).toContain("project_not_found");
+      expect(runDescription).toContain("Without `projectId` the run spans every project");
+    });
+
     it("advertises no truncated flag and no RESULT_TRUNCATED diagnostic", () => {
       const output = routeOf("postApiV1Query")?.output;
       const published = output

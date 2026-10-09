@@ -392,11 +392,11 @@ describe("the settings shell in a new navigation mode", () => {
   describe("when an ops page is opened in a new navigation mode", () => {
     /** @scenario An ops page renders inside the new settings shell */
     it("marks the matching entry active for an ops page", () => {
-      renderSettingsSidebar({ hasOpsAccess: true, pathname: "/ops/migrations" });
+      renderSettingsSidebar({ hasOpsAccess: true, pathname: "/ops/upgrades" });
 
       expect(screen.getByRole("button", { name: "Quick Search" })).toBeInTheDocument();
-      const migrations = screen.getByRole("link", { name: "Migrations" });
-      expect(migrations).toHaveAttribute("aria-current", "page");
+      const upgrades = screen.getByRole("link", { name: "Upgrades" });
+      expect(upgrades).toHaveAttribute("aria-current", "page");
     });
 
     /** @scenario An ops page renders inside the new settings shell */

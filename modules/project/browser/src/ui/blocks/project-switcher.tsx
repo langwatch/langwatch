@@ -47,19 +47,22 @@ export default function ProjectSwitcher() {
           paddingY={1}
           height="auto"
           fontWeight="normal"
-          minWidth="fit-content"
+          minWidth={0}
+          maxWidth="260px"
           color="fg"
           _hover={{ backgroundColor: "bg.muted" }}
         >
-          <HStack gap={2}>
+          <HStack gap={2} minWidth={0}>
             <ProjectAvatar name={current.name} />
-            <Text>{current.name}</Text>
+            <Text truncate title={current.name}>
+              {current.name}
+            </Text>
             <ChevronDown size={14} />
           </HStack>
         </Button>
       </Menu.Trigger>
       {isOpen && (
-        <Menu.Content>
+        <Menu.Content maxWidth="320px">
           {groups.map((group) => (
             <Menu.ItemGroup key={group.key} title={group.title}>
               {group.projects.map((project) => {
@@ -71,9 +74,11 @@ export default function ProjectSwitcher() {
                 return (
                   <Menu.Item key={project.id} value={project.id} fontSize="14px" asChild>
                     <Link href={href} onClick={follow(href)} _hover={{ textDecoration: "none" }}>
-                      <HStack gap={2}>
+                      <HStack gap={2} minWidth={0}>
                         <ProjectAvatar name={project.name} />
-                        <Text>{project.name}</Text>
+                        <Text truncate title={project.name}>
+                          {project.name}
+                        </Text>
                       </HStack>
                     </Link>
                   </Menu.Item>

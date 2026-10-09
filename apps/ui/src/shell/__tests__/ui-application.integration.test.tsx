@@ -113,7 +113,7 @@ function routeAt(routes: readonly RouteObject[], path: string): RouteObject | un
 
 describe("given an application composed of pages apps/ui serves and pages the host still serves", () => {
   describe("when both halves register the same page key", () => {
-    it("routes to the apps/ui page, inside a shell that answers its capabilities", async () => {
+    it("routes to the apps/ui page, inside a shell that answers its host services", async () => {
       function HostHome() {
         return <div data-testid="page">host</div>;
       }

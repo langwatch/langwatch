@@ -200,8 +200,9 @@ In `dev/scripts/dev-supervisor.mjs` (proof: `dev/scripts/reload-burst.mjs`, run 
 The split stack's api lane (`pnpm --filter @langwatch/dev-runtime dev`) runs the B1 host
 without the UI: `app.entrypoint.ts --backend-only` under `dev-supervisor.mjs --watch` with
 `LANGWATCH_DEV_RELOAD=module`. The host re-links what an edit reaches in-process, so the pid
-survives a source edit. The supervisor restarts the process only for a `package.json`, a file
-in the host's own `src/`, or a non-zero exit after `backend ready`; a bad edit never exits the
+survives a source edit. The supervisor restarts the process only for a non-zero exit after
+`backend ready`; an edit to the host's own `src/` logs that it applies on the next restart
+(amended 2026-10-09: restarting for it dropped the whole stack). A bad edit never exits the
 host. `LANGWATCH_DEV_RELOAD=process` is the escape hatch: the whole-process restart per change.
 The mail preview runs inside the ui dev process (`apps/ui/vite/mail-preview.ts`), started on first
 visit and closed after idle; `LANGWATCH_MAIL_PREVIEW_SPAWN=1` runs it apart. Storybook is still spawned.

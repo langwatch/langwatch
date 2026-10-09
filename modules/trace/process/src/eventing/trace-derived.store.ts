@@ -1,7 +1,9 @@
-import type {
-  FoldProjectionStore,
-  ProjectionStoreContext,
-  FoldStateRead,
+import {
+  type FoldProjectionStore,
+  type ProjectionStoreContext,
+  type FoldStateRead,
+  type FoldReadAuthorizer,
+  foldReadPurpose,
 } from "@langwatch/eventing";
 import { TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT } from "@langwatch/trace-contract";
 
@@ -23,20 +25,26 @@ const DECODABLE_PROJECTION_VERSIONS: ReadonlySet<string> = new Set([
 
 /**
  * FoldProjectionStore adapter for the slim trace_analytics fold (ADR-034
- * Phase 2, read-back per ADR-066). `get`/`getWithApplied` decode the last
- * committed row instead of refolding from `event_log`.
+ * Phase 2, read-back per ADR-066). `get`/`getWithApplied` decode the last committed row,
+ * read through an own-only proof on the context's tenant from `authorize` (ADR-177 block C).
  */
 export class TraceAnalyticsStore implements FoldProjectionStore<TraceAnalyticsData> {
   private constructor(
     private readonly storage: TraceAnalyticsProjectionRepository,
     private readonly defaultRetentionDays: () => number,
+    private readonly authorize: FoldReadAuthorizer,
   ) {}
 
   static create(options: {
     storage: TraceAnalyticsProjectionRepository;
     defaultRetentionDays: () => number;
+    authorize: FoldReadAuthorizer;
   }): TraceAnalyticsStore {
-    return new TraceAnalyticsStore(options.storage, options.defaultRetentionDays);
+    return new TraceAnalyticsStore(
+      options.storage,
+      options.defaultRetentionDays,
+      options.authorize,
+    );
   }
 
   async store(state: TraceAnalyticsData, context: ProjectionStoreContext): Promise<void> {
@@ -101,7 +109,10 @@ export class TraceAnalyticsStore implements FoldProjectionStore<TraceAnalyticsDa
     miss?: "absent" | "undecodable";
   }> {
     const found = await this.storage.findByTraceId({
-      tenantId: String(context.tenantId),
+      authorization: await this.authorize({
+        projectId: String(context.tenantId),
+        purpose: foldReadPurpose({ context, entry: "TraceAnalyticsStore.getWithApplied" }),
+      }),
       traceId: aggregateId,
       window: context.readWindow,
     });

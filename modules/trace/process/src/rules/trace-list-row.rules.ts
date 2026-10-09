@@ -54,13 +54,16 @@ function parseLabels(raw: string | undefined): string[] {
   }
 }
 
-export function mapToTraceListItem(row: TraceSummaryData): TraceListItem {
+export function mapToTraceListItem(
+  row: TraceSummaryData & { tenantId: string },
+): Omit<TraceListItem, "evaluations"> {
   const status = deriveTraceStatus(row);
 
   const totalTokens = (row.totalPromptTokenCount ?? 0) + (row.totalCompletionTokenCount ?? 0);
 
   return {
     traceId: row.traceId,
+    projectId: row.tenantId,
     timestamp: deriveTraceTimestamp({
       occurredAt: row.occurredAt,
       storageAnchorMs: row.storageAnchorMs,
@@ -122,7 +125,7 @@ function parseTokenCount(raw: string | undefined): number | null {
 
 /** Keep this normalization in lockstep with `cursorSortExpression` in the CH repository. */
 export function cursorForTraceRow(
-  row: TraceSummaryData,
+  row: TraceSummaryData & { tenantId: string },
   sortColumn: TraceListSortColumn,
 ): TraceListCursor {
   let sortValue: number;
@@ -158,6 +161,7 @@ export function cursorForTraceRow(
 
   return {
     sortValue: Number.isFinite(sortValue) ? sortValue : 0,
+    tenantId: row.tenantId,
     traceId: row.traceId,
   };
 }

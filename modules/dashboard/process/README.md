@@ -62,8 +62,10 @@ reorder(input: { projectId: string; dashboardIds: string[]; viewer?: DashboardVi
 
 #### `getOrCreateFirst`
 
+The first dashboard, created on demand; empty on an aggregate that has none (ADR-177).
+
 ```typescript
-getOrCreateFirst(input: { projectId: string; viewer?: DashboardViewer }): Promise<Dashboard>;
+getOrCreateFirst(input: { projectId: string; viewer?: DashboardViewer }): Promise<Dashboard[]>;
 ```
 
 #### `listStarred`
@@ -909,7 +911,7 @@ Contract `../contract/src/dashboard.trpc.ts:29`, router `src/transport/dashboard
 | `dashboards.rename`            | mutation | Permission `analytics:update` | inline                 | `dashboardTrpcRowSchema`         |
 | `dashboards.delete`            | mutation | Permission `analytics:delete` | `dashboardScopeSchema` | `dashboardTrpcRowSchema`         |
 | `dashboards.reorderDashboards` | mutation | Permission `analytics:update` | inline                 | `dashboardReorderResponseSchema` |
-| `dashboards.getOrCreateFirst`  | query    | Permission `analytics:view`   | `projectScopeSchema`   | `dashboardTrpcRowSchema`         |
+| `dashboards.getOrCreateFirst`  | query    | Permission `analytics:view`   | `projectScopeSchema`   | inline                           |
 | `dashboards.updateDetails`     | mutation | Permission `analytics:update` | inline                 | `dashboardTrpcRowSchema`         |
 | `dashboards.listStarred`       | query    | Permission `analytics:view`   | `projectScopeSchema`   | inline                           |
 | `dashboards.star`              | mutation | Permission `analytics:view`   | inline                 | `dashboardReorderResponseSchema` |
@@ -974,7 +976,17 @@ type Output = z.infer<typeof dashboardReorderResponseSchema>; // ../contract/src
 
 // dashboards.getOrCreateFirst
 type Input = z.infer<typeof projectScopeSchema>; // ../contract/src/dashboard.trpc.ts:23
-type Output = z.infer<typeof dashboardTrpcRowSchema>; // ../contract/src/dashboard.responses.ts:31
+// Output: inline, ../contract/src/dashboard.trpc.ts:67
+type Output = {
+  id: string;
+  projectId: string;
+  name: string;
+  order: number;
+  description: string | null;
+  createdById: string | null;
+  createdAt: unknown;
+  updatedAt: unknown;
+} | null;
 
 // dashboards.updateDetails
 // Input: inline, ../contract/src/dashboard.trpc.ts:75

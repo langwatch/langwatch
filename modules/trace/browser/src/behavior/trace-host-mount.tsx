@@ -1,6 +1,6 @@
 /**
  * Trace's answer to the port its screens declare: every method projects a
- * `@langwatch/browser-host` capability, so the module mounts it, not the
+ * `@langwatch/browser-host` host service, so the module mounts it, not the
  * application. ARCHITECTURE.md §10.1.
  */
 
@@ -27,6 +27,7 @@ type TraceHostReadings = {
   readonly team: TraceHostTeam | undefined;
   readonly currentUser: TraceHostUser | undefined;
   readonly isLoading: boolean;
+  readonly projectNames: ReadonlyMap<string, string>;
 };
 
 type TraceHostActions = {
@@ -41,7 +42,7 @@ type TraceHostActions = {
   readonly failed: (failure: TraceFailureNotice) => void;
 };
 
-class CapabilityTraceHost extends TraceHostApi {
+class HostServiceTraceHost extends TraceHostApi {
   constructor(
     private readonly readings: TraceHostReadings,
     private readonly actions: TraceHostActions,
@@ -81,6 +82,10 @@ class CapabilityTraceHost extends TraceHostApi {
     return this.readings.isLoading;
   }
 
+  override projectName(projectId: string): string | undefined {
+    return this.readings.projectNames.get(projectId);
+  }
+
   route(): TraceRouteReading {
     return this.actions.route();
   }
@@ -105,7 +110,7 @@ class CapabilityTraceHost extends TraceHostApi {
   }
 
   /**
-   * No `@langwatch/browser-host` capability carries the agent's page
+   * No `@langwatch/browser-host` host service carries the agent's page
    * registry, so the port is told absence rather than a guess: a composition
    * that installs Langy answers this from Langy's published capability.
    */
@@ -122,16 +127,12 @@ class CapabilityTraceHost extends TraceHostApi {
 type ProjectRecord = {
   presenceEnabled: boolean | undefined;
   organizationPresenceEnabled: boolean | undefined;
-};
-
-const NO_RECORD: ProjectRecord = {
-  presenceEnabled: void 0,
-  organizationPresenceEnabled: void 0,
+  projectNames: ReadonlyMap<string, string>;
 };
 
 /**
- * What the session scope does not carry, off the project's row in the scope graph:
- * the presence switches. The shared-trace page asks nothing.
+ * What the session scope does not carry, off the scope graph: the presence switches and
+ * the name of every project the reader can see. The shared-trace page asks nothing.
  */
 function useProjectRecord(input: {
   projectId: string | undefined;
@@ -141,19 +142,25 @@ function useProjectRecord(input: {
     {},
     { enabled: input.enabled && input.projectId !== void 0 },
   );
-  if (!input.projectId) return NO_RECORD;
-  for (const organization of graph.data ?? []) {
-    for (const team of organization.teams) {
-      const project = team.projects.find((candidate) => candidate.id === input.projectId);
-      if (project) {
-        return {
-          presenceEnabled: project.presenceEnabled,
-          organizationPresenceEnabled: organization.presenceEnabled,
-        };
+  return useMemo(() => {
+    const projectNames = new Map<string, string>();
+    const record: ProjectRecord = {
+      presenceEnabled: void 0,
+      organizationPresenceEnabled: void 0,
+      projectNames,
+    };
+    for (const organization of graph.data ?? []) {
+      for (const team of organization.teams) {
+        for (const project of team.projects) {
+          projectNames.set(project.id, project.name);
+          if (project.id !== input.projectId) continue;
+          record.presenceEnabled = project.presenceEnabled;
+          record.organizationPresenceEnabled = organization.presenceEnabled;
+        }
       }
     }
-  }
-  return NO_RECORD;
+    return record;
+  }, [graph.data, input.projectId]);
 }
 
 /** The first-trace flag, read until the project has one, then left alone. */
@@ -175,15 +182,17 @@ function projectReading(input: {
   id: string | undefined;
   slug: string | undefined;
   name: string | undefined;
+  kind: string | undefined;
   firstMessage: boolean | undefined;
   presenceEnabled: boolean | undefined;
 }): TraceHostProject | undefined {
   if (input.id === void 0) return void 0;
-  const { firstMessage, presenceEnabled } = input;
+  const { kind, firstMessage, presenceEnabled } = input;
   return {
     id: input.id,
     slug: input.slug ?? "",
     name: input.name ?? "",
+    ...(kind === void 0 ? {} : { kind }),
     ...(firstMessage === void 0 ? {} : { firstMessage }),
     ...(presenceEnabled === void 0 ? {} : { presenceEnabled }),
   };
@@ -220,6 +229,7 @@ export default function TraceHostMount({ children }: { children?: ReactNode }) {
   const projectId = project?.id;
   const projectName = project?.name;
   const projectSlug = project?.slug;
+  const projectKind = project?.kind;
   const organizationId = organization?.id;
   const organizationName = organization?.name;
   const teamId = team?.id;
@@ -229,17 +239,18 @@ export default function TraceHostMount({ children }: { children?: ReactNode }) {
   const actorEmail = actor?.email;
   const actorImage = actor?.image;
   const record = useProjectRecord({ projectId, enabled: actorId !== void 0 });
-  const { presenceEnabled, organizationPresenceEnabled } = record;
+  const { presenceEnabled, organizationPresenceEnabled, projectNames } = record;
   const firstMessage = useFirstMessage({ projectId, enabled: actorId !== void 0 });
 
   const host = useMemo(
     () =>
-      new CapabilityTraceHost(
+      new HostServiceTraceHost(
         {
           project: projectReading({
             id: projectId,
             slug: projectSlug,
             name: projectName,
+            kind: projectKind,
             firstMessage,
             presenceEnabled,
           }),
@@ -255,6 +266,7 @@ export default function TraceHostMount({ children }: { children?: ReactNode }) {
               ? void 0
               : { id: actorId, name: actorName, email: actorEmail, image: actorImage },
           isLoading: !isSettled,
+          projectNames,
         },
         {
           hasPermission: (permission) => session.hasPermission(permission),
@@ -277,9 +289,11 @@ export default function TraceHostMount({ children }: { children?: ReactNode }) {
       projectId,
       projectName,
       projectSlug,
+      projectKind,
       firstMessage,
       presenceEnabled,
       organizationPresenceEnabled,
+      projectNames,
       organizationId,
       organizationName,
       teamId,

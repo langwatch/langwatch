@@ -95,6 +95,13 @@ describe("given the secrets page with a project in scope", () => {
       expect(names).toEqual(["Api", "Web", "Docs"]);
     });
 
+    it("names every project in full on hover, since long names truncate", async () => {
+      await screen.findByText("Acme - Platform");
+      for (const name of ["Api", "Web", "Docs"]) {
+        expect(screen.getAllByTitle(name).length).toBeGreaterThan(0);
+      }
+    });
+
     it("links each project to its home, told to return to the secrets page", async () => {
       const docs = await screen.findByRole("menuitem", { name: /Docs/ });
       expect(docs).toHaveAttribute("href", "/docs?return_to=%2Fsettings%2Fsecrets");

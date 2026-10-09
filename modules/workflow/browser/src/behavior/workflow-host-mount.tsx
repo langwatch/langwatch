@@ -1,6 +1,6 @@
 /**
  * Workflow's answer to the host its screens, and experiment's, declare: every
- * action projects a `@langwatch/browser-host` capability and is published as the
+ * action projects a `@langwatch/browser-host` host service and is published as the
  * `workflow:host` slice, so the module mounts it, not the application.
  */
 

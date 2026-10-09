@@ -244,6 +244,7 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   "tools/diffsuite",
   "tools/fuzz",
   "tools/workerrun",
+  "tools/seedgen",
   // The Go SDK. Its span-attribute scenarios (typed input/output envelopes,
   // binary content parts, metadata hoisting, data capture) are satisfied by Go
   // tests and by nothing else, so without this root those scenarios could only
@@ -351,7 +352,6 @@ const LEGACY_INERT: string[] = [
   // would bind them (packages/architecture-enforcer's unspecced-core report),
   // every scenario @unimplemented on purpose. Remove each entry with its
   // first real binding.
-  "modules/authz/specs/offboarding.feature",
   "modules/scenario/specs/simulation-run.feature",
   "specs/agents/create-workflow-agent.feature",
   "specs/agents/workflow-agent-editor.feature",

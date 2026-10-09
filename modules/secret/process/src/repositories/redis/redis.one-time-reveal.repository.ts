@@ -7,6 +7,7 @@ import type { RedisConnection } from "@langwatch/redis-client";
 
 import type {
   OneTimeRevealRepository,
+  RevealAddress,
   StoredReveal,
   TakenReveal,
 } from "../one-time-reveal.repository.ts";
@@ -15,10 +16,10 @@ import type { SecretCipher } from "../secret.repositories.ts";
 /** The value at rest, as every process before this one wrote it. */
 type SealedReveal = Omit<StoredReveal, "secret"> & { sealed: string };
 
-const secretKey = (organizationId: string, revealId: string) =>
-  `secret_reveal:${organizationId}:${revealId}`;
-const markerKey = (organizationId: string, revealId: string) =>
-  `secret_revealed:${organizationId}:${revealId}`;
+const secretKey = ({ organizationId, recipientUserId, revealId }: RevealAddress) =>
+  `secret_reveal:${organizationId}:${recipientUserId}:${revealId}`;
+const markerKey = ({ organizationId, recipientUserId, revealId }: RevealAddress) =>
+  `secret_revealed:${organizationId}:${recipientUserId}:${revealId}`;
 
 /** Redis below 6.2 has no GETDEL; the server refusing it is the only signal. */
 function isUnknownCommand(error: unknown): boolean {
@@ -43,59 +44,33 @@ export class RedisOneTimeRevealRepository implements OneTimeRevealRepository {
   ) {}
 
   async put({
-    organizationId,
-    revealId,
     reveal,
     ttlMs,
-  }: {
-    organizationId: string;
-    revealId: string;
-    reveal: StoredReveal;
-    ttlMs: number;
-  }): Promise<void> {
+    ...address
+  }: RevealAddress & { reveal: StoredReveal; ttlMs: number }): Promise<void> {
     const sealed: SealedReveal = {
       kind: reveal.kind,
       keyId: reveal.keyId,
       preview: reveal.preview,
       sealed: this.cipher.encrypt(reveal.secret),
     };
-    await this.redis.set(secretKey(organizationId, revealId), JSON.stringify(sealed), "PX", ttlMs);
+    await this.redis.set(secretKey(address), JSON.stringify(sealed), "PX", ttlMs);
   }
 
-  async take({
-    organizationId,
-    revealId,
-  }: {
-    organizationId: string;
-    revealId: string;
-  }): Promise<TakenReveal> {
-    const raw = await this.getdel(secretKey(organizationId, revealId));
+  async take(address: RevealAddress): Promise<TakenReveal> {
+    const raw = await this.getdel(secretKey(address));
     if (raw === null) return { taken: false };
 
     const { sealed, ...reveal } = JSON.parse(raw) as SealedReveal;
     return { taken: true, reveal: { ...reveal, secret: this.cipher.decrypt(sealed) } };
   }
 
-  async markServed({
-    organizationId,
-    revealId,
-    ttlMs,
-  }: {
-    organizationId: string;
-    revealId: string;
-    ttlMs: number;
-  }): Promise<void> {
-    await this.redis.set(markerKey(organizationId, revealId), "1", "PX", ttlMs);
+  async markServed({ ttlMs, ...address }: RevealAddress & { ttlMs: number }): Promise<void> {
+    await this.redis.set(markerKey(address), "1", "PX", ttlMs);
   }
 
-  async wasServed({
-    organizationId,
-    revealId,
-  }: {
-    organizationId: string;
-    revealId: string;
-  }): Promise<boolean> {
-    return (await this.redis.exists(markerKey(organizationId, revealId))) > 0;
+  async wasServed(address: RevealAddress): Promise<boolean> {
+    return (await this.redis.exists(markerKey(address))) > 0;
   }
 
   /** Read-and-delete in one command, so two reads racing cannot both be served.

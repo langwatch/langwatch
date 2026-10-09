@@ -1,5 +1,5 @@
 /**
- * The Navigation capability (record 10.1): the address bar, leaving the
+ * The Navigation host service (record 10.1): the address bar, leaving the
  * application, a stale chunk after a deploy, and an API that has not answered.
  */
 
@@ -536,7 +536,7 @@ export function createUiRouter({
 }
 
 /**
- * The navigation capability, over the router this package already owns —
+ * The navigation host service, over the router this package already owns —
  * `react-router` is sealed off from a frontend feature (ADR-004), so a
  * screen gets a `UiNavigation` instead, which a test can record.
  */
@@ -619,7 +619,7 @@ export function createUiRoute({
   return new RouterUiRoute(values, setQuery);
 }
 
-/** The route capability of the router this render is inside. */
+/** The route host service of the router this render is inside. */
 export function useRouterUiRoute(): UiRoute {
   const params = useParams();
   const { pathname } = useLocation();

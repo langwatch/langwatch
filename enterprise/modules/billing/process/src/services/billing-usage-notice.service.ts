@@ -20,14 +20,11 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
-import { billingAlertChannels } from "../channels/billing-alert-channels.registry.ts";
 import type {
   BillingAlertChannel,
   BillingAlertMessage,
 } from "../channels/billing-alert.channel.ts";
-import { hubspotFormChannels } from "../channels/hubspot-form-channels.registry.ts";
 import type { HubspotFormChannel } from "../channels/hubspot-form.channel.ts";
-import { usageLimitEmailChannels } from "../channels/usage-limit-email-channels.registry.ts";
 import type { UsageLimitEmailChannel } from "../channels/usage-limit-email.channel.ts";
 import {
   type HubspotFormBody,
@@ -78,10 +75,10 @@ type NotificationServiceOptions = {
     hubspotReachedLimitFormId?: string;
     hubspotFormId?: string;
   };
-  slack?: BillingAlertChannel;
-  hubspotForms?: HubspotFormChannel;
+  slack: BillingAlertChannel;
+  hubspotForms: HubspotFormChannel;
   errorReporter?: BillingErrorReporter;
-  usageLimitEmail?: UsageLimitEmailChannel;
+  usageLimitEmail: UsageLimitEmailChannel;
 };
 
 // ---------------------------------------------------------------------------
@@ -101,10 +98,10 @@ export class NotificationService {
 
   private constructor(options: NotificationServiceOptions) {
     this.config = options.config;
-    this.slack = options.slack ?? billingAlertChannels.live.create();
-    this.hubspotForms = options.hubspotForms ?? hubspotFormChannels.live.create();
+    this.slack = options.slack;
+    this.hubspotForms = options.hubspotForms;
     this.errorReporter = options.errorReporter ?? NullBillingErrorReporter.create();
-    this.usageLimitEmail = options.usageLimitEmail ?? usageLimitEmailChannels.memory.create();
+    this.usageLimitEmail = options.usageLimitEmail;
   }
 
   /**
@@ -112,16 +109,6 @@ export class NotificationService {
    */
   static create(options: NotificationServiceOptions): NotificationService {
     return new NotificationService(options);
-  }
-
-  /**
-   * Null-object factory: every method is a silent noop.
-   * Use in tests or non-SaaS deployments where no notifications are needed.
-   */
-  static createNull(): NotificationService {
-    return NotificationService.create({
-      config: {} as NotificationServiceOptions["config"],
-    });
   }
 
   private getAdminLink(organizationId: string): string {

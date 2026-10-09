@@ -45,14 +45,14 @@ boot -> gate.admit ---------------------------------+   boot -> gate.admit
 
 ## 3. What moves
 
-| Concern | Today | Target |
-| --- | --- | --- |
-| Who takes the lease | api child, Helm Job, compose `migrate`, npx | the worker's child; CLI stays a runner for dev, CI, by hand |
-| Who runs blocking steps | `pnpm task upgrade` in those | the same command, spawned by the worker gate |
-| api on a behind ledger | spawns the upgrade | never runs a step; holding then upgrading mode |
-| worker on a behind ledger | refuses and exits | runs the upgrade, or waits for the holder; takes no job until current |
-| How the api learns "current" | its own child exits 0 | its gate re-reads the ledger every 10 s on its one connection |
-| Background steps | worker, per-step leases | unchanged (Q8) |
+| Concern                      | Today                                       | Target                                                                |
+| ---------------------------- | ------------------------------------------- | --------------------------------------------------------------------- |
+| Who takes the lease          | api child, Helm Job, compose `migrate`, npx | the worker's child; CLI stays a runner for dev, CI, by hand           |
+| Who runs blocking steps      | `pnpm task upgrade` in those                | the same command, spawned by the worker gate                          |
+| api on a behind ledger       | spawns the upgrade                          | never runs a step; holding then upgrading mode                        |
+| worker on a behind ledger    | refuses and exits                           | runs the upgrade, or waits for the holder; takes no job until current |
+| How the api learns "current" | its own child exits 0                       | its gate re-reads the ledger every 10 s on its one connection         |
+| Background steps             | worker, per-step leases                     | unchanged (Q8)                                                        |
 
 The child keeps the record's split ("tasks runs the blocking ones, the worker the background ones,
 the api builds none"): the worker hosts the tasks app's run, it does not compose blocking steps.
@@ -112,16 +112,16 @@ waiting for its own or a peer's run. Lease held by another runner: no spawn, re-
 
 ## 6. Failure and retry
 
-| Case | Worker | api | Way out |
-| --- | --- | --- | --- |
-| step fails in schema phase | step `failed`, waits | holding + token console (Q7) | console Retry or CLI |
-| step fails in blocking phase | step `failed`, waits | upgrading; Upgrades page shows it | `retryStep` (`ops:manage`) |
-| worker dies mid-step | lease lapses after 60 s | unchanged | next worker resumes from the checkpoint |
-| two workers start | one runs, others wait | unchanged | - |
-| CLI run holds the lease | waits | unchanged | - |
-| image below floor | refuses by name (as today) | refuses by name | stop at the named LTS |
-| ledger unreadable | refuses, restarts (as today) | refuses | fix `DATABASE_URL` |
-| worker restarted after a failure | runs once again (a restart is an operator act, D2) | new console token | - |
+| Case                             | Worker                                             | api                               | Way out                                 |
+| -------------------------------- | -------------------------------------------------- | --------------------------------- | --------------------------------------- |
+| step fails in schema phase       | step `failed`, waits                               | holding + token console (Q7)      | console Retry or CLI                    |
+| step fails in blocking phase     | step `failed`, waits                               | upgrading; Upgrades page shows it | `retryStep` (`ops:manage`)              |
+| worker dies mid-step             | lease lapses after 60 s                            | unchanged                         | next worker resumes from the checkpoint |
+| two workers start                | one runs, others wait                              | unchanged                         | -                                       |
+| CLI run holds the lease          | waits                                              | unchanged                         | -                                       |
+| image below floor                | refuses by name (as today)                         | refuses by name                   | stop at the named LTS                   |
+| ledger unreadable                | refuses, restarts (as today)                       | refuses                           | fix `DATABASE_URL`                      |
+| worker restarted after a failure | runs once again (a restart is an operator act, D2) | new console token                 | -                                       |
 
 Retry is one mechanism: a failed step goes back to `pending` in the ledger (`retryStep` widened from
 background steps to every step the worker runs, Q10; the console's Retry writes the same through the
@@ -151,17 +151,17 @@ through" to "never does (Alex, 2026-10-09, UPGRADE-FIXES)."); the rest of the pa
 
 ## 8. Slices, in order
 
-| # | Slice | Paths | Owner | Tests |
-| --- | --- | --- | --- | --- |
-| 0 | Specs first: rewrite `in-app-upgrade.feature` (worker runs, api phases, upgrading mode, retry), `entry-points.feature` (no Job, no `migrate`, npx), `serving-gate.feature` worker scenarios; add the sign-in-table scenario to `packages/architecture-enforcer/specs` | `specs/upgrade/`, enforcer specs | Sonnet high | `check:feature-parity` |
-| 1 | Sign-in table policy | `packages/architecture-enforcer/src/policies/persistence/` | lint-rule lane, Sonnet high | fixture unit test; tree clean before it ships at error |
-| 2 | Worker gate runs the upgrade: move `admitAfterFirstInstall` to `worker`, lease-held wait, wait-for-Retry loop, 10 s re-ask; api gate returns holding/upgrading/current and never spawns | `packages/upgrade/src/gate/`, `packages/process/src/migration/upgrade-gate.ts` | Opus high | unit (loop, verdicts); integration over a real ledger |
-| 3 | Upgrading mode in the door: hold with pass-through for declared routes; readiness latched at current; `/api/health` serves | `packages/process/src/lifecycle/`, `packages/api` (declaration, Q6) | Opus high (authz surface) | `upgrade-holding-page.feature`; thread routing unit |
-| 4 | Declare the routes: auth sign-in, ops upgrade reads + `retryStep`; widen `retryStep` (Q10) | `modules/auth`, `modules/ops` | Opus medium | `modules/ops/specs/upgrades.feature`; auth sign-in installation test in upgrading mode |
-| 5 | Browser: holding-page sign-in link, shell renders sign-in + Upgrades under 503s | `packages/browser-host`, `modules/ops/browser` | Sonnet high | component tests; visualdiff flow |
-| 6 | Console: read failure from the ledger run report, Retry writes `pending`, shown only in the holding phase | `packages/process/src/migration/`, `lifecycle/` | Opus high (security) | the 14 console scenarios rebound |
-| 7 | Entry points: render the Helm Job only with `serializeUpgrades` (Q4, Q11), drop compose `migrate`, drop npx migrate phase, NOTES and `docs/self-hosting/upgrade.mdx` | `charts/langwatch`, `infra/compose.yml`, `apps/server` | Sonnet high | `entry-points.feature` unit scenarios; chart render tests; rehearsal run |
-| 8 | Record (section 7 text) with slice 2's commit; `upgrade` skill shape and "Never" list; ADR-173 amendment | `dev/docs/`, `.claude/skills/upgrade` | coordinator | - |
+| #   | Slice                                                                                                                                                                                                                                                                 | Paths                                                                          | Owner                       | Tests                                                                                  |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | --------------------------- | -------------------------------------------------------------------------------------- |
+| 0   | Specs first: rewrite `in-app-upgrade.feature` (worker runs, api phases, upgrading mode, retry), `entry-points.feature` (no Job, no `migrate`, npx), `serving-gate.feature` worker scenarios; add the sign-in-table scenario to `packages/architecture-enforcer/specs` | `specs/upgrade/`, enforcer specs                                               | Sonnet high                 | `check:feature-parity`                                                                 |
+| 1   | Sign-in table policy                                                                                                                                                                                                                                                  | `packages/architecture-enforcer/src/policies/persistence/`                     | lint-rule lane, Sonnet high | fixture unit test; tree clean before it ships at error                                 |
+| 2   | Worker gate runs the upgrade: move `admitAfterFirstInstall` to `worker`, lease-held wait, wait-for-Retry loop, 10 s re-ask; api gate returns holding/upgrading/current and never spawns                                                                               | `packages/upgrade/src/gate/`, `packages/process/src/migration/upgrade-gate.ts` | Opus high                   | unit (loop, verdicts); integration over a real ledger                                  |
+| 3   | Upgrading mode in the door: hold with pass-through for declared routes; readiness latched at current; `/api/health` serves                                                                                                                                            | `packages/process/src/lifecycle/`, `packages/api` (declaration, Q6)            | Opus high (authz surface)   | `upgrade-holding-page.feature`; thread routing unit                                    |
+| 4   | Declare the routes: auth sign-in, ops upgrade reads + `retryStep`; widen `retryStep` (Q10)                                                                                                                                                                            | `modules/auth`, `modules/ops`                                                  | Opus medium                 | `modules/ops/specs/upgrades.feature`; auth sign-in installation test in upgrading mode |
+| 5   | Browser: holding-page sign-in link, shell renders sign-in + Upgrades under 503s                                                                                                                                                                                       | `packages/browser-host`, `modules/ops/browser`                                 | Sonnet high                 | component tests; visualdiff flow                                                       |
+| 6   | Console: read failure from the ledger run report, Retry writes `pending`, shown only in the holding phase                                                                                                                                                             | `packages/process/src/migration/`, `lifecycle/`                                | Opus high (security)        | the 14 console scenarios rebound                                                       |
+| 7   | Entry points: render the Helm Job only with `serializeUpgrades` (Q4, Q11), drop compose `migrate`, drop npx migrate phase, NOTES and `docs/self-hosting/upgrade.mdx`                                                                                                  | `charts/langwatch`, `infra/compose.yml`, `apps/server`                         | Sonnet high                 | `entry-points.feature` unit scenarios; chart render tests; rehearsal run               |
+| 8   | Record (section 7 text) with slice 2's commit; `upgrade` skill shape and "Never" list; ADR-173 amendment                                                                                                                                                              | `dev/docs/`, `.claude/skills/upgrade`                                          | coordinator                 | -                                                                                      |
 
 Order: 0, then 1 and 2 in parallel, then 3 and 4, then 5 and 6, then 7 (never before 2: removing the
 Job or `migrate` first leaves nothing upgrading), 8 lands with 2. Proof: `dev/scripts/upgrade-rehearsal`
@@ -171,19 +171,19 @@ from the LTS floor on compose and npx, plus `tools/upgradelab` once its harness 
 
 Each took its recommendation.
 
-| # | Question | Ruled |
-| --- | --- | --- |
-| 1 | Sign-in during the schema phase | (a) holding page until the Postgres schema steps are done, then upgrading mode |
-| 2 | How the worker runs it | (a) spawns `pnpm task upgrade` as a child process under the lease |
-| 3 | After a failed run | (a) waits for Retry, plus one run per worker restart |
-| 4 | Helm pre-roll Job | (a) removed, NOTES keeps the `kubectl run ... start:prepare:db` line (see 11) |
-| 5 | Readiness while upgrading | (a) not ready until the ledger is current |
-| 6 | Declaring what serves while upgrading | (a) a route-level declaration in `packages/api`, enforced by the door |
-| 7 | Token console | (a) kept, only for failures in the holding phase |
-| 8 | Background steps' lease | (a) per-step `background:<id>` leases stay |
-| 9 | Sign-in table set | tables owned by auth, user, organization, authz and identity (owner of `SsoConnection`, the SSO config, per `modules/catalogue.json` and the Prisma claims), resolved from ownership claims |
-| 10 | `retryStep` widened | yes: schema and blocking steps too, `ops:manage`, same `upgrade_step_not_failed` 409 |
-| 11 | `serializeUpgrades` deadlock | (a) the pre-roll Job renders only when `serializeUpgrades` is on |
+| #   | Question                              | Ruled                                                                                                                                                                                       |
+| --- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Sign-in during the schema phase       | (a) holding page until the Postgres schema steps are done, then upgrading mode                                                                                                              |
+| 2   | How the worker runs it                | (a) spawns `pnpm task upgrade` as a child process under the lease                                                                                                                           |
+| 3   | After a failed run                    | (a) waits for Retry, plus one run per worker restart                                                                                                                                        |
+| 4   | Helm pre-roll Job                     | (a) removed, NOTES keeps the `kubectl run ... start:prepare:db` line (see 11)                                                                                                               |
+| 5   | Readiness while upgrading             | (a) not ready until the ledger is current                                                                                                                                                   |
+| 6   | Declaring what serves while upgrading | (a) a route-level declaration in `packages/api`, enforced by the door                                                                                                                       |
+| 7   | Token console                         | (a) kept, only for failures in the holding phase                                                                                                                                            |
+| 8   | Background steps' lease               | (a) per-step `background:<id>` leases stay                                                                                                                                                  |
+| 9   | Sign-in table set                     | tables owned by auth, user, organization, authz and identity (owner of `SsoConnection`, the SSO config, per `modules/catalogue.json` and the Prisma claims), resolved from ownership claims |
+| 10  | `retryStep` widened                   | yes: schema and blocking steps too, `ops:manage`, same `upgrade_step_not_failed` 409                                                                                                        |
+| 11  | `serializeUpgrades` deadlock          | (a) the pre-roll Job renders only when `serializeUpgrades` is on                                                                                                                            |
 
 ## 10. Noticed, not changed
 

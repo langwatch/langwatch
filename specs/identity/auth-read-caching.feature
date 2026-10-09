@@ -45,3 +45,23 @@ Feature: Authentication reads are remembered briefly and never past a revocation
       Given one request was allowed
       When the permission is removed before the next request
       Then the next request is refused
+
+    @unit
+    Scenario: Shared decisions still mint the route's proof
+      Given a request whose procedure reads traces on one project
+      When it is served through the request's shared decisions
+      Then the handler receives the proof the host's authorization minted
+
+    @unit
+    Scenario: Shared decisions still refuse a non-admin on an aggregate project
+      Given a request whose procedure reads traces on one project
+      When a member who is not an admin opens an aggregate project
+      Then the project's kind is read
+      And the request is refused before the handler runs
+
+    @unit
+    Scenario: Shared decisions still refuse a write on an aggregate project
+      Given a request whose procedure writes on one project
+      When an admin writes on an aggregate project
+      Then the project's kind is read
+      And the write is refused as read only before the handler runs

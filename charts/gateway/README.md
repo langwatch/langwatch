@@ -66,17 +66,17 @@ helm install gateway ./charts/gateway -n langwatch -f values.prod.yaml
 The defaults in `values.yaml` are tuned for typical production
 self-hosting. The values you most often override:
 
-| Path                                      | Purpose                                                                                      |
-| ----------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `image.tag`                               | Image tag override (defaults to `Chart.AppVersion`)                                          |
-| `controlPlane.baseUrl`                    | URL of your LangWatch app. Empty resolves to `<release>-app:5560`                            |
-| `secrets.existingSecretName`              | Name of the Secret created above (default `gateway-runtime-secrets`)                         |
-| `replicaCount`                            | Static replicas if `autoscaling.enabled: false`                                              |
-| `autoscaling.minReplicas` / `maxReplicas` | HPA bounds                                                                                   |
-| `resources`                               | Pod CPU/memory requests + limits                                                             |
-| `otel.endpoint`                           | Optional OTLP HTTP exporter URL (gateway emits its own spans)                                |
+| Path                                      | Purpose                                                                                                         |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `image.tag`                               | Image tag override (defaults to `Chart.AppVersion`)                                                             |
+| `controlPlane.baseUrl`                    | URL of your LangWatch app. Empty resolves to `<release>-app:5560`                                               |
+| `secrets.existingSecretName`              | Name of the Secret created above (default `gateway-runtime-secrets`)                                            |
+| `replicaCount`                            | Static replicas if `autoscaling.enabled: false`                                                                 |
+| `autoscaling.minReplicas` / `maxReplicas` | HPA bounds                                                                                                      |
+| `resources`                               | Pod CPU/memory requests + limits                                                                                |
+| `otel.endpoint`                           | Optional OTLP HTTP exporter URL (gateway emits its own spans)                                                   |
 | `metrics.enabled`                         | Serves Prometheus `/metrics` on `metrics.port` (default `9464`), bearer `METRICS_API_KEY` from `metrics.apiKey` |
-| `spend.enabled`                           | Kill switch for spend emission (default `true`). Off means no budget debits are ever written |
+| `spend.enabled`                           | Kill switch for spend emission (default `true`). Off means no budget debits are ever written                    |
 
 The pod ships hardened (`podSecurityContext` / `containerSecurityContext` in
 `values.yaml`): non-root at both pod and container level, read-only root,

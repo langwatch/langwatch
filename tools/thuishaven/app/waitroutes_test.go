@@ -3,6 +3,7 @@ package app
 import (
 	"sync"
 	"testing"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -55,6 +56,8 @@ func waitOrch(routePort int, launcherAlive, appUp bool) (*Orchestrator, *tablePr
 func TestWaitRoutesPointADownServiceAtTheDaemon(t *testing.T) {
 	o, proxy := waitOrch(waitAppPort, true, false)
 	o.reconcileWaitRoutes(waitDaemonPort, false)
+	o.sys.(*fakeSystem).now = o.sys.Now().Add(waitGrace)
+	o.reconcileWaitRoutes(waitDaemonPort, false)
 	if got := proxy.routes[appHost]; got != waitDaemonPort {
 		t.Errorf("app route = %d, want the daemon's %d", got, waitDaemonPort)
 	}
@@ -93,5 +96,22 @@ func TestWaitRoutesGoBackWhenTheDaemonLeaves(t *testing.T) {
 	o.reconcileWaitRoutes(waitDaemonPort, true)
 	if got := proxy.routes[appHost]; got != waitAppPort {
 		t.Errorf("app route = %d after the daemon left, want the app's %d", got, waitAppPort)
+	}
+}
+
+// @scenario "a short restart keeps its route"
+func TestWaitRoutesKeepTheRouteThroughAShortRestart(t *testing.T) {
+	o, proxy := waitOrch(waitAppPort, true, false)
+	sys := o.sys.(*fakeSystem)
+	o.reconcileWaitRoutes(waitDaemonPort, false)
+	sys.now = sys.now.Add(waitGrace - time.Second)
+	o.reconcileWaitRoutes(waitDaemonPort, false)
+	sys.portsInUse[waitAppPort] = true
+	o.reconcileWaitRoutes(waitDaemonPort, false)
+	sys.portsInUse[waitAppPort] = false
+	sys.now = sys.now.Add(2 * time.Second)
+	o.reconcileWaitRoutes(waitDaemonPort, false)
+	if proxy.calls != 0 {
+		t.Errorf("a restart shorter than the grace moved the route: %v", proxy.routes)
 	}
 }

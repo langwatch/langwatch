@@ -4,6 +4,7 @@
  * @see modules/instant-eval/specs/instant-eval-api.feature
  */
 
+import { sealAuthorization, type Actor, type Authorization } from "@langwatch/authorization";
 import { InstantEvalNotEnabledError } from "@langwatch/instant-eval-contract";
 import { Temporal } from "@langwatch/time";
 import { FilterParseError, type LangWatchQLTraceFilter } from "@langwatch/trace-contract";
@@ -19,6 +20,15 @@ import type { AcceptedInstantEvalStatement } from "../instant-eval-statement.ser
 
 const NOW = Temporal.Instant.from("2026-09-18T12:00:00Z");
 const ACTOR = { kind: "member", userId: "user-1" } as const;
+/** The asker's traces:view proof a selection is read under (ruling TRACE-PROOF-EVAL-PERM). */
+const PROOF = sealAuthorization({
+  actor: { type: "user", id: "user-1" },
+  principal: { type: "user", id: "user-1" },
+  scope: { organizationId: "organization-1" },
+  grants: [{ projectId: "project-1", permissions: ["traces:view"], via: [], kind: "own" }],
+  expiresAt: Date.now() + 5 * 60 * 1000,
+  purpose: { kind: "route", route: "instantEval.runs" },
+});
 
 const ACCEPTED: AcceptedInstantEvalStatement = {
   sql: "SELECT TraceId FROM analytics.traces",
@@ -138,6 +148,7 @@ function harness(
   const budget = new RecordingBudget(options.standing ?? PAID, options.releaseFailure);
   const cancelled: { runId: string; requestedByUserId?: string }[] = [];
   const sampled: { runId: string; rows: number; lwqlKey: string }[] = [];
+  const minted: Actor[] = [];
 
   const peers: InstantEvalRunPeers = {
     isEnabled: async () => true,
@@ -182,12 +193,18 @@ function harness(
           return { rows: [], judgments: [] };
         },
       },
+      proofs: {
+        mint: async ({ actor }) => {
+          minted.push(actor);
+          return PROOF;
+        },
+      },
     },
     peers,
     now: () => NOW,
   });
 
-  return { service, statements, creates, budget, cancelled, sampled };
+  return { service, statements, creates, budget, cancelled, sampled, minted };
 }
 
 describe("creating a run", () => {
@@ -318,6 +335,63 @@ describe("a target rather than a statement", () => {
     expect(statements.accepted[0]?.parameters).toMatchObject({
       instant_eval_selection_ids: ["trace-1", "trace-2"],
     });
+  });
+
+  it("reads the selection under the asker's own traces:view proof", async () => {
+    const proofs: Authorization[] = [];
+    const { service, minted } = harness({
+      peers: {
+        selectTraceIds: async ({ authorization }) => {
+          proofs.push(authorization);
+          return ["trace-1"];
+        },
+      },
+    });
+
+    await service.createRun({
+      projectId: "project-1",
+      actor: ACTOR,
+      input: { shorthand: { ...shorthand, questions: [...shorthand.questions] } },
+    });
+
+    expect(minted).toEqual([{ type: "user", id: "user-1" }]);
+    expect(proofs).toEqual([PROOF]);
+  });
+
+  it("mints an API key's selection proof for the actor the door resolved", async () => {
+    const { service, minted } = harness({ peers: { selectTraceIds: async () => ["trace-1"] } });
+
+    await service.createRun({
+      projectId: "project-1",
+      actor: {
+        kind: "credential",
+        credential: {
+          kind: "apiKey",
+          apiKeyId: "key-1",
+          userId: "user-1",
+          organizationId: "organization-1",
+          projectId: "project-1",
+          teamId: "team-1",
+        },
+        actor: { type: "user", id: "user-1" },
+      },
+      input: { shorthand: { ...shorthand, questions: [...shorthand.questions] } },
+    });
+
+    expect(minted).toEqual([{ type: "user", id: "user-1" }]);
+  });
+
+  it("refuses a legacy project key's selection, which names no principal to prove", async () => {
+    const { service, statements } = harness({ peers: { selectTraceIds: async () => ["trace-1"] } });
+
+    await expect(
+      service.createRun({
+        projectId: "project-1",
+        actor: { kind: "credential", credential: { kind: "legacyProjectKey" }, actor: null },
+        input: { shorthand: { ...shorthand, questions: [...shorthand.questions] } },
+      }),
+    ).rejects.toMatchObject({ code: "permission_denied" });
+    expect(statements.accepted).toEqual([]);
   });
 
   it("refuses a filter it cannot resolve rather than judging the whole window", async () => {

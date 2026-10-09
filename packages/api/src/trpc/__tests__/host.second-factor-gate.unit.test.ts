@@ -65,6 +65,7 @@ function served({ held, permitted = true }: { held: boolean; permitted?: boolean
     }),
     checkScopeLineage: async () => ({ kind: "consistent" }),
     organizationOf: async () => "acme",
+    projectKindOf: async () => "application",
     assertSecondFactor: async () => {
       if (held) throw new Error("held at the second-factor gate");
     },

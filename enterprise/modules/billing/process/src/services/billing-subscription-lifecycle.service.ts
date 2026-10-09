@@ -55,8 +55,8 @@ type BillingSubscriptionLifecycleOptions = {
   >;
 };
 
-/** The one licensing operation a subscription activation needs for a trial's licence. */
-export type LicenseClearer = Pick<LicensingApi, "removeLicense">;
+/** What a subscription activation asks licensing about a trial's licence, and its removal. */
+export type LicenseClearer = Pick<LicensingApi, "removeLicense" | "getLicenseStatus">;
 
 export class BillingSubscriptionLifecycleService {
   static create(options: BillingSubscriptionLifecycleOptions): BillingSubscriptionLifecycleService {
@@ -414,9 +414,8 @@ export class BillingSubscriptionLifecycleService {
     updatedSubscription: SubscriptionWithOrg,
     reason: string,
   ) {
-    if (!updatedSubscription.organization.license) {
-      return;
-    }
+    const { hasLicense } = await this.licenses.getLicenseStatus(updatedSubscription.organizationId);
+    if (!hasLicense) return;
 
     logger.info(
       { organizationId: updatedSubscription.organizationId },

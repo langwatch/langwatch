@@ -164,9 +164,14 @@ import { LogApi } from "@langwatch/log-contract";
 import { MetricApi } from "@langwatch/metric-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
-import { OrganizationApi, TeamNotFoundError } from "@langwatch/organization-contract";
+import {
+  MemberNotFoundError,
+  OrganizationApi,
+  TeamNotFoundError,
+} from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { PROJECT_KIND, ProjectApi } from "@langwatch/project-contract";
+import { nowInstant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
 import { UserApi, UserNotOrganizationMemberError } from "@langwatch/user-contract";
 import { WebhookApi } from "@langwatch/webhook-contract";
@@ -181,6 +186,8 @@ import { ssrfSafeFetch } from "../channels/http/http.governance-http.channel.ts"
 import { HttpOttlTransformChannel } from "../channels/http/http.ottl-transform.channel.ts";
 import { HttpPollingPullerAdapter } from "../channels/http/http.polling.channel.ts";
 import { HttpProviderAccountChannel } from "../channels/http/http.provider-account.channel.ts";
+import { OutboxAggregateReconcile } from "../eventing/aggregate-reconcile.intent.ts";
+import { enqueueMemberAggregates } from "../eventing/aggregate-reconcile.subscriber.ts";
 import {
   OutboxAnomalyAlertDelivery,
   requestAnomalyAlertDelivery,
@@ -229,7 +236,10 @@ import { GovernanceCostBreakdownService } from "../features/cost/services/govern
 import { GovernanceCostNoticesService } from "../features/cost/services/governance-cost-notices.service.ts";
 import { GovernanceCostSummaryService } from "../features/cost/services/governance-cost-summary.service.ts";
 import { DatabricksGeniePullerService } from "../features/databricks-genie/services/databricks-genie-puller.service.ts";
-import { DepartmentService } from "../features/identity/services/department.service.ts";
+import {
+  DepartmentService,
+  type MemberDepartmentAssigned,
+} from "../features/identity/services/department.service.ts";
 import { DirectoryDepartmentSyncService } from "../features/identity/services/directory-department-sync.service.ts";
 import { ErasureSuppressionService } from "../features/identity/services/erasure-suppression.service.ts";
 import { GovernancePeopleScreenService } from "../features/identity/services/governance-people-screen.service.ts";
@@ -283,6 +293,7 @@ import type { GovernanceRepositories } from "../repositories/governance.reposito
 import { governanceOperatorReads } from "../repositories/prisma/prisma.suppression-snapshot.repository.ts";
 import { anomalyRuleConfigComplaint } from "../rules/anomaly-rule-config-error.rules.ts";
 import { DefaultGovernanceAdminWorkspaceViewAuditService } from "../services/admin-workspace-view-audit.service.ts";
+import { AggregateReconcilerService } from "../services/aggregate-reconciler.service.ts";
 import { DefaultGovernanceAiToolCatalogService } from "../services/ai-tool-catalog.service.ts";
 import { ModelProviderAiToolCatalogService } from "../services/ai-tool-provider-catalog.service.ts";
 import { AiToolProviderReachService } from "../services/ai-tool-provider-reach.service.ts";
@@ -335,6 +346,11 @@ interface GovernanceAppDependencies {
     | "findLiveNonGovernanceIdsByOrganization"
     | "findLiveByRef"
     | "findIdentity"
+    | "findAggregate"
+    | "findLiveAggregateIds"
+    | "findAllLiveAggregates"
+    | "findPersonalProjectIds"
+    | "findReadableProjectIds"
   >;
   /** Agent owns the Agent table: the organization's connected agents, read by project. */
   agents: Pick<AgentApi, "findConnectedInProjects">;
@@ -439,7 +455,14 @@ interface GovernanceAppDependencies {
    * because the one question this feature asks it — may the caller see somebody
    * else's personal keys — is a plain decision at the organization scope.
    */
-  permissions: Pick<AuthzApi, "getDecision">;
+  permissions: Pick<
+    AuthzApi,
+    | "getDecision"
+    | "findLiveSharedProjectGrants"
+    | "attachSharedProjectGrant"
+    | "awaitSharedProjectGrants"
+    | "revokeSharedProjectGrants"
+  >;
 }
 
 /** How a process installs this application: its peers, its config, its secrets, its repositories. */
@@ -566,6 +589,13 @@ export class GovernanceModule implements GovernanceRestApi {
     });
     this.tenantHistory = tenantHistory;
     this.anomalyRules = AnomalyRuleService.create({ repository: repositories.anomalyRules });
+    this.aggregateReconciler = AggregateReconcilerService.create({
+      lock: repositories.aggregateReconcileLock,
+      projects: dependencies.projects,
+      organizations: dependencies.organizations,
+      grants: dependencies.permissions,
+      now: nowInstant,
+    });
     this.anomalyWebhookMigration = AnomalyWebhookDestinationMigrationService.create({
       rules: repositories.anomalyRules,
       organizationIds: (input) => dependencies.organizations.listAllIds(input),
@@ -605,6 +635,9 @@ export class GovernanceModule implements GovernanceRestApi {
       repository: repositories.departments,
       organizations: dependencies.organizations,
       projects: dependencies.projects,
+      // ponytail: no outbox in this process -> organization's member_department_changed fact and the sweep reconcile.
+      onMemberDepartmentAssigned: (fact) =>
+        this.#memberAggregateReconcile?.(fact) ?? Promise.resolve(),
     });
     this.erasureSuppression = erasureSuppression;
     // One instance: the erasure refreshes the very snapshot the cost fold reads (ADR-128 §9 step 5).
@@ -710,6 +743,7 @@ export class GovernanceModule implements GovernanceRestApi {
     this.workspaceViews = DefaultGovernanceAdminWorkspaceViewAuditService.create({
       auditLog: dependencies.auditLog,
       teams: dependencies.organizations,
+      targets: dependencies.projects,
       projects: tenantHistory,
       events: repositories.ocsfEvents,
       diagnostics: { warn: (message, context) => logger.warn(context, message) },
@@ -914,6 +948,8 @@ export class GovernanceModule implements GovernanceRestApi {
   private readonly costAttributionPolicy: PostgresGovernancePolicyService;
   /** Q82: the billed facts trace folds; the backfill task records them for existing configs. */
   readonly codingAssistantBilling: CodingAssistantBillingFactService;
+  /** ADR-177 decision 3: aggregate members as shared reads; the reconcile process manager runs it. */
+  readonly aggregateReconciler: AggregateReconcilerService;
   /** W-11: the deploy step moving inline anomaly webhooks onto endpoints. */
   readonly anomalyWebhookMigration: AnomalyWebhookDestinationMigrationService;
   private readonly people: GovernancePeopleScreenService;
@@ -1010,6 +1046,21 @@ export class GovernanceModule implements GovernanceRestApi {
   /** Main's `spendSpikeAnomalyWorker` tick: every active spend_spike rule against `governance_kpis`. */
   evaluateSpendSpikes(): Promise<SpendSpikeEvaluationSummary> {
     return this.spendSpikes.evaluateAll();
+  }
+
+  #memberAggregateReconcile: MemberDepartmentAssigned | undefined;
+
+  /** A built pipeline means an outbox: this module's own department writes enqueue reconciles. */
+  connectAggregateReconcileOutbox({
+    processStore,
+  }: {
+    processStore: Pick<ProcessStore, "appendIntents">;
+  }): void {
+    this.#memberAggregateReconcile = enqueueMemberAggregates({
+      reconciler: this.aggregateReconciler,
+      outbox: OutboxAggregateReconcile.create(processStore),
+      trigger: "department-write",
+    });
   }
 
   #anomalyAlertOutbox: OutboxAnomalyAlertDelivery | undefined;
@@ -1456,7 +1507,7 @@ export class GovernanceModule implements GovernanceRestApi {
       throw new PermissionDeniedError({
         permission: "ingestionSources:manage",
         scope: { type: "organization", id: rotate.organizationId },
-        denialReason: "no-binding",
+        denialReason: "no-grant",
       });
     }
     const rotated = await this.ingestionSources.rotateSecret(rotate);
@@ -1516,6 +1567,17 @@ export class GovernanceModule implements GovernanceRestApi {
     input: RecordWorkspaceViewInput,
   ): Promise<RecordWorkspaceViewResult> {
     return this.workspaceViews.recordView(input);
+  }
+
+  /** A view recorded from a fact: the fact's time is the window's clock, so redelivery writes nothing. */
+  async governanceAuditWorkspaceView({
+    view,
+    occurredAt,
+  }: {
+    view: RecordWorkspaceViewInput;
+    occurredAt: number;
+  }): Promise<RecordWorkspaceViewResult> {
+    return this.workspaceViews.recordView(view, { occurredAt });
   }
 
   registerMcpTools(input: GovernanceMcpSessionTools): void {
@@ -1963,8 +2025,21 @@ export class GovernanceModule implements GovernanceRestApi {
     return this.departments.getAll(input);
   }
 
-  departmentAssignments(input: { organizationId: string }): Promise<DepartmentAssignments> {
-    return this.departments.getAssignments(input);
+  async departmentAssignments(input: {
+    organizationId: string;
+    callerUserId: string | null;
+  }): Promise<DepartmentAssignments> {
+    const { organizationId, callerUserId } = input;
+    const callerOrganizationRole = callerUserId
+      ? await this.dependencies.organizations
+          .getMember({ organizationId, userId: callerUserId })
+          .then((member) => member.role)
+          .catch((error: unknown) => {
+            if (error instanceof MemberNotFoundError) return null;
+            throw error;
+          })
+      : null;
+    return this.departments.getAssignments({ organizationId, callerOrganizationRole });
   }
 
   departmentCreate(input: { organizationId: string; name: string }): Promise<Department> {
@@ -2174,7 +2249,7 @@ function refuseImpersonatedKeyMint(input: {
   throw new PermissionDeniedError({
     permission: "organization:view",
     scope: { type: "organization", id: input.organizationId },
-    denialReason: "no-binding",
+    denialReason: "no-grant",
   });
 }
 

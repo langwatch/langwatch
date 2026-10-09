@@ -13,6 +13,7 @@ import AnalyticsLayout from "../../../ui/sections/analytics-layout.tsx";
 import { CustomGraph, type CustomGraphInput } from "../../../ui/sections/custom-graph.tsx";
 import { FeedbacksTable } from "../../../ui/sections/feedbacks-table.tsx";
 import { FilterSidebar } from "../../../ui/sections/filter-sidebar.tsx";
+import { withAggregateAnalyticsGate } from "../aggregate-analytics-gate.tsx";
 
 // Time unit conversion constants
 const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day
@@ -273,4 +274,4 @@ function UsersContent() {
  * `withPermissionGuard("analytics:view")` and `DashboardLayout` — both the composing
  * application's job, stated once in `analytics-routes.tsx`, in front of the same loader registry.
  */
-export default UsersContent;
+export default withAggregateAnalyticsGate("Users", UsersContent);

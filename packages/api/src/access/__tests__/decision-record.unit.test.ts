@@ -5,6 +5,7 @@
 import { PermissionDeniedError } from "@langwatch/authorization";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { authorizeDefaults } from "../../__tests__/api-double.ts";
 import { decide, type AccessDenial, type Authorize, type Caller } from "../access.ts";
 import type * as decisionRecordModule from "../decision-record.ts";
 import { permissionDecisionRecord, recordPermissionDecision } from "../decision-record.ts";
@@ -24,10 +25,11 @@ const denials: AccessDenial = {
 
 function authorize({ permitted }: { permitted: boolean }): Authorize {
   return {
+    ...authorizeDefaults,
     getDecision: async () =>
       permitted
         ? { permitted, organizationRole: null }
-        : { permitted, organizationRole: null, denialReason: "no-binding" },
+        : { permitted, organizationRole: null, denialReason: "no-grant" },
     getProjectAnyDecision: async () => ({ permitted, organizationRole: null }),
     checkScopeLineage: async () => ({ kind: "consistent" }),
   };
@@ -61,7 +63,7 @@ describe("an authorization decision", () => {
           permission: "organization:manage",
           scope,
           permitted: false,
-          denialReason: "no-binding",
+          denialReason: "no-grant",
         });
 
         expect(record).toMatchObject({
@@ -69,7 +71,7 @@ describe("an authorization decision", () => {
           subjectUserId: "sam",
           impersonating: true,
           permitted: false,
-          denialReason: "no-binding",
+          denialReason: "no-grant",
           permission: "organization:manage",
           scopeTier: "organization",
           scopeId: "org_acme",
@@ -121,7 +123,7 @@ describe("an authorization decision", () => {
           }),
           expect.objectContaining({
             permitted: false,
-            denialReason: "no-binding",
+            denialReason: "no-grant",
             actorUserId: "operator_1",
             subjectUserId: "sam",
             impersonating: true,

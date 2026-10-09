@@ -14,8 +14,8 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { COMMAND_INLINE_THRESHOLD, type RecordSpanCommandData } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { TraceEdgeMediaPayloadService } from "../trace-edge-media-payload.service.ts";
 import { TraceEdgeSpoolService } from "../../../ingestion/services/trace-edge-spool.service.ts";
+import { TraceEdgeMediaPayloadService } from "../trace-edge-media-payload.service.ts";
 import type { TraceMediaStore } from "../trace-stored-media-store.service.ts";
 
 function fakeStore(): TraceMediaStore {

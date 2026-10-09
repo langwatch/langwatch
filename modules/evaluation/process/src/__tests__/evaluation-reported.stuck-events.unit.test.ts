@@ -29,6 +29,7 @@ import {
   monitorReportedEvent,
   rollupReportedEvent,
 } from "./fixtures/stuck-reported-events.fixture.ts";
+import { ownProofAuthorizer } from "./support/authorization-proofs.fixture.ts";
 
 const RETENTION = { traces: 63, scenarios: 63, experiments: 63 };
 
@@ -62,6 +63,7 @@ function stores() {
     analyticsFoldCache: MemoryEvaluationAnalyticsFoldCacheRepository.create(),
     defaultRetentionDays: () => 30,
     tenantRetention: { resolve: async () => RETENTION },
+    authorizeFoldRead: ownProofAuthorizer,
   }).buildStores();
 }
 

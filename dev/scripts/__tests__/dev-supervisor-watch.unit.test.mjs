@@ -14,6 +14,7 @@ import {
   createBackendFilter,
   createDebouncer,
   createReloadQueue,
+  hostEditWaits,
   needsNewProcess,
   resolveBundleConfig,
   resolveWatchConfig,
@@ -435,12 +436,14 @@ void describe("needsNewProcess for a child that reloads in-process", () => {
     assert.equal(needsNewProcess({ relativePath, reloadsInChild: false }), true);
   });
 
-  /** @scenario "Only what Node loaded natively restarts the in-process api lane" */
-  void it("restarts for a package.json or the host's own source, never for ignored churn", () => {
+  /** @scenario "An edit never restarts the in-process api lane" */
+  void it("never restarts for a package.json or the host's own source; the host's source waits", () => {
     const needs = (relativePath) => needsNewProcess({ relativePath, reloadsInChild: true });
-    assert.equal(needs("../../packages/api/package.json"), true);
-    assert.equal(needs("src/backend.reload.ts"), true);
-    assert.equal(needs("../../packages/api/not-a-package.json"), false);
-    assert.equal(needs("src/__tests__/backend.reload.unit.test.ts"), false);
+    const waits = (relativePath) => hostEditWaits({ relativePath, reloadsInChild: true });
+    assert.equal(needs("../../packages/api/package.json"), false);
+    assert.equal(needs("src/backend.reload.ts"), false);
+    assert.equal(waits("src/backend.reload.ts"), true);
+    assert.equal(waits("src/__tests__/backend.reload.unit.test.ts"), false);
+    assert.equal(hostEditWaits({ relativePath: "src/main.ts", reloadsInChild: false }), false);
   });
 });

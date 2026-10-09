@@ -211,7 +211,7 @@ describe("the gateway platform family's public wire", () => {
       throw new PermissionDeniedError({
         permission,
         scope: { type: "organization", id: ORGANIZATION_ID },
-        denialReason: "no-binding",
+        denialReason: "no-grant",
       });
     };
 
@@ -259,7 +259,7 @@ describe("the gateway platform family's public wire", () => {
       throw new PermissionDeniedError({
         permission,
         scope: { type: "project", id: PROJECT_ID },
-        denialReason: "no-binding",
+        denialReason: "no-grant",
       });
     };
 

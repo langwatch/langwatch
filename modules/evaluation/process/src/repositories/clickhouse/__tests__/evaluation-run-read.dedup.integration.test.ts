@@ -1,9 +1,11 @@
 /** @vitest-environment node */
 /** Spec: specs/evaluations/trace-evaluations-read.feature */
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
+import { AuthorizedClickHouse } from "@langwatch/clickhouse-client";
 import { startTestClickHouseEndpoints } from "@langwatch/clickhouse-client/testing";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { ownProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
 import { EvaluationRunClickHouseReadRepository } from "../evaluation-run-read.repository.ts";
 
 const TENANT = "tenant_dedup";
@@ -100,11 +102,15 @@ describe("given an evaluation whose row was rewritten as it progressed", () => {
   describe("when the trace behind it is read", () => {
     /** @scenario "A rewritten evaluation is not hidden by the read's own column aliases" */
     it("returns it through the by-trace read as well", async () => {
+      const resolveClient = async () => client as never;
       const repository = EvaluationRunClickHouseReadRepository.create({
-        resolveClient: async () => client as never,
+        clickhouse: new AuthorizedClickHouse({ resolveClient }),
       });
 
-      const result = await repository.findByTraceId({ tenantId: TENANT, traceId: TRACE_ID });
+      const result = await repository.findByTraceId({
+        authorization: ownProof({ projectId: TENANT }),
+        traceId: TRACE_ID,
+      });
 
       expect(result.map((run) => run.status)).toEqual(["processed"]);
     });

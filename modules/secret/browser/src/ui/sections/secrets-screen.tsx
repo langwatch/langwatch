@@ -25,7 +25,7 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { Secret } from "@langwatch/secret-contract";
 import { readableDate } from "@langwatch/time";
 import { Edit, Key, MoreVertical, Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { secretApi } from "../../behavior/secret-api.ts";
 import { SECRET_MANAGE_PERMISSION, useSecretHost } from "../../model/secret-host.ts";
@@ -157,32 +157,31 @@ function SecretsTableHeader() {
   );
 }
 
-/** The list's own shape while it loads, so nothing jumps when rows arrive. */
+/** A few faint rows, no table chrome: a loading list that turns out empty should barely register. */
 function SecretsTableSkeleton() {
   return (
-    <ListTable width="full" containerProps={{ width: "full" }} data-testid="secrets-loading">
-      <SecretsTableHeader />
-      <Table.Body>
-        {[0, 1, 2].map((row) => (
-          <Table.Row key={row}>
-            <Table.Cell>
-              <HStack gap={3}>
-                <Skeleton boxSize={4} borderRadius="sm" />
-                <SkeletonText noOfLines={1} width="160px" />
-              </HStack>
-            </Table.Cell>
-            <Table.Cell>
-              <SkeletonText noOfLines={1} width="100px" />
-            </Table.Cell>
-            <Table.Cell>
-              <SkeletonText noOfLines={1} width="80px" />
-            </Table.Cell>
-            <Table.Cell />
-          </Table.Row>
-        ))}
-      </Table.Body>
-    </ListTable>
+    <VStack gap={4} width="full" align="start" data-testid="secrets-loading">
+      {[0, 1, 2].map((row) => (
+        <HStack key={row} gap={3} width="full" opacity={0.5}>
+          <Skeleton boxSize={4} borderRadius="sm" />
+          <SkeletonText noOfLines={1} width="160px" />
+        </HStack>
+      ))}
+    </VStack>
   );
+}
+
+const SKELETON_DELAY_MS = 300;
+
+/** True once `active` has held for the delay, so a fast load never shows a skeleton. */
+function useAfterDelay({ active }: { active: boolean }) {
+  const [elapsed, setElapsed] = useState(false);
+  useEffect(() => {
+    if (!active) return setElapsed(false);
+    const timer = setTimeout(() => setElapsed(true), SKELETON_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [active]);
+  return active && elapsed;
 }
 
 export default function SecretsScreen() {
@@ -258,6 +257,7 @@ export default function SecretsScreen() {
     });
   };
 
+  const showSkeleton = useAfterDelay({ active: secretsQuery.isLoading });
   const showEmpty = !secretsQuery.isLoading && secrets.length === 0;
   const showSecrets = !secretsQuery.isLoading && secrets.length > 0;
 
@@ -281,7 +281,7 @@ export default function SecretsScreen() {
       </PageLayout.Header>
       <VStack gap={6} width="full" align="start" paddingTop={4}>
         <Text color="fg.muted">Encrypted values your code blocks can read at run time.</Text>
-        {secretsQuery.isLoading && <SecretsTableSkeleton />}
+        {showSkeleton && <SecretsTableSkeleton />}
         {showEmpty && (
           <NoDataInfoBlock
             title="No secrets configured"

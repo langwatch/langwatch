@@ -8,7 +8,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
 import { HeldConnectionsFake } from "../../__tests__/support/held-connections-fake.ts";
-import { OrganizationAdministrationFake } from "../../__tests__/support/organization-administration-fake.ts";
+import {
+  MembersFake,
+  OrganizationAdministrationFake,
+} from "../../__tests__/support/organization-administration-fake.ts";
 import type { ScimRepository } from "../../repositories/scim.repository.ts";
 import type { ScimUserProvisioning } from "../scim-provisioning.service.ts";
 import type { ScimSyncLifecycle } from "../scim-sync-lifecycle.service.ts";
@@ -63,7 +66,6 @@ function repository(overrides: Partial<ScimRepository> = {}): ScimRepository {
     })),
     markUserResourceDeleted: vi.fn(async () => undefined),
     addMembership: vi.fn(async () => undefined),
-    removeMembership: vi.fn(async () => undefined),
     findDirectoryGroupIds: vi.fn(async () => []),
     findGroup: vi.fn(async () => null),
     findGroupByExternalId: vi.fn(async () => null),
@@ -104,6 +106,7 @@ function service(
   lifecycle: ScimSyncLifecycle = new QuietScimSyncLifecycle(),
 ): ScimService {
   return ScimService.create({
+    members: new MembersFake(),
     connections: HeldConnectionsFake.of(),
     prisma: repo,
     writer: new GrantsFake(),
@@ -296,8 +299,11 @@ describe("SCIM characterization: provisioning invariants", () => {
       })),
       create: vi.fn(),
     } satisfies ScimUserProvisioning;
+    const connections = HeldConnectionsFake.of();
+    connections.hold({ connectionId: "okta", verifiedDomains: ["example.com"] });
     const scim = ScimService.create({
-      connections: HeldConnectionsFake.of(),
+      members: new MembersFake(),
+      connections,
       prisma: repo,
       users,
       writer,
@@ -383,8 +389,11 @@ describe("SCIM characterization: provisioning invariants", () => {
       })),
       create: vi.fn(),
     } satisfies ScimUserProvisioning;
+    const connections = HeldConnectionsFake.of();
+    connections.hold({ connectionId: "okta", verifiedDomains: ["example.com"] });
     const scim = ScimService.create({
-      connections: HeldConnectionsFake.of(),
+      members: new MembersFake(),
+      connections,
       prisma: repo,
       users,
       writer,
@@ -449,6 +458,7 @@ describe("SCIM characterization: provisioning invariants", () => {
           })),
         } satisfies ScimUserProvisioning;
         const scim = ScimService.create({
+          members: new MembersFake(),
           connections: HeldConnectionsFake.of(),
           prisma: repository({ addMembership: vi.fn(async () => undefined) }),
           writer,

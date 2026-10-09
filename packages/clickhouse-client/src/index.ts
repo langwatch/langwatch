@@ -197,3 +197,26 @@ export type {
   WindowedReadMetrics,
   WindowedReadOutcome,
 } from "./windowedRead.ts";
+export type {
+  ClickHouseClientResolver,
+  ReadResource,
+  StatementScopeViolation,
+  TenantScopeTimeColumn,
+} from "./authorized-reads.ts";
+export {
+  AuthorizedClickHouse,
+  expandFragment,
+  expandStatement,
+  fenceExpression,
+  fenceFor,
+  HAND_WRITTEN_TENANT_PREDICATE,
+  ownProjectIdOf,
+  PROOF_BEARING_PERMISSIONS,
+  singleTenantOf,
+  StatementScopeError,
+  TenantReaderClientUnavailableError,
+  TenantScopedReader,
+  tenantScope,
+  tenantScopeKey,
+  tenantSet,
+} from "./authorized-reads.ts";

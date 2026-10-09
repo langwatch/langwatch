@@ -59,6 +59,7 @@ function endpointRow(id: string) {
     maxBatchSize: 50,
     maxBatchDelayMs: 5000,
     maxInFlight: 4,
+    allowSelfSignedCertificate: false,
     createdAt,
     updatedAt: createdAt,
   };

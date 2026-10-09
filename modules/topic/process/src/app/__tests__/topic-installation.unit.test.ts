@@ -29,7 +29,7 @@ describe("topic app installation", () => {
       expect(runtime.module(topicProcessModule).provided).toBe(app);
       await expect(app.getAll({ projectId: "project-1" })).resolves.toEqual([]);
       await expect(
-        app.getNamesByIds({ projectId: "project-1", ids: ["topic-1"] }),
+        app.getNamesByIds({ projectIds: ["project-1"], ids: ["topic-1"] }),
       ).resolves.toEqual(new Map());
       await expect(app.getClusteringRunHistory({ projectId: "project-1" })).resolves.toEqual([]);
     } finally {

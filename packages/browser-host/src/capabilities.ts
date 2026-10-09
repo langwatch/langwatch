@@ -13,7 +13,7 @@ import { UiScope, type UiActiveScope } from "./scope.ts";
 import type { UiSessionSnapshot } from "./session.ts";
 import type { UiAnalytics } from "./telemetry/analytics.ts";
 
-/** Scope is a capability of its own; this file stays the one ports barrel. */
+/** Scope is a host service of its own; this file stays the one ports barrel. */
 export { UiScope, type UiActiveScope };
 export { ABSENT_UI_COPY_TARGETS, UiCopyTargets, type UiCopyTarget };
 
@@ -182,7 +182,7 @@ export type UiActor = {
 /**
  * Who is here and what they may do — `hasPermission` and `hasOrganizationPermission`
  * answer synchronously and fail closed, so a loading screen
- * renders the same as a "no" screen. Where they are is `UiScope`, a capability of its own.
+ * renders the same as a "no" screen. Where they are is `UiScope`, a host service of its own.
  */
 export abstract class UiSession {
   abstract currentUser(): UiActor | null;
@@ -336,7 +336,7 @@ const PRODUCTION_UI_DEPLOYMENT: UiDeployment = {
   hasCloudOps: false,
 };
 
-/** Every capability a screen can ask for, all of them answered. */
+/** Every host service a screen can ask for, all of them answered. */
 export type UiHostServices = {
   /**
    * Where every module's named events go. Absent and "installed no
@@ -352,7 +352,7 @@ export type UiHostServices = {
    */
   declarations?: UiDeclarations;
   /**
-   * Optional so a hand-built capability set stays valid without one;
+   * Optional so a hand-built host service set stays valid without one;
    * {@link resolveUiHostServices} always fills it, production when absent.
    */
   deployment?: UiDeployment;
@@ -362,12 +362,12 @@ export type UiHostServices = {
   route: UiRoute;
   /**
    * The by-path dispatcher, for the few surfaces too wide for a procedure
-   * map. Optional so a hand-built capability set stays valid without one;
+   * map. Optional so a hand-built host service set stays valid without one;
    * absent reads as the refusing dispatcher, exactly as `session` does.
    */
   rpc?: UiRpc;
   /**
-   * Where the reader is standing. Optional so a hand-built capability set
+   * Where the reader is standing. Optional so a hand-built host service set
    * stays valid without one; absent reads as the refusing port, exactly as
    * `rpc` does.
    */
@@ -441,11 +441,11 @@ export function resolveUiHostServices({
 
 const UiHostServicesContext = createContext<UiHostServices | undefined>(void 0);
 
-/** Publishes the resolved capabilities to everything a screen renders. */
+/** Publishes the resolved host services to everything a screen renders. */
 export const UiHostServicesContextProvider = UiHostServicesContext.Provider;
 
 /**
- * The capabilities above this screen, or undefined where none are mounted.
+ * The host services above this screen, or undefined where none are mounted.
  * The hooks this package publishes over the ports read this one rather than
  * {@link useUiHostServices}, degrading to an inert reading instead of a crash.
  */
@@ -468,7 +468,7 @@ export function useUiDeclarations(): UiDeclarations {
 
 /**
  * The by-path dispatcher of the process this screen is running in. Read off
- * the capabilities rather than a context of its own: record 10.1 rules out
+ * the host services rather than a context of its own: record 10.1 rules out
  * ambient React context as a cross-module transport.
  */
 export function useUiRpc(): UiRpc {
@@ -480,13 +480,13 @@ export function useUiRpc(): UiRpc {
  * composition fault, not something the screen can degrade around.
  */
 export function useUiHostServices(): UiHostServices {
-  const capabilities = useContext(UiHostServicesContext);
-  if (!capabilities) {
+  const hostServices = useContext(UiHostServicesContext);
+  if (!hostServices) {
     throw new Error(
-      "No UI capabilities are mounted above this screen; render it inside the application shell.",
+      "No UI host services are mounted above this screen; render it inside the application shell.",
     );
   }
-  return capabilities;
+  return hostServices;
 }
 
 /** What a composition's session read yields; copy targets only where organization lent them. */
@@ -552,7 +552,7 @@ export const UNAVAILABLE_UI_SCOPE: UiScope = new UnavailableUiScope();
 
 /**
  * Where this screen is standing. Mounted outside a shell it reads the refusing
- * port, which names the missing capability rather than inventing a scope.
+ * port, which names the missing host service rather than inventing a scope.
  */
 export function useUiScope(): UiScope {
   return useOptionalUiHostServices()?.scope ?? UNAVAILABLE_UI_SCOPE;

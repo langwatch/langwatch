@@ -69,9 +69,9 @@ type Selection struct {
 	// default: it keeps the product's outbound messages from their real
 	// destinations. `haven up +outbound` once.
 	Outbound bool `json:"outbound"`
-	// Telemetry is the OTLP sender (telemetrysim). Off by default: it only
-	// sends when asked, so a stack that never drives it needn't run it.
-	// `haven up +telemetry` once.
+	// Telemetry is the OTLP sender (telemetrysim). On by default like Mail: one
+	// small Go process that sends nothing until asked, and its console is
+	// always routed. Worktrees that don't want it say `haven up -telemetry`.
 	Telemetry bool `json:"telemetry"`
 }
 
@@ -79,7 +79,7 @@ type Selection struct {
 // gateway, nlp, the idp simulator and the mail sink — no langy, no langevals,
 // and neither of the two developer tools (design-system, mail-room).
 func DefaultSelection() Selection {
-	return Selection{Gateway: true, NLP: true, IDP: true, Mail: true, Storage: true}
+	return Selection{Gateway: true, NLP: true, IDP: true, Mail: true, Storage: true, Telemetry: true}
 }
 
 // SelectableServices are the names ±deltas accept, in display order.

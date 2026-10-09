@@ -12,6 +12,7 @@ export function stepOf(
     statusLabel: "Done",
     owner: null,
     description: null,
+    finishBy: null,
     recorded: true,
     inferred: false,
     attempt: 1,

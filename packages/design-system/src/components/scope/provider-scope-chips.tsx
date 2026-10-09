@@ -13,6 +13,9 @@ import {
 import { Badge, HStack, Link, Text } from "../../primitives.ts";
 import { Tooltip } from "../overlays/tooltip.tsx";
 
+const CHIP_MAX_WIDTH = "240px";
+const NO_SHRINK = { flexShrink: 0 };
+
 // Scope kinds chip renders; mirrors Prisma enum or picker/badge-only.
 export type ProviderScopeType =
   | "ORGANIZATION"
@@ -181,7 +184,7 @@ export function ProviderScopeChips({
     );
   }
   return (
-    <HStack gap={1} wrap="wrap">
+    <HStack gap={1} wrap="wrap" minWidth={0}>
       {entries.map((entry) => {
         const style = CHIP_STYLES[entry.scopeType] ?? CHIP_STYLES.PROJECT;
         const Icon = style.icon;
@@ -192,10 +195,11 @@ export function ProviderScopeChips({
             colorPalette={tone === "neutral" ? "gray" : style.colorPalette}
             variant="subtle"
             size={size}
+            maxWidth={CHIP_MAX_WIDTH}
           >
-            <HStack gap={1}>
-              <Icon size={iconSize} aria-hidden />
-              <Text>{label}</Text>
+            <HStack gap={1} minWidth={0}>
+              <Icon size={iconSize} aria-hidden style={NO_SHRINK} />
+              <Text truncate>{label}</Text>
             </HStack>
           </Badge>
         );
@@ -213,10 +217,10 @@ export function ProviderScopeChips({
       })}
       {principalLabel && (
         <Tooltip content={`Personal: ${principalLabel}`}>
-          <Badge colorPalette="teal" variant="subtle" size={size}>
-            <HStack gap={1}>
-              <User size={iconSize} aria-hidden />
-              <Text>{principalLabel}</Text>
+          <Badge colorPalette="teal" variant="subtle" size={size} maxWidth={CHIP_MAX_WIDTH}>
+            <HStack gap={1} minWidth={0}>
+              <User size={iconSize} aria-hidden style={NO_SHRINK} />
+              <Text truncate>{principalLabel}</Text>
             </HStack>
           </Badge>
         </Tooltip>

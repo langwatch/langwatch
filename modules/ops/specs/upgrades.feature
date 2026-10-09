@@ -51,10 +51,33 @@ Feature: Ops shows an installation's release upgrades, read-only
     And the line opens the step
 
   @integration
-  Scenario: A release's steps are grouped by mode
-    Given a release with a blocking, a background and an operator step
+  Scenario: A release's steps read as a summary, the unfinished ones first, the applied ones collapsed
+    Given a release with hundreds of applied steps and a few still to do
     When an operator opens that release
-    Then the steps are listed under Blocking, Background and Operator in that order
+    Then it shows how many steps sit in each status and of each kind
+    And the unfinished steps are listed first with their mode and what they wait on
+    And the applied steps are one collapsed group that says whether each ran or was recorded done
+    And an empty owner, zero attempts and a duration that never started are not shown
+
+  @unit
+  Scenario: The releases list puts unreleased first, then the newest release, and calls out what is left
+    Given releases 3.19.0, 3.19.4 and 3.20.1 and unreleased steps
+    When an operator opens Ops, Upgrades
+    Then the unreleased steps are listed first and the releases newest first after them
+    And each release calls out how many of its steps are still pending
+
+  @unit
+  Scenario: A long step error reads as a one-line summary with the full text a click away
+    Given a step whose last error is a long runner message with parenthesised detail
+    When an operator reads the step lists
+    Then the error reads as its first clause on one line
+    And the full text shows on hover and in the step drawer
+
+  @integration
+  Scenario: Tenant migrations are a tab of the Upgrades page
+    When an operator opens the Tenant migrations tab on Ops, Upgrades
+    Then the tenant migrations, their enrolment and per-organization actions are shown
+    And the retired Ops, Migrations address opens this tab
 
   @integration
   Scenario: The step drawer shows a step's error, fix and checkpoint, read-only
@@ -139,7 +162,7 @@ Feature: Ops shows an installation's release upgrades, read-only
 
   # --- Background steps and their Retry (Alex, 2026-10-09, UPGRADE-CONSOLE D6) ---
 
-  @unimplemented
+  @integration
   Scenario: The background step list shows each step's state, progress and deadline
     Given a background step at 63 percent, one waiting on old writers and one failed
     When an operator opens "Finishing in background"
@@ -209,7 +232,7 @@ Feature: Ops shows an installation's release upgrades, read-only
     Then the preview is refused as "target_not_in_image"
     And it shows the command that runs "upgrade plan --to 3.24.0" from the 3.24.0 image
 
-  @unimplemented
+  @unit
   Scenario: An installation below the floor previews as refused with the LTS to upgrade to first
     Given an installation on 3.18.0 below the floor 3.20.1
     When an operator previews an upgrade to the image's release
@@ -234,13 +257,12 @@ Feature: Ops shows an installation's release upgrades, read-only
     When an operator opens Ops, Upgrades
     Then no Dataplanes tab is offered
 
-  # Upgrading mode (UPGRADE-IN-WORKER slice 4, UIW-6; plan dev/docs/plans/upgrade-in-worker-2026-10-09.md section 4)
+  # Upgrading mode (UIW-6, then API-UP-DURING-UPGRADE, Alex 2026-10-09: every route serves by default)
   @unit
-  Scenario: The Upgrades reads and Retry serve while the installation upgrades and the migration procedures stay held
+  Scenario: The Upgrades and system-migration procedures serve while the installation upgrades
     Given the api is in upgrading mode
-    When a batched call names the eight upgrade reads and Retry
+    When a batched call names the upgrade reads, Retry and the system-migration procedures
     Then it passes the holding door to the door that asks ops:view or ops:manage at the platform
-    And a call naming any system-migration procedure answers 503 before the door
 
   # --- Tenant and operator steps on the Upgrades page (U4, U5) ---
 

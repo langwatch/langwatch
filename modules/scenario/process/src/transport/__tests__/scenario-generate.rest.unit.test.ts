@@ -5,6 +5,7 @@
 import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import { type ScenarioApi, type ScenarioGenerateResponse } from "@langwatch/scenario-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 
 import { scenarioGenerateRest } from "../scenario-generate.rest.ts";
@@ -20,6 +21,7 @@ function buildApi(permitted = true) {
   const app = createApiFixture<ScenarioApi>({ generateScenario });
   const authorize = vi.fn(() => ({ permitted, organizationRole: null }));
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({ actor: null, scope: null }),
       identify: () => ({ actor: { type: "user", id: "user_1" }, scope: null }),

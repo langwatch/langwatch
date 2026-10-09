@@ -15,7 +15,8 @@ import {
 } from "./gateway-elevenlabs-credential.service.ts";
 
 const logger = createLogger("langwatch:api:elevenlabs");
-const SIGNATURE_TOLERANCE_SECONDS = 30 * 60;
+/** The window the other signed inbound webhooks (SCIM, Stripe) allow. */
+const SIGNATURE_TOLERANCE_SECONDS = 5 * 60;
 const BILLABLE_EVENT_TYPE = "post_call_transcription";
 
 const postCallSchema = z.object({

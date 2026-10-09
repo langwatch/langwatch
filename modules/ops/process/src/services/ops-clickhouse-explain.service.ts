@@ -5,7 +5,7 @@ import { CLICKHOUSE_GUARDRAILS } from "../rules/ops-clickhouse-guardrails.rules.
 
 const logger = createLogger("langwatch:ops:clickhouse:explain");
 
-export type OpsExplainOutcome =
+type OpsExplainOutcome =
   /** `CLICKHOUSE_OPS_URL` is unset and the caller is in production —
    *  refusing to fall back to the default-user client. */
   | { status: "not_configured_in_production" }

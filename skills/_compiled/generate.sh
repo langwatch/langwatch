@@ -9,7 +9,7 @@ set -e
 COMPILER="node skills/_compiler/compile.ts"
 OUT_DIR="skills/_compiled"
 
-SKILLS="tracing experiments online-evaluations evaluations scenarios connect-agent prompts agent-performance agent-improve level-up datasets context-sweet-spot provider-cost-comparison"
+SKILLS="tracing experiments online-evaluations evaluations scenarios connect-agent prompts agent-performance agent-improve level-up datasets context-sweet-spot provider-cost-comparison coding-agent-cost"
 
 for skill in $SKILLS; do
   echo "Compiling $skill..."

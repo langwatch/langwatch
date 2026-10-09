@@ -27,6 +27,7 @@
   },
   "dependencies": {
     "@clickhouse/client": "catalog:",
+    "@langwatch/authorization": "workspace:*",
     "@langwatch/limiter": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/task": "workspace:*",

@@ -1,6 +1,6 @@
 /**
  * API Key's answer to the port its three screens declare, over
- * `@langwatch/browser-host` capabilities, this family's own `organization.getAll`
+ * `@langwatch/browser-host` host services, this family's own `organization.getAll`
  * query, and the CLI device-flow's own REST doors. ARCHITECTURE.md §10.1.
  */
 
@@ -71,7 +71,7 @@ function sessionStatusOf(hasActor: boolean, isSettled: boolean): ApiKeySessionSt
   return isSettled ? "unauthenticated" : "loading";
 }
 
-class CapabilityApiKeyHost extends ApiKeyHostApi {
+class HostServiceApiKeyHost extends ApiKeyHostApi {
   constructor(
     private readonly deps: {
       activeScopeIds: { organizationId: string | undefined; projectId: string | undefined };
@@ -218,7 +218,7 @@ export default function ApiKeyHostMount({ children }: { children?: ReactNode }) 
 
   const host = useMemo(
     () =>
-      new CapabilityApiKeyHost({
+      new HostServiceApiKeyHost({
         activeScopeIds: {
           organizationId: activeScope.organizationId ?? void 0,
           projectId: activeScope.projectId ?? void 0,

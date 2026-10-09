@@ -11,6 +11,7 @@ import {
 } from "@langwatch/design-system/primitives";
 import { getHexColorForString } from "@langwatch/design-system/rotating-colors";
 import { HandledErrorAlert } from "@langwatch/error-views";
+import { findLandingProjects } from "@langwatch/project-contract";
 import { type TimeInput, nowInstant, toEpochMs } from "@langwatch/time";
 import numeral from "numeral";
 
@@ -52,13 +53,12 @@ function GovernanceTeamDetailPage() {
   const { organization, organizations, hasAnyPermission } = useGovernanceScope();
   const orgId = organization?.id ?? "";
   const canReadActivity = hasAnyPermission("activityMonitor:view");
-  // Resolve the team's first project slug for the bird's-eye drill-in link,
-  // landing on the team's workspace via the existing project-shell. No
-  // "viewing as admin" banner: that keys off a PERSONAL workspace owned by
-  // someone else, and an org team isn't one, so this drill-through is silent.
-  const teamProjectSlug =
-    organizations?.flatMap((org) => org.teams ?? []).find((t) => t.id === teamId)?.projects?.[0]
-      ?.slug ?? null;
+  // The team's landing project for the drill-in link: never an aggregate, the
+  // rule the app lands on (ADR-144 block F). No "viewing as admin" banner: that
+  // keys off someone else's PERSONAL workspace, so this drill-through is silent.
+  const teamProjects =
+    organizations?.flatMap((org) => org.teams ?? []).find((t) => t.id === teamId)?.projects ?? [];
+  const teamProjectSlug = findLandingProjects(teamProjects)[0]?.slug ?? null;
 
   const teamsQuery = api.activityMonitor.spendByTeam.useQuery(
     { organizationId: orgId, windowDays: 30, limit: 500 },

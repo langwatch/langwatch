@@ -87,7 +87,7 @@ function mountKey({
           throw new PermissionDeniedError({
             permission,
             scope: { type: "project", id: projectId },
-            denialReason: "no-binding",
+            denialReason: "no-grant",
           });
         }
         return caller;

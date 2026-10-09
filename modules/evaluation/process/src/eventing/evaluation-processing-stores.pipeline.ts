@@ -3,6 +3,7 @@ import type { EvaluationRunData } from "@langwatch/evaluation-contract";
 import type {
   AppendStore,
   FoldProjectionStore,
+  FoldReadAuthorizer,
   RetentionPolicyResolver,
 } from "@langwatch/eventing";
 
@@ -42,6 +43,8 @@ export class EvaluationProcessingStoresAdapter {
       /** The platform default a tenant with no override is stamped with, read per write. */
       defaultRetentionDays: () => number;
       tenantRetention: RetentionPolicyResolver;
+      /** Mints the own-only proof the run fold's read-back is fenced by. */
+      authorizeFoldRead: FoldReadAuthorizer;
     },
   ) {}
 
@@ -51,16 +54,27 @@ export class EvaluationProcessingStoresAdapter {
     analyticsFoldCache: EvaluationAnalyticsFoldCacheRepository;
     defaultRetentionDays: () => number;
     tenantRetention: RetentionPolicyResolver;
+    authorizeFoldRead: FoldReadAuthorizer;
   }): EvaluationProcessingStoresAdapter {
     return new EvaluationProcessingStoresAdapter(input);
   }
 
   buildStores(): EvaluationEventingStores {
-    const { runs, analytics, analyticsFoldCache, defaultRetentionDays, tenantRetention } =
-      this.input;
+    const {
+      runs,
+      analytics,
+      analyticsFoldCache,
+      defaultRetentionDays,
+      tenantRetention,
+      authorizeFoldRead,
+    } = this.input;
 
     return {
-      evalRunStore: EvaluationRunStore.create({ service: runs, defaultRetentionDays }),
+      evalRunStore: EvaluationRunStore.create({
+        service: runs,
+        defaultRetentionDays,
+        authorize: authorizeFoldRead,
+      }),
       evaluationAnalyticsStore: analyticsFoldCache.cached(
         EvaluationAnalyticsStore.create({ analytics, defaultRetentionDays }),
       ),

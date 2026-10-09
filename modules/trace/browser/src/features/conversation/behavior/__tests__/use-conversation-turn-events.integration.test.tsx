@@ -88,7 +88,10 @@ describe("useConversationTurnEvents", () => {
     /** @scenario "Each turn in a thread carries the events it recorded" */
     it("gives every turn its own count", () => {
       resolveWith({
-        data: { "t-1": rollup("tool.output", 3), "t-2": rollup("vote", 1) },
+        data: {
+          "proj-1:t-1": rollup("tool.output", 3),
+          "proj-1:t-2": rollup("vote", 1),
+        },
       });
 
       const { result } = renderHook(() =>
@@ -139,7 +142,7 @@ describe("useConversationTurnEvents", () => {
   describe("given a turn belonging to a thread that just changed", () => {
     it("keeps reporting none until its own answer arrives", () => {
       resolveWith({
-        data: { "old-turn": rollup("vote", 2) },
+        data: { "proj-1:old-turn": rollup("vote", 2) },
         extra: { isPlaceholderData: true },
       });
 

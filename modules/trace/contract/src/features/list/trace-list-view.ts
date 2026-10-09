@@ -18,6 +18,8 @@ const facetGroupSchema = z.enum(["trace", "evaluation", "span", "metadata", "pro
 
 export const traceListViewItemSchema = z.object({
   traceId: z.string(),
+  /** The project that owns the trace; on an aggregate, the member it was read from (ADR-177). */
+  projectId: z.string(),
   timestamp: z.number(),
   name: z.string(),
   serviceName: z.string(),
@@ -71,6 +73,8 @@ export const traceListViewItemSchema = z.object({
   ttft: z.number().nullable(),
   traceName: z.string(),
   rootSpanType: z.string().nullable(),
+  /** The evaluations scored on this row's trace, matched by project and trace id together. */
+  evaluations: z.array(evaluationSummarySchema),
 });
 
 export type TraceListItem = z.infer<typeof traceListViewItemSchema>;
@@ -78,7 +82,6 @@ export type TraceListItem = z.infer<typeof traceListViewItemSchema>;
 export const traceListPageSchema = z.object({
   items: z.array(traceListViewItemSchema),
   totalHits: z.number(),
-  evaluations: z.record(z.string(), z.array(evaluationSummarySchema)),
   nextCursor: traceListCursorSchema.nullable(),
 });
 

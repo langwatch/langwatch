@@ -13,6 +13,10 @@ import type {
 } from "@langwatch/trace-contract";
 
 import { enrichTracesWithEvaluations } from "../../../rules/trace-evaluation-enrichment.rules.ts";
+// The PORT rather than the concrete legacy service: the export reads one
+// method, and typing it at the port lets a process hand over whatever it
+// composed its legacy read as.
+import type { TraceLegacyRead } from "../../../services/trace-viewer.service.ts";
 import {
   CSV_NEWLINE,
   serializeTracesToFullCsv,
@@ -22,10 +26,6 @@ import {
   serializeTraceToFullJson,
   serializeTraceToSummaryJson,
 } from "../rules/trace-export-json.rules.ts";
-// The PORT rather than the concrete legacy service: the export reads one
-// method, and typing it at the port lets a process hand over whatever it
-// composed its legacy read as.
-import type { TraceLegacyRead } from "../../../services/trace-viewer.service.ts";
 
 const BATCH_SIZE = 100;
 

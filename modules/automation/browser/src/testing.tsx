@@ -254,7 +254,7 @@ export class FakeAutomationHost extends AutomationHost {
 
   /**
    * The one line `apps/ui` would show for this failure: the fallback the
-   * real host's feedback capability uses for an unnamed code, so a test
+   * real feedback host service uses for an unnamed code, so a test
    * never depends on copy that lives in a registry this package can't see.
    */
   describeFailure(failure: AutomationFailureNotice): string {

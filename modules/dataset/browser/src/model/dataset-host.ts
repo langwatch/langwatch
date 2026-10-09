@@ -9,6 +9,8 @@ export type DatasetHostProject = {
   id: string;
   slug: string;
   name?: string;
+  /** The project's kind (`application`, `aggregate`, ...), once the shell has read it. */
+  kind?: string;
 };
 
 /** One project a dataset can be replicated into. */

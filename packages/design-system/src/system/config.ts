@@ -752,6 +752,9 @@ export const designSystemConfig = defineConfig({
       badge: defineRecipe({
         base: {
           borderRadius: "lg",
+          maxWidth: "100%",
+          minWidth: 0,
+          overflow: "hidden",
         },
       }),
     },

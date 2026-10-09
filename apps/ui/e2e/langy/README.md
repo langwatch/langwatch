@@ -526,7 +526,7 @@ Three handles, in increasing order of what they prove:
 | `POST /api/langy/ui/actions`                                                                                                        | the agent worker's own session key, never the suite's   |
 
 `LANGY_PROJECT_ID` is the project's real id, not its slug: the tRPC procedures
-resolve permissions on the id, and a slug there is refused as `no-binding` on
+resolve permissions on the id, and a slug there is refused as `no-grant` on
 every project-scoped call.
 
 ### What the page cannot show

@@ -133,7 +133,7 @@ function fakeKeyDoor({
       throw new PermissionDeniedError({
         permission,
         scope: { type: "organization", id: ORGANIZATION_ID },
-        denialReason: "no-binding",
+        denialReason: "no-grant",
       });
     },
     identify: caller,
@@ -199,7 +199,7 @@ function mountGatewayPlatform(options: { allowedAtOrganization: readonly string[
     throw new PermissionDeniedError({
       permission,
       scope: { type: "organization", id: organizationId },
-      denialReason: "no-binding",
+      denialReason: "no-grant",
     });
   };
   const app = createApiFixture<GatewayApi>({

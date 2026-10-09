@@ -56,7 +56,7 @@ function mount({ grants }: { grants: readonly string[] }) {
       throw new PermissionDeniedError({
         permission,
         scope: { type: "project", id: PROJECT_ID },
-        denialReason: "no-binding",
+        denialReason: "no-grant",
       });
     }
     return caller;

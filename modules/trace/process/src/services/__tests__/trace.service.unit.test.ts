@@ -1,6 +1,8 @@
+import type { Authorization } from "@langwatch/authorization";
 import type { SpanTreeNode, TraceFullRecord } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
+import { ownProof } from "../../__tests__/support/authorization-proofs.fixture.ts";
 import { TestModelProviderService } from "../../__tests__/support/model-provider.service.fake.ts";
 import { TestTraceQueryClassification } from "../../__tests__/support/query-classification.fake.ts";
 import { traceReadPorts } from "../../__tests__/support/trace-read-ports.fake.ts";
@@ -37,6 +39,8 @@ const node: SpanTreeNode = {
   updatedAtMs: 30,
 };
 
+const treeProof = ownProof({ projectId: "project_1" });
+
 const record = (value: SpanTreeNode): TraceSpanSummaryRecord => ({
   ...value,
   cost: value.cost ?? null,
@@ -65,11 +69,11 @@ class FakeTraceRepository extends TraceProjectedReadRepository {
   }
 
   async listSummaryPage(input: {
-    tenantId: string;
+    authorization: Authorization;
     traceId: string;
     limit: number;
   }): Promise<TraceSpanPage> {
-    if (input.tenantId !== "project_1" || input.traceId !== "trace_1") {
+    if (input.authorization !== treeProof || input.traceId !== "trace_1") {
       throw new Error("FakeTraceRepository received an unexpected trace scope");
     }
     return { rows: this.rows, hasMore: this.rows.length > 0 };
@@ -114,6 +118,8 @@ class FullRecords extends TraceFullRecordRepository {
     return [];
   }
 }
+
+const PROOF = ownProof({ projectId: "project_1" });
 
 const service = (
   rows: SpanTreeNode[] = [node],
@@ -192,7 +198,7 @@ describe("TraceService span-tree read", () => {
       /** @scenario "A trace read is tenant scoped" */
       it("reads nothing back and offers no cursor to page on with", async () => {
         class TenantKeyedRepository extends TraceProjectedReadRepository {
-          readonly seen: string[] = [];
+          readonly seen: Authorization[] = [];
 
           findEvaluationSpans(): Promise<[]> {
             return Promise.resolve([]);
@@ -206,9 +212,9 @@ describe("TraceService span-tree read", () => {
             return null;
           }
 
-          async listSummaryPage(input: { tenantId: string }): Promise<TraceSpanPage> {
-            this.seen.push(input.tenantId);
-            const rows = input.tenantId === "project_1" ? [record(node)] : [];
+          async listSummaryPage(input: { authorization: Authorization }): Promise<TraceSpanPage> {
+            this.seen.push(input.authorization);
+            const rows = input.authorization === treeProof ? [record(node)] : [];
             return { rows, hasMore: rows.length > 0 };
           }
 
@@ -218,6 +224,7 @@ describe("TraceService span-tree read", () => {
         }
 
         const repository = new TenantKeyedRepository();
+        const otherProof = ownProof({ projectId: "project_2" });
         const traceService = TraceService.create({
           repository,
           modelProviders: new TestModelProviderService(),
@@ -229,15 +236,16 @@ describe("TraceService span-tree read", () => {
 
         await expect(
           traceService.getSpanTreePage({
+            authorization: otherProof,
             projectId: "project_2",
             traceId: "trace_1",
             limit: 1,
             canSeeCosts: true,
           }),
         ).resolves.toEqual({ nodes: [], nextCursor: null });
-        // The read is scoped by the caller's project, not by the trace id: a
+        // The read is fenced by the caller's proof, not by the trace id: a
         // trace id alone is not unique across tenants.
-        expect(repository.seen).toEqual(["project_2"]);
+        expect(repository.seen).toEqual([otherProof]);
       });
     });
   });
@@ -246,6 +254,7 @@ describe("TraceService span-tree read", () => {
   it("returns the complete characterized page and cursor", async () => {
     await expect(
       service().getSpanTreePage({
+        authorization: treeProof,
         projectId: "project_1",
         traceId: "trace_1",
         limit: 1,
@@ -260,6 +269,7 @@ describe("TraceService span-tree read", () => {
   /** @scenario "A tree cost is withheld for a restricted viewer" */
   it("redacts cost without changing the rest of the node", async () => {
     const result = await service().getSpanTreePage({
+      authorization: treeProof,
       projectId: "project_1",
       traceId: "trace_1",
       limit: 1,
@@ -272,6 +282,7 @@ describe("TraceService span-tree read", () => {
   it("preserves the live empty-page response when no spans are found", async () => {
     await expect(
       service([]).getSpanTreePage({
+        authorization: treeProof,
         projectId: "project_1",
         traceId: "trace_1",
         limit: 1,
@@ -312,6 +323,7 @@ describe("TraceService span-tree read", () => {
         summaryReader: new CapturingSummaryReader(),
         ...traceReadPorts(),
       }).getSpanTreePage({
+        authorization: treeProof,
         projectId: "project_1",
         traceId: "trace_1",
         limit: 1,
@@ -330,6 +342,7 @@ describe("TraceService span-tree read", () => {
       summaryReader: new CapturingSummaryReader(),
       ...traceReadPorts(),
     }).getSpanTreePage({
+      authorization: treeProof,
       projectId: "project_1",
       traceId: "trace_1",
       limit: 1,
@@ -349,6 +362,7 @@ describe("TraceService span-tree read", () => {
       summaryReader: new CapturingSummaryReader(),
       ...traceReadPorts(),
     }).getSpanTreeDelta({
+      authorization: treeProof,
       projectId: "project_1",
       traceId: "trace_1",
       sinceUpdatedAtMs: 29,
@@ -358,6 +372,7 @@ describe("TraceService span-tree read", () => {
     expect(priced).toEqual([{ ...node, cost: 0.12 }]);
 
     const redacted = await service().getSpanTreeDelta({
+      authorization: treeProof,
       projectId: "project_1",
       traceId: "trace_1",
       sinceUpdatedAtMs: 29,
@@ -372,8 +387,8 @@ describe("TraceService query field catalogue", () => {
   it("merges live values before static values and degrades one failed facet", async () => {
     const fieldValues = new CharacterizedQueryFieldValues();
     const catalogue = await service([], fieldValues).buildQueryFieldCatalogue({
-      projectId: "project_1",
-      timeRange: { from: 100, to: 200 },
+      input: { projectId: "project_1", timeRange: { from: 100, to: 200 } },
+      authorization: PROOF,
     });
 
     expect(catalogue).toContain("- status (categorical): Status — e.g. warning, custom, error, ok");
@@ -385,6 +400,7 @@ describe("TraceService query field catalogue", () => {
         {
           projectId: "project_1",
           timeRange: { from: 100, to: 200 },
+          authorization: PROOF,
           facetKey: "status",
           limit: 20,
           offset: 0,

@@ -10,7 +10,7 @@ import {
  * Only what this repository touches, so composition names the slice it needs
  * rather than the whole generated client.
  */
-export type BillingCheckpointDatabase = Pick<PrismaClient, "billingMeterCheckpoint">;
+type BillingCheckpointDatabase = Pick<PrismaClient, "billingMeterCheckpoint">;
 
 export class PrismaBillingCheckpointRepository extends BillingCheckpointRepository {
   private constructor(private readonly prisma: BillingCheckpointDatabase) {

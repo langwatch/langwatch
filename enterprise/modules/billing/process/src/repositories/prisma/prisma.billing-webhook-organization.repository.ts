@@ -7,7 +7,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import { BillingWebhookOrganizationRepository } from "../billing-webhook-organization.repository.ts";
 
-export type BillingWebhookOrganizationDatabase = Pick<PrismaClient, "organization">;
+type BillingWebhookOrganizationDatabase = Pick<PrismaClient, "organization">;
 
 export class PrismaBillingWebhookOrganizationRepository extends BillingWebhookOrganizationRepository {
   private constructor(private readonly database: BillingWebhookOrganizationDatabase) {

@@ -6,8 +6,9 @@ import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
 import { POSTGRES_TOUCH, postgresOwners, SQL_COMMENT } from "./migration-owners.ts";
 
 /**
- * The api serves sign-in while the worker runs blocking upgrade steps, so a blocking step's
- * frozen SQL never touches a table the sign-in owners claim (Alex, 2026-10-09, UIW-9).
+ * The api serves while the worker runs blocking steps, so a blocking step's SQL never touches a
+ * sign-in or ingest door's table (Alex, 2026-10-09, UIW-9), and touches only tables created in
+ * its own release, which no released image reads (Alex, 2026-10-09).
  */
 
 const POLICY = "upgrade-sign-in-tables";
@@ -17,9 +18,26 @@ const SIGN_IN_OWNERS: ReadonlySet<string> = new Set([
   "organization",
   "authz",
   "identity",
+  "api-key",
+  "project",
+  "evaluation",
+  "evaluator",
+  "model-provider",
+  "monitor",
+  "experiment",
+  "governance",
 ]);
 const ALLOWED =
-  "Ship the change as a background step (expand/contract); the api serves sign-in while the worker runs blocking steps (Alex, 2026-10-09, UIW-9).";
+  "Ship the change as a background step (expand/contract); the api serves sign-in and ingestion while the worker runs blocking steps (Alex, 2026-10-09, UIW-9).";
+const OLDER_TABLE_FIX =
+  "A blocking data step may touch only tables created in its own release; ship it as a background step, ordered with `after:` (Alex, 2026-10-09).";
+const PRISMA_MIGRATIONS = "packages/prisma-client/prisma/migrations";
+const RELEASES = "packages/upgrade/releases";
+// The newest Prisma migration in langwatch@v3.20.1; release manifests carry later ones.
+const RELEASED_THROUGH = "20261001120000_sso_provider_entra_issuer_trailing_slash";
+// Real findings listed for a fix (2026-10-09); never add to it.
+const OPEN_STEPS: ReadonlySet<string> = new Set(["ops:copy-automation-migration-state"]);
+const CREATE_TABLE = /\bCREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:"?public"?\.)?"?(\w+)"?/gi;
 const TS_COMMENT = /^\s*\/\/.*$/gm;
 const MIGRATION_REPOSITORY = /^prisma\..+-migration\.repository\.ts$/;
 const NEXT_MEMBER = /\n {2}(?:(?:async|static|private|public|protected)\s+)*\w+\s*[(<]/;
@@ -95,7 +113,56 @@ function ownersTouched({
   return touched;
 }
 
-/** Every blocking step whose frozen SQL touches a sign-in owner's table, in module order. */
+/** The newest released Prisma migration: the floor tag's, or a later one a manifest names. */
+export function releasedThrough({ root }: { root: string }): string {
+  const named = filesIn({
+    directory: join(root, RELEASES),
+    accept: (name) => name.endsWith(".json"),
+  })
+    .flatMap((file) => [...readFileSync(file, "utf8").matchAll(/"id":\s*"prisma:(\w+)"/g)])
+    .map((match) => match[1] ?? "");
+
+  return [RELEASED_THROUGH, ...named].toSorted().at(-1)!;
+}
+
+/** Each table a Prisma migration creates, with the first migration that creates it. */
+export function tableCreations({ root }: { root: string }): Map<string, string> {
+  const created = new Map<string, string>();
+  const directory = join(root, PRISMA_MIGRATIONS);
+  const names = existsSync(directory) ? readdirSync(directory).toSorted() : [];
+  for (const name of names) {
+    const file = join(directory, name, "migration.sql");
+    if (!existsSync(file)) continue;
+    const sql = readFileSync(file, "utf8").replace(SQL_COMMENT, "");
+    for (const match of sql.matchAll(CREATE_TABLE)) {
+      const table = match[1] ?? "";
+      if (!created.has(table)) created.set(table, name);
+    }
+  }
+
+  return created;
+}
+
+function olderTables({
+  sql,
+  created,
+  released,
+}: {
+  sql: string;
+  created: ReadonlyMap<string, string>;
+  released: string;
+}): string[] {
+  const names = [...sql.replace(TS_COMMENT, "").replace(SQL_COMMENT, "").matchAll(POSTGRES_TOUCH)]
+    .map((match) => match[1] ?? "")
+    .filter((table) => {
+      const at = created.get(table);
+      return at !== undefined && at <= released;
+    });
+
+  return [...new Set(names)];
+}
+
+/** Every blocking step touching a sign-in owner's table or one an earlier release created. */
 export function lintUpgradeSignInTablesAt({
   root,
   catalogue,
@@ -104,6 +171,8 @@ export function lintUpgradeSignInTablesAt({
   catalogue: readonly FeatureCatalogueEntry[];
 }): ArchitectureViolation[] {
   const tables = signInTables({ root, catalogue });
+  const created = tableCreations({ root });
+  const released = releasedThrough({ root });
 
   return catalogue.flatMap((feature) => {
     const source = join(root, feature.root, "process", "src");
@@ -121,16 +190,30 @@ export function lintUpgradeSignInTablesAt({
         const text = readFileSync(file, "utf8");
         const sql = step.calls.map((name) => methodBody({ source: text, name })).join("\n");
         const touched = ownersTouched({ sql, tables });
-        if (touched.size === 0) return [];
+        const older = OPEN_STEPS.has(step.id) ? [] : olderTables({ sql, created, released });
         const named = [...touched].map(([owner, names]) => `${owner} (${names.join(", ")})`);
 
         return [
-          {
-            policy: POLICY,
-            file,
-            message: `Blocking step "${step.id}" touches the sign-in tables of ${named.join(" and ")}.`,
-            allowed: ALLOWED,
-          } satisfies ArchitectureViolation,
+          ...(touched.size === 0
+            ? []
+            : [
+                {
+                  policy: POLICY,
+                  file,
+                  message: `Blocking step "${step.id}" touches the sign-in tables of ${named.join(" and ")}.`,
+                  allowed: ALLOWED,
+                } satisfies ArchitectureViolation,
+              ]),
+          ...(older.length === 0
+            ? []
+            : [
+                {
+                  policy: POLICY,
+                  file,
+                  message: `Blocking step "${step.id}" touches ${older.join(", ")}, created before this release.`,
+                  allowed: OLDER_TABLE_FIX,
+                } satisfies ArchitectureViolation,
+              ]),
         ];
       }),
     );

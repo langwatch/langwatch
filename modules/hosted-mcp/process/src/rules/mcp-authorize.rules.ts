@@ -1,3 +1,4 @@
+import { AggregateProjectHasNoCredentialError } from "@langwatch/api-key-contract";
 import { postedApprovalFieldsSchema } from "@langwatch/hosted-mcp-contract";
 import type { z } from "zod";
 
@@ -24,12 +25,14 @@ export type McpApprovalOutcome =
   | Readonly<{ kind: "challenge-missing" }>
   | Readonly<{ kind: "challenge-method-unsupported" }>
   | Readonly<{ kind: "denied" }>
+  | Readonly<{ kind: "aggregate-project-has-no-credential" }>
   | Readonly<{ kind: "unavailable" }>;
 
 /** The body every refusal carries, in the OAuth shape the consent page reads. */
 type RefusalBody = Readonly<{
   error: string;
   error_description?: string;
+  code?: string;
   redirect?: string;
 }>;
 
@@ -47,7 +50,11 @@ type ApprovalRefusal = Readonly<{
   error: string;
   /** Null for a refusal raised before the redirect URI was verified. */
   description: string | null;
+  /** The registered handled-error code, where the refusal has one. */
+  code?: string;
 }>;
+
+const aggregateRefusal = new AggregateProjectHasNoCredentialError();
 
 /**
  * Every refusal an approval can decide. The two with no description are raised before the
@@ -78,6 +85,12 @@ const APPROVAL_REFUSALS = {
     status: 403,
     error: "access_denied",
     description: "Project not found or you don't have access",
+  },
+  "aggregate-project-has-no-credential": {
+    status: 403,
+    error: "access_denied",
+    description: aggregateRefusal.message,
+    code: aggregateRefusal.code,
   },
   unavailable: {
     status: 500,
@@ -141,6 +154,7 @@ export function buildAuthorizeAnswer({
     body: {
       error: refusal.error,
       error_description: refusal.description,
+      ...(refusal.code === undefined ? {} : { code: refusal.code }),
       redirect: redirectWith(redirectUri, {
         error: refusal.error,
         error_description: refusal.description,

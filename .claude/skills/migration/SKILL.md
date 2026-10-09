@@ -78,7 +78,7 @@ Kinds and modes are `upgradeStepKindSchema` and `upgradeStepModeSchema` in
   Prisma folders and goose `up-to` its last version, then its blocking steps, so a blocking step sees
   its own release's schema** (`specs/upgrade/stepping.feature`). Unreleased schema goes in one pass at
   the end. Write a blocking step as stepped (frozen SQL, its own release's columns). Postgres sessions
-  carry `lock_timeout` (10 s) and a failed apply is attempted up to 3 times (2 s, then 4 s;
+  carry `lock_timeout` (2 s, Alex, 2026-10-09) and a failed apply is attempted up to 3 times (2 s, then 4 s;
   `DEFAULT_LOCK_TIMEOUT_MS`, `DEFAULT_RETRY`, `packages/upgrade/src/runner/upgrade-runner.ts`). A Prisma migration newer than `RERUNNABLE_PRISMA_FROM` that fails (a
   `lock_timeout` cancel) is marked rolled back and retried, logged by name; an older one stops the
   run `failed_prisma_migration` naming the `prisma migrate resolve` command

@@ -33,6 +33,8 @@ export interface TimeRange {
 
 export interface TraceListCursor {
   sortValue: number;
+  /** The tenant the row was read from; an aggregate project lists several. */
+  tenantId?: string;
   traceId: string;
 }
 

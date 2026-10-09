@@ -4,19 +4,22 @@
  * call the app doesn't serve fails here as it does in production.
  */
 import {
+  bindRestMiddleware,
   createRestRuntime,
   canonicalErrorResponse,
   ForbiddenError,
   UnauthorizedError,
 } from "@langwatch/api/rest";
 import { LocalFeatureApis } from "@langwatch/process";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 
-import { projectRest, ProjectManagementApi } from "../project.rest.ts";
+import { projectRest, projectRestCaller, ProjectManagementApi } from "../project.rest.ts";
 import { TestProjectManagementApi } from "./support/test-project-management-api.ts";
 
 export const ORGANIZATION_ID = "organization-1";
 export const USER_ID = "user-1";
 export const CREDENTIAL = "organization-credential";
+export const API_KEY_ID = "api-key-1";
 
 /** Every permission an organization credential holds unless a test narrows it. */
 const EVERY_PERMISSION = [
@@ -43,7 +46,12 @@ export function mountProjectRest(
   const { app, ...access } = options;
 
   return mountProjectRestApplication(
-    new TestProjectManagementApi({ getPiiRedactionLevel: async () => "ESSENTIAL", ...app }),
+    new TestProjectManagementApi({
+      getPiiRedactionLevel: async () => "ESSENTIAL",
+      // The aggregate guard reads the row first; an unstubbed read finds an ordinary project.
+      findWithTeam: async () => null,
+      ...app,
+    }),
     access,
   );
 }
@@ -77,6 +85,7 @@ export function mountProjectRestApplication(
   };
 
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       identify: ({ request }) => admit(request),
       authenticate: ({ request, permission }) => {
@@ -95,6 +104,9 @@ export function mountProjectRestApplication(
 
   const hono = runtime.mount(projectRest.router(), {
     app: () => apis.reference(ProjectManagementApi),
+    facts: [
+      bindRestMiddleware(projectRestCaller, () => ({ userId: USER_ID, apiKeyId: API_KEY_ID })),
+    ],
     onError: canonicalErrorResponse,
   });
 

@@ -148,6 +148,7 @@ export const authzRevokeGrantByIdInputSchema = z
   .object({
     organizationId: z.string().min(1),
     grantId: z.string().min(1),
+    caller: authzPrincipalRefSchema,
     actor: ledgerActorSchema,
   })
   .strict();

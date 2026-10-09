@@ -63,7 +63,11 @@ describe("copying an ops-held migration's state to its owner's step", () => {
     expect(await stateOf("acme")).toBe("finalized");
     expect(await stateOf("beta")).toBe("rolled_back");
     expect(await stateOf("gamma")).toBeNull();
-    expect(legacy.recordsOf({ migrationName: LEGACY })).toHaveLength(3);
+    expect(await legacy.findStatusCounts({ migrationName: LEGACY })).toMatchObject({
+      finalized: 1,
+      rolled_back: 1,
+      migrated: 1,
+    });
     expect(await run(false)).toBe(0);
   });
 

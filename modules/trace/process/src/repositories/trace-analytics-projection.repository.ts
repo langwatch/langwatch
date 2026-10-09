@@ -1,3 +1,5 @@
+import type { Authorization } from "@langwatch/authorization";
+
 import type { TraceAnalyticsRow } from "../eventing/trace-derived.projection.ts";
 
 export type TraceAnalyticsProjectionEntry = {
@@ -19,8 +21,9 @@ export abstract class TraceAnalyticsProjectionRepository {
     throw new Error("Trace analytics batch persistence is not implemented");
   }
 
+  /** The proof fences the tenants the read sees; the fold passes an own-only one. */
   abstract findByTraceId(input: {
-    tenantId: string;
+    authorization: Authorization;
     traceId: string;
     window?: { fromMs: number; toMs: number };
   }): Promise<TraceAnalyticsProjectionRead | null>;

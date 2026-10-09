@@ -94,8 +94,9 @@ export {
 // Every mounted route and the policy it declared, recorded as each surface mounts.
 export {
   allRegisteredRoutes,
-  routesServingWhileUpgrading,
+  routesHeldWhileUpgrading,
   getRoutePolicy,
   registerRoutePolicy,
   type RegisteredRoute,
+  type UpgradeHoldReason,
 } from "./route-registry.ts";

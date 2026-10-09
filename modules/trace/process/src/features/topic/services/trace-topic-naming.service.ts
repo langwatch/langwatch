@@ -4,6 +4,7 @@
  * cached facet's identity.
  */
 
+import { type Authorization, projectIdsReadBy } from "@langwatch/authorization";
 import type { CategoricalFacetResult } from "@langwatch/trace-contract";
 
 import type { TraceTopicNamesReadRepository } from "../repositories/trace-topic-names.repository.ts";
@@ -19,10 +20,11 @@ export class TraceTopicNamingService {
 
   /**
    * Replace TopicId/SubTopicId facet values with friendly names from topic's shared table.
-   * The `value` field stays as the ID (used for filtering); `label` carries the name.
+   * The `value` field stays as the ID (used for filtering); `label` carries the name. On an
+   * aggregate the ids belong to any member the proof reads, so every one of them is asked.
    */
   async enrichTopicNames(
-    projectId: string,
+    authorization: Authorization,
     result: CategoricalFacetResult,
   ): Promise<CategoricalFacetResult> {
     const ids = result.values.map((v) => v.value).filter(Boolean);
@@ -30,7 +32,13 @@ export class TraceTopicNamingService {
       return result;
     }
 
-    const names = await this.topicNames.findNamesByIds({ projectId, ids });
+    // ponytail: one read per project; widen findNamesByIds to projectIds if aggregates grow large
+    const perProject = await Promise.all(
+      projectIdsReadBy(authorization).map((projectId) =>
+        this.topicNames.findNamesByIds({ projectId, ids }),
+      ),
+    );
+    const names = new Map(perProject.flatMap((found) => [...found]));
 
     return {
       ...result,

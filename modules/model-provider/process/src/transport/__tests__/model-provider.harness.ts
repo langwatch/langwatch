@@ -10,6 +10,7 @@ import type {
   ModelProviderCredentialVerdict,
 } from "@langwatch/model-provider-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { mintTestAuthorization, testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 
 import { createModelProviderTestApp } from "../../app/__tests__/model-provider.fixture.ts";
 import type {
@@ -40,6 +41,7 @@ export function modelProviderTrpcTestMembers(
     identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
     authorization: {
       forRequest: () => ({
+        ...testAuthorizeDefaults,
         getDecision: async ({ permission, scope }) => ({
           permitted: permits(permission, scope),
           organizationRole: null,
@@ -51,6 +53,7 @@ export function modelProviderTrpcTestMembers(
           organizationRole: null,
         }),
         checkScopeLineage: async () => ({ kind: "consistent" }),
+        authorization: mintTestAuthorization,
       }),
     },
     denials: {
@@ -95,6 +98,10 @@ export class RecordingCredentialProbe extends ModelProviderCredentialProbe {
     this.probedStored.push({ projectId: input.projectId, provider: input.provider });
 
     return Promise.resolve(this.verdict);
+  }
+
+  assertEndpointAllowed(): Promise<void> {
+    return Promise.resolve();
   }
 }
 

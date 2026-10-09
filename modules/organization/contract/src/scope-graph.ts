@@ -11,6 +11,7 @@ export const scopeGraphProjectSchema = z.object({
   id: z.string(),
   slug: z.string(),
   name: z.string(),
+  kind: z.string(),
   userLinkTemplate: z.string().nullable(),
   presenceEnabled: z.boolean(),
   lastCodingAgentSessionAt: z.date().nullable(),

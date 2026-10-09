@@ -27,7 +27,7 @@ type Delegate<Model extends keyof PrismaClient, Methods extends keyof PrismaClie
 type GdprUserDataEraseDatabase = {
   user: Delegate<"user", "findUnique" | "delete">;
   organization: Delegate<"organization", "findMany" | "deleteMany">;
-  organizationUser: Delegate<"organizationUser", "count" | "deleteMany" | "groupBy">;
+  organizationUser: Delegate<"organizationUser", "count" | "deleteMany" | "findMany" | "groupBy">;
   team: Delegate<"team", "findMany" | "deleteMany">;
   teamUser: Delegate<"teamUser", "deleteMany" | "groupBy">;
   project: Delegate<"project", "findMany" | "deleteMany">;
@@ -288,6 +288,13 @@ export class PrismaGdprUserDataEraseRepository implements GdprUserDataEraseRepos
         }
 
         await tx.teamUser.deleteMany({ where: { userId } });
+        // Sole-owned organisations are gone by now, so these are the seats the erasure takes.
+        const organizationIds = (
+          await tx.organizationUser.findMany({
+            where: { userId },
+            select: { organizationId: true },
+          })
+        ).map((membership) => membership.organizationId);
         await tx.organizationUser.deleteMany({ where: { userId } });
         await tx.account.deleteMany({ where: { userId } });
         await tx.session.deleteMany({ where: { userId } });
@@ -298,7 +305,12 @@ export class PrismaGdprUserDataEraseRepository implements GdprUserDataEraseRepos
           userId,
           transaction: tx,
           now: occurredAt,
-          intents: [{ type: "recordErased", data: { tenantId: userId, userId, occurredAt } }],
+          intents: [
+            {
+              type: "recordErased",
+              data: { tenantId: userId, userId, occurredAt, organizationIds },
+            },
+          ],
         });
       },
       { timeout: 120_000, maxWait: 30_000 },

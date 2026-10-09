@@ -1,9 +1,10 @@
 # The operator's only act is changing the image. The new worker runs every blocking upgrade step
 # under the runner's lease (`pnpm task upgrade` as a child process); the new api never runs a step.
-# While a Postgres schema step of its image is outstanding the api serves the holding page; after
-# that, until the ledger is current, it serves in upgrading mode: sign-in and the Ops Upgrades page
-# only. A failure in the holding phase opens the token console; later failures show on Upgrades.
-# Ruling: Alex, 2026-10-09 (UPGRADE-IN-WORKER, UIW-1..11; dev/docs/plans/upgrade-in-worker-2026-10-09.md).
+# While a Postgres or ClickHouse schema step of its image is outstanding the api holds each request
+# up to the hold window; after that, until the ledger is current, it serves in upgrading mode: every
+# route but the few declared to hold, each naming why. A failure in the holding phase opens the token
+# console; later failures show on Upgrades. Rulings: Alex, 2026-10-09 (UPGRADE-IN-WORKER, UIW-1..11;
+# API-UP-DURING-UPGRADE: "ideally no dropped api calls either; eventually consistent is fine").
 # The holding page itself: packages/process/specs/upgrade-holding-page.feature.
 
 Feature: The new image's worker runs its blocking upgrade while the api holds, then upgrades in the app
@@ -73,27 +74,48 @@ Feature: The new image's worker runs its blocking upgrade while the api holds, t
   # --- The api's phases: holding, then upgrading mode, then serving ---
 
   @unimplemented
-  Scenario: The api holds while a Postgres schema step of its image is outstanding
-    Given the worker is running the upgrade and a Postgres schema step of the api's image is pending
+  # API-UP-CLICKHOUSE: ClickHouse schema steps hold too (recommended, pending Alex's ruling).
+  Scenario: The api holds while a Postgres or ClickHouse schema step of its image is outstanding
+    Given the worker is running the upgrade and a schema step of the api's image is pending
     When a browser requests any page, the sign-in page included
-    Then it answers the holding page
+    Then the request waits up to the hold window for the schema step to finish
+    And it answers the holding page only if the step is still pending when the window ends
     And the api reports not ready
 
   @unimplemented
-  Scenario: Once the schema steps are done the api serves sign-in and the Upgrades page only
-    Given every Postgres schema step of the api's image is done
-    And a ClickHouse schema step, a blocking data step or reconcile is still outstanding
-    When a browser signs in and opens Ops > Upgrades
-    Then both are served
-    And any other page answers the holding page and any other request 503 with Retry-After 10
+  Scenario: Once the schema steps are done the api serves every route that does not hold
+    Given every schema step of the api's image is done
+    And a blocking data step or reconcile is still outstanding
+    When a browser signs in, opens Ops > Upgrades and opens any other page
+    Then each is served
+    And only a route declared to hold answers the holding page or 503 with Retry-After 10
     And the api reports not ready
 
+  # API-UP-DURING-UPGRADE (Alex, 2026-10-09): the api is up while the worker upgrades; ingestion
+  # enqueues for the worker and is never dropped. Dev boot order: specs/setup/haven-local-topology.feature.
   @unit
-  Scenario: Upgrading mode serves only the routes declared to serve while upgrading
+  Scenario: An SDK posting traces while the installation upgrades is answered by the api
+    Given the api is upgrading and a blocking data step is outstanding
+    When an SDK posts traces over OTLP, the collector or a tracked event
+    Then the request passes the holding door to its route
+    And a trace read passes too
+
+  @unimplemented
+  Scenario: A trace posted during an upgrade appears once the worker finishes
+    Given the api accepted an SDK's traces with 2xx while a blocking data step was outstanding
+    And the api wrote no ClickHouse row for them: its spans were enqueued for the worker
+    When the worker finishes the upgrade and takes jobs
+    Then the trace appears, and no span the api accepted is missing
+    # Proven end to end by tools/upgradelab's "no dropped traces" invariant (not landed).
+
+  @unit
+  Scenario: Every route serves while upgrading unless it holds, naming why
     Given the api is in upgrading mode
-    When a request reaches a route that does not declare it serves while upgrading
-    Then the holding page or 503 answers before the door
-    And a declared route still answers only when the door grants its declared permission
+    When a REST, tRPC or SSE request reaches a route that declares no hold
+    Then it passes the holding door and still answers only when the door grants its declared permission
+    And a route declared with holdsWhileUpgrading and its reason answers the holding page or 503 before the door
+    And a tRPC batch naming one held procedure holds whole
+    And a hold that names no reason is refused when the route is declared
 
   @unimplemented
   Scenario: The api's liveness answers in every phase
@@ -115,16 +137,23 @@ Feature: The new image's worker runs its blocking upgrade while the api holds, t
     Then the upgrading frame names the phase and "2 of 5"
     And it names no tenant, error, hostname or version
 
+  @unit
   Scenario: The holding page offers sign-in to follow the upgrade
     Given the api is in upgrading mode
-    When a browser requests a page that is not served
+    When a browser requests a page that holds, and the hold window ends
     Then the holding page links "Sign in to follow the upgrade" to sign-in, returning to Ops > Upgrades
 
-  @unimplemented
-  Scenario: The shell renders sign-in and the Upgrades page while its other startup reads answer 503
+  @unit
+  Scenario: The shell's startup reads serve while the installation upgrades
     Given the api is in upgrading mode
-    When a platform operator signs in and opens Ops > Upgrades
-    Then the shell renders the page with the blocking steps and their states
+    When the shell reads the caller's permissions and the organization's scope graph and lists
+    Then each read passes the holding door
+
+  @integration
+  Scenario: The Upgrades page opens once its grant read settles, even when no feature flag answers
+    Given the api is in upgrading mode and a platform operator holds ops:view
+    When the shell opens Ops > Upgrades before any feature flag read has answered
+    Then the page opens on the grant read alone
 
   @unimplemented
   Scenario: A failed blocking step is retried from the Upgrades page
@@ -234,7 +263,7 @@ Feature: The new image's worker runs its blocking upgrade while the api holds, t
   @unit
   Scenario: A failure after the schema phase opens no console
     Given the worker's upgrade failed on a blocking data step and the api is in upgrading mode
-    When a browser requests any page that is not served
+    When a browser requests a page that holds
     Then the holding page asks for no token and no console token is printed
     And the failure shows on Ops > Upgrades
 

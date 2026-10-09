@@ -598,12 +598,14 @@ services**, not capabilities (§16). Enforcement is prose for now; a lint rule f
 converted (no availability logic in `*.config.ts` projections; off states use the shared notice).
 
 **Ops and Cloud admin are split by audience** (Alex, 2026-09-29). **Ops** (`/ops/**`) is for every
-instance operator, self-hosted included: the dashboard, event sourcing, the foundry, flags,
+instance operator, self-hosted included: the dashboard, event sourcing, the foundry,
 migrations, and instance administration (users, organizations, projects, SSO connections,
 identity lookup, directory sync). **Cloud admin** (`/ops/cloud/**`) is LangWatch's own company
 tooling (subscriptions, licences, self-hosted instances, bug reports): the ops gate plus ops's own
 cloud-ops capability, invisible and refused elsewhere. `/ops/backoffice/**` redirects; "backoffice" is
 a deleted name (§15).
+Feature Flags show only with cloud ops: flags are the cloud's gradual-rollout switch and self-hosted
+gets features by release; the env override still applies everywhere (Alex, 2026-10-09).
 The capability is ops's, from its own config and secrets, never `isSaas`: ops config asks for cloud
 ops (`LANGWATCH_CLOUD_OPS`), and ops's secrets hold the licence private key, which must match the
 release's built-in public key. Asked for without a matching key refuses boot (Alex, 2026-09-29).
@@ -1374,13 +1376,24 @@ task upgrade` stays a runner under the same lease for development, CI and an ope
 `start:prepare:db`: upgrade alone; no system-migrations pass); the root `prisma:migrate` and
 `clickhouse:migrate` scripts are aliases of it, so no script applies schema outside the ledger
 (Alex, 2026-10-09); the Helm pre-roll Job renders only
-with `serializeUpgrades`, and the compose `migrate` service is gone. The api never runs a step:
-while a Postgres schema step of its image is outstanding it serves the holding page; after that,
-until the ledger is current, it serves in upgrading mode, only sign-in and the Ops Upgrades page
-(the routes declared to serve while upgrading through a `packages/api` route declaration the door
-enforces; everything else answers the holding page), and reports not ready. A blocking step never
-touches a table owned by auth, user, organization, authz or identity; `lint:architecture` refuses
-one that does (UIW-1..11). A background step names the background steps it runs after by their step
+with `serializeUpgrades`, and the compose `migrate` service is gone. The api never runs a step,
+and it is up from boot (Alex, 2026-10-09, API-UP-DURING-UPGRADE: "anything important can get stuck
+on the queue for a few mins while upgrades happen, that's fine. Worker can be down, but api must be
+up"); dev starts it beside the worker, never after it. While a Postgres schema step of its image is
+outstanding the door holds each request up to the hold window (30 s) for the hold to lift; after
+that, until the ledger is current, it serves the routes declared to serve while upgrading (a
+`packages/api` route declaration the door enforces): sign-in, the Ops Upgrades page and ingestion
+(OTLP traces, logs and metrics, the collector, tracked events, RUM, evaluator and guardrail calls,
+batch result logs, governance sources). Ingestion only enqueues for the worker, which drains the
+queue once the ledger is current, so nothing is dropped. A request still held when its window ends
+answers the holding page or 503 with Retry-After, and the api reports not ready. Alex's direction
+(2026-10-09: "ideally no dropped api calls either; eventually consistent is fine") is that every
+route serves while upgrading, with an opt-out naming its reason; until that lands the declared set
+is what serves. A blocking step never touches a table the sign-in or ingest doors read or write
+(auth, user, organization, authz, identity, api-key, project, evaluation, evaluator,
+model-provider, monitor, experiment, governance); `lint:architecture` refuses one that does
+(UIW-1..11). A blocking data step touches only tables created in its own release; anything older
+ships as a background step (Alex, 2026-10-09). A background step names the background steps it runs after by their step
 values (`after: [step]`, STEP-AFTER); the worker waits on them, the upgrade inlines them before a
 contract, and an unknown id or a cycle refuses the plan. A fact old images never recorded is
 recorded by its owner's background data step with `needsOldWritersGone`; `project:record-created-facts`
@@ -1388,7 +1401,13 @@ runs after `instant-eval:copy-judge-spend` (ADR-174 decision 17). Prisma migrati
 ClickHouse migrations are goose SQL files. A serving process holding DDL locks is how deploys die.
 A goose file that starts a background mutation (`MATERIALIZE INDEX`) is tracked by a background step in
 the table owner that waits on `system.mutations` and fails on its fail reason, so the ledger shows it
-(`trace:track-updated-at-index-materialisation`, Alex, 2026-10-09).
+(`trace:track-updated-at-index-materialisation`, Alex, 2026-10-09); the goose file names that step in a
+`-- background step: <id>` note above the statement. Migrations are graceful because the api serves
+through them (Alex, 2026-10-09): the runner sets `lock_timeout` 2 s with a bounded retry, and the
+migration-safety scanners refuse a Postgres `UPDATE`/`DELETE` on an existing table, a volatile
+`DEFAULT` on an added column, two `ALTER`s on one existing table and a longer `lock_timeout`, and a
+ClickHouse mutation without that note, `MODIFY TTL` that materialises, `MODIFY ORDER BY`,
+`OPTIMIZE ... FINAL` and `POPULATE`. Migrations in the LTS floor's tag are history and never rewritten.
 Because they run before any module boots, apps/tasks' migration-runner files (`src/*migrat*.ts`) may
 name process packages (Alex, 2026-09-27), and so may `lwql-provision.ts` and
 `lwql-render-access-config.ts`: LangWatchQL provisioning reads both schemas under the same migration
@@ -1567,7 +1586,11 @@ organization's projects (a gateway budget's ledger) declares its **tenant set** 
 the tenant guard accepts `TenantId IN (...)` only when the list binds exactly that set, the request's
 `tenantId` among them, with no `OR` disjoining it; the member's router resolves every tenant through
 the tenant directory it already routes by and refuses a set spanning organizations. One statement,
-answered on that organization's server, never an `unscoped` reason (Alex, 2026-09-29). Eventing's replay
+answered on that organization's server, never an `unscoped` reason (Alex, 2026-09-29). The list may
+also be one `Array(String)` parameter holding exactly that set, as the proof fence binds it, and an `OR`
+bracketed beneath that set does not weaken it (M8487-GUARD-ARRAY, Alex, 2026-10-09); an `OR` in a
+subquery beneath the set, and a `NOT` in front of any tenant predicate, are refused (GUARD-FOLLOWUPS,
+Alex, 2026-10-09). Eventing's replay
 reads through the member's own surface (`query`, `stream`, `command`); `stream` yields a large read
 batch by batch under the tenant guard and the route, holding no slot and never retried.
 
@@ -1736,6 +1759,14 @@ office deactivates only through user, so it keeps no picked date (Alex, 2026-10-
 - A REST request is authenticated before its body is capped, parsed or validated: a missing or invalid credential
   answers 401/403, never 422 or 413. A door that signs over the body reads the capped raw bytes first. Which project
   the caller acts on is resolved after, from the parsed input (Alex, 2026-09-30).
+- A permission is asked where its scope location says: `{ at: "route" }`, `{ at: "header" }`, or
+  `{ at: "body"; param; schema; field? }` for a raw text JSON body, which the door's runtime parses and validates
+  against `schema` after the credential (400, then 422), then asks at the project its field names (merge #8487).
+- **Authorization fails closed** (Alex, 2026-10-09): a missing member, proof or decision refuses; a wrapper that
+  rebuilds an access object must fail to compile when the object gains a member. Every `Authorize` member is
+  required, a wrapper returns `Required<...>`, and what a type cannot express refuses at boot or at the request,
+  then by a lint rule. The aggregate admin gate (ADR-177 decision 5) applies wherever a door decides at a project,
+  a REST route's own scope included.
 - The exception is a hidden family, whose 404 comes before the credential or the body: `instance_admin` with no key
   set or on SaaS, and `/api/admin/*` for a caller who is not an admin (as main, 2026-09-30).
 - REST runs in three steps: the credential and identity checks that read no body (the door, and a public route's

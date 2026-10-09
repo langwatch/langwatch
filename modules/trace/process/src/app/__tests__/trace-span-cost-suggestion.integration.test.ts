@@ -7,8 +7,8 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { baseSpanSchema, lLMSpanSchema, type Span } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { openProtections } from "../../repositories/clickhouse/__tests__/open-protections.ts";
 import { SpanCostSuggestionService } from "../../features/span/services/span-cost-suggestion.service.ts";
+import { openProtections } from "../../repositories/clickhouse/__tests__/open-protections.ts";
 import type { TraceViewerProtectionService } from "../../services/trace-viewer-protection.service.ts";
 import type { TracesSpanReader } from "../trace.app.ts";
 import { createTraceAppHarness } from "./support/trace-app.harness.ts";

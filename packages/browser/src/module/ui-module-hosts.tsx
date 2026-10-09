@@ -1,6 +1,6 @@
 /**
  * Every declared host mount, composed into one stack the routed tree renders
- * inside. A host implementation reads the route and the capabilities, so this
+ * inside. A host implementation reads the route and the host services, so this
  * sits below the router and below the feature shell. ARCHITECTURE.md §10.1.
  */
 
