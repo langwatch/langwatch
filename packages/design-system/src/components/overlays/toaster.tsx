@@ -43,11 +43,11 @@ export const toaster: Omit<CreateToasterReturn, "create"> & {
 };
 
 const STATUS = {
-  error: { fg: "red.fg", action: "orange.fg", filled: true },
-  warning: { fg: "yellow.fg", action: "orange.fg", filled: true },
-  success: { fg: "green.fg", action: "green.fg", filled: true },
-  info: { fg: "fg.muted", action: "orange.fg", filled: false },
-  loading: { fg: "fg.muted", action: "orange.fg", filled: false },
+  error: { fg: "red.fg", filled: true },
+  warning: { fg: "yellow.fg", filled: true },
+  success: { fg: "green.fg", filled: true },
+  info: { fg: "fg.muted", filled: false },
+  loading: { fg: "fg.muted", filled: false },
 } as const;
 
 type ToastStatus = keyof typeof STATUS;
@@ -56,10 +56,13 @@ const statusOf = (type: string | undefined): ToastStatus =>
 const onPanelOnly = (status: ToastStatus, color: string) =>
   STATUS[status].filled ? { _light: "inherit", _dark: color } : color;
 
-export const toastActionColor = (type: string | undefined) => {
-  const status = statusOf(type);
-  return onPanelOnly(status, STATUS[status].action);
-};
+/** Secondary actions wear the toast's own foreground, quieter than its title, in both modes. */
+export const toastActionStyle = {
+  color: "inherit",
+  opacity: 0.8,
+  "&:hover": { opacity: 1 },
+  "--toast-trigger-bg": "transparent",
+} as const;
 
 function StatusGlyph({ status }: { status: ToastStatus }) {
   const props = { size: 15, "aria-hidden": true } as const;
@@ -189,7 +192,7 @@ export function Toaster({
                     alignSelf="flex-start"
                     fontSize="12px"
                     fontWeight="560"
-                    css={{ color: toastActionColor(toast.type) }}
+                    css={toastActionStyle}
                   >
                     {toast.action.label}
                   </Toast.ActionTrigger>
