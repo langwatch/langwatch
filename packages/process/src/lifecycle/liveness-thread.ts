@@ -154,6 +154,17 @@ const hasSession = (req) => {
   const hashed = sha256(pair.slice(prefix.length));
   return sessions.some((session) => crypto.timingSafeEqual(session, hashed));
 };
+// CONSOLE-FOLLOWUPS: the browser's Sec-Fetch-Site decides; without it, Origin's host must be Host.
+const crossSite = (req) => {
+  const site = req.headers["sec-fetch-site"];
+  if (site !== undefined) return site !== "same-origin";
+  if (req.headers.origin === undefined) return false;
+  try {
+    return new URL(req.headers.origin).host !== req.headers.host;
+  } catch {
+    return true;
+  }
+};
 const openConsole = (req, res, token) => {
   const held = consoleHold;
   if (held === null) return answerHolding(req, res);
@@ -193,7 +204,7 @@ const answerFailed = (req, res) => {
   }
   req.resume();
   if (req.method === "POST" && path === workerData.retryPath) {
-    if (!hasSession(req)) return answerConsole(res, 403, consoleHold.loginPage);
+    if (crossSite(req) || !hasSession(req)) return answerConsole(res, 403, consoleHold.loginPage);
     consoleHold = null;
     parentPort.postMessage({ type: "retry" });
     res.writeHead(303, { Location: "/", "Cache-Control": "no-store" }).end();
@@ -288,6 +299,8 @@ parentPort.on("message", (message) => {
     return;
   }
   if (message.type === "console") {
+    // CONSOLE-FOLLOWUPS: a session opened one failed run's console, never the next run's.
+    sessions.length = 0;
     holdingPage = message.loginPage;
     consoleHold = {
       loginPage: message.loginPage,

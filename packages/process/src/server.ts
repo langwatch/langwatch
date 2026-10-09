@@ -22,6 +22,8 @@ import { ResourceScope } from "./resource-scope.ts";
 /** What this package needs of a logger, so it depends on no logging implementation. */
 export interface ServerLogger {
   info: (obj: object, msg: string) => void;
+  /** Absent, a warn line prints at info (the upgrade console's token line, CONSOLE-FOLLOWUPS). */
+  warn?: (obj: object, msg: string) => void;
   error: (obj: object, msg: string) => void;
 }
 

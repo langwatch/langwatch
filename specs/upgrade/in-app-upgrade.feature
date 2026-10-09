@@ -75,8 +75,28 @@ Feature: The new image runs its blocking upgrade behind a holding page
     Given the api's upgrade fails on a blocking step
     When the run ends
     Then the api keeps running and holds the door
-    And it prints one console token to its log with how to open the console
+    And it prints one console token to its log at warn level, with how to reach this pod and open the console
     And the token appears in no page, header, URL or other log line
+
+  # Follow-ups: Alex, 2026-10-09 (CONSOLE-FOLLOWUPS).
+  @unit
+  Scenario: The console shows a failed run's errors and log lines with connection passwords redacted
+    Given the api's upgrade fails with a connection URL carrying a password in a step error and the run's log
+    When the api shows the upgrade console
+    Then the console shows the URL with its password replaced by ***
+
+  @unit
+  Scenario: A console session of an earlier failed run does not open the next run's console
+    Given an operator opened the console and pressed Retry
+    When the retried upgrade fails again and the console shows the new failure
+    Then the earlier console session sees the token page and its Retry is refused
+
+  @unit
+  Scenario: A cross-site Retry is refused even with the console session
+    Given an operator opened the console of a failed upgrade
+    When a request carrying the console session posts Retry from another site or origin
+    Then it is refused and no upgrade runs
+    And a Retry from the console's own origin runs the upgrade again
 
   @unit
   Scenario: The holding page of a failed upgrade asks for the token and shows no failure detail

@@ -4,6 +4,7 @@
  * `@langwatch/upgrade/gate` answers it. Spec: specs/upgrade/serving-gate.feature.
  */
 import { createHash, randomBytes } from "node:crypto";
+import { hostname } from "node:os";
 
 import type { ServerRole } from "../feature-installer.ts";
 import {
@@ -101,10 +102,14 @@ export function upgradeGateComponent({
       { role, phase: CONSOLE_PHASE, waitingOn: "an operator", next: "open the console" },
       `${server} (${role}): the upgrade failed; this api holds the door with the upgrade console`,
     );
-    logger.info(
-      { role, phase: CONSOLE_PHASE, waitingOn: "an operator", next: "open the console" },
-      `${server} (${role}): open any page of this api in a browser and enter this console token, valid once for ${minutes} minutes: ${token}`,
-    );
+    const fields = {
+      role,
+      phase: CONSOLE_PHASE,
+      waitingOn: "an operator",
+      next: "open the console",
+    };
+    const line = `${server} (${role}): open any page of this api in a browser and enter this console token. Only this pod shows the console and it reports not ready meanwhile, so on Kubernetes reach it with \`kubectl port-forward pod/${hostname()} 8080:<api port>\` and open http://localhost:8080. The token is valid once for ${minutes} minutes: ${token}`;
+    warnOrInfo({ logger, fields, line });
     return {
       tokenSha256: createHash("sha256").update(token).digest("hex"),
       tokenTtlMs: UPGRADE_CONSOLE_TOKEN_TTL_MS,
@@ -115,7 +120,11 @@ export function upgradeGateComponent({
     for (;;) {
       const verdict = await gate.admit();
       if (verdict.admitted || !verdict.failedRun || !onFailed) return verdict;
-      if (!(await onFailed({ ...verdict.failedRun, ...issueConsoleToken() }))) return verdict;
+      const retried = await onFailed({
+        ...redactFailedRun(verdict.failedRun),
+        ...issueConsoleToken(),
+      });
+      if (!retried) return verdict;
       await onHolding?.({ phase: GATE_PHASE, outstandingStepIds: [] });
     }
   };
@@ -178,4 +187,29 @@ function messageOf(error: unknown): string {
 /** A connection URL's password never reaches a log line. */
 function redactUrls(text: string): string {
   return text.replace(/([a-z][a-z0-9+.-]*:\/\/[^\s:/@]*):[^\s@/]*@/gi, "$1:***@");
+}
+
+/** CONSOLE-FOLLOWUPS: the token line prints at warn, so a warn-level install still shows it. */
+function warnOrInfo({
+  logger,
+  fields,
+  line,
+}: {
+  logger: ServerLogger;
+  fields: object;
+  line: string;
+}): void {
+  if (logger.warn) logger.warn(fields, line);
+  else logger.info(fields, line);
+}
+
+/** CONSOLE-FOLLOWUPS: a connection URL's password never reaches the console page either. */
+function redactFailedRun({ failedSteps, logTail }: UpgradeGateFailedRun): UpgradeGateFailedRun {
+  return {
+    failedSteps: failedSteps.map(({ id, error }) => ({
+      id,
+      error: error === null ? null : redactUrls(error),
+    })),
+    logTail: logTail.map((logLine) => redactUrls(logLine)),
+  };
 }

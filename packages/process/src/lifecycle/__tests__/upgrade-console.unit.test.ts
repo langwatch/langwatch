@@ -72,6 +72,7 @@ const post = (
   path: string,
   form: Record<string, string>,
   cookie?: string,
+  headers: Record<string, string> = {},
 ) =>
   fetch(urlOf(thread, path), {
     method: "POST",
@@ -80,6 +81,7 @@ const post = (
       Accept: "text/html",
       "Content-Type": "application/x-www-form-urlencoded",
       ...(cookie === undefined ? {} : { Cookie: cookie }),
+      ...headers,
     },
     body: new URLSearchParams(form).toString(),
   });
@@ -230,6 +232,55 @@ describe("the upgrade console", () => {
 
         expect(bare.status).toBe(403);
         expect(forged.status).toBe(403);
+        expect(await settledWithin(retried, 100)).toBe("pending");
+      });
+    });
+
+    describe("when another site posts Retry with the console session attached", () => {
+      /** @scenario "A cross-site Retry is refused even with the console session" */
+      it("refuses a cross-site or foreign-origin Retry and runs only the same-origin one", async () => {
+        const thread = await bootThread();
+        const { retried } = await showConsole(thread);
+        const cookie = await openSession(thread);
+        const own = `http://127.0.0.1:${thread.address.port}`;
+
+        const crossSite = await post(thread, UPGRADE_RETRY_PATH, {}, cookie, {
+          "Sec-Fetch-Site": "same-site",
+          Origin: own,
+        });
+        const foreign = await post(thread, UPGRADE_RETRY_PATH, {}, cookie, {
+          Origin: "http://sibling.example",
+        });
+        const opaque = await post(thread, UPGRADE_RETRY_PATH, {}, cookie, { Origin: "null" });
+        const stillPending = await settledWithin(retried, 100);
+        const sameOrigin = await post(thread, UPGRADE_RETRY_PATH, {}, cookie, {
+          "Sec-Fetch-Site": "same-origin",
+          Origin: own,
+        });
+
+        expect([crossSite.status, foreign.status, opaque.status]).toEqual([403, 403, 403]);
+        expect(stillPending).toBe("pending");
+        expect(sameOrigin.status).toBe(303);
+        expect(await retried).toBe(true);
+      });
+    });
+
+    describe("when a new failed run shows its console", () => {
+      /** @scenario "A console session of an earlier failed run does not open the next run's console" */
+      it("asks for the new token and refuses the old session's Retry", async () => {
+        const thread = await bootThread();
+        await showConsole(thread);
+        const cookie = await openSession(thread);
+        expect((await post(thread, UPGRADE_RETRY_PATH, {}, cookie)).status).toBe(303);
+        await thread.hold({ phase: "upgrade-gate", outstandingStepIds: [] });
+        const { retried } = await showConsole(thread);
+
+        const page = await (await browse(thread, cookie)).text();
+        const pressed = await post(thread, UPGRADE_RETRY_PATH, {}, cookie);
+
+        expect(page).toContain("Enter the console token");
+        expect(page).not.toContain("dataset:move-to-storage");
+        expect(pressed.status).toBe(403);
         expect(await settledWithin(retried, 100)).toBe("pending");
       });
     });

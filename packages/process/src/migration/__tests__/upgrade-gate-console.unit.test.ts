@@ -11,6 +11,7 @@ import type { UpgradeConsole } from "../../lifecycle/liveness-thread.ts";
 import { type UpgradeGateVerdict, upgradeGateComponent } from "../upgrade-gate.ts";
 
 const HOLDING = { phase: "upgrade-gate", outstandingStepIds: [] };
+const PINO_WARN = 40;
 
 const failedAt = (id: string): UpgradeGateVerdict => ({
   admitted: false,
@@ -64,10 +65,50 @@ describe("the upgrade gate's console", () => {
 
       expect(onHolding.mock.calls).toEqual([[HOLDING]]);
       expect(createHash("sha256").update(token).digest("hex")).toBe(consoles[0]?.tokenSha256);
-      expect(lines.filter((line) => JSON.stringify(line).includes(token))).toHaveLength(1);
+      const tokenLines = lines.filter((line) => JSON.stringify(line).includes(token));
+      expect(tokenLines).toHaveLength(1);
+      expect(tokenLines[0]?.level).toBe(PINO_WARN);
+      expect(JSON.stringify(tokenLines[0])).toContain("kubectl port-forward pod/");
       expect(JSON.stringify(consoles)).not.toContain(token);
       expect(consoles[0]?.failedSteps).toEqual([
         { id: "dataset:move", error: "dataset:move broke" },
+      ]);
+    });
+
+    /** @scenario "The console shows a failed run's errors and log lines with connection passwords redacted" */
+    it("redacts a connection URL's password in the step errors and log lines it hands the console", async () => {
+      const consoles: UpgradeConsole[] = [];
+      const leaked = "postgres://langwatch:s3cret-pw@db:5432/langwatch";
+      const { hosted } = hostGate({
+        verdicts: [
+          {
+            admitted: false,
+            refusal: "behind this image",
+            failedRun: {
+              failedSteps: [
+                { id: "a:url", error: `could not reach ${leaked}` },
+                { id: "b:none", error: null },
+              ],
+              logTail: [`[upgrade] connecting to ${leaked}`, "[upgrade] plain line"],
+            },
+          },
+        ],
+        onFailed: async (upgradeConsole) => {
+          consoles.push(upgradeConsole);
+          return false;
+        },
+      });
+
+      await expect(hosted.start?.()).rejects.toThrow("refuses to serve");
+
+      expect(JSON.stringify(consoles)).not.toContain("s3cret-pw");
+      expect(consoles[0]?.failedSteps).toEqual([
+        { id: "a:url", error: "could not reach postgres://langwatch:***@db:5432/langwatch" },
+        { id: "b:none", error: null },
+      ]);
+      expect(consoles[0]?.logTail).toEqual([
+        "[upgrade] connecting to postgres://langwatch:***@db:5432/langwatch",
+        "[upgrade] plain line",
       ]);
     });
 
