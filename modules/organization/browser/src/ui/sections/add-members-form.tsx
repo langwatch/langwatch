@@ -8,6 +8,7 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Mail } from "lucide-react";
+import { useEffect } from "react";
 import {
   type Control,
   Controller,
@@ -65,6 +66,7 @@ export function AddMembersForm({
     control,
     handleSubmit,
     setValue,
+    setFocus,
     formState: { errors },
   } = useForm<InviteFormValues>({
     defaultValues: {
@@ -73,6 +75,11 @@ export function AddMembersForm({
       teams: firstTeamId !== undefined ? [{ teamId: firstTeamId, role: TeamUserRole.MEMBER }] : [],
     },
   });
+
+  // Opened from the inline invite box: typing carries on here, not in the box behind.
+  useEffect(() => {
+    if (initialEmails) setFocus("emailsRaw");
+  }, [initialEmails, setFocus]);
 
   const selectedTeams = useWatch({ control, name: "teams" });
   const orgRole = useWatch({ control, name: "orgRole" });
