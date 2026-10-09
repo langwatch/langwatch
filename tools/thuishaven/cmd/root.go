@@ -783,7 +783,7 @@ func startDetachedUp(d deps, rest []string) (detachedStack, error) {
 		return detachedStack{}, err
 	}
 	logPath := stackLogPath(d.worktree, slug)
-	if err := os.MkdirAll(filepath.Dir(logPath), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(logPath), 0o700); err != nil {
 		return detachedStack{}, err
 	}
 	root := trustedRepoRoot()
