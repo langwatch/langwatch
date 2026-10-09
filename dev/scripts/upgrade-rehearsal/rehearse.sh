@@ -18,6 +18,7 @@ ORDER="api-first"
 SETTLE_SECONDS=300
 DRILL_SECONDS=120
 SEED_TRACES=200
+SEED_PER_KIND=1
 RUN_DIR=""
 KEEP=0
 PLAN_ONLY=0
@@ -31,7 +32,7 @@ usage() {
   cat <<'EOF'
 usage: rehearse.sh [--origin 3.20.1|main|empty] [--old-image IMAGE | --build-main]
                    [--head-image IMAGE | --build-head] [--order api-first|worker-first]
-                   [--settle-seconds N] [--drill-seconds N] [--seed-traces N]
+                   [--settle-seconds N] [--drill-seconds N] [--seed-traces N] [--seed-per-kind N]
                    [--through 2|3|4|5] [--scale [--scale-projects N] [--scale-users N]]
                    [--bounds FILE] [--run-dir DIR] [--keep] [--plan-only]
 EOF
@@ -55,6 +56,7 @@ parse_args() {
       --settle-seconds) SETTLE_SECONDS="${2:?}"; shift 2 ;;
       --drill-seconds) DRILL_SECONDS="${2:?}"; shift 2 ;;
       --seed-traces) SEED_TRACES="${2:?}"; shift 2 ;;
+      --seed-per-kind) SEED_PER_KIND="${2:?}"; shift 2 ;;
       --run-dir) RUN_DIR="${2:?}"; shift 2 ;;
       --keep) KEEP=1; shift ;;
       --plan-only) PLAN_ONLY=1; shift ;;
@@ -147,12 +149,14 @@ write_env_file() {
     echo "BASE_HOST=http://localhost:${OLD_APP_PORT}"
     echo "NEXTAUTH_URL=http://localhost:${OLD_APP_PORT}"
     echo "AUTH_PROVIDER=email"
+    echo "IS_SAAS=true"
+    echo "GROUP_QUEUE_ENVELOPE_WRITES_ENABLED=true"
     for key in NEXTAUTH_SECRET CREDENTIALS_SECRET API_TOKEN_JWT_SECRET LW_VIRTUAL_KEY_PEPPER \
       LW_GATEWAY_INTERNAL_SECRET LW_GATEWAY_JWT_SECRET LANGWATCH_NLP_INTERNAL_SECRET LANGY_INTERNAL_SECRET; do
       echo "$key=$(secret)"
     done
     echo "ENVIRONMENT=rehearsal"
-    echo "ADMIN_EMAILS=rollback+${RUN_ID}@rehearsal.test"
+    echo "ADMIN_EMAILS=rollback+${RUN_ID}@rehearsal.test,seed+${RUN_ID}@rehearsal.test"
     # The second organisation's private ClickHouse route (tenancy.ts: CLICKHOUSE_URL__<label>__<org>).
     echo "CLICKHOUSE_URL__rehearsal__rh_${RUN_ID}_org_b=http://default:langwatch@clickhouse-private:8123/langwatch"
   } >"$RUN_DIR/rehearsal.env"
@@ -168,12 +172,17 @@ wait_http() {
   return 1
 }
 
+# Posts in batches of at most 500 traces (1,000 spans), so a large seed stays under the body limit.
 post_traces() {
-  local key="$1" count="$2" out
-  out="$(node "$HERE/otlp-batch.mjs" "rehearsal-$key" "$count" |
-    curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' \
-      -H "X-Auth-Token: $key" --data-binary @- "http://localhost:${OLD_APP_PORT}/api/otel/v1/traces" || true)"
-  echo "$(date -u +%FT%TZ) $key $count $out" >>"$RUN_DIR/evidence/ingest.log"
+  local key="$1" left="$2" count out
+  while ((left > 0)); do
+    count=$((left < 500 ? left : 500))
+    left=$((left - count))
+    out="$(node "$HERE/otlp-batch.mjs" "rehearsal-$key" "$count" |
+      curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' \
+        -H "X-Auth-Token: $key" --data-binary @- "http://localhost:${OLD_APP_PORT}/api/otel/v1/traces" || true)"
+    echo "$(date -u +%FT%TZ) $key $count $out" >>"$RUN_DIR/evidence/ingest.log"
+  done
 }
 
 # Every group-queue key under any queue with its size, as a flat JSON [key, size, ...] array.
@@ -206,13 +215,15 @@ phase0_products() {
   SEED_EMAIL="seed+${RUN_ID}@rehearsal.test"
   SEED_PASSWORD="Seed-$(node -e 'process.stdout.write(require("node:crypto").randomBytes(16).toString("hex"))')"
   mkdir -p "$RUN_DIR/evidence/logs"
+  # A throwaway stack's test login, for whoever inspects a --keep stack (run dir is gitignored).
+  printf 'email=%s\npassword=%s\n' "$SEED_EMAIL" "$SEED_PASSWORD" >"$RUN_DIR/login.txt"
   write_psql_shim
   log "phase 0: product seeds through the old image's tRPC"
   PATH="$RUN_DIR/bin:$PATH" DATABASE_URL="postgresql://prisma:prisma@postgres:5432/mydb?schema=mydb" \
     bash "$REPO_ROOT/dev/scripts/migration-compat-smoke/seed-account.sh" "$SEED_EMAIL" "$SEED_PASSWORD" \
     >"$RUN_DIR/evidence/logs/product-seed.log" 2>&1 &&
     APP_BASE="http://localhost:${OLD_APP_PORT}" SEED_EMAIL="$SEED_EMAIL" SEED_PASSWORD="$SEED_PASSWORD" \
-      SEED_LABEL="$RUN_ID" OUT="$RUN_DIR/evidence/product-seeds.json" node "$HERE/seed/product.mjs" seed \
+      SEED_LABEL="$RUN_ID" SEED_PER_KIND="$SEED_PER_KIND" OUT="$RUN_DIR/evidence/product-seeds.json" node "$HERE/seed/product.mjs" seed \
       >>"$RUN_DIR/evidence/logs/product-seed.log" 2>&1 ||
     log "phase 0: product seeds failed (logs/product-seed.log); their findings read inconclusive"
 }
@@ -354,6 +365,22 @@ collect_resolution() {
   ' "$projects" "$folded" >"$RUN_DIR/evidence/resolution.json"
 }
 
+# Spans the old api accepted (two per trace, 2xx rows of ingest.log) against those head stores.
+collect_spans() {
+  local sent stored=0 target n
+  sent="$(awk '$4 ~ /^2/ { n += $3 * 2 } END { print n + 0 }' "$RUN_DIR/evidence/ingest.log" 2>/dev/null || echo 0)"
+  for ((i = 0; i < 60; i++)); do
+    stored=0
+    for target in clickhouse clickhouse-private; do
+      n="$(clickhouse_at "$target" "SELECT count() FROM stored_spans WHERE TenantId LIKE 'rh\\_${RUN_ID}\\_%'" 2>/dev/null || echo 0)"
+      stored=$((stored + ${n:-0}))
+    done
+    ((stored >= sent)) && break
+    sleep 5
+  done
+  printf '{"sent":%s,"stored":%s}' "$sent" "$stored" >"$RUN_DIR/evidence/spans.json"
+}
+
 settle() {
   local deadline=$((SECONDS + SETTLE_SECONDS)) open
   while ((SECONDS < deadline)); do
@@ -374,6 +401,7 @@ phase2_collect() {
   psql_json "SELECT step_id, target, status, version, last_error FROM \"mydb_upgrade_ledger\".\"_langwatch_upgrade_target\" ORDER BY step_id, target" >"$RUN_DIR/evidence/ledger-targets.json"
   psql_json "SELECT process_id, role, image, release, steps, heartbeat_at FROM \"mydb_upgrade_ledger\".\"_langwatch_serving_roster\"" >"$RUN_DIR/evidence/ledger-roster.json"
   collect_resolution
+  collect_spans
   collect_products
   snapshot_queues queues-settled.json
   curl -s "http://localhost:${HEAD_WORKER_METRICS_PORT}/metrics" >"$RUN_DIR/evidence/head-worker.metrics" || rm -f "$RUN_DIR/evidence/head-worker.metrics"
