@@ -1,6 +1,7 @@
 import { bindRestCredential, bindRestMiddleware } from "@langwatch/api/rest";
 import type { OpsApi, OpsServerConfig } from "@langwatch/ops-contract";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
+import { type CodeStepId, defineMigrationStep } from "@langwatch/upgrade/step";
 
 import { OpsModule } from "#app/ops.app";
 import { opsChannels } from "#channels/ops-channels.registry";
@@ -25,6 +26,11 @@ import { opsBugReportTrpcTransport } from "#transport/ops-bug-report.trpc";
 import { opsClickHouseExplainRest } from "#transport/ops-clickhouse-explain.rest";
 import { opsUpgradeTrpcTransport } from "#transport/ops-upgrade.trpc";
 import { opsTrpcTransport } from "#transport/ops.trpc";
+
+/** Ops-held migrations automation now declares: legacy name -> step id. Never edit (S6-COPY). */
+const MOVED_TO_AUTOMATION = {
+  "automations-slack-connections": "automation:import-slack-connections",
+} as const satisfies Record<string, CodeStepId>;
 
 export const opsProcessModule: PublishedProcessModule<"ops", OpsApi, OpsServerConfig> =
   defineProcessModule("ops")
@@ -73,6 +79,23 @@ export const opsProcessModule: PublishedProcessModule<"ops", OpsApi, OpsServerCo
       }),
       GrantPlatformOperatorTask.create({ operators: app }),
       SystemMigrationsPassTask.create({ pass: () => app.systemMigrationPass() }),
+    ])
+    .withMigrations(({ app, repositories }) => [
+      // Blocking, so the moved step finds its finished tenants before any pass runs (S6-COPY).
+      defineMigrationStep({
+        id: "ops:copy-automation-migration-state",
+        kind: "data",
+        mode: "blocking",
+        description:
+          "Carries organizations that finished the Slack connections migration over to its new step, so it does not run for them again.",
+        run: async ({ dryRun }) => {
+          const copied = await repositories.migration.copyTenantState({
+            moves: MOVED_TO_AUTOMATION,
+            dryRun,
+          });
+          return dryRun ? { wouldCopy: copied } : { copied };
+        },
+      }),
     ]);
 
 /** One request's presented project credential, unverified, or none at all. */

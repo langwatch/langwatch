@@ -1,6 +1,5 @@
 import { moduleApi } from "@langwatch/module";
 import type { Monitor } from "@langwatch/monitor-contract";
-import type { SystemMigration } from "@langwatch/system-migrations";
 import type { Instant } from "@langwatch/time";
 
 import type {
@@ -107,8 +106,6 @@ export interface AutomationApi {
     limit: number;
   }): Promise<WebhookDeliveryRow[]>;
   getReportSchedules(input: { projectId: string }): Promise<ReportSchedule[]>;
-  /** The ORGANIZATION-rooted migrations automation registers (the Slack connection move). */
-  registeredMigrations(): readonly SystemMigration[];
   /** The Slack conversations a connection's bot can see, for the channel picker. */
   listSlackChannels(input: AutomationApiListSlackChannelsInput): Promise<SlackChannelListing>;
   create(input: CreateTriggerCommand): Promise<Trigger>;

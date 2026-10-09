@@ -27,3 +27,12 @@ Feature: Ops runs the system migration passes and names their cohorts
     When the pass runs
     Then the step's ledger row is left pending
     And once a later pass leaves no tenant held, the row is settled
+
+  @unit
+  Scenario: An organization that finished an ops-held migration does not run it again after its owner declares it
+    Given organization "acme" finished the Slack connections migration under ops' legacy name
+    And organization "beta" was rolled back from it and organization "gamma" is still held
+    When the upgrade runs the blocking step that copies the migration's state to automation's step
+    Then "acme" is finalized and "beta" rolled back under automation's step
+    And "gamma" has no state under the new step, so the next pass runs it again
+    And the legacy rows are left in place, and a second run copies nothing

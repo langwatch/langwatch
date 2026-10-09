@@ -62,9 +62,7 @@ function console({
         registeredMigrations: () => [migration("sso-domain-ownership")],
         userMigrations: () => [],
       }),
-      automations: createApiFixture<AutomationApi>({
-        registeredMigrations: () => [migration("automations-slack-connections")],
-      }),
+      automations: createApiFixture<AutomationApi>({}),
       auditLog: createApiFixture<AuditLogApi>({
         record: async () => ({ id: "audit", occurredAt: 0 }),
       }),
@@ -113,7 +111,6 @@ describe("SystemMigrationPassService.runner", () => {
       expect(overview.map((migration) => migration.name)).toEqual([
         "authz-grants-genesis-import",
         "sso-domain-ownership",
-        "automations-slack-connections",
       ]);
     });
   });

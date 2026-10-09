@@ -22,6 +22,7 @@ import type { ImpersonationRepository } from "./impersonation.repository.ts";
 import type { InstanceAdminRepository } from "./instance-admin.repository.ts";
 import type { MigrationMembershipRepository } from "./migration-membership.repository.ts";
 import type { OpsMetricsRepository } from "./ops-metrics.repository.ts";
+import type { OpsMigrationRepository } from "./ops-migration.repository.ts";
 import type { OpsSnapshotRepository } from "./ops-snapshot.repository.ts";
 import type { OrganizationTenantSourceRepository } from "./organization-tenant-source.repository.ts";
 import type { PipelineDefinitionsRepository } from "./pipeline-definitions.repository.ts";
@@ -56,6 +57,8 @@ export interface OpsRepositories {
   /** The walk over every stored sealed value only the credentials-reseal task makes. */
   readonly credentialsReseal: CredentialsResealRepository;
   readonly migrationState: SystemMigrationStateRepository;
+  /** The blocking steps' frozen SQL over ops' own migration state (S6-COPY). */
+  readonly migration: OpsMigrationRepository;
   readonly migrationEnrollments: SystemMigrationEnrollmentRepository;
   readonly migrationMemberships: MigrationMembershipRepository;
   readonly migrationLease: MigrationLeaseRepository;

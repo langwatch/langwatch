@@ -35,11 +35,25 @@ export const automationProcessModule: PublishedProcessModule<
     ReportScheduleBackfillTask.create(app),
   ])
   .withMigrations(({ app }) => {
+    const slack = app.slackConnectionMigration();
     const run: MigrationStepRun = async ({ dryRun }) =>
       dryRun ? { dryRun: true } : app.reconcileReportSchedules();
     const description =
       "Gives every active report automation its schedule; reports already scheduled or paused are left alone.";
     return [
+      // Was ops-held as "automations-slack-connections"; ops copies its finished tenants (S6-COPY).
+      defineMigrationStep({
+        id: "automation:import-slack-connections",
+        kind: "tenant",
+        mode: "background",
+        tenants: "organization",
+        title: slack.title,
+        description: slack.description,
+        requiresOperatorConfirmation: slack.requiresOperatorConfirmation,
+        runsAutomaticallyOnSelfHosted: slack.runsAutomaticallyOnSelfHosted,
+        enrolledAutomatically: slack.enrolledAutomatically,
+        migrateTenant: (args) => slack.migrateTenant(args),
+      }),
       defineMigrationStep({
         id: "automation:reconcile-report-schedules",
         kind: "data",

@@ -468,12 +468,11 @@ export class SystemMigrationPassService {
     dependencies: Pick<OpsAppDependencies, "identity" | "authz" | "automations" | "auditLog">;
     passRequests: Pick<SystemMigrationPassRequestsService, "request">;
   }): OpsSystemMigrationRunner {
-    const { identity, authz, automations, auditLog } = dependencies;
-    // Main's registry order: authorization's import, identity's D04, then Slack connections.
+    const { identity, authz, auditLog } = dependencies;
+    // Main's registry order: authorization's import, then identity's D04.
     const organizationMigrations = () => [
       ...authz.registeredMigrations(),
       ...identity.registeredMigrations(),
-      ...automations.registeredMigrations(),
     ];
     const passes = SystemMigrationPassService.create({
       repositories,

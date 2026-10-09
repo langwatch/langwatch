@@ -31,6 +31,7 @@ import { MemoryImpersonationRepository } from "./memory.impersonation.repository
 import { MemoryInstanceAdminRepository } from "./memory.instance-admin.repository.ts";
 import { MemoryMigrationLeaseRepository } from "./memory.migration-lease.repository.ts";
 import { MemoryOpsMetricsRepository } from "./memory.ops-metrics.repository.ts";
+import { MemoryOpsMigrationRepository } from "./memory.ops-migration.repository.ts";
 import { MemoryOpsSnapshotRepository } from "./memory.ops-snapshot.repository.ts";
 import { MemoryOpsStore } from "./memory.ops.store.ts";
 import { MemoryProcessManagerPurgeRepository } from "./memory.process-manager-purge.repository.ts";
@@ -135,6 +136,8 @@ export class MemoryOpsRepositories {
     processStore: InMemoryProcessStore;
   }>): OpsRepositories {
     const store = MemoryOpsStore.create();
+    const migrationState = MemorySystemMigrationStateRepository.create();
+    const tenantStepState = MemoryTenantStepStateRepository.create();
 
     return {
       bugReports: MemoryBugReportRepository.create({ store }),
@@ -142,7 +145,11 @@ export class MemoryOpsRepositories {
       processStore,
       processManagerPurge: MemoryProcessManagerPurgeRepository.create(),
       credentialsReseal: MemoryCredentialsResealRepository.create(),
-      migrationState: MemorySystemMigrationStateRepository.create(),
+      migrationState,
+      migration: MemoryOpsMigrationRepository.create({
+        legacy: migrationState,
+        steps: tenantStepState,
+      }),
       migrationEnrollments: MemorySystemMigrationEnrollmentRepository.create(),
       migrationMemberships: MemoryMigrationMembershipRepository.create(),
       migrationLease: MemoryMigrationLeaseRepository.create(),
@@ -171,7 +178,7 @@ export class MemoryOpsRepositories {
       events: MemoryEventExplorerRepository.create({ store }),
       storageFootprint: MemoryStorageFootprintRepository.create(),
       upgradeLedger: MemoryUpgradeLedgerRepository.create(),
-      tenantStepState: MemoryTenantStepStateRepository.create(),
+      tenantStepState,
       tenantStepLedger: MemoryTenantStepLedgerRepository.create(),
     };
   }

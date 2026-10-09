@@ -70,7 +70,6 @@ import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
 import { sessionSecret } from "@langwatch/secrets";
 import { SlackApi } from "@langwatch/slack-contract";
-import type { SystemMigration } from "@langwatch/system-migrations";
 import { nowInstant, type Instant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
 import { WebhookApi } from "@langwatch/webhook-contract";
@@ -982,14 +981,15 @@ export class AutomationModule implements AutomationApi {
     return this.#automation.getReportSchedules(input);
   }
 
-  registeredMigrations(): readonly SystemMigration[] {
+  /** The Slack connection move, which the module declares as its tenant step. */
+  slackConnectionMigration(): SlackConnectionMigration {
     if (!this.#migration) {
       throw new Error(
         "This AutomationModule was composed from already-built services, so it holds no migration: " +
-          "compose it through AutomationModule.create to answer its registered migrations.",
+          "compose it through AutomationModule.create to declare its tenant step.",
       );
     }
-    return [this.#migration];
+    return this.#migration;
   }
 
   /** The Slack conversations a bot token can see, for the channel picker. */

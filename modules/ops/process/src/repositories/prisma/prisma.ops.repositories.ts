@@ -15,6 +15,7 @@ import { PrismaBugReportRepository } from "./prisma.bug-report.repository.ts";
 import { PrismaCredentialsResealRepository } from "./prisma.credentials-reseal.repository.ts";
 import { PrismaInstanceAdminRepository } from "./prisma.instance-admin.repository.ts";
 import { PrismaMigrationMembershipRepository } from "./prisma.migration-membership.repository.ts";
+import { PrismaOpsMigrationRepository } from "./prisma.ops-migration.repository.ts";
 import { PrismaOrganizationTenantSourceRepository } from "./prisma.organization-tenant-source.repository.ts";
 import { PrismaProjectTenantSourceRepository } from "./prisma.project-tenant-source.repository.ts";
 import { PrismaSystemMigrationEnrollmentRepository } from "./prisma.system-migration-enrollment.repository.ts";
@@ -93,6 +94,7 @@ export const PostgresOpsRepositories = {
       processManagerPurge: PrismaProcessPurge.create({ database: prisma }),
       credentialsReseal: PrismaCredentialsResealRepository.create({ database: prisma }),
       migrationState: PrismaSystemMigrationStateRepository.create({ prisma }),
+      migration: PrismaOpsMigrationRepository.create({ prisma }),
       migrationEnrollments: PrismaSystemMigrationEnrollmentRepository.create({ prisma }),
       migrationMemberships: PrismaMigrationMembershipRepository.create({ prisma }),
       organizationTenants: PrismaOrganizationTenantSourceRepository.create({ prisma }),

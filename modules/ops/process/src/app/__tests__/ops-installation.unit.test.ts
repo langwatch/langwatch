@@ -118,7 +118,7 @@ function process(
       experiment: createApiFixture<ExperimentApi>(),
       prompt: createApiFixture<PromptApi>(),
       workflow: createApiFixture<WorkflowApi>(),
-      automation: createApiFixture<AutomationApi>({ registeredMigrations: () => [] }),
+      automation: createApiFixture<AutomationApi>({}),
       github: createApiFixture<GithubApi>(),
       langy: createApiFixture<LangyApi>(),
       dashboard: createApiFixture<DashboardApi>(),

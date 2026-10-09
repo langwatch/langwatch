@@ -7,6 +7,13 @@
     "description": "Fills LangWatchQL's key map with every project's key that it lacks."
   },
   {
+    "id": "automation:import-slack-connections",
+    "kind": "tenant",
+    "mode": "background",
+    "owner": "automation",
+    "description": "Moves each Slack automation's stored secret onto a Slack connection. Delivery does not change."
+  },
+  {
     "id": "automation:reconcile-report-schedules",
     "kind": "data",
     "mode": "background",
@@ -100,6 +107,13 @@
     "owner": "licensing",
     "description": "Copies each organization's licence key and its dates into licensing's own licence table, overwriting a row that differs.",
     "needsOldWritersGone": true
+  },
+  {
+    "id": "ops:copy-automation-migration-state",
+    "kind": "data",
+    "mode": "blocking",
+    "owner": "ops",
+    "description": "Carries organizations that finished the Slack connections migration over to its new step, so it does not run for them again."
   },
   {
     "id": "scim:replay-sso-connection-view",
