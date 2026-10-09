@@ -713,6 +713,7 @@ function LangyPanel({
                   failure.setReconnectCodex(false);
                   closePanel();
                 }}
+                // Beside a drawer, the drawer owns the only close affordance on screen.
                 historyOpen={historyOpen}
                 onToggleHistory={() => setHistoryOpen((open) => !open)}
                 devMode={inspector.devMode}
@@ -956,30 +957,32 @@ function PanelHeader({
           <LangyOverflowMenu devDrawerOpen={devDrawerOpen} onToggleDevDrawer={onToggleDevDrawer} />
 
           {/* Says "minimise" since the panel stays mounted and sinks to a header sliver. */}
-          <Box width="1px" alignSelf="stretch" marginY="4px" marginX="3px" background="border" />
+          <>
+            <Box width="1px" alignSelf="stretch" marginY="4px" marginX="3px" background="border" />
 
-          <Tooltip
-            content={
-              <HStack gap={2}>
-                <Text>Minimise</Text>
-                <HStack gap={1}>
-                  <Kbd>⌘</Kbd>
-                  <Kbd>I</Kbd>
+            <Tooltip
+              content={
+                <HStack gap={2}>
+                  <Text>Minimise</Text>
+                  <HStack gap={1}>
+                    <Kbd>⌘</Kbd>
+                    <Kbd>I</Kbd>
+                  </HStack>
                 </HStack>
-              </HStack>
-            }
-            positioning={{ placement: "bottom" }}
-          >
-            <IconButton
-              size="xs"
-              variant="ghost"
-              aria-label="Minimise Langy"
-              color="fg.muted"
-              onClick={onClose}
+              }
+              positioning={{ placement: "bottom" }}
             >
-              <Minus size={15} />
-            </IconButton>
-          </Tooltip>
+              <IconButton
+                size="xs"
+                variant="ghost"
+                aria-label="Minimise Langy"
+                color="fg.muted"
+                onClick={onClose}
+              >
+                <Minus size={15} />
+              </IconButton>
+            </Tooltip>
+          </>
         </HStack>
       </HStack>
       <Separator />

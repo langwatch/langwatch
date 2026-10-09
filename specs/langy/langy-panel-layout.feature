@@ -83,28 +83,38 @@ Feature: Langy panel layout modes
     And the composer seats itself on that panel's floor as one continuous object
     And the panel is not remounted, so nothing in flight is torn down
 
-  # Langy has two looks, docked and floating. A drawer never makes the dock
-  # leave its column; the floating card rides beside the drawer instead.
+  # Opening a drawer does something DIFFERENT per layout, so docked and
+  # floating stay visibly distinct.
 
-  Scenario: A drawer leaves the DOCKED panel in its column below the top bar
+  Scenario: A drawer turns the DOCKED panel into its floating companion
     Given the Langy panel is open in sidebar mode
     When a right-anchored drawer opens
-    Then the panel stays docked below the full-width top bar, aligned with the content card
-    And the dock's room stays reserved
-    And the drawer yields the dock's width plus a strip of space, so the two never overlap
+    Then the panel MORPHS in place to the right edge as a floating card: it grows taller and lifts above all content, it does not slide off-screen and back
+    And the companion card wears exactly the drawer's chrome: height, radius, hairline, material and shadow
+    And the drawer keeps its own slide-in but starts from BEHIND the companion card, which sits above it at a higher z-index
+    And a strip of space separates the two cards, both above all content
+    And the page content reclaims the dock's reserved width underneath
 
-  Scenario: A drawer turns the FLOATING panel into its companion
+  Scenario: A drawer makes the FLOATING panel dodge to the left
     Given the Langy panel is open in floating mode
     When a right-anchored drawer opens
-    Then the panel moves to the right edge beside the drawer, growing to the drawer's height over the top bar
-    And the companion card wears exactly the drawer's chrome: height, radius, hairline, material and shadow
-    And the drawer yields the companion's width plus a strip of space between the two cards
-    And the drawer's entrance is held back briefly so the panel settles first
+    Then the floating panel hops to the LEFT corner, out of the drawer's way
+    And the drawer keeps the full right edge, it does not yield
+    And the drawer's entrance is held back briefly so the panel clears out first
+    And the panel keeps its own Close, the two cards being far apart
 
-  Scenario: Closing the drawer sends the companion back to its floating corner
-    Given the floating Langy panel is riding beside an open drawer
+  @unit
+  Scenario: The floating panel returns to the right only after the drawer has left
+    Given the floating panel is dodging an open drawer on the left
     When the drawer closes
-    Then the panel returns to its floating corner
+    Then the drawer leaves the right edge first while the panel holds its corner
+    And the panel glides back to the right only after a beat
+
+  Scenario: Closing the drawer sends the docked companion back to its dock
+    Given the Langy panel is riding beside an open drawer
+    When the drawer closes
+    Then the panel morphs back to where it was before the drawer opened
+    And the dock's room is reserved again
 
   Scenario: Closing Langy mid-ride returns the drawer to the edge
     Given the Langy panel is riding beside an open drawer
@@ -112,22 +122,16 @@ Feature: Langy panel layout modes
     Then the drawer returns to the viewport's right edge
 
   @integration
-  Scenario: The drawer companion keeps its own Minimise
-    Given the floating Langy panel is riding beside an open drawer
-    Then the panel's header shows its Minimise control, as in every other look
+  Scenario: The docked companion keeps its own Minimise
+    Given the Langy panel is riding beside an open drawer as the docked companion
+    Then the panel's header still shows its Minimise control
+    And the drawer keeps its own close
 
   # The closed state is a PEEK of the panel itself, not a separate launcher —
   # see specs/langy/langy-peek-dock.feature for its states and geometry.
   Scenario: The minimised peek dodges the drawer
     Given the Langy panel is minimised in floating mode and a right-anchored drawer is open
     Then the peek sliver rests along the bottom-LEFT edge, clear of the drawer and the table pager
-
-  @unit
-  Scenario: The minimised peek returns to the right only after the drawer has left
-    Given the minimised peek is dodging an open drawer on the left
-    When the drawer closes
-    Then the drawer leaves the right edge first while the peek holds its corner
-    And the peek glides back to the right only after a beat
 
   # The conversation column dissolves into the panel edges with a soft mask so
   # scrolled-off content never hard-clips against the header or composer seams.

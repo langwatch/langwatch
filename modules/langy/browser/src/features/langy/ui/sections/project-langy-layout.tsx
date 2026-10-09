@@ -1,3 +1,4 @@
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import { UiRouteOutlet } from "@langwatch/browser/route-objects";
 import { Box } from "@langwatch/design-system/primitives";
 import { memo, type ReactNode, useEffect } from "react";
@@ -71,9 +72,13 @@ function LangyShiftedRoot({ showLangy, children }: { showLangy: boolean; childre
   const panelMode = useLangyStore((s) => s.panelMode);
   const shellClaimed = useLangyStore((s) => s.dockShellClaims > 0);
   const setDockShifted = useLangyStore((s) => s.setDockShifted);
-  // Only the dock reserves room, drawer or not: it stays a column below the top bar.
-  // Floating overlays the page, content stays full width and the card floats over it.
-  const shifted = showLangy && isOpen && panelMode === "sidebar";
+  // While a drawer is open the panel rides beside it as a floating companion
+  // (see LangyPanel), so the dock's reservation releases and the page gets
+  // its width back underneath the overlay pair.
+  const { currentDrawer } = useDrawer();
+  // Only Sidebar mode reserves room (pushes content left). Floating mode
+  // overlays the page — content stays full width and the card floats over it.
+  const shifted = showLangy && isOpen && panelMode === "sidebar" && !currentDrawer;
   // Publish the reservation truth for a claiming shell (see the store): this
   // wrapper owns the visibility gate, the shell only consumes the result.
   useEffect(() => {

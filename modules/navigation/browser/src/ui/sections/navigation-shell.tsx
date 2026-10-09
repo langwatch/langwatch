@@ -66,18 +66,15 @@ export function NavigationShell({
 
   // A phone has room for the page or the chrome, not both: one compact bar and
   // a full-screen menu replace the sidebar and the rail in both modes.
-  // The dock is claimed here too, so the panel never opens over the compact bar.
   if (state.isMobile) {
-    return host.langyDockRoom({
-      render: () => (
-        <Box width="full" minHeight="100vh" background="bg.page">
-          <ShellTitle pageTitle={pageTitle} state={state} />
-          <MobileShell state={state}>
-            <ShellPageBody personalScope={personalScope}>{page}</ShellPageBody>
-          </MobileShell>
-        </Box>
-      ),
-    });
+    return (
+      <Box width="full" minHeight="100vh" background="bg.page">
+        <ShellTitle pageTitle={pageTitle} state={state} />
+        <MobileShell state={state}>
+          <ShellPageBody personalScope={personalScope}>{page}</ShellPageBody>
+        </MobileShell>
+      </Box>
+    );
   }
 
   return (

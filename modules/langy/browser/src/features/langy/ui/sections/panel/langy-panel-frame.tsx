@@ -122,6 +122,7 @@ export function LangyPanelFrame({
         floating,
         isDrawerCompanion,
         dockShellClaimed,
+        dodgesDrawer: placement.floatingDodgesDrawer,
         minHeightPx: floorPx,
       })}
     >

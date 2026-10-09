@@ -37,7 +37,9 @@ vi.mock("@ai-sdk/react", () => ({
   }),
 }));
 
-/** The panel reads `currentDrawer` directly to know it is riding beside one as its companion. */
+/** The wrapper releases the dock reservation while a drawer is open — see
+ * `ProjectLangyLayout`. Here the panel reads `currentDrawer` directly to know
+ * it is riding beside one as a floating companion. */
 const currentDrawerRef = { current: undefined as string | undefined };
 vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({
@@ -207,11 +209,14 @@ describe("given the Langy panel is docked or floating on its own", () => {
   });
 });
 
-describe("given the floating Langy panel is riding beside an open drawer", () => {
+describe("given the Langy panel is riding beside an open drawer", () => {
   describe("when the header renders", () => {
-    /** @scenario The drawer companion keeps its own Minimise */
+    /** @scenario The docked companion keeps its own Minimise */
     it("still offers its own Minimise beside the drawer's close", async () => {
-      useLangyStore.setState({ panelMode: "floating" });
+      // Only the DOCKED (sidebar) panel becomes the drawer's companion — the
+      // floating panel dodges sideways instead. See the note above
+      // `isDrawerCompanion` in the panel.
+      useLangyStore.setState({ panelMode: "sidebar" });
       currentDrawerRef.current = "traceV2Details";
       renderPanel();
 

@@ -26,8 +26,9 @@ function useViewportWidth(): number {
 }
 
 /**
- * Where the panel sits: docked below the top bar as a third column, or floating, which rides
- * beside an open drawer as its companion. Spec: specs/langy/langy-panel-layout.feature
+ * Where the panel sits: docked or floating, riding beside an open drawer (docked becomes the
+ * drawer's companion, floating dodges to the left on a lingering release), and the floating
+ * card's width. Spec: specs/langy/langy-panel-layout.feature
  */
 export function useLangyPanelPlacement() {
   const isOpen = useLangyStore((s) => s.isOpen);
@@ -46,7 +47,8 @@ export function useLangyPanelPlacement() {
     floating,
     reduceMotion,
     drawerEdgeHeld,
-    isDrawerCompanion: isOpen && !!currentDrawer && floating,
+    isDrawerCompanion: isOpen && !!currentDrawer && !floating,
+    floatingDodgesDrawer: isOpen && drawerEdgeHeld && floating,
     floatingPanelWidth: resolveFloatingPanelWidth(viewportWidth),
   };
 }
