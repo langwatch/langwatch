@@ -341,6 +341,8 @@ function CacheHealth({ session }: { session: CodingAgentSessionDisplay }) {
   const ratio = session.peakContextTokens / ceiling;
   const band = contextHealthBand(ratio);
   const rebuildTone = cacheRebuildTone(session.cacheRebuildCount);
+  // No peak means no context data was reported; a 0 would read as a measurement.
+  const hasContextData = session.peakContextTokens > 0;
 
   return (
     <Section title="Cache health">
@@ -348,13 +350,13 @@ function CacheHealth({ session }: { session: CodingAgentSessionDisplay }) {
         <Grid templateColumns="repeat(auto-fit, minmax(140px, 1fr))" gap={3}>
           <Stat
             label="Peak context"
-            value={formatCompact(session.peakContextTokens)}
+            value={hasContextData ? formatCompact(session.peakContextTokens) : "—"}
             hint={`${Math.round(ratio * 100)}% of the ${formatCompact(ceiling)}-token window: ${band.label.toLowerCase()}, per the current reliability guidance for long-context sessions.`}
             tone={session.peakContextTokens > 0 ? band.tone : undefined}
           />
           <Stat
             label="Cache misses"
-            value={String(session.cacheRebuildCount)}
+            value={hasContextData ? String(session.cacheRebuildCount) : "—"}
             hint="Model calls that re-created most of the context instead of reading it from cache. A cache WRITE costs more per token than a read, so this is the session paying twice for the same tokens."
             tone={rebuildTone}
           />
