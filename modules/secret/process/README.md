@@ -80,10 +80,10 @@ stashReveal(input: StashRevealInput): Promise<StashedReveal>;
 
 #### `revealOnce`
 
-Serves a stashed secret and forgets it. Every later read is refused.
+Serves a stashed secret to its recipient and forgets it. Every later read is refused.
 
 ```typescript
-revealOnce(input: RevealOnceInput): Promise<RevealedSecret>;
+revealOnce(input: RevealOnceInput, by: SecretCaller): Promise<RevealedSecret>;
 ```
 
 ## REST transport
@@ -254,12 +254,12 @@ interface Input {
 type Output = z.infer<typeof secretWriteAcknowledgedSchema>; // ../contract/src/secret.ts:125
 
 // secrets.revealOnce
-// Input: revealOnceInputSchema, ../contract/src/one-time-reveal.ts:34
+// Input: revealOnceInputSchema, ../contract/src/one-time-reveal.ts:36
 interface Input {
   organizationId: string;
   revealId: string;
 }
-// Output: revealedSecretSchema, ../contract/src/one-time-reveal.ts:42
+// Output: revealedSecretSchema, ../contract/src/one-time-reveal.ts:44
 interface Output {
   kind: "virtual_key";
   keyId: string;
