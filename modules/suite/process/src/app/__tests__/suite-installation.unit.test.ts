@@ -33,7 +33,7 @@ function process(role: "api" | "worker") {
   return createApp({ role })
     .withModules([suiteProcessModule])
     .withStores(memoryStores())
-    .withConfig({ suite: { publicBaseUrl: undefined } })
+    .withConfig({ suite: { publicBaseUrl: undefined, foldCacheTtlSeconds: 300 } })
     .provide({
       scenario: createApiFixture<ScenarioApiContract>({ findTestSuite: async () => null }),
       agent: createApiFixture<AgentApi>({}),
@@ -180,7 +180,9 @@ describe("given a stored run plan in the api role", () => {
           processManagerMode: "producer-only",
         }),
       )
-      .withConfig({ suite: { publicBaseUrl: "https://app.langwatch.test" } })
+      .withConfig({
+        suite: { publicBaseUrl: "https://app.langwatch.test", foldCacheTtlSeconds: 300 },
+      })
       .provide({
         scenario: memoryScenarioApi(world, commands),
         agent: memoryAgentApi(world),

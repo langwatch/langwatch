@@ -6630,6 +6630,9 @@ importers:
 
   modules/coding-agent/contract:
     dependencies:
+      '@langwatch/config':
+        specifier: workspace:*
+        version: link:../../../packages/config
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module

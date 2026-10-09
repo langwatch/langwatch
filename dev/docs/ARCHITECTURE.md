@@ -293,7 +293,8 @@ document, is the authority on filenames):
   a client itself, and never declares a peer — only the module class does.
 - `repositories/` — interfaces at the top; `prisma/` and `memory/` backends
   below; the registry offers both via `defineRepositories({ live, memory })`.
-  Only `repositories/prisma/**` names Prisma, through
+  A tier's `create` receives the stores it `requires` and, like a channel tier,
+  the module's parsed `config` (Alex, 2026-10-09, FOLD-TTL). Only `repositories/prisma/**` names Prisma, through
   `PrismaRepository.for("Model")`; every project-model query carries
   `projectId`. Every ClickHouse query filters `TenantId` first.
 - `channels/` — messages to or from anything the module does not own (bus,

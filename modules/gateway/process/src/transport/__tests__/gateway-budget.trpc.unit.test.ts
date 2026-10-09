@@ -166,6 +166,7 @@ async function callerFor(budgets: GatewayBudget[], debits: GatewayBudgetDebitRow
     },
     repositories,
     config: {
+      foldCacheTtlSeconds: 300,
       spendSettlementGraceMs: void 0,
       internalUrl: void 0,
       controlPlaneUrl: void 0,

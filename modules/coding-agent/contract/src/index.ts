@@ -1,5 +1,6 @@
 export * from "./coding-agent.ts";
 export * from "./coding-agent.api.ts";
+export * from "./coding-agent.config.ts";
 export * from "./coding-agent.trpc.ts";
 export * from "./coding-agent-trpc.schemas.ts";
 export * from "./coding-agent-processing.ts";

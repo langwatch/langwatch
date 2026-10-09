@@ -28,3 +28,9 @@ Feature: What a process hands its modules
     Given a module that declares a config slice and builds its tasks with a binder
     When a process with the "tasks" role boots with that module's config stated
     Then the binder is handed the module's parsed config beside its app
+
+  @unit
+  Scenario: A repository tier is handed its module's parsed config
+    Given a module whose live repository tier reads a leaf of the module's config
+    When the process boots with that module's config stated
+    Then the live tier is built with the module's parsed config beside its stores

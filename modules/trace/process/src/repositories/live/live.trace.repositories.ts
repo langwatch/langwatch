@@ -2,6 +2,7 @@ import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { EventReadSeat } from "@langwatch/eventing";
 import type { RateLimiter } from "@langwatch/process-stores";
 import type { RedisConnection } from "@langwatch/redis-client";
+import type { TraceServerConfig } from "@langwatch/trace-contract";
 
 import { ClickHouseTraceClientsRepository } from "../clickhouse/clickhouse.trace-member-client.repository.ts";
 import { EventingTraceEventPayloadRepository } from "../eventing/eventing.trace-event-payload.repository.ts";
@@ -32,17 +33,25 @@ export class LiveTraceRepositories {
     redis,
     rateLimiter,
     eventReadSeat,
+    config,
   }: Readonly<{
     prisma: Parameters<typeof PostgresTraceRepositories.create>[0]["prisma"];
     clickhouse: ClickHouseQueryClient;
     redis: RedisConnection;
     rateLimiter: RateLimiter;
     eventReadSeat: EventReadSeat;
+    config: Pick<TraceServerConfig, "foldCacheTtlSeconds">;
   }>): TraceRepositories {
     return {
       ...PostgresTraceRepositories.create({ prisma, clickhouse }),
-      summaryFoldCache: RedisTraceSummaryFoldCacheRepository.create(redis),
-      analyticsFoldCache: RedisTraceAnalyticsFoldCacheRepository.create(redis),
+      summaryFoldCache: RedisTraceSummaryFoldCacheRepository.create({
+        redis,
+        ttlSeconds: config.foldCacheTtlSeconds,
+      }),
+      analyticsFoldCache: RedisTraceAnalyticsFoldCacheRepository.create({
+        redis,
+        ttlSeconds: config.foldCacheTtlSeconds,
+      }),
       spanDedup: RedisTraceSpanDedupRepository.create({ connection: redis }),
       exportSlots: RedisTraceExportSlotRepository.create({ connection: redis }),
       rateLimits: RedisTraceRateLimitRepository.create(rateLimiter),

@@ -353,6 +353,7 @@ function boot({
     .withEventing(eventing)
     .withConfig({
       experiment: {
+        foldCacheTtlSeconds: 300,
         blockLocalHttpCalls: false,
         allowedProxyHosts: [],
         runConcurrency,

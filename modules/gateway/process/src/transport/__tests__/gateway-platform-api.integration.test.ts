@@ -78,8 +78,10 @@ async function mount() {
       clickhouse: createApiFixture<ClickHouseQueryClient>({}),
       encryption: reversible,
       redis: memoryRedisDouble(),
+      config: { foldCacheTtlSeconds: 300 },
     }),
     config: {
+      foldCacheTtlSeconds: 300,
       spendSettlementGraceMs: void 0,
       internalUrl: void 0,
       controlPlaneUrl: void 0,

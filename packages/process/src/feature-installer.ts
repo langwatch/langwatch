@@ -1360,7 +1360,10 @@ class RepositoryAppBuilder<
           if (!args.repositorySelection) {
             throw new Error(`Module "${name}" was installed without a repository tier.`);
           }
-          const repositories = instantiateRepositories(registry, args.repositorySelection);
+          const repositories = instantiateRepositories(registry, {
+            ...args.repositorySelection,
+            config: args.config,
+          });
           return { ...(await setup.install({ ...args, repositories })), repositories };
         },
         ...declaredOwner(app),

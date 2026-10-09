@@ -255,6 +255,7 @@ export const installableEvaluation: typeof evaluationProcessModule = {
 
 /** The parsed config an installation test hands the module: main's defaults, no endpoint. */
 export const EVALUATION_TEST_CONFIG: EvaluationServerConfig = {
+  foldCacheTtlSeconds: 300,
   langevalsEndpoint: undefined,
   stagingThresholdBytes: undefined,
   stagingTtlSeconds: 600,

@@ -156,6 +156,7 @@ async function mountedBudgets() {
     },
     repositories,
     config: {
+      foldCacheTtlSeconds: 300,
       spendSettlementGraceMs: void 0,
       internalUrl: void 0,
       controlPlaneUrl: void 0,

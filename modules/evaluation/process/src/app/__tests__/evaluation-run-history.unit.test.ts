@@ -121,6 +121,7 @@ describe("given the live evaluation repositories over the process's ClickHouse m
         clickhouse,
         redis: createApiFixture<RedisConnection>(),
         objectStorage: createApiFixture<ObjectStorage>(),
+        config: { foldCacheTtlSeconds: 300 },
       });
 
       await expect(
@@ -160,6 +161,7 @@ describe("given the live run read over a tenant's retention from data retention"
       }),
       redis: createApiFixture<RedisConnection>(),
       objectStorage: createApiFixture<ObjectStorage>(),
+      config: { foldCacheTtlSeconds: 300 },
     });
     const before = nowInstant().epochMilliseconds;
     await expect(

@@ -68,6 +68,26 @@ class ConfiguredApp {
   constructor(readonly value: string) {}
 }
 
+class ConfiguredLiveRepositories {
+  static readonly requires = ["prisma"] as const;
+  static create({
+    prisma,
+    config,
+  }: {
+    prisma: { prefix: string };
+    config: { prefix: string };
+  }): Repositories {
+    return { value: { read: () => `${config.prefix}/${prisma.prefix}` } };
+  }
+}
+
+const configuredRepositoriesFeature = defineProcessModule("agent")
+  .withRepositories(
+    defineRepositories({ live: ConfiguredLiveRepositories, memory: MemoryRepositories }),
+  )
+  .withApi(ConfiguredApp)
+  .build();
+
 const feature = defineProcessModule("annotation")
   .withRepositories(repositories)
   .withApi(App)
@@ -186,6 +206,24 @@ describe("given a module that declares both repository tiers", () => {
         .boot();
 
       expect(runtime.module(configuredFeature).provided.value).toBe("config:database");
+      await runtime.stop();
+    });
+  });
+
+  describe("when the live tier reads the module's config", () => {
+    /** @scenario "A repository tier is handed its module's parsed config" */
+    it("builds the live tier with the parsed config beside its stores", async () => {
+      const runtime = await new ApplicationBuilder({
+        role: "api",
+        config: { agent: { prefix: "config" } },
+        stores: liveMemberSourceOf({ prisma: { prefix: "database" } }),
+      })
+        .withModules([configuredRepositoriesFeature])
+        .boot();
+
+      expect(runtime.module(configuredRepositoriesFeature).provided.value).toBe(
+        "config:config/database",
+      );
       await runtime.stop();
     });
   });

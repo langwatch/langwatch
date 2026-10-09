@@ -4,7 +4,7 @@ import {
   organizationCredentialOfRequest,
   projectCredentialOfRequest,
 } from "@langwatch/api/rest";
-import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
+import type { CodingAgentApi, CodingAgentServerConfig } from "@langwatch/coding-agent-contract";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 
 import { CodingAgentModule } from "./app/coding-agent.app.ts";
@@ -18,38 +18,41 @@ import {
 } from "./transport/coding-agent.rest.ts";
 import { codingAgentTrpcTransport } from "./transport/coding-agent.trpc.ts";
 
-export const codingAgentProcessModule: PublishedProcessModule<"coding-agent", CodingAgentApi> =
-  defineProcessModule("coding-agent")
-    .withRepositories(codingAgentRepositories)
-    .withApi(CodingAgentModule)
-    .withTransports(
-      codingAgentRest,
-      codingAgentRollupRest,
-      codingAgentV1Rest,
-      codingAgentTrpcTransport,
-    )
-    .withEventing(codingAgentEventing)
-    .withTransportFacts(() => [
-      bindRestMiddleware(codingAgentRestCaller, (context) => {
-        const resolved = projectCredentialOfRequest(context.req.raw);
+export const codingAgentProcessModule: PublishedProcessModule<
+  "coding-agent",
+  CodingAgentApi,
+  CodingAgentServerConfig
+> = defineProcessModule("coding-agent")
+  .withRepositories(codingAgentRepositories)
+  .withApi(CodingAgentModule)
+  .withTransports(
+    codingAgentRest,
+    codingAgentRollupRest,
+    codingAgentV1Rest,
+    codingAgentTrpcTransport,
+  )
+  .withEventing(codingAgentEventing)
+  .withTransportFacts(() => [
+    bindRestMiddleware(codingAgentRestCaller, (context) => {
+      const resolved = projectCredentialOfRequest(context.req.raw);
 
-        return {
-          project: {
-            isPersonal: resolved.project.isPersonal,
-            ownerUserId: resolved.project.ownerUserId,
-          },
-          credential: credentialPrincipalOfToken(resolved),
-        };
-      }),
-      bindRestMiddleware(codingAgentV1RestCaller, (context) => {
-        const credential = organizationCredentialOfRequest(context.req.raw);
+      return {
+        project: {
+          isPersonal: resolved.project.isPersonal,
+          ownerUserId: resolved.project.ownerUserId,
+        },
+        credential: credentialPrincipalOfToken(resolved),
+      };
+    }),
+    bindRestMiddleware(codingAgentV1RestCaller, (context) => {
+      const credential = organizationCredentialOfRequest(context.req.raw);
 
-        return {
-          apiKeyId: credential.apiKeyId,
-          userId: credential.userId,
-          // The member the credential acts as, or the credential itself where it
-          // acts as nobody - one stable string per credential either way.
-          actorId: credential.userId ?? `apikey:${credential.apiKeyId}`,
-        };
-      }),
-    ]);
+      return {
+        apiKeyId: credential.apiKeyId,
+        userId: credential.userId,
+        // The member the credential acts as, or the credential itself where it
+        // acts as nobody - one stable string per credential either way.
+        actorId: credential.userId ?? `apikey:${credential.apiKeyId}`,
+      };
+    }),
+  ]);

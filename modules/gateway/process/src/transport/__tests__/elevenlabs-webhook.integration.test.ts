@@ -150,6 +150,7 @@ async function mountWebhook(): Promise<MountableRestApp> {
     .withModules([gatewayProcessModule])
     .withConfig({
       gateway: {
+        foldCacheTtlSeconds: 300,
         spendSettlementGraceMs: undefined,
         internalUrl: undefined,
         controlPlaneUrl: undefined,

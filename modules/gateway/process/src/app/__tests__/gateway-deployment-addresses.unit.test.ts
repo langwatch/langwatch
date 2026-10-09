@@ -39,6 +39,7 @@ function gatewayApp({
     },
     repositories: MemoryGatewayRepositories.create(),
     config: {
+      foldCacheTtlSeconds: 300,
       spendSettlementGraceMs: void 0,
       internalUrl,
       controlPlaneUrl,
