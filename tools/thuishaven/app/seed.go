@@ -205,6 +205,7 @@ func (o *Orchestrator) runSeedgen(ctx context.Context, t seedTarget, args []stri
 		shell += " " + shellQuote(a)
 	}
 	env := append(append([]string{}, t.Env...), "LANGWATCH_TASK_MODULES="+seedTaskModule)
+	env = append(env, o.licenceEnv(t.Slug, resolvedDevEnv(t.Dir), true)...)
 	err := o.sup.RunOnce(ctx, "seed", t.Dir, shell, env)
 	status.Exit, status.FinishedAt = exitCodeOf(err), o.sys.Now()
 	if status.Exit < 0 {

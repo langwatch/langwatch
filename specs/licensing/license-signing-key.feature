@@ -83,3 +83,27 @@ Feature: The key a deployment verifies licences with
     And LANGWATCH_LICENSE_PUBLIC_KEY is unset or blank
     When a licence signed by the LangWatch production key is activated
     Then the licence is accepted
+
+  # ============================================================================
+  # Dev stack licences (a haven stack signs its own)
+  # ============================================================================
+
+  @unit
+  Scenario: A release build refuses a dev stack licence whatever key signed it
+    Given a release build
+    And a licence carrying the devStack claim, signed by the key the build verifies with
+    When the licence is activated
+    Then the licence is refused as having an invalid signature
+
+  @unit
+  Scenario: A development build accepts a dev stack licence signed by its override key
+    Given a development build
+    And LANGWATCH_LICENSE_PUBLIC_KEY names the stack's dev public key
+    When a licence carrying the devStack claim, signed by the matching private key, is activated
+    Then the licence is accepted
+
+  @unit
+  Scenario: A verifier that is not told its build refuses a dev stack licence
+    Given a licence verifier constructed without saying whether it may accept dev stack licences
+    When a licence carrying the devStack claim is verified
+    Then it is refused
