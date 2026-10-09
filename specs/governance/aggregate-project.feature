@@ -369,6 +369,46 @@ Feature: An aggregate project reads its member projects
     When the nightly sweep runs for the organisation
     Then that personal project is a member
 
+  # A member's read starts at the beginning of time under an all-personal or
+  # explicit rule, and on the day it joined under a department rule, so a move
+  # between departments never shows the new one the old past. ADR-144 (this
+  # feature) records the rule; a missing start is never "everything".
+
+  @unit
+  Scenario: A member's older traces show in an all-personal or explicit aggregate
+    Given an aggregate project with the rule "all personal projects" or an explicit list
+    When a member is attached to it
+    Then the member's read starts at the beginning of time
+    And traces the member wrote before it joined, imported history included, show in the aggregate
+
+  @unit
+  Scenario: A by-department aggregate reads a member only from the day it joined
+    Given an aggregate project with the rule "personal projects in department Engineering"
+    When a member in Engineering is attached to it
+    Then the member's read starts at the moment it was attached
+
+  @unit
+  Scenario: An aggregate whose reads start at their join date is widened to full history
+    Given an aggregate project with the rule "all personal projects"
+    And a member whose read was attached before full history was the rule
+    When the reconciler or the nightly sweep runs
+    Then that read is revoked as a window change
+    And the member is attached again with a read from the beginning of time
+
+  @unit
+  Scenario: A department aggregate narrows a full-history read to the day it is attached again
+    Given an aggregate project whose rule was changed to "personal projects in department Engineering"
+    And a member that still holds a read from the beginning of time
+    When the reconciler runs
+    Then that read is revoked as a window change
+    And the member is attached again with a read from that moment
+
+  @unit
+  Scenario: A read already on its rule's window is never rewritten
+    Given an aggregate project whose members hold reads on their rule's window
+    When the reconciler runs again, on any later day
+    Then no read is revoked and none is attached
+
   # ── F. Trace routes carry the proof ──────────────────────────────────────
 
   @integration
