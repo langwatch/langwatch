@@ -214,11 +214,16 @@ func headAll(lines []string, limit int) []string {
 // WriteVerdictFile writes verdict.md into the run directory, ending with a
 // line per section the run skipped (done.go skipLines).
 func WriteVerdictFile(runDir string, rows []Row, skipped []string) error {
-	ledgers, err := readJudgeLedgers(runDir)
+	judged, ledgers, err := judgeRows(runDir, rows)
 	if err != nil {
-		return fmt.Errorf("read judge: %w", err)
+		return err
 	}
-	text := RenderVerdict(applyJudgements(rows, ledgers)) + renderJudgeCost(ledgers)
+	return writeVerdict(runDir, judged, ledgers, skipped)
+}
+
+// writeVerdict writes verdict.md from rows the judge has already been applied to.
+func writeVerdict(runDir string, rows []Row, ledgers map[Edition]JudgeLedger, skipped []string) error {
+	text := RenderVerdict(rows) + renderJudgeCost(ledgers)
 	if len(skipped) > 0 {
 		text += "\nskipped:\n" + strings.Join(skipped, "\n") + "\n"
 	}

@@ -73,6 +73,15 @@ func readJudgeLedgers(runDir string) (map[Edition]JudgeLedger, error) {
 	return ledgers, nil
 }
 
+// judgeRows reads the run's judge ledgers and applies them to a copy of rows.
+func judgeRows(runDir string, rows []Row) ([]Row, map[Edition]JudgeLedger, error) {
+	ledgers, err := readJudgeLedgers(runDir)
+	if err != nil {
+		return nil, nil, fmt.Errorf("read judge: %w", err)
+	}
+	return applyJudgements(rows, ledgers), ledgers, nil
+}
+
 // applyJudgements fails a row whose pair the judge found a regression in and
 // marks a judged finding with none as judged-harmless; rows is a copy.
 func applyJudgements(rows []Row, ledgers map[Edition]JudgeLedger) []Row {

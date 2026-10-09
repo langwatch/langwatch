@@ -912,10 +912,17 @@ func (run *session) report(stream RunnerStream, edition Edition) ([]Row, error) 
 	return rows, nil
 }
 
-// finish records every uncovered route as a finding, then writes
-// summary.txt and prints it.
+// finish applies the judge's verdicts to the rows, records every uncovered
+// route as a finding, then writes summary.txt, works.json and verdict.md from
+// the same judged rows and prints the summary.
 func (run *session) finish(result Result) (Result, error) {
 	options := run.request.Options
+	judged, ledgers, err := judgeRows(options.RunDir, result.Rows)
+	if err != nil {
+		return result, err
+	}
+	result.Findings += CountFindings(judged) - CountFindings(result.Rows)
+	result.Rows = judged
 	if result.Coverage != nil {
 		uncovered := result.Coverage.Uncovered()
 		if err := appendUncovered(filepath.Join(options.RunDir, FindingsFile), uncovered, run.request.Deps.Now()); err != nil {
@@ -934,7 +941,7 @@ func (run *session) finish(result Result) (Result, error) {
 		fmt.Fprintf(run.streams.Err, "outcome: %v\n", err)
 	}
 	run.recordWorks(result.Rows)
-	if err := WriteVerdictFile(options.RunDir, result.Rows, run.request.Done.skipLines(run.request.Config, options.Editions)); err != nil {
+	if err := writeVerdict(options.RunDir, result.Rows, ledgers, run.request.Done.skipLines(run.request.Config, options.Editions)); err != nil {
 		return result, fmt.Errorf("write verdict: %w", err)
 	}
 	if err := diffkit.WriteSignaturesFile(options.RunDir); err != nil {

@@ -1,10 +1,14 @@
 package visualdiff
 
 import (
+	"context"
+	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func writeJudgeLedger(t *testing.T, runDir string, edition Edition, body string) {
@@ -75,4 +79,33 @@ func TestAJudgedPairWithNoRegressionIsHarmless(t *testing.T) {
 	if !strings.Contains(verdict, "/a: layout · moved · judged-harmless") {
 		t.Fatalf("verdict:\n%s", verdict)
 	}
+}
+
+// @scenario "A judged regression is counted in the summary, works.json and verdict.md alike"
+func TestAJudgedRegressionChangesTheSummaryCount(t *testing.T) {
+	runDir, root := t.TempDir(), t.TempDir()
+	writeJudgeLedger(t, runDir, EditionEnterprise, `{"model":"m","pairs":[{"label":"route-3","regressions":[{"kind":"missing-element","element":"Save button","message":"gone"}]}]}`)
+	rows := []Row{{Edition: EditionEnterprise, Kind: "route", Key: "/a", Class: ClassNoise, DiffFile: "/run/diff/route-3.png"}}
+	run := &session{
+		request: Request{Options: Options{Root: root, RunDir: runDir, Editions: []Edition{EditionEnterprise}}, Config: &Config{}, Deps: Deps{
+			Run: func(context.Context, commandSpec, io.Writer) error { return errors.New("no git") },
+			Now: time.Now,
+		}},
+		streams: Streams{Out: io.Discard, Err: io.Discard},
+	}
+
+	result, err := run.finish(Result{Rows: rows})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if result.Findings != 1 || result.Rows[0].Class != ClassRegression {
+		t.Fatalf("the judged row is the finding: %d %+v", result.Findings, result.Rows[0])
+	}
+	mustContain(t, result.Summary, "1 screens, 1 findings")
+	verdict, err := os.ReadFile(filepath.Join(runDir, VerdictFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	mustContain(t, string(verdict), "/a: regression · judge: missing-element Save button: gone")
 }
