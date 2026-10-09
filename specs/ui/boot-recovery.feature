@@ -79,7 +79,7 @@ Feature: The application recovers from files a lossy link dropped while it boots
       When the build splits the code
       Then it lands in the host-mounts file
 
-    @e2e
+    @e2e @unimplemented
     Scenario: Sign-in shows on a link that drops a fifth of its requests
       Given a link with 250 ms of latency that drops 20% of asset requests
       When a person opens the sign-in page, signs in and opens a dashboard

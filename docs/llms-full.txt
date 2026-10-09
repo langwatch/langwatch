@@ -41133,7 +41133,7 @@ completeness: {
 }
 ```
 
-- `state`: `no_traffic` means nothing arrived in the period. `missing` means a
+- `state`: `no_traffic` means no rows arrived in the period. `missing` means a
   field the query reads is on no row: show a setup step that names the field
   to send. `partial` means some rows lack a field, or some cost has no price.
 - `fields`: one entry per field the query reads that can be empty, with how
