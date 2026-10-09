@@ -128,16 +128,15 @@ export function firstInstallVerdict(): ServingVerdict {
 }
 
 /**
- * The steps the api holds requests for (step id grammar, blitz plan 5.3), so new code never reads
- * a schema it is ahead of. ClickHouse additive DDL is metadata-only, so it waits in the same window:
- * API-UP-CLICKHOUSE, a recommendation pending Alex's ruling; the other option is readers that
- * tolerate a missing column. Spec: specs/upgrade/serving-gate.feature.
+ * The steps the api holds requests for, so new code never reads a schema it is ahead of. ClickHouse
+ * DDL is metadata-only, so it waits in the same window (API-UP-CLICKHOUSE, pending Alex's ruling;
+ * the other option is readers that tolerate a missing column). Spec: serving-gate.feature.
  */
 export function holdsApiRequests(stepId: string): boolean {
   return stepId.startsWith("prisma:") || stepId.startsWith("clickhouse:");
 }
 
-/** The api never runs a step (UIW-1): it holds while a schema step is outstanding, then upgrades. */
+/** The api never runs a step (UIW-1): it holds while a schema step is outstanding, then serves. */
 export function apiPhaseVerdict({
   outstanding,
 }: {
