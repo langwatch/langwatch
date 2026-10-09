@@ -42,11 +42,12 @@ export const toaster: Omit<CreateToasterReturn, "create"> & {
     }),
 };
 
+/** Light mode inks the icon with the toast's own text; dark mode tints it on the neutral panel. */
 const STATUS = {
-  error: { fg: "red.fg" },
-  warning: { fg: "orange.fg" },
-  success: { fg: "green.fg" },
-  info: { fg: "fg.muted" },
+  error: { fg: { _light: "inherit", _dark: "red.fg" } },
+  warning: { fg: { _light: "inherit", _dark: "orange.fg" } },
+  success: { fg: { _light: "inherit", _dark: "green.fg" } },
+  info: { fg: { _light: "inherit", _dark: "fg.muted" } },
   loading: { fg: "fg.muted" },
 } as const;
 

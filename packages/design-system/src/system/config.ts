@@ -1295,20 +1295,15 @@ export const designSystemConfig = defineConfig({
               animation: "toast-sink 220ms cubic-bezier(0.4, 0, 1, 1) both",
             },
             _motionReduce: { transition: "none", animation: "none" },
-            // Light mode: a plain surface with dark text and a status accent on
-            // the start edge, as the alert's surface variant; white on a solid
-            // orange or yellow fill fails contrast.
+            // Light mode: a vibrant status fill with deep same-hue ink (AA: 4.9-11.6:1);
+            // white on these fills fails contrast. Loading stays neutral.
             _light: {
-              "&:is([data-type=error], [data-type=warning], [data-type=success])": {
-                bg: "bg.surface",
-                color: "fg",
-                borderColor: "border.muted",
-                borderInlineStartWidth: "3px",
-                "--toast-trigger-bg": "colors.bg.muted",
-              },
-              "&[data-type=error]": { borderInlineStartColor: "red.fg" },
-              "&[data-type=warning]": { borderInlineStartColor: "orange.fg" },
-              "&[data-type=success]": { borderInlineStartColor: "green.fg" },
+              "&:is([data-type=error], [data-type=warning], [data-type=success], [data-type=info])":
+                { borderColor: "transparent", "--toast-trigger-bg": "rgba(255, 255, 255, 0.35)" },
+              "&[data-type=error]": { bg: "red.500", color: "red.950" },
+              "&[data-type=warning]": { bg: "orange.400", color: "orange.950" },
+              "&[data-type=success]": { bg: "green.500", color: "green.950" },
+              "&[data-type=info]": { bg: "blue.400", color: "blue.950" },
             },
             _dark: {
               ...toastPanel,
