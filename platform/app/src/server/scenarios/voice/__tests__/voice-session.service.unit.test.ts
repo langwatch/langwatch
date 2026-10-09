@@ -567,6 +567,10 @@ describe("finishVoiceSession", () => {
         expect(writeCallRun.mock.calls[0]?.[0].scenarioRunId).toBe(
           result.runId,
         );
+        // A run already existed, so the write is a re-drive: the run's
+        // metadata is refreshed to this attempt's rather than kept at the
+        // first attempt's (#8032).
+        expect(writeCallRun.mock.calls[0]?.[0].isRedrive).toBe(true);
       });
 
       /** @scenario "A retried hang-up completes a half-written run" */
@@ -750,6 +754,9 @@ describe("finishVoiceSession", () => {
         expect(writeCallRun).toHaveBeenCalledWith(
           expect.objectContaining({
             scenario: { scenarioId: "scenario_1", scenarioSetId: "set_x" },
+            // A fresh finish: no run existed, so the started event carries the
+            // metadata and there is nothing to refresh over (#8032).
+            isRedrive: false,
           }),
         );
         expect(result.scenarioSetId).toBe("set_x");
