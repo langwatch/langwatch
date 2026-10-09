@@ -44,3 +44,7 @@ ee724546d96949b22f8d04adc3a2ec5d8c79616a:platform/app/ee/sso/__tests__/sso-gate.
 # "content-marker", so only this pull request's history carries the literal.
 e361040a34adcefc378718482969f16445ac70e9:modules/agent/process/src/transport/__tests__/agent-connect-output.rest.unit.test.ts:generic-api-key:21
 2ab77b8edccec30eca91ddab0618a9765b9b6a01:charts/langwatch/tests/credentials-secret-previous.sh:generic-api-key:57
+
+# An ops checkup test used the placeholder licence fingerprint "0123456789abcdef".
+# It was never a credential.
+14cdab9b9513879fea0976c2f37dcfb4cc7a7217:modules/ops/process/src/services/__tests__/ops-checkup.service.unit.test.ts:generic-api-key:95

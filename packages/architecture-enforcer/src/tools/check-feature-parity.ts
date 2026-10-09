@@ -351,7 +351,6 @@ const LEGACY_INERT: string[] = [
   // would bind them (packages/architecture-enforcer's unspecced-core report),
   // every scenario @unimplemented on purpose. Remove each entry with its
   // first real binding.
-  "modules/authz/specs/offboarding.feature",
   "modules/scenario/specs/simulation-run.feature",
   "specs/agents/create-workflow-agent.feature",
   "specs/agents/workflow-agent-editor.feature",
