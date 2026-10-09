@@ -288,6 +288,11 @@ export class SsoConnectionGuardChecksService {
     );
   }
 
+  /** Frees a slot whose command never reached the queue, so the next attempt may register. */
+  releaseRegistrationSlot(claim: { organizationId: string; commandId: string }): Promise<void> {
+    return this.registrationSlots.release(claim);
+  }
+
   /** The connection as the fold currently holds it; `SsoConnectionNotFoundError` when none. */
   getConnection(input: { connectionId: string }): Promise<SsoConnectionState> {
     return this.connections.getConnection(input);

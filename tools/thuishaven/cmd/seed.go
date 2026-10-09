@@ -5,12 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/app"
 )
 
 // seedValueFlags are the seedgen flags `haven seed` passes through, in the order it passes them.
-var seedValueFlags = []string{"--size", "--spans", "--days", "--persona", "--private", "--seed", "--anchor", "--shape"}
+var seedValueFlags = []string{"--size", "--spans", "--days", "--persona", "--private", "--seed", "--anchor", "--shape", "--into"}
 
 func seedSpec() commandSpec {
 	flags := []flagSpec{
@@ -22,6 +23,8 @@ func seedSpec() commandSpec {
 		{long: "--seed", takesValue: true, value: "<s>", summary: "the seed: the same seed gives the same content"},
 		{long: "--anchor", takesValue: true, value: "<rfc3339>", summary: "the moment history ends at"},
 		{long: "--shape", takesValue: true, value: "saas|sh-licensed|sh-free", summary: "deployment shape"},
+		{long: "--org", takesValue: true, value: "name=..,plan=free,users=N[,persona=..]", summary: "create this org instead of the tier's (repeatable)"},
+		{long: "--into", takesValue: true, value: "<org-id>/<project-id>", summary: "send telemetry only, into an existing project"},
 		{long: "--live", summary: "stream a gentle live load into the last seed's orgs"},
 		{long: "--dry-run", summary: "print the plan's counts, rows, bytes and duration; write nothing"},
 		{long: "--json", summary: "end with the logins and credentials as one JSON object"},
@@ -59,6 +62,13 @@ func seedgenArgs(inv invocation) []string {
 	for _, f := range seedValueFlags {
 		if inv.has(f) {
 			args = append(args, f, inv.value(f))
+		}
+	}
+	for i, arg := range inv.raw { // --org repeats; the parsed flags keep only the last
+		if value, ok := strings.CutPrefix(arg, "--org="); ok {
+			args = append(args, "--org", value)
+		} else if arg == "--org" && i+1 < len(inv.raw) {
+			args = append(args, "--org", inv.raw[i+1])
 		}
 	}
 	if inv.has("--dry-run") {

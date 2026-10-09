@@ -33,9 +33,11 @@ type TaskPipe struct {
 const RunnerModule = "@langwatch/seedgen-runner"
 
 // StartTaskPipe starts the runner in repo with the environment's stack settings; a set
-// LANGWATCH_TASK_MODULES (a path to the runner's entry) wins over the package name.
-func StartTaskPipe(ctx context.Context, repo string, log io.Writer) (*TaskPipe, error) {
-	cmd := exec.CommandContext(ctx, "pnpm", "--silent", "task", "seed:apply", "--concurrency", strconv.Itoa(WindowCeil)) //nolint:gosec // a fixed program and constant arguments
+// LANGWATCH_TASK_MODULES (a path to the runner's entry) wins over the package name. extra are
+// seed:apply's own options, such as --password-hash-file.
+func StartTaskPipe(ctx context.Context, repo string, log io.Writer, extra ...string) (*TaskPipe, error) {
+	args := append([]string{"--silent", "task", "seed:apply", "--concurrency", strconv.Itoa(WindowCeil)}, extra...)
+	cmd := exec.CommandContext(ctx, "pnpm", args...) //nolint:gosec // a fixed program; extra are seedgen's own options
 	cmd.Dir = repo
 	cmd.Env = os.Environ()
 	if os.Getenv("LANGWATCH_TASK_MODULES") == "" {

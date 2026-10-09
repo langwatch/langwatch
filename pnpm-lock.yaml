@@ -18640,15 +18640,24 @@ importers:
       '@langwatch/metric-contract':
         specifier: workspace:*
         version: link:../../../modules/metric/contract
+      '@langwatch/organization-contract':
+        specifier: workspace:*
+        version: link:../../../modules/organization/contract
       '@langwatch/process':
         specifier: workspace:*
         version: link:../../../packages/process
+      '@langwatch/project-contract':
+        specifier: workspace:*
+        version: link:../../../modules/project/contract
       '@langwatch/task':
         specifier: workspace:*
         version: link:../../../packages/task
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../../modules/trace/contract
+      '@langwatch/user-contract':
+        specifier: workspace:*
+        version: link:../../../modules/user/contract
       zod:
         specifier: 'catalog:'
         version: 4.6.5

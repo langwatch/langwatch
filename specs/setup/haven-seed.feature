@@ -86,6 +86,34 @@ Feature: haven seed fills a stack with every kind of data, at any size, without 
     And "--json" prints the same as one object
 
   @unit
+  Scenario: The access block lists every seeded org and its logins
+    Given a seed whose run record holds the ids the product returned
+    When "haven seed" prints its access block
+    Then it lists each org the product created, with its id, persona and member logins
+    And an org or user the product never returned an id for is not listed
+    And every login's password is the one dev password, masked unless "--reveal" is given
+
+  @unit
+  Scenario: The seeded admin is an admin of every org the seed creates
+    Given the stack's admin email
+    When a seed creates organizations
+    Then the admin account is found or created once
+    And each org's owner admits the admin with an admin role on the org and its main team
+
+  @unit
+  Scenario: haven seed creates the orgs it is asked for
+    When I run "haven seed --org name=acme,users=4 --org name=globex,persona=enterprise"
+    Then exactly those orgs are planned, named as asked, each with its owner and users
+    And a malformed name, an unknown key, a plan that is not built yet or a user count out of range is refused naming --org
+
+  @unit
+  Scenario: haven seed --into sends telemetry into one existing project
+    When I run "haven seed --into <org-id>/<project-id>"
+    Then no user, org, project or membership is created
+    And every telemetry chunk lands in that project
+    And --into with --org, or without a project, is refused naming --into
+
+  @unit
   Scenario: haven seed refuses a stack that is not up
     Given the stack's api or worker is not running
     When I run "haven seed"

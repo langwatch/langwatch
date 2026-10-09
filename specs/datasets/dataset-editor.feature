@@ -527,3 +527,9 @@ Feature: Dataset editor
     Given I am editing a saved dataset
     When I click "Run experiment"
     Then I am taken to a new experiment workbench seeded with this dataset
+
+  @integration
+  Scenario: An edited dataset's typed name and column are the ones applied
+    Given the dataset editor opened on an existing dataset and its values loaded
+    When its name and a column name are edited and applied
+    Then the applied dataset carries the typed name and column

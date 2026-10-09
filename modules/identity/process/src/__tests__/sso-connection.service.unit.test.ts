@@ -181,3 +181,53 @@ describe("the sso connection write surface", () => {
     });
   });
 });
+
+describe("given a registration whose commit fails before the command is staged", () => {
+  describe("when the organization tries again", () => {
+    /** @scenario "A registration whose command was never staged frees its slot" */
+    it("registers the new connection instead of refusing on the orphaned slot", async () => {
+      const store = new InMemoryConnections();
+      let isStageDown = true;
+      const ledger: SsoConnectionLedger = {
+        async commit({ command, facts }) {
+          if (isStageDown) throw new Error("the queue refused the command");
+          store.apply({
+            connectionId: command.data.connectionId,
+            facts,
+            occurredAt: command.data.occurredAtMs,
+          });
+          return facts.map((fact) => ({ ...fact, occurredAt: command.data.occurredAtMs }));
+        },
+      };
+      const flaky = SsoConnectionService.create(
+        SsoConnectionGuardsService.create({
+          connections: store,
+          registrationSlots: store,
+          breakGlass: new StubBreakGlassBindings(true),
+          stranding: new StubStranding([]),
+          authorization: new StubPlatformOperators([OPS.id]),
+          licensing: licensingFixture(),
+        }),
+        ledger,
+      );
+      const register = {
+        ...identity,
+        type: "oidc" as const,
+        idp: IDP,
+        arrivalPolicy: "admit" as const,
+      };
+
+      await expect(flaky.registerConnection(register)).rejects.toThrow(
+        "the queue refused the command",
+      );
+      isStageDown = false;
+      const facts = await flaky.registerConnection({
+        ...register,
+        connectionId: "ssoc_2",
+        commandId: "ssocmd_retry",
+      });
+
+      expect(facts.map((fact) => fact.data.connectionId)).toEqual(["ssoc_2"]);
+    });
+  });
+});

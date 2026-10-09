@@ -150,32 +150,101 @@ func itoa(n int) string {
 	return string(encoded)
 }
 
-func TestAcceptedUsersAreGrantedTheirRoleByTheOwnerAfterTheTeamExists(t *testing.T) {
+// @scenario "Seeded users, orgs, projects and memberships go through the module APIs"
+func TestAcceptedUsersAreAdmittedByTheOwnerAfterTheOrgExists(t *testing.T) {
 	plan := mustPlan(t, "--size", "tiny")
 	org := plan.Orgs[0]
-	teamCreated, granted := false, map[string]GrantAttachInput{}
+	founded, admitted := false, map[string]map[string]string{}
 	for step := range plan.Steps() {
 		a := step.Action
-		if a == nil || a.Org != org.Ref {
+		if a == nil || (a.Ref != org.Ref && a.Org != org.Ref) {
 			continue
 		}
-		teamCreated = teamCreated || a.Kind == KindTeamCreate
-		if a.Kind != KindGrantAttach {
+		founded = founded || a.Kind == KindOrgCreate
+		if a.Kind != KindMemberAdd {
 			continue
 		}
-		var input GrantAttachInput
-		if err := json.Unmarshal(a.Input, &input); err != nil || !teamCreated || a.As != org.Users[0].Ref {
-			t.Fatalf("grant %s: err %v, after team %v, as %q", a.Key, err, teamCreated, a.As)
+		var input map[string]string
+		if err := json.Unmarshal(a.Input, &input); err != nil || !founded || a.As != org.Users[0].Ref {
+			t.Fatalf("member %s: err %v, after the org %v, as %q", a.Key, err, founded, a.As)
 		}
-		granted[input.Grants[0].Principal["userId"]] = input
+		admitted[input["user"]] = input
 	}
-	for _, user := range org.Users {
-		input, ok := granted[user.Ref]
+	for _, user := range org.Users[1:] {
+		input, ok := admitted[user.Ref]
 		if ok != (user.State == "accepted") {
-			t.Fatalf("%s (%s): granted %v", user.Ref, user.State, ok)
+			t.Fatalf("%s (%s): admitted %v", user.Ref, user.State, ok)
 		}
-		if ok && (len(input.Grants) != 2 || input.Grants[0].Role != user.Role || input.Grants[1].ScopeType != "TEAM") {
-			t.Fatalf("%s: grants %+v", user.Ref, input.Grants)
+		if ok && (input["teamRole"] != user.Role || input["team"] != org.TeamRef() || input["role"] == "") {
+			t.Fatalf("%s: member input %+v", user.Ref, input)
+		}
+	}
+	if _, ok := admitted[org.Users[0].Ref]; ok {
+		t.Fatal("the owner is admitted again; founding the org made it a member")
+	}
+}
+
+// @scenario "The seeded admin is an admin of every org the seed creates"
+func TestTheAdminJoinsEveryOrgWithAnAdminGrant(t *testing.T) {
+	plan := mustPlan(t, "--size", "tiny", "--admin", "admin@example.test")
+	adminCreated, joined := 0, map[string]bool{}
+	for step := range plan.Steps() {
+		a := step.Action
+		switch {
+		case a == nil:
+		case a.Kind == KindUserCreate && a.Ref == AdminRef:
+			adminCreated++
+		case a.Kind == KindMemberAdd && strings.Contains(string(a.Input), `"user":"`+AdminRef+`"`):
+			if adminCreated != 1 || !strings.Contains(string(a.Input), `"role":"ADMIN"`) ||
+				!strings.Contains(string(a.Input), `"teamRole":"ADMIN"`) {
+				t.Fatalf("admin member action %s", a.Input)
+			}
+			joined[a.Org] = true
+		}
+	}
+	for _, org := range plan.Orgs {
+		if !joined[org.Ref] {
+			t.Errorf("the admin does not join %s", org.Ref)
+		}
+	}
+	if adminCreated != 1 {
+		t.Errorf("the admin account is created %d times, want once", adminCreated)
+	}
+}
+
+// @scenario "haven seed creates the orgs it is asked for"
+func TestOrgFlagsReplaceTheTierOrgs(t *testing.T) {
+	plan := mustPlan(t, "--size", "tiny", "--private", "0", "--org", "name=acme,users=4",
+		"--org", "name=globex,plan=free,users=1,persona=enterprise")
+	counts := plan.Estimate().Counts
+	if counts["orgs"] != 2 || counts[KindOrgCreate] != 2 || counts[KindUserCreate] != 5 || counts[KindProjectCreate] != 2 {
+		t.Fatalf("counts %v: want 2 orgs, 5 users, 2 projects", counts)
+	}
+	if plan.Orgs[0].Key != "acme" || plan.Orgs[1].Persona != "enterprise" {
+		t.Fatalf("orgs %+v %+v", plan.Orgs[0], plan.Orgs[1])
+	}
+	for _, refused := range []string{"name=Acme", "name=acme,plan=enterprise", "name=acme,users=0", "name=acme,colour=red",
+		"name=acme,persona=nosuch", "acme"} {
+		if _, err := ParseFlags([]string{"--org", refused}, anchor); !isFlagError(err, "org") {
+			t.Errorf("--org %s: want a refusal naming --org, got %v", refused, err)
+		}
+	}
+}
+
+// @scenario "haven seed --into sends telemetry into one existing project"
+func TestIntoSendsOnlyTelemetry(t *testing.T) {
+	plan := mustPlan(t, "--size", "tiny", "--into", "org_1/project_1", "--admin", "admin@example.test")
+	for step := range plan.Steps() {
+		if step.Action != nil {
+			t.Fatalf("--into emitted %s; it creates nothing", step.Action.Kind)
+		}
+	}
+	if counts := plan.Estimate().Counts; counts["orgs"] != 0 || counts["spans"] != 1_500 {
+		t.Fatalf("counts %v: want no orgs and the tier's spans", counts)
+	}
+	for _, args := range [][]string{{"--into", "org_1"}, {"--into", "o/p", "--org", "name=acme"}} {
+		if _, err := ParseFlags(args, anchor); !isFlagError(err, "into") {
+			t.Errorf("%v: want a refusal naming --into, got %v", args, err)
 		}
 	}
 }

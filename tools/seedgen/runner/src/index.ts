@@ -12,6 +12,9 @@ export function createTasks(app: BootedApplication): Task[] {
     trace: app.service(seedApiTokens.trace),
     log: app.service(seedApiTokens.log),
     metric: app.service(seedApiTokens.metric),
+    user: app.service(seedApiTokens.user),
+    organization: app.service(seedApiTokens.organization),
+    project: app.service(seedApiTokens.project),
   };
   return [new SeedApplyTask({ apis, input: process.stdin, output: process.stdout })];
 }

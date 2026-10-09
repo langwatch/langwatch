@@ -59,7 +59,23 @@ func NewPlan(flags Flags) (*Plan, error) {
 	sum := sha256.Sum256(append([]byte(Recipe+"\x00"), encoded...))
 	plan := &Plan{Flags: flags, Run: hex.EncodeToString(sum[:6]), draws: Draws{Seed: flags.Seed},
 		hours: flags.Days * 24, start: flags.Anchor.Add(-time.Duration(flags.Days) * 24 * time.Hour)}
-	plan.Orgs = plan.sharedOrgs(tier)
+	switch {
+	case flags.Into != "":
+		into := plan.newOrg(flags.Personas[0], "into", false)
+		plan.fill(into, 1, 0)
+		plan.Orgs = []*Org{into}
+		plan.allocate()
+		return plan, nil
+	case len(flags.Orgs) > 0:
+		for _, spec := range flags.Orgs {
+			org := plan.newOrg(spec.Persona, spec.Name, false)
+			org.Key = spec.Name // the org is named as asked; its users' emails derive from the name
+			plan.fill(org, 1, spec.Users)
+			plan.Orgs = append(plan.Orgs, org)
+		}
+	default:
+		plan.Orgs = plan.sharedOrgs(tier)
+	}
 	for n := 1; n <= flags.Private; n++ {
 		org := plan.newOrg(flags.Personas[(n-1)%len(flags.Personas)], "private-"+strconv.Itoa(n), true)
 		plan.fill(org, 1, 3)
@@ -214,9 +230,20 @@ func (w *walker) emit(step Step) bool {
 	return w.yield(step)
 }
 
+// identity creates nothing under --into: the org and project already exist.
 func (w *walker) identity() bool {
+	if w.plan.Flags.Into != "" {
+		return true
+	}
+	if admin := w.plan.Flags.Admin; admin != "" {
+		action := Action{Kind: KindUserCreate, Ref: AdminRef, Key: admin,
+			Input: inputOf(map[string]any{"email": admin, "role": "ADMIN", "state": "accepted"})}
+		if !w.emit(Step{Action: &action}) {
+			return false
+		}
+	}
 	for _, org := range w.plan.Orgs {
-		actions := org.actions(w.plan.Flags.Days)
+		actions := org.actions(w.plan.Flags.Days, w.plan.Flags.Admin != "")
 		for i := range actions {
 			if !w.emit(Step{Action: &actions[i]}) {
 				return false
@@ -269,55 +296,57 @@ func (t *telemetry) cell(i, hour int) (Cell, bool) {
 		Spans: spans, Logs: spans, MetricPoints: 2 * spans}, spans > 0
 }
 
-// actions are the org's identity steps, retention before any data in the org.
-func (org *Org) actions(days int) []Action {
+// AdminRef is the seeded admin's ref: one account, a member of every org the seed creates.
+const AdminRef = "$user:admin"
+
+// orgRoles maps a plan role to the member row's role; a viewer holds a Lite (EXTERNAL) seat.
+var orgRoles = map[string]string{"ADMIN": "ADMIN", "MEMBER": "MEMBER", "VIEWER": "EXTERNAL"}
+
+// TeamRef is the ref org.create mints for the team the product founds with the org.
+func (org *Org) TeamRef() string { return "$team:" + org.Name + "/main" }
+
+// actions are the org's identity steps, retention before any data in the org. The owner founds
+// the org (and its main team); every other accepted user, and the admin, is admitted by the owner.
+func (org *Org) actions(days int, withAdmin bool) []Action {
 	owner := org.Users[0]
 	var actions []Action
 	if org.Private {
-		actions = append(actions, userAction(org, owner, org.Ref))
+		actions = append(actions, userAction(owner))
 	} else {
-		actions = append(actions, userAction(org, owner, ""),
+		actions = append(actions, userAction(owner),
 			Action{Kind: KindOrgCreate, Ref: org.Ref, As: owner.Ref, Key: org.Key,
-				Input: inputOf(map[string]any{"name": org.Key, "persona": org.Persona})})
+				Input: inputOf(map[string]any{"name": org.Key, "persona": org.Persona, "team": "main"})})
 	}
 	actions = append(actions,
 		Action{Kind: KindRetentionSet, Org: org.Ref, As: owner.Ref, Key: org.Key,
-			Input: inputOf(map[string]any{"days": RetentionDays(org.Persona, days)})},
-		Action{Kind: KindTeamCreate, Ref: "$team:" + org.Name + "/main", Org: org.Ref, As: owner.Ref, Key: "main",
-			Input: inputOf(map[string]any{"name": "main"})})
+			Input: inputOf(map[string]any{"days": RetentionDays(org.Persona, days)})})
 	for _, project := range org.Projects {
 		actions = append(actions, Action{Kind: KindProjectCreate, Ref: project.Ref, Org: org.Ref, As: owner.Ref,
-			Key: project.Key, Input: inputOf(map[string]any{"name": project.Key, "team": "$team:" + org.Name + "/main"})})
+			Key: project.Key, Input: inputOf(map[string]any{"name": project.Key, "team": org.TeamRef()})})
 	}
 	for _, user := range org.Users[1:] {
-		actions = append(actions, userAction(org, user, org.Ref))
+		actions = append(actions, userAction(user))
 	}
-	for _, user := range org.Users {
+	for _, user := range org.Users[1:] {
 		if user.State == "accepted" {
-			actions = append(actions, grantAction(org, user, owner.Ref))
+			actions = append(actions, memberAction(org, user.Ref, user.Email, user.Role, owner.Ref))
 		}
+	}
+	if withAdmin {
+		actions = append(actions, memberAction(org, AdminRef, "admin", "ADMIN", owner.Ref))
 	}
 	return actions
 }
 
-// grantAction gives an accepted user its role at the org and on the main team, as the owner.
-func grantAction(org *Org, user User, as string) Action {
-	grant := func(scopeType, scopeID string) Grant {
-		return Grant{Principal: map[string]string{"userId": user.Ref}, Role: user.Role, ScopeType: scopeType,
-			ScopeID: scopeID}
-	}
-	encoded, _ := json.Marshal(GrantAttachInput{Grants: []Grant{
-		grant("ORGANIZATION", org.Ref), grant("TEAM", "$team:"+org.Name+"/main")}})
-	return Action{Kind: KindGrantAttach, Org: org.Ref, As: as, Key: user.Email, Input: encoded}
+// memberAction admits a user to the org with its role, and to the main team, as the owner.
+func memberAction(org *Org, user, key, role, as string) Action {
+	return Action{Kind: KindMemberAdd, Org: org.Ref, As: as, Key: key, Input: inputOf(map[string]any{
+		"user": user, "role": orgRoles[role], "team": org.TeamRef(), "teamRole": role})}
 }
 
-func userAction(org *Org, user User, orgRef string) Action {
-	action := Action{Kind: KindUserCreate, Ref: user.Ref, Org: orgRef, Key: user.Email,
+func userAction(user User) Action {
+	return Action{Kind: KindUserCreate, Ref: user.Ref, Key: user.Email,
 		Input: inputOf(map[string]any{"email": user.Email, "role": user.Role, "state": user.State})}
-	if orgRef != "" && user.Ref != org.Users[0].Ref {
-		action.As = org.Users[0].Ref
-	}
-	return action
 }
 
 func inputOf(fields map[string]any) json.RawMessage {
