@@ -1269,13 +1269,15 @@ export const designSystemConfig = defineConfig({
             },
             // Hovering fans the cards a little; a click on the stack (the group
             // loses `data-fan`) lets Chakra's full list show.
-            "[data-fan] &[data-stack]": {
-              translate: "var(--x) calc(var(--lift) * var(--index) * 32px)",
-              scale: "calc(1 - var(--index) * 0.03)",
-              height: "var(--first-height)",
-              opacity: "clamp(0, calc(var(--opacity) * (3 - var(--index))), 1)",
-              transformOrigin: "top center",
-              "&:not([data-first]) > *": { opacity: 0 },
+            "[data-fan] &": {
+              "&[data-stack]": {
+                translate: "var(--x) calc(var(--lift) * var(--index) * 32px)",
+                scale: "calc(1 - var(--index) * 0.03)",
+                height: "var(--first-height)",
+                opacity: "clamp(0, calc(var(--opacity) * (3 - var(--index))), 1)",
+                transformOrigin: "top center",
+                "&:not([data-first]) > *": { opacity: 0 },
+              },
             },
             // The stack measures a card unscaled, before it mounts: the last
             // card measured sizes every card behind the front, so a back card
