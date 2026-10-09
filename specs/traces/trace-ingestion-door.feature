@@ -76,6 +76,17 @@ Feature: The trace ingestion doors are served
     When it exports a trace batch to the OpenTelemetry receiver
     Then the key is marked as used
 
+  # Characterises today's answer, which main shares: OTLP senders treat a partial
+  # rejection as permanent, so these spans are not re-sent. A retryable answer is
+  # a pending decision; the log and metric receivers already answer 503 here.
+  @integration
+  Scenario: A failed pipeline handoff answers the OTLP export as a partial rejection
+    Given an exporter holds a key that may create traces in its project
+    And the trace pipeline cannot take the batch's spans
+    When it exports a trace batch to the OpenTelemetry receiver
+    Then the batch is answered 200 with every span counted as rejected
+    And no span is recorded
+
   @integration
   Scenario: The OTLP receiver refuses an unauthenticated exporter
     Given a sender presents no credential

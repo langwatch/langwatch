@@ -134,13 +134,14 @@ function apiKeyDirectory(
  * the declared transport, over ONE application bound to its own module-API
  * token.
  */
-function deployment(access: OtlpAccess = {}) {
+function deployment(access: OtlpAccess = {}, handoff: { fails?: boolean } = {}) {
   const recordedSpans: RecordSpanCommandData[] = [];
   const markedUsed: string[] = [];
   const peers = unreachablePeers();
 
   const commands: TraceProcessingCommands = {
     recordSpan: async (data) => {
+      if (handoff.fails) throw new Error("queue unavailable");
       recordedSpans.push(data);
     },
     changeTraceName: async () => undefined,
@@ -319,6 +320,22 @@ describe("given the trace module as a process composes it", () => {
       await post("/api/otel/v1/traces", otlpTraceBody());
 
       expect(markedUsed).toEqual([API_KEY_ID]);
+    });
+  });
+
+  describe("when the pipeline handoff fails for every span of the batch", () => {
+    /** @scenario "A failed pipeline handoff answers the OTLP export as a partial rejection" */
+    it("answers 200 with every span rejected, as main does", async () => {
+      const { post, recordedSpans } = deployment({}, { fails: true });
+
+      const response = await post("/api/otel/v1/traces", otlpTraceBody());
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({
+        message: "Trace received successfully.",
+        partialSuccess: { rejectedSpans: 1, errorMessage: "queue unavailable" },
+      });
+      expect(recordedSpans).toHaveLength(0);
     });
   });
 
