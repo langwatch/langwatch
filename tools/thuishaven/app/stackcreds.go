@@ -61,7 +61,9 @@ func (o *Orchestrator) credentialEnv(slug, worktreeDir string) []string {
 		return nil
 	}
 	resolved := resolvedDevEnv(worktreeDir)
-	return append(domain.StackCredentialsEnv(stored, resolved), o.licenceEnv(slug, resolved, false)...)
+	// shortcut: the stack public key is held back until licence.issue re-signs seeded licences (S6 part 3);
+	// injecting it now would invalidate every licence signed with the built-in dev key.
+	return domain.StackCredentialsEnv(stored, resolved)
 }
 
 // removeStackCredentials forgets a destroyed stack's credentials and licence
