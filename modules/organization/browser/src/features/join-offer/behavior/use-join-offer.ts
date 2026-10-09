@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { api } from "../../../behavior/organization-api.ts";
 import { useShowErrorToast } from "../../../behavior/organization-feedback.ts";
-import { joinOfferView, type JoinOfferView } from "../model/join-offer.ts";
+import { joinOfferView, type JoinOfferView, shouldRetryOffer } from "../model/join-offer.ts";
 
 type JoinOrigin = "web" | "cli";
 
@@ -28,7 +28,9 @@ export function useJoinOffer({
   // Leading with an invitation and walking through an automatic door are the
   // welcome screen's alone: a dashboard has an organization in view (ADR-171 v6).
   const onboarding = currentOrganizationId === null;
-  const offer = identityClient.identity.joinRequests.offer.useQuery();
+  const offer = identityClient.identity.joinRequests.offer.useQuery(void 0, {
+    retry: (failureCount, error) => shouldRetryOffer({ failureCount, error }),
+  });
   const mine = identityClient.identity.joinRequests.mine.useQuery();
   const invitations = api.invite.pendingForMe.useQuery({}, { enabled: onboarding });
   const dismissOffer = identityClient.identity.joinRequests.dismissOffer.useMutation();
