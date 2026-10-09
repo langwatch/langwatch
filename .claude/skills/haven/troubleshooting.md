@@ -75,28 +75,26 @@ Verify both afterwards: a real host (expect a 401, not a resolve failure) and th
 hostname. It drifts back after `wsl --shutdown`; the durable fix is
 `generateResolvConf = false` under `[network]` in `/etc/wsl.conf`.
 
-## Gotcha 3: langy on the host needs `opencode`, and its egress refuses cleartext
+## Gotcha 3: langy on the host needs the `langy-worker` binary
 
-With `LANGY_UNSAFE_HOST_ACCESS=1`, and by default on macOS, the langy worker runs as a bare host process, so the
-`opencode` binary baked into the container image is absent. Symptom:
-`POST /worker/create` logs `error=start opencode`, `.cause=exec: "opencode"`. Install the
-version and hash `infra/docker/Dockerfile.langyagent` currently pins; read them from the
-file, do not hardcode.
-
-Even with it installed the chat can hang until the chat timeout with no visible error:
-worker creates (202), SSE connects, the panel sits on "Starting up…". The per-worker
-egress adapter (`services/langyagent/adapters/egress/enforcing.go`) requires TLS, and the
-worker's own `OPENAI_BASE_URL` points at the manager's loopback relay over plain HTTP.
-Confirm from opencode's own unbuffered log before touching anything:
+With `LANGY_UNSAFE_HOST_ACCESS=1`, and by default on macOS, the langy worker runs as a
+bare host process and spawns `.bin/langy-worker/langy-worker`. `haven up` builds it when
+it is missing (one progress line, output in `<haven logs dir>/<slug>/langy-worker-build.log`).
+If that build fails, Langy is off for the run and the rest of the stack still comes up;
+fix the cause in the log, or build it by hand:
 
 ```bash
-find ~/.langwatch/portless/langyagent -iname opencode.log 2>/dev/null | xargs tail -f
-# look for: AI_APICallError: failed to execute HTTP request to provider API
+pnpm --filter @langwatch/langyworker build:binary
 ```
 
-Fix, config only, and only on the host tier (`LANGY_UNSAFE_HOST_ACCESS=1` or the macOS default; that tier has already
-accepted reduced isolation): `LANGY_EGRESS_REQUIRE_TLS=false` (read in
-`services/langyagent/config.go`).
+Nothing needs `opencode` on the host: the default harness is `pi`.
+
+haven also sets `LANGY_EGRESS_REQUIRE_TLS=false` in the langyagent environment on this
+tier (`app/plan_langy.go`), so there is no manual step. The per-worker egress adapter
+(`services/langyagent/adapters/egress/enforcing.go`) requires TLS, and the worker's
+`OPENAI_BASE_URL` points at the manager's loopback relay over plain HTTP; without the
+flag the chat hangs on "Starting up…" with no visible error. Container tiers keep the
+TLS rung on.
 
 ## Gotcha 4: stale k8s overrides in `.env`
 

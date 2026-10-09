@@ -1,8 +1,17 @@
 package app
 
 import (
+	"context"
+	"errors"
+	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
+
+	"go.uber.org/zap"
+
+	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
 func TestLangyContainerShell(t *testing.T) {
@@ -160,6 +169,69 @@ func TestLangyWorkerIdleMS(t *testing.T) {
 			if got := langyWorkerIdleMS(localLangyWorkerIdleMS); got != localLangyWorkerIdleMS {
 				t.Fatalf("%q: want fallback %d, got %d", bad, localLangyWorkerIdleMS, got)
 			}
+		}
+	})
+}
+
+func TestLangyChildHostTier(t *testing.T) {
+	o := &Orchestrator{cfg: Config{Home: t.TempDir()}}
+	st := domain.Stack{Slug: "demo", LangyTier: domain.LangyTierHostUnsafe}
+	child := o.langyChild(st, PlanOptions{RepoRoot: t.TempDir()}, nil, 4123, "")
+
+	t.Run("accepts the manager's loopback relay over cleartext", func(t *testing.T) {
+		if !slices.Contains(child.Env, "LANGY_EGRESS_REQUIRE_TLS=false") {
+			t.Fatalf("host tier env lacks LANGY_EGRESS_REQUIRE_TLS=false: %v", child.Env)
+		}
+	})
+}
+
+func TestEnsureLangyWorkerBinary(t *testing.T) {
+	run := func(t *testing.T, sup *fakeSupervisor, withBinary bool, tier domain.LangyTier) PlanOptions {
+		t.Helper()
+		repo := t.TempDir()
+		if withBinary {
+			path := langyWorkerBinaryPath(repo)
+			if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(path, []byte("#!/bin/sh\n"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Chmod(path, 0o700); err != nil { //nolint:gosec // the fixture needs the exec bit
+				t.Fatal(err)
+			}
+		}
+		o := &Orchestrator{sup: sup, sys: &fakeSystem{}, log: zap.NewNop()}
+		st := domain.Stack{Slug: "demo", WorktreeDir: t.TempDir(), LangyTier: tier}
+		opts := PlanOptions{RepoRoot: repo, Selection: domain.Selection{Langy: true}}
+		o.ensureLangyWorkerBinary(context.Background(), st, &opts)
+		return opts
+	}
+
+	t.Run("builds a missing binary on the host tier and keeps Langy", func(t *testing.T) {
+		sup := &fakeSupervisor{}
+		opts := run(t, sup, false, domain.LangyTierHostUnsafe)
+		if len(sup.shells) != 1 || !strings.Contains(sup.shells[0], "@langwatch/langyworker build:binary") {
+			t.Fatalf("expected one build, got %v", sup.shells)
+		}
+		if !opts.Selection.Langy {
+			t.Fatal("Langy was deselected after a good build")
+		}
+	})
+
+	t.Run("deselects Langy when the build fails", func(t *testing.T) {
+		sup := &fakeSupervisor{err: errors.New("exit 1")}
+		if run(t, sup, false, domain.LangyTierHostUnsafe).Selection.Langy {
+			t.Fatal("Langy still selected after a failed build")
+		}
+	})
+
+	t.Run("does nothing when the binary exists or the tier is a container", func(t *testing.T) {
+		sup := &fakeSupervisor{}
+		run(t, sup, true, domain.LangyTierHostUnsafe)
+		run(t, sup, false, domain.LangyTierSandboxed)
+		if len(sup.shells) != 0 {
+			t.Fatalf("unexpected build: %v", sup.shells)
 		}
 	})
 }

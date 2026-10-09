@@ -532,6 +532,7 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 	}
 	o.EnsureGateHookForUp(p.WorktreeDir)
 	opts.langyDockerHost = o.langyContainerHost(ctx, st, &opts)
+	o.ensureLangyWorkerBinary(ctx, st, &opts)
 	children := o.planChildren(st, opts, p.WorktreeDir)
 	retireStaleSimsCapture(children)
 	o.sup.Supervise(ctx, children)

@@ -163,7 +163,7 @@ worktree's.
 
 `troubleshooting.md` (same folder) covers: a stack that is already up, the portless
 proxy dying or holding root-owned state, `.localhost` not resolving on WSL2, Langy
-needing `opencode` on the host, stale k8s URLs in `.env`, a frozen log, a blank page
+needing its `langy-worker` binary on the host, stale k8s URLs in `.env`, a frozen log, a blank page
 that is only Vite re-optimising, and signing in for a browser check.
 
 ## Do not
