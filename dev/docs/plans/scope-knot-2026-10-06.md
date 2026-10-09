@@ -124,6 +124,14 @@ does not rise); `pnpm lint:architecture --policies peer-cycles` (must not rise).
   (including `redacted-field.tsx`, which read the browser-host hook); trace's scope shim no longer
   offers `hasPermission`; 37 tests mock `useTraceHost` instead. Bound: "A migrated screen answers
   ... the same as before" (trace-host-permission-reads test). Batches 4b-4d not started.
+- Batch 4c landed: experiment's three readers ask `useWorkflowHost().hasPermission` (experiment requires
+  `WorkflowHostApi`); prompt's editor drawer reads `usePromptProject().hasPermission`; project already
+  read its hosts; scenario's `useCan` asks `useScenarioHost().hasPermission` and sends no
+  `authz.effectivePermissions` read. Bound: "Agent Testing asks the session ..." (use-can test).
+- Batch 4b landed: gateway's 9 and organization's 7 production permission readers ask their
+  own host (`useGatewayHost()` / `useOrganizationHost()`); `team-form.tsx`'s `hasOrgPermission`
+  reads `host.hasOrganizationPermission`. Both module shims dropped their permission fields. Bound
+  by one test per module (`*-host-permission-reads.integration.test.tsx`).
 - The batch 2 outline's `apps/ui` test is blocked on a decision: apps/ui reaches a module only
   through `./declaration`, so it cannot import `useTraceHost`/`useScenarioHost` to ask the host;
   see the sk-batch4 handoff for options.

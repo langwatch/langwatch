@@ -126,7 +126,7 @@ Feature: Permission reads come from the session, and a public page holds none
   # Call sites move onto the session (plan batch 4)
   # ---------------------------------------------------------------------------
 
-  @integration @unimplemented
+  @integration
   Scenario: Agent Testing asks the session rather than sending its own grant read
     Given the session has answered the reader's grants in the active project
     When the Agent Testing page decides which actions to offer

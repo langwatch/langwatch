@@ -1,49 +1,17 @@
-import { type AuthzPermission, permissionSatisfiedBy } from "@langwatch/authorization";
-import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { useCallback, useMemo } from "react";
+import type { AuthzPermission } from "@langwatch/authorization";
+import { useCallback } from "react";
 
-import { api } from "./scenario-api.ts";
+import { useScenarioHost } from "../model/scenario-host.ts";
 
 /**
- * The registry types are shared, so a typo'd permission string fails the
- * build; the hierarchy helper is the engine's own pure function. ADR-092
- * §5: the client asks the server once per org+project, not re-deriving decisions.
+ * The registry type makes a typo'd permission fail the build. The answer is
+ * the session's, through scenario's host: no grant read of its own (ADR-092 §5).
  */
 export function useCan() {
-  const { project, organization } = useOrganizationTeamProject();
-
-  const effective = api.authz.effectivePermissions.useQuery(
-    {
-      projectId: project?.id,
-      organizationId: project?.id ? undefined : organization?.id,
-    },
-    { enabled: !!project?.id || !!organization?.id },
-  );
-
-  // Built once per fetched set rather than per `can()` call: a page asking
-  // about a dozen permissions on every render would otherwise rebuild the
-  // same ~126-entry set a dozen times.
-  const granted = useMemo(
-    () => new Set(effective.data?.permissions),
-    [effective.data?.permissions],
-  );
-
+  const host = useScenarioHost();
   const can = useCallback(
-    (permission: AuthzPermission): boolean => {
-      if (!effective.data?.permissions) return false;
-      return permissionSatisfiedBy({ granted, requested: permission });
-    },
-    [granted, effective.data?.permissions],
+    (permission: AuthzPermission): boolean => host.hasPermission(permission),
+    [host],
   );
-
-  return {
-    can,
-    // TanStack Query v5's `isLoading` is `isPending && isFetching`: false for
-    // a DISABLED query, and this query is disabled until there is an org or a
-    // project to ask about. That is the flag that means "a fetch this hook
-    // actually started has not answered yet" — a consumer gating its render
-    // on it still renders on screens where the query never starts.
-    isLoading: effective.isLoading,
-    permissions: effective.data?.permissions ?? [],
-  };
+  return { can };
 }

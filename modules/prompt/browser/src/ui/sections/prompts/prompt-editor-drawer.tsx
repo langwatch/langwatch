@@ -29,6 +29,7 @@ import {
 } from "../../../behavior/prompts/use-prompt-editor-form.ts";
 import { usePromptEditorSave } from "../../../behavior/prompts/use-prompt-editor-save.ts";
 import { useLatestPromptVersion } from "../../../behavior/use-latest-prompt-version.ts";
+import { usePromptProject } from "../../../behavior/use-prompt-project.ts";
 import { usePromptVersion } from "../../../behavior/use-prompt-version.ts";
 import { useModelProvidersSettings } from "../../../features/model-selection/behavior/use-model-providers-settings.ts";
 import { usePromptDefaultModel } from "../../../features/model-selection/behavior/use-prompt-default-model.ts";
@@ -207,7 +208,8 @@ function EditorDialogs({
  * another drawer; in an experiment it edits one target and maps its variables.
  */
 export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
-  const { project, hasPermission } = useOrganizationTeamProject();
+  const { project } = useOrganizationTeamProject();
+  const { hasPermission } = usePromptProject();
   const { modelMetadata } = useModelProvidersSettings({ projectId: project?.id });
   const { canGoBack, goBack } = useDrawer();
   const opened = useEditorOpenedWith(props);

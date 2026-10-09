@@ -40,6 +40,7 @@ import { useCopyExperiment } from "../../../behavior/experiments/use-copy-experi
 import { useCreateExperiment } from "../../../behavior/experiments/use-create-experiment.ts";
 import { experimentContextChip } from "../../../behavior/langy/langy-context-chips.ts";
 import type { ExperimentType } from "../../../model/prisma-types.ts";
+import { useWorkflowHost } from "../../../model/workflow/workflow-host.ts";
 import { formatEvaluationSummary } from "../../../ui/elements/experiments/BatchEvaluationV2/batch-evaluation-summary.tsx";
 import { CopyExperimentDialog } from "../../../ui/elements/experiments/copy-experiment-dialog.tsx";
 import { CreateExperimentButton } from "../../../ui/elements/experiments/create-experiment-button.tsx";
@@ -336,7 +337,8 @@ const ExperimentRow = ({
 );
 
 export function ExperimentsPage() {
-  const { project, hasPermission } = useOrganizationTeamProject();
+  const { project } = useOrganizationTeamProject();
+  const workflowHost = useWorkflowHost();
   const router = useRouter();
   const [copyDialogState, setCopyDialogState] = useState<{
     open: boolean;
@@ -479,9 +481,9 @@ export function ExperimentsPage() {
                           experiment={experiment}
                           projectSlug={project.slug}
                           permissions={{
-                            canEdit: hasPermission("workflows:create"),
-                            canReplicate: hasPermission("evaluations:manage"),
-                            canDelete: hasPermission("workflows:delete"),
+                            canEdit: workflowHost.hasPermission("workflows:create"),
+                            canReplicate: workflowHost.hasPermission("evaluations:manage"),
+                            canDelete: workflowHost.hasPermission("workflows:delete"),
                           }}
                           onOpen={(path) => void router.push(path)}
                           onReplicate={() =>
