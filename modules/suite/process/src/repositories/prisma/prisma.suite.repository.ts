@@ -60,8 +60,10 @@ function slugify(value: string): string {
  */
 type SuiteDatabase = Pick<
   PrismaClient,
-  "scenario" | "simulationSuite" | "$transaction" | "$executeRaw"
+  "scenario" | "simulationSuite" | "$transaction" | "$executeRaw" | "$queryRaw"
 >;
+
+const projectIdRowsSchema = z.array(z.object({ projectId: z.string() }));
 
 /** The run plan a NAME joins. */
 function joinablePlanWhere(input: {
@@ -131,13 +133,13 @@ export class PrismaSuiteRepository extends SuiteRepository {
     return rows.map(mapSuite);
   }
 
+  /** Every project's id: the replay step walks them one tenant at a time. */
   async findProjectIdsHoldingSuites(): Promise<string[]> {
-    const rows = await this.database.simulationSuite.findMany({
-      distinct: ["projectId"],
-      select: { projectId: true },
-      orderBy: { projectId: "asc" },
-    });
-    return rows.map((row) => row.projectId);
+    const rows = await this.database.$queryRaw<unknown[]>`
+      SELECT DISTINCT "projectId" FROM "SimulationSuite" ORDER BY "projectId" ASC
+      -- @tenancy: suite replay walks every project holding suites (upgrade step, worker)
+    `;
+    return projectIdRowsSchema.parse(rows).map((row) => row.projectId);
   }
 
   async resolveDynamicRunMembership(input: SuiteIdInput): Promise<string[]> {

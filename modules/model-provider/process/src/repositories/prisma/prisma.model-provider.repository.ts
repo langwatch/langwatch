@@ -24,11 +24,24 @@ import type {
   ModelProviderRepository,
 } from "../model-provider.repository.ts";
 
-type Database = Pick<PrismaClient, "modelProvider" | "gatewayChangeEvent" | "$transaction">;
+type Database = Pick<
+  PrismaClient,
+  "modelProvider" | "gatewayChangeEvent" | "$transaction" | "$queryRaw"
+>;
 
 const recordSchema = z.record(z.string(), z.unknown());
 const stringRecordSchema = z.record(z.string(), z.string());
 const jsonValueSchema = z.json();
+const legacyColumnsRowsSchema = z.array(
+  z.object({
+    id: z.string(),
+    provider: z.string(),
+    customKeys: z.unknown(),
+    customModels: z.unknown(),
+    customEmbeddingsModels: z.unknown(),
+    updatedAt: z.date(),
+  }),
+);
 const headerSchema = z.object({ key: z.string(), value: z.string() });
 const storedModelSchema = z.union([
   z.string(),
@@ -255,18 +268,19 @@ export class PrismaModelProviderRepository implements ModelProviderRepository {
   }
 
   async findProjectScopedLegacyColumns(): Promise<ModelProviderLegacyColumns[]> {
-    const rows = await this.database.modelProvider.findMany({
-      where: { scopes: { some: { scopeType: "PROJECT" } } },
-      select: {
-        id: true,
-        provider: true,
-        customKeys: true,
-        customModels: true,
-        customEmbeddingsModels: true,
-        updatedAt: true,
-      },
-    });
-    return rows.map((row) => ({ ...row, updatedAt: fromDate(row.updatedAt) }));
+    const rows = await this.database.$queryRaw<unknown[]>`
+      SELECT p."id", p."provider", p."customKeys", p."customModels",
+             p."customEmbeddingsModels", p."updatedAt"
+      FROM "ModelProvider" p
+      WHERE EXISTS (
+        SELECT 1 FROM "ModelProviderScope" s
+        WHERE s."modelProviderId" = p."id" AND s."scopeType" = 'PROJECT'
+      )
+      -- @tenancy: model provider legacy-column sweep, every organization (upgrade step, worker)
+    `;
+    return legacyColumnsRowsSchema
+      .parse(rows)
+      .map((row) => ({ ...row, updatedAt: fromDate(row.updatedAt) }));
   }
 
   async updateLegacyColumns(input: ModelProviderLegacyColumnsUpdate): Promise<void> {

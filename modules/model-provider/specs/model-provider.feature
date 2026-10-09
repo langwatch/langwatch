@@ -123,3 +123,10 @@ Feature: Model Provider service
     When a legacy model-provider migration runs
     Then it reads every project-scoped provider in one query of its own table
     And it never lists projects
+
+  @unit
+  Scenario: The key seal sweep reads every provider through the tenancy guard
+    Given providers scoped to projects in two organizations
+    When the key seal step reads the project-scoped providers
+    Then the tenancy guard admits the one read, declared as a sweep of every organization
+    And each provider's stored columns are returned

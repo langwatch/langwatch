@@ -237,6 +237,13 @@ Feature: Slack connections
       When a page of claims is read from it
       Then the read fails and no claim is returned
 
+    @unit
+    Scenario: A claim page reads every organisation's claims through the tenancy guard
+      Given claims in two organisations
+      When the claimant's release sweep reads a page of claims
+      Then the tenancy guard admits the one read, declared as a sweep of every organisation
+      And each claim is returned with its connection, its project and its claimant
+
   Rule: Delivery resolves through the automation's connection
 
     @unit
