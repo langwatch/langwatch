@@ -78,7 +78,7 @@ export class BrowserSessionIdentity implements RestIdentity {
     const actor = impersonatorId
       ? { type: "user" as const, id: caller.userId, impersonatorId }
       : { type: "user" as const, id: caller.userId };
-    return { actor, scope: null };
+    return { actor, scope: null, browserSession: { id: caller.sessionId ?? null } };
   }
 
   #isFromOwnPages(request: Request): boolean {
