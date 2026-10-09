@@ -78,6 +78,23 @@ const targetRowSchema = z.object({
 });
 export type LedgerTargetRow = z.infer<typeof targetRowSchema>;
 
+const runFactSchema = z.object({
+  kind: z.string(),
+  outcome: nullable(z.string()),
+  release: nullable(z.string()),
+  floor: nullable(z.string()),
+  started_at: z.date(),
+});
+export type LedgerRunFact = z.infer<typeof runFactSchema>;
+
+const targetSummaryRowSchema = z.object({
+  target: z.string(),
+  version: nullable(z.string()),
+  outstanding: z.number().int(),
+  last_error: nullable(z.string()),
+});
+export type LedgerTargetSummaryRow = z.infer<typeof targetSummaryRowSchema>;
+
 const leaseRowSchema = z.object({
   name: nullable(z.string()),
   owner: nullable(z.string()),
@@ -315,6 +332,35 @@ export class UpgradeReaderRepository {
       values: [after?.startedAt ?? null, after?.id ?? null, limit],
     });
     return rows.map((row) => runRowSchema.parse(row));
+  }
+
+  /** What planning reads of every run; one row per upgrade, so few. pg hands back the Date. */
+  async findRunFacts({ tables }: { tables: LedgerTables }): Promise<LedgerRunFact[]> {
+    if (!tables.run) return [];
+    const { rows } = await this.query<object>(
+      (t) => `SELECT run."kind", run."outcome", run."release",
+          to_jsonb(run) ->> 'floor' AS "floor", run."started_at" FROM ${t.run} run`,
+    );
+    return rows.map((row) => runFactSchema.parse(row));
+  }
+
+  /** Per target: the latest done version, steps not yet done, and the latest failure's error. */
+  async findTargetSummaries({
+    tables,
+  }: {
+    tables: LedgerTables;
+  }): Promise<LedgerTargetSummaryRow[]> {
+    if (!tables.target) return [];
+    const { rows } = await this.query<object>(
+      (t) => `SELECT entry."target" AS "target",
+          (array_agg(entry."version" ORDER BY entry."updated_at" DESC)
+            FILTER (WHERE entry."status" = 'done'))[1] AS "version",
+          count(*) FILTER (WHERE entry."status" <> 'done')::int AS "outstanding",
+          (array_agg(entry."last_error" ORDER BY entry."updated_at" DESC)
+            FILTER (WHERE entry."status" = 'failed'))[1] AS "last_error"
+        FROM ${t.target} entry GROUP BY entry."target" ORDER BY entry."target"`,
+    );
+    return rows.map((row) => targetSummaryRowSchema.parse(row));
   }
 
   async findRunById({ tables, id }: { tables: LedgerTables; id: string }): Promise<LedgerRunRow[]> {

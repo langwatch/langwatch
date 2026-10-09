@@ -2,12 +2,26 @@ import { HandledError } from "@langwatch/handled-error";
 import { z } from "zod";
 
 import { SERVING_ROSTER_TIMING } from "../gate/serving-roster-timing.ts";
-import type { UpgradePostgres } from "../ports.ts";
+import {
+  upgradeRunKindSchema,
+  upgradeRunOutcomeSchema,
+  upgradeStepStatusSchema,
+} from "../ledger.ts";
+import { planInstallation, type UpgradePlanning } from "../plan/plan-installation.ts";
+import type { UpgradeClickHouse, UpgradePostgres } from "../ports.ts";
+import {
+  gooseSteps,
+  prismaSteps,
+  readGooseVersions,
+  readPrismaMigrations,
+} from "../seed-sources.ts";
 import { computeInstallationState, describeInstallationState } from "./installation-state.ts";
 import { preflightFrom, type UpgradePreflightRow } from "./preflight.ts";
+import { previewUpgradeTo, type UpgradePreview } from "./preview.ts";
 import {
   type LedgerLeaseRow,
   type LedgerRosterRow,
+  type LedgerRunFact,
   type LedgerRunRow,
   type LedgerStepRow,
   type LedgerStepFact,
@@ -31,6 +45,7 @@ import type {
   UpgradeStepDetail,
   UpgradeStepPage,
   UpgradeStepView,
+  UpgradeTargetSummary,
 } from "./reader.schema.ts";
 import { compareReleasesNewestFirst, pickHighestRelease } from "./release.ts";
 import { parseRunPhases } from "./run-phase-view.ts";
@@ -183,6 +198,50 @@ function summariseReleases({
     }));
 }
 
+/** Ledger facts in the planner's words; a status or kind a newer runner wrote is left out. */
+function planFactsFrom({
+  stepRows,
+  runRows,
+}: {
+  stepRows: readonly LedgerStepFact[];
+  runRows: readonly LedgerRunFact[];
+}) {
+  const steps = stepRows.flatMap(({ id, status }) => {
+    const known = upgradeStepStatusSchema.safeParse(status);
+    return known.success ? [{ id, status: known.data }] : [];
+  });
+  const runs = runRows.flatMap((run) => {
+    const kind = upgradeRunKindSchema.safeParse(run.kind);
+    const outcome = upgradeRunOutcomeSchema.nullable().safeParse(run.outcome);
+    if (!kind.success || !outcome.success) return [];
+    const { release, floor, started_at: startedAt } = run;
+    return [{ kind: kind.data, outcome: outcome.data, release, floor, startedAt }];
+  });
+  return { steps, runs };
+}
+
+/** The ledger as the planner reads it; an empty or absent one is read from the tools' records. */
+async function readPlanFacts({
+  repository,
+  tables,
+  postgres,
+  clickhouse,
+}: {
+  repository: UpgradeReaderRepository;
+  tables: LedgerTables;
+  postgres: UpgradePostgres;
+  clickhouse?: UpgradeClickHouse;
+}) {
+  const [stepRows, runRows] = await Promise.all([
+    repository.findStepFacts({ tables }),
+    repository.findRunFacts({ tables }),
+  ]);
+  if (stepRows.length > 0 || runRows.length > 0) return planFactsFrom({ stepRows, runRows });
+  const prisma = prismaSteps({ rows: await readPrismaMigrations({ postgres }) });
+  const goose = clickhouse ? gooseSteps({ rows: await readGooseVersions({ clickhouse }) }) : [];
+  return { steps: [...prisma, ...goose], runs: [] };
+}
+
 /**
  * The read model of the Upgrades page and `upgrade status` (dev/docs/plans/upgrade-ui-2026-10-06.md
  * section 8). It touches only the ledger tables, tolerates unknown kinds and statuses, and is
@@ -193,11 +252,14 @@ export function createUpgradeReader({
   image,
   floor,
   needsOldWritersGone = new Set(),
+  planning,
 }: {
   postgres: UpgradePostgres;
   image: UpgradeImage;
   floor: UpgradeFloor | null;
   needsOldWritersGone?: ReadonlySet<string>;
+  /** The manifests `preview` plans with; ClickHouse seeds goose history into an empty ledger. */
+  planning?: UpgradePlanning & { clickhouse?: UpgradeClickHouse };
 }) {
   const repository = UpgradeReaderRepository.create({ postgres });
   const declaredById = new Map(image.steps.map((step) => [step.id, step]));
@@ -353,7 +415,44 @@ export function createUpgradeReader({
     return preflightFrom({ status: await status() });
   }
 
-  return { status, listReleases, listSteps, getStep, listRuns, getRun, preflight };
+  /** `upgrade plan --to` as the preview page shows it, beside the preflight (U6-U9-READER). */
+  async function preview({ to }: { to: string }): Promise<UpgradePreview> {
+    if (!planning) throw new Error("this upgrade reader was created without planning");
+    const tables = await repository.findTables();
+    const { installed, plan } = planInstallation({
+      ...planning,
+      ...(await readPlanFacts({ repository, tables, postgres, clickhouse: planning.clickhouse })),
+    });
+    return {
+      installed,
+      plan: previewUpgradeTo({ plan, image: planning.image, to }),
+      preflight: await preflight(),
+    };
+  }
+
+  /** Every ledger target rolled up from one summed query (U6-U9-READER). */
+  async function listTargets(): Promise<UpgradeTargetSummary[]> {
+    const tables = await repository.findTables();
+    const rows = await repository.findTargetSummaries({ tables });
+    return rows.map((row) => ({
+      target: row.target,
+      version: row.version,
+      outstanding: row.outstanding,
+      lastError: row.last_error,
+    }));
+  }
+
+  return {
+    status,
+    listReleases,
+    listSteps,
+    getStep,
+    listRuns,
+    getRun,
+    preflight,
+    preview,
+    listTargets,
+  };
 }
 
 export type UpgradeReader = ReturnType<typeof createUpgradeReader>;

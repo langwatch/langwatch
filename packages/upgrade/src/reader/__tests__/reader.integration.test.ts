@@ -599,4 +599,42 @@ describe.skipIf(!DB_URL)("UpgradeReader over the ledger tables", () => {
     await expect(reader.listRuns()).resolves.toBeDefined();
     await expect(reader.getRun({ id: "run_up" })).resolves.toBeDefined();
   });
+
+  describe("when the ledger targets are listed", () => {
+    it("rolls each target up from one summed read", async () => {
+      await scratch.widen();
+      await scratch.postgres.query(
+        `INSERT INTO "_langwatch_upgrade_target"
+           ("step_id", "target", "status", "version", "last_error", "updated_at") VALUES
+           ('clickhouse:00001', 'eu', 'done', '1', NULL, '2026-10-01T00:00:00Z'),
+           ('clickhouse:00002', 'eu', 'failed', NULL, 'boom', '2026-10-02T00:00:00Z'),
+           ('clickhouse:00001', 'us', 'done', '1', NULL, '2026-10-01T00:00:00Z')`,
+      );
+      await expect(readerOver({ scratch }).listTargets()).resolves.toEqual([
+        { target: "eu", version: "1", outstanding: 1, lastError: "boom" },
+        { target: "us", version: "1", outstanding: 0, lastError: null },
+      ]);
+    });
+
+    it("lists none when the ledger has no target table", async () => {
+      await expect(readerOver({ scratch }).listTargets()).resolves.toEqual([]);
+    });
+  });
+
+  describe("when an upgrade is previewed", () => {
+    it("plans an empty ledger as a fresh install and shows the preflight", async () => {
+      const preview = await createUpgradeReader({
+        postgres: scratch.postgres,
+        image: IMAGE,
+        floor: FLOOR,
+        planning: {
+          image: { release: "3.21.0", steps: [] },
+          releases: { manifests: [], floor: { release: "3.20.1", namedAt: "2026-09-01" } },
+        },
+      }).preview({ to: "3.21.0" });
+      expect(preview.installed).toBeNull();
+      expect(preview.plan.outcome).toBe("planned");
+      expect(preview.preflight.map((row) => row.id)).toContain("floor");
+    });
+  });
 });
