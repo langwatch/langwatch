@@ -177,11 +177,6 @@ export class OrganizationProvisioningService {
     await this.repo.markSelfHostedCustomer(organizationId);
   }
 
-  /** Marks an existing organization as a self-hosted licence customer. */
-  markSelfHostedCustomer({ organizationId }: { organizationId: string }): Promise<void> {
-    return this.repo.markSelfHostedCustomer(organizationId);
-  }
-
   findSelfHostedCustomers(): Promise<{ organizationId: string; organizationName: string }[]> {
     return this.repo.findSelfHostedCustomers();
   }

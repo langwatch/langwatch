@@ -151,12 +151,6 @@ export class OrganizationMembershipService {
     return this.provisioning.createSelfHostedCustomer(params);
   }
 
-  markSelfHostedCustomer(
-    params: Parameters<OrganizationProvisioningService["markSelfHostedCustomer"]>[0],
-  ): ReturnType<OrganizationProvisioningService["markSelfHostedCustomer"]> {
-    return this.provisioning.markSelfHostedCustomer(params);
-  }
-
   findSelfHostedCustomers(): ReturnType<
     OrganizationProvisioningService["findSelfHostedCustomers"]
   > {

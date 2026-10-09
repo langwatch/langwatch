@@ -790,10 +790,6 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     return this.#dependencies.membership.createSelfHostedCustomer(input);
   }
 
-  markSelfHostedCustomer(input: { organizationId: string }): Promise<void> {
-    return this.#dependencies.membership.markSelfHostedCustomer(input);
-  }
-
   findSelfHostedCustomers(): Promise<{ organizationId: string; organizationName: string }[]> {
     return this.#dependencies.membership.findSelfHostedCustomers();
   }

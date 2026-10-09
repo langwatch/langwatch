@@ -248,12 +248,6 @@ getProvisioningSummary(organizationId: string): Promise<OrganizationProvisioning
 deleteProvisionedOrganization(input: { organizationId: string }): Promise<void>;
 ```
 
-#### `markSelfHostedCustomer`
-
-```typescript
-markSelfHostedCustomer(input: { organizationId: string }): Promise<void>;
-```
-
 #### `findSelfHostedCustomers`
 
 Every organization an operator marked as a self-hosted licence customer.

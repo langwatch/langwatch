@@ -119,26 +119,6 @@ describe("OrganizationMembershipService.createSelfHostedCustomer", () => {
       expect([...memory.selfHostedCustomers]).toEqual([organizationId]);
     });
   });
-
-  describe("when an existing organization becomes a customer", () => {
-    it("marks it, and marking twice changes nothing", async () => {
-      const { service, memory } = installed();
-      const { organization } = await service.createForProvisioning({ name: "Globex" });
-
-      await service.markSelfHostedCustomer({ organizationId: organization.id });
-      await service.markSelfHostedCustomer({ organizationId: organization.id });
-
-      expect([...memory.selfHostedCustomers]).toEqual([organization.id]);
-    });
-
-    it("refuses an organization that does not exist", async () => {
-      const { service } = installed();
-
-      await expect(
-        service.markSelfHostedCustomer({ organizationId: "org_missing" }),
-      ).rejects.toThrow(/org_missing/);
-    });
-  });
 });
 
 describe("OrganizationMembershipService.findSelfHostedCustomers", () => {
